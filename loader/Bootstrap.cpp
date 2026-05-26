@@ -1,4 +1,6 @@
 #include <cstdio>
+#include <cstring>
+#include <errno.h>
 #include "runtime/Logger.h"
 
 // The constructor attribute ensures this function runs as soon as the shared library 
@@ -6,6 +8,12 @@
 __attribute__((constructor))
 void Obelisk_Init() 
 {
+    // Avoid injecting into LinuxGSM scripts (bash, grep, tmux, etc)
+    if (program_invocation_short_name != nullptr && strstr(program_invocation_short_name, "ShooterGameServer") == nullptr) 
+    {
+        return;
+    }
+
     // Initialize our logging system
     Obelisk::Logger::Init();
 
