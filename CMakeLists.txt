@@ -40,6 +40,7 @@ add_library(obelisk SHARED
     loader/Bootstrap.cpp
     runtime/Logger.cpp
     ue/Memory.cpp
+    ue/ReflectionScanner.cpp
     hooks/HookManager.cpp
     hooks/ProcessEventHook.cpp
     core/EventManager.cpp
@@ -54,6 +55,7 @@ target_link_libraries(obelisk PRIVATE fmt::fmt spdlog::spdlog subhook dl pthread
 # (Good practice for LD_PRELOAD plugins)
 set_target_properties(obelisk PROPERTIES CXX_VISIBILITY_PRESET hidden)
 set_target_properties(obelisk PROPERTIES VISIBILITY_INLINES_HIDDEN 1)
+set_target_properties(obelisk PROPERTIES BUILD_RPATH "\$ORIGIN")
+set_target_properties(obelisk PROPERTIES INSTALL_RPATH "\$ORIGIN")
 
-add_subdirectory(test_plugin)
-add_subdirectory(plugins/monitor)
+add_subdirectory(plugins/chat)

@@ -2,3 +2,14 @@ build/
 Obelisk.log
 .DS_Store
 *.so
+*.log
+logs/
+cmake-build-*/
+compile_commands.json
+/.cache/
+/dist/
+/install/
+/local/
+/tmp/
+*.core
+chat_config.json

@@ -1,77 +1,199 @@
-# Obelisk 🏺
+# Obelisk
 
-**Obelisk** es un framework de inyección y hooking nativo en C++ para servidores dedicados de *ARK: Survival Evolved* en Linux. 
+Obelisk is a Linux-native runtime and plugin framework for dedicated
+ARK: Survival Evolved servers.
 
-Dado que el binario de Linux (`ShooterGameServer`) es un ejecutable *Stripped* (sin símbolos ni nombres expuestos), crear *mods* en C++ históricamente ha sido casi imposible sin usar complejas herramientas de Windows. Obelisk soluciona esto inyectándose en el espacio de memoria del servidor mediante `LD_PRELOAD`, utilizando escaneo heurístico de memoria (Memory Probing) para localizar las funciones maestras del motor gráfico (Unreal Engine 4) e instalar desvíos (Hooks).
+The goal is to bring an ArkApi/DarkApi-style developer experience to Linux:
+central runtime injection, Unreal Engine event hooks, a stable C plugin ABI,
+reflection utilities, and reusable server-side modding APIs.
 
-## ✨ Características Principales
-- **Inyección Segura:** Se inyecta exclusivamente en el proceso del juego, ignorando comandos del sistema operativo u herramientas como LinuxGSM, evitando crasheos o *segfaults* del Kernel.
-- **Dynamic Memory Probing:** Busca firmas, VTables y offsets en caliente usando llamadas seguras al Kernel de Linux (`/dev/random`). ¡No necesitas Dumper-7!
-- **Plugin Manager Integrado:** Carga automáticamente cualquier librería `.so` programada en C++ desde la carpeta `ObeliskPlugins`.
-- **Event API:** Proporciona un sistema de subscripción ultra rápido y seguro para interceptar `ProcessEvent` milisegundos antes de que ocurra en el juego.
+## Current Status
 
----
+Obelisk is in active reverse-engineering and runtime stabilization work.
 
-## 🛠️ Instalación en LinuxGSM
+Stable enough to test:
 
-1. **Compilar el proyecto:**
-   ```bash
-   mkdir build && cd build
-   cmake ..
-   cmake --build . -j$(nproc)
-   ```
-   Esto generará `libobelisk.so`.
+- LD_PRELOAD bootstrap for `ShooterGameServer`.
+- Centralized runtime layout under `/servidor/ark/obelisk`.
+- Absolute x64 hook for `UObject::ProcessEvent`.
+- C ABI plugin loading.
+- Filtered ProcessEvent callbacks by `FName` index.
+- Per-map logs.
+- Runtime feature flags per server instance.
 
-2. **Preparar el Servidor:**
-   Asegúrate de que `ObeliskRun.sh` y `libobelisk.so` (o un symlink) están en la carpeta base de los binarios del servidor de ARK (`ShooterGame/Binaries/Linux/`).
+Experimental:
 
-3. **Configurar LinuxGSM:**
-   Modifica tu archivo de configuración común de instancia de LinuxGSM (ej. `lgsm/config-lgsm/arkserver/common.cfg`) y añade la siguiente línea para delegar el arranque a Obelisk:
-   ```ini
-   executable="./ObeliskRun.sh"
-   ```
+- Chat command discovery.
+- Raw reflection scanner.
+- FString/FName inference.
+- Higher-level SDK APIs.
 
-4. **Reiniciar:**
-   ```bash
-   ./arkserver restart
-   ```
+Not production-ready yet:
 
----
+- General-purpose chat interception.
+- Full GObjects/GNames reflection.
+- Player, tribe, inventory, dino, permission, and command abstractions.
 
-## 🔌 Creación de Plugins
+## Why Obelisk Exists
 
-Para crear un plugin, simplemente debes exportar la función `ObeliskPlugin_Init` en tu librería compartida en C++.
+ARK's Linux dedicated server binary is stripped and does not expose a clean
+plugin interface. Most mature server API ecosystems were built around Windows
+tooling and binary assumptions.
+
+Obelisk takes the Linux path:
+
+- ELF runtime injection via `LD_PRELOAD`.
+- Native Linux memory and module inspection.
+- x86_64-safe detours.
+- C ABI boundary for plugins.
+- UE4 reflection and `ProcessEvent` as the long-term compatibility layer.
+
+## Repository Layout
+
+```text
+api/                 Public C ABI exposed to plugins
+core/                Event manager and plugin manager
+hooks/               Runtime hooks, including ProcessEvent
+loader/              LD_PRELOAD bootstrap
+runtime/             Logging and runtime services
+ue/                  UE4 memory/reflection helpers
+plugins/chat/        Experimental chat plugin
+plugins/monitor/     Experimental monitoring plugin
+agent-skills/        Local engineering/reversing notes
+docs/                Contributor and operator documentation
+scripts/             Install/deploy helpers
+```
+
+## Central Server Layout
+
+The recommended install layout is:
+
+```text
+/servidor/ark/obelisk/
+  lib/
+    libobelisk.so
+    libsubhook.so
+  plugins/
+    ChatPlugin.so
+  config/
+    plugins/
+      chat_config.json
+  logs/
+    Obelisk.log
+    Obelisk-Ragnarok.log
+    Obelisk-TheIsland.log
+  state/
+    enable-process-event-hook-ragnarok
+    disable-plugins-ragnarok
+```
+
+The ARK binary directory only needs a thin `ObeliskRun.sh` wrapper.
+
+See [docs/INSTALL.md](docs/INSTALL.md).
+
+## Build
+
+Requirements:
+
+- Linux x86_64
+- CMake 3.22+
+- C++20 compiler
+- Git
+
+```bash
+cmake -S . -B build
+cmake --build build -j"$(nproc)"
+```
+
+Main build outputs:
+
+```text
+build/libobelisk.so
+build/plugins/chat/ChatPlugin.so
+build/_deps/subhook-build/libsubhook.so
+```
+
+## Plugin Example
 
 ```cpp
 #include "api/ObeliskApi.h"
 
-// Función de intercepción
-bool OnMyProcessEvent(void* caller, void* function, void* parms) {
-    // Si devuelves false, bloqueas la ejecución en Unreal Engine
-    return true; 
+static bool OnProcessEvent(void* caller, void* function, void* params)
+{
+    return true;
 }
 
-// Punto de entrada del Plugin
-extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(ObeliskApi* api) {
-    api->LogInfo("¡Mi primer plugin cargado con éxito!");
-    api->RegisterPreProcessEvent(OnMyProcessEvent);
+extern "C" __attribute__((visibility("default")))
+bool ObeliskPlugin_Init(ObeliskApi* api)
+{
+    api->LogInfo("Plugin loaded");
+    api->RegisterPreProcessEventForNameIndex(9622, OnProcessEvent);
     return true;
 }
 ```
 
-Coloca tu plugin compilado (`MiPlugin.so`) en `/ShooterGame/Binaries/Linux/ObeliskPlugins/` y el servidor lo cargará automáticamente en su próximo arranque.
+Prefer filtered callbacks whenever possible. Subscribing to every
+`ProcessEvent` is very expensive and unsafe until a plugin has strict guards.
 
----
+## Runtime Flags
 
-## 🚀 Estado de Desarrollo
+Obelisk uses environment variables and marker files to keep risky features
+explicit.
 
-Obelisk es actualmente estable (v1.0) en lo que respecta a su **Core Engine**:
-- [x] Inyección `LD_PRELOAD`.
-- [x] Memory Scanner y Offset Finder Dinámico.
-- [x] Subhook / Trampoline Hooking en `UObject::ProcessEvent`.
-- [x] Plugin Manager y C-API para desarrolladores.
+Important variables:
 
-### Próximos Pasos (Plugins Avanzados)
-El framework subyacente está listo, pero para crear plugins complejos (como sistemas avanzados de Whitelist o interceptación de Chat), es necesario expandir la capa de **Reflexión de Unreal Engine** de Obelisk (`ue/Reflection.cpp`), la cual actualmente incluye soporte básico para inspección de memoria cruda de `FString` y `FName`.
+```text
+OBELISK_ROOT
+OBELISK_PLUGIN_DIR
+OBELISK_CONFIG_DIR
+OBELISK_LOG_DIR
+OBELISK_ENABLE_PROCESS_EVENT_HOOK=1
+OBELISK_DISABLE_PLUGINS=1
+OBELISK_CHAT_DISCOVERY=1
+OBELISK_ENABLE_REFLECTION_SCANNER=1
+OBELISK_PE_TRACE_LIMIT=0
+```
 
-*Construido para soportar los servidores más grandes de la comunidad hispana.*
+Marker files are usually placed in:
+
+```text
+/servidor/ark/obelisk/state/
+```
+
+## Roadmap
+
+High-priority engineering:
+
+- Resolve `FName` indices to real names through GNames/FNamePool.
+- Build a safe reflection layer for GObjects and UFunction lookup.
+- Replace raw chat memory scanning with reflection-backed parameter decoding.
+- Add first-class APIs: chat commands, players, permissions, timers, RCON helpers.
+- Create example plugins and CI builds.
+- Document reversing workflows and signatures per ARK server version.
+
+## Contributing
+
+Contributors are welcome, especially in these areas:
+
+- Linux ELF/x86_64 hooking
+- Unreal Engine 4 reflection
+- ARK server internals
+- C ABI plugin systems
+- CMake and packaging
+- Documentation and reproducible test environments
+
+Start with [CONTRIBUTING.md](CONTRIBUTING.md) and
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Safety Notes
+
+Obelisk runs inside `ShooterGameServer`. A bad hook or unsafe plugin can crash
+the whole server process.
+
+For live servers:
+
+- Enable hooks per map, not globally.
+- Keep experimental scanners disabled by default.
+- Prefer filtered callbacks.
+- Keep logs per instance.
+- Test new plugins on one map before rolling out cluster-wide.

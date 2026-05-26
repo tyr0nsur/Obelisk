@@ -1,9 +1,30 @@
 #include <cstdio>
 #include <cstring>
 #include <errno.h>
+#include <exception>
+#include <cstdlib>
+#include <filesystem>
+#include <string>
 #include "runtime/Logger.h"
 #include "hooks/HookManager.h"
+#include "hooks/ProcessEventHook.h"
 #include "core/PluginManager.h"
+#include "ue/ReflectionScanner.h"
+
+static bool g_ObeliskStarted = false;
+
+static std::string GetObeliskPath(const char* specificEnv, const char* fallbackChild, const char* legacyFallback)
+{
+    const char* specific = std::getenv(specificEnv);
+    if (specific && specific[0] != '\0')
+        return specific;
+
+    const char* root = std::getenv("OBELISK_ROOT");
+    if (root && root[0] != '\0')
+        return (std::filesystem::path(root) / fallbackChild).string();
+
+    return legacyFallback;
+}
 
 // The constructor attribute ensures this function runs as soon as the shared library 
 // is loaded into the target process via LD_PRELOAD.
@@ -16,8 +37,10 @@ void Obelisk_Init()
         return;
     }
 
-    // Initialize our logging system
-    Obelisk::Logger::Init();
+    try
+    {
+        Obelisk::Logger::Init();
+        g_ObeliskStarted = true;
 
     OBELISK_INFO("==========================================");
     OBELISK_INFO(" Obelisk Runtime Loaded Native (LD_PRELOAD)");
@@ -27,13 +50,59 @@ void Obelisk_Init()
     // Initialize hooking engine
     Obelisk::Hooks::HookManager::Init();
 
-    // Load Plugins
-    Obelisk::Core::PluginManager::Get().LoadPlugins("ObeliskPlugins");
+        const char* reflectionScanner = std::getenv("OBELISK_ENABLE_REFLECTION_SCANNER");
+        if (reflectionScanner && std::strcmp(reflectionScanner, "1") == 0)
+        {
+            Obelisk::UE::ReflectionScanner::RunStartupScan();
+        }
+        else
+        {
+            OBELISK_INFO("ReflectionScanner disabled. Set OBELISK_ENABLE_REFLECTION_SCANNER=1 to run the experimental scanner.");
+        }
+
+        const char* disablePlugins = std::getenv("OBELISK_DISABLE_PLUGINS");
+        if (disablePlugins && std::strcmp(disablePlugins, "1") == 0)
+        {
+            OBELISK_WARN("Plugin loading disabled by OBELISK_DISABLE_PLUGINS=1.");
+        }
+        else
+        {
+            Obelisk::Core::PluginManager::Get().LoadPlugins(GetObeliskPath("OBELISK_PLUGIN_DIR", "plugins", "ObeliskPlugins"));
+        }
+    }
+    catch (const std::exception& e)
+    {
+        if (Obelisk::Logger::IsInitialized())
+        {
+            OBELISK_CRITICAL("Obelisk bootstrap failed: {}", e.what());
+            Obelisk::Hooks::ProcessEventHook::Remove();
+            Obelisk::Core::PluginManager::Get().UnloadAll();
+            Obelisk::Logger::Shutdown();
+        }
+        g_ObeliskStarted = false;
+    }
+    catch (...)
+    {
+        if (Obelisk::Logger::IsInitialized())
+        {
+            OBELISK_CRITICAL("Obelisk bootstrap failed with unknown exception.");
+            Obelisk::Hooks::ProcessEventHook::Remove();
+            Obelisk::Core::PluginManager::Get().UnloadAll();
+            Obelisk::Logger::Shutdown();
+        }
+        g_ObeliskStarted = false;
+    }
 }
 
 __attribute__((destructor))
 void Obelisk_Shutdown()
 {
+    if (!g_ObeliskStarted || !Obelisk::Logger::IsInitialized())
+        return;
+
     OBELISK_INFO("Obelisk Runtime Shutting Down...");
-    // Future phases: Unload plugins, remove hooks, etc.
+    Obelisk::Hooks::ProcessEventHook::Remove();
+    Obelisk::Core::PluginManager::Get().UnloadAll();
+    Obelisk::Logger::Shutdown();
+    g_ObeliskStarted = false;
 }

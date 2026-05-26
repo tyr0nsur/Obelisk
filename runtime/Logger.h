@@ -9,6 +9,8 @@ namespace Obelisk
     {
     public:
         static void Init();
+        static void Shutdown();
+        static bool IsInitialized();
         static std::shared_ptr<spdlog::logger>& Get();
 
     private:
