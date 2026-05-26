@@ -4,6 +4,8 @@ Updated: 2026-05-27
 
 ## Stable Baseline
 
+- fact: Compact recovery context is stored in `docs/agent-handoff/COMPACT_CONTEXT.md` for
+  resuming after conversation compaction.
 - fact: Obelisk central install root is `/servidor/ark/obelisk`.
 - fact: Contributor-facing stability matrix is documented in `docs/STATUS.md`.
 - fact: Ragnarok stable baseline is ProcessEvent hook enabled with plugins disabled:
