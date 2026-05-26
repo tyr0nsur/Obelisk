@@ -3,6 +3,8 @@
 #include <fstream>
 #include <sstream>
 #include <cstring>
+#include <fcntl.h>
+#include <unistd.h>
 
 namespace Obelisk::Memory
 {
@@ -89,5 +91,20 @@ namespace Obelisk::Memory
 
         OBELISK_WARN("Pattern not found: {}", pattern);
         return nullptr;
+    }
+
+    bool IsReadable(void* ptr, size_t size)
+    {
+        if (!ptr || size == 0) return false;
+        
+        // Use the write() syscall trick to safely check if memory is readable
+        // writing to /dev/random (or /dev/null) will fail with EFAULT if ptr is invalid
+        int fd = open("/dev/random", O_WRONLY);
+        if (fd < 0) return false;
+        
+        ssize_t ret = write(fd, ptr, size);
+        close(fd);
+        
+        return ret >= 0;
     }
 }

@@ -14,4 +14,5 @@ namespace Obelisk::Memory
 
     ModuleInfo GetMainModuleInfo();
     void* FindPattern(const std::string& pattern);
+    bool IsReadable(void* ptr, size_t size);
 }
