@@ -287,6 +287,158 @@ namespace Obelisk::UE
             return index >= -1 && index < 10000000;
         }
 
+        template <typename T>
+        bool ReadMemory(uintptr_t address, T& out)
+        {
+            if (!Obelisk::Memory::IsReadable(reinterpret_cast<void*>(address), sizeof(T)))
+                return false;
+
+            std::memcpy(&out, reinterpret_cast<void*>(address), sizeof(T));
+            return true;
+        }
+
+        std::string ReadAnsiPreview(uintptr_t address, size_t maxChars)
+        {
+            std::string result;
+            for (size_t i = 0; i < maxChars; ++i)
+            {
+                char c = 0;
+                if (!ReadMemory(address + i, c))
+                    return {};
+                if (c == '\0')
+                    return result;
+                if (c < 0x20 || c > 0x7E)
+                    return {};
+                result.push_back(c);
+            }
+            return result;
+        }
+
+        std::string ReadUtf32Preview(uintptr_t address, size_t maxChars)
+        {
+            std::string result;
+            for (size_t i = 0; i < maxChars; ++i)
+            {
+                uint32_t c = 0;
+                if (!ReadMemory(address + (i * sizeof(c)), c))
+                    return {};
+                if (c == 0)
+                    return result;
+                if (c < 0x20 || c > 0x7E)
+                    return {};
+                result.push_back(static_cast<char>(c));
+            }
+            return result;
+        }
+
+        std::string ReadFNameEntryPreview(uintptr_t entry)
+        {
+            constexpr std::array<size_t, 4> candidateNameOffsets = {0x8, 0xC, 0x10, 0x14};
+            for (size_t offset : candidateNameOffsets)
+            {
+                std::string value = ReadAnsiPreview(entry + offset, 48);
+                if (!value.empty())
+                    return value;
+
+                value = ReadUtf32Preview(entry + offset, 48);
+                if (!value.empty())
+                    return value;
+            }
+
+            return {};
+        }
+
+        struct FNameEntryClue
+        {
+            int32_t Index;
+            const char* ExpectedName;
+        };
+
+        bool ProbeFNameEntry(uintptr_t table, const FNameEntryClue& clue, std::string& preview)
+        {
+            if (clue.Index < 0)
+                return false;
+
+            uintptr_t chunk = 0;
+            const int32_t chunkIndex = clue.Index / FNameIndirectArrayProbe::ChunkSize;
+            const int32_t withinChunk = clue.Index % FNameIndirectArrayProbe::ChunkSize;
+            const uintptr_t chunkPointerAddress = table + FNameIndirectArrayProbe::InlineChunksOffset +
+                                                  (static_cast<uintptr_t>(chunkIndex) * sizeof(uintptr_t));
+            if (!ReadMemory(chunkPointerAddress, chunk) ||
+                !IsCanonicalUserPointer(chunk) ||
+                !Obelisk::Memory::IsReadable(reinterpret_cast<void*>(chunk), sizeof(uintptr_t)))
+            {
+                return false;
+            }
+
+            uintptr_t entry = 0;
+            const uintptr_t entryPointerAddress = chunk + (static_cast<uintptr_t>(withinChunk) * sizeof(uintptr_t));
+            if (!ReadMemory(entryPointerAddress, entry) ||
+                !IsCanonicalUserPointer(entry) ||
+                !Obelisk::Memory::IsReadable(reinterpret_cast<void*>(entry), 0x40))
+            {
+                return false;
+            }
+
+            preview = ReadFNameEntryPreview(entry);
+            return !preview.empty();
+        }
+
+        void LogFNameIndirectArrayCandidate(const char* name, void* value)
+        {
+            const uintptr_t table = reinterpret_cast<uintptr_t>(value);
+            if (!value ||
+                !Obelisk::Memory::IsReadable(value, FNameIndirectArrayProbe::NumChunksOffset + sizeof(int32_t)))
+            {
+                return;
+            }
+
+            int32_t numElements = 0;
+            int32_t numChunks = 0;
+            ReadMemory(table + FNameIndirectArrayProbe::NumElementsOffset, numElements);
+            ReadMemory(table + FNameIndirectArrayProbe::NumChunksOffset, numChunks);
+
+            const bool elementCountPlausible = numElements > 9622 && numElements < 10000000;
+            const bool chunkCountPlausible = numChunks > 0 && numChunks <= FNameIndirectArrayProbe::MaxChunks;
+
+            const std::array<FNameEntryClue, 3> clues = {
+                FNameEntryClue{0, "None"},
+                FNameEntryClue{9619, "ClientMessage"},
+                FNameEntryClue{9622, "ServerChat"},
+            };
+
+            int readableClues = 0;
+            int matchedClues = 0;
+            std::array<std::string, clues.size()> previews;
+            for (size_t i = 0; i < clues.size(); ++i)
+            {
+                if (!ProbeFNameEntry(table, clues[i], previews[i]))
+                    continue;
+
+                ++readableClues;
+                if (previews[i] == clues[i].ExpectedName)
+                    ++matchedClues;
+            }
+
+            const int score = (elementCountPlausible ? 1 : 0) +
+                              (chunkCountPlausible ? 1 : 0) +
+                              readableClues +
+                              matchedClues;
+
+            if (score < 2 || readableClues == 0)
+                return;
+
+            OBELISK_INFO("[ReflectionScanner] {} FName indirect-table probe: table={} score={}/8 num_elements={} num_chunks={} none='{}' client_message='{}' server_chat='{}'",
+                         name,
+                         value,
+                         score,
+                         numElements,
+                         numChunks,
+                         previews[0],
+                         previews[1],
+                         previews[2]);
+        }
+
         void LogUObjectValidation(const std::vector<Mapping>& mappings, const char* name, void* value, const UObjectProbe& object)
         {
             uintptr_t firstVtableEntry = 0;
@@ -435,6 +587,8 @@ namespace Obelisk::UE
             const uintptr_t* qwords = reinterpret_cast<const uintptr_t*>(value);
             OBELISK_INFO("[ReflectionScanner] {} object probe: +00=0x{:X} +08=0x{:X} +10=0x{:X} +18=0x{:X} +20=0x{:X} +28=0x{:X} +30=0x{:X} +38=0x{:X}",
                          name, qwords[0], qwords[1], qwords[2], qwords[3], qwords[4], qwords[5], qwords[6], qwords[7]);
+
+            LogFNameIndirectArrayCandidate(name, value);
 
             size_t executableFields = 0;
             for (size_t offset = 0; offset < 0x200; offset += sizeof(uintptr_t))

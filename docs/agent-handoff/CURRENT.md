@@ -17,6 +17,12 @@ Updated: 2026-05-27
 - fact: ReflectionScanner now logs bounded UObject candidate validation scores and avoids
   unchecked executable-field reads past verified memory; see
   `docs/research/2026-05-27-reflection-scanner-candidate-validation.md`.
+- fact: ReflectionScanner now includes a bounded FName indirect-table candidate probe for
+  already-discovered globals; see
+  `docs/research/2026-05-27-fname-indirect-table-probe.md`.
+- fact: Top-level CMake now pins `subhook` to local FetchContent commit
+  `568d2e5a5d6013907e8008857968906b33ef3b7d` instead of `master`; see
+  `docs/research/2026-05-27-subhook-reproducibility.md`.
 
 ## Rejected Or Unsafe
 
@@ -24,6 +30,8 @@ Updated: 2026-05-27
 - risk: ChatPlugin raw FString scanning/discovery must not be enabled on live Ragnarok as
   the normal test path.
 - risk: Native exec probes must remain disabled on live servers.
+- risk: The `subhook` pin was selected from the existing local checkout without internet
+  verification; full offline resilience still needs a mirror or vendored archive.
 
 ## Priority Next Steps
 
@@ -42,6 +50,9 @@ Updated: 2026-05-27
 - next-step: Locate `GUObjectArray`/`GObjects` and enumerate `UFunction` metadata.
 - next-step: Use isolated ReflectionScanner captures to compare UObject validation scores
   before accepting any `GObjects`, `GNames`, or `UFunction` offset.
+- next-step: In the next isolated ReflectionScanner capture, compare any
+  `FName indirect-table probe` lines against `None`, `ClientMessage`, and `ServerChat`
+  before treating a candidate as `GNames`.
 - next-step: Replace ChatPlugin raw parameter probing with reflected parameter decoding.
 - next-step: Add binary hash validation or an instruction decoder before accepting future
   ProcessEvent prologue changes.

@@ -31,7 +31,7 @@ FetchContent_MakeAvailable(spdlog)
 FetchContent_Declare(
     subhook
     GIT_REPOSITORY https://github.com/wyrover/subhook.git
-    GIT_TAG        master
+    GIT_TAG        568d2e5a5d6013907e8008857968906b33ef3b7d
 )
 FetchContent_MakeAvailable(subhook)
 

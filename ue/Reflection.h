@@ -48,6 +48,17 @@ namespace Obelisk::UE
         int32_t Number;
     };
 
+    // Candidate layout for older UE4 indirect GNames arrays. This is only a
+    // bounded scanner probe; ARK's exact FName storage still needs validation.
+    struct FNameIndirectArrayProbe
+    {
+        static constexpr int32_t ChunkSize = 16384;
+        static constexpr int32_t MaxChunks = 128;
+        static constexpr size_t InlineChunksOffset = 0x0;
+        static constexpr size_t NumElementsOffset = InlineChunksOffset + (MaxChunks * sizeof(void*));
+        static constexpr size_t NumChunksOffset = NumElementsOffset + sizeof(int32_t);
+    };
+
     struct UObjectBase
     {
         void** VTable;
