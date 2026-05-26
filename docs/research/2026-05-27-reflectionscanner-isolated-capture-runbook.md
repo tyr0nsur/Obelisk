@@ -83,8 +83,8 @@ python3 scripts/analyze_reflectionscanner_capture.py --json /path/to/isolated/Ob
 The analyzer extracts candidate globals, delayed globals, top `UObject validation` scores,
 `FName indirect-table probe` rows, and reject markers such as `[NativeExecProbe] installed`
 or `[ChatPlugin]`. Use `--strict` only in offline analysis when a non-zero exit should mean
-that reject markers were present or no exact `matched_clues=3/3` FName research candidate
-was found.
+that reject markers were present or no repeat-confirmed exact `matched_clues=3/3` FName
+research candidate was found.
 
 ## Expected Logs
 

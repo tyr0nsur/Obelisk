@@ -23,9 +23,16 @@ Updated: 2026-05-27
 - fact: The next isolated ReflectionScanner capture has a reproducible runbook with
   flags, expected logs, GNames accept/reject criteria, and rollback; see
   `docs/research/2026-05-27-reflectionscanner-isolated-capture-runbook.md`.
+- fact: Read-only ops audit found no confirmed isolated/debug ARK instance on
+  `/servidor/ark`; treat both observed instances as live/non-isolated unless an operator
+  confirms otherwise. See
+  `docs/research/2026-05-27-reflectionscanner-isolated-instance-audit.md`.
 - fact: `scripts/analyze_reflectionscanner_capture.py` passively summarizes copied
   ReflectionScanner logs for UObject scores, FName `matched_clues`, delayed globals, and
   reject markers; it does not touch server state.
+- fact: ReflectionScanner FName analyzer review tightened offline count bounds and now
+  distinguishes exact single-hit candidates from repeat-confirmed candidates; see
+  `docs/research/2026-05-27-reflectionscanner-analyzer-review.md`.
 - fact: Top-level CMake now pins `subhook` to local FetchContent commit
   `568d2e5a5d6013907e8008857968906b33ef3b7d` instead of `master`; see
   `docs/research/2026-05-27-subhook-reproducibility.md`.
@@ -47,6 +54,9 @@ Updated: 2026-05-27
 - fact: Plugin ProcessEvent callbacks now carry owner tokens and are unregistered on init
   failure and before unload/`dlclose`; see
   `docs/research/2026-05-27-plugin-callback-ownership-hardening.md`.
+- fact: Runtime now supports optional `extern "C" void ObeliskPlugin_Shutdown()`,
+  resolved outside `ObeliskApi` and called before callback owner cleanup and `dlclose`;
+  see `docs/research/2026-05-27-plugin-shutdown-lifecycle.md`.
 - fact: `ObeliskApi` now appends `abi_version`, `struct_size`, and `capabilities` without
   shifting existing function-pointer offsets; front-loaded ABI headers remain a future
   major-version plan.

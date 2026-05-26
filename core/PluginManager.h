@@ -22,6 +22,7 @@ namespace Obelisk::Core
             std::string name;
             void* handle;
             void* owner;
+            void (*shutdown)();
         };
 
         std::vector<PluginInfo> m_LoadedPlugins;

@@ -16,6 +16,9 @@ namespace Obelisk::Core
     {
         thread_local void* g_CurrentPluginOwner = nullptr;
 
+        using InitFunc = bool(*)(ObeliskApi*);
+        using ShutdownFunc = void(*)();
+
         void* ResolveCallbackOwner(OnProcessEventCallback callback)
         {
             if (g_CurrentPluginOwner)
@@ -29,6 +32,40 @@ namespace Obelisk::Core
                 return nullptr;
 
             return info.dli_fbase;
+        }
+
+        ShutdownFunc ResolveShutdownFunc(void* handle, const std::string& pluginName)
+        {
+            dlerror();
+            ShutdownFunc shutdownFunc = reinterpret_cast<ShutdownFunc>(dlsym(handle, "ObeliskPlugin_Shutdown"));
+            const char* symbolError = dlerror();
+            if (symbolError || !shutdownFunc)
+            {
+                OBELISK_INFO("Plugin {} does not export ObeliskPlugin_Shutdown; unload will use callback owner cleanup only.", pluginName);
+                return nullptr;
+            }
+
+            return shutdownFunc;
+        }
+
+        void CallPluginShutdown(const std::string& pluginName, ShutdownFunc shutdownFunc)
+        {
+            if (!shutdownFunc)
+                return;
+
+            try
+            {
+                shutdownFunc();
+                OBELISK_INFO("Plugin {} shutdown completed.", pluginName);
+            }
+            catch (const std::exception& e)
+            {
+                OBELISK_ERROR("Plugin {} threw during shutdown: {}", pluginName, e.what());
+            }
+            catch (...)
+            {
+                OBELISK_ERROR("Plugin {} threw an unknown exception during shutdown.", pluginName);
+            }
         }
     }
 
@@ -116,7 +153,6 @@ namespace Obelisk::Core
                     continue;
                 }
 
-                using InitFunc = bool(*)(ObeliskApi*);
                 dlerror();
                 InitFunc initFunc = reinterpret_cast<InitFunc>(dlsym(handle, "ObeliskPlugin_Init"));
                 const char* symbolError = dlerror();
@@ -127,6 +163,8 @@ namespace Obelisk::Core
                     dlclose(handle);
                     continue;
                 }
+
+                ShutdownFunc shutdownFunc = ResolveShutdownFunc(handle, pluginName);
 
                 Dl_info initInfo{};
                 void* pluginOwner = nullptr;
@@ -155,11 +193,12 @@ namespace Obelisk::Core
                 if (initialized)
                 {
                     OBELISK_INFO("Plugin {} initialized successfully.", pluginName);
-                    m_LoadedPlugins.push_back({pluginName, handle, pluginOwner});
+                    m_LoadedPlugins.push_back({pluginName, handle, pluginOwner, shutdownFunc});
                 }
                 else
                 {
                     OBELISK_ERROR("Plugin {} failed to initialize.", pluginName);
+                    CallPluginShutdown(pluginName, shutdownFunc);
                     const size_t removed = EventManager::Get().UnregisterCallbacksForOwner(pluginOwner);
                     if (removed > 0)
                         OBELISK_WARN("Removed {} callback(s) registered by failed plugin {} before dlclose.", removed, pluginName);
@@ -182,6 +221,7 @@ namespace Obelisk::Core
         for (auto& plugin : m_LoadedPlugins)
         {
             OBELISK_INFO("Unloading plugin: {}", plugin.name);
+            CallPluginShutdown(plugin.name, plugin.shutdown);
             const size_t removed = EventManager::Get().UnregisterCallbacksForOwner(plugin.owner);
             if (removed > 0)
                 OBELISK_INFO("Removed {} callback(s) registered by plugin {} before dlclose.", removed, plugin.name);

@@ -74,12 +74,14 @@ Expected:
 
 - Add plugin-owned callback registration and unregister paths in `EventManager` and
   `PluginManager`.
+- Call optional `ObeliskPlugin_Shutdown()` before owner callback cleanup and before
+  closing a plugin library.
 - Reject or disable plugin callbacks before closing a plugin library.
 - Avoid raw callback pointers that can survive `dlclose`.
 - Keep global ProcessEvent callbacks off production paths unless a measured debug session
   needs them.
-- Add a first-class plugin shutdown export before treating thread-owning or HTTP-owning
-  plugins as stable.
+- Require a validated, idempotent plugin shutdown export before treating thread-owning or
+  HTTP-owning plugins as stable.
 
 ## Before Shipping
 

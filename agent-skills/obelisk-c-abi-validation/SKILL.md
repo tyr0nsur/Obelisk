@@ -20,6 +20,9 @@ that a `.so` will consume.
 - Callback ownership and unregister-on-unload exist for plugin ProcessEvent callbacks.
   Preserve that behavior: raw callback pointers must not survive plugin init failure,
   plugin unload, or `dlclose`.
+- Plugins may optionally export `extern "C" void ObeliskPlugin_Shutdown()`. The runtime
+  resolves it with `dlsym` outside the `ObeliskApi` table and calls it before callback
+  owner cleanup and before `dlclose`.
 
 ## Required Boundary Rules
 
@@ -64,8 +67,10 @@ Validation rules:
   handle that can be removed as a group.
 - If `Plugin_Load` or `Plugin_Init` fails, all callbacks registered by that plugin must be
   removed before the library is closed.
-- Before `dlclose`, runtime must remove plugin-owned callbacks and stop dispatching into
-  that address range.
+- Before `dlclose`, runtime must call optional plugin shutdown, remove plugin-owned
+  callbacks, and stop dispatching into that address range.
+- Shutdown exports must be idempotent, stop external ingress before releasing state, and
+  catch all exceptions before returning across the C ABI boundary.
 - Prefer filtered ProcessEvent callbacks over global callbacks. Global callbacks are hot
   path and should be rare, measured, and disabled by default for experimental plugins.
 - Callback implementations must be non-blocking and must not call back into unsafe UE4

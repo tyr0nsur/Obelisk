@@ -99,7 +99,7 @@ class FNameProbe:
 
     @property
     def plausible_counts(self) -> bool:
-        return self.num_elements > 9622 and self.num_chunks > 0
+        return 9622 < self.num_elements < 10_000_000 and 0 < self.num_chunks <= 128
 
     @property
     def research_candidate(self) -> bool:
@@ -140,7 +140,7 @@ def parse_args() -> argparse.Namespace:
         "--strict",
         action="store_true",
         help=(
-            "Exit non-zero when reject markers are present or no exact "
+            "Exit non-zero when reject markers are present or no repeat-confirmed "
             "matched_clues=3/3 FName research candidate is found."
         ),
     )
@@ -253,6 +253,9 @@ def parse_logs(paths: list[str]) -> dict[str, object]:
                 "exact_name_match": item.exact_name_match,
                 "plausible_counts": item.plausible_counts,
                 "research_candidate": item.research_candidate,
+                "repeat_confirmed_candidate": (
+                    item.research_candidate and table_counts[item.table] > 1
+                ),
                 "table_seen_count": table_counts[item.table],
             }
             for item in fnames
@@ -283,9 +286,11 @@ def print_human(summary: dict[str, object]) -> None:
     else:
         print("\nreject markers: none")
 
-    research_candidates = [item for item in fnames if item["research_candidate"]]
-    print(f"\nFName research candidates: {len(research_candidates)}")
-    for item in research_candidates:
+    exact_candidates = [item for item in fnames if item["research_candidate"]]
+    repeat_confirmed = [item for item in fnames if item["repeat_confirmed_candidate"]]
+    print(f"\nFName exact candidates: {len(exact_candidates)}")
+    print(f"FName repeat-confirmed candidates: {len(repeat_confirmed)}")
+    for item in exact_candidates:
         repeated = "repeated" if item["table_seen_count"] > 1 else "single"
         print(
             "- line {line}: target={target} table={table} score={score}/{score_max} "
@@ -296,7 +301,7 @@ def print_human(summary: dict[str, object]) -> None:
             )
         )
 
-    weak_fnames = [item for item in fnames if not item["research_candidate"]]
+    weak_fnames = [item for item in fnames if not item["repeat_confirmed_candidate"]]
     if weak_fnames:
         print("\nweak or rejected FName probes:")
         for item in weak_fnames:
@@ -334,10 +339,10 @@ def main() -> int:
 
     if args.strict:
         has_reject_markers = bool(summary["reject_markers"])
-        has_research_candidate = any(
-            item["research_candidate"] for item in summary["fname_probes"]
+        has_repeat_confirmed_candidate = any(
+            item["repeat_confirmed_candidate"] for item in summary["fname_probes"]
         )
-        if has_reject_markers or not has_research_candidate:
+        if has_reject_markers or not has_repeat_confirmed_candidate:
             return 1
     return 0
 

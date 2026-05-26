@@ -95,21 +95,21 @@ Every non-trivial plugin should be designed around these phases:
 5. On shutdown, stop external ingress first, unregister callbacks, drain worker
    queues, join threads, then release state.
 
-The current ABI only exposes initialization to plugins. Until a first-class
-shutdown entry point exists, plugins that start threads, sockets, or long-lived
-file readers are experimental by definition. They may leak work into `dlclose`
-or process shutdown and must not be treated as stable.
-
-Future stable plugins should support a shutdown export such as:
+The ABI exposes initialization through `ObeliskPlugin_Init` and supports an
+optional shutdown export resolved directly from the plugin shared object:
 
 ```cpp
 extern "C" __attribute__((visibility("default")))
 void ObeliskPlugin_Shutdown();
 ```
 
-The runtime should call shutdown before unregistering plugin-owned callbacks and
-before `dlclose`. This is a future contract; do not rely on it until implemented
-and documented in the ABI validation skill.
+This export is not part of the `ObeliskApi` function table, so it does not shift
+existing ABI offsets. When present, the runtime calls shutdown before
+unregistering plugin-owned callbacks and before `dlclose`. Plugin shutdown must
+be idempotent, must stop external ingress first, and must catch all exceptions
+before returning across the C ABI boundary. Plugins that start threads, sockets,
+or long-lived file readers remain experimental until they implement and validate
+this shutdown path.
 
 ## ProcessEvent Policy
 

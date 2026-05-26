@@ -45,6 +45,11 @@ struct ObeliskApi {
 
 // Plugins must export this function to be loaded by Obelisk
 // __attribute__((visibility("default"))) bool ObeliskPlugin_Init(ObeliskApi* api);
+//
+// Plugins may also export this optional lifecycle hook. When present, the runtime
+// calls it before unregistering plugin-owned callbacks and before dlclose.
+// The hook must be idempotent and must not throw across the C ABI boundary.
+// __attribute__((visibility("default"))) void ObeliskPlugin_Shutdown();
 
 #ifdef __cplusplus
 }
