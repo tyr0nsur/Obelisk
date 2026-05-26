@@ -31,6 +31,11 @@ namespace Obelisk::Hooks
         constexpr size_t kJumpSize = 12;
         constexpr size_t kPatchSize = 18;
         constexpr size_t kTrampolineSize = kPatchSize + kJumpSize;
+        constexpr uintptr_t kCurrentArkProcessEventOffset = 0x1D34E20;
+        constexpr std::array<uint8_t, kPatchSize> kExpectedProcessEventPrologue = {
+            0x55, 0x48, 0x89, 0xE5, 0x41, 0x57, 0x41, 0x56, 0x41,
+            0x54, 0x53, 0x48, 0x81, 0xEC, 0xA0, 0x00, 0x00, 0x00
+        };
 
         struct AbsoluteHook
         {
@@ -80,9 +85,63 @@ namespace Obelisk::Hooks
         return mprotect(reinterpret_cast<void*>(start), end - start, PROT_READ | PROT_EXEC) == 0;
     }
 
+    static bool IsInExecutableSegment(void* address, size_t size, const Memory::ModuleInfo& moduleInfo)
+    {
+        if (!address || size == 0 || !moduleInfo.found)
+            return false;
+
+        const uintptr_t start = reinterpret_cast<uintptr_t>(address);
+        if (start < moduleInfo.start)
+            return false;
+        if (start > UINTPTR_MAX - size)
+            return false;
+
+        const uintptr_t end = start + size;
+        return end <= moduleInfo.end;
+    }
+
+    static bool HasExpectedProcessEventPrologue(void* target)
+    {
+        if (!Memory::IsReadable(target, kExpectedProcessEventPrologue.size()))
+            return false;
+
+        return std::memcmp(target,
+                           kExpectedProcessEventPrologue.data(),
+                           kExpectedProcessEventPrologue.size()) == 0;
+    }
+
+    static bool ValidateProcessEventTarget(void* target,
+                                           const Memory::ModuleInfo& moduleInfo,
+                                           const char* source)
+    {
+        if (!target)
+        {
+            OBELISK_WARN("Rejected null ProcessEvent {} candidate.", source);
+            return false;
+        }
+
+        if (!IsInExecutableSegment(target, kPatchSize, moduleInfo))
+        {
+            OBELISK_WARN("Rejected ProcessEvent {} candidate {}: outside ShooterGameServer executable segment.",
+                         source, target);
+            return false;
+        }
+
+        if (!HasExpectedProcessEventPrologue(target))
+        {
+            OBELISK_WARN("Rejected ProcessEvent {} candidate {}: unexpected or unreadable prologue.",
+                         source, target);
+            return false;
+        }
+
+        return true;
+    }
+
     static bool InstallAbsoluteHook(AbsoluteHook& hook, void* target, void* detour)
     {
         if (!target || !detour)
+            return false;
+        if (!Memory::IsReadable(target, kPatchSize))
             return false;
 
         hook.Target = target;
@@ -221,21 +280,41 @@ namespace Obelisk::Hooks
         std::string pattern =
             "55 48 89 E5 41 57 41 56 41 54 53 48 81 EC A0 00 00 00 "
             "49 89 D6 49 89 F4 49 89 FF 64 48 8B 04 25 28 00 00 00";
+        const auto moduleInfo = Memory::GetMainModuleInfo();
+        if (!moduleInfo.found)
+        {
+            OBELISK_ERROR("Failed to find ShooterGameServer executable segment. ProcessEvent hook NOT installed.");
+            return;
+        }
+
         auto candidates = Memory::FindPatternAll(pattern, 16);
         OBELISK_INFO("ProcessEvent vtable-derived pattern candidates found: {}", candidates.size());
         for (size_t i = 0; i < candidates.size(); ++i)
             OBELISK_INFO("ProcessEvent candidate[{}] = {}", i, candidates[i]);
 
-        void* processEventAddr = candidates.empty() ? nullptr : candidates.front();
+        void* processEventAddr = nullptr;
+        bool mayTryDirectOffsetFallback = candidates.empty();
+        if (candidates.size() == 1 &&
+            ValidateProcessEventTarget(candidates.front(), moduleInfo, "pattern"))
+        {
+            processEventAddr = candidates.front();
+        }
+        else if (candidates.size() > 1)
+        {
+            OBELISK_ERROR("ProcessEvent pattern produced {} candidates. Refusing ambiguous hook target.",
+                          candidates.size());
+        }
 
-        if (!processEventAddr)
+        if (!processEventAddr && mayTryDirectOffsetFallback)
         {
             OBELISK_WARN("ProcessEvent pattern not found. Trying current ARK direct offset fallback...");
-            auto moduleInfo = Memory::GetMainModuleInfo();
             uintptr_t baseAddress = moduleInfo.imageBase;
-            if (baseAddress != 0) {
+            if (baseAddress != 0)
+            {
                 // Current ShooterGameServer vtable slot 61 target.
-                processEventAddr = reinterpret_cast<void*>(baseAddress + 0x1D34E20);
+                void* fallbackAddr = reinterpret_cast<void*>(baseAddress + kCurrentArkProcessEventOffset);
+                if (ValidateProcessEventTarget(fallbackAddr, moduleInfo, "direct-offset fallback"))
+                    processEventAddr = fallbackAddr;
             }
         }
 

@@ -10,6 +10,8 @@ reflection utilities, and reusable server-side modding APIs.
 ## Current Status
 
 Obelisk is in active reverse-engineering and runtime stabilization work.
+See [docs/STATUS.md](docs/STATUS.md) for the contributor-facing stable,
+experimental, and not-ready matrix.
 
 Stable enough to test:
 
@@ -183,7 +185,9 @@ Contributors are welcome, especially in these areas:
 - Documentation and reproducible test environments
 
 Start with [CONTRIBUTING.md](CONTRIBUTING.md) and
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Use
+[docs/STATUS.md](docs/STATUS.md) to choose work that matches the current
+safety posture.
 
 ## Safety Notes
 

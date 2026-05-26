@@ -255,6 +255,83 @@ namespace Obelisk::UE
             });
         }
 
+        bool IsCanonicalUserPointer(uintptr_t address)
+        {
+            return address >= 0x10000 && address <= 0x00007FFFFFFFFFFF;
+        }
+
+        bool IsNullOrReadablePointer(void* value, size_t size)
+        {
+            if (!value)
+                return true;
+
+            return IsCanonicalUserPointer(reinterpret_cast<uintptr_t>(value)) &&
+                   Obelisk::Memory::IsReadable(value, size);
+        }
+
+        bool IsPlausibleFName(const FName& name)
+        {
+            return name.ComparisonIndex >= 0 &&
+                   name.ComparisonIndex < 10000000 &&
+                   name.Number >= 0 &&
+                   name.Number < 1000000;
+        }
+
+        bool IsPlausibleObjectFlags(int32_t flags)
+        {
+            return flags >= 0;
+        }
+
+        bool IsPlausibleInternalIndex(int32_t index)
+        {
+            return index >= -1 && index < 10000000;
+        }
+
+        void LogUObjectValidation(const std::vector<Mapping>& mappings, const char* name, void* value, const UObjectProbe& object)
+        {
+            uintptr_t firstVtableEntry = 0;
+            const bool vtableReadable = object.VTable &&
+                                        IsCanonicalUserPointer(reinterpret_cast<uintptr_t>(object.VTable)) &&
+                                        Obelisk::Memory::IsReadable(object.VTable, sizeof(firstVtableEntry));
+            if (vtableReadable)
+                std::memcpy(&firstVtableEntry, object.VTable, sizeof(firstVtableEntry));
+
+            const bool vtableExecutable = firstVtableEntry != 0 &&
+                                          IsExecutableAddress(mappings, firstVtableEntry);
+            const bool classReadable = IsNullOrReadablePointer(object.ClassPrivate, sizeof(UObjectBase));
+            const bool outerReadable = IsNullOrReadablePointer(object.OuterPrivate, sizeof(UObjectBase));
+            const bool fnamePlausible = IsPlausibleFName(object.NamePrivate);
+            const bool flagsPlausible = IsPlausibleObjectFlags(object.ObjectFlags);
+            const bool internalPlausible = IsPlausibleInternalIndex(object.InternalIndex);
+            const int score = (vtableExecutable ? 1 : 0) +
+                              (classReadable ? 1 : 0) +
+                              (outerReadable ? 1 : 0) +
+                              (fnamePlausible ? 1 : 0) +
+                              (flagsPlausible ? 1 : 0) +
+                              (internalPlausible ? 1 : 0);
+
+            OBELISK_INFO("[ReflectionScanner] {} UObject validation: object={} score={}/6 vtable_exec={} class_readable_or_null={} outer_readable_or_null={} fname_plausible={} flags_plausible={} internal_plausible={}",
+                         name,
+                         value,
+                         score,
+                         vtableExecutable,
+                         classReadable,
+                         outerReadable,
+                         fnamePlausible,
+                         flagsPlausible,
+                         internalPlausible);
+        }
+
+        bool ReadUintptrField(void* base, size_t offset, uintptr_t& out)
+        {
+            auto* address = static_cast<uint8_t*>(base) + offset;
+            if (!Obelisk::Memory::IsReadable(address, sizeof(out)))
+                return false;
+
+            std::memcpy(&out, address, sizeof(out));
+            return true;
+        }
+
         void PushUniqueLimited(std::vector<uintptr_t>& values, uintptr_t value, size_t maxValues)
         {
             if (std::find(values.begin(), values.end(), value) != values.end())
@@ -352,6 +429,7 @@ namespace Obelisk::UE
                              object.NamePrivate.ComparisonIndex,
                              object.NamePrivate.Number,
                              object.OuterPrivate);
+                LogUObjectValidation(mappings, name, value, object);
             }
 
             const uintptr_t* qwords = reinterpret_cast<const uintptr_t*>(value);
@@ -362,7 +440,9 @@ namespace Obelisk::UE
             for (size_t offset = 0; offset < 0x200; offset += sizeof(uintptr_t))
             {
                 uintptr_t field = 0;
-                std::memcpy(&field, reinterpret_cast<const uint8_t*>(value) + offset, sizeof(field));
+                if (!ReadUintptrField(value, offset, field))
+                    break;
+
                 if (IsExecutableAddress(mappings, field))
                 {
                     OBELISK_INFO("[ReflectionScanner] {} executable field candidate global=0x{:X} object={} offset=0x{:X} value=0x{:X}",

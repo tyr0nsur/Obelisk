@@ -27,9 +27,12 @@ modding, UE4 reflection, and safe runtime hooking.
 Before opening a pull request:
 
 ```bash
+git diff --check
 cmake -S . -B build
 cmake --build build -j"$(nproc)"
 ```
+
+Docs-only changes may skip the CMake build, but the PR should say why.
 
 ## Runtime Testing
 
@@ -62,3 +65,16 @@ Harden chat plugin FString probing
 3. Add safe plugin examples.
 4. Add CI build checks.
 5. Convert the experimental scanner into a documented offline/debug tool.
+
+Use [docs/STATUS.md](docs/STATUS.md) before changing runtime behavior. It
+defines which pieces are stable baseline, experimental, or not ready.
+
+## Pull Request Checklist
+
+The GitHub PR template contains the canonical checklist. At minimum, every PR
+should answer:
+
+- What subsystem or documentation area changed?
+- Which validation ran, and what was intentionally skipped?
+- Did the change affect live-server safety, research notes, or agent handoff?
+- Are experimental probes still behind explicit gates?
