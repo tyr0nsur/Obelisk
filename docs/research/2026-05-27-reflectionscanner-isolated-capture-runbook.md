@@ -13,7 +13,8 @@ ChatPlugin discovery or native exec probes on live Ragnarok.
 
 ## Environment To Record
 
-- Obelisk commit: `9f319c5` plus local scanner logging change from this turn.
+- Obelisk commit: record the exact commit under test before each capture; current handoff
+  starts from `a33b547`.
 - ARK binary path:
   `/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer`
 - ARK binary SHA256 observed from this workspace:
@@ -71,6 +72,19 @@ Collect only the relevant scanner lines:
 rg "ReflectionScanner|NativeExecProbe|ChatPlugin|ProcessEvent" /path/to/isolated/Obelisk.log
 rg "UObject validation|FName indirect-table probe|delayed global resolved" /path/to/isolated/Obelisk.log
 ```
+
+Then summarize the copied log without touching the server:
+
+```bash
+python3 scripts/analyze_reflectionscanner_capture.py /path/to/isolated/Obelisk.log
+python3 scripts/analyze_reflectionscanner_capture.py --json /path/to/isolated/Obelisk.log
+```
+
+The analyzer extracts candidate globals, delayed globals, top `UObject validation` scores,
+`FName indirect-table probe` rows, and reject markers such as `[NativeExecProbe] installed`
+or `[ChatPlugin]`. Use `--strict` only in offline analysis when a non-zero exit should mean
+that reject markers were present or no exact `matched_clues=3/3` FName research candidate
+was found.
 
 ## Expected Logs
 
@@ -166,8 +180,9 @@ Do not apply these marker changes to live Ragnarok as part of this runbook.
 
 ## Result
 
-This turn prepared the capture but did not run it. No server was restarted and no marker
-files were changed.
+This turn prepared the capture and later added a passive log analyzer under
+`scripts/analyze_reflectionscanner_capture.py`. No server was restarted and no marker files
+were changed.
 
 ## Next Steps
 

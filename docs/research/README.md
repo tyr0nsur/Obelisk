@@ -14,6 +14,7 @@ ARK server operations, and plugin experiments.
 | [2026-05-27-reflectionscanner-isolated-capture-runbook.md](2026-05-27-reflectionscanner-isolated-capture-runbook.md) | ReflectionScanner isolated capture runbook | Documents flags, expected logs, GNames acceptance criteria, and rollback for the next isolated capture. |
 | [2026-05-27-plugin-callback-ownership-hardening.md](2026-05-27-plugin-callback-ownership-hardening.md) | Plugin callback ownership | Documents callback owner-token cleanup on init failure and unload. |
 | [2026-05-27-processevent-target-validation.md](2026-05-27-processevent-target-validation.md) | ProcessEvent target validation | Documents range/prologue validation before hook installation or direct-offset fallback. |
+| [2026-05-27-subhook-reproducibility.md](2026-05-27-subhook-reproducibility.md) | Subhook reproducibility | Documents the local FetchContent commit pin and remaining mirror/vendor risk. |
 
 Use one file per investigation:
 

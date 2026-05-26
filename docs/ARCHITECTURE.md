@@ -58,6 +58,10 @@ extern "C" __attribute__((visibility("default")))
 bool ObeliskPlugin_Init(ObeliskApi* api);
 ```
 
+Plugin structure, configuration, lifecycle, HTTP safety, and promotion rules are
+documented in [PLUGIN_ARCHITECTURE.md](PLUGIN_ARCHITECTURE.md). Larger plugins
+must follow that document before they are added to the top-level build.
+
 ## Central Install Root
 
 At runtime, paths come from:
@@ -90,3 +94,7 @@ Preferred direction:
 disabled by default on live servers.
 
 The chat plugin is a testbed for command interception, not yet a stable API.
+
+`plugins/monitor` is also experimental. It currently combines HTTP service,
+log tailing, whitelist enforcement, raw parameter discovery, and a global
+`ProcessEvent` callback without a stable shutdown contract.

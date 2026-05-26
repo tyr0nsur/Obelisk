@@ -1,0 +1,190 @@
+# Plugin Architecture
+
+This document defines the expected shape for Obelisk plugins before promoting
+larger plugins such as `MonitorPlugin` beyond experimental status.
+
+## Repository Layout
+
+Keep plugin source code split by maturity:
+
+```text
+plugins/
+  README.md
+  examples/
+    minimal/
+    process_event_filtered/
+    http_status/
+  experimental/
+    monitor/
+  chat/
+  monitor/
+```
+
+Current reality is still transitional: `plugins/chat` and `plugins/monitor`
+exist at the top of `plugins/`, but only the deliberately small
+`helloworld_plugin` target is built by the top-level build as a stable example.
+Do not add `plugins/monitor` to the top-level build until the responsibilities
+below are separated and validated in isolation.
+
+## Plugin Categories
+
+| Category | Purpose | Build policy | Runtime policy |
+| --- | --- | --- | --- |
+| `examples/` | Minimal reference plugins that teach one safe pattern. | May be built by CI after review. | Disabled by default unless explicitly installed. |
+| `experimental/` | Research, probes, and prototype integrations. | Excluded from top-level build. | Keep in `plugins-disabled/` except isolated tests. |
+| stable plugin directories | Operational plugins with documented config, tests, and rollback. | Eligible for top-level build after review. | Map-gated rollout only. |
+
+An example plugin should demonstrate exactly one behavior. For example, an HTTP
+status example should not also decode `ProcessEvent` params, and a filtered
+`ProcessEvent` example should not also start background services.
+
+## ABI Boundary
+
+Plugins must treat `api/ObeliskApi.h` as a C ABI boundary:
+
+- Export entry points with `extern "C"` and default visibility.
+- Pass only POD structs, primitive types, raw pointers, explicit sizes, and
+  function pointers across the boundary.
+- Do not pass STL types, C++ classes, references, exceptions, RTTI-dependent
+  objects, or ownership-bearing wrappers across the ABI.
+- Catch all plugin exceptions before returning to the runtime.
+- Check `abi_version`, `struct_size`, and capability flags before using appended
+  API fields when the plugin depends on them.
+
+Runtime-owned callback cleanup is already part of the stable baseline. Plugin
+authors must still make callback registration explicit and avoid registering
+callbacks from background threads unless the runtime API documents that path.
+
+## Configuration Convention
+
+Plugin configuration belongs under the central install root, not the ARK binary
+directory:
+
+```text
+${OBELISK_CONFIG_DIR}/plugins/<plugin-id>.json
+```
+
+Fallback order:
+
+1. A plugin-specific override env var, for example
+   `OBELISK_MONITOR_CONFIG=/path/to/monitor.json`.
+2. `${OBELISK_CONFIG_DIR}/plugins/<plugin-id>.json`.
+3. `${OBELISK_ROOT}/config/plugins/<plugin-id>.json`.
+
+Config files should include:
+
+- `enabled`: boolean defaulting to `false` for experimental plugins.
+- `map_allowlist`: list of map names where the plugin may run.
+- `log_level`: plugin-local verbosity.
+- Feature gates for every risky subsystem, such as `http.enabled`,
+  `process_event.enabled`, and `discovery.enabled`.
+- Explicit limits: queue lengths, log retention, trace caps, request body caps,
+  and timeouts.
+
+Plugins may create a default config only when the target directory already
+exists and the default is safe-disabled. They should log the chosen config path.
+
+## Lifecycle
+
+Every non-trivial plugin should be designed around these phases:
+
+1. Load config and validate ABI/capabilities.
+2. Initialize plugin-owned state without starting background work.
+3. Register callbacks only after all required state is ready.
+4. Start optional background services after callback registration succeeds.
+5. On shutdown, stop external ingress first, unregister callbacks, drain worker
+   queues, join threads, then release state.
+
+The current ABI only exposes initialization to plugins. Until a first-class
+shutdown entry point exists, plugins that start threads, sockets, or long-lived
+file readers are experimental by definition. They may leak work into `dlclose`
+or process shutdown and must not be treated as stable.
+
+Future stable plugins should support a shutdown export such as:
+
+```cpp
+extern "C" __attribute__((visibility("default")))
+void ObeliskPlugin_Shutdown();
+```
+
+The runtime should call shutdown before unregistering plugin-owned callbacks and
+before `dlclose`. This is a future contract; do not rely on it until implemented
+and documented in the ABI validation skill.
+
+## ProcessEvent Policy
+
+`ProcessEvent` is a hot path. Global callbacks are the highest-risk plugin
+integration point.
+
+Rules:
+
+- Prefer `RegisterPreProcessEventForNameIndex` or another filtered API.
+- Global callbacks require a documented debug objective, a bounded trace limit,
+  and an explicit config or env gate.
+- Global callbacks must not block, allocate heavily, perform file or network I/O,
+  parse JSON, sleep, or take contended locks.
+- Parameter decoding must be reflection-backed before it is considered stable.
+  Raw memory scans and string heuristics are research tools only.
+- A global callback may be acceptable for an isolated discovery run if plugins
+  are otherwise disabled on live maps and the test has rollback instructions.
+
+Promotion from experimental to stable requires proving that a plugin can run
+with filtered callbacks only, or documenting why a global callback is necessary
+and measuring its overhead on an isolated server.
+
+## HTTP And Security
+
+HTTP-capable plugins are two systems: an Obelisk plugin and a network service.
+They need separate gates.
+
+Minimum HTTP requirements before stability:
+
+- Bind to `127.0.0.1` by default. Binding to `0.0.0.0` must require explicit
+  config.
+- Authentication for every mutating endpoint.
+- Request body size limits and content-type checks.
+- Timeouts for reads, writes, and idle connections.
+- No config write endpoint without auth, validation, atomic write, and a backup
+  or rollback path.
+- No server log streaming endpoint that can expose secrets unless explicitly
+  enabled and access-controlled.
+- A shutdown path that stops accepting requests and joins the HTTP thread.
+
+Until those controls exist, HTTP plugins belong in `experimental/` and should be
+installed only on isolated test instances or behind a trusted local proxy.
+
+## Why MonitorPlugin Is Experimental
+
+`plugins/monitor` is useful as a prototype, but it is not a stable plugin
+architecture yet:
+
+- It registers a global `ProcessEvent` callback rather than a filtered callback.
+- It discovers `PreLogin` by scanning raw parameter memory and caching a name
+  index heuristic.
+- It starts detached log and HTTP threads with no plugin shutdown path.
+- Its HTTP server binds to `0.0.0.0` and exposes config/log endpoints without a
+  documented auth and network policy.
+- It reads and writes config outside the central config convention.
+- It combines monitoring, whitelist enforcement, HTTP API, log tailing, and UE4
+  event discovery in one plugin.
+
+For that reason, keep `MonitorPlugin` out of the top-level build and out of the
+stable install path. The safe path forward is to split it into small examples or
+future plugins: one HTTP status example, one config convention example, one
+filtered `ProcessEvent` example, and a later monitor plugin that only composes
+validated pieces.
+
+## Promotion Checklist
+
+Before a plugin is promoted to stable or added to the top-level build:
+
+- [ ] Config path follows `${OBELISK_CONFIG_DIR}/plugins/<plugin-id>.json`.
+- [ ] Risky features are safe-disabled and map-gated.
+- [ ] No global `ProcessEvent` callback outside a documented debug gate.
+- [ ] Callback lifetime is covered by runtime owner cleanup and plugin-local
+      shutdown design.
+- [ ] Background threads, sockets, and file readers have a stop and join path.
+- [ ] HTTP endpoints are local-only by default, authenticated when mutating, and
+      bounded by request limits.
+- [ ] Raw UE memory scanning is absent from the stable path.
+- [ ] Build, `git diff --check`, and isolated runtime validation are recorded.

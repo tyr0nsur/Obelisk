@@ -66,6 +66,10 @@ docs/                Contributor and operator documentation
 scripts/             Install/deploy helpers
 ```
 
+Plugin structure and promotion rules are documented in
+[docs/PLUGIN_ARCHITECTURE.md](docs/PLUGIN_ARCHITECTURE.md). `plugins/monitor`
+is experimental and intentionally not part of the top-level stable build.
+
 ## Central Server Layout
 
 The recommended install layout is:
@@ -130,7 +134,13 @@ extern "C" __attribute__((visibility("default")))
 bool ObeliskPlugin_Init(ObeliskApi* api)
 {
     api->LogInfo("Plugin loaded");
-    api->RegisterPreProcessEventForNameIndex(9622, OnProcessEvent);
+
+    // Use a validated FName index from your own reflection research/config.
+    // Do not treat observed ARK indices as stable API contracts.
+    const int32_t validated_function_index = -1;
+    if (validated_function_index >= 0)
+        api->RegisterPreProcessEventForNameIndex(validated_function_index, OnProcessEvent);
+
     return true;
 }
 ```
@@ -171,7 +181,8 @@ High-priority engineering:
 - Build a safe reflection layer for GObjects and UFunction lookup.
 - Replace raw chat memory scanning with reflection-backed parameter decoding.
 - Add first-class APIs: chat commands, players, permissions, timers, RCON helpers.
-- Create example plugins and CI builds.
+- Create small plugin examples for minimal load, filtered `ProcessEvent`, config,
+  and HTTP status patterns.
 - Document reversing workflows and signatures per ARK server version.
 
 ## Contributing

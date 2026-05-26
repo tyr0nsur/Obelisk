@@ -23,6 +23,9 @@ Updated: 2026-05-27
 - fact: The next isolated ReflectionScanner capture has a reproducible runbook with
   flags, expected logs, GNames accept/reject criteria, and rollback; see
   `docs/research/2026-05-27-reflectionscanner-isolated-capture-runbook.md`.
+- fact: `scripts/analyze_reflectionscanner_capture.py` passively summarizes copied
+  ReflectionScanner logs for UObject scores, FName `matched_clues`, delayed globals, and
+  reject markers; it does not touch server state.
 - fact: Top-level CMake now pins `subhook` to local FetchContent commit
   `568d2e5a5d6013907e8008857968906b33ef3b7d` instead of `master`; see
   `docs/research/2026-05-27-subhook-reproducibility.md`.
@@ -50,6 +53,9 @@ Updated: 2026-05-27
 - fact: Top-level CMake builds `helloworld_plugin/HelloWorldPlugin.so` as the minimal
   plugin example. `plugins/monitor` remains experimental and intentionally excluded from
   the top-level build until its structure and safety model are redesigned.
+- fact: Plugin structure and promotion rules are now documented in
+  `docs/PLUGIN_ARCHITECTURE.md`; `plugins/README.md` records the intended
+  `examples/` and `experimental/` split without moving code or changing CMake.
 - fact: Full build completed after fixing `ue/ReflectionScanner.cpp` pointer formatting in
   the reflection/chat metadata audit.
 - next-step: Resolve `FName` indices through `GNames` or `FNamePool`.

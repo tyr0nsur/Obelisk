@@ -21,6 +21,8 @@ modding, UE4 reflection, and safe runtime hooking.
 - Keep experimental scanners behind explicit flags.
 - Document every new signature or offset with how it was found.
 - Avoid hardcoded offsets when reflection can be used.
+- Follow [docs/PLUGIN_ARCHITECTURE.md](docs/PLUGIN_ARCHITECTURE.md) before
+  adding or promoting plugins.
 
 ## Build Check
 
@@ -62,7 +64,7 @@ Harden chat plugin FString probing
 
 1. Resolve `FName` indices to names.
 2. Stabilize filtered chat interception.
-3. Add safe plugin examples.
+3. Add safe plugin examples following the documented plugin architecture.
 4. Add CI build checks.
 5. Convert the experimental scanner into a documented offline/debug tool.
 

@@ -22,7 +22,9 @@ contributor-facing summary, not a replacement for detailed research notes.
 | Plugin C ABI loading | Stable baseline | ABI is C-compatible and currently append-only for new metadata fields. |
 | Filtered ProcessEvent callbacks | Stable baseline | Prefer callbacks scoped by `FName` index over global callbacks. |
 | Plugin callback ownership | Stable baseline | Callback owner tokens are unregistered on init failure and before plugin unload. |
+| Plugin architecture policy | Stable baseline | See `docs/PLUGIN_ARCHITECTURE.md`; examples must stay small and experimental plugins stay out of top-level build. |
 | ChatPlugin | Experimental | Testbed only; do not use raw FString scanning as a normal live path. |
+| MonitorPlugin | Experimental | Prototype only; combines HTTP, log tailing, whitelist enforcement, raw param scanning, detached threads, and global ProcessEvent callback. |
 | ReflectionScanner | Experimental | Use for isolated captures with explicit gates; keep disabled by default. |
 | Raw FString/FName inference | Experimental | Evidence gathering only until reflection-backed decoding replaces it. |
 | GNames/FNamePool resolution | Not ready | Priority research item. |

@@ -30,6 +30,9 @@ Own these areas:
 - Do not subscribe plugins to all `ProcessEvent` calls unless explicitly debugging.
 - Treat callback ownership as runtime-critical: callbacks registered by a plugin must be
   unregistered if init fails, before unload, and before `dlclose`.
+- Follow `docs/PLUGIN_ARCHITECTURE.md` before adding plugin examples or promoting
+  experimental plugins. Plugins that start HTTP servers, threads, or file readers need a
+  shutdown design before stability.
 
 ## Hooking Baseline
 
@@ -75,6 +78,8 @@ Expected:
 - Avoid raw callback pointers that can survive `dlclose`.
 - Keep global ProcessEvent callbacks off production paths unless a measured debug session
   needs them.
+- Add a first-class plugin shutdown export before treating thread-owning or HTTP-owning
+  plugins as stable.
 
 ## Before Shipping
 

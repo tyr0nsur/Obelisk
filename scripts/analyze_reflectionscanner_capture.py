@@ -1,0 +1,346 @@
+#!/usr/bin/env python3
+"""Summarize isolated ReflectionScanner capture logs.
+
+This is intentionally passive: it only reads copied log files or stdin and does
+not touch server state, marker files, or runtime configuration.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Iterable
+
+
+UOBJECT_RE = re.compile(
+    r"\[ReflectionScanner\] (?P<target>\S+) UObject validation: "
+    r"object=(?P<object>\S+) score=(?P<score>\d+)/(?P<score_max>\d+) "
+    r"vtable_exec=(?P<vtable_exec>\w+) "
+    r"class_readable_or_null=(?P<class_readable_or_null>\w+) "
+    r"outer_readable_or_null=(?P<outer_readable_or_null>\w+) "
+    r"fname_plausible=(?P<fname_plausible>\w+) "
+    r"flags_plausible=(?P<flags_plausible>\w+) "
+    r"internal_plausible=(?P<internal_plausible>\w+)"
+)
+
+FNAME_RE = re.compile(
+    r"\[ReflectionScanner\] (?P<target>\S+) FName indirect-table probe: "
+    r"table=(?P<table>\S+) score=(?P<score>\d+)/(?P<score_max>\d+) "
+    r"readable_clues=(?P<readable_clues>\d+)/(?P<readable_clues_max>\d+) "
+    r"matched_clues=(?P<matched_clues>\d+)/(?P<matched_clues_max>\d+) "
+    r"num_elements=(?P<num_elements>-?\d+) num_chunks=(?P<num_chunks>-?\d+) "
+    r"none='(?P<none>[^']*)' "
+    r"client_message='(?P<client_message>[^']*)' "
+    r"server_chat='(?P<server_chat>[^']*)'"
+)
+
+DELAYED_RE = re.compile(
+    r"\[ReflectionScanner\] delayed global resolved after (?P<seconds>\d+)s: "
+    r"(?P<target>\S+) (?P<global>\S+) -> (?P<value>\S+)"
+)
+
+CANDIDATE_RE = re.compile(
+    r"\[ReflectionScanner\] (?P<target>\S+) candidate global "
+    r"(?P<global>\S+) -> (?P<value>\S+)"
+)
+
+
+@dataclass(frozen=True)
+class LogMatch:
+    line: int
+    text: str
+
+
+@dataclass(frozen=True)
+class UObjectValidation:
+    line: int
+    target: str
+    object: str
+    score: int
+    score_max: int
+    vtable_exec: str
+    class_readable_or_null: str
+    outer_readable_or_null: str
+    fname_plausible: str
+    flags_plausible: str
+    internal_plausible: str
+
+
+@dataclass(frozen=True)
+class FNameProbe:
+    line: int
+    target: str
+    table: str
+    score: int
+    score_max: int
+    readable_clues: int
+    readable_clues_max: int
+    matched_clues: int
+    matched_clues_max: int
+    num_elements: int
+    num_chunks: int
+    none: str
+    client_message: str
+    server_chat: str
+
+    @property
+    def exact_name_match(self) -> bool:
+        return (
+            self.matched_clues == 3
+            and self.matched_clues_max == 3
+            and self.none == "None"
+            and self.client_message == "ClientMessage"
+            and self.server_chat == "ServerChat"
+        )
+
+    @property
+    def plausible_counts(self) -> bool:
+        return self.num_elements > 9622 and self.num_chunks > 0
+
+    @property
+    def research_candidate(self) -> bool:
+        return self.exact_name_match and self.plausible_counts
+
+
+@dataclass(frozen=True)
+class DelayedGlobal:
+    line: int
+    seconds: int
+    target: str
+    global_address: str
+    value: str
+
+
+@dataclass(frozen=True)
+class CandidateGlobal:
+    line: int
+    target: str
+    global_address: str
+    value: str
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Analyze copied Obelisk logs from an isolated ReflectionScanner capture. "
+            "Use '-' to read from stdin."
+        )
+    )
+    parser.add_argument("logs", nargs="+", help="Log file path(s), or '-' for stdin.")
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit machine-readable JSON instead of the human summary.",
+    )
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help=(
+            "Exit non-zero when reject markers are present or no exact "
+            "matched_clues=3/3 FName research candidate is found."
+        ),
+    )
+    return parser.parse_args()
+
+
+def iter_lines(paths: list[str]) -> Iterable[tuple[str, int, str]]:
+    for raw_path in paths:
+        if raw_path == "-":
+            for line_number, line in enumerate(sys.stdin, start=1):
+                yield "<stdin>", line_number, line.rstrip("\n")
+            continue
+
+        path = Path(raw_path)
+        with path.open("r", encoding="utf-8", errors="replace") as handle:
+            for line_number, line in enumerate(handle, start=1):
+                yield str(path), line_number, line.rstrip("\n")
+
+
+def parse_logs(paths: list[str]) -> dict[str, object]:
+    uobjects: list[UObjectValidation] = []
+    fnames: list[FNameProbe] = []
+    delayed: list[DelayedGlobal] = []
+    candidate_globals: list[CandidateGlobal] = []
+    reject_markers: list[LogMatch] = []
+    files: set[str] = set()
+
+    for source, line_number, line in iter_lines(paths):
+        files.add(source)
+
+        if "[NativeExecProbe] installed" in line or "[ChatPlugin]" in line:
+            reject_markers.append(LogMatch(line_number, line))
+
+        if match := UOBJECT_RE.search(line):
+            groups = match.groupdict()
+            uobjects.append(
+                UObjectValidation(
+                    line=line_number,
+                    target=groups["target"],
+                    object=groups["object"],
+                    score=int(groups["score"]),
+                    score_max=int(groups["score_max"]),
+                    vtable_exec=groups["vtable_exec"],
+                    class_readable_or_null=groups["class_readable_or_null"],
+                    outer_readable_or_null=groups["outer_readable_or_null"],
+                    fname_plausible=groups["fname_plausible"],
+                    flags_plausible=groups["flags_plausible"],
+                    internal_plausible=groups["internal_plausible"],
+                )
+            )
+            continue
+
+        if match := FNAME_RE.search(line):
+            groups = match.groupdict()
+            fnames.append(
+                FNameProbe(
+                    line=line_number,
+                    target=groups["target"],
+                    table=groups["table"],
+                    score=int(groups["score"]),
+                    score_max=int(groups["score_max"]),
+                    readable_clues=int(groups["readable_clues"]),
+                    readable_clues_max=int(groups["readable_clues_max"]),
+                    matched_clues=int(groups["matched_clues"]),
+                    matched_clues_max=int(groups["matched_clues_max"]),
+                    num_elements=int(groups["num_elements"]),
+                    num_chunks=int(groups["num_chunks"]),
+                    none=groups["none"],
+                    client_message=groups["client_message"],
+                    server_chat=groups["server_chat"],
+                )
+            )
+            continue
+
+        if match := DELAYED_RE.search(line):
+            groups = match.groupdict()
+            delayed.append(
+                DelayedGlobal(
+                    line=line_number,
+                    seconds=int(groups["seconds"]),
+                    target=groups["target"],
+                    global_address=groups["global"],
+                    value=groups["value"],
+                )
+            )
+            continue
+
+        if match := CANDIDATE_RE.search(line):
+            groups = match.groupdict()
+            candidate_globals.append(
+                CandidateGlobal(
+                    line=line_number,
+                    target=groups["target"],
+                    global_address=groups["global"],
+                    value=groups["value"],
+                )
+            )
+
+    table_counts: dict[str, int] = {}
+    for probe in fnames:
+        table_counts[probe.table] = table_counts.get(probe.table, 0) + 1
+
+    return {
+        "files": sorted(files),
+        "reject_markers": [asdict(item) for item in reject_markers],
+        "uobject_validations": [asdict(item) for item in uobjects],
+        "fname_probes": [
+            {
+                **asdict(item),
+                "exact_name_match": item.exact_name_match,
+                "plausible_counts": item.plausible_counts,
+                "research_candidate": item.research_candidate,
+                "table_seen_count": table_counts[item.table],
+            }
+            for item in fnames
+        ],
+        "delayed_globals": [asdict(item) for item in delayed],
+        "candidate_globals": [asdict(item) for item in candidate_globals],
+    }
+
+
+def print_human(summary: dict[str, object]) -> None:
+    reject_markers = summary["reject_markers"]
+    uobjects = summary["uobject_validations"]
+    fnames = summary["fname_probes"]
+    delayed = summary["delayed_globals"]
+    candidate_globals = summary["candidate_globals"]
+
+    print("ReflectionScanner capture summary")
+    print(f"files: {', '.join(summary['files'])}")
+    print(f"candidate globals: {len(candidate_globals)}")
+    print(f"delayed globals: {len(delayed)}")
+    print(f"UObject validations: {len(uobjects)}")
+    print(f"FName probes: {len(fnames)}")
+
+    if reject_markers:
+        print("\nreject markers:")
+        for marker in reject_markers:
+            print(f"- line {marker['line']}: {marker['text']}")
+    else:
+        print("\nreject markers: none")
+
+    research_candidates = [item for item in fnames if item["research_candidate"]]
+    print(f"\nFName research candidates: {len(research_candidates)}")
+    for item in research_candidates:
+        repeated = "repeated" if item["table_seen_count"] > 1 else "single"
+        print(
+            "- line {line}: target={target} table={table} score={score}/{score_max} "
+            "matched={matched_clues}/{matched_clues_max} elements={num_elements} "
+            "chunks={num_chunks} table_seen={table_seen_count} ({repeated})".format(
+                **item,
+                repeated=repeated,
+            )
+        )
+
+    weak_fnames = [item for item in fnames if not item["research_candidate"]]
+    if weak_fnames:
+        print("\nweak or rejected FName probes:")
+        for item in weak_fnames:
+            print(
+                "- line {line}: target={target} table={table} matched={matched_clues}/"
+                "{matched_clues_max} none='{none}' client_message='{client_message}' "
+                "server_chat='{server_chat}' elements={num_elements} chunks={num_chunks}".format(
+                    **item
+                )
+            )
+
+    print("\ntop UObject validation scores:")
+    top_uobjects = sorted(
+        uobjects,
+        key=lambda item: (item["score"], item["target"], item["line"]),
+        reverse=True,
+    )[:10]
+    if not top_uobjects:
+        print("- none")
+    for item in top_uobjects:
+        print(
+            "- line {line}: target={target} object={object} score={score}/{score_max} "
+            "vtable_exec={vtable_exec} fname_plausible={fname_plausible}".format(**item)
+        )
+
+
+def main() -> int:
+    args = parse_args()
+    summary = parse_logs(args.logs)
+
+    if args.json:
+        print(json.dumps(summary, indent=2, sort_keys=True))
+    else:
+        print_human(summary)
+
+    if args.strict:
+        has_reject_markers = bool(summary["reject_markers"])
+        has_research_candidate = any(
+            item["research_candidate"] for item in summary["fname_probes"]
+        )
+        if has_reject_markers or not has_research_candidate:
+            return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
