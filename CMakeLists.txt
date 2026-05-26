@@ -42,13 +42,17 @@ add_library(obelisk SHARED
     ue/Memory.cpp
     hooks/HookManager.cpp
     hooks/ProcessEventHook.cpp
+    core/EventManager.cpp
+    core/PluginManager.cpp
 )
 
 # Includes and linking
 target_include_directories(obelisk PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(obelisk PRIVATE fmt::fmt spdlog::spdlog subhook dl pthread)
+target_link_libraries(obelisk PRIVATE fmt::fmt spdlog::spdlog subhook dl pthread stdc++fs)
 
 # Ensure visibility is hidden by default, and we only export what we want
 # (Good practice for LD_PRELOAD plugins)
 set_target_properties(obelisk PROPERTIES CXX_VISIBILITY_PRESET hidden)
 set_target_properties(obelisk PROPERTIES VISIBILITY_INLINES_HIDDEN 1)
+
+add_subdirectory(test_plugin)

@@ -3,6 +3,7 @@
 #include <errno.h>
 #include "runtime/Logger.h"
 #include "hooks/HookManager.h"
+#include "core/PluginManager.h"
 
 // The constructor attribute ensures this function runs as soon as the shared library 
 // is loaded into the target process via LD_PRELOAD.
@@ -25,6 +26,9 @@ void Obelisk_Init()
     
     // Initialize hooking engine
     Obelisk::Hooks::HookManager::Init();
+
+    // Load Plugins
+    Obelisk::Core::PluginManager::Get().LoadPlugins("ObeliskPlugins");
 }
 
 __attribute__((destructor))
