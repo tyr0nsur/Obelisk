@@ -27,15 +27,26 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(spdlog)
 
+# subhook library
+FetchContent_Declare(
+    subhook
+    GIT_REPOSITORY https://github.com/wyrover/subhook.git
+    GIT_TAG        master
+)
+FetchContent_MakeAvailable(subhook)
+
 # Create the Obelisk shared library
 add_library(obelisk SHARED
     loader/Bootstrap.cpp
     runtime/Logger.cpp
+    ue/Memory.cpp
+    hooks/HookManager.cpp
+    hooks/ProcessEventHook.cpp
 )
 
 # Includes and linking
 target_include_directories(obelisk PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(obelisk PRIVATE fmt::fmt spdlog::spdlog dl pthread)
+target_link_libraries(obelisk PRIVATE fmt::fmt spdlog::spdlog subhook dl pthread)
 
 # Ensure visibility is hidden by default, and we only export what we want
 # (Good practice for LD_PRELOAD plugins)

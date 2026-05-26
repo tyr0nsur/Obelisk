@@ -2,6 +2,7 @@
 #include <cstring>
 #include <errno.h>
 #include "runtime/Logger.h"
+#include "hooks/HookManager.h"
 
 // The constructor attribute ensures this function runs as soon as the shared library 
 // is loaded into the target process via LD_PRELOAD.
@@ -22,7 +23,8 @@ void Obelisk_Init()
     OBELISK_INFO("==========================================");
     OBELISK_INFO("Starting runtime bootstrap...");
     
-    // Future phases: Initialize hooking engine, setup plugins, etc.
+    // Initialize hooking engine
+    Obelisk::Hooks::HookManager::Init();
 }
 
 __attribute__((destructor))
