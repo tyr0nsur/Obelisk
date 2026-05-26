@@ -56,3 +56,4 @@ set_target_properties(obelisk PROPERTIES CXX_VISIBILITY_PRESET hidden)
 set_target_properties(obelisk PROPERTIES VISIBILITY_INLINES_HIDDEN 1)
 
 add_subdirectory(test_plugin)
+add_subdirectory(plugins/monitor)
