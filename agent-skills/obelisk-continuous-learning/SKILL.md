@@ -1,0 +1,96 @@
+---
+name: obelisk-continuous-learning
+description: Use when Obelisk agents should turn investigations into durable knowledge by updating research notes, revising skills, recording rejected hypotheses, and preserving evidence for future agents.
+---
+
+# Obelisk Continuous Learning
+
+Use this skill after investigations, debugging sessions, live-server experiments, reverse
+engineering work, or failed attempts that teach something useful.
+
+## Learning Loop
+
+Every serious investigation should end with one of these outcomes:
+
+- Code change with tests or live validation.
+- Research note under `docs/research/`.
+- Skill update under `agent-skills/`.
+- Explicit rejected hypothesis documented so future agents do not repeat it.
+
+If the finding changes how agents should behave, update a skill. If it only records one
+experiment or evidence trail, update `docs/research/`.
+
+## What To Capture
+
+Capture facts that are expensive to rediscover:
+
+- ARK binary path and SHA256.
+- Map/server tested.
+- Obelisk commit.
+- Environment variables and state markers.
+- Exact addresses, signatures, offsets, and why they are trusted or rejected.
+- Logs that prove a hook loaded, a plugin crashed, or an event was observed.
+- Negative results, especially false positives like bad ProcessEvent candidates.
+
+Do not capture speculation as fact. Label uncertain findings as hypotheses.
+
+## Research Note Pattern
+
+Create or update:
+
+```text
+docs/research/YYYY-MM-DD-topic.md
+```
+
+Use these sections:
+
+- Objective
+- Environment
+- Hypothesis
+- Method
+- Evidence
+- Result
+- Rejected paths
+- Risks
+- Next steps
+- Skill updates needed
+
+Keep raw logs out of Git. Summarize the important lines and reference local paths.
+
+## Skill Update Pattern
+
+Update `agent-skills/` when a research result changes future behavior:
+
+- `obelisk-core-runtime`: runtime safety, plugin lifecycle, API ownership.
+- `obelisk-linux-hooking`: hook mechanism, trampolines, memory protection.
+- `obelisk-ue4-reversing`: signatures, offsets, binary validation.
+- `obelisk-ue4-reflection`: FName, GNames, GObjects, UFunction, params.
+- `obelisk-reversing-research`: active research strategy and unsafe experiments.
+- `obelisk-live-ops`: production server operation and rollback.
+- `obelisk-github-research-workflow`: commit, push, agent handoff, documentation flow.
+
+Keep skills operational and short. Move detailed experiment logs to `docs/research/`.
+
+## Agent Handoff
+
+When handing work to another agent, include:
+
+- Current objective.
+- Files they own.
+- What they must not edit.
+- Current stable baseline.
+- Known false positives and unsafe flags.
+- Where to write research notes.
+
+After the agent returns, integrate useful findings into skills or research notes before
+starting a new round.
+
+## End-of-Turn Checklist
+
+- [ ] Did this work produce a reusable fact?
+- [ ] Did any previous instruction become unsafe, stale, or false?
+- [ ] Is there a rejected hypothesis worth saving?
+- [ ] Did a live-server rule change?
+- [ ] Did the relevant skill get updated?
+- [ ] Did `docs/research/` get updated when the evidence is too detailed for a skill?
+- [ ] Are changes committed and pushed if stable?
