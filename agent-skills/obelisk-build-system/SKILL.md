@@ -1,53 +1,71 @@
 ---
 name: obelisk-build-system
-description: Standard CMake configuration rules and build environment requirements for the Obelisk runtime and its plugins.
+description: Use when changing Obelisk CMake, dependencies, build outputs, install scripts, or centralized deployment layout for the runtime and plugins.
 ---
 
-# Obelisk Build System Skill
+# Obelisk Build System
 
-**Context:** Obelisk uses CMake and C++20. It builds a shared object (`libobelisk.so`) meant to be injected into the ARK Dedicated Server via `LD_PRELOAD`.
+Obelisk uses CMake, C++20, and Linux x86_64 shared objects.
 
-**When to use this skill:**
-- When setting up `CMakeLists.txt` for the core runtime.
-- When creating a template for a new plugin.
-- When adding external dependencies.
+## Build
 
-## Build Requirements
-
-### 1. Toolchain
-- **Language Standard:** C++20 (`set(CMAKE_CXX_STANDARD 20)`)
-- **Compiler:** `clang` or `gcc` on Linux (Ubuntu 22.04 or Debian 12 minimum).
-- **Architecture:** x86_64.
-
-### 2. CMake Targets
-
-**Runtime:**
-The core Obelisk runtime should be built as a `SHARED` library.
-```cmake
-add_library(obelisk SHARED src/main.cpp src/hooking.cpp ...)
-target_link_libraries(obelisk PRIVATE dl pthread)
+```bash
+cmake -S . -B build
+cmake --build build -j"$(nproc)"
 ```
 
-**Plugins:**
-Plugins should also be `SHARED` or `MODULE` libraries that link against the Obelisk API headers but do not static link the Obelisk runtime itself.
-```cmake
-add_library(MyPlugin MODULE src/plugin_main.cpp)
+Expected outputs:
+
+```text
+build/libobelisk.so
+build/_deps/subhook-build/libsubhook.so
+build/plugins/chat/ChatPlugin.so
 ```
 
-### 3. Dependency Management
-- Use `FetchContent` or standard Linux package managers for dependencies.
-- Required dependencies:
-  - `spdlog` (for logging)
-  - `fmt` (string formatting)
-  - `capstone` (for binary analysis and signature scanning)
-  - `subhook` or `funchook` (hooking)
+## Central Install
 
-### 4. Compiler Flags
-To ensure proper `LD_PRELOAD` behavior and ELF symbol resolution:
-- Use `-fPIC` (Position Independent Code).
-- Consider `-fvisibility=hidden` by default, explicitly exporting only what is needed to avoid symbol collision with `ShooterGameServer`.
+Use:
 
-## Checklist
-- [ ] Is C++20 strictly enforced in CMake?
-- [ ] Are dependencies integrated without breaking the build on a clean Ubuntu/Debian system?
-- [ ] Is the output a `.so` file that can be loaded via `LD_PRELOAD`?
+```bash
+./scripts/install_obelisk.sh /servidor/ark/obelisk
+```
+
+Install layout:
+
+```text
+/servidor/ark/obelisk/
+  lib/
+  plugins/
+  plugins-disabled/
+  config/plugins/
+  logs/
+  state/
+```
+
+Do not install runtime artifacts directly into `ShooterGame/Binaries/Linux` except the thin `ObeliskRun.sh` wrapper.
+
+## Dependency Rules
+
+- Pin dependency versions where possible; avoid tracking `master` for reproducible builds.
+- Runtime links currently include `fmt`, `spdlog`, `subhook`, `dl`, and `pthread`.
+- Do not commit `.so` outputs, logs, config state, or build directories.
+- Experimental plugins should go to `plugins-disabled/` or require an explicit install flag.
+  Do not make `ChatPlugin.so` production-enabled by default.
+
+## Before Commit
+
+```bash
+git diff --check
+cmake --build build -j"$(nproc)"
+git status --short --ignored
+```
+
+Check that no files matching these patterns are staged:
+
+```text
+build/
+*.so
+*.log
+chat_config.json
+/servidor/ark/obelisk/state/*
+```

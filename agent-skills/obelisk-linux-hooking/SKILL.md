@@ -1,53 +1,58 @@
 ---
 name: obelisk-linux-hooking
-description: Instructions for using subhook or funchook on Linux ELF binaries, memory protection, and detours for the Obelisk runtime.
+description: Use when implementing or auditing Linux ELF/x86_64 hooks in Obelisk, especially absolute jumps, LD_PRELOAD, mprotect, trampolines, and ProcessEvent hook safety.
 ---
 
-# Obelisk Linux Hooking Skill
+# Obelisk Linux Hooking
 
-**Context:** Obelisk is a Linux-native runtime. Standard Windows tools like MinHook, Detours, and PE-parsing libraries are strictly prohibited. We operate on ELF binaries using native Linux APIs.
+Obelisk is Linux-native. Do not use Windows PE/DLL tooling or MinHook-style assumptions.
 
-**When to use this skill:**
-- When setting up a new hook (e.g., hooking `ProcessEvent` or `LD_PRELOAD` initialization).
-- When resolving memory protection issues.
+## Preferred ProcessEvent Hook
 
-## Hooking Guidelines
+For `ShooterGameServer` internal functions, use an absolute x64 jump:
 
-### 1. Allowed Libraries
-Use lightweight, cross-platform or Linux-compatible hooking libraries:
-- `subhook`
-- `funchook`
+```text
+48 B8 <imm64> FF E0
+mov rax, imm64; jmp rax
+```
 
-### 2. Finding Targets (dlsym vs Signature Scanning)
-- **dlsym:** For exported symbols, use `dlsym(RTLD_NEXT, "symbol_name")`.
-- **Signature Scanning:** For internal functions (like `ProcessEvent`), use a pattern scanner on the mapped memory segments.
+Reason: a 5-byte `jmp rel32` only reaches +/-2GB. ARK maps the executable low and shared libraries high, so rel32 detours can jump to the wrong address and crash.
 
-### 3. Memory Protection (`mprotect`)
-Linux strictly enforces W^X (Write XOR Execute). When applying a hook manually or when writing a pattern scanner, you must modify page permissions.
-- Get the page size: `sysconf(_SC_PAGESIZE)`
-- Align the address: `(uintptr_t)addr & ~(page_size - 1)`
-- Change permissions before hooking: `mprotect(aligned_addr, len, PROT_READ | PROT_WRITE | PROT_EXEC)`
-- **CRITICAL:** Always restore original permissions after modifying `.text` sections.
+`subhook` may remain for isolated experimental probes, but it is not the preferred implementation for `UObject::ProcessEvent`.
 
-### 4. Avoiding DLL Loaders
-Do not implement custom PE or DLL loaders. The runtime is injected using `LD_PRELOAD`.
+## Memory Protection
+
+When patching `.text`:
+
+1. Get page size with `sysconf(_SC_PAGESIZE)`.
+2. Align start address down to page boundary.
+3. Align end address up to page boundary.
+4. `mprotect(..., PROT_READ | PROT_WRITE | PROT_EXEC)`.
+5. Write patch.
+6. Flush instruction cache with `__builtin___clear_cache`.
+7. Restore the mapping's original permissions when they are known. Use `PROT_READ |
+   PROT_EXEC` only when the target is confirmed to be an executable text mapping and the
+   original permissions cannot be recovered.
+
+## Operational Safety
+
+- Keep hook enablement per map via `/servidor/ark/obelisk/state`.
+- Validate the core hook with plugins disabled first.
+- Keep tracing disabled by default: `OBELISK_PE_TRACE_LIMIT=0`.
+- Never run startup scanners or native exec probes by default.
+
+## Validation
+
 ```bash
-LD_PRELOAD=./libobelisk.so ./ShooterGameServer
-```
-Inside the code, use `__attribute__((constructor))` for initialization.
-
-**Example Bootstrap:**
-```cpp
-#include <cstdio>
-
-__attribute__((constructor))
-void Obelisk_Init() {
-    printf("[Obelisk] Runtime Loaded natively via LD_PRELOAD.\n");
-    // Initialize hooking engine...
-}
+cmake --build build -j"$(nproc)"
+touch /servidor/ark/obelisk/state/enable-process-event-hook-ragnarok
+touch /servidor/ark/obelisk/state/disable-plugins-ragnarok
+./arkserver restart
+tail -n 80 /servidor/ark/obelisk/logs/Obelisk-Ragnarok.log
 ```
 
-## Checklist
-- [ ] Is the hooking library native to Linux/ELF?
-- [ ] Are memory pages aligned correctly before calling `mprotect`?
-- [ ] Is the runtime initialized using compiler constructors rather than external injectors?
+Expected:
+
+- `ProcessEvent absolute x64 hook installed successfully`
+- server process remains alive
+- player can join

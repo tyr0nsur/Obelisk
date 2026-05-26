@@ -1,54 +1,66 @@
 ---
 name: obelisk-ue4-reflection
-description: Guidelines on how to use ProcessEvent and UE4 reflection instead of hardcoded offsets for the Obelisk runtime.
+description: Guides Obelisk work that should decode UE4 objects, UFunctions, FNames, and parameters through reflection instead of fragile raw memory scans.
 ---
 
 # Obelisk UE4 Reflection Skill
 
-**Context:** Obelisk relies on UE4's reflection system (`UObject`, `UFunction`, `ProcessEvent`) rather than hardcoded memory offsets. This ensures the runtime remains robust across ARK server updates.
+Use this skill when building gameplay APIs, chat interception, SDK wrappers, object lookup,
+or parameter decoding for ARK's Linux UE4 server.
 
-**When to use this skill:**
-- When needing to access game data (Player, Dino, World).
-- When searching for a function to hook or call.
-- When creating SDK wrappers.
+## Current Reality
 
-## Principles: Reflection over Offsets
+- `UObject::ProcessEvent` is hookable and currently observed around `0x1d34e20` on the
+  validated Ragnarok binary.
+- `UObjectBase::NamePrivate.ComparisonIndex` has been observed at object offset `0x18`
+  and `Number` at `0x1c`.
+- The chat experiment has seen likely `FName` indices:
+  - `ServerChat`: `9622`
+  - `ClientMessage`: `9619`
+- These indices are useful research clues, not a stable public API.
+- `ChatPlugin` currently uses raw parameter probing and FString heuristics. Treat that as
+  temporary discovery code, not the final architecture.
 
-### 1. Intercepting and Calling Gameplay Functions
-The primary artery for UE4 gameplay logic is `UObject::ProcessEvent`.
-Instead of searching for offsets for every function (e.g., `AddExperience`, `BroadcastMessage`), we:
-1. Locate `UObject::ProcessEvent`.
-2. Find the specific `UFunction` by name using the Global Objects Array (GObjects) or `FindObject<UFunction>("Function Name")`.
-3. Intercept it using our central `ProcessEvent` hook, or call it directly by allocating the parameters struct.
+## Reflection Direction
 
-### 2. FName Handling
-UE4 relies heavily on `FName` for identifying objects and properties.
-- When implementing reflection tools, ensure you locate the `FName::ToString` or `FNamePool` logic.
+Build toward a real UE4 metadata pipeline:
 
-### 3. Creating SDK Wrappers
-When building the `sdk/` wrappers (e.g., `Player`, `Dino`), abstract the `ProcessEvent` calls away from the user.
+1. Resolve `FName` indices to strings through `GNames`/`FNamePool`.
+2. Resolve `GUObjectArray`/`GObjects`.
+3. Enumerate `UObject` instances and identify `UFunction` objects.
+4. Model enough `UFunction` fields to read flags, `NumParms`, `ParmsSize`, and the property
+   chain.
+5. Model `UProperty`/`FProperty` offsets and types for function parameters.
+6. Decode `ProcessEvent` params from reflected metadata instead of scanning arbitrary memory.
+7. Expose stable Obelisk-level events such as `OnChatMessage` only after metadata-backed
+   decoding exists.
 
-**SDK Wrapper Pattern:**
-```cpp
-// Inside sdk/Player.cpp
-void Player::GiveItem(const char* blueprint_path, int quantity) {
-    // 1. Get the target UFunction from reflection
-    UFunction* func = FindFunctionByName("Function ShooterGame.ShooterPlayerController.GiveItem");
-    
-    // 2. Setup the struct mimicking the UE4 parameters
-    struct GiveItemParams {
-        FString BlueprintPath;
-        int Quantity;
-    } params;
-    
-    // ... Initialize params ...
-    
-    // 3. Call ProcessEvent
-    this->internal_uobject->ProcessEvent(func, &params);
-}
-```
+## Parameter Decoding Rules
 
-## Checklist for Reflection Usage
-- [ ] Is the data accessible via `UProperty` reflection rather than a hardcoded struct offset?
-- [ ] Have you verified the `UFunction` signature using a recent Dumper-7 or UE4SS output?
-- [ ] Are we using `ProcessEvent` instead of a direct function call offset when possible?
+- Prefer reflected property offsets over hardcoded struct offsets.
+- Validate `ParmsSize` before reading a parameter buffer.
+- Decode strings with a known UE4 `FString` layout for this binary, not by accepting any
+  readable pointer-like value.
+- Do not send chat or client messages from inside a pre-hook until reentrancy and caller
+  object semantics are understood.
+- Do not cache a `UFunction*` or caller object as valid unless it has been verified against
+  the object array or another reliable lifetime signal.
+
+## ChatPlugin Guidance
+
+- Keep chat interception experimental until `ServerChat` and outbound message functions are
+  resolved through reflection.
+- Do not expand raw `0x00..0x80` param scanning as the long-term fix.
+- Avoid manual construction of `ClientMessage` params until the real property layout is
+  decoded.
+- Prefer logging metadata discoveries over mutating gameplay state while researching.
+- On live servers, keep plugin discovery off unless testing a known safe build.
+
+## Review Checklist
+
+- [ ] Does this code resolve names/objects/functions through UE4 metadata where possible?
+- [ ] Are all raw offsets documented with binary hash, map/server, and validation evidence?
+- [ ] Is `FName` index use treated as a hint rather than a stable identifier?
+- [ ] Are parameter reads bounded by `ParmsSize` and property metadata?
+- [ ] Does the implementation avoid blocking or unsafe UE4 calls inside ProcessEvent hooks?
+- [ ] Is experimental reflection or chat discovery gated by environment variables/config?

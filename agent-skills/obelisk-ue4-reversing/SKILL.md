@@ -1,40 +1,86 @@
 ---
 name: obelisk-ue4-reversing
-description: Commands, procedures, and tools for reverse engineering the Linux UE4 ShooterGameServer to maintain Obelisk's compatibility.
+description: Operational reversing workflow for maintaining Obelisk against ARK Linux ShooterGameServer updates, signatures, FName/object globals, and safe experiments.
 ---
 
 # Obelisk UE4 Reversing Skill
 
-**Context:** ARK updates frequently break signatures and offsets. Obelisk maintains an active reversing strategy to keep the runtime working. This skill covers how to inspect the Linux binary.
+Use this skill when an ARK update changes signatures, ProcessEvent discovery fails, chat
+events are not detected, reflection globals need validation, or a server crash may be tied
+to native hooks.
 
-**When to use this skill:**
-- When an update breaks the `ProcessEvent` hook or reflection system.
-- When you need to find the signature of a new UE4 function.
-- When debugging a crash related to `ShooterGameServer`.
+## Ground Truth First
 
-## Reversing Toolkit
+Record this before accepting a new offset or pattern:
 
-### 1. Static Analysis Command-line Tools
-The primary tools for ELF inspection are native to Linux binutils:
-- **`readelf`**: Use `readelf -Ws ShooterGameServer` to dump all symbols.
-- **`nm`**: Use `nm -D ShooterGameServer` or `nm -C` (to demangle C++ names) to find exported and internal symbols.
-- **`objdump`**: Use `objdump -d ShooterGameServer` to disassemble specific sections if you need to build a byte signature.
+- Absolute path to `ShooterGameServer`.
+- Binary hash: `sha256sum ShooterGameServer`.
+- Server/map tested, for example Ragnarok or TheIsland.
+- Obelisk commit hash and build type.
+- Whether plugins were enabled or disabled.
+- Exact env/config gates used for the test.
 
-### 2. GDB (Dynamic Analysis)
-Use `gdb` to attach to a running server or start it under debug.
-- Run under GDB: `gdb --args ./ShooterGameServer "TheIsland?listen"`
-- Set environment variables in GDB: `set environment LD_PRELOAD=./libobelisk.so`
-- Find memory maps: `info proc mappings`
+## Static Toolkit
 
-### 3. Signature Generation
-When `dlsym` isn't enough (because a symbol is stripped or internal), create an IDA/Ghidra style pattern (e.g., `48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 57 41 56 41 57 48 83 EC ? 48 8B 05 ? ? ? ? 48 33 C4`).
-- Use Capstone at runtime to verify instructions if you are scanning memory dynamically.
+Use Linux-native inspection first:
 
-### 4. UE4SS and Dumper-7
-While Obelisk operates natively, you can use output from `Dumper-7` or `UE4SS` (run on a Windows client or server if necessary) to understand the `UObject` layouts and `UFunction` names.
-- Map the dumped `FNames` and `ProcessEvent` structures to your Linux signatures.
+```bash
+readelf -Ws ShooterGameServer
+nm -D ShooterGameServer
+nm -C ShooterGameServer
+objdump -d --start-address=0xADDR --stop-address=0xADDR ShooterGameServer
+c++filt '<mangled-name>'
+sha256sum ShooterGameServer
+```
+
+Use `/proc/<pid>/maps` to confirm loaded ranges for the live process. Prefer stable evidence
+from the ELF executable segment plus runtime maps over guesses from one crash log.
+
+## ProcessEvent Maintenance
+
+- Current validated Ragnarok candidate: `0x1d34e20`.
+- Previous false positive: `0x1d11cb0`. Do not reuse it just because a pattern finds it.
+- Pattern scanning should produce exactly one strong candidate. Multiple candidates means
+  the signature is not precise enough.
+- Fallbacks like `base + 0x1D34E20` are unsafe unless the binary hash and prologue are
+  validated for that exact build.
+- Before installing the hook, verify the target is executable, inside the expected module,
+  and has a known compatible prologue.
+- Manual trampolines must account for instruction boundaries and RIP-relative relocation.
+  If the prologue changes, use a decoder such as Capstone/Zydis or refuse to hook.
+
+## Reflection Research
+
+Known research targets:
+
+- Locate `GNames`/`FNamePool` and implement `FName` index-to-string.
+- Locate `GUObjectArray`/`GObjects`.
+- Enumerate `UFunction` objects and validate names for `ServerChat`, `ClientMessage`, and
+  related ShooterGame functions.
+- Recover enough property metadata to decode `ProcessEvent` parameter buffers.
+
+`ReflectionScanner` may scan UTF-32 names such as `ServerSendChatMessage`, `ServerChat`,
+`ClientServerChatMessage`, `ClientChatMessage`, and `ClientMessage`, plus mov-immediate and
+RIP-relative references. Treat results as candidates until cross-validated by object and
+property metadata.
+
+## Live Server Safety
+
+- Keep `OBELISK_ENABLE_PROCESS_EVENT_HOOK=1` plus plugins disabled as the baseline safe
+  runtime test.
+- Do not enable `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` on live servers.
+- Do not enable broad chat discovery on a production map until it has survived an isolated
+  server test.
+- Use small `OBELISK_PE_TRACE_LIMIT` windows only when capturing evidence; default should
+  remain quiet.
+- If a plugin crashes during load/init, disable plugins first and preserve logs/core files
+  for analysis.
 
 ## Checklist
-- [ ] Have you verified if the symbol is exported via `nm -D` before resorting to signature scanning?
-- [ ] Are you using demangled names (`c++filt`) when searching for specific UE4 classes?
-- [ ] Have you tested the signature against the latest `ShooterGameServer` binary using Capstone or GDB?
+
+- [ ] Did you hash and identify the exact server binary before accepting the result?
+- [ ] Did the pattern produce one candidate and reject known false positives?
+- [ ] Did you validate executable range and prologue before hook installation?
+- [ ] Did you avoid native exec probes on live servers?
+- [ ] Are candidate globals/functions confirmed by more than string proximity?
+- [ ] Are new offsets documented with commit, binary hash, and observed map/server?
