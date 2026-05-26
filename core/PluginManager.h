@@ -21,6 +21,7 @@ namespace Obelisk::Core
         struct PluginInfo {
             std::string name;
             void* handle;
+            void* owner;
         };
 
         std::vector<PluginInfo> m_LoadedPlugins;

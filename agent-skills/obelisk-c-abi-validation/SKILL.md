@@ -14,10 +14,12 @@ that a `.so` will consume.
 - The runtime loads plugins with `dlopen` and calls exported C entry points.
 - Plugins receive an `ObeliskApi` function table.
 - Event callbacks may be global or filtered by `FName` index.
-- The current API still needs a versioned header (`abi_version`, `struct_size`, and
-  capability flags) before it should be treated as stable for third-party plugins.
-- Callback ownership and unregister-on-unload are priority hardening work. Raw callback
-  pointers must not survive plugin init failure, plugin unload, or `dlclose`.
+- The current API appends `abi_version`, `struct_size`, and capability flags after the
+  original function table to preserve existing offsets. Treat this as an ABI v1 bridge, not
+  the final ABI shape.
+- Callback ownership and unregister-on-unload exist for plugin ProcessEvent callbacks.
+  Preserve that behavior: raw callback pointers must not survive plugin init failure,
+  plugin unload, or `dlclose`.
 
 ## Required Boundary Rules
 
@@ -33,7 +35,8 @@ that a `.so` will consume.
 
 ## API Versioning Pattern
 
-When changing `ObeliskApi`, add or preserve a header like this:
+When designing a future ABI-breaking `ObeliskApi` v2, prefer a front-loaded header like
+this:
 
 ```cpp
 struct ObeliskApi {
@@ -48,8 +51,10 @@ struct ObeliskApi {
 
 Validation rules:
 
-- Runtime fills `abi_version` and `struct_size`.
-- Plugin validates both before using later fields.
+- Runtime fills `abi_version` and `struct_size`. In ABI v1 these fields are appended for
+  compatibility; in a future ABI v2 they should move to the front.
+- Plugin validates both before using later fields when compiled against an ABI that exposes
+  them.
 - New API functions are appended to avoid shifting older field offsets.
 - Removing or retyping fields is an ABI break and requires a major version bump.
 

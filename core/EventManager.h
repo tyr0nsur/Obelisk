@@ -3,6 +3,7 @@
 #include "api/ObeliskApi.h"
 #include <vector>
 #include <mutex>
+#include <cstddef>
 
 namespace Obelisk::Core
 {
@@ -15,6 +16,11 @@ namespace Obelisk::Core
         void RegisterPostProcessEvent(OnProcessEventCallback callback);
         void RegisterPreProcessEventForNameIndex(int32_t nameIndex, OnProcessEventCallback callback);
         void RegisterPostProcessEventForNameIndex(int32_t nameIndex, OnProcessEventCallback callback);
+        void RegisterPreProcessEventOwned(void* owner, OnProcessEventCallback callback);
+        void RegisterPostProcessEventOwned(void* owner, OnProcessEventCallback callback);
+        void RegisterPreProcessEventForNameIndexOwned(void* owner, int32_t nameIndex, OnProcessEventCallback callback);
+        void RegisterPostProcessEventForNameIndexOwned(void* owner, int32_t nameIndex, OnProcessEventCallback callback);
+        size_t UnregisterCallbacksForOwner(void* owner);
 
         bool HasPreProcessEventCallbacks();
         bool HasPostProcessEventCallbacks();
@@ -30,10 +36,17 @@ namespace Obelisk::Core
         EventManager() = default;
         ~EventManager() = default;
 
+        struct CallbackRegistration {
+            int32_t nameIndex;
+            OnProcessEventCallback callback;
+            void* owner;
+        };
+
         std::mutex m_Mutex;
-        std::vector<OnProcessEventCallback> m_PreProcessEventCallbacks;
-        std::vector<OnProcessEventCallback> m_PostProcessEventCallbacks;
-        std::vector<std::pair<int32_t, OnProcessEventCallback>> m_FilteredPreProcessEventCallbacks;
-        std::vector<std::pair<int32_t, OnProcessEventCallback>> m_FilteredPostProcessEventCallbacks;
+        std::mutex m_DispatchMutex;
+        std::vector<CallbackRegistration> m_PreProcessEventCallbacks;
+        std::vector<CallbackRegistration> m_PostProcessEventCallbacks;
+        std::vector<CallbackRegistration> m_FilteredPreProcessEventCallbacks;
+        std::vector<CallbackRegistration> m_FilteredPostProcessEventCallbacks;
     };
 }

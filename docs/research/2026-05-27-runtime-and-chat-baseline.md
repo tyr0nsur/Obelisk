@@ -32,18 +32,19 @@ the initial live-server investigation.
 
 ## Current Risks
 
-- Plugin callbacks are raw function pointers and need plugin-owned unregister handling
-  before init failure, unload, or `dlclose`.
-- The public plugin API needs `abi_version`, `struct_size`, and capabilities before being
-  treated as stable.
+- Plugin callbacks now carry owner tokens and unregister before init failure cleanup,
+  unload, or `dlclose`; see `2026-05-27-plugin-callback-ownership-hardening.md`.
+- The public plugin API now appends `abi_version`, `struct_size`, and capabilities as an
+  ABI v1 compatibility bridge. A future ABI-major layout should put version metadata at the
+  front and reject incompatible plugins explicitly.
 - Manual ProcessEvent trampoline logic must be hardened against prologue changes and
   RIP-relative instructions.
 - ChatPlugin still relies on raw parameter scanning and FString heuristics.
 
 ## Next Steps
 
-1. Add callback ownership and unregister paths in the runtime.
-2. Add ABI version/size validation to `ObeliskApi`.
-3. Resolve `FName` indices to strings through `GNames` or `FNamePool`.
-4. Locate `GUObjectArray`/`GObjects` and enumerate `UFunction` metadata.
-5. Replace ChatPlugin raw memory probing with reflected parameter decoding.
+1. Resolve `FName` indices to strings through `GNames` or `FNamePool`.
+2. Locate `GUObjectArray`/`GObjects` and enumerate `UFunction` metadata.
+3. Replace ChatPlugin raw memory probing with reflected parameter decoding.
+4. Design a future ABI v2 with front-loaded version metadata and explicit rejection of
+   incompatible plugins.

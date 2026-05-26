@@ -3,6 +3,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#define OBELISK_API_ABI_VERSION 1u
+#define OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS (1ull << 0)
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -32,6 +35,12 @@ struct ObeliskApi {
 
     // Call Original ProcessEvent (for executing UE functions)
     void (*CallProcessEvent)(void* caller, void* function, void* parms);
+
+    // ABI metadata appended for compatibility with the original function table layout.
+    // Future ABI-breaking layouts should move these fields to the front with a version bump.
+    uint32_t abi_version;
+    uint32_t struct_size;
+    uint64_t capabilities;
 };
 
 // Plugins must export this function to be loaded by Obelisk

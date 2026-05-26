@@ -12,6 +12,26 @@ namespace fs = std::filesystem;
 
 namespace Obelisk::Core
 {
+    namespace
+    {
+        thread_local void* g_CurrentPluginOwner = nullptr;
+
+        void* ResolveCallbackOwner(OnProcessEventCallback callback)
+        {
+            if (g_CurrentPluginOwner)
+                return g_CurrentPluginOwner;
+
+            if (!callback)
+                return nullptr;
+
+            Dl_info info{};
+            if (dladdr(reinterpret_cast<void*>(callback), &info) == 0)
+                return nullptr;
+
+            return info.dli_fbase;
+        }
+    }
+
     // C-API Wrappers for Plugins
     extern "C" {
         void PluginLogInfo(const char* message) { OBELISK_INFO("[Plugin] {}", message ? message : ""); }
@@ -19,16 +39,16 @@ namespace Obelisk::Core
         void PluginLogError(const char* message) { OBELISK_ERROR("[Plugin] {}", message ? message : ""); }
 
         void PluginRegisterPreProcessEvent(OnProcessEventCallback callback) {
-            EventManager::Get().RegisterPreProcessEvent(callback);
+            EventManager::Get().RegisterPreProcessEventOwned(ResolveCallbackOwner(callback), callback);
         }
         void PluginRegisterPostProcessEvent(OnProcessEventCallback callback) {
-            EventManager::Get().RegisterPostProcessEvent(callback);
+            EventManager::Get().RegisterPostProcessEventOwned(ResolveCallbackOwner(callback), callback);
         }
         void PluginRegisterPreProcessEventForNameIndex(int32_t nameIndex, OnProcessEventCallback callback) {
-            EventManager::Get().RegisterPreProcessEventForNameIndex(nameIndex, callback);
+            EventManager::Get().RegisterPreProcessEventForNameIndexOwned(ResolveCallbackOwner(callback), nameIndex, callback);
         }
         void PluginRegisterPostProcessEventForNameIndex(int32_t nameIndex, OnProcessEventCallback callback) {
-            EventManager::Get().RegisterPostProcessEventForNameIndex(nameIndex, callback);
+            EventManager::Get().RegisterPostProcessEventForNameIndexOwned(ResolveCallbackOwner(callback), nameIndex, callback);
         }
         void PluginCallProcessEvent(void* caller, void* function, void* parms) {
             Hooks::ProcessEventHook::CallOriginalProcessEvent(caller, function, parms);
@@ -51,6 +71,9 @@ namespace Obelisk::Core
         m_Api.RegisterPreProcessEventForNameIndex = PluginRegisterPreProcessEventForNameIndex;
         m_Api.RegisterPostProcessEventForNameIndex = PluginRegisterPostProcessEventForNameIndex;
         m_Api.CallProcessEvent = PluginCallProcessEvent;
+        m_Api.abi_version = OBELISK_API_ABI_VERSION;
+        m_Api.struct_size = sizeof(ObeliskApi);
+        m_Api.capabilities = OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS;
     }
 
     PluginManager::~PluginManager()
@@ -105,7 +128,16 @@ namespace Obelisk::Core
                     continue;
                 }
 
+                Dl_info initInfo{};
+                void* pluginOwner = nullptr;
+                if (dladdr(reinterpret_cast<void*>(initFunc), &initInfo) != 0)
+                    pluginOwner = initInfo.dli_fbase;
+                if (!pluginOwner)
+                    pluginOwner = handle;
+
                 bool initialized = false;
+                void* previousOwner = g_CurrentPluginOwner;
+                g_CurrentPluginOwner = pluginOwner;
                 try
                 {
                     initialized = initFunc(&m_Api);
@@ -118,15 +150,19 @@ namespace Obelisk::Core
                 {
                     OBELISK_ERROR("Plugin {} threw an unknown exception during initialization.", pluginName);
                 }
+                g_CurrentPluginOwner = previousOwner;
 
                 if (initialized)
                 {
                     OBELISK_INFO("Plugin {} initialized successfully.", pluginName);
-                    m_LoadedPlugins.push_back({pluginName, handle});
+                    m_LoadedPlugins.push_back({pluginName, handle, pluginOwner});
                 }
                 else
                 {
                     OBELISK_ERROR("Plugin {} failed to initialize.", pluginName);
+                    const size_t removed = EventManager::Get().UnregisterCallbacksForOwner(pluginOwner);
+                    if (removed > 0)
+                        OBELISK_WARN("Removed {} callback(s) registered by failed plugin {} before dlclose.", removed, pluginName);
                     dlclose(handle);
                 }
             }
@@ -146,6 +182,9 @@ namespace Obelisk::Core
         for (auto& plugin : m_LoadedPlugins)
         {
             OBELISK_INFO("Unloading plugin: {}", plugin.name);
+            const size_t removed = EventManager::Get().UnregisterCallbacksForOwner(plugin.owner);
+            if (removed > 0)
+                OBELISK_INFO("Removed {} callback(s) registered by plugin {} before dlclose.", removed, plugin.name);
             dlclose(plugin.handle);
         }
         m_LoadedPlugins.clear();

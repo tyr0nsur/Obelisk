@@ -2,6 +2,7 @@
 
 #include "runtime/Logger.h"
 #include "ue/Memory.h"
+#include "ue/Reflection.h"
 
 #include <subhook.h>
 
@@ -337,6 +338,22 @@ namespace Obelisk::UE
             if (!value || !Obelisk::Memory::IsReadable(value, 0x80))
                 return;
 
+            if (Obelisk::Memory::IsReadable(value, sizeof(UObjectProbe)))
+            {
+                UObjectProbe object{};
+                std::memcpy(&object, value, sizeof(object));
+                OBELISK_INFO("[ReflectionScanner] {} UObject probe: object={} vtable={} flags=0x{:X} internal={} class={} name_index={} name_number={} outer={}",
+                             name,
+                             value,
+                             static_cast<void*>(object.VTable),
+                             object.ObjectFlags,
+                             object.InternalIndex,
+                             object.ClassPrivate,
+                             object.NamePrivate.ComparisonIndex,
+                             object.NamePrivate.Number,
+                             object.OuterPrivate);
+            }
+
             const uintptr_t* qwords = reinterpret_cast<const uintptr_t*>(value);
             OBELISK_INFO("[ReflectionScanner] {} object probe: +00=0x{:X} +08=0x{:X} +10=0x{:X} +18=0x{:X} +20=0x{:X} +28=0x{:X} +30=0x{:X} +38=0x{:X}",
                          name, qwords[0], qwords[1], qwords[2], qwords[3], qwords[4], qwords[5], qwords[6], qwords[7]);
@@ -350,6 +367,24 @@ namespace Obelisk::UE
                 {
                     OBELISK_INFO("[ReflectionScanner] {} executable field candidate global=0x{:X} object={} offset=0x{:X} value=0x{:X}",
                                  name, global, value, offset, field);
+                    uint8_t* base = reinterpret_cast<uint8_t*>(value);
+                    if (Obelisk::Memory::IsReadable(base + 0xA0, 0x40))
+                    {
+                        uint64_t qA0 = 0;
+                        uint64_t qA8 = 0;
+                        uint64_t qB0 = 0;
+                        uint64_t qB8 = 0;
+                        uint64_t qC0 = 0;
+                        uint64_t qC8 = 0;
+                        std::memcpy(&qA0, base + 0xA0, sizeof(qA0));
+                        std::memcpy(&qA8, base + 0xA8, sizeof(qA8));
+                        std::memcpy(&qB0, base + 0xB0, sizeof(qB0));
+                        std::memcpy(&qB8, base + 0xB8, sizeof(qB8));
+                        std::memcpy(&qC0, base + 0xC0, sizeof(qC0));
+                        std::memcpy(&qC8, base + 0xC8, sizeof(qC8));
+                        OBELISK_INFO("[ReflectionScanner] {} UFunction tail window object={} +A0=0x{:X} +A8=0x{:X} +B0=0x{:X} +B8=0x{:X} +C0=0x{:X} +C8=0x{:X}",
+                                     name, value, qA0, qA8, qB0, qB8, qC0, qC8);
+                    }
                     if (offset == 0xA8)
                         InstallNativeExecProbe(name, field);
                     if (++executableFields >= 12)

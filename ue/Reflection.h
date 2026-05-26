@@ -1,38 +1,76 @@
 #pragma once
-#include <stdint.h>
+
+#include <cstdint>
+#include <cstddef>
 #include <string>
 
 namespace Obelisk::UE
 {
-    struct FString {
+    struct FString
+    {
         void* Data;
         int32_t ArrayNum;
         int32_t ArrayMax;
 
-        std::string ToString() const {
-            if (!Data || ArrayNum <= 0) return "";
-            
+        bool IsSane(int32_t maxChars = 2048) const
+        {
+            if (!Data || ArrayNum <= 0 || ArrayNum > maxChars)
+                return false;
+            if (ArrayMax < ArrayNum || ArrayMax > maxChars * 2)
+                return false;
+
+            uintptr_t p = reinterpret_cast<uintptr_t>(Data);
+            return p >= 0x10000 && p <= 0x00007FFFFFFFFFFF;
+        }
+
+        template <typename CharT>
+        std::string ToAsciiString(size_t maxChars = 1024) const
+        {
             std::string result;
-            // ARK Linux usually uses 4-byte wchar_t or 2-byte char16_t depending on the compiler flags.
-            // Let's assume 2-byte char16_t for TCHAR as it's standard UE4, but we can safely read it
-            // by just casting to char* and reading every 2nd or 4th byte if it's wide.
-            
-            // For safety, let's just read it as 2-byte chars first
-            char16_t* ptr = (char16_t*)Data;
-            for (int32_t i = 0; i < ArrayNum && i < 1024; ++i) {
-                if (ptr[i] == 0) break;
-                // Basic ASCII downcast
-                result += (char)(ptr[i] & 0xFF);
+            if (!IsSane())
+                return result;
+
+            const CharT* ptr = static_cast<const CharT*>(Data);
+            int32_t limit = ArrayNum < static_cast<int32_t>(maxChars) ? ArrayNum : static_cast<int32_t>(maxChars);
+            for (int32_t i = 0; i < limit; ++i)
+            {
+                if (ptr[i] == 0)
+                    break;
+                result += ptr[i] < 0x80 ? static_cast<char>(ptr[i]) : '?';
             }
             return result;
         }
     };
 
-    // Very basic structural representation of PreLogin params
-    // Note: FUniqueNetIdRepl size can vary. In 4.5 it's usually small.
-    // If we assume standard 64-bit packing:
-    // 0x00: FString Options (16 bytes)
-    // 0x10: FString Address (16 bytes)
-    // 0x20: FUniqueNetIdRepl UniqueId (Size unknown, maybe 16-24 bytes)
-    // 0x??: FString ErrorMessage
+    struct FName
+    {
+        int32_t ComparisonIndex;
+        int32_t Number;
+    };
+
+    struct UObjectBase
+    {
+        void** VTable;
+        int32_t ObjectFlags;
+        int32_t InternalIndex;
+        void* ClassPrivate;
+        FName NamePrivate;
+    };
+
+    struct UObjectProbe : UObjectBase
+    {
+        void* OuterPrivate;
+    };
+
+    // Candidate UE4 UFunction tail fields. Offsets are not accepted as facts until
+    // validated against the target ARK binary; use only for bounded research logging.
+    struct UFunctionMetadataProbe
+    {
+        uint64_t CandidateFunctionFlags;
+        uint16_t CandidateNumParms;
+        uint16_t CandidateParmsSize;
+        uint16_t CandidateReturnValueOffset;
+        uint16_t CandidateRpcId;
+        uint16_t CandidateRpcResponseId;
+    };
 }

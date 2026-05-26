@@ -10,6 +10,9 @@ Updated: 2026-05-27
   `/servidor/ark/obelisk/state/disable-plugins-ragnarok`.
 - fact: Runtime/chat baseline is documented in
   `docs/research/2026-05-27-runtime-and-chat-baseline.md`.
+- fact: Reflection/chat metadata audit added shared UE probe layouts and gated
+  ReflectionScanner object/UFunction tail logging; see
+  `docs/research/2026-05-27-reflection-chat-metadata-audit.md`.
 
 ## Rejected Or Unsafe
 
@@ -20,10 +23,18 @@ Updated: 2026-05-27
 
 ## Priority Next Steps
 
-- next-step: Implement plugin-owned callback unregister before plugin unload or `dlclose`.
-- next-step: Add `abi_version`, `struct_size`, and capabilities to `ObeliskApi`.
+- fact: Plugin ProcessEvent callbacks now carry owner tokens and are unregistered on init
+  failure and before unload/`dlclose`; see
+  `docs/research/2026-05-27-plugin-callback-ownership-hardening.md`.
+- fact: `ObeliskApi` now appends `abi_version`, `struct_size`, and `capabilities` without
+  shifting existing function-pointer offsets; front-loaded ABI headers remain a future
+  major-version plan.
+- fact: Full build completed after fixing `ue/ReflectionScanner.cpp` pointer formatting in
+  the reflection/chat metadata audit.
 - next-step: Resolve `FName` indices through `GNames` or `FNamePool`.
 - next-step: Locate `GUObjectArray`/`GObjects` and enumerate `UFunction` metadata.
+- next-step: Use isolated ReflectionScanner captures to validate candidate object shapes
+  before accepting any `GObjects`, `GNames`, or `UFunction` offset.
 - next-step: Replace ChatPlugin raw parameter probing with reflected parameter decoding.
 
 ## Agent Protocol

@@ -1,5 +1,6 @@
 #include "EventManager.h"
 #include "runtime/Logger.h"
+#include <algorithm>
 #include <exception>
 
 namespace Obelisk::Core
@@ -12,26 +13,70 @@ namespace Obelisk::Core
 
     void EventManager::RegisterPreProcessEvent(OnProcessEventCallback callback)
     {
-        std::lock_guard<std::mutex> lock(m_Mutex);
-        m_PreProcessEventCallbacks.push_back(callback);
+        RegisterPreProcessEventOwned(nullptr, callback);
     }
 
     void EventManager::RegisterPostProcessEvent(OnProcessEventCallback callback)
     {
-        std::lock_guard<std::mutex> lock(m_Mutex);
-        m_PostProcessEventCallbacks.push_back(callback);
+        RegisterPostProcessEventOwned(nullptr, callback);
     }
 
     void EventManager::RegisterPreProcessEventForNameIndex(int32_t nameIndex, OnProcessEventCallback callback)
     {
-        std::lock_guard<std::mutex> lock(m_Mutex);
-        m_FilteredPreProcessEventCallbacks.push_back({nameIndex, callback});
+        RegisterPreProcessEventForNameIndexOwned(nullptr, nameIndex, callback);
     }
 
     void EventManager::RegisterPostProcessEventForNameIndex(int32_t nameIndex, OnProcessEventCallback callback)
     {
+        RegisterPostProcessEventForNameIndexOwned(nullptr, nameIndex, callback);
+    }
+
+    void EventManager::RegisterPreProcessEventOwned(void* owner, OnProcessEventCallback callback)
+    {
         std::lock_guard<std::mutex> lock(m_Mutex);
-        m_FilteredPostProcessEventCallbacks.push_back({nameIndex, callback});
+        m_PreProcessEventCallbacks.push_back({-1, callback, owner});
+    }
+
+    void EventManager::RegisterPostProcessEventOwned(void* owner, OnProcessEventCallback callback)
+    {
+        std::lock_guard<std::mutex> lock(m_Mutex);
+        m_PostProcessEventCallbacks.push_back({-1, callback, owner});
+    }
+
+    void EventManager::RegisterPreProcessEventForNameIndexOwned(void* owner, int32_t nameIndex, OnProcessEventCallback callback)
+    {
+        std::lock_guard<std::mutex> lock(m_Mutex);
+        m_FilteredPreProcessEventCallbacks.push_back({nameIndex, callback, owner});
+    }
+
+    void EventManager::RegisterPostProcessEventForNameIndexOwned(void* owner, int32_t nameIndex, OnProcessEventCallback callback)
+    {
+        std::lock_guard<std::mutex> lock(m_Mutex);
+        m_FilteredPostProcessEventCallbacks.push_back({nameIndex, callback, owner});
+    }
+
+    size_t EventManager::UnregisterCallbacksForOwner(void* owner)
+    {
+        if (!owner)
+            return 0;
+
+        std::lock_guard<std::mutex> dispatchLock(m_DispatchMutex);
+        std::lock_guard<std::mutex> lock(m_Mutex);
+
+        auto removeForOwner = [owner](auto& callbacks) -> size_t {
+            const size_t before = callbacks.size();
+            callbacks.erase(
+                std::remove_if(callbacks.begin(), callbacks.end(), [owner](const CallbackRegistration& item) {
+                    return item.owner == owner;
+                }),
+                callbacks.end());
+            return before - callbacks.size();
+        };
+
+        return removeForOwner(m_PreProcessEventCallbacks) +
+               removeForOwner(m_PostProcessEventCallbacks) +
+               removeForOwner(m_FilteredPreProcessEventCallbacks) +
+               removeForOwner(m_FilteredPostProcessEventCallbacks);
     }
 
     bool EventManager::HasPreProcessEventCallbacks()
@@ -49,9 +94,11 @@ namespace Obelisk::Core
     bool EventManager::TriggerPreProcessEvent(void* caller, void* function, void* parms)
     {
         std::vector<OnProcessEventCallback> callbacks;
+        std::lock_guard<std::mutex> dispatchLock(m_DispatchMutex);
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
-            callbacks = m_PreProcessEventCallbacks;
+            for (const auto& item : m_PreProcessEventCallbacks)
+                callbacks.push_back(item.callback);
         }
 
         for (auto callback : callbacks)
@@ -82,12 +129,13 @@ namespace Obelisk::Core
             return false;
 
         std::vector<OnProcessEventCallback> callbacks;
+        std::lock_guard<std::mutex> dispatchLock(m_DispatchMutex);
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
             for (const auto& item : m_FilteredPreProcessEventCallbacks)
             {
-                if (item.first == nameIndex)
-                    callbacks.push_back(item.second);
+                if (item.nameIndex == nameIndex)
+                    callbacks.push_back(item.callback);
             }
         }
 
@@ -116,9 +164,11 @@ namespace Obelisk::Core
     void EventManager::TriggerPostProcessEvent(void* caller, void* function, void* parms)
     {
         std::vector<OnProcessEventCallback> callbacks;
+        std::lock_guard<std::mutex> dispatchLock(m_DispatchMutex);
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
-            callbacks = m_PostProcessEventCallbacks;
+            for (const auto& item : m_PostProcessEventCallbacks)
+                callbacks.push_back(item.callback);
         }
 
         for (auto callback : callbacks)
@@ -146,12 +196,13 @@ namespace Obelisk::Core
         TriggerPostProcessEvent(caller, function, parms);
 
         std::vector<OnProcessEventCallback> callbacks;
+        std::lock_guard<std::mutex> dispatchLock(m_DispatchMutex);
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
             for (const auto& item : m_FilteredPostProcessEventCallbacks)
             {
-                if (item.first == nameIndex)
-                    callbacks.push_back(item.second);
+                if (item.nameIndex == nameIndex)
+                    callbacks.push_back(item.callback);
             }
         }
 

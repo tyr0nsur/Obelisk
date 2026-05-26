@@ -14,8 +14,13 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include "extern/nlohmann/json.hpp" // Librería JSON unificada
+#include "ue/Reflection.h"
 
 using json = nlohmann::json;
+using Obelisk::UE::FName;
+using Obelisk::UE::FString;
+using Obelisk::UE::UObjectBase;
+
 static bool IsReadable(void* ptr, size_t size) {
     if (!ptr || size == 0) return false;
     static int fd = -1;
@@ -23,68 +28,6 @@ static bool IsReadable(void* ptr, size_t size) {
     if (fd < 0) return false;
     return write(fd, ptr, size) >= 0;
 }
-
-struct FString {
-    void* Data;
-    int32_t ArrayNum;
-    int32_t ArrayMax;
-
-    bool IsSane() const {
-        if (!Data || ArrayNum <= 0 || ArrayNum > 2048) return false;
-        if (ArrayMax < ArrayNum || ArrayMax > 4096) return false;
-        uintptr_t p = reinterpret_cast<uintptr_t>(Data);
-        if (p < 0x10000 || p > 0x00007FFFFFFFFFFF) return false;
-        return true; // We defer IsReadable to ToString to save syscalls
-    }
-
-    std::string ToString() const {
-        if (!IsSane()) return "";
-
-        std::string utf16;
-        if (IsReadable(Data, static_cast<size_t>(ArrayNum) * sizeof(char16_t))) {
-            char16_t* ptr = static_cast<char16_t*>(Data);
-            for (int32_t i = 0; i < ArrayNum && i < 1024; ++i) {
-                if (ptr[i] == 0) break;
-                if (ptr[i] < 0x80) utf16 += static_cast<char>(ptr[i]);
-                else utf16 += '?';
-            }
-        }
-
-        std::string utf32;
-        if (IsReadable(Data, static_cast<size_t>(ArrayNum) * sizeof(char32_t))) {
-            char32_t* ptr = static_cast<char32_t*>(Data);
-            for (int32_t i = 0; i < ArrayNum && i < 1024; ++i) {
-                if (ptr[i] == 0) break;
-                if (ptr[i] < 0x80) utf32 += static_cast<char>(ptr[i]);
-                else utf32 += '?';
-            }
-        }
-
-        auto score = [](const std::string& value) {
-            int result = 0;
-            for (unsigned char ch : value) {
-                if (std::isprint(ch) || std::isspace(ch)) ++result;
-                else result -= 4;
-            }
-            return result;
-        };
-
-        return score(utf32) > score(utf16) ? utf32 : utf16;
-    }
-};
-
-struct FName {
-    int32_t ComparisonIndex;
-    int32_t Number;
-};
-
-struct UObjectBase {
-    void** VTable;
-    int32_t ObjectFlags;
-    int32_t InternalIndex;
-    void* ClassPrivate;
-    FName NamePrivate;
-};
 
 static ObeliskApi* g_Api = nullptr;
 
@@ -235,7 +178,26 @@ static bool ReadFStringAt(void* parms, int32_t offset, FStringHit& out) {
     if (!IsReadable(candidate, sizeof(FString))) return false;
     if (!candidate->IsSane()) return false;
 
-    std::string text = candidate->ToString();
+    auto score = [](const std::string& value) {
+        int result = 0;
+        for (unsigned char ch : value) {
+            if (std::isprint(ch) || std::isspace(ch)) ++result;
+            else result -= 4;
+        }
+        return result;
+    };
+
+    std::string utf16;
+    if (IsReadable(candidate->Data, static_cast<size_t>(candidate->ArrayNum) * sizeof(char16_t))) {
+        utf16 = candidate->ToAsciiString<char16_t>();
+    }
+
+    std::string utf32;
+    if (IsReadable(candidate->Data, static_cast<size_t>(candidate->ArrayNum) * sizeof(char32_t))) {
+        utf32 = candidate->ToAsciiString<char32_t>();
+    }
+
+    std::string text = score(utf32) > score(utf16) ? utf32 : utf16;
     if (!LooksLikeChatText(text)) return false;
 
     out = { offset, candidate, text };
