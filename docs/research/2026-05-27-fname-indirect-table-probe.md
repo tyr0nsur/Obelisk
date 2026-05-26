@@ -51,7 +51,7 @@ passive:
 Expected log shape if a candidate is found:
 
 ```text
-[ReflectionScanner] <target> FName indirect-table probe: table=<ptr> score=<n>/8 num_elements=<n> num_chunks=<n> none='<name>' client_message='<name>' server_chat='<name>'
+[ReflectionScanner] <target> FName indirect-table probe: table=<ptr> score=<n>/8 readable_clues=<n>/3 matched_clues=<n>/3 num_elements=<n> num_chunks=<n> none='<name>' client_message='<name>' server_chat='<name>'
 ```
 
 ## Result

@@ -428,10 +428,12 @@ namespace Obelisk::UE
             if (score < 2 || readableClues == 0)
                 return;
 
-            OBELISK_INFO("[ReflectionScanner] {} FName indirect-table probe: table={} score={}/8 num_elements={} num_chunks={} none='{}' client_message='{}' server_chat='{}'",
+            OBELISK_INFO("[ReflectionScanner] {} FName indirect-table probe: table={} score={}/8 readable_clues={}/3 matched_clues={}/3 num_elements={} num_chunks={} none='{}' client_message='{}' server_chat='{}'",
                          name,
                          value,
                          score,
+                         readableClues,
+                         matchedClues,
                          numElements,
                          numChunks,
                          previews[0],

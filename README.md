@@ -112,6 +112,7 @@ Main build outputs:
 ```text
 build/libobelisk.so
 build/plugins/chat/ChatPlugin.so
+build/helloworld_plugin/HelloWorldPlugin.so
 build/_deps/subhook-build/libsubhook.so
 ```
 
