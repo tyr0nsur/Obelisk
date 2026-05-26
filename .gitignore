@@ -1,0 +1,4 @@
+build/
+Obelisk.log
+.DS_Store
+*.so
