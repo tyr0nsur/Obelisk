@@ -226,6 +226,10 @@ Updated: 2026-05-27
 - fact: `packaging/linuxgsm/ObeliskRun.sh` supports
   `state/instances/<id>/enable-chat-reflection` to set the experimental chat reflection
   gates and default log limit on restart.
+- fact: Commit `e115300` plus local runtime build was deployed to `/servidor/ark/obelisk`
+  and `arkserver` was restarted. Current PID `3154298` has
+  `OBELISK_ENABLE_CHAT_REFLECTION=1`, matching SHA gate, ProcessEvent hook installed at
+  `0x1d34e20`, plugins disabled, and stable posture confirmed.
 
 ## Rejected Or Unsafe
 
@@ -287,6 +291,8 @@ Updated: 2026-05-27
   see `docs/research/2026-05-27-runtime-chat-reflection-plan.md`.
 - next-step: Deploy the new runtime to the isolated debug server with chat reflection env
   gates and write one chat message to confirm `Reflected chat ProcessEvent` log entries.
+- next-step: When an operator can join, write one in-game chat message on Ragnarok and
+  tail `/servidor/ark/obelisk/logs/arkserver/Obelisk.log` for `Reflected chat ProcessEvent`.
 - rollback: remove `enable-chat-reflection` marker and restart the debug server; no plugin
   ABI or config migration is involved.
 - next-step: After a repeat-confirmed `GNames` research candidate appears, generate

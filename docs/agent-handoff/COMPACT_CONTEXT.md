@@ -283,6 +283,9 @@ python3 scripts/analyze_reflectionscanner_capture.py \
   the supported ARK SHA. It logs metadata/ranges only, not text.
 - `packaging/linuxgsm/ObeliskRun.sh` supports the
   `state/instances/<id>/enable-chat-reflection` marker for restart-time activation.
+- Latest deployed runtime on `arkserver` has chat reflection enabled and plugins disabled.
+  It reached the experimental gate log after first ProcessEvent; no chat message has been
+  observed yet in the log.
 - Evidence: after any isolated scanner capture, run
   `scripts/build_reflection_evidence_pack.py` against copied logs and the matching binary
   before promoting candidates.
