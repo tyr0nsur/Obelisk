@@ -102,14 +102,15 @@ Operators can override it before launching the wrapper.
 Instance marker files are preferred for production operations:
 
 ```bash
-mkdir -p /servidor/ark/obelisk/state/instances/arkserver2
-# Experimental, development-only chat observation on TheIsland:
-touch /servidor/ark/obelisk/state/instances/arkserver2/enable-chat-reflection
+# Approved debug window only. Do not run from an ordinary install or agent round.
+# mkdir -p /servidor/ark/obelisk/state/instances/arkserver2
+# touch /servidor/ark/obelisk/state/instances/arkserver2/<approved-marker>
 ```
 
 Do not create, remove, or refresh `arkserver` / Ragnarok markers from install or debug
 rounds. Treat the Ragnarok marker list as observed baseline unless the operator opens a
-Ragnarok maintenance window in the current turn.
+Ragnarok maintenance window in the current turn. Experimental module markers, scanners,
+ptrace/gcore, broad tracing, and restarts require explicit run-window approval.
 
 Useful flags:
 

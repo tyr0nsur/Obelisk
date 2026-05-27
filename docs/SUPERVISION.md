@@ -180,11 +180,13 @@ Interpret the snapshot counters this way:
 - `rejected_chat_lines=0`: no bounded rejection line was logged. This can also mean the
   diagnostic path or log limit suppressed rejection details.
 
-Rollback is marker-only plus a controlled restart:
+Rollback is marker-only plus a controlled restart during the approved debug window. Do not
+run this block from an ordinary documentation review or unattended round:
 
 ```bash
-rm -f /servidor/ark/obelisk/state/instances/arkserver2/enable-chat-reflection
-/servidor/ark/arkserver2 restart
+# Approved debug-window rollback only:
+# rm -f /servidor/ark/obelisk/state/instances/arkserver2/enable-chat-reflection
+# /servidor/ark/arkserver2 restart
 cd /home/flowcommunity-ark/Obelisk
 scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance arkserver2
 scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map TheIsland --instance arkserver2
