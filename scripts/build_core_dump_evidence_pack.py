@@ -56,6 +56,7 @@ OBJDUMP_XREF_RE = re.compile(
 )
 OBJDUMP_FUNCTION_RE = re.compile(r"^(?P<address>[0-9a-fA-F]+)\s+<(?P<label>[^>]+)>:$")
 OBJDUMP_INSTRUCTION_RE = re.compile(r"^\s*(?P<address>[0-9a-fA-F]+):\s+(?P<body>.*)$")
+HEX_LITERAL_RE = re.compile(r"0x[0-9a-fA-F]+")
 ANCHOR_GROUP_MAX_GAP_BYTES = 0x100
 OVERSIZED_FUNCTION_GROUP_XREFS = 512
 OVERSIZED_FUNCTION_GROUP_SPAN_BYTES = 0x10000
@@ -218,7 +219,7 @@ def immediate_targets_from_instruction(instruction: str, targets: dict[str, str]
     return sorted(
         {
             normalize_hex(match)
-            for match in re.findall(r"0x[0-9a-fA-F]+", instruction)
+            for match in HEX_LITERAL_RE.findall(instruction)
             if normalize_hex(match) in targets
         }
     )
@@ -315,6 +316,9 @@ def build_anchor_groups(xrefs: dict[str, list[dict[str, object]]]) -> list[dict[
 
 def collect_static_xrefs(objdump_path: Path, targets: dict[str, str]) -> dict[str, object]:
     xrefs: dict[str, list[dict[str, object]]] = {target: [] for target in targets}
+    target_needles = tuple(
+        sorted({needle for target in targets for needle in (target.lower(), target.lower()[2:])})
+    )
     function_start: str | None = None
     function_label: str | None = None
     with objdump_path.open("r", encoding="utf-8", errors="replace") as handle:
@@ -324,6 +328,10 @@ def collect_static_xrefs(objdump_path: Path, targets: dict[str, str]) -> dict[st
             if function_match:
                 function_start = normalize_hex(function_match.group("address"))
                 function_label = function_match.group("label")
+                continue
+
+            stripped_lower = stripped.lower()
+            if not any(needle in stripped_lower for needle in target_needles):
                 continue
 
             instruction_match = OBJDUMP_INSTRUCTION_RE.match(stripped)

@@ -75,6 +75,11 @@ still does not promote a runtime-stable offset.
 - `function_groups` include `first_xref`, `last_xref`, `xref_span_bytes`, and
   `oversized`, plus separate `anchor_groups` built from small instruction windows.
 
+Validation against the local 1.1GB objdump completed in about 12 seconds and recovered
+`13938` xrefs. Large nearest-symbol buckets were marked `oversized=True`, including
+`0x886d80`, `0xeaa3a0`, `0x12d1400`, and `0x81dc59`; the concrete `0x648400` neighborhood
+containing `0x79ce22`, `0x7a27a7`, and `0x7a27b6` remained non-oversized.
+
 ## Risks
 
 - The binary is stripped; exported labels near these addresses should not be treated as
