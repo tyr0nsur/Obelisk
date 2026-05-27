@@ -243,6 +243,9 @@ Updated: 2026-05-27
   `ServerSendChatMessage` recognizer and restarted `arkserver`. Current PID `3220707` has
   `OBELISK_ENABLE_CHAT_REFLECTION=1`, matching SHA gate, ProcessEvent hook installed at
   `0x1d34e20`, plugins disabled, and stable posture confirmed.
+- fact: Manual post-deploy `ServerSendChatMessage` chat validation commands, expected log
+  lines, `reflected_chat_lines` / `rejected_chat_lines` interpretation, and marker-only
+  rollback are documented in `docs/SUPERVISION.md`.
 - fact: `hooks/ProcessEventChatReflection.{h,cpp}` extracts gate/recognition logic from
   the hook for direct tests. `ProcessEventChatReflectionTests` cover disabled and non-chat
   short-circuit behavior plus valid borrowed param ranges.
@@ -264,9 +267,9 @@ Updated: 2026-05-27
 
 ## Priority Next Steps
 
-- next-step: Write one in-game chat message on Ragnarok and tail
-  `/servidor/ark/obelisk/logs/arkserver/Obelisk.log` for a bounded reflected
-  chat/candidate log entry.
+- next-step: Run the manual `ServerSendChatMessage` chat check in `docs/SUPERVISION.md`
+  by sending one normal in-game Ragnarok chat message and reviewing the bounded reflected
+  chat logs/snapshot.
 - next-step: Wire UTF-32 text decoding into the experimental chat reflection logger only
   after one real `ServerSendChatMessage` capture confirms the reflected params are being
   hit.
