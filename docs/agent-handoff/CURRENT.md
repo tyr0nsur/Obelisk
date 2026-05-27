@@ -53,6 +53,9 @@ Updated: 2026-05-27
 - fact: Top-level CMake now pins `subhook` to local FetchContent commit
   `568d2e5a5d6013907e8008857968906b33ef3b7d` instead of `master`; see
   `docs/research/2026-05-27-subhook-reproducibility.md`.
+- fact: Commit `f755c43` repositioned public docs around Obelisk as a Linux
+  modding runtime/API/SDK. ARK/LinuxGSM are now framed as debug harness/adapters,
+  not the project center.
 
 ## Rejected Or Unsafe
 
@@ -99,8 +102,6 @@ Updated: 2026-05-27
 - next-step: Replace raw chat parameter probing with reflected parameter decoding.
 - next-step: Add binary hash validation or an instruction decoder before accepting future
   ProcessEvent prologue changes.
-- next-step: Reposition public docs around Obelisk as a Linux modding runtime/API/SDK and
-  keep `/servidor/ark`/LinuxGSM framed as a debug harness, not the project center.
 - next-step: Add SDK layout, CTest-based offline tests, ABI layout checks, and CI quality
   gates before adding gameplay APIs.
 
