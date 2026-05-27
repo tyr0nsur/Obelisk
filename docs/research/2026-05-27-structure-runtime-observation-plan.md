@@ -97,7 +97,8 @@ OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da40
 OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT=25
 ```
 
-It is not deployed, not enabled by default, and not a public SDK or mutation API.
+The log limit is also the observation budget; absence or `0` keeps structure observation
+inactive. It is not deployed, not enabled by default, and not a public SDK or mutation API.
 
 ## Next Steps
 

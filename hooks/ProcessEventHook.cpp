@@ -347,10 +347,16 @@ namespace Obelisk::Hooks
     {
         static uint64_t limit = [] {
             const char* env = std::getenv("OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT");
-            if (!env || env[0] == '\0') return uint64_t{25};
+            if (!env || env[0] == '\0') return uint64_t{0};
             return static_cast<uint64_t>(std::strtoull(env, nullptr, 10));
         }();
         return limit;
+    }
+
+    static bool IsStructureObservationActive()
+    {
+        return IsStructureReflectionEnabled() &&
+               ProcessEventStructureReflection::ShouldAttemptObservation(GetStructureReflectionLogLimit());
     }
 
     static const char* ChatFunctionName(Obelisk::UE::ChatReflection::ChatFunction function)
@@ -543,8 +549,12 @@ namespace Obelisk::Hooks
         if (!gate.Enabled())
             return;
         const uint64_t limit = GetStructureReflectionLogLimit();
-        if (!ProcessEventStructureReflection::ShouldAttemptObservation(limit))
+        uint64_t observationNumber = 0;
+        if (!ProcessEventStructureReflection::TryReserveObservationBudget(
+                s_ReflectedStructureCalls, limit, observationNumber))
+        {
             return;
+        }
 
         Obelisk::UE::RuntimeReflection::MemoryReader reader{RuntimeReflectionReader, nullptr};
         ProcessEventStructureReflection::Attempt attempt =
@@ -556,22 +566,21 @@ namespace Obelisk::Hooks
         }
         if (attempt.Status == ProcessEventStructureReflection::AttemptStatus::Rejected)
         {
-            const uint64_t rejectNumber = ++s_ReflectedStructureRejects;
-            if (ProcessEventStructureReflection::ShouldLogObservation(rejectNumber, limit))
+            ++s_ReflectedStructureRejects;
+            if (ProcessEventStructureReflection::ShouldLogObservation(observationNumber, limit))
             {
                 OBELISK_INFO("Reflected structure rejected #{} fname_index={} reason={}",
-                             rejectNumber, nameIndex, attempt.Result.Reason);
+                             observationNumber, nameIndex, attempt.Result.Reason);
             }
             return;
         }
 
         const Obelisk::UE::StructureReflection::StructureInvocation& invocation = attempt.Invocation;
-        const uint64_t callNumber = ++s_ReflectedStructureCalls;
-        if (!ProcessEventStructureReflection::ShouldLogObservation(callNumber, limit))
+        if (!ProcessEventStructureReflection::ShouldLogObservation(observationNumber, limit))
             return;
 
         OBELISK_INFO("Reflected structure ProcessEvent #{} function={} fname_index={} outer_fname_index={} fields={}",
-                     callNumber,
+                     observationNumber,
                      StructureFunctionName(invocation.Function),
                      invocation.FunctionNameIndex,
                      invocation.OuterNameIndex,
@@ -596,9 +605,9 @@ namespace Obelisk::Hooks
         const bool hasPreCallbacks = eventManager.HasPreProcessEventCallbacks();
         const bool hasPostCallbacks = eventManager.HasPostProcessEventCallbacks();
         const bool chatReflectionEnabled = IsChatReflectionEnabled();
-        const bool structureReflectionEnabled = IsStructureReflectionEnabled();
+        const bool structureObservationActive = IsStructureObservationActive();
         const bool needsNameIndex =
-            hasPreCallbacks || hasPostCallbacks || chatReflectionEnabled || structureReflectionEnabled;
+            hasPreCallbacks || hasPostCallbacks || chatReflectionEnabled || structureObservationActive;
         const int32_t nameIndex = needsNameIndex ? GetFunctionNameIndex(function) : -1;
 
         TraceReflectedChatInvocation(nameIndex, function, params);

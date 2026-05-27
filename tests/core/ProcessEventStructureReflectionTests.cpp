@@ -1,6 +1,7 @@
 #include "hooks/ProcessEventStructureReflection.h"
 
 #include <array>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -211,6 +212,21 @@ namespace
         Require(!ShouldLogObservation(1, 0), "zero structure reflection log limit should disable logs");
         Require(ShouldLogObservation(1, 1), "first observation should log at limit one");
         Require(!ShouldLogObservation(2, 1), "observation beyond limit should not log");
+
+        std::atomic<uint64_t> counter{0};
+        uint64_t observationNumber = 99;
+        Require(!TryReserveObservationBudget(counter, 0, observationNumber),
+                "zero limit reserved observation budget");
+        Require(observationNumber == 0, "zero limit did not clear observation number");
+        Require(TryReserveObservationBudget(counter, 2, observationNumber),
+                "first observation budget reservation failed");
+        Require(observationNumber == 1, "first observation number mismatch");
+        Require(TryReserveObservationBudget(counter, 2, observationNumber),
+                "second observation budget reservation failed");
+        Require(observationNumber == 2, "second observation number mismatch");
+        Require(!TryReserveObservationBudget(counter, 2, observationNumber),
+                "budget reservation exceeded limit");
+        Require(observationNumber == 0, "exhausted budget did not clear observation number");
     }
 
     void TestReflectedStructureNameFilter()

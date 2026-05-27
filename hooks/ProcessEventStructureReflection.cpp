@@ -40,6 +40,26 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
         return ShouldAttemptObservation(limit) && observationNumber != 0 && observationNumber <= limit;
     }
 
+    bool TryReserveObservationBudget(std::atomic<uint64_t>& counter, uint64_t limit, uint64_t& observationNumber)
+    {
+        if (!ShouldAttemptObservation(limit))
+        {
+            observationNumber = 0;
+            return false;
+        }
+        uint64_t current = counter.load();
+        while (current < limit)
+        {
+            if (counter.compare_exchange_weak(current, current + 1))
+            {
+                observationNumber = current + 1;
+                return true;
+            }
+        }
+        observationNumber = 0;
+        return false;
+    }
+
     Attempt TryIdentifyInvocation(const Gate& gate,
                                   int32_t nameIndex,
                                   const Obelisk::UE::RuntimeReflection::MemoryReader& reader,

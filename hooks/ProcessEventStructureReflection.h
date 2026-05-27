@@ -4,6 +4,7 @@
 #include "ue/StructureReflection.h"
 
 #include <cstdint>
+#include <atomic>
 #include <string>
 
 namespace Obelisk::Hooks::ProcessEventStructureReflection
@@ -46,6 +47,7 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
     bool IsReflectedStructureNameIndex(int32_t nameIndex);
     bool ShouldAttemptObservation(uint64_t limit);
     bool ShouldLogObservation(uint64_t observationNumber, uint64_t limit);
+    bool TryReserveObservationBudget(std::atomic<uint64_t>& counter, uint64_t limit, uint64_t& observationNumber);
 
     Attempt TryIdentifyInvocation(const Gate& gate,
                                   int32_t nameIndex,
