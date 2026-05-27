@@ -75,6 +75,9 @@ work from repository state instead of chat history.
   internal `sdk.buffs` recognizer around exact compact `PrimalBuff` fixtures. Keep runtime
   hooks, callbacks, return overrides, raw object/class exposure, and gameplay mutation
   blocked.
+- `sdk.transfers` ScriptStruct snapshots preserve target/property object and FName
+  identity fields, while `regenerate_scriptstruct_snapshots.py --check-layout` remains a
+  semantic/layout-only gate for second-source portability.
 - Latest restart audit:
   `docs/research/2026-05-27-ops-restart-audit-instance-id.md`
   - live `ObeliskRun.sh` exports `OBELISK_INSTANCE_ID=arkserver`

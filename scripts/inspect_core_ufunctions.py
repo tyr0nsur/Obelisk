@@ -538,7 +538,8 @@ def inspect_property_chain(
             parms_size is not None
             and offset_internal is not None
             and element_size is not None
-            and offset_internal + element_size > parms_size
+            and array_dim is not None
+            and offset_internal + (element_size * array_dim) > parms_size
         ):
             property_rejects.append("property_exceeds_parms_size")
 

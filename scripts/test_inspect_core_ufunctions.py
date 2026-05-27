@@ -937,9 +937,16 @@ def build_core_fixture(path: Path) -> dict[str, int]:
         put_i32(addrs["send_mode_enum_names"] + enum_value * 8 + 4, 0)
     put_u32(addrs["readable_non_uobject"], 0xABCD)
 
-    def put_property_data(address: int, *, offset: int, element_size: int, next_field: int = 0) -> None:
+    def put_property_data(
+        address: int,
+        *,
+        offset: int,
+        element_size: int,
+        array_dim: int = 1,
+        next_field: int = 0,
+    ) -> None:
         put_ptr(address + 0x28, next_field)
-        put_i32(address + 0x30, 1)
+        put_i32(address + 0x30, array_dim)
         put_i32(address + 0x34, element_size)
         put_ptr(address + 0x38, 0x1040000280)
         put_i32(address + 0x4C, offset)
@@ -1017,7 +1024,7 @@ def build_core_fixture(path: Path) -> dict[str, int]:
     put_property_data(addrs["can_use_return_property"], offset=1, element_size=1)
 
     put_function_data(addrs["malformed_function"], first_property=addrs["malformed_bool_property"], num_parms=1, parms_size=1)
-    put_property_data(addrs["malformed_bool_property"], offset=1, element_size=1)
+    put_property_data(addrs["malformed_bool_property"], offset=0, element_size=1, array_dim=2)
 
     add_function_chain(
         "server_request_attack_function",

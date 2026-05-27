@@ -53,6 +53,14 @@ FName/GObjects indices by default; it returns `accepted`, `rejected`, or `inconc
 target. Use `--strict-identity-indices` only when intentionally comparing same-binary
 identity evidence, not for cross-source layout promotion.
 
+For `sdk.transfers` ScriptStruct fixtures, the committed snapshots now preserve
+target/property object indices and FName identity fields. Regeneration remains an offline
+core workflow; use `regenerate_scriptstruct_snapshots.py --check-layout` as a
+semantic/layout-only check that ignores evidence commit churn and unstable capture-specific
+indices, then use `compare_reflection_snapshots.py` for cross-source semantic layout
+comparison. Use strict identity comparison only when intentionally checking same-binary
+identity evidence.
+
 ## P1 Module Fixture Matrix
 
 | Module | Current Best Use | Second-Source Promotion Gate | Still Blocked |

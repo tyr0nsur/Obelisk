@@ -155,15 +155,36 @@ def property_layout(prop: dict[str, Any], *, strict_identity_indices: bool) -> d
         }
         if strict_identity_indices:
             result[nested_key][nested_identity_key]["object_index"] = nested_identity.get("object_index")
+            result[nested_key][nested_identity_key]["name_index"] = nested_identity.get("name_index")
             result[nested_key][nested_identity_key]["class_name_index"] = nested_identity.get("class_name_index")
             result[nested_key][nested_identity_key]["class_object_index"] = nested_identity.get("class_object_index")
     return result
+
+
+def evidence_reasons(payload: dict[str, Any]) -> list[str]:
+    evidence = payload.get("evidence")
+    if not isinstance(evidence, dict):
+        return ["missing_evidence"]
+    reasons: list[str] = []
+    if not isinstance(evidence.get("ark_binary_sha256"), str):
+        reasons.append("missing_ark_binary_sha256")
+    if evidence.get("source") != "offline_core":
+        reasons.append(f"evidence_source_{evidence.get('source')}")
+    if evidence.get("status") != "candidate-only":
+        reasons.append(f"evidence_status_{evidence.get('status')}")
+    generated_by = evidence.get("generated_by")
+    if generated_by is not None and generated_by != "scripts/inspect_core_ufunctions.py --snapshot-json":
+        reasons.append(f"evidence_generated_by_{generated_by}")
+    return reasons
 
 
 def comparable_layout(payload: dict[str, Any], *, strict_identity_indices: bool) -> tuple[dict[str, Any] | None, list[str]]:
     raw_reasons = raw_sanitization_reasons(payload)
     if raw_reasons:
         return None, raw_reasons
+    invalid_evidence = evidence_reasons(payload)
+    if invalid_evidence:
+        return None, invalid_evidence
     target = payload["targets"][0]
     identity = target.get("target")
     chain = target.get("property_chain")

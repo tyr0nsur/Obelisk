@@ -223,6 +223,63 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         report = json.loads(result.stdout)
         self.assertEqual(report["results"][0]["reasons"], ["ark_binary_sha256_mismatch"])
 
+    def test_marks_non_offline_candidate_evidence_inconclusive(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            left = base_snapshot()
+            right = deepcopy(left)
+            right["evidence"]["source"] = "runtime_probe"  # type: ignore[index]
+            right["evidence"]["status"] = "accepted"  # type: ignore[index]
+            write_snapshot(base, left)
+            write_snapshot(candidate, right)
+
+            result = run_compare(base, candidate, "--json")
+
+        self.assertEqual(result.returncode, 2)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["counts"]["inconclusive"], 1)
+        self.assertIn("candidate:evidence_source_runtime_probe", report["results"][0]["reasons"])
+        self.assertIn("candidate:evidence_status_accepted", report["results"][0]["reasons"])
+
+    def test_strict_identity_indices_rejects_nested_index_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            left = base_snapshot()
+            left["targets"][0]["property_chain"]["properties"][0]["array_inner_candidate"] = {  # type: ignore[index]
+                "status": "candidate",
+                "reject_reasons": [],
+                "membership_status": "candidate-uobject",
+                "inner_property": {
+                    "object_index": 2000,
+                    "name": "InventoryItems",
+                    "name_index": 3000,
+                    "class_name": "ObjectProperty",
+                    "class_name_index": 4000,
+                    "class_object_index": 5000,
+                },
+            }
+            right = deepcopy(left)
+            right["targets"][0]["property_chain"]["properties"][0]["array_inner_candidate"]["inner_property"]["name_index"] = 999  # type: ignore[index]
+            write_snapshot(base, left)
+            write_snapshot(candidate, right)
+
+            loose = run_compare(base, candidate, "--json")
+            strict = run_compare(base, candidate, "--strict-identity-indices", "--json")
+
+        self.assertEqual(loose.returncode, 0, loose.stderr + loose.stdout)
+        self.assertEqual(strict.returncode, 1)
+        report = json.loads(strict.stdout)
+        self.assertEqual(report["counts"]["rejected"], 1)
+        self.assertIn("array_inner_candidate.inner_property.name_index", report["results"][0]["diffs"][0]["path"])
+
 
 if __name__ == "__main__":
     unittest.main()
