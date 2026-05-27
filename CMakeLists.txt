@@ -58,9 +58,4 @@ set_target_properties(obelisk PROPERTIES VISIBILITY_INLINES_HIDDEN 1)
 set_target_properties(obelisk PROPERTIES BUILD_RPATH "\$ORIGIN")
 set_target_properties(obelisk PROPERTIES INSTALL_RPATH "\$ORIGIN")
 
-add_subdirectory(helloworld_plugin)
-
-option(OBELISK_BUILD_EXPERIMENTAL_CHAT_PLUGIN "Build experimental ChatPlugin" OFF)
-if(OBELISK_BUILD_EXPERIMENTAL_CHAT_PLUGIN)
-    add_subdirectory(plugins/chat)
-endif()
+add_subdirectory(plugins/oBaseEvents)

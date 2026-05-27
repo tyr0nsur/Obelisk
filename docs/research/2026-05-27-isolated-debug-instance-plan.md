@@ -98,7 +98,7 @@ Pros:
 Cons:
 
 - Current evidence says it is public, named as FLOWCOM live, clustered with live saves, and
-  has loaded old `ChatPlugin` artifacts.
+  has loaded old experimental plugin artifacts.
 - It is unsafe as-is for scanner capture.
 - Converting it risks touching a real player-facing map.
 
@@ -169,7 +169,6 @@ export OBELISK_ENABLE_PROCESS_EVENT_HOOK=1
 export OBELISK_DISABLE_PLUGINS=1
 export OBELISK_PE_TRACE_LIMIT=0
 
-unset OBELISK_CHAT_DISCOVERY
 unset OBELISK_ENABLE_NATIVE_EXEC_PROBES
 
 # Set this only for the scanner capture start, not for normal debug idle.
@@ -217,7 +216,6 @@ For a `ReflectionScanner` capture on the debug instance:
 export OBELISK_ENABLE_REFLECTION_SCANNER=1
 export OBELISK_ENABLE_PROCESS_EVENT_HOOK=1
 export OBELISK_DISABLE_PLUGINS=1
-unset OBELISK_CHAT_DISCOVERY
 unset OBELISK_ENABLE_NATIVE_EXEC_PROBES
 export OBELISK_PE_TRACE_LIMIT=0
 ```
@@ -233,8 +231,8 @@ export LD_LIBRARY_PATH=/servidor/ark/obelisk/lib:${LD_LIBRARY_PATH}
 export LD_PRELOAD=/servidor/ark/obelisk/lib/libobelisk.so
 ```
 
-`OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` is forbidden for this plan. `OBELISK_CHAT_DISCOVERY`
-must remain unset for the scanner capture.
+`OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` is forbidden for this plan. Raw event discovery must
+remain disabled for the scanner capture.
 
 ## Permission Checklist
 
@@ -299,7 +297,7 @@ Reject the run if copied logs contain:
 
 ```text
 [NativeExecProbe] installed
-[ChatPlugin]
+legacy plugin markers
 ```
 
 Analyze only copied logs with the existing runbook commands:
@@ -327,7 +325,6 @@ Disable scanner but keep the debug instance available:
 unset OBELISK_ENABLE_REFLECTION_SCANNER
 export OBELISK_DISABLE_PLUGINS=1
 export OBELISK_PE_TRACE_LIMIT=0
-unset OBELISK_CHAT_DISCOVERY
 unset OBELISK_ENABLE_NATIVE_EXEC_PROBES
 
 cd /servidor/ark

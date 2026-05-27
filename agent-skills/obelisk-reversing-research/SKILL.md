@@ -14,7 +14,6 @@ Own these areas:
 - `ue/ReflectionScanner.*`
 - `ue/Memory.*`
 - `ue/Reflection.h`
-- `plugins/chat/ChatPlugin.cpp`
 - docs describing offsets, signatures, and experiments
 
 ## Known Findings
@@ -57,14 +56,13 @@ On production Ragnarok, stop here unless the goal is only to validate the core h
 Chat discovery has been unstable and must not be enabled on the live map as the normal
 experiment path.
 
-For scanner or chat discovery, use only a confirmed isolated/debug instance and enable one
+For scanner or event discovery, use only a confirmed isolated/debug instance and enable one
 experiment at a time. The debug wrapper should set explicit environment variables such as:
 
 ```bash
 export OBELISK_ENABLE_PROCESS_EVENT_HOOK=1
 export OBELISK_DISABLE_PLUGINS=1
 export OBELISK_PE_TRACE_LIMIT=0
-unset OBELISK_CHAT_DISCOVERY
 unset OBELISK_ENABLE_NATIVE_EXEC_PROBES
 ```
 
@@ -85,4 +83,4 @@ isolated capture or static xref validation before promoting a candidate.
 2. Locate GObjects and enumerate UFunction objects.
 3. Register callbacks by function name, not raw index.
 4. Decode function params from UProperty metadata.
-5. Replace ChatPlugin FString probing with reflected param decoding.
+5. Replace raw FString probing with reflected param decoding.

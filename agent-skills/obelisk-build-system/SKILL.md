@@ -19,7 +19,7 @@ Expected outputs:
 ```text
 build/libobelisk.so
 build/_deps/subhook-build/libsubhook.so
-build/helloworld_plugin/HelloWorldPlugin.so
+build/plugins/oBaseEvents/oBaseEvents.so
 ```
 
 ## Central Install
@@ -48,10 +48,9 @@ Do not install runtime artifacts directly into `ShooterGame/Binaries/Linux` exce
 - Pin dependency versions where possible; avoid tracking `master` for reproducible builds.
 - Runtime links currently include `fmt`, `spdlog`, `subhook`, `dl`, and `pthread`.
 - Do not commit `.so` outputs, logs, config state, or build directories.
-- Experimental plugins should not be installed into `plugins/` by default. Do not make
-  `ChatPlugin.so` production-enabled by default.
-- Keep `plugins/monitor` out of the top-level stable build until its lifecycle, HTTP
-  surface, config, and shutdown model are redesigned.
+- `oBaseEvents` is the first official plugin target and should remain small,
+  instructional, and safe by default.
+- Experimental/research plugins should not be installed into `plugins/` by default.
 
 ## Before Commit
 

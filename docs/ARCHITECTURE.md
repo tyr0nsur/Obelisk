@@ -93,8 +93,7 @@ Preferred direction:
 `ue/ReflectionScanner.*` currently exists as a research tool. It should remain
 disabled by default on live servers.
 
-The chat plugin is a testbed for command interception, not yet a stable API.
-
-`plugins/monitor` is also experimental. It currently combines HTTP service,
-log tailing, whitelist enforcement, raw parameter discovery, and a global
-`ProcessEvent` callback without a stable shutdown contract.
+The first official plugin target is `plugins/oBaseEvents`, which demonstrates the C ABI,
+safe default config creation, filtered event registration, and plugin shutdown. Larger
+server features should be built as separate plugins after the reflection layer is more
+complete.

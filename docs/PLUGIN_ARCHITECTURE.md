@@ -1,7 +1,7 @@
 # Plugin Architecture
 
-This document defines the expected shape for Obelisk plugins before promoting
-larger plugins such as `MonitorPlugin` beyond experimental status.
+This document defines the expected shape for Obelisk plugins before promoting them into
+the first-party release set.
 
 ## Repository Layout
 
@@ -10,28 +10,18 @@ Keep plugin source code split by maturity:
 ```text
 plugins/
   README.md
-  examples/
-    minimal/
-    process_event_filtered/
-    http_status/
-  experimental/
-    monitor/
-  chat/
-  monitor/
+  oBaseEvents/
 ```
 
-Current reality is still transitional: `plugins/chat` and `plugins/monitor`
-exist at the top of `plugins/`, but only the deliberately small
-`helloworld_plugin` target is built by the top-level build as a stable example.
-Do not add `plugins/monitor` to the top-level build until the responsibilities
-below are separated and validated in isolation.
+`oBaseEvents` is the first official plugin planned for release. Keep it small and focused
+on teaching the plugin model.
 
 ## Plugin Categories
 
 | Category | Purpose | Build policy | Runtime policy |
 | --- | --- | --- | --- |
-| `examples/` | Minimal reference plugins that teach one safe pattern. | May be built by CI after review. | Disabled by default unless explicitly installed. |
-| `experimental/` | Research, probes, and prototype integrations. | Excluded from top-level build by default. | Do not install into `plugins/` except isolated tests. |
+| `oBaseEvents` | Official reference plugin for event/config/lifecycle patterns. | Built by default. | Installed only when the operator copies the `.so` into the runtime plugin directory. |
+| research branches | Probes and prototype integrations. | Excluded from top-level build by default. | Do not install into `plugins/` except isolated tests. |
 | stable plugin directories | Operational plugins with documented config, tests, and rollback. | Eligible for top-level build after review. | Map-gated rollout only. |
 
 An example plugin should demonstrate exactly one behavior. For example, an HTTP
@@ -61,16 +51,16 @@ Plugin configuration belongs under the central install root, not the ARK binary
 directory:
 
 ```text
-${OBELISK_CONFIG_DIR}/plugins/<plugin-id>/config.json
+${OBELISK_CONFIG_DIR}/plugins/<plugin-id>/<plugin-config-file>
 ```
 
 Fallback order:
 
 1. A plugin-specific override env var, for example
-   `OBELISK_MONITOR_CONFIG=/path/to/monitor.json`.
-2. `${OBELISK_CONFIG_DIR}/plugins/<plugin-id>/config.json`.
+   `OBASEEVENTS_CONFIG=/path/to/config.conf`.
+2. `${OBELISK_CONFIG_DIR}/plugins/<plugin-id>/<plugin-config-file>`.
 3. `${OBELISK_CONFIG_DIR}/plugins/<plugin-id>.json` for legacy plugins.
-4. `${OBELISK_ROOT}/config/plugins/<plugin-id>/config.json`.
+4. `${OBELISK_ROOT}/config/plugins/<plugin-id>/<plugin-config-file>`.
 5. `${OBELISK_ROOT}/config/plugins/<plugin-id>.json` for legacy plugins.
 
 Config files should include:
@@ -102,7 +92,7 @@ The runtime does not need to know how a plugin was compiled. On restart it scans
 The stable operational flow is:
 
 1. Build or obtain `PluginName.so`.
-2. Ensure `${OBELISK_ROOT}/config/plugins/plugin-name/config.json` exists or that the
+2. Ensure `${OBELISK_ROOT}/config/plugins/plugin-name/<config-file>` exists or that the
    plugin creates a safe-disabled default on first init.
 3. Copy the `.so` into `${OBELISK_ROOT}/plugins/`.
 4. Restart only the target ARK instance.
@@ -179,32 +169,11 @@ Minimum HTTP requirements before stability:
 Until those controls exist, HTTP plugins belong in `experimental/` and should be
 installed only on isolated test instances or behind a trusted local proxy.
 
-## Why MonitorPlugin Is Experimental
-
-`plugins/monitor` is useful as a prototype, but it is not a stable plugin
-architecture yet:
-
-- It registers a global `ProcessEvent` callback rather than a filtered callback.
-- It discovers `PreLogin` by scanning raw parameter memory and caching a name
-  index heuristic.
-- It starts detached log and HTTP threads with no plugin shutdown path.
-- Its HTTP server binds to `0.0.0.0` and exposes config/log endpoints without a
-  documented auth and network policy.
-- It reads and writes config outside the central config convention.
-- It combines monitoring, whitelist enforcement, HTTP API, log tailing, and UE4
-  event discovery in one plugin.
-
-For that reason, keep `MonitorPlugin` out of the top-level build and out of the
-stable install path. The safe path forward is to split it into small examples or
-future plugins: one HTTP status example, one config convention example, one
-filtered `ProcessEvent` example, and a later monitor plugin that only composes
-validated pieces.
-
 ## Promotion Checklist
 
 Before a plugin is promoted to stable or added to the top-level build:
 
-- [ ] Config path follows `${OBELISK_CONFIG_DIR}/plugins/<plugin-id>.json`.
+- [ ] Config path follows `${OBELISK_CONFIG_DIR}/plugins/<plugin-id>/<config-file>`.
 - [ ] Risky features are safe-disabled and map-gated.
 - [ ] No global `ProcessEvent` callback outside a documented debug gate.
 - [ ] Callback lifetime is covered by runtime owner cleanup and plugin-local

@@ -51,7 +51,7 @@ Updated: 2026-05-27
 ## Rejected Or Unsafe
 
 - rejected: ProcessEvent candidate `0x1d11cb0` did not receive gameplay events.
-- risk: ChatPlugin raw FString scanning/discovery must not be enabled on live Ragnarok as
+- risk: Raw FString scanning/discovery must not be enabled on live Ragnarok as
   the normal test path.
 - risk: Native exec probes must remain disabled on live servers.
 - risk: The `subhook` pin was selected from the existing local checkout without internet
@@ -71,10 +71,9 @@ Updated: 2026-05-27
 - fact: `ObeliskApi` now appends `abi_version`, `struct_size`, and `capabilities` without
   shifting existing function-pointer offsets; front-loaded ABI headers remain a future
   major-version plan.
-- fact: Top-level CMake builds `helloworld_plugin/HelloWorldPlugin.so` as the minimal
-  plugin example. `plugins/chat` and `plugins/monitor` remain experimental and are
-  intentionally excluded from the default top-level build until their structure and safety
-  model are redesigned.
+- fact: Top-level CMake builds `plugins/oBaseEvents/oBaseEvents.so` as the first official
+  plugin example. Legacy chat/monitor prototype source has been removed from the release
+  tree.
 - fact: Plugin structure and promotion rules are now documented in
   `docs/PLUGIN_ARCHITECTURE.md`; `plugins/README.md` records the intended
   `examples/` and `experimental/` split without moving code or changing CMake.
@@ -89,7 +88,7 @@ Updated: 2026-05-27
 - next-step: In the next isolated ReflectionScanner capture, compare any
   `FName indirect-table probe` lines against `None`, `ClientMessage`, and `ServerChat`;
   require `matched_clues=3/3` before treating a table as a `GNames` research candidate.
-- next-step: Replace ChatPlugin raw parameter probing with reflected parameter decoding.
+- next-step: Replace raw chat parameter probing with reflected parameter decoding.
 - next-step: Add binary hash validation or an instruction decoder before accepting future
   ProcessEvent prologue changes.
 

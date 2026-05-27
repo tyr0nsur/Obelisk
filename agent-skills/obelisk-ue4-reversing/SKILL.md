@@ -71,8 +71,8 @@ property metadata.
 - Keep `OBELISK_ENABLE_PROCESS_EVENT_HOOK=1` plus plugins disabled as the baseline safe
   runtime test.
 - Do not enable `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` on live servers.
-- Do not enable broad chat discovery on a production map until it has survived an isolated
-  server test.
+- Do not enable broad event discovery on a production map until it has survived an
+  isolated server test.
 - Do not run `ReflectionScanner` on `arkserver` or `arkserver2` unless one has been
   explicitly converted into an isolated debug target. Preferred path:
   `arkserver-obelisk-debug`.

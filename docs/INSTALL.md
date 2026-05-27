@@ -18,7 +18,7 @@ Recommended root:
 /servidor/ark/obelisk/
   lib/
   plugins/
-  config/plugins/<plugin-id>/config.json
+  config/plugins/<plugin-id>/<plugin-config-file>
   config/instances/
   logs/
   state/
@@ -40,10 +40,10 @@ build/_deps/subhook-build/libsubhook.so     -> lib/libsubhook.so
 It also creates `plugins`, `config/plugins`, `config/instances`, `logs`, and `state`.
 
 Plugins loaded from `plugins/` are expected to own their config defaults. The preferred
-path for plugin config is:
+directory for plugin config is:
 
 ```text
-/servidor/ark/obelisk/config/plugins/<plugin-id>/config.json
+/servidor/ark/obelisk/config/plugins/<plugin-id>/
 ```
 
 The runtime loads every `.so` directly inside `/servidor/ark/obelisk/plugins/` on restart.

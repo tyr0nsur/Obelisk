@@ -124,4 +124,4 @@ Expected safe Obelisk posture for development baseline:
 - Do not copy old binary-local `libobelisk.so` or `ObeliskPlugins/` back into the ARK
   binary directory.
 - Do not reuse live cluster flags for a future isolated debug instance.
-- Do not activate ChatPlugin discovery or ReflectionScanner as part of config recovery.
+- Do not activate raw discovery probes or ReflectionScanner as part of config recovery.

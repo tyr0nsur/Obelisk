@@ -52,7 +52,6 @@ Expected logs:
 
 ## Experiment Gates
 
-- Do not activate `ChatPlugin.so` or chat discovery on a production map as the first test.
 - Keep experimental plugins outside `plugins/` until an isolated server test passes.
 - Enable one marker/config gate at a time and record the exact change.
 - Never enable native exec probes on live servers.

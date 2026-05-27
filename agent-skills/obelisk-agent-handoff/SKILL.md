@@ -62,7 +62,7 @@ Good entries:
 
 - `fact: Ragnarok core hook is stable with plugins disabled; see research note X.`
 - `rejected: ProcessEvent candidate 0x1d11cb0 does not receive gameplay events.`
-- `risk: ChatPlugin raw FString scanning must stay off live Ragnarok.`
+- `risk: raw FString scanning must stay off live Ragnarok.`
 - `next-step: implement plugin-owned callback unregister before enabling plugins.`
 
 Bad entries:

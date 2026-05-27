@@ -57,7 +57,7 @@ Use short, direct commit messages:
 ```text
 Add filtered ProcessEvent callbacks
 Document centralized install layout
-Harden chat plugin FString probing
+Harden reflected event parameter decoding
 ```
 
 ## Current Priorities

@@ -9,7 +9,7 @@ Prepare the next isolated `ReflectionScanner` capture to validate two scanner-on
   `9622 == ServerChat`.
 
 This runbook is for an isolated/debug ARK instance only. Do not use it to enable
-ChatPlugin discovery or native exec probes on live Ragnarok.
+raw event discovery or native exec probes on live Ragnarok.
 
 ## Environment To Record
 
@@ -33,7 +33,6 @@ Use the existing explicit scanner gate and keep all risky experiments off:
 export OBELISK_ENABLE_REFLECTION_SCANNER=1
 export OBELISK_ENABLE_PROCESS_EVENT_HOOK=1
 export OBELISK_DISABLE_PLUGINS=1
-unset OBELISK_CHAT_DISCOVERY
 unset OBELISK_ENABLE_NATIVE_EXEC_PROBES
 export OBELISK_PE_TRACE_LIMIT=0
 ```
@@ -69,7 +68,7 @@ to 120 iterations at 5-second intervals.
 Collect only the relevant scanner lines:
 
 ```bash
-rg "ReflectionScanner|NativeExecProbe|ChatPlugin|ProcessEvent" /path/to/isolated/Obelisk.log
+rg "ReflectionScanner|NativeExecProbe|ProcessEvent" /path/to/isolated/Obelisk.log
 rg "UObject validation|FName indirect-table probe|delayed global resolved" /path/to/isolated/Obelisk.log
 ```
 
@@ -82,7 +81,7 @@ python3 scripts/analyze_reflectionscanner_capture.py --json /path/to/isolated/Ob
 
 The analyzer extracts candidate globals, delayed globals, top `UObject validation` scores,
 `FName indirect-table probe` rows, and reject markers such as `[NativeExecProbe] installed`
-or `[ChatPlugin]`. Use `--strict` only in offline analysis when a non-zero exit should mean
+or legacy plugin markers. Use `--strict` only in offline analysis when a non-zero exit should mean
 that reject markers were present or no repeat-confirmed exact `matched_clues=3/3` FName
 research candidate was found.
 
@@ -118,7 +117,7 @@ Reject the capture immediately if it contains:
 
 ```text
 [NativeExecProbe] installed
-[ChatPlugin]
+legacy plugin markers
 ```
 
 ## Accept Or Reject GNames
@@ -161,7 +160,6 @@ plugins disabled until the log has been reviewed:
 
 ```bash
 unset OBELISK_ENABLE_REFLECTION_SCANNER
-unset OBELISK_CHAT_DISCOVERY
 unset OBELISK_ENABLE_NATIVE_EXEC_PROBES
 export OBELISK_DISABLE_PLUGINS=1
 export OBELISK_PE_TRACE_LIMIT=0

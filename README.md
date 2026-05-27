@@ -25,7 +25,6 @@ Stable enough to test:
 
 Experimental:
 
-- Chat command discovery.
 - Raw reflection scanner.
 - FString/FName inference.
 - Higher-level SDK APIs.
@@ -59,16 +58,14 @@ hooks/               Runtime hooks, including ProcessEvent
 loader/              LD_PRELOAD bootstrap
 runtime/             Logging and runtime services
 ue/                  UE4 memory/reflection helpers
-plugins/chat/        Experimental chat plugin
-plugins/monitor/     Experimental monitoring plugin
+plugins/oBaseEvents/ First official example plugin for events and plugin structure
 agent-skills/        Local engineering/reversing notes
 docs/                Contributor and operator documentation
 scripts/             Install/deploy helpers
 ```
 
 Plugin structure and promotion rules are documented in
-[docs/PLUGIN_ARCHITECTURE.md](docs/PLUGIN_ARCHITECTURE.md). `plugins/monitor`
-is experimental and intentionally not part of the top-level stable build.
+[docs/PLUGIN_ARCHITECTURE.md](docs/PLUGIN_ARCHITECTURE.md).
 
 ## Central Server Layout
 
@@ -83,7 +80,7 @@ The recommended install layout is:
   config/
     plugins/
       <plugin-id>/
-        config.json
+        <plugin-config-file>
   logs/
     Obelisk.log
     Obelisk-Ragnarok.log
@@ -116,17 +113,13 @@ Main build outputs:
 
 ```text
 build/libobelisk.so
-build/helloworld_plugin/HelloWorldPlugin.so
+build/plugins/oBaseEvents/oBaseEvents.so
 build/_deps/subhook-build/libsubhook.so
 ```
 
-`plugins/chat` is experimental and is not compiled by default. Build it only for isolated
-research with:
-
-```bash
-cmake -S . -B build -DOBELISK_BUILD_EXPERIMENTAL_CHAT_PLUGIN=ON
-cmake --build build --target ChatPlugin -j"$(nproc)"
-```
+`oBaseEvents` is the first official plugin target. It is intentionally small: it validates
+the C ABI, creates a safe default config, demonstrates a filtered `ProcessEvent` callback,
+and exports `ObeliskPlugin_Shutdown`.
 
 ## Plugin Example
 
@@ -170,7 +163,6 @@ OBELISK_CONFIG_DIR
 OBELISK_LOG_DIR
 OBELISK_ENABLE_PROCESS_EVENT_HOOK=1
 OBELISK_DISABLE_PLUGINS=1
-OBELISK_CHAT_DISCOVERY=1
 OBELISK_ENABLE_REFLECTION_SCANNER=1
 OBELISK_PE_TRACE_LIMIT=0
 ```

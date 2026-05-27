@@ -25,7 +25,7 @@ skill updates, or making work reproducible for contributors.
 
 - Before spawning agents, define disjoint ownership:
   - runtime/core: hooks, loader, EventManager, PluginManager, ABI
-  - reversing/research: FName, GNames, GObjects, UFunction, ChatPlugin experiments
+  - reversing/research: FName, GNames, GObjects, UFunction, event decoding experiments
   - ops/docs: install layout, server markers, logs, research notes, contributor docs
 - Tell agents whether they may edit files. Read-only reviewers should not change the tree.
 - Close old agents after their findings are integrated so stale context does not keep

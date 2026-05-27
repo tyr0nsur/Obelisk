@@ -41,14 +41,11 @@ work from repository state instead of chat history.
   files directly in `/servidor/ark/obelisk/plugins/`.
 - Plugin-owned callback cleanup on init failure and unload.
 - Optional plugin export: `extern "C" void ObeliskPlugin_Shutdown()`.
-- `helloworld_plugin` builds as the minimal plugin example.
+- `plugins/oBaseEvents` builds as the first official plugin example.
 
 ## What Is Experimental Or Blocked
 
-- `ChatPlugin` remains experimental, is not built by default, and is unsafe as a
-  production chat API.
-- `MonitorPlugin` remains experimental and intentionally excluded from top-level stable
-  build; it needs lifecycle, HTTP security, config, and callback redesign.
+- Legacy chat/monitor prototype source has been removed from the release tree.
 - ReflectionScanner is experimental and must stay disabled on live servers.
 - No confirmed isolated/debug ARK instance exists right now.
 - Ops plan now recommends creating `arkserver-obelisk-debug` with isolated ports/saves,
@@ -78,7 +75,7 @@ python3 scripts/analyze_reflectionscanner_capture.py --json /path/to/isolated/Ob
 ## Hard Rules
 
 - Never enable `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` on live servers.
-- Never enable ChatPlugin discovery on live Ragnarok as a normal test.
+- Never enable raw chat discovery on live Ragnarok as a normal test.
 - Do not treat observed FName indices such as `9619` or `9622` as stable API contracts.
 - Do not promote plugins with HTTP, threads, or file readers until they implement and
   validate `ObeliskPlugin_Shutdown()`.
