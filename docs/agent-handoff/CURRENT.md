@@ -124,6 +124,11 @@ Updated: 2026-05-27
   `OBELISK_REFLECTION_LOG_FNAME_REJECTS=1`, and the analyzer records
   `fname_reject_count`, `fname_reject_reason_counts`, and `fname_rejects`; see
   `docs/research/2026-05-27-fname-reject-evidence-logging.md`.
+- fact: Commit `8cb3bbe` was deployed to `/servidor/ark/obelisk` and a controlled Ragnarok
+  dev capture produced 22 UObject validation hits, 22 FName rejects, and zero positive
+  FName probes. Current evidence says the chat UObject globals are not plausible GNames
+  roots under the indirect-table model. See
+  `docs/research/2026-05-27-live-fname-reject-capture.md`.
 
 ## Rejected Or Unsafe
 
@@ -167,9 +172,9 @@ Updated: 2026-05-27
   `FName indirect-table probe` lines against `None`, `ClientMessage`, and `ServerChat`;
   require `matched_clues=3/3` plus repeat confirmation through distinct `source_global`
   values or distinct targets before treating a table as a `GNames` research candidate.
-- next-step: For the next isolated ReflectionScanner run, add
-  `OBELISK_REFLECTION_LOG_FNAME_REJECTS=1` so rejected FName candidates produce reason
-  counts without satisfying strict evidence gates.
+- next-step: Stop trying to promote chat UObject globals directly into GNames. Next FName
+  work should use static discovery of the name table global or a bounded alternate name
+  storage scanner, then validate with the analyzer.
 - next-step: After a repeat-confirmed `GNames` research candidate appears, generate
   `objdump -d -M intel` for the matching ShooterGameServer binary and run the analyzer with
   `--binary` plus `--objdump-xrefs`; inspect whether candidate `source_global` references

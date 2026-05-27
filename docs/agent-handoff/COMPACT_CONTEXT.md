@@ -120,6 +120,11 @@ work from repository state instead of chat history.
   current GNames evidence audit is inconclusive because scanner logs only show
   `ReflectionScanner disabled`; see
   `docs/research/2026-05-27-current-gname-evidence-pack-audit.md`.
+- A later controlled Ragnarok development capture on commit `8cb3bbe` produced 22
+  UObject/UFunction leads and 22 FName reject rows, with zero positive FName probes.
+  Rejection reasons were `implausible_num_elements` and `implausible_num_chunks`, so the
+  chat UObject globals should not be promoted directly into GNames roots; see
+  `docs/research/2026-05-27-live-fname-reject-capture.md`.
 
 ## Current Research Direction
 
