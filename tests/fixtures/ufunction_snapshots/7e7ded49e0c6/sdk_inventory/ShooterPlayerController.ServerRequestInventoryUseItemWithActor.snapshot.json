@@ -3,7 +3,7 @@
   "evidence": {
     "ark_binary_sha256": "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
     "generated_by": "scripts/inspect_core_ufunctions.py --snapshot-json",
-    "obelisk_commit": "dd07098",
+    "obelisk_commit": "763ba2e",
     "source": "offline_core",
     "status": "candidate-only"
   },
@@ -74,7 +74,17 @@
             "outer_membership_status": "candidate-uobject",
             "property_flags": "0x1040000280",
             "reject_reasons": [],
-            "status": "candidate"
+            "status": "candidate",
+            "struct_type_candidate": {
+              "membership_status": "candidate-uobject",
+              "reject_reasons": [],
+              "status": "candidate",
+              "struct_type": {
+                "class_name": "ScriptStruct",
+                "name": "ItemNetID",
+                "name_index": 593
+              }
+            }
           },
           {
             "array_dim": 1,

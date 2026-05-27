@@ -12,7 +12,7 @@ array, and string payloads deferred.
 - Snapshot binary SHA256:
   `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`
 - Obelisk baseline:
-  `dd07098 Add array payload snapshot fixtures`
+  `3fe06d5 Add transfer snapshot fixtures`
 - Source:
   offline core, candidate-only metadata.
 - Live-server impact: none.
@@ -64,8 +64,8 @@ public SDK readiness.
 
 ## Risks
 
-- Transfer/upload/download names are gameplay-sensitive; fixtures prove metadata shape
-  only.
+- Transfer/upload/download names are gameplay-sensitive; fixtures record candidate metadata
+  shape only.
 - Object/class params are not ownership or lifetime contracts.
 - Runtime probing remains gated to TheIsland or an isolated debug instance in an approved
   window.
@@ -73,5 +73,5 @@ public SDK readiness.
 ## Next Steps
 
 - Keep `sdk.transfers` candidate-only and offline.
-- Add struct identity evidence before any large transfer payload fixture.
+- Add ScriptStruct field evidence before any large transfer payload fixture.
 - Do not expose transfer SDK callbacks until ownership, policy, and rollback gates exist.

@@ -42,9 +42,9 @@ property chains, and sanitized `array_inner_candidate` entries.
 ## Result
 
 The manifest now includes compact array-bearing fixtures as metadata evidence. These
-fixtures prove reflected parameter shape and inner property identity only. They do not
-prove `TArray` ownership, allocation behavior, element lifetime, runtime safety, or public
-SDK decoding.
+fixtures record reflected parameter shape and inner property identity only. They do not
+establish `TArray` ownership, allocation behavior, element lifetime, runtime safety, or
+public SDK decoding.
 
 ## Rejected Paths
 
