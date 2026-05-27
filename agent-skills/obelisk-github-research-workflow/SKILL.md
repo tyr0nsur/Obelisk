@@ -10,6 +10,11 @@ skill updates, or making work reproducible for contributors.
 
 ## Working Contract
 
+- The team lead owns GitHub integration. Sub-agents must not commit, amend, rebase,
+  tag, push, or update GitHub state unless the lead explicitly delegates that action for
+  one turn.
+- Sub-agents deliver scoped file edits, evidence, validation output, and risks. The lead
+  reviews, stages, commits, pushes, closes agents, and updates shared handoff state.
 - Keep each commit focused: runtime code, docs, skills, or deployment scripts should not be
   mixed unless the change requires it.
 - Push stable checkpoints to `origin/main` after validation.
@@ -40,13 +45,17 @@ skill updates, or making work reproducible for contributors.
 - If shared-file edits are unavoidable, name a single integration owner. Other agents should
   return plans or patches scoped to their own files instead of editing the shared file.
 - Tell agents whether they may edit files. Read-only reviewers should not change the tree.
+- Tell agents they must not manage GitHub. They may leave working-tree changes in their
+  owned scope, but the lead is the only integration owner.
 - Close old agents after their findings are integrated so stale context does not keep
   influencing new work.
 - Relaunch agents after major skill updates when their next task depends on the new rules.
 - Documentation/skills workers must not edit runtime C++ or `/servidor/ark` unless their
   prompt explicitly widens scope.
 
-## Commit Flow
+## Lead Commit Flow
+
+Only the lead runs this flow:
 
 ```bash
 git status --short --ignored

@@ -48,9 +48,18 @@ Do not pass vague claims as facts. Include evidence or mark them as hypotheses.
 
 ## Before Finishing
 
-1. Update `docs/agent-handoff/CURRENT.md` with what changed.
-2. Add or update a research note if the work produced reusable evidence.
-3. Update skills if a rule, risk, or workflow changed.
+For sub-agents:
+
+1. Report what changed, validation run, files touched, and remaining risks.
+2. Add or update a research note only if that was inside the assigned ownership scope.
+3. Do not commit, amend, rebase, tag, push, or update GitHub state.
+4. Do not update handoff files unless the lead explicitly assigned that scope.
+
+For the lead:
+
+1. Review and integrate sub-agent findings.
+2. Update `docs/agent-handoff/CURRENT.md` with what changed.
+3. Add or update research notes and skills when the evidence changes future behavior.
 4. Commit and push stable documentation/code when appropriate.
 5. Report uncommitted files, skipped validation, and remaining risks.
 
