@@ -195,6 +195,11 @@ Updated: 2026-05-27
   candidate-only structure surfaces for access, snapping, demolish, pickup, variants,
   pincode, seating, and elevator controls. Favor small bool/object/int fixtures first;
   defer placement/build/range/string/array-heavy functions.
+- fact: `docs/research/2026-05-27-missiontype-function-inventory.md` identifies
+  candidate-only mission surfaces. `scripts/test_inspect_core_ufunctions.py` now has
+  synthetic fixture coverage for `MissionType.AddPlayerToMission`,
+  `BPAllowPlayerToLeaveMission`, `BPOnPlayerAddedToMission`, and a rejected string/array
+  mission chain. Keep mission spawn/leaderboard/string/array-heavy paths deferred.
 - fact: ReflectionScanner now has opt-in FName rejection evidence behind
   `OBELISK_REFLECTION_LOG_FNAME_REJECTS=1`, and the analyzer records
   `fname_reject_count`, `fname_reject_reason_counts`, and `fname_rejects`; see
