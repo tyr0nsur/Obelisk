@@ -1,10 +1,15 @@
 # Live Development FName Reject Capture
 
+> Historical Ragnarok capture note. Do not repeat this workflow on `arkserver` / Ragnarok
+> while player performance testing is active. Future FName reject or ReflectionScanner
+> captures should prefer `arkserver-obelisk-debug`; use `arkserver2` / TheIsland only
+> during an explicitly approved fallback debug window.
+
 ## Objective
 
-Run a short development-server ReflectionScanner capture with the new opt-in FName reject
-logging to determine whether current chat-related globals are plausible `GNames` or
-`FNamePool` roots.
+Record a historical short ReflectionScanner capture with opt-in FName reject logging to
+determine whether current chat-related globals were plausible `GNames` or `FNamePool`
+roots.
 
 ## Environment
 
@@ -26,12 +31,13 @@ logging to determine whether current chat-related globals are plausible `GNames`
 2. Installed current Obelisk runtime into `/servidor/ark/obelisk` with backups:
    - `libobelisk.so.20260527-041436.bak`
    - `libsubhook.so.20260527-041436.bak`
-3. Started `arkserver` once with:
+3. Historically started `arkserver` once with:
 
 ```bash
+# Historical only: do not run on Ragnarok during player performance testing.
 OBELISK_ENABLE_REFLECTION_SCANNER=1
 OBELISK_REFLECTION_LOG_FNAME_REJECTS=1
-/servidor/ark/arkserver start
+# Start only an approved isolated/debug instance for future retries.
 ```
 
 4. Analyzed `/servidor/ark/obelisk/logs/arkserver/Obelisk.log`.
@@ -100,4 +106,3 @@ promote the chat UObject globals into a name table. Continue with either:
 - Plugins were disabled through the instance marker.
 - ReflectionScanner was disabled again after the capture.
 - No config files or saves were modified.
-

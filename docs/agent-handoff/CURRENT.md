@@ -431,6 +431,9 @@ Updated: 2026-05-27
   rewritten as non-default guidance: future captures must use
   `docs/research/2026-05-27-isolated-second-core-runbook.md`,
   `arkserver-obelisk-debug` first, and TheIsland only as approved fallback.
+- fact: Historical FName/ReflectionScanner capture notes that previously showed direct
+  Ragnarok start commands now say not to repeat that workflow on `arkserver`; future
+  retries target `arkserver-obelisk-debug` first.
 - risk: Native exec probes must remain disabled on live servers.
 - risk: The `subhook` pin was selected from the existing local checkout without internet
   verification; full offline resilience still needs a mirror or vendored archive.

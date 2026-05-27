@@ -1,9 +1,15 @@
 # Arkserver Core FName Evidence
 
+> Historical evidence note. This documents an operator-authorized Ragnarok core dump that
+> already happened. Do not repeat `gcore`, ptrace marker changes, or restarts on
+> `arkserver` / Ragnarok while player performance testing is active. Future second-source
+> cores should use `docs/research/2026-05-27-isolated-second-core-runbook.md` with
+> `arkserver-obelisk-debug` preferred and TheIsland only as approved fallback.
+
 ## Objective
 
-Use an operator-authorized Linux core dump from `arkserver` / Ragnarok to validate the
-current static FName root candidate and correct ReflectionScanner clue indices.
+Record how an operator-authorized Linux core dump from `arkserver` / Ragnarok validated the
+current static FName root candidate and corrected ReflectionScanner clue indices.
 
 ## Environment
 

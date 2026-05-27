@@ -1,5 +1,10 @@
 # Static FName Root Sampling
 
+> Historical Ragnarok capture note. Do not repeat this workflow on `arkserver` / Ragnarok
+> while player performance testing is active. Future static-root sampling should prefer
+> `arkserver-obelisk-debug`; use `arkserver2` / TheIsland only during an explicitly
+> approved fallback debug window.
+
 ## Objective
 
 Replace fixed clue-only static-root validation with a bounded sampler that can test the
@@ -60,13 +65,14 @@ still requires stronger evidence and follow-up validation.
 
 ## Ragnarok Capture
 
-After deploying commit `fa76213`, Ragnarok was restarted once with:
+After deploying commit `fa76213`, Ragnarok was historically restarted once with:
 
 ```bash
+# Historical only: do not run on Ragnarok during player performance testing.
 OBELISK_ENABLE_REFLECTION_SCANNER=1
 OBELISK_REFLECTION_STATIC_FNAME_ROOTS=0x5956f30
 OBELISK_REFLECTION_SAMPLE_STATIC_FNAME_ROOTS=1
-/servidor/ark/arkserver start
+# Start only an approved isolated/debug instance for future retries.
 ```
 
 Analyzer artifact:

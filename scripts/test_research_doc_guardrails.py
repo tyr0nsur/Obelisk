@@ -66,12 +66,17 @@ class ResearchDocGuardrailTests(unittest.TestCase):
         self.assertNotIn("touch /servidor/ark/obelisk/state/instances/arkserver-obelisk-debug/disable-plugins\n./arkserver2 restart", text)
 
     def test_static_fname_capture_is_historical_not_ragnarok_retry(self) -> None:
-        note = REPO_ROOT / "docs/research/2026-05-27-static-fname-root-live-capture.md"
-        text = note.read_text(encoding="utf-8")
+        notes = [
+            REPO_ROOT / "docs/research/2026-05-27-static-fname-root-live-capture.md",
+            REPO_ROOT / "docs/research/2026-05-27-live-fname-reject-capture.md",
+            REPO_ROOT / "docs/research/2026-05-27-static-fname-root-sampling.md",
+        ]
 
-        self.assertIn("Historical capture note", text)
-        self.assertIn("arkserver-obelisk-debug", text)
-        self.assertNotIn("/servidor/ark/arkserver start", text)
+        for note in notes:
+            text = note.read_text(encoding="utf-8")
+            self.assertIn("Historical", text, str(note))
+            self.assertIn("arkserver-obelisk-debug", text, str(note))
+            self.assertNotIn("/servidor/ark/arkserver start", text, str(note))
 
 
 if __name__ == "__main__":
