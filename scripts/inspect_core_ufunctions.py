@@ -517,6 +517,8 @@ def inspect_property_chain(
         if summary.get("class_name") == "ByteProperty":
             property_payload["enum_candidate"] = inspect_enum_candidate(context, current)
         properties.append(property_payload)
+        if property_rejects:
+            reject_reasons.append(f"property_{depth}_rejected")
         current = next_field
 
     if current:
