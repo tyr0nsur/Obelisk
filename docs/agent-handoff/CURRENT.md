@@ -129,6 +129,12 @@ Updated: 2026-05-27
   FName probes. Current evidence says the chat UObject globals are not plausible GNames
   roots under the indirect-table model. See
   `docs/research/2026-05-27-live-fname-reject-capture.md`.
+- fact: Static analysis found a stronger FName root research-candidate in the current ARK
+  binary: global pointer slot `0x5956f30`, bucket array `0x594e020`, mutex slot
+  `0x5956f38`, init flag `0x5956f40`, and name-table code around `0x1c88e70`,
+  `0x1c89a70`, and `0x1c990d0`. Treat it as binary-hash-specific and unpromoted until an
+  isolated runtime probe confirms known indices through `*0x5956f30`; see
+  `docs/research/2026-05-27-static-fname-root-candidate.md`.
 
 ## Rejected Or Unsafe
 
@@ -175,6 +181,9 @@ Updated: 2026-05-27
 - next-step: Stop trying to promote chat UObject globals directly into GNames. Next FName
   work should use static discovery of the name table global or a bounded alternate name
   storage scanner, then validate with the analyzer.
+- next-step: Add an isolated-only explicit static FName root probe that accepts
+  binary-hash-guarded global pointer slots such as `0x5956f30` and runs the existing
+  `None`/`ClientMessage`/`ServerChat` clue checks against the dereferenced table value.
 - next-step: After a repeat-confirmed `GNames` research candidate appears, generate
   `objdump -d -M intel` for the matching ShooterGameServer binary and run the analyzer with
   `--binary` plus `--objdump-xrefs`; inspect whether candidate `source_global` references
