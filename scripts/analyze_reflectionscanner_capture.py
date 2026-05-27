@@ -125,6 +125,78 @@ class CandidateGlobal:
     value: str
 
 
+def summarize_gname_tables(fnames: list[FNameProbe]) -> list[dict[str, object]]:
+    probes_by_table: dict[str, list[FNameProbe]] = {}
+    for probe in fnames:
+        probes_by_table.setdefault(probe.table, []).append(probe)
+
+    summaries: list[dict[str, object]] = []
+    for table, probes in sorted(probes_by_table.items()):
+        research_probes = [probe for probe in probes if probe.research_candidate]
+        exact_name_matches = [probe for probe in probes if probe.exact_name_match]
+        plausible_count_matches = [probe for probe in probes if probe.plausible_counts]
+        distinct_source_globals = sorted(
+            {
+                probe.source_global
+                for probe in research_probes
+                if probe.source_global != "unknown"
+            }
+        )
+        distinct_targets = sorted({probe.target for probe in research_probes})
+        repeat_confirmed = bool(research_probes) and (
+            len(distinct_source_globals) > 1 or len(distinct_targets) > 1
+        )
+
+        reasons: list[str] = []
+        if not exact_name_matches:
+            reasons.append("no exact None/ClientMessage/ServerChat 3/3 clue match")
+        if not plausible_count_matches:
+            reasons.append("no plausible element/chunk count")
+        if research_probes and not repeat_confirmed:
+            reasons.append("single-source evidence only")
+        if any(probe.matched_clues < probe.matched_clues_max for probe in probes):
+            reasons.append("partial clue match observed")
+        if any(
+            probe.none not in ("", "None")
+            or probe.client_message not in ("", "ClientMessage")
+            or probe.server_chat not in ("", "ServerChat")
+            for probe in probes
+        ):
+            reasons.append("preview mismatch observed")
+        if not reasons:
+            reasons.append("repeat-confirmed exact clue match")
+
+        best_probe = max(
+            probes,
+            key=lambda probe: (
+                probe.research_candidate,
+                probe.matched_clues,
+                probe.readable_clues,
+                probe.score,
+            ),
+        )
+        summaries.append(
+            {
+                "table": table,
+                "status": "research-candidate" if repeat_confirmed else "rejected",
+                "reason": "; ".join(reasons),
+                "line_count": len(probes),
+                "lines": [probe.line for probe in probes],
+                "research_candidate_count": len(research_probes),
+                "distinct_source_globals": distinct_source_globals,
+                "distinct_targets": distinct_targets,
+                "best_score": best_probe.score,
+                "best_score_max": best_probe.score_max,
+                "best_matched_clues": best_probe.matched_clues,
+                "best_matched_clues_max": best_probe.matched_clues_max,
+                "best_num_elements": best_probe.num_elements,
+                "best_num_chunks": best_probe.num_chunks,
+            }
+        )
+
+    return summaries
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -276,6 +348,7 @@ def parse_logs(paths: list[str]) -> dict[str, object]:
             }
             for item in fnames
         ],
+        "gname_table_candidates": summarize_gname_tables(fnames),
         "delayed_globals": [asdict(item) for item in delayed],
         "candidate_globals": [asdict(item) for item in candidate_globals],
     }
@@ -320,6 +393,20 @@ def print_human(summary: dict[str, object]) -> None:
             )
         )
 
+    print("\nGNames table triage:")
+    table_candidates = summary["gname_table_candidates"]
+    if not table_candidates:
+        print("- none")
+    for item in table_candidates:
+        print(
+            "- table={table} status={status} lines={lines} research_hits={research_candidate_count} "
+            "distinct_globals={distinct_global_count} distinct_targets={distinct_target_count} reason={reason}".format(
+                **item,
+                distinct_global_count=len(item["distinct_source_globals"]),
+                distinct_target_count=len(item["distinct_targets"]),
+            )
+        )
+
     weak_fnames = [item for item in fnames if not item["repeat_confirmed_candidate"]]
     if weak_fnames:
         print("\nweak or rejected FName probes:")
@@ -359,7 +446,8 @@ def main() -> int:
     if args.strict:
         has_reject_markers = bool(summary["reject_markers"])
         has_repeat_confirmed_candidate = any(
-            item["repeat_confirmed_candidate"] for item in summary["fname_probes"]
+            item["status"] == "research-candidate"
+            for item in summary["gname_table_candidates"]
         )
         if has_reject_markers or not has_repeat_confirmed_candidate:
             return 1

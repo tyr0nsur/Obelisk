@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 import tempfile
@@ -38,12 +39,12 @@ def fname_probe(
 
 
 class ReflectionScannerAnalyzerStrictTests(unittest.TestCase):
-    def run_analyzer(self, lines: list[str]) -> subprocess.CompletedProcess[str]:
+    def run_analyzer(self, lines: list[str], *extra_args: str) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory() as temp_dir:
             log_path = Path(temp_dir) / "Obelisk.log"
             log_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
             return subprocess.run(
-                [sys.executable, str(ANALYZER), "--strict", str(log_path)],
+                [sys.executable, str(ANALYZER), *extra_args, str(log_path)],
                 check=False,
                 text=True,
                 stdout=subprocess.PIPE,
@@ -51,27 +52,32 @@ class ReflectionScannerAnalyzerStrictTests(unittest.TestCase):
             )
 
     def test_single_exact_hit_fails_strict(self) -> None:
-        result = self.run_analyzer([fname_probe()])
+        result = self.run_analyzer([fname_probe()], "--strict")
 
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("FName exact candidates: 1", result.stdout)
         self.assertIn("FName repeat-confirmed candidates: 0", result.stdout)
+        self.assertIn("status=rejected", result.stdout)
+        self.assertIn("single-source evidence only", result.stdout)
 
     def test_repeated_exact_hit_passes_strict(self) -> None:
         result = self.run_analyzer(
             [
                 fname_probe(source_global="0x600000"),
                 fname_probe(source_global="0x600008"),
-            ]
+            ],
+            "--strict",
         )
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("FName exact candidates: 2", result.stdout)
         self.assertIn("FName repeat-confirmed candidates: 2", result.stdout)
         self.assertIn("distinct_globals=2", result.stdout)
+        self.assertIn("status=research-candidate", result.stdout)
+        self.assertIn("repeat-confirmed exact clue match", result.stdout)
 
     def test_duplicate_exact_hit_fails_strict(self) -> None:
-        result = self.run_analyzer([fname_probe(), fname_probe()])
+        result = self.run_analyzer([fname_probe(), fname_probe()], "--strict")
 
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("FName exact candidates: 2", result.stdout)
@@ -83,7 +89,8 @@ class ReflectionScannerAnalyzerStrictTests(unittest.TestCase):
             [
                 fname_probe(target="ServerChat"),
                 fname_probe(target="ClientMessage"),
-            ]
+            ],
+            "--strict",
         )
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -97,7 +104,8 @@ class ReflectionScannerAnalyzerStrictTests(unittest.TestCase):
                 fname_probe(source_global="0x600000"),
                 fname_probe(source_global="0x600008"),
                 "[LegacyPlugin] discovery enabled in this copied log",
-            ]
+            ],
+            "--strict",
         )
 
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
@@ -109,12 +117,40 @@ class ReflectionScannerAnalyzerStrictTests(unittest.TestCase):
             [
                 fname_probe(num_elements=9622),
                 fname_probe(num_elements=9622),
-            ]
+            ],
+            "--strict",
         )
 
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("FName exact candidates: 0", result.stdout)
         self.assertIn("FName repeat-confirmed candidates: 0", result.stdout)
+        self.assertIn("no plausible element/chunk count", result.stdout)
+
+    def test_json_summarizes_gname_table_candidates(self) -> None:
+        result = self.run_analyzer(
+            [
+                fname_probe(source_global="0x600000"),
+                fname_probe(source_global="0x600008"),
+                fname_probe(
+                    table="0x7f0000002000",
+                    none="None",
+                    client_message="ServerChat",
+                    server_chat="ClientMessage",
+                ),
+            ],
+            "--json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        summary = json.loads(result.stdout)
+        tables = {
+            item["table"]: item
+            for item in summary["gname_table_candidates"]
+        }
+        self.assertEqual(tables["0x7f0000001000"]["status"], "research-candidate")
+        self.assertEqual(tables["0x7f0000001000"]["research_candidate_count"], 2)
+        self.assertEqual(tables["0x7f0000002000"]["status"], "rejected")
+        self.assertIn("preview mismatch observed", tables["0x7f0000002000"]["reason"])
 
 
 if __name__ == "__main__":
