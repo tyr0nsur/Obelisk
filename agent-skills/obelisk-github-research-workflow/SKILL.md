@@ -29,6 +29,16 @@ skill updates, or making work reproducible for contributors.
   - runtime/core: hooks, loader, EventManager, PluginManager, ABI
   - reversing/research: FName, GNames, GObjects, UFunction, event decoding experiments
   - ops/docs: install layout, server markers, logs, research notes, contributor docs
+- Separate agents by expert focus, not only by file paths. Examples:
+  - ABI/API engineer owns public headers, plugin entry points, layout assertions, and ABI docs.
+  - Build/SDK engineer owns CMake targets, install/include layout, examples, and package shape.
+  - UE4 reflection engineer owns FName/GNames/GObjects/UFunction research and analyzers.
+  - Live-ops engineer owns `/servidor/ark`, wrappers, markers, backups, and rollback notes.
+- Do not assign two editing agents to the same focus area in the same round. If two tasks
+  need the same shared file such as `CMakeLists.txt`, `.github/workflows/ci.yml`, or
+  `api/ObeliskApi.h`, make one agent read-only or sequence the work in separate rounds.
+- If shared-file edits are unavoidable, name a single integration owner. Other agents should
+  return plans or patches scoped to their own files instead of editing the shared file.
 - Tell agents whether they may edit files. Read-only reviewers should not change the tree.
 - Close old agents after their findings are integrated so stale context does not keep
   influencing new work.

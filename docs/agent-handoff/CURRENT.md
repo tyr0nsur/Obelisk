@@ -59,6 +59,9 @@ Updated: 2026-05-27
 - fact: Commit `27de1fb` enabled CTest and added offline `PluginConfigTests`.
   The suite covers safe-disabled default creation, metadata rejection, corrupt JSON,
   `instance_allowlist` typing, and preserving existing valid config.
+- fact: Commit `e9dfbaf` added the canonical SDK header at
+  `include/obelisk/ObeliskApi.h`, kept `api/ObeliskApi.h` as a transition wrapper,
+  made `oBaseEvents` consume `obelisk_sdk`, and added `AbiLayoutTests`.
 
 ## Rejected Or Unsafe
 
@@ -105,16 +108,17 @@ Updated: 2026-05-27
 - next-step: Replace raw chat parameter probing with reflected parameter decoding.
 - next-step: Add binary hash validation or an instruction decoder before accepting future
   ProcessEvent prologue changes.
-- next-step: Add canonical SDK include layout with `include/obelisk/ObeliskApi.h`,
-  keep `api/ObeliskApi.h` as a transition wrapper, and make `oBaseEvents` consume
-  an `obelisk_sdk` CMake target.
-- next-step: Add ABI layout checks and CI quality gates before adding gameplay APIs.
+- next-step: Add CI quality gates for `ctest`, `git diff --check`, installer dry-run,
+  and an SDK consumer fixture before adding gameplay APIs.
 
 ## Agent Protocol
 
 - fact: Agents should read `agent-skills/obelisk-agent-handoff/SKILL.md`,
   `agent-skills/obelisk-continuous-learning/SKILL.md`, and the subsystem-specific skill
   before starting multi-agent work.
+- fact: Agent rounds must be separated by expert focus as well as file ownership. Do not
+  assign two editing agents to the same focus or shared integration file in the same round
+  unless one is explicitly the integration owner and the other is read-only.
 - fact: Ops/docs/QA work may use `.github/pull_request_template.md`,
   `.github/workflows/ci.yml`, `CONTRIBUTING.md`, and `docs/STATUS.md` for contributor
   checks before changing runtime or research scope.
