@@ -78,6 +78,10 @@ Updated: 2026-05-28
   compact `PrimalBuff` fixtures. It has no runtime hook, no public callback, no return
   override, and exposes only bounded bool ranges; object/class pointer ranges stay
   internal.
+- fact: `scripts/compare_reflection_snapshots.py` compares sanitized UFunction and
+  ScriptStruct snapshot sets offline and reports `accepted`, `rejected`, or `inconclusive`
+  per target. Use it for second-source layout checks; it does not read cores or touch
+  servers.
 - next-step: Use `sdk.buffs` as the next offline module to strengthen the general ARK
   Linux API/SDK core, but keep runtime hooks, callbacks, return overrides, raw
   object/class exposure, and gameplay mutation blocked.

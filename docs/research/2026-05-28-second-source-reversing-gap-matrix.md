@@ -39,6 +39,20 @@ ReflectionScanner, native exec probes, or runtime observation.
 | `UObject` base | RuntimeReflection has a candidate layout; fixtures validate synthetic and primary-core shapes. | Second source confirms vtable, flags, internal index, class, name, outer; object pointer is reachable from `GObjects[InternalIndex]`. | `python3 scripts/enumerate_core_uobjects.py --core <core> --gobjects 0x595b7e0 --fname-root-slot 0x5956f30 --max-objects 30000 --class-contains Function --json`. | Class pointer not in `GObjects`, outer chain loops, FName only numeric, bad vtable/range. |
 | `UFunction` / `UProperty` | Primary core supports property-chain snapshots and internal recognizers. | Second core or static path repeats target identity, outer/class membership, `NumParms`, `ParmsSize`, `ReturnValueOffset`, property names/classes/offsets/sizes. | `python3 scripts/inspect_core_ufunctions.py --core <core> --gobjects 0x595b7e0 --fname-root-slot 0x5956f30 --name-exact <target> --outer-exact <outer> --max-object-scan 30000 --snapshot-json`. | String proximity only, executable-tail heuristic only, chain loops, property count mismatch, offsets outside `ParmsSize`. |
 
+After a second-source snapshot set exists, compare sanitized layouts offline before
+updating any module status:
+
+```bash
+python3 scripts/compare_reflection_snapshots.py \
+  --base-root tests/fixtures/ufunction_snapshots/<sha-prefix>/<module> \
+  --candidate-root <second-source-ufunction-snapshots>/<sha-prefix>/<module>
+```
+
+Use `--json` for evidence packs. The comparator ignores commit, metadata, and unstable
+FName/GObjects indices by default; it returns `accepted`, `rejected`, or `inconclusive` per
+target. Use `--strict-identity-indices` only when intentionally comparing same-binary
+identity evidence, not for cross-source layout promotion.
+
 ## P1 Module Fixture Matrix
 
 | Module | Current Best Use | Second-Source Promotion Gate | Still Blocked |
@@ -70,7 +84,8 @@ Every second-source note or evidence pack should record:
 
 1. Obtain or prepare an approved second isolated core path for `FName`/`GObjects`.
 2. Re-run object enumeration and `UFunction` property-chain inspection on that second core.
-3. Compare existing module snapshots layout-only against the second source when available.
+3. Compare existing module snapshots layout-only against the second source with
+   `scripts/compare_reflection_snapshots.py` when available.
 4. Only then schedule short, marker-gated TheIsland/debug observation for inventory or
    structures.
 5. Define SDK promotion policy after copied-data ownership and ABI lifecycle are proven.
