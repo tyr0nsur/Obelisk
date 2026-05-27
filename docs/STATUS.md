@@ -34,10 +34,12 @@ define or protect runtime behavior.
 | `oBaseEvents` | Release example | First official example plugin; demonstrates ABI validation, config creation, filtered callbacks, and shutdown. |
 | ReflectionScanner | Experimental | Use for isolated captures with explicit gates; keep disabled by default. |
 | Runtime debug control | Experimental | Marker-triggered post-start probes for short debug windows; stable posture rejects `OBELISK_ENABLE_DEBUG_CONTROL`. |
+| Binary-hash-gated chat reflection | Experimental | Internal metadata-only observation path for `ServerSendChatMessage` and exact fallback candidates; no text decoding, plugin dispatch, or public ABI yet. |
 | Raw FString/FName inference | Experimental | Evidence gathering only until reflection-backed decoding replaces it. |
 | GNames/FNamePool resolution | Not ready | Priority research item. |
 | GObjects/GUObjectArray enumeration | Not ready | Validate object shapes in isolation before accepting offsets. |
-| Reflected UFunction parameter decoding | Not ready | Required before stable chat command interception. |
+| General reflected UFunction parameter decoding | Not ready | A narrow internal chat path exists; general SDK-facing decoding remains unpromoted. |
+| Stable chat command interception | Not ready | Requires a confirmed real runtime hit, bounded text decoding, ABI/lifecycle tests, and a copied-data plugin event API. |
 | Higher-level SDK APIs | Not ready | Players, tribes, inventory, dinos, permissions, timers, and RCON helpers remain roadmap items. |
 
 ## Harness Safety Baseline
