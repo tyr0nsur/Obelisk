@@ -11,6 +11,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
+READINESS_DOC = REPO_ROOT / "docs" / "research" / "2026-05-27-module-readiness-matrix.md"
 EXPECTED_ARK_SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 MANIFEST_SCHEMA = "obelisk.ufunction-snapshot-manifest.v1"
 FORBIDDEN_KEYS = {
@@ -75,6 +76,15 @@ class UFunctionSnapshotFixtureTests(unittest.TestCase):
             sorted(path.relative_to(FIXTURE_ROOT).as_posix() for path in actual_paths),
             sorted(path.relative_to(FIXTURE_ROOT).as_posix() for path in expected_paths),
         )
+
+    def test_manifest_modules_are_reflected_in_readiness_matrix(self) -> None:
+        manifest = self.manifest()
+        doc = READINESS_DOC.read_text(encoding="utf-8")
+
+        modules = sorted({entry["module"] for entry in manifest["targets"]})
+        for module in modules:
+            with self.subTest(module=module):
+                self.assertIn(f"`{module.replace('_', '.')}`", doc)
 
     def test_snapshot_fixtures_are_sanitized_and_bounded(self) -> None:
         paths = self.fixture_paths()
