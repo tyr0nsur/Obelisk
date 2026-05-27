@@ -101,8 +101,9 @@ work from repository state instead of chat history.
   no live cluster, debug-only `OBELISK_LOG_DIR`, and wrapper-level Obelisk env instead of
   map marker reuse; see
   `docs/research/2026-05-27-isolated-debug-instance-plan.md`.
-- `GNames`, `GObjects`, `UFunction` metadata, and reflected parameter decoding are not
-  solved yet.
+- General-purpose SDK reflection is not solved yet. However, the current ARK binary has
+  binary-hash-scoped evidence for FName, `GUObjectArray`, chat `UFunction` property chains,
+  bounded param ranges, and an internal UTF-32 `FString` decoder candidate.
 - Analyzer-level GNames table triage is available in
   `scripts/analyze_reflectionscanner_capture.py` and documented in
   `docs/research/2026-05-27-reflectionscanner-gname-table-triage.md`. A
@@ -259,25 +260,16 @@ python3 scripts/analyze_reflectionscanner_capture.py \
 
 - Ops: get permission to create or designate the isolated ARK debug instance; preferred
   plan is `arkserver-obelisk-debug`.
-- Reflection: replace blind startup/static-slot waits with a bounded live data-mapping
-  scanner or offline core scanner for FName-table-shaped pointers.
-- GObjects: statically find candidate `GUObjectArray` slots, then inspect only those with
-  the enhanced core evidence pack.
-- GObjects: next implementation should validate multiple `FUObjectItem` indices from
-  `0x595b7e0` and use FName-backed names before attempting `UFunction` enumeration.
-- UFunction: inspect metadata/property-chain windows for the enumerated chat functions
-  before returning to runtime chat interception.
-- Runtime chat: next implementation should filter `ProcessEvent` by validated
-  `UFunction*` and decode only reflected `FString` offsets in isolated debug mode.
-- Preferred runtime integration point: `hooks/ProcessEventHook.cpp` inside
-  `ProcessEvent_Detour`, immediately after FName index extraction and before pre callback
-  dispatch. Keep helper internal; do not change public plugin ABI yet.
+- Runtime chat: wait for one real in-game chat message and confirm
+  `Reflected chat ProcessEvent` in `/servidor/ark/obelisk/logs/arkserver/Obelisk.log`.
+- After a real hit, wire `RuntimeReflection::TryDecodeFStringUtf32` into the experimental
+  logger and keep it gated/rate-limited.
 - `ue/RuntimeReflection.{h,cpp}` exists as the internal gated reader for
-  `UObject`/`UFunction`/`UProperty` and bounded parameter ranges. It is tested but not wired
-  into `ProcessEvent` yet.
+  `UObject`/`UFunction`/`UProperty`, bounded parameter ranges, and UTF-32 `FString`
+  decoding. It is tested and used by hook-side chat observation.
 - `ue/ChatReflection.{h,cpp}` exists as the internal recognizer for `ServerChat`,
   `ServerChatTo`, and `ServerChatToPlayer` shapes. It is tested, returns borrowed param
-  ranges, does not decode `FString`, and is not wired into `ProcessEvent` yet.
+  ranges, and does not decode `FString` in runtime logs yet.
 - `ProcessEvent_Detour` has experimental chat observation wiring, disabled unless
   `OBELISK_ENABLE_CHAT_REFLECTION=1` and `OBELISK_CHAT_REFLECTION_BINARY_SHA256` matches
   the supported ARK SHA. It logs metadata/ranges only, not text.

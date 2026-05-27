@@ -102,6 +102,8 @@ Instance marker files are preferred for production operations:
 mkdir -p /servidor/ark/obelisk/state/instances/arkserver
 touch /servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook
 touch /servidor/ark/obelisk/state/instances/arkserver/disable-plugins
+# Experimental, development-only chat observation:
+touch /servidor/ark/obelisk/state/instances/arkserver/enable-chat-reflection
 ```
 
 Useful flags:
@@ -109,7 +111,20 @@ Useful flags:
 ```text
 state/instances/<instance-id>/enable-process-event-hook
 state/instances/<instance-id>/disable-plugins
+state/instances/<instance-id>/enable-chat-reflection  # experimental
 ```
+
+`enable-chat-reflection` makes the wrapper set:
+
+```text
+OBELISK_ENABLE_CHAT_REFLECTION=1
+OBELISK_CHAT_REFLECTION_BINARY_SHA256=<supported ARK SHA256>
+OBELISK_CHAT_REFLECTION_LOG_LIMIT=25
+```
+
+Rollback is removing the marker and restarting the instance. The stable production posture
+is still process-event hook enabled, plugins disabled for debug, and chat reflection off
+unless a development validation run explicitly needs it.
 
 Map markers such as `enable-process-event-hook-ragnarok` are obsolete and are not read by
 the release wrapper.

@@ -214,11 +214,11 @@ Updated: 2026-05-27
   `docs/research/2026-05-27-core-ufunction-property-chain.md`.
 - fact: `ue/RuntimeReflection.{h,cpp}` now provides an internal, binary-hash-gated
   reflection reader with tests for bounded `UFunction`/`UProperty` chains and borrowed
-  parameter ranges. It is not public ABI and is not wired into `ProcessEvent` yet.
+  parameter ranges. It is not public ABI; it is used by the experimental hook-side chat
+  observation path.
 - fact: `ue/ChatReflection.{h,cpp}` now recognizes `ServerChat`, `ServerChatTo`, and
   `ServerChatToPlayer` shapes on top of `RuntimeReflection` and returns borrowed parameter
-  ranges when `params` is provided. It still does not decode `FString` and is not wired
-  into `ProcessEvent` yet.
+  ranges when `params` is provided. It still does not decode `FString` in runtime logs.
 - fact: `hooks/ProcessEventHook.cpp` has experimental chat reflection observation wiring,
   disabled unless `OBELISK_ENABLE_CHAT_REFLECTION=1` and
   `OBELISK_CHAT_REFLECTION_BINARY_SHA256` equals the supported ShooterGameServer SHA256.
@@ -251,72 +251,14 @@ Updated: 2026-05-27
 
 ## Priority Next Steps
 
-- fact: ProcessEvent hook installation now requires a unique validated signature match.
-  Direct offset fallback has been removed from active runtime code. See
-  `docs/research/2026-05-27-processevent-target-validation.md`.
-- fact: Plugin ProcessEvent callbacks now carry owner tokens and are unregistered on init
-  failure and before unload/`dlclose`; see
-  `docs/research/2026-05-27-plugin-callback-ownership-hardening.md`.
-- fact: Runtime now supports optional `extern "C" void ObeliskPlugin_Shutdown()`,
-  resolved outside `ObeliskApi` and called before callback owner cleanup and `dlclose`;
-  see `docs/research/2026-05-27-plugin-shutdown-lifecycle.md`.
-- fact: Commit `6f20a2c` introduced the strict plugin metadata/config ABI. Plugins must
-  export `ObeliskPlugin_GetInfo`, the runtime creates/validates
-  `${OBELISK_CONFIG_DIR}/<plugin-id>/config.json`, and `ObeliskPlugin_Init` receives an
-  `ObeliskPluginInitContext`.
-- fact: Top-level CMake builds `plugins/oBaseEvents/oBaseEvents.so` as the first official
-  plugin example. `oBaseEvents` has migrated to the metadata/config ABI; legacy
-  chat/monitor prototype source has been removed from the release tree.
-- fact: Plugin structure and promotion rules are now documented in
-  `docs/PLUGIN_ARCHITECTURE.md`; `plugins/README.md` records the intended
-  `examples/` and `experimental/` split without moving code or changing CMake.
-- fact: Full build completed after fixing `ue/ReflectionScanner.cpp` pointer formatting in
-  the reflection/chat metadata audit.
-- next-step: Resolve `FName` indices through `GNames` or `FNamePool`.
-- next-step: Locate `GUObjectArray`/`GObjects` and enumerate `UFunction` metadata.
-- next-step: Get operator permission to create or designate an isolated/debug instance
-  before running ReflectionScanner; preferred plan is `arkserver-obelisk-debug`.
-- next-step: Use isolated ReflectionScanner captures to compare UObject validation scores
-  before accepting any `GObjects`, `GNames`, or `UFunction` offset.
-- next-step: In the next isolated ReflectionScanner capture, compare any
-  `FName indirect-table probe` lines against `None`, `ClientMessage`, and `ServerChat`;
-  require `matched_clues=3/3` plus repeat confirmation through distinct `source_global`
-  values or distinct targets before treating a table as a `GNames` research candidate.
-- next-step: Stop trying to promote chat UObject globals directly into GNames. Next FName
-  work should use static discovery of the name table global or a bounded alternate name
-  storage scanner, then validate with the analyzer.
-- next-step: Replace blind startup/static-slot waits with a bounded live data-mapping
-  scanner or offline core scanner for FName-table-shaped pointers.
-- next-step: Extend core tooling to validate multiple `FUObjectItem` indices from
-  `0x595b7e0`, including `InternalIndex`, `ClassPrivate`, `OuterPrivate`, and FName
-  resolution.
-- next-step: Add offline `UFunction` metadata/property-chain inspection for the enumerated
-  chat function objects before any runtime chat decoder work.
-- next-step: Implement a gated runtime reflection resolver and `ProcessEvent` filter for
-  validated chat `UFunction*` calls, then decode only reflected `FString` param offsets in
-  isolated debug mode.
-- next-step: Preferred integration point is `hooks/ProcessEventHook.cpp` inside
-  `ProcessEvent_Detour`, after FName index extraction and before pre callback dispatch;
-  see `docs/research/2026-05-27-runtime-chat-reflection-plan.md`.
-- next-step: Deploy the new runtime to the isolated debug server with chat reflection env
-  gates and write one chat message to confirm `Reflected chat ProcessEvent` log entries.
 - next-step: When an operator can join, write one in-game chat message on Ragnarok and
   tail `/servidor/ark/obelisk/logs/arkserver/Obelisk.log` for `Reflected chat ProcessEvent`.
 - next-step: Wire UTF-32 text decoding into the experimental chat reflection logger only
   after one real chat capture confirms the reflected params are being hit.
 - rollback: remove `enable-chat-reflection` marker and restart the debug server; no plugin
   ABI or config migration is involved.
-- next-step: After a repeat-confirmed `GNames` research candidate appears, generate
-  `objdump -d -M intel` for the matching ShooterGameServer binary and run the analyzer with
-  `--binary` plus `--objdump-xrefs`; inspect whether candidate `source_global` references
-  are real load/store paths before designing runtime name-resolution code.
-- next-step: To get a real GNames evidence pack, create or designate an isolated debug
-  instance and run a short ReflectionScanner capture with plugins disabled and native exec
-  probes unset.
-- next-step: For the next isolated capture, run
-  `scripts/build_reflection_evidence_pack.py` against copied logs and the matching binary
-  before making any offset claim.
-- next-step: Replace raw chat parameter probing with reflected parameter decoding.
+- next-step: Generalize the binary-hash-scoped reflection pipeline only after another
+  capture or ARK binary hash validates the same fields.
 - next-step: Add binary hash validation or an instruction decoder before accepting future
   ProcessEvent prologue changes.
 - next-step: Keep expanding package/export validation only when external plugin

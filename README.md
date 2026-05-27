@@ -28,7 +28,9 @@ Experimental:
 
 - ReflectionScanner and offline analyzer tooling.
 - FName/GNames/GObjects/UFunction discovery.
-- Reflected parameter decoding.
+- Binary-hash-gated chat reflection observation.
+- Internal UTF-32 `FString` decoder candidate.
+- General reflected parameter decoding beyond the current chat path.
 
 Not ready:
 
@@ -118,6 +120,7 @@ uses `/servidor/ark/obelisk`:
       <instance-id>/
         enable-process-event-hook
         disable-plugins
+        enable-chat-reflection  # experimental
 ```
 
 The target binary directory should only need a thin launcher/wrapper. Runtime
@@ -210,6 +213,9 @@ OBELISK_INSTANCE_ID
 OBELISK_ENABLE_PROCESS_EVENT_HOOK=1
 OBELISK_DISABLE_PLUGINS=1
 OBELISK_ENABLE_REFLECTION_SCANNER=1
+OBELISK_ENABLE_CHAT_REFLECTION=1
+OBELISK_CHAT_REFLECTION_BINARY_SHA256=<supported ARK SHA256>
+OBELISK_CHAT_REFLECTION_LOG_LIMIT=25
 OBELISK_PE_TRACE_LIMIT=0
 ```
 
@@ -222,9 +228,10 @@ Near-term engineering:
 
 - Keep CI as a real quality gate: build, CTest, analyzer tests, SDK consumer
   fixture, and install dry-run.
-- Resolve FName indices through GNames/FNamePool.
-- Build safe GObjects and UFunction lookup.
-- Replace raw chat memory scanning with reflected parameter decoding.
+- Confirm one real chat `ProcessEvent` hit on the deployed gated runtime.
+- Decode reflected UTF-32 `FString` chat fields after the runtime hit is confirmed.
+- Generalize FName/GObjects/UFunction lookup only after another capture or binary hash
+  validates the current field layout.
 - Add small SDK examples for minimal load, filtered events, config, and safe
   lifecycle.
 

@@ -52,5 +52,9 @@ cat "${latest}/chat-reflection.txt"
 tail -n 80 "${latest}/obelisk-log-tail.txt"
 ```
 
+`chat-reflection.txt` summarizes marker and log evidence. It proves only whether the
+experimental gate and log lines are present; it does not prove chat text capture unless
+`reflected_chat_lines` is non-zero and the lines are reviewed.
+
 If `posture.txt` shows failure, stop and restore stable posture before launching agents or
 runtime experiments.
