@@ -231,6 +231,9 @@ Updated: 2026-05-27
 - fact: Agents should read `agent-skills/obelisk-agent-handoff/SKILL.md`,
   `agent-skills/obelisk-continuous-learning/SKILL.md`, and the subsystem-specific skill
   before starting multi-agent work.
+- fact: Agent commits/pushes without explicit one-turn delegation are protocol violations.
+  The lead may accept audited content, but future prompts should say
+  "leave changes unstaged/uncommitted and report touched paths" when edits are allowed.
 - fact: Agent rounds must be separated by expert focus as well as file ownership. Do not
   assign two editing agents to the same focus or shared integration file in the same round
   unless one is explicitly the integration owner and the other is read-only.

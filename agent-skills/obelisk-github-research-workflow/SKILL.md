@@ -13,6 +13,9 @@ skill updates, or making work reproducible for contributors.
 - The team lead owns GitHub integration. Sub-agents must not commit, amend, rebase,
   tag, push, or update GitHub state unless the lead explicitly delegates that action for
   one turn.
+- If a sub-agent commits or pushes without explicit delegation, treat it as a protocol
+  violation even when the technical content is useful. The lead must audit the commit,
+  record or correct the deviation, and restate ownership before launching more agents.
 - Sub-agents deliver scoped file edits, evidence, validation output, and risks. The lead
   reviews, stages, commits, pushes, closes agents, and updates shared handoff state.
 - Keep each commit focused: runtime code, docs, skills, or deployment scripts should not be
@@ -47,6 +50,9 @@ skill updates, or making work reproducible for contributors.
 - Tell agents whether they may edit files. Read-only reviewers should not change the tree.
 - Tell agents they must not manage GitHub. They may leave working-tree changes in their
   owned scope, but the lead is the only integration owner.
+- In agent prompts, prefer explicit wording: "leave changes unstaged/uncommitted and report
+  touched paths"; do not ask sub-agents to create "stable commits" unless delegating GitHub
+  for exactly that turn.
 - Close old agents after their findings are integrated so stale context does not keep
   influencing new work.
 - Relaunch agents after major skill updates when their next task depends on the new rules.

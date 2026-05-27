@@ -54,6 +54,8 @@ For sub-agents:
 2. Add or update a research note only if that was inside the assigned ownership scope.
 3. Do not commit, amend, rebase, tag, push, or update GitHub state.
 4. Do not update handoff files unless the lead explicitly assigned that scope.
+5. If you accidentally committed or pushed, say so explicitly in your final report with the
+   commit hash and do no further GitHub operations.
 
 For the lead:
 
