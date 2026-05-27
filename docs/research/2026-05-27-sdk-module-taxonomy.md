@@ -15,6 +15,8 @@ core/evidence pack:
   - `ShooterPlayerController`
   - `PrimalItem`
   - `PrimalDinoCharacter`
+  - `PrimalStructure`
+  - `MissionType`
 - Evidence is scoped to ARK Linux binary SHA256
   `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`.
 
@@ -45,6 +47,7 @@ memory alone, or metadata reads without ownership and lifetime design.
 | `sdk.items` | `PrimalItem` crafting, repair, durability, NetExec | Item metadata and policy design | Candidate-only |
 | `sdk.dinos` | `PrimalDinoCharacter` passenger, carry, attack, tame, flight | Dino event metadata fixtures | Candidate-only |
 | `sdk.structures` | `ServerRequestPlaceStructure`, multiuse/place functions, `PrimalStructure` | Struct-heavy validation surface | Candidate-only; defer runtime |
+| `sdk.missions` | `MissionType` player add/leave hooks, state, leaderboard, spawn functions | Mission metadata fixtures and policy design | Candidate-only; fixture-backed compact chains |
 | `sdk.tribes` | Tribe/alliance/log request functions | Low-param observation candidates | Candidate-only |
 | `sdk.transfer` | Upload/download/ARK transfer functions | Future deep struct decoding | Candidate-only; defer |
 | `sdk.admin` | `ShooterCheatManager`, controller admin RPCs | Research and permission-model planning | Documentation-only |
@@ -91,17 +94,25 @@ Keep these out of public SDK until stronger evidence and policy exist:
 
 ## First Fixture Targets
 
-Prioritize compact, non-chat property chains:
+Current fixture-backed compact, non-chat property chains:
 
 ```text
 ShooterPlayerController.ServerRequestInventoryUseItem
 PrimalItem.AllowRemoteAddToInventory
 PrimalItem.CanUse
-PrimalItem.UseItemOntoItem
-PrimalDinoCharacter.AddPassenger
-PrimalDinoCharacter.AllowCarryCharacter
 PrimalDinoCharacter.ServerRequestAttack
-PrimalDinoCharacter.SetCharacterStatusTameable
+PrimalDinoCharacter.BPNotifyAddPassenger
+PrimalStructureElevatorPlatform.ServerActivate
+MissionType.AddPlayerToMission
+MissionType.BPAllowPlayerToLeaveMission
+MissionType.BPOnPlayerAddedToMission
+```
+
+Current rejected/deferred fixture examples:
+
+```text
+PrimalItem.MalformedCanUse
+MissionType.DeferredMissionStringArray
 ```
 
 Structure placement should remain a later fixture because it exercises larger struct-heavy
@@ -109,9 +120,8 @@ params and has higher gameplay-authority risk.
 
 ## Open Questions
 
-- Which compact non-chat candidate should become the first analyzer fixture?
-- Should module readiness be tracked in one central table or inside each focused research
-  note?
+- Should fixture-backed status be promoted from synthetic tests to real-core fixture JSON
+  snapshots?
 - What minimum second-source evidence is required before non-chat runtime observation?
 - What policy layer is needed before admin, transfer, and NetExec surfaces can be discussed
   as SDK features?
@@ -122,3 +132,5 @@ params and has higher gameplay-authority risk.
 - `docs/research/2026-05-27-shooterplayercontroller-function-inventory.md`
 - `docs/research/2026-05-27-primalitem-function-inventory.md`
 - `docs/research/2026-05-27-primaldinocharacter-function-inventory.md`
+- `docs/research/2026-05-27-primalstructure-function-inventory.md`
+- `docs/research/2026-05-27-missiontype-function-inventory.md`
