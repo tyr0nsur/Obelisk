@@ -294,6 +294,8 @@ Updated: 2026-05-27
   `user_data`, callback owner cleanup, ABI layout tests, plugin fixture coverage, hot-path
   benchmark evidence, and runtime validation before adding `OnChatMessage`; see
   `docs/research/2026-05-27-sdk-chat-event-ownership-plan.md`.
+- fact: `docs/research/2026-05-27-chat-sdk-abi-preflight.md` records the test-first ABI
+  and dispatcher gates for future `OnChatMessage` without changing the public SDK header.
 - fact: Commit `76356bf` adds `chat_reflection_benchmark`, an excluded-from-default-build
   local helper for synthetic `TryIdentifyInvocation()` and UTF-32 decode measurements. It
   does not cover hook-side `GetFunctionNameIndex()` / `Memory::IsReadable()` overhead.
@@ -337,6 +339,8 @@ Updated: 2026-05-27
 - next-step: Before drafting public chat API, justify or reduce the remaining three
   matched-chat allocations and seven text-log allocations, then plan isolated runtime A/B
   separately.
+- next-step: When chat API work resumes, add ABI layout tests and dispatcher ownership
+  tests first; only then append public fields to `include/obelisk/ObeliskApi.h`.
 - rollback: remove `enable-chat-reflection` marker and restart the debug server; no plugin
   ABI or config migration is involved.
 - next-step: Generalize the binary-hash-scoped reflection pipeline only after another
