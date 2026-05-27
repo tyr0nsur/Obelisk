@@ -93,15 +93,15 @@ Updated: 2026-05-27
 - fact: Commit `2420e82` added the static/reversing workflow skills:
   `obelisk-static-binary-analysis`, `obelisk-tooling-discipline`, and
   `obelisk-ue4-type-reconstruction`.
-- fact: Commit `1e62968` makes `PluginManager::UnloadAll()` unload plugins in reverse
+- fact: Commit `502752f` makes `PluginManager::UnloadAll()` unload plugins in reverse
   load order and adds a multi-plugin order test.
-- fact: Commit `6da5c9c` installs the public SDK as a CMake package export
-  (`ObeliskTargets.cmake`, `ObeliskConfig.cmake`, and version file) through the installer's
-  SDK component.
+- fact: Commit `ff245d4` installs the public SDK as a CMake package export
+  (`ObeliskTargets.cmake`, `ObeliskConfig.cmake`, and version file), updates the installer
+  SDK component, and validates installed consumption through `find_package`.
 - fact: The installed layout test now consumes the installed SDK through
   `find_package(Obelisk CONFIG REQUIRED)` and `Obelisk::obelisk_sdk`, so package export
   regressions are covered by `scripts/test_install_obelisk_layout.sh`.
-- fact: Commit `a986a57` adds analyzer evidence pack metadata. Use
+- fact: Commit `f24152f` adds analyzer evidence pack metadata. Use
   `scripts/analyze_reflectionscanner_capture.py --json --binary <ShooterGameServer>
   --objdump-xrefs <objdump.txt> <Obelisk.log>` to record Obelisk commit, binary SHA256,
   copied logs, objdump artifact, candidate counts, reject markers, and promotion gate.
