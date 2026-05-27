@@ -194,14 +194,21 @@ hook_like_server_send_chat ns_avg=459 ns_p50=451 ns_p95=481 ns_p99=501 reader_ca
 hook_like_server_send_chat_text ns_avg=904 ns_p50=901 ns_p95=932 ns_p99=942 reader_calls_per_iter=55 allocations=350000 allocations_per_iter=7
 ```
 
-Interpretation: the synthetic non-chat enabled path adds one name-index readability check;
-the disabled and non-chat paths now stay allocation-free; reserving reflected parameter
-and field vectors, then replacing the property-cycle `unordered_set` with a reserved
-linear vector, reduced matched-chat temporary allocations from seven to three per
-iteration. The fixture text intentionally exceeds small-string optimization storage, so
-text decode now shows three allocations and the hook-like text path shows seven
-allocations per iteration. These are local regression signals only, not runtime acceptance
-evidence.
+Interpretation from that older run: reserving reflected parameter and field vectors
+reduced matched-chat temporary allocations from seven to three per iteration, but text
+decode still allocated heavily for a non-SSO fixture. A later stack-cycle and UTF-8
+reservation pass improved the current local gate further:
+
+```text
+server_send_chat_match allocations_per_iter=0
+server_send_chat_decode_utf32 allocations_per_iter=1
+hook_like_server_send_chat allocations_per_iter=0
+hook_like_server_send_chat_text allocations_per_iter=1
+```
+
+The disabled, enabled non-chat, and `OBELISK_CHAT_REFLECTION_LOG_LIMIT=0` paths remain
+allocation-free in the synthetic benchmark. These are local regression signals only, not
+runtime acceptance evidence.
 
 `scripts/check_chat_reflection_benchmark.py` now enforces those local regression gates for
 the hook-like paths. It requires disabled/non-chat paths to remain allocation-free, caps
