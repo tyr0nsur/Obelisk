@@ -88,6 +88,9 @@ work from repository state instead of chat history.
   ladder and require explicit debug-window approval before marker edits, restarts,
   scanners, ptrace/gcore, or broad tracing. Public SDK guardrails now block premature
   gameplay module APIs, not only chat.
+- Operational docs/skills outside `docs/research/` are guarded by
+  `scripts/test_operational_doc_guardrails.py`, which blocks active marker/restart
+  command examples from returning to install, supervision, or skill docs.
 - Latest restart audit:
   `docs/research/2026-05-27-ops-restart-audit-instance-id.md`
   - live `ObeliskRun.sh` exports `OBELISK_INSTANCE_ID=arkserver`

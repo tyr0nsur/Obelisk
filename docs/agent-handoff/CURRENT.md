@@ -97,6 +97,13 @@ Updated: 2026-05-28
 - fact: Commit `6d0f783` extends public SDK guardrails so gameplay module APIs
   (inventory, structures, buffs, dinos, tribes, missions, transfers, admin, player, item)
   cannot appear before intentional promotion.
+- fact: Commit `b401df4` removed direct TheIsland marker/restart commands from core and
+  Linux hooking skills; live validation now requires explicit approval and posture checks.
+- fact: Commit `7a7a307` gates documented debug marker and rollback commands in
+  `docs/INSTALL.md` and `docs/SUPERVISION.md`.
+- fact: Commit `a884b3f` adds `scripts/test_operational_doc_guardrails.py` to CI/release
+  so docs and skills outside `docs/research/` cannot reintroduce active marker/restart
+  commands.
 - fact: `sdk.transfers` ScriptStruct fixtures now preserve target/property object and
   FName identity fields like UFunction fixtures. `regenerate_scriptstruct_snapshots.py
   --check-layout` stays semantic/layout-only so second-source gates do not depend on
