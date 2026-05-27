@@ -20,6 +20,10 @@ Every serious investigation should end with one of these outcomes:
 If the finding changes how agents should behave, update a skill. If it only records one
 experiment or evidence trail, update `docs/research/`.
 
+Sub-agents may recommend skill changes in their final report or in an assigned research
+note, but the team lead owns skill edits, commits, pushes, and handoff updates. Do not let
+worker agents silently change project process rules while implementing subsystem code.
+
 ## What To Capture
 
 Capture facts that are expensive to rediscover:
@@ -71,6 +75,14 @@ Update `agent-skills/` when a research result changes future behavior:
 
 Keep skills operational and short. Move detailed experiment logs to `docs/research/`.
 
+Use this escalation rule:
+
+- New evidence about one experiment: write or update `docs/research/`.
+- New repeatable workflow or safety rule: update the relevant `agent-skills/*/SKILL.md`.
+- New team coordination rule: update `obelisk-github-research-workflow` or
+  `obelisk-agent-handoff`.
+- Uncertain idea: record as a `hypothesis` in research notes, not as a skill rule.
+
 ## Agent Handoff
 
 When handing work to another agent, include:
@@ -90,6 +102,7 @@ starting a new round.
 - [ ] Did this work produce a reusable fact?
 - [ ] Did any previous instruction become unsafe, stale, or false?
 - [ ] Is there a rejected hypothesis worth saving?
+- [ ] Did a sub-agent suggest a skill update that the lead must accept, reject, or defer?
 - [ ] Did a live-server rule change?
 - [ ] Did the relevant skill get updated?
 - [ ] Did `docs/research/` get updated when the evidence is too detailed for a skill?
