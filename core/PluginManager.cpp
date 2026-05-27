@@ -324,8 +324,9 @@ namespace Obelisk::Core
 
     void PluginManager::UnloadAll()
     {
-        for (auto& plugin : m_LoadedPlugins)
+        for (auto it = m_LoadedPlugins.rbegin(); it != m_LoadedPlugins.rend(); ++it)
         {
+            auto& plugin = *it;
             OBELISK_INFO("Unloading plugin: {}", plugin.name);
             CallPluginShutdown(plugin.name, plugin.shutdown);
             const size_t removed = EventManager::Get().UnregisterCallbacksForOwner(plugin.owner);

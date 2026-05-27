@@ -10,6 +10,7 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace fs = std::filesystem;
 
@@ -36,6 +37,7 @@ namespace
         std::string initConfigPath;
         std::string initInstanceId;
         void* owner = this;
+        std::vector<std::string>* orderLog = nullptr;
     };
 
     FakePlugin* g_CurrentFakePlugin = nullptr;
@@ -91,6 +93,9 @@ namespace
         if (g_CurrentFakePlugin->registerCallback)
             api->RegisterPreProcessEvent(FakeCallback);
 
+        if (g_CurrentFakePlugin->orderLog)
+            g_CurrentFakePlugin->orderLog->push_back("init:" + g_CurrentFakePlugin->filename);
+
         return g_CurrentFakePlugin->initResult;
     }
 
@@ -143,7 +148,10 @@ namespace
 
         void Close(void* handle) override
         {
-            ++static_cast<FakePlugin*>(handle)->closeCalls;
+            auto* plugin = static_cast<FakePlugin*>(handle);
+            ++plugin->closeCalls;
+            if (plugin->orderLog)
+                plugin->orderLog->push_back("close:" + plugin->filename);
         }
 
     private:
@@ -294,6 +302,39 @@ namespace
         CleanupPlugin(plugin);
         fs::remove_all(root);
     }
+
+    void TestMultiplePluginsLoadSortedAndUnloadReverse()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_multi");
+        ConfigureEnvironment(root);
+
+        std::vector<std::string> orderLog;
+        FakePlugin pluginA{.filename = "a_first.so", .pluginId = "plugin_a", .hasShutdown = false, .orderLog = &orderLog};
+        FakePlugin pluginB{.filename = "b_second.so", .pluginId = "plugin_b", .hasShutdown = false, .orderLog = &orderLog};
+        FakeLoader loader;
+        loader.Add(pluginA);
+        loader.Add(pluginB);
+        TouchPlugin(root, pluginB.filename);
+        TouchPlugin(root, pluginA.filename);
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+        manager.UnloadAll();
+
+        const std::vector<std::string> expected{
+            "init:a_first.so",
+            "init:b_second.so",
+            "close:b_second.so",
+            "close:a_first.so",
+        };
+        Require(orderLog == expected, "plugins were not loaded sorted and unloaded in reverse load order");
+        Require(pluginA.closeCalls == 1, "first plugin was not closed once");
+        Require(pluginB.closeCalls == 1, "second plugin was not closed once");
+
+        CleanupPlugin(pluginA);
+        CleanupPlugin(pluginB);
+        fs::remove_all(root);
+    }
 }
 
 int main()
@@ -307,6 +348,7 @@ int main()
     TestMissingInitRejectsAndCloses();
     TestInvalidMetadataRejectsAndCloses();
     TestInitFailureCleansCallbacksAndCloses();
+    TestMultiplePluginsLoadSortedAndUnloadReverse();
 
     Obelisk::Logger::Shutdown();
     fs::remove_all(logRoot);
