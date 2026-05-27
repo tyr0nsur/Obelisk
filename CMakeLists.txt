@@ -52,6 +52,7 @@ add_library(obelisk SHARED
     loader/Bootstrap.cpp
     runtime/Logger.cpp
     ue/Memory.cpp
+    ue/ChatReflection.cpp
     ue/RuntimeReflection.cpp
     ue/ReflectionScanner.cpp
     hooks/HookManager.cpp
@@ -121,6 +122,15 @@ add_executable(runtime_reflection_tests
 target_include_directories(runtime_reflection_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_test(NAME RuntimeReflectionTests COMMAND runtime_reflection_tests)
+
+add_executable(chat_reflection_tests
+    tests/core/ChatReflectionTests.cpp
+    ue/ChatReflection.cpp
+    ue/RuntimeReflection.cpp
+)
+target_include_directories(chat_reflection_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_test(NAME ChatReflectionTests COMMAND chat_reflection_tests)
 
 install(TARGETS obelisk
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}

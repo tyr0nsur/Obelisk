@@ -34,6 +34,11 @@ binary-hash-gated internal reader for `UObject`, `UFunction`, `UProperty`, bound
 parameter ranges, and inert `FString` header helpers. It is not wired into
 `ProcessEvent_Detour` yet.
 
+The chat-specific recognizer now exists as `ue/ChatReflection.{h,cpp}`. It recognizes
+`ServerChat`, `ServerChatTo`, and `ServerChatToPlayer` by FName index plus reflected
+property-chain shape, and can return borrowed parameter ranges when `params` is provided.
+It still does not decode `FString` contents and is not wired into the hook yet.
+
 The final chat helper should build on that module and:
 
 - reject null or unreadable pointers;
@@ -81,12 +86,13 @@ From `docs/research/2026-05-27-core-ufunction-property-chain.md`:
 - `RuntimeReflectionTests` currently cover disabled/unsupported gates, bounded property
   chains, `ParmsSize` bounds, owner mismatch rejection, borrowed parameter ranges, and
   inert `FString` header parsing.
-- Still needed: named chat target validation for `ServerChat`, `ServerChatTo`, and
-  `ServerChatToPlayer` shapes, plus hook-level dispatch tests once the helper is wired
-  into `ProcessEvent_Detour`.
+- `ChatReflectionTests` cover valid `ServerChat`, `ServerChatTo`, and
+  `ServerChatToPlayer` shapes; same-FName wrong shapes; wrong property names; wrong
+  `StrProperty` class; and disabled/unsupported gates.
+- Still needed: hook-level dispatch tests once the helper is wired into
+  `ProcessEvent_Detour`.
 
 ## Next Step
 
-Implement the chat-specific target recognizer on top of `ue/RuntimeReflection`, then wire
-it into `ProcessEvent_Detour` only after tests prove the recognizer rejects malformed
-layouts.
+Wire `ue/ChatReflection` into `ProcessEvent_Detour` behind an explicit experimental gate
+and rate-limited logging, then add hook-level tests.

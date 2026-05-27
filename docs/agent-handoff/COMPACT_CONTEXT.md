@@ -275,6 +275,9 @@ python3 scripts/analyze_reflectionscanner_capture.py \
 - `ue/RuntimeReflection.{h,cpp}` exists as the internal gated reader for
   `UObject`/`UFunction`/`UProperty` and bounded parameter ranges. It is tested but not wired
   into `ProcessEvent` yet.
+- `ue/ChatReflection.{h,cpp}` exists as the internal recognizer for `ServerChat`,
+  `ServerChatTo`, and `ServerChatToPlayer` shapes. It is tested, returns borrowed param
+  ranges, does not decode `FString`, and is not wired into `ProcessEvent` yet.
 - Evidence: after any isolated scanner capture, run
   `scripts/build_reflection_evidence_pack.py` against copied logs and the matching binary
   before promoting candidates.

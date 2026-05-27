@@ -215,6 +215,10 @@ Updated: 2026-05-27
 - fact: `ue/RuntimeReflection.{h,cpp}` now provides an internal, binary-hash-gated
   reflection reader with tests for bounded `UFunction`/`UProperty` chains and borrowed
   parameter ranges. It is not public ABI and is not wired into `ProcessEvent` yet.
+- fact: `ue/ChatReflection.{h,cpp}` now recognizes `ServerChat`, `ServerChatTo`, and
+  `ServerChatToPlayer` shapes on top of `RuntimeReflection` and returns borrowed parameter
+  ranges when `params` is provided. It still does not decode `FString` and is not wired
+  into `ProcessEvent` yet.
 
 ## Rejected Or Unsafe
 
@@ -274,8 +278,8 @@ Updated: 2026-05-27
 - next-step: Preferred integration point is `hooks/ProcessEventHook.cpp` inside
   `ProcessEvent_Detour`, after FName index extraction and before pre callback dispatch;
   see `docs/research/2026-05-27-runtime-chat-reflection-plan.md`.
-- next-step: Add a chat-specific recognizer on top of `ue/RuntimeReflection` before
-  adding runtime logging/dispatch for decoded chat text.
+- next-step: Wire `ue/ChatReflection` into `ProcessEvent_Detour` behind an explicit
+  experimental gate with rate-limited logging, then add hook-level tests.
 - next-step: After a repeat-confirmed `GNames` research candidate appears, generate
   `objdump -d -M intel` for the matching ShooterGameServer binary and run the analyzer with
   `--binary` plus `--objdump-xrefs`; inspect whether candidate `source_global` references
