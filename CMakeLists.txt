@@ -58,6 +58,7 @@ add_library(obelisk SHARED
     ue/ReflectionScanner.cpp
     hooks/HookManager.cpp
     hooks/ProcessEventChatReflection.cpp
+    hooks/ProcessEventStructureReflection.cpp
     hooks/ProcessEventHook.cpp
     core/ChatEventDispatcher.cpp
     core/EventManager.cpp
@@ -174,6 +175,16 @@ add_executable(process_event_chat_reflection_tests
 target_include_directories(process_event_chat_reflection_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_test(NAME ProcessEventChatReflectionTests COMMAND process_event_chat_reflection_tests)
+
+add_executable(process_event_structure_reflection_tests
+    tests/core/ProcessEventStructureReflectionTests.cpp
+    hooks/ProcessEventStructureReflection.cpp
+    ue/StructureReflection.cpp
+    ue/RuntimeReflection.cpp
+)
+target_include_directories(process_event_structure_reflection_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_test(NAME ProcessEventStructureReflectionTests COMMAND process_event_structure_reflection_tests)
 
 add_executable(chat_reflection_benchmark EXCLUDE_FROM_ALL
     tests/perf/ChatReflectionBenchmark.cpp

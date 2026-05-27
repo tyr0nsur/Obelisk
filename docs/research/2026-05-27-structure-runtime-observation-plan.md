@@ -88,12 +88,21 @@ instance policy:
 `sdk.structures` is the best next non-chat runtime-observed candidate because it has compact
 fixture-backed functions and clear gameplay value. A first internal `StructureReflection`
 recognizer now validates the six compact shapes locally with synthetic memory fixtures.
-It is not connected to `ProcessEvent`, not deployed, and not a public SDK or mutation API.
+`ProcessEventStructureReflection` wires that recognizer behind an explicit
+disabled-by-default runtime gate:
+
+```bash
+OBELISK_ENABLE_STRUCTURE_REFLECTION=1
+OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520
+OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT=25
+```
+
+It is not deployed, not enabled by default, and not a public SDK or mutation API.
 
 ## Next Steps
 
 1. Extend `StructureReflection` only if the next target stays scalar-only and
    fixture-backed.
-2. Add hook integration behind an explicit disabled-by-default runtime gate.
+2. Add an operator runbook for the disabled-by-default structure observation gate.
 3. Schedule a controlled TheIsland/debug validation only after the recognizer and negative
    gates pass locally.
