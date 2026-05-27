@@ -286,6 +286,9 @@ python3 scripts/analyze_reflectionscanner_capture.py \
 - Latest deployed runtime on `arkserver` has chat reflection enabled and plugins disabled.
   It reached the experimental gate log after first ProcessEvent; no chat message has been
   observed yet in the log.
+- `FString` candidate for this ARK Linux build is a 16-byte
+  `{Data, ArrayNum, ArrayMax}` header with UTF-32LE `TCHAR`; see
+  `docs/research/2026-05-27-fstring-layout.md`.
 - Evidence: after any isolated scanner capture, run
   `scripts/build_reflection_evidence_pack.py` against copied logs and the matching binary
   before promoting candidates.
