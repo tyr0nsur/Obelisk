@@ -110,6 +110,25 @@ def build_core_fixture(path: Path) -> dict[str, int]:
         "for_character_property": base + 0x25C00,
         "can_seat_force_property": base + 0x25D00,
         "can_seat_return_property": base + 0x25E00,
+        "add_passenger_function": base + 0x25F00,
+        "add_passenger_character_property": base + 0x26000,
+        "passenger_seat_index_property": base + 0x26100,
+        "force_passenger_property": base + 0x26200,
+        "allow_flyers_water_property": base + 0x26300,
+        "skip_line_trace_property": base + 0x26400,
+        "add_passenger_return_property": base + 0x26500,
+        "allow_carry_character_function": base + 0x26600,
+        "can_carry_pawn_property": base + 0x26700,
+        "allow_carry_return_property": base + 0x26800,
+        "bp_allow_carry_character_function": base + 0x26900,
+        "check_character_property": base + 0x26A00,
+        "bp_allow_carry_return_property": base + 0x26B00,
+        "set_character_status_tameable_function": base + 0x26C00,
+        "set_tameable_property": base + 0x26D00,
+        "create_inventory_property": base + 0x26E00,
+        "inventory_for_waking_tame_property": base + 0x26F00,
+        "server_request_dino_char_stats_function": base + 0x27000,
+        "the_dino_char_property": base + 0x27100,
         "readable_non_uobject": base + 0x80000,
     }
 
@@ -159,7 +178,7 @@ def build_core_fixture(path: Path) -> dict[str, int]:
 
     put_ptr(addrs["fname_root_slot"], addrs["fname_table"])
     put_ptr(addrs["fname_table"], addrs["fname_chunk"])
-    put_u32(addrs["fname_table"] + 0x800, 96)
+    put_u32(addrs["fname_table"] + 0x800, 128)
     put_u32(addrs["fname_table"] + 0x804, 1)
     put_entry(0, b"None\x00")
     put_entry(1, b"Class\x00")
@@ -230,9 +249,25 @@ def build_core_fixture(path: Path) -> dict[str, int]:
     put_entry(66, b"CanSeat\x00")
     put_entry(67, b"forCharacter\x00")
     put_entry(68, b"bForce\x00")
+    put_entry(69, b"AddPassenger\x00")
+    put_entry(70, b"ACharacter\x00")
+    put_entry(71, b"PassengerSeatIndex\x00")
+    put_entry(72, b"bForcePassenger\x00")
+    put_entry(73, b"bAllowFlyersAndWaterDinos\x00")
+    put_entry(74, b"bSkipLineTrace\x00")
+    put_entry(75, b"AllowCarryCharacter\x00")
+    put_entry(76, b"CanCarryPawn\x00")
+    put_entry(77, b"BPAllowCarryCharacter\x00")
+    put_entry(78, b"checkCharacter\x00")
+    put_entry(79, b"SetCharacterStatusTameable\x00")
+    put_entry(80, b"bSetTameable\x00")
+    put_entry(81, b"bCreateInventory\x00")
+    put_entry(82, b"bInventoryForWakingTame\x00")
+    put_entry(83, b"ServerRequestDinoCharStats\x00")
+    put_entry(84, b"theDinoChar\x00")
 
     put_ptr(addrs["gobjects"] + enum.GOBJECTS_CHUNKS_OFFSET, addrs["gobjects_chunks"])
-    put_i32(addrs["gobjects"] + enum.GOBJECTS_COUNT_OFFSET, 79)
+    put_i32(addrs["gobjects"] + enum.GOBJECTS_COUNT_OFFSET, 98)
     put_ptr(addrs["gobjects_chunks"], addrs["gobjects_chunk0"])
 
     put_uobject(addrs["class_class"], 1, 0, addrs["class_class"], 1, 0)
@@ -650,6 +685,139 @@ def build_core_fixture(path: Path) -> dict[str, int]:
         name_index=29,
         outer_key="can_seat_function",
     )
+    add_uobject(
+        "add_passenger_function",
+        object_index=79,
+        class_key="function_class",
+        name_index=69,
+        outer_key="primal_dino_character_class",
+    )
+    add_uobject(
+        "add_passenger_character_property",
+        object_index=80,
+        class_key="object_property_class",
+        name_index=70,
+        outer_key="add_passenger_function",
+    )
+    add_uobject(
+        "passenger_seat_index_property",
+        object_index=81,
+        class_key="property_class",
+        name_index=71,
+        outer_key="add_passenger_function",
+    )
+    add_uobject(
+        "force_passenger_property",
+        object_index=82,
+        class_key="bool_property_class",
+        name_index=72,
+        outer_key="add_passenger_function",
+    )
+    add_uobject(
+        "allow_flyers_water_property",
+        object_index=83,
+        class_key="bool_property_class",
+        name_index=73,
+        outer_key="add_passenger_function",
+    )
+    add_uobject(
+        "skip_line_trace_property",
+        object_index=84,
+        class_key="bool_property_class",
+        name_index=74,
+        outer_key="add_passenger_function",
+    )
+    add_uobject(
+        "add_passenger_return_property",
+        object_index=85,
+        class_key="bool_property_class",
+        name_index=29,
+        outer_key="add_passenger_function",
+    )
+    add_uobject(
+        "allow_carry_character_function",
+        object_index=86,
+        class_key="function_class",
+        name_index=75,
+        outer_key="primal_dino_character_class",
+    )
+    add_uobject(
+        "can_carry_pawn_property",
+        object_index=87,
+        class_key="object_property_class",
+        name_index=76,
+        outer_key="allow_carry_character_function",
+    )
+    add_uobject(
+        "allow_carry_return_property",
+        object_index=88,
+        class_key="bool_property_class",
+        name_index=29,
+        outer_key="allow_carry_character_function",
+    )
+    add_uobject(
+        "bp_allow_carry_character_function",
+        object_index=89,
+        class_key="function_class",
+        name_index=77,
+        outer_key="primal_dino_character_class",
+    )
+    add_uobject(
+        "check_character_property",
+        object_index=90,
+        class_key="object_property_class",
+        name_index=78,
+        outer_key="bp_allow_carry_character_function",
+    )
+    add_uobject(
+        "bp_allow_carry_return_property",
+        object_index=91,
+        class_key="bool_property_class",
+        name_index=29,
+        outer_key="bp_allow_carry_character_function",
+    )
+    add_uobject(
+        "set_character_status_tameable_function",
+        object_index=92,
+        class_key="function_class",
+        name_index=79,
+        outer_key="primal_dino_character_class",
+    )
+    add_uobject(
+        "set_tameable_property",
+        object_index=93,
+        class_key="bool_property_class",
+        name_index=80,
+        outer_key="set_character_status_tameable_function",
+    )
+    add_uobject(
+        "create_inventory_property",
+        object_index=94,
+        class_key="bool_property_class",
+        name_index=81,
+        outer_key="set_character_status_tameable_function",
+    )
+    add_uobject(
+        "inventory_for_waking_tame_property",
+        object_index=95,
+        class_key="bool_property_class",
+        name_index=82,
+        outer_key="set_character_status_tameable_function",
+    )
+    add_uobject(
+        "server_request_dino_char_stats_function",
+        object_index=96,
+        class_key="function_class",
+        name_index=83,
+        outer_key="shooter_player_controller_class",
+    )
+    add_uobject(
+        "the_dino_char_property",
+        object_index=97,
+        class_key="object_property_class",
+        name_index=84,
+        outer_key="server_request_dino_char_stats_function",
+    )
 
     for index, key in [
         (0, "class_class"),
@@ -897,6 +1065,47 @@ def build_core_fixture(path: Path) -> dict[str, int]:
             ("can_seat_return_property", 0x11, 1),
         ],
     )
+    add_function_chain(
+        "add_passenger_function",
+        first_property_key="add_passenger_character_property",
+        parms_size=16,
+        properties=[
+            ("add_passenger_character_property", 0, 8),
+            ("passenger_seat_index_property", 8, 4),
+            ("force_passenger_property", 0xC, 1),
+            ("allow_flyers_water_property", 0xD, 1),
+            ("skip_line_trace_property", 0xE, 1),
+            ("add_passenger_return_property", 0xF, 1),
+        ],
+    )
+    add_function_chain(
+        "allow_carry_character_function",
+        first_property_key="can_carry_pawn_property",
+        parms_size=9,
+        properties=[("can_carry_pawn_property", 0, 8), ("allow_carry_return_property", 8, 1)],
+    )
+    add_function_chain(
+        "bp_allow_carry_character_function",
+        first_property_key="check_character_property",
+        parms_size=9,
+        properties=[("check_character_property", 0, 8), ("bp_allow_carry_return_property", 8, 1)],
+    )
+    add_function_chain(
+        "set_character_status_tameable_function",
+        first_property_key="set_tameable_property",
+        parms_size=3,
+        properties=[
+            ("set_tameable_property", 0, 1),
+            ("create_inventory_property", 1, 1),
+            ("inventory_for_waking_tame_property", 2, 1),
+        ],
+    )
+    add_function_chain(
+        "server_request_dino_char_stats_function",
+        first_property_key="the_dino_char_property",
+        parms_size=8,
+        properties=[("the_dino_char_property", 0, 8)],
+    )
 
     write_minimal_elf64_core(path, base, bytes(segment))
     return addrs
@@ -925,10 +1134,12 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
                     fname_root_slot=addrs["fname_root_slot"],
                     object_addresses=[],
                     indices=[],
-                    name_contains=[name],
-                    outer_contains=[outer],
+                    name_contains=[],
+                    outer_contains=[],
+                    name_exact=[name],
+                    outer_exact=[outer],
                     window_size=0xC0,
-                    max_object_scan=96,
+                    max_object_scan=128,
                 )
             finally:
                 memory.close()
@@ -1181,6 +1392,70 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
                 ("SeatIndex", "IntProperty", 8, 4),
             ],
         )
+
+    def test_primal_dino_add_passenger_policy_property_chain(self) -> None:
+        target = self.inspect_single_by_name_outer("AddPassenger", "PrimalDinoCharacter")
+        chain = target["property_chain"]
+
+        self.assertEqual(chain["status"], "candidate")
+        self.assert_property_sequence(
+            chain,
+            [
+                ("ACharacter", "ObjectProperty", 0, 8),
+                ("PassengerSeatIndex", "IntProperty", 8, 4),
+                ("bForcePassenger", "BoolProperty", 0xC, 1),
+                ("bAllowFlyersAndWaterDinos", "BoolProperty", 0xD, 1),
+                ("bSkipLineTrace", "BoolProperty", 0xE, 1),
+                ("ReturnValue", "BoolProperty", 0xF, 1),
+            ],
+        )
+
+    def test_primal_dino_allow_carry_property_chain(self) -> None:
+        target = self.inspect_single_by_name_outer("AllowCarryCharacter", "PrimalDinoCharacter")
+        chain = target["property_chain"]
+
+        self.assertEqual(chain["status"], "candidate")
+        self.assert_property_sequence(
+            chain,
+            [
+                ("CanCarryPawn", "ObjectProperty", 0, 8),
+                ("ReturnValue", "BoolProperty", 8, 1),
+            ],
+        )
+
+    def test_primal_dino_bp_allow_carry_property_chain(self) -> None:
+        target = self.inspect_single_by_name_outer("BPAllowCarryCharacter", "PrimalDinoCharacter")
+        chain = target["property_chain"]
+
+        self.assertEqual(chain["status"], "candidate")
+        self.assert_property_sequence(
+            chain,
+            [
+                ("checkCharacter", "ObjectProperty", 0, 8),
+                ("ReturnValue", "BoolProperty", 8, 1),
+            ],
+        )
+
+    def test_primal_dino_set_tameable_bool_property_chain(self) -> None:
+        target = self.inspect_single_by_name_outer("SetCharacterStatusTameable", "PrimalDinoCharacter")
+        chain = target["property_chain"]
+
+        self.assertEqual(chain["status"], "candidate")
+        self.assert_property_sequence(
+            chain,
+            [
+                ("bSetTameable", "BoolProperty", 0, 1),
+                ("bCreateInventory", "BoolProperty", 1, 1),
+                ("bInventoryForWakingTame", "BoolProperty", 2, 1),
+            ],
+        )
+
+    def test_player_controller_request_dino_stats_property_chain(self) -> None:
+        target = self.inspect_single_by_name_outer("ServerRequestDinoCharStats", "ShooterPlayerController")
+        chain = target["property_chain"]
+
+        self.assertEqual(chain["status"], "candidate")
+        self.assert_property_sequence(chain, [("theDinoChar", "ObjectProperty", 0, 8)])
 
     def test_primal_structure_elevator_server_activate_byte_property_chain(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

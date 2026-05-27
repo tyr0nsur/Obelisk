@@ -102,6 +102,11 @@ PrimalItem.AllowRemoteAddToInventory
 PrimalItem.CanUse
 PrimalDinoCharacter.ServerRequestAttack
 PrimalDinoCharacter.BPNotifyAddPassenger
+PrimalDinoCharacter.AddPassenger
+PrimalDinoCharacter.AllowCarryCharacter
+PrimalDinoCharacter.BPAllowCarryCharacter
+PrimalDinoCharacter.SetCharacterStatusTameable
+ShooterPlayerController.ServerRequestDinoCharStats
 PrimalStructure.AllowStructureAccess
 PrimalStructure.IsAllowedToDemolish
 PrimalStructure.SetVariant
@@ -138,6 +143,7 @@ params and has higher gameplay-authority risk.
 - `docs/research/2026-05-27-shooterplayercontroller-function-inventory.md`
 - `docs/research/2026-05-27-primalitem-function-inventory.md`
 - `docs/research/2026-05-27-primaldinocharacter-function-inventory.md`
+- `docs/research/2026-05-27-dino-second-wave-fixtures.md`
 - `docs/research/2026-05-27-primalstructure-function-inventory.md`
 - `docs/research/2026-05-27-structure-access-policy-fixtures.md`
 - `docs/research/2026-05-27-real-core-ufunction-snapshot-fixtures.md`
