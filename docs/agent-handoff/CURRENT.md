@@ -324,6 +324,8 @@ Updated: 2026-05-27
   `user_data`, callback owner cleanup, ABI layout tests, plugin fixture coverage, hot-path
   benchmark evidence, and runtime validation before adding `OnChatMessage`; see
   `docs/research/2026-05-27-sdk-chat-event-ownership-plan.md`.
+- fact: `AbiLayoutTests` now fail if `OBELISK_API_CAPABILITY_CHAT_EVENTS` is added to the
+  public SDK header before chat ABI promotion is intentional.
 - fact: `docs/research/2026-05-27-chat-sdk-abi-preflight.md` records the test-first ABI
   and dispatcher gates for future `OnChatMessage` without changing the public SDK header.
 - fact: `core/ChatEventDispatcher.{h,cpp}` is an internal, non-SDK dispatcher foundation

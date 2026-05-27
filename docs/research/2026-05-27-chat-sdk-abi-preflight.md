@@ -104,6 +104,8 @@ Before dispatch is connected to `ProcessEvent`:
   mirrors `EventManager` lifecycle protection.
 - Verify installed SDK consumer can compile and load a plugin using the chat declarations.
   Pending until the public SDK header is intentionally promoted.
+- Until promotion is intentional, `AbiLayoutTests` fail if
+  `OBELISK_API_CAPABILITY_CHAT_EVENTS` appears in the public SDK header.
 
 ## Promotion Gates
 

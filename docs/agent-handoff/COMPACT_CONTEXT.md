@@ -79,6 +79,8 @@ work from repository state instead of chat history.
   - `api/ObeliskApi.h` is a transition wrapper
   - `obelisk_sdk` is the CMake interface target
   - `AbiLayoutTests` locks ABI v1 layout on Linux x86_64
+  - `AbiLayoutTests` currently fail if public chat capability is added before intentional
+    ABI promotion
   - `tests/sdk_consumer` builds and loads a minimal external plugin against the public SDK
     through CTest
 - `EventManagerTests` cover global/filtered pre callbacks, blocking behavior, post

@@ -4,6 +4,10 @@
 #include <cstdint>
 #include <type_traits>
 
+#ifdef OBELISK_API_CAPABILITY_CHAT_EVENTS
+#error "Public chat API must stay gated until chat ABI promotion requirements are complete."
+#endif
+
 namespace
 {
     template <typename T>
