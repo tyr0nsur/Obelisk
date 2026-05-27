@@ -62,6 +62,17 @@ def build_core_fixture(path: Path) -> dict[str, int]:
         "can_use_return_property": base + 0x22C00,
         "malformed_function": base + 0x22D00,
         "malformed_bool_property": base + 0x22E00,
+        "primal_dino_character_class": base + 0x22F00,
+        "server_request_attack_function": base + 0x23000,
+        "attack_index_property": base + 0x23100,
+        "bp_notify_add_passenger_function": base + 0x23200,
+        "passenger_char_property": base + 0x23300,
+        "seat_index_property": base + 0x23400,
+        "primal_structure_elevator_platform_class": base + 0x23500,
+        "server_activate_function": base + 0x23600,
+        "for_pc_property": base + 0x23700,
+        "force_direction_property": base + 0x23800,
+        "dir_property": base + 0x23900,
         "readable_non_uobject": base + 0x80000,
     }
 
@@ -134,9 +145,20 @@ def build_core_fixture(path: Path) -> dict[str, int]:
     put_entry(30, b"CanUse\x00")
     put_entry(31, b"bIgnoreCooldown\x00")
     put_entry(32, b"MalformedCanUse\x00")
+    put_entry(33, b"PrimalDinoCharacter\x00")
+    put_entry(34, b"ServerRequestAttack\x00")
+    put_entry(35, b"AttackIndex\x00")
+    put_entry(36, b"BPNotifyAddPassenger\x00")
+    put_entry(37, b"PassengerChar\x00")
+    put_entry(38, b"SeatIndex\x00")
+    put_entry(39, b"PrimalStructureElevatorPlatform\x00")
+    put_entry(40, b"ServerActivate\x00")
+    put_entry(41, b"ForPC\x00")
+    put_entry(42, b"bForceDirection\x00")
+    put_entry(43, b"Dir\x00")
 
     put_ptr(addrs["gobjects"] + enum.GOBJECTS_CHUNKS_OFFSET, addrs["gobjects_chunks"])
-    put_i32(addrs["gobjects"] + enum.GOBJECTS_COUNT_OFFSET, 32)
+    put_i32(addrs["gobjects"] + enum.GOBJECTS_COUNT_OFFSET, 42)
     put_ptr(addrs["gobjects_chunks"], addrs["gobjects_chunk0"])
 
     put_uobject(addrs["class_class"], 1, 0, addrs["class_class"], 1, 0)
@@ -254,6 +276,80 @@ def build_core_fixture(path: Path) -> dict[str, int]:
         29,
         addrs["malformed_function"],
     )
+    put_uobject(addrs["primal_dino_character_class"], 1, 31, addrs["class_class"], 33, addrs["package_object"])
+    put_uobject(
+        addrs["server_request_attack_function"],
+        1,
+        32,
+        addrs["function_class"],
+        34,
+        addrs["primal_dino_character_class"],
+    )
+    put_uobject(
+        addrs["attack_index_property"],
+        1,
+        33,
+        addrs["property_class"],
+        35,
+        addrs["server_request_attack_function"],
+    )
+    put_uobject(
+        addrs["bp_notify_add_passenger_function"],
+        1,
+        34,
+        addrs["function_class"],
+        36,
+        addrs["primal_dino_character_class"],
+    )
+    put_uobject(
+        addrs["passenger_char_property"],
+        1,
+        35,
+        addrs["object_property_class"],
+        37,
+        addrs["bp_notify_add_passenger_function"],
+    )
+    put_uobject(
+        addrs["seat_index_property"],
+        1,
+        36,
+        addrs["property_class"],
+        38,
+        addrs["bp_notify_add_passenger_function"],
+    )
+    put_uobject(
+        addrs["primal_structure_elevator_platform_class"],
+        1,
+        37,
+        addrs["class_class"],
+        39,
+        addrs["package_object"],
+    )
+    put_uobject(
+        addrs["server_activate_function"],
+        1,
+        38,
+        addrs["function_class"],
+        40,
+        addrs["primal_structure_elevator_platform_class"],
+    )
+    put_uobject(
+        addrs["for_pc_property"],
+        1,
+        39,
+        addrs["object_property_class"],
+        41,
+        addrs["server_activate_function"],
+    )
+    put_uobject(
+        addrs["force_direction_property"],
+        1,
+        40,
+        addrs["bool_property_class"],
+        42,
+        addrs["server_activate_function"],
+    )
+    put_uobject(addrs["dir_property"], 1, 41, addrs["byte_property_class"], 43, addrs["server_activate_function"])
 
     for index, key in [
         (0, "class_class"),
@@ -287,6 +383,17 @@ def build_core_fixture(path: Path) -> dict[str, int]:
         (28, "can_use_return_property"),
         (29, "malformed_function"),
         (30, "malformed_bool_property"),
+        (31, "primal_dino_character_class"),
+        (32, "server_request_attack_function"),
+        (33, "attack_index_property"),
+        (34, "bp_notify_add_passenger_function"),
+        (35, "passenger_char_property"),
+        (36, "seat_index_property"),
+        (37, "primal_structure_elevator_platform_class"),
+        (38, "server_activate_function"),
+        (39, "for_pc_property"),
+        (40, "force_direction_property"),
+        (41, "dir_property"),
     ]:
         put_item(index, addrs[key], 100 + index)
 
@@ -388,6 +495,48 @@ def build_core_fixture(path: Path) -> dict[str, int]:
 
     put_function_data(addrs["malformed_function"], first_property=addrs["malformed_bool_property"], num_parms=1, parms_size=1)
     put_property_data(addrs["malformed_bool_property"], offset=1, element_size=1)
+
+    put_function_data(
+        addrs["server_request_attack_function"],
+        first_property=addrs["attack_index_property"],
+        num_parms=1,
+        parms_size=4,
+    )
+    put_property_data(addrs["attack_index_property"], offset=0, element_size=4)
+
+    put_function_data(
+        addrs["bp_notify_add_passenger_function"],
+        first_property=addrs["passenger_char_property"],
+        num_parms=2,
+        parms_size=12,
+    )
+    put_property_data(
+        addrs["passenger_char_property"],
+        offset=0,
+        element_size=8,
+        next_field=addrs["seat_index_property"],
+    )
+    put_property_data(addrs["seat_index_property"], offset=8, element_size=4)
+
+    put_function_data(
+        addrs["server_activate_function"],
+        first_property=addrs["for_pc_property"],
+        num_parms=3,
+        parms_size=10,
+    )
+    put_property_data(
+        addrs["for_pc_property"],
+        offset=0,
+        element_size=8,
+        next_field=addrs["force_direction_property"],
+    )
+    put_property_data(
+        addrs["force_direction_property"],
+        offset=8,
+        element_size=1,
+        next_field=addrs["dir_property"],
+    )
+    put_property_data(addrs["dir_property"], offset=9, element_size=1)
 
     write_minimal_elf64_core(path, base, bytes(segment))
     return addrs
@@ -586,6 +735,103 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
             self.assertEqual(prop["membership_status"], "candidate-uobject")
             self.assertEqual(prop["class_membership_status"], "candidate-uobject")
             self.assertEqual(prop["outer_membership_status"], "candidate-uobject")
+
+    def test_primal_dino_server_request_attack_int_property_chain(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            core = Path(temp_dir) / "core"
+            addrs = build_core_fixture(core)
+            memory = inspector.uobjects.CoreMemory(core)
+            try:
+                payload = inspector.inspect_core(
+                    memory,
+                    gobjects=addrs["gobjects"],
+                    fname_root_slot=addrs["fname_root_slot"],
+                    object_addresses=[],
+                    indices=[],
+                    name_contains=["ServerRequestAttack"],
+                    outer_contains=["PrimalDinoCharacter"],
+                    window_size=0xC0,
+                    max_object_scan=48,
+                )
+            finally:
+                memory.close()
+
+        chain = payload["targets"][0]["property_chain"]
+        self.assertEqual(chain["status"], "candidate")
+        self.assertEqual(
+            [
+                (prop["summary"]["name"], prop["summary"]["class_name"], prop["offset_internal"], prop["element_size"])
+                for prop in chain["properties"]
+            ],
+            [("AttackIndex", "IntProperty", 0, 4)],
+        )
+
+    def test_primal_dino_notify_add_passenger_object_int_property_chain(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            core = Path(temp_dir) / "core"
+            addrs = build_core_fixture(core)
+            memory = inspector.uobjects.CoreMemory(core)
+            try:
+                payload = inspector.inspect_core(
+                    memory,
+                    gobjects=addrs["gobjects"],
+                    fname_root_slot=addrs["fname_root_slot"],
+                    object_addresses=[],
+                    indices=[],
+                    name_contains=["BPNotifyAddPassenger"],
+                    outer_contains=["PrimalDinoCharacter"],
+                    window_size=0xC0,
+                    max_object_scan=48,
+                )
+            finally:
+                memory.close()
+
+        chain = payload["targets"][0]["property_chain"]
+        self.assertEqual(chain["status"], "candidate")
+        self.assertEqual(
+            [
+                (prop["summary"]["name"], prop["summary"]["class_name"], prop["offset_internal"], prop["element_size"])
+                for prop in chain["properties"]
+            ],
+            [
+                ("PassengerChar", "ObjectProperty", 0, 8),
+                ("SeatIndex", "IntProperty", 8, 4),
+            ],
+        )
+
+    def test_primal_structure_elevator_server_activate_byte_property_chain(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            core = Path(temp_dir) / "core"
+            addrs = build_core_fixture(core)
+            memory = inspector.uobjects.CoreMemory(core)
+            try:
+                payload = inspector.inspect_core(
+                    memory,
+                    gobjects=addrs["gobjects"],
+                    fname_root_slot=addrs["fname_root_slot"],
+                    object_addresses=[],
+                    indices=[],
+                    name_contains=["ServerActivate"],
+                    outer_contains=["PrimalStructureElevatorPlatform"],
+                    window_size=0xC0,
+                    max_object_scan=48,
+                )
+            finally:
+                memory.close()
+
+        chain = payload["targets"][0]["property_chain"]
+        self.assertEqual(chain["status"], "candidate")
+        self.assertEqual(
+            [
+                (prop["summary"]["name"], prop["summary"]["class_name"], prop["offset_internal"], prop["element_size"])
+                for prop in chain["properties"]
+            ],
+            [
+                ("ForPC", "ObjectProperty", 0, 8),
+                ("bForceDirection", "BoolProperty", 8, 1),
+                ("Dir", "ByteProperty", 9, 1),
+            ],
+        )
 
     def test_rejects_non_chat_property_exceeding_parms_size(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
