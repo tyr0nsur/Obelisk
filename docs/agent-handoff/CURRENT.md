@@ -240,7 +240,8 @@ Updated: 2026-05-27
   gates and default log limit on restart.
 - fact: Latest local runtime from `main` including commits through `751a7c3` was deployed to
   `/servidor/ark/obelisk`; later deploy on commit `df332d7` installed the
-  `ServerSendChatMessage` recognizer and restarted `arkserver`. Current PID `3220707` has
+  `ServerSendChatMessage` recognizer. Commit `f504ed4` added reflected `SendMode` byte
+  logging and was deployed afterward. Current PID `3229615` has
   `OBELISK_ENABLE_CHAT_REFLECTION=1`, matching SHA gate, ProcessEvent hook installed at
   `0x1d34e20`, plugins disabled, and stable posture confirmed.
 - fact: Manual post-deploy `ServerSendChatMessage` chat validation commands, expected log
@@ -270,9 +271,8 @@ Updated: 2026-05-27
 - next-step: Run the manual `ServerSendChatMessage` chat check in `docs/SUPERVISION.md`
   by sending one normal in-game Ragnarok chat message and reviewing the bounded reflected
   chat logs/snapshot.
-- next-step: Wire UTF-32 text decoding into the experimental chat reflection logger only
-  after one real `ServerSendChatMessage` capture confirms the reflected params are being
-  hit.
+- next-step: After one real `ServerSendChatMessage` capture confirms the reflected params
+  are being hit, wire UTF-32 text decoding into the experimental chat reflection logger.
 - next-step: Run `scripts/verify_chat_reflection_constants.py` against any new core before
   accepting changed chat FName indices, parameter offsets, or `StrProperty` constants.
 - rollback: remove `enable-chat-reflection` marker and restart the debug server; no plugin

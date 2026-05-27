@@ -175,7 +175,8 @@ work from repository state instead of chat history.
   `ShooterPlayerController.ServerSendChatMessage` has FName index `2697`,
   `StrProperty ChatMessage` offset `0x0`, `ByteProperty SendMode` offset `0x10`, and
   `ParmsSize=0x11`; this recognizer was deployed to `/servidor/ark/obelisk` on commit
-  `df332d7` and `arkserver` restarted as PID `3220707`. See
+  `df332d7`. Commit `f504ed4` adds reflected `SendMode` byte logging and is deployed on
+  `arkserver` PID `3229615`. See
   `docs/research/2026-05-27-real-chat-ufunction-path-hypotheses.md`.
 - Core-pack tooling now supports direct FName entry reads and bounded
   `--gobjects-candidate` previews for the next `GUObjectArray` investigation.
