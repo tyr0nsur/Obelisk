@@ -86,6 +86,8 @@ work from repository state instead of chat history.
 - Installed SDK layout validation consumes the installed package with
   `find_package(Obelisk 0.1.0 CONFIG REQUIRED)` and `Obelisk::obelisk_sdk`, and
   rejects installed CMake package files that leak local source or build paths.
+- Runtime install uses the CMake `Runtime` component for `libobelisk.so`, which preserves
+  the intended installed `RUNPATH=$ORIGIN` and avoids build-tree dependency path leaks.
 - Versioning policy is documented in `docs/VERSIONING.md`: no stable `0.1.0` tag yet;
   use `0.1.0-alpha.N` only for intentional contributor previews and `0.1.0-rc.N` only
   after scope freeze.
@@ -114,6 +116,10 @@ work from repository state instead of chat history.
 - UE4 type reconstruction planning is captured in
   `docs/research/2026-05-27-ue4-type-reconstruction-roadmap.md`; keep the milestone
   order as `FName`, `GObjects`, `UFunction`, then bounded params.
+- Current local Ragnarok logs do not contain a usable ReflectionScanner capture. The
+  current GNames evidence audit is inconclusive because scanner logs only show
+  `ReflectionScanner disabled`; see
+  `docs/research/2026-05-27-current-gname-evidence-pack-audit.md`.
 
 ## Current Research Direction
 

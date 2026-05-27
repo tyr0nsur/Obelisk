@@ -107,6 +107,12 @@ Updated: 2026-05-27
   copied logs, objdump artifact, candidate counts, reject markers, and promotion gate.
   The workflow is documented in
   `docs/research/2026-05-27-gname-evidence-pack-workflow.md`.
+- fact: Current available Ragnarok logs are not enough for a GNames/FNamePool candidate:
+  ReflectionScanner is disabled and analyzer output is `inconclusive`; see
+  `docs/research/2026-05-27-current-gname-evidence-pack-audit.md`.
+- fact: Runtime installation now uses the CMake `Runtime` component for `libobelisk.so`,
+  so the installed shared library gets `RUNPATH=$ORIGIN` instead of leaking build-tree
+  dependency paths.
 - fact: Commit `96b53d2` hardened installed SDK package validation by requiring
   `find_package(Obelisk 0.1.0 CONFIG REQUIRED)` and rejecting source/build tree
   path leaks in installed CMake package files.
@@ -161,6 +167,9 @@ Updated: 2026-05-27
   `objdump -d -M intel` for the matching ShooterGameServer binary and run the analyzer with
   `--binary` plus `--objdump-xrefs`; inspect whether candidate `source_global` references
   are real load/store paths before designing runtime name-resolution code.
+- next-step: To get a real GNames evidence pack, create or designate an isolated debug
+  instance and run a short ReflectionScanner capture with plugins disabled and native exec
+  probes unset.
 - next-step: Replace raw chat parameter probing with reflected parameter decoding.
 - next-step: Add binary hash validation or an instruction decoder before accepting future
   ProcessEvent prologue changes.
