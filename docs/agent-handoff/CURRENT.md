@@ -281,7 +281,8 @@ Updated: 2026-05-27
   observation path.
 - fact: `ue/ChatReflection.{h,cpp}` now recognizes `ServerChat`, `ServerChatTo`, and
   `ServerChatToPlayer` shapes on top of `RuntimeReflection` and returns borrowed parameter
-  ranges when `params` is provided. It still does not decode `FString` in runtime logs.
+  ranges when `params` is provided. Runtime text logging is handled through the gated
+  `ProcessEventChatReflection` decode-and-sanitize path, not through public SDK dispatch.
 - fact: `hooks/ProcessEventHook.cpp` has experimental chat reflection observation wiring,
   disabled unless `OBELISK_ENABLE_CHAT_REFLECTION=1` and
   `OBELISK_CHAT_REFLECTION_BINARY_SHA256` equals the supported ShooterGameServer SHA256.

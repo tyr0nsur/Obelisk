@@ -361,8 +361,8 @@ python3 scripts/analyze_reflectionscanner_capture.py \
 - `ue/ChatReflection.{h,cpp}` exists as the internal recognizer for `ServerChat`,
   `ServerChatTo`, `ServerChatToPlayer`, `ServerSendChatMessage`, and exact metadata-only
   `ShooterPlayerController` fallback shapes. It is tested, returns borrowed param ranges,
-  logs accepted `send_mode`/`send_mode_name`, and does not decode `FString` in runtime
-  logs yet.
+  and supports gated runtime text logging through the `ProcessEventChatReflection`
+  decode-and-sanitize path.
 - `ProcessEvent_Detour` has experimental chat observation wiring, disabled unless
   `OBELISK_ENABLE_CHAT_REFLECTION=1` and `OBELISK_CHAT_REFLECTION_BINARY_SHA256` matches
   the supported ARK SHA. It logs metadata/ranges only, not text.
