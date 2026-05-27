@@ -43,6 +43,7 @@ python3 scripts/test_regenerate_ufunction_snapshots.py
 python3 scripts/test_scriptstruct_snapshot_fixtures.py
 python3 scripts/test_regenerate_scriptstruct_snapshots.py
 python3 scripts/test_research_doc_guardrails.py
+python3 scripts/test_operational_doc_guardrails.py
 python3 scripts/test_public_sdk_chat_guardrails.py
 python3 scripts/test_dependency_pins.py
 python3 scripts/test_versioning_guardrails.py
