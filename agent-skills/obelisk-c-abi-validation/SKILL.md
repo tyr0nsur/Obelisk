@@ -81,6 +81,9 @@ Validation rules:
 - Future gameplay events such as chat must copy data into Obelisk-owned memory before
   calling plugins. Do not expose borrowed UE4 params, `FString`, `UObject`, `UFunction`, or
   raw `ProcessEvent` buffers as a stable SDK contract.
+- Future chat events should pass through the internal `core/ChatEventDispatcher` ownership
+  layer before any SDK exposure. Do not dispatch plugin-facing chat callbacks directly from
+  the `ProcessEvent` hook.
 - Prefer opaque `uint64_t` registration ids plus explicit unregister for new event APIs.
   Keep owner-token cleanup on init failure/unload as the backstop, and include `user_data`
   in callback subscriptions instead of asking plugins to capture global state.
