@@ -149,6 +149,29 @@ Reject promotion if non-chat cost is dominated by readability checks, if rejecte
 candidates produce a log storm, or if p99/runtime tick behavior changes materially in the
 isolated validation run.
 
+The local helper target is intentionally excluded from the default build:
+
+```bash
+cmake --build build --target chat_reflection_benchmark
+./build/chat_reflection_benchmark 100000
+```
+
+It uses synthetic memory only and must not be treated as a replacement for isolated runtime
+A/B validation.
+
+Initial local run after adding the helper:
+
+```text
+./build/chat_reflection_benchmark 50000
+non_chat_filter ns_per_iter=45 reader_calls_per_iter=0
+server_send_chat_match ns_per_iter=629 reader_calls_per_iter=53
+server_send_chat_decode_utf32 ns_per_iter=31 reader_calls_per_iter=1
+```
+
+This measures the recognizer helper after a caller already has a `nameIndex`; it does not
+include the hook-side `GetFunctionNameIndex()` / `Memory::IsReadable()` cost paid when chat
+reflection is enabled. That cost still needs an isolated runtime A/B measurement.
+
 ## Risks
 
 - Borrowed UE4 memory crossing the ABI would create use-after-return risks.

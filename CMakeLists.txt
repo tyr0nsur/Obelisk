@@ -153,6 +153,14 @@ target_include_directories(process_event_chat_reflection_tests PRIVATE ${CMAKE_C
 
 add_test(NAME ProcessEventChatReflectionTests COMMAND process_event_chat_reflection_tests)
 
+add_executable(chat_reflection_benchmark EXCLUDE_FROM_ALL
+    tests/perf/ChatReflectionBenchmark.cpp
+    hooks/ProcessEventChatReflection.cpp
+    ue/ChatReflection.cpp
+    ue/RuntimeReflection.cpp
+)
+target_include_directories(chat_reflection_benchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
 install(TARGETS obelisk
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     COMPONENT Runtime
