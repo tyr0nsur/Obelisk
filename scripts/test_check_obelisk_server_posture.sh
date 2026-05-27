@@ -44,6 +44,8 @@ write_proc_fixture 101 "${stable_maps}" \
     "OBELISK_DISABLE_PLUGINS=1"
 expect_success stable-posture \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable
+expect_success stable-posture-instance-id-alias \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable --instance-id arkserver
 
 write_proc_fixture 102 "${stable_maps}" \
     "OBELISK_INSTANCE_ID=arkserver" \

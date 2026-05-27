@@ -186,7 +186,7 @@ For TheIsland debug posture, use `arkserver2` paths and map filters instead:
 tail -n 100 /servidor/ark/obelisk/logs/arkserver2/Obelisk.log
 pid=$(pgrep -f '^./ShooterGameServer TheIsland' | head -n1)
 rg 'libobelisk|libsubhook' /proc/$pid/maps
-scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance-id arkserver2
+scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance arkserver2
 ```
 
 ## Rollback

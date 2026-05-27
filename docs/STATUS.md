@@ -44,7 +44,7 @@ define or protect runtime behavior.
 
 ## Harness Safety Baseline
 
-For the current Ragnarok ARK harness, the documented debug posture is:
+For the current Ragnarok ARK harness, the documented stable/performance posture is:
 
 ```text
 state/instances/arkserver/enable-process-event-hook
@@ -55,7 +55,11 @@ Do not enable native exec probes on debug harness servers. Keep experimental
 plugins in the repository or another staging location until isolated validation
 passes.
 
+While Ragnarok is under player performance testing, use `arkserver2` / TheIsland as the
+Obelisk debug/development harness instead of changing Ragnarok markers or restarting it.
+
 After any scanner/plugin capture or runtime redeploy, run
-`scripts/check_obelisk_server_posture.sh --expect-stable` before treating the
+`scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance
+arkserver2` before treating the
 harness as stable. The check is read-only and should fail closed rather than
 depending on a live experiment to reveal stale runtime state.

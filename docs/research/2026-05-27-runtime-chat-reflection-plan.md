@@ -56,13 +56,16 @@ expose ABI, or hook native exec pointers.
 The LinuxGSM wrapper supports marker-based activation:
 
 ```bash
-touch /servidor/ark/obelisk/state/instances/arkserver/enable-chat-reflection
+touch /servidor/ark/obelisk/state/instances/arkserver2/enable-chat-reflection
 ```
 
 The marker sets `OBELISK_ENABLE_CHAT_REFLECTION=1`, the current supported binary SHA, and
 a default `OBELISK_CHAT_REFLECTION_LOG_LIMIT=25`.
 `OBELISK_CHAT_REFLECTION_LOG_LIMIT=0` suppresses chat reflection observation logs instead
 of allowing unlimited output.
+
+Use this marker on `arkserver2` / TheIsland for future debug validation while Ragnarok is
+reserved for player performance testing.
 
 The final chat helper should build on that module and:
 

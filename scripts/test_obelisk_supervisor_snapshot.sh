@@ -20,9 +20,9 @@ write_proc_fixture() {
 write_obelisk_fixture() {
     local root="$1"
 
-    mkdir -p "${root}/logs/arkserver" "${root}/state/instances/arkserver"
-    : > "${root}/state/instances/arkserver/enable-chat-reflection"
-    cat > "${root}/logs/arkserver/Obelisk.log" <<'EOF'
+    mkdir -p "${root}/logs/arkserver2" "${root}/state/instances/arkserver2"
+    : > "${root}/state/instances/arkserver2/enable-chat-reflection"
+    cat > "${root}/logs/arkserver2/Obelisk.log" <<'EOF'
 [2026-05-27 01:00:00.000] [warning] Experimental chat reflection enabled for ShooterGameServer SHA256 abc123.
 [2026-05-27 01:00:01.000] [info] Reflected chat ProcessEvent #1 function=ServerSendChatMessage fname_index=2697 params=0x123 fields=2
 [2026-05-27 01:00:01.001] [info] Reflected chat ServerSendChatMessage send_mode=4 send_mode_name=Unknown send_mode_known=false
@@ -85,7 +85,7 @@ stable_out="${TMP_DIR}/stable-out"
 write_obelisk_fixture "${stable_root}"
 write_proc_fixture 4242 "${stable_maps}" \
     "LD_PRELOAD=/servidor/ark/obelisk/lib/libobelisk.so" \
-    "OBELISK_INSTANCE_ID=arkserver" \
+    "OBELISK_INSTANCE_ID=arkserver2" \
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
     "OBELISK_DISABLE_PLUGINS=1" \
     "OBELISK_ENABLE_CHAT_REFLECTION=1" \
@@ -120,7 +120,7 @@ unstable_root="${TMP_DIR}/unstable-root"
 unstable_out="${TMP_DIR}/unstable-out"
 write_obelisk_fixture "${unstable_root}"
 write_proc_fixture 4343 "${stable_maps}" \
-    "OBELISK_INSTANCE_ID=arkserver" \
+    "OBELISK_INSTANCE_ID=arkserver2" \
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
     "OBELISK_DISABLE_PLUGINS=1" \
     "OBELISK_ENABLE_DEBUG_CONTROL=1"

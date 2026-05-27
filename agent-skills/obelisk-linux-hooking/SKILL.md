@@ -55,11 +55,11 @@ When patching `.text`:
 
 ```bash
 cmake --build build -j"$(nproc)"
-mkdir -p /servidor/ark/obelisk/state/instances/arkserver
-touch /servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook
-touch /servidor/ark/obelisk/state/instances/arkserver/disable-plugins
-./arkserver restart
-tail -n 80 /servidor/ark/obelisk/logs/arkserver/Obelisk.log
+mkdir -p /servidor/ark/obelisk/state/instances/arkserver2
+touch /servidor/ark/obelisk/state/instances/arkserver2/enable-process-event-hook
+touch /servidor/ark/obelisk/state/instances/arkserver2/disable-plugins
+./arkserver2 restart
+tail -n 80 /servidor/ark/obelisk/logs/arkserver2/Obelisk.log
 ```
 
 Expected:
@@ -67,3 +67,6 @@ Expected:
 - `ProcessEvent absolute x64 hook installed successfully`
 - server process remains alive
 - player can join
+
+Do not use `arkserver` / Ragnarok for hook validation while player performance testing is
+active unless the operator opens a maintenance window.

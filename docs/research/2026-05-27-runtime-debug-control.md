@@ -1,5 +1,9 @@
 # Runtime Debug Control
 
+> Historical Ragnarok capture note. Do not enable debug-control on `arkserver` / Ragnarok
+> while player performance testing is active. Future debug-control runs should target an
+> explicitly approved `arkserver2` / TheIsland debug window or a dedicated debug instance.
+
 ## Why this exists
 
 The static FName root experiments proved that bootstrap-time probing is not a

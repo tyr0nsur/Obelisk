@@ -109,7 +109,7 @@ After starting:
 pgrep -af '^./ShooterGameServer'
 tail -n 100 /servidor/ark/obelisk/logs/arkserver/Obelisk.log
 tail -n 100 /servidor/ark/obelisk/logs/arkserver2/Obelisk.log
-tr '\0' '\n' < /proc/$(pgrep -f '^./ShooterGameServer Ragnarok' | head -n1)/environ | rg 'OBELISK_INSTANCE_ID|OBELISK_ROOT|OBELISK_LOG_DIR'
+tr '\0' '\n' < /proc/$(pgrep -f '^./ShooterGameServer TheIsland' | head -n1)/environ | rg 'OBELISK_INSTANCE_ID|OBELISK_ROOT|OBELISK_LOG_DIR'
 ```
 
 Expected safe Obelisk posture for development baseline:

@@ -33,7 +33,7 @@ Allowed on `arkserver2` after normal lead review:
 - bounded chat reflection validation;
 - copied-log analysis;
 - stable posture verification with `scripts/check_obelisk_server_posture.sh --expect-stable
-  --map TheIsland --instance-id arkserver2`.
+  --map TheIsland --instance arkserver2`.
 
 Still requires a specific operator-approved run window:
 
@@ -71,7 +71,7 @@ Post-check:
 tail -n 100 /servidor/ark/obelisk/logs/arkserver2/Obelisk.log
 pid=$(pgrep -f '^./ShooterGameServer TheIsland' | head -n1)
 rg 'libobelisk|libsubhook' /proc/$pid/maps
-scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance-id arkserver2
+scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance arkserver2
 ```
 
 ## Rollback
@@ -81,7 +81,7 @@ For any TheIsland debug run:
 1. Remove the experiment marker or env.
 2. Keep `disable-plugins`.
 3. Restart only `arkserver2`.
-4. Run stable posture check with `--map TheIsland --instance-id arkserver2`.
+4. Run stable posture check with `--map TheIsland --instance arkserver2`.
 5. Preserve copied logs outside Git and summarize only the evidence.
 
 ## Result

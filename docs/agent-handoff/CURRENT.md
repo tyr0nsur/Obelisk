@@ -364,7 +364,7 @@ Updated: 2026-05-27
   the public ABI/capability gate and plugin owner integration plan are ready.
 - rollback: on `arkserver2`, remove the experimental marker/env, keep
   `disable-plugins`, restart only TheIsland, and run
-  `scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance-id
+  `scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance
   arkserver2`; no plugin ABI or config migration is involved.
 - next-step: Generalize the binary-hash-scoped reflection pipeline only after another
   capture or ARK binary hash validates the same fields.

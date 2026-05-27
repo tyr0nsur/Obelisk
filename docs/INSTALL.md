@@ -77,9 +77,10 @@ Then configure LinuxGSM:
 executable="./ObeliskRun.sh"
 ```
 
-For scanner or reflection research, use the debug wrapper from `ObeliskRunDebug.sh` on a
-separate instance such as `arkserver-obelisk-debug`; do not reuse live map markers for
-debug captures.
+For current Obelisk debug/development work, use `arkserver2` / TheIsland instead of
+Ragnarok. For scanner or reflection research that needs stronger isolation, use the debug
+wrapper from `ObeliskRunDebug.sh` on a separate instance such as
+`arkserver-obelisk-debug`; do not reuse live map markers for debug captures.
 
 ## Instance Identity
 
@@ -103,7 +104,7 @@ mkdir -p /servidor/ark/obelisk/state/instances/arkserver
 touch /servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook
 touch /servidor/ark/obelisk/state/instances/arkserver/disable-plugins
 # Experimental, development-only chat observation:
-touch /servidor/ark/obelisk/state/instances/arkserver/enable-chat-reflection
+touch /servidor/ark/obelisk/state/instances/arkserver2/enable-chat-reflection
 ```
 
 Useful flags:
@@ -161,3 +162,6 @@ state/instances/arkserver/disable-plugins
 ```
 
 This validates the core ProcessEvent hook without loading experimental plugins.
+
+While Ragnarok is under player performance testing, use `arkserver2` / TheIsland for
+debug/development markers and validation windows.

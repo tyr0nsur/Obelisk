@@ -10,6 +10,11 @@ Allowed unattended job:
 */30 * * * * /home/flowcommunity-ark/Obelisk/scripts/obelisk_supervisor_snapshot.sh >/dev/null 2>&1
 ```
 
+The default snapshot target is now `arkserver2` / TheIsland so Ragnarok player
+performance tests are not used as the normal debug evidence stream. To intentionally
+snapshot another instance, set `OBELISK_SUPERVISOR_INSTANCE` and `OBELISK_SUPERVISOR_MAP`
+explicitly.
+
 For an already supervised open shell, use a finite timer loop instead of installing cron:
 
 ```bash
@@ -108,10 +113,11 @@ Use this after deploying a build that recognizes
 hook enabled, plugins disabled, and chat reflection enabled only for the supported binary
 SHA gate.
 
-Before sending chat, start a live tail in one shell:
+Run this on `arkserver2` / TheIsland, not on Ragnarok while players are testing
+performance. Before sending chat, start a live tail in one shell:
 
 ```bash
-tail -Fn 0 /servidor/ark/obelisk/logs/arkserver/Obelisk.log \
+tail -Fn 0 /servidor/ark/obelisk/logs/arkserver2/Obelisk.log \
   | rg --line-buffered 'Experimental chat reflection|Reflected chat|Chat reflection rejected|Reflected chat rejected|metadata_only=true|ClientChatMessage|ClientServerChatMessage|ClientServerChatDirectMessage'
 ```
 
@@ -119,13 +125,13 @@ In another shell, keep a read-only snapshot command ready:
 
 ```bash
 cd /home/flowcommunity-ark/Obelisk
-scripts/obelisk_supervisor_snapshot.sh
+OBELISK_SUPERVISOR_INSTANCE=arkserver2 OBELISK_SUPERVISOR_MAP=TheIsland scripts/obelisk_supervisor_snapshot.sh
 latest=/servidor/ark/obelisk/dumps/supervisor/latest
 cat "${latest}/chat-reflection.txt"
 tail -n 80 "${latest}/obelisk-log-tail.txt"
 ```
 
-Then send exactly one normal in-game chat message from a client on Ragnarok. Expected
+Then send exactly one normal in-game chat message from a client on TheIsland. Expected
 successful evidence is a bounded `Reflected chat ProcessEvent` line for
 `ServerSendChatMessage`, with reflected metadata showing the
 `ShooterPlayerController.ServerSendChatMessage` path and parameter ranges for
@@ -167,14 +173,14 @@ Interpret the snapshot counters this way:
 Rollback is marker-only plus a controlled restart:
 
 ```bash
-rm -f /servidor/ark/obelisk/state/instances/arkserver/enable-chat-reflection
-/servidor/ark/arkserver restart
+rm -f /servidor/ark/obelisk/state/instances/arkserver2/enable-chat-reflection
+/servidor/ark/arkserver2 restart
 cd /home/flowcommunity-ark/Obelisk
-scripts/check_obelisk_server_posture.sh --expect-stable
-scripts/obelisk_supervisor_snapshot.sh
+scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance arkserver2
+OBELISK_SUPERVISOR_INSTANCE=arkserver2 OBELISK_SUPERVISOR_MAP=TheIsland scripts/obelisk_supervisor_snapshot.sh
 cat /servidor/ark/obelisk/dumps/supervisor/latest/chat-reflection.txt
 ```
 
 After rollback, `chat_reflection_marker=disabled` is expected. Do not remove
 `enable-process-event-hook` or `disable-plugins` for this rollback; they are part of the
-current stable baseline.
+current TheIsland debug baseline.

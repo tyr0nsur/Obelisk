@@ -62,8 +62,12 @@ From the isolated server control directory, start or restart only the isolated i
 sha256sum /servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer
 git -C /home/flowcommunity-ark/Obelisk rev-parse --short HEAD
 git -C /home/flowcommunity-ark/Obelisk status --short
-./arkserver restart
+./arkserver2 restart
 ```
+
+Use `./arkserver2 restart` only during an approved TheIsland debug window. If a dedicated
+`arkserver-obelisk-debug` instance exists, use that instead. Never restart `arkserver` /
+Ragnarok for scanner captures while player performance testing is active.
 
 Let the process reach normal startup before copying logs. Do not rely on blind
 bootstrap/static-root waits as the main strategy; later runtime debug-control probing
@@ -168,15 +172,19 @@ unset OBELISK_ENABLE_REFLECTION_SCANNER
 unset OBELISK_ENABLE_NATIVE_EXEC_PROBES
 export OBELISK_DISABLE_PLUGINS=1
 export OBELISK_PE_TRACE_LIMIT=0
-./arkserver restart
+./arkserver2 restart
 ```
 
 If marker files were used on the isolated instance:
 
 ```bash
 touch /servidor/ark/obelisk/state/instances/arkserver-obelisk-debug/disable-plugins
-./arkserver restart
+./arkserver2 restart
 ```
+
+Use `./arkserver2 restart` only during an approved TheIsland debug window. If a dedicated
+`arkserver-obelisk-debug` instance exists, restart that instance instead. Do not apply
+these marker changes to Ragnarok as part of this runbook.
 
 Do not apply these marker changes to the active development server as part of this runbook.
 

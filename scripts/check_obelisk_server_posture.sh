@@ -10,6 +10,7 @@ Checks a running ARK/Obelisk process posture without changing server state.
 Options:
   --map <name>              Map argument prefix to find. Default: Ragnarok.
   --instance <id>           Expected OBELISK_INSTANCE_ID. Default: arkserver.
+  --instance-id <id>        Alias for --instance.
   --pid <pid>               Check a specific process id instead of using pgrep.
   --proc-root <path>        Procfs root. Default: /proc. Intended for offline tests.
   --expect-stable           Require stable dev posture: ProcessEvent on, plugins off,
@@ -32,7 +33,7 @@ while [[ $# -gt 0 ]]; do
             MAP="${2:?missing map}"
             shift 2
             ;;
-        --instance)
+        --instance|--instance-id)
             INSTANCE="${2:?missing instance}"
             shift 2
             ;;

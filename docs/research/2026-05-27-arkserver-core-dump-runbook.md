@@ -1,5 +1,10 @@
 # Arkserver Core Dump Runbook
 
+> Historical runbook. Do not use `arkserver` / Ragnarok for new core dumps while player
+> performance testing is active. Port this procedure to an explicitly approved
+> `arkserver2` / TheIsland debug window or to `arkserver-obelisk-debug` before any future
+> execution.
+
 ## Objective
 
 Capture one Linux core dump from the operator-designated `arkserver` / Ragnarok debug
