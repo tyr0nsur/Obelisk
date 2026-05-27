@@ -130,6 +130,12 @@ work from repository state instead of chat history.
   Rejection reasons were `implausible_num_elements` and `implausible_num_chunks`, so the
   chat UObject globals should not be promoted directly into GNames roots; see
   `docs/research/2026-05-27-live-fname-reject-capture.md`.
+- A controlled Ragnarok development capture on commit `5754fca` tested
+  `OBELISK_REFLECTION_STATIC_FNAME_ROOTS=0x5956f30`; the startup static-root probe rejected
+  it with `table=0x0` / `unreadable_table_header`. The server was restarted afterward
+  without scanner/static-root env. Treat this as inconclusive until a delayed retry or
+  stronger static evidence; see
+  `docs/research/2026-05-27-static-fname-root-live-capture.md`.
 
 ## Current Research Direction
 
@@ -192,6 +198,8 @@ python3 scripts/analyze_reflectionscanner_capture.py \
 - Ops: get permission to create or designate the isolated ARK debug instance; preferred
   plan is `arkserver-obelisk-debug`.
 - Reflection: improve FName/GNames probes and analyzer fixtures offline.
+- Reflection: add a delayed static-root retry for `OBELISK_REFLECTION_STATIC_FNAME_ROOTS`
+  before retesting `0x5956f30`.
 - Build/QA: keep package/export validation tied to concrete external plugin consumption
   gaps.
 - Core runtime: extend PluginManager coverage only if a new lifecycle risk is identified;
