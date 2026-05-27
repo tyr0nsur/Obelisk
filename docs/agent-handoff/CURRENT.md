@@ -137,6 +137,10 @@ Updated: 2026-05-27
   `libobelisk.so` is not mapped, if a deleted `libobelisk` mapping remains, or if scanner
   / native-exec env vars are present. Offline procfs fixture coverage is in
   `scripts/test_check_obelisk_server_posture.sh`.
+- fact: `scripts/check_obelisk_server_posture.sh --forbid-chat-reflection` adds a
+  production/performance posture guard that rejects experimental chat reflection and chat
+  text logging env. Use it with `--expect-stable` for Ragnarok player-performance checks
+  and for TheIsland Phase A / rollback checks.
 - fact: Current available Ragnarok logs are not enough for a GNames/FNamePool candidate:
   ReflectionScanner is disabled and analyzer output is `inconclusive`; see
   `docs/research/2026-05-27-current-gname-evidence-pack-audit.md`.
@@ -309,6 +313,11 @@ Updated: 2026-05-27
   lines, `reflected_chat_process_event_lines` / `server_send_chat_message_lines` /
   metadata-only fallback counters / `rejected_chat_lines` interpretation, and marker-only
   rollback are documented in `docs/SUPERVISION.md`.
+- fact: The next isolated runtime chat validation should follow
+  `docs/research/2026-05-27-theisland-chat-reflection-ab-runbook.md`: Phase A reflection
+  off, Phase B metadata-only reflection on, Phase C text logging only with separate
+  explicit approval, then rollback on `arkserver2` / TheIsland. Do not use Ragnarok for
+  this A/B run.
 - fact: `hooks/ProcessEventChatReflection.{h,cpp}` extracts gate/recognition logic from
   the hook for direct tests. `ProcessEventChatReflectionTests` cover disabled and non-chat
   short-circuit behavior plus valid borrowed param ranges.
@@ -386,7 +395,8 @@ Updated: 2026-05-27
 
 - next-step: If runtime text evidence is needed, use a controlled `arkserver2` / TheIsland
   restart window with `OBELISK_CHAT_REFLECTION_LOG_TEXT=1`, review bounded logs, then
-  remove the text gate; keep dispatch blocked and do not use Ragnarok.
+  remove the text gate; use the TheIsland A/B runbook, keep dispatch blocked, and do not
+  use Ragnarok.
 - next-step: Design plugin-facing chat event ownership only after text is copied into
   Obelisk-owned memory and callback lifetime is covered by tests. Use
   `docs/research/2026-05-27-sdk-chat-event-ownership-plan.md` as the acceptance gate before

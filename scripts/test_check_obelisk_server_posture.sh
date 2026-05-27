@@ -46,6 +46,28 @@ expect_success stable-posture \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable
 expect_success stable-posture-instance-id-alias \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable --instance-id arkserver
+expect_success stable-posture-chat-forbidden-clean \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable --forbid-chat-reflection
+
+write_proc_fixture 109 "${stable_maps}" \
+    "OBELISK_INSTANCE_ID=arkserver" \
+    "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
+    "OBELISK_DISABLE_PLUGINS=1" \
+    "OBELISK_ENABLE_CHAT_REFLECTION=1" \
+    "OBELISK_CHAT_REFLECTION_BINARY_SHA256=abc123" \
+    "OBELISK_CHAT_REFLECTION_LOG_LIMIT=25"
+expect_success chat-reflection-allowed-in-debug-stable \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 109 --expect-stable
+expect_failure chat-reflection-forbidden-for-production \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 109 --expect-stable --forbid-chat-reflection
+
+write_proc_fixture 110 "${stable_maps}" \
+    "OBELISK_INSTANCE_ID=arkserver" \
+    "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
+    "OBELISK_DISABLE_PLUGINS=1" \
+    "OBELISK_CHAT_REFLECTION_LOG_TEXT=1"
+expect_failure chat-text-forbidden-for-production \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 110 --expect-stable --forbid-chat-reflection
 
 write_proc_fixture 102 "${stable_maps}" \
     "OBELISK_INSTANCE_ID=arkserver" \

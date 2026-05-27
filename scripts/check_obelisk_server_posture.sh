@@ -15,6 +15,8 @@ Options:
   --proc-root <path>        Procfs root. Default: /proc. Intended for offline tests.
   --expect-stable           Require stable dev posture: ProcessEvent on, plugins off,
                             ReflectionScanner/debug control/native exec probes off.
+  --forbid-chat-reflection  Also require chat reflection and chat text logging to be off.
+                            Use this for production/performance posture checks.
   --allow-scanner           Allow OBELISK_ENABLE_REFLECTION_SCANNER=1.
   -h, --help                Show this help.
 EOF
@@ -25,6 +27,7 @@ INSTANCE="arkserver"
 PID=""
 PROC_ROOT="/proc"
 EXPECT_STABLE=0
+FORBID_CHAT_REFLECTION=0
 ALLOW_SCANNER=0
 
 while [[ $# -gt 0 ]]; do
@@ -47,6 +50,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --expect-stable)
             EXPECT_STABLE=1
+            shift
+            ;;
+        --forbid-chat-reflection)
+            FORBID_CHAT_REFLECTION=1
             shift
             ;;
         --allow-scanner)
@@ -156,4 +163,11 @@ if [[ "${EXPECT_STABLE}" == "1" ]]; then
         forbid_env OBELISK_REFLECTION_SAMPLE_STATIC_FNAME_ROOTS
         forbid_env OBELISK_REFLECTION_LOG_FNAME_REJECTS
     fi
+fi
+
+if [[ "${FORBID_CHAT_REFLECTION}" == "1" ]]; then
+    forbid_env OBELISK_ENABLE_CHAT_REFLECTION
+    forbid_env OBELISK_CHAT_REFLECTION_BINARY_SHA256
+    forbid_env OBELISK_CHAT_REFLECTION_LOG_LIMIT
+    forbid_env OBELISK_CHAT_REFLECTION_LOG_TEXT
 fi

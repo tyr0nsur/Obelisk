@@ -236,6 +236,11 @@ work from repository state instead of chat history.
   `ServerSendChatMessage`, exact metadata-only fallback names, `metadata_only=true`,
   rejections, and `send_mode_known=false`. They must not restart, install, edit markers,
   attach debuggers, enable scanners, commit, or push.
+- The next approved runtime chat validation should use
+  `docs/research/2026-05-27-theisland-chat-reflection-ab-runbook.md`: Phase A reflection
+  off baseline, Phase B metadata-only reflection on, optional Phase C text logging only
+  with explicit approval, and rollback on `arkserver2` / TheIsland. Ragnarok remains
+  protected for player performance testing.
 - UE4 type reconstruction planning is captured in
   `docs/research/2026-05-27-ue4-type-reconstruction-roadmap.md`; keep the milestone
   order as `FName`, `GObjects`, `UFunction`, then bounded params.
@@ -247,6 +252,10 @@ work from repository state instead of chat history.
   guardrail after server debug work. It checks expected env, requires `libobelisk.so` to be
   mapped, rejects deleted Obelisk mappings, and has offline procfs fixture coverage in
   `scripts/test_check_obelisk_server_posture.sh`.
+- Add `--forbid-chat-reflection` to the posture check when validating
+  production/performance or quiet-baseline posture. It rejects
+  `OBELISK_ENABLE_CHAT_REFLECTION`, the chat SHA/log-limit env, and
+  `OBELISK_CHAT_REFLECTION_LOG_TEXT`.
 - `Memory::IsReadable` was changed away from `write(/dev/null)` after local evidence showed
   that probe reports invalid and `PROT_NONE` mappings as readable. The replacement uses
   cached readable ranges from `/proc/self/maps` and has `MemoryTests`. Commit `257f432` is

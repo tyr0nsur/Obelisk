@@ -113,6 +113,10 @@ Use this after deploying a build that recognizes
 hook enabled, plugins disabled, and chat reflection enabled only for the supported binary
 SHA gate.
 
+For the full approved-window A/B flow, including reflection-off baseline, metadata-only
+validation, text-log gate, evidence fields, and rollback, use
+`docs/research/2026-05-27-theisland-chat-reflection-ab-runbook.md`.
+
 Run this on `arkserver2` / TheIsland, not on Ragnarok while players are testing
 performance. Before sending chat, start a live tail in one shell:
 
@@ -177,6 +181,7 @@ rm -f /servidor/ark/obelisk/state/instances/arkserver2/enable-chat-reflection
 /servidor/ark/arkserver2 restart
 cd /home/flowcommunity-ark/Obelisk
 scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance arkserver2
+scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map TheIsland --instance arkserver2
 OBELISK_SUPERVISOR_INSTANCE=arkserver2 OBELISK_SUPERVISOR_MAP=TheIsland scripts/obelisk_supervisor_snapshot.sh
 cat /servidor/ark/obelisk/dumps/supervisor/latest/chat-reflection.txt
 ```
