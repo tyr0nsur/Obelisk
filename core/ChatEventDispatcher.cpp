@@ -15,6 +15,12 @@ namespace Obelisk::Core
         };
     }
 
+    ChatEventDispatcher& ChatEventDispatcher::Get()
+    {
+        static ChatEventDispatcher dispatcher;
+        return dispatcher;
+    }
+
     uint64_t ChatEventDispatcher::Register(void* owner, const ChatMessageSubscription& subscription)
     {
         if (!owner || !subscription.Callback)

@@ -144,12 +144,18 @@ namespace Obelisk::Core
     }
 
     PluginManager::PluginManager()
-        : PluginManager(DefaultLoader())
+        : PluginManager(DefaultLoader(), ChatEventDispatcher::Get())
     {
     }
 
     PluginManager::PluginManager(LibraryLoader& loader)
+        : PluginManager(loader, ChatEventDispatcher::Get())
+    {
+    }
+
+    PluginManager::PluginManager(LibraryLoader& loader, ChatEventDispatcher& chatDispatcher)
         : m_Loader(&loader)
+        , m_ChatDispatcher(&chatDispatcher)
     {
         m_Api.LogInfo = PluginLogInfo;
         m_Api.LogWarn = PluginLogWarn;
@@ -167,6 +173,17 @@ namespace Obelisk::Core
     PluginManager::~PluginManager()
     {
         UnloadAll();
+    }
+
+    void PluginManager::UnregisterPluginCallbacks(const std::string& pluginName, void* owner, const char* reason)
+    {
+        const size_t eventRemoved = EventManager::Get().UnregisterCallbacksForOwner(owner);
+        const size_t chatRemoved = m_ChatDispatcher->UnregisterCallbacksForOwner(owner);
+
+        if (eventRemoved > 0)
+            OBELISK_INFO("Removed {} ProcessEvent callback(s) registered by plugin {} {}.", eventRemoved, pluginName, reason);
+        if (chatRemoved > 0)
+            OBELISK_INFO("Removed {} chat callback(s) registered by plugin {} {}.", chatRemoved, pluginName, reason);
     }
 
     void PluginManager::LoadPlugins(const std::string& directory)
@@ -328,9 +345,7 @@ namespace Obelisk::Core
                 {
                     OBELISK_ERROR("Plugin {} failed to initialize.", pluginName);
                     CallPluginShutdown(pluginName, shutdownFunc);
-                    const size_t removed = EventManager::Get().UnregisterCallbacksForOwner(pluginOwner);
-                    if (removed > 0)
-                        OBELISK_WARN("Removed {} callback(s) registered by failed plugin {} before dlclose.", removed, pluginName);
+                    UnregisterPluginCallbacks(pluginName, pluginOwner, "after init failure and before dlclose");
                     m_Loader->Close(handle);
                 }
             }
@@ -352,9 +367,7 @@ namespace Obelisk::Core
             auto& plugin = *it;
             OBELISK_INFO("Unloading plugin: {}", plugin.name);
             CallPluginShutdown(plugin.name, plugin.shutdown);
-            const size_t removed = EventManager::Get().UnregisterCallbacksForOwner(plugin.owner);
-            if (removed > 0)
-                OBELISK_INFO("Removed {} callback(s) registered by plugin {} before dlclose.", removed, plugin.name);
+            UnregisterPluginCallbacks(plugin.name, plugin.owner, "before dlclose");
             m_Loader->Close(plugin.handle);
         }
         m_LoadedPlugins.clear();

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ChatEventDispatcher.h"
 #include "api/ObeliskApi.h"
 #include <filesystem>
 #include <string>
@@ -22,6 +23,7 @@ namespace Obelisk::Core
 
         PluginManager();
         explicit PluginManager(LibraryLoader& loader);
+        PluginManager(LibraryLoader& loader, ChatEventDispatcher& chatDispatcher);
         ~PluginManager();
 
         void LoadPlugins(const std::string& directory);
@@ -38,5 +40,8 @@ namespace Obelisk::Core
         std::vector<PluginInfo> m_LoadedPlugins;
         ObeliskApi m_Api;
         LibraryLoader* m_Loader;
+        ChatEventDispatcher* m_ChatDispatcher;
+
+        void UnregisterPluginCallbacks(const std::string& pluginName, void* owner, const char* reason);
     };
 }

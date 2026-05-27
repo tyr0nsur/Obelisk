@@ -31,6 +31,9 @@ Own these areas:
 - Do not subscribe plugins to all `ProcessEvent` calls unless explicitly debugging.
 - Treat callback ownership as runtime-critical: callbacks registered by a plugin must be
   unregistered if init fails, before unload, and before `dlclose`.
+- Keep plugin-owned lifecycle cleanup shared across `EventManager` and the internal
+  `ChatEventDispatcher`; future event families must join the same owner cleanup path before
+  any public SDK exposure.
 - Preserve optional plugin shutdown ordering: call `ObeliskPlugin_Shutdown()` before
   plugin-owned callback cleanup and before `dlclose`.
 - Follow `docs/PLUGIN_ARCHITECTURE.md` before adding plugin examples or promoting

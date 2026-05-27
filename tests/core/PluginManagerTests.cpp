@@ -1,3 +1,4 @@
+#include "core/ChatEventDispatcher.h"
 #include "core/EventManager.h"
 #include "core/PluginManager.h"
 #include "runtime/Logger.h"
@@ -29,6 +30,7 @@ namespace
         bool initResult = true;
         bool validMetadata = true;
         bool registerCallback = false;
+        bool registerChatCallback = false;
         int getInfoCalls = 0;
         int initCalls = 0;
         int shutdownCalls = 0;
@@ -38,6 +40,8 @@ namespace
         std::string initInstanceId;
         void* owner = this;
         std::vector<std::string>* orderLog = nullptr;
+        Obelisk::Core::ChatEventDispatcher* chatDispatcher = nullptr;
+        size_t chatSubscriptionsAtClose = 0;
     };
 
     FakePlugin* g_CurrentFakePlugin = nullptr;
@@ -51,6 +55,10 @@ namespace
     bool FakeCallback(void*, void*, void*)
     {
         return true;
+    }
+
+    void FakeChatCallback(const Obelisk::Core::ChatMessageView&, void*)
+    {
     }
 
     bool FakeGetInfo(ObeliskPluginMetadata* out)
@@ -92,6 +100,16 @@ namespace
 
         if (g_CurrentFakePlugin->registerCallback)
             api->RegisterPreProcessEvent(FakeCallback);
+
+        if (g_CurrentFakePlugin->registerChatCallback)
+        {
+            Require(g_CurrentFakePlugin->chatDispatcher != nullptr,
+                    "fake plugin requested chat callback without dispatcher");
+            const uint64_t registrationId = g_CurrentFakePlugin->chatDispatcher->Register(
+                g_CurrentFakePlugin->owner,
+                Obelisk::Core::ChatMessageSubscription{FakeChatCallback, g_CurrentFakePlugin});
+            Require(registrationId != 0, "fake chat callback registration failed");
+        }
 
         if (g_CurrentFakePlugin->orderLog)
             g_CurrentFakePlugin->orderLog->push_back("init:" + g_CurrentFakePlugin->filename);
@@ -149,6 +167,8 @@ namespace
         void Close(void* handle) override
         {
             auto* plugin = static_cast<FakePlugin*>(handle);
+            if (plugin->chatDispatcher)
+                plugin->chatSubscriptionsAtClose = plugin->chatDispatcher->SubscriptionCount();
             ++plugin->closeCalls;
             if (plugin->orderLog)
                 plugin->orderLog->push_back("close:" + plugin->filename);
@@ -193,6 +213,8 @@ namespace
     void CleanupPlugin(FakePlugin& plugin)
     {
         Obelisk::Core::EventManager::Get().UnregisterCallbacksForOwner(plugin.owner);
+        if (plugin.chatDispatcher)
+            plugin.chatDispatcher->UnregisterCallbacksForOwner(plugin.owner);
         g_CurrentFakePlugin = nullptr;
     }
 
@@ -202,12 +224,15 @@ namespace
         ConfigureEnvironment(root);
 
         FakePlugin plugin{.filename = "valid.so", .registerCallback = true};
+        Obelisk::Core::ChatEventDispatcher chatDispatcher;
+        plugin.registerChatCallback = true;
+        plugin.chatDispatcher = &chatDispatcher;
         FakeLoader loader;
         loader.Add(plugin);
         TouchPlugin(root, plugin.filename);
         WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
 
-        Obelisk::Core::PluginManager manager(loader);
+        Obelisk::Core::PluginManager manager(loader, chatDispatcher);
         manager.LoadPlugins((root / "plugins").string());
 
         Require(plugin.getInfoCalls == 1, "valid plugin GetInfo was not called once");
@@ -217,13 +242,17 @@ namespace
         Require(plugin.initInstanceId == "arkserver", "instance id was not passed to plugin init");
         Require(Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
                 "owned callback was not registered during plugin init");
+        Require(chatDispatcher.SubscriptionCount() == 1,
+                "owned chat callback was not registered during plugin init");
 
         manager.UnloadAll();
 
         Require(plugin.shutdownCalls == 1, "valid plugin shutdown was not called during unload");
         Require(plugin.closeCalls == 1, "valid plugin was not closed during unload");
+        Require(plugin.chatSubscriptionsAtClose == 0, "chat callback was still registered at dlclose");
         Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
                 "owned callback survived plugin unload");
+        Require(chatDispatcher.SubscriptionCount() == 0, "owned chat callback survived plugin unload");
 
         CleanupPlugin(plugin);
         fs::remove_all(root);
@@ -344,20 +373,26 @@ namespace
         ConfigureEnvironment(root);
 
         FakePlugin plugin{.filename = "init_fail.so", .initResult = false, .registerCallback = true};
+        Obelisk::Core::ChatEventDispatcher chatDispatcher;
+        plugin.registerChatCallback = true;
+        plugin.chatDispatcher = &chatDispatcher;
         FakeLoader loader;
         loader.Add(plugin);
         TouchPlugin(root, plugin.filename);
         WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
 
-        Obelisk::Core::PluginManager manager(loader);
+        Obelisk::Core::PluginManager manager(loader, chatDispatcher);
         manager.LoadPlugins((root / "plugins").string());
 
         Require(plugin.getInfoCalls == 1, "init-failing plugin did not report metadata");
         Require(plugin.initCalls == 1, "init-failing plugin Init was not called");
         Require(plugin.shutdownCalls == 1, "init-failing plugin shutdown was not called");
         Require(plugin.closeCalls == 1, "init-failing plugin was not closed");
+        Require(plugin.chatSubscriptionsAtClose == 0, "failed plugin chat callback was still registered at dlclose");
         Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
                 "callback registered by failed plugin survived load failure");
+        Require(chatDispatcher.SubscriptionCount() == 0,
+                "chat callback registered by failed plugin survived load failure");
 
         CleanupPlugin(plugin);
         fs::remove_all(root);

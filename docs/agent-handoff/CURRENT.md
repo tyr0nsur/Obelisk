@@ -313,6 +313,10 @@ Updated: 2026-05-27
 - fact: `ChatEventDispatcher::Dispatch()` holds its dispatch mutex across callback
   invocation so owner cleanup cannot race plugin `dlclose` while a copied callback is
   executing.
+- fact: `PluginManager` now owns the internal chat dispatcher lifecycle backstop:
+  plugin init failure and `UnloadAll()` unregister both ProcessEvent callbacks and
+  `ChatEventDispatcher` subscriptions before `dlclose`. `PluginManagerTests` cover
+  successful unload and init-failure cleanup with injected dispatcher ownership.
 - fact: Commit `76356bf` adds `chat_reflection_benchmark`, an excluded-from-default-build
   local helper for synthetic `TryIdentifyInvocation()` and UTF-32 decode measurements. It
   does not cover hook-side `GetFunctionNameIndex()` / `Memory::IsReadable()` overhead.
@@ -360,8 +364,9 @@ Updated: 2026-05-27
   separately.
 - next-step: When chat API work resumes, add ABI layout tests and dispatcher ownership
   tests first; only then append public fields to `include/obelisk/ObeliskApi.h`.
-- next-step: Do not connect `ChatEventDispatcher` to `ProcessEvent` or PluginManager until
-  the public ABI/capability gate and plugin owner integration plan are ready.
+- next-step: Do not connect `ChatEventDispatcher` to `ProcessEvent` or public SDK fields
+  until the public ABI/capability gate is ready; PluginManager owner cleanup is now in
+  place as the internal lifecycle backstop.
 - rollback: on `arkserver2`, remove the experimental marker/env, keep
   `disable-plugins`, restart only TheIsland, and run
   `scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance

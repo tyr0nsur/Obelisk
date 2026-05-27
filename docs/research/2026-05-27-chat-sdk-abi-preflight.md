@@ -90,8 +90,8 @@ Before dispatch is connected to `ProcessEvent`:
 - Verify register returns an opaque `uint64_t` id. Covered by registration tests.
 - Verify unregister is idempotent. Covered by `TestUnregisterIsIdempotent`.
 - Verify plugin init failure, explicit unload, and shutdown cleanup remove callbacks.
-  Owner cleanup is covered internally by `TestOwnerCleanup`; plugin-manager integration
-  remains pending.
+  Owner cleanup is covered internally by `TestOwnerCleanup`; PluginManager integration is
+  covered by `PluginManagerTests` with an injected `ChatEventDispatcher`.
 - Verify plugin exceptions are caught before returning to runtime code. Covered by
   `TestExceptionsDoNotStopDispatch`.
 - Keep a dispatch mutex held across callback invocation so plugin owner cleanup cannot

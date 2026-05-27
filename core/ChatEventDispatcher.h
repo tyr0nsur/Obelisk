@@ -36,6 +36,8 @@ namespace Obelisk::Core
     class ChatEventDispatcher
     {
     public:
+        static ChatEventDispatcher& Get();
+
         uint64_t Register(void* owner, const ChatMessageSubscription& subscription);
         bool Unregister(uint64_t registrationId);
         size_t UnregisterCallbacksForOwner(void* owner);

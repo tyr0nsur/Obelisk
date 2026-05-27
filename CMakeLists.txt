@@ -109,6 +109,7 @@ add_test(NAME ChatEventDispatcherTests COMMAND chat_event_dispatcher_tests)
 
 add_executable(plugin_manager_tests
     tests/core/PluginManagerTests.cpp
+    core/ChatEventDispatcher.cpp
     core/EventManager.cpp
     core/PluginConfig.cpp
     core/PluginManager.cpp
