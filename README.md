@@ -28,14 +28,15 @@ Experimental:
 
 - ReflectionScanner and offline analyzer tooling.
 - FName/GNames/GObjects/UFunction discovery.
-- Binary-hash-gated chat reflection observation.
+- Binary-hash-gated runtime observers for candidate modules.
 - Internal UTF-32 `FString` decoder candidate.
-- General reflected parameter decoding beyond the current chat path.
+- Sanitized UFunction/ScriptStruct snapshot fixtures and second-source comparison tooling.
+- General reflected parameter decoding beyond candidate-only module recognizers.
 
 Not ready:
 
-- General-purpose chat interception.
-- Player, tribe, inventory, dino, permission, timer, and command APIs.
+- Public gameplay module APIs: players, chat, tribes, inventory, items, dinos,
+  structures, missions, transfers, permissions, timers, admin, and commands.
 - Production-ready gameplay SDK.
 
 See [docs/STATUS.md](docs/STATUS.md) for the current stability matrix and
@@ -92,8 +93,11 @@ python3 scripts/test_inspect_core_ufunctions.py
 python3 scripts/test_build_core_dump_evidence_pack.py
 python3 scripts/test_verify_chat_reflection_constants.py
 python3 scripts/test_summarize_core_ufunction_inventory.py
+python3 scripts/test_compare_reflection_snapshots.py
 python3 scripts/test_ufunction_snapshot_fixtures.py
 python3 scripts/test_regenerate_ufunction_snapshots.py
+python3 scripts/test_scriptstruct_snapshot_fixtures.py
+python3 scripts/test_regenerate_scriptstruct_snapshots.py
 python3 scripts/test_research_doc_guardrails.py
 python3 scripts/test_public_sdk_chat_guardrails.py
 python3 scripts/test_dependency_pins.py
@@ -244,10 +248,10 @@ Near-term engineering:
 
 - Keep CI as a real quality gate: build, CTest, analyzer tests, SDK consumer
   fixture, and install dry-run.
-- Validate the local UTF-32 `FString` chat-text logger in a controlled runtime window
-  while keeping chat reflection experimental.
-- Define copied-data ownership and callback lifetime before exposing a plugin-facing chat
-  event.
+- Strengthen sanitized reflection snapshots, manifest regeneration, and second-source
+  comparison for candidate modules.
+- Define copied-data ownership and callback lifetime before exposing any plugin-facing
+  gameplay event.
 - Generalize FName/GObjects/UFunction lookup only after another capture or binary hash
   validates the current field layout.
 - Add small SDK examples for minimal load, filtered events, config, and safe
@@ -255,9 +259,8 @@ Near-term engineering:
 
 Later:
 
-- Chat commands.
-- Players, permissions, timers, RCON helpers.
-- Tribe, inventory, dino, and gameplay APIs.
+- Public module APIs for players, chat, tribes, inventory, items, dinos, structures,
+  missions, transfers, permissions, timers, admin, and commands.
 
 ## Contributing
 
