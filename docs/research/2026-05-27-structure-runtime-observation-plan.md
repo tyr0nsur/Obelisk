@@ -86,13 +86,14 @@ instance policy:
 ## Result
 
 `sdk.structures` is the best next non-chat runtime-observed candidate because it has compact
-fixture-backed functions and clear gameplay value. The plan is observation-only and should
-not become a public SDK or mutation API in the next step.
+fixture-backed functions and clear gameplay value. A first internal `StructureReflection`
+recognizer now validates the six compact shapes locally with synthetic memory fixtures.
+It is not connected to `ProcessEvent`, not deployed, and not a public SDK or mutation API.
 
 ## Next Steps
 
-1. Add a `StructureReflection` internal recognizer mirroring the chat recognizer discipline,
-   but limited to scalar/counter evidence.
-2. Add tests from committed snapshots or synthetic equivalents.
+1. Extend `StructureReflection` only if the next target stays scalar-only and
+   fixture-backed.
+2. Add hook integration behind an explicit disabled-by-default runtime gate.
 3. Schedule a controlled TheIsland/debug validation only after the recognizer and negative
    gates pass locally.
