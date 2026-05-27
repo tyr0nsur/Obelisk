@@ -44,6 +44,7 @@ and updates:
 
 - Git status and recent commits.
 - Server posture check.
+- Quiet production/performance posture check.
 - Stable posture summary and PID.
 - ARK/Obelisk process list.
 - Obelisk marker files.
@@ -82,10 +83,15 @@ cat "${latest}/chat-reflection.txt"
 tail -n 80 "${latest}/obelisk-log-tail.txt"
 ```
 
-`summary.txt` includes `pid`, `posture_status`, and `stable_posture_summary`. A usable
+`summary.txt` includes `pid`, `posture_status`, `quiet_posture_status`, and
+`stable_posture_summary`. A usable
 overnight snapshot must show `posture_status=ok`; if it shows `failed`, the snapshot
 stopped early, `chat-reflection.txt` is marked `skipped_unstable_posture=true`, and the
 lead should restore stable posture before interpreting chat/reflection evidence.
+
+`quiet_posture_status=failed` does not invalidate a debug snapshot. It means the stricter
+production/performance check found chat reflection or chat text logging enabled. Review
+`quiet-posture.txt` before using the instance as a Ragnarok-like performance baseline.
 
 `chat-reflection.txt` summarizes marker, env, and log evidence. It proves only whether the
 experimental gate and log lines are present; it does not prove chat text capture unless

@@ -94,7 +94,10 @@ write_proc_fixture 4242 "${stable_maps}" \
 snapshot_dir="$(run_snapshot "${stable_root}" "${stable_out}" 4242)"
 assert_file_contains "${snapshot_dir}/summary.txt" '^pid=4242$'
 assert_file_contains "${snapshot_dir}/summary.txt" '^posture_status=ok$'
+assert_file_contains "${snapshot_dir}/summary.txt" '^quiet_posture_status=failed$'
 assert_file_contains "${snapshot_dir}/summary.txt" '^stable_posture_summary=stable;'
+assert_file_contains "${snapshot_dir}/summary.txt" '^quiet_posture_summary=not_quiet;'
+assert_file_contains "${snapshot_dir}/quiet-posture.txt" 'Forbidden OBELISK_ENABLE_CHAT_REFLECTION'
 assert_file_contains "${snapshot_dir}/summary.txt" '^chat_reflection_gate_env=1$'
 assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^chat_reflection_marker=enabled$'
 assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^chat_reflection_env=1$'
@@ -115,6 +118,7 @@ assert_file_not_contains "${snapshot_dir}/disk.txt" '/servidor/ark '
 loop_out="${TMP_DIR}/loop-out"
 run_loop_once "${stable_root}" "${loop_out}" 4242 >/dev/null
 assert_file_contains "${loop_out}/latest/summary.txt" '^posture_status=ok$'
+assert_file_contains "${loop_out}/latest/summary.txt" '^quiet_posture_status=failed$'
 
 unstable_root="${TMP_DIR}/unstable-root"
 unstable_out="${TMP_DIR}/unstable-out"

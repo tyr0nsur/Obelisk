@@ -146,6 +146,9 @@ Updated: 2026-05-27
   production/performance guard. TheIsland was not running. Do not auto-fix this without an
   operator-approved restart window; see
   `docs/research/2026-05-27-quiet-posture-readonly-audit.md`.
+- fact: `scripts/obelisk_supervisor_snapshot.sh` now writes `quiet-posture.txt` and
+  `quiet_posture_status` so debug-stable snapshots do not hide active chat reflection from
+  production/performance review.
 - fact: Current available Ragnarok logs are not enough for a GNames/FNamePool candidate:
   ReflectionScanner is disabled and analyzer output is `inconclusive`; see
   `docs/research/2026-05-27-current-gname-evidence-pack-audit.md`.

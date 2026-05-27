@@ -93,6 +93,12 @@ if ! capture_command posture "${POSTURE_CMD[@]}"; then
     exit 1
 fi
 
+QUIET_POSTURE_CMD=("${POSTURE_CMD[@]}" --forbid-chat-reflection)
+quiet_posture_status=ok
+if ! capture_command quiet-posture "${QUIET_POSTURE_CMD[@]}"; then
+    quiet_posture_status=failed
+fi
+
 CHAT_LOG="${OBELISK_ROOT}/logs/${INSTANCE}/Obelisk.log"
 CHAT_MARKER="${OBELISK_ROOT}/state/instances/${INSTANCE}/enable-chat-reflection"
 PID="$(posture_value pid)"
@@ -168,7 +174,9 @@ map=${MAP}
 snapshot_dir=${OUT_DIR}
 pid=${PID:-unknown}
 posture_status=${posture_status}
+quiet_posture_status=${quiet_posture_status}
 stable_posture_summary=stable; instance=${INSTANCE}; process_event_hook=1; plugins_disabled=1; libobelisk_mapped=1; scanner_debug_native_exec_absent=1
+quiet_posture_summary=$([[ "${quiet_posture_status}" == "ok" ]] && printf 'quiet; chat_reflection=0; chat_text_logging=0' || printf 'not_quiet; see quiet-posture.txt and chat-reflection.txt')
 chat_reflection_gate_env=${CHAT_REFLECTION_ENV:-<unset>}
 chat_reflection_binary_sha256=$([[ -n "${CHAT_REFLECTION_SHA}" ]] && printf present || printf missing)
 
