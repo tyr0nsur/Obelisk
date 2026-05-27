@@ -120,6 +120,52 @@ class RegenerateScriptStructSnapshotsTests(unittest.TestCase):
 
         self.assertEqual(result.stdout, "")
 
+    def test_check_layout_ignores_evidence_commit_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            manifest = root / "manifest.json"
+            output_root = root / "out"
+            addrs = build_core_fixture(core)
+            self.write_manifest(manifest)
+            common_args = [
+                sys.executable,
+                str(SCRIPT_DIR / "regenerate_scriptstruct_snapshots.py"),
+                "--core",
+                str(core),
+                "--manifest",
+                str(manifest),
+                "--output-root",
+                str(output_root),
+                "--gobjects",
+                hex(addrs["gobjects"]),
+                "--fname-root-slot",
+                hex(addrs["fname_root_slot"]),
+            ]
+
+            subprocess.run(
+                [*common_args, "--obelisk-commit", "abcdef1", "--write"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            result = subprocess.run(
+                [*common_args, "--obelisk-commit", "1234567", "--check-layout"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            drift = subprocess.run(
+                [*common_args, "--obelisk-commit", "1234567", "--check"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertIn("layout ok", result.stdout)
+        self.assertNotEqual(drift.returncode, 0)
+        self.assertIn("snapshot drift detected", drift.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

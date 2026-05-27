@@ -40,6 +40,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--target", action="append", default=[], help="Only process exact Outer.Name target. Repeatable.")
     parser.add_argument("--write", action="store_true", help="Write fixtures. Default is dry-run.")
     parser.add_argument("--check", action="store_true", help="Generate to temp files and fail if committed fixtures differ.")
+    parser.add_argument(
+        "--check-layout",
+        action="store_true",
+        help="Fail only when target identity, PropertiesSize, or property-chain layout differs.",
+    )
     return parser.parse_args()
 
 
@@ -169,6 +174,45 @@ def check_matches(path: Path, payload: dict[str, object]) -> bool:
         temp_path.unlink(missing_ok=True)
 
 
+def target_layout(payload: dict[str, object]) -> dict[str, object]:
+    targets = payload.get("targets")
+    if not isinstance(targets, list) or len(targets) != 1:
+        raise SystemExit("snapshot must contain exactly one target for layout comparison")
+    target = targets[0]
+    if not isinstance(target, dict):
+        raise SystemExit("snapshot target must be an object")
+    identity = target.get("target")
+    chain = target.get("property_chain")
+    if not isinstance(identity, dict) or not isinstance(chain, dict):
+        raise SystemExit("snapshot missing target identity or property chain")
+    return {
+        "schema": payload.get("schema"),
+        "inspection_mode": target.get("inspection_mode"),
+        "target": {
+            "class_name": identity.get("class_name"),
+            "name": identity.get("name"),
+            "outer_name": identity.get("outer_name"),
+            "outer_class_name": identity.get("outer_class_name"),
+        },
+        "status": target.get("status"),
+        "properties_size": target.get("properties_size"),
+        "property_chain": {
+            "status": chain.get("status"),
+            "expected_count": chain.get("expected_count"),
+            "observed_count": chain.get("observed_count"),
+            "properties_size": chain.get("properties_size"),
+            "properties": chain.get("properties"),
+        },
+    }
+
+
+def check_layout_matches(path: Path, payload: dict[str, object]) -> bool:
+    if not path.exists():
+        return False
+    committed = json.loads(path.read_text(encoding="utf-8"))
+    return target_layout(committed) == target_layout(payload)
+
+
 def main() -> int:
     args = parse_args()
     manifest = load_manifest(args.manifest)
@@ -176,8 +220,9 @@ def main() -> int:
     max_object_scan = args.max_object_scan if args.max_object_scan is not None else manifest_scan
     if not isinstance(max_object_scan, int) or max_object_scan < 0:
         raise SystemExit("max_object_scan must be a non-negative integer")
-    if args.check and args.write:
-        raise SystemExit("choose only one of --check or --write")
+    selected_modes = sum(1 for enabled in (args.check, args.check_layout, args.write) if enabled)
+    if selected_modes > 1:
+        raise SystemExit("choose only one of --check, --check-layout, or --write")
 
     ark_sha = required_text(manifest, "ark_binary_sha256")
     sha_prefix = required_text(manifest, "sha_prefix")
@@ -215,6 +260,12 @@ def main() -> int:
                 else:
                     failures.append(str(label))
                     print(f"diff {label}")
+            elif args.check_layout:
+                if check_layout_matches(output_path, snapshot):
+                    print(f"layout ok {label}")
+                else:
+                    failures.append(str(label))
+                    print(f"layout diff {label}")
             elif args.write:
                 write_atomic_json(output_path, snapshot)
                 print(f"wrote {label}")
@@ -227,7 +278,8 @@ def main() -> int:
         missing = sorted(filters - {entry_id(entry) for entry in manifest["targets"] if isinstance(entry, dict)})
         raise SystemExit(f"target filter did not match manifest entries: {missing}")
     if failures:
-        raise SystemExit(f"snapshot drift detected: {', '.join(failures)}")
+        drift_kind = "layout drift" if args.check_layout else "snapshot drift"
+        raise SystemExit(f"{drift_kind} detected: {', '.join(failures)}")
     return 0
 
 

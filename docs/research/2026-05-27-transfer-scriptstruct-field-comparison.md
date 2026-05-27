@@ -12,7 +12,7 @@ decide whether to add committed ScriptStruct fixtures immediately.
 - Snapshot binary SHA256:
   `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`
 - Obelisk baseline:
-  `41f2c52 Add ScriptStruct inspection mode`
+  `016778a Add transfer ScriptStruct snapshot fixtures`
 - Source:
   offline core, candidate-only metadata.
 - Live-server impact: none.
@@ -25,7 +25,8 @@ Generated sanitized ScriptStruct snapshots for:
 - `ArkTributePlayerData`
 - `ItemNetInfo`
 
-No large transfer payload fixtures were added to the manifest in this pass.
+The first pass compared the three transfer payload structs. A later guarded pass added
+manifest-backed fixtures for the two 288-byte tribute structs only.
 
 ## Evidence
 
@@ -41,9 +42,9 @@ script_struct`, `properties_size`, and sanitized property chains. It also preser
 
 ## Result
 
-Do not add committed ScriptStruct fixtures yet. The output is useful and bounded, but the
-repo still lacks a ScriptStruct manifest and fixture validator. Adding these files without
-that surrounding discipline would make the evidence look more operational than it is.
+`ARKTributeDino` and `ArkTributePlayerData` now have committed, manifest-backed
+ScriptStruct fixtures under `tests/fixtures/scriptstruct_snapshots/`. They remain
+candidate-only field metadata from one offline core. `ItemNetInfo` remains deferred.
 
 ## Rejected Paths
 
@@ -63,7 +64,8 @@ that surrounding discipline would make the evidence look more operational than i
 
 ## Next Steps
 
-- Add a dedicated ScriptStruct fixture manifest and validator before committing struct
-  snapshots.
-- Start with a compact synthetic or low-field ScriptStruct fixture before transfer payloads.
+- Add second-source validation for `ARKTributeDino` and `ArkTributePlayerData` before
+  runtime decoding or SDK promotion.
+- Keep `ItemNetInfo` out of fixtures until nested array/struct and weak/object reference
+  policy is explicit.
 - Keep transfer payload runtime dispatch blocked.

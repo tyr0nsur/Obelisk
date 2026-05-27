@@ -13,6 +13,17 @@ python3 scripts/regenerate_scriptstruct_snapshots.py \
   --check
 ```
 
+For second-core comparisons where the evidence commit naturally differs, use
+`--check-layout` to compare only target identity, `PropertiesSize`, and property-chain
+layout:
+
+```bash
+python3 scripts/regenerate_scriptstruct_snapshots.py \
+  --core /path/to/second/offline/core \
+  --obelisk-commit <commit> \
+  --check-layout
+```
+
 Accepted fixtures use:
 
 ```text
