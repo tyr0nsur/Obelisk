@@ -212,6 +212,11 @@ Updated: 2026-05-27
   `ServerChatTo.MessageText` offset `0x10`, `ServerChatToPlayer.PlayerName` offset `0x0`,
   and `ServerChatToPlayer.MessageText` offset `0x10`; see
   `docs/research/2026-05-27-core-ufunction-property-chain.md`.
+- fact: `scripts/verify_chat_reflection_constants.py` compares the local
+  `ue/ChatReflection.cpp` constants to offline core evidence for `ServerChat`,
+  `ServerChatTo`, and `ServerChatToPlayer`. It passed against
+  `/servidor/ark/obelisk/dumps/arkserver-20260527T031311Z/core/arkserver-20260527T031311Z.2902200`
+  with `--max-object-scan 30000`.
 - fact: `ue/RuntimeReflection.{h,cpp}` now provides an internal, binary-hash-gated
   reflection reader with tests for bounded `UFunction`/`UProperty` chains and borrowed
   parameter ranges. It is not public ABI; it is used by the experimental hook-side chat
@@ -255,6 +260,8 @@ Updated: 2026-05-27
   tail `/servidor/ark/obelisk/logs/arkserver/Obelisk.log` for `Reflected chat ProcessEvent`.
 - next-step: Wire UTF-32 text decoding into the experimental chat reflection logger only
   after one real chat capture confirms the reflected params are being hit.
+- next-step: Run `scripts/verify_chat_reflection_constants.py` against any new core before
+  accepting changed chat FName indices, parameter offsets, or `StrProperty` constants.
 - rollback: remove `enable-chat-reflection` marker and restart the debug server; no plugin
   ABI or config migration is involved.
 - next-step: Generalize the binary-hash-scoped reflection pipeline only after another

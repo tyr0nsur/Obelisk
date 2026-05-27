@@ -163,6 +163,11 @@ work from repository state instead of chat history.
   `ServerChat.MessageText` offset `0x0`; `ServerChatTo.SteamID` offset `0x0` and
   `MessageText` offset `0x10`; `ServerChatToPlayer.PlayerName` offset `0x0` and
   `MessageText` offset `0x10`.
+- `scripts/verify_chat_reflection_constants.py` verifies the current
+  `ue/ChatReflection.cpp` constants against offline core evidence. It passed against
+  `/servidor/ark/obelisk/dumps/arkserver-20260527T031311Z/core/arkserver-20260527T031311Z.2902200`
+  with `--max-object-scan 30000`; rerun it before promoting chat reflection constants for
+  a new binary/core.
 - Core-pack tooling now supports direct FName entry reads and bounded
   `--gobjects-candidate` previews for the next `GUObjectArray` investigation.
 - Read-only overnight snapshots are documented in `docs/SUPERVISION.md` and implemented by

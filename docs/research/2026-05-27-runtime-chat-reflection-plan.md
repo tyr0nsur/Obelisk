@@ -113,6 +113,10 @@ From `docs/research/2026-05-27-core-ufunction-property-chain.md`:
 - `ProcessEventChatReflectionTests` cover the extracted hook helper gates and ensure
   disabled/non-chat paths avoid memory reads while valid chat invocations return borrowed
   parameter ranges.
+- `scripts/verify_chat_reflection_constants.py` compares `ue/ChatReflection.cpp`
+  constants to offline core UFunction/property-chain evidence. It should stay in the
+  promotion path for any new ARK binary hash or new core dump before runtime wiring is
+  widened.
 - Still needed: a runtime smoke test with one real in-game chat message.
 
 ## Next Step

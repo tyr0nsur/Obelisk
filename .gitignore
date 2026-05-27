@@ -3,6 +3,8 @@ Obelisk.log
 .DS_Store
 *.so
 *.log
+__pycache__/
+*.pyc
 logs/
 cmake-build-*/
 compile_commands.json
