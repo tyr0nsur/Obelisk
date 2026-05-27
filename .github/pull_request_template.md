@@ -9,7 +9,7 @@
 
 ## Safety
 
-- [ ] Experimental scanners, chat discovery, and native exec probes remain disabled by default.
+- [ ] Experimental scanners, runtime observers, and native exec probes remain disabled by default.
 - [ ] New plugin or hook behavior is gated by explicit flags or marker files.
 - [ ] Global `ProcessEvent` callbacks are avoided unless the risk is documented and bounded.
 - [ ] Live-server changes include rollback notes.

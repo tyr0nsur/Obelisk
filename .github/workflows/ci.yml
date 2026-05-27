@@ -24,7 +24,9 @@ jobs:
             scripts/build_core_dump_evidence_pack.py \
             scripts/build_reflection_evidence_pack.py \
             scripts/check_chat_reflection_benchmark.py \
+            scripts/compare_reflection_snapshots.py \
             scripts/regenerate_ufunction_snapshots.py \
+            scripts/regenerate_scriptstruct_snapshots.py \
             scripts/verify_chat_reflection_constants.py \
             scripts/test_scan_core_fname_tables.py \
             scripts/test_enumerate_core_uobjects.py \
@@ -34,8 +36,11 @@ jobs:
             scripts/test_analyze_reflectionscanner_capture.py \
             scripts/test_verify_chat_reflection_constants.py \
             scripts/test_summarize_core_ufunction_inventory.py \
+            scripts/test_compare_reflection_snapshots.py \
             scripts/test_ufunction_snapshot_fixtures.py \
             scripts/test_regenerate_ufunction_snapshots.py \
+            scripts/test_scriptstruct_snapshot_fixtures.py \
+            scripts/test_regenerate_scriptstruct_snapshots.py \
             scripts/test_research_doc_guardrails.py \
             scripts/test_public_sdk_chat_guardrails.py \
             scripts/test_dependency_pins.py \
@@ -70,8 +75,14 @@ jobs:
         run: |
           python3 scripts/test_verify_chat_reflection_constants.py
           python3 scripts/test_summarize_core_ufunction_inventory.py
+
+      - name: Run reflection snapshot tests
+        run: |
+          python3 scripts/test_compare_reflection_snapshots.py
           python3 scripts/test_ufunction_snapshot_fixtures.py
           python3 scripts/test_regenerate_ufunction_snapshots.py
+          python3 scripts/test_scriptstruct_snapshot_fixtures.py
+          python3 scripts/test_regenerate_scriptstruct_snapshots.py
 
       - name: Run research doc guardrail tests
         run: |
