@@ -139,9 +139,8 @@ params and has higher gameplay-authority risk.
 
 ## Open Questions
 
-- Should fixture-backed status be promoted from synthetic tests to real-core fixture JSON
 - Which additional synthetic fixtures should be promoted to real-core snapshot JSON after
-  the first structure/mission snapshots?
+  the first inventory, buff, dino, structure, mission, and tribe snapshots?
 - What minimum second-source evidence is required before non-chat runtime observation?
 - What policy layer is needed before admin, transfer, and NetExec surfaces can be discussed
   as SDK features?
@@ -153,6 +152,7 @@ params and has higher gameplay-authority risk.
 - `docs/research/2026-05-27-primalitem-function-inventory.md`
 - `docs/research/2026-05-27-inventory-controller-snapshot-fixtures.md`
 - `docs/research/2026-05-27-primalbuff-snapshot-fixtures.md`
+- `docs/research/2026-05-27-module-readiness-matrix.md`
 - `docs/research/2026-05-27-primaldinocharacter-function-inventory.md`
 - `docs/research/2026-05-27-dino-second-wave-fixtures.md`
 - `docs/research/2026-05-27-primalstructure-function-inventory.md`
