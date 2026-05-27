@@ -51,7 +51,8 @@ work from repository state instead of chat history.
   disabled by default, marker/env/SHA/budget gated, metadata-only, and not a public SDK
   event.
 - Runtime observer marker checks are centralized in `runtime/RuntimeMarkers.*`; unsafe
-  path components and directory markers are rejected before observers can enable.
+  path components, directory markers, symlink markers, and symlink instance directories are
+  rejected before observers can enable.
 - Latest restart audit:
   `docs/research/2026-05-27-ops-restart-audit-instance-id.md`
   - live `ObeliskRun.sh` exports `OBELISK_INSTANCE_ID=arkserver`

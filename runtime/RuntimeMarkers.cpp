@@ -40,6 +40,14 @@ namespace Obelisk::Runtime
             return false;
 
         std::error_code ec;
-        return std::filesystem::is_regular_file(InstanceMarkerPath(root, instance, marker), ec) && !ec;
+        const std::filesystem::path instancePath =
+            std::filesystem::path(root) / "state" / "instances" / instance;
+        const std::filesystem::file_status instanceStatus = std::filesystem::symlink_status(instancePath, ec);
+        if (ec || !std::filesystem::is_directory(instanceStatus) || std::filesystem::is_symlink(instanceStatus))
+            return false;
+
+        const std::filesystem::file_status markerStatus =
+            std::filesystem::symlink_status(InstanceMarkerPath(root, instance, marker), ec);
+        return !ec && std::filesystem::is_regular_file(markerStatus) && !std::filesystem::is_symlink(markerStatus);
     }
 }

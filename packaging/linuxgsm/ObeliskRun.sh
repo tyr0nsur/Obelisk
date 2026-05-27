@@ -11,8 +11,13 @@ export LD_PRELOAD="${OBELISK_ROOT}/lib/libobelisk.so${LD_PRELOAD:+:${LD_PRELOAD}
 enable_marker() {
     local feature="$1"
     local instance="${OBELISK_INSTANCE_ID:-}"
+    local instance_dir="${OBELISK_ROOT}/state/instances/${instance}"
+    local marker="${instance_dir}/${feature}"
 
-    [[ -n "${instance}" && -f "${OBELISK_ROOT}/state/instances/${instance}/${feature}" ]] && return 0
+    [[ "${instance}" =~ ^[A-Za-z0-9_-]+$ ]] || return 1
+    [[ "${feature}" =~ ^[A-Za-z0-9_-]+$ ]] || return 1
+    [[ -d "${instance_dir}" && ! -L "${instance_dir}" ]] || return 1
+    [[ -f "${marker}" && ! -L "${marker}" ]] && return 0
     return 1
 }
 

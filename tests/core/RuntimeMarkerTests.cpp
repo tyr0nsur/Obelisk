@@ -76,6 +76,23 @@ namespace
         Require(Obelisk::Runtime::IsInstanceMarkerEnabled(root.c_str(), "arkserver2", "enable-inventory-reflection"),
                 "regular marker file was rejected");
 
+        std::filesystem::remove(marker);
+        const std::filesystem::path target = root / "target-marker";
+        Touch(target);
+        std::filesystem::create_symlink(target, marker);
+        Require(!Obelisk::Runtime::IsInstanceMarkerEnabled(root.c_str(), "arkserver2", "enable-inventory-reflection"),
+                "symlink marker was accepted");
+
+        std::filesystem::remove(marker);
+        const std::filesystem::path instanceDir = root / "state" / "instances" / "arkserver2";
+        std::filesystem::remove_all(instanceDir);
+        const std::filesystem::path realInstanceDir = root / "real-instance";
+        std::filesystem::create_directories(realInstanceDir);
+        Touch(realInstanceDir / "enable-inventory-reflection");
+        std::filesystem::create_symlink(realInstanceDir, instanceDir);
+        Require(!Obelisk::Runtime::IsInstanceMarkerEnabled(root.c_str(), "arkserver2", "enable-inventory-reflection"),
+                "symlink instance directory was accepted");
+
         std::filesystem::remove_all(root);
     }
 }

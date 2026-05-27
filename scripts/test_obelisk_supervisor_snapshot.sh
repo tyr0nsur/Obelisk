@@ -168,6 +168,24 @@ assert_file_contains "${unstable_out}/latest/chat-reflection.txt" '^skipped_unst
 assert_file_contains "${unstable_out}/latest/inventory-reflection.txt" '^skipped_unstable_posture=true$'
 assert_file_contains "${unstable_out}/latest/structure-reflection.txt" '^skipped_unstable_posture=true$'
 
+invalid_root="${TMP_DIR}/invalid-root"
+invalid_out="${TMP_DIR}/invalid-out"
+write_obelisk_fixture "${invalid_root}"
+rm -f "${invalid_root}/state/instances/arkserver2/enable-inventory-reflection"
+rm -f "${invalid_root}/state/instances/arkserver2/enable-structure-reflection"
+mkdir -p "${invalid_root}/state/instances/arkserver2/enable-inventory-reflection"
+: > "${TMP_DIR}/external-structure-marker"
+ln -s "${TMP_DIR}/external-structure-marker" "${invalid_root}/state/instances/arkserver2/enable-structure-reflection"
+write_proc_fixture 4444 "${stable_maps}" \
+    "LD_PRELOAD=/servidor/ark/obelisk/lib/libobelisk.so" \
+    "OBELISK_INSTANCE_ID=arkserver2" \
+    "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
+    "OBELISK_DISABLE_PLUGINS=1"
+
+invalid_snapshot_dir="$(run_snapshot "${invalid_root}" "${invalid_out}" 4444)"
+assert_file_contains "${invalid_snapshot_dir}/inventory-reflection.txt" '^inventory_reflection_marker=invalid$'
+assert_file_contains "${invalid_snapshot_dir}/structure-reflection.txt" '^structure_reflection_marker=invalid$'
+
 if OBELISK_ROOT="${unstable_root}" \
     OBELISK_SUPERVISOR_OUT="${TMP_DIR}/loop-fail-out" \
     OBELISK_SUPERVISOR_PROC_ROOT="${TMP_DIR}/proc" \

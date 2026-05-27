@@ -44,6 +44,29 @@ posture_value() {
     sed -n "s/^${name}=//p" "${OUT_DIR}/posture.txt" | tail -n1
 }
 
+valid_marker_component() {
+    [[ "${1:-}" =~ ^[A-Za-z0-9_-]+$ ]]
+}
+
+marker_status() {
+    local marker="$1"
+    local instance_dir="${OBELISK_ROOT}/state/instances/${INSTANCE}"
+
+    if ! valid_marker_component "${INSTANCE}"; then
+        printf 'invalid'
+        return
+    fi
+    if [[ ! -e "${marker}" && ! -L "${marker}" ]]; then
+        printf 'disabled'
+        return
+    fi
+    if [[ -L "${instance_dir}" || -L "${marker}" || ! -d "${instance_dir}" || ! -f "${marker}" ]]; then
+        printf 'invalid'
+        return
+    fi
+    printf 'enabled'
+}
+
 write_unstable_summary() {
     local posture_status="$1"
     local pid
@@ -121,7 +144,7 @@ STRUCTURE_REFLECTION_SHA="$(posture_value OBELISK_STRUCTURE_REFLECTION_BINARY_SH
 STRUCTURE_REFLECTION_LIMIT="$(posture_value OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT)"
 
 {
-    printf 'chat_reflection_marker=%s\n' "$([[ -f "${CHAT_MARKER}" ]] && printf enabled || printf disabled)"
+    printf 'chat_reflection_marker=%s\n' "$(marker_status "${CHAT_MARKER}")"
     printf 'chat_reflection_env=%s\n' "${CHAT_REFLECTION_ENV:-<unset>}"
     printf 'chat_reflection_binary_sha256=%s\n' "$([[ -n "${CHAT_REFLECTION_SHA}" ]] && printf present || printf missing)"
     printf 'log_path=%s\n' "${CHAT_LOG}"
@@ -173,7 +196,7 @@ STRUCTURE_REFLECTION_LIMIT="$(posture_value OBELISK_STRUCTURE_REFLECTION_LOG_LIM
 } > "${OUT_DIR}/chat-reflection.txt" 2>&1
 
 {
-    printf 'inventory_reflection_marker=%s\n' "$([[ -f "${INVENTORY_MARKER}" ]] && printf enabled || printf disabled)"
+    printf 'inventory_reflection_marker=%s\n' "$(marker_status "${INVENTORY_MARKER}")"
     printf 'inventory_reflection_env=%s\n' "${INVENTORY_REFLECTION_ENV:-<unset>}"
     printf 'inventory_reflection_binary_sha256=%s\n' "$([[ -n "${INVENTORY_REFLECTION_SHA}" ]] && printf present || printf missing)"
     printf 'inventory_reflection_log_limit=%s\n' "${INVENTORY_REFLECTION_LIMIT:-<unset>}"
@@ -203,7 +226,7 @@ STRUCTURE_REFLECTION_LIMIT="$(posture_value OBELISK_STRUCTURE_REFLECTION_LOG_LIM
 } > "${OUT_DIR}/inventory-reflection.txt" 2>&1
 
 {
-    printf 'structure_reflection_marker=%s\n' "$([[ -f "${STRUCTURE_MARKER}" ]] && printf enabled || printf disabled)"
+    printf 'structure_reflection_marker=%s\n' "$(marker_status "${STRUCTURE_MARKER}")"
     printf 'structure_reflection_env=%s\n' "${STRUCTURE_REFLECTION_ENV:-<unset>}"
     printf 'structure_reflection_binary_sha256=%s\n' "$([[ -n "${STRUCTURE_REFLECTION_SHA}" ]] && printf present || printf missing)"
     printf 'structure_reflection_log_limit=%s\n' "${STRUCTURE_REFLECTION_LIMIT:-<unset>}"

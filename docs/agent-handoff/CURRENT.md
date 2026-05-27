@@ -49,8 +49,8 @@ Updated: 2026-05-28
   metadata only, filters exact inventory FNames before reserving budget, and has no public
   SDK callback or gameplay mutation path.
 - fact: Runtime observer marker checks use `runtime/RuntimeMarkers.*`, which rejects empty
-  components, path traversal, slashes, dots, spaces, and directory markers before checking
-  `state/instances/<instance>/<marker>`.
+  components, path traversal, slashes, dots, spaces, directory markers, symlink markers, and
+  symlink instance directories before checking `state/instances/<instance>/<marker>`.
 - fact: Runtime/chat baseline is documented in
   `docs/research/2026-05-27-runtime-and-chat-baseline.md`.
 - fact: Reflection/chat metadata audit added shared UE probe layouts and gated
