@@ -179,6 +179,9 @@ work from repository state instead of chat history.
   `--outer-contains` filters for Function/Struct discovery from core dumps. Use broad
   substring searches only for discovery; runtime filters should stay exact
   FName+outer+ParmsSize+property-chain matches.
+- `scripts/inspect_core_ufunctions.py` reports bounded enum candidates for `ByteProperty`
+  through the observed `+0x70` enum pointer. Current core evidence resolves
+  `ServerSendChatMessage.SendMode` to the six `EChatSendMode` names.
 - `scripts/verify_chat_reflection_constants.py` verifies the current
   `ue/ChatReflection.cpp` constants against offline core evidence for `ServerChat*`,
   `ServerSendChatMessage`, and the metadata-only `ShooterPlayerController` candidates

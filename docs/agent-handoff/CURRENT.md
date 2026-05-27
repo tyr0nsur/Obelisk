@@ -239,6 +239,9 @@ Updated: 2026-05-27
   `--name-contains Chat` is discovery-only and too noisy for runtime filters; exact
   candidates are documented in
   `docs/research/2026-05-27-real-chat-ufunction-path-hypotheses.md`.
+- fact: `scripts/inspect_core_ufunctions.py` now reports bounded enum candidates for
+  `ByteProperty` through the observed `+0x70` enum pointer. On the existing core,
+  `ServerSendChatMessage.SendMode` resolves the six `EChatSendMode` names.
 - fact: `scripts/verify_chat_reflection_constants.py` compares the local
   `ue/ChatReflection.cpp` constants to offline core evidence for `ServerChat`,
   `ServerChatTo`, `ServerChatToPlayer`, `ServerSendChatMessage`, `ClientChatMessage`,

@@ -33,12 +33,17 @@ def build_core_fixture(path: Path) -> dict[str, int]:
         "package_class": base + 0x20100,
         "function_class": base + 0x20200,
         "property_class": base + 0x20300,
+        "byte_property_class": base + 0x20400,
         "package_object": base + 0x21000,
         "owner_class": base + 0x21100,
         "property_object": base + 0x21200,
         "chat_function": base + 0x21300,
         "chat_message_outer": base + 0x21400,
         "outer_matched_function": base + 0x21500,
+        "byte_property_object": base + 0x21600,
+        "byte_function": base + 0x21700,
+        "send_mode_enum": base + 0x21800,
+        "send_mode_enum_names": base + 0x21900,
         "readable_non_uobject": base + 0x80000,
     }
 
@@ -76,7 +81,7 @@ def build_core_fixture(path: Path) -> dict[str, int]:
 
     put_ptr(addrs["fname_root_slot"], addrs["fname_table"])
     put_ptr(addrs["fname_table"], addrs["fname_chunk"])
-    put_u32(addrs["fname_table"] + 0x800, 32)
+    put_u32(addrs["fname_table"] + 0x800, 64)
     put_u32(addrs["fname_table"] + 0x804, 1)
     put_entry(0, b"None\x00")
     put_entry(1, b"Class\x00")
@@ -88,36 +93,47 @@ def build_core_fixture(path: Path) -> dict[str, int]:
     put_entry(7, b"ChatMessage\x00")
     put_entry(8, b"ServerChat\x00")
     put_entry(9, b"AdminCommand\x00")
+    put_entry(10, b"ByteProperty\x00")
+    put_entry(11, b"ServerSendChatMessage\x00")
+    put_entry(12, b"SendMode\x00")
+    put_entry(13, b"EChatSendMode::GlobalChat\x00")
+    put_entry(14, b"EChatSendMode::GlobalTribeChat\x00")
+    put_entry(15, b"EChatSendMode::LocalChat\x00")
+    put_entry(16, b"EChatSendMode::AllianceChat\x00")
 
     put_ptr(addrs["gobjects"] + enum.GOBJECTS_CHUNKS_OFFSET, addrs["gobjects_chunks"])
-    put_i32(addrs["gobjects"] + enum.GOBJECTS_COUNT_OFFSET, 10)
+    put_i32(addrs["gobjects"] + enum.GOBJECTS_COUNT_OFFSET, 13)
     put_ptr(addrs["gobjects_chunks"], addrs["gobjects_chunk0"])
 
     put_uobject(addrs["class_class"], 1, 0, addrs["class_class"], 1, 0)
     put_uobject(addrs["package_class"], 1, 1, addrs["class_class"], 2, 0)
     put_uobject(addrs["function_class"], 1, 2, addrs["class_class"], 3, 0)
     put_uobject(addrs["property_class"], 1, 3, addrs["class_class"], 4, 0)
+    put_uobject(addrs["byte_property_class"], 1, 10, addrs["class_class"], 10, 0)
     put_uobject(addrs["package_object"], 1, 4, addrs["package_class"], 5, 0)
     put_uobject(addrs["owner_class"], 1, 5, addrs["class_class"], 6, addrs["package_object"])
     put_uobject(addrs["property_object"], 1, 6, addrs["property_class"], 7, addrs["chat_function"])
     put_uobject(addrs["chat_function"], 1, 7, addrs["function_class"], 8, addrs["owner_class"])
     put_uobject(addrs["chat_message_outer"], 1, 8, addrs["class_class"], 7, addrs["package_object"])
     put_uobject(addrs["outer_matched_function"], 1, 9, addrs["function_class"], 9, addrs["chat_message_outer"])
+    put_uobject(addrs["byte_property_object"], 1, 11, addrs["byte_property_class"], 12, addrs["byte_function"])
+    put_uobject(addrs["byte_function"], 1, 12, addrs["function_class"], 11, addrs["owner_class"])
 
-    for index, key in enumerate(
-        [
-            "class_class",
-            "package_class",
-            "function_class",
-            "property_class",
-            "package_object",
-            "owner_class",
-            "property_object",
-            "chat_function",
-            "chat_message_outer",
-            "outer_matched_function",
-        ]
-    ):
+    for index, key in [
+        (0, "class_class"),
+        (1, "package_class"),
+        (2, "function_class"),
+        (3, "property_class"),
+        (4, "package_object"),
+        (5, "owner_class"),
+        (6, "property_object"),
+        (7, "chat_function"),
+        (8, "chat_message_outer"),
+        (9, "outer_matched_function"),
+        (10, "byte_property_class"),
+        (11, "byte_property_object"),
+        (12, "byte_function"),
+    ]:
         put_item(index, addrs[key], 100 + index)
 
     put_ptr(addrs["chat_function"] + 0x38, addrs["property_object"])
@@ -135,6 +151,24 @@ def build_core_fixture(path: Path) -> dict[str, int]:
     put_i32(addrs["property_object"] + 0x34, 0x10)
     put_ptr(addrs["property_object"] + 0x38, 0x280)
     put_i32(addrs["property_object"] + 0x4C, 0)
+    put_ptr(addrs["byte_function"] + 0x38, addrs["byte_property_object"])
+    put_i32(addrs["byte_function"] + 0x40, 0x11)
+    put_i32(addrs["byte_function"] + 0x44, 0x8)
+    put_u32(addrs["byte_function"] + 0x90, 0x00204000)
+    put_u16(addrs["byte_function"] + 0x94, 0xFFFF)
+    put_u16(addrs["byte_function"] + 0x96, 1)
+    put_u16(addrs["byte_function"] + 0x98, 0x11)
+    put_u16(addrs["byte_function"] + 0x9A, 0xFFFF)
+    put_i32(addrs["byte_property_object"] + 0x30, 1)
+    put_i32(addrs["byte_property_object"] + 0x34, 1)
+    put_ptr(addrs["byte_property_object"] + 0x38, 0x280)
+    put_i32(addrs["byte_property_object"] + 0x4C, 0x10)
+    put_ptr(addrs["byte_property_object"] + 0x70, addrs["send_mode_enum"])
+    put_ptr(addrs["send_mode_enum"] + 0x40, addrs["send_mode_enum_names"])
+    put_i32(addrs["send_mode_enum"] + 0x48, 4)
+    for enum_value, name_index in enumerate(range(13, 17)):
+        put_i32(addrs["send_mode_enum_names"] + enum_value * 8, name_index)
+        put_i32(addrs["send_mode_enum_names"] + enum_value * 8 + 4, 0)
     put_u32(addrs["readable_non_uobject"], 0xABCD)
 
     write_minimal_elf64_core(path, base, bytes(segment))
@@ -212,6 +246,40 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
         self.assertIn("class_name_not_function_or_struct", target["reject_reasons"])
         self.assertEqual(payload["interpretation"]["status"], "candidate-only")
 
+    def test_byte_property_reports_enum_candidate(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            core = Path(temp_dir) / "core"
+            addrs = build_core_fixture(core)
+            memory = inspector.uobjects.CoreMemory(core)
+            try:
+                payload = inspector.inspect_core(
+                    memory,
+                    gobjects=addrs["gobjects"],
+                    fname_root_slot=addrs["fname_root_slot"],
+                    object_addresses=[],
+                    indices=[12],
+                    name_contains=[],
+                    outer_contains=[],
+                    window_size=0xC0,
+                    max_object_scan=16,
+                )
+            finally:
+                memory.close()
+
+        prop = payload["targets"][0]["property_chain"]["properties"][0]
+        self.assertEqual(prop["summary"]["class_name"], "ByteProperty")
+        self.assertEqual(prop["summary"]["name"], "SendMode")
+        self.assertEqual(prop["enum_candidate"]["status"], "candidate")
+        self.assertEqual(
+            [item["name"] for item in prop["enum_candidate"]["values"]],
+            [
+                "EChatSendMode::GlobalChat",
+                "EChatSendMode::GlobalTribeChat",
+                "EChatSendMode::LocalChat",
+                "EChatSendMode::AllianceChat",
+            ],
+        )
+
     def test_cli_json_output(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             core = Path(temp_dir) / "core"
@@ -254,7 +322,7 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
                     "--fname-root-slot",
                     hex(addrs["fname_root_slot"]),
                     "--name-contains",
-                    "Chat",
+                    "ServerChat",
                     "--json",
                 ],
                 check=True,

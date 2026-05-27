@@ -358,6 +358,56 @@ def read_u64(memory: uobjects.CoreMemory, address: int) -> int | None:
     return read_int(memory, address, "<Q")
 
 
+def inspect_enum_candidate(context: GObjectContext, property_address: int) -> dict[str, object]:
+    enum_address = context.memory.read_ptr(property_address + 0x70)
+    if not enum_address:
+        return {
+            "status": "rejected",
+            "reject_reasons": ["null_enum_pointer"],
+            "enum": None,
+        }
+
+    names_address = context.memory.read_ptr(enum_address + 0x40)
+    count = read_i32(context.memory, enum_address + 0x48)
+    reject_reasons: list[str] = []
+    if not names_address:
+        reject_reasons.append("null_enum_names")
+    if count is None:
+        reject_reasons.append("unreadable_enum_count")
+    elif count < 0 or count > 64:
+        reject_reasons.append("implausible_enum_count")
+
+    values: list[dict[str, object]] = []
+    if names_address and count is not None and 0 <= count <= 64:
+        for index in range(count):
+            raw = context.memory.read(names_address + index * 8, 8)
+            if raw is None:
+                values.append({"index": index, "name_index": None, "name": None})
+                reject_reasons.append(f"enum_name_{index}_unreadable")
+                continue
+            name_index, name_number = struct.unpack("<ii", raw)
+            resolved = uobjects.resolve_fname(context.memory, context.fname_table, name_index, name_number)
+            values.append(
+                {
+                    "index": index,
+                    "name_index": name_index,
+                    "name_number": name_number,
+                    "name": resolved.text,
+                }
+            )
+            if resolved.text is None:
+                reject_reasons.append(f"enum_name_{index}_unresolved")
+
+    return {
+        "status": "candidate" if not reject_reasons else "rejected",
+        "reject_reasons": reject_reasons,
+        "enum": hex_or_none(enum_address),
+        "names": hex_or_none(names_address),
+        "count": count,
+        "values": values,
+    }
+
+
 def inspect_property_chain(
     context: GObjectContext,
     *,
@@ -412,23 +462,24 @@ def inspect_property_chain(
         ):
             property_rejects.append("property_exceeds_parms_size")
 
-        properties.append(
-            {
-                "depth": depth,
-                "address": f"0x{current:x}",
-                "summary": summary,
-                "owner_matches": owner_matches,
-                "array_dim": array_dim,
-                "element_size": element_size,
-                "property_flags": hex_or_none(property_flags),
-                "offset_internal": offset_internal,
-                "offset_internal_hex": hex_or_none(offset_internal),
-                "next_field": hex_or_none(next_field),
-                "next_property": hex_or_none(next_property),
-                "status": "candidate" if not property_rejects and owner_matches else "rejected",
-                "reject_reasons": property_rejects,
-            }
-        )
+        property_payload = {
+            "depth": depth,
+            "address": f"0x{current:x}",
+            "summary": summary,
+            "owner_matches": owner_matches,
+            "array_dim": array_dim,
+            "element_size": element_size,
+            "property_flags": hex_or_none(property_flags),
+            "offset_internal": offset_internal,
+            "offset_internal_hex": hex_or_none(offset_internal),
+            "next_field": hex_or_none(next_field),
+            "next_property": hex_or_none(next_property),
+            "status": "candidate" if not property_rejects and owner_matches else "rejected",
+            "reject_reasons": property_rejects,
+        }
+        if summary.get("class_name") == "ByteProperty":
+            property_payload["enum_candidate"] = inspect_enum_candidate(context, current)
+        properties.append(property_payload)
         current = next_field
 
     if current:
@@ -728,6 +779,25 @@ def format_text(payload: dict[str, object]) -> str:
                         reasons=",".join(prop.get("reject_reasons", [])) if prop.get("reject_reasons") else "-",
                     )
                 )
+                enum_candidate = prop.get("enum_candidate")
+                if isinstance(enum_candidate, dict):
+                    enum_values = [
+                        str(item.get("name"))
+                        for item in enum_candidate.get("values", [])
+                        if isinstance(item, dict)
+                    ]
+                    lines.append(
+                        "      enum_candidate enum={enum} count={count} status={status} "
+                        "reasons={reasons} values={values}".format(
+                            enum=enum_candidate.get("enum"),
+                            count=enum_candidate.get("count"),
+                            status=enum_candidate.get("status"),
+                            reasons=",".join(enum_candidate.get("reject_reasons", []))
+                            if enum_candidate.get("reject_reasons")
+                            else "-",
+                            values=",".join(enum_values),
+                        )
+                    )
     return "\n".join(lines)
 
 

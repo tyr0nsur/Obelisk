@@ -28,6 +28,8 @@ Added `scripts/inspect_core_ufunctions.py`, an offline-only core inspector that:
 - walks the legacy `UStruct.Children +0x38` and `UField.Next +0x28` chain;
 - validates property count against `UFunction.NumParms`;
 - validates each property `Offset_Internal + ElementSize` against `ParmsSize`;
+- reads a candidate enum pointer for `ByteProperty` at `+0x70` and resolves bounded
+  enum names through the confirmed FName table;
 - labels output as `candidate-only`.
 
 ## Candidate Layout
@@ -51,6 +53,7 @@ The current core supports these binary-hash-scoped candidates:
 | `UProperty::ElementSize` | `+0x34` | `StrProperty` shows `0x10`, `BoolProperty` shows `1`, `IntProperty` shows `4`. |
 | `UProperty::PropertyFlags` | `+0x38` | Param flags are plausible and repeatable. |
 | `UProperty::Offset_Internal` | `+0x4c` | Multi-param functions show offsets such as `0x10`, `0x20`, `0x24`, and `0x28`. |
+| `UByteProperty::Enum` candidate | `+0x70` | `ServerSendChatMessage.SendMode` resolves `EChatSendMode` enum names. |
 
 Rejected stale candidates:
 
@@ -94,6 +97,18 @@ SendServerChatMessage:
   BoolProperty bIsBold offset=0x20 element_size=0x1
   IntProperty ReceiverTeamId offset=0x24 element_size=0x4
   IntProperty ReceiverPlayerID offset=0x28 element_size=0x4
+
+ServerSendChatMessage:
+  NumParms=2 ParmsSize=0x11
+  StrProperty ChatMessage offset=0x0 element_size=0x10
+  ByteProperty SendMode offset=0x10 element_size=0x1
+  ByteProperty enum candidate values:
+    EChatSendMode::GlobalChat
+    EChatSendMode::GlobalTribeChat
+    EChatSendMode::LocalChat
+    EChatSendMode::AllianceChat
+    EChatSendMode::MAX
+    EChatSendMode::EChatSendMode_MAX
 ```
 
 ## Result
