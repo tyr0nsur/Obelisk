@@ -43,6 +43,12 @@
       "outer": "ShooterPlayerController"
     },
     {
+      "file": "ShooterPlayerController.ServerRequestInventoryUseItemWithActor.snapshot.json",
+      "module": "sdk_inventory",
+      "name": "ServerRequestInventoryUseItemWithActor",
+      "outer": "ShooterPlayerController"
+    },
+    {
       "file": "PrimalBuff.AllowPostProcessEffect.snapshot.json",
       "module": "sdk_buffs",
       "name": "AllowPostProcessEffect",

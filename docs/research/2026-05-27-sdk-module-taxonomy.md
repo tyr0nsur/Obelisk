@@ -99,6 +99,7 @@ Current fixture-backed compact, non-chat property chains:
 
 ```text
 ShooterPlayerController.ServerRequestInventoryUseItem
+ShooterPlayerController.ServerRequestInventoryUseItemWithActor
 PrimalItem.AllowRemoteAddToInventory
 PrimalItem.CanUse
 PrimalBuff.AllowPostProcessEffect

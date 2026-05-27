@@ -51,6 +51,7 @@ New real-core snapshots:
 tests/fixtures/ufunction_snapshots/7e7ded49e0c6/sdk_inventory/PrimalItem.AllowRemoteAddToInventory.snapshot.json
 tests/fixtures/ufunction_snapshots/7e7ded49e0c6/sdk_inventory/PrimalItem.CanUse.snapshot.json
 tests/fixtures/ufunction_snapshots/7e7ded49e0c6/sdk_inventory/ShooterPlayerController.ServerRequestInventoryUseItem.snapshot.json
+tests/fixtures/ufunction_snapshots/7e7ded49e0c6/sdk_inventory/ShooterPlayerController.ServerRequestInventoryUseItemWithActor.snapshot.json
 ```
 
 Accepted chains:
@@ -69,6 +70,12 @@ PrimalItem.CanUse
 ShooterPlayerController.ServerRequestInventoryUseItem
   InventoryComp ObjectProperty @0x0 size 8
   ItemId StructProperty @0x8 size 8
+
+ShooterPlayerController.ServerRequestInventoryUseItemWithActor
+  anActor ObjectProperty @0x0 size 8
+  InventoryComp ObjectProperty @0x8 size 8
+  ItemID1 StructProperty @0x10 size 8
+  AdditionalData IntProperty @0x18 size 4
 ```
 
 ## Result
@@ -76,13 +83,12 @@ ShooterPlayerController.ServerRequestInventoryUseItem
 Confirmed as `candidate-only`. `sdk.inventory` now has real-core snapshots connecting
 item gates and controller-side inventory requests.
 
-`ItemId` is a reflected `StructProperty` in the snapshot. This preserves layout evidence
-but does not authorize public struct decoding, invocation, or SDK exposure.
+`ItemId` and `ItemID1` are reflected `StructProperty` values in the snapshots. This
+preserves layout evidence but does not authorize public struct decoding, invocation, or SDK
+exposure.
 
 ## Rejected Paths
 
-- `ServerRequestInventoryUseItemWithActor` remains deferred until the first three
-  inventory snapshots remain stable.
 - Transform-heavy item use and item NetExec surfaces remain deferred because they include
   larger structs or command-like behavior.
 - Runtime observation remains blocked without a TheIsland/debug-instance approved window.
@@ -95,8 +101,6 @@ but does not authorize public struct decoding, invocation, or SDK exposure.
 
 ## Next Steps
 
-1. Consider `ServerRequestInventoryUseItemWithActor` only after current inventory
-   snapshots remain stable.
-2. Keep `UseWithTransform` and item NetExec deferred until struct decoding and policy
+1. Keep `UseWithTransform` and item NetExec deferred until struct decoding and policy
    gates mature.
-3. Use manifest-driven regeneration for all future snapshot additions.
+2. Use manifest-driven regeneration for all future snapshot additions.

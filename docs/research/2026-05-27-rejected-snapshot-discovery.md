@@ -29,6 +29,8 @@ Inspected exact high-risk/deferred targets with `--snapshot-json`:
 ShooterPlayerController.ServerRequestInventoryUseItemWithTransform
 PrimalItem.ServerSendItemExecCommandToPlayer
 ShooterPlayerController.ServerRequestDownloadDino
+PrimalItem.UseItemAddCharacterStatusValue
+PrimalItem.UseSpawnActorLocOffset
 ```
 
 ## Evidence
@@ -57,16 +59,29 @@ ShooterPlayerController.ServerRequestDownloadDino
   DownloadedDino StructProperty @0x0 size 288
   ParmsSize 288
   status candidate
+
+PrimalItem.UseItemAddCharacterStatusValue
+  target class_name ScriptStruct
+  property_chain status rejected
+  reject reason property_count_mismatch
+
+PrimalItem.UseSpawnActorLocOffset
+  target class_name StructProperty
+  property_chain status rejected
+  reject reasons property_0_not_readable_as_uobject, property_chain_depth_limit
 ```
 
 ## Result
 
-No real rejected snapshot was found in this pass. These functions are rejected for SDK or
-runtime promotion reasons, not because the reflected property chains are invalid.
+No real rejected `UFunction` snapshot was found in this pass. The three deferred functions
+resolved as valid metadata chains. The two rejected exact hits were not functions
+(`ScriptStruct` and `StructProperty`), confirming that broad `Use` inventory matches can
+surface non-call metadata objects.
 
 ## Rejected Paths
 
 - Do not commit a fake rejected real-core snapshot.
+- Do not commit non-`UFunction` rejected snapshots under the `UFunction` snapshot manifest.
 - Do not treat large valid chains as public decoding readiness.
 - Keep transfer, transform, and item NetExec surfaces deferred until struct decoding and
   policy gates are stronger.
@@ -80,5 +95,5 @@ runtime promotion reasons, not because the reflected property chains are invalid
 
 1. Keep synthetic rejected fixtures for analyzer failure behavior.
 2. Add real rejected snapshots only when core evidence naturally produces rejection.
-3. Prefer `ServerRequestInventoryUseItemWithActor` as the next accepted inventory
-   second-wave snapshot before transform/transfer/NetExec surfaces.
+3. Treat exact non-function matches as rejected discovery evidence in research notes, not
+   snapshot fixtures.
