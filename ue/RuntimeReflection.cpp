@@ -2,6 +2,7 @@
 
 #include <cstring>
 #include <limits>
+#include <string>
 #include <unordered_set>
 #include <utility>
 
@@ -115,6 +116,37 @@ namespace Obelisk::UE::RuntimeReflection
 
             out = std::move(value);
             return ReadResult::Ok();
+        }
+
+        bool IsInvalidUnicodeScalar(uint32_t codepoint)
+        {
+            return codepoint > 0x10ffff || (codepoint >= 0xd800 && codepoint <= 0xdfff);
+        }
+
+        void AppendUtf8(uint32_t codepoint, std::string& out)
+        {
+            if (codepoint <= 0x7f)
+            {
+                out.push_back(static_cast<char>(codepoint));
+            }
+            else if (codepoint <= 0x7ff)
+            {
+                out.push_back(static_cast<char>(0xc0 | (codepoint >> 6)));
+                out.push_back(static_cast<char>(0x80 | (codepoint & 0x3f)));
+            }
+            else if (codepoint <= 0xffff)
+            {
+                out.push_back(static_cast<char>(0xe0 | (codepoint >> 12)));
+                out.push_back(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3f)));
+                out.push_back(static_cast<char>(0x80 | (codepoint & 0x3f)));
+            }
+            else
+            {
+                out.push_back(static_cast<char>(0xf0 | (codepoint >> 18)));
+                out.push_back(static_cast<char>(0x80 | ((codepoint >> 12) & 0x3f)));
+                out.push_back(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3f)));
+                out.push_back(static_cast<char>(0x80 | (codepoint & 0x3f)));
+            }
         }
     }
 
@@ -326,6 +358,50 @@ namespace Obelisk::UE::RuntimeReflection
         std::memcpy(&value.ArrayMax, cursor, sizeof(value.ArrayMax));
 
         out = value;
+        return ReadResult::Ok();
+    }
+
+    ReadResult TryDecodeFStringUtf32(const MemoryReader& reader,
+                                     const FStringHeaderCandidate& header,
+                                     int32_t maxChars,
+                                     std::string& out)
+    {
+        out.clear();
+        if (maxChars <= 0)
+            return ReadResult::Fail(ReadStatus::InvalidArgument, "maxChars must be positive");
+        if (header.ArrayNum == 0 && header.ArrayMax == 0 && header.Data == nullptr)
+            return ReadResult::Ok();
+        if (!IsPlausibleFStringHeader(header, maxChars))
+            return ReadResult::Fail(ReadStatus::Implausible, "FString header is implausible");
+
+        const auto charCount = static_cast<size_t>(header.ArrayNum);
+        if (charCount > std::numeric_limits<size_t>::max() / sizeof(uint32_t))
+            return ReadResult::Fail(ReadStatus::OutOfBounds, "FString byte size overflow");
+        const size_t byteSize = charCount * sizeof(uint32_t);
+        if (!reader.CanRead(header.Data, byteSize))
+            return ReadResult::Fail(ReadStatus::Unreadable, "FString data is unreadable");
+
+        const auto* cursor = static_cast<const uint8_t*>(header.Data);
+        for (size_t i = 0; i < charCount; ++i)
+        {
+            uint32_t codepoint = 0;
+            std::memcpy(&codepoint, cursor + i * sizeof(uint32_t), sizeof(codepoint));
+
+            if (i == charCount - 1)
+            {
+                if (codepoint != 0)
+                    return ReadResult::Fail(ReadStatus::Implausible, "FString is not NUL terminated");
+                break;
+            }
+
+            if (codepoint == 0)
+                return ReadResult::Fail(ReadStatus::Implausible, "FString contains an early NUL");
+            if (IsInvalidUnicodeScalar(codepoint))
+                return ReadResult::Fail(ReadStatus::Implausible, "FString contains an invalid UTF-32 codepoint");
+
+            AppendUtf8(codepoint, out);
+        }
+
         return ReadResult::Ok();
     }
 }

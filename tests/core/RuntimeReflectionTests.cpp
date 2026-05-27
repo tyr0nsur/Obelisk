@@ -280,6 +280,87 @@ namespace
         result = TryReadFStringHeaderFromBuffer(buffer.data(), buffer.size(), 0x18, actual);
         Require(result.Status == ReadStatus::OutOfBounds, "short FString header was accepted");
     }
+
+    void TestDecodesUtf32FString()
+    {
+        std::array<uint32_t, 12> text{
+            'P', 'l', 'a', 'y', 'e', 'r', 'N', 'a', 'm', 'e', 0, 0xaaaa,
+        };
+        FStringHeaderCandidate header{text.data(), 11, 11};
+        ReaderContext context;
+        context.Regions.push_back({reinterpret_cast<const uint8_t*>(text.data()), text.size() * sizeof(uint32_t)});
+        MemoryReader reader{RegionReader, &context};
+
+        std::string decoded;
+        ReadResult result = TryDecodeFStringUtf32(reader, header, 512, decoded);
+        Require(static_cast<bool>(result), result.Reason.c_str());
+        Require(decoded == "PlayerName", "UTF-32 FString decoded incorrectly");
+    }
+
+    void TestDecodesUtf32FStringUnicodeScalar()
+    {
+        std::array<uint32_t, 4> text{'A', 0x1f600, 'Z', 0};
+        FStringHeaderCandidate header{text.data(), 4, 4};
+        ReaderContext context;
+        context.Regions.push_back({reinterpret_cast<const uint8_t*>(text.data()), text.size() * sizeof(uint32_t)});
+        MemoryReader reader{RegionReader, &context};
+
+        std::string decoded;
+        ReadResult result = TryDecodeFStringUtf32(reader, header, 512, decoded);
+        Require(static_cast<bool>(result), result.Reason.c_str());
+        Require(decoded == "A\xf0\x9f\x98\x80Z", "non-BMP UTF-32 FString decoded incorrectly");
+    }
+
+    void TestDecodesEmptyFString()
+    {
+        ReaderContext context;
+        MemoryReader reader{RegionReader, &context};
+        std::string decoded = "not-empty";
+
+        ReadResult result = TryDecodeFStringUtf32(reader, {}, 512, decoded);
+        Require(static_cast<bool>(result), result.Reason.c_str());
+        Require(decoded.empty(), "empty FString did not decode to empty string");
+    }
+
+    void TestRejectsMalformedFString()
+    {
+        std::array<uint32_t, 4> noTerminator{'B', 'a', 'd', '!'};
+        std::array<uint32_t, 4> earlyNull{'B', 0, 'd', 0};
+        std::array<uint32_t, 2> invalidScalar{0xd800, 0};
+        ReaderContext context;
+        context.Regions.push_back({
+            reinterpret_cast<const uint8_t*>(noTerminator.data()),
+            noTerminator.size() * sizeof(uint32_t),
+        });
+        context.Regions.push_back({
+            reinterpret_cast<const uint8_t*>(earlyNull.data()),
+            earlyNull.size() * sizeof(uint32_t),
+        });
+        context.Regions.push_back({
+            reinterpret_cast<const uint8_t*>(invalidScalar.data()),
+            invalidScalar.size() * sizeof(uint32_t),
+        });
+        MemoryReader reader{RegionReader, &context};
+
+        std::string decoded;
+        ReadResult result = TryDecodeFStringUtf32(reader, {noTerminator.data(), 4, 4}, 512, decoded);
+        Require(result.Status == ReadStatus::Implausible, "unterminated FString was accepted");
+
+        result = TryDecodeFStringUtf32(reader, {earlyNull.data(), 4, 4}, 512, decoded);
+        Require(result.Status == ReadStatus::Implausible, "early-NUL FString was accepted");
+
+        result = TryDecodeFStringUtf32(reader, {invalidScalar.data(), 2, 2}, 512, decoded);
+        Require(result.Status == ReadStatus::Implausible, "invalid UTF-32 scalar was accepted");
+
+        result = TryDecodeFStringUtf32(reader, {reinterpret_cast<const void*>(0x12345000), 4, 4}, 512, decoded);
+        Require(result.Status == ReadStatus::Unreadable, "unreadable FString data was accepted");
+
+        result = TryDecodeFStringUtf32(reader, {noTerminator.data(), 4, 3}, 512, decoded);
+        Require(result.Status == ReadStatus::Implausible, "ArrayMax < ArrayNum was accepted");
+
+        result = TryDecodeFStringUtf32(reader, {noTerminator.data(), 513, 513}, 512, decoded);
+        Require(result.Status == ReadStatus::Implausible, "oversized FString was accepted");
+    }
 }
 
 int main()
@@ -290,6 +371,10 @@ int main()
     TestRejectsPropertyOwnerMismatch();
     TestParameterRangeIsBounded();
     TestFStringHeaderHelpersDoNotDecode();
+    TestDecodesUtf32FString();
+    TestDecodesUtf32FStringUnicodeScalar();
+    TestDecodesEmptyFString();
+    TestRejectsMalformedFString();
 
     std::cout << "RuntimeReflectionTests passed\n";
     return 0;

@@ -289,6 +289,8 @@ python3 scripts/analyze_reflectionscanner_capture.py \
 - `FString` candidate for this ARK Linux build is a 16-byte
   `{Data, ArrayNum, ArrayMax}` header with UTF-32LE `TCHAR`; see
   `docs/research/2026-05-27-fstring-layout.md`.
+- `RuntimeReflection::TryDecodeFStringUtf32` exists and is tested, but runtime chat logging
+  still logs metadata/ranges only until real chat capture confirms params.
 - Evidence: after any isolated scanner capture, run
   `scripts/build_reflection_evidence_pack.py` against copied logs and the matching binary
   before promoting candidates.

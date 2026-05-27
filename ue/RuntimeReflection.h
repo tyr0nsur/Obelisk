@@ -158,4 +158,9 @@ namespace Obelisk::UE::RuntimeReflection
                                               size_t bufferSize,
                                               size_t offset,
                                               FStringHeaderCandidate& out);
+
+    ReadResult TryDecodeFStringUtf32(const MemoryReader& reader,
+                                     const FStringHeaderCandidate& header,
+                                     int32_t maxChars,
+                                     std::string& out);
 }

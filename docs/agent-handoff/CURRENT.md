@@ -236,6 +236,9 @@ Updated: 2026-05-27
 - fact: `FString` for this ARK Linux build is a strong candidate for
   `{TCHAR* Data, int32 ArrayNum, int32 ArrayMax}` with `TCHAR=UTF-32LE`; see
   `docs/research/2026-05-27-fstring-layout.md`.
+- fact: `RuntimeReflection::TryDecodeFStringUtf32` now implements the internal decoder
+  candidate with synthetic tests and strict reject conditions. It is not wired into chat
+  logging yet.
 
 ## Rejected Or Unsafe
 
@@ -299,8 +302,8 @@ Updated: 2026-05-27
   gates and write one chat message to confirm `Reflected chat ProcessEvent` log entries.
 - next-step: When an operator can join, write one in-game chat message on Ragnarok and
   tail `/servidor/ark/obelisk/logs/arkserver/Obelisk.log` for `Reflected chat ProcessEvent`.
-- next-step: Add an internal UTF-32 `FString` decoder helper with synthetic tests, but keep
-  runtime text logging gated until a real chat capture confirms the layout.
+- next-step: Wire UTF-32 text decoding into the experimental chat reflection logger only
+  after one real chat capture confirms the reflected params are being hit.
 - rollback: remove `enable-chat-reflection` marker and restart the debug server; no plugin
   ABI or config migration is involved.
 - next-step: After a repeat-confirmed `GNames` research candidate appears, generate

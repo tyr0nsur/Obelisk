@@ -100,7 +100,9 @@ upper bound for generic future helpers.
 
 ## Next Steps
 
-1. Add a UTF-32 `FString` decoder helper with synthetic tests.
+1. `RuntimeReflection::TryDecodeFStringUtf32` now exists with synthetic tests for valid
+   UTF-32, empty strings, malformed headers, missing NUL, unreadable buffers, oversized
+   strings, and invalid codepoints.
 2. Keep it internal and gated behind validated chat reflection.
 3. Use it only on reflected `StrProperty` parameter ranges.
 4. After one live chat capture confirms the layout, consider exposing decoded chat through
