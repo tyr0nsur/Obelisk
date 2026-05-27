@@ -19,7 +19,7 @@ coverage, focused on access, demolish, pincode, variant, and seating policy surf
 ## Hypothesis
 
 Structure policy functions with only object, int, byte, and bool params are the best next
-non-chat fixtures because they cover real modding decisions without requiring placement
+gameplay fixtures because they cover real modding decisions without requiring placement
 structs, strings, arrays, or live authority mutation.
 
 ## Method
@@ -78,7 +78,7 @@ Ran 26 tests: OK
 ## Result
 
 Confirmed as `candidate-only`, now with synthetic fixture coverage. This improves
-Obelisk's non-chat roadmap toward structure access policy and container/seating decisions,
+Obelisk's modding roadmap toward structure access policy and container/seating decisions,
 but it does not create a public SDK API and does not authorize runtime observation.
 
 The new snapshot output is suitable as the next bridge toward real-core fixture JSON

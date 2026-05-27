@@ -39,8 +39,8 @@ Updated: 2026-05-28
 - fact: stable posture checks now reject `OBELISK_ENABLE_STRUCTURE_REFLECTION`,
   `OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256`, and
   `OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT`; supervisor snapshots write
-  `structure-reflection.txt` so structure observation cannot be hidden inside chat-centric
-  summaries.
+  `structure-reflection.txt` so structure observation is reported as its own runtime
+  observer family.
 - fact: structure observation budget is now reserved only after the cheap exact structure
   FName filter passes. Non-structure `ProcessEvent` calls no longer consume the bounded
   observation budget.
@@ -51,6 +51,18 @@ Updated: 2026-05-28
 - fact: Runtime observer marker checks use `runtime/RuntimeMarkers.*`, which rejects empty
   components, path traversal, slashes, dots, spaces, directory markers, symlink markers, and
   symlink instance directories before checking `state/instances/<instance>/<marker>`.
+- fact: Second-source reversing gates are centralized in
+  `docs/research/2026-05-28-second-source-reversing-gap-matrix.md`. Current
+  `FName`/`GObjects`/`UObject`/`UFunction` evidence remains single-core or otherwise
+  candidate-only until a second isolated core or independent static path satisfies that
+  matrix.
+- fact: `ue/BuffReflection.*` adds an offline internal `sdk.buffs` recognizer for exact
+  compact `PrimalBuff` fixtures. It has no runtime hook, no public callback, no return
+  override, and exposes only bounded bool ranges; object/class pointer ranges stay
+  internal.
+- next-step: Use `sdk.buffs` as the next offline module to strengthen the general ARK
+  Linux API/SDK core, but keep runtime hooks, callbacks, return overrides, raw
+  object/class exposure, and gameplay mutation blocked.
 - fact: Runtime/chat baseline is documented in
   `docs/research/2026-05-27-runtime-and-chat-baseline.md`.
 - fact: Reflection/chat metadata audit added shared UE probe layouts and gated
@@ -190,7 +202,7 @@ Updated: 2026-05-28
   call, jump, or other in analyzer output and evidence-pack counts. It also adds
   `docs/research/2026-05-27-ue4-type-reconstruction-roadmap.md` for the staged
   `FName -> GObjects -> UFunction -> params` reconstruction path.
-- fact: General function research has pivoted beyond chat. `scripts/summarize_core_ufunction_inventory.py`
+- fact: General function research has pivoted across the full modding surface. `scripts/summarize_core_ufunction_inventory.py`
   supports focused filters (`--outer-contains`, `--name-contains`, `--family`,
   `--min-params`, `--max-params`, `--include-functions`) and
   `docs/research/2026-05-27-shooterplayercontroller-function-inventory.md` identifies
@@ -206,8 +218,8 @@ Updated: 2026-05-28
   and blueprint hooks. Favor compact offline fixtures such as `AddPassenger`,
   `AllowCarryCharacter`, `ServerRequestAttack`, and `SetCharacterStatusTameable`.
 - fact: `docs/research/2026-05-27-sdk-module-taxonomy.md` defines the current module
-  roadmap beyond chat: player, inventory, items, dinos, structures, tribes, transfer,
-  admin, and internal UE reflection. Keep all non-chat modules candidate-only until they
+  roadmap across the full modding surface: player, inventory, items, dinos, structures, tribes, transfer,
+  admin, and internal UE reflection. Keep all gameplay modules candidate-only until they
   pass offline validation, fixture coverage, isolated runtime observation, copied-data
   ownership, and public C ABI gates.
 - fact: `docs/research/2026-05-27-primalstructure-function-inventory.md` identifies
@@ -426,7 +438,7 @@ Updated: 2026-05-28
   explicit approval, then rollback on `arkserver2` / TheIsland. Do not use Ragnarok for
   this A/B run.
 - fact: `hooks/ProcessEventChatReflection.{h,cpp}` extracts gate/recognition logic from
-  the hook for direct tests. `ProcessEventChatReflectionTests` cover disabled and non-chat
+  the hook for direct tests. `ProcessEventChatReflectionTests` cover disabled and chat-unmatched
   short-circuit behavior plus valid borrowed param ranges.
 - fact: `FString` for this ARK Linux build is a strong candidate for
   `{TCHAR* Data, int32 ArrayNum, int32 ArrayMax}` with `TCHAR=UTF-32LE`; see
@@ -466,9 +478,9 @@ Updated: 2026-05-28
   local helper for synthetic `TryIdentifyInvocation()` and UTF-32 decode measurements. It
   does not cover hook-side `GetFunctionNameIndex()` / `Memory::IsReadable()` overhead.
 - fact: `chat_reflection_benchmark` now reports p50/p95/p99 and
-  `allocations_per_iter`, including hook-like disabled, enabled non-chat, matched
+  `allocations_per_iter`, including hook-like disabled, enabled chat-unmatched, matched
   `ServerSendChatMessage`, and text decode cases. The hook-side wrapper keeps disabled and
-  non-chat attempts allocation-free in the synthetic benchmark. Fixed internal storage in
+  chat-unmatched attempts allocation-free in the synthetic benchmark. Fixed internal storage in
   `RuntimeReflection::TryReadUFunction()` / `ChatInvocation` and UTF-8 output reservation
   lower matched chat to zero allocations, standalone UTF-32 decode to one allocation, and
   hook-like text logging to one allocation per iteration locally.
@@ -476,7 +488,7 @@ Updated: 2026-05-28
   now short-circuits observation reflection work; see
   `docs/research/2026-05-27-chat-reflection-stack-cycle-guard.md`.
 - fact: `scripts/check_chat_reflection_benchmark.py` gates local benchmark output so
-  disabled/non-chat hook-like paths remain allocation-free and matched/text paths stay
+  disabled/chat-unmatched hook-like paths remain allocation-free and matched/text paths stay
   within documented reader-call/allocation ceilings. This is a regression gate, not
   runtime acceptance evidence.
 - fact: CI runs deterministic parser/threshold tests for the benchmark gate and also

@@ -2,7 +2,7 @@
 
 ## Objective
 
-Use the general offline `UFunction` inventory to move Obelisk roadmap work beyond chat and
+Use the general offline `UFunction` inventory to move Obelisk roadmap work across the full modding surface and
 identify high-value player/controller function families for future reflection and SDK
 planning.
 
@@ -31,7 +31,7 @@ python3 scripts/summarize_core_ufunction_inventory.py \
   --json
 ```
 
-Selected non-chat candidates were then inspected with:
+Selected gameplay candidates were then inspected with:
 
 ```bash
 python3 scripts/inspect_core_ufunctions.py \
@@ -62,7 +62,7 @@ Set:13
 BP:6
 ```
 
-Useful non-chat clusters:
+Useful gameplay clusters:
 
 ```text
 admin:15
@@ -127,7 +127,7 @@ ServerRequestTribeLog: 0/0 properties
 ## Result
 
 Confirmed as `candidate-only`: the offline core has enough reflected metadata to plan a
-general player/controller module roadmap beyond chat. The strongest next targets are:
+general player/controller module roadmap across the full modding surface. The strongest next targets are:
 
 1. Inventory item-use events, because their reflected property chains are small and
    reusable.

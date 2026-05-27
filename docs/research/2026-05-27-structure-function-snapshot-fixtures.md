@@ -68,6 +68,6 @@ do not imply public SDK surface, permission behavior, or safe runtime dispatch.
 ## Next Steps
 
 - Regenerate fixtures from the manifest and keep path coverage validated.
-- Consider mission leave/notify snapshots next to broaden non-chat functionality.
+- Consider mission leave/notify snapshots next to broaden gameplay functionality.
 - Keep placement/build-authoritative targets deferred until policy and struct decoding
   gates are explicit.

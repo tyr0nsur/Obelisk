@@ -2,7 +2,7 @@
 
 ## Objective
 
-Extend the non-chat `UFunction` roadmap into structures: access, snapping, pickup,
+Extend the gameplay `UFunction` roadmap into structures: access, snapping, pickup,
 demolish, variant, seating, containers, and elevator controls.
 
 ## Environment

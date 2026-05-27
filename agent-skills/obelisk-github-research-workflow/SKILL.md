@@ -8,6 +8,14 @@ description: "Use when coordinating Obelisk agents that should commit to GitHub,
 Use this skill when an Obelisk task involves GitHub hygiene, agent handoff, research notes,
 skill updates, or making work reproducible for contributors.
 
+## Project Vision
+
+Obelisk is a Linux runtime/API/SDK core for ARK modding. Coordinate work toward a robust
+general modding substrate: UE4 reflection, safe runtime hooks, stable C ABI, plugin
+lifecycle, install layout, live-ops safety, and reproducible reversing evidence. Treat chat,
+inventory, structures, buffs, dinos, tribes, missions, transfers, and admin surfaces as
+module areas on top of the same core, not as the center of the project.
+
 ## Working Contract
 
 - The team lead owns GitHub integration. Sub-agents must not commit, amend, rebase,

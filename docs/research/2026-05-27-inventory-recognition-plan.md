@@ -2,7 +2,7 @@
 
 ## Objective
 
-Define the next non-chat SDK recognition target after `sdk.structures`: a narrow internal
+Define the next gameplay SDK recognition target after `sdk.structures`: a narrow internal
 `InventoryReflection` recognizer for compact item-use and remote-add metadata.
 
 ## Environment

@@ -2,7 +2,7 @@
 
 ## Objective
 
-Broaden non-chat fixture coverage with compact mission lifecycle and tribe permission
+Broaden gameplay fixture coverage with compact mission lifecycle and tribe permission
 UFunction snapshots.
 
 ## Environment

@@ -2,7 +2,7 @@
 
 ## Objective
 
-Add a narrow `sdk.tribes` control fixture for a non-chat, zero-parameter reflected
+Add a narrow `sdk.tribes` control fixture for a gameplay zero-parameter reflected
 function before exploring broader tribe/alliance policy surfaces.
 
 ## Environment
@@ -55,7 +55,7 @@ python3 scripts/test_ufunction_snapshot_fixtures.py
 ## Result
 
 Confirmed as `candidate-only`. This adds one low-risk shape to the fixture matrix:
-non-chat, exact target, no params, no param buffer reads.
+gameplay exact target, no params, no param buffer reads.
 
 ## Rejected Paths
 

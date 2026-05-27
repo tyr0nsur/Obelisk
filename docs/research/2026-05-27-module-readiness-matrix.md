@@ -22,7 +22,7 @@ snapshot rounds, without implying public SDK or runtime readiness.
 | Module | Current Level | Real Snapshots | Evidence | Next Gate |
 | --- | --- | ---: | --- | --- |
 | `sdk.inventory` | `internal-marker-gated-observer` | 5 | Item/controller exact snapshots plus internal `InventoryReflection` and hook-side metadata observer for `CanUse` and `AllowRemoteAddToInventory`; arrays/structs/item contents stay blocked. | Offline/posture review before any approved TheIsland/debug activation; no SDK callbacks or gameplay mutation. |
-| `sdk.buffs` | `fixture-backed` | 6 | Focused `PrimalBuff` exact snapshots for inventory-access, allow-add, prevent-add, bool-return, and zero-param shapes. | Keep gameplay semantics candidate-only; defer mission/grapple/companion surfaces. |
+| `sdk.buffs` | `offline-internal-recognizer` | 6 | Focused `PrimalBuff` exact snapshots plus `ue/BuffReflection.*` tests for inventory-access, allow-add, prevent-add, bool-return, and zero-param shapes. This broadens the gameplay API substrate while staying metadata-only. | Keep runtime hooks, callbacks, return overrides, object/class exposure, and gameplay semantics blocked until second-source evidence and SDK policy exist. |
 | `sdk.dinos` | `fixture-backed` | 2 | Passenger/carry real snapshots plus broader synthetic coverage for attack, tame-state, and controller dino stats. | Promote more real snapshots only for compact exact targets. |
 | `sdk.structures` | `internal-marker-gated-observer` | 6 | Access/demolish plus pincode, container activation, seating, and variant snapshots; `StructureReflection` and disabled-by-default runtime gate require env, SHA, log budget, and `enable-structure-reflection` instance marker. | TheIsland/debug activation still needs explicit operator window and stable-posture rollback; keep placement/build-authoritative targets deferred. |
 | `sdk.missions` | `fixture-backed` | 4 | Add, leave-policy, removal lifecycle, and usable-item array metadata snapshots. | Keep array/struct payloads metadata-only until second-source evidence. |
@@ -53,9 +53,10 @@ chains only.
 
 ## Next Priorities
 
-1. Review the disabled-by-default `sdk.inventory` observation gate before any TheIsland/debug
+1. Obtain second-source validation for `FName`/`GObjects`/`UObject`/`UFunction` before
+   promoting recognizers beyond candidate-only.
+2. Review the disabled-by-default `sdk.inventory` observation gate before any TheIsland/debug
    activation.
-2. Add second-source validation for ScriptStruct transfer field layouts.
 3. Add second-source validation for ScriptStruct transfer field layouts.
 4. Keep `ItemNetInfo`, admin/NetExec, placement/build, and gameplay-authoritative mutation
    out of runtime work.

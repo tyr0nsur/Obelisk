@@ -136,7 +136,7 @@ Before adding public ABI fields:
 Measure before any SDK promotion:
 
 - local microbenchmark for `TryIdentifyInvocation()` with synthetic readers:
-  non-chat fast path, rejected chat candidate, matched `ServerSendChatMessage`, and text
+  chat-unmatched fast path, rejected chat candidate, matched `ServerSendChatMessage`, and text
   decode;
 - local hook-like microbenchmark for the enabled/disabled branch, name-index read,
   recognition, send-mode check, optional text decode, and synthetic log sanitization;
@@ -146,7 +146,7 @@ Measure before any SDK promotion:
 - collect CPU, RSS, log rate, candidate/reject/match counters, and any tick/hitch signal
   available from the harness.
 
-Reject promotion if non-chat cost is dominated by readability checks, if rejected
+Reject promotion if chat-unmatched cost is dominated by readability checks, if rejected
 candidates produce a log storm, or if p99/runtime tick behavior changes materially in the
 isolated validation run.
 
@@ -206,12 +206,12 @@ hook_like_server_send_chat allocations_per_iter=0
 hook_like_server_send_chat_text allocations_per_iter=1
 ```
 
-The disabled, enabled non-chat, and `OBELISK_CHAT_REFLECTION_LOG_LIMIT=0` paths remain
+The disabled, enabled chat-unmatched, and `OBELISK_CHAT_REFLECTION_LOG_LIMIT=0` paths remain
 allocation-free in the synthetic benchmark. These are local regression signals only, not
 runtime acceptance evidence.
 
 `scripts/check_chat_reflection_benchmark.py` now enforces those local regression gates for
-the hook-like paths. It requires disabled/non-chat paths to remain allocation-free, caps
+the hook-like paths. It requires disabled/chat-unmatched paths to remain allocation-free, caps
 reader calls for hook-like cases, and verifies each required case accepts every iteration.
 This still does not replace TheIsland runtime A/B evidence.
 

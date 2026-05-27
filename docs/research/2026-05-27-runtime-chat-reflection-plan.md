@@ -170,7 +170,7 @@ message text.
   `ServerSendChatMessage`, and metadata-only fallback shapes; same-FName wrong shapes;
   wrong property names; wrong property classes; and disabled/unsupported gates.
 - `ProcessEventChatReflectionTests` cover the extracted hook helper gates and ensure
-  disabled/non-chat paths avoid memory reads while valid chat invocations return borrowed
+  disabled/chat-unmatched paths avoid memory reads while valid chat invocations return borrowed
   parameter ranges.
 - `scripts/verify_chat_reflection_constants.py` compares `ue/ChatReflection.cpp`
   constants to offline core UFunction/property-chain evidence for all seven current

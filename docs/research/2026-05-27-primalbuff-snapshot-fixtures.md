@@ -109,10 +109,11 @@ PrimalBuff.BPPreventAddingOtherBuff
 
 ## Result
 
-Confirmed as `candidate-only`. `sdk.buffs` now has a focused real-core snapshot foothold:
-inventory-access input, allow-add-buff policy, class-based prevent-add-buff, bool-return,
-and zero-param shapes. This is useful for reflection coverage, but not enough to define a
-public buff SDK or runtime observation plan.
+Confirmed as `candidate-only`. `sdk.buffs` now has a focused real-core snapshot foothold
+and an offline internal recognizer in `ue/BuffReflection.*`: inventory-access input,
+allow-add-buff policy, class-based prevent-add-buff, bool-return, and zero-param shapes.
+This is useful for reflection coverage, but not enough to define a public buff SDK or
+runtime observation plan.
 
 ## Rejected Paths
 
@@ -134,8 +135,10 @@ public buff SDK or runtime observation plan.
 
 ## Next Steps
 
-1. Keep buffs as a focused snapshot-backed module for now.
-2. Prefer rejected-snapshot discovery or inventory second-wave before expanding deeper buff
-   surfaces.
-3. Do not add runtime buff hooks until there is an explicit policy and isolated validation
-   plan.
+1. Keep `ue/BuffReflection.*` offline/internal and expand it only with fixture-backed,
+   exact reflected metadata.
+2. Keep object/class pointer ranges internal for secondary targets such as
+   `BuffOverrideInventoryAccessInput`, `BPCustomAllowAddBuff`, and
+   `BPPreventAddingOtherBuff`.
+3. Do not add runtime buff hooks, public SDK callbacks, return-value override, or gameplay
+   mutation until there is an explicit policy and isolated validation plan.

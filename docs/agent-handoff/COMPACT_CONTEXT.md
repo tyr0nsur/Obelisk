@@ -53,6 +53,14 @@ work from repository state instead of chat history.
 - Runtime observer marker checks are centralized in `runtime/RuntimeMarkers.*`; unsafe
   path components, directory markers, symlink markers, and symlink instance directories are
   rejected before observers can enable.
+- Second-source reversing gates are centralized in
+  `docs/research/2026-05-28-second-source-reversing-gap-matrix.md`. Current
+  `FName`/`GObjects`/`UObject`/`UFunction` evidence remains candidate-only until a second
+  isolated core or independent static path satisfies the matrix.
+- `ue/BuffReflection.*` adds the next broad gameplay API building block: an offline
+  internal `sdk.buffs` recognizer around exact compact `PrimalBuff` fixtures. Keep runtime
+  hooks, callbacks, return overrides, raw object/class exposure, and gameplay mutation
+  blocked.
 - Latest restart audit:
   `docs/research/2026-05-27-ops-restart-audit-instance-id.md`
   - live `ObeliskRun.sh` exports `OBELISK_INSTANCE_ID=arkserver`
@@ -414,14 +422,14 @@ python3 scripts/analyze_reflectionscanner_capture.py \
   recognizer and UTF-32 decode timing. It is useful for local regressions, but it does not
   include hook-side `GetFunctionNameIndex()` / `Memory::IsReadable()` overhead.
 - `chat_reflection_benchmark` reports tail latency and allocation counts. Disabled and
-  enabled non-chat hook-like paths are allocation-free locally; matched chat paths are
+  enabled chat-unmatched hook-like paths are allocation-free locally; matched chat paths are
   allocation-free after fixed internal parameter/field storage. Standalone UTF-32 decode
   reserves output and currently allows one allocation for a non-SSO fixture; hook-like text
   logging currently shows one allocation in the text path.
   `OBELISK_CHAT_REFLECTION_LOG_LIMIT=0` now short-circuits observation reflection work. See
   `docs/research/2026-05-27-chat-reflection-stack-cycle-guard.md`.
 - `scripts/check_chat_reflection_benchmark.py` gates benchmark output for allocation-free
-  disabled/non-chat paths and documented matched/text ceilings. It is a local regression
+  disabled/chat-unmatched paths and documented matched/text ceilings. It is a local regression
   gate only, not isolated runtime A/B acceptance.
 - CI runs deterministic benchmark-gate parser tests and a short
   `chat_reflection_benchmark` gate for allocation/reader-call ceilings.

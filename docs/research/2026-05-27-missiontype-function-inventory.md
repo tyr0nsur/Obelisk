@@ -2,7 +2,7 @@
 
 ## Objective
 
-Evaluate `MissionType` as the next non-chat module after player, item, dino, and structure
+Evaluate `MissionType` as the next gameplay module after player, item, dino, and structure
 fixtures, and record the first fixture-backed mission candidates.
 
 ## Environment

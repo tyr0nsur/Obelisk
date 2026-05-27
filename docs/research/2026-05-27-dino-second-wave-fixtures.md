@@ -20,7 +20,7 @@ carry, tame-state, and controller dino-stat property chains.
 
 ## Hypothesis
 
-Dino passenger and carry functions are the next best broad non-chat surface after
+Dino passenger and carry functions are the next best broad gameplay surface after
 structures because they exercise object, int, bool, bool-return, and gameplay policy
 shapes without strings, arrays, large structs, transfer payloads, or admin command risk.
 

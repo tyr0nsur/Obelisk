@@ -2,8 +2,8 @@
 
 ## Objective
 
-Move Obelisk research beyond chat-specific functions by producing a broad offline inventory
-of reflected `UFunction` objects from the existing core/evidence pack.
+Move Obelisk research from a single event family into a broad offline inventory of
+reflected `UFunction` objects from the existing core/evidence pack.
 
 ## Method
 
@@ -84,7 +84,7 @@ to pick reusable module families:
 
 1. Add focused inventory reports for `ShooterPlayerController`, `PrimalItem`, and
    `PrimalDinoCharacter`.
-2. Select one non-chat family for deeper offline property-chain validation before any
+2. Select one gameplay family for deeper offline property-chain validation before any
    runtime experiment.
 3. Keep SDK surfaces blocked until object lifetime, parameter ownership, and ABI shape are
    designed.

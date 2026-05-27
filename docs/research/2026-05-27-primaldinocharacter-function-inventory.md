@@ -2,7 +2,7 @@
 
 ## Objective
 
-Extend the non-chat `UFunction` roadmap into dino gameplay surfaces: riding, passengers,
+Extend the gameplay `UFunction` roadmap into dino gameplay surfaces: riding, passengers,
 carry checks, attacks, movement, tame state, and blueprint hooks.
 
 ## Environment

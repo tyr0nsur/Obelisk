@@ -3,7 +3,7 @@
 ## Objective
 
 Bridge synthetic analyzer fixtures to committed, sanitized real-core snapshots for compact
-non-chat `UFunction` property chains.
+gameplay `UFunction` property chains.
 
 ## Environment
 

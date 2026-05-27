@@ -21,7 +21,8 @@ or parameter decoding for ARK's Linux UE4 server.
 - Older chat experiments that assumed `9619 -> ClientMessage` and `9622 -> ServerChat`
   are obsolete. Treat historical chat indices as research clues, not stable API.
 - Core evidence promotes `0x595b7e0` to a binary-specific `GUObjectArray`
-  research-candidate; use it to enumerate objects before returning to chat params.
+  research-candidate; use it to enumerate objects and validate gameplay/API module
+  candidates.
 - `scripts/enumerate_core_uobjects.py` and `scripts/inspect_core_ufunctions.py` can
   reproduce the current offline path from core dump to chat `UFunction` property chains.
 - Internal runtime layers exist:
@@ -63,13 +64,16 @@ or parameter decoding for ARK's Linux UE4 server.
 - `ReflectionScanner` FName table output must be treated as candidate ranking. Analyzer
   `--strict` requires repeat-confirmed exact `matched_clues=3/3` evidence, and even that
   needs a second isolated capture or static xref before becoming an accepted offset.
-- Non-chat recognizers are active research tracks, not public SDK:
+- Gameplay recognizers are active research tracks, not public SDK:
   - `ue/StructureReflection` has a hook-side observer, but it requires env, supported SHA,
     non-zero budget, and `state/instances/<id>/enable-structure-reflection`.
   - `ue/InventoryReflection` is internal recognizer only. A future runtime observer must
     require `enable-inventory-reflection`, exact `CanUse` / `AllowRemoteAddToInventory`
     FName prefiltering before budget reservation, and no return override or gameplay
     mutation.
+  - `ue/BuffReflection` is an offline internal recognizer only. Keep buff hooks,
+    callbacks, return overrides, raw object/class exposure, and gameplay mutation blocked
+    until second-source evidence and SDK policy exist.
 
 ## Reflection Direction
 
@@ -82,8 +86,8 @@ Build toward a real UE4 metadata pipeline:
    chain.
 5. Model `UProperty`/`FProperty` offsets and types for function parameters.
 6. Decode `ProcessEvent` params from reflected metadata instead of scanning arbitrary memory.
-7. Expose stable Obelisk-level events such as `OnChatMessage` only after metadata-backed
-   decoding exists.
+7. Expose stable Obelisk-level events only after metadata-backed decoding, copied-data
+   ownership, callback lifecycle, and ABI policy exist for the target module.
 
 ## Parameter Decoding Rules
 

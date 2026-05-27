@@ -2,7 +2,7 @@
 
 ## Objective
 
-Prepare the first non-chat runtime-observed module plan for `sdk.structures`, using
+Prepare the first gameplay runtime-observed module plan for `sdk.structures`, using
 fixture-backed compact functions while keeping public SDK and gameplay mutation blocked.
 
 ## Environment
@@ -85,7 +85,7 @@ instance policy:
 
 ## Result
 
-`sdk.structures` is the best next non-chat runtime-observed candidate because it has compact
+`sdk.structures` is the best next gameplay runtime-observed candidate because it has compact
 fixture-backed functions and clear gameplay value. A first internal `StructureReflection`
 recognizer now validates the six compact shapes locally with synthetic memory fixtures.
 `ProcessEventStructureReflection` wires that recognizer behind an explicit

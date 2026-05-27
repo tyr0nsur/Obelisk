@@ -90,7 +90,7 @@ Expected:
 - Keep global ProcessEvent callbacks off production paths unless a measured debug session
   needs them.
 - Keep hook-side experimental chat reflection cheap while it remains internal:
-  disabled, non-chat, and `OBELISK_CHAT_REFLECTION_LOG_LIMIT=0` paths must stay
+  disabled, chat-unmatched, and `OBELISK_CHAT_REFLECTION_LOG_LIMIT=0` paths must stay
   allocation-free in `chat_reflection_benchmark`; matched metadata-only
   `ServerSendChatMessage` should also remain allocation-free unless a research note
   justifies the regression. Hook-like text logging should stay at one allocation or lower.

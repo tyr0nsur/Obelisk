@@ -3,7 +3,7 @@
 ## Objective
 
 Define a research-first module taxonomy for Obelisk so future work does not drift back to
-chat-only development. This is a planning document, not a public SDK contract.
+single-surface development. This is a planning document, not a public SDK contract.
 
 ## Evidence Baseline
 
@@ -43,7 +43,7 @@ memory alone, or metadata reads without ownership and lifetime design.
 | --- | --- | --- | --- |
 | `sdk.chat` | `ServerSendChatMessage`, exact chat fallback recognizers | Internal observation and eventual copied-data event API | Experimental internal only |
 | `sdk.player` | `ShooterPlayerController` session/client/server functions | Player identity, notifications, inventory requests, tribe requests | Candidate-only |
-| `sdk.inventory` | `ServerRequestInventoryUseItem*`, `PrimalItem` use/equip/remote gates | First non-chat analyzer fixtures | Candidate-only; strongest next track |
+| `sdk.inventory` | `ServerRequestInventoryUseItem*`, `PrimalItem` use/equip/remote gates | First gameplay analyzer fixtures | Candidate-only; strongest next track |
 | `sdk.items` | `PrimalItem` crafting, repair, durability, NetExec | Item metadata and policy design | Candidate-only |
 | `sdk.dinos` | `PrimalDinoCharacter` passenger, carry, attack, tame, flight | Dino event metadata fixtures | Candidate-only |
 | `sdk.structures` | `ServerRequestPlaceStructure`, multiuse/place functions, `PrimalStructure` | Struct-heavy validation surface | Candidate-only; defer runtime |
@@ -95,7 +95,7 @@ Keep these out of public SDK until stronger evidence and policy exist:
 
 ## First Fixture Targets
 
-Current fixture-backed compact, non-chat property chains:
+Current fixture-backed compact gameplay property chains:
 
 ```text
 ShooterPlayerController.ServerRequestInventoryUseItem
@@ -141,7 +141,7 @@ params and has higher gameplay-authority risk.
 
 - Which additional synthetic fixtures should be promoted to real-core snapshot JSON after
   the first inventory, buff, dino, structure, mission, and tribe snapshots?
-- What minimum second-source evidence is required before non-chat runtime observation?
+- What minimum second-source evidence is required before gameplay runtime observation?
 - What policy layer is needed before admin, transfer, and NetExec surfaces can be discussed
   as SDK features?
 

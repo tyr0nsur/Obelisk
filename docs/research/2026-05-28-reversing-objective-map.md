@@ -3,8 +3,8 @@
 ## Objective
 
 Define the broad Obelisk reverse-engineering and research objective after the first
-non-chat recognizers, so future rounds collect the evidence needed for a stable modding
-runtime without drifting back into chat-only work.
+gameplay recognizers, so future rounds collect the evidence needed for a stable modding
+runtime and a general ARK Linux API/SDK core.
 
 ## Environment
 
@@ -21,7 +21,7 @@ runtime without drifting back into chat-only work.
 | Area | Needed Evidence | Current Gate |
 | --- | --- | --- |
 | Instance safety | Instance-scoped marker gates for runtime observers. | `sdk.structures` now requires env plus `enable-structure-reflection`; inventory must follow before runtime. |
-| Second source | Independent debug core for ScriptStruct and UFunction layout comparison. | Existing packs derive from one core only. |
+| Second source | Independent debug core or static path for `FName`/`GObjects`/`UObject`/`UFunction` layout comparison. | Existing packs derive from one core only; operational checklist is in `docs/research/2026-05-28-second-source-reversing-gap-matrix.md`. |
 | Runtime budget | Every observer gate must have explicit budget defaulting to zero. | Structures has this; inventory must copy it. |
 | Public SDK readiness | Copied-data ownership and callback lifecycle for each event family. | No new public ABI until proven. |
 
@@ -31,8 +31,9 @@ runtime without drifting back into chat-only work.
 | --- | --- | --- |
 | `sdk.structures` | Add wrapper/posture tests and perform only approved TheIsland/debug observation. | Placement/build/snapping mutation. |
 | `sdk.inventory` | Add disabled-by-default observation gate after audit, with cheap exact FName filter before budget reservation. | Item ids, arrays, item contents, NetExec. |
+| `sdk.buffs` | Maintain the offline internal recognizer and use it to harden exact reflected metadata validation. | Runtime hooks, callbacks, return override, object/class pointer exposure, gameplay mutation. |
 | `sdk.transfers` | Capture or obtain second source for tribute ScriptStruct layouts. | `ItemNetInfo`, upload/download dispatch. |
-| `ue.reflection` | Keep strengthening exact identity and property-chain validation. | Treating FName/object indices as cross-build contracts. |
+| `ue.reflection` | Keep strengthening exact identity and property-chain validation through the second-source matrix. | Treating FName/object indices as cross-build contracts. |
 
 ## P2 Broadening Tracks
 
@@ -40,8 +41,8 @@ runtime without drifting back into chat-only work.
   proven.
 - `sdk.tribes`: read-only membership/permission recognition only; tribe logs and arrays
   stay deferred.
-- `sdk.buffs`: useful type-coverage track, but Blueprint-heavy semantics need stricter
-  policy notes before runtime observation.
+- `sdk.buffs`: active offline broadening track; the first metadata recognizer exists, but
+  Blueprint-heavy semantics and runtime observation remain blocked.
 - `sdk.missions`: lifecycle fixtures are useful, but array/struct payloads stay offline.
 
 ## Hard Blocks

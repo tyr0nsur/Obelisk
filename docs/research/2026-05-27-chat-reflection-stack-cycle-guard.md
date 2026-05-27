@@ -75,7 +75,7 @@ standalone match/decode cases, not only hook-like cases.
 
 Confirmed. Stack cycle detection removes one temporary allocation from matched chat
 reflection paths, and decode reservation removes repeated string growth allocations while
-keeping disabled, non-chat, and log-limit-zero paths allocation-free in the synthetic
+keeping disabled, chat-unmatched, and log-limit-zero paths allocation-free in the synthetic
 hook-like benchmark.
 
 ## Risks
