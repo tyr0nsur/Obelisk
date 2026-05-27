@@ -1,18 +1,19 @@
 # UFunction Snapshot Fixtures
 
 Sanitized `UFunction` property-chain snapshots live here as versioned evidence for
-offline analyzer behavior. Each file is generated from an existing offline core with:
+offline analyzer behavior. The committed set is listed in `manifest.json` and can be
+regenerated from an existing offline core with:
 
 ```bash
-python3 scripts/inspect_core_ufunctions.py \
+python3 scripts/regenerate_ufunction_snapshots.py \
   --core <offline-core-path> \
-  --max-object-scan 30000 \
-  --outer-exact <OuterName> \
-  --name-exact <FunctionName> \
-  --snapshot-json \
-  --evidence-ark-sha256 <ark-binary-sha256> \
-  --evidence-obelisk-commit <obelisk-commit>
+  --obelisk-commit <obelisk-commit> \
+  --write
 ```
+
+Omit `--write` for a dry-run, or use `--check` to compare regenerated output against the
+committed fixtures without modifying files. Use `--target Outer.Function` to regenerate or
+check one manifest entry.
 
 Naming:
 

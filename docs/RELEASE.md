@@ -38,6 +38,7 @@ python3 scripts/test_build_core_dump_evidence_pack.py
 python3 scripts/test_verify_chat_reflection_constants.py
 python3 scripts/test_summarize_core_ufunction_inventory.py
 python3 scripts/test_ufunction_snapshot_fixtures.py
+python3 scripts/test_regenerate_ufunction_snapshots.py
 python3 scripts/test_research_doc_guardrails.py
 python3 scripts/test_public_sdk_chat_guardrails.py
 python3 scripts/test_dependency_pins.py

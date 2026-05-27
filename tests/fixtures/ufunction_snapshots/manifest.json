@@ -1,0 +1,46 @@
+{
+  "ark_binary_sha256": "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+  "max_object_scan": 30000,
+  "schema": "obelisk.ufunction-snapshot-manifest.v1",
+  "sha_prefix": "7e7ded49e0c6",
+  "source": "offline_core",
+  "status": "candidate-only",
+  "targets": [
+    {
+      "file": "PrimalStructure.AllowStructureAccess.snapshot.json",
+      "module": "sdk_structures",
+      "name": "AllowStructureAccess",
+      "outer": "PrimalStructure"
+    },
+    {
+      "file": "PrimalStructure.IsAllowedToDemolish.snapshot.json",
+      "module": "sdk_structures",
+      "name": "IsAllowedToDemolish",
+      "outer": "PrimalStructure"
+    },
+    {
+      "file": "MissionType.AddPlayerToMission.snapshot.json",
+      "module": "sdk_missions",
+      "name": "AddPlayerToMission",
+      "outer": "MissionType"
+    },
+    {
+      "file": "PrimalDinoCharacter.AddPassenger.snapshot.json",
+      "module": "sdk_dinos",
+      "name": "AddPassenger",
+      "outer": "PrimalDinoCharacter"
+    },
+    {
+      "file": "PrimalDinoCharacter.AllowCarryCharacter.snapshot.json",
+      "module": "sdk_dinos",
+      "name": "AllowCarryCharacter",
+      "outer": "PrimalDinoCharacter"
+    },
+    {
+      "file": "ShooterPlayerController.ServerRequestTribeLog.snapshot.json",
+      "module": "sdk_tribes",
+      "name": "ServerRequestTribeLog",
+      "outer": "ShooterPlayerController"
+    }
+  ]
+}
