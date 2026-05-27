@@ -184,8 +184,10 @@ work from repository state instead of chat history.
   `--gobjects-candidate` previews for the next `GUObjectArray` investigation.
 - Read-only overnight snapshots are documented in `docs/SUPERVISION.md` and implemented by
   `scripts/obelisk_supervisor_snapshot.sh`. They write to
-  `/servidor/ark/obelisk/dumps/supervisor/` and must not restart, install, edit markers,
-  attach debuggers, enable scanners, commit, or push.
+  `/servidor/ark/obelisk/dumps/supervisor/`, fail closed on unstable posture, record
+  PID/stable posture summary, and separate chat counters for `Reflected chat ProcessEvent`,
+  `ServerSendChatMessage`, rejections, and `send_mode_known=false`. They must not restart,
+  install, edit markers, attach debuggers, enable scanners, commit, or push.
 - UE4 type reconstruction planning is captured in
   `docs/research/2026-05-27-ue4-type-reconstruction-roadmap.md`; keep the milestone
   order as `FName`, `GObjects`, `UFunction`, then bounded params.
@@ -298,8 +300,8 @@ python3 scripts/analyze_reflectionscanner_capture.py \
   the supported ARK SHA. It logs metadata/ranges only, not text.
 - `packaging/linuxgsm/ObeliskRun.sh` supports the
   `state/instances/<id>/enable-chat-reflection` marker for restart-time activation.
-- Latest deployed runtime on `arkserver` includes commits through `751a7c3`, has chat
-  reflection enabled and plugins disabled, PID `3180747`. It reached the experimental gate
+- Latest deployed runtime on `arkserver` includes commits through `8905996`, has chat
+  reflection enabled and plugins disabled, PID `3243871`. It reached the experimental gate
   log after first ProcessEvent; no chat message has been observed yet in the log.
 - `FString` candidate for this ARK Linux build is a 16-byte
   `{Data, ArrayNum, ArrayMax}` header with UTF-32LE `TCHAR`; see

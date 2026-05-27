@@ -65,7 +65,10 @@ while true; do
         printf '/%d' "${COUNT}"
     fi
     printf '\n'
-    "${SNAPSHOT}"
+    if ! "${SNAPSHOT}"; then
+        echo "snapshot failed; stopping supervisor loop" >&2
+        exit 1
+    fi
 
     if [[ "${COUNT}" -gt 0 && "${iteration}" -ge "${COUNT}" ]]; then
         break

@@ -35,10 +35,11 @@ and updates:
 
 - Git status and recent commits.
 - Server posture check.
+- Stable posture summary and PID.
 - ARK/Obelisk process list.
 - Obelisk marker files.
 - Recent Obelisk logs.
-- Chat reflection marker/log summary.
+- Chat reflection gate marker/env/log summary.
 - Disk usage.
 
 ## What It Must Not Do
@@ -61,16 +62,25 @@ cat "${latest}/chat-reflection.txt"
 tail -n 80 "${latest}/obelisk-log-tail.txt"
 ```
 
-`chat-reflection.txt` summarizes marker and log evidence. It proves only whether the
+`summary.txt` includes `pid`, `posture_status`, and `stable_posture_summary`. A usable
+overnight snapshot must show `posture_status=ok`; if it shows `failed`, the snapshot
+stopped early, `chat-reflection.txt` is marked `skipped_unstable_posture=true`, and the
+lead should restore stable posture before interpreting chat/reflection evidence.
+
+`chat-reflection.txt` summarizes marker, env, and log evidence. It proves only whether the
 experimental gate and log lines are present; it does not prove chat text capture unless
-`reflected_chat_lines` is non-zero and the lines are reviewed.
+`reflected_chat_process_event_lines` is non-zero and the lines are reviewed.
 
 `rejected_chat_lines` counts bounded reflection rejections when the runtime is built with
 that diagnostic path. `OBELISK_CHAT_REFLECTION_LOG_LIMIT=0` disables those experimental
 chat reflection observation logs.
 
-If `posture.txt` shows failure, stop and restore stable posture before launching agents or
-runtime experiments.
+`server_send_chat_message_lines` counts any log line mentioning `ServerSendChatMessage`,
+including the main `ProcessEvent` line and the send-mode summary. Use it as a pointer to
+review the lines, not as a count of player messages. `rejected_or_unknown_send_mode_lines`
+counts either reflected rejection lines or `send_mode_known=false`; non-zero means the
+snapshot found evidence that needs active review before promotion. `last_relevant_line`
+shows the last chat/reflection line matched by the snapshot.
 
 ## Manual ServerSendChatMessage Check
 
@@ -108,15 +118,20 @@ chat-name scans.
 
 Interpret the snapshot counters this way:
 
-- `reflected_chat_lines=0`: no accepted reflected chat hit is present in the reviewed log.
+- `reflected_chat_process_event_lines=0`: no accepted reflected chat hit is present in the reviewed log.
   If the player definitely sent chat after deployment, treat this as inconclusive or a
   runtime-path miss, not as proof that chat is absent from `ProcessEvent`.
-- `reflected_chat_lines>0`: review the actual `Reflected chat ProcessEvent` lines. Accept
+- `reflected_chat_process_event_lines>0`: review the actual `Reflected chat ProcessEvent` lines. Accept
   only lines that name `ServerSendChatMessage` or its reflected fields; older `ServerChat*`
   lines are cheat-manager coverage, not proof of normal player chat.
+- `server_send_chat_message_lines>0`: review the matching lines; this counter can include
+  field or send-mode diagnostics for the same ProcessEvent hit.
 - `rejected_chat_lines>0`: the cheap chat filter saw a candidate FName, but reflected
   `UFunction`/property/`ParmsSize` validation rejected it. Rejections are useful evidence
   for debugging constants, but they are not successful chat capture.
+- `rejected_or_unknown_send_mode_lines>0`: at least one rejection or
+  `send_mode_known=false` line is present. Treat it as a prompt for active review rather
+  than success evidence.
 - `rejected_chat_lines=0`: no bounded rejection line was logged. This can also mean the
   diagnostic path or log limit suppressed rejection details.
 

@@ -196,7 +196,10 @@ Updated: 2026-05-27
   `docs/research/2026-05-27-runtime-debug-control.md`.
 - fact: `scripts/obelisk_supervisor_snapshot.sh` is the only approved unattended
   cron-style workflow for now. It is read-only and writes snapshots to
-  `/servidor/ark/obelisk/dumps/supervisor/`; see `docs/SUPERVISION.md`.
+  `/servidor/ark/obelisk/dumps/supervisor/`; see `docs/SUPERVISION.md`. It now fails
+  closed on unstable posture, records PID/stable posture summary, and separates chat
+  counters for `Reflected chat ProcessEvent`, `ServerSendChatMessage`, rejections, and
+  `send_mode_known=false`.
 - fact: Core evidence promotes `0x595b7e0` to `GUObjectArray research-candidate` for ARK
   binary SHA256 `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`.
   The first object item resolves to `/Script/CoreUObject`, and its class resolves to
@@ -240,15 +243,14 @@ Updated: 2026-05-27
 - fact: `packaging/linuxgsm/ObeliskRun.sh` supports
   `state/instances/<id>/enable-chat-reflection` to set the experimental chat reflection
   gates and default log limit on restart.
-- fact: Latest local runtime from `main` including commits through `751a7c3` was deployed to
-  `/servidor/ark/obelisk`; later deploy on commit `df332d7` installed the
-  `ServerSendChatMessage` recognizer. Commit `8281123` added reflected `send_mode` and
-  `send_mode_name` logging and was deployed afterward. Current PID `3233586` has
+- fact: Latest deployed runtime on `arkserver` includes commits through `8905996`
+  (`Memory::IsReadable` maps-backed replacement). Current PID `3243871` has
   `OBELISK_ENABLE_CHAT_REFLECTION=1`, matching SHA gate, ProcessEvent hook installed at
   `0x1d34e20`, plugins disabled, and stable posture confirmed.
 - fact: Manual post-deploy `ServerSendChatMessage` chat validation commands, expected log
-  lines, `reflected_chat_lines` / `rejected_chat_lines` interpretation, and marker-only
-  rollback are documented in `docs/SUPERVISION.md`.
+  lines, `reflected_chat_process_event_lines` / `server_send_chat_message_lines` /
+  `rejected_chat_lines` interpretation, and marker-only rollback are documented in
+  `docs/SUPERVISION.md`.
 - fact: `hooks/ProcessEventChatReflection.{h,cpp}` extracts gate/recognition logic from
   the hook for direct tests. `ProcessEventChatReflectionTests` cover disabled and non-chat
   short-circuit behavior plus valid borrowed param ranges.
