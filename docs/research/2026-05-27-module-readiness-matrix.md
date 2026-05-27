@@ -12,7 +12,7 @@ snapshot rounds, without implying public SDK or runtime readiness.
 - Snapshot binary SHA256:
   `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`
 - Obelisk baseline:
-  `19caa07 Check snapshot modules in readiness matrix`
+  `43b1054 Add structure function snapshot fixtures`
 - Live-server impact: none.
 
 ## Readiness Snapshot
@@ -23,8 +23,8 @@ snapshot rounds, without implying public SDK or runtime readiness.
 | `sdk.buffs` | `fixture-backed` | 6 | Focused `PrimalBuff` exact snapshots for inventory-access, allow-add, prevent-add, bool-return, and zero-param shapes. | Keep gameplay semantics candidate-only; defer mission/grapple/companion surfaces. |
 | `sdk.dinos` | `fixture-backed` | 2 | Passenger/carry real snapshots plus broader synthetic coverage for attack, tame-state, and controller dino stats. | Promote more real snapshots only for compact exact targets. |
 | `sdk.structures` | `fixture-backed` | 6 | Access/demolish plus pincode, container activation, seating, and variant real snapshots; elevator remains deferred. | Keep placement/build-authoritative targets deferred until policy gates. |
-| `sdk.missions` | `fixture-backed` | 1 | `AddPlayerToMission` real snapshot plus synthetic mission add/leave/notify fixtures. | Promote leave/notify snapshots; keep string/array candidates deferred. |
-| `sdk.tribes` | `fixture-backed-control` | 1 | `ServerRequestTribeLog` zero-param control snapshot. | Focused tribe inventory before more snapshots. |
+| `sdk.missions` | `fixture-backed` | 3 | Add, leave-policy, and removal lifecycle real snapshots; string/tag payloads remain deferred. | Keep array/string mission payloads behind explicit decoding gates. |
+| `sdk.tribes` | `fixture-backed` | 3 | Tribe log control plus permission enum-shape and membership bool-return snapshots. | Add array/enum evidence before client tribe log or online-list payloads. |
 | `sdk.chat` | `runtime-observed-internal` | 0 in manifest | Separate internal chat reflection evidence and runtime hit notes. | TheIsland A/B validation and copied-data ownership before public API. |
 | `sdk.transfer` | `candidate` | 0 | Valid metadata chain exists for `ServerRequestDownloadDino`, but struct payload is large. | Deep struct decoding and policy gates. |
 | `sdk.admin` | `documentation-only` | 0 | Admin surfaces identified but intentionally blocked. | Permission model and explicit policy; no runtime work. |
@@ -33,7 +33,7 @@ snapshot rounds, without implying public SDK or runtime readiness.
 ## Result
 
 The strongest offline tracks are now `sdk.inventory`, `sdk.structures`, `sdk.buffs`,
-`sdk.dinos`, and `sdk.missions`. They are still not public SDK modules: current
+`sdk.missions`, `sdk.tribes`, and `sdk.dinos`. They are still not public SDK modules: current
 snapshots prove exact metadata shape, membership checks, and bounded property chains only.
 
 ## Policy Notes
@@ -48,6 +48,6 @@ snapshots prove exact metadata shape, membership checks, and bounded property ch
 
 ## Next Priorities
 
-1. Add mission leave/notify snapshots after the structures second wave.
-2. Add focused tribe inventory before expanding `sdk.tribes`.
-3. Keep transfer/admin/NetExec out of runtime work.
+1. Add array/enum evidence before promoting tribe log or mission tag payloads.
+2. Consider a focused transfer struct evidence pass without runtime dispatch.
+3. Keep admin/NetExec and gameplay-authoritative mutations out of runtime work.

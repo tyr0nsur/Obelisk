@@ -49,6 +49,18 @@
       "outer": "MissionType"
     },
     {
+      "file": "MissionType.BPAllowPlayerToLeaveMission.snapshot.json",
+      "module": "sdk_missions",
+      "name": "BPAllowPlayerToLeaveMission",
+      "outer": "MissionType"
+    },
+    {
+      "file": "MissionType.BPOnPlayerRemovedFromMission.snapshot.json",
+      "module": "sdk_missions",
+      "name": "BPOnPlayerRemovedFromMission",
+      "outer": "MissionType"
+    },
+    {
       "file": "PrimalItem.AllowRemoteAddToInventory.snapshot.json",
       "module": "sdk_inventory",
       "name": "AllowRemoteAddToInventory",
@@ -124,6 +136,18 @@
       "file": "ShooterPlayerController.ServerRequestTribeLog.snapshot.json",
       "module": "sdk_tribes",
       "name": "ServerRequestTribeLog",
+      "outer": "ShooterPlayerController"
+    },
+    {
+      "file": "ShooterPlayerController.AllowTribeGroupPermission.snapshot.json",
+      "module": "sdk_tribes",
+      "name": "AllowTribeGroupPermission",
+      "outer": "ShooterPlayerController"
+    },
+    {
+      "file": "ShooterPlayerController.IsInTribe.snapshot.json",
+      "module": "sdk_tribes",
+      "name": "IsInTribe",
       "outer": "ShooterPlayerController"
     }
   ]
