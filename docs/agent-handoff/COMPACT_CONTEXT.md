@@ -219,10 +219,9 @@ work from repository state instead of chat history.
 - `gobjects-static-xrefs.json` groups objdump xrefs by function anchor, but broad
   nearest-symbol groups can be contaminated. The `0x12d1400` group is not accepted as one
   decompiler target.
-- Offline core UObject enumeration now works through `scripts/enumerate_core_uobjects.py`.
-  It found real chat-related `Function` objects in `GObjects`, including `ServerChat`
-  index `25447`, `ServerChatTo` index `25449`, and `ServerChatToPlayer` index `25452`;
-  see `docs/research/2026-05-27-core-uobject-enumeration.md`.
+- Offline core UObject enumeration now works through `scripts/enumerate_core_uobjects.py`
+  and has found real gameplay `Function` objects in `GObjects`; see
+  `docs/research/2026-05-27-core-uobject-enumeration.md`.
 - Do not restart `GObjects` discovery from broad candidate search. Current priority is a
   second static path for `0x595b7e0`: classify `0x12d1400`, `0x79ce22`, `0x7a27a7`,
   `0x81f118`, and `0x81f206`, then strengthen class/outer back-reference validation.
@@ -230,76 +229,33 @@ work from repository state instead of chat history.
   existing Ragnarok-derived core and derivative packs. Prefer dedicated
   `arkserver-obelisk-debug`; use `arkserver2` / TheIsland only as explicit fallback. See
   `docs/research/2026-05-27-isolated-second-core-runbook.md`.
-- Offline `UFunction` property-chain inspection now works through
-  `scripts/inspect_core_ufunctions.py`. Current chat evidence:
-  `ServerChat.MessageText` offset `0x0`; `ServerChatTo.SteamID` offset `0x0` and
-  `MessageText` offset `0x10`; `ServerChatToPlayer.PlayerName` offset `0x0` and
-  `MessageText` offset `0x10`.
+- Offline `UFunction` and `ScriptStruct` property-chain inspection now works through
+  `scripts/inspect_core_ufunctions.py`. Treat module-specific offsets as candidate-only
+  fixture evidence until second-source comparison and SDK ownership gates pass.
 - `scripts/inspect_core_ufunctions.py` now validates target/class/outer/property objects
-  with direct `GObjects[InternalIndex]` back-references. Existing core checks pass for
-  `ServerChat` and `SendServerChatMessage`; see
+  with direct `GObjects[InternalIndex]` back-references; see
   `docs/research/2026-05-27-ufunction-membership-backrefs.md`.
 - `scripts/inspect_core_ufunctions.py` supports offline `--name-contains` and
   `--outer-contains` filters for Function/Struct discovery from core dumps. Use broad
   substring searches only for discovery; runtime filters should stay exact
   FName+outer+ParmsSize+property-chain matches.
 - `scripts/inspect_core_ufunctions.py` reports bounded enum candidates for `ByteProperty`
-  through the observed `+0x70` enum pointer. Current core evidence resolves
-  `ServerSendChatMessage.SendMode` to the six `EChatSendMode` names.
-- `scripts/verify_chat_reflection_constants.py` verifies the current
-  `ue/ChatReflection.cpp` constants against offline core evidence for `ServerChat*`,
-  `ServerSendChatMessage`, and the metadata-only `ShooterPlayerController` candidates
-  `ClientChatMessage`, `ClientServerChatDirectMessage`, and `ClientServerChatMessage`.
-  It also cross-checks target/class/outer/property `GObjects[InternalIndex]` membership,
-  `ServerSendChatMessage` native exec candidate `0x154a600`, executable segment
-  membership, and `EChatSendMode` enum names from the core.
-  It passed against
-  `/servidor/ark/obelisk/dumps/arkserver-20260527T031311Z/core/arkserver-20260527T031311Z.2902200`
-  with `--max-object-scan 30000`; rerun it before promoting chat reflection constants for
-  a new binary/core.
-- Public chat SDK promotion remains blocked by design. The public header has no chat
-  structs/capability/functions, `AbiLayoutTests` rejects
-  `OBELISK_API_CAPABILITY_CHAT_EVENTS`, and the future path is failing ABI layout +
-  installed SDK consumer tests before append-only C ABI wrappers over the internal
-  `ChatEventDispatcher`.
-- Current best hypothesis for real incoming player chat is not the `ServerChat*`
-  watchlist. `ServerChat`, `ServerChatTo`, and `ServerChatToPlayer` have
-  `ShooterCheatManager` outer evidence, while
-  `ShooterPlayerController.ServerSendChatMessage` has FName index `2697`,
-  `StrProperty ChatMessage` offset `0x0`, `ByteProperty SendMode` offset `0x10`, and
-  `ParmsSize=0x11`; `SendMode` is `EChatSendMode` with `0 GlobalChat`,
-  `1 GlobalTribeChat`, `2 LocalChat`, `3 AllianceChat`, and `>=4` invalid for
-  logging/dispatch. This recognizer was deployed to `/servidor/ark/obelisk` on commit
-  `df332d7`. Commit `8281123` adds reflected `send_mode` and `send_mode_name` logging;
-  current `arkserver` PID is `3289000` after the later `e1071a7` deployment. See
-  `docs/research/2026-05-27-real-chat-ufunction-path-hypotheses.md`.
-- Deployed code has gated metadata-only recognizers for exact `ShooterPlayerController`
-  candidates `ClientChatMessage`, `ClientServerChatMessage`, and
-  `ClientServerChatDirectMessage`. They log `metadata_only=true`, do not decode text, do
-  not dispatch plugin events, and do not change public ABI.
-- Read-only audit `docs/research/2026-05-27-chat-reflection-no-hit-audit.md` confirms
-  stable hook/gate posture for PID `3289000` but zero recognized chat hits in reviewed
-  snapshots through `20260527T101357Z`; later logs supersede the missing-evidence state.
-- Later read-only log review found accepted runtime `ServerSendChatMessage` hits at
-  `14:07:27`, `14:17:13`, `16:12:02`, and `16:12:45` with `fname_index=2697`,
-  `metadata_only=false`, `send_mode=0`, `send_mode_name=GlobalChat`, and bounded
-  `ChatMessage` / `SendMode` ranges. This confirms the experimental runtime path but not
-  a public SDK event; see
-  `docs/research/2026-05-27-server-send-chat-runtime-hit.md`.
+  through the observed `+0x70` enum pointer.
+- historical module evidence: chat produced useful patterns for exact UFunction/outer/
+  `ParmsSize`/property-chain recognition, bounded FString decoding, marker/env/SHA gates,
+  dispatcher ownership, ABI guardrails, and benchmark gates. Keep details in
+  `docs/research/2026-05-27-*chat*.md`, `docs/research/2026-05-27-fstring-layout.md`,
+  and `docs/research/2026-05-27-sdk-chat-event-ownership-plan.md`.
+- fact: chat remains internal/experimental only. The public SDK exposes no chat
+  structs/capabilities/functions, runtime dispatch is blocked, and tests guard accidental
+  promotion. Treat chat as one module proving promotion gates, not the active project
+  center.
 - Core-pack tooling now supports direct FName entry reads and bounded
   `--gobjects-candidate` previews for the next `GUObjectArray` investigation.
 - Read-only overnight snapshots are documented in `docs/SUPERVISION.md` and implemented by
   `scripts/obelisk_supervisor_snapshot.sh`. They write to
-  `/servidor/ark/obelisk/dumps/supervisor/`, fail closed on unstable posture, record
-  PID/stable posture summary, and separate chat counters for `Reflected chat ProcessEvent`,
-  `ServerSendChatMessage`, exact metadata-only fallback names, `metadata_only=true`,
-  rejections, and `send_mode_known=false`. They must not restart, install, edit markers,
-  attach debuggers, enable scanners, commit, or push.
-- The next approved runtime chat validation should use
-  `docs/research/2026-05-27-theisland-chat-reflection-ab-runbook.md`: Phase A reflection
-  off baseline, Phase B metadata-only reflection on, optional Phase C text logging only
-  with explicit approval, and rollback on `arkserver2` / TheIsland. Ragnarok remains
-  protected for player performance testing.
+  `/servidor/ark/obelisk/dumps/supervisor/`, fail closed on unstable posture, and must not
+  restart, install, edit markers, attach debuggers, enable scanners, commit, or push.
 - UE4 type reconstruction planning is captured in
   `docs/research/2026-05-27-ue4-type-reconstruction-roadmap.md`; keep the milestone
   order as `FName`, `GObjects`, `UFunction`, then bounded params.
@@ -410,58 +366,17 @@ python3 scripts/analyze_reflectionscanner_capture.py \
 
 - Ops: use `arkserver2` / TheIsland as the designated debug/development target, but keep
   scanner/native-exec/ptrace behind explicit run-window approval.
-- Runtime chat: collect future runtime validation on `arkserver2` / TheIsland logs, not
-  `/servidor/ark/obelisk/logs/arkserver/Obelisk.log`.
-- After a real hit, wire `RuntimeReflection::TryDecodeFStringUtf32` into the experimental
-  logger and keep it gated/rate-limited; dispatch must only accept `EChatSendMode` `0..3`.
-- `ue/RuntimeReflection.{h,cpp}` exists as the internal gated reader for
-  `UObject`/`UFunction`/`UProperty`, bounded parameter ranges, and UTF-32 `FString`
-  decoding. It is tested and used by hook-side chat observation.
-- `ue/ChatReflection.{h,cpp}` exists as the internal recognizer for `ServerChat`,
-  `ServerChatTo`, `ServerChatToPlayer`, `ServerSendChatMessage`, and exact metadata-only
-  `ShooterPlayerController` fallback shapes. It is tested, returns borrowed param ranges,
-  and supports gated runtime text logging through the `ProcessEventChatReflection`
-  decode-and-sanitize path.
-- `ProcessEvent_Detour` has experimental chat observation wiring, disabled unless
-  `OBELISK_ENABLE_CHAT_REFLECTION=1` and `OBELISK_CHAT_REFLECTION_BINARY_SHA256` matches
-  the supported ARK SHA. It logs metadata/ranges only, not text.
-- `packaging/linuxgsm/ObeliskRun.sh` supports the
-  `state/instances/<id>/enable-chat-reflection` marker for restart-time activation.
-- Latest deployed runtime on `arkserver` includes commits through `e1071a7`, has chat
-  reflection enabled and plugins disabled, PID `3289000`. It reached the experimental gate
-  log after first ProcessEvent and later logged accepted `ServerSendChatMessage` hits.
-- `FString` candidate for this ARK Linux build is a 16-byte
-  `{Data, ArrayNum, ArrayMax}` header with UTF-32LE `TCHAR`; see
-  `docs/research/2026-05-27-fstring-layout.md`.
-- Pushed `main` wires `RuntimeReflection::TryDecodeFStringUtf32` into experimental
-  `ServerSendChatMessage` logging through `ProcessEventChatReflection::TryDecodeUtf32Field`.
-  Decoded text requires the extra `OBELISK_CHAT_REFLECTION_LOG_TEXT=1` gate, logs only for
-  known `EChatSendMode` values, and does not dispatch plugins or change ABI. This is
-  validated locally but not deployed to `/servidor/ark/obelisk`.
-- Pushed `main` includes the excluded `chat_reflection_benchmark` target for synthetic
-  recognizer and UTF-32 decode timing. It is useful for local regressions, but it does not
-  include hook-side `GetFunctionNameIndex()` / `Memory::IsReadable()` overhead.
-- `chat_reflection_benchmark` reports tail latency and allocation counts. Disabled and
-  enabled chat-unmatched hook-like paths are allocation-free locally; matched chat paths are
-  allocation-free after fixed internal parameter/field storage. Standalone UTF-32 decode
-  reserves output and currently allows one allocation for a non-SSO fixture; hook-like text
-  logging currently shows one allocation in the text path.
-  `OBELISK_CHAT_REFLECTION_LOG_LIMIT=0` now short-circuits observation reflection work. See
-  `docs/research/2026-05-27-chat-reflection-stack-cycle-guard.md`.
-- `scripts/check_chat_reflection_benchmark.py` gates benchmark output for allocation-free
-  disabled/chat-unmatched paths and documented matched/text ceilings. It is a local regression
-  gate only, not isolated runtime A/B acceptance.
-- CI runs deterministic benchmark-gate parser tests and a short
-  `chat_reflection_benchmark` gate for allocation/reader-call ceilings.
-- `docs/research/2026-05-27-chat-sdk-abi-preflight.md` records the test-first plan for
-  future `OnChatMessage`: ABI layout tests, copied UTF-8 dispatcher tests, capability gate,
-  opaque registration id, idempotent unregister, owner cleanup, and installed SDK consumer
-  coverage before public header promotion.
-- `core/ChatEventDispatcher.{h,cpp}` now exists as an internal dispatcher foundation only.
-  It is tested and connected to PluginManager owner cleanup, but not to `ProcessEvent` or
-  public SDK fields. Dispatch holds a dispatch mutex across callback invocation to block
-  owner cleanup/dlclose races, cross-thread owner cleanup waiting is tested, and
-  self-unregister from inside a callback is supported.
+- Reflection core: strengthen `RuntimeReflection`, snapshot fixtures, comparators,
+  sanitizer tests, and evidence packs before adding public SDK module surfaces.
+- Module breadth: use focused snapshot comparison for inventory, structures, buffs, dinos,
+  tribes, missions, transfers, and admin candidates. Keep recognizers candidate-only until
+  second-source evidence and ABI/lifetime policy are satisfied.
+- Runtime safety: keep ProcessEvent observers gated by binary hash, markers, budgets, and
+  explicit debug-instance approval. Do not use Ragnarok as a development target.
+- SDK/API: promote public module APIs only after copied-data ownership, callback cleanup,
+  installed SDK consumer coverage, and ABI layout tests are in place.
+- Historical chat work remains internal and blocked from public SDK promotion; do not let
+  it dominate new rounds unless the operator explicitly asks for that module.
 - Evidence: after any isolated scanner capture, run
   `scripts/build_reflection_evidence_pack.py` against copied logs and the matching binary
   before promoting candidates.
