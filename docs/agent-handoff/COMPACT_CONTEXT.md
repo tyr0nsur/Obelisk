@@ -341,8 +341,8 @@ python3 scripts/analyze_reflectionscanner_capture.py \
   include hook-side `GetFunctionNameIndex()` / `Memory::IsReadable()` overhead.
 - `chat_reflection_benchmark` reports tail latency and allocation counts. Disabled and
   enabled non-chat hook-like paths are allocation-free locally; matched chat paths still
-  allocate temporary vectors/strings and need reduction or justification before SDK
-  promotion.
+  allocate five temporary vectors/strings after reserve hardening and need justification or
+  bounded stack/small-vector storage before SDK promotion.
 - Evidence: after any isolated scanner capture, run
   `scripts/build_reflection_evidence_pack.py` against copied logs and the matching binary
   before promoting candidates.

@@ -183,20 +183,20 @@ Follow-up local run after adding percentiles and hook-like cases:
 
 ```text
 ./build/chat_reflection_benchmark 50000
-non_chat_filter ns_avg=32 ns_p50=30 ns_p95=40 ns_p99=41 reader_calls_per_iter=0 allocations_per_iter=0
-server_send_chat_match ns_avg=800 ns_p50=832 ns_p95=862 ns_p99=912 reader_calls_per_iter=53 allocations_per_iter=7
-server_send_chat_decode_utf32 ns_avg=75 ns_p50=71 ns_p95=81 ns_p99=81 reader_calls_per_iter=1 allocations_per_iter=0
-hook_like_disabled ns_avg=58 ns_p50=60 ns_p95=61 ns_p99=81 reader_calls_per_iter=0 allocations_per_iter=0
-hook_like_enabled_non_chat ns_avg=49 ns_p50=50 ns_p95=61 ns_p99=61 reader_calls_per_iter=1 allocations_per_iter=0
-hook_like_server_send_chat ns_avg=530 ns_p50=521 ns_p95=561 ns_p99=582 reader_calls_per_iter=54 allocations_per_iter=7
-hook_like_server_send_chat_text ns_avg=608 ns_p50=601 ns_p95=622 ns_p99=952 reader_calls_per_iter=55 allocations_per_iter=7
+non_chat_filter ns_avg=32 ns_p50=30 ns_p95=40 ns_p99=50 reader_calls_per_iter=0 allocations_per_iter=0
+server_send_chat_match ns_avg=507 ns_p50=461 ns_p95=591 ns_p99=872 reader_calls_per_iter=53 allocations_per_iter=5
+server_send_chat_decode_utf32 ns_avg=46 ns_p50=50 ns_p95=51 ns_p99=51 reader_calls_per_iter=1 allocations_per_iter=0
+hook_like_disabled ns_avg=33 ns_p50=30 ns_p95=40 ns_p99=41 reader_calls_per_iter=0 allocations_per_iter=0
+hook_like_enabled_non_chat ns_avg=34 ns_p50=30 ns_p95=50 ns_p99=51 reader_calls_per_iter=1 allocations_per_iter=0
+hook_like_server_send_chat ns_avg=483 ns_p50=471 ns_p95=501 ns_p99=751 reader_calls_per_iter=54 allocations_per_iter=5
+hook_like_server_send_chat_text ns_avg=549 ns_p50=541 ns_p95=561 ns_p99=582 reader_calls_per_iter=55 allocations_per_iter=5
 ```
 
 Interpretation: the synthetic non-chat enabled path adds one name-index readability check;
-the disabled and non-chat paths now stay allocation-free; the matched chat path is
-dominated by bounded reflection reads and temporary vectors/strings; and text decode adds
-one extra reader call plus UTF-8/sanitization work. These are local regression signals
-only, not runtime acceptance evidence.
+the disabled and non-chat paths now stay allocation-free; reserving reflected parameter
+and field vectors reduced matched-chat temporary allocations from seven to five per
+iteration; and text decode adds one extra reader call plus UTF-8/sanitization work. These
+are local regression signals only, not runtime acceptance evidence.
 
 ## Risks
 

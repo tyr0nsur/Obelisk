@@ -269,7 +269,9 @@ namespace Obelisk::UE::RuntimeReflection
         if (value.ReturnValueOffset != 0xffff && value.ReturnValueOffset >= value.ParmsSize)
             return ReadResult::Fail(ReadStatus::OutOfBounds, "ReturnValueOffset exceeds ParmsSize");
 
+        value.Parameters.reserve(value.NumParms);
         std::unordered_set<const void*> visited;
+        visited.reserve(value.NumParms);
         const void* current = value.Children;
         for (uint16_t i = 0; i < value.NumParms; ++i)
         {

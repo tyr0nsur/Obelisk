@@ -490,6 +490,7 @@ namespace Obelisk::UE::ChatReflection
         value.ReflectedFunction = std::move(reflectedFunction);
         value.MetadataOnlyCandidate = spec->MetadataOnlyCandidate;
         value.HasParameterRanges = params != nullptr && !value.MetadataOnlyCandidate;
+        value.Fields.reserve(spec->FieldCount);
 
         size_t index = 0;
         for (size_t i = 0; i < spec->FieldCount; ++i)
