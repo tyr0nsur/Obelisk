@@ -29,6 +29,7 @@ and updates:
 - ARK/Obelisk process list.
 - Obelisk marker files.
 - Recent Obelisk logs.
+- Chat reflection marker/log summary.
 - Disk usage.
 
 ## What It Must Not Do
@@ -47,6 +48,7 @@ latest=/servidor/ark/obelisk/dumps/supervisor/latest
 cat "${latest}/summary.txt"
 cat "${latest}/posture.txt"
 cat "${latest}/git-status.txt"
+cat "${latest}/chat-reflection.txt"
 tail -n 80 "${latest}/obelisk-log-tail.txt"
 ```
 

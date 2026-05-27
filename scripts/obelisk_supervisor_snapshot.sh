@@ -27,6 +27,23 @@ run_capture processes pgrep -af 'ShooterGameServer|arkserver'
 run_capture markers find "${OBELISK_ROOT}/state/instances" -maxdepth 3 -type f -printf '%TY-%Tm-%Td %TH:%TM:%TS %p\n'
 run_capture posture "${REPO_ROOT}/scripts/check_obelisk_server_posture.sh" --expect-stable
 
+CHAT_LOG="${OBELISK_ROOT}/logs/arkserver/Obelisk.log"
+CHAT_MARKER="${OBELISK_ROOT}/state/instances/arkserver/enable-chat-reflection"
+
+{
+    printf 'chat_reflection_marker=%s\n' "$([[ -f "${CHAT_MARKER}" ]] && printf enabled || printf disabled)"
+    printf 'log_path=%s\n' "${CHAT_LOG}"
+    if [[ -f "${CHAT_LOG}" ]]; then
+        printf 'experimental_gate_lines=%s\n' "$(grep -c 'Experimental chat reflection enabled' "${CHAT_LOG}" || true)"
+        printf 'reflected_chat_lines=%s\n' "$(grep -c 'Reflected chat ProcessEvent' "${CHAT_LOG}" || true)"
+        printf 'rejected_chat_trace_lines=%s\n' "$(grep -c 'Chat reflection rejected' "${CHAT_LOG}" || true)"
+        printf '\nrecent_chat_reflection_lines:\n'
+        grep -E 'Experimental chat reflection|Reflected chat|Chat reflection rejected' "${CHAT_LOG}" | tail -n 80 || true
+    else
+        printf 'missing_log=true\n'
+    fi
+} > "${OUT_DIR}/chat-reflection.txt" 2>&1
+
 if [[ -f "${OBELISK_ROOT}/logs/arkserver/Obelisk.log" ]]; then
     run_capture obelisk-log-tail tail -n 200 "${OBELISK_ROOT}/logs/arkserver/Obelisk.log"
 fi
