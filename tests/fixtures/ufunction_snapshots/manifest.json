@@ -173,6 +173,48 @@
       "module": "sdk_tribes",
       "name": "ClientReceiveActiveMissionTags",
       "outer": "ShooterPlayerController"
+    },
+    {
+      "file": "ShooterPlayerController.ServerDownloadTransferredPlayer.snapshot.json",
+      "module": "sdk_transfers",
+      "name": "ServerDownloadTransferredPlayer",
+      "outer": "ShooterPlayerController"
+    },
+    {
+      "file": "ShooterPlayerController.ServerTransferredPlayerConfirmationResult.snapshot.json",
+      "module": "sdk_transfers",
+      "name": "ServerTransferredPlayerConfirmationResult",
+      "outer": "ShooterPlayerController"
+    },
+    {
+      "file": "ShooterPlayerController.ServerUploadCurrentCharacterAndItems.snapshot.json",
+      "module": "sdk_transfers",
+      "name": "ServerUploadCurrentCharacterAndItems",
+      "outer": "ShooterPlayerController"
+    },
+    {
+      "file": "ShooterPlayerController.ServerUploadDino.snapshot.json",
+      "module": "sdk_transfers",
+      "name": "ServerUploadDino",
+      "outer": "ShooterPlayerController"
+    },
+    {
+      "file": "ShooterPlayerState.ServerRequestSpawnPointsForDownloadedCharacters.snapshot.json",
+      "module": "sdk_transfers",
+      "name": "ServerRequestSpawnPointsForDownloadedCharacters",
+      "outer": "ShooterPlayerState"
+    },
+    {
+      "file": "ShooterGameState.AllowDownloadDino.snapshot.json",
+      "module": "sdk_transfers",
+      "name": "AllowDownloadDino",
+      "outer": "ShooterGameState"
+    },
+    {
+      "file": "PrimalDinoCharacter.IsAllowedToTransfer.snapshot.json",
+      "module": "sdk_transfers",
+      "name": "IsAllowedToTransfer",
+      "outer": "PrimalDinoCharacter"
     }
   ]
 }

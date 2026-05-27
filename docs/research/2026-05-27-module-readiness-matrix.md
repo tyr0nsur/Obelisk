@@ -12,7 +12,7 @@ snapshot rounds, without implying public SDK or runtime readiness.
 - Snapshot binary SHA256:
   `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`
 - Obelisk baseline:
-  `8820707 Preserve array inner metadata in snapshots`
+  `dd07098 Add array payload snapshot fixtures`
 - Live-server impact: none.
 
 ## Readiness Snapshot
@@ -26,7 +26,7 @@ snapshot rounds, without implying public SDK or runtime readiness.
 | `sdk.missions` | `fixture-backed` | 4 | Add, leave-policy, removal lifecycle, and usable-item array metadata snapshots. | Keep array/struct payloads metadata-only until second-source evidence. |
 | `sdk.tribes` | `fixture-backed` | 5 | Tribe log control, permission enum-shape, membership bool-return, online-list array, and mission-tag array snapshots; log string remains deferred. | Keep string gates separate; do not decode client payload arrays yet. |
 | `sdk.chat` | `runtime-observed-internal` | 0 in manifest | Separate internal chat reflection evidence and runtime hit notes. | TheIsland A/B validation and copied-data ownership before public API. |
-| `sdk.transfer` | `candidate` | 0 | Valid metadata chain exists for `ServerRequestDownloadDino`, but struct payload is large. | Deep struct decoding and policy gates. |
+| `sdk.transfers` | `fixture-backed` | 7 | Compact transfer/download/upload scalar, object, class, and bool-return snapshots. | Keep large structs, arrays, strings, and runtime dispatch deferred. |
 | `sdk.admin` | `documentation-only` | 0 | Admin surfaces identified but intentionally blocked. | Permission model and explicit policy; no runtime work. |
 | `ue.reflection` | `internal-substrate` | n/a | FName/GObjects/UObject/UFunction/UProperty tooling underpins all modules. | Second-source evidence and runtime safety gates. |
 
@@ -48,6 +48,6 @@ snapshots prove exact metadata shape, membership checks, and bounded property ch
 
 ## Next Priorities
 
-1. Add compact transfer scalar/object fixtures without struct or array payloads.
-2. Consider second-source validation for array inner metadata.
+1. Add second-source validation for array inner and compact transfer metadata.
+2. Build a struct-identity evidence pass for deferred transfer payloads.
 3. Keep admin/NetExec and gameplay-authoritative mutations out of runtime work.
