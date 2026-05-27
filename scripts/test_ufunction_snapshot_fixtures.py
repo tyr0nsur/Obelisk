@@ -153,6 +153,18 @@ class UFunctionSnapshotFixtureTests(unittest.TestCase):
                             self.assertIsInstance(value, str)
                             self.assertNotEqual(value.strip(), "")
                             self.assertIsNone(ADDRESS_RE.search(value), value)
+                    array_inner_candidate = prop.get("array_inner_candidate")
+                    if array_inner_candidate is not None:
+                        self.assertEqual(array_inner_candidate.get("status"), "candidate")
+                        self.assertEqual(array_inner_candidate.get("reject_reasons"), [])
+                        self.assertEqual(array_inner_candidate.get("membership_status"), "candidate-uobject")
+                        inner_property = array_inner_candidate.get("inner_property")
+                        self.assertIsInstance(inner_property, dict)
+                        self.assertIsInstance(inner_property.get("name"), str)
+                        self.assertIsInstance(inner_property.get("name_index"), int)
+                        self.assertIsInstance(inner_property.get("class_name"), str)
+                        self.assertIsNone(ADDRESS_RE.search(inner_property["name"]), inner_property["name"])
+                        self.assertIsNone(ADDRESS_RE.search(inner_property["class_name"]), inner_property["class_name"])
                     if prop.get("status") == "candidate":
                         self.assertLessEqual(offset + size, parms_size)
 

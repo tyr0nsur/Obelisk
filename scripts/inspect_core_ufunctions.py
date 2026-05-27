@@ -419,6 +419,28 @@ def inspect_enum_candidate(context: GObjectContext, property_address: int) -> di
     }
 
 
+def inspect_array_inner_candidate(context: GObjectContext, property_address: int) -> dict[str, object]:
+    inner_address = context.memory.read_ptr(property_address + 0x70)
+    if not inner_address:
+        return {
+            "status": "rejected",
+            "reject_reasons": ["null_inner_pointer"],
+            "inner": None,
+        }
+
+    resolved_inner = context.resolve_uobject_pointer(inner_address)
+    inner_summary = summarize_uobject(resolved_inner.get("uobject"))
+    return {
+        "status": "candidate"
+        if resolved_inner["status"] == "candidate-uobject"
+        else "rejected",
+        "reject_reasons": resolved_inner["reject_reasons"],
+        "inner": hex_or_none(inner_address),
+        "inner_property": inner_summary,
+        "membership_status": resolved_inner["status"],
+    }
+
+
 def inspect_property_chain(
     context: GObjectContext,
     *,
@@ -516,6 +538,8 @@ def inspect_property_chain(
         }
         if summary.get("class_name") == "ByteProperty":
             property_payload["enum_candidate"] = inspect_enum_candidate(context, current)
+        if summary.get("class_name") == "ArrayProperty":
+            property_payload["array_inner_candidate"] = inspect_array_inner_candidate(context, current)
         properties.append(property_payload)
         if property_rejects:
             reject_reasons.append(f"property_{depth}_rejected")
@@ -761,6 +785,14 @@ def build_fixture_snapshot(
                         for item in enum_candidate.get("values", [])
                         if isinstance(item, dict)
                     ],
+                }
+            array_inner_candidate = prop.get("array_inner_candidate")
+            if isinstance(array_inner_candidate, dict):
+                property_payload["array_inner_candidate"] = {
+                    "status": array_inner_candidate.get("status"),
+                    "reject_reasons": array_inner_candidate.get("reject_reasons", []),
+                    "membership_status": array_inner_candidate.get("membership_status"),
+                    "inner_property": array_inner_candidate.get("inner_property"),
                 }
             properties.append(property_payload)
 

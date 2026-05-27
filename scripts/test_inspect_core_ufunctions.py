@@ -89,6 +89,7 @@ def build_core_fixture(path: Path) -> dict[str, int]:
         "mission_tags_property": base + 0x24700,
         "str_property_class": base + 0x24800,
         "array_property_class": base + 0x24900,
+        "mission_tags_inner_property": base + 0x24980,
         "primal_structure_class": base + 0x24A00,
         "allow_structure_access_function": base + 0x24B00,
         "allow_structure_access_for_pc_property": base + 0x24C00,
@@ -267,9 +268,10 @@ def build_core_fixture(path: Path) -> dict[str, int]:
     put_entry(83, b"ServerRequestDinoCharStats\x00")
     put_entry(84, b"theDinoChar\x00")
     put_entry(85, b"ServerRequestTribeLog\x00")
+    put_entry(86, b"MissionTag\x00")
 
     put_ptr(addrs["gobjects"] + enum.GOBJECTS_CHUNKS_OFFSET, addrs["gobjects_chunks"])
-    put_i32(addrs["gobjects"] + enum.GOBJECTS_COUNT_OFFSET, 99)
+    put_i32(addrs["gobjects"] + enum.GOBJECTS_COUNT_OFFSET, 100)
     put_ptr(addrs["gobjects_chunks"], addrs["gobjects_chunk0"])
 
     put_uobject(addrs["class_class"], 1, 0, addrs["class_class"], 1, 0)
@@ -545,6 +547,13 @@ def build_core_fixture(path: Path) -> dict[str, int]:
         class_key="array_property_class",
         name_index=53,
         outer_key="deferred_mission_string_array_function",
+    )
+    add_uobject(
+        "mission_tags_inner_property",
+        object_index=99,
+        class_key="str_property_class",
+        name_index=86,
+        outer_key="mission_tags_property",
     )
     add_uobject("primal_structure_class", object_index=58, class_key="class_class", name_index=56, outer_key="package_object")
     add_uobject(
@@ -1032,6 +1041,7 @@ def build_core_fixture(path: Path) -> dict[str, int]:
         parms_size=16,
         properties=[("mission_name_property", 0, 16), ("mission_tags_property", 16, 16)],
     )
+    put_ptr(addrs["mission_tags_property"] + 0x70, addrs["mission_tags_inner_property"])
     add_function_chain(
         "allow_structure_access_function",
         first_property_key="allow_structure_access_for_pc_property",
@@ -1657,6 +1667,55 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
             ],
         )
         self.assertIn("property_exceeds_parms_size", chain["properties"][1]["reject_reasons"])
+
+    def test_array_property_reports_inner_candidate(self) -> None:
+        target = self.inspect_single_by_name_outer("DeferredMissionStringArray", "MissionType")
+        array_prop = target["property_chain"]["properties"][1]
+
+        self.assertEqual(array_prop["summary"]["class_name"], "ArrayProperty")
+        inner = array_prop["array_inner_candidate"]
+        self.assertEqual(inner["status"], "candidate")
+        self.assertEqual(inner["membership_status"], "candidate-uobject")
+        self.assertEqual(inner["reject_reasons"], [])
+        self.assertEqual(
+            inner["inner_property"],
+            {"name": "MissionTag", "name_index": 86, "class_name": "StrProperty"},
+        )
+
+    def test_fixture_snapshot_preserves_array_inner_candidate(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            core = Path(temp_dir) / "core"
+            addrs = build_core_fixture(core)
+            memory = inspector.uobjects.CoreMemory(core)
+            try:
+                payload = inspector.inspect_core(
+                    memory,
+                    gobjects=addrs["gobjects"],
+                    fname_root_slot=addrs["fname_root_slot"],
+                    object_addresses=[],
+                    indices=[],
+                    name_contains=["DeferredMissionStringArray"],
+                    outer_contains=["MissionType"],
+                    window_size=0xC0,
+                    max_object_scan=128,
+                )
+            finally:
+                memory.close()
+
+        snapshot = inspector.build_fixture_snapshot(payload)
+        array_prop = snapshot["targets"][0]["property_chain"]["properties"][1]
+        self.assertEqual(
+            array_prop["array_inner_candidate"],
+            {
+                "status": "candidate",
+                "reject_reasons": [],
+                "membership_status": "candidate-uobject",
+                "inner_property": {"name": "MissionTag", "name_index": 86, "class_name": "StrProperty"},
+            },
+        )
+        serialized = json.dumps(snapshot, sort_keys=True)
+        self.assertNotIn(hex(addrs["mission_tags_inner_property"]), serialized)
+        self.assertNotIn(str(core), serialized)
 
     def test_cli_json_output(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
