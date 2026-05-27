@@ -54,7 +54,16 @@ For each reconstructed field:
 ## Promotion Checklist
 
 - [ ] The type field has at least two evidence paths.
+- [ ] There is an evidence pack with binary SHA256, Obelisk commit, copied log paths,
+      objdump/readelf artifact paths, and candidate status.
 - [ ] Reads are bounded and reject unreadable or implausible memory.
 - [ ] Analyzer or C++ tests cover accepted and rejected examples.
 - [ ] Research notes describe why false positives were rejected.
 - [ ] No live server mutation is required to validate the field.
+
+## `GNames/FNamePool` First Milestone
+
+The first accepted reflection milestone is not chat. It is a bounded `FName` resolver that
+can turn known indices like `9619` and `9622` into expected strings on the validated binary.
+Do not move to `GObjects`, `UFunction`, or params until this is repeatable from evidence
+packs plus guarded runtime reads.

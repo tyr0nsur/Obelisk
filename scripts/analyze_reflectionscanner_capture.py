@@ -8,8 +8,10 @@ not touch server state, marker files, or runtime configuration.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
+import subprocess
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -243,6 +245,28 @@ def parse_objdump_xrefs(path: Path, targets: set[str]) -> dict[str, list[StaticX
     return xrefs
 
 
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def detect_obelisk_commit(repo_root: Path) -> str:
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_root), "rev-parse", "--short=12", "HEAD"],
+            check=True,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+    return result.stdout.strip() or "unknown"
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -272,6 +296,21 @@ def parse_args() -> argparse.Namespace:
             "objdump -d text file. This is offline evidence only."
         ),
     )
+    parser.add_argument(
+        "--binary",
+        type=Path,
+        help=(
+            "Attach offline binary metadata to the summary evidence pack. The analyzer "
+            "hashes the file but does not execute or modify it."
+        ),
+    )
+    parser.add_argument(
+        "--obelisk-commit",
+        help=(
+            "Override the Obelisk commit recorded in the evidence pack. Defaults to the "
+            "current repository HEAD when available."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -288,7 +327,12 @@ def iter_lines(paths: list[str]) -> Iterable[tuple[str, int, str]]:
                 yield str(path), line_number, line.rstrip("\n")
 
 
-def parse_logs(paths: list[str], objdump_xrefs_path: Path | None = None) -> dict[str, object]:
+def parse_logs(
+    paths: list[str],
+    objdump_xrefs_path: Path | None = None,
+    binary_path: Path | None = None,
+    obelisk_commit: str | None = None,
+) -> dict[str, object]:
     uobjects: list[UObjectValidation] = []
     fnames: list[FNameProbe] = []
     delayed: list[DelayedGlobal] = []
@@ -395,7 +439,38 @@ def parse_logs(paths: list[str], objdump_xrefs_path: Path | None = None) -> dict
         else {}
     )
 
+    table_summaries = summarize_gname_tables(fnames)
+    binary_metadata: dict[str, object] | None = None
+    if binary_path is not None:
+        binary_metadata = {
+            "path": str(binary_path),
+            "sha256": sha256_file(binary_path),
+            "size_bytes": binary_path.stat().st_size,
+        }
+
+    repeat_confirmed_tables = [
+        item for item in table_summaries if item["status"] == "research-candidate"
+    ]
+
     return {
+        "evidence_pack": {
+            "obelisk_commit": obelisk_commit
+            if obelisk_commit is not None
+            else detect_obelisk_commit(Path(__file__).resolve().parents[1]),
+            "logs": sorted(files),
+            "binary": binary_metadata,
+            "objdump_xrefs": str(objdump_xrefs_path) if objdump_xrefs_path else None,
+            "reject_marker_count": len(reject_markers),
+            "fname_probe_count": len(fnames),
+            "gname_table_candidate_count": len(repeat_confirmed_tables),
+            "status": "research-candidate"
+            if repeat_confirmed_tables and not reject_markers
+            else "inconclusive",
+            "promotion_gate": (
+                "Never promote directly from this analyzer output. Require a second "
+                "isolated capture or independent static validation before runtime code."
+            ),
+        },
         "files": sorted(files),
         "reject_markers": [asdict(item) for item in reject_markers],
         "uobject_validations": [asdict(item) for item in uobjects],
@@ -417,7 +492,7 @@ def parse_logs(paths: list[str], objdump_xrefs_path: Path | None = None) -> dict
             }
             for item in fnames
         ],
-        "gname_table_candidates": summarize_gname_tables(fnames),
+        "gname_table_candidates": table_summaries,
         "delayed_globals": [asdict(item) for item in delayed],
         "candidate_globals": [asdict(item) for item in candidate_globals],
         "static_xrefs": {
@@ -428,6 +503,7 @@ def parse_logs(paths: list[str], objdump_xrefs_path: Path | None = None) -> dict
 
 
 def print_human(summary: dict[str, object]) -> None:
+    evidence_pack = summary["evidence_pack"]
     reject_markers = summary["reject_markers"]
     uobjects = summary["uobject_validations"]
     fnames = summary["fname_probes"]
@@ -436,6 +512,15 @@ def print_human(summary: dict[str, object]) -> None:
     static_xrefs = summary["static_xrefs"]
 
     print("ReflectionScanner capture summary")
+    print(f"obelisk commit: {evidence_pack['obelisk_commit']}")
+    if evidence_pack["binary"]:
+        binary = evidence_pack["binary"]
+        print(
+            "binary: {path} sha256={sha256} size={size_bytes}".format(**binary)
+        )
+    if evidence_pack["objdump_xrefs"]:
+        print(f"objdump xrefs: {evidence_pack['objdump_xrefs']}")
+    print(f"evidence status: {evidence_pack['status']}")
     print(f"files: {', '.join(summary['files'])}")
     print(f"candidate globals: {len(candidate_globals)}")
     print(f"delayed globals: {len(delayed)}")
@@ -522,7 +607,12 @@ def print_human(summary: dict[str, object]) -> None:
 
 def main() -> int:
     args = parse_args()
-    summary = parse_logs(args.logs, args.objdump_xrefs)
+    summary = parse_logs(
+        args.logs,
+        objdump_xrefs_path=args.objdump_xrefs,
+        binary_path=args.binary,
+        obelisk_commit=args.obelisk_commit,
+    )
 
     if args.json:
         print(json.dumps(summary, indent=2, sort_keys=True))

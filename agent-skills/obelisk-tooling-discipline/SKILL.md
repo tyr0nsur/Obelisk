@@ -14,8 +14,10 @@ Offline-safe:
 
 - `sha256sum`, `readelf`, `objdump`, `nm`, `c++filt`, `strings`
 - copied Obelisk logs
-- `scripts/analyze_reflectionscanner_capture.py`
+- `scripts/analyze_reflectionscanner_capture.py` with copied logs, copied objdump output,
+  and `--binary` pointed at an offline copy of `ShooterGameServer`
 - Ghidra/rizin/radare2 on copied binaries
+- CMake/CTest validation against copied or installed SDK artifacts
 
 Isolated-debug only:
 
@@ -52,7 +54,19 @@ Before adopting a tool into the workflow:
 4. Document expected output and reject conditions.
 5. Record where results belong: `docs/research/`, analyzer fixture, or code test.
 
+## Evidence Discipline
+
+- Prefer analyzer JSON evidence packs over hand-written offset summaries.
+- A tool result is not accepted unless another engineer can reproduce it from the command,
+  binary hash, Obelisk commit, and copied artifacts.
+- UI-only Ghidra conclusions must be translated into text: function/address, xref path,
+  decompiled shape, and reject conditions. Do not rely on screenshots.
+
 ## Agent Rule
 
 Sub-agents may recommend tools and commands, but the lead decides whether the tool becomes
 part of the official workflow or skill set.
+
+Sub-agents must not publish to GitHub or update handoff/versioning. They may edit their
+assigned scope, but the lead performs integration, commits, pushes, and durable process
+updates.

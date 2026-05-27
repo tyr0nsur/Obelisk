@@ -44,6 +44,7 @@ class ReflectionScannerAnalyzerStrictTests(unittest.TestCase):
         lines: list[str],
         *extra_args: str,
         objdump_text: str | None = None,
+        binary_text: bytes | None = None,
     ) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory() as temp_dir:
             log_path = Path(temp_dir) / "Obelisk.log"
@@ -53,6 +54,10 @@ class ReflectionScannerAnalyzerStrictTests(unittest.TestCase):
                 objdump_path = Path(temp_dir) / "ShooterGameServer.objdump"
                 objdump_path.write_text(objdump_text, encoding="utf-8")
                 args.extend(["--objdump-xrefs", str(objdump_path)])
+            if binary_text is not None:
+                binary_path = Path(temp_dir) / "ShooterGameServer"
+                binary_path.write_bytes(binary_text)
+                args.extend(["--binary", str(binary_path)])
             args.append(str(log_path))
             return subprocess.run(
                 args,
@@ -154,6 +159,8 @@ class ReflectionScannerAnalyzerStrictTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         summary = json.loads(result.stdout)
+        self.assertEqual(summary["evidence_pack"]["status"], "research-candidate")
+        self.assertEqual(summary["evidence_pack"]["gname_table_candidate_count"], 1)
         tables = {
             item["table"]: item
             for item in summary["gname_table_candidates"]
@@ -197,6 +204,29 @@ class ReflectionScannerAnalyzerStrictTests(unittest.TestCase):
         self.assertIn("static xrefs:", result.stdout)
         self.assertIn("0x600000: 1 reference(s)", result.stdout)
         self.assertIn("0x410010", result.stdout)
+
+    def test_json_includes_evidence_pack_binary_metadata(self) -> None:
+        result = self.run_analyzer(
+            [
+                fname_probe(source_global="0x600000"),
+                fname_probe(source_global="0x600008"),
+            ],
+            "--json",
+            "--obelisk-commit",
+            "test-commit",
+            binary_text=b"offline-test-binary",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        summary = json.loads(result.stdout)
+        evidence_pack = summary["evidence_pack"]
+        self.assertEqual(evidence_pack["obelisk_commit"], "test-commit")
+        self.assertEqual(evidence_pack["binary"]["size_bytes"], 19)
+        self.assertEqual(
+            evidence_pack["binary"]["sha256"],
+            "d936ee81753955ccd696878ea4beb9cf69db467d7c6e5fdc2ffd001c81b641e6",
+        )
+        self.assertIn("Never promote directly", evidence_pack["promotion_gate"])
 
 
 if __name__ == "__main__":

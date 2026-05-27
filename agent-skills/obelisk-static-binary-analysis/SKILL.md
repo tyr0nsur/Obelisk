@@ -23,6 +23,7 @@ For every candidate offset/global/function, capture:
 
 ```bash
 sha256sum ShooterGameServer
+file ShooterGameServer
 readelf -h -W ShooterGameServer
 readelf -S -W ShooterGameServer
 readelf -l -W ShooterGameServer
@@ -38,6 +39,27 @@ radare2 -A -q -c 'iz; afl; q' ShooterGameServer
 
 Use Ghidra for manual decompilation/xref confirmation when command-line evidence is
 ambiguous. Save conclusions in `docs/research/`, not screenshots.
+
+## Tool Selection
+
+- Start with `readelf`/`objdump`/analyzer evidence because it is reproducible in CI-like
+  shell workflows.
+- Use Ghidra when the question needs decompiler context, recovered control flow, or manual
+  type reasoning.
+- Use rizin/radare2 when batchable xrefs or function lists help automate a hypothesis.
+- Keep `rr`, Frida, `gdb` attach, and broad runtime instrumentation out of this skill unless
+  an isolated debug instance has already been approved.
+
+## Agent Output Contract
+
+Static reversing agents must return an evidence pack, not just a conclusion:
+
+- binary path and SHA256,
+- exact commands,
+- candidate addresses with segment/range,
+- xref summary,
+- accepted/rejected status,
+- next validation needed.
 
 ## Candidate Workflow
 
@@ -55,15 +77,19 @@ ambiguous. Save conclusions in `docs/research/`, not screenshots.
 ```bash
 python3 scripts/analyze_reflectionscanner_capture.py \
   --json \
+  --binary /path/to/ShooterGameServer \
   --objdump-xrefs /tmp/ShooterGameServer.objdump \
   /path/to/isolated/Obelisk.log
 ```
+
+The JSON output contains an `evidence_pack` block. Preserve that block in the research
+note summary when a candidate is promoted to `research-candidate` or explicitly rejected.
 
 ## Acceptance Bar
 
 A candidate may become a research candidate when:
 
-- Binary hash and command trail are recorded.
+- Binary hash, Obelisk commit, and command trail are recorded in an evidence pack.
 - The value is in the expected segment/range.
 - Static xrefs explain why the candidate can be a UE4 global/function.
 - Runtime analyzer evidence is repeat-confirmed or a second static path supports it.
