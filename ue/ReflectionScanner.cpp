@@ -84,6 +84,15 @@ namespace Obelisk::UE
             return enabled;
         }
 
+        bool StaticFNameRootSamplingEnabled()
+        {
+            static bool enabled = [] {
+                const char* value = std::getenv("OBELISK_REFLECTION_SAMPLE_STATIC_FNAME_ROOTS");
+                return value && std::string(value) == "1";
+            }();
+            return enabled;
+        }
+
         std::vector<uintptr_t> StaticFNameRootSlots()
         {
             std::vector<uintptr_t> slots;
@@ -642,6 +651,170 @@ namespace Obelisk::UE
             return result;
         }
 
+        struct StaticFNameRootTable
+        {
+            void* TableValue = nullptr;
+            uintptr_t Table = 0;
+            int32_t NumElements = 0;
+            int32_t NumChunks = 0;
+            const char* RejectReason = nullptr;
+        };
+
+        StaticFNameRootTable ResolveStaticFNameRootTable(uintptr_t slot)
+        {
+            StaticFNameRootTable result;
+            if (!IsCanonicalUserPointer(slot) ||
+                !Obelisk::Memory::IsReadable(reinterpret_cast<void*>(slot), sizeof(uintptr_t)))
+            {
+                result.RejectReason = "unreadable_slot";
+                return result;
+            }
+
+            std::memcpy(&result.TableValue, reinterpret_cast<void*>(slot), sizeof(result.TableValue));
+            result.Table = reinterpret_cast<uintptr_t>(result.TableValue);
+
+            if (!result.TableValue ||
+                !IsCanonicalUserPointer(result.Table) ||
+                !Obelisk::Memory::IsReadable(result.TableValue, FNameIndirectArrayProbe::NumChunksOffset + sizeof(int32_t)))
+            {
+                result.RejectReason = "unreadable_table_header";
+                return result;
+            }
+
+            ReadMemory(result.Table + FNameIndirectArrayProbe::NumElementsOffset, result.NumElements);
+            ReadMemory(result.Table + FNameIndirectArrayProbe::NumChunksOffset, result.NumChunks);
+
+            if (result.NumElements <= 0 || result.NumElements >= 10000000)
+                result.RejectReason = "implausible_num_elements";
+            else if (result.NumChunks <= 0 || result.NumChunks > FNameIndirectArrayProbe::MaxChunks)
+                result.RejectReason = "implausible_num_chunks";
+
+            return result;
+        }
+
+        struct StaticFNameSampleResult
+        {
+            std::string Name;
+            bool HeaderIndexOk = false;
+            const char* RejectReason = nullptr;
+        };
+
+        StaticFNameSampleResult SampleStaticLegacyGNamesEntry(uintptr_t table, int32_t index)
+        {
+            StaticFNameSampleResult result;
+            if (index < 0)
+            {
+                result.RejectReason = "invalid_index";
+                return result;
+            }
+
+            uintptr_t chunk = 0;
+            const int32_t chunkIndex = index / FNameIndirectArrayProbe::ChunkSize;
+            const int32_t withinChunk = index % FNameIndirectArrayProbe::ChunkSize;
+            const uintptr_t chunkPointerAddress = table + FNameIndirectArrayProbe::InlineChunksOffset +
+                                                  (static_cast<uintptr_t>(chunkIndex) * sizeof(uintptr_t));
+            if (!ReadMemory(chunkPointerAddress, chunk) ||
+                !IsCanonicalUserPointer(chunk) ||
+                !Obelisk::Memory::IsReadable(reinterpret_cast<void*>(chunk), sizeof(uintptr_t)))
+            {
+                result.RejectReason = "unreadable_chunk_pointer";
+                return result;
+            }
+
+            uintptr_t entry = 0;
+            const uintptr_t entryPointerAddress = chunk + (static_cast<uintptr_t>(withinChunk) * sizeof(uintptr_t));
+            if (!ReadMemory(entryPointerAddress, entry) ||
+                !IsCanonicalUserPointer(entry) ||
+                !Obelisk::Memory::IsReadable(reinterpret_cast<void*>(entry), 0x40))
+            {
+                result.RejectReason = "unreadable_entry_pointer";
+                return result;
+            }
+
+            uint32_t entryHeader = 0;
+            if (!ReadMemory(entry, entryHeader))
+            {
+                result.RejectReason = "unreadable_entry_header";
+                return result;
+            }
+
+            result.HeaderIndexOk = static_cast<int32_t>(entryHeader >> 1) == index;
+            result.Name = ReadAnsiPreview(entry + 0x10, 64);
+            if (result.Name.empty())
+            {
+                result.RejectReason = "empty_entry_name";
+                return result;
+            }
+
+            return result;
+        }
+
+        void SampleStaticFNameRootsForObject(const std::vector<uintptr_t>& slots,
+                                             const char* target,
+                                             uintptr_t sourceGlobal,
+                                             void* object,
+                                             const FName& name)
+        {
+            if (!StaticFNameRootSamplingEnabled() || slots.empty())
+                return;
+
+            if (!IsPlausibleFName(name))
+                return;
+
+            for (uintptr_t slot : slots)
+            {
+                const StaticFNameRootTable table = ResolveStaticFNameRootTable(slot);
+                if (table.RejectReason)
+                {
+                    OBELISK_INFO("[ReflectionScanner] StaticFNameRoot FName sample: slot=0x{:X} table={} target={} source_global=0x{:X} object={} index={} header_index_ok=false name='' status=reject reason={}",
+                                 slot,
+                                 table.TableValue,
+                                 target,
+                                 sourceGlobal,
+                                 object,
+                                 name.ComparisonIndex,
+                                 table.RejectReason);
+                    continue;
+                }
+
+                if (name.ComparisonIndex >= table.NumElements)
+                {
+                    OBELISK_INFO("[ReflectionScanner] StaticFNameRoot FName sample: slot=0x{:X} table={} target={} source_global=0x{:X} object={} index={} header_index_ok=false name='' status=reject reason=index_out_of_range num_elements={} num_chunks={}",
+                                 slot,
+                                 table.TableValue,
+                                 target,
+                                 sourceGlobal,
+                                 object,
+                                 name.ComparisonIndex,
+                                 table.NumElements,
+                                 table.NumChunks);
+                    continue;
+                }
+
+                const StaticFNameSampleResult sample = SampleStaticLegacyGNamesEntry(table.Table, name.ComparisonIndex);
+                const bool matched = !sample.RejectReason && sample.HeaderIndexOk && sample.Name == target;
+                const char* status = sample.RejectReason ? "reject" : matched ? "match" : "mismatch";
+                const char* reason = sample.RejectReason ? sample.RejectReason
+                                   : !sample.HeaderIndexOk ? "header_index_mismatch"
+                                   : sample.Name != target ? "name_mismatch"
+                                   : "none";
+
+                OBELISK_INFO("[ReflectionScanner] StaticFNameRoot FName sample: slot=0x{:X} table={} target={} source_global=0x{:X} object={} index={} header_index_ok={} name='{}' status={} reason={} num_elements={} num_chunks={}",
+                             slot,
+                             table.TableValue,
+                             target,
+                             sourceGlobal,
+                             object,
+                             name.ComparisonIndex,
+                             sample.HeaderIndexOk,
+                             sample.Name,
+                             status,
+                             reason,
+                             table.NumElements,
+                             table.NumChunks);
+            }
+        }
+
         void LogFNameIndirectArrayReject(const char* name,
                                          uintptr_t sourceGlobal,
                                          void* value,
@@ -740,35 +913,23 @@ namespace Obelisk::UE
 
         bool ProbeStaticFNameRootSlot(uintptr_t slot)
         {
-            if (!IsCanonicalUserPointer(slot) ||
-                !Obelisk::Memory::IsReadable(reinterpret_cast<void*>(slot), sizeof(uintptr_t)))
+            const StaticFNameRootTable table = ResolveStaticFNameRootTable(slot);
+            if (table.RejectReason)
             {
-                LogFNameStaticRootReject(slot, nullptr, "unreadable_slot");
+                LogFNameStaticRootReject(slot, table.TableValue, table.RejectReason);
                 return false;
             }
 
-            void* tableValue = nullptr;
-            std::memcpy(&tableValue, reinterpret_cast<void*>(slot), sizeof(tableValue));
-            const uintptr_t table = reinterpret_cast<uintptr_t>(tableValue);
-
-            if (!tableValue ||
-                !IsCanonicalUserPointer(table) ||
-                !Obelisk::Memory::IsReadable(tableValue, FNameIndirectArrayProbe::NumChunksOffset + sizeof(int32_t)))
-            {
-                LogFNameStaticRootReject(slot, tableValue, "unreadable_table_header");
-                return false;
-            }
-
-            const StaticFNameRootProbeResult result = ProbeStaticLegacyGNamesTable(table);
+            const StaticFNameRootProbeResult result = ProbeStaticLegacyGNamesTable(table.Table);
             if (result.RejectReason)
             {
-                LogFNameStaticRootReject(slot, tableValue, result.RejectReason, result);
+                LogFNameStaticRootReject(slot, table.TableValue, result.RejectReason, result);
                 return false;
             }
 
             OBELISK_INFO("[ReflectionScanner] StaticFNameRoot FName static-root probe: slot=0x{:X} table={} score={}/9 readable_clues={}/3 matched_clues={}/3 header_index_ok={}/3 num_elements={} num_chunks={} none='{}' client_message='{}' server_chat='{}'",
                          slot,
-                         tableValue,
+                         table.TableValue,
                          result.Score,
                          result.ReadableClues,
                          result.MatchedClues,
@@ -791,7 +952,7 @@ namespace Obelisk::UE
                 ProbeStaticFNameRootSlot(slot);
         }
 
-        void LogUObjectValidation(const std::vector<Mapping>& mappings, const char* name, void* value, const UObjectProbe& object)
+        int LogUObjectValidation(const std::vector<Mapping>& mappings, const char* name, void* value, const UObjectProbe& object)
         {
             uintptr_t firstVtableEntry = 0;
             const bool vtableReadable = object.VTable &&
@@ -824,6 +985,7 @@ namespace Obelisk::UE
                          fnamePlausible,
                          flagsPlausible,
                          internalPlausible);
+            return score;
         }
 
         bool ReadUintptrField(void* base, size_t offset, uintptr_t& out)
@@ -907,7 +1069,10 @@ namespace Obelisk::UE
             return globals;
         }
 
-        void DumpGlobalPointer(const std::vector<Mapping>& mappings, const char* name, uintptr_t global)
+        void DumpGlobalPointer(const std::vector<Mapping>& mappings,
+                               const std::vector<uintptr_t>& staticFNameRootSlots,
+                               const char* name,
+                               uintptr_t global)
         {
             if (!Obelisk::Memory::IsReadable(reinterpret_cast<void*>(global), sizeof(void*)))
                 return;
@@ -933,7 +1098,9 @@ namespace Obelisk::UE
                              object.NamePrivate.ComparisonIndex,
                              object.NamePrivate.Number,
                              object.OuterPrivate);
-                LogUObjectValidation(mappings, name, value, object);
+                const int validationScore = LogUObjectValidation(mappings, name, value, object);
+                if (validationScore >= 4)
+                    SampleStaticFNameRootsForObject(staticFNameRootSlots, name, global, value, object.NamePrivate);
             }
 
             const uintptr_t* qwords = reinterpret_cast<const uintptr_t*>(value);
@@ -979,12 +1146,12 @@ namespace Obelisk::UE
             }
         }
 
-        void StartDelayedGlobalProbe(std::vector<GlobalWatch> watches)
+        void StartDelayedGlobalProbe(std::vector<GlobalWatch> watches, std::vector<uintptr_t> staticFNameRootSlots)
         {
             if (watches.empty())
                 return;
 
-            std::thread([watches = std::move(watches)]() mutable {
+            std::thread([watches = std::move(watches), staticFNameRootSlots = std::move(staticFNameRootSlots)]() mutable {
                 std::vector<void*> lastValues(watches.size(), nullptr);
 
                 for (int iteration = 1; iteration <= 120; ++iteration)
@@ -1008,7 +1175,7 @@ namespace Obelisk::UE
                         lastValues[i] = value;
                         OBELISK_INFO("[ReflectionScanner] delayed global resolved after {}s: {} 0x{:X} -> {}",
                                      iteration * 5, watch.Name, watch.Address, value);
-                        DumpGlobalPointer(mappings, watch.Name.c_str(), watch.Address);
+                        DumpGlobalPointer(mappings, staticFNameRootSlots, watch.Name.c_str(), watch.Address);
                     }
                 }
             }).detach();
@@ -1070,8 +1237,19 @@ namespace Obelisk::UE
                      mappings.size(), readableCount, executableCount);
 
         const std::vector<uintptr_t> staticFNameRootSlots = StaticFNameRootSlots();
-        ProbeStaticFNameRoots(staticFNameRootSlots);
-        StartDelayedStaticFNameRootProbe(staticFNameRootSlots);
+        if (!staticFNameRootSlots.empty())
+        {
+            if (StaticFNameRootSamplingEnabled())
+            {
+                OBELISK_INFO("[ReflectionScanner] StaticFNameRoot sampling enabled for {} env-supplied slot(s). Fixed clue static-root probing is skipped while sampling observed UObject NamePrivate indices.",
+                             staticFNameRootSlots.size());
+            }
+            else
+            {
+                ProbeStaticFNameRoots(staticFNameRootSlots);
+                StartDelayedStaticFNameRootProbe(staticFNameRootSlots);
+            }
+        }
 
         std::vector<GlobalWatch> watches;
         for (const char* target : targets)
@@ -1105,11 +1283,11 @@ namespace Obelisk::UE
 
             for (uintptr_t global : scan.CandidateGlobals)
             {
-                DumpGlobalPointer(mappings, scan.Name, global);
+                DumpGlobalPointer(mappings, staticFNameRootSlots, scan.Name, global);
                 watches.push_back({scan.Name, global});
             }
         }
 
-        StartDelayedGlobalProbe(std::move(watches));
+        StartDelayedGlobalProbe(std::move(watches), staticFNameRootSlots);
     }
 }

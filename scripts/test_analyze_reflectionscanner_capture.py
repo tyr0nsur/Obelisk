@@ -117,6 +117,36 @@ def static_fname_root_reject(
     )
 
 
+def static_fname_root_sample(
+    *,
+    slot: str = "0x5956f30",
+    table: str = "0x7f0000001000",
+    target: str = "ServerChat",
+    source_global: str | None = None,
+    object: str = "0x7f0000002000",
+    index: int = 9622,
+    header_index_ok: bool = True,
+    name: str = "ServerChat",
+    status: str = "match",
+    reason: str = "exact_name",
+    num_elements: int | None = None,
+    num_chunks: int | None = None,
+) -> str:
+    header_text = "true" if header_index_ok else "false"
+    source_text = f"source_global={source_global} " if source_global else ""
+    counts_text = (
+        f" num_elements={num_elements} num_chunks={num_chunks}"
+        if num_elements is not None and num_chunks is not None
+        else ""
+    )
+    return (
+        "[ReflectionScanner] StaticFNameRoot FName sample: "
+        f"slot={slot} table={table} target={target} {source_text}object={object} "
+        f"index={index} header_index_ok={header_text} name='{name}' "
+        f"status={status} reason={reason}{counts_text}"
+    )
+
+
 class ReflectionScannerAnalyzerStrictTests(unittest.TestCase):
     def run_analyzer(
         self,
@@ -418,6 +448,90 @@ class ReflectionScannerAnalyzerStrictTests(unittest.TestCase):
         self.assertIn("Static FName root rejects: 1", result.stdout)
         self.assertIn("Static FName root reject reasons:", result.stdout)
         self.assertIn("null_table: 1", result.stdout)
+
+    def test_json_summarizes_static_fname_root_samples(self) -> None:
+        result = self.run_analyzer(
+            [
+                static_fname_root_sample(target="ServerChat", reason="exact_name"),
+                static_fname_root_sample(
+                    target="ClientMessage",
+                    source_global="0x600000",
+                    index=9619,
+                    name="ServerChat",
+                    status="mismatch",
+                    reason="name_mismatch",
+                    num_elements=12000,
+                    num_chunks=1,
+                ),
+                static_fname_root_sample(
+                    target="Foo",
+                    index=42,
+                    header_index_ok=False,
+                    name="",
+                    status="reject",
+                    reason="unreadable_entry",
+                ),
+            ],
+            "--json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        summary = json.loads(result.stdout)
+        evidence_pack = summary["evidence_pack"]
+        self.assertEqual(evidence_pack["status"], "inconclusive")
+        self.assertEqual(evidence_pack["static_fname_root_sample_count"], 3)
+        self.assertEqual(
+            evidence_pack["static_fname_root_sample_status_counts"],
+            {"match": 1, "mismatch": 1, "reject": 1},
+        )
+        self.assertEqual(
+            evidence_pack["static_fname_root_sample_reason_counts"],
+            {"exact_name": 1, "name_mismatch": 1, "unreadable_entry": 1},
+        )
+        self.assertEqual(
+            evidence_pack["static_fname_root_sample_target_counts"],
+            {"ClientMessage": 1, "Foo": 1, "ServerChat": 1},
+        )
+        sample = summary["static_fname_root_samples"][2]
+        self.assertEqual(sample["target"], "Foo")
+        self.assertFalse(sample["header_index_ok"])
+        self.assertEqual(
+            summary["static_fname_root_samples"][1]["source_global"], "0x600000"
+        )
+        self.assertEqual(summary["static_fname_root_samples"][1]["num_elements"], 12000)
+
+    def test_human_output_reports_static_fname_root_samples(self) -> None:
+        result = self.run_analyzer(
+            [
+                static_fname_root_sample(target="ServerChat"),
+                static_fname_root_sample(
+                    target="ClientMessage",
+                    status="mismatch",
+                    reason="name_mismatch",
+                ),
+            ],
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Static FName root samples: 2", result.stdout)
+        self.assertIn("Static FName root sample summary:", result.stdout)
+        self.assertIn("- match: 1", result.stdout)
+        self.assertIn("- mismatch: 1", result.stdout)
+        self.assertIn("- name_mismatch: 1", result.stdout)
+        self.assertIn("target=ClientMessage", result.stdout)
+
+    def test_static_fname_root_samples_do_not_satisfy_strict(self) -> None:
+        result = self.run_analyzer(
+            [
+                static_fname_root_sample(target="ServerChat"),
+                static_fname_root_sample(target="ClientMessage", index=9619),
+            ],
+            "--strict",
+        )
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("Static FName root samples: 2", result.stdout)
+        self.assertIn("Static FName root candidates: 0", result.stdout)
 
     def test_json_annotates_static_xrefs_from_objdump_text(self) -> None:
         result = self.run_analyzer(

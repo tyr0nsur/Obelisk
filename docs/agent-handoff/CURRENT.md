@@ -146,6 +146,11 @@ Updated: 2026-05-27
   candidate requires exact `None`/`ClientMessage`/`ServerChat`, `header_index_ok=3/3`,
   plausible counts, and no reject markers; see
   `docs/research/2026-05-27-static-fname-root-probe.md`.
+- fact: ReflectionScanner also has opt-in observed-index static-root sampling via
+  `OBELISK_REFLECTION_SAMPLE_STATIC_FNAME_ROOTS=1`. It samples only already discovered
+  plausible `UObject` candidates against env-supplied static roots, and the analyzer
+  records sample JSON plus status/reason/target counts. Samples do not satisfy `--strict`
+  by themselves; see `docs/research/2026-05-27-static-fname-root-sampling.md`.
 - fact: A controlled Ragnarok dev capture on commit `5754fca` tested
   `OBELISK_REFLECTION_STATIC_FNAME_ROOTS=0x5956f30`. Startup probe rejected it with
   `table=0x0` and `reason=unreadable_table_header`; the server was then restarted without
@@ -197,8 +202,8 @@ Updated: 2026-05-27
 - next-step: Stop trying to promote chat UObject globals directly into GNames. Next FName
   work should use static discovery of the name table global or a bounded alternate name
   storage scanner, then validate with the analyzer.
-- next-step: Replace fixed clue-index assumptions with a bounded static-root sampler that
-  validates names using observed `UObject.NamePrivate` indices from scanner output.
+- next-step: Use the bounded static-root sampler to validate names using observed
+  `UObject.NamePrivate` indices from scanner output on an isolated/debug instance.
 - next-step: Add an isolated-only explicit static FName root probe that accepts
   env-supplied global pointer slots such as `0x5956f30` and runs the existing
   `None`/`ClientMessage`/`ServerChat` clue checks plus header-index validation against

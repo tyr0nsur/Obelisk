@@ -119,6 +119,12 @@ work from repository state instead of chat history.
   `None`/`ClientMessage`/`ServerChat`, `header_index_ok=3/3`, plausible counts, and no
   reject markers; see
   `docs/research/2026-05-27-static-fname-root-probe.md`.
+- ReflectionScanner can also sample observed `UObject.NamePrivate.ComparisonIndex` values
+  against env-supplied static FName roots with
+  `OBELISK_REFLECTION_SAMPLE_STATIC_FNAME_ROOTS=1`. Analyzer JSON records
+  `static_fname_root_samples` and sample counts by status/reason/target; `--strict` does
+  not pass from samples alone. See
+  `docs/research/2026-05-27-static-fname-root-sampling.md`.
 - UE4 type reconstruction planning is captured in
   `docs/research/2026-05-27-ue4-type-reconstruction-roadmap.md`; keep the milestone
   order as `FName`, `GObjects`, `UFunction`, then bounded params.
@@ -153,6 +159,8 @@ Next technical milestone is `FName -> string` resolution:
    diagnostic reasons for rejected FName candidates.
 4. For the current static candidate, add
    `OBELISK_REFLECTION_STATIC_FNAME_ROOTS=0x5956f30` only on an isolated/debug capture.
+   To test observed object name indices instead of fixed clues, also add
+   `OBELISK_REFLECTION_SAMPLE_STATIC_FNAME_ROOTS=1`.
 5. Analyze copied logs with:
 
 ```bash
@@ -170,7 +178,8 @@ python3 scripts/analyze_reflectionscanner_capture.py \
    same table pointer through distinct `source_global` values or distinct targets, and
    there are no reject markers.
 7. Treat static-root `GNames` only as a research candidate when exact clue matches and
-   `header_index_ok=3/3` appear with plausible counts and no reject markers.
+   `header_index_ok=3/3` appear with plausible counts and no reject markers. Static-root
+   samples are supporting evidence only until promoted by a later gate.
 8. Before committing offsets, require a second isolated capture or static xref validation.
    Static xrefs are supporting evidence only; inspect whether they are real load/store paths
    before designing runtime name-resolution code.
@@ -203,7 +212,8 @@ python3 scripts/analyze_reflectionscanner_capture.py \
 
 - Ops: get permission to create or designate the isolated ARK debug instance; preferred
   plan is `arkserver-obelisk-debug`.
-- Reflection: improve FName/GNames probes and analyzer fixtures offline.
+- Reflection: run observed-index static-root sampling on an isolated/debug instance and
+  inspect whether decoded names match the target strings that produced each object.
 - Reflection: redeploy and retest delayed static-root retry for
   `OBELISK_REFLECTION_STATIC_FNAME_ROOTS=0x5956f30`.
 - Build/QA: keep package/export validation tied to concrete external plugin consumption

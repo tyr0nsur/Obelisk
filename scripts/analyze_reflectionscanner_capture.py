@@ -78,6 +78,20 @@ STATIC_FNAME_ROOT_REJECT_RE = re.compile(
     r"server_chat='(?P<server_chat>[^']*)'"
 )
 
+STATIC_FNAME_ROOT_SAMPLE_RE = re.compile(
+    r"\[ReflectionScanner\] StaticFNameRoot FName sample: "
+    r"slot=(?P<slot>\S+) table=(?P<table>\S+) "
+    r"target=(?P<target>\S+) "
+    r"(?:source_global=(?P<source_global>\S+) )?"
+    r"object=(?P<object>\S+) "
+    r"index=(?P<index>\d+) "
+    r"header_index_ok=(?P<header_index_ok>true|false) "
+    r"name='(?P<name>[^']*)' "
+    r"status=(?P<status>match|mismatch|reject) "
+    r"reason=(?P<reason>\S+)"
+    r"(?: num_elements=(?P<num_elements>-?\d+) num_chunks=(?P<num_chunks>-?\d+))?"
+)
+
 DELAYED_RE = re.compile(
     r"\[ReflectionScanner\] delayed global resolved after (?P<seconds>\d+)s: "
     r"(?P<target>\S+) (?P<global>\S+) -> (?P<value>\S+)"
@@ -235,6 +249,23 @@ class StaticFNameRootReject:
     none: str
     client_message: str
     server_chat: str
+
+
+@dataclass(frozen=True)
+class StaticFNameRootSample:
+    line: int
+    slot: str
+    table: str
+    target: str
+    source_global: str
+    object: str
+    index: int
+    header_index_ok: bool
+    name: str
+    status: str
+    reason: str
+    num_elements: int | None
+    num_chunks: int | None
 
 
 @dataclass(frozen=True)
@@ -412,6 +443,14 @@ def summarize_fname_rejects(rejects: list[FNameReject]) -> list[dict[str, object
     return summaries
 
 
+def count_by(items: list[StaticFNameRootSample], field: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for item in items:
+        value = str(getattr(item, field))
+        counts[value] = counts.get(value, 0) + 1
+    return dict(sorted(counts.items()))
+
+
 def parse_objdump_xrefs(path: Path, targets: set[str]) -> dict[str, list[StaticXref]]:
     normalized_targets = {normalize_hex(target) for target in targets}
     xrefs: dict[str, list[StaticXref]] = {target: [] for target in normalized_targets}
@@ -532,6 +571,7 @@ def parse_logs(
     fname_rejects: list[FNameReject] = []
     static_fname_root_probes: list[StaticFNameRootProbe] = []
     static_fname_root_rejects: list[StaticFNameRootReject] = []
+    static_fname_root_samples: list[StaticFNameRootSample] = []
     delayed: list[DelayedGlobal] = []
     candidate_globals: list[CandidateGlobal] = []
     reject_markers: list[LogMatch] = []
@@ -656,6 +696,31 @@ def parse_logs(
             )
             continue
 
+        if match := STATIC_FNAME_ROOT_SAMPLE_RE.search(line):
+            groups = match.groupdict()
+            static_fname_root_samples.append(
+                StaticFNameRootSample(
+                    line=line_number,
+                    slot=groups["slot"],
+                    table=groups["table"],
+                    target=groups["target"],
+                    source_global=groups.get("source_global") or "unknown",
+                    object=groups["object"],
+                    index=int(groups["index"]),
+                    header_index_ok=groups["header_index_ok"] == "true",
+                    name=groups["name"],
+                    status=groups["status"],
+                    reason=groups["reason"],
+                    num_elements=int(groups["num_elements"])
+                    if groups.get("num_elements")
+                    else None,
+                    num_chunks=int(groups["num_chunks"])
+                    if groups.get("num_chunks")
+                    else None,
+                )
+            )
+            continue
+
         if match := DELAYED_RE.search(line):
             groups = match.groupdict()
             delayed.append(
@@ -704,6 +769,12 @@ def parse_logs(
     )
     static_targets.update(normalize_hex(probe.slot) for probe in static_fname_root_probes)
     static_targets.update(normalize_hex(reject.slot) for reject in static_fname_root_rejects)
+    static_targets.update(normalize_hex(sample.slot) for sample in static_fname_root_samples)
+    static_targets.update(
+        normalize_hex(sample.source_global)
+        for sample in static_fname_root_samples
+        if sample.source_global != "unknown"
+    )
     static_targets.update(
         normalize_hex(item.global_address)
         for item in candidate_globals
@@ -766,6 +837,16 @@ def parse_logs(
             "static_fname_root_reject_reason_counts": dict(
                 sorted(static_fname_root_reject_reason_counts.items())
             ),
+            "static_fname_root_sample_count": len(static_fname_root_samples),
+            "static_fname_root_sample_status_counts": count_by(
+                static_fname_root_samples, "status"
+            ),
+            "static_fname_root_sample_reason_counts": count_by(
+                static_fname_root_samples, "reason"
+            ),
+            "static_fname_root_sample_target_counts": count_by(
+                static_fname_root_samples, "target"
+            ),
             "static_fname_root_candidate_count": len(static_fname_root_candidates),
             "gname_table_candidate_count": len(repeat_confirmed_tables),
             "status": (
@@ -815,6 +896,9 @@ def parse_logs(
         "static_fname_root_rejects": [
             asdict(item) for item in static_fname_root_rejects
         ],
+        "static_fname_root_samples": [
+            asdict(item) for item in static_fname_root_samples
+        ],
         "gname_table_candidates": table_summaries,
         "delayed_globals": [asdict(item) for item in delayed],
         "candidate_globals": [asdict(item) for item in candidate_globals],
@@ -834,6 +918,7 @@ def print_human(summary: dict[str, object]) -> None:
     fname_reject_groups = summary["fname_reject_groups"]
     static_fname_root_probes = summary["static_fname_root_probes"]
     static_fname_root_rejects = summary["static_fname_root_rejects"]
+    static_fname_root_samples = summary["static_fname_root_samples"]
     delayed = summary["delayed_globals"]
     candidate_globals = summary["candidate_globals"]
     static_xrefs = summary["static_xrefs"]
@@ -856,6 +941,7 @@ def print_human(summary: dict[str, object]) -> None:
     print(f"FName rejects: {len(fname_rejects)}")
     print(f"Static FName root probes: {len(static_fname_root_probes)}")
     print(f"Static FName root rejects: {len(static_fname_root_rejects)}")
+    print(f"Static FName root samples: {len(static_fname_root_samples)}")
 
     if reject_markers:
         print("\nreject markers:")
@@ -970,6 +1056,26 @@ def print_human(summary: dict[str, object]) -> None:
                 "matched={matched_clues}/{matched_clues_max} elements={num_elements} "
                 "chunks={num_chunks} header_index_ok={header_index_ok}/"
                 "{header_index_ok_max}".format(**item)
+            )
+
+    if static_fname_root_samples:
+        print("\nStatic FName root sample summary:")
+        print("status:")
+        for status, count in evidence_pack["static_fname_root_sample_status_counts"].items():
+            print(f"- {status}: {count}")
+        print("reasons:")
+        for reason, count in evidence_pack["static_fname_root_sample_reason_counts"].items():
+            print(f"- {reason}: {count}")
+        print("targets:")
+        for target, count in evidence_pack["static_fname_root_sample_target_counts"].items():
+            print(f"- {target}: {count}")
+        print("samples:")
+        for item in static_fname_root_samples[:10]:
+            print(
+                "- line {line}: slot={slot} table={table} target={target} "
+                "source_global={source_global} object={object} index={index} "
+                "header_index_ok={header_index_ok} "
+                "status={status} reason={reason} name='{name}'".format(**item)
             )
 
     print("\ntop UObject validation scores:")
