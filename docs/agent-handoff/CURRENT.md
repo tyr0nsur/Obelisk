@@ -283,6 +283,7 @@ Updated: 2026-05-27
   `ue/ChatReflection.cpp` constants to offline core evidence for `ServerChat`,
   `ServerChatTo`, `ServerChatToPlayer`, `ServerSendChatMessage`, `ClientChatMessage`,
   `ClientServerChatDirectMessage`, and `ClientServerChatMessage`. It now also cross-checks
+  target/class/outer/property `GObjects[InternalIndex]` membership,
   `ServerSendChatMessage` native exec candidate `0x154a600`, executable segment
   membership, and `EChatSendMode` enum names. It passed against
   `/servidor/ark/obelisk/dumps/arkserver-20260527T031311Z/core/arkserver-20260527T031311Z.2902200`

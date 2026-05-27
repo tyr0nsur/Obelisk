@@ -72,6 +72,10 @@ memory windows: their object, class, and outer pointers round-trip through the c
 Offline `UFunction` property-chain evidence is stronger for this core and binary hash.
 This still does not promote a public SDK contract or a runtime-stable offset.
 
+`scripts/verify_chat_reflection_constants.py` now requires these membership checks before
+accepting local `ue/ChatReflection.cpp` constants. The existing core verification still
+reports `status=ok` with object/class/outer and per-property membership checks.
+
 ## Risks
 
 - The evidence still depends on one core and one ARK binary hash.

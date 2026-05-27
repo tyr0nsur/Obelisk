@@ -675,6 +675,18 @@ class VerifyChatReflectionConstantsTests(unittest.TestCase):
             for function in payload["functions"]
             for check in function["checks"]
         }
+        self.assertEqual(checks[("ServerChat", "object membership")]["observed"], "candidate-uobject")
+        self.assertEqual(checks[("ServerChat", "class membership")]["observed"], "candidate-uobject")
+        self.assertEqual(checks[("ServerChat", "outer membership")]["observed"], "candidate-uobject")
+        self.assertEqual(checks[("ServerChat", "MessageText[0] membership")]["observed"], "candidate-uobject")
+        self.assertEqual(
+            checks[("ServerChat", "MessageText[0] class membership")]["observed"],
+            "candidate-uobject",
+        )
+        self.assertEqual(
+            checks[("ServerChat", "MessageText[0] outer membership")]["observed"],
+            "candidate-uobject",
+        )
         self.assertEqual(checks[("ServerChat", "FName index")]["observed"], 9619)
         self.assertEqual(checks[("ServerChatTo", "MessageText[1] offset")]["observed"], 0x10)
         self.assertEqual(checks[("ServerChatToPlayer", "PlayerName[0] property class")]["observed"], "StrProperty")

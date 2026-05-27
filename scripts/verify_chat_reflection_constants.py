@@ -313,6 +313,27 @@ def verify_core(
         properties = chain.get("properties") or []
         expected_name_index = chat_spec.constants[expected.name_index_constant]
         observed_name_index = summary.get("name_index")
+        _add_check(
+            checks,
+            target.get("object_membership_status") == "candidate-uobject",
+            "object membership",
+            "candidate-uobject",
+            target.get("object_membership_status"),
+        )
+        _add_check(
+            checks,
+            target.get("class_membership_status") == "candidate-uobject",
+            "class membership",
+            "candidate-uobject",
+            target.get("class_membership_status"),
+        )
+        _add_check(
+            checks,
+            target.get("outer_membership_status") == "candidate-uobject",
+            "outer membership",
+            "candidate-uobject",
+            target.get("outer_membership_status"),
+        )
         _add_check(checks, observed_name_index == expected_name_index, "FName index", expected_name_index, observed_name_index)
         _add_check(checks, chain.get("expected_count") == expected.num_parms, "NumParms", expected.num_parms, chain.get("expected_count"))
         _add_check(checks, chain.get("parms_size") == expected.parms_size, "ParmsSize", expected.parms_size, chain.get("parms_size"))
@@ -326,6 +347,27 @@ def verify_core(
                 _add_check(checks, False, f"{prefix} present", "present", "missing")
                 continue
             prop_summary = prop.get("summary") if isinstance(prop.get("summary"), dict) else {}
+            _add_check(
+                checks,
+                prop.get("membership_status") == "candidate-uobject",
+                f"{prefix} membership",
+                "candidate-uobject",
+                prop.get("membership_status"),
+            )
+            _add_check(
+                checks,
+                prop.get("class_membership_status") == "candidate-uobject",
+                f"{prefix} class membership",
+                "candidate-uobject",
+                prop.get("class_membership_status"),
+            )
+            _add_check(
+                checks,
+                prop.get("outer_membership_status") == "candidate-uobject",
+                f"{prefix} outer membership",
+                "candidate-uobject",
+                prop.get("outer_membership_status"),
+            )
             expected_prop_name_index = chat_spec.constants[field.name_index_constant]
             expected_class_name_index = chat_spec.constants[field.class_name_index_constant]
             expected_class_object_index = chat_spec.constants[field.class_object_index_constant]
