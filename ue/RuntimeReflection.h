@@ -1,10 +1,11 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
-#include <vector>
+#include <utility>
 
 namespace Obelisk::UE::RuntimeReflection
 {
@@ -110,6 +111,37 @@ namespace Obelisk::UE::RuntimeReflection
         size_t ByteSize = 0;
     };
 
+    template <typename T, size_t CapacityValue>
+    struct FixedVector
+    {
+        std::array<T, CapacityValue> Items{};
+        size_t Count = 0;
+
+        size_t size() const { return Count; }
+        constexpr size_t capacity() const { return CapacityValue; }
+        bool empty() const { return Count == 0; }
+        void reserve(size_t) {}
+        void clear() { Count = 0; }
+
+        T* begin() { return Items.data(); }
+        T* end() { return Items.data() + Count; }
+        const T* begin() const { return Items.data(); }
+        const T* end() const { return Items.data() + Count; }
+
+        T& operator[](size_t index) { return Items[index]; }
+        const T& operator[](size_t index) const { return Items[index]; }
+
+        void push_back(const T& value)
+        {
+            Items[Count++] = value;
+        }
+
+        void push_back(T&& value)
+        {
+            Items[Count++] = std::move(value);
+        }
+    };
+
     struct UFunctionView
     {
         const void* Address = nullptr;
@@ -119,7 +151,7 @@ namespace Obelisk::UE::RuntimeReflection
         uint16_t NumParms = 0;
         uint16_t ParmsSize = 0;
         uint16_t ReturnValueOffset = 0xffff;
-        std::vector<UPropertyView> Parameters;
+        FixedVector<UPropertyView, 16> Parameters;
     };
 
     struct ParamRange

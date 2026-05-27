@@ -383,11 +383,10 @@ python3 scripts/analyze_reflectionscanner_capture.py \
   recognizer and UTF-32 decode timing. It is useful for local regressions, but it does not
   include hook-side `GetFunctionNameIndex()` / `Memory::IsReadable()` overhead.
 - `chat_reflection_benchmark` reports tail latency and allocation counts. Disabled and
-  enabled non-chat hook-like paths are allocation-free locally; matched chat paths still
-  allocate two temporary vectors/strings after stack cycle-guard hardening and need
-  justification or bounded stack/small-vector storage before SDK promotion. Standalone
-  UTF-32 decode reserves output and currently allows one allocation for a non-SSO fixture;
-  hook-like text logging currently shows four allocations in the text path.
+  enabled non-chat hook-like paths are allocation-free locally; matched chat paths are
+  allocation-free after fixed internal parameter/field storage. Standalone UTF-32 decode
+  reserves output and currently allows one allocation for a non-SSO fixture; hook-like text
+  logging currently shows two allocations in the text path.
   `OBELISK_CHAT_REFLECTION_LOG_LIMIT=0` now short-circuits observation reflection work. See
   `docs/research/2026-05-27-chat-reflection-stack-cycle-guard.md`.
 - `scripts/check_chat_reflection_benchmark.py` gates benchmark output for allocation-free

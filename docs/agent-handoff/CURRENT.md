@@ -369,10 +369,11 @@ Updated: 2026-05-27
 - fact: `chat_reflection_benchmark` now reports p50/p95/p99 and
   `allocations_per_iter`, including hook-like disabled, enabled non-chat, matched
   `ServerSendChatMessage`, and text decode cases. The hook-side wrapper keeps disabled and
-  non-chat attempts allocation-free in the synthetic benchmark. Stack cycle detection in
-  `RuntimeReflection::TryReadUFunction()` and UTF-8 output reservation lower matched chat
-  to two allocations, standalone UTF-32 decode to one allocation, and hook-like text
-  logging to four allocations per iteration locally. `OBELISK_CHAT_REFLECTION_LOG_LIMIT=0`
+  non-chat attempts allocation-free in the synthetic benchmark. Fixed internal storage in
+  `RuntimeReflection::TryReadUFunction()` / `ChatInvocation` and UTF-8 output reservation
+  lower matched chat to zero allocations, standalone UTF-32 decode to one allocation, and
+  hook-like text logging to two allocations per iteration locally.
+  `OBELISK_CHAT_REFLECTION_LOG_LIMIT=0`
   now short-circuits observation reflection work; see
   `docs/research/2026-05-27-chat-reflection-stack-cycle-guard.md`.
 - fact: `scripts/check_chat_reflection_benchmark.py` gates local benchmark output so
@@ -419,7 +420,7 @@ Updated: 2026-05-27
 - next-step: Benchmark ProcessEvent overhead with chat reflection enabled vs disabled
   before keeping the marker active for long high-population sessions.
 - next-step: Before drafting public chat API, justify or reduce the remaining two
-  matched-chat allocations and four text-log allocations, then plan isolated runtime A/B
+  text-log allocations, then plan isolated runtime A/B
   separately.
 - next-step: When chat API work resumes, add ABI layout tests and dispatcher ownership
   tests first; only then append public fields to `include/obelisk/ObeliskApi.h`.

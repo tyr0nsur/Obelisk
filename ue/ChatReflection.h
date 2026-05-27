@@ -4,7 +4,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <vector>
 
 namespace Obelisk::UE::ChatReflection
 {
@@ -48,10 +47,9 @@ namespace Obelisk::UE::ChatReflection
     {
         ChatFunction Function = ChatFunction::ServerChat;
         int32_t FunctionNameIndex = -1;
-        RuntimeReflection::UFunctionView ReflectedFunction;
         bool HasParameterRanges = false;
         bool MetadataOnlyCandidate = false;
-        std::vector<ChatFieldRange> Fields;
+        RuntimeReflection::FixedVector<ChatFieldRange, 8> Fields;
     };
 
     RuntimeReflection::ReadResult TryIdentifyChatInvocation(const RuntimeReflection::MemoryReader& reader,

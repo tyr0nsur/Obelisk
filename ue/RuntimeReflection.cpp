@@ -270,6 +270,8 @@ namespace Obelisk::UE::RuntimeReflection
         if (value.ReturnValueOffset != 0xffff && value.ReturnValueOffset >= value.ParmsSize)
             return ReadResult::Fail(ReadStatus::OutOfBounds, "ReturnValueOffset exceeds ParmsSize");
 
+        if (value.NumParms > value.Parameters.capacity())
+            return ReadResult::Fail(ReadStatus::OutOfBounds, "UFunction NumParms exceeds parameter storage capacity");
         value.Parameters.reserve(value.NumParms);
         std::array<const void*, 64> visited{};
         if (value.NumParms > visited.size())

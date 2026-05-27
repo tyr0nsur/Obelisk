@@ -28,6 +28,10 @@ header, reducing reallocations for non-SSO chat text without changing decode sem
 ## Method
 
 - Replaced the temporary visited vector with a fixed stack array of 64 property pointers.
+- Replaced internal `UFunctionView.Parameters` and `ChatInvocation.Fields` vector storage
+  with fixed-capacity internal storage.
+- Stopped carrying the full reflected `UFunctionView` in `ChatInvocation` after fields are
+  validated, avoiding unnecessary fixed-array copies on return.
 - Kept the existing `MaxProperties` and `NumParms` checks.
 - Added a fail-closed guard if `NumParms` exceeds the stack cycle guard capacity.
 - Reserved UTF-8 output capacity once the reflected `FString` char count is validated.
@@ -54,10 +58,10 @@ Observed synthetic benchmark allocation deltas:
 hook_like_disabled allocations_per_iter=0
 hook_like_enabled_non_chat allocations_per_iter=0
 hook_like_chat_limit_zero allocations_per_iter=0
-server_send_chat_match allocations_per_iter=2
+server_send_chat_match allocations_per_iter=0
 server_send_chat_decode_utf32 allocations_per_iter=1
-hook_like_server_send_chat allocations_per_iter=2
-hook_like_server_send_chat_text allocations_per_iter=4
+hook_like_server_send_chat allocations_per_iter=0
+hook_like_server_send_chat_text allocations_per_iter=2
 ```
 
 The matched metadata path previously allowed 3 allocations per iteration; the text path

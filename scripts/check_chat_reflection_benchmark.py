@@ -20,13 +20,13 @@ REQUIRED_CASES = {
 }
 
 DEFAULT_LIMITS = {
-    "server_send_chat_match": {"allocations_per_iter": 2, "reader_calls_per_iter": 60},
+    "server_send_chat_match": {"allocations_per_iter": 0, "reader_calls_per_iter": 60},
     "server_send_chat_decode_utf32": {"allocations_per_iter": 1, "reader_calls_per_iter": 2},
     "hook_like_disabled": {"allocations_per_iter": 0, "reader_calls_per_iter": 0},
     "hook_like_enabled_non_chat": {"allocations_per_iter": 0, "reader_calls_per_iter": 1},
     "hook_like_chat_limit_zero": {"allocations_per_iter": 0, "reader_calls_per_iter": 1},
-    "hook_like_server_send_chat": {"allocations_per_iter": 2, "reader_calls_per_iter": 60},
-    "hook_like_server_send_chat_text": {"allocations_per_iter": 4, "reader_calls_per_iter": 65},
+    "hook_like_server_send_chat": {"allocations_per_iter": 0, "reader_calls_per_iter": 60},
+    "hook_like_server_send_chat_text": {"allocations_per_iter": 2, "reader_calls_per_iter": 65},
 }
 
 METRIC_RE = re.compile(r"(?P<key>[A-Za-z0-9_]+)=(?P<value>[0-9]+)")

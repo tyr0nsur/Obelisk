@@ -487,16 +487,18 @@ namespace Obelisk::UE::ChatReflection
         ChatInvocation value;
         value.Function = spec->Function;
         value.FunctionNameIndex = spec->NameIndex;
-        value.ReflectedFunction = std::move(reflectedFunction);
         value.MetadataOnlyCandidate = spec->MetadataOnlyCandidate;
         value.HasParameterRanges = params != nullptr && !value.MetadataOnlyCandidate;
+        if (spec->FieldCount > value.Fields.capacity())
+            return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::OutOfBounds,
+                                                       "chat field count exceeds storage capacity");
         value.Fields.reserve(spec->FieldCount);
 
         size_t index = 0;
         for (size_t i = 0; i < spec->FieldCount; ++i)
         {
             const ChatFieldSpec& fieldSpec = spec->Fields[i];
-            const RuntimeReflection::UPropertyView& property = value.ReflectedFunction.Parameters[index];
+            const RuntimeReflection::UPropertyView& property = reflectedFunction.Parameters[index];
             if (RuntimeReflection::ReadResult result = ValidateProperty(reader, *options.Layout, property, fieldSpec);
                 !result)
             {
@@ -514,7 +516,7 @@ namespace Obelisk::UE::ChatReflection
                 if (RuntimeReflection::ReadResult result =
                         RuntimeReflection::TryGetParameterRange(reader,
                                                                 params,
-                                                                value.ReflectedFunction.ParmsSize,
+                                                                reflectedFunction.ParmsSize,
                                                                 property,
                                                                 fieldSpec.Size,
                                                                 field.Range);
