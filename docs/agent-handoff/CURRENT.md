@@ -258,6 +258,11 @@ Updated: 2026-05-27
 - fact: `RuntimeReflection::TryDecodeFStringUtf32` now implements the internal decoder
   candidate with synthetic tests and strict reject conditions. It is not wired into chat
   logging yet.
+- fact: `Memory::IsReadable` no longer uses `write(/dev/null)` because that probe returned
+  success for invalid and `PROT_NONE` mappings on this host. It is now backed by cached
+  readable ranges from `/proc/self/maps`, with `MemoryTests` covering invalid pointers,
+  overflow, and `PROT_NONE`; see
+  `docs/research/2026-05-27-isreadable-dev-null-hotpath.md`.
 
 ## Rejected Or Unsafe
 
@@ -278,6 +283,8 @@ Updated: 2026-05-27
   keep dispatch limited to `EChatSendMode` `0..3`.
 - next-step: Run `scripts/verify_chat_reflection_constants.py` against any new core before
   accepting changed chat FName indices, parameter offsets, or `StrProperty` constants.
+- next-step: Benchmark ProcessEvent overhead with chat reflection enabled vs disabled
+  before keeping the marker active for long high-population sessions.
 - rollback: remove `enable-chat-reflection` marker and restart the debug server; no plugin
   ABI or config migration is involved.
 - next-step: Generalize the binary-hash-scoped reflection pipeline only after another

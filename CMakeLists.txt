@@ -124,6 +124,16 @@ target_include_directories(runtime_reflection_tests PRIVATE ${CMAKE_CURRENT_SOUR
 
 add_test(NAME RuntimeReflectionTests COMMAND runtime_reflection_tests)
 
+add_executable(memory_tests
+    tests/core/MemoryTests.cpp
+    ue/Memory.cpp
+    runtime/Logger.cpp
+)
+target_include_directories(memory_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(memory_tests PRIVATE fmt::fmt spdlog::spdlog)
+
+add_test(NAME MemoryTests COMMAND memory_tests)
+
 add_executable(chat_reflection_tests
     tests/core/ChatReflectionTests.cpp
     ue/ChatReflection.cpp

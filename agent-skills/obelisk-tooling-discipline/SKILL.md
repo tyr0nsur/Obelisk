@@ -52,6 +52,8 @@ Forbidden on live/shared instances:
 - Prefer deterministic scripts over manual UI-only conclusions.
 - Use Ghidra for decompilation and manual xref reasoning, but summarize evidence in text.
 - Use Frida/rr only after there is an isolated debug instance and a rollback plan.
+- Do not introduce `/dev/null` write probes as memory-readability checks on Linux; current
+  evidence shows they can report invalid mappings as readable.
 
 ## Adding A Tool
 

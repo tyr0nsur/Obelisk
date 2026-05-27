@@ -62,8 +62,8 @@ is readable after an earlier `0x80` check.
 
 - The validation score uses heuristics and broad plausibility bounds. It should only help
   rank candidates for the next isolated capture.
-- `Memory::IsReadable` remains a coarse readability probe; scanner output must still be
-  cross-validated against names and object enumeration before accepting metadata offsets.
+- `Memory::IsReadable` is now maps-backed, but scanner output must still be cross-validated
+  against names and object enumeration before accepting metadata offsets.
 - A high-scoring object shape can still be a false positive without `GNames`/`GObjects`
   confirmation.
 

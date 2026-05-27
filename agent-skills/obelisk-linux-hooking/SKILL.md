@@ -46,6 +46,10 @@ When patching `.text`:
 - Validate the core hook with plugins disabled first.
 - Keep tracing disabled by default: `OBELISK_PE_TRACE_LIMIT=0`.
 - Never run startup scanners or native exec probes by default.
+- Do not use `write(/dev/null, ptr, size)` as a Linux readability probe. Obelisk's
+  `Memory::IsReadable` is maps-backed; arbitrary scanner reads still need metadata and
+  range validation, and UE-owned hot-path pointers should avoid syscall-style probing when
+  provenance is strong.
 
 ## Validation
 

@@ -64,8 +64,9 @@ metadata hypotheses.
 
 - `UFunction` tail logging is a candidate window only. Values around `+0xA0..+0xC8` can be
   false positives unless cross-validated against object enumeration and resolved names.
-- `Memory::IsReadable` is still a coarse probe based on `write(/dev/null)`. It is acceptable
-  for gated research logging, not for production metadata traversal.
+- Historical note: this audit predates the maps-backed `Memory::IsReadable` replacement in
+  `docs/research/2026-05-27-isreadable-dev-null-hotpath.md`. Keep candidate window logging
+  gated and cross-validated even with the newer readable-range check.
 - ChatPlugin still relies on raw FString parameter probing until property metadata is
   recovered.
 

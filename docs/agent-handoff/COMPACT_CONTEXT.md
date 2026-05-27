@@ -197,6 +197,10 @@ work from repository state instead of chat history.
   guardrail after server debug work. It checks expected env, requires `libobelisk.so` to be
   mapped, rejects deleted Obelisk mappings, and has offline procfs fixture coverage in
   `scripts/test_check_obelisk_server_posture.sh`.
+- `Memory::IsReadable` was changed away from `write(/dev/null)` after local evidence showed
+  that probe reports invalid and `PROT_NONE` mappings as readable. The replacement uses
+  cached readable ranges from `/proc/self/maps` and has `MemoryTests`; keep future scanner
+  reads metadata-bounded and benchmark ProcessEvent overhead separately.
 - A later controlled Ragnarok development capture on commit `8cb3bbe` produced 22
   UObject/UFunction leads and 22 FName reject rows, with zero positive FName probes.
   Rejection reasons were `implausible_num_elements` and `implausible_num_chunks`, so the

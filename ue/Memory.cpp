@@ -1,13 +1,99 @@
 #include "Memory.h"
 #include "runtime/Logger.h"
+#include <algorithm>
 #include <fstream>
 #include <sstream>
 #include <cstring>
-#include <fcntl.h>
-#include <unistd.h>
+#include <mutex>
 
 namespace Obelisk::Memory
 {
+    namespace
+    {
+        struct ReadableRange
+        {
+            uintptr_t Start = 0;
+            uintptr_t End = 0;
+        };
+
+        std::mutex s_ReadableRangesMutex;
+        std::vector<ReadableRange> s_ReadableRanges;
+
+        bool AddWouldOverflow(uintptr_t address, size_t size)
+        {
+            return size > 0 && address > UINTPTR_MAX - (size - 1);
+        }
+
+        bool ParseMapsReadableRanges(std::vector<ReadableRange>& ranges)
+        {
+            std::ifstream maps("/proc/self/maps");
+            if (!maps)
+                return false;
+
+            std::vector<ReadableRange> parsed;
+            std::string line;
+            while (std::getline(maps, line))
+            {
+                std::istringstream iss(line);
+                std::string addressRange;
+                std::string perms;
+                iss >> addressRange >> perms;
+                if (addressRange.empty() || perms.empty() || perms[0] != 'r')
+                    continue;
+
+                size_t dash = addressRange.find('-');
+                if (dash == std::string::npos)
+                    continue;
+
+                uintptr_t start = 0;
+                uintptr_t end = 0;
+                try
+                {
+                    start = std::stoull(addressRange.substr(0, dash), nullptr, 16);
+                    end = std::stoull(addressRange.substr(dash + 1), nullptr, 16);
+                }
+                catch (...)
+                {
+                    continue;
+                }
+
+                if (start < end)
+                    parsed.push_back({start, end});
+            }
+
+            std::sort(parsed.begin(), parsed.end(), [](const ReadableRange& lhs, const ReadableRange& rhs) {
+                return lhs.Start < rhs.Start;
+            });
+            ranges = std::move(parsed);
+            return true;
+        }
+
+        bool RangeContains(const std::vector<ReadableRange>& ranges, uintptr_t start, uintptr_t end)
+        {
+            auto it = std::upper_bound(
+                ranges.begin(),
+                ranges.end(),
+                start,
+                [](uintptr_t value, const ReadableRange& range) {
+                    return value < range.Start;
+                });
+            if (it == ranges.begin())
+                return false;
+
+            --it;
+            return start >= it->Start && end <= it->End;
+        }
+
+        bool RefreshReadableRangesLocked()
+        {
+            std::vector<ReadableRange> ranges;
+            if (!ParseMapsReadableRanges(ranges))
+                return false;
+            s_ReadableRanges = std::move(ranges);
+            return true;
+        }
+    }
+
     ModuleInfo GetMainModuleInfo()
     {
         ModuleInfo info = {0, 0, 0, false};
@@ -136,13 +222,25 @@ namespace Obelisk::Memory
 
     __attribute__((visibility("default"))) bool IsReadable(void* ptr, size_t size)
     {
-        if (!ptr || size == 0) return false;
-        
-        static int fd = -1;
-        if (fd < 0) fd = open("/dev/null", O_WRONLY);
-        if (fd < 0) return false;
-        
-        ssize_t ret = write(fd, ptr, size);
-        return ret >= 0;
+        if (!ptr || size == 0)
+            return false;
+
+        const uintptr_t start = reinterpret_cast<uintptr_t>(ptr);
+        if (AddWouldOverflow(start, size))
+            return false;
+        const uintptr_t end = start + size;
+
+        std::lock_guard<std::mutex> lock(s_ReadableRangesMutex);
+        if (s_ReadableRanges.empty() && !RefreshReadableRangesLocked())
+            return false;
+
+        if (RangeContains(s_ReadableRanges, start, end))
+            return true;
+
+        // Mappings can appear after startup when shared objects are loaded. Refresh once
+        // on a miss before rejecting the address.
+        if (!RefreshReadableRangesLocked())
+            return false;
+        return RangeContains(s_ReadableRanges, start, end);
     }
 }
