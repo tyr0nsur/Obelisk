@@ -67,6 +67,9 @@ jobs:
       - name: Installer dry run
         run: scripts/install_obelisk.sh --dry-run /tmp/obelisk-ci-install
 
+      - name: Validate installed SDK layout
+        run: scripts/test_install_obelisk_layout.sh /tmp/obelisk-ci-layout
+
   docs:
     name: Documentation hygiene
     runs-on: ubuntu-24.04
