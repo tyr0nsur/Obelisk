@@ -696,6 +696,111 @@ def inspect_core(
     }
 
 
+def summarize_uobject(summary: object) -> dict[str, object] | None:
+    if not isinstance(summary, dict):
+        return None
+    return {
+        "name": summary.get("name"),
+        "name_index": summary.get("name_index"),
+        "class_name": summary.get("class_name"),
+    }
+
+
+def scalar_field_value(target: dict[str, object], label: str) -> object:
+    for field in target.get("candidate_fields", []):
+        if isinstance(field, dict) and field.get("label") == label:
+            return field.get("value_hex") if field.get("kind") in ("u32", "u16") else field.get("value")
+    return None
+
+
+def build_fixture_snapshot(payload: dict[str, object]) -> dict[str, object]:
+    metadata = payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
+    snapshot_targets: list[dict[str, object]] = []
+    for target in payload.get("targets", []):
+        if not isinstance(target, dict):
+            continue
+        target_summary = summarize_uobject(target.get("object_summary"))
+        outer_summary = summarize_uobject(target.get("outer_summary"))
+        chain = target.get("property_chain") if isinstance(target.get("property_chain"), dict) else {}
+
+        properties: list[dict[str, object]] = []
+        for prop in chain.get("properties", []) if isinstance(chain, dict) else []:
+            if not isinstance(prop, dict):
+                continue
+            prop_summary = summarize_uobject(prop.get("summary")) or {}
+            property_payload: dict[str, object] = {
+                "depth": prop.get("depth"),
+                "name": prop_summary.get("name"),
+                "name_index": prop_summary.get("name_index"),
+                "class_name": prop_summary.get("class_name"),
+                "offset_internal": prop.get("offset_internal"),
+                "element_size": prop.get("element_size"),
+                "array_dim": prop.get("array_dim"),
+                "property_flags": prop.get("property_flags"),
+                "membership_status": prop.get("membership_status"),
+                "class_membership_status": prop.get("class_membership_status"),
+                "outer_membership_status": prop.get("outer_membership_status"),
+                "status": prop.get("status"),
+                "reject_reasons": prop.get("reject_reasons", []),
+            }
+            enum_candidate = prop.get("enum_candidate")
+            if isinstance(enum_candidate, dict):
+                property_payload["enum_candidate"] = {
+                    "status": enum_candidate.get("status"),
+                    "reject_reasons": enum_candidate.get("reject_reasons", []),
+                    "values": [
+                        item.get("name")
+                        for item in enum_candidate.get("values", [])
+                        if isinstance(item, dict)
+                    ],
+                }
+            properties.append(property_payload)
+
+        snapshot_targets.append(
+            {
+                "target": {
+                    "kind": target.get("target_kind"),
+                    "value": target.get("target_value"),
+                    "object_index": target.get("object_index"),
+                    "name": target_summary.get("name") if target_summary else None,
+                    "class_name": target_summary.get("class_name") if target_summary else None,
+                    "outer_name": outer_summary.get("name") if outer_summary else None,
+                    "outer_class_name": outer_summary.get("class_name") if outer_summary else None,
+                },
+                "status": target.get("status"),
+                "reject_reasons": target.get("reject_reasons", []),
+                "membership": {
+                    "object": target.get("object_membership_status"),
+                    "class": target.get("class_membership_status"),
+                    "outer": target.get("outer_membership_status"),
+                },
+                "num_parms": target.get("num_parms"),
+                "parms_size": target.get("parms_size"),
+                "function_flags": scalar_field_value(target, "ufunction.function_flags"),
+                "return_value_offset": scalar_field_value(target, "ufunction.return_value_offset"),
+                "property_chain": {
+                    "status": chain.get("status") if isinstance(chain, dict) else None,
+                    "reject_reasons": chain.get("reject_reasons", []) if isinstance(chain, dict) else [],
+                    "expected_count": chain.get("expected_count") if isinstance(chain, dict) else None,
+                    "observed_count": chain.get("observed_count") if isinstance(chain, dict) else None,
+                    "parms_size": chain.get("parms_size") if isinstance(chain, dict) else None,
+                    "properties": properties,
+                },
+            }
+        )
+
+    return {
+        "schema": "obelisk.ufunction-chain.snapshot.v1",
+        "address_policy": "absolute core paths and addresses omitted; use full inspector JSON for local evidence review",
+        "interpretation": payload.get("interpretation"),
+        "metadata": {
+            "object_count": metadata.get("object_count"),
+            "max_object_scan": metadata.get("max_object_scan"),
+        },
+        "targets": snapshot_targets,
+    }
+
+
 def contains_any(value: object, needles: list[str]) -> bool:
     if not needles:
         return True
@@ -890,6 +995,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--window-size", type=parse_int, default=DEFAULT_WINDOW_SIZE)
     parser.add_argument("--max-object-scan", type=int, default=DEFAULT_MAX_OBJECT_SCAN)
     parser.add_argument("--json", action="store_true", help="Emit JSON instead of text.")
+    parser.add_argument(
+        "--snapshot-json",
+        action="store_true",
+        help="Emit a sanitized JSON fixture snapshot without core paths or absolute addresses.",
+    )
     return parser.parse_args()
 
 
@@ -901,6 +1011,8 @@ def main() -> int:
         raise SystemExit("--window-size must be positive")
     if args.max_object_scan < 0:
         raise SystemExit("--max-object-scan must be non-negative")
+    if args.json and args.snapshot_json:
+        raise SystemExit("choose only one of --json or --snapshot-json")
 
     memory = uobjects.CoreMemory(args.core)
     try:
@@ -920,6 +1032,8 @@ def main() -> int:
 
     if args.json:
         print(json.dumps({"core": str(args.core), **payload}, indent=2, sort_keys=True))
+    elif args.snapshot_json:
+        print(json.dumps(build_fixture_snapshot(payload), indent=2, sort_keys=True))
     else:
         print(format_text(payload))
     return 0

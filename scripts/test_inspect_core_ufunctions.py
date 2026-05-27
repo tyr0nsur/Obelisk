@@ -89,6 +89,27 @@ def build_core_fixture(path: Path) -> dict[str, int]:
         "mission_tags_property": base + 0x24700,
         "str_property_class": base + 0x24800,
         "array_property_class": base + 0x24900,
+        "primal_structure_class": base + 0x24A00,
+        "allow_structure_access_function": base + 0x24B00,
+        "allow_structure_access_for_pc_property": base + 0x24C00,
+        "allow_structure_access_return_property": base + 0x24D00,
+        "is_allowed_to_demolish_function": base + 0x24E00,
+        "demolish_for_pc_property": base + 0x24F00,
+        "demolish_return_property": base + 0x25000,
+        "set_variant_function": base + 0x25100,
+        "variant_index_property": base + 0x25200,
+        "force_set_property": base + 0x25300,
+        "set_variant_return_property": base + 0x25400,
+        "primal_structure_item_container_class": base + 0x25500,
+        "verify_pin_code_function": base + 0x25600,
+        "pin_code_property": base + 0x25700,
+        "verify_pin_return_property": base + 0x25800,
+        "primal_structure_seating_class": base + 0x25900,
+        "can_seat_function": base + 0x25A00,
+        "can_seat_for_pc_property": base + 0x25B00,
+        "for_character_property": base + 0x25C00,
+        "can_seat_force_property": base + 0x25D00,
+        "can_seat_return_property": base + 0x25E00,
         "readable_non_uobject": base + 0x80000,
     }
 
@@ -138,7 +159,7 @@ def build_core_fixture(path: Path) -> dict[str, int]:
 
     put_ptr(addrs["fname_root_slot"], addrs["fname_table"])
     put_ptr(addrs["fname_table"], addrs["fname_chunk"])
-    put_u32(addrs["fname_table"] + 0x800, 64)
+    put_u32(addrs["fname_table"] + 0x800, 96)
     put_u32(addrs["fname_table"] + 0x804, 1)
     put_entry(0, b"None\x00")
     put_entry(1, b"Class\x00")
@@ -196,9 +217,22 @@ def build_core_fixture(path: Path) -> dict[str, int]:
     put_entry(53, b"MissionTags\x00")
     put_entry(54, b"StrProperty\x00")
     put_entry(55, b"ArrayProperty\x00")
+    put_entry(56, b"PrimalStructure\x00")
+    put_entry(57, b"AllowStructureAccess\x00")
+    put_entry(58, b"IsAllowedToDemolish\x00")
+    put_entry(59, b"SetVariant\x00")
+    put_entry(60, b"VariantIndex\x00")
+    put_entry(61, b"bForceSet\x00")
+    put_entry(62, b"PrimalStructureItemContainer\x00")
+    put_entry(63, b"VerifyPinCode\x00")
+    put_entry(64, b"pinCode\x00")
+    put_entry(65, b"PrimalStructureSeating\x00")
+    put_entry(66, b"CanSeat\x00")
+    put_entry(67, b"forCharacter\x00")
+    put_entry(68, b"bForce\x00")
 
     put_ptr(addrs["gobjects"] + enum.GOBJECTS_CHUNKS_OFFSET, addrs["gobjects_chunks"])
-    put_i32(addrs["gobjects"] + enum.GOBJECTS_COUNT_OFFSET, 58)
+    put_i32(addrs["gobjects"] + enum.GOBJECTS_COUNT_OFFSET, 79)
     put_ptr(addrs["gobjects_chunks"], addrs["gobjects_chunk0"])
 
     put_uobject(addrs["class_class"], 1, 0, addrs["class_class"], 1, 0)
@@ -475,6 +509,147 @@ def build_core_fixture(path: Path) -> dict[str, int]:
         name_index=53,
         outer_key="deferred_mission_string_array_function",
     )
+    add_uobject("primal_structure_class", object_index=58, class_key="class_class", name_index=56, outer_key="package_object")
+    add_uobject(
+        "allow_structure_access_function",
+        object_index=59,
+        class_key="function_class",
+        name_index=57,
+        outer_key="primal_structure_class",
+    )
+    add_uobject(
+        "allow_structure_access_for_pc_property",
+        object_index=60,
+        class_key="object_property_class",
+        name_index=41,
+        outer_key="allow_structure_access_function",
+    )
+    add_uobject(
+        "allow_structure_access_return_property",
+        object_index=61,
+        class_key="bool_property_class",
+        name_index=29,
+        outer_key="allow_structure_access_function",
+    )
+    add_uobject(
+        "is_allowed_to_demolish_function",
+        object_index=62,
+        class_key="function_class",
+        name_index=58,
+        outer_key="primal_structure_class",
+    )
+    add_uobject(
+        "demolish_for_pc_property",
+        object_index=63,
+        class_key="object_property_class",
+        name_index=41,
+        outer_key="is_allowed_to_demolish_function",
+    )
+    add_uobject(
+        "demolish_return_property",
+        object_index=64,
+        class_key="bool_property_class",
+        name_index=29,
+        outer_key="is_allowed_to_demolish_function",
+    )
+    add_uobject(
+        "set_variant_function",
+        object_index=65,
+        class_key="function_class",
+        name_index=59,
+        outer_key="primal_structure_class",
+    )
+    add_uobject(
+        "variant_index_property",
+        object_index=66,
+        class_key="property_class",
+        name_index=60,
+        outer_key="set_variant_function",
+    )
+    add_uobject(
+        "force_set_property",
+        object_index=67,
+        class_key="bool_property_class",
+        name_index=61,
+        outer_key="set_variant_function",
+    )
+    add_uobject(
+        "set_variant_return_property",
+        object_index=68,
+        class_key="bool_property_class",
+        name_index=29,
+        outer_key="set_variant_function",
+    )
+    add_uobject(
+        "primal_structure_item_container_class",
+        object_index=69,
+        class_key="class_class",
+        name_index=62,
+        outer_key="package_object",
+    )
+    add_uobject(
+        "verify_pin_code_function",
+        object_index=70,
+        class_key="function_class",
+        name_index=63,
+        outer_key="primal_structure_item_container_class",
+    )
+    add_uobject(
+        "pin_code_property",
+        object_index=71,
+        class_key="property_class",
+        name_index=64,
+        outer_key="verify_pin_code_function",
+    )
+    add_uobject(
+        "verify_pin_return_property",
+        object_index=72,
+        class_key="bool_property_class",
+        name_index=29,
+        outer_key="verify_pin_code_function",
+    )
+    add_uobject(
+        "primal_structure_seating_class",
+        object_index=73,
+        class_key="class_class",
+        name_index=65,
+        outer_key="package_object",
+    )
+    add_uobject(
+        "can_seat_function",
+        object_index=74,
+        class_key="function_class",
+        name_index=66,
+        outer_key="primal_structure_seating_class",
+    )
+    add_uobject(
+        "can_seat_for_pc_property",
+        object_index=75,
+        class_key="object_property_class",
+        name_index=41,
+        outer_key="can_seat_function",
+    )
+    add_uobject(
+        "for_character_property",
+        object_index=76,
+        class_key="object_property_class",
+        name_index=67,
+        outer_key="can_seat_function",
+    )
+    add_uobject(
+        "can_seat_force_property",
+        object_index=77,
+        class_key="bool_property_class",
+        name_index=68,
+        outer_key="can_seat_function",
+    )
+    add_uobject(
+        "can_seat_return_property",
+        object_index=78,
+        class_key="bool_property_class",
+        name_index=29,
+        outer_key="can_seat_function",
+    )
 
     for index, key in [
         (0, "class_class"),
@@ -680,6 +855,48 @@ def build_core_fixture(path: Path) -> dict[str, int]:
         parms_size=16,
         properties=[("mission_name_property", 0, 16), ("mission_tags_property", 16, 16)],
     )
+    add_function_chain(
+        "allow_structure_access_function",
+        first_property_key="allow_structure_access_for_pc_property",
+        parms_size=9,
+        properties=[
+            ("allow_structure_access_for_pc_property", 0, 8),
+            ("allow_structure_access_return_property", 8, 1),
+        ],
+    )
+    add_function_chain(
+        "is_allowed_to_demolish_function",
+        first_property_key="demolish_for_pc_property",
+        parms_size=9,
+        properties=[("demolish_for_pc_property", 0, 8), ("demolish_return_property", 8, 1)],
+    )
+    add_function_chain(
+        "set_variant_function",
+        first_property_key="variant_index_property",
+        parms_size=6,
+        properties=[
+            ("variant_index_property", 0, 4),
+            ("force_set_property", 4, 1),
+            ("set_variant_return_property", 5, 1),
+        ],
+    )
+    add_function_chain(
+        "verify_pin_code_function",
+        first_property_key="pin_code_property",
+        parms_size=5,
+        properties=[("pin_code_property", 0, 4), ("verify_pin_return_property", 4, 1)],
+    )
+    add_function_chain(
+        "can_seat_function",
+        first_property_key="can_seat_for_pc_property",
+        parms_size=18,
+        properties=[
+            ("can_seat_for_pc_property", 0, 8),
+            ("for_character_property", 8, 8),
+            ("can_seat_force_property", 0x10, 1),
+            ("can_seat_return_property", 0x11, 1),
+        ],
+    )
 
     write_minimal_elf64_core(path, base, bytes(segment))
     return addrs
@@ -711,7 +928,7 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
                     name_contains=[name],
                     outer_contains=[outer],
                     window_size=0xC0,
-                    max_object_scan=64,
+                    max_object_scan=96,
                 )
             finally:
                 memory.close()
@@ -996,6 +1213,74 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
             ],
         )
 
+    def test_primal_structure_access_bool_return_property_chain(self) -> None:
+        target = self.inspect_single_by_name_outer("AllowStructureAccess", "PrimalStructure")
+        chain = target["property_chain"]
+
+        self.assertEqual(chain["status"], "candidate")
+        self.assert_property_sequence(
+            chain,
+            [
+                ("ForPC", "ObjectProperty", 0, 8),
+                ("ReturnValue", "BoolProperty", 8, 1),
+            ],
+        )
+
+    def test_primal_structure_demolish_bool_return_property_chain(self) -> None:
+        target = self.inspect_single_by_name_outer("IsAllowedToDemolish", "PrimalStructure")
+        chain = target["property_chain"]
+
+        self.assertEqual(chain["status"], "candidate")
+        self.assert_property_sequence(
+            chain,
+            [
+                ("ForPC", "ObjectProperty", 0, 8),
+                ("ReturnValue", "BoolProperty", 8, 1),
+            ],
+        )
+
+    def test_primal_structure_variant_int_bool_return_property_chain(self) -> None:
+        target = self.inspect_single_by_name_outer("SetVariant", "PrimalStructure")
+        chain = target["property_chain"]
+
+        self.assertEqual(chain["status"], "candidate")
+        self.assert_property_sequence(
+            chain,
+            [
+                ("VariantIndex", "IntProperty", 0, 4),
+                ("bForceSet", "BoolProperty", 4, 1),
+                ("ReturnValue", "BoolProperty", 5, 1),
+            ],
+        )
+
+    def test_primal_structure_item_container_pin_code_property_chain(self) -> None:
+        target = self.inspect_single_by_name_outer("VerifyPinCode", "PrimalStructureItemContainer")
+        chain = target["property_chain"]
+
+        self.assertEqual(chain["status"], "candidate")
+        self.assert_property_sequence(
+            chain,
+            [
+                ("pinCode", "IntProperty", 0, 4),
+                ("ReturnValue", "BoolProperty", 4, 1),
+            ],
+        )
+
+    def test_primal_structure_seating_can_seat_property_chain(self) -> None:
+        target = self.inspect_single_by_name_outer("CanSeat", "PrimalStructureSeating")
+        chain = target["property_chain"]
+
+        self.assertEqual(chain["status"], "candidate")
+        self.assert_property_sequence(
+            chain,
+            [
+                ("ForPC", "ObjectProperty", 0, 8),
+                ("forCharacter", "ObjectProperty", 8, 8),
+                ("bForce", "BoolProperty", 0x10, 1),
+                ("ReturnValue", "BoolProperty", 0x11, 1),
+            ],
+        )
+
     def test_rejects_non_chat_property_exceeding_parms_size(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             core = Path(temp_dir) / "core"
@@ -1103,6 +1388,140 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
         payload = json.loads(result.stdout)
         self.assertEqual(payload["targets"][0]["object_summary"]["name"], "ServerChat")
         self.assertEqual(payload["targets"][0]["pointer_window"][2]["label"], "uobject.class")
+
+    def test_fixture_snapshot_omits_addresses_and_keeps_property_shape(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            core = Path(temp_dir) / "core"
+            addrs = build_core_fixture(core)
+            memory = inspector.uobjects.CoreMemory(core)
+            try:
+                payload = inspector.inspect_core(
+                    memory,
+                    gobjects=addrs["gobjects"],
+                    fname_root_slot=addrs["fname_root_slot"],
+                    object_addresses=[],
+                    indices=[],
+                    name_contains=["ServerActivate"],
+                    outer_contains=["PrimalStructureElevatorPlatform"],
+                    window_size=0xC0,
+                    max_object_scan=64,
+                )
+            finally:
+                memory.close()
+
+        snapshot = inspector.build_fixture_snapshot(payload)
+        self.assertEqual(snapshot["schema"], "obelisk.ufunction-chain.snapshot.v1")
+        target = snapshot["targets"][0]
+        self.assertEqual(target["target"]["name"], "ServerActivate")
+        self.assertEqual(target["target"]["outer_name"], "PrimalStructureElevatorPlatform")
+        self.assertEqual(
+            target["membership"],
+            {"object": "candidate-uobject", "class": "candidate-uobject", "outer": "candidate-uobject"},
+        )
+        self.assertEqual(target["function_flags"], "0x204000")
+        self.assertEqual(target["return_value_offset"], "0xffff")
+        self.assertEqual(
+            [
+                (prop["depth"], prop["name"], prop["class_name"], prop["offset_internal"], prop["element_size"])
+                for prop in target["property_chain"]["properties"]
+            ],
+            [
+                (0, "ForPC", "ObjectProperty", 0, 8),
+                (1, "bForceDirection", "BoolProperty", 8, 1),
+                (2, "Dir", "ByteProperty", 9, 1),
+            ],
+        )
+        serialized = json.dumps(snapshot, sort_keys=True)
+        self.assertNotIn(hex(addrs["server_activate_function"]), serialized)
+        self.assertNotIn(str(core), serialized)
+        self.assertNotIn("pointer_window", serialized)
+
+    def test_fixture_snapshot_preserves_rejected_chain_reasons(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            core = Path(temp_dir) / "core"
+            addrs = build_core_fixture(core)
+            memory = inspector.uobjects.CoreMemory(core)
+            try:
+                payload = inspector.inspect_core(
+                    memory,
+                    gobjects=addrs["gobjects"],
+                    fname_root_slot=addrs["fname_root_slot"],
+                    object_addresses=[],
+                    indices=[],
+                    name_contains=["DeferredMissionStringArray"],
+                    outer_contains=["MissionType"],
+                    window_size=0xC0,
+                    max_object_scan=64,
+                )
+            finally:
+                memory.close()
+
+        target = inspector.build_fixture_snapshot(payload)["targets"][0]
+        chain = target["property_chain"]
+        self.assertEqual(chain["status"], "rejected")
+        self.assertIn("property_1_rejected", chain["reject_reasons"])
+        self.assertIn("property_exceeds_parms_size", chain["properties"][1]["reject_reasons"])
+        serialized = json.dumps(target, sort_keys=True)
+        self.assertNotIn(hex(addrs["deferred_mission_string_array_function"]), serialized)
+
+    def test_cli_snapshot_json_output_omits_core_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            core = Path(temp_dir) / "core"
+            addrs = build_core_fixture(core)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "inspect_core_ufunctions.py"),
+                    "--core",
+                    str(core),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--name-contains",
+                    "BPAllowPlayerToLeaveMission",
+                    "--outer-contains",
+                    "MissionType",
+                    "--snapshot-json",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["targets"][0]["target"]["name"], "BPAllowPlayerToLeaveMission")
+        self.assertNotIn(str(core), result.stdout)
+        self.assertNotIn(hex(addrs["bp_allow_player_leave_function"]), result.stdout)
+        self.assertNotIn(hex(addrs["leave_player_character_property"]), result.stdout)
+        self.assertNotIn(hex(addrs["gobjects"]), result.stdout)
+        self.assertNotIn(hex(addrs["fname_table"]), result.stdout)
+
+    def test_cli_rejects_full_and_snapshot_json_together(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            core = Path(temp_dir) / "core"
+            addrs = build_core_fixture(core)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "inspect_core_ufunctions.py"),
+                    "--core",
+                    str(core),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--index",
+                    "7",
+                    "--json",
+                    "--snapshot-json",
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("choose only one", result.stderr)
 
     def test_cli_name_contains_finds_matching_function(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -102,6 +102,11 @@ PrimalItem.AllowRemoteAddToInventory
 PrimalItem.CanUse
 PrimalDinoCharacter.ServerRequestAttack
 PrimalDinoCharacter.BPNotifyAddPassenger
+PrimalStructure.AllowStructureAccess
+PrimalStructure.IsAllowedToDemolish
+PrimalStructure.SetVariant
+PrimalStructureItemContainer.VerifyPinCode
+PrimalStructureSeating.CanSeat
 PrimalStructureElevatorPlatform.ServerActivate
 MissionType.AddPlayerToMission
 MissionType.BPAllowPlayerToLeaveMission
@@ -121,7 +126,7 @@ params and has higher gameplay-authority risk.
 ## Open Questions
 
 - Should fixture-backed status be promoted from synthetic tests to real-core fixture JSON
-  snapshots?
+  snapshots using `scripts/inspect_core_ufunctions.py --snapshot-json`?
 - What minimum second-source evidence is required before non-chat runtime observation?
 - What policy layer is needed before admin, transfer, and NetExec surfaces can be discussed
   as SDK features?
@@ -133,4 +138,5 @@ params and has higher gameplay-authority risk.
 - `docs/research/2026-05-27-primalitem-function-inventory.md`
 - `docs/research/2026-05-27-primaldinocharacter-function-inventory.md`
 - `docs/research/2026-05-27-primalstructure-function-inventory.md`
+- `docs/research/2026-05-27-structure-access-policy-fixtures.md`
 - `docs/research/2026-05-27-missiontype-function-inventory.md`
