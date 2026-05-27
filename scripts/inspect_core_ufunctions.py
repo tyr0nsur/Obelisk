@@ -430,6 +430,8 @@ def inspect_array_inner_candidate(context: GObjectContext, property_address: int
 
     resolved_inner = context.resolve_uobject_pointer(inner_address)
     inner_summary = summarize_uobject(resolved_inner.get("uobject"))
+    if inner_summary is not None:
+        inner_summary["object_index"] = resolved_inner.get("gobjects_index")
     return {
         "status": "candidate"
         if resolved_inner["status"] == "candidate-uobject"
@@ -452,6 +454,8 @@ def inspect_struct_type_candidate(context: GObjectContext, property_address: int
 
     resolved_struct = context.resolve_uobject_pointer(struct_address)
     struct_summary = summarize_uobject(resolved_struct.get("uobject"))
+    if struct_summary is not None:
+        struct_summary["object_index"] = resolved_struct.get("gobjects_index")
     return {
         "status": "candidate"
         if resolved_struct["status"] == "candidate-uobject"
@@ -814,9 +818,14 @@ def build_fixture_snapshot(
             prop_summary = summarize_uobject(prop.get("summary")) or {}
             property_payload: dict[str, object] = {
                 "depth": prop.get("depth"),
+                "object_index": prop.get("gobjects_index"),
                 "name": prop_summary.get("name"),
                 "name_index": prop_summary.get("name_index"),
                 "class_name": prop_summary.get("class_name"),
+                "class_name_index": (prop.get("class_summary") or {}).get("name_index")
+                if isinstance(prop.get("class_summary"), dict)
+                else None,
+                "class_object_index": prop.get("class_gobjects_index"),
                 "offset_internal": prop.get("offset_internal"),
                 "element_size": prop.get("element_size"),
                 "array_dim": prop.get("array_dim"),
@@ -862,9 +871,16 @@ def build_fixture_snapshot(
                 "value": target.get("target_value"),
                 "object_index": target.get("object_index"),
                 "name": target_summary.get("name") if target_summary else None,
+                "name_index": target_summary.get("name_index") if target_summary else None,
                 "class_name": target_summary.get("class_name") if target_summary else None,
+                "class_name_index": (target.get("class_summary") or {}).get("name_index")
+                if isinstance(target.get("class_summary"), dict)
+                else None,
+                "class_object_index": target.get("class_index"),
                 "outer_name": outer_summary.get("name") if outer_summary else None,
+                "outer_name_index": outer_summary.get("name_index") if outer_summary else None,
                 "outer_class_name": outer_summary.get("class_name") if outer_summary else None,
+                "outer_object_index": target.get("outer_index"),
             },
             "inspection_mode": target.get("inspection_mode"),
             "status": target.get("status"),

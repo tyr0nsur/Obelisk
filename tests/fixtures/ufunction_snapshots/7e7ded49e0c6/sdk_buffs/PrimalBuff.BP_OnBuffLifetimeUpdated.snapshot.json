@@ -3,7 +3,7 @@
   "evidence": {
     "ark_binary_sha256": "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
     "generated_by": "scripts/inspect_core_ufunctions.py --snapshot-json",
-    "obelisk_commit": "763ba2e",
+    "obelisk_commit": "5ad06ff",
     "source": "offline_core",
     "status": "candidate-only"
   },
@@ -19,6 +19,7 @@
   "targets": [
     {
       "function_flags": "0xc020800",
+      "inspection_mode": "ufunction",
       "membership": {
         "class": "candidate-uobject",
         "outer": "candidate-uobject",
@@ -39,11 +40,16 @@
       "status": "candidate",
       "target": {
         "class_name": "Function",
+        "class_name_index": 10650,
+        "class_object_index": 518,
         "kind": "index",
         "name": "BP_OnBuffLifetimeUpdated",
+        "name_index": 1129,
         "object_index": 15063,
         "outer_class_name": "Class",
         "outer_name": "PrimalBuff",
+        "outer_name_index": 7843,
+        "outer_object_index": 195,
         "value": 15063
       }
     }

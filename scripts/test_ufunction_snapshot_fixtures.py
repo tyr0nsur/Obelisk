@@ -120,7 +120,10 @@ class UFunctionSnapshotFixtureTests(unittest.TestCase):
                 self.assertEqual(len(targets), 1)
                 target = targets[0]
                 self.assertIn(target.get("status"), {"candidate", "rejected"})
-                self.assertEqual(target.get("target", {}).get("class_name"), "Function")
+                target_identity = target.get("target", {})
+                self.assertEqual(target_identity.get("class_name"), "Function")
+                for field in ("object_index", "name_index", "class_name_index", "class_object_index", "outer_name_index", "outer_object_index"):
+                    self.assertIsInstance(target_identity.get(field), int)
                 self.assertEqual(
                     target.get("membership"),
                     {"target": "candidate-uobject", "class": "candidate-uobject", "outer": "candidate-uobject"},
@@ -135,6 +138,10 @@ class UFunctionSnapshotFixtureTests(unittest.TestCase):
                 self.assertIsInstance(properties, list)
                 self.assertEqual(len(properties), chain.get("observed_count"))
                 for prop in properties:
+                    self.assertIsInstance(prop.get("object_index"), int)
+                    self.assertIsInstance(prop.get("name_index"), int)
+                    self.assertIsInstance(prop.get("class_name_index"), int)
+                    self.assertIsInstance(prop.get("class_object_index"), int)
                     self.assertEqual(prop.get("membership_status"), "candidate-uobject")
                     self.assertEqual(prop.get("class_membership_status"), "candidate-uobject")
                     self.assertEqual(prop.get("outer_membership_status"), "candidate-uobject")
@@ -160,6 +167,7 @@ class UFunctionSnapshotFixtureTests(unittest.TestCase):
                         self.assertEqual(array_inner_candidate.get("membership_status"), "candidate-uobject")
                         inner_property = array_inner_candidate.get("inner_property")
                         self.assertIsInstance(inner_property, dict)
+                        self.assertIsInstance(inner_property.get("object_index"), int)
                         self.assertIsInstance(inner_property.get("name"), str)
                         self.assertIsInstance(inner_property.get("name_index"), int)
                         self.assertIsInstance(inner_property.get("class_name"), str)
@@ -172,6 +180,7 @@ class UFunctionSnapshotFixtureTests(unittest.TestCase):
                         self.assertEqual(struct_type_candidate.get("membership_status"), "candidate-uobject")
                         struct_type = struct_type_candidate.get("struct_type")
                         self.assertIsInstance(struct_type, dict)
+                        self.assertIsInstance(struct_type.get("object_index"), int)
                         self.assertIsInstance(struct_type.get("name"), str)
                         self.assertIsInstance(struct_type.get("name_index"), int)
                         self.assertIsInstance(struct_type.get("class_name"), str)

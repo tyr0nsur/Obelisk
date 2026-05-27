@@ -3,7 +3,7 @@
   "evidence": {
     "ark_binary_sha256": "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
     "generated_by": "scripts/inspect_core_ufunctions.py --snapshot-json",
-    "obelisk_commit": "763ba2e",
+    "obelisk_commit": "5ad06ff",
     "source": "offline_core",
     "status": "candidate-only"
   },
@@ -19,6 +19,7 @@
   "targets": [
     {
       "function_flags": "0x220cc0",
+      "inspection_mode": "ufunction",
       "membership": {
         "class": "candidate-uobject",
         "outer": "candidate-uobject",
@@ -35,11 +36,14 @@
             "array_dim": 1,
             "class_membership_status": "candidate-uobject",
             "class_name": "ObjectProperty",
+            "class_name_index": 5,
+            "class_object_index": 534,
             "depth": 0,
             "element_size": 8,
             "membership_status": "candidate-uobject",
             "name": "anActor",
             "name_index": 20098,
+            "object_index": 10356,
             "offset_internal": 0,
             "outer_membership_status": "candidate-uobject",
             "property_flags": "0x1040000280",
@@ -50,11 +54,14 @@
             "array_dim": 1,
             "class_membership_status": "candidate-uobject",
             "class_name": "ObjectProperty",
+            "class_name_index": 5,
+            "class_object_index": 534,
             "depth": 1,
             "element_size": 8,
             "membership_status": "candidate-uobject",
             "name": "InventoryComp",
             "name_index": 16929,
+            "object_index": 10355,
             "offset_internal": 8,
             "outer_membership_status": "candidate-uobject",
             "property_flags": "0x1044080280",
@@ -65,11 +72,14 @@
             "array_dim": 1,
             "class_membership_status": "candidate-uobject",
             "class_name": "StructProperty",
+            "class_name_index": 10,
+            "class_object_index": 548,
             "depth": 2,
             "element_size": 8,
             "membership_status": "candidate-uobject",
             "name": "ItemID1",
             "name_index": 16926,
+            "object_index": 10354,
             "offset_internal": 16,
             "outer_membership_status": "candidate-uobject",
             "property_flags": "0x1040000280",
@@ -82,7 +92,8 @@
               "struct_type": {
                 "class_name": "ScriptStruct",
                 "name": "ItemNetID",
-                "name_index": 593
+                "name_index": 593,
+                "object_index": 2236
               }
             }
           },
@@ -90,11 +101,14 @@
             "array_dim": 1,
             "class_membership_status": "candidate-uobject",
             "class_name": "IntProperty",
+            "class_name_index": 2,
+            "class_object_index": 539,
             "depth": 3,
             "element_size": 4,
             "membership_status": "candidate-uobject",
             "name": "AdditionalData",
             "name_index": 19290,
+            "object_index": 10353,
             "offset_internal": 24,
             "outer_membership_status": "candidate-uobject",
             "property_flags": "0x1040000280",
@@ -110,11 +124,16 @@
       "status": "candidate",
       "target": {
         "class_name": "Function",
+        "class_name_index": 10650,
+        "class_object_index": 518,
         "kind": "index",
         "name": "ServerRequestInventoryUseItemWithActor",
+        "name_index": 2652,
         "object_index": 10352,
         "outer_class_name": "Class",
         "outer_name": "ShooterPlayerController",
+        "outer_name_index": 6721,
+        "outer_object_index": 50,
         "value": 10352
       }
     }

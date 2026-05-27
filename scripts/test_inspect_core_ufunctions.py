@@ -1720,7 +1720,7 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
         self.assertEqual(inner["reject_reasons"], [])
         self.assertEqual(
             inner["inner_property"],
-            {"name": "MissionTag", "name_index": 86, "class_name": "StrProperty"},
+            {"name": "MissionTag", "name_index": 86, "class_name": "StrProperty", "object_index": 99},
         )
 
     def test_fixture_snapshot_preserves_array_inner_candidate(self) -> None:
@@ -1751,7 +1751,7 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
                 "status": "candidate",
                 "reject_reasons": [],
                 "membership_status": "candidate-uobject",
-                "inner_property": {"name": "MissionTag", "name_index": 86, "class_name": "StrProperty"},
+                "inner_property": {"name": "MissionTag", "name_index": 86, "class_name": "StrProperty", "object_index": 99},
             },
         )
         serialized = json.dumps(snapshot, sort_keys=True)
@@ -1769,7 +1769,7 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
         self.assertEqual(struct_type["reject_reasons"], [])
         self.assertEqual(
             struct_type["struct_type"],
-            {"name": "ChatMessage", "name_index": 7, "class_name": "Class"},
+            {"name": "ChatMessage", "name_index": 7, "class_name": "Class", "object_index": 8},
         )
 
     def test_fixture_snapshot_preserves_struct_type_candidate(self) -> None:
@@ -1800,7 +1800,7 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
                 "status": "candidate",
                 "reject_reasons": [],
                 "membership_status": "candidate-uobject",
-                "struct_type": {"name": "ChatMessage", "name_index": 7, "class_name": "Class"},
+                "struct_type": {"name": "ChatMessage", "name_index": 7, "class_name": "Class", "object_index": 8},
             },
         )
         serialized = json.dumps(snapshot, sort_keys=True)
@@ -1921,7 +1921,12 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
         self.assertEqual(snapshot["evidence"], evidence)
         target = snapshot["targets"][0]
         self.assertEqual(target["target"]["name"], "ServerActivate")
+        self.assertEqual(target["target"]["name_index"], 40)
+        self.assertEqual(target["target"]["class_name_index"], 3)
+        self.assertEqual(target["target"]["class_object_index"], 2)
         self.assertEqual(target["target"]["outer_name"], "PrimalStructureElevatorPlatform")
+        self.assertEqual(target["target"]["outer_name_index"], 39)
+        self.assertEqual(target["target"]["outer_object_index"], 37)
         self.assertEqual(
             target["membership"],
             {"target": "candidate-uobject", "class": "candidate-uobject", "outer": "candidate-uobject"},
@@ -1930,13 +1935,22 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
         self.assertEqual(target["return_value_offset"], "0xffff")
         self.assertEqual(
             [
-                (prop["depth"], prop["name"], prop["class_name"], prop["offset_internal"], prop["element_size"])
+                (
+                    prop["depth"],
+                    prop["name"],
+                    prop["name_index"],
+                    prop["class_name"],
+                    prop["class_name_index"],
+                    prop["class_object_index"],
+                    prop["offset_internal"],
+                    prop["element_size"],
+                )
                 for prop in target["property_chain"]["properties"]
             ],
             [
-                (0, "ForPC", "ObjectProperty", 0, 8),
-                (1, "bForceDirection", "BoolProperty", 8, 1),
-                (2, "Dir", "ByteProperty", 9, 1),
+                (0, "ForPC", 41, "ObjectProperty", 17, 13, 0, 8),
+                (1, "bForceDirection", 42, "BoolProperty", 19, 15, 8, 1),
+                (2, "Dir", 43, "ByteProperty", 10, 10, 9, 1),
             ],
         )
         serialized = json.dumps(snapshot, sort_keys=True)

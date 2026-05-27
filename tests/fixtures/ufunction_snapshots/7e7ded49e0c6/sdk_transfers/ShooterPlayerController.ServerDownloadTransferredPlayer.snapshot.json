@@ -3,7 +3,7 @@
   "evidence": {
     "ark_binary_sha256": "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
     "generated_by": "scripts/inspect_core_ufunctions.py --snapshot-json",
-    "obelisk_commit": "763ba2e",
+    "obelisk_commit": "5ad06ff",
     "source": "offline_core",
     "status": "candidate-only"
   },
@@ -19,6 +19,7 @@
   "targets": [
     {
       "function_flags": "0x220cc0",
+      "inspection_mode": "ufunction",
       "membership": {
         "class": "candidate-uobject",
         "outer": "candidate-uobject",
@@ -35,11 +36,14 @@
             "array_dim": 1,
             "class_membership_status": "candidate-uobject",
             "class_name": "IntProperty",
+            "class_name_index": 2,
+            "class_object_index": 539,
             "depth": 0,
             "element_size": 4,
             "membership_status": "candidate-uobject",
             "name": "SpawnPointID",
             "name_index": 20667,
+            "object_index": 10242,
             "offset_internal": 0,
             "outer_membership_status": "candidate-uobject",
             "property_flags": "0x1040000280",
@@ -50,11 +54,14 @@
             "array_dim": 1,
             "class_membership_status": "candidate-uobject",
             "class_name": "IntProperty",
+            "class_name_index": 2,
+            "class_object_index": 539,
             "depth": 1,
             "element_size": 4,
             "membership_status": "candidate-uobject",
             "name": "spawnPointRegionIndex",
             "name_index": 21474,
+            "object_index": 10241,
             "offset_internal": 4,
             "outer_membership_status": "candidate-uobject",
             "property_flags": "0x1040000280",
@@ -70,11 +77,16 @@
       "status": "candidate",
       "target": {
         "class_name": "Function",
+        "class_name_index": 10650,
+        "class_object_index": 518,
         "kind": "index",
         "name": "ServerDownloadTransferredPlayer",
+        "name_index": 2562,
         "object_index": 10240,
         "outer_class_name": "Class",
         "outer_name": "ShooterPlayerController",
+        "outer_name_index": 6721,
+        "outer_object_index": 50,
         "value": 10240
       }
     }

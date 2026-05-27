@@ -3,7 +3,7 @@
   "evidence": {
     "ark_binary_sha256": "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
     "generated_by": "scripts/inspect_core_ufunctions.py --snapshot-json",
-    "obelisk_commit": "763ba2e",
+    "obelisk_commit": "5ad06ff",
     "source": "offline_core",
     "status": "candidate-only"
   },
@@ -19,6 +19,7 @@
   "targets": [
     {
       "function_flags": "0x4020401",
+      "inspection_mode": "ufunction",
       "membership": {
         "class": "candidate-uobject",
         "outer": "candidate-uobject",
@@ -35,6 +36,8 @@
             "array_dim": 1,
             "class_membership_status": "candidate-uobject",
             "class_name": "ByteProperty",
+            "class_name_index": 1,
+            "class_object_index": 533,
             "depth": 0,
             "element_size": 1,
             "enum_candidate": {
@@ -61,6 +64,7 @@
             "membership_status": "candidate-uobject",
             "name": "TribeGroupPermission",
             "name_index": 20688,
+            "object_index": 9465,
             "offset_internal": 0,
             "outer_membership_status": "candidate-uobject",
             "property_flags": "0x1040000280",
@@ -71,11 +75,14 @@
             "array_dim": 1,
             "class_membership_status": "candidate-uobject",
             "class_name": "ObjectProperty",
+            "class_name_index": 5,
+            "class_object_index": 534,
             "depth": 1,
             "element_size": 8,
             "membership_status": "candidate-uobject",
             "name": "OnObject",
             "name_index": 20687,
+            "object_index": 9464,
             "offset_internal": 8,
             "outer_membership_status": "candidate-uobject",
             "property_flags": "0x1040000280",
@@ -86,11 +93,14 @@
             "array_dim": 1,
             "class_membership_status": "candidate-uobject",
             "class_name": "BoolProperty",
+            "class_name_index": 3,
+            "class_object_index": 532,
             "depth": 2,
             "element_size": 1,
             "membership_status": "candidate-uobject",
             "name": "ReturnValue",
             "name_index": 17716,
+            "object_index": 9463,
             "offset_internal": 16,
             "outer_membership_status": "candidate-uobject",
             "property_flags": "0x1040000780",
@@ -106,11 +116,16 @@
       "status": "candidate",
       "target": {
         "class_name": "Function",
+        "class_name_index": 10650,
+        "class_object_index": 518,
         "kind": "index",
         "name": "AllowTribeGroupPermission",
+        "name_index": 6699,
         "object_index": 9462,
         "outer_class_name": "Class",
         "outer_name": "ShooterPlayerController",
+        "outer_name_index": 6721,
+        "outer_object_index": 50,
         "value": 9462
       }
     }
