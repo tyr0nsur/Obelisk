@@ -51,7 +51,9 @@ For each reconstructed field:
 - Put reusable structs and guarded readers under `ue/`.
 - Current internal layers are `ue/RuntimeReflection.{h,cpp}` for bounded type reads and
   `ue/ChatReflection.{h,cpp}` for `ServerChat`/`ServerChatTo`/`ServerChatToPlayer` plus
-  `ServerSendChatMessage` recognition.
+  `ServerSendChatMessage` recognition. Runtime text logging, when explicitly enabled, is
+  decoded through `ProcessEventChatReflection` into sanitized log output and must remain
+  internal until SDK ownership gates are complete.
 - `ServerSendChatMessage.SendMode` is a reflected `ByteProperty` at offset `0x10` with
   `EChatSendMode` values `0 GlobalChat`, `1 GlobalTribeChat`, `2 LocalChat`,
   `3 AllianceChat`; values `>=4` are invalid for logging/dispatch.
@@ -75,9 +77,10 @@ For each reconstructed field:
 
 - Core evidence has already produced a binary-hash-scoped FName table, `GUObjectArray`
   candidate, UObject enumeration, UFunction property chains, and internal runtime readers.
-- The active blocker for chat is not more raw scanning; it is a real in-game chat message
-  confirming the deployed `ServerSendChatMessage` recognizer in the gated runtime.
+- The active blocker for chat is not more raw scanning or another Ragnarok hit; it is a
+  controlled TheIsland A/B runtime validation plus copied-data ownership and ABI/lifecycle
+  gates before public SDK promotion.
 - The deployed recognizer already logs accepted `send_mode` and `send_mode_name`; keep
   future dispatch bounded to `EChatSendMode` `0..3`.
-- Do not promote decoded chat text to public SDK until the live capture confirms the
-  reflected params and `FString` decoder against the running process.
+- Do not promote decoded chat text to public SDK until the TheIsland validation confirms
+  reflected params and sanitized text logging under the explicit text gate.
