@@ -174,9 +174,11 @@ work from repository state instead of chat history.
   `ShooterCheatManager` outer evidence, while
   `ShooterPlayerController.ServerSendChatMessage` has FName index `2697`,
   `StrProperty ChatMessage` offset `0x0`, `ByteProperty SendMode` offset `0x10`, and
-  `ParmsSize=0x11`; this recognizer was deployed to `/servidor/ark/obelisk` on commit
-  `df332d7`. Commit `8281123` adds reflected `SendMode` byte/name logging and is deployed
-  on `arkserver` PID `3233586`. See
+  `ParmsSize=0x11`; `SendMode` is `EChatSendMode` with `0 GlobalChat`,
+  `1 GlobalTribeChat`, `2 LocalChat`, `3 AllianceChat`, and `>=4` invalid for
+  logging/dispatch. This recognizer was deployed to `/servidor/ark/obelisk` on commit
+  `df332d7`. Commit `8281123` adds reflected `send_mode` and `send_mode_name` logging and
+  is deployed on `arkserver` PID `3233586`. See
   `docs/research/2026-05-27-real-chat-ufunction-path-hypotheses.md`.
 - Core-pack tooling now supports direct FName entry reads and bounded
   `--gobjects-candidate` previews for the next `GUObjectArray` investigation.
@@ -278,13 +280,14 @@ python3 scripts/analyze_reflectionscanner_capture.py \
 - Runtime chat: wait for one real in-game chat message and confirm
   `Reflected chat ProcessEvent` in `/servidor/ark/obelisk/logs/arkserver/Obelisk.log`.
 - After a real hit, wire `RuntimeReflection::TryDecodeFStringUtf32` into the experimental
-  logger and keep it gated/rate-limited.
+  logger and keep it gated/rate-limited; dispatch must only accept `EChatSendMode` `0..3`.
 - `ue/RuntimeReflection.{h,cpp}` exists as the internal gated reader for
   `UObject`/`UFunction`/`UProperty`, bounded parameter ranges, and UTF-32 `FString`
   decoding. It is tested and used by hook-side chat observation.
 - `ue/ChatReflection.{h,cpp}` exists as the internal recognizer for `ServerChat`,
-  `ServerChatTo`, and `ServerChatToPlayer` shapes. It is tested, returns borrowed param
-  ranges, and does not decode `FString` in runtime logs yet.
+  `ServerChatTo`, `ServerChatToPlayer`, and `ServerSendChatMessage` shapes. It is tested,
+  returns borrowed param ranges, logs accepted `send_mode`/`send_mode_name`, and does not
+  decode `FString` in runtime logs yet.
 - `ProcessEvent_Detour` has experimental chat observation wiring, disabled unless
   `OBELISK_ENABLE_CHAT_REFLECTION=1` and `OBELISK_CHAT_REFLECTION_BINARY_SHA256` matches
   the supported ARK SHA. It logs metadata/ranges only, not text.

@@ -36,7 +36,11 @@ or parameter decoding for ARK's Linux UE4 server.
   evidence and should not be treated as the primary normal player chat path. Current best
   incoming player chat candidate is `ServerSendChatMessage` with FName index `2697`,
   `StrProperty ChatMessage` at offset `0x0`, `ByteProperty SendMode` at offset `0x10`,
-  and `ParmsSize=0x11`.
+  and `ParmsSize=0x11`. `SendMode` is `EChatSendMode`: `0 GlobalChat`,
+  `1 GlobalTribeChat`, `2 LocalChat`, `3 AllianceChat`; values `>=4` must be rejected
+  for logging/dispatch.
+- The deployed experimental chat runtime logs reflected `send_mode` and `send_mode_name`
+  for accepted `ServerSendChatMessage` hits.
 - Prior raw chat experiments used parameter probing and FString heuristics. Treat that as
   historical discovery code, not the final architecture.
 - `ReflectionScanner` FName table output must be treated as candidate ranking. Analyzer
@@ -74,6 +78,8 @@ Build toward a real UE4 metadata pipeline:
 
 - Keep chat interception experimental until `ServerSendChatMessage` is confirmed by a live
   in-game chat message in the deployed hook path.
+- For `ServerSendChatMessage`, only log or dispatch recognized `EChatSendMode` values
+  `0..3`; treat `>=4` as rejected evidence, not a chat event.
 - Do not expand raw `0x00..0x80` param scanning as the long-term fix.
 - Avoid manual construction of `ClientMessage` params until the real property layout is
   decoded.

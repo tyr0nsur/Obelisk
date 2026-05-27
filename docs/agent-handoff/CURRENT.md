@@ -233,15 +233,17 @@ Updated: 2026-05-27
   offline evidence points normal incoming player chat at
   `ShooterPlayerController.ServerSendChatMessage` with FName index `2697`,
   `StrProperty ChatMessage` offset `0x0`, `ByteProperty SendMode` offset `0x10`, and
-  `ParmsSize=0x11`; see
+  `ParmsSize=0x11`. `SendMode` maps to `EChatSendMode`: `0 GlobalChat`,
+  `1 GlobalTribeChat`, `2 LocalChat`, `3 AllianceChat`; values `>=4` are invalid for
+  logging/dispatch. See
   `docs/research/2026-05-27-real-chat-ufunction-path-hypotheses.md`.
 - fact: `packaging/linuxgsm/ObeliskRun.sh` supports
   `state/instances/<id>/enable-chat-reflection` to set the experimental chat reflection
   gates and default log limit on restart.
 - fact: Latest local runtime from `main` including commits through `751a7c3` was deployed to
   `/servidor/ark/obelisk`; later deploy on commit `df332d7` installed the
-  `ServerSendChatMessage` recognizer. Commit `8281123` added reflected `SendMode` name
-  logging and was deployed afterward. Current PID `3233586` has
+  `ServerSendChatMessage` recognizer. Commit `8281123` added reflected `send_mode` and
+  `send_mode_name` logging and was deployed afterward. Current PID `3233586` has
   `OBELISK_ENABLE_CHAT_REFLECTION=1`, matching SHA gate, ProcessEvent hook installed at
   `0x1d34e20`, plugins disabled, and stable posture confirmed.
 - fact: Manual post-deploy `ServerSendChatMessage` chat validation commands, expected log
@@ -272,7 +274,8 @@ Updated: 2026-05-27
   by sending one normal in-game Ragnarok chat message and reviewing the bounded reflected
   chat logs/snapshot.
 - next-step: After one real `ServerSendChatMessage` capture confirms the reflected params
-  are being hit, wire UTF-32 text decoding into the experimental chat reflection logger.
+  are being hit, wire UTF-32 text decoding into the experimental chat reflection logger;
+  keep dispatch limited to `EChatSendMode` `0..3`.
 - next-step: Run `scripts/verify_chat_reflection_constants.py` against any new core before
   accepting changed chat FName indices, parameter offsets, or `StrProperty` constants.
 - rollback: remove `enable-chat-reflection` marker and restart the debug server; no plugin

@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstring>
 #include <iostream>
+#include <string>
 #include <stdexcept>
 #include <vector>
 
@@ -325,6 +326,47 @@ namespace
         Require(!ChatReflection::IsKnownSendMode(4), "MAX SendMode should be rejected");
         Require(std::string(ChatReflection::SendModeName(4)) == "Unknown",
                 "Unknown SendMode name mismatch");
+        Require(!ChatReflection::IsKnownSendMode(5), "MAX alias SendMode should be rejected");
+        Require(!ChatReflection::IsKnownSendMode(255), "out-of-range SendMode should be rejected");
+        fixture.Params[0x10] = 0xff;
+        Require(ChatReflection::TryGetSendMode(invocation, sendMode), "SendMode helper failed after param mutation");
+        Require(sendMode == 0xff, "SendMode helper did not read current borrowed byte");
+        Require(!ChatReflection::IsKnownSendMode(sendMode), "mutated SendMode should be unknown");
+    }
+
+    void TestRejectsServerSendChatMessageWhenSendModeByteUnreadable()
+    {
+        ChatFixture fixture;
+        BuildFunction(fixture,
+                      kServerSendChatMessageNameIndex,
+                      2,
+                      0x11,
+                      kChatMessageNameIndex,
+                      0x00,
+                      kSendModeNameIndex,
+                      0x10,
+                      0x10,
+                      0x1,
+                      fixture.StrPropertyClass.data(),
+                      fixture.BytePropertyClass.data());
+        fixture.Context.Regions.clear();
+        fixture.Context.Regions.push_back({fixture.Function.data(), fixture.Function.size()});
+        fixture.Context.Regions.push_back({fixture.PropertyA.data(), fixture.PropertyA.size()});
+        fixture.Context.Regions.push_back({fixture.PropertyB.data(), fixture.PropertyB.size()});
+        fixture.Context.Regions.push_back({fixture.BytePropertyClass.data(), fixture.BytePropertyClass.size()});
+        fixture.Context.Regions.push_back({fixture.StrPropertyClass.data(), fixture.StrPropertyClass.size()});
+        fixture.Context.Regions.push_back({fixture.Params.data(), 0x10});
+        MemoryReader reader{RegionReader, &fixture.Context};
+
+        ChatReflection::ChatInvocation invocation;
+        ReadResult result = ChatReflection::TryIdentifyChatInvocation(
+            reader,
+            Options(),
+            fixture.Function.data(),
+            fixture.Params.data(),
+            invocation);
+
+        Require(result.Status == ReadStatus::Unreadable, "unreadable SendMode byte was not rejected");
     }
 
     void TestRejectsSameFNameWithWrongShape()
@@ -415,6 +457,7 @@ int main()
     TestRecognizesServerChatToWithoutParams();
     TestRecognizesServerChatToPlayer();
     TestRecognizesServerSendChatMessage();
+    TestRejectsServerSendChatMessageWhenSendModeByteUnreadable();
     TestRejectsSameFNameWithWrongShape();
     TestRejectsSameFNameWithWrongPropertyName();
     TestRejectsWrongStrPropertyClass();

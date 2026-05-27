@@ -52,6 +52,9 @@ For each reconstructed field:
 - Current internal layers are `ue/RuntimeReflection` for bounded type reads and
   `ue/ChatReflection` for `ServerChat`/`ServerChatTo`/`ServerChatToPlayer` plus
   `ServerSendChatMessage` recognition.
+- `ServerSendChatMessage.SendMode` is a reflected `ByteProperty` at offset `0x10` with
+  `EChatSendMode` values `0 GlobalChat`, `1 GlobalTribeChat`, `2 LocalChat`,
+  `3 AllianceChat`; values `>=4` are invalid for logging/dispatch.
 - Keep scanners gated and bounded.
 - Log candidate scores and reasons, not just addresses.
 - Prefer analyzer fixtures before runtime reads.
@@ -74,5 +77,7 @@ For each reconstructed field:
   candidate, UObject enumeration, UFunction property chains, and internal runtime readers.
 - The active blocker for chat is not more raw scanning; it is a real in-game chat message
   confirming the deployed `ServerSendChatMessage` recognizer in the gated runtime.
+- The deployed recognizer already logs accepted `send_mode` and `send_mode_name`; keep
+  future dispatch bounded to `EChatSendMode` `0..3`.
 - Do not promote decoded chat text to public SDK until the live capture confirms the
   reflected params and `FString` decoder against the running process.
