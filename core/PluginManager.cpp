@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <exception>
+#include <unordered_set>
 #include <vector>
 
 namespace fs = std::filesystem;
@@ -200,6 +201,7 @@ namespace Obelisk::Core
             std::sort(plugins.begin(), plugins.end());
             OBELISK_INFO("Scanning for plugins in {}. Found {} candidate(s).", directory, plugins.size());
 
+            std::unordered_set<std::string> pluginIds;
             for (const auto& path : plugins)
             {
                 std::string pluginName = path.filename().string();
@@ -258,9 +260,30 @@ namespace Obelisk::Core
 
                 PreparedPluginConfig preparedConfig;
                 std::string configError;
-                if (!PreparePluginConfig(metadata, configRoot, preparedConfig, configError))
+                if (!PreparePluginConfig(metadata, configRoot, instanceId, preparedConfig, configError))
                 {
                     OBELISK_ERROR("Plugin {} metadata/config rejected: {}. Unloading.", pluginName, configError);
+                    m_Loader->Close(handle);
+                    continue;
+                }
+
+                if (!pluginIds.insert(metadata.plugin_id).second)
+                {
+                    OBELISK_ERROR("Plugin {} rejected: duplicate plugin_id '{}'. Unloading.", pluginName, metadata.plugin_id);
+                    m_Loader->Close(handle);
+                    continue;
+                }
+
+                if (!preparedConfig.enabled)
+                {
+                    OBELISK_INFO("Plugin {} skipped because config enabled=false.", pluginName);
+                    m_Loader->Close(handle);
+                    continue;
+                }
+
+                if (!preparedConfig.instance_allowed)
+                {
+                    OBELISK_INFO("Plugin {} skipped because instance '{}' is not in instance_allowlist.", pluginName, instanceId);
                     m_Loader->Close(handle);
                     continue;
                 }

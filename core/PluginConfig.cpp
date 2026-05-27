@@ -100,10 +100,60 @@ namespace Obelisk::Core
 
             return true;
         }
+
+        bool InstanceAllowed(const json& config, const std::string& instanceId)
+        {
+            const auto allowlist = config.find("instance_allowlist");
+            if (allowlist == config.end() || allowlist->empty())
+                return true;
+
+            for (const auto& entry : *allowlist)
+            {
+                if (entry.is_string() && entry.get<std::string>() == instanceId)
+                    return true;
+            }
+
+            return false;
+        }
+
+        bool WriteDefaultConfigAtomically(const fs::path& path, const json& config, std::string& error)
+        {
+            const fs::path tempPath = path.string() + ".tmp";
+
+            std::ofstream out(tempPath, std::ios::trunc);
+            if (!out.is_open())
+            {
+                error = "failed to create default plugin config";
+                return false;
+            }
+
+            out << config.dump(4) << '\n';
+            out.close();
+            if (!out)
+            {
+                error = "failed to write default plugin config";
+                std::error_code removeEc;
+                fs::remove(tempPath, removeEc);
+                return false;
+            }
+
+            std::error_code ec;
+            fs::rename(tempPath, path, ec);
+            if (ec)
+            {
+                error = "failed to install default plugin config: " + ec.message();
+                std::error_code removeEc;
+                fs::remove(tempPath, removeEc);
+                return false;
+            }
+
+            return true;
+        }
     }
 
     bool PreparePluginConfig(const ObeliskPluginMetadata& metadata,
                              const fs::path& configRoot,
+                             const std::string& instanceId,
                              PreparedPluginConfig& prepared,
                              std::string& error)
     {
@@ -171,20 +221,8 @@ namespace Obelisk::Core
                 return false;
             }
 
-            std::ofstream out(prepared.path);
-            if (!out.is_open())
-            {
-                error = "failed to create default plugin config";
+            if (!WriteDefaultConfigAtomically(prepared.path, defaultConfig, error))
                 return false;
-            }
-
-            out << defaultConfig.dump(4) << '\n';
-            out.close();
-            if (!out)
-            {
-                error = "failed to write default plugin config";
-                return false;
-            }
         }
 
         json existingConfig;
@@ -222,6 +260,9 @@ namespace Obelisk::Core
                 }
             }
         }
+
+        prepared.enabled = enabled->get<bool>();
+        prepared.instance_allowed = InstanceAllowed(existingConfig, instanceId);
 
         return true;
     }

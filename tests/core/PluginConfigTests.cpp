@@ -70,7 +70,7 @@ namespace
     {
         error.clear();
         prepared = {};
-        return Obelisk::Core::PreparePluginConfig(metadata, configRoot, prepared, error);
+        return Obelisk::Core::PreparePluginConfig(metadata, configRoot, "arkserver", prepared, error);
     }
 
     void TestCreatesSafeDisabledDefault(const fs::path& root)
@@ -82,6 +82,8 @@ namespace
         Require(error.empty(), "successful prepare returned an error");
         Require(prepared.directory == root / "test_plugin", "prepared directory mismatch");
         Require(prepared.path == root / "test_plugin" / "config.json", "prepared path mismatch");
+        Require(!prepared.enabled, "safe default should be disabled");
+        Require(prepared.instance_allowed, "safe default should allow configured instance");
         Require(fs::exists(prepared.path), "default config was not created");
 
         const std::string created = ReadFile(prepared.path);
@@ -164,7 +166,23 @@ namespace
         Require(Prepare(Metadata("existing_valid"), root, prepared, error), "existing valid config was rejected");
         Require(error.empty(), "existing valid config returned an error");
         Require(prepared.path == configPath, "existing valid config path mismatch");
+        Require(prepared.enabled, "existing enabled config did not set prepared enabled");
+        Require(prepared.instance_allowed, "existing allowlisted config did not allow instance");
         Require(ReadFile(configPath) == original, "existing valid config was overwritten");
+    }
+
+    void TestExistingConfigCanDisallowInstance(const fs::path& root)
+    {
+        WriteFile(root / "other_instance" / "config.json",
+                  "{\n  \"enabled\": true,\n  \"instance_allowlist\": [\"arkserver2\"]\n}\n");
+
+        Obelisk::Core::PreparedPluginConfig prepared;
+        std::string error;
+
+        Require(Prepare(Metadata("other_instance"), root, prepared, error),
+                "existing config for another instance was rejected");
+        Require(prepared.enabled, "enabled config for another instance did not set prepared enabled");
+        Require(!prepared.instance_allowed, "non-matching instance_allowlist was allowed");
     }
 
     void TestRejectsCorruptExistingJson(const fs::path& root)
@@ -210,6 +228,7 @@ int main()
         TestRejectsCorruptDefaultJson(root);
         TestRejectsMistypedDefaultAllowlist(root);
         TestAcceptsExistingValidConfigWithoutOverwrite(root);
+        TestExistingConfigCanDisallowInstance(root);
         TestRejectsCorruptExistingJson(root);
         TestRejectsMistypedExistingAllowlist(root);
         fs::remove_all(root);

@@ -173,6 +173,16 @@ namespace
         Require(out.is_open(), "failed to create fake plugin candidate");
     }
 
+    void WritePluginConfig(const fs::path& root, const std::string& pluginId, const std::string& contents)
+    {
+        fs::create_directories(root / "config" / pluginId);
+        std::ofstream out(root / "config" / pluginId / "config.json");
+        Require(out.is_open(), "failed to create fake plugin config");
+        out << contents;
+        out.close();
+        Require(static_cast<bool>(out), "failed to write fake plugin config");
+    }
+
     void ConfigureEnvironment(const fs::path& root)
     {
         setenv("OBELISK_CONFIG_DIR", (root / "config").string().c_str(), 1);
@@ -195,6 +205,7 @@ namespace
         FakeLoader loader;
         loader.Add(plugin);
         TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
 
         Obelisk::Core::PluginManager manager(loader);
         manager.LoadPlugins((root / "plugins").string());
@@ -218,6 +229,52 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestDisabledPluginPreparesConfigButDoesNotInit()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_disabled");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{.filename = "disabled.so"};
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.getInfoCalls == 1, "disabled plugin metadata was not read");
+        Require(plugin.initCalls == 0, "disabled plugin was initialized");
+        Require(plugin.shutdownCalls == 0, "disabled plugin shutdown was called despite no init");
+        Require(plugin.closeCalls == 1, "disabled plugin was not closed after skip");
+        Require(fs::exists(root / "config" / plugin.pluginId / "config.json"),
+                "disabled plugin default config was not prepared");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestInstanceDisallowedPluginDoesNotInit()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_instance_disallowed");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{.filename = "wrong_instance.so"};
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver2"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.getInfoCalls == 1, "instance-disallowed plugin metadata was not read");
+        Require(plugin.initCalls == 0, "instance-disallowed plugin was initialized");
+        Require(plugin.closeCalls == 1, "instance-disallowed plugin was not closed after skip");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestMissingGetInfoRejectsAndCloses()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_no_getinfo");
@@ -227,6 +284,7 @@ namespace
         FakeLoader loader;
         loader.Add(plugin);
         TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
 
         Obelisk::Core::PluginManager manager(loader);
         manager.LoadPlugins((root / "plugins").string());
@@ -247,6 +305,7 @@ namespace
         FakeLoader loader;
         loader.Add(plugin);
         TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
 
         Obelisk::Core::PluginManager manager(loader);
         manager.LoadPlugins((root / "plugins").string());
@@ -288,6 +347,7 @@ namespace
         FakeLoader loader;
         loader.Add(plugin);
         TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
 
         Obelisk::Core::PluginManager manager(loader);
         manager.LoadPlugins((root / "plugins").string());
@@ -316,6 +376,8 @@ namespace
         loader.Add(pluginB);
         TouchPlugin(root, pluginB.filename);
         TouchPlugin(root, pluginA.filename);
+        WritePluginConfig(root, pluginA.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+        WritePluginConfig(root, pluginB.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
 
         Obelisk::Core::PluginManager manager(loader);
         manager.LoadPlugins((root / "plugins").string());
@@ -335,6 +397,34 @@ namespace
         CleanupPlugin(pluginB);
         fs::remove_all(root);
     }
+
+    void TestDuplicatePluginIdRejectsSecondPlugin()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_duplicate_id");
+        ConfigureEnvironment(root);
+
+        FakePlugin pluginA{.filename = "a_first.so", .pluginId = "duplicate"};
+        FakePlugin pluginB{.filename = "b_second.so", .pluginId = "duplicate"};
+        FakeLoader loader;
+        loader.Add(pluginA);
+        loader.Add(pluginB);
+        TouchPlugin(root, pluginA.filename);
+        TouchPlugin(root, pluginB.filename);
+        WritePluginConfig(root, "duplicate", R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(pluginA.initCalls == 1, "first duplicate-id plugin was not initialized");
+        Require(pluginB.getInfoCalls == 1, "second duplicate-id plugin metadata was not read");
+        Require(pluginB.initCalls == 0, "second duplicate-id plugin was initialized");
+        Require(pluginB.closeCalls == 1, "second duplicate-id plugin was not closed");
+
+        manager.UnloadAll();
+        CleanupPlugin(pluginA);
+        CleanupPlugin(pluginB);
+        fs::remove_all(root);
+    }
 }
 
 int main()
@@ -344,11 +434,14 @@ int main()
     Obelisk::Logger::Init();
 
     TestValidPluginLoadsAndUnloadCleansCallbacks();
+    TestDisabledPluginPreparesConfigButDoesNotInit();
+    TestInstanceDisallowedPluginDoesNotInit();
     TestMissingGetInfoRejectsAndCloses();
     TestMissingInitRejectsAndCloses();
     TestInvalidMetadataRejectsAndCloses();
     TestInitFailureCleansCallbacksAndCloses();
     TestMultiplePluginsLoadSortedAndUnloadReverse();
+    TestDuplicatePluginIdRejectsSecondPlugin();
 
     Obelisk::Logger::Shutdown();
     fs::remove_all(logRoot);

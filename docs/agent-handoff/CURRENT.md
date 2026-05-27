@@ -85,6 +85,10 @@ Updated: 2026-05-27
 - fact: Commit `ac6eada` added `PluginManagerTests` using an injectable fake library
   loader. The suite covers valid load/unload, missing `GetInfo`, missing `Init`, invalid
   metadata, init failure, callback cleanup, shutdown, and close behavior.
+- fact: Plugin activation is now runtime-gated: `PreparePluginConfig` returns
+  `enabled` and `instance_allowed`, `PluginManager` skips `ObeliskPlugin_Init` for
+  `enabled=false` or non-matching `instance_allowlist`, duplicate `plugin_id` values are
+  rejected, and default config creation uses a temp file plus rename.
 - fact: Commit `882f0d7` hardened `scripts/test_install_obelisk_layout.sh` so the installed
   SDK consumer validates config dir/path, instance id, installed-header dependency, and
   plugin placement under the install root.
@@ -258,6 +262,10 @@ Updated: 2026-05-27
   (`metadata_only` chat fallback recognizers). Current PID `3289000` has
   `OBELISK_ENABLE_CHAT_REFLECTION=1`, matching SHA gate, ProcessEvent hook installed at
   `0x1d34e20`, plugins disabled, and stable posture confirmed.
+- fact: Read-only no-hit audit found stable ProcessEvent/chat-reflection posture but zero
+  recognized chat hits in snapshots through `20260527T101357Z`; absence of lines does not
+  prove a real chat send occurred. See
+  `docs/research/2026-05-27-chat-reflection-no-hit-audit.md`.
 - fact: Manual post-deploy `ServerSendChatMessage` chat validation commands, expected log
   lines, `reflected_chat_process_event_lines` / `server_send_chat_message_lines` /
   metadata-only fallback counters / `rejected_chat_lines` interpretation, and marker-only

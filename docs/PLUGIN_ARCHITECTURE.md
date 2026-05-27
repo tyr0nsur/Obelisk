@@ -75,6 +75,12 @@ The runtime creates a plugin's missing default config before initialization usin
 with `enabled: false`. If metadata, default config, or an existing config is invalid,
 the runtime rejects the plugin before calling `ObeliskPlugin_Init`.
 
+The runtime interprets the common activation envelope before initialization:
+`enabled=false` or a non-matching `instance_allowlist` skips
+`ObeliskPlugin_Init` and closes the shared object. Plugin-specific feature gates remain
+owned by the plugin and must be checked before registering callbacks or starting
+background work.
+
 ## Build And Drop-In Model
 
 Obelisk should support two plugin build paths:
@@ -84,15 +90,17 @@ Obelisk should support two plugin build paths:
   `${OBELISK_PLUGIN_DIR}` as `.so` files.
 
 The runtime does not need to know how a plugin was compiled. On restart it scans
-`${OBELISK_PLUGIN_DIR}` for `.so` files, resolves `ObeliskPlugin_GetInfo`, validates
-metadata/config, resolves `ObeliskPlugin_Init`, optionally resolves
-`ObeliskPlugin_Shutdown`, and passes the plugin its resolved config paths.
+`${OBELISK_PLUGIN_DIR}` for `.so` files directly inside that directory, resolves
+`ObeliskPlugin_GetInfo`, validates metadata/config, rejects duplicate `plugin_id`
+values, applies runtime activation gates, resolves `ObeliskPlugin_Init`, optionally
+resolves `ObeliskPlugin_Shutdown`, and passes enabled plugins their resolved config
+paths.
 
 The stable operational flow is:
 
 1. Build or obtain `PluginName.so`.
 2. Ensure `${OBELISK_CONFIG_DIR}/<plugin-id>/config.json` exists or let the runtime
-   create the safe-disabled default on first init.
+   create the safe-disabled default on first load.
 3. Copy the `.so` into `${OBELISK_ROOT}/plugins/`.
 4. Restart only the target ARK instance.
 

@@ -51,6 +51,9 @@ work from repository state instead of chat history.
 - Strict plugin metadata/config ABI:
   - plugins must export `ObeliskPlugin_GetInfo`
   - runtime creates/validates `${OBELISK_CONFIG_DIR}/<plugin-id>/config.json`
+  - runtime skips `ObeliskPlugin_Init` when common config has `enabled=false` or the
+    current `OBELISK_INSTANCE_ID` is not in `instance_allowlist`
+  - duplicate `plugin_id` values are rejected during one load pass
   - `ObeliskPlugin_Init` receives `ObeliskPluginInitContext`
 - Stable install only deploys runtime libraries; plugins are activated by placing `.so`
   files directly in `/servidor/ark/obelisk/plugins/`.
@@ -77,7 +80,8 @@ work from repository state instead of chat history.
   placement, config dir/path, and instance id passed to a consumer plugin.
 - `PluginManagerTests` cover plugin lifecycle and rejection paths with a fake loader:
   valid load/unload, missing entry points, invalid metadata, init failure, callback cleanup,
-  shutdown, and close behavior.
+  shutdown, disabled/default config skip, instance allowlist skip, duplicate `plugin_id`,
+  and close behavior.
 - `PluginManager::UnloadAll()` unloads plugins in reverse load order and has a multi-plugin
   order test.
 - The SDK now installs a CMake package export:
@@ -192,6 +196,11 @@ work from repository state instead of chat history.
   not dispatch plugin events, and do not change public ABI. If confirmed real player chat
   still produces zero `ServerSendChatMessage` hits after deploying them, review those
   exact fallback lines before considering `ShooterGameMode.SendServerChatMessage`.
+- Read-only audit `docs/research/2026-05-27-chat-reflection-no-hit-audit.md` confirms
+  stable hook/gate posture for PID `3289000` but zero recognized chat hits in reviewed
+  snapshots. Treat this as missing runtime evidence, not proof that chat cannot be
+  intercepted; the next useful step is one operator-confirmed normal chat send and a
+  bounded log/snapshot review.
 - Core-pack tooling now supports direct FName entry reads and bounded
   `--gobjects-candidate` previews for the next `GUObjectArray` investigation.
 - Read-only overnight snapshots are documented in `docs/SUPERVISION.md` and implemented by
