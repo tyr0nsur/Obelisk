@@ -19,6 +19,30 @@
       "outer": "PrimalStructure"
     },
     {
+      "file": "PrimalStructure.SetVariant.snapshot.json",
+      "module": "sdk_structures",
+      "name": "SetVariant",
+      "outer": "PrimalStructure"
+    },
+    {
+      "file": "PrimalStructureItemContainer.VerifyPinCode.snapshot.json",
+      "module": "sdk_structures",
+      "name": "VerifyPinCode",
+      "outer": "PrimalStructureItemContainer"
+    },
+    {
+      "file": "PrimalStructureItemContainer.AllowToggleActivation.snapshot.json",
+      "module": "sdk_structures",
+      "name": "AllowToggleActivation",
+      "outer": "PrimalStructureItemContainer"
+    },
+    {
+      "file": "PrimalStructureSeating.CanSeat.snapshot.json",
+      "module": "sdk_structures",
+      "name": "CanSeat",
+      "outer": "PrimalStructureSeating"
+    },
+    {
       "file": "MissionType.AddPlayerToMission.snapshot.json",
       "module": "sdk_missions",
       "name": "AddPlayerToMission",

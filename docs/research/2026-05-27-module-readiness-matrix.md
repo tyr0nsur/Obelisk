@@ -12,7 +12,7 @@ snapshot rounds, without implying public SDK or runtime readiness.
 - Snapshot binary SHA256:
   `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`
 - Obelisk baseline:
-  `29c5851 Require Function snapshot targets`
+  `19caa07 Check snapshot modules in readiness matrix`
 - Live-server impact: none.
 
 ## Readiness Snapshot
@@ -22,7 +22,7 @@ snapshot rounds, without implying public SDK or runtime readiness.
 | `sdk.inventory` | `fixture-backed` | 4 | Item/controller exact snapshots, including object/bool/int and small `StructProperty` shapes. | Keep struct values metadata-only; defer transform and NetExec. |
 | `sdk.buffs` | `fixture-backed` | 6 | Focused `PrimalBuff` exact snapshots for inventory-access, allow-add, prevent-add, bool-return, and zero-param shapes. | Keep gameplay semantics candidate-only; defer mission/grapple/companion surfaces. |
 | `sdk.dinos` | `fixture-backed` | 2 | Passenger/carry real snapshots plus broader synthetic coverage for attack, tame-state, and controller dino stats. | Promote more real snapshots only for compact exact targets. |
-| `sdk.structures` | `fixture-backed` | 2 | Access/demolish real snapshots plus synthetic coverage for variant, pincode, seating, and elevator. | Consider pincode or seating real snapshots before placement/build. |
+| `sdk.structures` | `fixture-backed` | 6 | Access/demolish plus pincode, container activation, seating, and variant real snapshots; elevator remains deferred. | Keep placement/build-authoritative targets deferred until policy gates. |
 | `sdk.missions` | `fixture-backed` | 1 | `AddPlayerToMission` real snapshot plus synthetic mission add/leave/notify fixtures. | Promote leave/notify snapshots; keep string/array candidates deferred. |
 | `sdk.tribes` | `fixture-backed-control` | 1 | `ServerRequestTribeLog` zero-param control snapshot. | Focused tribe inventory before more snapshots. |
 | `sdk.chat` | `runtime-observed-internal` | 0 in manifest | Separate internal chat reflection evidence and runtime hit notes. | TheIsland A/B validation and copied-data ownership before public API. |
@@ -32,8 +32,8 @@ snapshot rounds, without implying public SDK or runtime readiness.
 
 ## Result
 
-The strongest offline tracks are now `sdk.inventory`, `sdk.buffs`, `sdk.dinos`,
-`sdk.structures`, and `sdk.missions`. They are still not public SDK modules: current
+The strongest offline tracks are now `sdk.inventory`, `sdk.structures`, `sdk.buffs`,
+`sdk.dinos`, and `sdk.missions`. They are still not public SDK modules: current
 snapshots prove exact metadata shape, membership checks, and bounded property chains only.
 
 ## Policy Notes
@@ -48,6 +48,6 @@ snapshots prove exact metadata shape, membership checks, and bounded property ch
 
 ## Next Priorities
 
-1. Add real snapshots for structure pincode/seating or mission leave/notify.
+1. Add mission leave/notify snapshots after the structures second wave.
 2. Add focused tribe inventory before expanding `sdk.tribes`.
 3. Keep transfer/admin/NetExec out of runtime work.
