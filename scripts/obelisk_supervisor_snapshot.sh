@@ -108,27 +108,42 @@ CHAT_REFLECTION_SHA="$(posture_value OBELISK_CHAT_REFLECTION_BINARY_SHA256)"
         experimental_gate_lines="$(safe_grep_count 'Experimental chat reflection enabled' "${CHAT_LOG}")"
         reflected_chat_process_event_lines="$(safe_grep_count 'Reflected chat ProcessEvent' "${CHAT_LOG}")"
         server_send_chat_message_lines="$(safe_grep_count 'ServerSendChatMessage' "${CHAT_LOG}")"
+        client_chat_message_lines="$(safe_grep_count 'ClientChatMessage' "${CHAT_LOG}")"
+        client_server_chat_message_lines="$(safe_grep_count 'ClientServerChatMessage' "${CHAT_LOG}")"
+        client_server_chat_direct_message_lines="$(safe_grep_count 'ClientServerChatDirectMessage' "${CHAT_LOG}")"
+        metadata_only_lines="$(safe_grep_count 'metadata_only=true' "${CHAT_LOG}")"
+        chat_candidate_lines="$(safe_grep_count 'ServerSendChatMessage|ClientChatMessage|ClientServerChatMessage|ClientServerChatDirectMessage' "${CHAT_LOG}")"
         rejected_chat_lines="$(safe_grep_count 'Chat reflection rejected|Reflected chat rejected' "${CHAT_LOG}")"
         rejected_or_unknown_send_mode_lines="$(safe_grep_count 'rejected|send_mode_known=false' "${CHAT_LOG}")"
         send_mode_unknown_lines="$(safe_grep_count 'send_mode_known=false' "${CHAT_LOG}")"
-        last_relevant_line="$(grep -E 'Experimental chat reflection|Reflected chat|Chat reflection rejected|ServerSendChatMessage|send_mode_known=false' "${CHAT_LOG}" | tail -n1 || true)"
+        last_relevant_line="$(grep -E 'Experimental chat reflection|Reflected chat|Chat reflection rejected|ServerSendChatMessage|ClientChatMessage|ClientServerChatMessage|ClientServerChatDirectMessage|metadata_only=true|send_mode_known=false' "${CHAT_LOG}" | tail -n1 || true)"
 
         printf 'experimental_gate_lines=%s\n' "${experimental_gate_lines}"
         printf 'reflected_chat_lines=%s\n' "${reflected_chat_process_event_lines}"
         printf 'reflected_chat_process_event_lines=%s\n' "${reflected_chat_process_event_lines}"
         printf 'server_send_chat_message_lines=%s\n' "${server_send_chat_message_lines}"
+        printf 'client_chat_message_lines=%s\n' "${client_chat_message_lines}"
+        printf 'client_server_chat_message_lines=%s\n' "${client_server_chat_message_lines}"
+        printf 'client_server_chat_direct_message_lines=%s\n' "${client_server_chat_direct_message_lines}"
+        printf 'metadata_only_lines=%s\n' "${metadata_only_lines}"
+        printf 'chat_candidate_lines=%s\n' "${chat_candidate_lines}"
         printf 'rejected_chat_lines=%s\n' "${rejected_chat_lines}"
         printf 'rejected_or_unknown_send_mode_lines=%s\n' "${rejected_or_unknown_send_mode_lines}"
         printf 'send_mode_unknown_lines=%s\n' "${send_mode_unknown_lines}"
         printf 'last_relevant_line=%s\n' "${last_relevant_line:-<none>}"
         printf '\nrecent_chat_reflection_lines:\n'
-        grep -E 'Experimental chat reflection|Reflected chat|Chat reflection rejected|ServerSendChatMessage|send_mode_known=false' "${CHAT_LOG}" | tail -n 80 || true
+        grep -E 'Experimental chat reflection|Reflected chat|Chat reflection rejected|ServerSendChatMessage|ClientChatMessage|ClientServerChatMessage|ClientServerChatDirectMessage|metadata_only=true|send_mode_known=false' "${CHAT_LOG}" | tail -n 80 || true
     else
         printf 'missing_log=true\n'
         printf 'experimental_gate_lines=0\n'
         printf 'reflected_chat_lines=0\n'
         printf 'reflected_chat_process_event_lines=0\n'
         printf 'server_send_chat_message_lines=0\n'
+        printf 'client_chat_message_lines=0\n'
+        printf 'client_server_chat_message_lines=0\n'
+        printf 'client_server_chat_direct_message_lines=0\n'
+        printf 'metadata_only_lines=0\n'
+        printf 'chat_candidate_lines=0\n'
         printf 'rejected_chat_lines=0\n'
         printf 'rejected_or_unknown_send_mode_lines=0\n'
         printf 'send_mode_unknown_lines=0\n'

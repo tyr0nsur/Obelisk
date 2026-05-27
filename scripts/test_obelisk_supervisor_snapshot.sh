@@ -28,6 +28,9 @@ write_obelisk_fixture() {
 [2026-05-27 01:00:01.001] [info] Reflected chat ServerSendChatMessage send_mode=4 send_mode_name=Unknown send_mode_known=false
 [2026-05-27 01:00:01.002] [info] Reflected chat field ChatMessage offset=0x0 size=16 has_range=true
 [2026-05-27 01:00:01.003] [info] Reflected chat rejected #1 fname_index=2697 function=0x456 reason=bad_parms_size
+[2026-05-27 01:00:01.004] [info] Reflected chat ProcessEvent #2 function=ClientServerChatMessage fname_index=1984 params=0x789 fields=3 metadata_only=true
+[2026-05-27 01:00:01.005] [info] Reflected chat ProcessEvent #3 function=ClientChatMessage fname_index=1865 params=0xabc fields=1 metadata_only=true
+[2026-05-27 01:00:01.006] [info] Reflected chat ProcessEvent #4 function=ClientServerChatDirectMessage fname_index=1983 params=0xdef fields=3 metadata_only=true
 EOF
 }
 
@@ -96,12 +99,17 @@ assert_file_contains "${snapshot_dir}/summary.txt" '^chat_reflection_gate_env=1$
 assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^chat_reflection_marker=enabled$'
 assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^chat_reflection_env=1$'
 assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^experimental_gate_lines=1$'
-assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^reflected_chat_process_event_lines=1$'
+assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^reflected_chat_process_event_lines=4$'
 assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^server_send_chat_message_lines=2$'
+assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^client_chat_message_lines=1$'
+assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^client_server_chat_message_lines=1$'
+assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^client_server_chat_direct_message_lines=1$'
+assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^metadata_only_lines=3$'
+assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^chat_candidate_lines=5$'
 assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^rejected_chat_lines=1$'
 assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^rejected_or_unknown_send_mode_lines=2$'
 assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^send_mode_unknown_lines=1$'
-assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^last_relevant_line=.*Reflected chat rejected #1'
+assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^last_relevant_line=.*ClientServerChatDirectMessage'
 assert_file_not_contains "${snapshot_dir}/disk.txt" '/servidor/ark '
 
 loop_out="${TMP_DIR}/loop-out"
