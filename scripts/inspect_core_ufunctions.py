@@ -633,6 +633,8 @@ def inspect_core(
     indices: Iterable[int],
     name_contains: Iterable[str] = (),
     outer_contains: Iterable[str] = (),
+    name_exact: Iterable[str] = (),
+    outer_exact: Iterable[str] = (),
     window_size: int,
     max_object_scan: int,
 ) -> dict[str, object]:
@@ -672,6 +674,8 @@ def inspect_core(
         context,
         name_contains=name_contains,
         outer_contains=outer_contains,
+        name_exact=name_exact,
+        outer_exact=outer_exact,
     ):
         if address in seen_addresses:
             continue
@@ -713,7 +717,11 @@ def scalar_field_value(target: dict[str, object], label: str) -> object:
     return None
 
 
-def build_fixture_snapshot(payload: dict[str, object]) -> dict[str, object]:
+def build_fixture_snapshot(
+    payload: dict[str, object],
+    *,
+    evidence: dict[str, object] | None = None,
+) -> dict[str, object]:
     metadata = payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
     snapshot_targets: list[dict[str, object]] = []
     for target in payload.get("targets", []):
@@ -770,7 +778,7 @@ def build_fixture_snapshot(payload: dict[str, object]) -> dict[str, object]:
                 "status": target.get("status"),
                 "reject_reasons": target.get("reject_reasons", []),
                 "membership": {
-                    "object": target.get("object_membership_status"),
+                    "target": target.get("object_membership_status"),
                     "class": target.get("class_membership_status"),
                     "outer": target.get("outer_membership_status"),
                 },
@@ -791,6 +799,7 @@ def build_fixture_snapshot(payload: dict[str, object]) -> dict[str, object]:
 
     return {
         "schema": "obelisk.ufunction-chain.snapshot.v1",
+        "evidence": evidence,
         "address_policy": "absolute core paths and addresses omitted; use full inspector JSON for local evidence review",
         "interpretation": payload.get("interpretation"),
         "metadata": {
@@ -808,15 +817,26 @@ def contains_any(value: object, needles: list[str]) -> bool:
     return any(needle in haystack for needle in needles)
 
 
+def equals_any(value: object, needles: list[str]) -> bool:
+    if not needles:
+        return True
+    haystack = str(value or "").lower()
+    return any(haystack == needle for needle in needles)
+
+
 def find_matching_function_indices(
     context: GObjectContext,
     *,
     name_contains: Iterable[str],
     outer_contains: Iterable[str],
+    name_exact: Iterable[str],
+    outer_exact: Iterable[str],
 ) -> list[tuple[int, int]]:
     name_filters = [item.lower() for item in name_contains if item]
     outer_filters = [item.lower() for item in outer_contains if item]
-    if not name_filters and not outer_filters:
+    name_exact_filters = [item.lower() for item in name_exact if item]
+    outer_exact_filters = [item.lower() for item in outer_exact if item]
+    if not name_filters and not outer_filters and not name_exact_filters and not outer_exact_filters:
         return []
     if context.object_count is None:
         return []
@@ -835,6 +855,8 @@ def find_matching_function_indices(
             continue
         if not contains_any(summary.get("name"), name_filters):
             continue
+        if not equals_any(summary.get("name"), name_exact_filters):
+            continue
 
         outer_name = None
         outer_address = parse_hex_string(summary.get("outer"))
@@ -843,6 +865,8 @@ def find_matching_function_indices(
             if isinstance(outer_summary, dict):
                 outer_name = outer_summary.get("name")
         if not contains_any(outer_name, outer_filters):
+            continue
+        if not equals_any(outer_name, outer_exact_filters):
             continue
         matches.append((index, address))
     return matches
@@ -992,6 +1016,18 @@ def parse_args() -> argparse.Namespace:
         default=[],
         help="Inspect Function/Struct objects whose resolved outer name contains this substring. Repeatable.",
     )
+    parser.add_argument(
+        "--name-exact",
+        action="append",
+        default=[],
+        help="Inspect Function/Struct objects whose resolved name exactly matches this value. Repeatable.",
+    )
+    parser.add_argument(
+        "--outer-exact",
+        action="append",
+        default=[],
+        help="Inspect Function/Struct objects whose resolved outer name exactly matches this value. Repeatable.",
+    )
     parser.add_argument("--window-size", type=parse_int, default=DEFAULT_WINDOW_SIZE)
     parser.add_argument("--max-object-scan", type=int, default=DEFAULT_MAX_OBJECT_SCAN)
     parser.add_argument("--json", action="store_true", help="Emit JSON instead of text.")
@@ -1000,19 +1036,36 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Emit a sanitized JSON fixture snapshot without core paths or absolute addresses.",
     )
+    parser.add_argument("--evidence-ark-sha256", help="ARK binary SHA256 for --snapshot-json evidence metadata.")
+    parser.add_argument("--evidence-obelisk-commit", help="Obelisk commit for --snapshot-json evidence metadata.")
+    parser.add_argument("--evidence-source", default="offline_core", help="Evidence source label for --snapshot-json.")
+    parser.add_argument("--evidence-status", default="candidate-only", help="Evidence status label for --snapshot-json.")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    if not args.object and not args.index and not args.name_contains and not args.outer_contains:
-        raise SystemExit("provide at least one --object, --index, --name-contains, or --outer-contains")
+    if (
+        not args.object
+        and not args.index
+        and not args.name_contains
+        and not args.outer_contains
+        and not args.name_exact
+        and not args.outer_exact
+    ):
+        raise SystemExit(
+            "provide at least one --object, --index, --name-contains, --outer-contains, --name-exact, or --outer-exact"
+        )
     if args.window_size <= 0:
         raise SystemExit("--window-size must be positive")
     if args.max_object_scan < 0:
         raise SystemExit("--max-object-scan must be non-negative")
     if args.json and args.snapshot_json:
         raise SystemExit("choose only one of --json or --snapshot-json")
+    if not args.snapshot_json and (
+        args.evidence_ark_sha256 is not None or args.evidence_obelisk_commit is not None
+    ):
+        raise SystemExit("evidence metadata flags require --snapshot-json")
 
     memory = uobjects.CoreMemory(args.core)
     try:
@@ -1024,6 +1077,8 @@ def main() -> int:
             indices=args.index,
             name_contains=args.name_contains,
             outer_contains=args.outer_contains,
+            name_exact=args.name_exact,
+            outer_exact=args.outer_exact,
             window_size=args.window_size,
             max_object_scan=args.max_object_scan,
         )
@@ -1033,7 +1088,14 @@ def main() -> int:
     if args.json:
         print(json.dumps({"core": str(args.core), **payload}, indent=2, sort_keys=True))
     elif args.snapshot_json:
-        print(json.dumps(build_fixture_snapshot(payload), indent=2, sort_keys=True))
+        evidence = {
+            "ark_binary_sha256": args.evidence_ark_sha256,
+            "obelisk_commit": args.evidence_obelisk_commit,
+            "source": args.evidence_source,
+            "status": args.evidence_status,
+            "generated_by": "scripts/inspect_core_ufunctions.py --snapshot-json",
+        }
+        print(json.dumps(build_fixture_snapshot(payload, evidence=evidence), indent=2, sort_keys=True))
     else:
         print(format_text(payload))
     return 0

@@ -33,6 +33,7 @@ jobs:
             scripts/test_analyze_reflectionscanner_capture.py \
             scripts/test_verify_chat_reflection_constants.py \
             scripts/test_summarize_core_ufunction_inventory.py \
+            scripts/test_ufunction_snapshot_fixtures.py \
             scripts/test_research_doc_guardrails.py \
             scripts/test_public_sdk_chat_guardrails.py \
             scripts/test_dependency_pins.py \
@@ -66,6 +67,7 @@ jobs:
         run: |
           python3 scripts/test_verify_chat_reflection_constants.py
           python3 scripts/test_summarize_core_ufunction_inventory.py
+          python3 scripts/test_ufunction_snapshot_fixtures.py
 
       - name: Run research doc guardrail tests
         run: |

@@ -1409,14 +1409,22 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
             finally:
                 memory.close()
 
-        snapshot = inspector.build_fixture_snapshot(payload)
+        evidence = {
+            "ark_binary_sha256": "fixture-sha",
+            "obelisk_commit": "fixture-commit",
+            "source": "synthetic_core",
+            "status": "candidate-only",
+            "generated_by": "unit-test",
+        }
+        snapshot = inspector.build_fixture_snapshot(payload, evidence=evidence)
         self.assertEqual(snapshot["schema"], "obelisk.ufunction-chain.snapshot.v1")
+        self.assertEqual(snapshot["evidence"], evidence)
         target = snapshot["targets"][0]
         self.assertEqual(target["target"]["name"], "ServerActivate")
         self.assertEqual(target["target"]["outer_name"], "PrimalStructureElevatorPlatform")
         self.assertEqual(
             target["membership"],
-            {"object": "candidate-uobject", "class": "candidate-uobject", "outer": "candidate-uobject"},
+            {"target": "candidate-uobject", "class": "candidate-uobject", "outer": "candidate-uobject"},
         )
         self.assertEqual(target["function_flags"], "0x204000")
         self.assertEqual(target["return_value_offset"], "0xffff")
@@ -1483,6 +1491,10 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
                     "--outer-contains",
                     "MissionType",
                     "--snapshot-json",
+                    "--evidence-ark-sha256",
+                    "fixture-sha",
+                    "--evidence-obelisk-commit",
+                    "fixture-commit",
                 ],
                 check=True,
                 capture_output=True,
@@ -1490,6 +1502,10 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
             )
 
         payload = json.loads(result.stdout)
+        self.assertEqual(payload["evidence"]["ark_binary_sha256"], "fixture-sha")
+        self.assertEqual(payload["evidence"]["obelisk_commit"], "fixture-commit")
+        self.assertEqual(payload["evidence"]["source"], "offline_core")
+        self.assertEqual(payload["evidence"]["status"], "candidate-only")
         self.assertEqual(payload["targets"][0]["target"]["name"], "BPAllowPlayerToLeaveMission")
         self.assertNotIn(str(core), result.stdout)
         self.assertNotIn(hex(addrs["bp_allow_player_leave_function"]), result.stdout)
@@ -1522,6 +1538,32 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("choose only one", result.stderr)
+
+    def test_cli_rejects_evidence_metadata_without_snapshot_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            core = Path(temp_dir) / "core"
+            addrs = build_core_fixture(core)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "inspect_core_ufunctions.py"),
+                    "--core",
+                    str(core),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--index",
+                    "7",
+                    "--evidence-ark-sha256",
+                    "fixture-sha",
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("evidence metadata flags require --snapshot-json", result.stderr)
 
     def test_cli_name_contains_finds_matching_function(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1575,6 +1617,36 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
 
         self.assertIn("object_index=9 class='Function' name='AdminCommand'", result.stdout)
         self.assertIn("outer_index=8 outer_name='ChatMessage'", result.stdout)
+
+    def test_cli_exact_filters_find_single_matching_function(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            core = Path(temp_dir) / "core"
+            addrs = build_core_fixture(core)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "inspect_core_ufunctions.py"),
+                    "--core",
+                    str(core),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--name-exact",
+                    "AllowStructureAccess",
+                    "--outer-exact",
+                    "PrimalStructure",
+                    "--json",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(len(payload["targets"]), 1)
+        self.assertEqual(payload["targets"][0]["object_summary"]["name"], "AllowStructureAccess")
+        self.assertEqual(payload["targets"][0]["outer_summary"]["name"], "PrimalStructure")
 
     def test_cli_text_mentions_candidate_only_and_reject_reasons(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
