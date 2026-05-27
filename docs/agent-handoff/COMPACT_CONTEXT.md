@@ -9,8 +9,8 @@ work from repository state instead of chat history.
 
 - Repo: `/home/flowcommunity-ark/Obelisk`
 - Remote: `git@github.com:tyr0nsur/Obelisk.git`
-- Current known good baseline: latest pushed `main` after validation, currently
-  `ef6cfc5 Add SDK consumer CI quality gate`.
+- Current known good baseline: latest pushed and validated `main`, currently
+  `60a7746 Document development versioning policy`.
 - Current development version line: `0.1.0-dev`. This is a coordination label, not a
   release tag. See `docs/VERSIONING.md`.
 - Local ignored artifacts normally present: `build/`, `Obelisk.log`
