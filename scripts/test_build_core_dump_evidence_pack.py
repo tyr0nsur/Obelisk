@@ -136,7 +136,8 @@ class CoreDumpEvidencePackCommandTests(unittest.TestCase):
   100d: f0 0f c1 05 00 00 00  lock xadd DWORD PTR [rip+0x3],eax     # 0x595b838
 0000000000001010 <InitObjects>:
   1015: 48 8d 3d 00 00 00 00  lea    rdi,[rip+0x4]                  # 0x595b7e0
-  1020: 48 8b 05 00 00 00 00  mov    rax,QWORD PTR [rip+0x5]        # 0x12345678
+  1020: bf e0 b7 95 05        mov    edi,0x595b7e0
+  1028: 48 8b 05 00 00 00 00  mov    rax,QWORD PTR [rip+0x5]        # 0x12345678
 """,
                 encoding="utf-8",
             )
@@ -146,16 +147,50 @@ class CoreDumpEvidencePackCommandTests(unittest.TestCase):
                 core_pack.gobjects_static_xref_targets([("gobjects", 0x595B7E0)]),
             )
 
-        self.assertEqual(payload["access_counts"], {"address": 1, "load": 2, "store": 1})
+        self.assertEqual(payload["access_counts"], {"address": 1, "load": 2, "other": 1, "store": 1})
         self.assertEqual(payload["xrefs"]["0x595b7e0"][0]["target_label"], "gobjects.root")
+        self.assertEqual(payload["xrefs"]["0x595b7e0"][1]["instruction_address"], "0x1020")
         self.assertEqual(payload["xrefs"]["0x595b7f0"][0]["target_label"], "gobjects.chunks")
         self.assertEqual(payload["xrefs"]["0x595b804"][0]["target_label"], "gobjects.count")
         self.assertEqual(payload["xrefs"]["0x595b838"][0]["target_label"], "gobjects.serial")
         self.assertEqual(payload["xrefs"]["0x595b7f0"][0]["function_label"], "LookupObjects")
+        self.assertEqual(payload["function_groups"][0]["first_xref"], "0x1000")
+        self.assertEqual(payload["function_groups"][0]["last_xref"], "0x100d")
+        self.assertEqual(payload["function_groups"][0]["xref_span_bytes"], 0xD)
+        self.assertFalse(payload["function_groups"][0]["oversized"])
         self.assertEqual(payload["function_groups"][0]["function_label"], "LookupObjects")
         self.assertEqual(payload["function_groups"][0]["xref_count"], 3)
         self.assertEqual(payload["function_groups"][1]["function_label"], "InitObjects")
         self.assertEqual(payload["function_groups"][1]["target_labels"], ["gobjects.root"])
+        self.assertEqual(payload["function_groups"][1]["xref_count"], 2)
+        self.assertEqual(payload["anchor_groups"][0]["anchor_start"], "0x1000")
+        self.assertEqual(payload["anchor_groups"][0]["anchor_end"], "0x1020")
+        self.assertEqual(payload["anchor_groups"][0]["xref_count"], 5)
+
+    def test_static_xref_groups_mark_oversized_symbol_buckets(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            objdump = Path(temp_dir) / "ShooterGameServer.objdump"
+            objdump.write_text(
+                """
+0000000000010000 <HugeExportedSymbol>:
+  1000: 48 8b 05 00 00 00 00  mov    rax,QWORD PTR [rip+0x1]        # 0x595b7f0
+ 22000: 48 8b 05 00 00 00 00  mov    rax,QWORD PTR [rip+0x2]        # 0x595b804
+""",
+                encoding="utf-8",
+            )
+
+            payload = core_pack.collect_static_xrefs(
+                objdump,
+                core_pack.gobjects_static_xref_targets([("gobjects", 0x595B7E0)]),
+            )
+
+        group = payload["function_groups"][0]
+        self.assertEqual(group["function_label"], "HugeExportedSymbol")
+        self.assertEqual(group["first_xref"], "0x1000")
+        self.assertEqual(group["last_xref"], "0x22000")
+        self.assertTrue(group["oversized"])
+        self.assertEqual(len(payload["anchor_groups"]), 2)
+        self.assertEqual(payload["anchor_groups"][0]["xref_count"], 1)
 
     def test_gobjects_sample_options_require_candidate_and_fname_root(self) -> None:
         self.assertEqual(

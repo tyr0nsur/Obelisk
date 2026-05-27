@@ -172,12 +172,13 @@ work from repository state instead of chat history.
   `--gobjects-candidate`, covering root, chunks, count, and serial fields. Offline
   validation for `0x595b7e0` found 3 root, 8016 chunks, 5870 count, and 2 serial xrefs.
   New packs record the Obelisk commit in `manifest.json`.
-- Static context anchors for `0x595b7e0`: `0x79ce22` root store plus bounded walk,
-  `0x7a27a7` helper/destructor registration, `0x81f118` startup reset, and `0x81f206`
-  startup helper call. Labels are anchors only, not accepted function names.
-- `gobjects-static-xrefs.json` groups objdump xrefs by function anchor. Current top
-  follow-up groups are `0x12d1400` touching root/chunks/count/serial and `0x81dc59` for
-  startup/reset context.
+- Static context anchors for `0x595b7e0`: `0x79ce22` is lookup/bootstrap cache,
+  `0x7a27a7` is init/destructor registration, `0x81f118` is startup reset, and
+  `0x81f206` is startup helper. Labels are anchors only, not accepted function names; see
+  `docs/research/2026-05-27-gobjects-static-anchor-classification.md`.
+- `gobjects-static-xrefs.json` groups objdump xrefs by function anchor, but broad
+  nearest-symbol groups can be contaminated. The `0x12d1400` group is not accepted as one
+  decompiler target.
 - Offline core UObject enumeration now works through `scripts/enumerate_core_uobjects.py`.
   It found real chat-related `Function` objects in `GObjects`, including `ServerChat`
   index `25447`, `ServerChatTo` index `25449`, and `ServerChatToPlayer` index `25452`;

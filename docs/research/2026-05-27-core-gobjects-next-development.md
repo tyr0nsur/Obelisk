@@ -135,9 +135,11 @@ reported the highest-volume groups:
 0x648400  xrefs=2    targets=gobjects.chunks,gobjects.count
 ```
 
-The `0x12d1400` group is the best next decompiler target because it touches all tracked
-fields including the serial-like field. The `0x81dc59` group is a useful startup/reset
-context. Treat the printed symbol names as approximate anchors only.
+Follow-up classification in `2026-05-27-gobjects-static-anchor-classification.md` found
+that the `0x12d1400` group is too broad to treat as one decompiler target: sample xrefs
+are dispersed under a nearest exported symbol. Prefer concrete instruction windows such as
+`0x79ce22`, `0x7a27a7`, `0x81f118`, and `0x81f206` when reasoning about init/reset/lookup
+behavior. The `0x81dc59` group remains useful only as a broad startup/reset neighborhood.
 
 ## Acceptance Gate
 
@@ -157,6 +159,6 @@ The original slot-finding step is superseded by `0x595b7e0`, now documented in
 path for this candidate; the older legacy `--gobjects-candidate` preview treats `ADDR` as
 an indirect slot and is only useful for unresolved slot-style candidates.
 
-After `0x595b7e0`, the next offline step is to inspect the four context anchors above in a
-decompiler/disassembler and classify each as initialization, reset, destructor, or lookup.
-Record the result here before considering any runtime probe.
+After `0x595b7e0`, the next offline step is not another broad candidate search. Improve
+the xref grouping output so broad nearest-symbol ranges are flagged, then repeat the
+classified static/context checks on a second isolated core or future binary.

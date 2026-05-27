@@ -90,6 +90,10 @@ initialization/reset, destructor registration, and lookup/walk behavior. The sym
 in stripped objdump are often nearest exported labels and should not be treated as true
 function names.
 
+`2026-05-27-gobjects-static-anchor-classification.md` later classified these contexts and
+rejected the broad `0x12d1400` function group as a standalone decompiler target because its
+sample xrefs are dispersed under a huge nearest-symbol range.
+
 ## Result
 
 `0x595b7e0` is promoted to `GUObjectArray research-candidate` for this ARK binary hash.
