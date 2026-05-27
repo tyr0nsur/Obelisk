@@ -35,9 +35,10 @@ parameter ranges, and inert `FString` header helpers. It is not wired into
 `ProcessEvent_Detour` yet.
 
 The chat-specific recognizer now exists as `ue/ChatReflection.{h,cpp}`. It recognizes
-`ServerChat`, `ServerChatTo`, and `ServerChatToPlayer` by FName index plus reflected
-property-chain shape, and can return borrowed parameter ranges when `params` is provided.
-It still does not decode `FString` contents and is not wired into the hook yet.
+`ServerChat`, `ServerChatTo`, `ServerChatToPlayer`, `ServerSendChatMessage`, and three
+exact `ShooterPlayerController` fallback candidates by FName index plus reflected
+property-chain shape. It can return borrowed parameter ranges when `params` is provided.
+It still does not decode `FString` contents.
 
 `ProcessEvent_Detour` now has experimental observation wiring. It is disabled unless both
 environment variables are present:
@@ -48,8 +49,9 @@ OBELISK_CHAT_REFLECTION_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e4
 ```
 
 When enabled, it cheaply filters by chat FName index, validates the reflected chat shape,
-and logs only function/field metadata and borrowed parameter ranges. It does not decode
-text, call plugins, expose ABI, or hook native exec pointers.
+and logs only function/field metadata and borrowed parameter ranges. Metadata-only
+fallback candidates log `metadata_only=true`. It does not decode text, call plugins,
+expose ABI, or hook native exec pointers.
 
 The LinuxGSM wrapper supports marker-based activation:
 
@@ -93,6 +95,39 @@ From `docs/research/2026-05-27-core-ufunction-property-chain.md`:
   - `StrProperty PlayerName`, offset `0x0`, size `0x10`
   - `StrProperty MessageText`, offset `0x10`, size `0x10`
 
+These `ServerChat*` targets are now treated as cheat-manager command coverage, not proof
+of normal player chat.
+
+Current normal-player-chat target:
+
+- `ServerSendChatMessage`
+  - FName index `2697`
+  - outer: `ShooterPlayerController`
+  - `NumParms=2`, `ParmsSize=0x11`
+  - `StrProperty ChatMessage`, offset `0x0`, size `0x10`
+  - `ByteProperty SendMode`, offset `0x10`, size `0x1`
+  - `SendMode` accepted values: `0..3`
+
+Current metadata-only fallback targets:
+
+- `ClientChatMessage`
+  - FName index `1865`
+  - outer: `ShooterPlayerController`
+  - `NumParms=1`, `ParmsSize=0x90`
+  - `StructProperty Chat`, offset `0x0`, size `0x90`
+- `ClientServerChatDirectMessage`
+  - FName index `1983`
+  - outer: `ShooterPlayerController`
+  - `NumParms=3`, `ParmsSize=0x21`
+  - `StrProperty MessageText`, `StructProperty MessageColor`, `BoolProperty bIsBold`
+- `ClientServerChatMessage`
+  - FName index `1984`
+  - outer: `ShooterPlayerController`
+  - same reflected shape as `ClientServerChatDirectMessage`
+
+These fallback targets are observation-only. They must not dispatch plugin events or
+decode text until a real runtime capture proves they are the path we need.
+
 ## Runtime Rules
 
 - Keep this gated behind an explicit experimental config or environment flag.
@@ -103,28 +138,52 @@ From `docs/research/2026-05-27-core-ufunction-property-chain.md`:
 - Do not cache borrowed `params` pointers.
 - Keep any logging rate-limited.
 - Decode `FString` only after the reflected offset and `ParmsSize` checks pass.
+- Do not dispatch events from `metadata_only=true` recognizers.
+
+## Future Plugin ABI Direction
+
+After one real `ServerSendChatMessage` hit validates the path, the first public chat API
+should remain append-only and passive:
+
+- add a capability bit such as `OBELISK_API_CAPABILITY_CHAT_EVENTS`;
+- add a POD `ObeliskChatMessageEvent` containing copied data only;
+- add `RegisterChatMessage` as the final field of `ObeliskApi`;
+- copy decoded UTF-8 text into runtime-owned event storage before invoking plugins;
+- expose `send_mode`, text length, and a monotonic sequence number at most for the first
+  public version.
+
+Do not expose `UObject*`, `UFunction*`, `params`, `FString.Data`, borrowed ranges, offsets,
+FName indices, object indices, controller pointers, SteamID, tribe, sender identity,
+blocking/modification, or send/reply helpers yet. `oBaseEvents` should eventually consume
+this API behind `chat_message.enabled=false` by default and log mode/length rather than
+message text.
 
 ## Tests To Add
 
 - `RuntimeReflectionTests` currently cover disabled/unsupported gates, bounded property
   chains, `ParmsSize` bounds, owner mismatch rejection, borrowed parameter ranges, and
   inert `FString` header parsing.
-- `ChatReflectionTests` cover valid `ServerChat`, `ServerChatTo`, and
-  `ServerChatToPlayer` shapes; same-FName wrong shapes; wrong property names; wrong
-  `StrProperty` class; and disabled/unsupported gates.
+- `ChatReflectionTests` cover valid `ServerChat`, `ServerChatTo`, `ServerChatToPlayer`,
+  `ServerSendChatMessage`, and metadata-only fallback shapes; same-FName wrong shapes;
+  wrong property names; wrong property classes; and disabled/unsupported gates.
 - `ProcessEventChatReflectionTests` cover the extracted hook helper gates and ensure
   disabled/non-chat paths avoid memory reads while valid chat invocations return borrowed
   parameter ranges.
 - `scripts/verify_chat_reflection_constants.py` compares `ue/ChatReflection.cpp`
-  constants to offline core UFunction/property-chain evidence. It should stay in the
-  promotion path for any new ARK binary hash or new core dump before runtime wiring is
-  widened.
+  constants to offline core UFunction/property-chain evidence for all seven current
+  targets. It should stay in the promotion path for any new ARK binary hash or new core
+  dump before runtime wiring is widened.
 - Still needed: a runtime smoke test with one real in-game chat message.
 
 ## Next Step
 
-The `ServerChat*` functions in this note are now best treated as cheat-manager command
-coverage, not the likely normal player chat path. Add a gated recognizer for
-`ShooterPlayerController.ServerSendChatMessage` using
-`docs/research/2026-05-27-real-chat-ufunction-path-hypotheses.md`, then write one
-in-game chat message on the debug server and check for reflected candidate log entries.
+The deployed runtime has the `ServerSendChatMessage` recognizer and metadata-only
+fallback recognizers enabled behind the chat reflection gate. Write one in-game chat
+message on the debug server and check for:
+
+- `Reflected chat ProcessEvent ... function=ServerSendChatMessage ... metadata_only=false`
+- or exact fallback lines with `metadata_only=true`
+
+If `ServerSendChatMessage` appears with known `SendMode`, the next implementation step is
+experimental text decoding in logs. Public plugin ABI should wait until that path is
+proven with tests listed above.
