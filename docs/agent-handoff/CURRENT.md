@@ -289,6 +289,11 @@ Updated: 2026-05-27
   Decoded text requires the extra `OBELISK_CHAT_REFLECTION_LOG_TEXT=1` gate, logs only for
   known `EChatSendMode` values, and does not dispatch plugin callbacks or change ABI. This
   is validated locally but not yet deployed.
+- fact: Public SDK chat event ownership is intentionally deferred. The current design note
+  requires copied Obelisk-owned UTF-8 text, POD structs, opaque registration ids,
+  `user_data`, callback owner cleanup, ABI layout tests, plugin fixture coverage, hot-path
+  benchmark evidence, and runtime validation before adding `OnChatMessage`; see
+  `docs/research/2026-05-27-sdk-chat-event-ownership-plan.md`.
 - fact: `Memory::IsReadable` no longer uses `write(/dev/null)` because that probe returned
   success for invalid and `PROT_NONE` mappings on this host. It is now backed by cached
   readable ranges from `/proc/self/maps`, with `MemoryTests` covering invalid pointers,
@@ -312,7 +317,9 @@ Updated: 2026-05-27
   in a controlled restart window with `OBELISK_CHAT_REFLECTION_LOG_TEXT=1`, review bounded
   logs, then remove the text gate; keep dispatch blocked.
 - next-step: Design plugin-facing chat event ownership only after text is copied into
-  Obelisk-owned memory and callback lifetime is covered by tests.
+  Obelisk-owned memory and callback lifetime is covered by tests. Use
+  `docs/research/2026-05-27-sdk-chat-event-ownership-plan.md` as the acceptance gate before
+  touching `include/obelisk/ObeliskApi.h`.
 - next-step: Run `scripts/verify_chat_reflection_constants.py` against any new core before
   accepting changed chat FName indices, parameter offsets, or `StrProperty` constants.
 - next-step: Benchmark ProcessEvent overhead with chat reflection enabled vs disabled

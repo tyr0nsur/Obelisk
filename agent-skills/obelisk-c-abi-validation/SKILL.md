@@ -78,6 +78,12 @@ Validation rules:
   path and should be rare, measured, and disabled by default for experimental plugins.
 - Callback implementations must be non-blocking and must not call back into unsafe UE4
   functions unless reentrancy is explicitly handled.
+- Future gameplay events such as chat must copy data into Obelisk-owned memory before
+  calling plugins. Do not expose borrowed UE4 params, `FString`, `UObject`, `UFunction`, or
+  raw `ProcessEvent` buffers as a stable SDK contract.
+- Prefer opaque `uint64_t` registration ids plus explicit unregister for new event APIs.
+  Keep owner-token cleanup on init failure/unload as the backstop, and include `user_data`
+  in callback subscriptions instead of asking plugins to capture global state.
 
 ## Review Checklist
 
