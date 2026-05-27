@@ -80,6 +80,10 @@ scripts/check_obelisk_server_posture.sh --expect-stable
 ```
 
 That check must pass before launching another agent round that assumes a stable server.
+In `--expect-stable` mode it must fail closed if `libobelisk.so` is not mapped, if a
+deleted `libobelisk` mapping remains after redeploy, or if scanner/native-exec variables
+are still present. Its parser is tested offline with procfs fixtures; do not weaken those
+tests to depend on a live ARK process.
 
 ## Config Restore Backups
 

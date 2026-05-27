@@ -107,6 +107,15 @@ Updated: 2026-05-27
   copied logs, objdump artifact, candidate counts, reject markers, and promotion gate.
   The workflow is documented in
   `docs/research/2026-05-27-gname-evidence-pack-workflow.md`.
+- fact: `scripts/build_reflection_evidence_pack.py` builds a reproducible offline evidence
+  pack from a ShooterGameServer binary and copied Obelisk logs. It copies logs, records
+  SHA256/file/readelf/objdump artifacts, runs analyzer JSON with `--binary` and
+  `--objdump-xrefs`, writes `manifest.json`, and refuses to write artifacts under
+  `/servidor/ark`.
+- fact: `scripts/check_obelisk_server_posture.sh --expect-stable` now fails closed if
+  `libobelisk.so` is not mapped, if a deleted `libobelisk` mapping remains, or if scanner
+  / native-exec env vars are present. Offline procfs fixture coverage is in
+  `scripts/test_check_obelisk_server_posture.sh`.
 - fact: Current available Ragnarok logs are not enough for a GNames/FNamePool candidate:
   ReflectionScanner is disabled and analyzer output is `inconclusive`; see
   `docs/research/2026-05-27-current-gname-evidence-pack-audit.md`.
@@ -217,6 +226,9 @@ Updated: 2026-05-27
 - next-step: To get a real GNames evidence pack, create or designate an isolated debug
   instance and run a short ReflectionScanner capture with plugins disabled and native exec
   probes unset.
+- next-step: For the next isolated capture, run
+  `scripts/build_reflection_evidence_pack.py` against copied logs and the matching binary
+  before making any offset claim.
 - next-step: Replace raw chat parameter probing with reflected parameter decoding.
 - next-step: Add binary hash validation or an instruction decoder before accepting future
   ProcessEvent prologue changes.

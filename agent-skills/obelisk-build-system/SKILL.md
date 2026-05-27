@@ -75,6 +75,7 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake --build build -j"$(nproc)"
 ctest --test-dir build --output-on-failure
 python3 -m unittest scripts/test_analyze_reflectionscanner_capture.py
+scripts/test_check_obelisk_server_posture.sh
 scripts/test_install_obelisk_layout.sh /tmp/obelisk-install-layout-check
 git status --short --ignored
 ```

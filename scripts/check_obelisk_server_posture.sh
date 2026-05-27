@@ -10,6 +10,8 @@ Checks a running ARK/Obelisk process posture without changing server state.
 Options:
   --map <name>              Map argument prefix to find. Default: Ragnarok.
   --instance <id>           Expected OBELISK_INSTANCE_ID. Default: arkserver.
+  --pid <pid>               Check a specific process id instead of using pgrep.
+  --proc-root <path>        Procfs root. Default: /proc. Intended for offline tests.
   --expect-stable           Require stable dev posture: ProcessEvent on, plugins off,
                             ReflectionScanner/static sampling/native exec probes off.
   --allow-scanner           Allow OBELISK_ENABLE_REFLECTION_SCANNER=1.
@@ -19,6 +21,8 @@ EOF
 
 MAP="Ragnarok"
 INSTANCE="arkserver"
+PID=""
+PROC_ROOT="/proc"
 EXPECT_STABLE=0
 ALLOW_SCANNER=0
 
@@ -30,6 +34,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --instance)
             INSTANCE="${2:?missing instance}"
+            shift 2
+            ;;
+        --pid)
+            PID="${2:?missing pid}"
+            shift 2
+            ;;
+        --proc-root)
+            PROC_ROOT="${2:?missing proc root}"
             shift 2
             ;;
         --expect-stable)
@@ -52,13 +64,31 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-pid="$(pgrep -f "^./ShooterGameServer ${MAP}" | head -n1 || true)"
-if [[ -z "${pid}" ]]; then
+if [[ -z "${PID}" ]]; then
+    PID="$(pgrep -f "^./ShooterGameServer ${MAP}" | head -n1 || true)"
+fi
+
+if [[ -z "${PID}" ]]; then
     echo "No ShooterGameServer process found for map prefix '${MAP}'." >&2
     exit 1
 fi
 
-env_dump="$(tr '\0' '\n' < "/proc/${pid}/environ" | sort)"
+proc_pid_dir="${PROC_ROOT%/}/${PID}"
+env_file="${proc_pid_dir}/environ"
+maps_file="${proc_pid_dir}/maps"
+
+if [[ ! -r "${env_file}" ]]; then
+    echo "Cannot read ${env_file}." >&2
+    exit 1
+fi
+
+if [[ ! -r "${maps_file}" ]]; then
+    echo "Cannot read ${maps_file}." >&2
+    exit 1
+fi
+
+env_dump="$(tr '\0' '\n' < "${env_file}" | sort)"
+maps_dump="$(cat "${maps_file}")"
 
 get_env() {
     local name="$1"
@@ -86,13 +116,30 @@ forbid_env() {
     fi
 }
 
-echo "pid=${pid}"
+require_mapped_library() {
+    local library="$1"
+    if ! printf '%s\n' "${maps_dump}" | grep -F -- "${library}" >/dev/null; then
+        echo "Expected mapped library matching '${library}' in ${maps_file}." >&2
+        return 1
+    fi
+}
+
+forbid_deleted_obelisk_mapping() {
+    if printf '%s\n' "${maps_dump}" | grep -E 'libobelisk[^[:space:]]*[[:space:]].*\(deleted\)' >/dev/null; then
+        echo "Found deleted libobelisk mapping in ${maps_file}." >&2
+        return 1
+    fi
+}
+
+echo "pid=${PID}"
 printf '%s\n' "${env_dump}" | grep -E '^(OBELISK_|LD_PRELOAD=|LD_LIBRARY_PATH=)' || true
 
 if [[ "${EXPECT_STABLE}" == "1" ]]; then
     require_env OBELISK_INSTANCE_ID "${INSTANCE}"
     require_env OBELISK_ENABLE_PROCESS_EVENT_HOOK 1
     require_env OBELISK_DISABLE_PLUGINS 1
+    require_mapped_library "libobelisk.so"
+    forbid_deleted_obelisk_mapping
     forbid_env OBELISK_ENABLE_NATIVE_EXEC_PROBES
 
     if [[ "${ALLOW_SCANNER}" != "1" ]]; then

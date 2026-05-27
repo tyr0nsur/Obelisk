@@ -13,6 +13,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ANALYZER = REPO_ROOT / "scripts" / "analyze_reflectionscanner_capture.py"
+EVIDENCE_PACK_BUILDER = REPO_ROOT / "scripts" / "build_reflection_evidence_pack.py"
 
 
 def fname_probe(
@@ -622,6 +623,78 @@ class ReflectionScannerAnalyzerStrictTests(unittest.TestCase):
             "d936ee81753955ccd696878ea4beb9cf69db467d7c6e5fdc2ffd001c81b641e6",
         )
         self.assertIn("Never promote directly", evidence_pack["promotion_gate"])
+
+
+class ReflectionEvidencePackBuilderTests(unittest.TestCase):
+    def test_builds_offline_pack_from_copied_log_and_local_elf(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            log_path = temp_path / "Obelisk.log"
+            output_dir = temp_path / "pack"
+            log_path.write_text(
+                "[ReflectionScanner] disabled for offline builder test\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(EVIDENCE_PACK_BUILDER),
+                    "--binary",
+                    sys.executable,
+                    "--output-dir",
+                    str(output_dir),
+                    "--obelisk-commit",
+                    "test-commit",
+                    str(log_path),
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertTrue((output_dir / "ShooterGameServer.sha256.txt").is_file())
+            self.assertTrue((output_dir / "ShooterGameServer.readelf-header.txt").is_file())
+            self.assertTrue((output_dir / "ShooterGameServer.objdump").is_file())
+            self.assertTrue((output_dir / "logs" / "Obelisk.log").is_file())
+
+            manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+            analyzer = json.loads(
+                (output_dir / "analyzer-evidence.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(manifest["binary"]["path"], str(Path(sys.executable).resolve()))
+            self.assertEqual(analyzer["evidence_pack"]["obelisk_commit"], "test-commit")
+            self.assertEqual(analyzer["evidence_pack"]["status"], "inconclusive")
+            self.assertEqual(
+                analyzer["evidence_pack"]["logs"],
+                [str(output_dir / "logs" / "Obelisk.log")],
+            )
+
+    def test_refuses_to_write_under_server_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            log_path = Path(temp_dir) / "Obelisk.log"
+            log_path.write_text("offline test\n", encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(EVIDENCE_PACK_BUILDER),
+                    "--binary",
+                    sys.executable,
+                    "--output-dir",
+                    "/servidor/ark/obelisk-evidence-test",
+                    str(log_path),
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertIn("refusing to write evidence artifacts", result.stderr)
 
 
 if __name__ == "__main__":

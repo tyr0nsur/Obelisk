@@ -111,6 +111,9 @@ work from repository state instead of chat history.
   `--binary` to record the offline ShooterGameServer SHA256 and `--objdump-xrefs` to attach
   static xref evidence. Workflow:
   `docs/research/2026-05-27-gname-evidence-pack-workflow.md`.
+- `scripts/build_reflection_evidence_pack.py` wraps that manual flow into a reproducible
+  offline pack: copied logs, SHA256/file/readelf/objdump artifacts, analyzer JSON, and a
+  manifest. It refuses to write artifacts under `/servidor/ark`.
 - Analyzer static xref entries now include access classification (`load`, `store`,
   `address`, `call`, `jump`, or `other`) and evidence-pack access counts.
 - ReflectionScanner can probe explicit static FName root slots supplied through
@@ -136,6 +139,10 @@ work from repository state instead of chat history.
   current GNames evidence audit is inconclusive because scanner logs only show
   `ReflectionScanner disabled`; see
   `docs/research/2026-05-27-current-gname-evidence-pack-audit.md`.
+- `scripts/check_obelisk_server_posture.sh --expect-stable` is the required read-only
+  guardrail after server debug work. It checks expected env, requires `libobelisk.so` to be
+  mapped, rejects deleted Obelisk mappings, and has offline procfs fixture coverage in
+  `scripts/test_check_obelisk_server_posture.sh`.
 - A later controlled Ragnarok development capture on commit `8cb3bbe` produced 22
   UObject/UFunction leads and 22 FName reject rows, with zero positive FName probes.
   Rejection reasons were `implausible_num_elements` and `implausible_num_chunks`, so the
@@ -218,6 +225,9 @@ python3 scripts/analyze_reflectionscanner_capture.py \
   plan is `arkserver-obelisk-debug`.
 - Reflection: relax the static-root sampler counter gate and rerun observed-index sampling
   on an isolated/debug instance.
+- Evidence: after any isolated scanner capture, run
+  `scripts/build_reflection_evidence_pack.py` against copied logs and the matching binary
+  before promoting candidates.
 - Build/QA: keep package/export validation tied to concrete external plugin consumption
   gaps.
 - Core runtime: extend PluginManager coverage only if a new lifecycle risk is identified;
