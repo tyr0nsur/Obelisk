@@ -1,6 +1,6 @@
 ---
 name: obelisk-ue4-reversing
-description: Operational reversing workflow for maintaining Obelisk against ARK Linux ShooterGameServer updates, signatures, FName/object globals, and safe experiments.
+description: "Operational reversing workflow for maintaining Obelisk against ARK Linux ShooterGameServer updates, signatures, FName/object globals, and safe experiments."
 ---
 
 # Obelisk UE4 Reversing Skill

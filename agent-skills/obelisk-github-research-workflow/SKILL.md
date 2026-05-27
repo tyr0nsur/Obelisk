@@ -1,6 +1,6 @@
 ---
 name: obelisk-github-research-workflow
-description: Use when coordinating Obelisk agents that should commit to GitHub, improve their own skills, and document reverse-engineering or runtime findings under docs/research.
+description: "Use when coordinating Obelisk agents that should commit to GitHub, improve their own skills, and document reverse-engineering or runtime findings under docs/research."
 ---
 
 # Obelisk GitHub Research Workflow
@@ -93,6 +93,32 @@ git push origin main
 ```
 
 Skip the build only for docs-only or skills-only commits, and say so in the final report.
+
+## Community Discord Updates
+
+When the lead makes a stable commit or pushes a checkpoint, also send a short community
+update to the configured Obelisk Discord webhook if one is available in the session.
+
+Update style:
+
+- Use Markdown.
+- Write for the Obelisk community, not as a raw CI log.
+- Focus on project direction, visible progress, and what changed for modding/runtime
+  capability.
+- Keep validation details brief unless they explain confidence or safety.
+- Do not publish secrets, player chat contents, private server details, full logs, core
+  paths, or sensitive operational data.
+- Be explicit when something is experimental, gated, not deployed, or not yet public SDK.
+
+Suggested shape:
+
+```text
+**Obelisk Dev Update**
+
+<1-2 short paragraphs about what improved and why it matters.>
+
+**Current focus:** <next development/research focus>
+```
 
 ## Research Notes
 

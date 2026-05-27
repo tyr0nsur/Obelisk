@@ -1,6 +1,6 @@
 ---
 name: obelisk-continuous-learning
-description: Use when Obelisk agents should turn investigations into durable knowledge by updating research notes, revising skills, recording rejected hypotheses, and preserving evidence for future agents.
+description: "Use when Obelisk agents should turn investigations into durable knowledge by updating research notes, revising skills, recording rejected hypotheses, and preserving evidence for future agents."
 ---
 
 # Obelisk Continuous Learning

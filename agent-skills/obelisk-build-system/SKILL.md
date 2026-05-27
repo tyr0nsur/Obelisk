@@ -1,6 +1,6 @@
 ---
 name: obelisk-build-system
-description: Use when changing Obelisk CMake, dependencies, build outputs, install scripts, or centralized deployment layout for the runtime and plugins.
+description: "Use when changing Obelisk CMake, dependencies, build outputs, install scripts, or centralized deployment layout for the runtime and plugins."
 ---
 
 # Obelisk Build System

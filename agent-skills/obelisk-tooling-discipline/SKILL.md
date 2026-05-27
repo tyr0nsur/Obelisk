@@ -1,6 +1,6 @@
 ---
 name: obelisk-tooling-discipline
-description: Use when choosing or operating reverse-engineering tools for Obelisk, especially deciding what is safe offline, what requires an isolated debug server, and what must not run on live ARK instances.
+description: "Use when choosing or operating reverse-engineering tools for Obelisk, especially deciding what is safe offline, what requires an isolated debug server, and what must not run on live ARK instances."
 ---
 
 # Obelisk Tooling Discipline

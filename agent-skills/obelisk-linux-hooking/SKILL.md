@@ -1,6 +1,6 @@
 ---
 name: obelisk-linux-hooking
-description: Use when implementing or auditing Linux ELF/x86_64 hooks in Obelisk, especially absolute jumps, LD_PRELOAD, mprotect, trampolines, and ProcessEvent hook safety.
+description: "Use when implementing or auditing Linux ELF/x86_64 hooks in Obelisk, especially absolute jumps, LD_PRELOAD, mprotect, trampolines, and ProcessEvent hook safety."
 ---
 
 # Obelisk Linux Hooking

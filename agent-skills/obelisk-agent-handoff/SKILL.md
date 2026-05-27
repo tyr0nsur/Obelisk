@@ -1,6 +1,6 @@
 ---
 name: obelisk-agent-handoff
-description: Use when Obelisk work is delegated between agents and they need to transfer valuable context through repo files, current state notes, and structured handoff updates.
+description: "Use when Obelisk work is delegated between agents and they need to transfer valuable context through repo files, current state notes, and structured handoff updates."
 ---
 
 # Obelisk Agent Handoff
@@ -22,7 +22,7 @@ Update these before finishing:
 
 - `docs/agent-handoff/CURRENT.md` for short-lived active context.
 - `docs/agent-handoff/COMPACT_CONTEXT.md` when the stable baseline or hard rules change.
-- `docs/research/YYYY-MM-DD-topic.md` for reusable evidence.
+- A dated research note under `docs/research/` for reusable evidence.
 - `agent-skills/*/SKILL.md` when the way agents should work changes.
 
 ## Handoff Categories

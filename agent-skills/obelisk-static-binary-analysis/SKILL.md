@@ -1,6 +1,6 @@
 ---
 name: obelisk-static-binary-analysis
-description: Use when Obelisk work needs offline analysis of ShooterGameServer or other ELF binaries with hashes, sections, disassembly, xrefs, Ghidra/rizin/radare evidence, and reproducible candidate validation before runtime probing.
+description: "Use when Obelisk work needs offline analysis of ShooterGameServer or other ELF binaries with hashes, sections, disassembly, xrefs, Ghidra/rizin/radare evidence, and reproducible candidate validation before runtime probing."
 ---
 
 # Obelisk Static Binary Analysis

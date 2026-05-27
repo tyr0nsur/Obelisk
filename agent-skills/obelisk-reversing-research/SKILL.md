@@ -1,6 +1,6 @@
 ---
 name: obelisk-reversing-research
-description: Use when researching ARK/UE4 internals for Obelisk: FName/GNames/GObjects, UFunction discovery, ProcessEvent fname_index mapping, ReflectionScanner analysis, chat/event decoding, and safe live-server experiments.
+description: "Use when researching ARK/UE4 internals for Obelisk: FName/GNames/GObjects, UFunction discovery, ProcessEvent fname_index mapping, ReflectionScanner analysis, chat/event decoding, and safe live-server experiments."
 ---
 
 # Obelisk Reversing Research
