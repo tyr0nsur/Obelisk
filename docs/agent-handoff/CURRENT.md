@@ -107,6 +107,13 @@ Updated: 2026-05-27
   copied logs, objdump artifact, candidate counts, reject markers, and promotion gate.
   The workflow is documented in
   `docs/research/2026-05-27-gname-evidence-pack-workflow.md`.
+- fact: Commit `96b53d2` hardened installed SDK package validation by requiring
+  `find_package(Obelisk 0.1.0 CONFIG REQUIRED)` and rejecting source/build tree
+  path leaks in installed CMake package files.
+- fact: Commit `06a75c4` classifies static objdump xrefs as load, store, address,
+  call, jump, or other in analyzer output and evidence-pack counts. It also adds
+  `docs/research/2026-05-27-ue4-type-reconstruction-roadmap.md` for the staged
+  `FName -> GObjects -> UFunction -> params` reconstruction path.
 
 ## Rejected Or Unsafe
 

@@ -84,7 +84,8 @@ work from repository state instead of chat history.
   `lib/cmake/Obelisk/ObeliskTargets.cmake`, `ObeliskConfig.cmake`, and
   `ObeliskConfigVersion.cmake`.
 - Installed SDK layout validation consumes the installed package with
-  `find_package(Obelisk CONFIG REQUIRED)` and `Obelisk::obelisk_sdk`.
+  `find_package(Obelisk 0.1.0 CONFIG REQUIRED)` and `Obelisk::obelisk_sdk`, and
+  rejects installed CMake package files that leak local source or build paths.
 - Versioning policy is documented in `docs/VERSIONING.md`: no stable `0.1.0` tag yet;
   use `0.1.0-alpha.N` only for intentional contributor previews and `0.1.0-rc.N` only
   after scope freeze.
@@ -108,6 +109,11 @@ work from repository state instead of chat history.
   `--binary` to record the offline ShooterGameServer SHA256 and `--objdump-xrefs` to attach
   static xref evidence. Workflow:
   `docs/research/2026-05-27-gname-evidence-pack-workflow.md`.
+- Analyzer static xref entries now include access classification (`load`, `store`,
+  `address`, `call`, `jump`, or `other`) and evidence-pack access counts.
+- UE4 type reconstruction planning is captured in
+  `docs/research/2026-05-27-ue4-type-reconstruction-roadmap.md`; keep the milestone
+  order as `FName`, `GObjects`, `UFunction`, then bounded params.
 
 ## Current Research Direction
 
