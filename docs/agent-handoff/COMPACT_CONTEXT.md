@@ -131,6 +131,11 @@ work from repository state instead of chat history.
   Rejection reasons were `implausible_num_elements` and `implausible_num_chunks`, so the
   chat UObject globals should not be promoted directly into GNames roots; see
   `docs/research/2026-05-27-live-fname-reject-capture.md`.
+- A static-root probe for slot `0x5956f30` was added and retried for 60s. The slot becomes
+  non-null (`table=0x41f8d660`) and has `header_index_ok=3/3`, but rejects with
+  `num_elements=0`, `num_chunks=0`, and shifted names (`9619 -> ServerChat`,
+  `9622 -> SetActiveMissionDebugFlags`). Do not accept it as GNames yet; next FName work
+  should sample/validate using observed `UObject.NamePrivate` indices.
 - A controlled Ragnarok development capture on commit `5754fca` tested
   `OBELISK_REFLECTION_STATIC_FNAME_ROOTS=0x5956f30`; the startup static-root probe rejected
   it with `table=0x0` / `unreadable_table_header`. The server was restarted afterward

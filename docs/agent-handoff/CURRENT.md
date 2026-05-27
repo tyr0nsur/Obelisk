@@ -129,6 +129,11 @@ Updated: 2026-05-27
   FName probes. Current evidence says the chat UObject globals are not plausible GNames
   roots under the indirect-table model. See
   `docs/research/2026-05-27-live-fname-reject-capture.md`.
+- fact: A delayed static-root retry capture for `0x5956f30` stayed inconclusive. The slot
+  becomes non-null after startup and reads names with `header_index_ok=3/3`, but the
+  expected clues do not match (`9619 -> ServerChat`, `9622 -> SetActiveMissionDebugFlags`)
+  and counts remain zero. Do not promote `0x5956f30` as accepted GNames; see
+  `docs/research/2026-05-27-static-fname-root-live-capture.md`.
 - fact: Static analysis found a stronger FName root research-candidate in the current ARK
   binary: global pointer slot `0x5956f30`, bucket array `0x594e020`, mutex slot
   `0x5956f38`, init flag `0x5956f40`, and name-table code around `0x1c88e70`,
@@ -192,6 +197,8 @@ Updated: 2026-05-27
 - next-step: Stop trying to promote chat UObject globals directly into GNames. Next FName
   work should use static discovery of the name table global or a bounded alternate name
   storage scanner, then validate with the analyzer.
+- next-step: Replace fixed clue-index assumptions with a bounded static-root sampler that
+  validates names using observed `UObject.NamePrivate` indices from scanner output.
 - next-step: Add an isolated-only explicit static FName root probe that accepts
   env-supplied global pointer slots such as `0x5956f30` and runs the existing
   `None`/`ClientMessage`/`ServerChat` clue checks plus header-index validation against
