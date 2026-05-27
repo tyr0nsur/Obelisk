@@ -239,7 +239,8 @@ Updated: 2026-05-27
   `state/instances/<id>/enable-chat-reflection` to set the experimental chat reflection
   gates and default log limit on restart.
 - fact: Latest local runtime from `main` including commits through `751a7c3` was deployed to
-  `/servidor/ark/obelisk` and `arkserver` was restarted. Current PID `3180747` has
+  `/servidor/ark/obelisk`; later deploy on commit `df332d7` installed the
+  `ServerSendChatMessage` recognizer and restarted `arkserver`. Current PID `3220707` has
   `OBELISK_ENABLE_CHAT_REFLECTION=1`, matching SHA gate, ProcessEvent hook installed at
   `0x1d34e20`, plugins disabled, and stable posture confirmed.
 - fact: `hooks/ProcessEventChatReflection.{h,cpp}` extracts gate/recognition logic from
@@ -263,8 +264,7 @@ Updated: 2026-05-27
 
 ## Priority Next Steps
 
-- next-step: Deploy the `ServerSendChatMessage` recognizer to the debug runtime, then write
-  one in-game chat message on Ragnarok and tail
+- next-step: Write one in-game chat message on Ragnarok and tail
   `/servidor/ark/obelisk/logs/arkserver/Obelisk.log` for a bounded reflected
   chat/candidate log entry.
 - next-step: Wire UTF-32 text decoding into the experimental chat reflection logger only
