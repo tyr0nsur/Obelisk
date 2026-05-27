@@ -21,11 +21,13 @@ case "${1:-}" in
         export OBELISK_INSTANCE_ID="${OBELISK_INSTANCE_ID:-arkserver}"
         enable_marker "enable-process-event-hook" && export OBELISK_ENABLE_PROCESS_EVENT_HOOK=1
         enable_marker "disable-plugins" && export OBELISK_DISABLE_PLUGINS=1
+        enable_marker "allow-ptrace" && export OBELISK_DEBUG_ALLOW_PTRACE=1
         ;;
     TheIsland*)
         export OBELISK_INSTANCE_ID="${OBELISK_INSTANCE_ID:-arkserver2}"
         enable_marker "enable-process-event-hook" && export OBELISK_ENABLE_PROCESS_EVENT_HOOK=1
         enable_marker "disable-plugins" && export OBELISK_DISABLE_PLUGINS=1
+        enable_marker "allow-ptrace" && export OBELISK_DEBUG_ALLOW_PTRACE=1
         ;;
 esac
 

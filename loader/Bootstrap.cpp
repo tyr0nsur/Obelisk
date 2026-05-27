@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <string>
+#include <sys/prctl.h>
 #include "runtime/Logger.h"
 #include "hooks/HookManager.h"
 #include "hooks/ProcessEventHook.h"
@@ -24,6 +25,21 @@ static std::string GetPluginDirectory()
         return (std::filesystem::path(root) / "plugins").string();
 
     return "plugins";
+}
+
+static void ConfigureDebugPtrace()
+{
+    const char* allowPtrace = std::getenv("OBELISK_DEBUG_ALLOW_PTRACE");
+    if (!allowPtrace || std::strcmp(allowPtrace, "1") != 0)
+        return;
+
+    if (prctl(PR_SET_PTRACER, PR_SET_PTRACER_ANY, 0, 0, 0) == 0)
+    {
+        OBELISK_WARN("Debug ptrace attach enabled by OBELISK_DEBUG_ALLOW_PTRACE=1.");
+        return;
+    }
+
+    OBELISK_ERROR("Failed to enable debug ptrace attach: errno={} ({})", errno, std::strerror(errno));
 }
 
 // The constructor attribute ensures this function runs as soon as the shared library 
@@ -46,6 +62,8 @@ void Obelisk_Init()
     OBELISK_INFO(" Obelisk Runtime Loaded Native (LD_PRELOAD)");
     OBELISK_INFO("==========================================");
     OBELISK_INFO("Starting runtime bootstrap...");
+
+    ConfigureDebugPtrace();
     
     // Initialize hooking engine
     Obelisk::Hooks::HookManager::Init();

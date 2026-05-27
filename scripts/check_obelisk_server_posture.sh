@@ -140,6 +140,7 @@ if [[ "${EXPECT_STABLE}" == "1" ]]; then
     require_env OBELISK_DISABLE_PLUGINS 1
     require_mapped_library "libobelisk.so"
     forbid_deleted_obelisk_mapping
+    forbid_env OBELISK_DEBUG_ALLOW_PTRACE
     forbid_env OBELISK_ENABLE_NATIVE_EXEC_PROBES
 
     if [[ "${ALLOW_SCANNER}" != "1" ]]; then
