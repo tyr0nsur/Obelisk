@@ -226,8 +226,8 @@ Updated: 2026-05-27
 - fact: `packaging/linuxgsm/ObeliskRun.sh` supports
   `state/instances/<id>/enable-chat-reflection` to set the experimental chat reflection
   gates and default log limit on restart.
-- fact: Commit `e115300` plus local runtime build was deployed to `/servidor/ark/obelisk`
-  and `arkserver` was restarted. Current PID `3154298` has
+- fact: Latest local runtime from `main` including commits through `751a7c3` was deployed to
+  `/servidor/ark/obelisk` and `arkserver` was restarted. Current PID `3180747` has
   `OBELISK_ENABLE_CHAT_REFLECTION=1`, matching SHA gate, ProcessEvent hook installed at
   `0x1d34e20`, plugins disabled, and stable posture confirmed.
 - fact: `hooks/ProcessEventChatReflection.{h,cpp}` extracts gate/recognition logic from

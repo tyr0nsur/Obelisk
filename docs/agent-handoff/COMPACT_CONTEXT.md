@@ -283,9 +283,9 @@ python3 scripts/analyze_reflectionscanner_capture.py \
   the supported ARK SHA. It logs metadata/ranges only, not text.
 - `packaging/linuxgsm/ObeliskRun.sh` supports the
   `state/instances/<id>/enable-chat-reflection` marker for restart-time activation.
-- Latest deployed runtime on `arkserver` has chat reflection enabled and plugins disabled.
-  It reached the experimental gate log after first ProcessEvent; no chat message has been
-  observed yet in the log.
+- Latest deployed runtime on `arkserver` includes commits through `751a7c3`, has chat
+  reflection enabled and plugins disabled, PID `3180747`. It reached the experimental gate
+  log after first ProcessEvent; no chat message has been observed yet in the log.
 - `FString` candidate for this ARK Linux build is a 16-byte
   `{Data, ArrayNum, ArrayMax}` header with UTF-32LE `TCHAR`; see
   `docs/research/2026-05-27-fstring-layout.md`.
