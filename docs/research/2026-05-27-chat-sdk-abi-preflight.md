@@ -112,6 +112,9 @@ Before dispatch is connected to `ProcessEvent`:
 The public API should remain blocked until all are true:
 
 - Local benchmark keeps disabled and non-chat paths allocation-free.
+- `scripts/check_chat_reflection_benchmark.py` gates synthetic benchmark output for
+  disabled/non-chat allocation-free paths, reader-call ceilings, matched-chat allocation
+  ceilings, and full accepted-iteration counts.
 - Matched chat and text decode allocation costs are either reduced with bounded storage or
   explicitly accepted with isolated runtime A/B evidence.
 - Controlled runtime text validation confirms copied UTF-8 contents for at least

@@ -155,6 +155,8 @@ The local helper target is intentionally excluded from the default build:
 ```bash
 cmake --build build --target chat_reflection_benchmark
 ./build/chat_reflection_benchmark 100000
+./build/chat_reflection_benchmark 20000 > /tmp/obelisk-chat-reflection-benchmark.txt
+python3 scripts/check_chat_reflection_benchmark.py /tmp/obelisk-chat-reflection-benchmark.txt
 ```
 
 It uses synthetic memory only and must not be treated as a replacement for isolated runtime
@@ -200,6 +202,11 @@ iteration. The fixture text intentionally exceeds small-string optimization stor
 text decode now shows three allocations and the hook-like text path shows seven
 allocations per iteration. These are local regression signals only, not runtime acceptance
 evidence.
+
+`scripts/check_chat_reflection_benchmark.py` now enforces those local regression gates for
+the hook-like paths. It requires disabled/non-chat paths to remain allocation-free, caps
+reader calls for hook-like cases, and verifies each required case accepts every iteration.
+This still does not replace TheIsland runtime A/B evidence.
 
 ## Risks
 

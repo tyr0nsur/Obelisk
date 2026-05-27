@@ -370,6 +370,9 @@ python3 scripts/analyze_reflectionscanner_capture.py \
   allocate three temporary vectors/strings after reserve hardening and need justification or
   bounded stack/small-vector storage before SDK promotion. Text decode is measured with a
   non-SSO fixture string and currently shows seven allocations in the hook-like text path.
+- `scripts/check_chat_reflection_benchmark.py` gates benchmark output for allocation-free
+  disabled/non-chat paths and documented matched/text ceilings. It is a local regression
+  gate only, not isolated runtime A/B acceptance.
 - `docs/research/2026-05-27-chat-sdk-abi-preflight.md` records the test-first plan for
   future `OnChatMessage`: ABI layout tests, copied UTF-8 dispatcher tests, capability gate,
   opaque registration id, idempotent unregister, owner cleanup, and installed SDK consumer
