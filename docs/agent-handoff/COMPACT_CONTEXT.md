@@ -278,6 +278,9 @@ python3 scripts/analyze_reflectionscanner_capture.py \
 - `ue/ChatReflection.{h,cpp}` exists as the internal recognizer for `ServerChat`,
   `ServerChatTo`, and `ServerChatToPlayer` shapes. It is tested, returns borrowed param
   ranges, does not decode `FString`, and is not wired into `ProcessEvent` yet.
+- `ProcessEvent_Detour` has experimental chat observation wiring, disabled unless
+  `OBELISK_ENABLE_CHAT_REFLECTION=1` and `OBELISK_CHAT_REFLECTION_BINARY_SHA256` matches
+  the supported ARK SHA. It logs metadata/ranges only, not text.
 - Evidence: after any isolated scanner capture, run
   `scripts/build_reflection_evidence_pack.py` against copied logs and the matching binary
   before promoting candidates.

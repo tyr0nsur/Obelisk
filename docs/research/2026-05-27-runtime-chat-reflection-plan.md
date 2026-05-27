@@ -39,6 +39,18 @@ The chat-specific recognizer now exists as `ue/ChatReflection.{h,cpp}`. It recog
 property-chain shape, and can return borrowed parameter ranges when `params` is provided.
 It still does not decode `FString` contents and is not wired into the hook yet.
 
+`ProcessEvent_Detour` now has experimental observation wiring. It is disabled unless both
+environment variables are present:
+
+```text
+OBELISK_ENABLE_CHAT_REFLECTION=1
+OBELISK_CHAT_REFLECTION_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520
+```
+
+When enabled, it cheaply filters by chat FName index, validates the reflected chat shape,
+and logs only function/field metadata and borrowed parameter ranges. It does not decode
+text, call plugins, expose ABI, or hook native exec pointers.
+
 The final chat helper should build on that module and:
 
 - reject null or unreadable pointers;
@@ -89,10 +101,10 @@ From `docs/research/2026-05-27-core-ufunction-property-chain.md`:
 - `ChatReflectionTests` cover valid `ServerChat`, `ServerChatTo`, and
   `ServerChatToPlayer` shapes; same-FName wrong shapes; wrong property names; wrong
   `StrProperty` class; and disabled/unsupported gates.
-- Still needed: hook-level dispatch tests once the helper is wired into
-  `ProcessEvent_Detour`.
+- Still needed: hook-level dispatch tests for the new observation path.
 
 ## Next Step
 
-Wire `ue/ChatReflection` into `ProcessEvent_Detour` behind an explicit experimental gate
-and rate-limited logging, then add hook-level tests.
+Deploy to an isolated debug server with the two environment gates above and
+`OBELISK_CHAT_REFLECTION_LOG_LIMIT` set to a small value. Then write one chat message and
+check for `Reflected chat ProcessEvent` log entries.
