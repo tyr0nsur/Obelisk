@@ -14,8 +14,8 @@ python3 scripts/regenerate_scriptstruct_snapshots.py \
 ```
 
 For second-core comparisons where the evidence commit naturally differs, use
-`--check-layout` to compare only target identity, `PropertiesSize`, and property-chain
-layout:
+`--check-layout` as a semantic layout check that ignores capture-specific identity
+indices:
 
 ```bash
 python3 scripts/regenerate_scriptstruct_snapshots.py \
@@ -32,3 +32,13 @@ tests/fixtures/scriptstruct_snapshots/<ark-sha12>/<sdk_module>/<SafeOuter>.<Stru
 
 ScriptStruct snapshots must use schema `obelisk.scriptstruct-chain.snapshot.v1` and stay
 separate from UFunction fixtures.
+
+Use the shared comparator for second-source evidence roots:
+
+```bash
+python3 scripts/compare_reflection_snapshots.py \
+  --base-root tests/fixtures/scriptstruct_snapshots/<ark-sha12>/<sdk_module> \
+  --candidate-root /path/to/second-source/scriptstruct_snapshots/<ark-sha12>/<sdk_module> \
+  --target Outer.Struct \
+  --json
+```

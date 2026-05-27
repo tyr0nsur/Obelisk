@@ -45,7 +45,9 @@ updating any module status:
 ```bash
 python3 scripts/compare_reflection_snapshots.py \
   --base-root tests/fixtures/ufunction_snapshots/<sha-prefix>/<module> \
-  --candidate-root <second-source-ufunction-snapshots>/<sha-prefix>/<module>
+  --candidate-root <second-source-ufunction-snapshots>/<sha-prefix>/<module> \
+  --target <Outer.Name> \
+  --json
 ```
 
 Use `--json` for evidence packs. The comparator ignores commit, metadata, and unstable

@@ -80,8 +80,8 @@ Updated: 2026-05-28
   internal.
 - fact: `scripts/compare_reflection_snapshots.py` compares sanitized UFunction and
   ScriptStruct snapshot sets offline and reports `accepted`, `rejected`, or `inconclusive`
-  per target. Use it for second-source layout checks; it does not read cores or touch
-  servers.
+  per target. Use `--target Outer.Name` for focused module checks. It does not read cores
+  or touch servers.
 - fact: `sdk.transfers` ScriptStruct fixtures now preserve target/property object and
   FName identity fields like UFunction fixtures. `regenerate_scriptstruct_snapshots.py
   --check-layout` stays semantic/layout-only so second-source gates do not depend on

@@ -48,6 +48,15 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Also require FName/object identity indices to match where snapshots carry them.",
     )
+    parser.add_argument(
+        "--target",
+        action="append",
+        default=[],
+        help=(
+            "Only compare an exact target. Accepts Outer.Name or schema:Outer.Name. "
+            "Repeatable."
+        ),
+    )
     parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     return parser.parse_args()
 
@@ -286,15 +295,35 @@ def evidence_sha(payload: dict[str, Any]) -> Any:
     return evidence.get("ark_binary_sha256") if isinstance(evidence, dict) else None
 
 
+def matches_target_filter(key: str, filters: set[str]) -> bool:
+    if not filters:
+        return True
+    _, _, short_key = key.partition(":")
+    return key in filters or short_key in filters
+
+
+def filtered_keys(
+    base: dict[str, dict[str, Any]],
+    candidate: dict[str, dict[str, Any]],
+    *,
+    target_filters: set[str],
+) -> list[str]:
+    keys = sorted(key for key in set(base) | set(candidate) if matches_target_filter(key, target_filters))
+    if target_filters and not keys:
+        raise SystemExit(f"target filter did not match snapshots: {', '.join(sorted(target_filters))}")
+    return keys
+
+
 def compare_sets(
     base: dict[str, dict[str, Any]],
     candidate: dict[str, dict[str, Any]],
     *,
     strict_identity_indices: bool,
     allow_ark_sha_mismatch: bool,
+    target_filters: set[str],
 ) -> dict[str, Any]:
     results: list[dict[str, Any]] = []
-    for key in sorted(set(base) | set(candidate)):
+    for key in filtered_keys(base, candidate, target_filters=target_filters):
         if key not in candidate:
             results.append({"target": key, "status": "inconclusive", "reasons": ["missing_candidate_snapshot"]})
             continue
@@ -337,6 +366,7 @@ def compare_sets(
         "schema": "obelisk.reflection-snapshot-comparison.v1",
         "strict_identity_indices": strict_identity_indices,
         "allow_ark_sha_mismatch": allow_ark_sha_mismatch,
+        "target_filters": sorted(target_filters),
         "counts": counts,
         "results": results,
     }
@@ -368,6 +398,7 @@ def main() -> int:
         candidate,
         strict_identity_indices=args.strict_identity_indices,
         allow_ark_sha_mismatch=args.allow_ark_sha_mismatch,
+        target_filters=set(args.target),
     )
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))

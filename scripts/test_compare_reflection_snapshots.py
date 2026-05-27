@@ -105,6 +105,13 @@ def write_snapshot(root: Path, payload: dict[str, object], name: str = "PrimalIt
     return path
 
 
+def rename_target(payload: dict[str, object], *, outer: str, name: str) -> dict[str, object]:
+    target = payload["targets"][0]["target"]  # type: ignore[index]
+    target["outer_name"] = outer
+    target["name"] = name
+    return payload
+
+
 def run_compare(base: Path, candidate: Path, *extra: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [
@@ -279,6 +286,120 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         report = json.loads(strict.stdout)
         self.assertEqual(report["counts"]["rejected"], 1)
         self.assertIn("array_inner_candidate.inner_property.name_index", report["results"][0]["diffs"][0]["path"])
+
+    def test_target_filter_limits_comparison_to_requested_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            requested_left = base_snapshot()
+            requested_right = deepcopy(requested_left)
+            ignored_left = rename_target(deepcopy(base_snapshot()), outer="PrimalBuff", name="AllowPostProcessEffect")
+            ignored_right = deepcopy(ignored_left)
+            ignored_right["targets"][0]["property_chain"]["properties"][0]["offset_internal"] = 99  # type: ignore[index]
+            write_snapshot(base, requested_left)
+            write_snapshot(candidate, requested_right)
+            write_snapshot(base, ignored_left, "PrimalBuff.AllowPostProcessEffect.snapshot.json")
+            write_snapshot(candidate, ignored_right, "PrimalBuff.AllowPostProcessEffect.snapshot.json")
+
+            result = run_compare(base, candidate, "--target", "PrimalItem.CanUse", "--json")
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["counts"], {"accepted": 1, "inconclusive": 0, "rejected": 0})
+        self.assertEqual(report["target_filters"], ["PrimalItem.CanUse"])
+        self.assertEqual(report["results"][0]["target"], "obelisk.ufunction-chain.snapshot.v1:PrimalItem.CanUse")
+
+    def test_target_filter_accepts_schema_qualified_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            write_snapshot(base, base_snapshot())
+            write_snapshot(candidate, base_snapshot())
+
+            result = run_compare(
+                base,
+                candidate,
+                "--target",
+                "obelisk.ufunction-chain.snapshot.v1:PrimalItem.CanUse",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["counts"]["accepted"], 1)
+
+    def test_target_filter_fails_when_no_snapshot_matches(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            write_snapshot(base, base_snapshot())
+            write_snapshot(candidate, base_snapshot())
+
+            result = run_compare(base, candidate, "--target", "PrimalBuff.Missing", "--json")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("target filter did not match snapshots", result.stderr)
+
+    def test_target_filter_reports_missing_candidate_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            left = rename_target(deepcopy(base_snapshot()), outer="PrimalBuff", name="AllowPostProcessEffect")
+            write_snapshot(base, left, "PrimalBuff.AllowPostProcessEffect.snapshot.json")
+
+            result = run_compare(base, candidate, "--target", "PrimalBuff.AllowPostProcessEffect", "--json")
+
+        self.assertEqual(result.returncode, 2)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["counts"], {"accepted": 0, "inconclusive": 1, "rejected": 0})
+        self.assertEqual(report["results"][0]["reasons"], ["missing_candidate_snapshot"])
+
+    def test_repeated_target_filters_preserve_global_exit_code_priority(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            accepted_left = base_snapshot()
+            accepted_right = deepcopy(accepted_left)
+            rejected_left = rename_target(deepcopy(base_snapshot()), outer="PrimalBuff", name="AllowPostProcessEffect")
+            rejected_right = deepcopy(rejected_left)
+            rejected_right["targets"][0]["property_chain"]["properties"][0]["offset_internal"] = 99  # type: ignore[index]
+            missing_left = rename_target(deepcopy(base_snapshot()), outer="MissionType", name="AddPlayerToMission")
+            write_snapshot(base, accepted_left)
+            write_snapshot(candidate, accepted_right)
+            write_snapshot(base, rejected_left, "PrimalBuff.AllowPostProcessEffect.snapshot.json")
+            write_snapshot(candidate, rejected_right, "PrimalBuff.AllowPostProcessEffect.snapshot.json")
+            write_snapshot(base, missing_left, "MissionType.AddPlayerToMission.snapshot.json")
+
+            result = run_compare(
+                base,
+                candidate,
+                "--target",
+                "PrimalItem.CanUse",
+                "--target",
+                "PrimalBuff.AllowPostProcessEffect",
+                "--target",
+                "MissionType.AddPlayerToMission",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 1)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["counts"], {"accepted": 1, "inconclusive": 1, "rejected": 1})
 
 
 if __name__ == "__main__":
