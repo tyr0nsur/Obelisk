@@ -38,7 +38,8 @@ Not ready:
 - Player, tribe, inventory, dino, permission, timer, and command APIs.
 - Production-ready gameplay SDK.
 
-See [docs/STATUS.md](docs/STATUS.md) for the current stability matrix.
+See [docs/STATUS.md](docs/STATUS.md) for the current stability matrix and
+[docs/VERSIONING.md](docs/VERSIONING.md) for the pre-release versioning policy.
 
 ## Why Obelisk
 
@@ -93,6 +94,7 @@ python3 scripts/test_verify_chat_reflection_constants.py
 python3 scripts/test_research_doc_guardrails.py
 python3 scripts/test_public_sdk_chat_guardrails.py
 python3 scripts/test_dependency_pins.py
+python3 scripts/test_versioning_guardrails.py
 scripts/install_obelisk.sh --dry-run /tmp/obelisk-install-check
 ```
 

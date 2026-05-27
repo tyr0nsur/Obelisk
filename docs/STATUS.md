@@ -4,6 +4,9 @@ This matrix separates the stable baseline from experimental work. It is a
 contributor-facing summary for the Obelisk runtime/API/SDK, not a replacement
 for detailed research notes.
 
+Current development line is `0.1.0-dev`; see [VERSIONING.md](VERSIONING.md). This is not
+a production-stable release claim.
+
 The current ARK server setup is the debug harness used to validate Obelisk in a
 real UE4 Linux process. Harness operations are documented here only when they
 define or protect runtime behavior.

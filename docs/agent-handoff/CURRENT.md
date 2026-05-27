@@ -97,6 +97,9 @@ Updated: 2026-05-27
 - fact: Development versioning policy is documented in `docs/VERSIONING.md`. The current
   line is `0.1.0-dev`, not a release tag; use alpha/rc tags only when external testing or
   release-candidate validation needs a fixed checkpoint.
+- fact: `README.md`, `docs/STATUS.md`, `docs/RELEASE.md`, and
+  `scripts/test_versioning_guardrails.py` now link/enforce the pre-release versioning
+  policy so `0.1.0-dev` is not presented as a stable release.
 - fact: Commit `fc837a0` added passive static xref annotation to
   `scripts/analyze_reflectionscanner_capture.py`. Use `--objdump-xrefs` with a
   pre-generated `objdump -d` text file to annotate candidate globals; this is supporting

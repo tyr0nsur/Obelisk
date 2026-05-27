@@ -1,7 +1,8 @@
 # Release Process
 
 This project is not ready for a production-stable release yet. Use this checklist for the
-first public `0.1.0` tag.
+first public `0.1.0` tag. Version labels and pre-release rules are defined in
+[VERSIONING.md](VERSIONING.md).
 
 ## Scope
 
@@ -38,6 +39,7 @@ python3 scripts/test_verify_chat_reflection_constants.py
 python3 scripts/test_research_doc_guardrails.py
 python3 scripts/test_public_sdk_chat_guardrails.py
 python3 scripts/test_dependency_pins.py
+python3 scripts/test_versioning_guardrails.py
 scripts/install_obelisk.sh --dry-run /tmp/obelisk-release-check
 ```
 
