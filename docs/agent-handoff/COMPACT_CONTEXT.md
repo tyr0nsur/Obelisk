@@ -186,6 +186,10 @@ work from repository state instead of chat history.
 - Do not restart `GObjects` discovery from broad candidate search. Current priority is a
   second static path for `0x595b7e0`: classify `0x12d1400`, `0x79ce22`, `0x7a27a7`,
   `0x81f118`, and `0x81f206`, then strengthen class/outer back-reference validation.
+- No second isolated core is currently available; read-only dump inventory only found the
+  existing Ragnarok-derived core and derivative packs. Prefer dedicated
+  `arkserver-obelisk-debug`; use `arkserver2` / TheIsland only as explicit fallback. See
+  `docs/research/2026-05-27-isolated-second-core-runbook.md`.
 - Offline `UFunction` property-chain inspection now works through
   `scripts/inspect_core_ufunctions.py`. Current chat evidence:
   `ServerChat.MessageText` offset `0x0`; `ServerChatTo.SteamID` offset `0x0` and

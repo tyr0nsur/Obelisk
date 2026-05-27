@@ -261,6 +261,11 @@ Updated: 2026-05-27
   candidate. The priority is improving xref grouping so broad nearest-symbol ranges are
   flagged, then repeating the classified context checks on a second isolated core or future
   binary before promoting any runtime-stable reflection contract.
+- next-step: No second isolated core is currently available; read-only dump inventory only
+  found the existing Ragnarok-derived core and derivative packs. When the operator opens a
+  core window, prefer dedicated `arkserver-obelisk-debug`; use `arkserver2` / TheIsland
+  only as explicit fallback. Follow
+  `docs/research/2026-05-27-isolated-second-core-runbook.md` and do not touch Ragnarok.
 - fact: `scripts/inspect_core_ufunctions.py` can walk legacy `UStruct.Children +0x38` and
   `UField.Next +0x28` property chains from the core. Chat parameter evidence:
   `ServerChat.MessageText` offset `0x0`, `ServerChatTo.SteamID` offset `0x0`,

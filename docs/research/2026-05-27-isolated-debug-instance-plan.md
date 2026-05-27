@@ -383,4 +383,5 @@ Obelisk environment variables instead of shared production markers.
 1. Ask the operator to approve Option A or choose Option B/C explicitly.
 2. If Option A is approved, request permission for the specific file creations and port
    reservation listed in the checklist.
-3. After the debug instance exists, run the existing isolated capture runbook only against
+3. After the debug instance exists, run the isolated capture/core runbooks only against
+   `arkserver-obelisk-debug`, never against Ragnarok.

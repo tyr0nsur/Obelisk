@@ -62,12 +62,14 @@ From the isolated server control directory, start or restart only the isolated i
 sha256sum /servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer
 git -C /home/flowcommunity-ark/Obelisk rev-parse --short HEAD
 git -C /home/flowcommunity-ark/Obelisk status --short
+# Preferred: restart/start only arkserver-obelisk-debug through its approved control script.
+# Fallback only with explicit approval:
 ./arkserver2 restart
 ```
 
-Use `./arkserver2 restart` only during an approved TheIsland debug window. If a dedicated
-`arkserver-obelisk-debug` instance exists, use that instead. Never restart `arkserver` /
-Ragnarok for scanner captures while player performance testing is active.
+Prefer `arkserver-obelisk-debug` for scanner captures. Use `./arkserver2 restart` only
+during an approved TheIsland debug window. Never restart `arkserver` / Ragnarok for
+scanner captures while player performance testing is active.
 
 Let the process reach normal startup before copying logs. Do not rely on blind
 bootstrap/static-root waits as the main strategy; later runtime debug-control probing
