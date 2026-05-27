@@ -360,6 +360,9 @@ Updated: 2026-05-27
   disabled/non-chat hook-like paths remain allocation-free and matched/text paths stay
   within documented reader-call/allocation ceilings. This is a regression gate, not
   runtime acceptance evidence.
+- fact: CI runs the deterministic parser/threshold tests for the benchmark gate. CI does
+  not run the timing benchmark itself; `chat_reflection_benchmark` remains excluded from
+  the default build.
 - fact: `Memory::IsReadable` no longer uses `write(/dev/null)` because that probe returned
   success for invalid and `PROT_NONE` mappings on this host. It is now backed by cached
   readable ranges from `/proc/self/maps`, with `MemoryTests` covering invalid pointers,

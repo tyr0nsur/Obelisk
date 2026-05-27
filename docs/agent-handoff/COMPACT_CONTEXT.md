@@ -373,6 +373,7 @@ python3 scripts/analyze_reflectionscanner_capture.py \
 - `scripts/check_chat_reflection_benchmark.py` gates benchmark output for allocation-free
   disabled/non-chat paths and documented matched/text ceilings. It is a local regression
   gate only, not isolated runtime A/B acceptance.
+- CI runs the deterministic benchmark-gate parser tests, not the timing benchmark itself.
 - `docs/research/2026-05-27-chat-sdk-abi-preflight.md` records the test-first plan for
   future `OnChatMessage`: ABI layout tests, copied UTF-8 dispatcher tests, capability gate,
   opaque registration id, idempotent unregister, owner cleanup, and installed SDK consumer
