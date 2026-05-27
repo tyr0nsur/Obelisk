@@ -55,6 +55,17 @@ and updates:
 - Attach debuggers or create core dumps.
 - Commit, push, tag, or change GitHub state.
 
+## Retention
+
+Supervisor snapshots are intentionally small text evidence packs. Keep them under
+`/servidor/ark/obelisk/dumps/supervisor/`; they can be pruned after their findings have
+been summarized into `docs/research/` or `docs/agent-handoff/`.
+
+Core dumps and evidence packs under `/servidor/ark/obelisk/dumps/` are different: do not
+delete them just because they are large. They may be the only reproducible source for
+accepted offsets, FName/GObjects evidence, and UFunction property chains. Prune them only
+after recording which research notes, commits, and verifier outputs replace that evidence.
+
 ## Morning Review
 
 ```bash
