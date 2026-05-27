@@ -427,6 +427,10 @@ Updated: 2026-05-27
   default target for high-risk tooling. For `gcore`, `ptrace`, `ReflectionScanner`, broad
   tracing, and scanner-like captures, prefer a dedicated `arkserver-obelisk-debug`
   instance with separate ports/save/cluster/logs.
+- fact: Historical Ragnarok runbooks for core dumps and runtime debug-control were
+  rewritten as non-default guidance: future captures must use
+  `docs/research/2026-05-27-isolated-second-core-runbook.md`,
+  `arkserver-obelisk-debug` first, and TheIsland only as approved fallback.
 - risk: Native exec probes must remain disabled on live servers.
 - risk: The `subhook` pin was selected from the existing local checkout without internet
   verification; full offline resilience still needs a mirror or vendored archive.

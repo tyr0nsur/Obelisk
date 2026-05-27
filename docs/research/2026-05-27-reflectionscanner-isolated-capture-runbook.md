@@ -11,8 +11,10 @@ Prepare the next isolated `ReflectionScanner` capture to validate two scanner-on
   `4884 == ClientMessage`, `9619 == ServerChat`, and
   `9622 == SetActiveMissionDebugFlags`.
 
-This runbook is for an isolated/debug ARK instance only. Do not use it to enable
-raw event discovery or native exec probes on the active development server.
+This runbook is for an isolated/debug ARK instance only. Prefer
+`arkserver-obelisk-debug`. Use `arkserver2` / TheIsland only as an explicit fallback
+debug window, and never use `arkserver` / Ragnarok while player performance testing is
+active.
 
 ## Environment To Record
 
@@ -56,20 +58,24 @@ explicitly changed to translate that marker into `OBELISK_ENABLE_REFLECTION_SCAN
 
 ## Capture Commands
 
-From the isolated server control directory, start or restart only the isolated instance:
+From the isolated server control directory, start or restart only the isolated instance.
+Preferred dedicated-debug profile:
 
 ```bash
 sha256sum /servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer
 git -C /home/flowcommunity-ark/Obelisk rev-parse --short HEAD
 git -C /home/flowcommunity-ark/Obelisk status --short
-# Preferred: restart/start only arkserver-obelisk-debug through its approved control script.
-# Fallback only with explicit approval:
-./arkserver2 restart
+# Restart/start only arkserver-obelisk-debug through its approved control script.
 ```
 
-Prefer `arkserver-obelisk-debug` for scanner captures. Use `./arkserver2 restart` only
-during an approved TheIsland debug window. Never restart `arkserver` / Ragnarok for
-scanner captures while player performance testing is active.
+Fallback TheIsland profile, only with explicit operator approval:
+
+```bash
+sha256sum /servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer
+git -C /home/flowcommunity-ark/Obelisk rev-parse --short HEAD
+git -C /home/flowcommunity-ark/Obelisk status --short
+./arkserver2 restart
+```
 
 Let the process reach normal startup before copying logs. Do not rely on blind
 bootstrap/static-root waits as the main strategy; later runtime debug-control probing
@@ -174,19 +180,19 @@ unset OBELISK_ENABLE_REFLECTION_SCANNER
 unset OBELISK_ENABLE_NATIVE_EXEC_PROBES
 export OBELISK_DISABLE_PLUGINS=1
 export OBELISK_PE_TRACE_LIMIT=0
-./arkserver2 restart
+# Restart only the same approved isolated/debug instance used for the capture.
 ```
 
-If marker files were used on the isolated instance:
+If marker files were used on `arkserver-obelisk-debug`:
 
 ```bash
 touch /servidor/ark/obelisk/state/instances/arkserver-obelisk-debug/disable-plugins
-./arkserver2 restart
+# Restart only arkserver-obelisk-debug through its approved control script.
 ```
 
-Use `./arkserver2 restart` only during an approved TheIsland debug window. If a dedicated
-`arkserver-obelisk-debug` instance exists, restart that instance instead. Do not apply
-these marker changes to Ragnarok as part of this runbook.
+For the TheIsland fallback, use `./arkserver2 restart` only during the approved debug
+window and keep rollback/posture evidence. Do not apply these marker changes to Ragnarok
+as part of this runbook.
 
 Do not apply these marker changes to the active development server as part of this runbook.
 

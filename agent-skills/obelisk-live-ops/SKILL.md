@@ -33,9 +33,26 @@ Convenience log links may live under:
 /home/flowcommunity-ark/logs/ark/
 ```
 
+Current operator direction as of 2026-05-27:
+
+- `arkserver` / Ragnarok is reserved for player performance testing. Do not restart it,
+  change markers, deploy new runtime, enable extra logging, run scanners, or attach
+  debuggers unless the operator explicitly opens a maintenance window.
+- `arkserver2` / TheIsland is the designated debug/development target for Obelisk rounds.
+  Prefer it for controlled runtime validation, plugin lifecycle checks, and research
+  captures that need an ARK server harness.
+- Treat `arkserver2` as debug-designated, not automatically scanner-safe. ReflectionScanner,
+  native exec probes, ptrace/gcore, broad ProcessEvent tracing, and text logging still need
+  a specific operator-approved run window, per-instance markers, copied-log evidence, and
+  rollback to stable posture.
+- Prefer `arkserver-obelisk-debug` for high-risk captures such as `gcore`, `ptrace`,
+  ReflectionScanner, and broad tracing.
+
 ## Production Baseline
 
-For Ragnarok live-like stability and player performance validation:
+Maintenance-window-only setup for Ragnarok live-like stability and player performance
+validation. Do not run this block during active player testing; first record the operator's
+maintenance approval in the handoff or research note:
 
 ```bash
 mkdir -p /servidor/ark/obelisk/state/instances/arkserver
@@ -51,18 +68,12 @@ Expected logs:
 - plugin loading disabled
 - server remains joinable
 
-Current operator direction as of 2026-05-27:
+Post-check for the current protected Ragnarok baseline should also reject experimental chat
+reflection unless the maintenance plan explicitly says otherwise:
 
-- `arkserver` / Ragnarok is reserved for player performance testing. Do not restart it,
-  change markers, deploy new runtime, enable extra logging, run scanners, or attach
-  debuggers unless the operator explicitly opens a maintenance window.
-- `arkserver2` / TheIsland is the designated debug/development target for Obelisk rounds.
-  Prefer it for controlled runtime validation, plugin lifecycle checks, and research
-  captures that need an ARK server harness.
-- Treat `arkserver2` as debug-designated, not automatically scanner-safe. ReflectionScanner,
-  native exec probes, ptrace/gcore, broad ProcessEvent tracing, and text logging still need
-  a specific operator-approved run window, per-instance markers, copied-log evidence, and
-  rollback to stable posture.
+```bash
+scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection
+```
 
 ## Experiment Gates
 

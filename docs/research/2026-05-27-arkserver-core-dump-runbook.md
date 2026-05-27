@@ -1,20 +1,22 @@
-# Arkserver Core Dump Runbook
+# Historical Arkserver Core Dump Runbook
 
-> Historical runbook. Do not use `arkserver` / Ragnarok for new core dumps while player
-> performance testing is active. Port this procedure to an explicitly approved
-> `arkserver2` / TheIsland debug window or to `arkserver-obelisk-debug` before any future
-> execution.
+> Historical runbook. Do not execute this against `arkserver` / Ragnarok while player
+> performance testing is active. The executable workflow for future second-source cores is
+> `docs/research/2026-05-27-isolated-second-core-runbook.md`: prefer
+> `arkserver-obelisk-debug`; use `arkserver2` / TheIsland only as an explicit
+> operator-approved fallback.
 
 ## Objective
 
-Capture one Linux core dump from the operator-designated `arkserver` / Ragnarok debug
-process with the smallest practical blast radius, then preserve enough metadata for
-offline analysis. This runbook is for the lead/operator to execute. Sub-agents must not
-run `gdb`, `gcore`, restart servers, or modify `/servidor/ark`.
+Preserve the original Ragnarok core-dump procedure as historical evidence and a source of
+metadata requirements. Future captures must be ported to an isolated/debug target before
+execution. This runbook is for lead review only; sub-agents must not run `gdb`, `gcore`,
+restart servers, or modify `/servidor/ark`.
 
 ## Preconditions
 
-- Operator has explicitly designated `arkserver` as the debug target for this capture.
+- Operator has explicitly designated `arkserver-obelisk-debug` as the debug target for
+  this capture, or explicitly approved `arkserver2` / TheIsland as fallback.
 - The lead owns the invasive command window and is ready to abort if posture is wrong.
 - The preferred path uses the per-instance `allow-ptrace` marker and a restart into debug
   posture. Root/sysctl changes are a fallback, not the normal path.
@@ -29,7 +31,9 @@ set -euo pipefail
 repo=/home/flowcommunity-ark/Obelisk
 server_bin=/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer
 stamp=$(date -u +%Y%m%dT%H%M%SZ)
-out=/servidor/ark/obelisk/dumps/arkserver-${stamp}
+instance=arkserver-obelisk-debug
+map=TheIsland
+out=/servidor/ark/obelisk/dumps/${instance}-${stamp}
 
 mkdir -p "${out}"/{pre,post,logs}
 chmod 700 "${out}"
@@ -40,7 +44,7 @@ sha256sum "${server_bin}" | tee "${out}/ShooterGameServer.sha256.txt"
 file "${server_bin}" | tee "${out}/ShooterGameServer.file.txt"
 cat /proc/sys/kernel/yama/ptrace_scope | tee "${out}/pre/yama-ptrace-scope.txt"
 
-pgrep -af '^./ShooterGameServer Ragnarok' | tee "${out}/pre/pgrep.txt"
+pgrep -af "^./ShooterGameServer ${map}" | tee "${out}/pre/pgrep.txt"
 pid_count=$(wc -l < "${out}/pre/pgrep.txt")
 test "${pid_count}" -eq 1
 pid=$(awk '{print $1}' "${out}/pre/pgrep.txt")
@@ -48,6 +52,7 @@ test -n "${pid}"
 echo "${pid}" | tee "${out}/pid.txt"
 
 "${repo}/scripts/check_obelisk_server_posture.sh" --expect-stable --pid "${pid}" \
+  --map "${map}" --instance "${instance}" \
   | tee "${out}/pre/posture.txt"
 
 tr '\0' '\n' < "/proc/${pid}/cmdline" | tee "${out}/pre/cmdline.txt"
@@ -66,7 +71,7 @@ echo "rss_kb=${rss_kb}" | tee "${out}/pre/rss.txt"
 
 Abort before attaching if:
 
-- `pid` is empty, or multiple plausible `ShooterGameServer Ragnarok` processes exist.
+- `pid` is empty, or multiple plausible `ShooterGameServer ${map}` processes exist.
 - `check_obelisk_server_posture.sh --expect-stable` fails before enabling debug ptrace.
 - `OBELISK_ENABLE_NATIVE_EXEC_PROBES` is present.
 - Scanner/static-root env is present unless the lead intentionally accepts that posture.
@@ -79,8 +84,8 @@ With Yama `ptrace_scope=1`, `gcore` cannot attach to an existing sibling process
 Obelisk opts in or root changes the kernel setting. The preferred Obelisk path is:
 
 ```bash
-touch /servidor/ark/obelisk/state/instances/arkserver/allow-ptrace
-/servidor/ark/arkserver restart
+touch /servidor/ark/obelisk/state/instances/${instance}/allow-ptrace
+# Restart only the approved isolated/debug instance control script.
 ```
 
 After restart, the process env should include `OBELISK_DEBUG_ALLOW_PTRACE=1`, and Obelisk
@@ -94,8 +99,8 @@ Do not treat this as stable posture. It is a temporary dump posture and must be 
 after the dump:
 
 ```bash
-rm -f /servidor/ark/obelisk/state/instances/arkserver/allow-ptrace
-/servidor/ark/arkserver restart
+rm -f /servidor/ark/obelisk/state/instances/${instance}/allow-ptrace
+# Restart only the approved isolated/debug instance control script.
 ```
 
 ## Dump
@@ -104,7 +109,7 @@ rm -f /servidor/ark/obelisk/state/instances/arkserver/allow-ptrace
 approved window:
 
 ```bash
-core_base="${out}/core/arkserver-${stamp}"
+core_base="${out}/core/${instance}-${stamp}"
 mkdir -p "${out}/core"
 chmod 700 "${out}/core"
 
@@ -143,7 +148,7 @@ else
   echo "pid ${pid} no longer exists after dump" | tee "${out}/post/process-gone.txt"
 fi
 
-cp -a /servidor/ark/obelisk/logs/arkserver/. "${out}/logs/" 2>/dev/null || true
+cp -a "/servidor/ark/obelisk/logs/${instance}/." "${out}/logs/" 2>/dev/null || true
 rg -n "Obelisk Runtime Loaded|ProcessEvent|ReflectionScanner|NativeExecProbe|Plugin loading|ERROR|Fatal|Signal" \
   "${out}/logs" | tee "${out}/log-markers.txt" || true
 ```
@@ -155,6 +160,7 @@ After removing `allow-ptrace` and restarting, stable posture must pass:
 
 ```bash
 "${repo}/scripts/check_obelisk_server_posture.sh" --expect-stable \
+  --map "${map}" --instance "${instance}" \
   | tee "${out}/post/stable-posture-after-rollback.txt"
 ```
 
@@ -162,7 +168,7 @@ After removing `allow-ptrace` and restarting, stable posture must pass:
 
 Preserve the whole `${out}` directory, including:
 
-- `core/arkserver-*.${pid}` and `core.sha256.txt`
+- `core/<instance>-*.${pid}` and `core.sha256.txt`
 - `obelisk-commit.txt` and `git-status.txt`
 - `ShooterGameServer.sha256.txt` and `ShooterGameServer.file.txt`
 - `pid.txt`

@@ -38,6 +38,33 @@ class ResearchDocGuardrailTests(unittest.TestCase):
         self.assertIn("Protected target:", text)
         self.assertIn("arkserver` / Ragnarok", text)
 
+    def test_historical_core_dump_runbook_is_not_ragnarok_executable(self) -> None:
+        runbook = REPO_ROOT / "docs/research/2026-05-27-arkserver-core-dump-runbook.md"
+        text = runbook.read_text(encoding="utf-8")
+
+        self.assertIn("Historical runbook", text)
+        self.assertIn("arkserver-obelisk-debug", text)
+        self.assertNotIn("/servidor/ark/arkserver restart", text)
+        self.assertNotIn("state/instances/arkserver/allow-ptrace", text)
+        self.assertNotIn("ShooterGameServer Ragnarok", text)
+
+    def test_runtime_debug_control_prefers_dedicated_debug_instance(self) -> None:
+        runbook = REPO_ROOT / "docs/research/2026-05-27-runtime-debug-control.md"
+        text = runbook.read_text(encoding="utf-8")
+
+        self.assertIn("arkserver-obelisk-debug", text)
+        self.assertNotIn("/servidor/ark/arkserver restart", text)
+        self.assertNotIn("state/instances/arkserver/enable-debug-control", text)
+
+    def test_reflectionscanner_runbook_separates_debug_and_theisland_fallback(self) -> None:
+        runbook = REPO_ROOT / "docs/research/2026-05-27-reflectionscanner-isolated-capture-runbook.md"
+        text = runbook.read_text(encoding="utf-8")
+
+        self.assertIn("Preferred dedicated-debug profile", text)
+        self.assertIn("Fallback TheIsland profile", text)
+        self.assertIn("only with explicit operator approval", text)
+        self.assertNotIn("touch /servidor/ark/obelisk/state/instances/arkserver-obelisk-debug/disable-plugins\n./arkserver2 restart", text)
+
 
 if __name__ == "__main__":
     unittest.main()

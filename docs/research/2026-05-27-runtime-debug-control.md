@@ -1,8 +1,9 @@
 # Runtime Debug Control
 
 > Historical Ragnarok capture note. Do not enable debug-control on `arkserver` / Ragnarok
-> while player performance testing is active. Future debug-control runs should target an
-> explicitly approved `arkserver2` / TheIsland debug window or a dedicated debug instance.
+> while player performance testing is active. Future debug-control runs should prefer a
+> dedicated `arkserver-obelisk-debug` instance; use `arkserver2` / TheIsland only during an
+> explicitly approved fallback window.
 
 ## Why this exists
 
@@ -15,17 +16,19 @@ after the ARK process is alive.
 
 ## Enablement
 
-This is not stable posture. Enable it only for a short debug window:
+This is not stable posture. Enable it only for a short approved debug window on the
+dedicated debug instance:
 
 ```bash
-touch /servidor/ark/obelisk/state/instances/arkserver/enable-debug-control
-/servidor/ark/arkserver restart
+instance=arkserver-obelisk-debug
+touch /servidor/ark/obelisk/state/instances/${instance}/enable-debug-control
+# Restart only the approved isolated/debug instance control script.
 ```
 
 Expected Obelisk log line:
 
 ```text
-Debug control enabled. Watching /servidor/ark/obelisk/state/instances/arkserver for marker requests.
+Debug control enabled. Watching /servidor/ark/obelisk/state/instances/arkserver-obelisk-debug for marker requests.
 ```
 
 Stable posture must reject `OBELISK_ENABLE_DEBUG_CONTROL=1`.
@@ -35,13 +38,13 @@ Stable posture must reject `OBELISK_ENABLE_DEBUG_CONTROL=1`.
 Write one or more candidate slot addresses to:
 
 ```text
-/servidor/ark/obelisk/state/instances/arkserver/request-static-fname-probe
+/servidor/ark/obelisk/state/instances/arkserver-obelisk-debug/request-static-fname-probe
 ```
 
 Example:
 
 ```bash
-printf '0x5956f30\n' > /servidor/ark/obelisk/state/instances/arkserver/request-static-fname-probe
+printf '0x5956f30\n' > /servidor/ark/obelisk/state/instances/${instance}/request-static-fname-probe
 ```
 
 The debug control thread polls every two seconds, runs the static FName root
@@ -50,9 +53,10 @@ probe, then renames the request to `request-static-fname-probe.done.<ms>`.
 ## Rollback
 
 ```bash
-rm -f /servidor/ark/obelisk/state/instances/arkserver/enable-debug-control
-/servidor/ark/arkserver restart
-/home/flowcommunity-ark/Obelisk/scripts/check_obelisk_server_posture.sh --expect-stable
+rm -f /servidor/ark/obelisk/state/instances/${instance}/enable-debug-control
+# Restart only the approved isolated/debug instance control script.
+/home/flowcommunity-ark/Obelisk/scripts/check_obelisk_server_posture.sh --expect-stable \
+  --map TheIsland --instance "${instance}"
 ```
 
 This keeps the default harness clean while allowing targeted post-start memory
