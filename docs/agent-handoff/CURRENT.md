@@ -16,8 +16,9 @@ Updated: 2026-05-28
   ReflectionScanner, attach ptrace/gcore, enable broad `ProcessEvent` tracing, or publish
   runtime observations without explicit operator approval for that run.
 - cadence: use focused agent rounds, integrate findings into repo files, validate with
-  safe offline tests, commit/push stable checkpoints, and record Discord community updates
-  when the configured webhook is functional.
+  safe offline tests, and commit/push stable checkpoints. Send Discord community updates
+  only for major Obelisk milestones relevant to future mod/plugin creators, not routine
+  development checkpoints.
 
 ## Stable Baseline
 

@@ -104,16 +104,34 @@ Skip the build only for docs-only or skills-only commits, and say so in the fina
 
 ## Community Discord Updates
 
-When the lead makes a stable commit or pushes a checkpoint, also send a short community
-update to the configured Obelisk Discord webhook if one is available in the session.
+Do not send Discord updates for routine commits, internal validation, research bookkeeping,
+agent coordination, refactors, or developer-only checkpoints.
+
+Send a short community update to the configured Obelisk Discord webhook only when a change
+is important to future mod creators using the Obelisk core. The audience is modders and
+server/plugin creators, not the internal development team.
+
+Examples that qualify:
+
+- a new or meaningfully expanded public SDK/API capability;
+- a major runtime safety or compatibility milestone that affects plugin authors;
+- a documented module surface becoming ready for external experimentation;
+- a release, preview, migration notice, or breaking/important behavior change.
+
+Examples that do not qualify:
+
+- docs-only research notes;
+- internal recognizers that remain candidate-only;
+- fixture regeneration, guardrail updates, benchmark/test-only work;
+- ordinary commits, pushes, validations, or agent round summaries.
 
 Update style:
 
 - Use Markdown.
-- Write for the Obelisk community, not as a raw CI log.
-- Focus on project direction, visible progress, and what changed for modding/runtime
-  capability.
-- Keep validation details brief unless they explain confidence or safety.
+- Write for mod creators who will build against Obelisk.
+- Focus on what they can eventually use, test, migrate to, or rely on.
+- Keep validation details brief and only include them when they explain confidence or
+  compatibility.
 - Do not publish secrets, player chat contents, private server details, full logs, core
   paths, or sensitive operational data.
 - Be explicit when something is experimental, gated, not deployed, or not yet public SDK.
@@ -123,9 +141,9 @@ Suggested shape:
 ```text
 **Obelisk Dev Update**
 
-<1-2 short paragraphs about what improved and why it matters.>
+<1-2 short paragraphs about what changed for mod creators and why it matters.>
 
-**Current focus:** <next development/research focus>
+**For modders:** <what is available, experimental, or coming next>
 ```
 
 ## Research Notes

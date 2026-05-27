@@ -15,6 +15,9 @@ work from repository state instead of chat history.
 - Safety remains first: no server restarts, `/servidor/ark` changes, marker edits,
   ReflectionScanner, ptrace/gcore, broad `ProcessEvent` tracing, or runtime observations
   without explicit operator approval for that run.
+- Discord updates are reserved for major Obelisk milestones relevant to future
+  mod/plugin creators; do not post routine development, validation, fixture, or research
+  checkpoint updates.
 
 ## Current Repo State
 
