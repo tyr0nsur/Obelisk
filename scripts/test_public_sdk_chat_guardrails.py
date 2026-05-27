@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Guardrails that keep experimental chat reflection out of the public SDK."""
+"""Guardrails that keep experimental gameplay modules out of the public SDK."""
 
 from __future__ import annotations
 
@@ -37,6 +37,32 @@ class PublicSdkChatGuardrailTests(unittest.TestCase):
                 if token in text:
                     offenders.append(f"{path.relative_to(REPO_ROOT)}: {token}")
 
+        self.assertEqual(offenders, [])
+
+    def test_public_header_has_no_gameplay_module_api_until_promotion(self) -> None:
+        header = (REPO_ROOT / "include/obelisk/ObeliskApi.h").read_text(encoding="utf-8")
+        module_terms = [
+            "Inventory",
+            "Structure",
+            "Buff",
+            "Dino",
+            "Tribe",
+            "Mission",
+            "Transfer",
+            "Admin",
+            "Player",
+            "Item",
+        ]
+        forbidden = [
+            f"OBELISK_API_CAPABILITY_{term.upper()}_EVENTS"
+            for term in module_terms
+        ] + [
+            f"Obelisk{term}" for term in module_terms
+        ] + [
+            f"RegisterOn{term}" for term in module_terms
+        ]
+
+        offenders = [token for token in forbidden if token in header]
         self.assertEqual(offenders, [])
 
     def test_chat_abi_preflight_documents_future_shapes(self) -> None:
