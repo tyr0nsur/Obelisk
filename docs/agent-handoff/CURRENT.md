@@ -453,6 +453,9 @@ Updated: 2026-05-27
 - risk: Native exec probes must remain disabled on live servers.
 - risk: The `subhook` pin was selected from the existing local checkout without internet
   verification; full offline resilience still needs a mirror or vendored archive.
+- fact: `scripts/test_dependency_pins.py` now guards the `subhook` FetchContent declaration
+  so it stays pinned to a full commit SHA instead of a moving branch; mirroring/vendor
+  work remains a future resilience task.
 
 ## Priority Next Steps
 
