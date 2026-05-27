@@ -143,6 +143,7 @@ params and has higher gameplay-authority risk.
 - `docs/research/2026-05-27-general-ufunction-inventory.md`
 - `docs/research/2026-05-27-shooterplayercontroller-function-inventory.md`
 - `docs/research/2026-05-27-primalitem-function-inventory.md`
+- `docs/research/2026-05-27-inventory-controller-snapshot-fixtures.md`
 - `docs/research/2026-05-27-primaldinocharacter-function-inventory.md`
 - `docs/research/2026-05-27-dino-second-wave-fixtures.md`
 - `docs/research/2026-05-27-primalstructure-function-inventory.md`

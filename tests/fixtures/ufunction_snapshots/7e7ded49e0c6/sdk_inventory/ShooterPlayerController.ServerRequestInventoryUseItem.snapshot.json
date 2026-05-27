@@ -1,0 +1,82 @@
+{
+  "address_policy": "absolute core paths and addresses omitted; use full inspector JSON for local evidence review",
+  "evidence": {
+    "ark_binary_sha256": "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+    "generated_by": "scripts/inspect_core_ufunctions.py --snapshot-json",
+    "obelisk_commit": "9e685c2",
+    "source": "offline_core",
+    "status": "candidate-only"
+  },
+  "interpretation": {
+    "note": "Offsets are candidate observations from this core, not accepted UE4 layout contracts.",
+    "status": "candidate-only"
+  },
+  "metadata": {
+    "max_object_scan": 30000,
+    "object_count": 1243796
+  },
+  "schema": "obelisk.ufunction-chain.snapshot.v1",
+  "targets": [
+    {
+      "function_flags": "0x220cc0",
+      "membership": {
+        "class": "candidate-uobject",
+        "outer": "candidate-uobject",
+        "target": "candidate-uobject"
+      },
+      "num_parms": 2,
+      "parms_size": 16,
+      "property_chain": {
+        "expected_count": 2,
+        "observed_count": 2,
+        "parms_size": 16,
+        "properties": [
+          {
+            "array_dim": 1,
+            "class_membership_status": "candidate-uobject",
+            "class_name": "ObjectProperty",
+            "depth": 0,
+            "element_size": 8,
+            "membership_status": "candidate-uobject",
+            "name": "InventoryComp",
+            "name_index": 16929,
+            "offset_internal": 0,
+            "outer_membership_status": "candidate-uobject",
+            "property_flags": "0x1044080280",
+            "reject_reasons": [],
+            "status": "candidate"
+          },
+          {
+            "array_dim": 1,
+            "class_membership_status": "candidate-uobject",
+            "class_name": "StructProperty",
+            "depth": 1,
+            "element_size": 8,
+            "membership_status": "candidate-uobject",
+            "name": "ItemId",
+            "name_index": 16928,
+            "offset_internal": 8,
+            "outer_membership_status": "candidate-uobject",
+            "property_flags": "0x1040000280",
+            "reject_reasons": [],
+            "status": "candidate"
+          }
+        ],
+        "reject_reasons": [],
+        "status": "candidate"
+      },
+      "reject_reasons": [],
+      "return_value_offset": "0xffff",
+      "status": "candidate",
+      "target": {
+        "class_name": "Function",
+        "kind": "index",
+        "name": "ServerRequestInventoryUseItem",
+        "object_index": 10349,
+        "outer_class_name": "Class",
+        "outer_name": "ShooterPlayerController",
+        "value": 10349
+      }
+    }
+  ]
+}

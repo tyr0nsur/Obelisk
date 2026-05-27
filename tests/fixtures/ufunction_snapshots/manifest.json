@@ -25,6 +25,24 @@
       "outer": "MissionType"
     },
     {
+      "file": "PrimalItem.AllowRemoteAddToInventory.snapshot.json",
+      "module": "sdk_inventory",
+      "name": "AllowRemoteAddToInventory",
+      "outer": "PrimalItem"
+    },
+    {
+      "file": "PrimalItem.CanUse.snapshot.json",
+      "module": "sdk_inventory",
+      "name": "CanUse",
+      "outer": "PrimalItem"
+    },
+    {
+      "file": "ShooterPlayerController.ServerRequestInventoryUseItem.snapshot.json",
+      "module": "sdk_inventory",
+      "name": "ServerRequestInventoryUseItem",
+      "outer": "ShooterPlayerController"
+    },
+    {
       "file": "PrimalDinoCharacter.AddPassenger.snapshot.json",
       "module": "sdk_dinos",
       "name": "AddPassenger",
