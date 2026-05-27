@@ -142,6 +142,10 @@ python3 scripts/analyze_reflectionscanner_capture.py \
 - `agent-skills/obelisk-agent-handoff/SKILL.md`
 - `agent-skills/obelisk-continuous-learning/SKILL.md`
 - subsystem-specific skill under `agent-skills/`
+- For reversing/static work also read:
+  `agent-skills/obelisk-static-binary-analysis/SKILL.md`,
+  `agent-skills/obelisk-ue4-type-reconstruction/SKILL.md`, and
+  `agent-skills/obelisk-tooling-discipline/SKILL.md`.
 
 ## Next Good Rounds
 

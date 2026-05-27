@@ -156,5 +156,8 @@ Updated: 2026-05-27
 - fact: Ops/docs/QA work may use `.github/pull_request_template.md`,
   `.github/workflows/ci.yml`, `CONTRIBUTING.md`, and `docs/STATUS.md` for contributor
   checks before changing runtime or research scope.
+- fact: Static/reversing rounds should read `obelisk-static-binary-analysis`,
+  `obelisk-ue4-type-reconstruction`, and `obelisk-tooling-discipline` in addition to the
+  UE4 reflection/reversing skills.
 - next-step: After each investigation, update this file only with concise active context and
   put detailed evidence in `docs/research/`.

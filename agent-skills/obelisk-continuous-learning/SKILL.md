@@ -38,6 +38,22 @@ Capture facts that are expensive to rediscover:
 
 Do not capture speculation as fact. Label uncertain findings as hypotheses.
 
+## Evidence Packs
+
+For any accepted or promoted offset, signature, global, UE4 type field, or hook target,
+capture an evidence pack before code promotion:
+
+- binary path and SHA256,
+- Obelisk commit and build type,
+- exact commands or scripts used,
+- static xrefs or runtime log lines supporting the claim,
+- reject conditions and known false positives checked,
+- second-source validation plan or result,
+- rollback/safety posture if runtime probing was involved.
+
+If an evidence pack is incomplete, mark the result as `hypothesis` or
+`research-candidate`, not `fact`.
+
 ## Research Note Pattern
 
 Create or update:
@@ -69,6 +85,11 @@ Update `agent-skills/` when a research result changes future behavior:
 - `obelisk-linux-hooking`: hook mechanism, trampolines, memory protection.
 - `obelisk-ue4-reversing`: signatures, offsets, binary validation.
 - `obelisk-ue4-reflection`: FName, GNames, GObjects, UFunction, params.
+- `obelisk-static-binary-analysis`: offline ELF analysis, objdump/Ghidra/rizin evidence,
+  and candidate promotion gates.
+- `obelisk-ue4-type-reconstruction`: UE4 type field reconstruction and promotion rules.
+- `obelisk-tooling-discipline`: safe tool selection for offline, isolated-debug, and live
+  contexts.
 - `obelisk-reversing-research`: active research strategy and unsafe experiments.
 - `obelisk-live-ops`: production server operation and rollback.
 - `obelisk-github-research-workflow`: commit, push, agent handoff, documentation flow.
