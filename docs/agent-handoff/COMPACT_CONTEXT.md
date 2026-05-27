@@ -9,8 +9,9 @@ work from repository state instead of chat history.
 
 - Repo: `/home/flowcommunity-ark/Obelisk`
 - Remote: `git@github.com:tyr0nsur/Obelisk.git`
-- Current known good baseline: latest pushed and validated `main`, currently
-  `60a7746 Document development versioning policy`.
+- Current known good baseline: latest pushed and validated `main` after the 2026-05-27
+  priority round. Check `git log --oneline -5` for the exact head if resuming after a
+  compaction.
 - Current development version line: `0.1.0-dev`. This is a coordination label, not a
   release tag. See `docs/VERSIONING.md`.
 - Local ignored artifacts normally present: `build/`, `Obelisk.log`
@@ -72,7 +73,11 @@ work from repository state instead of chat history.
 - `EventManagerTests` cover global/filtered pre callbacks, blocking behavior, post
   callbacks, owner cleanup, and null callback handling.
 - Installed SDK layout validation exists through `scripts/test_install_obelisk_layout.sh`
-  and is run by CI.
+  and is run by CI. The layout test now validates installed-header consumption, plugin
+  placement, config dir/path, and instance id passed to a consumer plugin.
+- `PluginManagerTests` cover plugin lifecycle and rejection paths with a fake loader:
+  valid load/unload, missing entry points, invalid metadata, init failure, callback cleanup,
+  shutdown, and close behavior.
 - Versioning policy is documented in `docs/VERSIONING.md`: no stable `0.1.0` tag yet;
   use `0.1.0-alpha.N` only for intentional contributor previews and `0.1.0-rc.N` only
   after scope freeze.
@@ -104,12 +109,19 @@ Next technical milestone is `FName -> string` resolution:
 ```bash
 python3 scripts/analyze_reflectionscanner_capture.py /path/to/isolated/Obelisk.log
 python3 scripts/analyze_reflectionscanner_capture.py --json /path/to/isolated/Obelisk.log
+objdump -d /path/to/ShooterGameServer > /tmp/ShooterGameServer.objdump
+python3 scripts/analyze_reflectionscanner_capture.py \
+  --json \
+  --objdump-xrefs /tmp/ShooterGameServer.objdump \
+  /path/to/isolated/Obelisk.log
 ```
 
 4. Treat `GNames` only as a research candidate when `matched_clues=3/3` repeats for the
    same table pointer through distinct `source_global` values or distinct targets, and
    there are no reject markers.
 5. Before committing offsets, require a second isolated capture or static xref validation.
+   Static xrefs are supporting evidence only; inspect whether they are real load/store paths
+   before designing runtime name-resolution code.
 
 ## Hard Rules
 
@@ -137,3 +149,5 @@ python3 scripts/analyze_reflectionscanner_capture.py --json /path/to/isolated/Ob
   plan is `arkserver-obelisk-debug`.
 - Reflection: improve FName/GNames probes and analyzer fixtures offline.
 - Build/QA: evolve install/package validation toward clean CMake SDK/package exports.
+- Core runtime: extend PluginManager coverage only if a new lifecycle risk is identified;
+  the main missing test surface has moved from basic lifecycle to packaging/export.

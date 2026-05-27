@@ -78,6 +78,18 @@ Updated: 2026-05-27
 - fact: Development versioning policy is documented in `docs/VERSIONING.md`. The current
   line is `0.1.0-dev`, not a release tag; use alpha/rc tags only when external testing or
   release-candidate validation needs a fixed checkpoint.
+- fact: Commit `fc837a0` added passive static xref annotation to
+  `scripts/analyze_reflectionscanner_capture.py`. Use `--objdump-xrefs` with a
+  pre-generated `objdump -d` text file to annotate candidate globals; this is supporting
+  evidence only, not offset acceptance.
+- fact: Commit `ac6eada` added `PluginManagerTests` using an injectable fake library
+  loader. The suite covers valid load/unload, missing `GetInfo`, missing `Init`, invalid
+  metadata, init failure, callback cleanup, shutdown, and close behavior.
+- fact: Commit `882f0d7` hardened `scripts/test_install_obelisk_layout.sh` so the installed
+  SDK consumer validates config dir/path, instance id, installed-header dependency, and
+  plugin placement under the install root.
+- fact: Commit `3760f3b` clarified that sub-agents may recommend skill changes, but the
+  team lead owns skill edits, commits, pushes, and handoff updates.
 
 ## Rejected Or Unsafe
 
@@ -121,6 +133,10 @@ Updated: 2026-05-27
   `FName indirect-table probe` lines against `None`, `ClientMessage`, and `ServerChat`;
   require `matched_clues=3/3` plus repeat confirmation through distinct `source_global`
   values or distinct targets before treating a table as a `GNames` research candidate.
+- next-step: After a repeat-confirmed `GNames` research candidate appears, generate
+  `objdump -d` for the matching ShooterGameServer binary and run the analyzer with
+  `--objdump-xrefs`; inspect whether candidate `source_global` references are real
+  load/store paths before designing runtime name-resolution code.
 - next-step: Replace raw chat parameter probing with reflected parameter decoding.
 - next-step: Add binary hash validation or an instruction decoder before accepting future
   ProcessEvent prologue changes.
