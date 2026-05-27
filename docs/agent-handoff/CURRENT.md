@@ -284,16 +284,19 @@ Updated: 2026-05-27
   `docs/research/2026-05-27-fstring-layout.md`.
 - fact: `RuntimeReflection::TryDecodeFStringUtf32` now implements the internal decoder
   candidate with synthetic tests and strict reject conditions.
-- fact: Local working tree now wires `TryDecodeFStringUtf32` into the experimental
+- fact: Pushed `main` now wires `TryDecodeFStringUtf32` into the experimental
   `ServerSendChatMessage` logger through `ProcessEventChatReflection::TryDecodeUtf32Field`.
   Decoded text requires the extra `OBELISK_CHAT_REFLECTION_LOG_TEXT=1` gate, logs only for
   known `EChatSendMode` values, and does not dispatch plugin callbacks or change ABI. This
-  is validated locally but not yet deployed.
+  is validated locally but not yet deployed to `/servidor/ark/obelisk`.
 - fact: Public SDK chat event ownership is intentionally deferred. The current design note
   requires copied Obelisk-owned UTF-8 text, POD structs, opaque registration ids,
   `user_data`, callback owner cleanup, ABI layout tests, plugin fixture coverage, hot-path
   benchmark evidence, and runtime validation before adding `OnChatMessage`; see
   `docs/research/2026-05-27-sdk-chat-event-ownership-plan.md`.
+- fact: Commit `76356bf` adds `chat_reflection_benchmark`, an excluded-from-default-build
+  local helper for synthetic `TryIdentifyInvocation()` and UTF-32 decode measurements. It
+  does not cover hook-side `GetFunctionNameIndex()` / `Memory::IsReadable()` overhead.
 - fact: `Memory::IsReadable` no longer uses `write(/dev/null)` because that probe returned
   success for invalid and `PROT_NONE` mappings on this host. It is now backed by cached
   readable ranges from `/proc/self/maps`, with `MemoryTests` covering invalid pointers,
@@ -324,6 +327,9 @@ Updated: 2026-05-27
   accepting changed chat FName indices, parameter offsets, or `StrProperty` constants.
 - next-step: Benchmark ProcessEvent overhead with chat reflection enabled vs disabled
   before keeping the marker active for long high-population sessions.
+- next-step: Before drafting public chat API, improve local measurement coverage for
+  rejected chat candidates and record allocation/tail-latency behavior, then plan isolated
+  runtime A/B separately.
 - rollback: remove `enable-chat-reflection` marker and restart the debug server; no plugin
   ABI or config migration is involved.
 - next-step: Generalize the binary-hash-scoped reflection pipeline only after another

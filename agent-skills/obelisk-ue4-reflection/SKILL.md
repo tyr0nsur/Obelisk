@@ -45,10 +45,10 @@ or parameter decoding for ARK's Linux UE4 server.
 - The deployed experimental chat runtime logs reflected `send_mode` and `send_mode_name`
   for accepted `ServerSendChatMessage` hits. It still must not dispatch plugin events
   until text is copied into Obelisk-owned memory and callback ownership is specified.
-- Local working tree decodes `ServerSendChatMessage.ChatMessage` with the internal UTF-32
+- Current `main` decodes `ServerSendChatMessage.ChatMessage` with the internal UTF-32
   `FString` decoder for experimental logs only, after `SendMode` is known and
   `OBELISK_CHAT_REFLECTION_LOG_TEXT=1` is explicitly set. Treat this as validation
-  instrumentation, not SDK behavior.
+  instrumentation, not SDK behavior, and do not assume it is deployed to the active server.
 - Offline core evidence also supports two `ShooterGameMode` fallback candidates as
   metadata-only recognizers: `SendServerChatMessage` with FName index `9801`,
   `ParmsSize=0x2c`, and five fields; and `OnServerChatMessage__DelegateSignature` with

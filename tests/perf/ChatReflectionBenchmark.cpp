@@ -1,5 +1,6 @@
 #include "hooks/ProcessEventChatReflection.h"
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cstddef>
@@ -8,6 +9,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace
@@ -129,6 +131,11 @@ namespace
         return {GateStatus::Enabled, std::string(kSupportedShooterGameServerSha256)};
     }
 
+    Gate DisabledGate()
+    {
+        return {};
+    }
+
     void BuildServerSendChatMessage(Fixture& fixture)
     {
         WriteObject(fixture.BytePropertyClass,
@@ -186,20 +193,123 @@ namespace
         WriteAt(fixture.Function, 0x9a, returnValueOffset);
     }
 
+    bool ReadNameIndexLikeHook(const MemoryReader& reader, void* function, int32_t& out)
+    {
+        const auto* name = static_cast<const uint8_t*>(function) + 0x18;
+        if (!reader.CanRead(name, sizeof(FNameValue)))
+            return false;
+
+        FNameValue value;
+        std::memcpy(&value, name, sizeof(value));
+        out = value.ComparisonIndex;
+        return true;
+    }
+
+    std::string SanitizeForSyntheticLog(std::string text)
+    {
+        std::string out;
+        out.reserve(text.size());
+        for (char ch : text)
+        {
+            if (ch == '"' || ch == '\\')
+            {
+                out.push_back('\\');
+                out.push_back(ch);
+                continue;
+            }
+            if (static_cast<unsigned char>(ch) < 0x20)
+            {
+                out.push_back('?');
+                continue;
+            }
+            out.push_back(ch);
+        }
+        return out;
+    }
+
+    struct HookLikeOptions
+    {
+        Gate ChatGate;
+        bool HasCallbacks = false;
+        bool DecodeText = false;
+    };
+
+    bool RunHookLikePath(const HookLikeOptions& options,
+                         const MemoryReader& reader,
+                         void* function,
+                         void* params)
+    {
+        const bool chatReflectionEnabled = options.ChatGate.Enabled();
+        int32_t nameIndex = -1;
+        if ((options.HasCallbacks || chatReflectionEnabled) &&
+            !ReadNameIndexLikeHook(reader, function, nameIndex))
+        {
+            return false;
+        }
+
+        Attempt attempt = TryIdentifyInvocation(options.ChatGate, nameIndex, reader, function, params);
+        if (attempt.Status != AttemptStatus::Matched)
+            return attempt.Status == AttemptStatus::Disabled ||
+                   attempt.Status == AttemptStatus::NonChatFunction;
+
+        uint8_t sendMode = 0xff;
+        if (!ChatReflection::TryGetSendMode(attempt.Invocation, sendMode) ||
+            !ChatReflection::IsKnownSendMode(sendMode))
+        {
+            return false;
+        }
+
+        if (options.DecodeText)
+        {
+            std::string text;
+            ReadResult result = TryDecodeUtf32Field(
+                reader, attempt.Invocation, ChatReflection::ChatField::ChatMessage, 512, text);
+            if (!result)
+                return false;
+            volatile size_t sanitizedSize = SanitizeForSyntheticLog(std::move(text)).size();
+            (void)sanitizedSize;
+        }
+
+        return true;
+    }
+
+    uint64_t Percentile(const std::vector<uint64_t>& sorted, double percentile)
+    {
+        if (sorted.empty())
+            return 0;
+        const double rank = percentile * static_cast<double>(sorted.size() - 1);
+        return sorted[static_cast<size_t>(rank)];
+    }
+
     template <typename Fn>
     void RunCase(const char* name, int iterations, ReaderContext& context, Fn&& fn)
     {
         context.Calls = 0;
-        auto start = std::chrono::steady_clock::now();
+        std::vector<uint64_t> samples;
+        samples.reserve(static_cast<size_t>(iterations));
         uint64_t accepted = 0;
         for (int i = 0; i < iterations; ++i)
+        {
+            auto start = std::chrono::steady_clock::now();
             accepted += fn() ? 1 : 0;
-        auto end = std::chrono::steady_clock::now();
-        const auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+            auto end = std::chrono::steady_clock::now();
+            samples.push_back(static_cast<uint64_t>(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count()));
+        }
+        std::sort(samples.begin(), samples.end());
+        uint64_t total = 0;
+        for (uint64_t sample : samples)
+            total += sample;
+
         std::cout << name
                   << " iterations=" << iterations
-                  << " ns_per_iter=" << (ns / iterations)
-                  << " reader_calls_per_iter=" << (context.Calls / iterations)
+                  << " ns_avg=" << (total / static_cast<uint64_t>(iterations))
+                  << " ns_min=" << samples.front()
+                  << " ns_p50=" << Percentile(samples, 0.50)
+                  << " ns_p95=" << Percentile(samples, 0.95)
+                  << " ns_p99=" << Percentile(samples, 0.99)
+                  << " ns_max=" << samples.back()
+                  << " reader_calls_per_iter=" << (context.Calls / static_cast<uint64_t>(iterations))
                   << " accepted=" << accepted
                   << "\n";
     }
@@ -216,7 +326,14 @@ int main(int argc, char** argv)
     Fixture fixture;
     BuildServerSendChatMessage(fixture);
     MemoryReader reader = fixture.Reader();
+
+    Fixture nonChatFixture;
+    BuildServerSendChatMessage(nonChatFixture);
+    WriteAt(nonChatFixture.Function, 0x18, FNameValue{42, 0});
+    MemoryReader nonChatReader = nonChatFixture.Reader();
+
     const Gate gate = EnabledGate();
+    const Gate disabledGate = DisabledGate();
 
     RunCase("non_chat_filter", iterations, fixture.Context, [&] {
         Attempt attempt = TryIdentifyInvocation(
@@ -241,6 +358,26 @@ int main(int argc, char** argv)
         ReadResult result = TryDecodeUtf32Field(
             reader, invocation, ChatReflection::ChatField::ChatMessage, 512, out);
         return result.Status == ReadStatus::Ok && out == "Obelisk";
+    });
+
+    RunCase("hook_like_disabled", iterations, fixture.Context, [&] {
+        return RunHookLikePath(
+            {disabledGate, false, false}, reader, fixture.Function.data(), fixture.Params.data());
+    });
+
+    RunCase("hook_like_enabled_non_chat", iterations, nonChatFixture.Context, [&] {
+        return RunHookLikePath(
+            {gate, false, false}, nonChatReader, nonChatFixture.Function.data(), nonChatFixture.Params.data());
+    });
+
+    RunCase("hook_like_server_send_chat", iterations, fixture.Context, [&] {
+        return RunHookLikePath(
+            {gate, false, false}, reader, fixture.Function.data(), fixture.Params.data());
+    });
+
+    RunCase("hook_like_server_send_chat_text", iterations, fixture.Context, [&] {
+        return RunHookLikePath(
+            {gate, false, true}, reader, fixture.Function.data(), fixture.Params.data());
     });
 
     return 0;

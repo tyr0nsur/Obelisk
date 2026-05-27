@@ -57,8 +57,6 @@ typedef struct ObeliskChatMessage {
     ObeliskStringView sender_platform_id;
     uint32_t send_mode;
     int32_t sender_name_index;
-    void* sender_controller;
-    void* sender_primal_character;
 } ObeliskChatMessage;
 
 typedef void (*ObeliskOnChatMessageCallback)(
@@ -80,9 +78,10 @@ should be valid only for the duration of the callback unless a future API explic
 documents another lifetime. They must point to UTF-8 bytes owned by the runtime, not UE4
 memory. Sizes should exclude any trailing NUL if one is provided.
 
-Opaque UE pointers such as `sender_controller` and `sender_primal_character` should be
-documented as non-owning and callback-duration-only. They must not imply that plugins may
-call arbitrary UE methods.
+Raw UE pointers such as `sender_controller` and `sender_primal_character` should be kept
+out of the first public chat event. If sender identity needs runtime object access later,
+expose it through Obelisk-owned opaque handles with explicit operations and lifetime rules
+instead of raw `UObject` pointers.
 
 ## Registration Model
 
@@ -123,8 +122,8 @@ Before adding public ABI fields:
 2. Confirm copied UTF-8 text contents for at least `GlobalChat`; collect more modes when
    safely available.
 3. Benchmark chat reflection enabled/disabled enough to understand hot-path cost.
-4. Define caller/player identity separately; do not include player fields until evidence is
-   available.
+4. Define caller/player identity separately; do not include raw UE pointers or player
+   object fields until evidence and handle lifetime rules are available.
 5. Add ABI layout tests for struct size, field offsets, enum size, and appended API fields.
 6. Add EventManager or dedicated dispatcher tests for registration, callback invocation,
    unregister-on-init-failure, unload cleanup, and `send_mode >= 4` rejection.
@@ -139,6 +138,8 @@ Measure before any SDK promotion:
 - local microbenchmark for `TryIdentifyInvocation()` with synthetic readers:
   non-chat fast path, rejected chat candidate, matched `ServerSendChatMessage`, and text
   decode;
+- local hook-like microbenchmark for the enabled/disabled branch, name-index read,
+  recognition, send-mode check, optional text decode, and synthetic log sanitization;
 - count reader calls or `Memory::IsReadable` calls per path;
 - report p50/p95/p99 latency and allocation behavior for each path;
 - isolated debug runtime A/B: chat reflection off, metadata-only on, text logging on;
@@ -171,6 +172,30 @@ server_send_chat_decode_utf32 ns_per_iter=31 reader_calls_per_iter=1
 This measures the recognizer helper after a caller already has a `nameIndex`; it does not
 include the hook-side `GetFunctionNameIndex()` / `Memory::IsReadable()` cost paid when chat
 reflection is enabled. That cost still needs an isolated runtime A/B measurement.
+
+Follow-up audit promoted a local improvement: the helper should also report tail latency
+and hook-like cases, because an average-only recognizer measurement is not enough for SDK
+promotion gates. The helper can approximate the hook branch locally, but real
+`/proc/self/maps` readability checks, logging backend cost, and server tick impact still
+require isolated runtime A/B validation.
+
+Follow-up local run after adding percentiles and hook-like cases:
+
+```text
+./build/chat_reflection_benchmark 50000
+non_chat_filter ns_avg=46 ns_p50=50 ns_p95=51 ns_p99=70 reader_calls_per_iter=0
+server_send_chat_match ns_avg=564 ns_p50=531 ns_p95=662 ns_p99=1031 reader_calls_per_iter=53
+server_send_chat_decode_utf32 ns_avg=47 ns_p50=50 ns_p95=51 ns_p99=70 reader_calls_per_iter=1
+hook_like_disabled ns_avg=37 ns_p50=40 ns_p95=41 ns_p99=41 reader_calls_per_iter=0
+hook_like_enabled_non_chat ns_avg=49 ns_p50=50 ns_p95=51 ns_p99=51 reader_calls_per_iter=1
+hook_like_server_send_chat ns_avg=552 ns_p50=551 ns_p95=561 ns_p99=591 reader_calls_per_iter=54
+hook_like_server_send_chat_text ns_avg=615 ns_p50=611 ns_p95=621 ns_p99=651 reader_calls_per_iter=55
+```
+
+Interpretation: the synthetic non-chat enabled path adds one name-index readability check;
+the matched chat path is dominated by bounded reflection reads; and text decode adds one
+extra reader call plus UTF-8/sanitization work. These are local regression signals only,
+not runtime acceptance evidence.
 
 ## Risks
 

@@ -331,11 +331,14 @@ python3 scripts/analyze_reflectionscanner_capture.py \
 - `FString` candidate for this ARK Linux build is a 16-byte
   `{Data, ArrayNum, ArrayMax}` header with UTF-32LE `TCHAR`; see
   `docs/research/2026-05-27-fstring-layout.md`.
-- Local working tree wires `RuntimeReflection::TryDecodeFStringUtf32` into experimental
+- Pushed `main` wires `RuntimeReflection::TryDecodeFStringUtf32` into experimental
   `ServerSendChatMessage` logging through `ProcessEventChatReflection::TryDecodeUtf32Field`.
   Decoded text requires the extra `OBELISK_CHAT_REFLECTION_LOG_TEXT=1` gate, logs only for
   known `EChatSendMode` values, and does not dispatch plugins or change ABI. This is
-  validated locally but not deployed.
+  validated locally but not deployed to `/servidor/ark/obelisk`.
+- Pushed `main` includes the excluded `chat_reflection_benchmark` target for synthetic
+  recognizer and UTF-32 decode timing. It is useful for local regressions, but it does not
+  include hook-side `GetFunctionNameIndex()` / `Memory::IsReadable()` overhead.
 - Evidence: after any isolated scanner capture, run
   `scripts/build_reflection_evidence_pack.py` against copied logs and the matching binary
   before promoting candidates.
