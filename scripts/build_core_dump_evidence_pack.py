@@ -42,6 +42,8 @@ DEFAULT_FNAME_INDICES = [
 
 FNAME_CHUNK_SIZE = 0x4000
 GOBJECTS_POINTER_OFFSETS = (0x0, 0x8, 0x10, 0x18, 0x20)
+DEFAULT_POINTER_SCAN_MAX_MAPPING_BYTES = 64 * 1024 * 1024
+DEFAULT_POINTER_SCAN_MAX_HITS = 64
 
 
 def is_relative_to(path: Path, parent: Path) -> bool:
@@ -192,12 +194,73 @@ def extend_gobjects_candidate_commands(
             )
 
 
+def extend_pointer_scan_commands(
+    lines: list[str],
+    pointer_values: list[tuple[str, int]],
+    max_mapping_bytes: int,
+    max_hits: int,
+) -> None:
+    if not pointer_values:
+        return
+
+    values = ", ".join(f"({label!r}, 0x{address:x})" for label, address in pointer_values)
+    lines.extend(
+        [
+            'printf "\\n== pointer value scans ==\\n"',
+            "python",
+            "import gdb",
+            "import re",
+            f"values = [{values}]",
+            f"max_mapping_bytes = {max_mapping_bytes}",
+            f"max_hits = {max_hits}",
+            "mapping_re = re.compile(r'^\\s*(0x[0-9a-fA-F]+)\\s+(0x[0-9a-fA-F]+)\\s+\\S+\\s+\\S+\\s+(?P<perms>\\S+)\\s*(?P<path>.*)$')",
+            "mappings = []",
+            "for line in gdb.execute('info proc mappings', to_string=True).splitlines():",
+            "    match = mapping_re.match(line)",
+            "    if not match:",
+            "        continue",
+            "    start = int(match.group(1), 16)",
+            "    end = int(match.group(2), 16)",
+            "    perms = match.group('perms')",
+            "    path = match.group('path').strip()",
+            "    size = max(0, end - start)",
+            "    if size == 0 or size > max_mapping_bytes or 'r' not in perms or 'w' not in perms:",
+            "        continue",
+            "    mappings.append((start, end, path))",
+            "for label, value in values:",
+            "    print(f'\\n== pointer scan {label} value 0x{value:x} ==')",
+            "    hits = 0",
+            "    for start, end, path in mappings:",
+            "        if hits >= max_hits:",
+            "            break",
+            "        try:",
+            "            output = gdb.execute(f'find /g 0x{start:x}, 0x{end:x}, 0x{value:x}', to_string=True)",
+            "        except gdb.error as exc:",
+            "            print(f'skipped 0x{start:x}-0x{end:x} {path}: {exc}')",
+            "            continue",
+            "        for raw in output.splitlines():",
+            "            text = raw.strip()",
+            "            if not text.startswith('0x'):",
+            "                continue",
+            "            print(f'hit {label} value=0x{value:x} slot={text} mapping=0x{start:x}-0x{end:x} {path}')",
+            "            hits += 1",
+            "            if hits >= max_hits:",
+            "                break",
+            "    print(f'pointer scan {label} hits={hits} max_hits={max_hits}')",
+            "end",
+        ]
+    )
+
+
 def write_gdb_command_file(
     path: Path,
     candidates: list[tuple[str, int]],
     fname_root_slots: list[tuple[str, int]],
     fname_indices: list[tuple[str, int]],
     gobjects_candidates: list[tuple[str, int]],
+    pointer_scan_values: list[tuple[str, int]] | None = None,
+    pointer_scan_max_mapping_bytes: int = DEFAULT_POINTER_SCAN_MAX_MAPPING_BYTES,
+    pointer_scan_max_hits: int = DEFAULT_POINTER_SCAN_MAX_HITS,
 ) -> None:
     lines = [
         "set pagination off",
@@ -215,6 +278,12 @@ def write_gdb_command_file(
     extend_candidate_dump_commands(lines, candidates)
     extend_fname_root_commands(lines, fname_root_slots, fname_indices)
     extend_gobjects_candidate_commands(lines, gobjects_candidates)
+    extend_pointer_scan_commands(
+        lines,
+        pointer_scan_values or [],
+        pointer_scan_max_mapping_bytes,
+        pointer_scan_max_hits,
+    )
 
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -309,6 +378,58 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--scan-pointer-value",
+        action="append",
+        type=parse_candidate,
+        default=[],
+        metavar="LABEL=ADDR",
+        help=(
+            "Offline core-only pointer scan. Searches bounded core mappings for 64-bit "
+            "slots equal to ADDR and prints hit slots in gdb-core.txt. Useful for "
+            "finding globals that point to a confirmed in-memory FName table or "
+            "GUObjectArray root. May be repeated."
+        ),
+    )
+    parser.add_argument(
+        "--pointer-scan-max-mapping-bytes",
+        type=parse_int,
+        default=DEFAULT_POINTER_SCAN_MAX_MAPPING_BYTES,
+        help=(
+            "Maximum individual core mapping size to scan for --scan-pointer-value. "
+            f"Default: {DEFAULT_POINTER_SCAN_MAX_MAPPING_BYTES}."
+        ),
+    )
+    parser.add_argument(
+        "--pointer-scan-max-hits",
+        type=parse_int,
+        default=DEFAULT_POINTER_SCAN_MAX_HITS,
+        help=(
+            "Maximum hits to print per --scan-pointer-value. "
+            f"Default: {DEFAULT_POINTER_SCAN_MAX_HITS}."
+        ),
+    )
+    parser.add_argument(
+        "--scan-fname-tables",
+        action="store_true",
+        help=(
+            "Run the offline legacy FName table scanner against the core and write "
+            "core.fname-table-scan.json. This scans the core file only and does not "
+            "attach to a process."
+        ),
+    )
+    parser.add_argument(
+        "--fname-scan-max-none-hits",
+        type=parse_int,
+        default=256,
+        help="Maximum 'None' string hits for --scan-fname-tables. Default: 256.",
+    )
+    parser.add_argument(
+        "--fname-scan-max-pointer-hits",
+        type=parse_int,
+        default=2048,
+        help="Maximum pointer-chain hits for --scan-fname-tables. Default: 2048.",
+    )
+    parser.add_argument(
         "--skip-core-sha256",
         action="store_true",
         help="Skip hashing the core file when it is too large for a quick triage run.",
@@ -356,6 +477,20 @@ def main() -> int:
         fname_indices.extend(DEFAULT_FNAME_INDICES)
     fname_indices.extend(args.fname_index)
     gobjects_candidates = list(args.gobjects_candidate)
+    pointer_scan_values = list(args.scan_pointer_value)
+
+    if args.pointer_scan_max_mapping_bytes <= 0:
+        print("--pointer-scan-max-mapping-bytes must be positive", file=sys.stderr)
+        return 2
+    if args.pointer_scan_max_hits <= 0:
+        print("--pointer-scan-max-hits must be positive", file=sys.stderr)
+        return 2
+    if args.fname_scan_max_none_hits <= 0:
+        print("--fname-scan-max-none-hits must be positive", file=sys.stderr)
+        return 2
+    if args.fname_scan_max_pointer_hits <= 0:
+        print("--fname-scan-max-pointer-hits must be positive", file=sys.stderr)
+        return 2
 
     commands: dict[str, dict[str, object]] = {}
     try:
@@ -410,6 +545,9 @@ def main() -> int:
                 fname_root_slots,
                 fname_indices,
                 gobjects_candidates,
+                pointer_scan_values,
+                args.pointer_scan_max_mapping_bytes,
+                args.pointer_scan_max_hits,
             )
             shutil.copy2(gdb_commands, output_dir / "gdb-core-commands.txt")
             commands["gdb_core"] = run_command(
@@ -427,6 +565,22 @@ def main() -> int:
             )
         finally:
             gdb_commands.unlink(missing_ok=True)
+
+        if args.scan_fname_tables:
+            commands["core_fname_table_scan"] = run_command(
+                [
+                    sys.executable,
+                    str(REPO_ROOT / "scripts" / "scan_core_fname_tables.py"),
+                    "--core",
+                    str(core),
+                    "--max-none-hits",
+                    str(args.fname_scan_max_none_hits),
+                    "--max-pointer-hits",
+                    str(args.fname_scan_max_pointer_hits),
+                    "--json",
+                ],
+                output_dir / "core.fname-table-scan.json",
+            )
 
         for name, record in commands.items():
             if name == "gdb_core":
@@ -476,6 +630,19 @@ def main() -> int:
             {"label": label, "address": f"0x{address:x}"}
             for label, address in gobjects_candidates
         ],
+        "pointer_scan_values": [
+            {"label": label, "address": f"0x{address:x}"}
+            for label, address in pointer_scan_values
+        ],
+        "pointer_scan_limits": {
+            "max_mapping_bytes": args.pointer_scan_max_mapping_bytes,
+            "max_hits": args.pointer_scan_max_hits,
+        },
+        "fname_table_scan": {
+            "enabled": args.scan_fname_tables,
+            "max_none_hits": args.fname_scan_max_none_hits,
+            "max_pointer_hits": args.fname_scan_max_pointer_hits,
+        },
         "artifacts": {
             "binary_file": str(output_dir / "ShooterGameServer.file.txt"),
             "core_file": str(output_dir / "core.file.txt"),
@@ -488,6 +655,11 @@ def main() -> int:
             "objdump": str(output_dir / "ShooterGameServer.objdump"),
             "gdb_commands": str(output_dir / "gdb-core-commands.txt"),
             "gdb_core": str(output_dir / "gdb-core.txt"),
+            "core_fname_table_scan": (
+                str(output_dir / "core.fname-table-scan.json")
+                if args.scan_fname_tables
+                else None
+            ),
         },
         "commands": commands,
         "promotion_gate": (

@@ -197,6 +197,11 @@ Updated: 2026-05-27
 - fact: `scripts/obelisk_supervisor_snapshot.sh` is the only approved unattended
   cron-style workflow for now. It is read-only and writes snapshots to
   `/servidor/ark/obelisk/dumps/supervisor/`; see `docs/SUPERVISION.md`.
+- fact: Core evidence promotes `0x595b7e0` to `GUObjectArray research-candidate` for ARK
+  binary SHA256 `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`.
+  The first object item resolves to `/Script/CoreUObject`, and its class resolves to
+  `Package` through the confirmed FName table; see
+  `docs/research/2026-05-27-core-gobjects-candidate.md`.
 
 ## Rejected Or Unsafe
 
@@ -249,6 +254,9 @@ Updated: 2026-05-27
   scanner or offline core scanner for FName-table-shaped pointers.
 - next-step: Search statically for one or more `GUObjectArray` candidate slots and inspect
   them through `scripts/build_core_dump_evidence_pack.py --gobjects-candidate`.
+- next-step: Extend core tooling to validate multiple `FUObjectItem` indices from
+  `0x595b7e0`, including `InternalIndex`, `ClassPrivate`, `OuterPrivate`, and FName
+  resolution.
 - next-step: After a repeat-confirmed `GNames` research candidate appears, generate
   `objdump -d -M intel` for the matching ShooterGameServer binary and run the analyzer with
   `--binary` plus `--objdump-xrefs`; inspect whether candidate `source_global` references

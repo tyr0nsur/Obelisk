@@ -148,6 +148,11 @@ work from repository state instead of chat history.
   forbidden by stable posture. First live post-start probe of `0x5956f30` rejected with
   `table=0x13733660` / `implausible_num_elements`; waiting longer in bootstrap is rejected
   as a strategy. See `docs/research/2026-05-27-runtime-debug-control.md`.
+- Core evidence promotes `0x595b7e0` to `GUObjectArray research-candidate` for the current
+  ARK binary hash. `0x595b7f0` points to chunks, count-like field at `0x595b804` is
+  `1243796`, first object item resolves to `/Script/CoreUObject`, and its class resolves
+  to `Package` through the confirmed FName table. See
+  `docs/research/2026-05-27-core-gobjects-candidate.md`.
 - Core-pack tooling now supports direct FName entry reads and bounded
   `--gobjects-candidate` previews for the next `GUObjectArray` investigation.
 - Read-only overnight snapshots are documented in `docs/SUPERVISION.md` and implemented by
@@ -249,6 +254,8 @@ python3 scripts/analyze_reflectionscanner_capture.py \
   scanner or offline core scanner for FName-table-shaped pointers.
 - GObjects: statically find candidate `GUObjectArray` slots, then inspect only those with
   the enhanced core evidence pack.
+- GObjects: next implementation should validate multiple `FUObjectItem` indices from
+  `0x595b7e0` and use FName-backed names before attempting `UFunction` enumeration.
 - Evidence: after any isolated scanner capture, run
   `scripts/build_reflection_evidence_pack.py` against copied logs and the matching binary
   before promoting candidates.

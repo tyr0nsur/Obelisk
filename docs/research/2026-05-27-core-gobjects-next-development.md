@@ -53,9 +53,40 @@ The next concrete step is an offline candidate loop:
 - direct FName entry reads from `--fname-root-slot` using `--fname-index` values;
 - default FName clues for `0`, `4884`, and `9619`;
 - bounded `--gobjects-candidate LABEL=ADDR` global-slot and pointer-window previews.
+- bounded `--scan-pointer-value LABEL=ADDR` searches across small readable/writable core
+  mappings to find slots that point to a confirmed in-memory table/root value.
+- optional `--scan-fname-tables` runs `scripts/scan_core_fname_tables.py`, an offline
+  legacy FName-table shape scanner that starts from `None`, reconstructs
+  entry -> chunk -> table pointer chains, and validates known FName indices.
 
 These commands are evidence generation only. They deliberately do not perform a broad core
-scan or infer a final UE4 layout.
+scan by default or infer a final UE4 layout.
+
+Example for the already captured FName table value:
+
+```bash
+python3 scripts/build_core_dump_evidence_pack.py \
+  --binary /path/to/ShooterGameServer \
+  --core /path/to/core \
+  --output-dir /tmp/obelisk-core-pointer-scan \
+  --scan-pointer-value fname_table=0x2ae5c660 \
+  --scan-fname-tables \
+  --skip-core-sha256
+```
+
+The resulting `gdb-core.txt` prints rows like:
+
+```text
+hit fname_table value=0x2ae5c660 slot=0x... mapping=0x...-0x... <mapping>
+```
+
+Treat each hit as a candidate slot only. Promote it only after static xrefs and a second
+capture or independent validation path.
+
+The FName table scanner writes `core.fname-table-scan.json` when enabled. A candidate from
+that file is still a research candidate, not a stable runtime offset, because it is derived
+from one core image. On large cores this scanner can be slow; run it deliberately, prefer
+bounded limits or `timeout`, and do not enable it in unattended workflows.
 
 ## Acceptance Gate
 
