@@ -90,6 +90,23 @@ Updated: 2026-05-27
   plugin placement under the install root.
 - fact: Commit `3760f3b` clarified that sub-agents may recommend skill changes, but the
   team lead owns skill edits, commits, pushes, and handoff updates.
+- fact: Commit `2420e82` added the static/reversing workflow skills:
+  `obelisk-static-binary-analysis`, `obelisk-tooling-discipline`, and
+  `obelisk-ue4-type-reconstruction`.
+- fact: Commit `1e62968` makes `PluginManager::UnloadAll()` unload plugins in reverse
+  load order and adds a multi-plugin order test.
+- fact: Commit `6da5c9c` installs the public SDK as a CMake package export
+  (`ObeliskTargets.cmake`, `ObeliskConfig.cmake`, and version file) through the installer's
+  SDK component.
+- fact: The installed layout test now consumes the installed SDK through
+  `find_package(Obelisk CONFIG REQUIRED)` and `Obelisk::obelisk_sdk`, so package export
+  regressions are covered by `scripts/test_install_obelisk_layout.sh`.
+- fact: Commit `a986a57` adds analyzer evidence pack metadata. Use
+  `scripts/analyze_reflectionscanner_capture.py --json --binary <ShooterGameServer>
+  --objdump-xrefs <objdump.txt> <Obelisk.log>` to record Obelisk commit, binary SHA256,
+  copied logs, objdump artifact, candidate counts, reject markers, and promotion gate.
+  The workflow is documented in
+  `docs/research/2026-05-27-gname-evidence-pack-workflow.md`.
 
 ## Rejected Or Unsafe
 
@@ -134,14 +151,14 @@ Updated: 2026-05-27
   require `matched_clues=3/3` plus repeat confirmation through distinct `source_global`
   values or distinct targets before treating a table as a `GNames` research candidate.
 - next-step: After a repeat-confirmed `GNames` research candidate appears, generate
-  `objdump -d` for the matching ShooterGameServer binary and run the analyzer with
-  `--objdump-xrefs`; inspect whether candidate `source_global` references are real
-  load/store paths before designing runtime name-resolution code.
+  `objdump -d -M intel` for the matching ShooterGameServer binary and run the analyzer with
+  `--binary` plus `--objdump-xrefs`; inspect whether candidate `source_global` references
+  are real load/store paths before designing runtime name-resolution code.
 - next-step: Replace raw chat parameter probing with reflected parameter decoding.
 - next-step: Add binary hash validation or an instruction decoder before accepting future
   ProcessEvent prologue changes.
-- next-step: Broaden install/package validation from shell-level SDK layout checks toward a
-  CMake package/export story once public SDK consumption stabilizes.
+- next-step: Keep expanding package/export validation only when external plugin
+  consumption exposes a concrete missing contract.
 - next-step: Later integrate `docs/VERSIONING.md` into README/STATUS/RELEASE once the
   versioning policy has settled; avoid claiming `0.1.0` is imminent.
 

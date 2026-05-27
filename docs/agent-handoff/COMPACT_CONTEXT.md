@@ -78,6 +78,13 @@ work from repository state instead of chat history.
 - `PluginManagerTests` cover plugin lifecycle and rejection paths with a fake loader:
   valid load/unload, missing entry points, invalid metadata, init failure, callback cleanup,
   shutdown, and close behavior.
+- `PluginManager::UnloadAll()` unloads plugins in reverse load order and has a multi-plugin
+  order test.
+- The SDK now installs a CMake package export:
+  `lib/cmake/Obelisk/ObeliskTargets.cmake`, `ObeliskConfig.cmake`, and
+  `ObeliskConfigVersion.cmake`.
+- Installed SDK layout validation consumes the installed package with
+  `find_package(Obelisk CONFIG REQUIRED)` and `Obelisk::obelisk_sdk`.
 - Versioning policy is documented in `docs/VERSIONING.md`: no stable `0.1.0` tag yet;
   use `0.1.0-alpha.N` only for intentional contributor previews and `0.1.0-rc.N` only
   after scope freeze.
@@ -97,6 +104,10 @@ work from repository state instead of chat history.
   `scripts/analyze_reflectionscanner_capture.py` and documented in
   `docs/research/2026-05-27-reflectionscanner-gname-table-triage.md`. A
   `research-candidate` label is evidence for follow-up only, not an accepted offset.
+- Analyzer JSON now includes an `evidence_pack` block when run with copied logs. Use
+  `--binary` to record the offline ShooterGameServer SHA256 and `--objdump-xrefs` to attach
+  static xref evidence. Workflow:
+  `docs/research/2026-05-27-gname-evidence-pack-workflow.md`.
 
 ## Current Research Direction
 
@@ -112,6 +123,7 @@ python3 scripts/analyze_reflectionscanner_capture.py --json /path/to/isolated/Ob
 objdump -d /path/to/ShooterGameServer > /tmp/ShooterGameServer.objdump
 python3 scripts/analyze_reflectionscanner_capture.py \
   --json \
+  --binary /path/to/ShooterGameServer \
   --objdump-xrefs /tmp/ShooterGameServer.objdump \
   /path/to/isolated/Obelisk.log
 ```
@@ -153,5 +165,7 @@ python3 scripts/analyze_reflectionscanner_capture.py \
   plan is `arkserver-obelisk-debug`.
 - Reflection: improve FName/GNames probes and analyzer fixtures offline.
 - Build/QA: evolve install/package validation toward clean CMake SDK/package exports.
+- Build/QA: keep package/export validation tied to concrete external plugin consumption
+  gaps.
 - Core runtime: extend PluginManager coverage only if a new lifecycle risk is identified;
   the main missing test surface has moved from basic lifecycle to packaging/export.
