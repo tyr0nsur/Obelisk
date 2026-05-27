@@ -186,6 +186,15 @@ Updated: 2026-05-27
   candidate-only dino surfaces for passengers, carry checks, attacks, flight, tame status,
   and blueprint hooks. Favor compact offline fixtures such as `AddPassenger`,
   `AllowCarryCharacter`, `ServerRequestAttack`, and `SetCharacterStatusTameable`.
+- fact: `docs/research/2026-05-27-sdk-module-taxonomy.md` defines the current module
+  roadmap beyond chat: player, inventory, items, dinos, structures, tribes, transfer,
+  admin, and internal UE reflection. Keep all non-chat modules candidate-only until they
+  pass offline validation, fixture coverage, isolated runtime observation, copied-data
+  ownership, and public C ABI gates.
+- fact: `docs/research/2026-05-27-primalstructure-function-inventory.md` identifies
+  candidate-only structure surfaces for access, snapping, demolish, pickup, variants,
+  pincode, seating, and elevator controls. Favor small bool/object/int fixtures first;
+  defer placement/build/range/string/array-heavy functions.
 - fact: ReflectionScanner now has opt-in FName rejection evidence behind
   `OBELISK_REFLECTION_LOG_FNAME_REJECTS=1`, and the analyzer records
   `fname_reject_count`, `fname_reject_reason_counts`, and `fname_rejects`; see
