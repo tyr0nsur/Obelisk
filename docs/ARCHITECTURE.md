@@ -1,7 +1,7 @@
 # Architecture
 
 Obelisk is split into a small Linux runtime core, a C plugin API, and optional
-plugins. The current ARK server integration is a debug harness for validating
+plugins. The current ARK server integration is a validation adapter for checking
 that runtime against a real stripped UE4 dedicated server process.
 
 ## Runtime Bootstrap
@@ -82,10 +82,10 @@ OBELISK_INSTANCE_ID
 ```
 
 This keeps Obelisk artifacts outside the target binary directory and allows
-multiple debug harness instances to share one runtime root. `OBELISK_INSTANCE_ID`
+multiple validation adapter instances to share one runtime root. `OBELISK_INSTANCE_ID`
 separates logs and operational markers by instance.
 
-## ARK Debug Harness
+## ARK Validation Adapter
 
 The current harness injects Obelisk into `ShooterGameServer` with `LD_PRELOAD`.
 LinuxGSM wrapper templates under `packaging/linuxgsm/` are operational helpers
@@ -94,6 +94,10 @@ for that harness, not the core product surface.
 ARK-specific paths, instance names, and observed `FName` indices are validation
 inputs only. Stable plugin contracts should be expressed through public SDK
 headers and documented runtime behavior.
+
+Current runtime debug work targets `arkserver2` / TheIsland or a dedicated
+`arkserver-obelisk-debug` instance. Ragnarok is protected for player performance
+testing and should not be treated as the routine debug target.
 
 ## SDK Direction
 
@@ -116,7 +120,7 @@ Preferred direction:
 ## Experimental Components
 
 `ue/ReflectionScanner.*` currently exists as a research tool. It should remain
-disabled by default on debug harness servers.
+disabled by default on validation adapter servers.
 
 The first official plugin target is `plugins/oBaseEvents`, which demonstrates the C ABI,
 safe default config creation, filtered event registration, and plugin shutdown. Larger

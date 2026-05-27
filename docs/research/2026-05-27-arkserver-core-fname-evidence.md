@@ -120,7 +120,8 @@ ReflectionScanner clue indices were corrected to:
 
 1. Build and deploy the corrected ReflectionScanner.
 2. Run a short scanner capture with
-   `OBELISK_REFLECTION_STATIC_FNAME_ROOTS=0x5956f30` on the debug harness.
+   `OBELISK_REFLECTION_STATIC_FNAME_ROOTS=0x5956f30` only on
+   `arkserver-obelisk-debug`, or on `arkserver2` during an approved fallback window.
 3. Require analyzer strict success plus static xref evidence before promoting runtime
    name-resolution code.
 4. Use this FName resolver evidence as the base for `GObjects` discovery.

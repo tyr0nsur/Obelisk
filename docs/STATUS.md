@@ -7,15 +7,15 @@ for detailed research notes.
 Current development line is `0.1.0-dev`; see [VERSIONING.md](VERSIONING.md). This is not
 a production-stable release claim.
 
-The current ARK server setup is the debug harness used to validate Obelisk in a
-real UE4 Linux process. Harness operations are documented here only when they
+The current ARK server setup is a validation adapter used to check Obelisk in a
+real UE4 Linux process. Adapter operations are documented here only when they
 define or protect runtime behavior.
 
 ## Stability Levels
 
 | Level | Meaning | Required before promotion |
 | --- | --- | --- |
-| Stable baseline | Safe enough for guarded debug-harness validation in the documented posture. | Reproducible build, documented flags, and observed harness stability. |
+| Stable baseline | Safe enough for guarded validation-adapter checks in the documented posture. | Reproducible build, documented flags, and observed adapter stability. |
 | Experimental | Useful for isolated tests or evidence gathering, but not a default live path. | Isolated validation, bounded logs, rollback notes, and research evidence. |
 | Not ready | Planned API or behavior without enough evidence for runtime use. | Design, implementation, tests, and safe operational gates. |
 
@@ -25,7 +25,7 @@ define or protect runtime behavior.
 | --- | --- | --- |
 | `LD_PRELOAD` bootstrap | Stable baseline | Runtime loads through the central install layout. |
 | Central install root | Stable baseline | Operator-chosen Obelisk root with `lib/`, `plugins/`, `config/`, `logs/`, and `state/instances/`; current harness uses `/servidor/ark/obelisk`. |
-| ARK/LinuxGSM debug harness | Stable baseline | Versioned wrappers live under `packaging/linuxgsm/`; copy to the ARK binary directory only for harness validation. |
+| ARK/LinuxGSM validation adapter | Stable baseline | Versioned wrappers live under `packaging/linuxgsm/`; copy to the ARK binary directory only for adapter validation. |
 | Installer plugin posture | Stable baseline | `scripts/install_obelisk.sh` installs only runtime libraries; plugins are activated only by copying `.so` files into `plugins/`. |
 | Per-instance runtime flags | Stable baseline | `OBELISK_INSTANCE_ID` selects logs and markers under `state/instances/<id>/`; map markers are obsolete. |
 | ProcessEvent hook | Stable baseline | Current Ragnarok posture enables the hook while disabling plugins. |
@@ -47,14 +47,14 @@ define or protect runtime behavior.
 
 ## Harness Safety Baseline
 
-For the current Ragnarok ARK harness, the documented stable/performance posture is:
+For the current protected Ragnarok performance posture, the documented stable markers are:
 
 ```text
 state/instances/arkserver/enable-process-event-hook
 state/instances/arkserver/disable-plugins
 ```
 
-Do not enable native exec probes on debug harness servers. Keep experimental
+Do not enable native exec probes on validation adapter servers. Keep experimental
 plugins in the repository or another staging location until isolated validation
 passes.
 
