@@ -65,7 +65,7 @@ The next concrete step is an offline candidate loop:
 - when `--gobjects-candidate` is supplied, the pack now writes
   `gobjects-static-xrefs.json` from the generated objdump. It summarizes xrefs for the
   candidate root, direct chunks field `+0x10`, count field `+0x24`, and serial-like field
-  `+0x58`, with access classification.
+  `+0x58`, with access classification and objdump function-group anchors.
 
 These commands are evidence generation only. They deliberately do not perform a broad core
 scan by default or infer a final UE4 layout.
@@ -123,6 +123,21 @@ Manual context review from the same pack identified useful anchors for follow-up
 Treat these as static context anchors for decompiler/rizin follow-up. They are not
 accepted function names, because this stripped binary's objdump labels often point to
 nearest exported symbols rather than real internal functions.
+
+After adding function grouping to `gobjects-static-xrefs.json`, parsing the same objdump
+reported the highest-volume groups:
+
+```text
+0x886d80  xrefs=6298 targets=gobjects.chunks,gobjects.count
+0xeaa3a0  xrefs=4013 targets=gobjects.chunks,gobjects.count
+0x12d1400 xrefs=3488 targets=gobjects.root,gobjects.chunks,gobjects.count,gobjects.serial
+0x81dc59  xrefs=90   targets=gobjects.root,gobjects.chunks,gobjects.count
+0x648400  xrefs=2    targets=gobjects.chunks,gobjects.count
+```
+
+The `0x12d1400` group is the best next decompiler target because it touches all tracked
+fields including the serial-like field. The `0x81dc59` group is a useful startup/reset
+context. Treat the printed symbol names as approximate anchors only.
 
 ## Acceptance Gate
 

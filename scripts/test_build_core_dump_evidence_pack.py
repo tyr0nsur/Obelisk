@@ -130,9 +130,11 @@ class CoreDumpEvidencePackCommandTests(unittest.TestCase):
             objdump = Path(temp_dir) / "ShooterGameServer.objdump"
             objdump.write_text(
                 """
+0000000000000ff0 <LookupObjects>:
   1000: 48 8b 05 00 00 00 00  mov    rax,QWORD PTR [rip+0x1]        # 0x595b7f0
   1007: 39 3d 00 00 00 00     cmp    DWORD PTR [rip+0x2],edi        # 0x595b804
   100d: f0 0f c1 05 00 00 00  lock xadd DWORD PTR [rip+0x3],eax     # 0x595b838
+0000000000001010 <InitObjects>:
   1015: 48 8d 3d 00 00 00 00  lea    rdi,[rip+0x4]                  # 0x595b7e0
   1020: 48 8b 05 00 00 00 00  mov    rax,QWORD PTR [rip+0x5]        # 0x12345678
 """,
@@ -149,6 +151,11 @@ class CoreDumpEvidencePackCommandTests(unittest.TestCase):
         self.assertEqual(payload["xrefs"]["0x595b7f0"][0]["target_label"], "gobjects.chunks")
         self.assertEqual(payload["xrefs"]["0x595b804"][0]["target_label"], "gobjects.count")
         self.assertEqual(payload["xrefs"]["0x595b838"][0]["target_label"], "gobjects.serial")
+        self.assertEqual(payload["xrefs"]["0x595b7f0"][0]["function_label"], "LookupObjects")
+        self.assertEqual(payload["function_groups"][0]["function_label"], "LookupObjects")
+        self.assertEqual(payload["function_groups"][0]["xref_count"], 3)
+        self.assertEqual(payload["function_groups"][1]["function_label"], "InitObjects")
+        self.assertEqual(payload["function_groups"][1]["target_labels"], ["gobjects.root"])
 
     def test_gobjects_sample_options_require_candidate_and_fname_root(self) -> None:
         self.assertEqual(

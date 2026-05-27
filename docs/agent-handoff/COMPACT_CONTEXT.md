@@ -174,6 +174,9 @@ work from repository state instead of chat history.
 - Static context anchors for `0x595b7e0`: `0x79ce22` root store plus bounded walk,
   `0x7a27a7` helper/destructor registration, `0x81f118` startup reset, and `0x81f206`
   startup helper call. Labels are anchors only, not accepted function names.
+- `gobjects-static-xrefs.json` groups objdump xrefs by function anchor. Current top
+  follow-up groups are `0x12d1400` touching root/chunks/count/serial and `0x81dc59` for
+  startup/reset context.
 - Offline core UObject enumeration now works through `scripts/enumerate_core_uobjects.py`.
   It found real chat-related `Function` objects in `GObjects`, including `ServerChat`
   index `25447`, `ServerChatTo` index `25449`, and `ServerChatToPlayer` index `25452`;

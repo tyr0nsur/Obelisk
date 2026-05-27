@@ -70,7 +70,9 @@ Static xrefs from the matching `ShooterGameServer.objdump` also support the layo
 `scripts/build_core_dump_evidence_pack.py` now reproduces these xref summaries in
 `gobjects-static-xrefs.json` when run with `--gobjects-candidate`. A local offline pack
 for `0x595b7e0` reported `13884` load xrefs and `7` store xrefs across the tracked root,
-chunks, count, and serial fields.
+chunks, count, and serial fields. The same JSON now groups xrefs by objdump function
+anchor, making `0x12d1400` the strongest follow-up static context because it touches
+root, chunks, count, and serial.
 
 Concrete static contexts observed from that pack:
 

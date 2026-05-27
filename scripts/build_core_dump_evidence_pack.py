@@ -54,6 +54,7 @@ OBJDUMP_XREF_RE = re.compile(
     r"^\s*(?P<address>[0-9a-fA-F]+):\s+(?P<body>.*?)"
     r"(?:#|<)\s*(?P<target>(?:0x)?[0-9a-fA-F]+)"
 )
+OBJDUMP_FUNCTION_RE = re.compile(r"^(?P<address>[0-9a-fA-F]+)\s+<(?P<label>[^>]+)>:$")
 
 
 def is_relative_to(path: Path, parent: Path) -> bool:
@@ -175,9 +176,18 @@ def gobjects_static_xref_targets(gobjects_candidates: list[tuple[str, int]]) -> 
 
 def collect_static_xrefs(objdump_path: Path, targets: dict[str, str]) -> dict[str, object]:
     xrefs: dict[str, list[dict[str, object]]] = {target: [] for target in targets}
+    function_start: str | None = None
+    function_label: str | None = None
     with objdump_path.open("r", encoding="utf-8", errors="replace") as handle:
         for line_number, line in enumerate(handle, start=1):
-            match = OBJDUMP_XREF_RE.search(line.rstrip("\n"))
+            stripped = line.rstrip("\n")
+            function_match = OBJDUMP_FUNCTION_RE.match(stripped)
+            if function_match:
+                function_start = normalize_hex(function_match.group("address"))
+                function_label = function_match.group("label")
+                continue
+
+            match = OBJDUMP_XREF_RE.search(stripped)
             if not match:
                 continue
             target = normalize_hex(match.group("target"))
@@ -192,19 +202,48 @@ def collect_static_xrefs(objdump_path: Path, targets: dict[str, str]) -> dict[st
                     "target_label": targets[target],
                     "instruction": instruction,
                     "access": classify_xref_access(instruction),
+                    "function_start": function_start,
+                    "function_label": function_label,
                 }
             )
 
     access_counts: dict[str, int] = {}
+    function_groups: dict[str, dict[str, object]] = {}
     for refs in xrefs.values():
         for ref in refs:
             access = str(ref["access"])
             access_counts[access] = access_counts.get(access, 0) + 1
+            group_key = str(ref.get("function_start") or "unknown")
+            group = function_groups.setdefault(
+                group_key,
+                {
+                    "function_start": ref.get("function_start"),
+                    "function_label": ref.get("function_label"),
+                    "xref_count": 0,
+                    "target_labels": [],
+                    "access_counts": {},
+                    "sample_instruction_addresses": [],
+                },
+            )
+            group["xref_count"] = int(group["xref_count"]) + 1
+            target_labels = group["target_labels"]
+            if isinstance(target_labels, list) and ref["target_label"] not in target_labels:
+                target_labels.append(ref["target_label"])
+            group_access_counts = group["access_counts"]
+            if isinstance(group_access_counts, dict):
+                group_access_counts[access] = int(group_access_counts.get(access, 0)) + 1
+            samples = group["sample_instruction_addresses"]
+            if isinstance(samples, list) and len(samples) < 5:
+                samples.append(ref["instruction_address"])
 
     return {
         "targets": [{"address": address, "label": label} for address, label in sorted(targets.items())],
         "xrefs": xrefs,
         "access_counts": dict(sorted(access_counts.items())),
+        "function_groups": sorted(
+            function_groups.values(),
+            key=lambda item: (-int(item["xref_count"]), str(item["function_start"])),
+        ),
     }
 
 

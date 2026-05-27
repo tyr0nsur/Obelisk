@@ -234,6 +234,9 @@ Updated: 2026-05-27
   plus bounded walk, `0x7a27a7` helper/destructor registration, `0x81f118` startup reset,
   and `0x81f206` startup helper call. Treat labels as stripped-binary anchors, not accepted
   function names.
+- fact: `gobjects-static-xrefs.json` now groups objdump xrefs by function anchor. Current
+  top follow-up groups are `0x12d1400` touching root/chunks/count/serial and `0x81dc59`
+  for startup/reset context.
 - fact: `scripts/enumerate_core_uobjects.py` can enumerate UObjects from the core through
   `0x595b7e0` and `0x5956f30`. It found real chat-related `Function` objects including
   `ServerChat` at index `25447`, `ServerChatTo` at `25449`, and `ServerChatToPlayer` at
