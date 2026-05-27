@@ -100,6 +100,8 @@ Updated: 2026-05-27
 - fact: `README.md`, `docs/STATUS.md`, `docs/RELEASE.md`, and
   `scripts/test_versioning_guardrails.py` now link/enforce the pre-release versioning
   policy so `0.1.0-dev` is not presented as a stable release.
+- fact: `scripts/test_secret_guardrails.py` and CI now reject committed Discord webhook
+  URLs, keeping community update endpoints out of versioned files.
 - fact: Commit `fc837a0` added passive static xref annotation to
   `scripts/analyze_reflectionscanner_capture.py`. Use `--objdump-xrefs` with a
   pre-generated `objdump -d` text file to annotate candidate globals; this is supporting
