@@ -202,6 +202,10 @@ Updated: 2026-05-27
   The first object item resolves to `/Script/CoreUObject`, and its class resolves to
   `Package` through the confirmed FName table; see
   `docs/research/2026-05-27-core-gobjects-candidate.md`.
+- fact: `scripts/enumerate_core_uobjects.py` can enumerate UObjects from the core through
+  `0x595b7e0` and `0x5956f30`. It found real chat-related `Function` objects including
+  `ServerChat` at index `25447`, `ServerChatTo` at `25449`, and `ServerChatToPlayer` at
+  `25452`; see `docs/research/2026-05-27-core-uobject-enumeration.md`.
 
 ## Rejected Or Unsafe
 
@@ -253,6 +257,8 @@ Updated: 2026-05-27
 - next-step: Extend core tooling to validate multiple `FUObjectItem` indices from
   `0x595b7e0`, including `InternalIndex`, `ClassPrivate`, `OuterPrivate`, and FName
   resolution.
+- next-step: Add offline `UFunction` metadata/property-chain inspection for the enumerated
+  chat function objects before any runtime chat decoder work.
 - next-step: After a repeat-confirmed `GNames` research candidate appears, generate
   `objdump -d -M intel` for the matching ShooterGameServer binary and run the analyzer with
   `--binary` plus `--objdump-xrefs`; inspect whether candidate `source_global` references

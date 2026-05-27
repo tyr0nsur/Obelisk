@@ -14,9 +14,14 @@ behavior, or require touching `/servidor/ark`.
 - `ReflectionScanner` can rank candidate globals from copied isolated logs.
 - Analyzer evidence packs can record Obelisk commit, binary SHA256, copied log path,
   objdump path, candidate counts, reject markers, and GNames promotion gate.
-- No `GNames`, `FNamePool`, `GUObjectArray`, `GObjects`, `UFunction`, property chain, or
-  parameter layout is accepted yet.
-- Chat-related indices `9619` and `9622` are clues only.
+- Core evidence for this binary confirms a legacy FName table for the captured process and
+  promotes `0x595b7e0` to `GUObjectArray research-candidate`.
+- Offline UObject enumeration now finds real chat-related `Function` objects through
+  `GObjects` and FName-backed names. `UFunction` metadata, property chain, and parameter
+  layout are not accepted yet.
+- Old chat-related clue mapping `9619 -> ClientMessage` and `9622 -> ServerChat` is stale.
+  Current core evidence has `4884 -> ClientMessage`, `9619 -> ServerChat`, and
+  `9622 -> SetActiveMissionDebugFlags`.
 
 ## P0: Accept A Bounded FName Resolver
 
@@ -261,15 +266,12 @@ Do not implement yet:
 
 ## Recommended Shortest Path
 
-1. Finish `FName` resolver evidence from isolated logs plus static xrefs.
-2. Add offline analyzer fixtures for accepted and rejected name-table evidence.
-3. Design scanner-only `GObjects` candidate logging, but keep it disabled until FName is
-   repeatable.
-4. Confirm object-array mapping with known function/object candidates.
-5. Only then add `UFunction` object classification logs.
-6. Add `UFunction` metadata logs.
-7. Add property chain logs.
-8. Decode params only for one known function in a copied/isolated capture.
+1. Keep FName/GObjects evidence binary-hash-scoped until second-source validation exists.
+2. Use offline `GObjects` enumeration to inspect known chat `Function` objects.
+3. Add `UFunction` metadata logs or offline evidence for `FunctionFlags`, `NumParms`,
+   `ParmsSize`, and property root candidates.
+4. Add property chain logs.
+5. Decode params only for one known function in a copied/isolated capture.
 
 ## Risks
 

@@ -153,6 +153,10 @@ work from repository state instead of chat history.
   `1243796`, first object item resolves to `/Script/CoreUObject`, and its class resolves
   to `Package` through the confirmed FName table. See
   `docs/research/2026-05-27-core-gobjects-candidate.md`.
+- Offline core UObject enumeration now works through `scripts/enumerate_core_uobjects.py`.
+  It found real chat-related `Function` objects in `GObjects`, including `ServerChat`
+  index `25447`, `ServerChatTo` index `25449`, and `ServerChatToPlayer` index `25452`;
+  see `docs/research/2026-05-27-core-uobject-enumeration.md`.
 - Core-pack tooling now supports direct FName entry reads and bounded
   `--gobjects-candidate` previews for the next `GUObjectArray` investigation.
 - Read-only overnight snapshots are documented in `docs/SUPERVISION.md` and implemented by
@@ -256,6 +260,8 @@ python3 scripts/analyze_reflectionscanner_capture.py \
   the enhanced core evidence pack.
 - GObjects: next implementation should validate multiple `FUObjectItem` indices from
   `0x595b7e0` and use FName-backed names before attempting `UFunction` enumeration.
+- UFunction: inspect metadata/property-chain windows for the enumerated chat functions
+  before returning to runtime chat interception.
 - Evidence: after any isolated scanner capture, run
   `scripts/build_reflection_evidence_pack.py` against copied logs and the matching binary
   before promoting candidates.
