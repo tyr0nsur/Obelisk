@@ -21,6 +21,11 @@ Updated: 2026-05-27
   player performance testing. Do not restart, redeploy, change markers, enable extra
   logging, scan, ptrace, or run debug experiments there without an explicit maintenance
   window.
+- fact: Operator explicitly approved a Ragnarok gameplay config change on 2026-05-27:
+  `AllowCaveBuildingPvP=True` was applied to `GameUserSettings.ini`, pre-change backup is
+  `/home/flowcommunity-ark/backups/ark-config-manual/GameUserSettings.ini.allow-cave-20260527-184547.bak`,
+  `arkserver` was restarted successfully, and the refreshed config backup is
+  `/home/flowcommunity-ark/backups/ark-config-20260527-185011`.
 - fact: `arkserver2` / TheIsland is now the designated Obelisk debug/development target.
   Use it for controlled runtime validation and research harness work instead of Ragnarok,
   while still requiring explicit per-run approval for ReflectionScanner, native exec,

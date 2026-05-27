@@ -52,7 +52,7 @@ Latest backup symlink:
 Concrete backup created before further experiments:
 
 ```text
-/home/flowcommunity-ark/backups/ark-config-20260527-015805
+/home/flowcommunity-ark/backups/ark-config-20260527-185011
 ```
 
 It contains:
@@ -61,6 +61,14 @@ It contains:
 - `GameUserSettings.ini`
 - LinuxGSM `arkserver/*.cfg`
 - `MANIFEST.txt` with SHA256 hashes and running server command lines at backup time
+
+Ragnarok gameplay config note:
+
+- `AllowCaveBuildingPvP=True` was applied in
+  `GameUserSettings.ini` on 2026-05-27 after explicit operator approval, then
+  `arkserver` was restarted successfully.
+- The pre-change file backup is
+  `/home/flowcommunity-ark/backups/ark-config-manual/GameUserSettings.ini.allow-cave-20260527-184547.bak`.
 
 ## Create A Fresh Backup
 

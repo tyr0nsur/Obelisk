@@ -34,6 +34,10 @@ work from repository state instead of chat history.
     controlled runtime validation and research windows.
 - Do not restart `arkserver`, edit its marker files, deploy to it, attach debuggers, or
   increase logging while player performance testing is active.
+- Exception already completed with explicit operator approval: `AllowCaveBuildingPvP=True`
+  was applied to Ragnarok `GameUserSettings.ini` on 2026-05-27, `arkserver` was restarted,
+  and refreshed backup `/home/flowcommunity-ark/backups/ark-config-20260527-185011`
+  became `ark-config-latest`.
 - Do not restart servers, edit marker files, change `/servidor/ark`, or activate
   ReflectionScanner without explicit operator permission. For new debug work, target
   `arkserver2` / TheIsland, not Ragnarok.
