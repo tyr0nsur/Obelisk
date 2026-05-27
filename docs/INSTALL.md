@@ -102,12 +102,14 @@ Operators can override it before launching the wrapper.
 Instance marker files are preferred for production operations:
 
 ```bash
-mkdir -p /servidor/ark/obelisk/state/instances/arkserver
-touch /servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook
-touch /servidor/ark/obelisk/state/instances/arkserver/disable-plugins
-# Experimental, development-only chat observation:
+mkdir -p /servidor/ark/obelisk/state/instances/arkserver2
+# Experimental, development-only chat observation on TheIsland:
 touch /servidor/ark/obelisk/state/instances/arkserver2/enable-chat-reflection
 ```
+
+Do not create, remove, or refresh `arkserver` / Ragnarok markers from install or debug
+rounds. Treat the Ragnarok marker list as observed baseline unless the operator opens a
+Ragnarok maintenance window in the current turn.
 
 Useful flags:
 

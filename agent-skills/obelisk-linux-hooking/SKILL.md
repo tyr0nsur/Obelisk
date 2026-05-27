@@ -53,6 +53,10 @@ When patching `.text`:
 
 ## Validation
 
+Run this only during an approved TheIsland/debug window. For high-risk hook/scanner
+captures, prefer `arkserver-obelisk-debug`; do not validate hooks on Ragnarok while player
+performance testing is active.
+
 ```bash
 cmake --build build -j"$(nproc)"
 mkdir -p /servidor/ark/obelisk/state/instances/arkserver2

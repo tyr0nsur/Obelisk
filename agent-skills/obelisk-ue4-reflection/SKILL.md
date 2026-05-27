@@ -31,10 +31,13 @@ or parameter decoding for ARK's Linux UE4 server.
     `ShooterPlayerController.ServerSendChatMessage`, and metadata-only fallback
     recognition.
   - `hooks/ProcessEventChatReflection.{h,cpp}` for hook-side gate/recognition tests.
-- Deployed `arkserver` uses `state/instances/arkserver/enable-chat-reflection`; current
-  logs now include accepted `ServerSendChatMessage` hits with `send_mode=0` and bounded
-  `ChatMessage` / `SendMode` ranges. This confirms the experimental runtime path, not a
-  public SDK event.
+- Historical/current-state evidence: `arkserver` has had
+  `state/instances/arkserver/enable-chat-reflection` active, and current logs include
+  accepted `ServerSendChatMessage` hits with `send_mode=0` plus bounded `ChatMessage` /
+  `SendMode` ranges. Do not add, remove, or rely on that Ragnarok marker for new
+  validation. Future chat reflection work belongs on approved `arkserver2` windows or a
+  dedicated debug instance. This confirms the experimental runtime path, not a public SDK
+  event.
 - `ServerChat`, `ServerChatTo`, and `ServerChatToPlayer` have `ShooterCheatManager` outer
   evidence and should not be treated as the primary normal player chat path. Current best
   incoming player chat candidate is `ServerSendChatMessage` with FName index `2697`,

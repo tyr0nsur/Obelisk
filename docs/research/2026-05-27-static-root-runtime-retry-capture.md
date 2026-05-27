@@ -5,6 +5,11 @@ debug-control probing showed that waiting longer in bootstrap is not a coherent 
 strategy. New work should prefer post-start probes, offline core evidence packs, or
 bounded live data-mapping scanners.
 
+Historical Ragnarok capture note. Do not repeat this workflow on `arkserver` / Ragnarok.
+Future static-root, ReflectionScanner, or debug-control probes must prefer
+`arkserver-obelisk-debug`; `arkserver2` / TheIsland is only an explicit
+operator-approved fallback with rollback and posture evidence.
+
 ## Objective
 
 Retest `OBELISK_REFLECTION_STATIC_FNAME_ROOTS=0x5956f30` after correcting the static
@@ -65,7 +70,9 @@ entries from env-supplied slots.
 ## Next Steps
 
 1. Deploy the longer retry build.
-2. Run one static-root scanner capture and wait at least 10 minutes before copying logs.
+2. Run one static-root scanner capture only on `arkserver-obelisk-debug`, or on
+   `arkserver2` during an approved fallback window, and wait at least 10 minutes before
+   copying logs.
 3. Analyze with `scripts/analyze_reflectionscanner_capture.py --strict`.
 4. If it still rejects with zero clues, add static-root reject detail for first clue
    failure and consider validating from a post-start on-demand trigger rather than startup

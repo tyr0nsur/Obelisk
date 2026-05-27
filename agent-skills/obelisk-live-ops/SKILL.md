@@ -50,15 +50,18 @@ Current operator direction as of 2026-05-27:
 
 ## Production Baseline
 
-Maintenance-window-only setup for Ragnarok live-like stability and player performance
-validation. Do not run this block during active player testing; first record the operator's
-maintenance approval in the handoff or research note:
+Observed Ragnarok live-like stability markers are listed here for maintenance review only.
+Do not create, remove, refresh, or restart `arkserver` during normal agent rounds. Routine
+debug work belongs on `arkserver2`; scanner, ptrace, gcore, and broad tracing should
+prefer `arkserver-obelisk-debug`. Ragnarok changes require an operator-stated maintenance
+window in the current turn.
 
 ```bash
-mkdir -p /servidor/ark/obelisk/state/instances/arkserver
-touch /servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook
-touch /servidor/ark/obelisk/state/instances/arkserver/disable-plugins
-./arkserver restart
+# Observed baseline only. Maintenance-window-only if the operator explicitly approves:
+# mkdir -p /servidor/ark/obelisk/state/instances/arkserver
+# touch /servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook
+# touch /servidor/ark/obelisk/state/instances/arkserver/disable-plugins
+# ./arkserver restart
 ```
 
 Expected logs:
@@ -181,17 +184,19 @@ ls -la /servidor/ark/obelisk/lib /servidor/ark/obelisk/plugins
 ls -la /servidor/ark/obelisk/state
 ```
 
-After restart:
+After a maintenance-window Ragnarok restart, use the protected live-like profile:
 
 ```bash
 pgrep -af '^./ShooterGameServer'
 tail -n 100 /servidor/ark/obelisk/logs/arkserver/Obelisk.log
 pid=$(pgrep -f '^./ShooterGameServer Ragnarok' | head -n1)
 rg 'libobelisk|libsubhook' /proc/$pid/maps
-scripts/check_obelisk_server_posture.sh --expect-stable
+scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection \
+  --map Ragnarok --instance arkserver
 ```
 
-For TheIsland debug posture, use `arkserver2` paths and map filters instead:
+Do not use the Ragnarok block for routine debug. For TheIsland debug posture, use
+`arkserver2` paths and map filters instead:
 
 ```bash
 tail -n 100 /servidor/ark/obelisk/logs/arkserver2/Obelisk.log
