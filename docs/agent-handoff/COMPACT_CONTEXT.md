@@ -184,9 +184,9 @@ work from repository state instead of chat history.
   `1 GlobalTribeChat`, `2 LocalChat`, `3 AllianceChat`, and `>=4` invalid for
   logging/dispatch. This recognizer was deployed to `/servidor/ark/obelisk` on commit
   `df332d7`. Commit `8281123` adds reflected `send_mode` and `send_mode_name` logging;
-  current `arkserver` PID is `3243871` after the later `8905996` deployment. See
+  current `arkserver` PID is `3289000` after the later `e1071a7` deployment. See
   `docs/research/2026-05-27-real-chat-ufunction-path-hypotheses.md`.
-- Local code has gated metadata-only recognizers for exact `ShooterPlayerController`
+- Deployed code has gated metadata-only recognizers for exact `ShooterPlayerController`
   candidates `ClientChatMessage`, `ClientServerChatMessage`, and
   `ClientServerChatDirectMessage`. They log `metadata_only=true`, do not decode text, do
   not dispatch plugin events, and do not change public ABI. If confirmed real player chat
@@ -214,7 +214,7 @@ work from repository state instead of chat history.
 - `Memory::IsReadable` was changed away from `write(/dev/null)` after local evidence showed
   that probe reports invalid and `PROT_NONE` mappings as readable. The replacement uses
   cached readable ranges from `/proc/self/maps` and has `MemoryTests`. Commit `257f432` is
-  deployed on `arkserver` PID `3243871`; keep future scanner reads metadata-bounded and
+  included in the deployed runtime; keep future scanner reads metadata-bounded and
   benchmark ProcessEvent overhead separately.
 - A later controlled Ragnarok development capture on commit `8cb3bbe` produced 22
   UObject/UFunction leads and 22 FName reject rows, with zero positive FName probes.
@@ -313,8 +313,8 @@ python3 scripts/analyze_reflectionscanner_capture.py \
   the supported ARK SHA. It logs metadata/ranges only, not text.
 - `packaging/linuxgsm/ObeliskRun.sh` supports the
   `state/instances/<id>/enable-chat-reflection` marker for restart-time activation.
-- Latest deployed runtime on `arkserver` includes commits through `8905996`, has chat
-  reflection enabled and plugins disabled, PID `3243871`. It reached the experimental gate
+- Latest deployed runtime on `arkserver` includes commits through `e1071a7`, has chat
+  reflection enabled and plugins disabled, PID `3289000`. It reached the experimental gate
   log after first ProcessEvent; no chat message has been observed yet in the log.
 - `FString` candidate for this ARK Linux build is a 16-byte
   `{Data, ArrayNum, ArrayMax}` header with UTF-32LE `TCHAR`; see

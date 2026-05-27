@@ -246,7 +246,7 @@ Updated: 2026-05-27
   `1 GlobalTribeChat`, `2 LocalChat`, `3 AllianceChat`; values `>=4` are invalid for
   logging/dispatch. See
   `docs/research/2026-05-27-real-chat-ufunction-path-hypotheses.md`.
-- fact: Local code now has gated, metadata-only recognizers for exact
+- fact: Commit `e1071a7` adds gated, metadata-only recognizers for exact
   `ShooterPlayerController` fallback candidates `ClientChatMessage`,
   `ClientServerChatDirectMessage`, and `ClientServerChatMessage`. They log
   `metadata_only=true`, do not decode text, do not dispatch plugin events, and do not
@@ -254,8 +254,8 @@ Updated: 2026-05-27
 - fact: `packaging/linuxgsm/ObeliskRun.sh` supports
   `state/instances/<id>/enable-chat-reflection` to set the experimental chat reflection
   gates and default log limit on restart.
-- fact: Latest deployed runtime on `arkserver` includes commits through `8905996`
-  (`Memory::IsReadable` maps-backed replacement). Current PID `3243871` has
+- fact: Latest deployed runtime on `arkserver` includes commits through `e1071a7`
+  (`metadata_only` chat fallback recognizers). Current PID `3289000` has
   `OBELISK_ENABLE_CHAT_REFLECTION=1`, matching SHA gate, ProcessEvent hook installed at
   `0x1d34e20`, plugins disabled, and stable posture confirmed.
 - fact: Manual post-deploy `ServerSendChatMessage` chat validation commands, expected log
@@ -276,9 +276,8 @@ Updated: 2026-05-27
   readable ranges from `/proc/self/maps`, with `MemoryTests` covering invalid pointers,
   overflow, and `PROT_NONE`; see
   `docs/research/2026-05-27-isreadable-dev-null-hotpath.md`.
-- fact: Commit `257f432` with maps-backed `Memory::IsReadable` is deployed to
-  `/servidor/ark/obelisk`; `arkserver` restarted cleanly as PID `3243871` with stable
-  posture.
+- fact: Commit `257f432` with maps-backed `Memory::IsReadable` is included in the deployed
+  runtime at `/servidor/ark/obelisk`.
 
 ## Rejected Or Unsafe
 
@@ -298,7 +297,7 @@ Updated: 2026-05-27
   are being hit, wire UTF-32 text decoding into the experimental chat reflection logger;
   keep dispatch limited to `EChatSendMode` `0..3`.
 - next-step: If confirmed real player chat still produces zero `ServerSendChatMessage`
-  hits after deploying the local metadata-only recognizers, review exact
+  hits with the deployed metadata-only recognizers, review exact
   `ClientChatMessage`, `ClientServerChatMessage`, and `ClientServerChatDirectMessage`
   lines before considering `ShooterGameMode` helpers.
 - next-step: Run `scripts/verify_chat_reflection_constants.py` against any new core before
