@@ -96,6 +96,7 @@ python3 scripts/test_public_sdk_chat_guardrails.py
 python3 scripts/test_dependency_pins.py
 python3 scripts/test_versioning_guardrails.py
 python3 scripts/test_secret_guardrails.py
+python3 scripts/test_repo_hygiene.py
 scripts/install_obelisk.sh --dry-run /tmp/obelisk-install-check
 ```
 

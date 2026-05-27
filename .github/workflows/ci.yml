@@ -36,7 +36,8 @@ jobs:
             scripts/test_public_sdk_chat_guardrails.py \
             scripts/test_dependency_pins.py \
             scripts/test_versioning_guardrails.py \
-            scripts/test_secret_guardrails.py
+            scripts/test_secret_guardrails.py \
+            scripts/test_repo_hygiene.py
 
       - name: Check shell scripts parse
         run: |
@@ -70,6 +71,7 @@ jobs:
           python3 scripts/test_dependency_pins.py
           python3 scripts/test_versioning_guardrails.py
           python3 scripts/test_secret_guardrails.py
+          python3 scripts/test_repo_hygiene.py
 
       - name: Run server posture tests
         run: scripts/test_check_obelisk_server_posture.sh

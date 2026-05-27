@@ -102,6 +102,8 @@ Updated: 2026-05-27
   policy so `0.1.0-dev` is not presented as a stable release.
 - fact: `scripts/test_secret_guardrails.py` and CI now reject committed Discord webhook
   URLs, keeping community update endpoints out of versioned files.
+- fact: `scripts/test_repo_hygiene.py` and CI now guard `.gitignore` coverage for build
+  outputs, logs, shared libraries, cores, pycache, and local temp artifacts.
 - fact: Commit `fc837a0` added passive static xref annotation to
   `scripts/analyze_reflectionscanner_capture.py`. Use `--objdump-xrefs` with a
   pre-generated `objdump -d` text file to annotate candidate globals; this is supporting
