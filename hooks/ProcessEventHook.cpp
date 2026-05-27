@@ -8,6 +8,7 @@
 #include <atomic>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <string>
 #include <string_view>
 #include <sys/mman.h>
@@ -289,17 +290,34 @@ namespace Obelisk::Hooks
         return GetChatReflectionGate().Enabled();
     }
 
+    static bool IsInstanceMarkerEnabled(const char* markerName)
+    {
+        const char* root = std::getenv("OBELISK_ROOT");
+        const char* instance = std::getenv("OBELISK_INSTANCE_ID");
+        if (!root || root[0] == '\0' || !instance || instance[0] == '\0' || !markerName || markerName[0] == '\0')
+            return false;
+
+        const std::filesystem::path markerPath =
+            std::filesystem::path(root) / "state" / "instances" / instance / markerName;
+        std::error_code ec;
+        return std::filesystem::is_regular_file(markerPath, ec);
+    }
+
     static const ProcessEventStructureReflection::Gate& GetStructureReflectionGate()
     {
         static ProcessEventStructureReflection::Gate gate = [] {
             ProcessEventStructureReflection::Gate value =
                 ProcessEventStructureReflection::EvaluateGate(
                     std::getenv("OBELISK_ENABLE_STRUCTURE_REFLECTION"),
+                    IsInstanceMarkerEnabled("enable-structure-reflection"),
                     std::getenv("OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256"));
 
             switch (value.Status)
             {
             case ProcessEventStructureReflection::GateStatus::Disabled:
+                break;
+            case ProcessEventStructureReflection::GateStatus::MissingInstanceMarker:
+                OBELISK_WARN("Structure reflection disabled: instance marker enable-structure-reflection is required.");
                 break;
             case ProcessEventStructureReflection::GateStatus::MissingBinarySha256:
                 OBELISK_WARN("Structure reflection disabled: OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256 is required.");

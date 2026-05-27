@@ -12,6 +12,7 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
     enum class GateStatus
     {
         Disabled,
+        MissingInstanceMarker,
         MissingBinarySha256,
         UnsupportedBinarySha256,
         Enabled,
@@ -43,7 +44,7 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
         Obelisk::UE::StructureReflection::StructureInvocation Invocation;
     };
 
-    Gate EvaluateGate(const char* enableStructureReflection, const char* binarySha256);
+    Gate EvaluateGate(const char* enableStructureReflection, bool instanceMarkerEnabled, const char* binarySha256);
     bool IsReflectedStructureNameIndex(int32_t nameIndex);
     bool ShouldAttemptObservation(uint64_t limit);
     bool ShouldLogObservation(uint64_t observationNumber, uint64_t limit);

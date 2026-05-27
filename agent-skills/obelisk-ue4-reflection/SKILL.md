@@ -63,6 +63,13 @@ or parameter decoding for ARK's Linux UE4 server.
 - `ReflectionScanner` FName table output must be treated as candidate ranking. Analyzer
   `--strict` requires repeat-confirmed exact `matched_clues=3/3` evidence, and even that
   needs a second isolated capture or static xref before becoming an accepted offset.
+- Non-chat recognizers are active research tracks, not public SDK:
+  - `ue/StructureReflection` has a hook-side observer, but it requires env, supported SHA,
+    non-zero budget, and `state/instances/<id>/enable-structure-reflection`.
+  - `ue/InventoryReflection` is internal recognizer only. A future runtime observer must
+    require `enable-inventory-reflection`, exact `CanUse` / `AllowRemoteAddToInventory`
+    FName prefiltering before budget reservation, and no return override or gameplay
+    mutation.
 
 ## Reflection Direction
 
@@ -102,6 +109,9 @@ Build toward a real UE4 metadata pipeline:
 - Avoid manual construction of `ClientMessage` params until the real property layout is
   decoded.
 - Prefer logging metadata discoveries over mutating gameplay state while researching.
+- For inventory and other authority functions, do not override return values, mutate params,
+  call original `ProcessEvent` manually, or dispatch public plugin callbacks from candidate
+  evidence.
 - On live servers, keep plugin discovery off unless testing a known safe build.
 - Do not enable raw chat discovery or `ReflectionScanner` on shared/live-like instances;
   use the isolated debug instance plan and keep plugins disabled during scanner captures.

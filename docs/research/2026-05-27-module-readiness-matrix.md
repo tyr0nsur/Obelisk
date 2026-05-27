@@ -14,7 +14,7 @@ snapshot rounds, without implying public SDK or runtime readiness.
 - Snapshot binary SHA256:
   `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`
 - Obelisk baseline:
-  `4a80d17 Add internal inventory reflection recognizer`
+  `05fe0a3 Document reversing objective map` plus the current marker-gate follow-up.
 - Live-server impact: none.
 
 ## Readiness Snapshot
@@ -24,7 +24,7 @@ snapshot rounds, without implying public SDK or runtime readiness.
 | `sdk.inventory` | `internal-recognizer` | 5 | Item/controller exact snapshots plus internal `InventoryReflection` for `CanUse` and `AllowRemoteAddToInventory`; arrays/structs stay metadata-only. | Add a disabled-by-default runtime gate only after budget/marker policy mirrors structures. |
 | `sdk.buffs` | `fixture-backed` | 6 | Focused `PrimalBuff` exact snapshots for inventory-access, allow-add, prevent-add, bool-return, and zero-param shapes. | Keep gameplay semantics candidate-only; defer mission/grapple/companion surfaces. |
 | `sdk.dinos` | `fixture-backed` | 2 | Passenger/carry real snapshots plus broader synthetic coverage for attack, tame-state, and controller dino stats. | Promote more real snapshots only for compact exact targets. |
-| `sdk.structures` | `internal-gated-observer` | 6 | Access/demolish plus pincode, container activation, seating, and variant snapshots; `StructureReflection` and disabled-by-default runtime gate exist. | Require instance marker gate before TheIsland/debug activation; keep placement/build-authoritative targets deferred. |
+| `sdk.structures` | `internal-marker-gated-observer` | 6 | Access/demolish plus pincode, container activation, seating, and variant snapshots; `StructureReflection` and disabled-by-default runtime gate require env, SHA, log budget, and `enable-structure-reflection` instance marker. | TheIsland/debug activation still needs explicit operator window and stable-posture rollback; keep placement/build-authoritative targets deferred. |
 | `sdk.missions` | `fixture-backed` | 4 | Add, leave-policy, removal lifecycle, and usable-item array metadata snapshots. | Keep array/struct payloads metadata-only until second-source evidence. |
 | `sdk.tribes` | `fixture-backed` | 5 | Tribe log control, permission enum-shape, membership bool-return, online-list array, and mission-tag array snapshots; log string remains deferred. | Keep string gates separate; do not decode client payload arrays yet. |
 | `sdk.chat` | `runtime-observed-internal` | 0 in manifest | Separate internal chat reflection evidence and runtime hit notes. | TheIsland A/B validation and copied-data ownership before public API. |
@@ -53,9 +53,11 @@ chains only.
 
 ## Next Priorities
 
-1. Add an instance-scoped marker gate before any `sdk.structures` runtime observation.
-2. Design the disabled-by-default `sdk.inventory` observation gate, preserving explicit
-   budget defaults and object/struct/array privacy.
+1. Design the disabled-by-default `sdk.inventory` observation gate, preserving explicit
+   budget defaults, exact FName prefiltering, marker policy, and object/struct/array
+   privacy.
+2. Add posture/test coverage for structure marker export paths before any TheIsland/debug
+   activation.
 3. Add second-source validation for ScriptStruct transfer field layouts.
 4. Keep `ItemNetInfo`, admin/NetExec, placement/build, and gameplay-authoritative mutation
    out of runtime work.

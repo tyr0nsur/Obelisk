@@ -6,10 +6,13 @@
 
 namespace Obelisk::Hooks::ProcessEventStructureReflection
 {
-    Gate EvaluateGate(const char* enableStructureReflection, const char* binarySha256)
+    Gate EvaluateGate(const char* enableStructureReflection, bool instanceMarkerEnabled, const char* binarySha256)
     {
         if (!enableStructureReflection || std::strcmp(enableStructureReflection, "1") != 0)
             return {};
+
+        if (!instanceMarkerEnabled)
+            return {GateStatus::MissingInstanceMarker, {}};
 
         if (!binarySha256 || binarySha256[0] == '\0')
             return {GateStatus::MissingBinarySha256, {}};

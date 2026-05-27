@@ -20,7 +20,7 @@ runtime without drifting back into chat-only work.
 
 | Area | Needed Evidence | Current Gate |
 | --- | --- | --- |
-| Instance safety | Instance-scoped marker gates for runtime observers. | Do not run env-only observers on shared hosts. |
+| Instance safety | Instance-scoped marker gates for runtime observers. | `sdk.structures` now requires env plus `enable-structure-reflection`; inventory must follow before runtime. |
 | Second source | Independent debug core for ScriptStruct and UFunction layout comparison. | Existing packs derive from one core only. |
 | Runtime budget | Every observer gate must have explicit budget defaulting to zero. | Structures has this; inventory must copy it. |
 | Public SDK readiness | Copied-data ownership and callback lifecycle for each event family. | No new public ABI until proven. |
@@ -29,8 +29,8 @@ runtime without drifting back into chat-only work.
 
 | Track | Next Step | Blocked Items |
 | --- | --- | --- |
-| `sdk.structures` | Add instance marker gate before debug activation. | Placement/build/snapping mutation. |
-| `sdk.inventory` | Add disabled-by-default observation gate after audit. | Item ids, arrays, item contents, NetExec. |
+| `sdk.structures` | Add wrapper/posture tests and perform only approved TheIsland/debug observation. | Placement/build/snapping mutation. |
+| `sdk.inventory` | Add disabled-by-default observation gate after audit, with cheap exact FName filter before budget reservation. | Item ids, arrays, item contents, NetExec. |
 | `sdk.transfers` | Capture or obtain second source for tribute ScriptStruct layouts. | `ItemNetInfo`, upload/download dispatch. |
 | `ue.reflection` | Keep strengthening exact identity and property-chain validation. | Treating FName/object indices as cross-build contracts. |
 
@@ -59,4 +59,6 @@ runtime without drifting back into chat-only work.
 The active objective is to turn reverse-engineering into reproducible, reviewable assets:
 fixtures, recognizers, analyzer tests, runbooks, and skill updates. Runtime observation is
 allowed only after the corresponding offline recognizer, budget, marker, rollback, and
-privacy gates exist.
+privacy gates exist. For gameplay-authoritative functions, observers must not override
+returns, mutate params, call original manually, or dispatch public plugin callbacks until
+copied-data ownership and authority policy are proven.

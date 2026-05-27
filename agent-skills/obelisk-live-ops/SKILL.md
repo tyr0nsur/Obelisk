@@ -83,6 +83,12 @@ scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection
 - Keep experimental plugins outside `plugins/` until an isolated server test passes.
 - Enable one marker/config gate at a time and record the exact change.
 - Use instance markers under `state/instances/<instance-id>/`; map markers are obsolete.
+- Experimental runtime observers must have their own instance markers in addition to env
+  gates. Current observer markers:
+  - `enable-chat-reflection`
+  - `enable-structure-reflection`
+  Future inventory observation must use `enable-inventory-reflection` before any runtime
+  activation.
 - Never enable native exec probes on live servers.
 - Never enable `ReflectionScanner` on `arkserver`.
 - Enable `ReflectionScanner` on `arkserver2` only after a specific operator-approved debug

@@ -27,9 +27,10 @@ player identity, or mutate return values.
 - Prefer a dedicated `arkserver-obelisk-debug` instance.
 - Use `arkserver2` / TheIsland only with explicit operator approval for a short debug
   window.
-- Before any live/debug activation, add a second instance-scoped marker gate such as
-  `/servidor/ark/obelisk/state/instances/<instance>/enable-structure-reflection`; env-only
-  activation is not sufficient for production-like hosts.
+- Instance-scoped marker gate is required:
+  `/servidor/ark/obelisk/state/instances/<instance>/enable-structure-reflection`.
+  Env-only activation is rejected by the runtime gate and should be treated as a posture
+  error on production-like hosts.
 - ProcessEvent hook is enabled for the approved instance.
 - Plugins are disabled unless the window explicitly tests one minimal observer plugin.
 - Scanner, native exec probes, and broad trace are off.
@@ -41,14 +42,17 @@ player identity, or mutate return values.
 Use all three structure-specific variables together:
 
 ```bash
+touch /servidor/ark/obelisk/state/instances/<instance>/enable-structure-reflection
 export OBELISK_ENABLE_STRUCTURE_REFLECTION=1
 export OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520
 export OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT=25
 ```
 
-The log limit is also the observation budget. When it is absent or `0`, structure
-observation does not read `UFunction` names or reflected fields. Keep the budget small for
-debug windows.
+The LinuxGSM wrapper exports these variables only when the marker is present. The hook also
+checks the marker itself, so manually setting the env without the marker will not enable
+observation. The log limit is also the observation budget. When it is absent or `0`,
+structure observation does not read `UFunction` names or reflected fields. Keep the budget
+small for debug windows.
 
 Keep these unset unless the debug window is active:
 
@@ -90,6 +94,7 @@ Unset the structure gate and restore the approved instance only:
 unset OBELISK_ENABLE_STRUCTURE_REFLECTION
 unset OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256
 unset OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT
+rm -f /servidor/ark/obelisk/state/instances/<instance>/enable-structure-reflection
 ```
 
 For TheIsland fallback, verify stable posture after restart:

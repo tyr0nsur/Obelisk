@@ -1,6 +1,6 @@
 # Compact Context Snapshot
 
-Updated: 2026-05-27
+Updated: 2026-05-28
 
 Use this file when conversation context is compacted or an agent needs to resume Obelisk
 work from repository state instead of chat history.
@@ -41,6 +41,13 @@ work from repository state instead of chat history.
 - Do not restart servers, edit marker files, change `/servidor/ark`, or activate
   ReflectionScanner without explicit operator permission. For new debug work, target
   `arkserver2` / TheIsland, not Ragnarok.
+- Structure reflection is marker-gated in code and wrapper:
+  `/servidor/ark/obelisk/state/instances/<instance>/enable-structure-reflection`.
+  Env-only structure reflection activation is rejected; budget defaults to `0`.
+- Inventory reflection has no hook-side observer yet. Use
+  `docs/research/2026-05-28-inventory-observation-gate-plan.md` before implementing one:
+  exact inventory FName filter before budget reservation, marker `enable-inventory-reflection`,
+  no gameplay mutation or public callbacks.
 - Latest restart audit:
   `docs/research/2026-05-27-ops-restart-audit-instance-id.md`
   - live `ObeliskRun.sh` exports `OBELISK_INSTANCE_ID=arkserver`

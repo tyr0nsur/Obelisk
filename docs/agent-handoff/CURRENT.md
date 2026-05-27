@@ -1,6 +1,6 @@
 # Current Agent Handoff
 
-Updated: 2026-05-27
+Updated: 2026-05-28
 
 ## Stable Baseline
 
@@ -32,6 +32,14 @@ Updated: 2026-05-27
   Use it for controlled runtime validation and research harness work instead of Ragnarok,
   while still requiring explicit per-run approval for ReflectionScanner, native exec,
   ptrace/gcore, broad ProcessEvent traces, or chat text logging.
+- fact: `sdk.structures` runtime observation now requires both env/SHA/budget gates and
+  `/servidor/ark/obelisk/state/instances/<instance>/enable-structure-reflection`.
+  The LinuxGSM wrapper exports structure reflection env only from that marker, and the
+  hook rejects env-only activation. Default observation budget remains `0`.
+- next-step: `sdk.inventory` remains internal recognizer only. Before adding runtime
+  observation, follow `docs/research/2026-05-28-inventory-observation-gate-plan.md`:
+  exact `CanUse`/`AllowRemoteAddToInventory` FName prefilter first, then budget reserve,
+  no return override, no param mutation, no public plugin dispatch.
 - fact: Runtime/chat baseline is documented in
   `docs/research/2026-05-27-runtime-and-chat-baseline.md`.
 - fact: Reflection/chat metadata audit added shared UE probe layouts and gated
