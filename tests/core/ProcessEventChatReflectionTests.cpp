@@ -186,6 +186,16 @@ namespace
         Require(gate.BinarySha256 == kSupportedShooterGameServerSha256, "enabled gate did not retain binary SHA");
     }
 
+    void TestObservationLogLimit()
+    {
+        Require(!ShouldLogObservation(0, 25), "zero observation number should not log");
+        Require(!ShouldLogObservation(1, 0), "zero chat reflection log limit should disable logs");
+        Require(ShouldLogObservation(1, 1), "first observation should log at limit one");
+        Require(!ShouldLogObservation(2, 1), "observation beyond limit should not log");
+        Require(ShouldLogObservation(25, 25), "observation equal to limit should log");
+        Require(!ShouldLogObservation(26, 25), "observation after default limit should not log");
+    }
+
     void TestDisabledGateDoesNotRead()
     {
         ReaderContext context;
@@ -261,6 +271,7 @@ namespace
 int main()
 {
     TestGateEvaluation();
+    TestObservationLogLimit();
     TestDisabledGateDoesNotRead();
     TestNonChatNameDoesNotRead();
     TestUnreadableChatFunctionIsRejected();

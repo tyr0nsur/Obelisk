@@ -44,6 +44,7 @@ namespace Obelisk::Hooks::ProcessEventChatReflection
 
     Gate EvaluateGate(const char* enableChatReflection, const char* binarySha256);
     bool IsReflectedChatNameIndex(int32_t nameIndex);
+    bool ShouldLogObservation(uint64_t observationNumber, uint64_t limit);
 
     Attempt TryIdentifyInvocation(const Gate& gate,
                                   int32_t nameIndex,

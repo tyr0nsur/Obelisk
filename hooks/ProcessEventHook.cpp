@@ -51,6 +51,7 @@ namespace Obelisk::Hooks
 
     static std::atomic<uint64_t> s_ProcessEventCalls{0};
     static std::atomic<uint64_t> s_ReflectedChatCalls{0};
+    static std::atomic<uint64_t> s_ReflectedChatRejects{0};
 
     static void WriteAbsoluteJump(uint8_t* at, void* destination)
     {
@@ -339,15 +340,20 @@ namespace Obelisk::Hooks
         }
         if (attempt.Status == ProcessEventChatReflection::AttemptStatus::Rejected)
         {
-            OBELISK_TRACE("Chat reflection rejected fname_index={} function={} reason={}",
-                          nameIndex, function, attempt.Result.Reason);
+            const uint64_t rejectNumber = ++s_ReflectedChatRejects;
+            const uint64_t limit = GetChatReflectionLogLimit();
+            if (ProcessEventChatReflection::ShouldLogObservation(rejectNumber, limit))
+            {
+                OBELISK_INFO("Reflected chat rejected #{} fname_index={} function={} reason={}",
+                             rejectNumber, nameIndex, function, attempt.Result.Reason);
+            }
             return;
         }
 
         const Obelisk::UE::ChatReflection::ChatInvocation& invocation = attempt.Invocation;
         const uint64_t callNumber = ++s_ReflectedChatCalls;
         const uint64_t limit = GetChatReflectionLogLimit();
-        if (limit != 0 && callNumber > limit)
+        if (!ProcessEventChatReflection::ShouldLogObservation(callNumber, limit))
             return;
 
         OBELISK_INFO("Reflected chat ProcessEvent #{} function={} fname_index={} params={} fields={}",

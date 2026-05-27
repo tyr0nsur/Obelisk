@@ -59,6 +59,8 @@ touch /servidor/ark/obelisk/state/instances/arkserver/enable-chat-reflection
 
 The marker sets `OBELISK_ENABLE_CHAT_REFLECTION=1`, the current supported binary SHA, and
 a default `OBELISK_CHAT_REFLECTION_LOG_LIMIT=25`.
+`OBELISK_CHAT_REFLECTION_LOG_LIMIT=0` suppresses chat reflection observation logs instead
+of allowing unlimited output.
 
 The final chat helper should build on that module and:
 
@@ -121,5 +123,8 @@ From `docs/research/2026-05-27-core-ufunction-property-chain.md`:
 
 ## Next Step
 
-Write one in-game chat message on the debug server and check for
-`Reflected chat ProcessEvent` log entries.
+The `ServerChat*` functions in this note are now best treated as cheat-manager command
+coverage, not the likely normal player chat path. Add a gated recognizer for
+`ShooterPlayerController.ServerSendChatMessage` using
+`docs/research/2026-05-27-real-chat-ufunction-path-hypotheses.md`, then write one
+in-game chat message on the debug server and check for reflected candidate log entries.

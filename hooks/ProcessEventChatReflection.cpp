@@ -25,6 +25,11 @@ namespace Obelisk::Hooks::ProcessEventChatReflection
         return nameIndex == 9619 || nameIndex == 9620 || nameIndex == 9621;
     }
 
+    bool ShouldLogObservation(uint64_t observationNumber, uint64_t limit)
+    {
+        return limit != 0 && observationNumber != 0 && observationNumber <= limit;
+    }
+
     Attempt TryIdentifyInvocation(const Gate& gate,
                                   int32_t nameIndex,
                                   const Obelisk::UE::RuntimeReflection::MemoryReader& reader,

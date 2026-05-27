@@ -10,6 +10,15 @@ Allowed unattended job:
 */30 * * * * /home/flowcommunity-ark/Obelisk/scripts/obelisk_supervisor_snapshot.sh >/dev/null 2>&1
 ```
 
+For an already supervised open shell, use a finite timer loop instead of installing cron:
+
+```bash
+/home/flowcommunity-ark/Obelisk/scripts/obelisk_supervisor_loop.sh --interval 1800 --count 8
+```
+
+Use `--count 0` only when a human lead is actively keeping the session open and can stop
+or review it. The loop only runs the same read-only snapshot script.
+
 It writes read-only snapshots under:
 
 ```text
@@ -55,6 +64,10 @@ tail -n 80 "${latest}/obelisk-log-tail.txt"
 `chat-reflection.txt` summarizes marker and log evidence. It proves only whether the
 experimental gate and log lines are present; it does not prove chat text capture unless
 `reflected_chat_lines` is non-zero and the lines are reviewed.
+
+`rejected_chat_lines` counts bounded reflection rejections when the runtime is built with
+that diagnostic path. `OBELISK_CHAT_REFLECTION_LOG_LIMIT=0` disables those experimental
+chat reflection observation logs.
 
 If `posture.txt` shows failure, stop and restore stable posture before launching agents or
 runtime experiments.

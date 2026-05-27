@@ -228,6 +228,13 @@ Updated: 2026-05-27
   disabled unless `OBELISK_ENABLE_CHAT_REFLECTION=1` and
   `OBELISK_CHAT_REFLECTION_BINARY_SHA256` equals the supported ShooterGameServer SHA256.
   It logs metadata/ranges only, not text.
+- fact: `ServerChat`, `ServerChatTo`, and `ServerChatToPlayer` are likely
+  `ShooterCheatManager` command functions, not the normal player chat path. Current
+  offline evidence points normal incoming player chat at
+  `ShooterPlayerController.ServerSendChatMessage` with FName index `2697`,
+  `StrProperty ChatMessage` offset `0x0`, `ByteProperty SendMode` offset `0x10`, and
+  `ParmsSize=0x11`; see
+  `docs/research/2026-05-27-real-chat-ufunction-path-hypotheses.md`.
 - fact: `packaging/linuxgsm/ObeliskRun.sh` supports
   `state/instances/<id>/enable-chat-reflection` to set the experimental chat reflection
   gates and default log limit on restart.
@@ -256,10 +263,15 @@ Updated: 2026-05-27
 
 ## Priority Next Steps
 
-- next-step: When an operator can join, write one in-game chat message on Ragnarok and
-  tail `/servidor/ark/obelisk/logs/arkserver/Obelisk.log` for `Reflected chat ProcessEvent`.
+- next-step: Extend the experimental recognizer to validate
+  `ShooterPlayerController.ServerSendChatMessage` before asking an operator to test chat
+  again; the older `ServerChat*` watchlist is probably watching cheat-manager commands.
+- next-step: After `ServerSendChatMessage` is recognized, write one in-game chat message on
+  Ragnarok and tail `/servidor/ark/obelisk/logs/arkserver/Obelisk.log` for a bounded
+  reflected chat/candidate log entry.
 - next-step: Wire UTF-32 text decoding into the experimental chat reflection logger only
-  after one real chat capture confirms the reflected params are being hit.
+  after one real `ServerSendChatMessage` capture confirms the reflected params are being
+  hit.
 - next-step: Run `scripts/verify_chat_reflection_constants.py` against any new core before
   accepting changed chat FName indices, parameter offsets, or `StrProperty` constants.
 - rollback: remove `enable-chat-reflection` marker and restart the debug server; no plugin

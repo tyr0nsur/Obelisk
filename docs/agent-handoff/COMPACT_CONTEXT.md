@@ -168,6 +168,13 @@ work from repository state instead of chat history.
   `/servidor/ark/obelisk/dumps/arkserver-20260527T031311Z/core/arkserver-20260527T031311Z.2902200`
   with `--max-object-scan 30000`; rerun it before promoting chat reflection constants for
   a new binary/core.
+- Current best hypothesis for real incoming player chat is not the `ServerChat*`
+  watchlist. `ServerChat`, `ServerChatTo`, and `ServerChatToPlayer` have
+  `ShooterCheatManager` outer evidence, while
+  `ShooterPlayerController.ServerSendChatMessage` has FName index `2697`,
+  `StrProperty ChatMessage` offset `0x0`, `ByteProperty SendMode` offset `0x10`, and
+  `ParmsSize=0x11`; see
+  `docs/research/2026-05-27-real-chat-ufunction-path-hypotheses.md`.
 - Core-pack tooling now supports direct FName entry reads and bounded
   `--gobjects-candidate` previews for the next `GUObjectArray` investigation.
 - Read-only overnight snapshots are documented in `docs/SUPERVISION.md` and implemented by

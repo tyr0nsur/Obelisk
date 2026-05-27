@@ -36,7 +36,7 @@ CHAT_MARKER="${OBELISK_ROOT}/state/instances/arkserver/enable-chat-reflection"
     if [[ -f "${CHAT_LOG}" ]]; then
         printf 'experimental_gate_lines=%s\n' "$(grep -c 'Experimental chat reflection enabled' "${CHAT_LOG}" || true)"
         printf 'reflected_chat_lines=%s\n' "$(grep -c 'Reflected chat ProcessEvent' "${CHAT_LOG}" || true)"
-        printf 'rejected_chat_trace_lines=%s\n' "$(grep -c 'Chat reflection rejected' "${CHAT_LOG}" || true)"
+        printf 'rejected_chat_lines=%s\n' "$(grep -Ec 'Chat reflection rejected|Reflected chat rejected' "${CHAT_LOG}" || true)"
         printf '\nrecent_chat_reflection_lines:\n'
         grep -E 'Experimental chat reflection|Reflected chat|Chat reflection rejected' "${CHAT_LOG}" | tail -n 80 || true
     else
