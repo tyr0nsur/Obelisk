@@ -24,18 +24,28 @@ def fetchcontent_tag(cmake_text: str, dependency: str) -> str:
 
 
 class DependencyPinTests(unittest.TestCase):
-    def test_subhook_uses_full_commit_sha_not_branch(self) -> None:
+    def test_fetchcontent_dependencies_use_full_commit_sha_not_branch_or_tag(self) -> None:
         cmake_text = (REPO_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
-        tag = fetchcontent_tag(cmake_text, "subhook")
 
-        self.assertRegex(tag, FULL_GIT_SHA_RE)
-        self.assertNotIn(tag, {"master", "main", "HEAD"})
+        expected = {
+            "fmt": "f5e54359df4c26b6230fc61d38aa294581393084",
+            "spdlog": "7e635fca68d014934b4af8a1cf874f63989352b7",
+            "subhook": "568d2e5a5d6013907e8008857968906b33ef3b7d",
+        }
+        for dependency, expected_sha in expected.items():
+            with self.subTest(dependency=dependency):
+                tag = fetchcontent_tag(cmake_text, dependency)
+                self.assertRegex(tag, FULL_GIT_SHA_RE)
+                self.assertEqual(tag, expected_sha)
+                self.assertNotIn(tag, {"master", "main", "HEAD"})
 
-    def test_subhook_reproducibility_note_mentions_remaining_mirror_risk(self) -> None:
+    def test_dependency_reproducibility_note_mentions_remaining_mirror_risk(self) -> None:
         note = (REPO_ROOT / "docs/research/2026-05-27-subhook-reproducibility.md").read_text(
             encoding="utf-8"
         )
 
+        self.assertIn("f5e54359df4c26b6230fc61d38aa294581393084", note)
+        self.assertIn("7e635fca68d014934b4af8a1cf874f63989352b7", note)
         self.assertIn("568d2e5a5d6013907e8008857968906b33ef3b7d", note)
         self.assertIn("mirror or vendored archive", note)
 

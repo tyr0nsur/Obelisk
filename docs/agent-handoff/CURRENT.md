@@ -67,8 +67,10 @@ Updated: 2026-05-27
   `source_global` for FName indirect-table probes, and the analyzer only treats exact
   hits as repeat-confirmed when the same table appears from distinct source globals or
   distinct targets; see `docs/research/2026-05-27-reflectionscanner-analyzer-review.md`.
-- fact: Top-level CMake now pins `subhook` to local FetchContent commit
-  `568d2e5a5d6013907e8008857968906b33ef3b7d` instead of `master`; see
+- fact: Top-level CMake now pins FetchContent dependencies to full local checkout SHAs:
+  `fmt` `f5e54359df4c26b6230fc61d38aa294581393084`, `spdlog`
+  `7e635fca68d014934b4af8a1cf874f63989352b7`, and `subhook`
+  `568d2e5a5d6013907e8008857968906b33ef3b7d`; see
   `docs/research/2026-05-27-subhook-reproducibility.md`.
 - fact: Commit `f755c43` repositioned public docs around Obelisk as a Linux
   modding runtime/API/SDK. ARK/LinuxGSM are now framed as debug harness/adapters,
@@ -451,11 +453,11 @@ Updated: 2026-05-27
   without an operator maintenance window. See
   `docs/research/2026-05-27-ragnarok-readonly-posture-snapshot.md`.
 - risk: Native exec probes must remain disabled on live servers.
-- risk: The `subhook` pin was selected from the existing local checkout without internet
+- risk: FetchContent pins were selected from existing local checkouts without internet
   verification; full offline resilience still needs a mirror or vendored archive.
-- fact: `scripts/test_dependency_pins.py` now guards the `subhook` FetchContent declaration
-  so it stays pinned to a full commit SHA instead of a moving branch; mirroring/vendor
-  work remains a future resilience task.
+- fact: `scripts/test_dependency_pins.py` now guards `fmt`, `spdlog`, and `subhook`
+  FetchContent declarations so they stay pinned to full commit SHAs instead of moving
+  tags/branches; mirroring/vendor work remains a future resilience task.
 
 ## Priority Next Steps
 

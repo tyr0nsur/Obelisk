@@ -27,7 +27,7 @@ include(FetchContent)
 FetchContent_Declare(
     fmt
     GIT_REPOSITORY https://github.com/fmtlib/fmt.git
-    GIT_TAG        10.1.1
+    GIT_TAG        f5e54359df4c26b6230fc61d38aa294581393084
 )
 FetchContent_MakeAvailable(fmt)
 
@@ -35,7 +35,7 @@ FetchContent_MakeAvailable(fmt)
 FetchContent_Declare(
     spdlog
     GIT_REPOSITORY https://github.com/gabime/spdlog.git
-    GIT_TAG        v1.12.0
+    GIT_TAG        7e635fca68d014934b4af8a1cf874f63989352b7
 )
 FetchContent_MakeAvailable(spdlog)
 
