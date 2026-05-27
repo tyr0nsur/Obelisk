@@ -89,6 +89,9 @@ Before dispatch is connected to `ProcessEvent`:
   `TestRejectsUnknownSendMode`.
 - Verify register returns an opaque `uint64_t` id. Covered by registration tests.
 - Verify unregister is idempotent. Covered by `TestUnregisterIsIdempotent`.
+- Verify a callback can unregister its own registration without deadlocking. Covered by
+  `TestCallbackCanUnregisterItself`; owner cleanup from another thread still waits for the
+  dispatch mutex before `dlclose`.
 - Verify plugin init failure, explicit unload, and shutdown cleanup remove callbacks.
   Owner cleanup is covered internally by `TestOwnerCleanup`; PluginManager integration is
   covered by `PluginManagerTests` with an injected `ChatEventDispatcher`.

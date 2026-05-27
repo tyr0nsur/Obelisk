@@ -361,7 +361,7 @@ python3 scripts/analyze_reflectionscanner_capture.py \
 - `core/ChatEventDispatcher.{h,cpp}` now exists as an internal dispatcher foundation only.
   It is tested and connected to PluginManager owner cleanup, but not to `ProcessEvent` or
   public SDK fields. Dispatch holds a dispatch mutex across callback invocation to block
-  owner cleanup/dlclose races.
+  owner cleanup/dlclose races, and self-unregister from inside a callback is supported.
 - Evidence: after any isolated scanner capture, run
   `scripts/build_reflection_evidence_pack.py` against copied logs and the matching binary
   before promoting candidates.

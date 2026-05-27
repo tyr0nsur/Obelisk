@@ -318,6 +318,8 @@ Updated: 2026-05-27
 - fact: `ChatEventDispatcher::Dispatch()` holds its dispatch mutex across callback
   invocation so owner cleanup cannot race plugin `dlclose` while a copied callback is
   executing.
+- fact: `ChatEventDispatcher` supports self-unregister from inside a chat callback without
+  deadlock while still blocking cross-thread owner cleanup until dispatch completes.
 - fact: `PluginManager` now owns the internal chat dispatcher lifecycle backstop:
   plugin init failure and `UnloadAll()` unregister both ProcessEvent callbacks and
   `ChatEventDispatcher` subscriptions before `dlclose`. `PluginManagerTests` cover

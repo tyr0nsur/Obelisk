@@ -54,7 +54,7 @@ namespace Obelisk::Core
         };
 
         mutable std::mutex m_Mutex;
-        std::mutex m_DispatchMutex;
+        std::recursive_mutex m_DispatchMutex;
         uint64_t m_NextRegistrationId = 1;
         std::vector<Registration> m_Registrations;
     };

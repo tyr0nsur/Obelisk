@@ -39,7 +39,7 @@ namespace Obelisk::Core
         if (registrationId == 0)
             return false;
 
-        std::lock_guard<std::mutex> dispatchLock(m_DispatchMutex);
+        std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
         std::lock_guard<std::mutex> lock(m_Mutex);
         const auto before = m_Registrations.size();
         m_Registrations.erase(
@@ -57,7 +57,7 @@ namespace Obelisk::Core
         if (!owner)
             return 0;
 
-        std::lock_guard<std::mutex> dispatchLock(m_DispatchMutex);
+        std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
         std::lock_guard<std::mutex> lock(m_Mutex);
         const auto before = m_Registrations.size();
         m_Registrations.erase(
@@ -88,7 +88,7 @@ namespace Obelisk::Core
         };
 
         std::vector<DispatchRegistration> callbacks;
-        std::lock_guard<std::mutex> dispatchLock(m_DispatchMutex);
+        std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
             callbacks.reserve(m_Registrations.size());

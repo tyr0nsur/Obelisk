@@ -99,6 +99,36 @@ namespace
         Require(dispatcher.Dispatch(MakeMessage()) == 0, "unregistered callback ran");
     }
 
+    struct SelfUnregisterCapture
+    {
+        Obelisk::Core::ChatEventDispatcher* dispatcher = nullptr;
+        uint64_t registrationId = 0;
+        int calls = 0;
+    };
+
+    void SelfUnregisterCallback(const Obelisk::Core::ChatMessageView&, void* userData)
+    {
+        auto* capture = static_cast<SelfUnregisterCapture*>(userData);
+        ++capture->calls;
+        Require(capture->dispatcher != nullptr, "self-unregister callback had no dispatcher");
+        Require(capture->dispatcher->Unregister(capture->registrationId),
+                "self-unregister from callback failed");
+    }
+
+    void TestCallbackCanUnregisterItself()
+    {
+        Obelisk::Core::ChatEventDispatcher dispatcher;
+        int owner = 0;
+        SelfUnregisterCapture capture{&dispatcher, 0, 0};
+
+        capture.registrationId = dispatcher.Register(&owner, {SelfUnregisterCallback, &capture});
+        Require(capture.registrationId != 0, "registration id was not assigned");
+        Require(dispatcher.Dispatch(MakeMessage()) == 1, "self-unregister callback did not run");
+        Require(capture.calls == 1, "self-unregister callback ran wrong number of times");
+        Require(dispatcher.SubscriptionCount() == 0, "self-unregister callback remained registered");
+        Require(dispatcher.Dispatch(MakeMessage()) == 0, "self-unregistered callback ran twice");
+    }
+
     void TestOwnerCleanup()
     {
         Obelisk::Core::ChatEventDispatcher dispatcher;
@@ -148,6 +178,7 @@ int main()
     TestDispatchCopiesInputForCallbackDuration();
     TestRegisterRejectsInvalidInput();
     TestUnregisterIsIdempotent();
+    TestCallbackCanUnregisterItself();
     TestOwnerCleanup();
     TestRejectsUnknownSendMode();
     TestExceptionsDoNotStopDispatch();
