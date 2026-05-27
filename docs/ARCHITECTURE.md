@@ -71,10 +71,12 @@ OBELISK_ROOT
 OBELISK_PLUGIN_DIR
 OBELISK_CONFIG_DIR
 OBELISK_LOG_DIR
+OBELISK_INSTANCE_ID
 ```
 
 This keeps Obelisk artifacts outside the ARK binary directory and allows
-multiple LinuxGSM instances to share one runtime root.
+multiple LinuxGSM instances to share one runtime root. `OBELISK_INSTANCE_ID` separates
+logs and operational markers by instance so two servers can run the same map safely.
 
 ## Reflection Strategy
 

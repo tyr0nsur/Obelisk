@@ -5,8 +5,8 @@ development instances need to be restored quickly.
 
 ## Current Instances
 
-- `arkserver`: Ragnarok
-- `arkserver2`: TheIsland
+- `arkserver`: Ragnarok, `OBELISK_INSTANCE_ID=arkserver`
+- `arkserver2`: TheIsland, `OBELISK_INSTANCE_ID=arkserver2`
 - Shared ARK root: `/servidor/ark`
 - Shared serverfiles: `/servidor/ark/serverfiles`
 - Shared cluster id currently observed: `MiClusterArk`
@@ -107,8 +107,9 @@ After starting:
 
 ```bash
 pgrep -af '^./ShooterGameServer'
-tail -n 100 /servidor/ark/obelisk/logs/Obelisk-Ragnarok.log
-tail -n 100 /servidor/ark/obelisk/logs/Obelisk-TheIsland.log
+tail -n 100 /servidor/ark/obelisk/logs/arkserver/Obelisk.log
+tail -n 100 /servidor/ark/obelisk/logs/arkserver2/Obelisk.log
+tr '\0' '\n' < /proc/$(pgrep -f '^./ShooterGameServer Ragnarok' | head -n1)/environ | rg 'OBELISK_INSTANCE_ID|OBELISK_ROOT|OBELISK_LOG_DIR'
 ```
 
 Expected safe Obelisk posture for development baseline:
@@ -123,5 +124,6 @@ Expected safe Obelisk posture for development baseline:
 - Do not restore while a server is writing config.
 - Do not copy old binary-local `libobelisk.so` or `ObeliskPlugins/` back into the ARK
   binary directory.
+- Do not restore legacy map markers as the source of truth when instance markers exist.
 - Do not reuse live cluster flags for a future isolated debug instance.
 - Do not activate raw discovery probes or ReflectionScanner as part of config recovery.

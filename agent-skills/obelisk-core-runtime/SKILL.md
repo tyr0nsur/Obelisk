@@ -24,7 +24,7 @@ Own these areas:
 
 - Keep live servers stable before adding features.
 - Gate risky behavior behind explicit env vars or marker files.
-- Prefer per-map enablement under `/servidor/ark/obelisk/state`.
+- Prefer per-instance enablement under `/servidor/ark/obelisk/state/instances/<id>`.
 - Keep plugin loading optional via `OBELISK_DISABLE_PLUGINS=1`.
 - Never use `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` as part of normal runtime validation.
 - Do not let plugin exceptions or STL types cross the C ABI boundary.
@@ -53,8 +53,9 @@ This is required because `jmp rel32` can fail when `ShooterGameServer` is mapped
 For a live Ragnarok test:
 
 ```bash
-touch /servidor/ark/obelisk/state/enable-process-event-hook-ragnarok
-touch /servidor/ark/obelisk/state/disable-plugins-ragnarok
+mkdir -p /servidor/ark/obelisk/state/instances/arkserver
+touch /servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook
+touch /servidor/ark/obelisk/state/instances/arkserver/disable-plugins
 ./arkserver restart
 ```
 
@@ -62,7 +63,7 @@ Validate:
 
 ```bash
 pgrep -af '^./ShooterGameServer'
-tail -n 80 /servidor/ark/obelisk/logs/Obelisk-Ragnarok.log
+tail -n 80 /servidor/ark/obelisk/logs/arkserver/Obelisk.log
 rg 'libobelisk|libsubhook' /proc/$(pgrep -f '^./ShooterGameServer Ragnarok' | head -n1)/maps
 ```
 

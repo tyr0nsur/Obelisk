@@ -19,7 +19,7 @@ contributor-facing summary, not a replacement for detailed research notes.
 | Central install root | Stable baseline | `/servidor/ark/obelisk` with `lib/`, `plugins/`, `config/plugins/`, `config/instances/`, `logs/`, and `state/`. |
 | LinuxGSM wrapper templates | Stable baseline | Versioned under `packaging/linuxgsm/`; copy to the ARK binary directory during a maintenance window. |
 | Installer plugin posture | Stable baseline | `scripts/install_obelisk.sh` installs only runtime libraries; plugins are activated only by copying `.so` files into `plugins/`. |
-| Per-map runtime flags | Stable baseline | Marker files gate hooks, plugins, and discovery per server instance. |
+| Per-instance runtime flags | Stable baseline | `OBELISK_INSTANCE_ID` selects logs and preferred markers under `state/instances/<id>/`; map markers remain legacy fallback. |
 | ProcessEvent hook | Stable baseline | Current Ragnarok posture enables the hook while disabling plugins. |
 | Plugin C ABI loading | Stable baseline | ABI is C-compatible and currently append-only for new metadata fields. |
 | Filtered ProcessEvent callbacks | Stable baseline | Prefer callbacks scoped by `FName` index over global callbacks. |
@@ -38,8 +38,8 @@ contributor-facing summary, not a replacement for detailed research notes.
 For Ragnarok live stability, the currently documented posture is:
 
 ```text
-enable-process-event-hook-ragnarok
-disable-plugins-ragnarok
+state/instances/arkserver/enable-process-event-hook
+state/instances/arkserver/disable-plugins
 ```
 
 Do not enable native exec probes on live servers. Keep experimental plugins in

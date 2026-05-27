@@ -13,9 +13,11 @@ Updated: 2026-05-27
   `.so` is copied into `/servidor/ark/obelisk/plugins/`; inactive plugins stay outside the
   install root.
 - fact: Contributor-facing stability matrix is documented in `docs/STATUS.md`.
-- fact: Ragnarok stable baseline is ProcessEvent hook enabled with plugins disabled:
-  `/servidor/ark/obelisk/state/enable-process-event-hook-ragnarok` and
-  `/servidor/ark/obelisk/state/disable-plugins-ragnarok`.
+- fact: Ragnarok stable baseline is ProcessEvent hook enabled with plugins disabled.
+  Preferred markers are
+  `/servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook` and
+  `/servidor/ark/obelisk/state/instances/arkserver/disable-plugins`; map markers remain
+  fallback only.
 - fact: Runtime/chat baseline is documented in
   `docs/research/2026-05-27-runtime-and-chat-baseline.md`.
 - fact: Reflection/chat metadata audit added shared UE probe layouts and gated
@@ -38,6 +40,10 @@ Updated: 2026-05-27
   isolated ports, saves, cluster posture, `OBELISK_LOG_DIR`, and wrapper-level Obelisk
   env instead of shared map markers; see
   `docs/research/2026-05-27-isolated-debug-instance-plan.md`.
+- fact: Read-only restart audit found the live wrapper is older than the repo template;
+  TheIsland still maps deleted binary-local Obelisk/ChatPlugin libraries, and Ragnarok maps
+  deleted centralized Obelisk libraries until restart. See
+  `docs/research/2026-05-27-ops-restart-audit-instance-id.md`.
 - fact: `scripts/analyze_reflectionscanner_capture.py` passively summarizes copied
   ReflectionScanner logs for UObject scores, FName `matched_clues`, delayed globals, and
   reject markers; it does not touch server state.

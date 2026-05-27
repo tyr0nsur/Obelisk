@@ -9,6 +9,7 @@ Initial release scope:
 - C plugin ABI with logging, filtered ProcessEvent callbacks, owner cleanup, and optional
   plugin shutdown.
 - Central install layout under an operator-chosen Obelisk root.
+- Per-instance logs and preferred state markers via `OBELISK_INSTANCE_ID`.
 - LinuxGSM wrapper templates.
 - `oBaseEvents` as the first official plugin example.
 - Offline reflection capture analyzer tooling.

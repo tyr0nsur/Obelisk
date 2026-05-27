@@ -20,8 +20,8 @@ Recommended root:
   plugins/
   config/plugins/<plugin-id>/<plugin-config-file>
   config/instances/
-  logs/
-  state/
+  logs/<instance-id>/
+  state/instances/<instance-id>/
 ```
 
 Install the runtime:
@@ -89,43 +89,60 @@ For scanner or reflection research, use the debug wrapper from `ObeliskRunDebug.
 separate instance such as `arkserver-obelisk-debug`; do not reuse live map markers for
 debug captures.
 
+## Instance Identity
+
+`OBELISK_INSTANCE_ID` identifies the LinuxGSM instance, not the ARK map. The production
+wrapper sets known defaults:
+
+```text
+Ragnarok  -> arkserver
+TheIsland -> arkserver2
+Debug     -> arkserver-obelisk-debug
+```
+
+Operators can override it before launching the wrapper.
+
 ## Feature Flags
 
-Marker files are preferred for production operations:
+Instance marker files are preferred for production operations:
 
 ```bash
-touch /servidor/ark/obelisk/state/enable-process-event-hook-ragnarok
-touch /servidor/ark/obelisk/state/disable-plugins-ragnarok
-rm -f /servidor/ark/obelisk/state/disable-plugins-ragnarok
+mkdir -p /servidor/ark/obelisk/state/instances/arkserver
+touch /servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook
+touch /servidor/ark/obelisk/state/instances/arkserver/disable-plugins
 ```
 
 Useful flags:
 
 ```text
-enable-process-event-hook-ragnarok
-disable-plugins-ragnarok
-enable-process-event-hook-theisland
-disable-plugins-theisland
+state/instances/<instance-id>/enable-process-event-hook
+state/instances/<instance-id>/disable-plugins
 ```
+
+Legacy map markers such as `enable-process-event-hook-ragnarok` still work as fallback
+compatibility, but new deployments should use instance markers.
 
 ## Logs
 
 Runtime logs are written to:
 
 ```text
-/servidor/ark/obelisk/logs/Obelisk.log
-/servidor/ark/obelisk/logs/Obelisk-Ragnarok.log
-/servidor/ark/obelisk/logs/Obelisk-TheIsland.log
+/servidor/ark/obelisk/logs/arkserver/Obelisk.log
+/servidor/ark/obelisk/logs/arkserver/Obelisk-Ragnarok.log
+/servidor/ark/obelisk/logs/arkserver2/Obelisk.log
+/servidor/ark/obelisk/logs/arkserver2/Obelisk-TheIsland.log
 /servidor/ark/obelisk/logs/isolated-debug/
 ```
+
+If `OBELISK_INSTANCE_ID` is unset, logs fall back to the legacy root-level names.
 
 ## Current Safe Production Posture
 
 For live servers, the safest known posture is:
 
 ```text
-enable-process-event-hook-ragnarok
-disable-plugins-ragnarok
+state/instances/arkserver/enable-process-event-hook
+state/instances/arkserver/disable-plugins
 ```
 
 This validates the core ProcessEvent hook without loading experimental plugins.

@@ -92,7 +92,7 @@ run mkdir -p \
     "${ROOT}/config/plugins" \
     "${ROOT}/config/instances" \
     "${ROOT}/logs" \
-    "${ROOT}/state"
+    "${ROOT}/state/instances"
 
 install_file 755 "${BUILD_DIR}/libobelisk.so" "${ROOT}/lib/libobelisk.so"
 install_file 755 "${BUILD_DIR}/_deps/subhook-build/libsubhook.so" "${ROOT}/lib/libsubhook.so"

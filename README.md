@@ -20,7 +20,7 @@ Stable enough to test:
 - Absolute x64 hook for `UObject::ProcessEvent`.
 - C ABI plugin loading.
 - Filtered ProcessEvent callbacks by `FName` index.
-- Per-map logs.
+- Per-instance logs.
 - Runtime feature flags per server instance.
 
 Experimental:
@@ -81,12 +81,17 @@ The recommended install layout is:
       <plugin-id>/
         <plugin-config-file>
   logs/
-    Obelisk.log
-    Obelisk-Ragnarok.log
-    Obelisk-TheIsland.log
+    arkserver/
+      Obelisk.log
+      Obelisk-Ragnarok.log
+    arkserver2/
+      Obelisk.log
+      Obelisk-TheIsland.log
   state/
-    enable-process-event-hook-ragnarok
-    disable-plugins-ragnarok
+    instances/
+      arkserver/
+        enable-process-event-hook
+        disable-plugins
 ```
 
 The ARK binary directory only needs a thin `ObeliskRun.sh` wrapper. Versioned LinuxGSM
@@ -168,6 +173,7 @@ OBELISK_ROOT
 OBELISK_PLUGIN_DIR
 OBELISK_CONFIG_DIR
 OBELISK_LOG_DIR
+OBELISK_INSTANCE_ID
 OBELISK_ENABLE_PROCESS_EVENT_HOOK=1
 OBELISK_DISABLE_PLUGINS=1
 OBELISK_ENABLE_REFLECTION_SCANNER=1
@@ -215,7 +221,7 @@ the whole server process.
 
 For live servers:
 
-- Enable hooks per map, not globally.
+- Enable hooks per instance, not globally.
 - Keep experimental scanners disabled by default.
 - Prefer filtered callbacks.
 - Keep logs per instance.

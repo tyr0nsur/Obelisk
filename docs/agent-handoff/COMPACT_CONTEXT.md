@@ -22,19 +22,26 @@ work from repository state instead of chat history.
 - Gameplay config backup was created at
   `/home/flowcommunity-ark/backups/ark-config-20260527-015805`.
 - Ragnarok stable live posture:
-  - `/servidor/ark/obelisk/state/enable-process-event-hook-ragnarok`
-  - `/servidor/ark/obelisk/state/disable-plugins-ragnarok`
+  - `/servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook`
+  - `/servidor/ark/obelisk/state/instances/arkserver/disable-plugins`
+  - legacy map markers are still accepted as fallback only
 - Treat both observed ARK instances as live/non-isolated until the operator explicitly says
   otherwise:
   - `arkserver` / Ragnarok
   - `arkserver2` / TheIsland
 - Do not restart servers, edit marker files, change `/servidor/ark`, or activate
   ReflectionScanner without explicit operator permission and an isolated/debug instance.
+- Latest read-only restart audit:
+  `docs/research/2026-05-27-ops-restart-audit-instance-id.md`
+  - live `ObeliskRun.sh` lacks `OBELISK_INSTANCE_ID`
+  - TheIsland still maps deleted binary-local Obelisk/ChatPlugin libraries
+  - Ragnarok maps deleted centralized Obelisk libraries until restart
 
 ## What Is Stable Enough
 
 - LD_PRELOAD runtime bootstrap.
 - Central install layout under `/servidor/ark/obelisk`.
+- `OBELISK_INSTANCE_ID` separates logs and preferred state markers per LinuxGSM instance.
 - Absolute x64 ProcessEvent hook with executable range and known prologue validation.
 - C ABI plugin loading.
 - Stable install only deploys runtime libraries; plugins are activated by placing `.so`

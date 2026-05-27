@@ -47,8 +47,9 @@ Own these areas:
 Start with the core stable and plugins disabled:
 
 ```bash
-touch /servidor/ark/obelisk/state/enable-process-event-hook-ragnarok
-touch /servidor/ark/obelisk/state/disable-plugins-ragnarok
+mkdir -p /servidor/ark/obelisk/state/instances/arkserver
+touch /servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook
+touch /servidor/ark/obelisk/state/instances/arkserver/disable-plugins
 ./arkserver restart
 ```
 
@@ -62,6 +63,7 @@ experiment at a time. The debug wrapper should set explicit environment variable
 ```bash
 export OBELISK_ENABLE_PROCESS_EVENT_HOOK=1
 export OBELISK_DISABLE_PLUGINS=1
+export OBELISK_INSTANCE_ID=arkserver-obelisk-debug
 export OBELISK_PE_TRACE_LIMIT=0
 unset OBELISK_ENABLE_NATIVE_EXEC_PROBES
 ```

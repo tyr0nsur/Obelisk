@@ -1,6 +1,6 @@
 ---
 name: obelisk-live-ops
-description: Use when operating Obelisk on ARK server instances: central install root, arkmanager wrappers, per-map state markers, log symlinks, config restore backups, restart safety, isolated debug instances, and production experiment gates.
+description: Use when operating Obelisk on ARK server instances: central install root, arkmanager wrappers, per-instance state markers, log symlinks, config restore backups, restart safety, isolated debug instances, and production experiment gates.
 ---
 
 # Obelisk Live Ops
@@ -20,7 +20,7 @@ Central root:
   plugins/
   config/plugins/
   logs/
-  state/
+  state/instances/
 ```
 
 Only the thin launcher/wrapper should live inside the ARK binary directory. Runtime
@@ -38,8 +38,9 @@ Convenience log links may live under:
 For Ragnarok live-like stability:
 
 ```bash
-touch /servidor/ark/obelisk/state/enable-process-event-hook-ragnarok
-touch /servidor/ark/obelisk/state/disable-plugins-ragnarok
+mkdir -p /servidor/ark/obelisk/state/instances/arkserver
+touch /servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook
+touch /servidor/ark/obelisk/state/instances/arkserver/disable-plugins
 ./arkserver restart
 ```
 
@@ -54,6 +55,8 @@ Expected logs:
 
 - Keep experimental plugins outside `plugins/` until an isolated server test passes.
 - Enable one marker/config gate at a time and record the exact change.
+- Prefer instance markers under `state/instances/<instance-id>/`; map markers are legacy
+  fallback only.
 - Never enable native exec probes on live servers.
 - Never enable `ReflectionScanner` on `arkserver` or `arkserver2` unless the operator has
   explicitly converted that instance into an isolated debug target.
@@ -95,7 +98,7 @@ After restart:
 
 ```bash
 pgrep -af '^./ShooterGameServer'
-tail -n 100 /servidor/ark/obelisk/logs/Obelisk-Ragnarok.log
+tail -n 100 /servidor/ark/obelisk/logs/arkserver/Obelisk.log
 pid=$(pgrep -f '^./ShooterGameServer Ragnarok' | head -n1)
 rg 'libobelisk|libsubhook' /proc/$pid/maps
 ```
@@ -105,7 +108,8 @@ rg 'libobelisk|libsubhook' /proc/$pid/maps
 If a live map crashes after an Obelisk change:
 
 ```bash
-touch /servidor/ark/obelisk/state/disable-plugins-ragnarok
+mkdir -p /servidor/ark/obelisk/state/instances/arkserver
+touch /servidor/ark/obelisk/state/instances/arkserver/disable-plugins
 ./arkserver start
 ```
 

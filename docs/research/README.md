@@ -3,6 +3,10 @@
 This directory stores reproducible investigation notes for Obelisk runtime, UE4 reflection,
 ARK server operations, and plugin experiments.
 
+Notes written before `OBELISK_INSTANCE_ID` may mention map-based marker files and
+root-level map logs. New research should record the LinuxGSM instance id, map, ARK binary
+hash, runtime flags, and whether any legacy map marker fallback was used.
+
 ## Index
 
 | Note | Topic | Result |
@@ -14,6 +18,7 @@ ARK server operations, and plugin experiments.
 | [2026-05-27-reflectionscanner-isolated-capture-runbook.md](2026-05-27-reflectionscanner-isolated-capture-runbook.md) | ReflectionScanner isolated capture runbook | Documents flags, expected logs, GNames acceptance criteria, and rollback for the next isolated capture. |
 | [2026-05-27-reflectionscanner-isolated-instance-audit.md](2026-05-27-reflectionscanner-isolated-instance-audit.md) | ReflectionScanner isolated instance audit | Records read-only evidence that no confirmed isolated/debug ARK instance currently exists. |
 | [2026-05-27-isolated-debug-instance-plan.md](2026-05-27-isolated-debug-instance-plan.md) | Isolated debug instance plan | Plans a new LGSM debug instance with isolated ports, saves, cluster posture, Obelisk env, rollback, and permission checklist. |
+| [2026-05-27-ops-restart-audit-instance-id.md](2026-05-27-ops-restart-audit-instance-id.md) | Ops restart audit after instance id | Records the read-only `/servidor/ark` audit, deleted library mappings, wrapper gap, restart plan, and verification commands. |
 | [2026-05-27-reflectionscanner-analyzer-review.md](2026-05-27-reflectionscanner-analyzer-review.md) | ReflectionScanner analyzer review | Reviews false-positive and missed-candidate risks in the FName probe/analyzer path. |
 | [2026-05-27-plugin-callback-ownership-hardening.md](2026-05-27-plugin-callback-ownership-hardening.md) | Plugin callback ownership | Documents callback owner-token cleanup on init failure and unload. |
 | [2026-05-27-plugin-shutdown-lifecycle.md](2026-05-27-plugin-shutdown-lifecycle.md) | Plugin shutdown lifecycle | Documents optional `ObeliskPlugin_Shutdown()` resolution and unload ordering. |
@@ -29,7 +34,7 @@ YYYY-MM-DD-short-topic.md
 Each note should capture:
 
 - Objective
-- Environment: ARK binary path, SHA256, map/server, Obelisk commit, plugins state
+- Environment: ARK binary path, SHA256, instance id, map, Obelisk commit, plugins state
 - Hypothesis
 - Evidence: relevant log snippets, addresses, signatures, command summaries
 - Result: confirmed, rejected, or inconclusive

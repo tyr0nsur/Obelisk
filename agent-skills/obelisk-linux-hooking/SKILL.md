@@ -42,7 +42,7 @@ When patching `.text`:
 
 ## Operational Safety
 
-- Keep hook enablement per map via `/servidor/ark/obelisk/state`.
+- Keep hook enablement per instance via `/servidor/ark/obelisk/state/instances/<id>`.
 - Validate the core hook with plugins disabled first.
 - Keep tracing disabled by default: `OBELISK_PE_TRACE_LIMIT=0`.
 - Never run startup scanners or native exec probes by default.
@@ -51,10 +51,11 @@ When patching `.text`:
 
 ```bash
 cmake --build build -j"$(nproc)"
-touch /servidor/ark/obelisk/state/enable-process-event-hook-ragnarok
-touch /servidor/ark/obelisk/state/disable-plugins-ragnarok
+mkdir -p /servidor/ark/obelisk/state/instances/arkserver
+touch /servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook
+touch /servidor/ark/obelisk/state/instances/arkserver/disable-plugins
 ./arkserver restart
-tail -n 80 /servidor/ark/obelisk/logs/Obelisk-Ragnarok.log
+tail -n 80 /servidor/ark/obelisk/logs/arkserver/Obelisk.log
 ```
 
 Expected:

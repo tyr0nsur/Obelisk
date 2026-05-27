@@ -12,6 +12,7 @@ Included:
 - C plugin ABI.
 - Central install script and LinuxGSM wrappers.
 - `oBaseEvents`.
+- `OBELISK_INSTANCE_ID` logs and state markers.
 
 Excluded:
 
@@ -39,7 +40,9 @@ git status --short --ignored
 ```
 
 4. Update `CHANGELOG.md`.
-5. Tag:
+5. Confirm docs and wrappers prefer `state/instances/<instance-id>/` markers over legacy
+   map markers.
+6. Tag:
 
 ```bash
 git tag -a v0.1.0 -m "Obelisk 0.1.0"

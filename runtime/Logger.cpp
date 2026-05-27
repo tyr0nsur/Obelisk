@@ -62,6 +62,38 @@ namespace Obelisk
 
             return sanitized.empty() ? "unknown" : sanitized;
         }
+
+        std::string SanitizeIdentifier(const char* value)
+        {
+            if (!value || value[0] == '\0')
+                return "";
+
+            std::string sanitized;
+            for (const unsigned char ch : std::string(value))
+            {
+                if (std::isalnum(ch) || ch == '_' || ch == '-')
+                    sanitized.push_back(static_cast<char>(ch));
+            }
+
+            return sanitized;
+        }
+
+        std::string GetInstanceLogName()
+        {
+            const std::string mapName = GetMapNameFromCmdline();
+            return "Obelisk-" + mapName + ".log";
+        }
+
+        std::filesystem::path GetInstanceLogDir(const std::filesystem::path& baseLogDir)
+        {
+            const std::string instanceId = SanitizeIdentifier(std::getenv("OBELISK_INSTANCE_ID"));
+            if (instanceId.empty())
+                return baseLogDir;
+
+            std::filesystem::path path = baseLogDir / instanceId;
+            std::filesystem::create_directories(path);
+            return path;
+        }
     }
 
     void Logger::Init()
@@ -73,10 +105,11 @@ namespace Obelisk
         console_sink->set_pattern("%^[%T] [Obelisk] %v%$");
 
         std::filesystem::path logDir = GetLogDir();
-        auto shared_file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>((logDir / "Obelisk.log").string(), true);
+        std::filesystem::path instanceLogDir = GetInstanceLogDir(logDir);
+        auto shared_file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>((instanceLogDir / "Obelisk.log").string(), true);
         shared_file_sink->set_pattern("[%T] [%l] %v");
 
-        auto instance_file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>((logDir / ("Obelisk-" + GetMapNameFromCmdline() + ".log")).string(), true);
+        auto instance_file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>((instanceLogDir / GetInstanceLogName()).string(), true);
         instance_file_sink->set_pattern("[%T] [%l] %v");
 
         std::vector<spdlog::sink_ptr> sinks { console_sink, shared_file_sink, instance_file_sink };
