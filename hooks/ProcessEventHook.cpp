@@ -31,7 +31,6 @@ namespace Obelisk::Hooks
         constexpr size_t kJumpSize = 12;
         constexpr size_t kPatchSize = 18;
         constexpr size_t kTrampolineSize = kPatchSize + kJumpSize;
-        constexpr uintptr_t kCurrentArkProcessEventOffset = 0x1D34E20;
         constexpr std::array<uint8_t, kPatchSize> kExpectedProcessEventPrologue = {
             0x55, 0x48, 0x89, 0xE5, 0x41, 0x57, 0x41, 0x56, 0x41,
             0x54, 0x53, 0x48, 0x81, 0xEC, 0xA0, 0x00, 0x00, 0x00
@@ -293,11 +292,14 @@ namespace Obelisk::Hooks
             OBELISK_INFO("ProcessEvent candidate[{}] = {}", i, candidates[i]);
 
         void* processEventAddr = nullptr;
-        bool mayTryDirectOffsetFallback = candidates.empty();
         if (candidates.size() == 1 &&
             ValidateProcessEventTarget(candidates.front(), moduleInfo, "pattern"))
         {
             processEventAddr = candidates.front();
+        }
+        else if (candidates.empty())
+        {
+            OBELISK_ERROR("ProcessEvent pattern produced no candidates. Hook target must be rediscovered.");
         }
         else if (candidates.size() > 1)
         {
@@ -305,22 +307,9 @@ namespace Obelisk::Hooks
                           candidates.size());
         }
 
-        if (!processEventAddr && mayTryDirectOffsetFallback)
-        {
-            OBELISK_WARN("ProcessEvent pattern not found. Trying current ARK direct offset fallback...");
-            uintptr_t baseAddress = moduleInfo.imageBase;
-            if (baseAddress != 0)
-            {
-                // Current ShooterGameServer vtable slot 61 target.
-                void* fallbackAddr = reinterpret_cast<void*>(baseAddress + kCurrentArkProcessEventOffset);
-                if (ValidateProcessEventTarget(fallbackAddr, moduleInfo, "direct-offset fallback"))
-                    processEventAddr = fallbackAddr;
-            }
-        }
-
         if (!processEventAddr)
         {
-            OBELISK_ERROR("Failed to find ProcessEvent signature or offset. Hook NOT installed.");
+            OBELISK_ERROR("Failed to find ProcessEvent signature. Hook NOT installed.");
             return;
         }
 

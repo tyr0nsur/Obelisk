@@ -9,7 +9,7 @@ Prepare the next isolated `ReflectionScanner` capture to validate two scanner-on
   `9622 == ServerChat`.
 
 This runbook is for an isolated/debug ARK instance only. Do not use it to enable
-raw event discovery or native exec probes on live Ragnarok.
+raw event discovery or native exec probes on the active development server.
 
 ## Environment To Record
 
@@ -19,7 +19,7 @@ raw event discovery or native exec probes on live Ragnarok.
   `/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer`
 - ARK binary SHA256 observed from this workspace:
   `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`
-- Map/server: isolated/debug instance name and map.
+- Instance/map: isolated/debug `OBELISK_INSTANCE_ID` and map.
 - Plugins state: disabled.
 - Native exec probes: disabled or unset.
 - Raw chat discovery: disabled or unset.
@@ -39,11 +39,12 @@ export OBELISK_PE_TRACE_LIMIT=0
 
 There is currently no marker-file gate for `OBELISK_ENABLE_REFLECTION_SCANNER`; it must be
 set in the isolated instance environment. Marker files may still be used for the existing
-hook/plugin gates:
+hook/plugin gates, but only through instance markers:
 
 ```bash
-touch /servidor/ark/obelisk/state/enable-process-event-hook-ragnarok
-touch /servidor/ark/obelisk/state/disable-plugins-ragnarok
+mkdir -p /servidor/ark/obelisk/state/instances/arkserver-obelisk-debug
+touch /servidor/ark/obelisk/state/instances/arkserver-obelisk-debug/enable-process-event-hook
+touch /servidor/ark/obelisk/state/instances/arkserver-obelisk-debug/disable-plugins
 ```
 
 Do not remove the plugin-disable marker for this capture. Do not assume that creating an
@@ -169,12 +170,11 @@ export OBELISK_PE_TRACE_LIMIT=0
 If marker files were used on the isolated instance:
 
 ```bash
-touch /servidor/ark/obelisk/state/disable-plugins-ragnarok
-rm -f /servidor/ark/obelisk/state/enable-chat-discovery-ragnarok
+touch /servidor/ark/obelisk/state/instances/arkserver-obelisk-debug/disable-plugins
 ./arkserver restart
 ```
 
-Do not apply these marker changes to live Ragnarok as part of this runbook.
+Do not apply these marker changes to the active development server as part of this runbook.
 
 ## Result
 

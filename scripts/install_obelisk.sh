@@ -89,8 +89,7 @@ install_file() {
 run mkdir -p \
     "${ROOT}/lib" \
     "${ROOT}/plugins" \
-    "${ROOT}/config/plugins" \
-    "${ROOT}/config/instances" \
+    "${ROOT}/config" \
     "${ROOT}/logs" \
     "${ROOT}/state/instances"
 

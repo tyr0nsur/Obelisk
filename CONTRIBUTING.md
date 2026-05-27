@@ -43,12 +43,13 @@ Use one test map before enabling cluster-wide.
 Recommended test posture:
 
 ```bash
-touch /servidor/ark/obelisk/state/enable-process-event-hook-ragnarok
-touch /servidor/ark/obelisk/state/disable-plugins-ragnarok
+touch /servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook
+touch /servidor/ark/obelisk/state/instances/arkserver/disable-plugins
 ./arkserver restart
 ```
 
-Then remove `disable-plugins-ragnarok` only after the core hook is stable.
+Then remove the instance `disable-plugins` marker only when intentionally testing
+drop-in plugin loading.
 
 ## Commit Style
 

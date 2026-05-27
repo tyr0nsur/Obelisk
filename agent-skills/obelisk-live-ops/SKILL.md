@@ -18,7 +18,7 @@ Central root:
 /servidor/ark/obelisk/
   lib/
   plugins/
-  config/plugins/
+  config/
   logs/
   state/instances/
 ```

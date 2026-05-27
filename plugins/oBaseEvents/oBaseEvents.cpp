@@ -24,25 +24,13 @@ namespace
 
     std::filesystem::path ResolveConfigPath()
     {
-        if (const char* overridePath = std::getenv("OBASEEVENTS_CONFIG");
-            overridePath && overridePath[0] != '\0')
-        {
-            return overridePath;
-        }
-
         if (const char* configDir = std::getenv("OBELISK_CONFIG_DIR");
             configDir && configDir[0] != '\0')
         {
-            return std::filesystem::path(configDir) / "plugins" / "oBaseEvents" / "config.json";
+            return std::filesystem::path(configDir) / "oBaseEvents" / "config.json";
         }
 
-        if (const char* root = std::getenv("OBELISK_ROOT");
-            root && root[0] != '\0')
-        {
-            return std::filesystem::path(root) / "config" / "plugins" / "oBaseEvents" / "config.json";
-        }
-
-        return std::filesystem::path("oBaseEvents.json");
+        return std::filesystem::path("config") / "oBaseEvents" / "config.json";
     }
 
     json DefaultConfig()
@@ -50,6 +38,7 @@ namespace
         return {
             {"enabled", false},
             {"log_level", "info"},
+            {"instance_allowlist", json::array()},
             {"map_allowlist", json::array()},
             {"process_event", {
                 {"enabled", false},

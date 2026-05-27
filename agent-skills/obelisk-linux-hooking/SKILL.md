@@ -22,9 +22,9 @@ Reason: a 5-byte `jmp rel32` only reaches +/-2GB. ARK maps the executable low an
 
 Before installing a ProcessEvent hook, validate that the target is inside the
 ShooterGameServer executable segment and starts with a known compatible instruction-boundary
-prologue. Direct-offset fallbacks such as `base + 0x1D34E20` are not acceptable unless they
-pass the same range and prologue checks; if the prologue changes, refuse to hook until an
-instruction decoder or deliberately updated validation is in place.
+prologue. Direct-offset fallbacks such as `base + 0x1D34E20` are not acceptable in active
+runtime code. If the signature or prologue changes, refuse to hook until the target is
+deliberately rediscovered and validation is updated.
 
 ## Memory Protection
 

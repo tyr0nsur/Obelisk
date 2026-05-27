@@ -24,17 +24,16 @@ work from repository state instead of chat history.
 - Ragnarok stable live posture:
   - `/servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook`
   - `/servidor/ark/obelisk/state/instances/arkserver/disable-plugins`
-- Treat both observed ARK instances as live/non-isolated until the operator explicitly says
-  otherwise:
-  - `arkserver` / Ragnarok
-  - `arkserver2` / TheIsland
+- Current development posture uses one active ARK instance:
+  - active: `arkserver` / Ragnarok
+  - stopped: `arkserver2` / TheIsland
 - Do not restart servers, edit marker files, change `/servidor/ark`, or activate
   ReflectionScanner without explicit operator permission and an isolated/debug instance.
-- Latest read-only restart audit:
+- Latest restart audit:
   `docs/research/2026-05-27-ops-restart-audit-instance-id.md`
-  - live `ObeliskRun.sh` lacks `OBELISK_INSTANCE_ID`
-  - TheIsland still maps deleted binary-local Obelisk/ChatPlugin libraries
-  - Ragnarok maps deleted centralized Obelisk libraries until restart
+  - live `ObeliskRun.sh` exports `OBELISK_INSTANCE_ID=arkserver`
+  - active process maps only central `libobelisk.so` and `libsubhook.so`
+  - no active `ChatPlugin`, `ObeliskPlugins`, or deleted Obelisk mappings remain
 
 ## What Is Stable Enough
 
@@ -42,6 +41,8 @@ work from repository state instead of chat history.
 - Central install layout under `/servidor/ark/obelisk`.
 - `OBELISK_INSTANCE_ID` separates logs and preferred state markers per LinuxGSM instance.
 - Absolute x64 ProcessEvent hook with executable range and known prologue validation.
+- ProcessEvent direct-offset fallback is removed from active runtime code; a unique
+  signature match is required.
 - C ABI plugin loading.
 - Stable install only deploys runtime libraries; plugins are activated by placing `.so`
   files directly in `/servidor/ark/obelisk/plugins/`.

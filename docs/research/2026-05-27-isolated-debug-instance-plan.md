@@ -341,11 +341,11 @@ Remove or archive:
 - /servidor/ark/obelisk/logs/isolated-debug/ only after log evidence is preserved
 ```
 
-Do not remove or change live markers:
+Do not remove or change active development markers:
 
 ```text
-/servidor/ark/obelisk/state/enable-process-event-hook-ragnarok
-/servidor/ark/obelisk/state/disable-plugins-ragnarok
+/servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook
+/servidor/ark/obelisk/state/instances/arkserver/disable-plugins
 ```
 
 Post-rollback sanity checks:

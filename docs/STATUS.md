@@ -16,7 +16,7 @@ contributor-facing summary, not a replacement for detailed research notes.
 | Area | Status | Notes |
 | --- | --- | --- |
 | `LD_PRELOAD` bootstrap | Stable baseline | Runtime loads through the central install layout. |
-| Central install root | Stable baseline | `/servidor/ark/obelisk` with `lib/`, `plugins/`, `config/plugins/`, `config/instances/`, `logs/`, and `state/`. |
+| Central install root | Stable baseline | `/servidor/ark/obelisk` with `lib/`, `plugins/`, `config/`, `logs/`, and `state/instances/`. |
 | LinuxGSM wrapper templates | Stable baseline | Versioned under `packaging/linuxgsm/`; copy to the ARK binary directory during a maintenance window. |
 | Installer plugin posture | Stable baseline | `scripts/install_obelisk.sh` installs only runtime libraries; plugins are activated only by copying `.so` files into `plugins/`. |
 | Per-instance runtime flags | Stable baseline | `OBELISK_INSTANCE_ID` selects logs and markers under `state/instances/<id>/`; map markers are obsolete. |

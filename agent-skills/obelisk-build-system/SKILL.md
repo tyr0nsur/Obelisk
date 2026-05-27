@@ -36,9 +36,9 @@ Install layout:
 /servidor/ark/obelisk/
   lib/
   plugins/
-  config/plugins/
+  config/
   logs/
-  state/
+  state/instances/
 ```
 
 Do not install runtime artifacts directly into `ShooterGame/Binaries/Linux` except the thin `ObeliskRun.sh` wrapper.

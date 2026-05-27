@@ -10,25 +10,25 @@ the initial live-server investigation.
 - Obelisk root: `/servidor/ark/obelisk`
 - Runtime install: `/servidor/ark/obelisk/lib/libobelisk.so`
 - Plugin directory: `/servidor/ark/obelisk/plugins`
-- Config directory: `/servidor/ark/obelisk/config/plugins`
-- Logs: `/servidor/ark/obelisk/logs`
+- Config directory: `/servidor/ark/obelisk/config`
+- Logs: `/servidor/ark/obelisk/logs/arkserver`
 - Convenient log links: `/home/flowcommunity-ark/logs/ark`
-- Validated map: Ragnarok
-- Stable production markers:
-  - `/servidor/ark/obelisk/state/enable-process-event-hook-ragnarok`
-  - `/servidor/ark/obelisk/state/disable-plugins-ragnarok`
+- Validated instance/map: `arkserver` / Ragnarok
+- Stable development markers:
+  - `/servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook`
+  - `/servidor/ark/obelisk/state/instances/arkserver/disable-plugins`
 
 ## Evidence
 
 - The runtime loads through `LD_PRELOAD`.
 - The ProcessEvent hook is installed with an absolute x64 jump.
-- The validated Ragnarok ProcessEvent candidate was observed at runtime address
+- The validated Ragnarok ProcessEvent signature candidate was observed at runtime address
   `0x1d34e20` on the tested non-PIE binary.
 - The earlier `0x1d11cb0` candidate was a false positive and did not receive gameplay
   events.
 - With plugins disabled, players can join Ragnarok with the core hook active.
-- ChatPlugin remains experimental and must not be enabled on the live map as the normal
-  test path.
+- The removed ChatPlugin prototype remains historical only; new chat work should be rebuilt
+  on reflected metadata and the release plugin ABI.
 
 ## Current Risks
 

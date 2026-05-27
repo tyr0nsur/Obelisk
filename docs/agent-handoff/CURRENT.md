@@ -39,9 +39,9 @@ Updated: 2026-05-27
   isolated ports, saves, cluster posture, `OBELISK_LOG_DIR`, and wrapper-level Obelisk
   env instead of shared map markers; see
   `docs/research/2026-05-27-isolated-debug-instance-plan.md`.
-- fact: Read-only restart audit found the live wrapper is older than the repo template;
-  TheIsland still maps deleted binary-local Obelisk/ChatPlugin libraries, and Ragnarok maps
-  deleted centralized Obelisk libraries until restart. See
+- fact: Runtime and wrapper were redeployed from the central install root after removing
+  legacy marker fallbacks. Only `arkserver` / Ragnarok is active for development;
+  `arkserver2` / TheIsland is stopped. See
   `docs/research/2026-05-27-ops-restart-audit-instance-id.md`.
 - fact: `scripts/analyze_reflectionscanner_capture.py` passively summarizes copied
   ReflectionScanner logs for UObject scores, FName `matched_clues`, delayed globals, and
@@ -64,9 +64,9 @@ Updated: 2026-05-27
 
 ## Priority Next Steps
 
-- fact: ProcessEvent hook installation now validates the target range and known 18-byte
-  prologue before installing; direct offset fallback is no longer accepted without the same
-  validation. See `docs/research/2026-05-27-processevent-target-validation.md`.
+- fact: ProcessEvent hook installation now requires a unique validated signature match.
+  Direct offset fallback has been removed from active runtime code. See
+  `docs/research/2026-05-27-processevent-target-validation.md`.
 - fact: Plugin ProcessEvent callbacks now carry owner tokens and are unregistered on init
   failure and before unload/`dlclose`; see
   `docs/research/2026-05-27-plugin-callback-ownership-hardening.md`.

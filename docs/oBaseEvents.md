@@ -39,13 +39,7 @@ If the plugin should not load, do not place it in `/servidor/ark/obelisk/plugins
 Default path:
 
 ```text
-/servidor/ark/obelisk/config/plugins/oBaseEvents/config.json
-```
-
-Override path:
-
-```bash
-export OBASEEVENTS_CONFIG=/path/to/config.json
+/servidor/ark/obelisk/config/oBaseEvents/config.json
 ```
 
 Default generated config:

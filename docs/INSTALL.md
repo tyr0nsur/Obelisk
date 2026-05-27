@@ -18,8 +18,7 @@ Recommended root:
 /servidor/ark/obelisk/
   lib/
   plugins/
-  config/plugins/<plugin-id>/<plugin-config-file>
-  config/instances/
+  config/<plugin-id>/<plugin-config-file>
   logs/<instance-id>/
   state/instances/<instance-id>/
 ```
@@ -37,13 +36,13 @@ build/libobelisk.so                         -> lib/libobelisk.so
 build/_deps/subhook-build/libsubhook.so     -> lib/libsubhook.so
 ```
 
-It also creates `plugins`, `config/plugins`, `config/instances`, `logs`, and `state`.
+It also creates `plugins`, `config`, `logs`, and `state/instances`.
 
 Plugins loaded from `plugins/` are expected to own their config defaults. The preferred
 directory for plugin config is:
 
 ```text
-/servidor/ark/obelisk/config/plugins/<plugin-id>/
+/servidor/ark/obelisk/config/<plugin-id>/
 ```
 
 The runtime loads every `.so` directly inside `/servidor/ark/obelisk/plugins/` on restart.

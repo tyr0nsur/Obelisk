@@ -22,7 +22,7 @@ on teaching the plugin model.
 | --- | --- | --- | --- |
 | `oBaseEvents` | Official reference plugin for event/config/lifecycle patterns. | Built by default. | Installed only when the operator copies the `.so` into the runtime plugin directory. |
 | research branches | Probes and prototype integrations. | Excluded from top-level build by default. | Do not install into `plugins/` except isolated tests. |
-| stable plugin directories | Operational plugins with documented config, tests, and rollback. | Eligible for top-level build after review. | Map-gated rollout only. |
+| stable plugin directories | Operational plugins with documented config, tests, and rollback. | Eligible for top-level build after review. | Instance-gated rollout only. |
 
 An example plugin should demonstrate exactly one behavior. For example, an HTTP
 status example should not also decode `ProcessEvent` params, and a filtered
@@ -51,22 +51,18 @@ Plugin configuration belongs under the central install root, not the ARK binary
 directory:
 
 ```text
-${OBELISK_CONFIG_DIR}/plugins/<plugin-id>/<plugin-config-file>
+${OBELISK_CONFIG_DIR}/<plugin-id>/<plugin-config-file>
 ```
 
-Fallback order:
+Resolution order:
 
-1. A plugin-specific override env var, for example
-   `OBASEEVENTS_CONFIG=/path/to/config.json`.
-2. `${OBELISK_CONFIG_DIR}/plugins/<plugin-id>/<plugin-config-file>`.
-3. `${OBELISK_CONFIG_DIR}/plugins/<plugin-id>.json` for legacy plugins.
-4. `${OBELISK_ROOT}/config/plugins/<plugin-id>/<plugin-config-file>`.
-5. `${OBELISK_ROOT}/config/plugins/<plugin-id>.json` for legacy plugins.
+1. `${OBELISK_CONFIG_DIR}/<plugin-id>/<plugin-config-file>`.
 
 Config files should include:
 
 - `enabled`: boolean defaulting to `false` for experimental plugins.
-- `map_allowlist`: list of map names where the plugin may run.
+- `instance_allowlist`: list of `OBELISK_INSTANCE_ID` values where the plugin may run.
+- `map_allowlist`: optional plugin-owned map filter when behavior genuinely depends on map.
 - `log_level`: plugin-local verbosity.
 - Feature gates for every risky subsystem, such as `http.enabled`,
   `process_event.enabled`, and `discovery.enabled`.
@@ -75,7 +71,7 @@ Config files should include:
 
 Plugins may create a default config on first initialization when the file is missing, but
 the generated defaults must be safe-disabled. They should create only their own
-`plugins/<plugin-id>/` config directory and log the chosen config path.
+`<plugin-id>/` config directory and log the chosen config path.
 
 ## Build And Drop-In Model
 
@@ -92,7 +88,7 @@ The runtime does not need to know how a plugin was compiled. On restart it scans
 The stable operational flow is:
 
 1. Build or obtain `PluginName.so`.
-2. Ensure `${OBELISK_ROOT}/config/plugins/plugin-name/<config-file>` exists or that the
+2. Ensure `${OBELISK_CONFIG_DIR}/plugin-name/<config-file>` exists or that the
    plugin creates a safe-disabled default on first init.
 3. Copy the `.so` into `${OBELISK_ROOT}/plugins/`.
 4. Restart only the target ARK instance.
@@ -173,7 +169,7 @@ installed only on isolated test instances or behind a trusted local proxy.
 
 Before a plugin is promoted to stable or added to the top-level build:
 
-- [ ] Config path follows `${OBELISK_CONFIG_DIR}/plugins/<plugin-id>/<config-file>`.
+- [ ] Config path follows `${OBELISK_CONFIG_DIR}/<plugin-id>/<config-file>`.
 - [ ] Risky features are safe-disabled and map-gated.
 - [ ] No global `ProcessEvent` callback outside a documented debug gate.
 - [ ] Callback lifetime is covered by runtime owner cleanup and plugin-local
