@@ -1,5 +1,5 @@
-#include "api/ObeliskApi.h"
-#include "extern/nlohmann/json.hpp"
+#include <nlohmann/json.hpp>
+#include <obelisk/ObeliskApi.h>
 
 #include <atomic>
 #include <cstdint>

@@ -30,7 +30,7 @@ status example should not also decode `ProcessEvent` params, and a filtered
 
 ## ABI Boundary
 
-Plugins must treat `api/ObeliskApi.h` as a C ABI boundary:
+Plugins must treat `include/obelisk/ObeliskApi.h` as a C ABI boundary:
 
 - Export entry points with `extern "C"` and default visibility.
 - Export mandatory metadata through `ObeliskPlugin_GetInfo`.
@@ -80,7 +80,7 @@ the runtime rejects the plugin before calling `ObeliskPlugin_Init`.
 Obelisk should support two plugin build paths:
 
 - In-tree plugins for examples, experiments, and CI coverage.
-- External plugins compiled against `api/ObeliskApi.h` and copied into
+- External plugins compiled against `include/obelisk/ObeliskApi.h` and copied into
   `${OBELISK_PLUGIN_DIR}` as `.so` files.
 
 The runtime does not need to know how a plugin was compiled. On restart it scans

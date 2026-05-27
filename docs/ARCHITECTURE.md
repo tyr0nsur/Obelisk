@@ -45,7 +45,9 @@ player connection flows.
 
 ## Plugin ABI
 
-Plugins interact with Obelisk through `api/ObeliskApi.h`.
+Plugins interact with Obelisk through the public SDK header
+`include/obelisk/ObeliskApi.h`. The older `api/ObeliskApi.h` path remains a
+transition wrapper.
 
 The ABI is C-compatible by design:
 
@@ -90,14 +92,14 @@ LinuxGSM wrapper templates under `packaging/linuxgsm/` are operational helpers
 for that harness, not the core product surface.
 
 ARK-specific paths, instance names, and observed `FName` indices are validation
-inputs only. Stable plugin contracts should be expressed through `api/ObeliskApi.h`
-and documented runtime behavior.
+inputs only. Stable plugin contracts should be expressed through public SDK
+headers and documented runtime behavior.
 
 ## SDK Direction
 
-The SDK layer is not implemented yet. The intended stable surface is a set of
-runtime-backed APIs for common modding tasks after reflection metadata is
-reliable enough to support them.
+The SDK currently exposes the C ABI header and CMake `obelisk_sdk` interface
+target. Higher-level runtime-backed APIs for common modding tasks remain planned
+until reflection metadata is reliable enough to support them.
 
 ## Research Strategy
 

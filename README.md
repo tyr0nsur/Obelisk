@@ -161,7 +161,7 @@ See [docs/oBaseEvents.md](docs/oBaseEvents.md).
 ## Plugin Example
 
 ```cpp
-#include "api/ObeliskApi.h"
+#include <obelisk/ObeliskApi.h>
 
 static bool OnProcessEvent(void* caller, void* function, void* params)
 {

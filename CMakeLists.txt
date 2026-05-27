@@ -11,6 +11,11 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 enable_testing()
 set(SUBHOOK_NO_TESTS ON CACHE BOOL "Disable subhook tests" FORCE)
 
+add_library(obelisk_sdk INTERFACE)
+target_include_directories(obelisk_sdk INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+)
+
 # Dependencies
 include(FetchContent)
 
@@ -53,7 +58,7 @@ add_library(obelisk SHARED
 
 # Includes and linking
 target_include_directories(obelisk PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(obelisk PRIVATE fmt::fmt spdlog::spdlog subhook dl pthread stdc++fs)
+target_link_libraries(obelisk PRIVATE obelisk_sdk fmt::fmt spdlog::spdlog subhook dl pthread stdc++fs)
 
 # Ensure visibility is hidden by default, and we only export what we want
 # (Good practice for LD_PRELOAD plugins)
@@ -69,6 +74,13 @@ add_executable(plugin_config_tests
     core/PluginConfig.cpp
 )
 target_include_directories(plugin_config_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(plugin_config_tests PRIVATE stdc++fs)
+target_link_libraries(plugin_config_tests PRIVATE obelisk_sdk stdc++fs)
 
 add_test(NAME PluginConfigTests COMMAND plugin_config_tests)
+
+add_executable(abi_layout_tests
+    tests/abi/AbiLayoutTests.cpp
+)
+target_link_libraries(abi_layout_tests PRIVATE obelisk_sdk)
+
+add_test(NAME AbiLayoutTests COMMAND abi_layout_tests)
