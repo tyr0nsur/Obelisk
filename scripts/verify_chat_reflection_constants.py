@@ -597,8 +597,18 @@ def parse_args() -> argparse.Namespace:
         help="Path to a core evidence pack directory or manifest.json. Preferred over raw --core.",
     )
     parser.add_argument("--chat-reflection-source", type=Path, default=CHAT_REFLECTION_SOURCE)
-    parser.add_argument("--gobjects", type=parse_int, default=uobjects.DEFAULT_GOBJECTS)
-    parser.add_argument("--fname-root-slot", type=parse_int, default=uobjects.DEFAULT_FNAME_ROOT_SLOT)
+    parser.add_argument(
+        "--gobjects",
+        type=parse_int,
+        default=None,
+        help="GUObjectArray address for legacy --core mode. In --evidence-pack mode this comes from manifest.json.",
+    )
+    parser.add_argument(
+        "--fname-root-slot",
+        type=parse_int,
+        default=None,
+        help="FName root slot for legacy --core mode. In --evidence-pack mode this comes from manifest.json.",
+    )
     parser.add_argument("--max-object-scan", type=int, default=inspector.DEFAULT_MAX_OBJECT_SCAN)
     parser.add_argument("--window-size", type=parse_int, default=inspector.DEFAULT_WINDOW_SIZE)
     parser.add_argument(
@@ -625,9 +635,15 @@ def main() -> int:
 
     evidence_pack: EvidencePack | None = None
     core = args.core
-    gobjects = args.gobjects
-    fname_root_slot = args.fname_root_slot
+    gobjects = args.gobjects if args.gobjects is not None else uobjects.DEFAULT_GOBJECTS
+    fname_root_slot = (
+        args.fname_root_slot
+        if args.fname_root_slot is not None
+        else uobjects.DEFAULT_FNAME_ROOT_SLOT
+    )
     if args.evidence_pack:
+        if args.gobjects is not None or args.fname_root_slot is not None:
+            raise SystemExit("--evidence-pack reads gobjects and fname root from manifest; do not pass overrides")
         try:
             evidence_pack = load_evidence_pack(
                 args.evidence_pack,

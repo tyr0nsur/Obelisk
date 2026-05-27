@@ -851,6 +851,44 @@ class VerifyChatReflectionConstantsTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "gobjects_candidates"):
                 verifier.load_evidence_pack(manifest_path, verify_binary_sha=False)
 
+    def test_cli_rejects_evidence_pack_with_manual_gobjects_override(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            binary = root / "ShooterGameServer"
+            binary.write_bytes(b"synthetic-binary")
+            source = root / "ChatReflection.cpp"
+            source.write_text(CHAT_REFLECTION_CPP, encoding="utf-8")
+            addrs = build_chat_core_fixture(core)
+            manifest = {
+                "binary": {
+                    "path": str(binary),
+                    "sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
+                },
+                "core": {"path": str(core)},
+                "gobjects_candidates": [{"label": "gobjects", "address": hex(addrs["gobjects"])}],
+                "fname_root_slots": [{"label": "fname", "address": hex(addrs["fname_root_slot"])}],
+            }
+            (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "verify_chat_reflection_constants.py"),
+                    "--evidence-pack",
+                    str(root),
+                    "--chat-reflection-source",
+                    str(source),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("do not pass overrides", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
