@@ -28,7 +28,7 @@ snapshot rounds, without implying public SDK or runtime readiness.
 | `sdk.chat` | `runtime-observed-internal` | 0 in manifest | Separate internal chat reflection evidence and runtime hit notes. | TheIsland A/B validation and copied-data ownership before public API. |
 | `sdk.transfers` | `fixture-backed` | 7 | Compact transfer/download/upload scalar, object, class, and bool-return snapshots; large transfer structs have type candidates only. | Reconstruct `ARKTributeDino`, `ArkTributePlayerData`, and `ItemNetInfo` fields before payload fixtures. |
 | `sdk.admin` | `documentation-only` | 0 | Admin surfaces identified but intentionally blocked. | Permission model and explicit policy; no runtime work. |
-| `ue.reflection` | `internal-substrate` | n/a | FName/GObjects/UObject/UFunction/UProperty tooling underpins all modules. | Second-source evidence and runtime safety gates. |
+| `ue.reflection` | `internal-substrate` | n/a | FName/GObjects/UObject/UFunction/UProperty plus ScriptStruct inspection tooling underpins all modules. | Second-source evidence and runtime safety gates. |
 
 ## Result
 
@@ -50,5 +50,5 @@ bounded property chains only.
 ## Next Priorities
 
 1. Add second-source validation for array inner and compact transfer metadata.
-2. Build a struct-field evidence pass for deferred transfer payloads.
+2. Decide fixture root/manifest schema for ScriptStruct field snapshots.
 3. Keep admin/NetExec and gameplay-authoritative mutations out of runtime work.

@@ -592,6 +592,7 @@ def inspect_target(
     target_value: int,
     object_address: int | None,
     window_size: int,
+    inspection_mode: str,
 ) -> dict[str, object]:
     target = {
         "target_kind": target_kind,
@@ -615,8 +616,14 @@ def inspect_target(
     object_summary = resolved.get("uobject")
     reject_reasons = list(resolved["reject_reasons"])
     class_name = object_summary.get("class_name") if isinstance(object_summary, dict) else None
-    if class_name is not None and "Function" not in str(class_name) and "Struct" not in str(class_name):
-        reject_reasons.append("class_name_not_function_or_struct")
+    if inspection_mode == "script-struct":
+        if class_name != "ScriptStruct":
+            reject_reasons.append("class_name_not_script_struct")
+    elif inspection_mode == "ufunction":
+        if class_name != "Function":
+            reject_reasons.append("class_name_not_function")
+    elif class_name not in ("Function", "ScriptStruct"):
+        reject_reasons.append("class_name_not_function_or_script_struct")
 
     target["status"] = "candidate" if not reject_reasons else "rejected"
     target["reject_reasons"] = reject_reasons
@@ -650,8 +657,10 @@ def inspect_target(
     field_specs = [spec for spec in FIELD_SPECS if spec.offset < window_size]
     target["candidate_fields"] = [inspect_scalar_field(context.memory, object_address, spec) for spec in field_specs]
     first_property = context.memory.read_ptr(object_address + 0x38)
-    expected_count = read_u16(context.memory, object_address + 0x96)
-    parms_size = read_u16(context.memory, object_address + 0x98)
+    is_script_struct = class_name == "ScriptStruct"
+    expected_count = None if is_script_struct else read_u16(context.memory, object_address + 0x96)
+    parms_size = read_i32(context.memory, object_address + 0x40) if is_script_struct else read_u16(context.memory, object_address + 0x98)
+    target["inspection_mode"] = "script_struct" if is_script_struct else "ufunction"
     target["num_parms"] = expected_count
     target["parms_size"] = parms_size
     target["property_chain"] = inspect_property_chain(
@@ -685,6 +694,7 @@ def inspect_core(
     outer_exact: Iterable[str] = (),
     window_size: int,
     max_object_scan: int,
+    inspection_mode: str = "auto",
 ) -> dict[str, object]:
     context = GObjectContext(
         memory,
@@ -705,6 +715,7 @@ def inspect_core(
                 target_value=index,
                 object_address=object_address,
                 window_size=window_size,
+                inspection_mode=inspection_mode,
             )
         )
     for address in object_addresses:
@@ -716,6 +727,7 @@ def inspect_core(
                 target_value=address,
                 object_address=address,
                 window_size=window_size,
+                inspection_mode=inspection_mode,
             )
         )
     for index, address in find_matching_function_indices(
@@ -735,6 +747,7 @@ def inspect_core(
                 target_value=index,
                 object_address=address,
                 window_size=window_size,
+                inspection_mode=inspection_mode,
             )
         )
 
@@ -771,6 +784,21 @@ def build_fixture_snapshot(
     evidence: dict[str, object] | None = None,
 ) -> dict[str, object]:
     metadata = payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
+    modes = {
+        target.get("inspection_mode")
+        for target in payload.get("targets", [])
+        if isinstance(target, dict)
+    }
+    if len(modes) > 1:
+        raise ValueError("--snapshot-json requires targets with a single inspection_mode")
+    mode = next(iter(modes), "ufunction")
+    if mode not in ("ufunction", "script_struct"):
+        mode = "ufunction"
+    schema = (
+        "obelisk.scriptstruct-chain.snapshot.v1"
+        if mode == "script_struct"
+        else "obelisk.ufunction-chain.snapshot.v1"
+    )
     snapshot_targets: list[dict[str, object]] = []
     for target in payload.get("targets", []):
         if not isinstance(target, dict):
@@ -828,41 +856,46 @@ def build_fixture_snapshot(
                 }
             properties.append(property_payload)
 
-        snapshot_targets.append(
-            {
-                "target": {
-                    "kind": target.get("target_kind"),
-                    "value": target.get("target_value"),
-                    "object_index": target.get("object_index"),
-                    "name": target_summary.get("name") if target_summary else None,
-                    "class_name": target_summary.get("class_name") if target_summary else None,
-                    "outer_name": outer_summary.get("name") if outer_summary else None,
-                    "outer_class_name": outer_summary.get("class_name") if outer_summary else None,
-                },
-                "status": target.get("status"),
-                "reject_reasons": target.get("reject_reasons", []),
-                "membership": {
-                    "target": target.get("object_membership_status"),
-                    "class": target.get("class_membership_status"),
-                    "outer": target.get("outer_membership_status"),
-                },
-                "num_parms": target.get("num_parms"),
-                "parms_size": target.get("parms_size"),
-                "function_flags": scalar_field_value(target, "ufunction.function_flags"),
-                "return_value_offset": scalar_field_value(target, "ufunction.return_value_offset"),
-                "property_chain": {
-                    "status": chain.get("status") if isinstance(chain, dict) else None,
-                    "reject_reasons": chain.get("reject_reasons", []) if isinstance(chain, dict) else [],
-                    "expected_count": chain.get("expected_count") if isinstance(chain, dict) else None,
-                    "observed_count": chain.get("observed_count") if isinstance(chain, dict) else None,
-                    "parms_size": chain.get("parms_size") if isinstance(chain, dict) else None,
-                    "properties": properties,
-                },
-            }
-        )
+        snapshot_target = {
+            "target": {
+                "kind": target.get("target_kind"),
+                "value": target.get("target_value"),
+                "object_index": target.get("object_index"),
+                "name": target_summary.get("name") if target_summary else None,
+                "class_name": target_summary.get("class_name") if target_summary else None,
+                "outer_name": outer_summary.get("name") if outer_summary else None,
+                "outer_class_name": outer_summary.get("class_name") if outer_summary else None,
+            },
+            "inspection_mode": target.get("inspection_mode"),
+            "status": target.get("status"),
+            "reject_reasons": target.get("reject_reasons", []),
+            "membership": {
+                "target": target.get("object_membership_status"),
+                "class": target.get("class_membership_status"),
+                "outer": target.get("outer_membership_status"),
+            },
+            "property_chain": {
+                "status": chain.get("status") if isinstance(chain, dict) else None,
+                "reject_reasons": chain.get("reject_reasons", []) if isinstance(chain, dict) else [],
+                "expected_count": chain.get("expected_count") if isinstance(chain, dict) else None,
+                "observed_count": chain.get("observed_count") if isinstance(chain, dict) else None,
+                "properties": properties,
+            },
+        }
+        if mode == "script_struct":
+            snapshot_target["properties_size"] = target.get("parms_size")
+            snapshot_target["min_alignment"] = scalar_field_value(target, "ustruct.min_alignment")
+            snapshot_target["property_chain"]["properties_size"] = chain.get("parms_size") if isinstance(chain, dict) else None
+        else:
+            snapshot_target["num_parms"] = target.get("num_parms")
+            snapshot_target["parms_size"] = target.get("parms_size")
+            snapshot_target["function_flags"] = scalar_field_value(target, "ufunction.function_flags")
+            snapshot_target["return_value_offset"] = scalar_field_value(target, "ufunction.return_value_offset")
+            snapshot_target["property_chain"]["parms_size"] = chain.get("parms_size") if isinstance(chain, dict) else None
+        snapshot_targets.append(snapshot_target)
 
     return {
-        "schema": "obelisk.ufunction-chain.snapshot.v1",
+        "schema": schema,
         "evidence": evidence,
         "address_policy": "absolute core paths and addresses omitted; use full inspector JSON for local evidence review",
         "interpretation": payload.get("interpretation"),
@@ -915,7 +948,7 @@ def find_matching_function_indices(
         if summary is None:
             continue
         class_name = str(summary.get("class_name") or "")
-        if "Function" not in class_name and "Struct" not in class_name:
+        if class_name not in ("Function", "ScriptStruct"):
             continue
         if not contains_any(summary.get("name"), name_filters):
             continue
@@ -1094,6 +1127,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--window-size", type=parse_int, default=DEFAULT_WINDOW_SIZE)
     parser.add_argument("--max-object-scan", type=int, default=DEFAULT_MAX_OBJECT_SCAN)
+    parser.add_argument(
+        "--inspection-mode",
+        choices=("auto", "ufunction", "script-struct"),
+        default="auto",
+        help="Restrict targets to UFunction or ScriptStruct interpretation. Defaults to auto.",
+    )
     parser.add_argument("--json", action="store_true", help="Emit JSON instead of text.")
     parser.add_argument(
         "--snapshot-json",
@@ -1145,6 +1184,7 @@ def main() -> int:
             outer_exact=args.outer_exact,
             window_size=args.window_size,
             max_object_scan=args.max_object_scan,
+            inspection_mode=args.inspection_mode,
         )
     finally:
         memory.close()
@@ -1159,7 +1199,11 @@ def main() -> int:
             "status": args.evidence_status,
             "generated_by": "scripts/inspect_core_ufunctions.py --snapshot-json",
         }
-        print(json.dumps(build_fixture_snapshot(payload, evidence=evidence), indent=2, sort_keys=True))
+        try:
+            snapshot = build_fixture_snapshot(payload, evidence=evidence)
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
+        print(json.dumps(snapshot, indent=2, sort_keys=True))
     else:
         print(format_text(payload))
     return 0

@@ -131,6 +131,10 @@ def build_core_fixture(path: Path) -> dict[str, int]:
         "server_request_dino_char_stats_function": base + 0x27000,
         "the_dino_char_property": base + 0x27100,
         "server_request_tribe_log_function": base + 0x27200,
+        "script_struct_class": base + 0x27300,
+        "tribute_dino_struct": base + 0x27400,
+        "tribute_dino_class_name_property": base + 0x27500,
+        "tribute_dino_id1_property": base + 0x27600,
         "readable_non_uobject": base + 0x80000,
     }
 
@@ -269,9 +273,13 @@ def build_core_fixture(path: Path) -> dict[str, int]:
     put_entry(84, b"theDinoChar\x00")
     put_entry(85, b"ServerRequestTribeLog\x00")
     put_entry(86, b"MissionTag\x00")
+    put_entry(87, b"ScriptStruct\x00")
+    put_entry(88, b"ARKTributeDino\x00")
+    put_entry(89, b"DinoClassName\x00")
+    put_entry(90, b"DinoID1\x00")
 
     put_ptr(addrs["gobjects"] + enum.GOBJECTS_CHUNKS_OFFSET, addrs["gobjects_chunks"])
-    put_i32(addrs["gobjects"] + enum.GOBJECTS_COUNT_OFFSET, 100)
+    put_i32(addrs["gobjects"] + enum.GOBJECTS_COUNT_OFFSET, 104)
     put_ptr(addrs["gobjects_chunks"], addrs["gobjects_chunk0"])
 
     put_uobject(addrs["class_class"], 1, 0, addrs["class_class"], 1, 0)
@@ -836,6 +844,28 @@ def build_core_fixture(path: Path) -> dict[str, int]:
         name_index=85,
         outer_key="shooter_player_controller_class",
     )
+    add_uobject("script_struct_class", object_index=100, class_key="class_class", name_index=87, outer_key=None)
+    add_uobject(
+        "tribute_dino_struct",
+        object_index=101,
+        class_key="script_struct_class",
+        name_index=88,
+        outer_key="package_object",
+    )
+    add_uobject(
+        "tribute_dino_class_name_property",
+        object_index=102,
+        class_key="str_property_class",
+        name_index=89,
+        outer_key="tribute_dino_struct",
+    )
+    add_uobject(
+        "tribute_dino_id1_property",
+        object_index=103,
+        class_key="property_class",
+        name_index=90,
+        outer_key="tribute_dino_struct",
+    )
 
     for index, key in [
         (0, "class_class"),
@@ -1127,6 +1157,16 @@ def build_core_fixture(path: Path) -> dict[str, int]:
         properties=[("the_dino_char_property", 0, 8)],
     )
     put_function_data(addrs["server_request_tribe_log_function"], first_property=0, num_parms=0, parms_size=0)
+    put_ptr(addrs["tribute_dino_struct"] + 0x38, addrs["tribute_dino_class_name_property"])
+    put_i32(addrs["tribute_dino_struct"] + 0x40, 288)
+    put_i32(addrs["tribute_dino_struct"] + 0x44, 0x8)
+    put_property_data(
+        addrs["tribute_dino_class_name_property"],
+        offset=0,
+        element_size=16,
+        next_field=addrs["tribute_dino_id1_property"],
+    )
+    put_property_data(addrs["tribute_dino_id1_property"], offset=0x20, element_size=4)
 
     write_minimal_elf64_core(path, base, bytes(segment))
     return addrs
@@ -1248,7 +1288,7 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
 
         target = payload["targets"][0]
         self.assertEqual(target["status"], "rejected")
-        self.assertIn("class_name_not_function_or_struct", target["reject_reasons"])
+        self.assertIn("class_name_not_function_or_script_struct", target["reject_reasons"])
         self.assertEqual(payload["interpretation"]["status"], "candidate-only")
 
     def test_byte_property_reports_enum_candidate(self) -> None:
@@ -1767,6 +1807,61 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
         self.assertNotIn(hex(addrs["chat_message_outer"]), serialized)
         self.assertNotIn(str(core), serialized)
 
+    def test_script_struct_target_uses_ustruct_properties_size(self) -> None:
+        target = self.inspect_single_by_name_outer("ARKTributeDino", "/Script/ShooterGame")
+        chain = target["property_chain"]
+
+        self.assertEqual(target["object_summary"]["class_name"], "ScriptStruct")
+        self.assertEqual(target["inspection_mode"], "script_struct")
+        self.assertIsNone(target["num_parms"])
+        self.assertEqual(target["parms_size"], 288)
+        self.assertEqual(chain["status"], "candidate")
+        self.assertIsNone(chain["expected_count"])
+        self.assertEqual(chain["parms_size"], 288)
+        self.assert_property_sequence(
+            chain,
+            [
+                ("DinoClassName", "StrProperty", 0, 16),
+                ("DinoID1", "IntProperty", 0x20, 4),
+            ],
+        )
+
+    def test_script_struct_snapshot_uses_separate_schema(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            core = Path(temp_dir) / "core"
+            addrs = build_core_fixture(core)
+            memory = inspector.uobjects.CoreMemory(core)
+            try:
+                payload = inspector.inspect_core(
+                    memory,
+                    gobjects=addrs["gobjects"],
+                    fname_root_slot=addrs["fname_root_slot"],
+                    object_addresses=[],
+                    indices=[],
+                    name_contains=[],
+                    outer_contains=[],
+                    name_exact=["ARKTributeDino"],
+                    outer_exact=["/Script/ShooterGame"],
+                    window_size=0xC0,
+                    max_object_scan=128,
+                )
+            finally:
+                memory.close()
+
+        snapshot = inspector.build_fixture_snapshot(payload)
+        self.assertEqual(snapshot["schema"], "obelisk.scriptstruct-chain.snapshot.v1")
+        target = snapshot["targets"][0]
+        self.assertEqual(target["inspection_mode"], "script_struct")
+        self.assertEqual(target["target"]["class_name"], "ScriptStruct")
+        self.assertEqual(target["properties_size"], 288)
+        self.assertNotIn("num_parms", target)
+        self.assertNotIn("function_flags", target)
+        self.assertEqual(target["property_chain"]["expected_count"], None)
+        self.assertEqual(target["property_chain"]["properties_size"], 288)
+        serialized = json.dumps(snapshot, sort_keys=True)
+        self.assertNotIn(hex(addrs["tribute_dino_struct"]), serialized)
+        self.assertNotIn(str(core), serialized)
+
     def test_cli_json_output(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             core = Path(temp_dir) / "core"
@@ -1917,6 +2012,91 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
         self.assertNotIn(hex(addrs["leave_player_character_property"]), result.stdout)
         self.assertNotIn(hex(addrs["gobjects"]), result.stdout)
         self.assertNotIn(hex(addrs["fname_table"]), result.stdout)
+
+    def test_cli_script_struct_mode_emits_script_struct_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            core = Path(temp_dir) / "core"
+            addrs = build_core_fixture(core)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "inspect_core_ufunctions.py"),
+                    "--core",
+                    str(core),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--inspection-mode",
+                    "script-struct",
+                    "--name-exact",
+                    "ARKTributeDino",
+                    "--snapshot-json",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["schema"], "obelisk.scriptstruct-chain.snapshot.v1")
+        self.assertEqual(payload["targets"][0]["inspection_mode"], "script_struct")
+
+    def test_cli_script_struct_mode_rejects_function_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            core = Path(temp_dir) / "core"
+            addrs = build_core_fixture(core)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "inspect_core_ufunctions.py"),
+                    "--core",
+                    str(core),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--inspection-mode",
+                    "script-struct",
+                    "--name-exact",
+                    "ServerChat",
+                    "--json",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["targets"][0]["status"], "rejected")
+        self.assertIn("class_name_not_script_struct", payload["targets"][0]["reject_reasons"])
+
+    def test_cli_snapshot_json_rejects_mixed_inspection_modes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            core = Path(temp_dir) / "core"
+            addrs = build_core_fixture(core)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "inspect_core_ufunctions.py"),
+                    "--core",
+                    str(core),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--name-exact",
+                    "ServerChat",
+                    "--name-exact",
+                    "ARKTributeDino",
+                    "--snapshot-json",
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("single inspection_mode", result.stderr)
 
     def test_cli_rejects_full_and_snapshot_json_together(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
