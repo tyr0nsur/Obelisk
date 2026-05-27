@@ -25,6 +25,9 @@ jobs:
             scripts/build_reflection_evidence_pack.py \
             scripts/check_chat_reflection_benchmark.py \
             scripts/verify_chat_reflection_constants.py \
+            scripts/test_scan_core_fname_tables.py \
+            scripts/test_enumerate_core_uobjects.py \
+            scripts/test_inspect_core_ufunctions.py \
             scripts/test_build_core_dump_evidence_pack.py \
             scripts/test_check_chat_reflection_benchmark.py \
             scripts/test_analyze_reflectionscanner_capture.py \
@@ -44,7 +47,11 @@ jobs:
         run: python3 scripts/test_analyze_reflectionscanner_capture.py
 
       - name: Run core evidence pack tests
-        run: python3 scripts/test_build_core_dump_evidence_pack.py
+        run: |
+          python3 scripts/test_scan_core_fname_tables.py
+          python3 scripts/test_enumerate_core_uobjects.py
+          python3 scripts/test_inspect_core_ufunctions.py
+          python3 scripts/test_build_core_dump_evidence_pack.py
 
       - name: Run chat benchmark gate tests
         run: python3 scripts/test_check_chat_reflection_benchmark.py
