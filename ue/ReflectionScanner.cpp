@@ -384,7 +384,7 @@ namespace Obelisk::UE
             return !preview.empty();
         }
 
-        void LogFNameIndirectArrayCandidate(const char* name, void* value)
+        void LogFNameIndirectArrayCandidate(const char* name, uintptr_t sourceGlobal, void* value)
         {
             const uintptr_t table = reinterpret_cast<uintptr_t>(value);
             if (!value ||
@@ -428,8 +428,9 @@ namespace Obelisk::UE
             if (score < 2 || readableClues == 0)
                 return;
 
-            OBELISK_INFO("[ReflectionScanner] {} FName indirect-table probe: table={} score={}/8 readable_clues={}/3 matched_clues={}/3 num_elements={} num_chunks={} none='{}' client_message='{}' server_chat='{}'",
+            OBELISK_INFO("[ReflectionScanner] {} FName indirect-table probe: source_global=0x{:X} table={} score={}/8 readable_clues={}/3 matched_clues={}/3 num_elements={} num_chunks={} none='{}' client_message='{}' server_chat='{}'",
                          name,
+                         sourceGlobal,
                          value,
                          score,
                          readableClues,
@@ -590,7 +591,7 @@ namespace Obelisk::UE
             OBELISK_INFO("[ReflectionScanner] {} object probe: +00=0x{:X} +08=0x{:X} +10=0x{:X} +18=0x{:X} +20=0x{:X} +28=0x{:X} +30=0x{:X} +38=0x{:X}",
                          name, qwords[0], qwords[1], qwords[2], qwords[3], qwords[4], qwords[5], qwords[6], qwords[7]);
 
-            LogFNameIndirectArrayCandidate(name, value);
+            LogFNameIndirectArrayCandidate(name, global, value);
 
             size_t executableFields = 0;
             for (size_t offset = 0; offset < 0x200; offset += sizeof(uintptr_t))

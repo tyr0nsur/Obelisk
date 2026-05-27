@@ -46,9 +46,9 @@ repeat-confirmed candidates, and `--strict` now requires a repeat-confirmed exac
 
 ## Recommended Next Changes
 
-Log the source global address in each `FName indirect-table probe` line, not just the table
-pointer and target name. This would let the analyzer require distinct globals or distinct
-targets instead of merely counting repeated table strings.
+Implemented: each `FName indirect-table probe` line now logs `source_global`, and the analyzer
+only treats an exact table hit as repeat-confirmed when it appears from distinct source globals
+or distinct targets.
 
 Log which entry offset and encoding matched for each clue, for example
 `none_offset=0x10 none_encoding=ansi`. A real table should produce consistent layout metadata
@@ -58,9 +58,8 @@ Add one or two extra stable low-index control names after `None`, if known from 
 evidence for this binary. Matching only indices `0`, `9619`, and `9622` leaves too much weight
 on chat-specific clues.
 
-Add analyzer fixture tests with copied sample lines covering exact single-hit, repeated exact,
-bad counts, reject markers, and swapped or truncated names. These can run without server state
-and would prevent regression in the acceptance criteria.
+Implemented: analyzer fixture tests now cover exact single-hit, duplicate exact hit,
+repeat-confirmed hits by distinct globals or targets, bad counts, and reject markers.
 
 After a repeat-confirmed exact candidate appears, do a static cross-reference pass for the
 candidate global before using it as a committed offset. The probe should remain a candidate
@@ -68,6 +67,6 @@ ranking tool until the binary proves where the global is initialized and read.
 
 ## Risks
 
-`repeat_confirmed_candidate` currently means the same table pointer appeared more than once in
-the parsed logs. Until probe lines include source global addresses, this is weaker than proving
-that independent globals or targets converged on the same table.
+`repeat_confirmed_candidate` now requires the same exact table hit to appear from distinct
+source globals or distinct targets. This is still weaker than a static cross-reference proving
+the committed global initializer and readers.

@@ -29,6 +29,7 @@ UOBJECT_RE = re.compile(
 
 FNAME_RE = re.compile(
     r"\[ReflectionScanner\] (?P<target>\S+) FName indirect-table probe: "
+    r"(?:source_global=(?P<source_global>\S+) )?"
     r"table=(?P<table>\S+) score=(?P<score>\d+)/(?P<score_max>\d+) "
     r"readable_clues=(?P<readable_clues>\d+)/(?P<readable_clues_max>\d+) "
     r"matched_clues=(?P<matched_clues>\d+)/(?P<matched_clues_max>\d+) "
@@ -74,6 +75,7 @@ class UObjectValidation:
 class FNameProbe:
     line: int
     target: str
+    source_global: str
     table: str
     score: int
     score_max: int
@@ -199,6 +201,7 @@ def parse_logs(paths: list[str]) -> dict[str, object]:
                 FNameProbe(
                     line=line_number,
                     target=groups["target"],
+                    source_global=groups.get("source_global") or "unknown",
                     table=groups["table"],
                     score=int(groups["score"]),
                     score_max=int(groups["score_max"]),
@@ -240,8 +243,16 @@ def parse_logs(paths: list[str]) -> dict[str, object]:
             )
 
     table_counts: dict[str, int] = {}
+    research_table_counts: dict[str, int] = {}
+    table_targets: dict[str, set[str]] = {}
+    table_source_globals: dict[str, set[str]] = {}
     for probe in fnames:
         table_counts[probe.table] = table_counts.get(probe.table, 0) + 1
+        if probe.research_candidate:
+            research_table_counts[probe.table] = research_table_counts.get(probe.table, 0) + 1
+            table_targets.setdefault(probe.table, set()).add(probe.target)
+            if probe.source_global != "unknown":
+                table_source_globals.setdefault(probe.table, set()).add(probe.source_global)
 
     return {
         "files": sorted(files),
@@ -253,10 +264,15 @@ def parse_logs(paths: list[str]) -> dict[str, object]:
                 "exact_name_match": item.exact_name_match,
                 "plausible_counts": item.plausible_counts,
                 "research_candidate": item.research_candidate,
-                "repeat_confirmed_candidate": (
-                    item.research_candidate and table_counts[item.table] > 1
+                "repeat_confirmed_candidate": item.research_candidate
+                and (
+                    len(table_source_globals.get(item.table, set())) > 1
+                    or len(table_targets.get(item.table, set())) > 1
                 ),
                 "table_seen_count": table_counts[item.table],
+                "table_research_candidate_count": research_table_counts.get(item.table, 0),
+                "distinct_source_globals": sorted(table_source_globals.get(item.table, set())),
+                "distinct_targets": sorted(table_targets.get(item.table, set())),
             }
             for item in fnames
         ],
@@ -291,12 +307,15 @@ def print_human(summary: dict[str, object]) -> None:
     print(f"\nFName exact candidates: {len(exact_candidates)}")
     print(f"FName repeat-confirmed candidates: {len(repeat_confirmed)}")
     for item in exact_candidates:
-        repeated = "repeated" if item["table_seen_count"] > 1 else "single"
+        repeated = "repeated" if item["repeat_confirmed_candidate"] else "single"
         print(
-            "- line {line}: target={target} table={table} score={score}/{score_max} "
+            "- line {line}: target={target} source_global={source_global} table={table} score={score}/{score_max} "
             "matched={matched_clues}/{matched_clues_max} elements={num_elements} "
-            "chunks={num_chunks} table_seen={table_seen_count} ({repeated})".format(
+            "chunks={num_chunks} table_seen={table_seen_count} distinct_globals={distinct_global_count} "
+            "distinct_targets={distinct_target_count} ({repeated})".format(
                 **item,
+                distinct_global_count=len(item["distinct_source_globals"]),
+                distinct_target_count=len(item["distinct_targets"]),
                 repeated=repeated,
             )
         )
@@ -306,7 +325,7 @@ def print_human(summary: dict[str, object]) -> None:
         print("\nweak or rejected FName probes:")
         for item in weak_fnames:
             print(
-                "- line {line}: target={target} table={table} matched={matched_clues}/"
+                "- line {line}: target={target} source_global={source_global} table={table} matched={matched_clues}/"
                 "{matched_clues_max} none='{none}' client_message='{client_message}' "
                 "server_chat='{server_chat}' elements={num_elements} chunks={num_chunks}".format(
                     **item

@@ -105,7 +105,7 @@ UObject validation signal:
 FName indirect-table signal:
 
 ```text
-[ReflectionScanner] <target> FName indirect-table probe: table=<ptr> score=<n>/8 readable_clues=<n>/3 matched_clues=<n>/3 num_elements=<n> num_chunks=<n> none='<name>' client_message='<name>' server_chat='<name>'
+[ReflectionScanner] <target> FName indirect-table probe: source_global=0x<global> table=<ptr> score=<n>/8 readable_clues=<n>/3 matched_clues=<n>/3 num_elements=<n> num_chunks=<n> none='<name>' client_message='<name>' server_chat='<name>'
 ```
 
 Delayed resolution, if a static candidate becomes initialized after startup:
@@ -131,7 +131,7 @@ of these are true in one capture:
   `server_chat='ServerChat'`.
 - `num_elements` is greater than `9622` and plausible for the binary.
 - `num_chunks` is positive and no more than the scanner's probe maximum.
-- The same table pointer appears consistently for more than one target or delayed probe.
+- The same table pointer appears from more than one `source_global` or more than one target.
 
 Promote it beyond a research candidate only after a second isolated capture on the same
 binary reproduces the same table pointer or a static cross-reference validates the global.

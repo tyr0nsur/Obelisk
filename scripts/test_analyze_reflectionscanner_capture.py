@@ -16,6 +16,8 @@ ANALYZER = REPO_ROOT / "scripts" / "analyze_reflectionscanner_capture.py"
 
 def fname_probe(
     *,
+    target: str = "candidate",
+    source_global: str = "0x600000",
     table: str = "0x7f0000001000",
     matched: int = 3,
     matched_max: int = 3,
@@ -26,8 +28,8 @@ def fname_probe(
     server_chat: str = "ServerChat",
 ) -> str:
     return (
-        "[ReflectionScanner] candidate FName indirect-table probe: "
-        f"table={table} score=7/7 readable_clues=3/3 "
+        f"[ReflectionScanner] {target} FName indirect-table probe: "
+        f"source_global={source_global} table={table} score=8/8 readable_clues=3/3 "
         f"matched_clues={matched}/{matched_max} "
         f"num_elements={num_elements} num_chunks={num_chunks} "
         f"none='{none}' client_message='{client_message}' "
@@ -56,17 +58,44 @@ class ReflectionScannerAnalyzerStrictTests(unittest.TestCase):
         self.assertIn("FName repeat-confirmed candidates: 0", result.stdout)
 
     def test_repeated_exact_hit_passes_strict(self) -> None:
-        result = self.run_analyzer([fname_probe(), fname_probe()])
+        result = self.run_analyzer(
+            [
+                fname_probe(source_global="0x600000"),
+                fname_probe(source_global="0x600008"),
+            ]
+        )
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("FName exact candidates: 2", result.stdout)
         self.assertIn("FName repeat-confirmed candidates: 2", result.stdout)
+        self.assertIn("distinct_globals=2", result.stdout)
+
+    def test_duplicate_exact_hit_fails_strict(self) -> None:
+        result = self.run_analyzer([fname_probe(), fname_probe()])
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("FName exact candidates: 2", result.stdout)
+        self.assertIn("FName repeat-confirmed candidates: 0", result.stdout)
+        self.assertIn("table_seen=2", result.stdout)
+
+    def test_repeated_exact_hit_by_distinct_target_passes_strict(self) -> None:
+        result = self.run_analyzer(
+            [
+                fname_probe(target="ServerChat"),
+                fname_probe(target="ClientMessage"),
+            ]
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("FName exact candidates: 2", result.stdout)
+        self.assertIn("FName repeat-confirmed candidates: 2", result.stdout)
+        self.assertIn("distinct_targets=2", result.stdout)
 
     def test_reject_marker_fails_strict_even_with_repeated_hit(self) -> None:
         result = self.run_analyzer(
             [
-                fname_probe(),
-                fname_probe(),
+                fname_probe(source_global="0x600000"),
+                fname_probe(source_global="0x600008"),
                 "[LegacyPlugin] discovery enabled in this copied log",
             ]
         )
