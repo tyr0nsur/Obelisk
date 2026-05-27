@@ -1,0 +1,678 @@
+#!/usr/bin/env python3
+"""Inspect candidate UFunction/UStruct fields from an offline ELF core dump.
+
+This tool is intentionally conservative: it labels observed offsets as candidates, keeps
+reject reasons beside every interpreted value, and never promotes a layout as definitive.
+It reads an existing core file only and never attaches to a running process.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import struct
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Callable, Iterable
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPT_DIR))
+import enumerate_core_uobjects as uobjects  # noqa: E402
+
+
+DEFAULT_WINDOW_SIZE = 0xC0
+DEFAULT_MAX_OBJECT_SCAN = 30000
+POINTER_ALIGNMENT = 8
+
+
+@dataclass(frozen=True)
+class FieldSpec:
+    label: str
+    offset: int
+    kind: str
+    family: str
+    validator: Callable[[int], list[str]]
+
+
+def parse_int(value: str) -> int:
+    return int(value, 0)
+
+
+def hex_or_none(value: int | None) -> str | None:
+    return None if value is None else f"0x{value:x}"
+
+
+def read_int(memory: uobjects.CoreMemory, address: int, fmt: str) -> int | None:
+    size = struct.calcsize(fmt)
+    data = memory.read(address, size)
+    return None if data is None else struct.unpack(fmt, data)[0]
+
+
+def read_u16(memory: uobjects.CoreMemory, address: int) -> int | None:
+    return read_int(memory, address, "<H")
+
+
+def read_i16(memory: uobjects.CoreMemory, address: int) -> int | None:
+    return read_int(memory, address, "<h")
+
+
+def read_i32(memory: uobjects.CoreMemory, address: int) -> int | None:
+    return read_int(memory, address, "<i")
+
+
+def read_u32(memory: uobjects.CoreMemory, address: int) -> int | None:
+    return read_int(memory, address, "<I")
+
+
+def plausible_nonzero_u32(value: int) -> list[str]:
+    return ["zero_value"] if value == 0 else []
+
+
+def plausible_index(value: int) -> list[str]:
+    reasons: list[str] = []
+    if value < 0:
+        reasons.append("negative_index")
+    if value > 10_000_000:
+        reasons.append("implausibly_large_index")
+    return reasons
+
+
+def plausible_small_count(value: int) -> list[str]:
+    if value > 4096:
+        return ["implausibly_large_count"]
+    return []
+
+
+def plausible_size(value: int) -> list[str]:
+    if value > 0x10000:
+        return ["implausibly_large_size"]
+    return []
+
+
+def plausible_alignment(value: int) -> list[str]:
+    if value <= 0:
+        return ["non_positive_alignment"]
+    if value > 0x1000:
+        return ["implausibly_large_alignment"]
+    if value & (value - 1):
+        return ["not_power_of_two"]
+    return []
+
+
+def plausible_offset16(value: int) -> list[str]:
+    if value not in (0xFFFF, 0xFFFE) and value > 0x8000:
+        return ["implausibly_large_offset"]
+    return []
+
+
+def always_candidate(_value: int) -> list[str]:
+    return []
+
+
+FIELD_SPECS = [
+    FieldSpec("uobject.object_flags", 0x08, "u32", "UObjectBase", always_candidate),
+    FieldSpec("uobject.internal_index", 0x0C, "i32", "UObjectBase", plausible_index),
+    FieldSpec("uobject.name_index", 0x18, "i32", "UObjectBase", plausible_index),
+    FieldSpec("uobject.name_number", 0x1C, "i32", "UObjectBase", plausible_index),
+    FieldSpec("uproperty.array_dim", 0x30, "i32", "UProperty", plausible_small_count),
+    FieldSpec("uproperty.element_size", 0x34, "i32", "UProperty", plausible_size),
+    FieldSpec("uproperty.property_flags_low", 0x38, "u32", "UProperty", always_candidate),
+    FieldSpec("uproperty.property_flags_high", 0x3C, "u32", "UProperty", always_candidate),
+    FieldSpec("uproperty.offset_internal", 0x4C, "i32", "UProperty", plausible_size),
+    FieldSpec("ustruct.properties_size", 0x40, "i32", "UStruct", plausible_size),
+    FieldSpec("ustruct.min_alignment", 0x44, "i32", "UStruct", plausible_alignment),
+    FieldSpec("ufunction.function_flags", 0x90, "u32", "UFunction", plausible_nonzero_u32),
+    FieldSpec("ufunction.rep_offset", 0x94, "u16", "UFunction", plausible_offset16),
+    FieldSpec("ufunction.num_parms", 0x96, "u16", "UFunction", plausible_small_count),
+    FieldSpec("ufunction.parms_size", 0x98, "u16", "UFunction", plausible_size),
+    FieldSpec("ufunction.return_value_offset", 0x9A, "u16", "UFunction", plausible_offset16),
+    FieldSpec("ufunction.rpc_id", 0x9C, "u16", "UFunction", always_candidate),
+    FieldSpec("ufunction.rpc_response_id", 0x9E, "u16", "UFunction", always_candidate),
+]
+
+POINTER_LABELS = {
+    0x10: "uobject.class",
+    0x20: "uobject.outer",
+    0x28: "ufield.next",
+    0x30: "ustruct.super_struct",
+    0x38: "ustruct.children",
+    0x48: "ustruct.property_link_or_script_data",
+    0x50: "uproperty.property_link_next_or_ustruct.child_properties",
+    0x58: "ustruct.property_link_or_destructor_link",
+    0x60: "ustruct.ref_link_or_post_construct_link",
+    0x98: "ufunction.first_property_to_init",
+    0xA0: "ufunction.event_graph_function",
+    0xA8: "ufunction.native_func_candidate",
+    0xB0: "ufunction.trailing_pointer_candidate",
+}
+
+
+class GObjectContext:
+    def __init__(
+        self,
+        memory: uobjects.CoreMemory,
+        *,
+        gobjects: int,
+        fname_root_slot: int,
+        max_object_scan: int,
+    ) -> None:
+        self.memory = memory
+        self.gobjects = gobjects
+        self.fname_root_slot = fname_root_slot
+        self.max_object_scan = max_object_scan
+        self.chunks = memory.read_ptr(gobjects + uobjects.GOBJECTS_CHUNKS_OFFSET)
+        self.object_count = read_i32(memory, gobjects + uobjects.GOBJECTS_COUNT_OFFSET)
+        self.fname_table = memory.read_ptr(fname_root_slot)
+        self._address_to_index: dict[int, int] | None = None
+
+    def metadata(self) -> dict[str, object]:
+        return {
+            "gobjects": hex_or_none(self.gobjects),
+            "fname_root_slot": hex_or_none(self.fname_root_slot),
+            "fname_table": hex_or_none(self.fname_table),
+            "chunks": hex_or_none(self.chunks),
+            "object_count": self.object_count,
+            "max_object_scan": self.max_object_scan,
+        }
+
+    def object_address_for_index(self, index: int) -> int | None:
+        if self.chunks is None or self.object_count is None:
+            return None
+        if index < 0 or index >= self.object_count:
+            return None
+        chunk_index = index // uobjects.GOBJECTS_CHUNK_SIZE
+        index_in_chunk = index % uobjects.GOBJECTS_CHUNK_SIZE
+        chunk = self.memory.read_ptr(self.chunks + chunk_index * 8)
+        if not chunk:
+            return None
+        item = chunk + index_in_chunk * uobjects.FUOBJECT_ITEM_SIZE
+        return self.memory.read_ptr(item)
+
+    def address_to_index(self) -> dict[int, int]:
+        if self._address_to_index is not None:
+            return self._address_to_index
+        mapping: dict[int, int] = {}
+        if self.object_count is not None:
+            limit = min(max(self.max_object_scan, 0), self.object_count)
+            for index in range(limit):
+                address = self.object_address_for_index(index)
+                if address:
+                    mapping.setdefault(address, index)
+        self._address_to_index = mapping
+        return mapping
+
+    def describe_uobject(self, address: int) -> dict[str, object] | None:
+        return uobjects.read_uobject(self.memory, address, self.fname_table)
+
+    def resolve_uobject_pointer(self, address: int | None) -> dict[str, object]:
+        reject_reasons: list[str] = []
+        if address is None:
+            return {"status": "rejected", "reject_reasons": ["unreadable_pointer_value"]}
+        if address == 0:
+            return {"status": "rejected", "reject_reasons": ["null_pointer"]}
+        if self.memory.segment_for_vaddr(address, 1) is None:
+            return {
+                "status": "rejected",
+                "reject_reasons": ["pointer_target_not_in_core_segments"],
+            }
+
+        summary = self.describe_uobject(address)
+        if summary is None:
+            return {
+                "status": "candidate-readable-pointer",
+                "reject_reasons": ["not_readable_as_uobject_base"],
+            }
+
+        if summary.get("name") is None:
+            reject_reasons.append("unresolved_object_name")
+        if summary.get("class_name") is None:
+            reject_reasons.append("unresolved_class_name")
+
+        internal_index = summary.get("internal_index")
+        if not isinstance(internal_index, int):
+            reject_reasons.append("missing_internal_index")
+        elif internal_index < 0:
+            reject_reasons.append("negative_internal_index")
+        elif self.object_count is not None and internal_index >= self.object_count:
+            reject_reasons.append("internal_index_outside_gobjects_count")
+        else:
+            indexed_address = self.object_address_for_index(internal_index)
+            if indexed_address is None:
+                reject_reasons.append("gobjects_index_unreadable")
+            elif indexed_address != address:
+                reject_reasons.append("gobjects_internal_index_mismatch")
+
+        status = "candidate-uobject" if not reject_reasons else "rejected"
+        return {
+            "status": status,
+            "reject_reasons": reject_reasons,
+            "uobject": summary,
+            "gobjects_index": self.address_to_index().get(address),
+        }
+
+
+def inspect_scalar_field(memory: uobjects.CoreMemory, object_address: int, spec: FieldSpec) -> dict[str, object]:
+    absolute = object_address + spec.offset
+    if spec.kind == "u16":
+        value = read_u16(memory, absolute)
+    elif spec.kind == "i16":
+        value = read_i16(memory, absolute)
+    elif spec.kind == "u32":
+        value = read_u32(memory, absolute)
+    elif spec.kind == "i32":
+        value = read_i32(memory, absolute)
+    else:
+        raise ValueError(f"unsupported field kind: {spec.kind}")
+
+    if value is None:
+        reject_reasons = ["unreadable_field"]
+        status = "rejected"
+    else:
+        reject_reasons = spec.validator(value)
+        status = "candidate" if not reject_reasons else "rejected"
+
+    return {
+        "label": spec.label,
+        "family": spec.family,
+        "offset": f"0x{spec.offset:x}",
+        "absolute": f"0x{absolute:x}",
+        "kind": spec.kind,
+        "value": value,
+        "value_hex": hex_or_none(value),
+        "status": status,
+        "reject_reasons": reject_reasons,
+    }
+
+
+def inspect_pointer_slot(context: GObjectContext, object_address: int, offset: int) -> dict[str, object]:
+    absolute = object_address + offset
+    value = context.memory.read_ptr(absolute)
+    label = POINTER_LABELS.get(offset, "aligned_pointer_slot")
+    if label == "ufunction.native_func_candidate" and value:
+        segment = context.memory.segment_for_vaddr(value, 1)
+        if segment is not None and segment.flags & 0x1:
+            return {
+                "label": label,
+                "offset": f"0x{offset:x}",
+                "absolute": f"0x{absolute:x}",
+                "kind": "ptr",
+                "value": hex_or_none(value),
+                "status": "candidate-code-pointer",
+                "reject_reasons": [],
+                "segment_flags": segment.flags,
+            }
+    resolved = context.resolve_uobject_pointer(value)
+    result = {
+        "label": label,
+        "offset": f"0x{offset:x}",
+        "absolute": f"0x{absolute:x}",
+        "kind": "ptr",
+        "value": hex_or_none(value),
+        "status": resolved["status"],
+        "reject_reasons": resolved["reject_reasons"],
+    }
+    if "uobject" in resolved:
+        result["resolved_uobject"] = resolved["uobject"]
+    if resolved.get("gobjects_index") is not None:
+        result["gobjects_index"] = resolved["gobjects_index"]
+    return result
+
+
+def inspect_integer_slot(memory: uobjects.CoreMemory, object_address: int, offset: int) -> dict[str, object]:
+    absolute = object_address + offset
+    raw = memory.read(absolute, 8)
+    if raw is None:
+        return {
+            "offset": f"0x{offset:x}",
+            "absolute": f"0x{absolute:x}",
+            "status": "rejected",
+            "reject_reasons": ["unreadable_window_slot"],
+        }
+    u32_low, u32_high = struct.unpack("<II", raw)
+    i32_low, i32_high = struct.unpack("<ii", raw)
+    return {
+        "offset": f"0x{offset:x}",
+        "absolute": f"0x{absolute:x}",
+        "u32_low": u32_low,
+        "u32_low_hex": f"0x{u32_low:x}",
+        "i32_low": i32_low,
+        "u32_high": u32_high,
+        "u32_high_hex": f"0x{u32_high:x}",
+        "i32_high": i32_high,
+        "status": "observed",
+        "reject_reasons": [],
+    }
+
+
+def read_u64(memory: uobjects.CoreMemory, address: int) -> int | None:
+    return read_int(memory, address, "<Q")
+
+
+def inspect_property_chain(
+    context: GObjectContext,
+    *,
+    owner_address: int,
+    first_property: int | None,
+    expected_count: int | None,
+    parms_size: int | None,
+    max_depth: int = 64,
+) -> dict[str, object]:
+    properties: list[dict[str, object]] = []
+    reject_reasons: list[str] = []
+    seen: set[int] = set()
+    current = first_property
+
+    for depth in range(max_depth):
+        if not current:
+            break
+        if current in seen:
+            reject_reasons.append("property_chain_loop")
+            break
+        seen.add(current)
+
+        summary = context.describe_uobject(current)
+        if summary is None:
+            reject_reasons.append(f"property_{depth}_not_readable_as_uobject")
+            break
+
+        owner = summary.get("outer")
+        owner_matches = owner == f"0x{owner_address:x}"
+        if not owner_matches:
+            reject_reasons.append(f"property_{depth}_outer_mismatch")
+
+        array_dim = read_i32(context.memory, current + 0x30)
+        element_size = read_i32(context.memory, current + 0x34)
+        property_flags = read_u64(context.memory, current + 0x38)
+        offset_internal = read_i32(context.memory, current + 0x4C)
+        next_field = context.memory.read_ptr(current + 0x28)
+        next_property = context.memory.read_ptr(current + 0x50)
+
+        property_rejects: list[str] = []
+        if array_dim is None or array_dim <= 0 or array_dim > 4096:
+            property_rejects.append("implausible_array_dim")
+        if element_size is None or element_size <= 0 or element_size > 0x10000:
+            property_rejects.append("implausible_element_size")
+        if offset_internal is None or offset_internal < 0:
+            property_rejects.append("implausible_offset_internal")
+        if (
+            parms_size is not None
+            and offset_internal is not None
+            and element_size is not None
+            and offset_internal + element_size > parms_size
+        ):
+            property_rejects.append("property_exceeds_parms_size")
+
+        properties.append(
+            {
+                "depth": depth,
+                "address": f"0x{current:x}",
+                "summary": summary,
+                "owner_matches": owner_matches,
+                "array_dim": array_dim,
+                "element_size": element_size,
+                "property_flags": hex_or_none(property_flags),
+                "offset_internal": offset_internal,
+                "offset_internal_hex": hex_or_none(offset_internal),
+                "next_field": hex_or_none(next_field),
+                "next_property": hex_or_none(next_property),
+                "status": "candidate" if not property_rejects and owner_matches else "rejected",
+                "reject_reasons": property_rejects,
+            }
+        )
+        current = next_field
+
+    if current:
+        reject_reasons.append("property_chain_depth_limit")
+    if expected_count is not None and len(properties) != expected_count:
+        reject_reasons.append("property_count_mismatch")
+
+    return {
+        "first_property": hex_or_none(first_property),
+        "expected_count": expected_count,
+        "observed_count": len(properties),
+        "parms_size": parms_size,
+        "status": "candidate" if not reject_reasons else "rejected",
+        "reject_reasons": reject_reasons,
+        "properties": properties,
+    }
+
+
+def inspect_target(
+    context: GObjectContext,
+    *,
+    target_kind: str,
+    target_value: int,
+    object_address: int | None,
+    window_size: int,
+) -> dict[str, object]:
+    target = {
+        "target_kind": target_kind,
+        "target_value": target_value if target_kind == "index" else f"0x{target_value:x}",
+        "object": hex_or_none(object_address),
+    }
+    if object_address is None:
+        target.update(
+            {
+                "status": "rejected",
+                "reject_reasons": ["target_object_not_found"],
+                "object_summary": None,
+                "candidate_fields": [],
+                "pointer_window": [],
+                "integer_window": [],
+            }
+        )
+        return target
+
+    resolved = context.resolve_uobject_pointer(object_address)
+    object_summary = resolved.get("uobject")
+    reject_reasons = list(resolved["reject_reasons"])
+    class_name = object_summary.get("class_name") if isinstance(object_summary, dict) else None
+    if class_name is not None and "Function" not in str(class_name) and "Struct" not in str(class_name):
+        reject_reasons.append("class_name_not_function_or_struct")
+
+    target["status"] = "candidate" if not reject_reasons else "rejected"
+    target["reject_reasons"] = reject_reasons
+    target["object_summary"] = object_summary
+
+    field_specs = [spec for spec in FIELD_SPECS if spec.offset < window_size]
+    target["candidate_fields"] = [inspect_scalar_field(context.memory, object_address, spec) for spec in field_specs]
+    first_property = context.memory.read_ptr(object_address + 0x38)
+    expected_count = read_u16(context.memory, object_address + 0x96)
+    parms_size = read_u16(context.memory, object_address + 0x98)
+    target["property_chain"] = inspect_property_chain(
+        context,
+        owner_address=object_address,
+        first_property=first_property,
+        expected_count=expected_count,
+        parms_size=parms_size,
+    )
+    target["pointer_window"] = [
+        inspect_pointer_slot(context, object_address, offset)
+        for offset in range(0, window_size, POINTER_ALIGNMENT)
+    ]
+    target["integer_window"] = [
+        inspect_integer_slot(context.memory, object_address, offset)
+        for offset in range(0, window_size, POINTER_ALIGNMENT)
+    ]
+    return target
+
+
+def inspect_core(
+    memory: uobjects.CoreMemory,
+    *,
+    gobjects: int,
+    fname_root_slot: int,
+    object_addresses: Iterable[int],
+    indices: Iterable[int],
+    window_size: int,
+    max_object_scan: int,
+) -> dict[str, object]:
+    context = GObjectContext(
+        memory,
+        gobjects=gobjects,
+        fname_root_slot=fname_root_slot,
+        max_object_scan=max_object_scan,
+    )
+    targets: list[dict[str, object]] = []
+    for index in indices:
+        targets.append(
+            inspect_target(
+                context,
+                target_kind="index",
+                target_value=index,
+                object_address=context.object_address_for_index(index),
+                window_size=window_size,
+            )
+        )
+    for address in object_addresses:
+        targets.append(
+            inspect_target(
+                context,
+                target_kind="address",
+                target_value=address,
+                object_address=address,
+                window_size=window_size,
+            )
+        )
+
+    return {
+        "metadata": context.metadata(),
+        "interpretation": {
+            "status": "candidate-only",
+            "note": "Offsets are candidate observations from this core, not accepted UE4 layout contracts.",
+        },
+        "targets": targets,
+    }
+
+
+def format_text(payload: dict[str, object]) -> str:
+    metadata = payload["metadata"]
+    lines = [
+        "gobjects={gobjects} chunks={chunks} object_count={object_count} "
+        "fname_table={fname_table} max_object_scan={max_object_scan}".format(**metadata),
+        "interpretation=candidate-only offsets_are_not_definitive",
+    ]
+    for target in payload["targets"]:
+        summary = target.get("object_summary") or {}
+        lines.append(
+            "target={target_kind}:{target_value} object={object} status={status} "
+            "reasons={reasons} class={class_name!r} name={name!r}".format(
+                target_kind=target["target_kind"],
+                target_value=target["target_value"],
+                object=target["object"],
+                status=target["status"],
+                reasons=",".join(target["reject_reasons"]) if target["reject_reasons"] else "-",
+                class_name=summary.get("class_name") if isinstance(summary, dict) else None,
+                name=summary.get("name") if isinstance(summary, dict) else None,
+            )
+        )
+        for field in target.get("candidate_fields", []):
+            lines.append(
+                "  field offset={offset} label={label} kind={kind} value={value_hex} "
+                "status={status} reasons={reasons}".format(
+                    offset=field["offset"],
+                    label=field["label"],
+                    kind=field["kind"],
+                    value_hex=field["value_hex"],
+                    status=field["status"],
+                    reasons=",".join(field["reject_reasons"]) if field["reject_reasons"] else "-",
+                )
+            )
+        for pointer in target.get("pointer_window", []):
+            if pointer["status"] != "candidate-uobject" and pointer["label"] == "aligned_pointer_slot":
+                continue
+            resolved = pointer.get("resolved_uobject") or {}
+            lines.append(
+                "  ptr offset={offset} label={label} value={value} status={status} "
+                "reasons={reasons} resolved={class_name!r}/{name!r}".format(
+                    offset=pointer["offset"],
+                    label=pointer["label"],
+                    value=pointer["value"],
+                    status=pointer["status"],
+                    reasons=",".join(pointer["reject_reasons"]) if pointer["reject_reasons"] else "-",
+                    class_name=resolved.get("class_name") if isinstance(resolved, dict) else None,
+                    name=resolved.get("name") if isinstance(resolved, dict) else None,
+                )
+            )
+        chain = target.get("property_chain") or {}
+        if chain:
+            lines.append(
+                "  property_chain first={first_property} observed={observed_count} expected={expected_count} "
+                "parms_size={parms_size} status={status} reasons={reasons}".format(
+                    first_property=chain.get("first_property"),
+                    observed_count=chain.get("observed_count"),
+                    expected_count=chain.get("expected_count"),
+                    parms_size=chain.get("parms_size"),
+                    status=chain.get("status"),
+                    reasons=",".join(chain.get("reject_reasons", [])) if chain.get("reject_reasons") else "-",
+                )
+            )
+            for prop in chain.get("properties", []):
+                prop_summary = prop.get("summary") or {}
+                lines.append(
+                    "    prop depth={depth} address={address} class={class_name!r} name={name!r} "
+                    "offset={offset} element_size={element_size} flags={flags} next={next_field} "
+                    "status={status} reasons={reasons}".format(
+                        depth=prop["depth"],
+                        address=prop["address"],
+                        class_name=prop_summary.get("class_name") if isinstance(prop_summary, dict) else None,
+                        name=prop_summary.get("name") if isinstance(prop_summary, dict) else None,
+                        offset=prop.get("offset_internal_hex"),
+                        element_size=prop.get("element_size"),
+                        flags=prop.get("property_flags"),
+                        next_field=prop.get("next_field"),
+                        status=prop.get("status"),
+                        reasons=",".join(prop.get("reject_reasons", [])) if prop.get("reject_reasons") else "-",
+                    )
+                )
+    return "\n".join(lines)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Offline candidate UFunction/UStruct inspection from an ELF core dump."
+    )
+    parser.add_argument("--core", required=True, type=Path, help="Path to an existing ELF core dump.")
+    parser.add_argument("--gobjects", type=parse_int, default=uobjects.DEFAULT_GOBJECTS)
+    parser.add_argument("--fname-root-slot", type=parse_int, default=uobjects.DEFAULT_FNAME_ROOT_SLOT)
+    parser.add_argument("--object", action="append", type=parse_int, default=[], help="UObject address to inspect.")
+    parser.add_argument("--index", action="append", type=parse_int, default=[], help="GObjects index to inspect.")
+    parser.add_argument("--window-size", type=parse_int, default=DEFAULT_WINDOW_SIZE)
+    parser.add_argument("--max-object-scan", type=int, default=DEFAULT_MAX_OBJECT_SCAN)
+    parser.add_argument("--json", action="store_true", help="Emit JSON instead of text.")
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+    if not args.object and not args.index:
+        raise SystemExit("provide at least one --object or --index")
+    if args.window_size <= 0:
+        raise SystemExit("--window-size must be positive")
+    if args.max_object_scan < 0:
+        raise SystemExit("--max-object-scan must be non-negative")
+
+    memory = uobjects.CoreMemory(args.core)
+    try:
+        payload = inspect_core(
+            memory,
+            gobjects=args.gobjects,
+            fname_root_slot=args.fname_root_slot,
+            object_addresses=args.object,
+            indices=args.index,
+            window_size=args.window_size,
+            max_object_scan=args.max_object_scan,
+        )
+    finally:
+        memory.close()
+
+    if args.json:
+        print(json.dumps({"core": str(args.core), **payload}, indent=2, sort_keys=True))
+    else:
+        print(format_text(payload))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

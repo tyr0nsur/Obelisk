@@ -206,6 +206,12 @@ Updated: 2026-05-27
   `0x595b7e0` and `0x5956f30`. It found real chat-related `Function` objects including
   `ServerChat` at index `25447`, `ServerChatTo` at `25449`, and `ServerChatToPlayer` at
   `25452`; see `docs/research/2026-05-27-core-uobject-enumeration.md`.
+- fact: `scripts/inspect_core_ufunctions.py` can walk legacy `UStruct.Children +0x38` and
+  `UField.Next +0x28` property chains from the core. Chat parameter evidence:
+  `ServerChat.MessageText` offset `0x0`, `ServerChatTo.SteamID` offset `0x0`,
+  `ServerChatTo.MessageText` offset `0x10`, `ServerChatToPlayer.PlayerName` offset `0x0`,
+  and `ServerChatToPlayer.MessageText` offset `0x10`; see
+  `docs/research/2026-05-27-core-ufunction-property-chain.md`.
 
 ## Rejected Or Unsafe
 
@@ -259,6 +265,9 @@ Updated: 2026-05-27
   resolution.
 - next-step: Add offline `UFunction` metadata/property-chain inspection for the enumerated
   chat function objects before any runtime chat decoder work.
+- next-step: Implement a gated runtime reflection resolver and `ProcessEvent` filter for
+  validated chat `UFunction*` calls, then decode only reflected `FString` param offsets in
+  isolated debug mode.
 - next-step: After a repeat-confirmed `GNames` research candidate appears, generate
   `objdump -d -M intel` for the matching ShooterGameServer binary and run the analyzer with
   `--binary` plus `--objdump-xrefs`; inspect whether candidate `source_global` references
