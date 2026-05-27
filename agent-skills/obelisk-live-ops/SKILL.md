@@ -68,6 +68,9 @@ Expected logs:
 Use named profiles instead of ad hoc env mixes:
 
 - Stable dev: ProcessEvent hook on, plugins disabled, scanner/static roots/native exec off.
+- Runtime debug control: plugins disabled, scanner/native exec off,
+  `enable-debug-control` marker enabled only for a short window, request marker consumed,
+  then immediate restart back to stable dev.
 - Scanner capture: plugins disabled, native exec off, one scanner env family enabled, copied
   logs analyzed offline, then immediate restart back to stable dev.
 - Plugin capture: scanner off, only the target plugin installed, plugin config backed up,
@@ -84,6 +87,41 @@ In `--expect-stable` mode it must fail closed if `libobelisk.so` is not mapped, 
 deleted `libobelisk` mapping remains after redeploy, or if scanner/native-exec variables
 are still present. Its parser is tested offline with procfs fixtures; do not weaken those
 tests to depend on a live ARK process.
+
+## Runtime Debug Control
+
+`OBELISK_ENABLE_DEBUG_CONTROL=1` watches:
+
+```text
+/servidor/ark/obelisk/state/instances/<instance-id>/
+```
+
+Current request marker:
+
+```text
+request-static-fname-probe
+```
+
+Use it to trigger bounded probes after the ARK process is already alive. Do not use it as
+stable posture, and do not leave `enable-debug-control` present after the capture.
+
+Known result: a post-start probe of `0x5956f30` on `arkserver` worked mechanically but
+rejected the slot (`table=0x13733660`, `implausible_num_elements`). This proves waiting
+longer in bootstrap is not the right strategy; next work should scan live data mappings or
+derive roots from code/data references instead of pinning that single slot.
+
+## Overnight Supervision
+
+Unattended cron-style work may collect read-only snapshots only:
+
+- git status/log head,
+- server posture,
+- recent Obelisk logs,
+- marker list,
+- disk/memory/process summary.
+
+Do not let cron build, install, restart, edit marker files, attach debuggers, run gcore,
+enable scanners, commit, push, or create GitHub state. Those require an active lead turn.
 
 ## Config Restore Backups
 

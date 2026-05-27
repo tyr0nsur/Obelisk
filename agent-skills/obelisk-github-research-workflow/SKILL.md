@@ -58,6 +58,25 @@ skill updates, or making work reproducible for contributors.
 - Relaunch agents after major skill updates when their next task depends on the new rules.
 - Documentation/skills workers must not edit runtime C++ or `/servidor/ark` unless their
   prompt explicitly widens scope.
+- The lead must remain the integration owner while agents are active. Do not end a
+  supervised round by leaving active agents without a recorded handoff or polling plan.
+- Reused agents are useful only if the platform preserves their context and they are still
+  aligned with current skills. After major skill or research changes, relaunch fresh agents
+  and make them read the updated handoff/skills.
+
+## Long-Running Supervision
+
+Codex should not promise autonomous development for hours without an active supervising
+turn. Convert long-running work into:
+
+- focused agent rounds with explicit owners,
+- read-only cron snapshots,
+- research notes,
+- handoff updates,
+- queued next tasks.
+
+Unattended automation must not commit, push, restart servers, change markers, run scanners,
+or attach debuggers. It can collect status snapshots for the lead to review later.
 
 ## Lead Commit Flow
 

@@ -26,6 +26,7 @@ Isolated-debug only:
 - Frida,
 - dynamic binary instrumentation,
 - `ReflectionScanner`,
+- `OBELISK_ENABLE_DEBUG_CONTROL=1` marker-triggered runtime probes,
 - broad `ProcessEvent` tracing.
 
 Forbidden on live/shared instances:
@@ -73,3 +74,21 @@ part of the official workflow or skill set.
 Sub-agents must not publish to GitHub or update handoff/versioning. They may edit their
 assigned scope, but the lead performs integration, commits, pushes, and durable process
 updates.
+
+## Unattended Automation Rule
+
+Cron or overnight jobs may run read-only observation scripts only. Allowed outputs are
+timestamped snapshots under `/servidor/ark/obelisk/dumps/` or local text summaries.
+
+Forbidden unattended actions:
+
+- restarts,
+- marker edits,
+- runtime installs,
+- scanner/debug-control enablement,
+- debugger/core dump attach,
+- broad tracing,
+- commits, pushes, or GitHub changes.
+
+If an unattended snapshot finds a bad posture, it should record the failure and stop. The
+lead fixes posture in an active turn.

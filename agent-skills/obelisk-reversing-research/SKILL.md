@@ -31,6 +31,10 @@ Own these areas:
   throwaway process can tolerate crashes.
 - The ReflectionScanner analyzer strict mode now requires a repeat-confirmed exact
   `matched_clues=3/3` table candidate; a single exact row is only a clue.
+- Runtime debug control can trigger bounded probes after the process is alive. The first
+  post-start `request-static-fname-probe` for `0x5956f30` executed correctly but still
+  rejected the slot (`table=0x13733660`, `implausible_num_elements`). Do not keep waiting
+  for bootstrap retries or promote `0x5956f30` from a single core-dump session.
 
 ## Research Principles
 
@@ -38,6 +42,9 @@ Own these areas:
 - Do not scan arbitrary params on every `ProcessEvent` in live servers.
 - Use filtered callbacks by `fname_index` whenever possible.
 - Treat `ReflectionScanner` as an offline/debug tool, not a production startup feature.
+- Prefer post-start or offline evidence over blind startup waits. If a server is joinable
+  and the scanner still reads zero/invalid tables, change the method instead of extending
+  sleep/retry windows.
 - Every new offset or signature must include how it was derived and what binary/version it was tested against.
 - Run scanner captures only on a confirmed isolated/debug instance. The preferred plan is
   `arkserver-obelisk-debug`; do not reuse live Ragnarok/TheIsland marker posture.
@@ -99,7 +106,9 @@ If this fails, fix the server posture before doing more code or agent work.
 ## Next Research Goals
 
 1. Resolve `fname_index -> name` through GNames/FNamePool.
-2. Locate GObjects and enumerate UFunction objects.
-3. Register callbacks by function name, not raw index.
-4. Decode function params from UProperty metadata.
-5. Replace raw FString probing with reflected param decoding.
+2. Add a bounded live data-mapping scanner or offline core scanner for FName-table-shaped
+   pointers instead of relying on one static slot.
+3. Locate GObjects and enumerate UFunction objects.
+4. Register callbacks by function name, not raw index.
+5. Decode function params from UProperty metadata.
+6. Replace raw FString probing with reflected param decoding.

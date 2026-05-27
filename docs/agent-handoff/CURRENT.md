@@ -187,6 +187,16 @@ Updated: 2026-05-27
   `table=0x0` and `reason=unreadable_table_header`; the server was then restarted without
   scanner/static-root env. Treat this as inconclusive, not accepted; see
   `docs/research/2026-05-27-static-fname-root-live-capture.md`.
+- fact: Commit `e2ef8e9` added debug-only runtime control. `enable-debug-control` watches
+  per-instance marker requests, currently `request-static-fname-probe`, so probes can run
+  after ARK is alive. Stable posture rejects `OBELISK_ENABLE_DEBUG_CONTROL`.
+- rejected: The first post-start debug-control probe of `0x5956f30` mechanically worked but
+  rejected the slot (`table=0x13733660`, `implausible_num_elements`). Do not keep extending
+  bootstrap waits or promote that slot from one core-dump session; see
+  `docs/research/2026-05-27-runtime-debug-control.md`.
+- fact: `scripts/obelisk_supervisor_snapshot.sh` is the only approved unattended
+  cron-style workflow for now. It is read-only and writes snapshots to
+  `/servidor/ark/obelisk/dumps/supervisor/`; see `docs/SUPERVISION.md`.
 
 ## Rejected Or Unsafe
 
@@ -235,6 +245,8 @@ Updated: 2026-05-27
   storage scanner, then validate with the analyzer.
 - next-step: Deploy the 10-minute static-root retry build, run one scanner capture, wait at
   least 10 minutes, then analyze copied logs with `--strict`.
+- next-step: Replace blind startup/static-slot waits with a bounded live data-mapping
+  scanner or offline core scanner for FName-table-shaped pointers.
 - next-step: Search statically for one or more `GUObjectArray` candidate slots and inspect
   them through `scripts/build_core_dump_evidence_pack.py --gobjects-candidate`.
 - next-step: After a repeat-confirmed `GNames` research candidate appears, generate

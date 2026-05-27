@@ -125,6 +125,8 @@ starting a new round.
 - [ ] Is there a rejected hypothesis worth saving?
 - [ ] Did a sub-agent suggest a skill update that the lead must accept, reject, or defer?
 - [ ] Did a live-server rule change?
+- [ ] Did a long-running or unattended workflow get reduced to read-only snapshots plus
+      explicit next actions?
 - [ ] Did the relevant skill get updated?
 - [ ] Did `docs/research/` get updated when the evidence is too detailed for a skill?
 - [ ] Are changes committed and pushed if stable?

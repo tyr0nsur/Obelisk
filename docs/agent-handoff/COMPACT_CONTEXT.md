@@ -143,8 +143,17 @@ work from repository state instead of chat history.
   retry window: the slot pointed to `0x30752660`, but counters and clue reads stayed zero.
   Static-root delayed retry has been extended to 10 minutes; see
   `docs/research/2026-05-27-static-root-runtime-retry-capture.md`.
+- Runtime debug control now exists behind `OBELISK_ENABLE_DEBUG_CONTROL=1` and the
+  `enable-debug-control` marker. It runs bounded probes after the server is alive and is
+  forbidden by stable posture. First live post-start probe of `0x5956f30` rejected with
+  `table=0x13733660` / `implausible_num_elements`; waiting longer in bootstrap is rejected
+  as a strategy. See `docs/research/2026-05-27-runtime-debug-control.md`.
 - Core-pack tooling now supports direct FName entry reads and bounded
   `--gobjects-candidate` previews for the next `GUObjectArray` investigation.
+- Read-only overnight snapshots are documented in `docs/SUPERVISION.md` and implemented by
+  `scripts/obelisk_supervisor_snapshot.sh`. They write to
+  `/servidor/ark/obelisk/dumps/supervisor/` and must not restart, install, edit markers,
+  attach debuggers, enable scanners, commit, or push.
 - UE4 type reconstruction planning is captured in
   `docs/research/2026-05-27-ue4-type-reconstruction-roadmap.md`; keep the milestone
   order as `FName`, `GObjects`, `UFunction`, then bounded params.
@@ -236,8 +245,8 @@ python3 scripts/analyze_reflectionscanner_capture.py \
 
 - Ops: get permission to create or designate the isolated ARK debug instance; preferred
   plan is `arkserver-obelisk-debug`.
-- Reflection: deploy the 10-minute static-root retry build and run one scanner capture,
-  waiting at least 10 minutes before copying logs/analyzing strict mode.
+- Reflection: replace blind startup/static-slot waits with a bounded live data-mapping
+  scanner or offline core scanner for FName-table-shaped pointers.
 - GObjects: statically find candidate `GUObjectArray` slots, then inspect only those with
   the enhanced core evidence pack.
 - Evidence: after any isolated scanner capture, run

@@ -33,6 +33,7 @@ define or protect runtime behavior.
 | Plugin architecture policy | Stable baseline | See `docs/PLUGIN_ARCHITECTURE.md`; examples must stay small and experimental plugins stay out of top-level build. |
 | `oBaseEvents` | Release example | First official example plugin; demonstrates ABI validation, config creation, filtered callbacks, and shutdown. |
 | ReflectionScanner | Experimental | Use for isolated captures with explicit gates; keep disabled by default. |
+| Runtime debug control | Experimental | Marker-triggered post-start probes for short debug windows; stable posture rejects `OBELISK_ENABLE_DEBUG_CONTROL`. |
 | Raw FString/FName inference | Experimental | Evidence gathering only until reflection-backed decoding replaces it. |
 | GNames/FNamePool resolution | Not ready | Priority research item. |
 | GObjects/GUObjectArray enumeration | Not ready | Validate object shapes in isolation before accepting offsets. |
