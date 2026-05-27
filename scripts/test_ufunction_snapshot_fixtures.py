@@ -12,6 +12,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
 EXPECTED_ARK_SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
+MANIFEST_SCHEMA = "obelisk.ufunction-snapshot-manifest.v1"
 FORBIDDEN_KEYS = {
     "object",
     "address",
@@ -50,6 +51,30 @@ def walk_json(value: object) -> list[tuple[str | None, object]]:
 class UFunctionSnapshotFixtureTests(unittest.TestCase):
     def fixture_paths(self) -> list[Path]:
         return sorted(FIXTURE_ROOT.glob("**/*.snapshot.json"))
+
+    def manifest(self) -> dict[str, object]:
+        return json.loads((FIXTURE_ROOT / "manifest.json").read_text(encoding="utf-8"))
+
+    def test_manifest_covers_all_committed_snapshot_fixtures(self) -> None:
+        manifest = self.manifest()
+        self.assertEqual(manifest["schema"], MANIFEST_SCHEMA)
+        self.assertEqual(manifest["ark_binary_sha256"], EXPECTED_ARK_SHA)
+        sha_prefix = manifest["sha_prefix"]
+        self.assertEqual(sha_prefix, EXPECTED_ARK_SHA[: len(sha_prefix)])
+
+        entries = manifest["targets"]
+        self.assertIsInstance(entries, list)
+        expected_paths = set()
+        for entry in entries:
+            relative = Path(sha_prefix) / entry["module"] / entry["file"]
+            expected_paths.add(FIXTURE_ROOT / relative)
+            self.assertEqual(entry["file"], f"{entry['outer']}.{entry['name']}.snapshot.json")
+
+        actual_paths = set(self.fixture_paths())
+        self.assertEqual(
+            sorted(path.relative_to(FIXTURE_ROOT).as_posix() for path in actual_paths),
+            sorted(path.relative_to(FIXTURE_ROOT).as_posix() for path in expected_paths),
+        )
 
     def test_snapshot_fixtures_are_sanitized_and_bounded(self) -> None:
         paths = self.fixture_paths()
