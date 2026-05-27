@@ -188,8 +188,39 @@ class ReflectionScannerAnalyzerStrictTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         summary = json.loads(result.stdout)
         self.assertEqual(len(summary["static_xrefs"]["0x600000"]), 1)
+        self.assertEqual(summary["static_xrefs"]["0x600000"][0]["access"], "store")
         self.assertEqual(len(summary["static_xrefs"]["0x600008"]), 1)
+        self.assertEqual(summary["static_xrefs"]["0x600008"][0]["access"], "load")
+        self.assertEqual(
+            summary["evidence_pack"]["static_xref_access_counts"],
+            {"load": 1, "store": 1},
+        )
         self.assertNotIn("0x600010", summary["static_xrefs"])
+
+    def test_json_classifies_intel_static_xref_access(self) -> None:
+        result = self.run_analyzer(
+            [
+                fname_probe(source_global="0x600000"),
+                fname_probe(source_global="0x600008"),
+            ],
+            "--json",
+            objdump_text="""
+0000000000410000 <.text>:
+  410010: 48 89 1d e9 ff 1e 00    mov    QWORD PTR [rip+0x1effe9],rbx        # 0x600000
+  410020: 48 8b 05 e1 ff 1e 00    mov    rax,QWORD PTR [rip+0x1effe1]        # 0x600008
+  410028: 48 8d 05 d1 ff 1e 00    lea    rax,[rip+0x1effd1]                 # 0x600008
+""",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        summary = json.loads(result.stdout)
+        self.assertEqual(summary["static_xrefs"]["0x600000"][0]["access"], "store")
+        self.assertEqual(summary["static_xrefs"]["0x600008"][0]["access"], "load")
+        self.assertEqual(summary["static_xrefs"]["0x600008"][1]["access"], "address")
+        self.assertEqual(
+            summary["evidence_pack"]["static_xref_access_counts"],
+            {"address": 1, "load": 1, "store": 1},
+        )
 
     def test_human_output_reports_static_xrefs(self) -> None:
         result = self.run_analyzer(
@@ -204,6 +235,7 @@ class ReflectionScannerAnalyzerStrictTests(unittest.TestCase):
         self.assertIn("static xrefs:", result.stdout)
         self.assertIn("0x600000: 1 reference(s)", result.stdout)
         self.assertIn("0x410010", result.stdout)
+        self.assertIn("access=store", result.stdout)
 
     def test_json_includes_evidence_pack_binary_metadata(self) -> None:
         result = self.run_analyzer(

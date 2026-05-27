@@ -138,6 +138,37 @@ class StaticXref:
     instruction_address: str
     target_address: str
     instruction: str
+    access: str
+
+
+def classify_xref_access(instruction: str) -> str:
+    tokens = instruction.lower().split()
+    while tokens and re.fullmatch(r"[0-9a-f]{2}", tokens[0]):
+        tokens.pop(0)
+
+    if not tokens:
+        return "unknown"
+
+    mnemonic = tokens[0]
+    if mnemonic.startswith("call"):
+        return "call"
+    if mnemonic.startswith("j"):
+        return "jump"
+    if mnemonic == "lea":
+        return "address"
+
+    operands = " ".join(tokens[1:])
+    if "(%rip)" in operands:
+        parts = [part.strip() for part in operands.split(",", 1)]
+        if len(parts) == 2:
+            return "load" if "(%rip)" in parts[0] else "store"
+
+    if "[rip" in operands:
+        parts = [part.strip() for part in operands.split(",", 1)]
+        if len(parts) == 2:
+            return "store" if "[rip" in parts[0] else "load"
+
+    return "other"
 
 
 def normalize_hex(value: str) -> str:
@@ -239,6 +270,7 @@ def parse_objdump_xrefs(path: Path, targets: set[str]) -> dict[str, list[StaticX
                     instruction_address=f"0x{int(match.group('address'), 16):x}",
                     target_address=target,
                     instruction=" ".join(match.group("body").split()),
+                    access=classify_xref_access(match.group("body")),
                 )
             )
 
@@ -438,6 +470,12 @@ def parse_logs(
         if objdump_xrefs_path is not None
         else {}
     )
+    static_xref_access_counts: dict[str, int] = {}
+    for refs in static_xrefs.values():
+        for ref in refs:
+            static_xref_access_counts[ref.access] = (
+                static_xref_access_counts.get(ref.access, 0) + 1
+            )
 
     table_summaries = summarize_gname_tables(fnames)
     binary_metadata: dict[str, object] | None = None
@@ -460,6 +498,7 @@ def parse_logs(
             "logs": sorted(files),
             "binary": binary_metadata,
             "objdump_xrefs": str(objdump_xrefs_path) if objdump_xrefs_path else None,
+            "static_xref_access_counts": dict(sorted(static_xref_access_counts.items())),
             "reject_marker_count": len(reject_markers),
             "fname_probe_count": len(fnames),
             "gname_table_candidate_count": len(repeat_confirmed_tables),
@@ -601,7 +640,7 @@ def print_human(summary: dict[str, object]) -> None:
             print(f"- {target}: {len(refs)} reference(s)")
             for ref in refs[:5]:
                 print(
-                    "  line {line}: {instruction_address} {instruction}".format(**ref)
+                    "  line {line}: {instruction_address} access={access} {instruction}".format(**ref)
                 )
 
 
