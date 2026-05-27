@@ -5,5 +5,20 @@
   "sha_prefix": "7e7ded49e0c6",
   "source": "offline_core",
   "status": "candidate-only",
-  "targets": []
+  "targets": [
+    {
+      "file": "PrimalLocalProfile.ARKTributeDino.snapshot.json",
+      "module": "sdk_transfers",
+      "name": "ARKTributeDino",
+      "outer": "PrimalLocalProfile",
+      "safe_outer": "PrimalLocalProfile"
+    },
+    {
+      "file": "PrimalLocalProfile.ArkTributePlayerData.snapshot.json",
+      "module": "sdk_transfers",
+      "name": "ArkTributePlayerData",
+      "outer": "PrimalLocalProfile",
+      "safe_outer": "PrimalLocalProfile"
+    }
+  ]
 }

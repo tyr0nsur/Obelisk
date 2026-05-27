@@ -1,0 +1,211 @@
+{
+  "address_policy": "absolute core paths and addresses omitted; use full inspector JSON for local evidence review",
+  "evidence": {
+    "ark_binary_sha256": "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+    "generated_by": "scripts/inspect_core_ufunctions.py --snapshot-json",
+    "obelisk_commit": "0e11b07",
+    "source": "offline_core",
+    "status": "candidate-only"
+  },
+  "interpretation": {
+    "note": "Offsets are candidate observations from this core, not accepted UE4 layout contracts.",
+    "status": "candidate-only"
+  },
+  "metadata": {
+    "max_object_scan": 30000,
+    "object_count": 1243796
+  },
+  "schema": "obelisk.scriptstruct-chain.snapshot.v1",
+  "targets": [
+    {
+      "inspection_mode": "script_struct",
+      "membership": {
+        "class": "candidate-uobject",
+        "outer": "candidate-uobject",
+        "target": "candidate-uobject"
+      },
+      "min_alignment": 0,
+      "properties_size": 288,
+      "property_chain": {
+        "expected_count": null,
+        "observed_count": 10,
+        "properties": [
+          {
+            "array_dim": 1,
+            "class_membership_status": "candidate-uobject",
+            "class_name": "StrProperty",
+            "depth": 0,
+            "element_size": 16,
+            "membership_status": "candidate-uobject",
+            "name": "DinoClassName",
+            "name_index": 19825,
+            "offset_internal": 8,
+            "outer_membership_status": "candidate-uobject",
+            "property_flags": "0x10000000002200",
+            "reject_reasons": [],
+            "status": "candidate"
+          },
+          {
+            "array_dim": 1,
+            "class_membership_status": "candidate-uobject",
+            "class_name": "ClassProperty",
+            "depth": 1,
+            "element_size": 8,
+            "membership_status": "candidate-uobject",
+            "name": "DinoClass",
+            "name_index": 17723,
+            "offset_internal": 24,
+            "outer_membership_status": "candidate-uobject",
+            "property_flags": "0x1040002200",
+            "reject_reasons": [],
+            "status": "candidate"
+          },
+          {
+            "array_dim": 1,
+            "array_inner_candidate": {
+              "inner_property": {
+                "class_name": "ByteProperty",
+                "name": "DinoData",
+                "name_index": 19824
+              },
+              "membership_status": "candidate-uobject",
+              "reject_reasons": [],
+              "status": "candidate"
+            },
+            "class_membership_status": "candidate-uobject",
+            "class_name": "ArrayProperty",
+            "depth": 2,
+            "element_size": 16,
+            "membership_status": "candidate-uobject",
+            "name": "DinoData",
+            "name_index": 19824,
+            "offset_internal": 32,
+            "outer_membership_status": "candidate-uobject",
+            "property_flags": "0x10000000002200",
+            "reject_reasons": [],
+            "status": "candidate"
+          },
+          {
+            "array_dim": 1,
+            "class_membership_status": "candidate-uobject",
+            "class_name": "StrProperty",
+            "depth": 3,
+            "element_size": 16,
+            "membership_status": "candidate-uobject",
+            "name": "DinoName",
+            "name_index": 17357,
+            "offset_internal": 48,
+            "outer_membership_status": "candidate-uobject",
+            "property_flags": "0x10000000002200",
+            "reject_reasons": [],
+            "status": "candidate"
+          },
+          {
+            "array_dim": 1,
+            "class_membership_status": "candidate-uobject",
+            "class_name": "StrProperty",
+            "depth": 4,
+            "element_size": 16,
+            "membership_status": "candidate-uobject",
+            "name": "DinoNameInMap",
+            "name_index": 19823,
+            "offset_internal": 64,
+            "outer_membership_status": "candidate-uobject",
+            "property_flags": "0x10000000002200",
+            "reject_reasons": [],
+            "status": "candidate"
+          },
+          {
+            "array_dim": 12,
+            "class_membership_status": "candidate-uobject",
+            "class_name": "StrProperty",
+            "depth": 5,
+            "element_size": 16,
+            "membership_status": "candidate-uobject",
+            "name": "DinoStats",
+            "name_index": 19822,
+            "offset_internal": 80,
+            "outer_membership_status": "candidate-uobject",
+            "property_flags": "0x10000000002200",
+            "reject_reasons": [],
+            "status": "candidate"
+          },
+          {
+            "array_dim": 1,
+            "class_membership_status": "candidate-uobject",
+            "class_name": "FloatProperty",
+            "depth": 6,
+            "element_size": 4,
+            "membership_status": "candidate-uobject",
+            "name": "DinoExperiencePoints",
+            "name_index": 19821,
+            "offset_internal": 272,
+            "outer_membership_status": "candidate-uobject",
+            "property_flags": "0x10001040002200",
+            "reject_reasons": [],
+            "status": "candidate"
+          },
+          {
+            "array_dim": 1,
+            "class_membership_status": "candidate-uobject",
+            "class_name": "FloatProperty",
+            "depth": 7,
+            "element_size": 4,
+            "membership_status": "candidate-uobject",
+            "name": "Version",
+            "name_index": 510,
+            "offset_internal": 276,
+            "outer_membership_status": "candidate-uobject",
+            "property_flags": "0x10001040002200",
+            "reject_reasons": [],
+            "status": "candidate"
+          },
+          {
+            "array_dim": 1,
+            "class_membership_status": "candidate-uobject",
+            "class_name": "UInt32Property",
+            "depth": 8,
+            "element_size": 4,
+            "membership_status": "candidate-uobject",
+            "name": "DinoID1",
+            "name_index": 19820,
+            "offset_internal": 280,
+            "outer_membership_status": "candidate-uobject",
+            "property_flags": "0x1040002200",
+            "reject_reasons": [],
+            "status": "candidate"
+          },
+          {
+            "array_dim": 1,
+            "class_membership_status": "candidate-uobject",
+            "class_name": "UInt32Property",
+            "depth": 9,
+            "element_size": 4,
+            "membership_status": "candidate-uobject",
+            "name": "DinoID2",
+            "name_index": 19819,
+            "offset_internal": 284,
+            "outer_membership_status": "candidate-uobject",
+            "property_flags": "0x1040002200",
+            "reject_reasons": [],
+            "status": "candidate"
+          }
+        ],
+        "properties_size": 288,
+        "reject_reasons": [],
+        "status": "candidate"
+      },
+      "reject_reasons": [],
+      "status": "candidate",
+      "target": {
+        "class_name": "ScriptStruct",
+        "kind": "index",
+        "name": "ARKTributeDino",
+        "object_index": 6293,
+        "outer_class_name": "Class",
+        "outer_name": "PrimalLocalProfile",
+        "value": 6293
+      }
+    }
+  ]
+}

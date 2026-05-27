@@ -1,9 +1,10 @@
 # ScriptStruct Snapshot Fixtures
 
-This fixture root is reserved for sanitized `ScriptStruct` snapshots generated from
-offline core evidence.
+This fixture root stores sanitized `ScriptStruct` snapshots generated from offline core
+evidence. Fixtures are manifest-backed and candidate-only; they document reflected field
+metadata, not public decoding or runtime dispatch contracts.
 
-No real ScriptStruct fixtures are committed yet. Regenerate accepted entries with:
+Regenerate accepted entries with:
 
 ```bash
 python3 scripts/regenerate_scriptstruct_snapshots.py \
@@ -12,7 +13,7 @@ python3 scripts/regenerate_scriptstruct_snapshots.py \
   --check
 ```
 
-The first accepted fixtures should use:
+Accepted fixtures use:
 
 ```text
 tests/fixtures/scriptstruct_snapshots/<ark-sha12>/<sdk_module>/<SafeOuter>.<Struct>.snapshot.json

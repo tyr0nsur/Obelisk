@@ -1,0 +1,226 @@
+{
+  "address_policy": "absolute core paths and addresses omitted; use full inspector JSON for local evidence review",
+  "evidence": {
+    "ark_binary_sha256": "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+    "generated_by": "scripts/inspect_core_ufunctions.py --snapshot-json",
+    "obelisk_commit": "0e11b07",
+    "source": "offline_core",
+    "status": "candidate-only"
+  },
+  "interpretation": {
+    "note": "Offsets are candidate observations from this core, not accepted UE4 layout contracts.",
+    "status": "candidate-only"
+  },
+  "metadata": {
+    "max_object_scan": 30000,
+    "object_count": 1243796
+  },
+  "schema": "obelisk.scriptstruct-chain.snapshot.v1",
+  "targets": [
+    {
+      "inspection_mode": "script_struct",
+      "membership": {
+        "class": "candidate-uobject",
+        "outer": "candidate-uobject",
+        "target": "candidate-uobject"
+      },
+      "min_alignment": 0,
+      "properties_size": 288,
+      "property_chain": {
+        "expected_count": null,
+        "observed_count": 11,
+        "properties": [
+          {
+            "array_dim": 1,
+            "class_membership_status": "candidate-uobject",
+            "class_name": "UInt64Property",
+            "depth": 0,
+            "element_size": 8,
+            "membership_status": "candidate-uobject",
+            "name": "PlayerDataID",
+            "name_index": 19817,
+            "offset_internal": 8,
+            "outer_membership_status": "candidate-uobject",
+            "property_flags": "0x1040000200",
+            "reject_reasons": [],
+            "status": "candidate"
+          },
+          {
+            "array_dim": 1,
+            "array_inner_candidate": {
+              "inner_property": {
+                "class_name": "ByteProperty",
+                "name": "PlayerDataBytes",
+                "name_index": 19816
+              },
+              "membership_status": "candidate-uobject",
+              "reject_reasons": [],
+              "status": "candidate"
+            },
+            "class_membership_status": "candidate-uobject",
+            "class_name": "ArrayProperty",
+            "depth": 1,
+            "element_size": 16,
+            "membership_status": "candidate-uobject",
+            "name": "PlayerDataBytes",
+            "name_index": 19816,
+            "offset_internal": 16,
+            "outer_membership_status": "candidate-uobject",
+            "property_flags": "0x200",
+            "reject_reasons": [],
+            "status": "candidate"
+          },
+          {
+            "array_dim": 1,
+            "class_membership_status": "candidate-uobject",
+            "class_name": "StrProperty",
+            "depth": 2,
+            "element_size": 16,
+            "membership_status": "candidate-uobject",
+            "name": "PlayerName",
+            "name_index": 16693,
+            "offset_internal": 32,
+            "outer_membership_status": "candidate-uobject",
+            "property_flags": "0x200",
+            "reject_reasons": [],
+            "status": "candidate"
+          },
+          {
+            "array_dim": 12,
+            "class_membership_status": "candidate-uobject",
+            "class_name": "StrProperty",
+            "depth": 3,
+            "element_size": 16,
+            "membership_status": "candidate-uobject",
+            "name": "PlayerStats",
+            "name_index": 19815,
+            "offset_internal": 48,
+            "outer_membership_status": "candidate-uobject",
+            "property_flags": "0x10000000002200",
+            "reject_reasons": [],
+            "status": "candidate"
+          },
+          {
+            "array_dim": 1,
+            "class_membership_status": "candidate-uobject",
+            "class_name": "StrProperty",
+            "depth": 4,
+            "element_size": 16,
+            "membership_status": "candidate-uobject",
+            "name": "UploadingServerMapName",
+            "name_index": 19814,
+            "offset_internal": 240,
+            "outer_membership_status": "candidate-uobject",
+            "property_flags": "0x10000000002200",
+            "reject_reasons": [],
+            "status": "candidate"
+          },
+          {
+            "array_dim": 1,
+            "class_membership_status": "candidate-uobject",
+            "class_name": "StrProperty",
+            "depth": 5,
+            "element_size": 16,
+            "membership_status": "candidate-uobject",
+            "name": "UploadingServerName",
+            "name_index": 19813,
+            "offset_internal": 256,
+            "outer_membership_status": "candidate-uobject",
+            "property_flags": "0x10000000002200",
+            "reject_reasons": [],
+            "status": "candidate"
+          },
+          {
+            "array_dim": 1,
+            "class_membership_status": "candidate-uobject",
+            "class_name": "BoolProperty",
+            "depth": 6,
+            "element_size": 1,
+            "membership_status": "candidate-uobject",
+            "name": "bWasAllowDPCUpload",
+            "name_index": 19812,
+            "offset_internal": 272,
+            "outer_membership_status": "candidate-uobject",
+            "property_flags": "0x10001040002200",
+            "reject_reasons": [],
+            "status": "candidate"
+          },
+          {
+            "array_dim": 1,
+            "class_membership_status": "candidate-uobject",
+            "class_name": "BoolProperty",
+            "depth": 7,
+            "element_size": 1,
+            "membership_status": "candidate-uobject",
+            "name": "bWithItems",
+            "name_index": 19811,
+            "offset_internal": 273,
+            "outer_membership_status": "candidate-uobject",
+            "property_flags": "0x10001040002200",
+            "reject_reasons": [],
+            "status": "candidate"
+          },
+          {
+            "array_dim": 1,
+            "class_membership_status": "candidate-uobject",
+            "class_name": "UInt32Property",
+            "depth": 8,
+            "element_size": 4,
+            "membership_status": "candidate-uobject",
+            "name": "ItemCount",
+            "name_index": 19810,
+            "offset_internal": 276,
+            "outer_membership_status": "candidate-uobject",
+            "property_flags": "0x10001040002200",
+            "reject_reasons": [],
+            "status": "candidate"
+          },
+          {
+            "array_dim": 1,
+            "class_membership_status": "candidate-uobject",
+            "class_name": "BoolProperty",
+            "depth": 9,
+            "element_size": 1,
+            "membership_status": "candidate-uobject",
+            "name": "bForServerTransfer",
+            "name_index": 19809,
+            "offset_internal": 280,
+            "outer_membership_status": "candidate-uobject",
+            "property_flags": "0x10001040002200",
+            "reject_reasons": [],
+            "status": "candidate"
+          },
+          {
+            "array_dim": 1,
+            "class_membership_status": "candidate-uobject",
+            "class_name": "FloatProperty",
+            "depth": 10,
+            "element_size": 4,
+            "membership_status": "candidate-uobject",
+            "name": "Version",
+            "name_index": 510,
+            "offset_internal": 284,
+            "outer_membership_status": "candidate-uobject",
+            "property_flags": "0x10001040002200",
+            "reject_reasons": [],
+            "status": "candidate"
+          }
+        ],
+        "properties_size": 288,
+        "reject_reasons": [],
+        "status": "candidate"
+      },
+      "reject_reasons": [],
+      "status": "candidate",
+      "target": {
+        "class_name": "ScriptStruct",
+        "kind": "index",
+        "name": "ArkTributePlayerData",
+        "object_index": 6276,
+        "outer_class_name": "Class",
+        "outer_name": "PrimalLocalProfile",
+        "value": 6276
+      }
+    }
+  ]
+}
