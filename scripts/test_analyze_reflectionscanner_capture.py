@@ -64,6 +64,59 @@ def fname_reject(
     )
 
 
+def static_fname_root_probe(
+    *,
+    slot: str = "0x5956f30",
+    table: str = "0x7f0000001000",
+    matched: int = 3,
+    matched_max: int = 3,
+    header_index_ok: int = 3,
+    header_index_ok_max: int = 3,
+    num_elements: int = 10000,
+    num_chunks: int = 1,
+    none: str = "None",
+    client_message: str = "ClientMessage",
+    server_chat: str = "ServerChat",
+) -> str:
+    return (
+        "[ReflectionScanner] StaticFNameRoot FName static-root probe: "
+        f"slot={slot} table={table} score=9/9 readable_clues=3/3 "
+        f"matched_clues={matched}/{matched_max} "
+        f"header_index_ok={header_index_ok}/{header_index_ok_max} "
+        f"num_elements={num_elements} num_chunks={num_chunks} "
+        f"none='{none}' client_message='{client_message}' "
+        f"server_chat='{server_chat}'"
+    )
+
+
+def static_fname_root_reject(
+    *,
+    slot: str = "0x5956f30",
+    table: str = "0x0",
+    reason: str = "null_table",
+    readable: int = 0,
+    readable_max: int = 3,
+    matched: int = 0,
+    matched_max: int = 3,
+    header_index_ok: int = 0,
+    header_index_ok_max: int = 3,
+    num_elements: int = 0,
+    num_chunks: int = 0,
+    none: str = "",
+    client_message: str = "",
+    server_chat: str = "",
+) -> str:
+    return (
+        "[ReflectionScanner] StaticFNameRoot FName static-root reject: "
+        f"slot={slot} table={table} reason={reason} "
+        f"readable_clues={readable}/{readable_max} matched_clues={matched}/{matched_max} "
+        f"header_index_ok={header_index_ok}/{header_index_ok_max} "
+        f"num_elements={num_elements} num_chunks={num_chunks} "
+        f"none='{none}' client_message='{client_message}' "
+        f"server_chat='{server_chat}'"
+    )
+
+
 class ReflectionScannerAnalyzerStrictTests(unittest.TestCase):
     def run_analyzer(
         self,
@@ -298,6 +351,73 @@ class ReflectionScannerAnalyzerStrictTests(unittest.TestCase):
         self.assertIn("FName probes: 0", result.stdout)
         self.assertIn("FName rejects: 2", result.stdout)
         self.assertIn("preview_mismatch: 2", result.stdout)
+
+    def test_json_summarizes_static_fname_root_probe_and_reject(self) -> None:
+        result = self.run_analyzer(
+            [
+                static_fname_root_probe(),
+                static_fname_root_reject(
+                    slot="0x5956f38",
+                    reason="unreadable_table_header",
+                ),
+            ],
+            "--json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        summary = json.loads(result.stdout)
+        evidence_pack = summary["evidence_pack"]
+        self.assertEqual(evidence_pack["status"], "research-candidate")
+        self.assertEqual(evidence_pack["static_fname_root_probe_count"], 1)
+        self.assertEqual(evidence_pack["static_fname_root_reject_count"], 1)
+        self.assertEqual(evidence_pack["static_fname_root_candidate_count"], 1)
+        self.assertEqual(
+            evidence_pack["static_fname_root_reject_reason_counts"],
+            {"unreadable_table_header": 1},
+        )
+        probe = summary["static_fname_root_probes"][0]
+        self.assertEqual(probe["slot"], "0x5956f30")
+        self.assertTrue(probe["research_candidate"])
+        self.assertTrue(probe["valid_header_indices"])
+        self.assertEqual(probe["header_index_ok"], 3)
+        self.assertEqual(summary["static_fname_root_rejects"][0]["slot"], "0x5956f38")
+
+    def test_static_fname_root_candidate_passes_strict(self) -> None:
+        result = self.run_analyzer([static_fname_root_probe()], "--strict")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Static FName root probes: 1", result.stdout)
+        self.assertIn("Static FName root candidates: 1", result.stdout)
+        self.assertIn("slot=0x5956f30", result.stdout)
+
+    def test_static_fname_root_bad_counts_fail_strict(self) -> None:
+        result = self.run_analyzer(
+            [static_fname_root_probe(num_elements=10, num_chunks=0)],
+            "--strict",
+        )
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("Static FName root probes: 1", result.stdout)
+        self.assertIn("Static FName root candidates: 0", result.stdout)
+        self.assertIn("weak or rejected static FName root probes:", result.stdout)
+
+    def test_static_fname_root_header_index_failure_fails_strict(self) -> None:
+        result = self.run_analyzer(
+            [static_fname_root_probe(header_index_ok=2)],
+            "--strict",
+        )
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("Static FName root candidates: 0", result.stdout)
+        self.assertIn("header_index_ok=2/3", result.stdout)
+
+    def test_static_fname_root_rejects_do_not_satisfy_strict(self) -> None:
+        result = self.run_analyzer([static_fname_root_reject()], "--strict")
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("Static FName root rejects: 1", result.stdout)
+        self.assertIn("Static FName root reject reasons:", result.stdout)
+        self.assertIn("null_table: 1", result.stdout)
 
     def test_json_annotates_static_xrefs_from_objdump_text(self) -> None:
         result = self.run_analyzer(

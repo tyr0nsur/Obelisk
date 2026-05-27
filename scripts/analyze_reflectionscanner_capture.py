@@ -53,6 +53,31 @@ FNAME_REJECT_RE = re.compile(
     r"server_chat='(?P<server_chat>[^']*)'"
 )
 
+STATIC_FNAME_ROOT_RE = re.compile(
+    r"\[ReflectionScanner\] (?P<target>StaticFNameRoot) FName static-root probe: "
+    r"slot=(?P<slot>\S+) table=(?P<table>\S+) "
+    r"score=(?P<score>\d+)/(?P<score_max>\d+) "
+    r"readable_clues=(?P<readable_clues>\d+)/(?P<readable_clues_max>\d+) "
+    r"matched_clues=(?P<matched_clues>\d+)/(?P<matched_clues_max>\d+) "
+    r"header_index_ok=(?P<header_index_ok>\d+)/(?P<header_index_ok_max>\d+) "
+    r"num_elements=(?P<num_elements>-?\d+) num_chunks=(?P<num_chunks>-?\d+) "
+    r"none='(?P<none>[^']*)' "
+    r"client_message='(?P<client_message>[^']*)' "
+    r"server_chat='(?P<server_chat>[^']*)'"
+)
+
+STATIC_FNAME_ROOT_REJECT_RE = re.compile(
+    r"\[ReflectionScanner\] (?P<target>StaticFNameRoot) FName static-root reject: "
+    r"slot=(?P<slot>\S+) table=(?P<table>\S+) reason=(?P<reason>\S+) "
+    r"readable_clues=(?P<readable_clues>\d+)/(?P<readable_clues_max>\d+) "
+    r"matched_clues=(?P<matched_clues>\d+)/(?P<matched_clues_max>\d+) "
+    r"header_index_ok=(?P<header_index_ok>\d+)/(?P<header_index_ok_max>\d+) "
+    r"num_elements=(?P<num_elements>-?\d+) num_chunks=(?P<num_chunks>-?\d+) "
+    r"none='(?P<none>[^']*)' "
+    r"client_message='(?P<client_message>[^']*)' "
+    r"server_chat='(?P<server_chat>[^']*)'"
+)
+
 DELAYED_RE = re.compile(
     r"\[ReflectionScanner\] delayed global resolved after (?P<seconds>\d+)s: "
     r"(?P<target>\S+) (?P<global>\S+) -> (?P<value>\S+)"
@@ -138,6 +163,73 @@ class FNameReject:
     readable_clues_max: int
     matched_clues: int
     matched_clues_max: int
+    num_elements: int
+    num_chunks: int
+    none: str
+    client_message: str
+    server_chat: str
+
+
+@dataclass(frozen=True)
+class StaticFNameRootProbe:
+    line: int
+    target: str
+    slot: str
+    table: str
+    score: int
+    score_max: int
+    readable_clues: int
+    readable_clues_max: int
+    matched_clues: int
+    matched_clues_max: int
+    header_index_ok: int
+    header_index_ok_max: int
+    num_elements: int
+    num_chunks: int
+    none: str
+    client_message: str
+    server_chat: str
+
+    @property
+    def exact_name_match(self) -> bool:
+        return (
+            self.matched_clues == 3
+            and self.matched_clues_max == 3
+            and self.none == "None"
+            and self.client_message == "ClientMessage"
+            and self.server_chat == "ServerChat"
+        )
+
+    @property
+    def plausible_counts(self) -> bool:
+        return 9622 < self.num_elements < 10_000_000 and 0 < self.num_chunks <= 128
+
+    @property
+    def valid_header_indices(self) -> bool:
+        return self.header_index_ok == 3 and self.header_index_ok_max == 3
+
+    @property
+    def research_candidate(self) -> bool:
+        return (
+            self.exact_name_match
+            and self.valid_header_indices
+            and self.plausible_counts
+        )
+
+
+@dataclass(frozen=True)
+class StaticFNameRootReject:
+    line: int
+    target: str
+    slot: str
+    table: str
+    reason: str
+    readable_clues: int
+    readable_clues_max: int
+    matched_clues: int
+    matched_clues_max: int
+    header_index_ok: int
+    header_index_ok_max: int
     num_elements: int
     num_chunks: int
     none: str
@@ -438,6 +530,8 @@ def parse_logs(
     uobjects: list[UObjectValidation] = []
     fnames: list[FNameProbe] = []
     fname_rejects: list[FNameReject] = []
+    static_fname_root_probes: list[StaticFNameRootProbe] = []
+    static_fname_root_rejects: list[StaticFNameRootReject] = []
     delayed: list[DelayedGlobal] = []
     candidate_globals: list[CandidateGlobal] = []
     reject_markers: list[LogMatch] = []
@@ -513,6 +607,55 @@ def parse_logs(
             )
             continue
 
+        if match := STATIC_FNAME_ROOT_RE.search(line):
+            groups = match.groupdict()
+            static_fname_root_probes.append(
+                StaticFNameRootProbe(
+                    line=line_number,
+                    target=groups["target"],
+                    slot=groups["slot"],
+                    table=groups["table"],
+                    score=int(groups["score"]),
+                    score_max=int(groups["score_max"]),
+                    readable_clues=int(groups["readable_clues"]),
+                    readable_clues_max=int(groups["readable_clues_max"]),
+                    matched_clues=int(groups["matched_clues"]),
+                    matched_clues_max=int(groups["matched_clues_max"]),
+                    header_index_ok=int(groups["header_index_ok"]),
+                    header_index_ok_max=int(groups["header_index_ok_max"]),
+                    num_elements=int(groups["num_elements"]),
+                    num_chunks=int(groups["num_chunks"]),
+                    none=groups["none"],
+                    client_message=groups["client_message"],
+                    server_chat=groups["server_chat"],
+                )
+            )
+            continue
+
+        if match := STATIC_FNAME_ROOT_REJECT_RE.search(line):
+            groups = match.groupdict()
+            static_fname_root_rejects.append(
+                StaticFNameRootReject(
+                    line=line_number,
+                    target=groups["target"],
+                    slot=groups["slot"],
+                    table=groups["table"],
+                    reason=groups["reason"],
+                    readable_clues=int(groups["readable_clues"]),
+                    readable_clues_max=int(groups["readable_clues_max"]),
+                    matched_clues=int(groups["matched_clues"]),
+                    matched_clues_max=int(groups["matched_clues_max"]),
+                    header_index_ok=int(groups["header_index_ok"]),
+                    header_index_ok_max=int(groups["header_index_ok_max"]),
+                    num_elements=int(groups["num_elements"]),
+                    num_chunks=int(groups["num_chunks"]),
+                    none=groups["none"],
+                    client_message=groups["client_message"],
+                    server_chat=groups["server_chat"],
+                )
+            )
+            continue
+
         if match := DELAYED_RE.search(line):
             groups = match.groupdict()
             delayed.append(
@@ -559,6 +702,8 @@ def parse_logs(
         for reject in fname_rejects
         if reject.source_global != "unknown"
     )
+    static_targets.update(normalize_hex(probe.slot) for probe in static_fname_root_probes)
+    static_targets.update(normalize_hex(reject.slot) for reject in static_fname_root_rejects)
     static_targets.update(
         normalize_hex(item.global_address)
         for item in candidate_globals
@@ -594,6 +739,14 @@ def parse_logs(
         )
 
     fname_reject_groups = summarize_fname_rejects(fname_rejects)
+    static_fname_root_candidates = [
+        item for item in static_fname_root_probes if item.research_candidate
+    ]
+    static_fname_root_reject_reason_counts: dict[str, int] = {}
+    for reject in static_fname_root_rejects:
+        static_fname_root_reject_reason_counts[reject.reason] = (
+            static_fname_root_reject_reason_counts.get(reject.reason, 0) + 1
+        )
 
     return {
         "evidence_pack": {
@@ -608,10 +761,19 @@ def parse_logs(
             "fname_probe_count": len(fnames),
             "fname_reject_count": len(fname_rejects),
             "fname_reject_reason_counts": dict(sorted(fname_reject_reason_counts.items())),
+            "static_fname_root_probe_count": len(static_fname_root_probes),
+            "static_fname_root_reject_count": len(static_fname_root_rejects),
+            "static_fname_root_reject_reason_counts": dict(
+                sorted(static_fname_root_reject_reason_counts.items())
+            ),
+            "static_fname_root_candidate_count": len(static_fname_root_candidates),
             "gname_table_candidate_count": len(repeat_confirmed_tables),
-            "status": "research-candidate"
-            if repeat_confirmed_tables and not reject_markers
-            else "inconclusive",
+            "status": (
+                "research-candidate"
+                if (repeat_confirmed_tables or static_fname_root_candidates)
+                and not reject_markers
+                else "inconclusive"
+            ),
             "promotion_gate": (
                 "Never promote directly from this analyzer output. Require a second "
                 "isolated capture or independent static validation before runtime code."
@@ -640,6 +802,19 @@ def parse_logs(
         ],
         "fname_rejects": [asdict(item) for item in fname_rejects],
         "fname_reject_groups": fname_reject_groups,
+        "static_fname_root_probes": [
+            {
+                **asdict(item),
+                "exact_name_match": item.exact_name_match,
+                "valid_header_indices": item.valid_header_indices,
+                "plausible_counts": item.plausible_counts,
+                "research_candidate": item.research_candidate,
+            }
+            for item in static_fname_root_probes
+        ],
+        "static_fname_root_rejects": [
+            asdict(item) for item in static_fname_root_rejects
+        ],
         "gname_table_candidates": table_summaries,
         "delayed_globals": [asdict(item) for item in delayed],
         "candidate_globals": [asdict(item) for item in candidate_globals],
@@ -657,6 +832,8 @@ def print_human(summary: dict[str, object]) -> None:
     fnames = summary["fname_probes"]
     fname_rejects = summary["fname_rejects"]
     fname_reject_groups = summary["fname_reject_groups"]
+    static_fname_root_probes = summary["static_fname_root_probes"]
+    static_fname_root_rejects = summary["static_fname_root_rejects"]
     delayed = summary["delayed_globals"]
     candidate_globals = summary["candidate_globals"]
     static_xrefs = summary["static_xrefs"]
@@ -677,6 +854,8 @@ def print_human(summary: dict[str, object]) -> None:
     print(f"UObject validations: {len(uobjects)}")
     print(f"FName probes: {len(fnames)}")
     print(f"FName rejects: {len(fname_rejects)}")
+    print(f"Static FName root probes: {len(static_fname_root_probes)}")
+    print(f"Static FName root rejects: {len(static_fname_root_rejects)}")
 
     if reject_markers:
         print("\nreject markers:")
@@ -753,6 +932,46 @@ def print_human(summary: dict[str, object]) -> None:
                 )
             )
 
+    static_root_candidates = [
+        item for item in static_fname_root_probes if item["research_candidate"]
+    ]
+    print(f"\nStatic FName root candidates: {len(static_root_candidates)}")
+    for item in static_root_candidates:
+        print(
+            "- line {line}: slot={slot} table={table} score={score}/{score_max} "
+            "matched={matched_clues}/{matched_clues_max} elements={num_elements} "
+            "chunks={num_chunks} header_index_ok={header_index_ok}/"
+            "{header_index_ok_max}".format(**item)
+        )
+
+    weak_static_roots = [
+        item for item in static_fname_root_probes if not item["research_candidate"]
+    ]
+    if weak_static_roots:
+        print("\nweak or rejected static FName root probes:")
+        for item in weak_static_roots:
+            print(
+                "- line {line}: slot={slot} table={table} matched={matched_clues}/"
+                "{matched_clues_max} header_index_ok={header_index_ok}/"
+                "{header_index_ok_max} none='{none}' client_message='{client_message}' "
+                "server_chat='{server_chat}' elements={num_elements} "
+                "chunks={num_chunks}".format(**item)
+            )
+
+    if static_fname_root_rejects:
+        reason_counts = evidence_pack["static_fname_root_reject_reason_counts"]
+        print("\nStatic FName root reject reasons:")
+        for reason, count in reason_counts.items():
+            print(f"- {reason}: {count}")
+        print("\nStatic FName root reject samples:")
+        for item in static_fname_root_rejects[:10]:
+            print(
+                "- line {line}: slot={slot} table={table} reason={reason} "
+                "matched={matched_clues}/{matched_clues_max} elements={num_elements} "
+                "chunks={num_chunks} header_index_ok={header_index_ok}/"
+                "{header_index_ok_max}".format(**item)
+            )
+
     print("\ntop UObject validation scores:")
     top_uobjects = sorted(
         uobjects,
@@ -800,7 +1019,13 @@ def main() -> int:
             item["status"] == "research-candidate"
             for item in summary["gname_table_candidates"]
         )
-        if has_reject_markers or not has_repeat_confirmed_candidate:
+        has_static_root_candidate = any(
+            item["research_candidate"]
+            for item in summary["static_fname_root_probes"]
+        )
+        if has_reject_markers or not (
+            has_repeat_confirmed_candidate or has_static_root_candidate
+        ):
             return 1
     return 0
 

@@ -113,6 +113,11 @@ work from repository state instead of chat history.
   `docs/research/2026-05-27-gname-evidence-pack-workflow.md`.
 - Analyzer static xref entries now include access classification (`load`, `store`,
   `address`, `call`, `jump`, or `other`) and evidence-pack access counts.
+- ReflectionScanner can probe explicit static FName root slots supplied through
+  `OBELISK_REFLECTION_STATIC_FNAME_ROOTS`. Analyzer strict mode accepts a static-root
+  research candidate only with exact `None`/`ClientMessage`/`ServerChat`, `header_index_ok=3/3`,
+  plausible counts, and no reject markers; see
+  `docs/research/2026-05-27-static-fname-root-probe.md`.
 - UE4 type reconstruction planning is captured in
   `docs/research/2026-05-27-ue4-type-reconstruction-roadmap.md`; keep the milestone
   order as `FName`, `GObjects`, `UFunction`, then bounded params.
@@ -134,7 +139,9 @@ Next technical milestone is `FName -> string` resolution:
 2. Use `docs/research/2026-05-27-reflectionscanner-isolated-capture-runbook.md`.
 3. Add `OBELISK_REFLECTION_LOG_FNAME_REJECTS=1` during isolated captures when we need
    diagnostic reasons for rejected FName candidates.
-4. Analyze copied logs with:
+4. For the current static candidate, add
+   `OBELISK_REFLECTION_STATIC_FNAME_ROOTS=0x5956f30` only on an isolated/debug capture.
+5. Analyze copied logs with:
 
 ```bash
 python3 scripts/analyze_reflectionscanner_capture.py /path/to/isolated/Obelisk.log
@@ -147,10 +154,12 @@ python3 scripts/analyze_reflectionscanner_capture.py \
   /path/to/isolated/Obelisk.log
 ```
 
-5. Treat `GNames` only as a research candidate when `matched_clues=3/3` repeats for the
+6. Treat indirect-table `GNames` only as a research candidate when `matched_clues=3/3` repeats for the
    same table pointer through distinct `source_global` values or distinct targets, and
    there are no reject markers.
-6. Before committing offsets, require a second isolated capture or static xref validation.
+7. Treat static-root `GNames` only as a research candidate when exact clue matches and
+   `header_index_ok=3/3` appear with plausible counts and no reject markers.
+8. Before committing offsets, require a second isolated capture or static xref validation.
    Static xrefs are supporting evidence only; inspect whether they are real load/store paths
    before designing runtime name-resolution code.
 

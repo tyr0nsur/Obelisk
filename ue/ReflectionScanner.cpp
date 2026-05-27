@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cctype>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -81,6 +82,40 @@ namespace Obelisk::UE
                 return value && std::string(value) == "1";
             }();
             return enabled;
+        }
+
+        std::vector<uintptr_t> StaticFNameRootSlots()
+        {
+            std::vector<uintptr_t> slots;
+            const char* value = std::getenv("OBELISK_REFLECTION_STATIC_FNAME_ROOTS");
+            if (!value || *value == '\0')
+                return slots;
+
+            std::stringstream stream(value);
+            std::string token;
+            while (std::getline(stream, token, ','))
+            {
+                token.erase(std::remove_if(token.begin(), token.end(), [](unsigned char c) {
+                    return std::isspace(c) != 0;
+                }), token.end());
+
+                if (token.empty())
+                    continue;
+
+                char* end = nullptr;
+                const unsigned long long parsed = std::strtoull(token.c_str(), &end, 0);
+                if (end == token.c_str() || *end != '\0' || parsed == 0)
+                {
+                    OBELISK_WARN("[ReflectionScanner] Ignoring invalid OBELISK_REFLECTION_STATIC_FNAME_ROOTS entry '{}'", token);
+                    continue;
+                }
+
+                const uintptr_t slot = static_cast<uintptr_t>(parsed);
+                if (std::find(slots.begin(), slots.end(), slot) == slots.end())
+                    slots.push_back(slot);
+            }
+
+            return slots;
         }
 
         void CallOriginalNativeExec(size_t index, void* context, void* stack, void* result)
@@ -363,6 +398,12 @@ namespace Obelisk::UE
             const char* ExpectedName;
         };
 
+        constexpr std::array<FNameEntryClue, 3> s_FNameClues = {
+            FNameEntryClue{0, "None"},
+            FNameEntryClue{9619, "ClientMessage"},
+            FNameEntryClue{9622, "ServerChat"},
+        };
+
         enum class FNameProbeFailure
         {
             None,
@@ -432,6 +473,175 @@ namespace Obelisk::UE
             return true;
         }
 
+        struct FNameTableProbeResult
+        {
+            int32_t NumElements = 0;
+            int32_t NumChunks = 0;
+            int ReadableClues = 0;
+            int MatchedClues = 0;
+            int Score = 0;
+            std::array<std::string, s_FNameClues.size()> Previews;
+            const char* RejectReason = nullptr;
+        };
+
+        FNameTableProbeResult ProbeFNameIndirectTable(uintptr_t table)
+        {
+            FNameTableProbeResult result;
+            ReadMemory(table + FNameIndirectArrayProbe::NumElementsOffset, result.NumElements);
+            ReadMemory(table + FNameIndirectArrayProbe::NumChunksOffset, result.NumChunks);
+
+            const bool elementCountPlausible = result.NumElements > 9622 && result.NumElements < 10000000;
+            const bool chunkCountPlausible = result.NumChunks > 0 && result.NumChunks <= FNameIndirectArrayProbe::MaxChunks;
+
+            FNameProbeFailure firstFailure = FNameProbeFailure::None;
+            for (size_t i = 0; i < s_FNameClues.size(); ++i)
+            {
+                FNameProbeFailure failure = FNameProbeFailure::None;
+                if (!ProbeFNameEntry(table, s_FNameClues[i], result.Previews[i], failure))
+                {
+                    if (firstFailure == FNameProbeFailure::None)
+                        firstFailure = failure;
+                    continue;
+                }
+
+                ++result.ReadableClues;
+                if (result.Previews[i] == s_FNameClues[i].ExpectedName)
+                    ++result.MatchedClues;
+            }
+
+            result.Score = (elementCountPlausible ? 1 : 0) +
+                           (chunkCountPlausible ? 1 : 0) +
+                           result.ReadableClues +
+                           result.MatchedClues;
+
+            if (result.Score < 2 || result.ReadableClues == 0)
+            {
+                result.RejectReason = !elementCountPlausible ? "implausible_num_elements"
+                                      : !chunkCountPlausible ? "implausible_num_chunks"
+                                      : firstFailure != FNameProbeFailure::None ? ToString(firstFailure)
+                                      : "insufficient_score";
+            }
+            else if (result.MatchedClues < static_cast<int>(s_FNameClues.size()))
+            {
+                result.RejectReason = "preview_mismatch";
+            }
+
+            return result;
+        }
+
+        struct StaticFNameRootProbeResult
+        {
+            int32_t NumElements = 0;
+            int32_t NumChunks = 0;
+            int ReadableClues = 0;
+            int HeaderIndexOk = 0;
+            int MatchedClues = 0;
+            int Score = 0;
+            std::array<std::string, s_FNameClues.size()> Previews;
+            const char* RejectReason = nullptr;
+        };
+
+        bool ProbeStaticLegacyGNamesEntry(uintptr_t table,
+                                          const FNameEntryClue& clue,
+                                          std::string& preview,
+                                          bool& headerIndexOk,
+                                          FNameProbeFailure& failure)
+        {
+            headerIndexOk = false;
+            failure = FNameProbeFailure::None;
+            if (clue.Index < 0)
+            {
+                failure = FNameProbeFailure::InvalidIndex;
+                return false;
+            }
+
+            uintptr_t chunk = 0;
+            const int32_t chunkIndex = clue.Index / FNameIndirectArrayProbe::ChunkSize;
+            const int32_t withinChunk = clue.Index % FNameIndirectArrayProbe::ChunkSize;
+            const uintptr_t chunkPointerAddress = table + FNameIndirectArrayProbe::InlineChunksOffset +
+                                                  (static_cast<uintptr_t>(chunkIndex) * sizeof(uintptr_t));
+            if (!ReadMemory(chunkPointerAddress, chunk) ||
+                !IsCanonicalUserPointer(chunk) ||
+                !Obelisk::Memory::IsReadable(reinterpret_cast<void*>(chunk), sizeof(uintptr_t)))
+            {
+                failure = FNameProbeFailure::UnreadableChunkPointer;
+                return false;
+            }
+
+            uintptr_t entry = 0;
+            const uintptr_t entryPointerAddress = chunk + (static_cast<uintptr_t>(withinChunk) * sizeof(uintptr_t));
+            if (!ReadMemory(entryPointerAddress, entry) ||
+                !IsCanonicalUserPointer(entry) ||
+                !Obelisk::Memory::IsReadable(reinterpret_cast<void*>(entry), 0x40))
+            {
+                failure = FNameProbeFailure::UnreadableEntryPointer;
+                return false;
+            }
+
+            uint32_t entryHeader = 0;
+            if (!ReadMemory(entry, entryHeader))
+            {
+                failure = FNameProbeFailure::UnreadableEntryPointer;
+                return false;
+            }
+            headerIndexOk = static_cast<int32_t>(entryHeader >> 1) == clue.Index;
+
+            preview = ReadAnsiPreview(entry + 0x10, 48);
+            if (preview.empty())
+            {
+                failure = FNameProbeFailure::EmptyEntryPreview;
+                return false;
+            }
+
+            return true;
+        }
+
+        StaticFNameRootProbeResult ProbeStaticLegacyGNamesTable(uintptr_t table)
+        {
+            StaticFNameRootProbeResult result;
+            ReadMemory(table + FNameIndirectArrayProbe::NumElementsOffset, result.NumElements);
+            ReadMemory(table + FNameIndirectArrayProbe::NumChunksOffset, result.NumChunks);
+
+            const bool elementCountPlausible = result.NumElements > 9622 && result.NumElements < 10000000;
+            const bool chunkCountPlausible = result.NumChunks > 0 && result.NumChunks <= FNameIndirectArrayProbe::MaxChunks;
+
+            FNameProbeFailure firstFailure = FNameProbeFailure::None;
+            for (size_t i = 0; i < s_FNameClues.size(); ++i)
+            {
+                FNameProbeFailure failure = FNameProbeFailure::None;
+                bool headerIndexOk = false;
+                if (!ProbeStaticLegacyGNamesEntry(table, s_FNameClues[i], result.Previews[i], headerIndexOk, failure))
+                {
+                    if (firstFailure == FNameProbeFailure::None)
+                        firstFailure = failure;
+                    continue;
+                }
+
+                ++result.ReadableClues;
+                if (headerIndexOk)
+                    ++result.HeaderIndexOk;
+                if (result.Previews[i] == s_FNameClues[i].ExpectedName)
+                    ++result.MatchedClues;
+            }
+
+            result.Score = result.ReadableClues +
+                           result.HeaderIndexOk +
+                           result.MatchedClues;
+
+            if (!elementCountPlausible)
+                result.RejectReason = "implausible_num_elements";
+            else if (!chunkCountPlausible)
+                result.RejectReason = "implausible_num_chunks";
+            else if (result.ReadableClues < static_cast<int>(s_FNameClues.size()))
+                result.RejectReason = firstFailure != FNameProbeFailure::None ? ToString(firstFailure) : "unreadable_clues";
+            else if (result.HeaderIndexOk < static_cast<int>(s_FNameClues.size()))
+                result.RejectReason = "header_index_mismatch";
+            else if (result.MatchedClues < static_cast<int>(s_FNameClues.size()))
+                result.RejectReason = "preview_mismatch";
+
+            return result;
+        }
+
         void LogFNameIndirectArrayReject(const char* name,
                                          uintptr_t sourceGlobal,
                                          void* value,
@@ -478,87 +688,105 @@ namespace Obelisk::UE
                 return;
             }
 
-            int32_t numElements = 0;
-            int32_t numChunks = 0;
-            ReadMemory(table + FNameIndirectArrayProbe::NumElementsOffset, numElements);
-            ReadMemory(table + FNameIndirectArrayProbe::NumChunksOffset, numChunks);
+            const FNameTableProbeResult result = ProbeFNameIndirectTable(table);
 
-            const bool elementCountPlausible = numElements > 9622 && numElements < 10000000;
-            const bool chunkCountPlausible = numChunks > 0 && numChunks <= FNameIndirectArrayProbe::MaxChunks;
-
-            const std::array<FNameEntryClue, 3> clues = {
-                FNameEntryClue{0, "None"},
-                FNameEntryClue{9619, "ClientMessage"},
-                FNameEntryClue{9622, "ServerChat"},
-            };
-
-            int readableClues = 0;
-            int matchedClues = 0;
-            std::array<std::string, clues.size()> previews;
-            FNameProbeFailure firstFailure = FNameProbeFailure::None;
-            for (size_t i = 0; i < clues.size(); ++i)
-            {
-                FNameProbeFailure failure = FNameProbeFailure::None;
-                if (!ProbeFNameEntry(table, clues[i], previews[i], failure))
-                {
-                    if (firstFailure == FNameProbeFailure::None)
-                        firstFailure = failure;
-                    continue;
-                }
-
-                ++readableClues;
-                if (previews[i] == clues[i].ExpectedName)
-                    ++matchedClues;
-            }
-
-            const int score = (elementCountPlausible ? 1 : 0) +
-                              (chunkCountPlausible ? 1 : 0) +
-                              readableClues +
-                              matchedClues;
-
-            if (score < 2 || readableClues == 0)
-            {
-                const char* reason = !elementCountPlausible ? "implausible_num_elements"
-                                     : !chunkCountPlausible ? "implausible_num_chunks"
-                                     : firstFailure != FNameProbeFailure::None ? ToString(firstFailure)
-                                     : "insufficient_score";
-                LogFNameIndirectArrayReject(name,
-                                            sourceGlobal,
-                                            value,
-                                            reason,
-                                            numElements,
-                                            numChunks,
-                                            readableClues,
-                                            matchedClues,
-                                            previews);
-                return;
-            }
-
-            if (matchedClues < static_cast<int>(clues.size()))
+            if (result.RejectReason)
             {
                 LogFNameIndirectArrayReject(name,
                                             sourceGlobal,
                                             value,
-                                            "preview_mismatch",
-                                            numElements,
-                                            numChunks,
-                                            readableClues,
-                                            matchedClues,
-                                            previews);
+                                            result.RejectReason,
+                                            result.NumElements,
+                                            result.NumChunks,
+                                            result.ReadableClues,
+                                            result.MatchedClues,
+                                            result.Previews);
+                if (result.Score < 2 || result.ReadableClues == 0)
+                    return;
             }
 
             OBELISK_INFO("[ReflectionScanner] {} FName indirect-table probe: source_global=0x{:X} table={} score={}/8 readable_clues={}/3 matched_clues={}/3 num_elements={} num_chunks={} none='{}' client_message='{}' server_chat='{}'",
                          name,
                          sourceGlobal,
                          value,
-                         score,
-                         readableClues,
-                         matchedClues,
-                         numElements,
-                         numChunks,
-                         previews[0],
-                         previews[1],
-                         previews[2]);
+                         result.Score,
+                         result.ReadableClues,
+                         result.MatchedClues,
+                         result.NumElements,
+                         result.NumChunks,
+                         result.Previews[0],
+                         result.Previews[1],
+                         result.Previews[2]);
+        }
+
+        void LogFNameStaticRootReject(uintptr_t slot,
+                                      void* table,
+                                      const char* reason,
+                                      const StaticFNameRootProbeResult& result = {})
+        {
+            OBELISK_INFO("[ReflectionScanner] StaticFNameRoot FName static-root reject: slot=0x{:X} table={} reason={} readable_clues={}/3 matched_clues={}/3 header_index_ok={}/3 num_elements={} num_chunks={} none='{}' client_message='{}' server_chat='{}'",
+                         slot,
+                         table,
+                         reason,
+                         result.ReadableClues,
+                         result.MatchedClues,
+                         result.HeaderIndexOk,
+                         result.NumElements,
+                         result.NumChunks,
+                         result.Previews[0],
+                         result.Previews[1],
+                         result.Previews[2]);
+        }
+
+        void ProbeStaticFNameRoots()
+        {
+            const std::vector<uintptr_t> slots = StaticFNameRootSlots();
+            if (slots.empty())
+                return;
+
+            OBELISK_INFO("[ReflectionScanner] StaticFNameRoot probing {} env-supplied slot(s).", slots.size());
+
+            for (uintptr_t slot : slots)
+            {
+                if (!IsCanonicalUserPointer(slot) ||
+                    !Obelisk::Memory::IsReadable(reinterpret_cast<void*>(slot), sizeof(uintptr_t)))
+                {
+                    LogFNameStaticRootReject(slot, nullptr, "unreadable_slot");
+                    continue;
+                }
+
+                void* tableValue = nullptr;
+                std::memcpy(&tableValue, reinterpret_cast<void*>(slot), sizeof(tableValue));
+                const uintptr_t table = reinterpret_cast<uintptr_t>(tableValue);
+
+                if (!tableValue ||
+                    !IsCanonicalUserPointer(table) ||
+                    !Obelisk::Memory::IsReadable(tableValue, FNameIndirectArrayProbe::NumChunksOffset + sizeof(int32_t)))
+                {
+                    LogFNameStaticRootReject(slot, tableValue, "unreadable_table_header");
+                    continue;
+                }
+
+                const StaticFNameRootProbeResult result = ProbeStaticLegacyGNamesTable(table);
+                if (result.RejectReason)
+                {
+                    LogFNameStaticRootReject(slot, tableValue, result.RejectReason, result);
+                    continue;
+                }
+
+                OBELISK_INFO("[ReflectionScanner] StaticFNameRoot FName static-root probe: slot=0x{:X} table={} score={}/9 readable_clues={}/3 matched_clues={}/3 header_index_ok={}/3 num_elements={} num_chunks={} none='{}' client_message='{}' server_chat='{}'",
+                             slot,
+                             tableValue,
+                             result.Score,
+                             result.ReadableClues,
+                             result.MatchedClues,
+                             result.HeaderIndexOk,
+                             result.NumElements,
+                             result.NumChunks,
+                             result.Previews[0],
+                             result.Previews[1],
+                             result.Previews[2]);
+            }
         }
 
         void LogUObjectValidation(const std::vector<Mapping>& mappings, const char* name, void* value, const UObjectProbe& object)
@@ -814,6 +1042,8 @@ namespace Obelisk::UE
 
         OBELISK_INFO("[ReflectionScanner] Scanning {} ShooterGameServer mapping(s): {} readable, {} executable.",
                      mappings.size(), readableCount, executableCount);
+
+        ProbeStaticFNameRoots();
 
         std::vector<GlobalWatch> watches;
         for (const char* target : targets)
