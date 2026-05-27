@@ -41,6 +41,21 @@ Install layout:
   state/instances/
 ```
 
+The installed SDK must also expose a CMake package:
+
+```text
+<root>/include/obelisk/ObeliskApi.h
+<root>/lib/cmake/Obelisk/ObeliskConfig.cmake
+<root>/lib/cmake/Obelisk/ObeliskTargets.cmake
+```
+
+External plugin projects should prefer:
+
+```cmake
+find_package(Obelisk CONFIG REQUIRED)
+target_link_libraries(my_plugin PRIVATE Obelisk::obelisk_sdk)
+```
+
 Do not install runtime artifacts directly into `ShooterGame/Binaries/Linux` except the thin `ObeliskRun.sh` wrapper.
 
 ## Dependency Rules
@@ -56,7 +71,10 @@ Do not install runtime artifacts directly into `ShooterGame/Binaries/Linux` exce
 
 ```bash
 git diff --check
+cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake --build build -j"$(nproc)"
+ctest --test-dir build --output-on-failure
+scripts/test_install_obelisk_layout.sh /tmp/obelisk-install-layout-check
 git status --short --ignored
 ```
 

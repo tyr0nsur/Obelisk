@@ -86,6 +86,12 @@ install_file() {
     run install -m "${mode}" "${src}" "${dst}"
 }
 
+install_sdk_package() {
+    require_file "${BUILD_DIR}/ObeliskConfig.cmake"
+    require_file "${BUILD_DIR}/ObeliskConfigVersion.cmake"
+    run cmake --install "${BUILD_DIR}" --prefix "${ROOT}" --component SDK
+}
+
 run mkdir -p \
     "${ROOT}/lib" \
     "${ROOT}/plugins" \
@@ -96,6 +102,6 @@ run mkdir -p \
 
 install_file 755 "${BUILD_DIR}/libobelisk.so" "${ROOT}/lib/libobelisk.so"
 install_file 755 "${BUILD_DIR}/_deps/subhook-build/libsubhook.so" "${ROOT}/lib/libsubhook.so"
-install_file 644 "${REPO_DIR}/include/obelisk/ObeliskApi.h" "${ROOT}/include/obelisk/ObeliskApi.h"
+install_sdk_package
 
 echo "Obelisk installed to ${ROOT}"

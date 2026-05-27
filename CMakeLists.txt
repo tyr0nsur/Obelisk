@@ -5,6 +5,9 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
 # Use fPIC as it's a shared library
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
@@ -14,6 +17,7 @@ set(SUBHOOK_NO_TESTS ON CACHE BOOL "Disable subhook tests" FORCE)
 add_library(obelisk_sdk INTERFACE)
 target_include_directories(obelisk_sdk INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
 # Dependencies
@@ -108,3 +112,39 @@ add_executable(abi_layout_tests
 target_link_libraries(abi_layout_tests PRIVATE obelisk_sdk)
 
 add_test(NAME AbiLayoutTests COMMAND abi_layout_tests)
+
+install(TARGETS obelisk_sdk
+    EXPORT ObeliskTargets
+    COMPONENT SDK
+)
+
+install(DIRECTORY include/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    COMPONENT SDK
+)
+
+install(EXPORT ObeliskTargets
+    NAMESPACE Obelisk::
+    FILE ObeliskTargets.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Obelisk
+    COMPONENT SDK
+)
+
+configure_package_config_file(
+    cmake/ObeliskConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/ObeliskConfig.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Obelisk
+)
+
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/ObeliskConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMinorVersion
+)
+
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/ObeliskConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/ObeliskConfigVersion.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Obelisk
+    COMPONENT SDK
+)

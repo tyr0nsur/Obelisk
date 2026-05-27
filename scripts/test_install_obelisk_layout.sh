@@ -47,6 +47,9 @@ require_path "${INSTALL_ROOT}/config"
 require_path "${INSTALL_ROOT}/logs"
 require_path "${INSTALL_ROOT}/state/instances"
 require_path "${INSTALL_ROOT}/include/obelisk/ObeliskApi.h"
+require_path "${INSTALL_ROOT}/lib/cmake/Obelisk/ObeliskConfig.cmake"
+require_path "${INSTALL_ROOT}/lib/cmake/Obelisk/ObeliskConfigVersion.cmake"
+require_path "${INSTALL_ROOT}/lib/cmake/Obelisk/ObeliskTargets.cmake"
 
 CONFIG_DIR="${INSTALL_ROOT}/config/install_layout_consumer"
 CONFIG_PATH="${CONFIG_DIR}/config.json"
@@ -228,38 +231,51 @@ int main(int argc, char** argv)
 }
 CPP
 
-(
-    cd "${WORK_DIR}"
-    "${CXX_BIN}" -std=c++20 -fPIC -shared \
-        -I"${INSTALL_ROOT}/include" \
-        -MMD -MF consumer_plugin.d \
-        consumer_plugin.cpp \
-        -o "${PLUGIN_PATH}"
+cat > "${WORK_DIR}/CMakeLists.txt" <<'CMAKE'
+cmake_minimum_required(VERSION 3.22)
+project(ObeliskInstallLayoutConsumer LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+find_package(Obelisk CONFIG REQUIRED)
+
+add_library(install_layout_consumer SHARED consumer_plugin.cpp)
+target_link_libraries(install_layout_consumer PRIVATE Obelisk::obelisk_sdk)
+set_target_properties(install_layout_consumer PROPERTIES
+    PREFIX ""
+    OUTPUT_NAME "install_layout_consumer"
+    LIBRARY_OUTPUT_DIRECTORY "${OBELISK_INSTALL_ROOT}/plugins"
+    CXX_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN 1
 )
+
+add_executable(consumer_fixture consumer_fixture.cpp)
+target_link_libraries(consumer_fixture PRIVATE Obelisk::obelisk_sdk dl)
+CMAKE
+
+cmake -S "${WORK_DIR}" -B "${WORK_DIR}/build" \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DCMAKE_PREFIX_PATH="${INSTALL_ROOT}" \
+    -DOBELISK_INSTALL_ROOT="${INSTALL_ROOT}" \
+    -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+cmake --build "${WORK_DIR}/build" --parallel
 
 require_path "${PLUGIN_PATH}"
 
-if ! grep -F "${INSTALL_ROOT}/include/obelisk/ObeliskApi.h" "${WORK_DIR}/consumer_plugin.d" >/dev/null; then
-    echo "SDK consumer did not include ObeliskApi.h from the installed SDK layout" >&2
-    cat "${WORK_DIR}/consumer_plugin.d" >&2
+if ! grep -F "${INSTALL_ROOT}/include" "${WORK_DIR}/build/compile_commands.json" >/dev/null; then
+    echo "SDK consumer did not include headers from the installed SDK layout" >&2
+    cat "${WORK_DIR}/build/compile_commands.json" >&2
     exit 1
 fi
 
-if grep -F "${REPO_DIR}/include/obelisk/ObeliskApi.h" "${WORK_DIR}/consumer_plugin.d" >/dev/null; then
-    echo "SDK consumer accidentally included ObeliskApi.h from the source tree" >&2
-    cat "${WORK_DIR}/consumer_plugin.d" >&2
+if grep -F "${REPO_DIR}/include" "${WORK_DIR}/build/compile_commands.json" >/dev/null; then
+    echo "SDK consumer accidentally included headers from the source tree" >&2
+    cat "${WORK_DIR}/build/compile_commands.json" >&2
     exit 1
 fi
 
-(
-    cd "${WORK_DIR}"
-    "${CXX_BIN}" -std=c++20 \
-        -I"${INSTALL_ROOT}/include" \
-        consumer_fixture.cpp \
-        -ldl \
-        -o consumer_fixture
-)
-
-"${WORK_DIR}/consumer_fixture" "${PLUGIN_PATH}" "${CONFIG_DIR}" "${CONFIG_PATH}" "install-layout-test"
+"${WORK_DIR}/build/consumer_fixture" "${PLUGIN_PATH}" "${CONFIG_DIR}" "${CONFIG_PATH}" "install-layout-test"
 
 echo "Install layout and public SDK consumer validation passed for ${INSTALL_ROOT}"
