@@ -445,6 +445,11 @@ Updated: 2026-05-27
 - fact: Historical FName/ReflectionScanner capture notes that previously showed direct
   Ragnarok start commands now say not to repeat that workflow on `arkserver`; future
   retries target `arkserver-obelisk-debug` first.
+- fact: Read-only supervisor snapshot `20260527T185153Z` found one Ragnarok process with
+  stable posture passing, plugins disabled, ProcessEvent hook loaded, and scanner/debug
+  env absent. Quiet posture still fails because chat reflection is active; do not change it
+  without an operator maintenance window. See
+  `docs/research/2026-05-27-ragnarok-readonly-posture-snapshot.md`.
 - risk: Native exec probes must remain disabled on live servers.
 - risk: The `subhook` pin was selected from the existing local checkout without internet
   verification; full offline resilience still needs a mirror or vendored archive.
