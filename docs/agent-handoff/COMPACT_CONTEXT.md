@@ -84,6 +84,10 @@ work from repository state instead of chat history.
 - CI and release validation now run reflection snapshot comparison and ScriptStruct
   fixture tests. README/STATUS present module-first observers and snapshot tooling instead
   of a chat-centered roadmap. Mixed-schema target-filter behavior is covered by tests.
+- Reflection/reversing/type-reconstruction skills now use the shared module promotion
+  ladder and require explicit debug-window approval before marker edits, restarts,
+  scanners, ptrace/gcore, or broad tracing. Public SDK guardrails now block premature
+  gameplay module APIs, not only chat.
 - Latest restart audit:
   `docs/research/2026-05-27-ops-restart-audit-instance-id.md`
   - live `ObeliskRun.sh` exports `OBELISK_INSTANCE_ID=arkserver`

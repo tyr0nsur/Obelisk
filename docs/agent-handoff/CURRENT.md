@@ -89,6 +89,14 @@ Updated: 2026-05-28
 - fact: Commit `74b123d` covers mixed UFunction/ScriptStruct target-filter behavior so
   short `Outer.Name` filters can match both schemas and schema-qualified filters select
   exactly one.
+- fact: Commit `7ccd7a6` refocused `obelisk-ue4-reflection` around the general
+  module-recognizer promotion ladder, second-source checks, and debug-instance live-ops.
+- fact: Commit `707cbba` aligned reversing/type-reconstruction skills with module-first
+  reconstruction, candidate-only recognizers, and no marker/restart commands without
+  explicit approval.
+- fact: Commit `6d0f783` extends public SDK guardrails so gameplay module APIs
+  (inventory, structures, buffs, dinos, tribes, missions, transfers, admin, player, item)
+  cannot appear before intentional promotion.
 - fact: `sdk.transfers` ScriptStruct fixtures now preserve target/property object and
   FName identity fields like UFunction fixtures. `regenerate_scriptstruct_snapshots.py
   --check-layout` stays semantic/layout-only so second-source gates do not depend on
