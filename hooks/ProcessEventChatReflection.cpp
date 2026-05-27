@@ -26,14 +26,50 @@ namespace Obelisk::Hooks::ProcessEventChatReflection
                nameIndex == 1983 ||
                nameIndex == 1984 ||
                nameIndex == 2697 ||
+               nameIndex == 9801 ||
                nameIndex == 9619 ||
                nameIndex == 9620 ||
-               nameIndex == 9621;
+               nameIndex == 9621 ||
+               nameIndex == 28549;
     }
 
     bool ShouldLogObservation(uint64_t observationNumber, uint64_t limit)
     {
         return limit != 0 && observationNumber != 0 && observationNumber <= limit;
+    }
+
+    Obelisk::UE::RuntimeReflection::ReadResult TryDecodeUtf32Field(
+        const Obelisk::UE::RuntimeReflection::MemoryReader& reader,
+        const Obelisk::UE::ChatReflection::ChatInvocation& invocation,
+        Obelisk::UE::ChatReflection::ChatField field,
+        int32_t maxChars,
+        std::string& out)
+    {
+        out.clear();
+        for (const Obelisk::UE::ChatReflection::ChatFieldRange& candidate : invocation.Fields)
+        {
+            if (candidate.Field != field)
+                continue;
+            if (!candidate.Range.Data || candidate.Range.Size == 0)
+            {
+                return Obelisk::UE::RuntimeReflection::ReadResult::Fail(
+                    Obelisk::UE::RuntimeReflection::ReadStatus::Unreadable,
+                    "chat field has no readable parameter range");
+            }
+
+            Obelisk::UE::RuntimeReflection::FStringHeaderCandidate header;
+            Obelisk::UE::RuntimeReflection::ReadResult headerResult =
+                Obelisk::UE::RuntimeReflection::TryReadFStringHeaderFromBuffer(
+                    candidate.Range.Data, candidate.Range.Size, 0, header);
+            if (!headerResult)
+                return headerResult;
+
+            return Obelisk::UE::RuntimeReflection::TryDecodeFStringUtf32(reader, header, maxChars, out);
+        }
+
+        return Obelisk::UE::RuntimeReflection::ReadResult::Fail(
+            Obelisk::UE::RuntimeReflection::ReadStatus::InvalidArgument,
+            "chat field is not present in invocation");
     }
 
     Attempt TryIdentifyInvocation(const Gate& gate,

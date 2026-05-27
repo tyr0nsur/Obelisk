@@ -1,6 +1,6 @@
 ---
 name: obelisk-ue4-type-reconstruction
-description: Use when Obelisk work reconstructs UE4 runtime types such as FName, GNames/FNamePool, GUObjectArray/GObjects, UObject, UClass, UFunction, UProperty/FProperty, and ProcessEvent parameter layouts.
+description: "Use when Obelisk work reconstructs UE4 runtime types such as FName, GNames/FNamePool, GUObjectArray/GObjects, UObject, UClass, UFunction, UProperty/FProperty, and ProcessEvent parameter layouts."
 ---
 
 # Obelisk UE4 Type Reconstruction
@@ -49,8 +49,8 @@ For each reconstructed field:
 ## Implementation Shape
 
 - Put reusable structs and guarded readers under `ue/`.
-- Current internal layers are `ue/RuntimeReflection` for bounded type reads and
-  `ue/ChatReflection` for `ServerChat`/`ServerChatTo`/`ServerChatToPlayer` plus
+- Current internal layers are `ue/RuntimeReflection.{h,cpp}` for bounded type reads and
+  `ue/ChatReflection.{h,cpp}` for `ServerChat`/`ServerChatTo`/`ServerChatToPlayer` plus
   `ServerSendChatMessage` recognition.
 - `ServerSendChatMessage.SendMode` is a reflected `ByteProperty` at offset `0x10` with
   `EChatSendMode` values `0 GlobalChat`, `1 GlobalTribeChat`, `2 LocalChat`,

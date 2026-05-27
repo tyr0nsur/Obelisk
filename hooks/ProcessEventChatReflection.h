@@ -46,6 +46,13 @@ namespace Obelisk::Hooks::ProcessEventChatReflection
     bool IsReflectedChatNameIndex(int32_t nameIndex);
     bool ShouldLogObservation(uint64_t observationNumber, uint64_t limit);
 
+    Obelisk::UE::RuntimeReflection::ReadResult TryDecodeUtf32Field(
+        const Obelisk::UE::RuntimeReflection::MemoryReader& reader,
+        const Obelisk::UE::ChatReflection::ChatInvocation& invocation,
+        Obelisk::UE::ChatReflection::ChatField field,
+        int32_t maxChars,
+        std::string& out);
+
     Attempt TryIdentifyInvocation(const Gate& gate,
                                   int32_t nameIndex,
                                   const Obelisk::UE::RuntimeReflection::MemoryReader& reader,

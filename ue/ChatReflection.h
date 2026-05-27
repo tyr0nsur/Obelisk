@@ -17,6 +17,8 @@ namespace Obelisk::UE::ChatReflection
         ClientChatMessage,
         ClientServerChatDirectMessage,
         ClientServerChatMessage,
+        SendServerChatMessage,
+        OnServerChatMessageDelegate,
     };
 
     enum class ChatField
@@ -29,6 +31,8 @@ namespace Obelisk::UE::ChatReflection
         Chat,
         MessageColor,
         BIsBold,
+        ReceiverTeamId,
+        ReceiverPlayerID,
     };
 
     struct ChatFieldRange

@@ -216,6 +216,7 @@ OBELISK_ENABLE_REFLECTION_SCANNER=1
 OBELISK_ENABLE_CHAT_REFLECTION=1
 OBELISK_CHAT_REFLECTION_BINARY_SHA256=<supported ARK SHA256>
 OBELISK_CHAT_REFLECTION_LOG_LIMIT=25
+OBELISK_CHAT_REFLECTION_LOG_TEXT=1  # extra opt-in for decoded experimental chat text
 OBELISK_PE_TRACE_LIMIT=0
 ```
 
@@ -228,8 +229,10 @@ Near-term engineering:
 
 - Keep CI as a real quality gate: build, CTest, analyzer tests, SDK consumer
   fixture, and install dry-run.
-- Confirm one real chat `ProcessEvent` hit on the deployed gated runtime.
-- Decode reflected UTF-32 `FString` chat fields after the runtime hit is confirmed.
+- Validate the local UTF-32 `FString` chat-text logger in a controlled runtime window
+  while keeping chat reflection experimental.
+- Define copied-data ownership and callback lifetime before exposing a plugin-facing chat
+  event.
 - Generalize FName/GObjects/UFunction lookup only after another capture or binary hash
   validates the current field layout.
 - Add small SDK examples for minimal load, filtered events, config, and safe

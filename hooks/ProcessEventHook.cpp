@@ -7,6 +7,8 @@
 #include <atomic>
 #include <cstdlib>
 #include <cstring>
+#include <string>
+#include <string_view>
 #include <sys/mman.h>
 #include <unistd.h>
 
@@ -294,6 +296,15 @@ namespace Obelisk::Hooks
         return limit;
     }
 
+    static bool IsChatReflectionTextLoggingEnabled()
+    {
+        static bool enabled = [] {
+            const char* env = std::getenv("OBELISK_CHAT_REFLECTION_LOG_TEXT");
+            return env && std::strcmp(env, "1") == 0;
+        }();
+        return enabled;
+    }
+
     static const char* ChatFunctionName(Obelisk::UE::ChatReflection::ChatFunction function)
     {
         using Obelisk::UE::ChatReflection::ChatFunction;
@@ -313,6 +324,10 @@ namespace Obelisk::Hooks
             return "ClientServerChatDirectMessage";
         case ChatFunction::ClientServerChatMessage:
             return "ClientServerChatMessage";
+        case ChatFunction::SendServerChatMessage:
+            return "SendServerChatMessage";
+        case ChatFunction::OnServerChatMessageDelegate:
+            return "OnServerChatMessage__DelegateSignature";
         }
         return "Unknown";
     }
@@ -338,8 +353,72 @@ namespace Obelisk::Hooks
             return "MessageColor";
         case ChatField::BIsBold:
             return "bIsBold";
+        case ChatField::ReceiverTeamId:
+            return "ReceiverTeamId";
+        case ChatField::ReceiverPlayerID:
+            return "ReceiverPlayerID";
         }
         return "Unknown";
+    }
+
+    static std::string SanitizeChatTextForLog(std::string_view text)
+    {
+        constexpr size_t kMaxLoggedBytes = 256;
+        std::string sanitized;
+        sanitized.reserve(text.size() < kMaxLoggedBytes ? text.size() : kMaxLoggedBytes);
+        bool truncated = false;
+        for (size_t i = 0; i < text.size();)
+        {
+            const unsigned char byte = static_cast<unsigned char>(text[i]);
+            if (sanitized.size() >= kMaxLoggedBytes)
+            {
+                truncated = true;
+                break;
+            }
+
+            if (byte == '"' || byte == '\\')
+            {
+                if (sanitized.size() + 2 > kMaxLoggedBytes)
+                {
+                    truncated = true;
+                    break;
+                }
+                sanitized.push_back('\\');
+                sanitized.push_back(static_cast<char>(byte));
+                ++i;
+                continue;
+            }
+            if (byte < 0x20 || byte == 0x7f)
+            {
+                const std::string_view replacement = byte == '\n' ? std::string_view{"\\n"} : std::string_view{"?"};
+                if (sanitized.size() + replacement.size() > kMaxLoggedBytes)
+                {
+                    truncated = true;
+                    break;
+                }
+                sanitized.append(replacement);
+                ++i;
+                continue;
+            }
+
+            size_t sequenceLength = 1;
+            if ((byte & 0xe0) == 0xc0)
+                sequenceLength = 2;
+            else if ((byte & 0xf0) == 0xe0)
+                sequenceLength = 3;
+            else if ((byte & 0xf8) == 0xf0)
+                sequenceLength = 4;
+            if (sequenceLength > text.size() - i || sanitized.size() + sequenceLength > kMaxLoggedBytes)
+            {
+                truncated = true;
+                break;
+            }
+            sanitized.append(text.substr(i, sequenceLength));
+            i += sequenceLength;
+        }
+        if (truncated)
+            sanitized += "...";
+        return sanitized;
     }
 
     static void TraceReflectedChatInvocation(int32_t nameIndex, void* function, void* params)
@@ -382,12 +461,38 @@ namespace Obelisk::Hooks
                      invocation.Fields.size(),
                      invocation.MetadataOnlyCandidate);
         uint8_t sendMode = 0;
+        bool sendModeKnown = false;
         if (Obelisk::UE::ChatReflection::TryGetSendMode(invocation, sendMode))
         {
+            sendModeKnown = Obelisk::UE::ChatReflection::IsKnownSendMode(sendMode);
             OBELISK_INFO("Reflected chat ServerSendChatMessage send_mode={} send_mode_name={} send_mode_known={}",
                          static_cast<unsigned int>(sendMode),
                          Obelisk::UE::ChatReflection::SendModeName(sendMode),
-                         Obelisk::UE::ChatReflection::IsKnownSendMode(sendMode));
+                         sendModeKnown);
+        }
+        if (invocation.Function == Obelisk::UE::ChatReflection::ChatFunction::ServerSendChatMessage &&
+            sendModeKnown &&
+            IsChatReflectionTextLoggingEnabled())
+        {
+            std::string chatText;
+            Obelisk::UE::RuntimeReflection::ReadResult textResult =
+                ProcessEventChatReflection::TryDecodeUtf32Field(
+                    reader,
+                    invocation,
+                    Obelisk::UE::ChatReflection::ChatField::ChatMessage,
+                    512,
+                    chatText);
+            if (textResult)
+            {
+                OBELISK_INFO("Reflected chat ServerSendChatMessage text=\"{}\"",
+                             SanitizeChatTextForLog(chatText));
+            }
+            else
+            {
+                OBELISK_INFO("Reflected chat ServerSendChatMessage text_decode_status={} reason={}",
+                             static_cast<int>(textResult.Status),
+                             textResult.Reason);
+            }
         }
         for (const auto& field : invocation.Fields)
         {

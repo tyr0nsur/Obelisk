@@ -266,6 +266,12 @@ Updated: 2026-05-27
   recognized chat hits in snapshots through `20260527T101357Z`; absence of lines does not
   prove a real chat send occurred. See
   `docs/research/2026-05-27-chat-reflection-no-hit-audit.md`.
+- fact: Later read-only log review found accepted runtime `ServerSendChatMessage` hits at
+  `14:07:27`, `14:17:13`, `16:12:02`, and `16:12:45` with `fname_index=2697`,
+  `metadata_only=false`, `send_mode=0`, `send_mode_name=GlobalChat`, and bounded
+  `ChatMessage` / `SendMode` ranges. This confirms the experimental runtime path but not
+  a public SDK event; see
+  `docs/research/2026-05-27-server-send-chat-runtime-hit.md`.
 - fact: Manual post-deploy `ServerSendChatMessage` chat validation commands, expected log
   lines, `reflected_chat_process_event_lines` / `server_send_chat_message_lines` /
   metadata-only fallback counters / `rejected_chat_lines` interpretation, and marker-only
@@ -277,8 +283,12 @@ Updated: 2026-05-27
   `{TCHAR* Data, int32 ArrayNum, int32 ArrayMax}` with `TCHAR=UTF-32LE`; see
   `docs/research/2026-05-27-fstring-layout.md`.
 - fact: `RuntimeReflection::TryDecodeFStringUtf32` now implements the internal decoder
-  candidate with synthetic tests and strict reject conditions. It is not wired into chat
-  logging yet.
+  candidate with synthetic tests and strict reject conditions.
+- fact: Local working tree now wires `TryDecodeFStringUtf32` into the experimental
+  `ServerSendChatMessage` logger through `ProcessEventChatReflection::TryDecodeUtf32Field`.
+  Decoded text requires the extra `OBELISK_CHAT_REFLECTION_LOG_TEXT=1` gate, logs only for
+  known `EChatSendMode` values, and does not dispatch plugin callbacks or change ABI. This
+  is validated locally but not yet deployed.
 - fact: `Memory::IsReadable` no longer uses `write(/dev/null)` because that probe returned
   success for invalid and `PROT_NONE` mappings on this host. It is now backed by cached
   readable ranges from `/proc/self/maps`, with `MemoryTests` covering invalid pointers,
@@ -298,16 +308,11 @@ Updated: 2026-05-27
 
 ## Priority Next Steps
 
-- next-step: Run the manual `ServerSendChatMessage` chat check in `docs/SUPERVISION.md`
-  by sending one normal in-game Ragnarok chat message and reviewing the bounded reflected
-  chat logs/snapshot.
-- next-step: After one real `ServerSendChatMessage` capture confirms the reflected params
-  are being hit, wire UTF-32 text decoding into the experimental chat reflection logger;
-  keep dispatch limited to `EChatSendMode` `0..3`.
-- next-step: If confirmed real player chat still produces zero `ServerSendChatMessage`
-  hits with the deployed metadata-only recognizers, review exact
-  `ClientChatMessage`, `ClientServerChatMessage`, and `ClientServerChatDirectMessage`
-  lines before considering `ShooterGameMode` helpers.
+- next-step: If runtime text evidence is needed, deploy the local UTF-32 chat-text logger
+  in a controlled restart window with `OBELISK_CHAT_REFLECTION_LOG_TEXT=1`, review bounded
+  logs, then remove the text gate; keep dispatch blocked.
+- next-step: Design plugin-facing chat event ownership only after text is copied into
+  Obelisk-owned memory and callback lifetime is covered by tests.
 - next-step: Run `scripts/verify_chat_reflection_constants.py` against any new core before
   accepting changed chat FName indices, parameter offsets, or `StrProperty` constants.
 - next-step: Benchmark ProcessEvent overhead with chat reflection enabled vs disabled

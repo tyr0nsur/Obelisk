@@ -21,15 +21,24 @@ namespace
     constexpr int32_t kClientChatMessageNameIndex = 1865;
     constexpr int32_t kClientServerChatDirectMessageNameIndex = 1983;
     constexpr int32_t kClientServerChatMessageNameIndex = 1984;
+    constexpr int32_t kSendServerChatMessageNameIndex = 9801;
+    constexpr int32_t kOnServerChatMessageDelegateNameIndex = 28549;
     constexpr int32_t kShooterPlayerControllerNameIndex = 101;
+    constexpr int32_t kShooterGameModeNameIndex = 9755;
     constexpr int32_t kChatMessageNameIndex = 588;
     constexpr int32_t kMessageTextNameIndex = 21409;
+    constexpr int32_t kMessageColorNameIndex = 21408;
+    constexpr int32_t kBIsBoldNameIndex = 21407;
+    constexpr int32_t kReceiverPlayerIDNameIndex = 28550;
+    constexpr int32_t kReceiverTeamIdNameIndex = 28551;
     constexpr int32_t kSendModeNameIndex = 16753;
     constexpr int32_t kSteamIDNameIndex = 20681;
     constexpr int32_t kPlayerNameNameIndex = 16693;
     constexpr int32_t kBytePropertyClassNameIndex = 1;
     constexpr int32_t kBytePropertyClassObjectIndex = 533;
     constexpr int32_t kBoolPropertyClassNameIndex = 3;
+    constexpr int32_t kIntPropertyClassNameIndex = 2;
+    constexpr int32_t kIntPropertyClassObjectIndex = 539;
     constexpr int32_t kStructPropertyClassNameIndex = 10;
     constexpr int32_t kStrPropertyClassNameIndex = 13;
     constexpr int32_t kStrPropertyClassObjectIndex = 547;
@@ -121,11 +130,15 @@ namespace
         std::array<uint8_t, 0x80> PropertyA{};
         std::array<uint8_t, 0x80> PropertyB{};
         std::array<uint8_t, 0x80> PropertyC{};
+        std::array<uint8_t, 0x80> PropertyD{};
+        std::array<uint8_t, 0x80> PropertyE{};
         std::array<uint8_t, 0x40> BytePropertyClass{};
         std::array<uint8_t, 0x40> BoolPropertyClass{};
+        std::array<uint8_t, 0x40> IntPropertyClass{};
         std::array<uint8_t, 0x40> StrPropertyClass{};
         std::array<uint8_t, 0x40> StructPropertyClass{};
         std::array<uint8_t, 0x40> OwnerClass{};
+        std::array<uint8_t, 0x40> GameModeOwnerClass{};
         std::array<uint8_t, 0x90> Params{};
         ReaderContext Context;
 
@@ -136,11 +149,15 @@ namespace
             Context.Regions.push_back({PropertyA.data(), PropertyA.size()});
             Context.Regions.push_back({PropertyB.data(), PropertyB.size()});
             Context.Regions.push_back({PropertyC.data(), PropertyC.size()});
+            Context.Regions.push_back({PropertyD.data(), PropertyD.size()});
+            Context.Regions.push_back({PropertyE.data(), PropertyE.size()});
             Context.Regions.push_back({BytePropertyClass.data(), BytePropertyClass.size()});
             Context.Regions.push_back({BoolPropertyClass.data(), BoolPropertyClass.size()});
+            Context.Regions.push_back({IntPropertyClass.data(), IntPropertyClass.size()});
             Context.Regions.push_back({StrPropertyClass.data(), StrPropertyClass.size()});
             Context.Regions.push_back({StructPropertyClass.data(), StructPropertyClass.size()});
             Context.Regions.push_back({OwnerClass.data(), OwnerClass.size()});
+            Context.Regions.push_back({GameModeOwnerClass.data(), GameModeOwnerClass.size()});
             Context.Regions.push_back({Params.data(), Params.size()});
             return {RegionReader, &Context};
         }
@@ -173,6 +190,11 @@ namespace
                     kBoolPropertyClassNameIndex,
                     nullptr,
                     nullptr);
+        WriteObject(fixture.IntPropertyClass,
+                    kIntPropertyClassNameIndex,
+                    kIntPropertyClassObjectIndex,
+                    nullptr,
+                    nullptr);
         WriteObject(fixture.StrPropertyClass,
                     kStrPropertyClassNameIndex,
                     kStrPropertyClassObjectIndex,
@@ -186,6 +208,11 @@ namespace
         WriteObject(fixture.OwnerClass,
                     kShooterPlayerControllerNameIndex,
                     kShooterPlayerControllerNameIndex,
+                    nullptr,
+                    nullptr);
+        WriteObject(fixture.GameModeOwnerClass,
+                    kShooterGameModeNameIndex,
+                    kShooterGameModeNameIndex,
                     nullptr,
                     nullptr);
 
@@ -228,6 +255,116 @@ namespace
 
         const void* children = fixture.PropertyA.data();
         const uint32_t functionFlags = 0x204000;
+        const uint16_t returnValueOffset = 0xffff;
+        WriteAt(fixture.Function, 0x38, children);
+        WriteAt(fixture.Function, 0x90, functionFlags);
+        WriteAt(fixture.Function, 0x96, numParms);
+        WriteAt(fixture.Function, 0x98, parmsSize);
+        WriteAt(fixture.Function, 0x9a, returnValueOffset);
+    }
+
+    void BuildGameModeFunction(ChatFixture& fixture, bool delegateShape = false, int32_t receiverTeamOffset = -1)
+    {
+        WriteObject(fixture.BoolPropertyClass,
+                    kBoolPropertyClassNameIndex,
+                    kBoolPropertyClassNameIndex,
+                    nullptr,
+                    nullptr);
+        WriteObject(fixture.IntPropertyClass,
+                    kIntPropertyClassNameIndex,
+                    kIntPropertyClassObjectIndex,
+                    nullptr,
+                    nullptr);
+        WriteObject(fixture.StrPropertyClass,
+                    kStrPropertyClassNameIndex,
+                    kStrPropertyClassObjectIndex,
+                    nullptr,
+                    nullptr);
+        WriteObject(fixture.StructPropertyClass,
+                    kStructPropertyClassNameIndex,
+                    kStructPropertyClassNameIndex,
+                    nullptr,
+                    nullptr);
+        WriteObject(fixture.GameModeOwnerClass,
+                    kShooterGameModeNameIndex,
+                    kShooterGameModeNameIndex,
+                    nullptr,
+                    nullptr);
+
+        const int32_t functionName = delegateShape ? kOnServerChatMessageDelegateNameIndex : kSendServerChatMessageNameIndex;
+        WriteObject(fixture.Function,
+                    functionName,
+                    functionName,
+                    reinterpret_cast<const void*>(0x20000),
+                    fixture.GameModeOwnerClass.data());
+
+        if (delegateShape)
+        {
+            WriteProperty(fixture.PropertyA,
+                          fixture.PropertyB.data(),
+                          fixture.Function.data(),
+                          fixture.StrPropertyClass.data(),
+                          kMessageTextNameIndex,
+                          0x00,
+                          0x10);
+            WriteProperty(fixture.PropertyB,
+                          fixture.PropertyC.data(),
+                          fixture.Function.data(),
+                          fixture.IntPropertyClass.data(),
+                          kReceiverTeamIdNameIndex,
+                          receiverTeamOffset >= 0 ? receiverTeamOffset : 0x10,
+                          0x4);
+            WriteProperty(fixture.PropertyC,
+                          nullptr,
+                          fixture.Function.data(),
+                          fixture.IntPropertyClass.data(),
+                          kReceiverPlayerIDNameIndex,
+                          0x14,
+                          0x4);
+        }
+        else
+        {
+            WriteProperty(fixture.PropertyA,
+                          fixture.PropertyB.data(),
+                          fixture.Function.data(),
+                          fixture.StrPropertyClass.data(),
+                          kMessageTextNameIndex,
+                          0x00,
+                          0x10);
+            WriteProperty(fixture.PropertyB,
+                          fixture.PropertyC.data(),
+                          fixture.Function.data(),
+                          fixture.StructPropertyClass.data(),
+                          kMessageColorNameIndex,
+                          0x10,
+                          0x10);
+            WriteProperty(fixture.PropertyC,
+                          fixture.PropertyD.data(),
+                          fixture.Function.data(),
+                          fixture.BoolPropertyClass.data(),
+                          kBIsBoldNameIndex,
+                          0x20,
+                          0x1);
+            WriteProperty(fixture.PropertyD,
+                          fixture.PropertyE.data(),
+                          fixture.Function.data(),
+                          fixture.IntPropertyClass.data(),
+                          kReceiverTeamIdNameIndex,
+                          receiverTeamOffset >= 0 ? receiverTeamOffset : 0x24,
+                          0x4);
+            WriteProperty(fixture.PropertyE,
+                          nullptr,
+                          fixture.Function.data(),
+                          fixture.IntPropertyClass.data(),
+                          kReceiverPlayerIDNameIndex,
+                          0x28,
+                          0x4);
+        }
+
+        const void* children = fixture.PropertyA.data();
+        const uint32_t functionFlags = 0x204000;
+        const uint16_t numParms = delegateShape ? 3 : 5;
+        const uint16_t parmsSize = delegateShape ? 0x18 : 0x2c;
         const uint16_t returnValueOffset = 0xffff;
         WriteAt(fixture.Function, 0x38, children);
         WriteAt(fixture.Function, 0x90, functionFlags);
@@ -448,18 +585,17 @@ namespace
         Require(invocation.Function == ChatReflection::ChatFunction::ClientServerChatDirectMessage,
                 "ClientServerChatDirectMessage kind mismatch");
         Require(invocation.MetadataOnlyCandidate, "ClientServerChatDirectMessage should be metadata-only");
+        Require(!invocation.HasParameterRanges, "metadata-only candidate should not expose ranges");
         Require(invocation.Fields.size() == 3, "ClientServerChatDirectMessage field count mismatch");
         Require(invocation.Fields[0].Field == ChatReflection::ChatField::MessageText,
                 "MessageText field mismatch");
+        Require(invocation.Fields[0].Range.Data == nullptr, "metadata-only MessageText exposed range data");
         Require(invocation.Fields[1].Field == ChatReflection::ChatField::MessageColor,
                 "MessageColor field mismatch");
-        Require(invocation.Fields[1].Range.Data == fixture.Params.data() + 0x10,
-                "MessageColor range pointer mismatch");
+        Require(invocation.Fields[1].Range.Data == nullptr, "metadata-only MessageColor exposed range data");
         Require(invocation.Fields[2].Field == ChatReflection::ChatField::BIsBold,
                 "bIsBold field mismatch");
-        Require(invocation.Fields[2].Range.Data == fixture.Params.data() + 0x20,
-                "bIsBold range pointer mismatch");
-        Require(invocation.Fields[2].Range.Size == 0x1, "bIsBold range size mismatch");
+        Require(invocation.Fields[2].Range.Data == nullptr, "metadata-only bIsBold exposed range data");
     }
 
     void TestRecognizesClientServerChatMessageAsMetadataOnly()
@@ -494,6 +630,7 @@ namespace
         Require(invocation.Function == ChatReflection::ChatFunction::ClientServerChatMessage,
                 "ClientServerChatMessage kind mismatch");
         Require(invocation.MetadataOnlyCandidate, "ClientServerChatMessage should be metadata-only");
+        Require(!invocation.HasParameterRanges, "metadata-only candidate should not expose ranges");
         Require(invocation.Fields.size() == 3, "ClientServerChatMessage field count mismatch");
         Require(invocation.Fields[0].Field == ChatReflection::ChatField::MessageText,
                 "MessageText field mismatch");
@@ -501,6 +638,64 @@ namespace
                 "MessageColor field mismatch");
         Require(invocation.Fields[2].Field == ChatReflection::ChatField::BIsBold,
                 "bIsBold field mismatch");
+    }
+
+    void TestRecognizesShooterGameModeCandidatesAsMetadataOnly()
+    {
+        {
+            ChatFixture fixture;
+            BuildGameModeFunction(fixture);
+
+            ChatReflection::ChatInvocation invocation;
+            ReadResult result = ChatReflection::TryIdentifyChatInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+
+            Require(static_cast<bool>(result), result.Reason.c_str());
+            Require(invocation.Function == ChatReflection::ChatFunction::SendServerChatMessage,
+                    "SendServerChatMessage kind mismatch");
+            Require(invocation.MetadataOnlyCandidate, "SendServerChatMessage should be metadata-only");
+            Require(!invocation.HasParameterRanges, "metadata-only SendServerChatMessage exposed ranges");
+            Require(invocation.Fields.size() == 5, "SendServerChatMessage field count mismatch");
+            Require(invocation.Fields[3].Field == ChatReflection::ChatField::ReceiverTeamId,
+                    "ReceiverTeamId field mismatch");
+            Require(invocation.Fields[3].Offset == 0x24, "ReceiverTeamId offset mismatch");
+            Require(invocation.Fields[4].Field == ChatReflection::ChatField::ReceiverPlayerID,
+                    "ReceiverPlayerID field mismatch");
+            Require(invocation.Fields[4].Offset == 0x28, "ReceiverPlayerID offset mismatch");
+            for (const auto& field : invocation.Fields)
+                Require(field.Range.Data == nullptr, "metadata-only SendServerChatMessage exposed range data");
+        }
+        {
+            ChatFixture fixture;
+            BuildGameModeFunction(fixture, true);
+
+            ChatReflection::ChatInvocation invocation;
+            ReadResult result = ChatReflection::TryIdentifyChatInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+
+            Require(static_cast<bool>(result), result.Reason.c_str());
+            Require(invocation.Function == ChatReflection::ChatFunction::OnServerChatMessageDelegate,
+                    "OnServerChatMessageDelegate kind mismatch");
+            Require(invocation.MetadataOnlyCandidate, "OnServerChatMessageDelegate should be metadata-only");
+            Require(!invocation.HasParameterRanges, "metadata-only delegate exposed ranges");
+            Require(invocation.Fields.size() == 3, "OnServerChatMessageDelegate field count mismatch");
+            Require(invocation.Fields[1].Field == ChatReflection::ChatField::ReceiverTeamId,
+                    "delegate ReceiverTeamId field mismatch");
+            Require(invocation.Fields[1].Offset == 0x10, "delegate ReceiverTeamId offset mismatch");
+            Require(invocation.Fields[2].Field == ChatReflection::ChatField::ReceiverPlayerID,
+                    "delegate ReceiverPlayerID field mismatch");
+            Require(invocation.Fields[2].Offset == 0x14, "delegate ReceiverPlayerID offset mismatch");
+            for (const auto& field : invocation.Fields)
+                Require(field.Range.Data == nullptr, "metadata-only delegate exposed range data");
+        }
     }
 
     void TestRejectsMetadataOnlyCandidatesWithWrongShape()
@@ -582,6 +777,34 @@ namespace
                 invocation);
             Require(result.Status == ReadStatus::Implausible,
                     "wrong ClientServerChatMessage shape was accepted");
+        }
+        {
+            ChatFixture fixture;
+            BuildGameModeFunction(fixture, false, 0x20);
+
+            ChatReflection::ChatInvocation invocation;
+            ReadResult result = ChatReflection::TryIdentifyChatInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible,
+                    "wrong SendServerChatMessage ReceiverTeamId offset was accepted");
+        }
+        {
+            ChatFixture fixture;
+            BuildGameModeFunction(fixture, true, 0x14);
+
+            ChatReflection::ChatInvocation invocation;
+            ReadResult result = ChatReflection::TryIdentifyChatInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible,
+                    "wrong OnServerChatMessageDelegate ReceiverTeamId offset was accepted");
         }
     }
 
@@ -715,6 +938,7 @@ int main()
     TestRecognizesClientChatMessageAsMetadataOnly();
     TestRecognizesClientServerChatDirectMessageAsMetadataOnly();
     TestRecognizesClientServerChatMessageAsMetadataOnly();
+    TestRecognizesShooterGameModeCandidatesAsMetadataOnly();
     TestRejectsMetadataOnlyCandidatesWithWrongShape();
     TestRejectsServerSendChatMessageWhenSendModeByteUnreadable();
     TestRejectsSameFNameWithWrongShape();

@@ -193,14 +193,16 @@ work from repository state instead of chat history.
 - Deployed code has gated metadata-only recognizers for exact `ShooterPlayerController`
   candidates `ClientChatMessage`, `ClientServerChatMessage`, and
   `ClientServerChatDirectMessage`. They log `metadata_only=true`, do not decode text, do
-  not dispatch plugin events, and do not change public ABI. If confirmed real player chat
-  still produces zero `ServerSendChatMessage` hits after deploying them, review those
-  exact fallback lines before considering `ShooterGameMode.SendServerChatMessage`.
+  not dispatch plugin events, and do not change public ABI.
 - Read-only audit `docs/research/2026-05-27-chat-reflection-no-hit-audit.md` confirms
   stable hook/gate posture for PID `3289000` but zero recognized chat hits in reviewed
-  snapshots. Treat this as missing runtime evidence, not proof that chat cannot be
-  intercepted; the next useful step is one operator-confirmed normal chat send and a
-  bounded log/snapshot review.
+  snapshots through `20260527T101357Z`; later logs supersede the missing-evidence state.
+- Later read-only log review found accepted runtime `ServerSendChatMessage` hits at
+  `14:07:27`, `14:17:13`, `16:12:02`, and `16:12:45` with `fname_index=2697`,
+  `metadata_only=false`, `send_mode=0`, `send_mode_name=GlobalChat`, and bounded
+  `ChatMessage` / `SendMode` ranges. This confirms the experimental runtime path but not
+  a public SDK event; see
+  `docs/research/2026-05-27-server-send-chat-runtime-hit.md`.
 - Core-pack tooling now supports direct FName entry reads and bounded
   `--gobjects-candidate` previews for the next `GUObjectArray` investigation.
 - Read-only overnight snapshots are documented in `docs/SUPERVISION.md` and implemented by
@@ -325,12 +327,15 @@ python3 scripts/analyze_reflectionscanner_capture.py \
   `state/instances/<id>/enable-chat-reflection` marker for restart-time activation.
 - Latest deployed runtime on `arkserver` includes commits through `e1071a7`, has chat
   reflection enabled and plugins disabled, PID `3289000`. It reached the experimental gate
-  log after first ProcessEvent; no chat message has been observed yet in the log.
+  log after first ProcessEvent and later logged accepted `ServerSendChatMessage` hits.
 - `FString` candidate for this ARK Linux build is a 16-byte
   `{Data, ArrayNum, ArrayMax}` header with UTF-32LE `TCHAR`; see
   `docs/research/2026-05-27-fstring-layout.md`.
-- `RuntimeReflection::TryDecodeFStringUtf32` exists and is tested, but runtime chat logging
-  still logs metadata/ranges only until real chat capture confirms params.
+- Local working tree wires `RuntimeReflection::TryDecodeFStringUtf32` into experimental
+  `ServerSendChatMessage` logging through `ProcessEventChatReflection::TryDecodeUtf32Field`.
+  Decoded text requires the extra `OBELISK_CHAT_REFLECTION_LOG_TEXT=1` gate, logs only for
+  known `EChatSendMode` values, and does not dispatch plugins or change ABI. This is
+  validated locally but not deployed.
 - Evidence: after any isolated scanner capture, run
   `scripts/build_reflection_evidence_pack.py` against copied logs and the matching binary
   before promoting candidates.

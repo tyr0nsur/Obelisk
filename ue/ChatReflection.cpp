@@ -14,10 +14,17 @@ namespace Obelisk::UE::ChatReflection
         constexpr int32_t kClientChatMessageNameIndex = 1865;
         constexpr int32_t kClientServerChatDirectMessageNameIndex = 1983;
         constexpr int32_t kClientServerChatMessageNameIndex = 1984;
+        constexpr int32_t kSendServerChatMessageNameIndex = 9801;
+        constexpr int32_t kOnServerChatMessageDelegateNameIndex = 28549;
 
         constexpr int32_t kShooterPlayerControllerNameIndex = 101;
+        constexpr int32_t kShooterGameModeNameIndex = 9755;
         constexpr int32_t kChatMessageNameIndex = 588;
         constexpr int32_t kMessageTextNameIndex = 21409;
+        constexpr int32_t kMessageColorNameIndex = 21408;
+        constexpr int32_t kBIsBoldNameIndex = 21407;
+        constexpr int32_t kReceiverPlayerIDNameIndex = 28550;
+        constexpr int32_t kReceiverTeamIdNameIndex = 28551;
         constexpr int32_t kSendModeNameIndex = 16753;
         constexpr int32_t kSteamIDNameIndex = 20681;
         constexpr int32_t kPlayerNameNameIndex = 16693;
@@ -25,6 +32,8 @@ namespace Obelisk::UE::ChatReflection
         constexpr int32_t kBytePropertyClassNameIndex = 1;
         constexpr int32_t kBytePropertyClassObjectIndex = 533;
         constexpr int32_t kBoolPropertyClassNameIndex = 3;
+        constexpr int32_t kIntPropertyClassNameIndex = 2;
+        constexpr int32_t kIntPropertyClassObjectIndex = 539;
         constexpr int32_t kStructPropertyClassNameIndex = 10;
         constexpr int32_t kStrPropertyClassNameIndex = 13;
         constexpr int32_t kStrPropertyClassObjectIndex = 547;
@@ -32,6 +41,7 @@ namespace Obelisk::UE::ChatReflection
         constexpr size_t kFStringHeaderSize = 0x10;
         constexpr size_t kBytePropertySize = 0x1;
         constexpr size_t kBoolPropertySize = 0x1;
+        constexpr size_t kIntPropertySize = 0x4;
         constexpr size_t kStructPropertySize = 0x10;
         constexpr size_t kChatStructPropertySize = 0x90;
         constexpr int32_t kAnyNameIndex = -1;
@@ -144,6 +154,60 @@ namespace Obelisk::UE::ChatReflection
              kAnyObjectIndex},
         }};
 
+        constexpr std::array<ChatFieldSpec, 5> kSendServerChatMessageFields{{
+            {ChatField::MessageText,
+             kMessageTextNameIndex,
+             0x00,
+             kFStringHeaderSize,
+             kStrPropertyClassNameIndex,
+             kStrPropertyClassObjectIndex},
+            {ChatField::MessageColor,
+             kMessageColorNameIndex,
+             0x10,
+             kStructPropertySize,
+             kStructPropertyClassNameIndex,
+             kAnyObjectIndex},
+            {ChatField::BIsBold,
+             kBIsBoldNameIndex,
+             0x20,
+             kBoolPropertySize,
+             kBoolPropertyClassNameIndex,
+             kAnyObjectIndex},
+            {ChatField::ReceiverTeamId,
+             kReceiverTeamIdNameIndex,
+             0x24,
+             kIntPropertySize,
+             kIntPropertyClassNameIndex,
+             kIntPropertyClassObjectIndex},
+            {ChatField::ReceiverPlayerID,
+             kReceiverPlayerIDNameIndex,
+             0x28,
+             kIntPropertySize,
+             kIntPropertyClassNameIndex,
+             kIntPropertyClassObjectIndex},
+        }};
+
+        constexpr std::array<ChatFieldSpec, 3> kOnServerChatMessageDelegateFields{{
+            {ChatField::MessageText,
+             kMessageTextNameIndex,
+             0x00,
+             kFStringHeaderSize,
+             kStrPropertyClassNameIndex,
+             kStrPropertyClassObjectIndex},
+            {ChatField::ReceiverTeamId,
+             kReceiverTeamIdNameIndex,
+             0x10,
+             kIntPropertySize,
+             kIntPropertyClassNameIndex,
+             kIntPropertyClassObjectIndex},
+            {ChatField::ReceiverPlayerID,
+             kReceiverPlayerIDNameIndex,
+             0x14,
+             kIntPropertySize,
+             kIntPropertyClassNameIndex,
+             kIntPropertyClassObjectIndex},
+        }};
+
         constexpr ChatFunctionSpec kServerChatSpec{
             ChatFunction::ServerChat,
             kServerChatNameIndex,
@@ -221,6 +285,28 @@ namespace Obelisk::UE::ChatReflection
             true,
         };
 
+        constexpr ChatFunctionSpec kSendServerChatMessageSpec{
+            ChatFunction::SendServerChatMessage,
+            kSendServerChatMessageNameIndex,
+            5,
+            0x2c,
+            kSendServerChatMessageFields.data(),
+            kSendServerChatMessageFields.size(),
+            kShooterGameModeNameIndex,
+            true,
+        };
+
+        constexpr ChatFunctionSpec kOnServerChatMessageDelegateSpec{
+            ChatFunction::OnServerChatMessageDelegate,
+            kOnServerChatMessageDelegateNameIndex,
+            3,
+            0x18,
+            kOnServerChatMessageDelegateFields.data(),
+            kOnServerChatMessageDelegateFields.size(),
+            kShooterGameModeNameIndex,
+            true,
+        };
+
         const ChatFunctionSpec* FindSpec(int32_t nameIndex)
         {
             switch (nameIndex)
@@ -231,6 +317,10 @@ namespace Obelisk::UE::ChatReflection
                 return &kClientServerChatDirectMessageSpec;
             case kClientServerChatMessageNameIndex:
                 return &kClientServerChatMessageSpec;
+            case kSendServerChatMessageNameIndex:
+                return &kSendServerChatMessageSpec;
+            case kOnServerChatMessageDelegateNameIndex:
+                return &kOnServerChatMessageDelegateSpec;
             case kServerSendChatMessageNameIndex:
                 return &kServerSendChatMessageSpec;
             case kServerChatNameIndex:
@@ -398,8 +488,8 @@ namespace Obelisk::UE::ChatReflection
         value.Function = spec->Function;
         value.FunctionNameIndex = spec->NameIndex;
         value.ReflectedFunction = std::move(reflectedFunction);
-        value.HasParameterRanges = params != nullptr;
         value.MetadataOnlyCandidate = spec->MetadataOnlyCandidate;
+        value.HasParameterRanges = params != nullptr && !value.MetadataOnlyCandidate;
 
         size_t index = 0;
         for (size_t i = 0; i < spec->FieldCount; ++i)
@@ -418,7 +508,7 @@ namespace Obelisk::UE::ChatReflection
             field.Offset = fieldSpec.Offset;
             field.Size = fieldSpec.Size;
 
-            if (params)
+            if (value.HasParameterRanges)
             {
                 if (RuntimeReflection::ReadResult result =
                         RuntimeReflection::TryGetParameterRange(reader,

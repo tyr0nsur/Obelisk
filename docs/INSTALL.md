@@ -122,6 +122,13 @@ OBELISK_CHAT_REFLECTION_BINARY_SHA256=<supported ARK SHA256>
 OBELISK_CHAT_REFLECTION_LOG_LIMIT=25
 ```
 
+Decoded chat text logging is not enabled by the marker. It requires an additional explicit
+environment gate:
+
+```text
+OBELISK_CHAT_REFLECTION_LOG_TEXT=1
+```
+
 Rollback is removing the marker and restarting the instance. The stable production posture
 is still process-event hook enabled, plugins disabled for debug, and chat reflection off
 unless a development validation run explicitly needs it.

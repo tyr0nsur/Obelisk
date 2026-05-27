@@ -1,6 +1,6 @@
 ---
 name: obelisk-ue4-reflection
-description: Guides Obelisk work that should decode UE4 objects, UFunctions, FNames, and parameters through reflection instead of fragile raw memory scans.
+description: "Guides Obelisk work that should decode UE4 objects, UFunctions, FNames, and parameters through reflection instead of fragile raw memory scans."
 ---
 
 # Obelisk UE4 Reflection Skill
@@ -25,13 +25,16 @@ or parameter decoding for ARK's Linux UE4 server.
 - `scripts/enumerate_core_uobjects.py` and `scripts/inspect_core_ufunctions.py` can
   reproduce the current offline path from core dump to chat `UFunction` property chains.
 - Internal runtime layers exist:
-  - `ue/RuntimeReflection` for binary-hash-gated `UObject`/`UFunction`/`UProperty`
-    validation and UTF-32 `FString` decoding helpers.
-  - `ue/ChatReflection` for `ServerChat`, `ServerChatTo`, `ServerChatToPlayer`, and
-    `ShooterPlayerController.ServerSendChatMessage` recognition.
-  - `hooks/ProcessEventChatReflection` for hook-side gate/recognition tests.
+  - `ue/RuntimeReflection.{h,cpp}` for binary-hash-gated `UObject`/`UFunction`/
+    `UProperty` validation and UTF-32 `FString` decoding helpers.
+  - `ue/ChatReflection.{h,cpp}` for `ServerChat`, `ServerChatTo`, `ServerChatToPlayer`,
+    `ShooterPlayerController.ServerSendChatMessage`, and metadata-only fallback
+    recognition.
+  - `hooks/ProcessEventChatReflection.{h,cpp}` for hook-side gate/recognition tests.
 - Deployed `arkserver` uses `state/instances/arkserver/enable-chat-reflection`; current
-  logs show the experimental gate is enabled but no real chat hit has been observed yet.
+  logs now include accepted `ServerSendChatMessage` hits with `send_mode=0` and bounded
+  `ChatMessage` / `SendMode` ranges. This confirms the experimental runtime path, not a
+  public SDK event.
 - `ServerChat`, `ServerChatTo`, and `ServerChatToPlayer` have `ShooterCheatManager` outer
   evidence and should not be treated as the primary normal player chat path. Current best
   incoming player chat candidate is `ServerSendChatMessage` with FName index `2697`,
@@ -40,7 +43,18 @@ or parameter decoding for ARK's Linux UE4 server.
   `1 GlobalTribeChat`, `2 LocalChat`, `3 AllianceChat`; values `>=4` must be rejected
   for logging/dispatch.
 - The deployed experimental chat runtime logs reflected `send_mode` and `send_mode_name`
-  for accepted `ServerSendChatMessage` hits.
+  for accepted `ServerSendChatMessage` hits. It still must not dispatch plugin events
+  until text is copied into Obelisk-owned memory and callback ownership is specified.
+- Local working tree decodes `ServerSendChatMessage.ChatMessage` with the internal UTF-32
+  `FString` decoder for experimental logs only, after `SendMode` is known and
+  `OBELISK_CHAT_REFLECTION_LOG_TEXT=1` is explicitly set. Treat this as validation
+  instrumentation, not SDK behavior.
+- Offline core evidence also supports two `ShooterGameMode` fallback candidates as
+  metadata-only recognizers: `SendServerChatMessage` with FName index `9801`,
+  `ParmsSize=0x2c`, and five fields; and `OnServerChatMessage__DelegateSignature` with
+  FName index `28549`, `ParmsSize=0x18`, and three fields. Treat these as observation
+  targets only: no text decoding, no plugin dispatch, and no native exec hooks until a
+  confirmed runtime hit changes the evidence.
 - Prior raw chat experiments used parameter probing and FString heuristics. Treat that as
   historical discovery code, not the final architecture.
 - `ReflectionScanner` FName table output must be treated as candidate ranking. Analyzer
@@ -76,8 +90,9 @@ Build toward a real UE4 metadata pipeline:
 
 ## Chat/Event Guidance
 
-- Keep chat interception experimental until `ServerSendChatMessage` is confirmed by a live
-  in-game chat message in the deployed hook path.
+- Keep chat interception experimental even though `ServerSendChatMessage` is now observed
+  in the deployed hook path; the next boundary is copied text decoding plus a stable
+  callback ownership contract.
 - For `ServerSendChatMessage`, only log or dispatch recognized `EChatSendMode` values
   `0..3`; treat `>=4` as rejected evidence, not a chat event.
 - Do not expand raw `0x00..0x80` param scanning as the long-term fix.

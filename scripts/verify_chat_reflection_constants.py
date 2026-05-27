@@ -31,7 +31,13 @@ DEFAULT_TARGETS = (
     "ClientChatMessage",
     "ClientServerChatDirectMessage",
     "ClientServerChatMessage",
+    "SendServerChatMessage",
+    "OnServerChatMessageDelegate",
 )
+
+CORE_FUNCTION_NAMES = {
+    "OnServerChatMessageDelegate": "OnServerChatMessage__DelegateSignature",
+}
 
 
 @dataclass(frozen=True)
@@ -121,6 +127,8 @@ def parse_chat_reflection_source(path: Path = CHAT_REFLECTION_SOURCE) -> ChatRef
         "ClientChatMessage": parse_fields("kClientChatMessageFields"),
         "ClientServerChatDirectMessage": parse_fields("kClientServerChatMessageFields"),
         "ClientServerChatMessage": parse_fields("kClientServerChatMessageFields"),
+        "SendServerChatMessage": parse_fields("kSendServerChatMessageFields"),
+        "OnServerChatMessageDelegate": parse_fields("kOnServerChatMessageDelegateFields"),
     }
 
     for function in DEFAULT_TARGETS:
@@ -175,13 +183,13 @@ def _candidate_function_indices(
         max_objects=max_object_scan,
         class_contains="Function",
     )
-    wanted = set(targets)
+    wanted = {CORE_FUNCTION_NAMES.get(target, target): target for target in targets}
     result: dict[str, int] = {}
     for item in objects:
         name = item.get("name")
         index = item.get("index")
         if name in wanted and isinstance(index, int):
-            result.setdefault(str(name), index)
+            result.setdefault(wanted[str(name)], index)
     return result
 
 
@@ -232,9 +240,20 @@ def verify_core(
         max_object_scan=max_object_scan,
     )
     targets_by_name = {
-        target.get("object_summary", {}).get("name"): target
+        CORE_FUNCTION_NAMES.get(function_name, function_name): target
+        for function_name in DEFAULT_TARGETS
         for target in inspector_payload.get("targets", [])
         if isinstance(target.get("object_summary"), dict)
+        and target.get("object_summary", {}).get("name") == CORE_FUNCTION_NAMES.get(function_name, function_name)
+    }
+    targets_by_function = {
+        function_name: targets_by_name.get(CORE_FUNCTION_NAMES.get(function_name, function_name))
+        for function_name in DEFAULT_TARGETS
+    }
+    targets_by_name = {
+        function_name: target
+        for function_name, target in targets_by_function.items()
+        if target is not None
     }
 
     fname_table = memory.read_ptr(fname_root_slot)

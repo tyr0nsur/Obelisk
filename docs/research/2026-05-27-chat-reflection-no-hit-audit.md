@@ -1,5 +1,9 @@
 # Chat Reflection No-Hit Audit
 
+Update: later read-only log review found accepted `ServerSendChatMessage` hits after this
+snapshot window. Keep this note as evidence for the earlier no-hit window, but use
+`2026-05-27-server-send-chat-runtime-hit.md` for current chat-reflection status.
+
 ## Objective
 
 Investigate why the current `arkserver` process shows no chat reflection observations

@@ -20,6 +20,8 @@ namespace
     constexpr int32_t kClientChatMessageNameIndex = 1865;
     constexpr int32_t kClientServerChatDirectMessageNameIndex = 1983;
     constexpr int32_t kClientServerChatMessageNameIndex = 1984;
+    constexpr int32_t kSendServerChatMessageNameIndex = 9801;
+    constexpr int32_t kOnServerChatMessageDelegateNameIndex = 28549;
     constexpr int32_t kChatMessageNameIndex = 588;
     constexpr int32_t kMessageTextNameIndex = 21409;
     constexpr int32_t kSendModeNameIndex = 16753;
@@ -117,6 +119,7 @@ namespace
         std::array<uint8_t, 0x40> BytePropertyClass{};
         std::array<uint8_t, 0x40> StrPropertyClass{};
         std::array<uint8_t, 0x20> Params{};
+        std::array<uint32_t, 16> FStringData{};
         ReaderContext Context;
 
         MemoryReader Reader()
@@ -128,6 +131,8 @@ namespace
             Context.Regions.push_back({BytePropertyClass.data(), BytePropertyClass.size()});
             Context.Regions.push_back({StrPropertyClass.data(), StrPropertyClass.size()});
             Context.Regions.push_back({Params.data(), Params.size()});
+            Context.Regions.push_back(
+                {reinterpret_cast<const uint8_t*>(FStringData.data()), FStringData.size() * sizeof(uint32_t)});
             return {RegionReader, &Context};
         }
     };
@@ -258,6 +263,10 @@ namespace
                 "ClientServerChatDirectMessage FName was not accepted by cheap filter");
         Require(IsReflectedChatNameIndex(kClientServerChatMessageNameIndex),
                 "ClientServerChatMessage FName was not accepted by cheap filter");
+        Require(IsReflectedChatNameIndex(kSendServerChatMessageNameIndex),
+                "SendServerChatMessage FName was not accepted by cheap filter");
+        Require(IsReflectedChatNameIndex(kOnServerChatMessageDelegateNameIndex),
+                "OnServerChatMessage delegate FName was not accepted by cheap filter");
         Require(IsReflectedChatNameIndex(kServerSendChatMessageNameIndex),
                 "ServerSendChatMessage FName was not accepted by cheap filter");
         Require(IsReflectedChatNameIndex(kServerChatNameIndex), "ServerChat FName was not accepted by cheap filter");
@@ -362,6 +371,51 @@ namespace
                 "SendMode range should be borrowed from params");
         Require(attempt.Invocation.Fields[1].Range.Size == 0x1, "SendMode range size mismatch");
     }
+
+    void TestDecodesServerSendChatMessageText()
+    {
+        ChatFixture fixture;
+        BuildServerSendChatMessage(fixture);
+        fixture.FStringData[0] = 'H';
+        fixture.FStringData[1] = 'i';
+        fixture.FStringData[2] = 0;
+
+        RuntimeReflection::FStringHeaderCandidate header{
+            fixture.FStringData.data(),
+            3,
+            3,
+        };
+        WriteAt(fixture.Params, 0x00, header);
+        fixture.Params[0x10] = 0x00;
+
+        MemoryReader reader = fixture.Reader();
+        Attempt attempt = TryIdentifyInvocation(
+            EnabledGate(),
+            kServerSendChatMessageNameIndex,
+            reader,
+            fixture.Function.data(),
+            fixture.Params.data());
+
+        Require(attempt.Status == AttemptStatus::Matched, attempt.Result.Reason.c_str());
+        std::string text;
+        RuntimeReflection::ReadResult result = TryDecodeUtf32Field(
+            reader,
+            attempt.Invocation,
+            ChatReflection::ChatField::ChatMessage,
+            512,
+            text);
+        Require(result.Status == RuntimeReflection::ReadStatus::Ok, result.Reason.c_str());
+        Require(text == "Hi", "decoded chat text mismatch");
+
+        result = TryDecodeUtf32Field(
+            reader,
+            attempt.Invocation,
+            ChatReflection::ChatField::MessageText,
+            512,
+            text);
+        Require(result.Status == RuntimeReflection::ReadStatus::InvalidArgument,
+                "missing chat field did not fail closed");
+    }
 }
 
 int main()
@@ -374,6 +428,7 @@ int main()
     TestUnreadableChatFunctionIsRejected();
     TestMatchedChatInvocationReturnsBorrowedRanges();
     TestMatchedServerSendChatMessageReturnsByteRange();
+    TestDecodesServerSendChatMessageText();
 
     std::cout << "ProcessEventChatReflectionTests passed\n";
     return 0;
