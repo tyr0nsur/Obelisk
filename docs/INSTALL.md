@@ -18,7 +18,9 @@ Recommended root:
 /servidor/ark/obelisk/
   lib/
   plugins/
-  config/plugins/
+  plugins-disabled/
+  config/plugins/<plugin-id>/config.json
+  config/instances/
   logs/
   state/
 ```
@@ -26,7 +28,7 @@ Recommended root:
 Install the runtime:
 
 ```bash
-./scripts/install_obelisk.sh /servidor/ark/obelisk
+./scripts/install_obelisk.sh --backup-existing /servidor/ark/obelisk
 ```
 
 The script copies:
@@ -34,44 +36,57 @@ The script copies:
 ```text
 build/libobelisk.so                         -> lib/libobelisk.so
 build/_deps/subhook-build/libsubhook.so     -> lib/libsubhook.so
-build/plugins/chat/ChatPlugin.so            -> plugins/ChatPlugin.so
+build/plugins/chat/ChatPlugin.so            -> plugins-disabled/ChatPlugin.so
 ```
 
-It also creates `config/plugins`, `logs`, and `state`.
+It also creates `plugins-disabled`, `config/plugins`, `config/instances`, `logs`, and
+`state`.
+
+Plugins loaded from `plugins/` are expected to own their config defaults. The preferred
+path for plugin config is:
+
+```text
+/servidor/ark/obelisk/config/plugins/<plugin-id>/config.json
+```
+
+The runtime loads every `.so` directly inside `/servidor/ark/obelisk/plugins/` on restart.
+Use `/servidor/ark/obelisk/plugins-disabled/` as the staging area for plugins that are
+installed but not active.
+
+For the current transitional ChatPlugin, the installer creates both the preferred
+`config/plugins/chat/config.json` and the legacy `config/plugins/chat_config.json` when
+missing.
+
+`ChatPlugin.so` is installed disabled by default. Use `--enable-chat-plugin` only for an
+isolated plugin test:
+
+```bash
+./scripts/install_obelisk.sh --enable-chat-plugin /servidor/ark/obelisk
+```
+
+Useful installer flags:
+
+```text
+--dry-run
+--backup-existing
+--force-config
+--enable-chat-plugin
+```
 
 ## LinuxGSM Wrapper
 
-Place `ObeliskRun.sh` in:
+Versioned wrapper templates live in:
+
+```text
+packaging/linuxgsm/ObeliskRun.sh
+packaging/linuxgsm/ObeliskRunDebug.sh
+packaging/linuxgsm/arkserver-obelisk-debug.cfg.example
+```
+
+Place the production wrapper in:
 
 ```text
 ShooterGame/Binaries/Linux/ObeliskRun.sh
-```
-
-Example wrapper:
-
-```bash
-#!/bin/bash
-export OBELISK_ROOT="/servidor/ark/obelisk"
-export OBELISK_PLUGIN_DIR="${OBELISK_ROOT}/plugins"
-export OBELISK_CONFIG_DIR="${OBELISK_ROOT}/config"
-export OBELISK_LOG_DIR="${OBELISK_ROOT}/logs"
-export LD_LIBRARY_PATH="${OBELISK_ROOT}/lib:${LD_LIBRARY_PATH}"
-export LD_PRELOAD="${OBELISK_ROOT}/lib/libobelisk.so"
-
-case "$1" in
-    Ragnarok*)
-        [[ -f "${OBELISK_ROOT}/state/enable-process-event-hook-ragnarok" ]] && export OBELISK_ENABLE_PROCESS_EVENT_HOOK=1
-        [[ -f "${OBELISK_ROOT}/state/disable-plugins-ragnarok" ]] && export OBELISK_DISABLE_PLUGINS=1
-        [[ -f "${OBELISK_ROOT}/state/enable-chat-discovery-ragnarok" ]] && export OBELISK_CHAT_DISCOVERY=1
-        ;;
-    TheIsland*)
-        [[ -f "${OBELISK_ROOT}/state/enable-process-event-hook-theisland" ]] && export OBELISK_ENABLE_PROCESS_EVENT_HOOK=1
-        [[ -f "${OBELISK_ROOT}/state/disable-plugins-theisland" ]] && export OBELISK_DISABLE_PLUGINS=1
-        [[ -f "${OBELISK_ROOT}/state/enable-chat-discovery-theisland" ]] && export OBELISK_CHAT_DISCOVERY=1
-        ;;
-esac
-
-exec ./ShooterGameServer "$@"
 ```
 
 Then configure LinuxGSM:
@@ -79,6 +94,10 @@ Then configure LinuxGSM:
 ```ini
 executable="./ObeliskRun.sh"
 ```
+
+For scanner or reflection research, use the debug wrapper from `ObeliskRunDebug.sh` on a
+separate instance such as `arkserver-obelisk-debug`; do not reuse live map markers for
+debug captures.
 
 ## Feature Flags
 
@@ -109,6 +128,7 @@ Runtime logs are written to:
 /servidor/ark/obelisk/logs/Obelisk.log
 /servidor/ark/obelisk/logs/Obelisk-Ragnarok.log
 /servidor/ark/obelisk/logs/Obelisk-TheIsland.log
+/servidor/ark/obelisk/logs/isolated-debug/
 ```
 
 ## Current Safe Production Posture

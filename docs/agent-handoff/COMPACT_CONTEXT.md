@@ -9,7 +9,7 @@ work from repository state instead of chat history.
 
 - Repo: `/home/flowcommunity-ark/Obelisk`
 - Remote: `git@github.com:tyr0nsur/Obelisk.git`
-- Current known good commit: `8d3da3c Add plugin shutdown and scanner audit tooling`
+- Current known good commit: `7bf0e67 Add restore docs and analyzer tests`
 - Local ignored artifacts normally present: `build/`, `Obelisk.log`
 - Do not commit built `.so` files, logs, server config, core dumps, or state markers.
 - Server config restore notes: `docs/SERVER_RESTORE.md`

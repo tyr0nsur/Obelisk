@@ -13,12 +13,15 @@ later session.
 Read these before starting delegated work:
 
 - `docs/agent-handoff/CURRENT.md`: current active state, blockers, next tasks.
+- `docs/agent-handoff/COMPACT_CONTEXT.md`: compact resume state after long sessions.
 - `docs/research/`: durable investigation notes and evidence.
+- `docs/SERVER_RESTORE.md`: recovery flow for ARK config after SteamCMD/LinuxGSM rewrites.
 - `agent-skills/`: operational rules that future agents must follow.
 
 Update these before finishing:
 
 - `docs/agent-handoff/CURRENT.md` for short-lived active context.
+- `docs/agent-handoff/COMPACT_CONTEXT.md` when the stable baseline or hard rules change.
 - `docs/research/YYYY-MM-DD-topic.md` for reusable evidence.
 - `agent-skills/*/SKILL.md` when the way agents should work changes.
 

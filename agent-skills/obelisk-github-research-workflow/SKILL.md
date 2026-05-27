@@ -15,6 +15,8 @@ skill updates, or making work reproducible for contributors.
 - Push stable checkpoints to `origin/main` after validation.
 - Do not commit server artifacts: `.so`, logs, core files, local configs, state markers, or
   build directories.
+- Server restore documentation is allowed, but never stage copied `/servidor/ark` config
+  files themselves. Link to `docs/SERVER_RESTORE.md` instead.
 - If a discovery changes how future agents should work, update the relevant
   `agent-skills/*/SKILL.md` in the same or next commit.
 - If a discovery is not ready for code, write it under `docs/research/`.
@@ -29,6 +31,8 @@ skill updates, or making work reproducible for contributors.
 - Close old agents after their findings are integrated so stale context does not keep
   influencing new work.
 - Relaunch agents after major skill updates when their next task depends on the new rules.
+- Documentation/skills workers must not edit runtime C++ or `/servidor/ark` unless their
+  prompt explicitly widens scope.
 
 ## Commit Flow
 

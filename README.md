@@ -93,7 +93,8 @@ The recommended install layout is:
     disable-plugins-ragnarok
 ```
 
-The ARK binary directory only needs a thin `ObeliskRun.sh` wrapper.
+The ARK binary directory only needs a thin `ObeliskRun.sh` wrapper. Versioned LinuxGSM
+templates live under `packaging/linuxgsm/`.
 
 See [docs/INSTALL.md](docs/INSTALL.md).
 

@@ -46,6 +46,32 @@ static std::mutex g_ScanMutex;
 static std::set<int32_t> g_ScannedIndexes;
 static int g_CandidateLogCount = 0;
 
+static json DefaultConfig() {
+    return {
+        {"ServerChatIndex", -1},
+        {"ClientMessageIndex", -1},
+        {"ServerChatMessageOffset", -1},
+        {"ClientMessageTextOffset", 0}
+    };
+}
+
+static void WriteDefaultConfigIfMissing() {
+    if (g_ConfigPath.empty() || std::filesystem::exists(g_ConfigPath)) {
+        return;
+    }
+
+    try {
+        std::filesystem::create_directories(std::filesystem::path(g_ConfigPath).parent_path());
+        std::ofstream o(g_ConfigPath);
+        if (o.is_open()) {
+            o << g_Config.dump(4);
+            if (g_Api) g_Api->LogInfo("[ChatPlugin] Default config created.");
+        }
+    } catch (...) {
+        if (g_Api) g_Api->LogWarn("[ChatPlugin] Failed to create default config.");
+    }
+}
+
 void LoadConfig() {
     if (g_ConfigPath.empty()) {
         const char* overridePath = std::getenv("OBELISK_CHAT_CONFIG");
@@ -54,13 +80,19 @@ void LoadConfig() {
         } else {
             const char* configDir = std::getenv("OBELISK_CONFIG_DIR");
             if (configDir && configDir[0] != '\0') {
-                std::filesystem::path path = std::filesystem::path(configDir) / "plugins" / "chat_config.json";
-                g_ConfigPath = path.string();
+                std::filesystem::path preferred = std::filesystem::path(configDir) / "plugins" / "chat" / "config.json";
+                std::filesystem::path legacy = std::filesystem::path(configDir) / "plugins" / "chat_config.json";
+                g_ConfigPath = (std::filesystem::exists(legacy) && !std::filesystem::exists(preferred))
+                    ? legacy.string()
+                    : preferred.string();
             } else {
                 const char* root = std::getenv("OBELISK_ROOT");
                 if (root && root[0] != '\0') {
-                    std::filesystem::path path = std::filesystem::path(root) / "config" / "plugins" / "chat_config.json";
-                    g_ConfigPath = path.string();
+                    std::filesystem::path preferred = std::filesystem::path(root) / "config" / "plugins" / "chat" / "config.json";
+                    std::filesystem::path legacy = std::filesystem::path(root) / "config" / "plugins" / "chat_config.json";
+                    g_ConfigPath = (std::filesystem::exists(legacy) && !std::filesystem::exists(preferred))
+                        ? legacy.string()
+                        : preferred.string();
                 } else {
                     g_ConfigPath = "ObeliskPlugins/chat_config.json";
                 }
@@ -78,7 +110,8 @@ void LoadConfig() {
             g_Config = json::object();
         }
     } else {
-        g_Config = { {"ServerChatIndex", -1}, {"ClientMessageIndex", -1}, {"ServerChatMessageOffset", -1}, {"ClientMessageTextOffset", 0} };
+        g_Config = DefaultConfig();
+        WriteDefaultConfigIfMissing();
     }
 
     if (g_Config.contains("ServerChatIndex") && g_Config["ServerChatIndex"].is_number_integer()) {
@@ -104,6 +137,11 @@ void SaveConfig() {
     g_Config["ClientMessageIndex"] = g_ClientMessageIndex;
     g_Config["ServerChatMessageOffset"] = g_ServerChatMessageOffset;
     g_Config["ClientMessageTextOffset"] = g_ClientMessageTextOffset;
+    try {
+        std::filesystem::create_directories(std::filesystem::path(g_ConfigPath).parent_path());
+    } catch (...) {
+        return;
+    }
     std::ofstream o(g_ConfigPath);
     if (!o.is_open()) return;
     o << g_Config.dump(4);

@@ -61,15 +61,17 @@ Plugin configuration belongs under the central install root, not the ARK binary
 directory:
 
 ```text
-${OBELISK_CONFIG_DIR}/plugins/<plugin-id>.json
+${OBELISK_CONFIG_DIR}/plugins/<plugin-id>/config.json
 ```
 
 Fallback order:
 
 1. A plugin-specific override env var, for example
    `OBELISK_MONITOR_CONFIG=/path/to/monitor.json`.
-2. `${OBELISK_CONFIG_DIR}/plugins/<plugin-id>.json`.
-3. `${OBELISK_ROOT}/config/plugins/<plugin-id>.json`.
+2. `${OBELISK_CONFIG_DIR}/plugins/<plugin-id>/config.json`.
+3. `${OBELISK_CONFIG_DIR}/plugins/<plugin-id>.json` for legacy plugins.
+4. `${OBELISK_ROOT}/config/plugins/<plugin-id>/config.json`.
+5. `${OBELISK_ROOT}/config/plugins/<plugin-id>.json` for legacy plugins.
 
 Config files should include:
 
@@ -81,8 +83,33 @@ Config files should include:
 - Explicit limits: queue lengths, log retention, trace caps, request body caps,
   and timeouts.
 
-Plugins may create a default config only when the target directory already
-exists and the default is safe-disabled. They should log the chosen config path.
+Plugins may create a default config on first initialization when the file is missing, but
+the generated defaults must be safe-disabled. They should create only their own
+`plugins/<plugin-id>/` config directory and log the chosen config path.
+
+## Build And Drop-In Model
+
+Obelisk should support two plugin build paths:
+
+- In-tree plugins for examples, experiments, and CI coverage.
+- External plugins compiled against `api/ObeliskApi.h` and copied into
+  `${OBELISK_PLUGIN_DIR}` as `.so` files.
+
+The runtime does not need to know how a plugin was compiled. On restart it scans
+`${OBELISK_PLUGIN_DIR}` for `.so` files, resolves `ObeliskPlugin_Init`, optionally resolves
+`ObeliskPlugin_Shutdown`, and lets the plugin initialize its own safe config defaults.
+
+The stable operational flow is:
+
+1. Build or obtain `PluginName.so`.
+2. Place it in `${OBELISK_ROOT}/plugins-disabled/` while preparing config.
+3. Ensure `${OBELISK_ROOT}/config/plugins/plugin-name/config.json` exists or that the
+   plugin creates a safe-disabled default on first init.
+4. Move the `.so` into `${OBELISK_ROOT}/plugins/`.
+5. Restart only the target ARK instance.
+
+Dropping a plugin into `plugins/` is therefore the activation step. Plugins that should not
+load must stay in `plugins-disabled/` or outside the plugin directory.
 
 ## Lifecycle
 

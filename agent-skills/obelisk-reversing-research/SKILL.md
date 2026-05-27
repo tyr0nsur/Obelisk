@@ -27,7 +27,11 @@ Own these areas:
 - Raw scanner found likely chat-related FName/object indices:
   - `ClientMessageIndex`: `9619`
   - `ServerChatIndex`: `9622`
-- Native exec field patching was unsafe and must remain disabled unless explicitly isolated.
+- Native exec field patching was unsafe and must remain disabled. Do not use
+  `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` unless a future written plan proves a separate
+  throwaway process can tolerate crashes.
+- The ReflectionScanner analyzer strict mode now requires a repeat-confirmed exact
+  `matched_clues=3/3` table candidate; a single exact row is only a clue.
 
 ## Research Principles
 
@@ -36,6 +40,8 @@ Own these areas:
 - Use filtered callbacks by `fname_index` whenever possible.
 - Treat `ReflectionScanner` as an offline/debug tool, not a production startup feature.
 - Every new offset or signature must include how it was derived and what binary/version it was tested against.
+- Run scanner captures only on a confirmed isolated/debug instance. The preferred plan is
+  `arkserver-obelisk-debug`; do not reuse live Ragnarok/TheIsland marker posture.
 
 ## Safe Experiment Pattern
 
@@ -51,22 +57,27 @@ On production Ragnarok, stop here unless the goal is only to validate the core h
 Chat discovery has been unstable and must not be enabled on the live map as the normal
 experiment path.
 
-For chat discovery, use an isolated or non-critical instance and enable only one experiment
-at a time:
+For scanner or chat discovery, use only a confirmed isolated/debug instance and enable one
+experiment at a time. The debug wrapper should set explicit environment variables such as:
 
 ```bash
-rm -f /servidor/ark/obelisk/state/disable-plugins-ragnarok
-touch /servidor/ark/obelisk/state/enable-chat-discovery-ragnarok
-./arkserver restart
+export OBELISK_ENABLE_PROCESS_EVENT_HOOK=1
+export OBELISK_DISABLE_PLUGINS=1
+export OBELISK_PE_TRACE_LIMIT=0
+unset OBELISK_CHAT_DISCOVERY
+unset OBELISK_ENABLE_NATIVE_EXEC_PROBES
 ```
 
-If the test instance crashes, immediately restore:
+Set `OBELISK_ENABLE_REFLECTION_SCANNER=1` only for the specific scanner capture start, then
+copy the log and analyze it offline:
 
 ```bash
-touch /servidor/ark/obelisk/state/disable-plugins-ragnarok
-rm -f /servidor/ark/obelisk/state/enable-chat-discovery-ragnarok
-./arkserver start
+python3 scripts/analyze_reflectionscanner_capture.py /path/to/isolated/Obelisk.log
+python3 scripts/analyze_reflectionscanner_capture.py --strict /path/to/isolated/Obelisk.log
 ```
+
+Strict success is still research evidence, not a committed offset. Require either a second
+isolated capture or static xref validation before promoting a candidate.
 
 ## Next Research Goals
 

@@ -26,10 +26,13 @@ Own these areas:
 - Gate risky behavior behind explicit env vars or marker files.
 - Prefer per-map enablement under `/servidor/ark/obelisk/state`.
 - Keep plugin loading optional via `OBELISK_DISABLE_PLUGINS=1`.
+- Never use `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` as part of normal runtime validation.
 - Do not let plugin exceptions or STL types cross the C ABI boundary.
 - Do not subscribe plugins to all `ProcessEvent` calls unless explicitly debugging.
 - Treat callback ownership as runtime-critical: callbacks registered by a plugin must be
   unregistered if init fails, before unload, and before `dlclose`.
+- Preserve optional plugin shutdown ordering: call `ObeliskPlugin_Shutdown()` before
+  plugin-owned callback cleanup and before `dlclose`.
 - Follow `docs/PLUGIN_ARCHITECTURE.md` before adding plugin examples or promoting
   experimental plugins. Plugins that start HTTP servers, threads, or file readers need a
   shutdown design before stability.
@@ -72,12 +75,10 @@ Expected:
 
 ## Runtime Hardening Priorities
 
-- Add plugin-owned callback registration and unregister paths in `EventManager` and
+- Preserve plugin-owned callback registration and unregister paths in `EventManager` and
   `PluginManager`.
-- Call optional `ObeliskPlugin_Shutdown()` before owner callback cleanup and before
-  closing a plugin library.
-- Reject or disable plugin callbacks before closing a plugin library.
-- Avoid raw callback pointers that can survive `dlclose`.
+- Preserve optional `ObeliskPlugin_Shutdown()` resolution outside the public API table.
+- Add tests or harness coverage for shutdown order and callback cleanup.
 - Keep global ProcessEvent callbacks off production paths unless a measured debug session
   needs them.
 - Require a validated, idempotent plugin shutdown export before treating thread-owning or

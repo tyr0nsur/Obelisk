@@ -20,6 +20,7 @@ Expected outputs:
 build/libobelisk.so
 build/_deps/subhook-build/libsubhook.so
 build/plugins/chat/ChatPlugin.so
+build/helloworld_plugin/HelloWorldPlugin.so
 ```
 
 ## Central Install
@@ -51,6 +52,8 @@ Do not install runtime artifacts directly into `ShooterGame/Binaries/Linux` exce
 - Do not commit `.so` outputs, logs, config state, or build directories.
 - Experimental plugins should go to `plugins-disabled/` or require an explicit install flag.
   Do not make `ChatPlugin.so` production-enabled by default.
+- Keep `plugins/monitor` out of the top-level stable build until its lifecycle, HTTP
+  surface, config, and shutdown model are redesigned.
 
 ## Before Commit
 

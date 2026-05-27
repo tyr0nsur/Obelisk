@@ -58,6 +58,8 @@ Known research targets:
 - Enumerate `UFunction` objects and validate names for `ServerChat`, `ClientMessage`, and
   related ShooterGame functions.
 - Recover enough property metadata to decode `ProcessEvent` parameter buffers.
+- Use copied logs with `scripts/analyze_reflectionscanner_capture.py`; `--strict` requires
+  repeat-confirmed exact FName table clues and should fail on single-hit candidates.
 
 `ReflectionScanner` may scan UTF-32 names such as `ServerSendChatMessage`, `ServerChat`,
 `ClientServerChatMessage`, `ClientChatMessage`, and `ClientMessage`, plus mov-immediate and
@@ -71,6 +73,9 @@ property metadata.
 - Do not enable `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` on live servers.
 - Do not enable broad chat discovery on a production map until it has survived an isolated
   server test.
+- Do not run `ReflectionScanner` on `arkserver` or `arkserver2` unless one has been
+  explicitly converted into an isolated debug target. Preferred path:
+  `arkserver-obelisk-debug`.
 - Use small `OBELISK_PE_TRACE_LIMIT` windows only when capturing evidence; default should
   remain quiet.
 - If a plugin crashes during load/init, disable plugins first and preserve logs/core files

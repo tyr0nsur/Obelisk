@@ -20,6 +20,9 @@ or parameter decoding for ARK's Linux UE4 server.
 - These indices are useful research clues, not a stable public API.
 - `ChatPlugin` currently uses raw parameter probing and FString heuristics. Treat that as
   temporary discovery code, not the final architecture.
+- `ReflectionScanner` FName table output must be treated as candidate ranking. Analyzer
+  `--strict` requires repeat-confirmed exact `matched_clues=3/3` evidence, and even that
+  needs a second isolated capture or static xref before becoming an accepted offset.
 
 ## Reflection Direction
 
@@ -55,6 +58,8 @@ Build toward a real UE4 metadata pipeline:
   decoded.
 - Prefer logging metadata discoveries over mutating gameplay state while researching.
 - On live servers, keep plugin discovery off unless testing a known safe build.
+- Do not enable `ChatPlugin` discovery or `ReflectionScanner` on shared/live-like instances;
+  use the isolated debug instance plan and keep plugins disabled during scanner captures.
 
 ## Review Checklist
 
