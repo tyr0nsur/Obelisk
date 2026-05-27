@@ -73,6 +73,22 @@ def build_core_fixture(path: Path) -> dict[str, int]:
         "for_pc_property": base + 0x23700,
         "force_direction_property": base + 0x23800,
         "dir_property": base + 0x23900,
+        "mission_type_class": base + 0x23A00,
+        "add_player_to_mission_function": base + 0x23B00,
+        "mission_player_character_property": base + 0x23C00,
+        "mission_force_add_property": base + 0x23D00,
+        "mission_return_value_property": base + 0x23E00,
+        "bp_allow_player_leave_function": base + 0x23F00,
+        "leave_player_character_property": base + 0x24000,
+        "leave_return_value_property": base + 0x24100,
+        "bp_on_player_added_function": base + 0x24200,
+        "added_player_character_property": base + 0x24300,
+        "added_player_controller_property": base + 0x24400,
+        "deferred_mission_string_array_function": base + 0x24500,
+        "mission_name_property": base + 0x24600,
+        "mission_tags_property": base + 0x24700,
+        "str_property_class": base + 0x24800,
+        "array_property_class": base + 0x24900,
         "readable_non_uobject": base + 0x80000,
     }
 
@@ -107,6 +123,18 @@ def build_core_fixture(path: Path) -> dict[str, int]:
         put_ptr(item, object_address)
         put_u32(item + 0x8, 0)
         put_i32(item + 0xC, serial)
+
+    def add_uobject(
+        key: str,
+        *,
+        object_index: int,
+        class_key: str,
+        name_index: int,
+        outer_key: str | None,
+    ) -> None:
+        outer = addrs[outer_key] if outer_key else 0
+        put_uobject(addrs[key], 1, object_index, addrs[class_key], name_index, outer)
+        put_item(object_index, addrs[key], 100 + object_index)
 
     put_ptr(addrs["fname_root_slot"], addrs["fname_table"])
     put_ptr(addrs["fname_table"], addrs["fname_chunk"])
@@ -156,9 +184,21 @@ def build_core_fixture(path: Path) -> dict[str, int]:
     put_entry(41, b"ForPC\x00")
     put_entry(42, b"bForceDirection\x00")
     put_entry(43, b"Dir\x00")
+    put_entry(44, b"MissionType\x00")
+    put_entry(45, b"AddPlayerToMission\x00")
+    put_entry(46, b"PlayerCharacter\x00")
+    put_entry(47, b"bForceAdd\x00")
+    put_entry(48, b"BPAllowPlayerToLeaveMission\x00")
+    put_entry(49, b"BPOnPlayerAddedToMission\x00")
+    put_entry(50, b"PlayerController\x00")
+    put_entry(51, b"DeferredMissionStringArray\x00")
+    put_entry(52, b"MissionName\x00")
+    put_entry(53, b"MissionTags\x00")
+    put_entry(54, b"StrProperty\x00")
+    put_entry(55, b"ArrayProperty\x00")
 
     put_ptr(addrs["gobjects"] + enum.GOBJECTS_CHUNKS_OFFSET, addrs["gobjects_chunks"])
-    put_i32(addrs["gobjects"] + enum.GOBJECTS_COUNT_OFFSET, 42)
+    put_i32(addrs["gobjects"] + enum.GOBJECTS_COUNT_OFFSET, 58)
     put_ptr(addrs["gobjects_chunks"], addrs["gobjects_chunk0"])
 
     put_uobject(addrs["class_class"], 1, 0, addrs["class_class"], 1, 0)
@@ -276,80 +316,165 @@ def build_core_fixture(path: Path) -> dict[str, int]:
         29,
         addrs["malformed_function"],
     )
-    put_uobject(addrs["primal_dino_character_class"], 1, 31, addrs["class_class"], 33, addrs["package_object"])
-    put_uobject(
-        addrs["server_request_attack_function"],
-        1,
-        32,
-        addrs["function_class"],
-        34,
-        addrs["primal_dino_character_class"],
+    add_uobject("primal_dino_character_class", object_index=31, class_key="class_class", name_index=33, outer_key="package_object")
+    add_uobject(
+        "server_request_attack_function",
+        object_index=32,
+        class_key="function_class",
+        name_index=34,
+        outer_key="primal_dino_character_class",
     )
-    put_uobject(
-        addrs["attack_index_property"],
-        1,
-        33,
-        addrs["property_class"],
-        35,
-        addrs["server_request_attack_function"],
+    add_uobject(
+        "attack_index_property",
+        object_index=33,
+        class_key="property_class",
+        name_index=35,
+        outer_key="server_request_attack_function",
     )
-    put_uobject(
-        addrs["bp_notify_add_passenger_function"],
-        1,
-        34,
-        addrs["function_class"],
-        36,
-        addrs["primal_dino_character_class"],
+    add_uobject(
+        "bp_notify_add_passenger_function",
+        object_index=34,
+        class_key="function_class",
+        name_index=36,
+        outer_key="primal_dino_character_class",
     )
-    put_uobject(
-        addrs["passenger_char_property"],
-        1,
-        35,
-        addrs["object_property_class"],
-        37,
-        addrs["bp_notify_add_passenger_function"],
+    add_uobject(
+        "passenger_char_property",
+        object_index=35,
+        class_key="object_property_class",
+        name_index=37,
+        outer_key="bp_notify_add_passenger_function",
     )
-    put_uobject(
-        addrs["seat_index_property"],
-        1,
-        36,
-        addrs["property_class"],
-        38,
-        addrs["bp_notify_add_passenger_function"],
+    add_uobject(
+        "seat_index_property",
+        object_index=36,
+        class_key="property_class",
+        name_index=38,
+        outer_key="bp_notify_add_passenger_function",
     )
-    put_uobject(
-        addrs["primal_structure_elevator_platform_class"],
-        1,
-        37,
-        addrs["class_class"],
-        39,
-        addrs["package_object"],
+    add_uobject(
+        "primal_structure_elevator_platform_class",
+        object_index=37,
+        class_key="class_class",
+        name_index=39,
+        outer_key="package_object",
     )
-    put_uobject(
-        addrs["server_activate_function"],
-        1,
-        38,
-        addrs["function_class"],
-        40,
-        addrs["primal_structure_elevator_platform_class"],
+    add_uobject(
+        "server_activate_function",
+        object_index=38,
+        class_key="function_class",
+        name_index=40,
+        outer_key="primal_structure_elevator_platform_class",
     )
-    put_uobject(
-        addrs["for_pc_property"],
-        1,
-        39,
-        addrs["object_property_class"],
-        41,
-        addrs["server_activate_function"],
+    add_uobject(
+        "for_pc_property",
+        object_index=39,
+        class_key="object_property_class",
+        name_index=41,
+        outer_key="server_activate_function",
     )
-    put_uobject(
-        addrs["force_direction_property"],
-        1,
-        40,
-        addrs["bool_property_class"],
-        42,
-        addrs["server_activate_function"],
+    add_uobject(
+        "force_direction_property",
+        object_index=40,
+        class_key="bool_property_class",
+        name_index=42,
+        outer_key="server_activate_function",
     )
-    put_uobject(addrs["dir_property"], 1, 41, addrs["byte_property_class"], 43, addrs["server_activate_function"])
+    add_uobject("dir_property", object_index=41, class_key="byte_property_class", name_index=43, outer_key="server_activate_function")
+    add_uobject("str_property_class", object_index=42, class_key="class_class", name_index=54, outer_key=None)
+    add_uobject("array_property_class", object_index=43, class_key="class_class", name_index=55, outer_key=None)
+    add_uobject("mission_type_class", object_index=44, class_key="class_class", name_index=44, outer_key="package_object")
+    add_uobject(
+        "add_player_to_mission_function",
+        object_index=45,
+        class_key="function_class",
+        name_index=45,
+        outer_key="mission_type_class",
+    )
+    add_uobject(
+        "mission_player_character_property",
+        object_index=46,
+        class_key="object_property_class",
+        name_index=46,
+        outer_key="add_player_to_mission_function",
+    )
+    add_uobject(
+        "mission_force_add_property",
+        object_index=47,
+        class_key="bool_property_class",
+        name_index=47,
+        outer_key="add_player_to_mission_function",
+    )
+    add_uobject(
+        "mission_return_value_property",
+        object_index=48,
+        class_key="bool_property_class",
+        name_index=29,
+        outer_key="add_player_to_mission_function",
+    )
+    add_uobject(
+        "bp_allow_player_leave_function",
+        object_index=49,
+        class_key="function_class",
+        name_index=48,
+        outer_key="mission_type_class",
+    )
+    add_uobject(
+        "leave_player_character_property",
+        object_index=50,
+        class_key="object_property_class",
+        name_index=46,
+        outer_key="bp_allow_player_leave_function",
+    )
+    add_uobject(
+        "leave_return_value_property",
+        object_index=51,
+        class_key="bool_property_class",
+        name_index=29,
+        outer_key="bp_allow_player_leave_function",
+    )
+    add_uobject(
+        "bp_on_player_added_function",
+        object_index=52,
+        class_key="function_class",
+        name_index=49,
+        outer_key="mission_type_class",
+    )
+    add_uobject(
+        "added_player_character_property",
+        object_index=53,
+        class_key="object_property_class",
+        name_index=46,
+        outer_key="bp_on_player_added_function",
+    )
+    add_uobject(
+        "added_player_controller_property",
+        object_index=54,
+        class_key="object_property_class",
+        name_index=50,
+        outer_key="bp_on_player_added_function",
+    )
+    add_uobject(
+        "deferred_mission_string_array_function",
+        object_index=55,
+        class_key="function_class",
+        name_index=51,
+        outer_key="mission_type_class",
+    )
+    add_uobject(
+        "mission_name_property",
+        object_index=56,
+        class_key="str_property_class",
+        name_index=52,
+        outer_key="deferred_mission_string_array_function",
+    )
+    add_uobject(
+        "mission_tags_property",
+        object_index=57,
+        class_key="array_property_class",
+        name_index=53,
+        outer_key="deferred_mission_string_array_function",
+    )
 
     for index, key in [
         (0, "class_class"),
@@ -383,17 +508,6 @@ def build_core_fixture(path: Path) -> dict[str, int]:
         (28, "can_use_return_property"),
         (29, "malformed_function"),
         (30, "malformed_bool_property"),
-        (31, "primal_dino_character_class"),
-        (32, "server_request_attack_function"),
-        (33, "attack_index_property"),
-        (34, "bp_notify_add_passenger_function"),
-        (35, "passenger_char_property"),
-        (36, "seat_index_property"),
-        (37, "primal_structure_elevator_platform_class"),
-        (38, "server_activate_function"),
-        (39, "for_pc_property"),
-        (40, "force_direction_property"),
-        (41, "dir_property"),
     ]:
         put_item(index, addrs[key], 100 + index)
 
@@ -449,6 +563,23 @@ def build_core_fixture(path: Path) -> dict[str, int]:
         put_u16(address + 0x98, parms_size)
         put_u16(address + 0x9A, 0xFFFF)
 
+    def add_function_chain(
+        function_key: str,
+        *,
+        first_property_key: str,
+        parms_size: int,
+        properties: list[tuple[str, int, int]],
+    ) -> None:
+        put_function_data(
+            addrs[function_key],
+            first_property=addrs[first_property_key],
+            num_parms=len(properties),
+            parms_size=parms_size,
+        )
+        for index, (property_key, offset, element_size) in enumerate(properties):
+            next_field = addrs[properties[index + 1][0]] if index + 1 < len(properties) else 0
+            put_property_data(addrs[property_key], offset=offset, element_size=element_size, next_field=next_field)
+
     put_function_data(
         addrs["server_request_inventory_use_item"],
         first_property=addrs["inventory_comp_property"],
@@ -496,53 +627,98 @@ def build_core_fixture(path: Path) -> dict[str, int]:
     put_function_data(addrs["malformed_function"], first_property=addrs["malformed_bool_property"], num_parms=1, parms_size=1)
     put_property_data(addrs["malformed_bool_property"], offset=1, element_size=1)
 
-    put_function_data(
-        addrs["server_request_attack_function"],
-        first_property=addrs["attack_index_property"],
-        num_parms=1,
+    add_function_chain(
+        "server_request_attack_function",
+        first_property_key="attack_index_property",
         parms_size=4,
+        properties=[("attack_index_property", 0, 4)],
     )
-    put_property_data(addrs["attack_index_property"], offset=0, element_size=4)
-
-    put_function_data(
-        addrs["bp_notify_add_passenger_function"],
-        first_property=addrs["passenger_char_property"],
-        num_parms=2,
+    add_function_chain(
+        "bp_notify_add_passenger_function",
+        first_property_key="passenger_char_property",
         parms_size=12,
+        properties=[("passenger_char_property", 0, 8), ("seat_index_property", 8, 4)],
     )
-    put_property_data(
-        addrs["passenger_char_property"],
-        offset=0,
-        element_size=8,
-        next_field=addrs["seat_index_property"],
-    )
-    put_property_data(addrs["seat_index_property"], offset=8, element_size=4)
-
-    put_function_data(
-        addrs["server_activate_function"],
-        first_property=addrs["for_pc_property"],
-        num_parms=3,
+    add_function_chain(
+        "server_activate_function",
+        first_property_key="for_pc_property",
         parms_size=10,
+        properties=[
+            ("for_pc_property", 0, 8),
+            ("force_direction_property", 8, 1),
+            ("dir_property", 9, 1),
+        ],
     )
-    put_property_data(
-        addrs["for_pc_property"],
-        offset=0,
-        element_size=8,
-        next_field=addrs["force_direction_property"],
+    add_function_chain(
+        "add_player_to_mission_function",
+        first_property_key="mission_player_character_property",
+        parms_size=10,
+        properties=[
+            ("mission_player_character_property", 0, 8),
+            ("mission_force_add_property", 8, 1),
+            ("mission_return_value_property", 9, 1),
+        ],
     )
-    put_property_data(
-        addrs["force_direction_property"],
-        offset=8,
-        element_size=1,
-        next_field=addrs["dir_property"],
+    add_function_chain(
+        "bp_allow_player_leave_function",
+        first_property_key="leave_player_character_property",
+        parms_size=9,
+        properties=[("leave_player_character_property", 0, 8), ("leave_return_value_property", 8, 1)],
     )
-    put_property_data(addrs["dir_property"], offset=9, element_size=1)
+    add_function_chain(
+        "bp_on_player_added_function",
+        first_property_key="added_player_character_property",
+        parms_size=16,
+        properties=[
+            ("added_player_character_property", 0, 8),
+            ("added_player_controller_property", 8, 8),
+        ],
+    )
+    add_function_chain(
+        "deferred_mission_string_array_function",
+        first_property_key="mission_name_property",
+        parms_size=16,
+        properties=[("mission_name_property", 0, 16), ("mission_tags_property", 16, 16)],
+    )
 
     write_minimal_elf64_core(path, base, bytes(segment))
     return addrs
 
 
 class InspectCoreUFunctionsTests(unittest.TestCase):
+    def assert_property_sequence(self, chain: dict[str, object], expected: list[tuple[str, str, int, int]]) -> None:
+        properties = chain["properties"]
+        self.assertEqual(
+            [
+                (prop["summary"]["name"], prop["summary"]["class_name"], prop["offset_internal"], prop["element_size"])
+                for prop in properties
+            ],
+            expected,
+        )
+
+    def inspect_single_by_name_outer(self, name: str, outer: str) -> dict[str, object]:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            core = Path(temp_dir) / "core"
+            addrs = build_core_fixture(core)
+            memory = inspector.uobjects.CoreMemory(core)
+            try:
+                payload = inspector.inspect_core(
+                    memory,
+                    gobjects=addrs["gobjects"],
+                    fname_root_slot=addrs["fname_root_slot"],
+                    object_addresses=[],
+                    indices=[],
+                    name_contains=[name],
+                    outer_contains=[outer],
+                    window_size=0xC0,
+                    max_object_scan=64,
+                )
+            finally:
+                memory.close()
+
+        self.assertEqual(len(payload["targets"]), 1)
+        return payload["targets"][0]
+
     def test_inspects_index_and_resolves_candidate_uobject_pointers(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             core = Path(temp_dir) / "core"
@@ -687,9 +863,8 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
         self.assertEqual(chain["status"], "candidate")
         self.assertEqual(chain["observed_count"], 2)
         self.assertEqual(chain["expected_count"], 2)
-        props = chain["properties"]
-        self.assertEqual(
-            [(prop["summary"]["name"], prop["summary"]["class_name"], prop["offset_internal"], prop["element_size"]) for prop in props],
+        self.assert_property_sequence(
+            chain,
             [
                 ("InventoryComp", "ObjectProperty", 0, 8),
                 ("ItemId", "StructProperty", 8, 8),
@@ -722,8 +897,8 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
         self.assertEqual(chain["status"], "candidate")
         self.assertEqual(chain["observed_count"], 4)
         props = chain["properties"]
-        self.assertEqual(
-            [(prop["summary"]["name"], prop["summary"]["class_name"], prop["offset_internal"], prop["element_size"]) for prop in props],
+        self.assert_property_sequence(
+            chain,
             [
                 ("invComp", "ObjectProperty", 0, 8),
                 ("ByPC", "ObjectProperty", 8, 8),
@@ -758,13 +933,7 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
 
         chain = payload["targets"][0]["property_chain"]
         self.assertEqual(chain["status"], "candidate")
-        self.assertEqual(
-            [
-                (prop["summary"]["name"], prop["summary"]["class_name"], prop["offset_internal"], prop["element_size"])
-                for prop in chain["properties"]
-            ],
-            [("AttackIndex", "IntProperty", 0, 4)],
-        )
+        self.assert_property_sequence(chain, [("AttackIndex", "IntProperty", 0, 4)])
 
     def test_primal_dino_notify_add_passenger_object_int_property_chain(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -788,11 +957,8 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
 
         chain = payload["targets"][0]["property_chain"]
         self.assertEqual(chain["status"], "candidate")
-        self.assertEqual(
-            [
-                (prop["summary"]["name"], prop["summary"]["class_name"], prop["offset_internal"], prop["element_size"])
-                for prop in chain["properties"]
-            ],
+        self.assert_property_sequence(
+            chain,
             [
                 ("PassengerChar", "ObjectProperty", 0, 8),
                 ("SeatIndex", "IntProperty", 8, 4),
@@ -821,11 +987,8 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
 
         chain = payload["targets"][0]["property_chain"]
         self.assertEqual(chain["status"], "candidate")
-        self.assertEqual(
-            [
-                (prop["summary"]["name"], prop["summary"]["class_name"], prop["offset_internal"], prop["element_size"])
-                for prop in chain["properties"]
-            ],
+        self.assert_property_sequence(
+            chain,
             [
                 ("ForPC", "ObjectProperty", 0, 8),
                 ("bForceDirection", "BoolProperty", 8, 1),
@@ -858,6 +1021,61 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
         self.assertEqual(chain["status"], "rejected")
         self.assertIn("property_0_rejected", chain["reject_reasons"])
         self.assertIn("property_exceeds_parms_size", chain["properties"][0]["reject_reasons"])
+
+    def test_mission_add_player_to_mission_property_chain(self) -> None:
+        target = self.inspect_single_by_name_outer("AddPlayerToMission", "MissionType")
+        chain = target["property_chain"]
+
+        self.assertEqual(chain["status"], "candidate")
+        self.assert_property_sequence(
+            chain,
+            [
+                ("PlayerCharacter", "ObjectProperty", 0, 8),
+                ("bForceAdd", "BoolProperty", 8, 1),
+                ("ReturnValue", "BoolProperty", 9, 1),
+            ],
+        )
+
+    def test_mission_allow_player_to_leave_property_chain(self) -> None:
+        target = self.inspect_single_by_name_outer("BPAllowPlayerToLeaveMission", "MissionType")
+        chain = target["property_chain"]
+
+        self.assertEqual(chain["status"], "candidate")
+        self.assert_property_sequence(
+            chain,
+            [
+                ("PlayerCharacter", "ObjectProperty", 0, 8),
+                ("ReturnValue", "BoolProperty", 8, 1),
+            ],
+        )
+
+    def test_mission_player_added_object_pair_property_chain(self) -> None:
+        target = self.inspect_single_by_name_outer("BPOnPlayerAddedToMission", "MissionType")
+        chain = target["property_chain"]
+
+        self.assertEqual(chain["status"], "candidate")
+        self.assert_property_sequence(
+            chain,
+            [
+                ("PlayerCharacter", "ObjectProperty", 0, 8),
+                ("PlayerController", "ObjectProperty", 8, 8),
+            ],
+        )
+
+    def test_rejects_deferred_mission_string_array_chain(self) -> None:
+        target = self.inspect_single_by_name_outer("DeferredMissionStringArray", "MissionType")
+        chain = target["property_chain"]
+
+        self.assertEqual(chain["status"], "rejected")
+        self.assertIn("property_1_rejected", chain["reject_reasons"])
+        self.assert_property_sequence(
+            chain,
+            [
+                ("MissionName", "StrProperty", 0, 16),
+                ("MissionTags", "ArrayProperty", 16, 16),
+            ],
+        )
+        self.assertIn("property_exceeds_parms_size", chain["properties"][1]["reject_reasons"])
 
     def test_cli_json_output(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
