@@ -371,8 +371,10 @@ namespace Obelisk::Hooks
         uint8_t sendMode = 0;
         if (Obelisk::UE::ChatReflection::TryGetSendMode(invocation, sendMode))
         {
-            OBELISK_INFO("Reflected chat ServerSendChatMessage send_mode={}",
-                         static_cast<unsigned int>(sendMode));
+            OBELISK_INFO("Reflected chat ServerSendChatMessage send_mode={} send_mode_name={} send_mode_known={}",
+                         static_cast<unsigned int>(sendMode),
+                         Obelisk::UE::ChatReflection::SendModeName(sendMode),
+                         Obelisk::UE::ChatReflection::IsKnownSendMode(sendMode));
         }
         for (const auto& field : invocation.Fields)
         {

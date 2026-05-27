@@ -319,6 +319,12 @@ namespace
         uint8_t sendMode = 0xff;
         Require(ChatReflection::TryGetSendMode(invocation, sendMode), "SendMode helper failed");
         Require(sendMode == 0x02, "SendMode helper returned wrong byte");
+        Require(ChatReflection::IsKnownSendMode(sendMode), "SendMode should be known");
+        Require(std::string(ChatReflection::SendModeName(sendMode)) == "LocalChat",
+                "SendMode name mismatch");
+        Require(!ChatReflection::IsKnownSendMode(4), "MAX SendMode should be rejected");
+        Require(std::string(ChatReflection::SendModeName(4)) == "Unknown",
+                "Unknown SendMode name mismatch");
     }
 
     void TestRejectsSameFNameWithWrongShape()

@@ -50,4 +50,6 @@ namespace Obelisk::UE::ChatReflection
                                                             ChatInvocation& out);
 
     bool TryGetSendMode(const ChatInvocation& invocation, uint8_t& out);
+    const char* SendModeName(uint8_t sendMode);
+    bool IsKnownSendMode(uint8_t sendMode);
 }

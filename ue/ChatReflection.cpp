@@ -336,4 +336,26 @@ namespace Obelisk::UE::ChatReflection
 
         return false;
     }
+
+    const char* SendModeName(uint8_t sendMode)
+    {
+        switch (sendMode)
+        {
+        case 0:
+            return "GlobalChat";
+        case 1:
+            return "GlobalTribeChat";
+        case 2:
+            return "LocalChat";
+        case 3:
+            return "AllianceChat";
+        default:
+            return "Unknown";
+        }
+    }
+
+    bool IsKnownSendMode(uint8_t sendMode)
+    {
+        return sendMode <= 3;
+    }
 }
