@@ -114,9 +114,10 @@ work from repository state instead of chat history.
 - Analyzer static xref entries now include access classification (`load`, `store`,
   `address`, `call`, `jump`, or `other`) and evidence-pack access counts.
 - ReflectionScanner can probe explicit static FName root slots supplied through
-  `OBELISK_REFLECTION_STATIC_FNAME_ROOTS`. Analyzer strict mode accepts a static-root
-  research candidate only with exact `None`/`ClientMessage`/`ServerChat`, `header_index_ok=3/3`,
-  plausible counts, and no reject markers; see
+  `OBELISK_REFLECTION_STATIC_FNAME_ROOTS` at startup and through a one-minute delayed
+  retry. Analyzer strict mode accepts a static-root research candidate only with exact
+  `None`/`ClientMessage`/`ServerChat`, `header_index_ok=3/3`, plausible counts, and no
+  reject markers; see
   `docs/research/2026-05-27-static-fname-root-probe.md`.
 - UE4 type reconstruction planning is captured in
   `docs/research/2026-05-27-ue4-type-reconstruction-roadmap.md`; keep the milestone
@@ -198,8 +199,8 @@ python3 scripts/analyze_reflectionscanner_capture.py \
 - Ops: get permission to create or designate the isolated ARK debug instance; preferred
   plan is `arkserver-obelisk-debug`.
 - Reflection: improve FName/GNames probes and analyzer fixtures offline.
-- Reflection: add a delayed static-root retry for `OBELISK_REFLECTION_STATIC_FNAME_ROOTS`
-  before retesting `0x5956f30`.
+- Reflection: redeploy and retest delayed static-root retry for
+  `OBELISK_REFLECTION_STATIC_FNAME_ROOTS=0x5956f30`.
 - Build/QA: keep package/export validation tied to concrete external plugin consumption
   gaps.
 - Core runtime: extend PluginManager coverage only if a new lifecycle risk is identified;

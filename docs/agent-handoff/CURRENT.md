@@ -136,9 +136,10 @@ Updated: 2026-05-27
   isolated runtime probe confirms known indices through `*0x5956f30`; see
   `docs/research/2026-05-27-static-fname-root-candidate.md`.
 - fact: ReflectionScanner now has an explicit env-supplied static FName root probe via
-  `OBELISK_REFLECTION_STATIC_FNAME_ROOTS`, and the analyzer parses static-root probes and
-  rejects. A static-root research candidate requires exact `None`/`ClientMessage`/
-  `ServerChat`, `header_index_ok=3/3`, plausible counts, and no reject markers; see
+  `OBELISK_REFLECTION_STATIC_FNAME_ROOTS`, including startup and one-minute delayed retry
+  checks. The analyzer parses static-root probes and rejects. A static-root research
+  candidate requires exact `None`/`ClientMessage`/`ServerChat`, `header_index_ok=3/3`,
+  plausible counts, and no reject markers; see
   `docs/research/2026-05-27-static-fname-root-probe.md`.
 - fact: A controlled Ragnarok dev capture on commit `5754fca` tested
   `OBELISK_REFLECTION_STATIC_FNAME_ROOTS=0x5956f30`. Startup probe rejected it with
@@ -195,8 +196,9 @@ Updated: 2026-05-27
   env-supplied global pointer slots such as `0x5956f30` and runs the existing
   `None`/`ClientMessage`/`ServerChat` clue checks plus header-index validation against
   the dereferenced table value.
-- next-step: Add a delayed retry for env-supplied static FName root slots before rejecting
-  `0x5956f30` completely; the current startup-only probe saw `table=0x0`.
+- next-step: Redeploy the delayed static-root retry and retest
+  `OBELISK_REFLECTION_STATIC_FNAME_ROOTS=0x5956f30`; the previous startup-only capture saw
+  `table=0x0`.
 - next-step: After a repeat-confirmed `GNames` research candidate appears, generate
   `objdump -d -M intel` for the matching ShooterGameServer binary and run the analyzer with
   `--binary` plus `--objdump-xrefs`; inspect whether candidate `source_global` references

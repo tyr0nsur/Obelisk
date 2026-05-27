@@ -738,55 +738,57 @@ namespace Obelisk::UE
                          result.Previews[2]);
         }
 
-        void ProbeStaticFNameRoots()
+        bool ProbeStaticFNameRootSlot(uintptr_t slot)
         {
-            const std::vector<uintptr_t> slots = StaticFNameRootSlots();
+            if (!IsCanonicalUserPointer(slot) ||
+                !Obelisk::Memory::IsReadable(reinterpret_cast<void*>(slot), sizeof(uintptr_t)))
+            {
+                LogFNameStaticRootReject(slot, nullptr, "unreadable_slot");
+                return false;
+            }
+
+            void* tableValue = nullptr;
+            std::memcpy(&tableValue, reinterpret_cast<void*>(slot), sizeof(tableValue));
+            const uintptr_t table = reinterpret_cast<uintptr_t>(tableValue);
+
+            if (!tableValue ||
+                !IsCanonicalUserPointer(table) ||
+                !Obelisk::Memory::IsReadable(tableValue, FNameIndirectArrayProbe::NumChunksOffset + sizeof(int32_t)))
+            {
+                LogFNameStaticRootReject(slot, tableValue, "unreadable_table_header");
+                return false;
+            }
+
+            const StaticFNameRootProbeResult result = ProbeStaticLegacyGNamesTable(table);
+            if (result.RejectReason)
+            {
+                LogFNameStaticRootReject(slot, tableValue, result.RejectReason, result);
+                return false;
+            }
+
+            OBELISK_INFO("[ReflectionScanner] StaticFNameRoot FName static-root probe: slot=0x{:X} table={} score={}/9 readable_clues={}/3 matched_clues={}/3 header_index_ok={}/3 num_elements={} num_chunks={} none='{}' client_message='{}' server_chat='{}'",
+                         slot,
+                         tableValue,
+                         result.Score,
+                         result.ReadableClues,
+                         result.MatchedClues,
+                         result.HeaderIndexOk,
+                         result.NumElements,
+                         result.NumChunks,
+                         result.Previews[0],
+                         result.Previews[1],
+                         result.Previews[2]);
+            return true;
+        }
+
+        void ProbeStaticFNameRoots(const std::vector<uintptr_t>& slots)
+        {
             if (slots.empty())
                 return;
 
             OBELISK_INFO("[ReflectionScanner] StaticFNameRoot probing {} env-supplied slot(s).", slots.size());
-
             for (uintptr_t slot : slots)
-            {
-                if (!IsCanonicalUserPointer(slot) ||
-                    !Obelisk::Memory::IsReadable(reinterpret_cast<void*>(slot), sizeof(uintptr_t)))
-                {
-                    LogFNameStaticRootReject(slot, nullptr, "unreadable_slot");
-                    continue;
-                }
-
-                void* tableValue = nullptr;
-                std::memcpy(&tableValue, reinterpret_cast<void*>(slot), sizeof(tableValue));
-                const uintptr_t table = reinterpret_cast<uintptr_t>(tableValue);
-
-                if (!tableValue ||
-                    !IsCanonicalUserPointer(table) ||
-                    !Obelisk::Memory::IsReadable(tableValue, FNameIndirectArrayProbe::NumChunksOffset + sizeof(int32_t)))
-                {
-                    LogFNameStaticRootReject(slot, tableValue, "unreadable_table_header");
-                    continue;
-                }
-
-                const StaticFNameRootProbeResult result = ProbeStaticLegacyGNamesTable(table);
-                if (result.RejectReason)
-                {
-                    LogFNameStaticRootReject(slot, tableValue, result.RejectReason, result);
-                    continue;
-                }
-
-                OBELISK_INFO("[ReflectionScanner] StaticFNameRoot FName static-root probe: slot=0x{:X} table={} score={}/9 readable_clues={}/3 matched_clues={}/3 header_index_ok={}/3 num_elements={} num_chunks={} none='{}' client_message='{}' server_chat='{}'",
-                             slot,
-                             tableValue,
-                             result.Score,
-                             result.ReadableClues,
-                             result.MatchedClues,
-                             result.HeaderIndexOk,
-                             result.NumElements,
-                             result.NumChunks,
-                             result.Previews[0],
-                             result.Previews[1],
-                             result.Previews[2]);
-            }
+                ProbeStaticFNameRootSlot(slot);
         }
 
         void LogUObjectValidation(const std::vector<Mapping>& mappings, const char* name, void* value, const UObjectProbe& object)
@@ -1011,6 +1013,30 @@ namespace Obelisk::UE
                 }
             }).detach();
         }
+
+        void StartDelayedStaticFNameRootProbe(std::vector<uintptr_t> slots)
+        {
+            if (slots.empty())
+                return;
+
+            std::thread([slots = std::move(slots)]() {
+                for (int iteration = 1; iteration <= 12; ++iteration)
+                {
+                    std::this_thread::sleep_for(std::chrono::seconds(5));
+                    if (!Obelisk::Logger::IsInitialized())
+                        return;
+
+                    OBELISK_INFO("[ReflectionScanner] StaticFNameRoot delayed retry after {}s for {} slot(s).",
+                                 iteration * 5,
+                                 slots.size());
+                    bool accepted = false;
+                    for (uintptr_t slot : slots)
+                        accepted = ProbeStaticFNameRootSlot(slot) || accepted;
+                    if (accepted)
+                        return;
+                }
+            }).detach();
+        }
     }
 
     void ReflectionScanner::RunStartupScan()
@@ -1043,7 +1069,9 @@ namespace Obelisk::UE
         OBELISK_INFO("[ReflectionScanner] Scanning {} ShooterGameServer mapping(s): {} readable, {} executable.",
                      mappings.size(), readableCount, executableCount);
 
-        ProbeStaticFNameRoots();
+        const std::vector<uintptr_t> staticFNameRootSlots = StaticFNameRootSlots();
+        ProbeStaticFNameRoots(staticFNameRootSlots);
+        StartDelayedStaticFNameRootProbe(staticFNameRootSlots);
 
         std::vector<GlobalWatch> watches;
         for (const char* target : targets)

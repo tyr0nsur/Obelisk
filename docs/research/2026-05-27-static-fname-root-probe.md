@@ -30,6 +30,11 @@ The probe is dormant unless the env var is set. For each slot it:
 - logs a `StaticFNameRoot FName static-root probe` only when all checks pass,
 - otherwise logs a `StaticFNameRoot FName static-root reject`.
 
+After the startup check, the scanner also retries the same explicit slots every five
+seconds for one minute. The retry does not discover new slots and uses the same acceptance
+gate; it exists only to distinguish an uninitialized startup slot from a false static
+candidate.
+
 The expected accepted log shape is:
 
 ```text
@@ -73,5 +78,6 @@ Offline validation passed:
 ## Next steps
 
 - Run an isolated capture with `OBELISK_REFLECTION_STATIC_FNAME_ROOTS=0x5956f30`.
+- Inspect both startup and delayed retry lines before rejecting a zero startup slot.
 - Analyze copied logs with `scripts/analyze_reflectionscanner_capture.py --json`.
 - If accepted, add independent static xref evidence before using it for name resolution.
