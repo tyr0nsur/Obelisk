@@ -1,0 +1,193 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+INSTALL_ROOT="${1:-$(mktemp -d /tmp/obelisk-install-layout.XXXXXX)}"
+WORK_DIR="$(mktemp -d /tmp/obelisk-sdk-consumer.XXXXXX)"
+CXX_BIN="${CXX:-g++}"
+
+cleanup() {
+    rm -rf "${WORK_DIR}"
+}
+trap cleanup EXIT
+
+require_path() {
+    local path="$1"
+    if [[ ! -e "${path}" ]]; then
+        echo "Missing expected install path: ${path}" >&2
+        exit 1
+    fi
+}
+
+"${REPO_DIR}/scripts/install_obelisk.sh" "${INSTALL_ROOT}"
+
+require_path "${INSTALL_ROOT}/lib/libobelisk.so"
+require_path "${INSTALL_ROOT}/lib/libsubhook.so"
+require_path "${INSTALL_ROOT}/plugins"
+require_path "${INSTALL_ROOT}/config"
+require_path "${INSTALL_ROOT}/logs"
+require_path "${INSTALL_ROOT}/state/instances"
+require_path "${INSTALL_ROOT}/include/obelisk/ObeliskApi.h"
+
+cat > "${WORK_DIR}/consumer_plugin.cpp" <<'CPP'
+#include <obelisk/ObeliskApi.h>
+
+namespace
+{
+    constexpr const char* kDefaultConfig = R"json({
+    "enabled": false,
+    "instance_allowlist": []
+})json";
+}
+
+extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out)
+{
+    if (!out)
+        return false;
+
+    out->abi_version = OBELISK_PLUGIN_METADATA_ABI_VERSION;
+    out->struct_size = sizeof(ObeliskPluginMetadata);
+    out->plugin_id = "install_layout_consumer";
+    out->name = "Install Layout Consumer";
+    out->version = "0.1.0-dev";
+    out->config_file = "config.json";
+    out->default_config_json = kDefaultConfig;
+    return true;
+}
+
+extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
+    ObeliskApi* api,
+    const ObeliskPluginInitContext* context)
+{
+    return api &&
+        context &&
+        api->abi_version == OBELISK_API_ABI_VERSION &&
+        api->struct_size >= sizeof(ObeliskApi) &&
+        context->abi_version == OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION &&
+        context->struct_size >= sizeof(ObeliskPluginInitContext);
+}
+
+extern "C" __attribute__((visibility("default"))) void ObeliskPlugin_Shutdown()
+{
+}
+CPP
+
+cat > "${WORK_DIR}/consumer_fixture.cpp" <<'CPP'
+#include <obelisk/ObeliskApi.h>
+
+#include <dlfcn.h>
+
+#include <cstring>
+#include <iostream>
+#include <stdexcept>
+#include <string>
+
+namespace
+{
+    using GetInfoFn = bool (*)(ObeliskPluginMetadata*);
+    using InitFn = bool (*)(ObeliskApi*, const ObeliskPluginInitContext*);
+    using ShutdownFn = void (*)();
+
+    void Require(bool condition, const char* message)
+    {
+        if (!condition)
+            throw std::runtime_error(message);
+    }
+
+    void NoOpLog(const char*)
+    {
+    }
+
+    void RegisterProcessEvent(OnProcessEventCallback)
+    {
+    }
+
+    void RegisterNamedProcessEvent(int32_t, OnProcessEventCallback)
+    {
+    }
+
+    void CallProcessEvent(void*, void*, void*)
+    {
+    }
+
+    template <typename T>
+    T Resolve(void* handle, const char* symbol)
+    {
+        dlerror();
+        void* pointer = dlsym(handle, symbol);
+        const char* error = dlerror();
+        if (error)
+            throw std::runtime_error(std::string("missing symbol ") + symbol + ": " + error);
+        return reinterpret_cast<T>(pointer);
+    }
+}
+
+int main(int argc, char** argv)
+{
+    try
+    {
+        Require(argc == 2, "usage: consumer_fixture <plugin-so>");
+
+        void* handle = dlopen(argv[1], RTLD_NOW | RTLD_LOCAL);
+        if (!handle)
+            throw std::runtime_error(std::string("dlopen failed: ") + dlerror());
+
+        GetInfoFn getInfo = Resolve<GetInfoFn>(handle, "ObeliskPlugin_GetInfo");
+        InitFn init = Resolve<InitFn>(handle, "ObeliskPlugin_Init");
+        ShutdownFn shutdown = Resolve<ShutdownFn>(handle, "ObeliskPlugin_Shutdown");
+
+        ObeliskPluginMetadata metadata{};
+        Require(getInfo(&metadata), "ObeliskPlugin_GetInfo failed");
+        Require(metadata.abi_version == OBELISK_PLUGIN_METADATA_ABI_VERSION, "metadata ABI mismatch");
+        Require(metadata.struct_size >= sizeof(ObeliskPluginMetadata), "metadata size mismatch");
+        Require(std::strcmp(metadata.plugin_id, "install_layout_consumer") == 0, "plugin_id mismatch");
+        Require(std::strcmp(metadata.config_file, "config.json") == 0, "config file mismatch");
+
+        ObeliskApi api{};
+        api.LogInfo = NoOpLog;
+        api.LogWarn = NoOpLog;
+        api.LogError = NoOpLog;
+        api.RegisterPreProcessEvent = RegisterProcessEvent;
+        api.RegisterPostProcessEvent = RegisterProcessEvent;
+        api.RegisterPreProcessEventForNameIndex = RegisterNamedProcessEvent;
+        api.RegisterPostProcessEventForNameIndex = RegisterNamedProcessEvent;
+        api.CallProcessEvent = CallProcessEvent;
+        api.abi_version = OBELISK_API_ABI_VERSION;
+        api.struct_size = sizeof(ObeliskApi);
+        api.capabilities = OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS;
+
+        ObeliskPluginInitContext context{};
+        context.abi_version = OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION;
+        context.struct_size = sizeof(ObeliskPluginInitContext);
+        context.config_dir = "/tmp/obelisk-install-layout-consumer";
+        context.config_path = "/tmp/obelisk-install-layout-consumer/config.json";
+        context.instance_id = "install-layout-test";
+
+        Require(init(&api, &context), "ObeliskPlugin_Init failed");
+        shutdown();
+        dlclose(handle);
+    }
+    catch (const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+        return 1;
+    }
+
+    return 0;
+}
+CPP
+
+"${CXX_BIN}" -std=c++20 -fPIC -shared \
+    -I"${INSTALL_ROOT}/include" \
+    "${WORK_DIR}/consumer_plugin.cpp" \
+    -o "${WORK_DIR}/install_layout_consumer.so"
+
+"${CXX_BIN}" -std=c++20 \
+    -I"${INSTALL_ROOT}/include" \
+    "${WORK_DIR}/consumer_fixture.cpp" \
+    -ldl \
+    -o "${WORK_DIR}/consumer_fixture"
+
+"${WORK_DIR}/consumer_fixture" "${WORK_DIR}/install_layout_consumer.so"
+
+echo "Install layout and public SDK consumer validation passed for ${INSTALL_ROOT}"

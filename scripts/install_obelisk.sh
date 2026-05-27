@@ -89,11 +89,13 @@ install_file() {
 run mkdir -p \
     "${ROOT}/lib" \
     "${ROOT}/plugins" \
+    "${ROOT}/include/obelisk" \
     "${ROOT}/config" \
     "${ROOT}/logs" \
     "${ROOT}/state/instances"
 
 install_file 755 "${BUILD_DIR}/libobelisk.so" "${ROOT}/lib/libobelisk.so"
 install_file 755 "${BUILD_DIR}/_deps/subhook-build/libsubhook.so" "${ROOT}/lib/libsubhook.so"
+install_file 644 "${REPO_DIR}/include/obelisk/ObeliskApi.h" "${ROOT}/include/obelisk/ObeliskApi.h"
 
 echo "Obelisk installed to ${ROOT}"
