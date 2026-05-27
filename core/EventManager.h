@@ -10,6 +10,9 @@ namespace Obelisk::Core
     class EventManager
     {
     public:
+        EventManager() = default;
+        ~EventManager() = default;
+
         static EventManager& Get();
 
         void RegisterPreProcessEvent(OnProcessEventCallback callback);
@@ -33,9 +36,6 @@ namespace Obelisk::Core
         void TriggerPostProcessEvent(int32_t nameIndex, void* caller, void* function, void* parms);
 
     private:
-        EventManager() = default;
-        ~EventManager() = default;
-
         struct CallbackRegistration {
             int32_t nameIndex;
             OnProcessEventCallback callback;
