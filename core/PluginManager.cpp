@@ -1,10 +1,12 @@
 #include "PluginManager.h"
 #include "EventManager.h"
+#include "PluginConfig.h"
 #include "hooks/ProcessEventHook.h"
 #include "runtime/Logger.h"
 #include <dlfcn.h>
 #include <filesystem>
 #include <algorithm>
+#include <cstdlib>
 #include <exception>
 #include <vector>
 
@@ -16,7 +18,8 @@ namespace Obelisk::Core
     {
         thread_local void* g_CurrentPluginOwner = nullptr;
 
-        using InitFunc = bool(*)(ObeliskApi*);
+        using GetInfoFunc = bool(*)(ObeliskPluginMetadata*);
+        using InitFunc = bool(*)(ObeliskApi*, const ObeliskPluginInitContext*);
         using ShutdownFunc = void(*)();
 
         void* ResolveCallbackOwner(OnProcessEventCallback callback)
@@ -122,6 +125,17 @@ namespace Obelisk::Core
     {
         try
         {
+            const char* configRootEnv = std::getenv("OBELISK_CONFIG_DIR");
+            if (!configRootEnv || configRootEnv[0] == '\0')
+            {
+                OBELISK_ERROR("OBELISK_CONFIG_DIR is required for plugin loading. Plugins will not be loaded.");
+                return;
+            }
+
+            const fs::path configRoot = configRootEnv;
+            const char* instanceIdEnv = std::getenv("OBELISK_INSTANCE_ID");
+            const std::string instanceId = instanceIdEnv ? instanceIdEnv : "";
+
             if (!fs::exists(directory))
             {
                 OBELISK_WARN("Plugin directory {} does not exist. Creating it...", directory);
@@ -164,7 +178,59 @@ namespace Obelisk::Core
                     continue;
                 }
 
+                dlerror();
+                GetInfoFunc getInfoFunc = reinterpret_cast<GetInfoFunc>(dlsym(handle, "ObeliskPlugin_GetInfo"));
+                symbolError = dlerror();
+
+                if (symbolError || !getInfoFunc)
+                {
+                    OBELISK_ERROR("Plugin {} is missing ObeliskPlugin_GetInfo: {}. Unloading.", pluginName, symbolError ? symbolError : "unknown dlsym error");
+                    dlclose(handle);
+                    continue;
+                }
+
                 ShutdownFunc shutdownFunc = ResolveShutdownFunc(handle, pluginName);
+
+                ObeliskPluginMetadata metadata{};
+                bool metadataLoaded = false;
+                try
+                {
+                    metadataLoaded = getInfoFunc(&metadata);
+                }
+                catch (const std::exception& e)
+                {
+                    OBELISK_ERROR("Plugin {} threw while reporting metadata: {}", pluginName, e.what());
+                }
+                catch (...)
+                {
+                    OBELISK_ERROR("Plugin {} threw an unknown exception while reporting metadata.", pluginName);
+                }
+
+                if (!metadataLoaded)
+                {
+                    OBELISK_ERROR("Plugin {} failed to report metadata. Unloading.", pluginName);
+                    dlclose(handle);
+                    continue;
+                }
+
+                PreparedPluginConfig preparedConfig;
+                std::string configError;
+                if (!PreparePluginConfig(metadata, configRoot, preparedConfig, configError))
+                {
+                    OBELISK_ERROR("Plugin {} metadata/config rejected: {}. Unloading.", pluginName, configError);
+                    dlclose(handle);
+                    continue;
+                }
+
+                const std::string configDir = preparedConfig.directory.string();
+                const std::string configPath = preparedConfig.path.string();
+                ObeliskPluginInitContext initContext{
+                    OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION,
+                    sizeof(ObeliskPluginInitContext),
+                    configDir.c_str(),
+                    configPath.c_str(),
+                    instanceId.c_str()
+                };
 
                 Dl_info initInfo{};
                 void* pluginOwner = nullptr;
@@ -178,7 +244,7 @@ namespace Obelisk::Core
                 g_CurrentPluginOwner = pluginOwner;
                 try
                 {
-                    initialized = initFunc(&m_Api);
+                    initialized = initFunc(&m_Api, &initContext);
                 }
                 catch (const std::exception& e)
                 {

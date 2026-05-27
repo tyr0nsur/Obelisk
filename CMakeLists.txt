@@ -44,6 +44,7 @@ add_library(obelisk SHARED
     hooks/HookManager.cpp
     hooks/ProcessEventHook.cpp
     core/EventManager.cpp
+    core/PluginConfig.cpp
     core/PluginManager.cpp
 )
 

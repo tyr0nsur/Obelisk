@@ -1,0 +1,228 @@
+#include "PluginConfig.h"
+
+#include "extern/nlohmann/json.hpp"
+
+#include <cctype>
+#include <cstring>
+#include <fstream>
+#include <string>
+#include <system_error>
+
+namespace fs = std::filesystem;
+using json = nlohmann::json;
+
+namespace Obelisk::Core
+{
+    namespace
+    {
+        bool IsSafePluginId(const char* value)
+        {
+            if (!value || value[0] == '\0')
+                return false;
+
+            const std::string token(value);
+            for (const unsigned char ch : token)
+            {
+                if (std::isalnum(ch) || ch == '_' || ch == '-')
+                    continue;
+                return false;
+            }
+
+            return true;
+        }
+
+        bool IsSafeConfigFile(const char* value)
+        {
+            return value && std::strcmp(value, "config.json") == 0;
+        }
+
+        bool IsSafeDisabledConfig(const json& config, std::string& error)
+        {
+            if (!config.is_object())
+            {
+                error = "config root must be a JSON object";
+                return false;
+            }
+
+            const auto enabled = config.find("enabled");
+            if (enabled == config.end() || !enabled->is_boolean())
+            {
+                error = "config must include boolean field 'enabled'";
+                return false;
+            }
+
+            if (enabled->get<bool>())
+            {
+                error = "default config must be safe-disabled with enabled=false";
+                return false;
+            }
+
+            const auto allowlist = config.find("instance_allowlist");
+            if (allowlist != config.end())
+            {
+                if (!allowlist->is_array())
+                {
+                    error = "instance_allowlist must be an array";
+                    return false;
+                }
+
+                for (const auto& entry : *allowlist)
+                {
+                    if (!entry.is_string())
+                    {
+                        error = "instance_allowlist entries must be strings";
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        bool LoadJsonFile(const fs::path& path, json& out, std::string& error)
+        {
+            std::ifstream in(path);
+            if (!in.is_open())
+            {
+                error = "config file is not readable";
+                return false;
+            }
+
+            try
+            {
+                out = json::parse(in);
+            }
+            catch (const std::exception& e)
+            {
+                error = std::string("config JSON parse failed: ") + e.what();
+                return false;
+            }
+
+            return true;
+        }
+    }
+
+    bool PreparePluginConfig(const ObeliskPluginMetadata& metadata,
+                             const fs::path& configRoot,
+                             PreparedPluginConfig& prepared,
+                             std::string& error)
+    {
+        if (metadata.abi_version != OBELISK_PLUGIN_METADATA_ABI_VERSION ||
+            metadata.struct_size < sizeof(ObeliskPluginMetadata))
+        {
+            error = "unsupported plugin metadata ABI";
+            return false;
+        }
+
+        if (!IsSafePluginId(metadata.plugin_id))
+        {
+            error = "plugin_id is empty or contains unsafe path characters";
+            return false;
+        }
+
+        if (!metadata.name || metadata.name[0] == '\0')
+        {
+            error = "plugin name is empty";
+            return false;
+        }
+
+        if (!metadata.version || metadata.version[0] == '\0')
+        {
+            error = "plugin version is empty";
+            return false;
+        }
+
+        if (!IsSafeConfigFile(metadata.config_file))
+        {
+            error = "config_file must be config.json";
+            return false;
+        }
+
+        if (!metadata.default_config_json || metadata.default_config_json[0] == '\0')
+        {
+            error = "default_config_json is empty";
+            return false;
+        }
+
+        json defaultConfig;
+        try
+        {
+            defaultConfig = json::parse(metadata.default_config_json);
+        }
+        catch (const std::exception& e)
+        {
+            error = std::string("default_config_json parse failed: ") + e.what();
+            return false;
+        }
+
+        if (!IsSafeDisabledConfig(defaultConfig, error))
+            return false;
+
+        prepared.directory = configRoot / metadata.plugin_id;
+        prepared.path = prepared.directory / metadata.config_file;
+
+        std::error_code ec;
+        if (!fs::exists(prepared.path, ec))
+        {
+            fs::create_directories(prepared.directory, ec);
+            if (ec)
+            {
+                error = "failed to create plugin config directory: " + ec.message();
+                return false;
+            }
+
+            std::ofstream out(prepared.path);
+            if (!out.is_open())
+            {
+                error = "failed to create default plugin config";
+                return false;
+            }
+
+            out << defaultConfig.dump(4) << '\n';
+            out.close();
+            if (!out)
+            {
+                error = "failed to write default plugin config";
+                return false;
+            }
+        }
+
+        json existingConfig;
+        if (!LoadJsonFile(prepared.path, existingConfig, error))
+            return false;
+
+        if (!existingConfig.is_object())
+        {
+            error = "config root must be a JSON object";
+            return false;
+        }
+
+        const auto enabled = existingConfig.find("enabled");
+        if (enabled == existingConfig.end() || !enabled->is_boolean())
+        {
+            error = "config must include boolean field 'enabled'";
+            return false;
+        }
+
+        const auto allowlist = existingConfig.find("instance_allowlist");
+        if (allowlist != existingConfig.end() && !allowlist->is_array())
+        {
+            error = "instance_allowlist must be an array";
+            return false;
+        }
+
+        if (allowlist != existingConfig.end())
+        {
+            for (const auto& entry : *allowlist)
+            {
+                if (!entry.is_string())
+                {
+                    error = "instance_allowlist entries must be strings";
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+}

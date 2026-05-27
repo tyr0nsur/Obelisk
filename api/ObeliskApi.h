@@ -4,6 +4,8 @@
 #include <stdbool.h>
 
 #define OBELISK_API_ABI_VERSION 1u
+#define OBELISK_PLUGIN_METADATA_ABI_VERSION 1u
+#define OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION 1u
 #define OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS (1ull << 0)
 
 #ifdef __cplusplus
@@ -17,6 +19,24 @@ extern "C" {
 // Prototype for a function that will receive the ProcessEvent hook
 // Returns true if the event should continue execution, false to block it.
 typedef bool (*OnProcessEventCallback)(void* caller, void* function, void* parms);
+
+struct ObeliskPluginMetadata {
+    uint32_t abi_version;
+    uint32_t struct_size;
+    const char* plugin_id;
+    const char* name;
+    const char* version;
+    const char* config_file;
+    const char* default_config_json;
+};
+
+struct ObeliskPluginInitContext {
+    uint32_t abi_version;
+    uint32_t struct_size;
+    const char* config_dir;
+    const char* config_path;
+    const char* instance_id;
+};
 
 // ============================================================================
 // Public API Interface provided by Obelisk to Plugins
@@ -43,8 +63,12 @@ struct ObeliskApi {
     uint64_t capabilities;
 };
 
-// Plugins must export this function to be loaded by Obelisk
-// __attribute__((visibility("default"))) bool ObeliskPlugin_Init(ObeliskApi* api);
+// Plugins must export these functions to be loaded by Obelisk.
+// Metadata is validated before initialization. The runtime creates a missing
+// safe-disabled default config at:
+//   ${OBELISK_CONFIG_DIR}/<plugin_id>/config.json
+// __attribute__((visibility("default"))) bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out);
+// __attribute__((visibility("default"))) bool ObeliskPlugin_Init(ObeliskApi* api, const ObeliskPluginInitContext* context);
 //
 // Plugins may also export this optional lifecycle hook. When present, the runtime
 // calls it before unregistering plugin-owned callbacks and before dlclose.

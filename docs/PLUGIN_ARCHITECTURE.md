@@ -33,6 +33,7 @@ status example should not also decode `ProcessEvent` params, and a filtered
 Plugins must treat `api/ObeliskApi.h` as a C ABI boundary:
 
 - Export entry points with `extern "C"` and default visibility.
+- Export mandatory metadata through `ObeliskPlugin_GetInfo`.
 - Pass only POD structs, primitive types, raw pointers, explicit sizes, and
   function pointers across the boundary.
 - Do not pass STL types, C++ classes, references, exceptions, RTTI-dependent
@@ -51,12 +52,12 @@ Plugin configuration belongs under the central install root, not the ARK binary
 directory:
 
 ```text
-${OBELISK_CONFIG_DIR}/<plugin-id>/<plugin-config-file>
+${OBELISK_CONFIG_DIR}/<plugin-id>/config.json
 ```
 
 Resolution order:
 
-1. `${OBELISK_CONFIG_DIR}/<plugin-id>/<plugin-config-file>`.
+1. `${OBELISK_CONFIG_DIR}/<plugin-id>/config.json`.
 
 Config files should include:
 
@@ -69,9 +70,10 @@ Config files should include:
 - Explicit limits: queue lengths, log retention, trace caps, request body caps,
   and timeouts.
 
-Plugins may create a default config on first initialization when the file is missing, but
-the generated defaults must be safe-disabled. They should create only their own
-`<plugin-id>/` config directory and log the chosen config path.
+The runtime creates a plugin's missing default config before initialization using
+`default_config_json` from `ObeliskPlugin_GetInfo`. Defaults must be safe-disabled
+with `enabled: false`. If metadata, default config, or an existing config is invalid,
+the runtime rejects the plugin before calling `ObeliskPlugin_Init`.
 
 ## Build And Drop-In Model
 
@@ -82,14 +84,15 @@ Obelisk should support two plugin build paths:
   `${OBELISK_PLUGIN_DIR}` as `.so` files.
 
 The runtime does not need to know how a plugin was compiled. On restart it scans
-`${OBELISK_PLUGIN_DIR}` for `.so` files, resolves `ObeliskPlugin_Init`, optionally resolves
-`ObeliskPlugin_Shutdown`, and lets the plugin initialize its own safe config defaults.
+`${OBELISK_PLUGIN_DIR}` for `.so` files, resolves `ObeliskPlugin_GetInfo`, validates
+metadata/config, resolves `ObeliskPlugin_Init`, optionally resolves
+`ObeliskPlugin_Shutdown`, and passes the plugin its resolved config paths.
 
 The stable operational flow is:
 
 1. Build or obtain `PluginName.so`.
-2. Ensure `${OBELISK_CONFIG_DIR}/plugin-name/<config-file>` exists or that the
-   plugin creates a safe-disabled default on first init.
+2. Ensure `${OBELISK_CONFIG_DIR}/<plugin-id>/config.json` exists or let the runtime
+   create the safe-disabled default on first init.
 3. Copy the `.so` into `${OBELISK_ROOT}/plugins/`.
 4. Restart only the target ARK instance.
 
@@ -107,10 +110,17 @@ Every non-trivial plugin should be designed around these phases:
 5. On shutdown, stop external ingress first, unregister callbacks, drain worker
    queues, join threads, then release state.
 
-The ABI exposes initialization through `ObeliskPlugin_Init` and supports an
+The ABI exposes metadata/config through `ObeliskPlugin_GetInfo`, initialization
+through `ObeliskPlugin_Init`, and supports an
 optional shutdown export resolved directly from the plugin shared object:
 
 ```cpp
+extern "C" __attribute__((visibility("default")))
+bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out);
+
+extern "C" __attribute__((visibility("default")))
+bool ObeliskPlugin_Init(ObeliskApi* api, const ObeliskPluginInitContext* context);
+
 extern "C" __attribute__((visibility("default")))
 void ObeliskPlugin_Shutdown();
 ```
@@ -169,7 +179,7 @@ installed only on isolated test instances or behind a trusted local proxy.
 
 Before a plugin is promoted to stable or added to the top-level build:
 
-- [ ] Config path follows `${OBELISK_CONFIG_DIR}/<plugin-id>/<config-file>`.
+- [ ] Config path follows `${OBELISK_CONFIG_DIR}/<plugin-id>/config.json`.
 - [ ] Risky features are safe-disabled and map-gated.
 - [ ] No global `ProcessEvent` callback outside a documented debug gate.
 - [ ] Callback lifetime is covered by runtime owner cleanup and plugin-local

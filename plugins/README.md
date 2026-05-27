@@ -19,8 +19,8 @@ plugin, not to become a feature-heavy server plugin.
 ## Policy
 
 - Plugins activate only when their `.so` is copied into the runtime `plugins/` directory.
-- Stable plugins must use central config paths:
-  `${OBELISK_CONFIG_DIR}/<plugin-id>/<config-file>`.
+- Stable plugins must use runtime-owned central config paths:
+  `${OBELISK_CONFIG_DIR}/<plugin-id>/config.json`.
 - Prefer filtered `ProcessEvent` callbacks. Global callbacks require an explicit research
   gate and isolated validation.
 - Plugins that start HTTP servers, threads, or file readers need a documented shutdown

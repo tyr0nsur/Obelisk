@@ -3,12 +3,10 @@
 
 #include <atomic>
 #include <cstdint>
-#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <mutex>
 #include <string>
-#include <system_error>
 
 using json = nlohmann::json;
 
@@ -22,103 +20,161 @@ namespace
     int g_LogLimit = 5;
     std::atomic<int> g_LoggedEvents{0};
 
-    std::filesystem::path ResolveConfigPath()
+    constexpr const char* kDefaultConfig = R"json({
+    "enabled": false,
+    "log_level": "info",
+    "instance_allowlist": [],
+    "map_allowlist": [],
+    "process_event": {
+        "enabled": false,
+        "filtered_function_index": -1,
+        "log_limit": 5
+    }
+})json";
+
+    bool IsStringArray(const json& value)
     {
-        if (const char* configDir = std::getenv("OBELISK_CONFIG_DIR");
-            configDir && configDir[0] != '\0')
+        if (!value.is_array())
+            return false;
+
+        for (const auto& entry : value)
         {
-            return std::filesystem::path(configDir) / "oBaseEvents" / "config.json";
+            if (!entry.is_string())
+                return false;
         }
 
-        return std::filesystem::path("config") / "oBaseEvents" / "config.json";
+        return true;
     }
 
-    json DefaultConfig()
+    bool InstanceAllowed(const json& config, const char* instanceId)
     {
-        return {
-            {"enabled", false},
-            {"log_level", "info"},
-            {"instance_allowlist", json::array()},
-            {"map_allowlist", json::array()},
-            {"process_event", {
-                {"enabled", false},
-                {"filtered_function_index", -1},
-                {"log_limit", 5}
-            }}
-        };
-    }
+        const auto allowlist = config.find("instance_allowlist");
+        if (allowlist == config.end() || allowlist->empty())
+            return true;
 
-    void WriteDefaultConfig(const std::filesystem::path& path, const json& config)
-    {
-        std::error_code ec;
-        const std::filesystem::path parent = path.parent_path();
-        if (!parent.empty())
+        if (!IsStringArray(*allowlist))
+            return false;
+
+        const std::string current = instanceId ? instanceId : "";
+        for (const auto& entry : *allowlist)
         {
-            std::filesystem::create_directories(parent, ec);
-            if (ec)
-                return;
+            if (entry.get<std::string>() == current)
+                return true;
         }
 
-        std::ofstream out(path);
-        if (!out.is_open())
-            return;
-
-        out << config.dump(4) << '\n';
+        return false;
     }
 
-    json LoadConfigDocument(const std::filesystem::path& path)
+    bool LoadConfigDocument(const std::filesystem::path& path, json& config)
     {
-        json config = DefaultConfig();
-        std::error_code ec;
-        if (!std::filesystem::exists(path, ec))
-        {
-            WriteDefaultConfig(path, config);
-            if (g_Api)
-                g_Api->LogInfo("[oBaseEvents] Default config created.");
-            return config;
-        }
-
         std::ifstream in(path);
         if (!in.is_open())
         {
             if (g_Api)
-                g_Api->LogWarn("[oBaseEvents] Config not readable; using safe defaults.");
-            return config;
+                g_Api->LogError("[oBaseEvents] Config not readable.");
+            return false;
         }
 
         try
         {
-            json parsed = json::parse(in);
-            if (parsed.is_object())
-                return parsed;
+            config = json::parse(in);
         }
-        catch (...)
+        catch (const std::exception& e)
         {
             if (g_Api)
-                g_Api->LogWarn("[oBaseEvents] Config parse failed; using safe defaults.");
+                g_Api->LogError((std::string("[oBaseEvents] Config parse failed: ") + e.what()).c_str());
+            return false;
         }
 
-        return config;
+        if (!config.is_object())
+        {
+            if (g_Api)
+                g_Api->LogError("[oBaseEvents] Config root must be an object.");
+            return false;
+        }
+
+        return true;
     }
 
-    void LoadConfig()
+    bool LoadConfig(const ObeliskPluginInitContext* context)
     {
-        const std::filesystem::path path = ResolveConfigPath();
+        if (!context || context->abi_version != OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION ||
+            context->struct_size < sizeof(ObeliskPluginInitContext) ||
+            !context->config_path || context->config_path[0] == '\0')
+        {
+            if (g_Api)
+                g_Api->LogError("[oBaseEvents] Invalid plugin init context.");
+            return false;
+        }
+
+        const std::filesystem::path path = context->config_path;
         std::lock_guard<std::mutex> lock(g_ConfigMutex);
 
-        const json config = LoadConfigDocument(path);
+        json config;
+        if (!LoadConfigDocument(path, config))
+            return false;
+
+        if (!config.contains("enabled") || !config["enabled"].is_boolean())
+        {
+            if (g_Api)
+                g_Api->LogError("[oBaseEvents] Config field enabled must be boolean.");
+            return false;
+        }
+
+        if (config.contains("log_level") && !config["log_level"].is_string())
+        {
+            if (g_Api)
+                g_Api->LogError("[oBaseEvents] Config field log_level must be string.");
+            return false;
+        }
+
+        if (config.contains("instance_allowlist") && !IsStringArray(config["instance_allowlist"]))
+        {
+            if (g_Api)
+                g_Api->LogError("[oBaseEvents] Config field instance_allowlist must be an array of strings.");
+            return false;
+        }
+
+        if (config.contains("map_allowlist") && !IsStringArray(config["map_allowlist"]))
+        {
+            if (g_Api)
+                g_Api->LogError("[oBaseEvents] Config field map_allowlist must be an array of strings.");
+            return false;
+        }
+
+        if (!InstanceAllowed(config, context->instance_id))
+        {
+            g_Enabled = false;
+            return true;
+        }
+
         g_Enabled = config.value("enabled", false);
 
         const json processEvent = config.value("process_event", json::object());
-        if (processEvent.is_object())
+        if (!processEvent.is_object())
         {
-            g_ProcessEventEnabled = processEvent.value("enabled", false);
-            g_FilteredFunctionIndex = processEvent.value("filtered_function_index", -1);
-            g_LogLimit = processEvent.value("log_limit", 5);
+            if (g_Api)
+                g_Api->LogError("[oBaseEvents] Config field process_event must be an object.");
+            return false;
         }
+
+        if (!processEvent.contains("enabled") || !processEvent["enabled"].is_boolean() ||
+            !processEvent.contains("filtered_function_index") || !processEvent["filtered_function_index"].is_number_integer() ||
+            !processEvent.contains("log_limit") || !processEvent["log_limit"].is_number_integer())
+        {
+            if (g_Api)
+                g_Api->LogError("[oBaseEvents] process_event fields have invalid types.");
+            return false;
+        }
+
+        g_ProcessEventEnabled = processEvent.value("enabled", false);
+        g_FilteredFunctionIndex = processEvent.value("filtered_function_index", -1);
+        g_LogLimit = processEvent.value("log_limit", 5);
 
         if (g_LogLimit < 0)
             g_LogLimit = 0;
+
+        return true;
     }
 
     bool OnFilteredProcessEvent(void* caller, void* function, void* params)
@@ -135,7 +191,22 @@ namespace
     }
 }
 
-extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(ObeliskApi* api)
+extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out)
+{
+    if (!out)
+        return false;
+
+    out->abi_version = OBELISK_PLUGIN_METADATA_ABI_VERSION;
+    out->struct_size = sizeof(ObeliskPluginMetadata);
+    out->plugin_id = "oBaseEvents";
+    out->name = "oBaseEvents";
+    out->version = "0.1.0";
+    out->config_file = "config.json";
+    out->default_config_json = kDefaultConfig;
+    return true;
+}
+
+extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(ObeliskApi* api, const ObeliskPluginInitContext* context)
 {
     if (!api)
         return false;
@@ -150,7 +221,9 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(Obelis
     g_Api = api;
     g_LoggedEvents.store(0);
 
-    LoadConfig();
+    if (!LoadConfig(context))
+        return false;
+
     api->LogInfo("[oBaseEvents] Loaded.");
 
     if (!g_Enabled)

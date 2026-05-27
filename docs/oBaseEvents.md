@@ -6,7 +6,8 @@ safe by default.
 It demonstrates:
 
 - C ABI validation with `abi_version` and `struct_size`.
-- First-run config creation under the central Obelisk config directory.
+- Runtime-owned first-run config creation under the central Obelisk config directory.
+- `ObeliskPlugin_GetInfo` metadata and `ObeliskPluginInitContext` config paths.
 - A filtered `ProcessEvent` callback.
 - Optional `ObeliskPlugin_Shutdown()`.
 
@@ -39,7 +40,7 @@ If the plugin should not load, do not place it in `/servidor/ark/obelisk/plugins
 Default path:
 
 ```text
-/servidor/ark/obelisk/config/oBaseEvents/config.json
+${OBELISK_CONFIG_DIR}/oBaseEvents/config.json
 ```
 
 Default generated config:
@@ -48,6 +49,7 @@ Default generated config:
 {
     "enabled": false,
     "log_level": "info",
+    "instance_allowlist": [],
     "map_allowlist": [],
     "process_event": {
         "enabled": false,
