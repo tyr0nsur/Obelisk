@@ -28,7 +28,8 @@ jobs:
             scripts/test_build_core_dump_evidence_pack.py \
             scripts/test_check_chat_reflection_benchmark.py \
             scripts/test_analyze_reflectionscanner_capture.py \
-            scripts/test_verify_chat_reflection_constants.py
+            scripts/test_verify_chat_reflection_constants.py \
+            scripts/test_research_doc_guardrails.py
 
       - name: Check shell scripts parse
         run: |
@@ -50,6 +51,9 @@ jobs:
 
       - name: Run chat reflection verifier tests
         run: python3 scripts/test_verify_chat_reflection_constants.py
+
+      - name: Run research doc guardrail tests
+        run: python3 scripts/test_research_doc_guardrails.py
 
       - name: Run server posture tests
         run: scripts/test_check_obelisk_server_posture.sh
