@@ -198,8 +198,9 @@ work from repository state instead of chat history.
   `scripts/obelisk_supervisor_snapshot.sh`. They write to
   `/servidor/ark/obelisk/dumps/supervisor/`, fail closed on unstable posture, record
   PID/stable posture summary, and separate chat counters for `Reflected chat ProcessEvent`,
-  `ServerSendChatMessage`, rejections, and `send_mode_known=false`. They must not restart,
-  install, edit markers, attach debuggers, enable scanners, commit, or push.
+  `ServerSendChatMessage`, exact metadata-only fallback names, `metadata_only=true`,
+  rejections, and `send_mode_known=false`. They must not restart, install, edit markers,
+  attach debuggers, enable scanners, commit, or push.
 - UE4 type reconstruction planning is captured in
   `docs/research/2026-05-27-ue4-type-reconstruction-roadmap.md`; keep the milestone
   order as `FName`, `GObjects`, `UFunction`, then bounded params.
