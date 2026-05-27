@@ -4,13 +4,14 @@
 
 Initial release scope:
 
-- Linux `LD_PRELOAD` runtime bootstrap for ARK: Survival Evolved dedicated servers.
+- Linux `LD_PRELOAD` runtime bootstrap validated through the ARK: Survival Evolved
+  dedicated server debug harness.
 - Absolute x86_64 `UObject::ProcessEvent` hook with guarded validation.
 - C plugin ABI with logging, filtered ProcessEvent callbacks, owner cleanup, and optional
   plugin shutdown.
 - Central install layout under an operator-chosen Obelisk root.
 - Per-instance logs and preferred state markers via `OBELISK_INSTANCE_ID`.
-- LinuxGSM wrapper templates.
+- LinuxGSM wrapper templates for the current ARK debug harness.
 - `oBaseEvents` as the first official plugin example.
 - Offline reflection capture analyzer tooling.
 

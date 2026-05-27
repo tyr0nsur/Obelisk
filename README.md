@@ -1,11 +1,16 @@
 # Obelisk
 
-Obelisk is a Linux-native runtime and plugin framework for dedicated
-ARK: Survival Evolved servers.
+Obelisk is a Linux-native modding runtime, API, and SDK foundation for
+Unreal Engine dedicated server processes.
 
 The goal is to bring an ArkApi/DarkApi-style developer experience to Linux:
 central runtime injection, Unreal Engine event hooks, a stable C plugin ABI,
 reflection utilities, and reusable server-side modding APIs.
+
+ARK: Survival Evolved is the current debug harness used to validate the
+runtime inside a real stripped UE4 Linux server. Obelisk's public surface should
+remain the runtime/API/SDK layer; ARK-specific operational details belong in
+debug harness documentation and install notes.
 
 ## Current Status
 
@@ -13,31 +18,49 @@ Obelisk is in active reverse-engineering and runtime stabilization work.
 See [docs/STATUS.md](docs/STATUS.md) for the contributor-facing stable,
 experimental, and not-ready matrix.
 
-Stable enough to test:
+Runtime baseline:
 
 - LD_PRELOAD bootstrap for `ShooterGameServer`.
-- Centralized runtime layout under `/servidor/ark/obelisk`.
+- Centralized runtime layout under an operator-chosen Obelisk root.
 - Absolute x64 hook for `UObject::ProcessEvent`.
-- C ABI plugin loading.
-- Filtered ProcessEvent callbacks by `FName` index.
 - Per-instance logs.
 - Runtime feature flags per server instance.
 
-Experimental:
+API baseline:
+
+- C ABI plugin loading.
+- `ObeliskPlugin_GetInfo` metadata validation.
+- `ObeliskPlugin_Init(api, context)` initialization.
+- Filtered ProcessEvent callbacks by `FName` index.
+- Plugin-owned callback cleanup and optional plugin shutdown.
+
+SDK status:
+
+- Higher-level SDK APIs are not ready yet.
+- Player, tribe, inventory, dino, permission, timer, and command abstractions
+  remain roadmap items.
+
+Research:
 
 - Raw reflection scanner.
 - FString/FName inference.
-- Higher-level SDK APIs.
+- GNames/GObjects-backed reflection.
 
-Not production-ready yet:
+Harness:
+
+- ARK: Survival Evolved validates the runtime in a real stripped UE4 Linux
+  server process.
+- LinuxGSM wrappers are adapters for the ARK debug harness, not the core
+  project interface.
+
+Not production-ready:
 
 - General-purpose chat interception.
 - Full GObjects/GNames reflection.
-- Player, tribe, inventory, dino, permission, and command abstractions.
 
 ## Why Obelisk Exists
 
-ARK's Linux dedicated server binary is stripped and does not expose a clean
+Linux dedicated server binaries often ship stripped and without a clean native
 plugin interface. Most mature server API ecosystems were built around Windows
 tooling and binary assumptions.
 
@@ -59,16 +82,17 @@ loader/              LD_PRELOAD bootstrap
 runtime/             Logging and runtime services
 ue/                  UE4 memory/reflection helpers
 plugins/oBaseEvents/ First official example plugin for events and plugin structure
-  docs/                Contributor and operator documentation
-  scripts/             Install/deploy helpers
+docs/                Contributor and operator documentation
+scripts/             Install/deploy helpers
 ```
 
 Plugin structure and promotion rules are documented in
 [docs/PLUGIN_ARCHITECTURE.md](docs/PLUGIN_ARCHITECTURE.md).
 
-## Central Server Layout
+## Runtime Layout
 
-The recommended install layout is:
+The recommended install layout is an operator-chosen Obelisk root. The current
+ARK harness uses this concrete path:
 
 ```text
 /servidor/ark/obelisk/
@@ -94,10 +118,17 @@ The recommended install layout is:
         disable-plugins
 ```
 
-The ARK binary directory only needs a thin `ObeliskRun.sh` wrapper. Versioned LinuxGSM
-templates live under `packaging/linuxgsm/`.
-
 See [docs/INSTALL.md](docs/INSTALL.md).
+
+## ARK Debug Harness
+
+The current harness runs Obelisk inside `ShooterGameServer` with `LD_PRELOAD`.
+The ARK binary directory only needs a thin `ObeliskRun.sh` wrapper. Versioned
+LinuxGSM templates live under `packaging/linuxgsm/`.
+
+This harness is for validating loader, hook, logging, marker, and plugin ABI
+behavior against a real UE4 Linux server. Do not treat ARK paths, map names, or
+observed `FName` indices as stable SDK contracts.
 
 ## Build
 
@@ -138,12 +169,32 @@ static bool OnProcessEvent(void* caller, void* function, void* params)
 }
 
 extern "C" __attribute__((visibility("default")))
-bool ObeliskPlugin_Init(ObeliskApi* api)
+bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out)
+{
+    if (!out)
+        return false;
+
+    out->abi_version = OBELISK_PLUGIN_METADATA_ABI_VERSION;
+    out->struct_size = sizeof(ObeliskPluginMetadata);
+    out->plugin_id = "example";
+    out->name = "Example Plugin";
+    out->version = "0.1.0";
+    out->config_file = "config.json";
+    out->default_config_json = "{\"enabled\":false}\n";
+    return true;
+}
+
+extern "C" __attribute__((visibility("default")))
+bool ObeliskPlugin_Init(ObeliskApi* api, const ObeliskPluginInitContext* context)
 {
     if (!api)
         return false;
     if (api->abi_version != OBELISK_API_ABI_VERSION ||
         api->struct_size < sizeof(ObeliskApi))
+        return false;
+    if (!context ||
+        context->abi_version != OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION ||
+        context->struct_size < sizeof(ObeliskPluginInitContext))
         return false;
 
     api->LogInfo("Plugin loaded");
@@ -180,7 +231,8 @@ OBELISK_ENABLE_REFLECTION_SCANNER=1
 OBELISK_PE_TRACE_LIMIT=0
 ```
 
-Marker files are usually placed in:
+Marker files are usually placed under the selected Obelisk root. The current
+ARK harness uses:
 
 ```text
 /servidor/ark/obelisk/state/
@@ -196,7 +248,7 @@ High-priority engineering:
 - Add first-class APIs: chat commands, players, permissions, timers, RCON helpers.
 - Create small plugin examples for minimal load, filtered `ProcessEvent`, config,
   and HTTP status patterns.
-- Document reversing workflows and signatures per ARK server version.
+- Document reversing workflows and signatures per target binary version.
 
 ## Contributing
 
@@ -204,7 +256,8 @@ Contributors are welcome, especially in these areas:
 
 - Linux ELF/x86_64 hooking
 - Unreal Engine 4 reflection
-- ARK server internals
+- UE4/Linux dedicated server internals
+- ARK harness internals
 - C ABI plugin systems
 - CMake and packaging
 - Documentation and reproducible test environments
@@ -216,10 +269,10 @@ safety posture.
 
 ## Safety Notes
 
-Obelisk runs inside `ShooterGameServer`. A bad hook or unsafe plugin can crash
-the whole server process.
+The current harness runs Obelisk inside `ShooterGameServer`. A bad hook or
+unsafe plugin can crash the whole target process.
 
-For live servers:
+For debug harness servers:
 
 - Enable hooks per instance, not globally.
 - Keep experimental scanners disabled by default.

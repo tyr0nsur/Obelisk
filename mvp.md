@@ -1,12 +1,17 @@
 # Obelisk
 
-## Linux-first Runtime y Plugin Framework para ARK: Survival Evolved
+## Runtime/API/SDK Linux-first para modding de servidores UE4
 
 ---
 
 # Visión del proyecto
 
-Obelisk es un runtime moderno orientado a servidores dedicados Linux de ARK: Survival Evolved.
+Obelisk es un runtime moderno, una API C estable y una base de SDK para modding
+de servidores dedicados Linux basados en Unreal Engine.
+
+ARK: Survival Evolved es el harness de debug actual: sirve para validar loader,
+hooks, ABI, logs y plugins contra un servidor UE4 Linux real. No debe definir la
+primera impresión del proyecto ni convertirse en el contrato publico del SDK.
 
 El objetivo NO es clonar ArkApi ni portar código Windows directamente.
 
@@ -16,7 +21,7 @@ El objetivo es construir una arquitectura:
 * reflection-driven
 * modular
 * mantenible
-* orientada a servidores persistentes
+* orientada a procesos dedicados persistentes
 * con ABI estable para plugins
 * desacoplada de WinAPI
 * menos dependiente de offsets frágiles
@@ -96,7 +101,7 @@ Usar:
 
 ### 4. Tooling-first
 
-Los updates de ARK romperán offsets y patrones.
+Los updates del binario objetivo pueden romper offsets y patrones.
 
 Por eso Obelisk debe incluir tooling desde etapas tempranas:
 
@@ -280,17 +285,18 @@ plugins/MyPlugin.so
 
 # Roadmap inicial
 
-# Fase 0 — Entorno base
+# Fase 0 — Harness de debug
 
 ## Objetivo
 
-Levantar un dedicated server Linux funcional.
+Levantar un proceso dedicado Linux funcional para validar el runtime. El harness
+actual es ARK: Survival Evolved, pero no es el eje del producto.
 
 ## Requisitos
 
 * Ubuntu 22.04 o Debian 12
 * SteamCMD
-* Dedicated server ASE Linux
+* Dedicated server ASE Linux para el harness actual
 * gdb
 * clang
 * cmake
@@ -461,14 +467,11 @@ Inventory
 ## Correcto
 
 ```cpp
-extern "C"
-{
-    typedef struct
-    {
-        uint64_t steam_id;
-        const char* name;
-    } ObeliskPlayer;
-}
+extern "C" __attribute__((visibility("default")))
+bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out);
+
+extern "C" __attribute__((visibility("default")))
+bool ObeliskPlugin_Init(ObeliskApi* api, const ObeliskPluginInitContext* context);
 ```
 
 ---
@@ -487,12 +490,9 @@ En interfaces públicas.
 
 # Primera API mínima
 
-```cpp
-typedef struct
-{
-    void (*Log)(const char*);
-} ObeliskAPI;
-```
+La primera API minima implementada vive en `api/ObeliskApi.h`: logging,
+registro de callbacks `ProcessEvent`, llamada al `ProcessEvent` original,
+metadatos ABI y contexto de inicializacion de plugin.
 
 ---
 
@@ -535,7 +535,7 @@ Construir:
 
 # Riesgos técnicos
 
-## Actualizaciones del servidor
+## Actualizaciones del binario objetivo
 
 Cada update puede romper:
 
@@ -579,7 +579,7 @@ Construir un framework:
 * Linux-native
 * reflection-driven
 * mantenible
-* estable para servidores persistentes
+* estable para procesos dedicados persistentes
 
 que eventualmente pueda superar las limitaciones arquitectónicas de ArkApi clásico.
 
@@ -626,10 +626,11 @@ que eventualmente pueda superar las limitaciones arquitectónicas de ArkApi clá
 [✓] Logging funcional
 [✓] Plugin .so cargado
 [✓] ProcessEvent hookeado
-[✓] UFunctions enumeradas
-[✓] Primer evento gameplay capturado
+[ ] UFunctions enumeradas mediante reflection confiable
+[ ] Primer evento gameplay decodificado mediante metadata reflejada
 ```
 
 Cuando esto funcione:
 
-Obelisk ya tendrá la base técnica real de un runtime moderno para servidores Linux de ARK.
+Obelisk tendrá la base técnica real de un runtime/API/SDK moderno para modding
+Linux, validado inicialmente con el harness de ARK.

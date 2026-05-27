@@ -1,15 +1,17 @@
 # Architecture
 
-Obelisk is split into a small runtime core and optional plugins.
+Obelisk is split into a small Linux runtime core, a C plugin API, and optional
+plugins. The current ARK server integration is a debug harness for validating
+that runtime against a real stripped UE4 dedicated server process.
 
 ## Runtime Bootstrap
 
 `loader/Bootstrap.cpp` runs from a shared library constructor after
 `libobelisk.so` is injected with `LD_PRELOAD`.
 
-The bootstrap:
+The current bootstrap:
 
-1. Verifies the process is `ShooterGameServer`.
+1. Verifies the target process for the active harness.
 2. Initializes logging.
 3. Installs enabled hooks.
 4. Optionally runs experimental scanners.
@@ -55,7 +57,10 @@ Plugins export:
 
 ```cpp
 extern "C" __attribute__((visibility("default")))
-bool ObeliskPlugin_Init(ObeliskApi* api);
+bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out);
+
+extern "C" __attribute__((visibility("default")))
+bool ObeliskPlugin_Init(ObeliskApi* api, const ObeliskPluginInitContext* context);
 ```
 
 Plugin structure, configuration, lifecycle, HTTP safety, and promotion rules are
@@ -74,11 +79,27 @@ OBELISK_LOG_DIR
 OBELISK_INSTANCE_ID
 ```
 
-This keeps Obelisk artifacts outside the ARK binary directory and allows
-multiple LinuxGSM instances to share one runtime root. `OBELISK_INSTANCE_ID` separates
-logs and operational markers by instance so two servers can run the same map safely.
+This keeps Obelisk artifacts outside the target binary directory and allows
+multiple debug harness instances to share one runtime root. `OBELISK_INSTANCE_ID`
+separates logs and operational markers by instance.
 
-## Reflection Strategy
+## ARK Debug Harness
+
+The current harness injects Obelisk into `ShooterGameServer` with `LD_PRELOAD`.
+LinuxGSM wrapper templates under `packaging/linuxgsm/` are operational helpers
+for that harness, not the core product surface.
+
+ARK-specific paths, instance names, and observed `FName` indices are validation
+inputs only. Stable plugin contracts should be expressed through `api/ObeliskApi.h`
+and documented runtime behavior.
+
+## SDK Direction
+
+The SDK layer is not implemented yet. The intended stable surface is a set of
+runtime-backed APIs for common modding tasks after reflection metadata is
+reliable enough to support them.
+
+## Research Strategy
 
 Long term, Obelisk should avoid raw memory scanning in plugins.
 
@@ -93,9 +114,9 @@ Preferred direction:
 ## Experimental Components
 
 `ue/ReflectionScanner.*` currently exists as a research tool. It should remain
-disabled by default on live servers.
+disabled by default on debug harness servers.
 
 The first official plugin target is `plugins/oBaseEvents`, which demonstrates the C ABI,
 safe default config creation, filtered event registration, and plugin shutdown. Larger
-server features should be built as separate plugins after the reflection layer is more
-complete.
+modding features should be built as separate plugins after the reflection layer
+is more complete.
