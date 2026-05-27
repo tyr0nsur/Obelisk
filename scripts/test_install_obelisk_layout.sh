@@ -2,14 +2,31 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-INSTALL_ROOT="${1:-$(mktemp -d /tmp/obelisk-install-layout.XXXXXX)}"
+INSTALL_ROOT="${1:-}"
+if [[ -z "${INSTALL_ROOT}" ]]; then
+    INSTALL_ROOT="$(mktemp -d /tmp/obelisk-install-layout.XXXXXX)"
+    CLEAN_INSTALL_ROOT=1
+else
+    CLEAN_INSTALL_ROOT=0
+fi
 WORK_DIR="$(mktemp -d /tmp/obelisk-sdk-consumer.XXXXXX)"
 CXX_BIN="${CXX:-g++}"
 
 cleanup() {
     rm -rf "${WORK_DIR}"
+    if [[ "${CLEAN_INSTALL_ROOT}" == "1" ]]; then
+        rm -rf "${INSTALL_ROOT}"
+    fi
 }
 trap cleanup EXIT
+
+require_cmd() {
+    local cmd="$1"
+    if ! command -v "${cmd}" >/dev/null 2>&1; then
+        echo "Missing required command: ${cmd}" >&2
+        exit 1
+    fi
+}
 
 require_path() {
     local path="$1"
@@ -18,6 +35,8 @@ require_path() {
         exit 1
     fi
 }
+
+require_cmd "${CXX_BIN}"
 
 "${REPO_DIR}/scripts/install_obelisk.sh" "${INSTALL_ROOT}"
 
@@ -29,8 +48,23 @@ require_path "${INSTALL_ROOT}/logs"
 require_path "${INSTALL_ROOT}/state/instances"
 require_path "${INSTALL_ROOT}/include/obelisk/ObeliskApi.h"
 
+CONFIG_DIR="${INSTALL_ROOT}/config/install_layout_consumer"
+CONFIG_PATH="${CONFIG_DIR}/config.json"
+PLUGIN_PATH="${INSTALL_ROOT}/plugins/install_layout_consumer.so"
+
+mkdir -p "${CONFIG_DIR}"
+cat > "${CONFIG_PATH}" <<'JSON'
+{
+  "enabled": false,
+  "instance_allowlist": []
+}
+JSON
+
 cat > "${WORK_DIR}/consumer_plugin.cpp" <<'CPP'
 #include <obelisk/ObeliskApi.h>
+
+#include <cstring>
+#include <sys/stat.h>
 
 namespace
 {
@@ -38,6 +72,12 @@ namespace
     "enabled": false,
     "instance_allowlist": []
 })json";
+
+    bool PathExists(const char* path)
+    {
+        struct stat st {};
+        return path && stat(path, &st) == 0;
+    }
 }
 
 extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out)
@@ -59,12 +99,23 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
     ObeliskApi* api,
     const ObeliskPluginInitContext* context)
 {
-    return api &&
-        context &&
-        api->abi_version == OBELISK_API_ABI_VERSION &&
-        api->struct_size >= sizeof(ObeliskApi) &&
-        context->abi_version == OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION &&
-        context->struct_size >= sizeof(ObeliskPluginInitContext);
+    if (!api || !context)
+        return false;
+
+    if (api->abi_version != OBELISK_API_ABI_VERSION ||
+        api->struct_size < sizeof(ObeliskApi) ||
+        context->abi_version != OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION ||
+        context->struct_size < sizeof(ObeliskPluginInitContext))
+    {
+        return false;
+    }
+
+    return context->config_dir &&
+        context->config_path &&
+        context->instance_id &&
+        std::strcmp(context->instance_id, "install-layout-test") == 0 &&
+        PathExists(context->config_dir) &&
+        PathExists(context->config_path);
 }
 
 extern "C" __attribute__((visibility("default"))) void ObeliskPlugin_Shutdown()
@@ -126,7 +177,7 @@ int main(int argc, char** argv)
 {
     try
     {
-        Require(argc == 2, "usage: consumer_fixture <plugin-so>");
+        Require(argc == 5, "usage: consumer_fixture <plugin-so> <config-dir> <config-path> <instance-id>");
 
         void* handle = dlopen(argv[1], RTLD_NOW | RTLD_LOCAL);
         if (!handle)
@@ -159,9 +210,9 @@ int main(int argc, char** argv)
         ObeliskPluginInitContext context{};
         context.abi_version = OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION;
         context.struct_size = sizeof(ObeliskPluginInitContext);
-        context.config_dir = "/tmp/obelisk-install-layout-consumer";
-        context.config_path = "/tmp/obelisk-install-layout-consumer/config.json";
-        context.instance_id = "install-layout-test";
+        context.config_dir = argv[2];
+        context.config_path = argv[3];
+        context.instance_id = argv[4];
 
         Require(init(&api, &context), "ObeliskPlugin_Init failed");
         shutdown();
@@ -177,17 +228,38 @@ int main(int argc, char** argv)
 }
 CPP
 
-"${CXX_BIN}" -std=c++20 -fPIC -shared \
-    -I"${INSTALL_ROOT}/include" \
-    "${WORK_DIR}/consumer_plugin.cpp" \
-    -o "${WORK_DIR}/install_layout_consumer.so"
+(
+    cd "${WORK_DIR}"
+    "${CXX_BIN}" -std=c++20 -fPIC -shared \
+        -I"${INSTALL_ROOT}/include" \
+        -MMD -MF consumer_plugin.d \
+        consumer_plugin.cpp \
+        -o "${PLUGIN_PATH}"
+)
 
-"${CXX_BIN}" -std=c++20 \
-    -I"${INSTALL_ROOT}/include" \
-    "${WORK_DIR}/consumer_fixture.cpp" \
-    -ldl \
-    -o "${WORK_DIR}/consumer_fixture"
+require_path "${PLUGIN_PATH}"
 
-"${WORK_DIR}/consumer_fixture" "${WORK_DIR}/install_layout_consumer.so"
+if ! grep -F "${INSTALL_ROOT}/include/obelisk/ObeliskApi.h" "${WORK_DIR}/consumer_plugin.d" >/dev/null; then
+    echo "SDK consumer did not include ObeliskApi.h from the installed SDK layout" >&2
+    cat "${WORK_DIR}/consumer_plugin.d" >&2
+    exit 1
+fi
+
+if grep -F "${REPO_DIR}/include/obelisk/ObeliskApi.h" "${WORK_DIR}/consumer_plugin.d" >/dev/null; then
+    echo "SDK consumer accidentally included ObeliskApi.h from the source tree" >&2
+    cat "${WORK_DIR}/consumer_plugin.d" >&2
+    exit 1
+fi
+
+(
+    cd "${WORK_DIR}"
+    "${CXX_BIN}" -std=c++20 \
+        -I"${INSTALL_ROOT}/include" \
+        consumer_fixture.cpp \
+        -ldl \
+        -o consumer_fixture
+)
+
+"${WORK_DIR}/consumer_fixture" "${PLUGIN_PATH}" "${CONFIG_DIR}" "${CONFIG_PATH}" "install-layout-test"
 
 echo "Install layout and public SDK consumer validation passed for ${INSTALL_ROOT}"
