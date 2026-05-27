@@ -426,6 +426,9 @@ namespace Obelisk::Hooks
         const ProcessEventChatReflection::Gate& gate = GetChatReflectionGate();
         if (!gate.Enabled())
             return;
+        const uint64_t limit = GetChatReflectionLogLimit();
+        if (!ProcessEventChatReflection::ShouldAttemptObservation(limit))
+            return;
 
         Obelisk::UE::RuntimeReflection::MemoryReader reader{RuntimeReflectionReader, nullptr};
         ProcessEventChatReflection::Attempt attempt =
@@ -438,7 +441,6 @@ namespace Obelisk::Hooks
         if (attempt.Status == ProcessEventChatReflection::AttemptStatus::Rejected)
         {
             const uint64_t rejectNumber = ++s_ReflectedChatRejects;
-            const uint64_t limit = GetChatReflectionLogLimit();
             if (ProcessEventChatReflection::ShouldLogObservation(rejectNumber, limit))
             {
                 OBELISK_INFO("Reflected chat rejected #{} fname_index={} function={} reason={}",
@@ -449,7 +451,6 @@ namespace Obelisk::Hooks
 
         const Obelisk::UE::ChatReflection::ChatInvocation& invocation = attempt.Invocation;
         const uint64_t callNumber = ++s_ReflectedChatCalls;
-        const uint64_t limit = GetChatReflectionLogLimit();
         if (!ProcessEventChatReflection::ShouldLogObservation(callNumber, limit))
             return;
 

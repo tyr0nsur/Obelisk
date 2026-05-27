@@ -99,7 +99,7 @@ experimental gate and log lines are present; it does not prove chat text capture
 
 `rejected_chat_lines` counts bounded reflection rejections when the runtime is built with
 that diagnostic path. `OBELISK_CHAT_REFLECTION_LOG_LIMIT=0` disables those experimental
-chat reflection observation logs.
+chat reflection observation logs and short-circuits the reflection observation work.
 
 `server_send_chat_message_lines` counts any log line mentioning `ServerSendChatMessage`,
 including the main `ProcessEvent` line and the send-mode summary. Use it as a pointer to

@@ -33,9 +33,14 @@ namespace Obelisk::Hooks::ProcessEventChatReflection
                nameIndex == 28549;
     }
 
+    bool ShouldAttemptObservation(uint64_t limit)
+    {
+        return limit != 0;
+    }
+
     bool ShouldLogObservation(uint64_t observationNumber, uint64_t limit)
     {
-        return limit != 0 && observationNumber != 0 && observationNumber <= limit;
+        return ShouldAttemptObservation(limit) && observationNumber != 0 && observationNumber <= limit;
     }
 
     Obelisk::UE::RuntimeReflection::ReadResult TryDecodeUtf32Field(

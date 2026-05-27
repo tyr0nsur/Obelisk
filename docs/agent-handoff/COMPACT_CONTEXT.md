@@ -387,7 +387,8 @@ python3 scripts/analyze_reflectionscanner_capture.py \
   allocate two temporary vectors/strings after stack cycle-guard hardening and need
   justification or bounded stack/small-vector storage before SDK promotion. Standalone
   UTF-32 decode reserves output and currently allows one allocation for a non-SSO fixture;
-  hook-like text logging currently shows four allocations in the text path. See
+  hook-like text logging currently shows four allocations in the text path.
+  `OBELISK_CHAT_REFLECTION_LOG_LIMIT=0` now short-circuits observation reflection work. See
   `docs/research/2026-05-27-chat-reflection-stack-cycle-guard.md`.
 - `scripts/check_chat_reflection_benchmark.py` gates benchmark output for allocation-free
   disabled/non-chat paths and documented matched/text ceilings. It is a local regression

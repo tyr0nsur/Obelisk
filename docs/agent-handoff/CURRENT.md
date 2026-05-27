@@ -372,7 +372,8 @@ Updated: 2026-05-27
   non-chat attempts allocation-free in the synthetic benchmark. Stack cycle detection in
   `RuntimeReflection::TryReadUFunction()` and UTF-8 output reservation lower matched chat
   to two allocations, standalone UTF-32 decode to one allocation, and hook-like text
-  logging to four allocations per iteration locally; see
+  logging to four allocations per iteration locally. `OBELISK_CHAT_REFLECTION_LOG_LIMIT=0`
+  now short-circuits observation reflection work; see
   `docs/research/2026-05-27-chat-reflection-stack-cycle-guard.md`.
 - fact: `scripts/check_chat_reflection_benchmark.py` gates local benchmark output so
   disabled/non-chat hook-like paths remain allocation-free and matched/text paths stay

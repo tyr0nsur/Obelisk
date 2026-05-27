@@ -280,6 +280,7 @@ namespace
         const Gate* ChatGate = nullptr;
         bool HasCallbacks = false;
         bool DecodeText = false;
+        uint64_t ChatLogLimit = 25;
     };
 
     bool RunHookLikePath(const HookLikeOptions& options,
@@ -297,6 +298,8 @@ namespace
 
         const Gate disabledGate = DisabledGate();
         const Gate& chatGate = options.ChatGate ? *options.ChatGate : disabledGate;
+        if (chatReflectionEnabled && !ShouldAttemptObservation(options.ChatLogLimit))
+            return true;
         Attempt attempt = TryIdentifyInvocation(chatGate, nameIndex, reader, function, params);
         if (attempt.Status != AttemptStatus::Matched)
             return attempt.Status == AttemptStatus::Disabled ||
@@ -423,6 +426,11 @@ int main(int argc, char** argv)
     RunCase("hook_like_enabled_non_chat", iterations, nonChatFixture.Context, [&] {
         return RunHookLikePath(
             {&gate, false, false}, nonChatReader, nonChatFixture.Function.data(), nonChatFixture.Params.data());
+    });
+
+    RunCase("hook_like_chat_limit_zero", iterations, fixture.Context, [&] {
+        return RunHookLikePath(
+            {&gate, false, false, 0}, reader, fixture.Function.data(), fixture.Params.data());
     });
 
     RunCase("hook_like_server_send_chat", iterations, fixture.Context, [&] {

@@ -31,6 +31,8 @@ header, reducing reallocations for non-SSO chat text without changing decode sem
 - Kept the existing `MaxProperties` and `NumParms` checks.
 - Added a fail-closed guard if `NumParms` exceeds the stack cycle guard capacity.
 - Reserved UTF-8 output capacity once the reflected `FString` char count is validated.
+- Added an explicit `OBELISK_CHAT_REFLECTION_LOG_LIMIT=0` short-circuit so observation
+  logging disabled at the gate does not run reflection work.
 - Rebuilt and ran focused reflection tests.
 - Rebuilt `chat_reflection_benchmark` and checked benchmark gates.
 
@@ -51,6 +53,7 @@ Observed synthetic benchmark allocation deltas:
 ```text
 hook_like_disabled allocations_per_iter=0
 hook_like_enabled_non_chat allocations_per_iter=0
+hook_like_chat_limit_zero allocations_per_iter=0
 server_send_chat_match allocations_per_iter=2
 server_send_chat_decode_utf32 allocations_per_iter=1
 hook_like_server_send_chat allocations_per_iter=2
@@ -66,7 +69,8 @@ standalone match/decode cases, not only hook-like cases.
 
 Confirmed. Stack cycle detection removes one temporary allocation from matched chat
 reflection paths, and decode reservation removes repeated string growth allocations while
-keeping disabled and non-chat paths allocation-free in the synthetic hook-like benchmark.
+keeping disabled, non-chat, and log-limit-zero paths allocation-free in the synthetic
+hook-like benchmark.
 
 ## Risks
 

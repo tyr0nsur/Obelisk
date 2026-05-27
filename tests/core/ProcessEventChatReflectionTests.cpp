@@ -247,6 +247,8 @@ namespace
 
     void TestObservationLogLimit()
     {
+        Require(!ShouldAttemptObservation(0), "zero chat reflection log limit should skip observation");
+        Require(ShouldAttemptObservation(1), "non-zero chat reflection log limit should allow observation");
         Require(!ShouldLogObservation(0, 25), "zero observation number should not log");
         Require(!ShouldLogObservation(1, 0), "zero chat reflection log limit should disable logs");
         Require(ShouldLogObservation(1, 1), "first observation should log at limit one");

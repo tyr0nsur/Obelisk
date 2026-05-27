@@ -17,6 +17,7 @@ server_send_chat_match iterations=100 ns_avg=459 reader_calls_per_iter=53 alloca
 server_send_chat_decode_utf32 iterations=100 ns_avg=240 reader_calls_per_iter=1 allocations=100 allocations_per_iter=1 accepted=100
 hook_like_disabled iterations=100 ns_avg=35 reader_calls_per_iter=0 allocations=0 allocations_per_iter=0 accepted=100
 hook_like_enabled_non_chat iterations=100 ns_avg=33 reader_calls_per_iter=1 allocations=0 allocations_per_iter=0 accepted=100
+hook_like_chat_limit_zero iterations=100 ns_avg=33 reader_calls_per_iter=1 allocations=0 allocations_per_iter=0 accepted=100
 hook_like_server_send_chat iterations=100 ns_avg=459 reader_calls_per_iter=54 allocations=200 allocations_per_iter=2 accepted=100
 hook_like_server_send_chat_text iterations=100 ns_avg=904 reader_calls_per_iter=55 allocations=400 allocations_per_iter=4 accepted=100
 """
