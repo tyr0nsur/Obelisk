@@ -1187,7 +1187,7 @@ namespace Obelisk::UE
                 return;
 
             std::thread([slots = std::move(slots)]() {
-                for (int iteration = 1; iteration <= 12; ++iteration)
+                for (int iteration = 1; iteration <= 120; ++iteration)
                 {
                     std::this_thread::sleep_for(std::chrono::seconds(5));
                     if (!Obelisk::Logger::IsInitialized())

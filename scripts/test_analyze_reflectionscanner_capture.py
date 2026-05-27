@@ -421,6 +421,24 @@ class ReflectionScannerAnalyzerStrictTests(unittest.TestCase):
         self.assertIn("Static FName root candidates: 1", result.stdout)
         self.assertIn("slot=0x5956f30", result.stdout)
 
+    def test_current_static_fname_root_core_shape_passes_strict(self) -> None:
+        result = self.run_analyzer(
+            [
+                static_fname_root_probe(
+                    table="0x2ae5c660",
+                    num_elements=0x4516E,
+                    num_chunks=0x12,
+                )
+            ],
+            "--strict",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Static FName root candidates: 1", result.stdout)
+        self.assertIn("slot=0x5956f30", result.stdout)
+        self.assertIn("elements=282990", result.stdout)
+        self.assertIn("chunks=18", result.stdout)
+
     def test_static_fname_root_bad_counts_fail_strict(self) -> None:
         result = self.run_analyzer(
             [static_fname_root_probe(num_elements=10, num_chunks=0)],

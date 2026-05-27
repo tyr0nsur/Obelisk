@@ -30,6 +30,19 @@ DEFAULT_CANDIDATES = [
     ("static_fname_bucket_array", 0x594E020),
 ]
 
+DEFAULT_FNAME_ROOT_SLOTS = [
+    ("static_fname_root_slot", 0x5956F30),
+]
+
+DEFAULT_FNAME_INDICES = [
+    ("None", 0),
+    ("ClientMessage", 4884),
+    ("ServerChat", 9619),
+]
+
+FNAME_CHUNK_SIZE = 0x4000
+GOBJECTS_POINTER_OFFSETS = (0x0, 0x8, 0x10, 0x18, 0x20)
+
 
 def is_relative_to(path: Path, parent: Path) -> bool:
     try:
@@ -94,7 +107,98 @@ def parse_candidate(value: str) -> tuple[str, int]:
     return f"candidate_{address:x}", address
 
 
-def write_gdb_command_file(path: Path, candidates: list[tuple[str, int]]) -> None:
+def parse_fname_index(value: str) -> tuple[str, int]:
+    if "=" in value:
+        label, raw_index = value.split("=", 1)
+        label = label.strip()
+        if not label:
+            raise argparse.ArgumentTypeError("FName index label must not be empty")
+        return label, parse_int(raw_index)
+    index = parse_int(value)
+    return f"fname_{index}", index
+
+
+def extend_candidate_dump_commands(
+    lines: list[str],
+    candidates: list[tuple[str, int]],
+) -> None:
+    for label, address in candidates:
+        lines.extend(
+            [
+                f'printf "\\n== candidate {label} @ 0x{address:x} ==\\n"',
+                f"x/16gx 0x{address:x}",
+                f"x/64bx 0x{address:x}",
+            ]
+        )
+
+
+def extend_fname_root_commands(
+    lines: list[str],
+    fname_root_slots: list[tuple[str, int]],
+    fname_indices: list[tuple[str, int]],
+) -> None:
+    for label, address in fname_root_slots:
+        lines.extend(
+            [
+                f'printf "\\n== fname root {label} slot @ 0x{address:x} ==\\n"',
+                f"x/gx 0x{address:x}",
+                f"set $fname_table = *(void**)0x{address:x}",
+                'printf "table = %p\\n", $fname_table',
+                "x/272gx $fname_table",
+                "x/wx ((char*)$fname_table)+0x800",
+                "x/wx ((char*)$fname_table)+0x804",
+            ]
+        )
+        for index_label, index in fname_indices:
+            chunk_index = index // FNAME_CHUNK_SIZE
+            chunk_offset = chunk_index * 8
+            entry_offset = (index % FNAME_CHUNK_SIZE) * 8
+            lines.extend(
+                [
+                    f'printf "\\n-- fname index {index_label} [{index}] --\\n"',
+                    f"set $fname_chunk = *(void**)(((char*)$fname_table)+0x{chunk_offset:x})",
+                    f"set $fname_entry = *(void**)(((char*)$fname_chunk)+0x{entry_offset:x})",
+                    'printf "chunk = %p entry = %p string =\\n", $fname_chunk, $fname_entry',
+                    "x/s ((char*)$fname_entry)+0x10",
+                    "x/8gx $fname_entry",
+                ]
+            )
+
+
+def extend_gobjects_candidate_commands(
+    lines: list[str],
+    gobjects_candidates: list[tuple[str, int]],
+) -> None:
+    for label, address in gobjects_candidates:
+        lines.extend(
+            [
+                f'printf "\\n== gobjects candidate {label} slot @ 0x{address:x} ==\\n"',
+                f"x/16gx 0x{address:x}",
+                f"x/32wx 0x{address:x}",
+                f"set $gobjects_root = *(void**)0x{address:x}",
+                'printf "root = %p\\n", $gobjects_root',
+                "x/96gx $gobjects_root",
+                "x/64wx $gobjects_root",
+            ]
+        )
+        for offset in GOBJECTS_POINTER_OFFSETS:
+            lines.extend(
+                [
+                    f'printf "\\n-- gobjects root+0x{offset:x} pointer preview --\\n"',
+                    f"set $gobjects_maybe_ptr = *(void**)(((char*)$gobjects_root)+0x{offset:x})",
+                    'printf "value = %p\\n", $gobjects_maybe_ptr',
+                    "x/16gx $gobjects_maybe_ptr",
+                ]
+            )
+
+
+def write_gdb_command_file(
+    path: Path,
+    candidates: list[tuple[str, int]],
+    fname_root_slots: list[tuple[str, int]],
+    fname_indices: list[tuple[str, int]],
+    gobjects_candidates: list[tuple[str, int]],
+) -> None:
     lines = [
         "set pagination off",
         "set confirm off",
@@ -108,14 +212,9 @@ def write_gdb_command_file(path: Path, candidates: list[tuple[str, int]]) -> Non
         "maintenance info sections ALLOBJ",
     ]
 
-    for label, address in candidates:
-        lines.extend(
-            [
-                f'printf "\\n== candidate {label} @ 0x{address:x} ==\\n"',
-                f"x/16gx 0x{address:x}",
-                f"x/64bx 0x{address:x}",
-            ]
-        )
+    extend_candidate_dump_commands(lines, candidates)
+    extend_fname_root_commands(lines, fname_root_slots, fname_indices)
+    extend_gobjects_candidate_commands(lines, gobjects_candidates)
 
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -165,6 +264,51 @@ def parse_args() -> argparse.Namespace:
         help="Do not include the current static FName root candidate addresses.",
     )
     parser.add_argument(
+        "--fname-root-slot",
+        action="append",
+        type=parse_candidate,
+        default=[],
+        metavar="LABEL=ADDR",
+        help=(
+            "Pointer slot to inspect as a legacy indirect FName table root. May be "
+            "repeated. Defaults to the current static FName root slot unless "
+            "--no-default-fname-roots is set."
+        ),
+    )
+    parser.add_argument(
+        "--no-default-fname-roots",
+        action="store_true",
+        help="Do not emit direct FName entry reads for the current static root slot.",
+    )
+    parser.add_argument(
+        "--fname-index",
+        action="append",
+        type=parse_fname_index,
+        default=[],
+        metavar="LABEL=INDEX",
+        help=(
+            "FName index to resolve from each FName root slot. May be repeated. "
+            "Defaults to None, ClientMessage, and ServerChat."
+        ),
+    )
+    parser.add_argument(
+        "--no-default-fname-indices",
+        action="store_true",
+        help="Do not include the default known FName clue indices.",
+    )
+    parser.add_argument(
+        "--gobjects-candidate",
+        action="append",
+        type=parse_candidate,
+        default=[],
+        metavar="LABEL=ADDR",
+        help=(
+            "Candidate GUObjectArray/GObjects global slot address to preview from the "
+            "core. May be repeated. Use --candidate for raw root/window dumps. This is "
+            "bounded triage only."
+        ),
+    )
+    parser.add_argument(
         "--skip-core-sha256",
         action="store_true",
         help="Skip hashing the core file when it is too large for a quick triage run.",
@@ -203,6 +347,15 @@ def main() -> int:
     if not args.no_default_candidates:
         candidates.extend(DEFAULT_CANDIDATES)
     candidates.extend(args.candidate)
+    fname_root_slots = []
+    if not args.no_default_fname_roots:
+        fname_root_slots.extend(DEFAULT_FNAME_ROOT_SLOTS)
+    fname_root_slots.extend(args.fname_root_slot)
+    fname_indices = []
+    if not args.no_default_fname_indices:
+        fname_indices.extend(DEFAULT_FNAME_INDICES)
+    fname_indices.extend(args.fname_index)
+    gobjects_candidates = list(args.gobjects_candidate)
 
     commands: dict[str, dict[str, object]] = {}
     try:
@@ -251,7 +404,13 @@ def main() -> int:
         with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as handle:
             gdb_commands = Path(handle.name)
         try:
-            write_gdb_command_file(gdb_commands, candidates)
+            write_gdb_command_file(
+                gdb_commands,
+                candidates,
+                fname_root_slots,
+                fname_indices,
+                gobjects_candidates,
+            )
             shutil.copy2(gdb_commands, output_dir / "gdb-core-commands.txt")
             commands["gdb_core"] = run_command(
                 [
@@ -305,6 +464,17 @@ def main() -> int:
         },
         "candidates": [
             {"label": label, "address": f"0x{address:x}"} for label, address in candidates
+        ],
+        "fname_root_slots": [
+            {"label": label, "address": f"0x{address:x}"}
+            for label, address in fname_root_slots
+        ],
+        "fname_indices": [
+            {"label": label, "index": index} for label, index in fname_indices
+        ],
+        "gobjects_candidates": [
+            {"label": label, "address": f"0x{address:x}"}
+            for label, address in gobjects_candidates
         ],
         "artifacts": {
             "binary_file": str(output_dir / "ShooterGameServer.file.txt"),

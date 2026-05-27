@@ -95,6 +95,11 @@ get_env() {
     printf '%s\n' "${env_dump}" | sed -n "s/^${name}=//p" | tail -n1
 }
 
+has_env() {
+    local name="$1"
+    printf '%s\n' "${env_dump}" | grep -E "^${name}=" >/dev/null
+}
+
 require_env() {
     local name="$1"
     local expected="$2"
@@ -110,7 +115,7 @@ forbid_env() {
     local name="$1"
     local actual
     actual="$(get_env "${name}")"
-    if [[ -n "${actual}" ]]; then
+    if has_env "${name}"; then
         echo "Forbidden ${name} is set to '${actual}'." >&2
         return 1
     fi

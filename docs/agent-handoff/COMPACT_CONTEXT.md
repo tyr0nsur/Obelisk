@@ -139,6 +139,12 @@ work from repository state instead of chat history.
   `num_elements=0x4516e`, `num_chunks=0x12`, `0 -> None`,
   `4884 -> ClientMessage`, and `9619 -> ServerChat`; see
   `docs/research/2026-05-27-arkserver-core-fname-evidence.md`.
+- Runtime scanner retest with corrected clues was still inconclusive through the old 60s
+  retry window: the slot pointed to `0x30752660`, but counters and clue reads stayed zero.
+  Static-root delayed retry has been extended to 10 minutes; see
+  `docs/research/2026-05-27-static-root-runtime-retry-capture.md`.
+- Core-pack tooling now supports direct FName entry reads and bounded
+  `--gobjects-candidate` previews for the next `GUObjectArray` investigation.
 - UE4 type reconstruction planning is captured in
   `docs/research/2026-05-27-ue4-type-reconstruction-roadmap.md`; keep the milestone
   order as `FName`, `GObjects`, `UFunction`, then bounded params.
@@ -230,8 +236,10 @@ python3 scripts/analyze_reflectionscanner_capture.py \
 
 - Ops: get permission to create or designate the isolated ARK debug instance; preferred
   plan is `arkserver-obelisk-debug`.
-- Reflection: deploy corrected FName clue indices and run a short static-root scanner
-  capture for `OBELISK_REFLECTION_STATIC_FNAME_ROOTS=0x5956f30`.
+- Reflection: deploy the 10-minute static-root retry build and run one scanner capture,
+  waiting at least 10 minutes before copying logs/analyzing strict mode.
+- GObjects: statically find candidate `GUObjectArray` slots, then inspect only those with
+  the enhanced core evidence pack.
 - Evidence: after any isolated scanner capture, run
   `scripts/build_reflection_evidence_pack.py` against copied logs and the matching binary
   before promoting candidates.

@@ -174,6 +174,14 @@ Updated: 2026-05-27
   `0x2ae5c660`, `num_elements=0x4516e`, `num_chunks=0x12`, index `0 -> None`,
   `4884 -> ClientMessage`, and `9619 -> ServerChat`. See
   `docs/research/2026-05-27-arkserver-core-fname-evidence.md`.
+- fact: A runtime static-root scanner capture with corrected clues stayed inconclusive
+  through the old 60s retry window: `0x5956f30` pointed to `0x30752660`, but counters and
+  clue reads were still zero. Static-root retries now use the same 10-minute window as
+  global watches; see `docs/research/2026-05-27-static-root-runtime-retry-capture.md`.
+- fact: `scripts/build_core_dump_evidence_pack.py` now emits direct FName-entry GDB reads
+  for known indices and accepts bounded `--gobjects-candidate LABEL=ADDR` previews for the
+  next `GObjects` reconstruction step. See
+  `docs/research/2026-05-27-core-gobjects-next-development.md`.
 - fact: A controlled Ragnarok dev capture on commit `5754fca` tested
   `OBELISK_REFLECTION_STATIC_FNAME_ROOTS=0x5956f30`. Startup probe rejected it with
   `table=0x0` and `reason=unreadable_table_header`; the server was then restarted without
@@ -225,9 +233,10 @@ Updated: 2026-05-27
 - next-step: Stop trying to promote chat UObject globals directly into GNames. Next FName
   work should use static discovery of the name table global or a bounded alternate name
   storage scanner, then validate with the analyzer.
-- next-step: Deploy the corrected ReflectionScanner clues and run a short scanner capture
-  with `OBELISK_REFLECTION_STATIC_FNAME_ROOTS=0x5956f30` to confirm analyzer strict mode
-  now accepts the static-root candidate.
+- next-step: Deploy the 10-minute static-root retry build, run one scanner capture, wait at
+  least 10 minutes, then analyze copied logs with `--strict`.
+- next-step: Search statically for one or more `GUObjectArray` candidate slots and inspect
+  them through `scripts/build_core_dump_evidence_pack.py --gobjects-candidate`.
 - next-step: After a repeat-confirmed `GNames` research candidate appears, generate
   `objdump -d -M intel` for the matching ShooterGameServer binary and run the analyzer with
   `--binary` plus `--objdump-xrefs`; inspect whether candidate `source_global` references

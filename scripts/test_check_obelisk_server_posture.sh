@@ -56,6 +56,14 @@ expect_failure scanner-forbidden \
 expect_success scanner-explicitly-allowed \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 102 --expect-stable --allow-scanner
 
+write_proc_fixture 107 "${stable_maps}" \
+    "OBELISK_INSTANCE_ID=arkserver" \
+    "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
+    "OBELISK_DISABLE_PLUGINS=1" \
+    "OBELISK_ENABLE_REFLECTION_SCANNER="
+expect_failure scanner-empty-env-forbidden \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 107 --expect-stable
+
 write_proc_fixture 103 "7f000000-7f001000 r-xp 00000000 00:00 0 /usr/lib/libc.so" \
     "OBELISK_INSTANCE_ID=arkserver" \
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
