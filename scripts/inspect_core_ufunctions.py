@@ -441,6 +441,28 @@ def inspect_array_inner_candidate(context: GObjectContext, property_address: int
     }
 
 
+def inspect_struct_type_candidate(context: GObjectContext, property_address: int) -> dict[str, object]:
+    struct_address = context.memory.read_ptr(property_address + 0x70)
+    if not struct_address:
+        return {
+            "status": "rejected",
+            "reject_reasons": ["null_struct_pointer"],
+            "struct": None,
+        }
+
+    resolved_struct = context.resolve_uobject_pointer(struct_address)
+    struct_summary = summarize_uobject(resolved_struct.get("uobject"))
+    return {
+        "status": "candidate"
+        if resolved_struct["status"] == "candidate-uobject"
+        else "rejected",
+        "reject_reasons": resolved_struct["reject_reasons"],
+        "struct": hex_or_none(struct_address),
+        "struct_type": struct_summary,
+        "membership_status": resolved_struct["status"],
+    }
+
+
 def inspect_property_chain(
     context: GObjectContext,
     *,
@@ -540,6 +562,8 @@ def inspect_property_chain(
             property_payload["enum_candidate"] = inspect_enum_candidate(context, current)
         if summary.get("class_name") == "ArrayProperty":
             property_payload["array_inner_candidate"] = inspect_array_inner_candidate(context, current)
+        if summary.get("class_name") == "StructProperty":
+            property_payload["struct_type_candidate"] = inspect_struct_type_candidate(context, current)
         properties.append(property_payload)
         if property_rejects:
             reject_reasons.append(f"property_{depth}_rejected")
@@ -793,6 +817,14 @@ def build_fixture_snapshot(
                     "reject_reasons": array_inner_candidate.get("reject_reasons", []),
                     "membership_status": array_inner_candidate.get("membership_status"),
                     "inner_property": array_inner_candidate.get("inner_property"),
+                }
+            struct_type_candidate = prop.get("struct_type_candidate")
+            if isinstance(struct_type_candidate, dict):
+                property_payload["struct_type_candidate"] = {
+                    "status": struct_type_candidate.get("status"),
+                    "reject_reasons": struct_type_candidate.get("reject_reasons", []),
+                    "membership_status": struct_type_candidate.get("membership_status"),
+                    "struct_type": struct_type_candidate.get("struct_type"),
                 }
             properties.append(property_payload)
 

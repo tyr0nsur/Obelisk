@@ -954,6 +954,7 @@ def build_core_fixture(path: Path) -> dict[str, int]:
         next_field=addrs["item_id_property"],
     )
     put_property_data(addrs["item_id_property"], offset=8, element_size=8)
+    put_ptr(addrs["item_id_property"] + 0x70, addrs["chat_message_outer"])
 
     put_function_data(
         addrs["allow_remote_add_to_inventory"],
@@ -1715,6 +1716,55 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
         )
         serialized = json.dumps(snapshot, sort_keys=True)
         self.assertNotIn(hex(addrs["mission_tags_inner_property"]), serialized)
+        self.assertNotIn(str(core), serialized)
+
+    def test_struct_property_reports_type_candidate(self) -> None:
+        target = self.inspect_single_by_name_outer("ServerRequestInventoryUseItem", "ShooterPlayerController")
+        struct_prop = target["property_chain"]["properties"][1]
+
+        self.assertEqual(struct_prop["summary"]["class_name"], "StructProperty")
+        struct_type = struct_prop["struct_type_candidate"]
+        self.assertEqual(struct_type["status"], "candidate")
+        self.assertEqual(struct_type["membership_status"], "candidate-uobject")
+        self.assertEqual(struct_type["reject_reasons"], [])
+        self.assertEqual(
+            struct_type["struct_type"],
+            {"name": "ChatMessage", "name_index": 7, "class_name": "Class"},
+        )
+
+    def test_fixture_snapshot_preserves_struct_type_candidate(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            core = Path(temp_dir) / "core"
+            addrs = build_core_fixture(core)
+            memory = inspector.uobjects.CoreMemory(core)
+            try:
+                payload = inspector.inspect_core(
+                    memory,
+                    gobjects=addrs["gobjects"],
+                    fname_root_slot=addrs["fname_root_slot"],
+                    object_addresses=[],
+                    indices=[],
+                    name_contains=["ServerRequestInventoryUseItem"],
+                    outer_contains=["ShooterPlayerController"],
+                    window_size=0xC0,
+                    max_object_scan=128,
+                )
+            finally:
+                memory.close()
+
+        snapshot = inspector.build_fixture_snapshot(payload)
+        struct_prop = snapshot["targets"][0]["property_chain"]["properties"][1]
+        self.assertEqual(
+            struct_prop["struct_type_candidate"],
+            {
+                "status": "candidate",
+                "reject_reasons": [],
+                "membership_status": "candidate-uobject",
+                "struct_type": {"name": "ChatMessage", "name_index": 7, "class_name": "Class"},
+            },
+        )
+        serialized = json.dumps(snapshot, sort_keys=True)
+        self.assertNotIn(hex(addrs["chat_message_outer"]), serialized)
         self.assertNotIn(str(core), serialized)
 
     def test_cli_json_output(self) -> None:
