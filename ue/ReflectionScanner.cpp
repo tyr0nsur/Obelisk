@@ -1290,4 +1290,9 @@ namespace Obelisk::UE
 
         StartDelayedGlobalProbe(std::move(watches), staticFNameRootSlots);
     }
+
+    void ReflectionScanner::RunStaticFNameRootProbe(const std::vector<uintptr_t>& slots)
+    {
+        ProbeStaticFNameRoots(slots);
+    }
 }

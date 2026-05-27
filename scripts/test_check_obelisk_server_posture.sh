@@ -94,4 +94,12 @@ write_proc_fixture 106 "${stable_maps}" \
 expect_failure debug-ptrace-forbidden \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 106 --expect-stable
 
+write_proc_fixture 108 "${stable_maps}" \
+    "OBELISK_INSTANCE_ID=arkserver" \
+    "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
+    "OBELISK_DISABLE_PLUGINS=1" \
+    "OBELISK_ENABLE_DEBUG_CONTROL=1"
+expect_failure debug-control-forbidden \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 108 --expect-stable
+
 echo "check_obelisk_server_posture offline tests passed"

@@ -13,7 +13,7 @@ Options:
   --pid <pid>               Check a specific process id instead of using pgrep.
   --proc-root <path>        Procfs root. Default: /proc. Intended for offline tests.
   --expect-stable           Require stable dev posture: ProcessEvent on, plugins off,
-                            ReflectionScanner/static sampling/native exec probes off.
+                            ReflectionScanner/debug control/native exec probes off.
   --allow-scanner           Allow OBELISK_ENABLE_REFLECTION_SCANNER=1.
   -h, --help                Show this help.
 EOF
@@ -146,6 +146,7 @@ if [[ "${EXPECT_STABLE}" == "1" ]]; then
     require_mapped_library "libobelisk.so"
     forbid_deleted_obelisk_mapping
     forbid_env OBELISK_DEBUG_ALLOW_PTRACE
+    forbid_env OBELISK_ENABLE_DEBUG_CONTROL
     forbid_env OBELISK_ENABLE_NATIVE_EXEC_PROBES
 
     if [[ "${ALLOW_SCANNER}" != "1" ]]; then

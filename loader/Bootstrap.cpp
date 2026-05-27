@@ -3,8 +3,14 @@
 #include <errno.h>
 #include <exception>
 #include <cstdlib>
+#include <chrono>
+#include <cctype>
 #include <filesystem>
+#include <fstream>
+#include <sstream>
 #include <string>
+#include <thread>
+#include <vector>
 #include <sys/prctl.h>
 #include "runtime/Logger.h"
 #include "hooks/HookManager.h"
@@ -42,6 +48,136 @@ static void ConfigureDebugPtrace()
     OBELISK_ERROR("Failed to enable debug ptrace attach: errno={} ({})", errno, std::strerror(errno));
 }
 
+static std::string SanitizePathComponent(const char* value, const char* fallback)
+{
+    if (!value || value[0] == '\0')
+        return fallback;
+
+    std::string sanitized;
+    for (unsigned char ch : std::string(value))
+    {
+        if (std::isalnum(ch) || ch == '_' || ch == '-')
+            sanitized.push_back(static_cast<char>(ch));
+    }
+
+    return sanitized.empty() ? fallback : sanitized;
+}
+
+static std::filesystem::path GetDebugControlDirectory()
+{
+    const char* root = std::getenv("OBELISK_ROOT");
+    const std::filesystem::path base = root && root[0] != '\0' ? std::filesystem::path(root) : std::filesystem::path(".");
+    const std::string instance = SanitizePathComponent(std::getenv("OBELISK_INSTANCE_ID"), "default");
+    return base / "state" / "instances" / instance;
+}
+
+static std::vector<uintptr_t> ParseAddressList(const std::string& contents)
+{
+    std::string normalized = contents;
+    for (char& ch : normalized)
+    {
+        if (ch == ',' || ch == ';')
+            ch = ' ';
+    }
+
+    std::vector<uintptr_t> addresses;
+    std::istringstream stream(normalized);
+    std::string token;
+    while (stream >> token)
+    {
+        try
+        {
+            size_t consumed = 0;
+            const unsigned long long value = std::stoull(token, &consumed, 0);
+            if (consumed == token.size() && value != 0)
+                addresses.push_back(static_cast<uintptr_t>(value));
+            else
+                OBELISK_WARN("Debug control ignored invalid address token '{}'.", token);
+        }
+        catch (const std::exception&)
+        {
+            OBELISK_WARN("Debug control ignored invalid address token '{}'.", token);
+        }
+    }
+
+    return addresses;
+}
+
+static void ProcessStaticFNameProbeRequest(const std::filesystem::path& requestPath)
+{
+    std::ifstream file(requestPath);
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::vector<uintptr_t> slots = ParseAddressList(buffer.str());
+    if (slots.empty())
+    {
+        OBELISK_WARN("Debug control static FName probe request had no valid slots: {}", requestPath.string());
+        return;
+    }
+
+    OBELISK_INFO("Debug control running static FName probe for {} slot(s) from {}.", slots.size(), requestPath.string());
+    Obelisk::UE::ReflectionScanner::RunStaticFNameRootProbe(slots);
+}
+
+static void MarkDebugControlRequestDone(const std::filesystem::path& requestPath)
+{
+    const auto now = std::chrono::system_clock::now().time_since_epoch();
+    const auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
+    const std::filesystem::path donePath = requestPath.string() + ".done." + std::to_string(millis);
+
+    std::error_code ec;
+    std::filesystem::rename(requestPath, donePath, ec);
+    if (ec)
+    {
+        OBELISK_WARN("Debug control could not archive request {}: {}", requestPath.string(), ec.message());
+        std::filesystem::remove(requestPath, ec);
+    }
+}
+
+static void StartDebugControlThread()
+{
+    const char* enabled = std::getenv("OBELISK_ENABLE_DEBUG_CONTROL");
+    if (!enabled || std::strcmp(enabled, "1") != 0)
+        return;
+
+    const std::filesystem::path controlDir = GetDebugControlDirectory();
+    std::error_code ec;
+    std::filesystem::create_directories(controlDir, ec);
+    if (ec)
+    {
+        OBELISK_ERROR("Debug control could not create {}: {}", controlDir.string(), ec.message());
+        return;
+    }
+
+    OBELISK_WARN("Debug control enabled. Watching {} for marker requests.", controlDir.string());
+    std::thread([controlDir]() {
+        const std::filesystem::path staticFNameProbePath = controlDir / "request-static-fname-probe";
+
+        while (Obelisk::Logger::IsInitialized())
+        {
+            std::error_code existsEc;
+            if (std::filesystem::exists(staticFNameProbePath, existsEc))
+            {
+                try
+                {
+                    ProcessStaticFNameProbeRequest(staticFNameProbePath);
+                }
+                catch (const std::exception& e)
+                {
+                    OBELISK_ERROR("Debug control static FName probe failed: {}", e.what());
+                }
+                catch (...)
+                {
+                    OBELISK_ERROR("Debug control static FName probe failed with unknown exception.");
+                }
+                MarkDebugControlRequestDone(staticFNameProbePath);
+            }
+
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+        }
+    }).detach();
+}
+
 // The constructor attribute ensures this function runs as soon as the shared library 
 // is loaded into the target process via LD_PRELOAD.
 __attribute__((constructor))
@@ -64,6 +200,7 @@ void Obelisk_Init()
     OBELISK_INFO("Starting runtime bootstrap...");
 
     ConfigureDebugPtrace();
+    StartDebugControlThread();
     
     // Initialize hooking engine
     Obelisk::Hooks::HookManager::Init();
