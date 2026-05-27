@@ -10,7 +10,7 @@ model for Obelisk.
 
 ## Reconstruction Order
 
-Do not jump straight to chat params. Build the type chain in this order:
+Do not jump straight to any gameplay module's params. Build the type chain in this order:
 
 1. `FName` entry decoding through `GNames` or `FNamePool`.
 2. `GUObjectArray`/`GObjects` enumeration.
@@ -33,7 +33,7 @@ Do not jump straight to chat params. Build the type chain in this order:
   point check.
 - Parameter buffers must be bounded by reflected `ParmsSize`.
 - `FString` decoding requires a validated layout for this binary. Do not accept arbitrary
-  readable pointer/length pairs as chat text.
+  readable pointer/length pairs as module text or names.
 - For the current validated ARK Linux hash, `FString` is an internal candidate of
   `{Data, ArrayNum, ArrayMax}` with UTF-32LE `TCHAR`; use
   `RuntimeReflection::TryDecodeFStringUtf32` only after reflected `StrProperty`
@@ -53,14 +53,13 @@ For each reconstructed field:
 ## Implementation Shape
 
 - Put reusable structs and guarded readers under `ue/`.
-- Current internal layers are `ue/RuntimeReflection.{h,cpp}` for bounded type reads and
-  `ue/ChatReflection.{h,cpp}` for `ServerChat`/`ServerChatTo`/`ServerChatToPlayer` plus
-  `ServerSendChatMessage` recognition. Runtime text logging, when explicitly enabled, is
-  decoded through `ProcessEventChatReflection` into sanitized log output and must remain
-  internal until SDK ownership gates are complete.
-- `ServerSendChatMessage.SendMode` is a reflected `ByteProperty` at offset `0x10` with
-  `EChatSendMode` values `0 GlobalChat`, `1 GlobalTribeChat`, `2 LocalChat`,
-  `3 AllianceChat`; values `>=4` are invalid for logging/dispatch.
+- Current internal layers include `ue/RuntimeReflection.{h,cpp}` for bounded type reads
+  and module-specific recognizers such as chat, inventory, structures, and buffs. Keep
+  recognizers internal until second-source evidence, copied-data ownership, and SDK ABI
+  gates are complete.
+- Historical chat work proved the pattern for reflected strings/enums and dispatcher
+  ownership. Treat those details as module evidence in `docs/research/`, not as the active
+  reconstruction center.
 - Keep scanners gated and bounded.
 - Log candidate scores and reasons, not just addresses.
 - Prefer analyzer fixtures before runtime reads.
@@ -81,10 +80,11 @@ For each reconstructed field:
 
 - Core evidence has already produced a binary-hash-scoped FName table, `GUObjectArray`
   candidate, UObject enumeration, UFunction property chains, and internal runtime readers.
-- The active blocker for chat is not more raw scanning or another Ragnarok hit; it is a
-  controlled TheIsland A/B runtime validation plus copied-data ownership and ABI/lifecycle
-  gates before public SDK promotion.
-- The deployed recognizer already logs accepted `send_mode` and `send_mode_name`; keep
-  future dispatch bounded to `EChatSendMode` `0..3`.
-- Do not promote decoded chat text to public SDK until the TheIsland validation confirms
-  reflected params and sanitized text logging under the explicit text gate.
+- The active blocker for public module APIs is not more raw scanning; it is second-source
+  reflection evidence, copied-data ownership, callback lifecycle, ABI layout tests,
+  installed SDK consumer coverage, and approved isolated runtime validation.
+- Candidate module recognizers for inventory, structures, buffs, dinos, tribes, missions,
+  transfers, admin, and chat must stay internal until the common promotion gates pass.
+- Use sanitized snapshots and `compare_reflection_snapshots.py --target <Outer.Name>` to
+  compare semantic layouts before accepting any UFunction or ScriptStruct shape beyond
+  candidate-only.

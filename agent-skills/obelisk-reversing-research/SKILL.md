@@ -1,11 +1,13 @@
 ---
 name: obelisk-reversing-research
-description: "Use when researching ARK/UE4 internals for Obelisk: FName/GNames/GObjects, UFunction discovery, ProcessEvent fname_index mapping, ReflectionScanner analysis, chat/event decoding, and safe live-server experiments."
+description: "Use when researching ARK/UE4 internals for Obelisk: FName/GNames/GObjects, UFunction/ScriptStruct discovery, ProcessEvent fname_index mapping, ReflectionScanner analysis, module recognizers, and safe debug-server experiments."
 ---
 
 # Obelisk Reversing Research
 
-Use this skill for UE4/ARK research and experimental plugin work. Keep runtime-core edits out of scope unless the research proves a required ABI or hook change.
+Use this skill for UE4/ARK research, offline reversing, and explicitly approved debug
+experiments. Keep runtime-core edits out of scope unless the research proves a required
+ABI or hook change.
 
 ## Scope
 
@@ -60,15 +62,9 @@ Own these areas:
 ## Safe Experiment Pattern
 
 Do not use Ragnarok for new reversing/runtime experiments while player performance testing
-is active. For low-risk controlled runtime validation, start with TheIsland core stable and
-plugins disabled:
-
-```bash
-mkdir -p /servidor/ark/obelisk/state/instances/arkserver2
-touch /servidor/ark/obelisk/state/instances/arkserver2/enable-process-event-hook
-touch /servidor/ark/obelisk/state/instances/arkserver2/disable-plugins
-./arkserver2 restart
-```
+is active. For low-risk controlled runtime validation, first obtain explicit approval for
+the target instance, markers, restart window, and rollback plan. TheIsland is the
+debug/development fallback, not automatic permission to restart or edit markers.
 
 On production Ragnarok, stop unless there is an explicit maintenance window. Chat
 discovery has been unstable and must not be enabled on the live map as the normal
@@ -124,4 +120,6 @@ posture before doing more code or agent work.
 3. Locate GObjects and enumerate UFunction objects.
 4. Register callbacks by function name, not raw index.
 5. Decode function params from UProperty metadata.
-6. Replace raw FString probing with reflected param decoding.
+6. Compare sanitized UFunction/ScriptStruct snapshots against a second source before
+   promoting module recognizers.
+7. Replace raw FString and arbitrary param probing with reflected param decoding.
