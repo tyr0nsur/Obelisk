@@ -263,6 +263,9 @@ Updated: 2026-05-27
   readable ranges from `/proc/self/maps`, with `MemoryTests` covering invalid pointers,
   overflow, and `PROT_NONE`; see
   `docs/research/2026-05-27-isreadable-dev-null-hotpath.md`.
+- fact: Commit `257f432` with maps-backed `Memory::IsReadable` is deployed to
+  `/servidor/ark/obelisk`; `arkserver` restarted cleanly as PID `3243871` with stable
+  posture.
 
 ## Rejected Or Unsafe
 
