@@ -178,6 +178,10 @@ Updated: 2026-05-27
   candidate-only player/controller surfaces for inventory, dinos, structures, tribe,
   transfer, notifications, and admin. Keep these offline until second-core/property-chain
   validation and SDK ownership gates are satisfied.
+- fact: `docs/research/2026-05-27-primalitem-function-inventory.md` identifies
+  candidate-only item surfaces for equip/use, remote inventory, crafting, repair,
+  durability, and item NetExec. Narrow filters are required: broad `Use` matching pulled
+  unrelated reflected objects with implausible property chains.
 - fact: ReflectionScanner now has opt-in FName rejection evidence behind
   `OBELISK_REFLECTION_LOG_FNAME_REJECTS=1`, and the analyzer records
   `fname_reject_count`, `fname_reject_reason_counts`, and `fname_rejects`; see
