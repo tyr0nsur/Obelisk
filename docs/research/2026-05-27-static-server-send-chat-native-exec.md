@@ -144,6 +144,18 @@ probable runtime values `0=GlobalChat`, `1=GlobalTribeChat`, `2=LocalChat`, and
 4. Re-run `scripts/verify_chat_reflection_constants.py` and this static registration
    check after any ARK binary hash change.
 
+Update after tooling hardening:
+
+- `scripts/verify_chat_reflection_constants.py` now includes this cross-check in the
+  repeatable offline path: `ServerSendChatMessage` native exec candidate `0x154a600`,
+  executable segment membership, and the six `EChatSendMode` enum names read through the
+  `ByteProperty SendMode` enum pointer.
+- On the existing offline core
+  `/servidor/ark/obelisk/dumps/arkserver-20260527T031311Z/core/arkserver-20260527T031311Z.2902200`,
+  the extended verifier returns `status=ok` for those checks.
+- This remains evidence for the reflected `ProcessEvent` path only. Do not hook or patch
+  `0x154a600`.
+
 ## Skill Updates Needed
 
 None. This reinforces the existing static/core-first workflow and live native-exec probe

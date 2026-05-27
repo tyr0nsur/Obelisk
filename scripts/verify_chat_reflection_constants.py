@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import struct
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,6 +24,15 @@ import inspect_core_ufunctions as inspector  # noqa: E402
 
 
 CHAT_REFLECTION_SOURCE = REPO_ROOT / "ue" / "ChatReflection.cpp"
+DEFAULT_SERVER_SEND_CHAT_NATIVE_EXEC = 0x154A600
+EXPECTED_SEND_MODE_NAMES = (
+    "EChatSendMode::GlobalChat",
+    "EChatSendMode::GlobalTribeChat",
+    "EChatSendMode::LocalChat",
+    "EChatSendMode::AllianceChat",
+    "EChatSendMode::MAX",
+    "EChatSendMode::EChatSendMode_MAX",
+)
 DEFAULT_TARGETS = (
     "ServerChat",
     "ServerChatTo",
@@ -214,6 +224,33 @@ def _parse_hex_address(value: object) -> int | None:
     return int(value, 16)
 
 
+def _read_i32(memory: uobjects.CoreMemory, address: int) -> int | None:
+    data = memory.read(address, 4)
+    return None if data is None else struct.unpack("<i", data)[0]
+
+
+def _read_send_mode_enum(memory: uobjects.CoreMemory, fname_table: int | None, property_address: int) -> dict[str, object]:
+    enum_address = memory.read_ptr(property_address + 0x70)
+    names_address = memory.read_ptr(enum_address + 0x40) if enum_address else None
+    count = _read_i32(memory, enum_address + 0x48) if enum_address else None
+    names: list[str | None] = []
+    if names_address and count is not None and 0 <= count <= 32:
+        for index in range(count):
+            raw = memory.read(names_address + index * 8, 8)
+            if raw is None:
+                names.append(None)
+                continue
+            name_index, name_number = struct.unpack("<ii", raw)
+            names.append(uobjects.resolve_fname(memory, fname_table, name_index, name_number).text)
+
+    return {
+        "enum": f"0x{enum_address:x}" if enum_address else None,
+        "names": f"0x{names_address:x}" if names_address else None,
+        "count": count,
+        "values": names,
+    }
+
+
 def verify_core(
     memory: uobjects.CoreMemory,
     *,
@@ -222,6 +259,7 @@ def verify_core(
     fname_root_slot: int,
     max_object_scan: int,
     window_size: int,
+    expected_server_send_chat_native: int | None,
 ) -> dict[str, object]:
     indices = _candidate_function_indices(
         memory,
@@ -347,6 +385,44 @@ def verify_core(
                     class_summary.get("internal_index") if class_summary else None,
                 )
 
+        if function_name == "ServerSendChatMessage":
+            function_address = _parse_hex_address(target.get("object"))
+            native_exec = memory.read_ptr(function_address + 0xA8) if function_address else None
+            native_segment = memory.segment_for_vaddr(native_exec, 1) if native_exec else None
+            _add_check(
+                checks,
+                native_exec == expected_server_send_chat_native,
+                "native exec candidate",
+                f"0x{expected_server_send_chat_native:x}" if expected_server_send_chat_native is not None else None,
+                f"0x{native_exec:x}" if native_exec is not None else None,
+            )
+            _add_check(
+                checks,
+                bool(native_segment and native_segment.flags & 0x1),
+                "native exec segment executable",
+                True,
+                bool(native_segment and native_segment.flags & 0x1),
+            )
+
+            send_mode_property = None
+            for index, field in enumerate(expected.fields):
+                if field.field == "SendMode" and index < len(properties) and isinstance(properties[index], dict):
+                    send_mode_property = properties[index]
+                    break
+            send_mode_property_address = _parse_hex_address(send_mode_property.get("address")) if send_mode_property else None
+            enum_payload = (
+                _read_send_mode_enum(memory, fname_table, send_mode_property_address)
+                if send_mode_property_address is not None
+                else {"values": []}
+            )
+            _add_check(
+                checks,
+                tuple(enum_payload.get("values") or ()) == EXPECTED_SEND_MODE_NAMES,
+                "SendMode enum values",
+                list(EXPECTED_SEND_MODE_NAMES),
+                enum_payload.get("values"),
+            )
+
         status = "ok" if all(check["status"] == "ok" for check in checks) else "mismatch"
         function_results.append(
             {
@@ -403,6 +479,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--fname-root-slot", type=parse_int, default=uobjects.DEFAULT_FNAME_ROOT_SLOT)
     parser.add_argument("--max-object-scan", type=int, default=inspector.DEFAULT_MAX_OBJECT_SCAN)
     parser.add_argument("--window-size", type=parse_int, default=inspector.DEFAULT_WINDOW_SIZE)
+    parser.add_argument(
+        "--expected-server-send-chat-native",
+        type=parse_int,
+        default=DEFAULT_SERVER_SEND_CHAT_NATIVE_EXEC,
+        help="Binary-hash-scoped native exec pointer used only as offline cross-validation evidence.",
+    )
     parser.add_argument("--json", action="store_true")
     return parser.parse_args()
 
@@ -424,6 +506,7 @@ def main() -> int:
             fname_root_slot=args.fname_root_slot,
             max_object_scan=args.max_object_scan,
             window_size=args.window_size,
+            expected_server_send_chat_native=args.expected_server_send_chat_native,
         )
     finally:
         memory.close()

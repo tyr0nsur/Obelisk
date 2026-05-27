@@ -14,8 +14,8 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 import enumerate_core_uobjects as enum
+import scan_core_fname_tables as scanner
 import verify_chat_reflection_constants as verifier
-from test_scan_core_fname_tables import write_minimal_elf64_core
 
 
 CHAT_REFLECTION_CPP = """
@@ -205,11 +205,55 @@ constexpr ChatFunctionSpec kOnServerChatMessageDelegateSpec{
 """
 
 
+def write_chat_core_with_code_segment(path: Path, data_vaddr: int, data_segment: bytes, code_vaddr: int, code_segment: bytes) -> None:
+    header_size = 64
+    phoff = header_size
+    phentsize = 56
+    data_offset = 0x1000
+    code_offset = data_offset + ((len(data_segment) + 0xFFF) & ~0xFFF)
+
+    data = bytearray(code_offset + len(code_segment))
+    data[0:4] = b"\x7fELF"
+    data[4] = 2
+    data[5] = 1
+    data[6] = 1
+    struct.pack_into("<H", data, 0x10, 4)
+    struct.pack_into("<H", data, 0x12, 0x3E)
+    struct.pack_into("<I", data, 0x14, 1)
+    struct.pack_into("<Q", data, 0x20, phoff)
+    struct.pack_into("<H", data, 0x34, header_size)
+    struct.pack_into("<H", data, 0x36, phentsize)
+    struct.pack_into("<H", data, 0x38, 2)
+
+    for slot, flags, offset, vaddr, segment in (
+        (0, 6, data_offset, data_vaddr, data_segment),
+        (1, 5, code_offset, code_vaddr, code_segment),
+    ):
+        struct.pack_into(
+            "<IIQQQQQQ",
+            data,
+            phoff + slot * phentsize,
+            scanner.PT_LOAD,
+            flags,
+            offset,
+            vaddr,
+            0,
+            len(segment),
+            len(segment),
+            0x1000,
+        )
+        data[offset : offset + len(segment)] = segment
+
+    path.write_bytes(data)
+
+
 def build_chat_core_fixture(path: Path, *, mismatch_message_offset: bool = False) -> dict[str, int]:
     base = 0x10000000
+    code_base = 0x154A000
     segment = bytearray(0x180000)
     addrs = {
         "base": base,
+        "native_exec": 0x154A600,
         "fname_root_slot": base + 0x100,
         "fname_table": base + 0x1000,
         "fname_chunk0": base + 0x3000,
@@ -257,6 +301,8 @@ def build_chat_core_fixture(path: Path, *, mismatch_message_offset: bool = False
         "delegate_message_text": base + 0x41300,
         "delegate_receiver_team_id": base + 0x41400,
         "delegate_receiver_player_id": base + 0x41500,
+        "send_mode_enum": base + 0x41600,
+        "send_mode_enum_names": base + 0x41700,
     }
 
     def put_ptr(address: int, value: int) -> None:
@@ -297,7 +343,7 @@ def build_chat_core_fixture(path: Path, *, mismatch_message_offset: bool = False
         put_u32(item + 0x8, 0)
         put_i32(item + 0xC, 1000 + index)
 
-    def put_function(address: int, first_property: int, num_parms: int, parms_size: int) -> None:
+    def put_function(address: int, first_property: int, num_parms: int, parms_size: int, native_exec: int = 0) -> None:
         put_ptr(address + 0x38, first_property)
         put_i32(address + 0x40, parms_size)
         put_i32(address + 0x44, 8)
@@ -306,6 +352,8 @@ def build_chat_core_fixture(path: Path, *, mismatch_message_offset: bool = False
         put_u16(address + 0x96, num_parms)
         put_u16(address + 0x98, parms_size)
         put_u16(address + 0x9A, 0xFFFF)
+        if native_exec:
+            put_ptr(address + 0xA8, native_exec)
 
     def put_property(address: int, next_field: int, offset: int, element_size: int = 0x10) -> None:
         put_ptr(address + 0x28, next_field)
@@ -349,6 +397,12 @@ def build_chat_core_fixture(path: Path, *, mismatch_message_offset: bool = False
         28549: b"OnServerChatMessage__DelegateSignature\x00",
         28550: b"ReceiverPlayerID\x00",
         28551: b"ReceiverTeamId\x00",
+        30000: b"EChatSendMode::GlobalChat\x00",
+        30001: b"EChatSendMode::GlobalTribeChat\x00",
+        30002: b"EChatSendMode::LocalChat\x00",
+        30003: b"EChatSendMode::AllianceChat\x00",
+        30004: b"EChatSendMode::MAX\x00",
+        30005: b"EChatSendMode::EChatSendMode_MAX\x00",
     }.items():
         put_entry(index, text)
 
@@ -552,7 +606,7 @@ def build_chat_core_fixture(path: Path, *, mismatch_message_offset: bool = False
     put_function(addrs["server_chat"], addrs["server_chat_message"], 1, 0x10)
     put_function(addrs["server_chat_to"], addrs["server_chat_to_steam"], 2, 0x20)
     put_function(addrs["server_chat_to_player"], addrs["server_chat_to_player_name"], 2, 0x20)
-    put_function(addrs["server_send_chat_message"], addrs["server_send_chat_chat_message"], 2, 0x11)
+    put_function(addrs["server_send_chat_message"], addrs["server_send_chat_chat_message"], 2, 0x11, addrs["native_exec"])
     put_function(addrs["client_chat_message"], addrs["client_chat_chat"], 1, 0x90)
     put_function(addrs["client_server_chat_direct_message"], addrs["client_server_direct_message_text"], 3, 0x21)
     put_function(addrs["client_server_chat_message"], addrs["client_server_message_text"], 3, 0x21)
@@ -565,6 +619,12 @@ def build_chat_core_fixture(path: Path, *, mismatch_message_offset: bool = False
     put_property(addrs["server_chat_to_player_message"], 0, 0x10)
     put_property(addrs["server_send_chat_chat_message"], addrs["server_send_chat_send_mode"], 0)
     put_property(addrs["server_send_chat_send_mode"], 0, 0x10, 0x1)
+    put_ptr(addrs["server_send_chat_send_mode"] + 0x70, addrs["send_mode_enum"])
+    put_ptr(addrs["send_mode_enum"] + 0x40, addrs["send_mode_enum_names"])
+    put_i32(addrs["send_mode_enum"] + 0x48, 6)
+    for enum_value, name_index in enumerate(range(30000, 30006)):
+        put_i32(addrs["send_mode_enum_names"] + enum_value * 8, name_index)
+        put_i32(addrs["send_mode_enum_names"] + enum_value * 8 + 4, 0)
     put_property(addrs["client_chat_chat"], 0, 0, 0x90)
     put_property(addrs["client_server_direct_message_text"], addrs["client_server_direct_message_color"], 0)
     put_property(addrs["client_server_direct_message_color"], addrs["client_server_direct_b_is_bold"], 0x10)
@@ -581,7 +641,7 @@ def build_chat_core_fixture(path: Path, *, mismatch_message_offset: bool = False
     put_property(addrs["delegate_receiver_team_id"], addrs["delegate_receiver_player_id"], 0x10, 0x4)
     put_property(addrs["delegate_receiver_player_id"], 0, 0x14, 0x4)
 
-    write_minimal_elf64_core(path, base, bytes(segment))
+    write_chat_core_with_code_segment(path, base, bytes(segment), code_base, b"\x90" * 0x1000)
     return addrs
 
 
@@ -603,6 +663,7 @@ class VerifyChatReflectionConstantsTests(unittest.TestCase):
                     fname_root_slot=addrs["fname_root_slot"],
                     max_object_scan=30000,
                     window_size=0xC0,
+                    expected_server_send_chat_native=addrs["native_exec"],
                 )
             finally:
                 memory.close()
@@ -620,6 +681,17 @@ class VerifyChatReflectionConstantsTests(unittest.TestCase):
         self.assertEqual(checks[("ServerSendChatMessage", "FName index")]["observed"], 2697)
         self.assertEqual(checks[("ServerSendChatMessage", "SendMode[1] property class")]["observed"], "ByteProperty")
         self.assertEqual(checks[("ServerSendChatMessage", "SendMode[1] element size")]["observed"], 1)
+        self.assertEqual(checks[("ServerSendChatMessage", "native exec candidate")]["observed"], "0x154a600")
+        self.assertTrue(checks[("ServerSendChatMessage", "native exec segment executable")]["observed"])
+        self.assertEqual(
+            checks[("ServerSendChatMessage", "SendMode enum values")]["observed"][:4],
+            [
+                "EChatSendMode::GlobalChat",
+                "EChatSendMode::GlobalTribeChat",
+                "EChatSendMode::LocalChat",
+                "EChatSendMode::AllianceChat",
+            ],
+        )
         self.assertEqual(checks[("SendServerChatMessage", "FName index")]["observed"], 9801)
         self.assertEqual(checks[("SendServerChatMessage", "ReceiverTeamId[3] property class")]["observed"], "IntProperty")
         self.assertEqual(checks[("SendServerChatMessage", "ReceiverPlayerID[4] offset")]["observed"], 0x28)
@@ -643,6 +715,7 @@ class VerifyChatReflectionConstantsTests(unittest.TestCase):
                     fname_root_slot=addrs["fname_root_slot"],
                     max_object_scan=30000,
                     window_size=0xC0,
+                    expected_server_send_chat_native=addrs["native_exec"],
                 )
             finally:
                 memory.close()
@@ -675,6 +748,8 @@ class VerifyChatReflectionConstantsTests(unittest.TestCase):
                     hex(addrs["gobjects"]),
                     "--fname-root-slot",
                     hex(addrs["fname_root_slot"]),
+                    "--expected-server-send-chat-native",
+                    hex(addrs["native_exec"]),
                     "--json",
                 ],
                 check=True,

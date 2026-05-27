@@ -183,6 +183,8 @@ work from repository state instead of chat history.
   `ue/ChatReflection.cpp` constants against offline core evidence for `ServerChat*`,
   `ServerSendChatMessage`, and the metadata-only `ShooterPlayerController` candidates
   `ClientChatMessage`, `ClientServerChatDirectMessage`, and `ClientServerChatMessage`.
+  It also cross-checks `ServerSendChatMessage` native exec candidate `0x154a600`,
+  executable segment membership, and `EChatSendMode` enum names from the core.
   It passed against
   `/servidor/ark/obelisk/dumps/arkserver-20260527T031311Z/core/arkserver-20260527T031311Z.2902200`
   with `--max-object-scan 30000`; rerun it before promoting chat reflection constants for
