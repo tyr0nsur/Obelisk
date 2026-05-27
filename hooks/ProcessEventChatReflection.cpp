@@ -85,9 +85,7 @@ namespace Obelisk::Hooks::ProcessEventChatReflection
         {
             return {
                 AttemptStatus::NonChatFunction,
-                Obelisk::UE::RuntimeReflection::ReadResult::Fail(
-                    Obelisk::UE::RuntimeReflection::ReadStatus::Implausible,
-                    "UFunction FName index is not a supported chat target"),
+                {Obelisk::UE::RuntimeReflection::ReadStatus::Implausible, {}},
                 {},
             };
         }

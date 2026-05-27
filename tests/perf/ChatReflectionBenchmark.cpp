@@ -5,12 +5,56 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <new>
 #include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
+
+namespace
+{
+    thread_local bool g_CountAllocations = false;
+    thread_local uint64_t g_AllocationCount = 0;
+}
+
+void* operator new(std::size_t size)
+{
+    if (void* ptr = std::malloc(size == 0 ? 1 : size))
+    {
+        if (g_CountAllocations)
+            ++g_AllocationCount;
+        return ptr;
+    }
+    throw std::bad_alloc();
+}
+
+void* operator new[](std::size_t size)
+{
+    return operator new(size);
+}
+
+void operator delete(void* ptr) noexcept
+{
+    std::free(ptr);
+}
+
+void operator delete[](void* ptr) noexcept
+{
+    std::free(ptr);
+}
+
+void operator delete(void* ptr, std::size_t) noexcept
+{
+    std::free(ptr);
+}
+
+void operator delete[](void* ptr, std::size_t) noexcept
+{
+    std::free(ptr);
+}
 
 namespace
 {
@@ -229,7 +273,7 @@ namespace
 
     struct HookLikeOptions
     {
-        Gate ChatGate;
+        const Gate* ChatGate = nullptr;
         bool HasCallbacks = false;
         bool DecodeText = false;
     };
@@ -239,7 +283,7 @@ namespace
                          void* function,
                          void* params)
     {
-        const bool chatReflectionEnabled = options.ChatGate.Enabled();
+        const bool chatReflectionEnabled = options.ChatGate && options.ChatGate->Enabled();
         int32_t nameIndex = -1;
         if ((options.HasCallbacks || chatReflectionEnabled) &&
             !ReadNameIndexLikeHook(reader, function, nameIndex))
@@ -247,7 +291,9 @@ namespace
             return false;
         }
 
-        Attempt attempt = TryIdentifyInvocation(options.ChatGate, nameIndex, reader, function, params);
+        const Gate disabledGate = DisabledGate();
+        const Gate& chatGate = options.ChatGate ? *options.ChatGate : disabledGate;
+        Attempt attempt = TryIdentifyInvocation(chatGate, nameIndex, reader, function, params);
         if (attempt.Status != AttemptStatus::Matched)
             return attempt.Status == AttemptStatus::Disabled ||
                    attempt.Status == AttemptStatus::NonChatFunction;
@@ -288,6 +334,8 @@ namespace
         std::vector<uint64_t> samples;
         samples.reserve(static_cast<size_t>(iterations));
         uint64_t accepted = 0;
+        g_AllocationCount = 0;
+        g_CountAllocations = true;
         for (int i = 0; i < iterations; ++i)
         {
             auto start = std::chrono::steady_clock::now();
@@ -296,6 +344,7 @@ namespace
             samples.push_back(static_cast<uint64_t>(
                 std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count()));
         }
+        g_CountAllocations = false;
         std::sort(samples.begin(), samples.end());
         uint64_t total = 0;
         for (uint64_t sample : samples)
@@ -310,6 +359,7 @@ namespace
                   << " ns_p99=" << Percentile(samples, 0.99)
                   << " ns_max=" << samples.back()
                   << " reader_calls_per_iter=" << (context.Calls / static_cast<uint64_t>(iterations))
+                  << " allocations_per_iter=" << (g_AllocationCount / static_cast<uint64_t>(iterations))
                   << " accepted=" << accepted
                   << "\n";
     }
@@ -362,22 +412,22 @@ int main(int argc, char** argv)
 
     RunCase("hook_like_disabled", iterations, fixture.Context, [&] {
         return RunHookLikePath(
-            {disabledGate, false, false}, reader, fixture.Function.data(), fixture.Params.data());
+            {&disabledGate, false, false}, reader, fixture.Function.data(), fixture.Params.data());
     });
 
     RunCase("hook_like_enabled_non_chat", iterations, nonChatFixture.Context, [&] {
         return RunHookLikePath(
-            {gate, false, false}, nonChatReader, nonChatFixture.Function.data(), nonChatFixture.Params.data());
+            {&gate, false, false}, nonChatReader, nonChatFixture.Function.data(), nonChatFixture.Params.data());
     });
 
     RunCase("hook_like_server_send_chat", iterations, fixture.Context, [&] {
         return RunHookLikePath(
-            {gate, false, false}, reader, fixture.Function.data(), fixture.Params.data());
+            {&gate, false, false}, reader, fixture.Function.data(), fixture.Params.data());
     });
 
     RunCase("hook_like_server_send_chat_text", iterations, fixture.Context, [&] {
         return RunHookLikePath(
-            {gate, false, true}, reader, fixture.Function.data(), fixture.Params.data());
+            {&gate, false, true}, reader, fixture.Function.data(), fixture.Params.data());
     });
 
     return 0;

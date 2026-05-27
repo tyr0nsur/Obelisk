@@ -35,10 +35,10 @@ namespace Obelisk::Hooks::ProcessEventChatReflection
     struct Attempt
     {
         AttemptStatus Status = AttemptStatus::Disabled;
-        Obelisk::UE::RuntimeReflection::ReadResult Result =
-            Obelisk::UE::RuntimeReflection::ReadResult::Fail(
-                Obelisk::UE::RuntimeReflection::ReadStatus::Disabled,
-                "chat reflection is disabled");
+        Obelisk::UE::RuntimeReflection::ReadResult Result = {
+            Obelisk::UE::RuntimeReflection::ReadStatus::Disabled,
+            {},
+        };
         Obelisk::UE::ChatReflection::ChatInvocation Invocation;
     };
 
