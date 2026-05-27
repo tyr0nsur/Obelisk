@@ -23,10 +23,6 @@ static std::string GetPluginDirectory()
     if (root && root[0] != '\0')
         return (std::filesystem::path(root) / "plugins").string();
 
-    const char* legacy = std::getenv("OBELISK_ENABLE_LEGACY_PLUGIN_DIR");
-    if (legacy && std::strcmp(legacy, "1") == 0)
-        return "ObeliskPlugins";
-
     return "plugins";
 }
 

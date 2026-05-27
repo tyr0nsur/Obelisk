@@ -21,7 +21,7 @@ skill updates, or making work reproducible for contributors.
   `agent-skills/*/SKILL.md` in the same or next commit.
 - If a discovery is not ready for code, write it under `docs/research/`.
 - Research notes that depend on server behavior should record instance id, map, binary
-  hash, runtime flags, and whether markers were instance or legacy map markers.
+  hash, runtime flags, and active instance markers.
 
 ## Agent Coordination
 

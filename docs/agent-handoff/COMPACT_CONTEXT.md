@@ -24,7 +24,6 @@ work from repository state instead of chat history.
 - Ragnarok stable live posture:
   - `/servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook`
   - `/servidor/ark/obelisk/state/instances/arkserver/disable-plugins`
-  - legacy map markers are still accepted as fallback only
 - Treat both observed ARK instances as live/non-isolated until the operator explicitly says
   otherwise:
   - `arkserver` / Ragnarok
@@ -83,6 +82,7 @@ python3 scripts/analyze_reflectionscanner_capture.py --json /path/to/isolated/Ob
 
 - Never enable `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` on live servers.
 - Never enable raw chat discovery on live Ragnarok as a normal test.
+- Do not reintroduce legacy map markers or binary-local `ObeliskPlugins` fallback.
 - Do not treat observed FName indices such as `9619` or `9622` as stable API contracts.
 - Do not promote plugins with HTTP, threads, or file readers until they implement and
   validate `ObeliskPlugin_Shutdown()`.

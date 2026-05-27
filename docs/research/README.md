@@ -3,9 +3,9 @@
 This directory stores reproducible investigation notes for Obelisk runtime, UE4 reflection,
 ARK server operations, and plugin experiments.
 
-Notes written before `OBELISK_INSTANCE_ID` may mention map-based marker files and
+Notes written before `OBELISK_INSTANCE_ID` may mention obsolete map-based marker files and
 root-level map logs. New research should record the LinuxGSM instance id, map, ARK binary
-hash, runtime flags, and whether any legacy map marker fallback was used.
+hash, and runtime flags.
 
 ## Index
 

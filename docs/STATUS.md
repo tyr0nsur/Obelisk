@@ -19,7 +19,7 @@ contributor-facing summary, not a replacement for detailed research notes.
 | Central install root | Stable baseline | `/servidor/ark/obelisk` with `lib/`, `plugins/`, `config/plugins/`, `config/instances/`, `logs/`, and `state/`. |
 | LinuxGSM wrapper templates | Stable baseline | Versioned under `packaging/linuxgsm/`; copy to the ARK binary directory during a maintenance window. |
 | Installer plugin posture | Stable baseline | `scripts/install_obelisk.sh` installs only runtime libraries; plugins are activated only by copying `.so` files into `plugins/`. |
-| Per-instance runtime flags | Stable baseline | `OBELISK_INSTANCE_ID` selects logs and preferred markers under `state/instances/<id>/`; map markers remain legacy fallback. |
+| Per-instance runtime flags | Stable baseline | `OBELISK_INSTANCE_ID` selects logs and markers under `state/instances/<id>/`; map markers are obsolete. |
 | ProcessEvent hook | Stable baseline | Current Ragnarok posture enables the hook while disabling plugins. |
 | Plugin C ABI loading | Stable baseline | ABI is C-compatible and currently append-only for new metadata fields. |
 | Filtered ProcessEvent callbacks | Stable baseline | Prefer callbacks scoped by `FName` index over global callbacks. |

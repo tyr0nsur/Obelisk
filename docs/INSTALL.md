@@ -49,13 +49,6 @@ directory for plugin config is:
 The runtime loads every `.so` directly inside `/servidor/ark/obelisk/plugins/` on restart.
 If a plugin should not load, do not place it in `plugins/`.
 
-The old binary-local `ObeliskPlugins/` fallback is disabled by default. It exists only for
-manual legacy recovery with:
-
-```bash
-export OBELISK_ENABLE_LEGACY_PLUGIN_DIR=1
-```
-
 Useful installer flags:
 
 ```text
@@ -119,8 +112,8 @@ state/instances/<instance-id>/enable-process-event-hook
 state/instances/<instance-id>/disable-plugins
 ```
 
-Legacy map markers such as `enable-process-event-hook-ragnarok` still work as fallback
-compatibility, but new deployments should use instance markers.
+Map markers such as `enable-process-event-hook-ragnarok` are obsolete and are not read by
+the release wrapper.
 
 ## Logs
 
@@ -134,7 +127,8 @@ Runtime logs are written to:
 /servidor/ark/obelisk/logs/isolated-debug/
 ```
 
-If `OBELISK_INSTANCE_ID` is unset, logs fall back to the legacy root-level names.
+The LinuxGSM wrapper sets `OBELISK_INSTANCE_ID`. Custom launchers should set it explicitly
+before loading Obelisk.
 
 ## Current Safe Production Posture
 

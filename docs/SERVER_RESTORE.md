@@ -124,6 +124,6 @@ Expected safe Obelisk posture for development baseline:
 - Do not restore while a server is writing config.
 - Do not copy old binary-local `libobelisk.so` or `ObeliskPlugins/` back into the ARK
   binary directory.
-- Do not restore legacy map markers as the source of truth when instance markers exist.
+- Do not restore legacy map markers as the source of truth.
 - Do not reuse live cluster flags for a future isolated debug instance.
 - Do not activate raw discovery probes or ReflectionScanner as part of config recovery.

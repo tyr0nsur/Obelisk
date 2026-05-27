@@ -55,8 +55,7 @@ Expected logs:
 
 - Keep experimental plugins outside `plugins/` until an isolated server test passes.
 - Enable one marker/config gate at a time and record the exact change.
-- Prefer instance markers under `state/instances/<instance-id>/`; map markers are legacy
-  fallback only.
+- Use instance markers under `state/instances/<instance-id>/`; map markers are obsolete.
 - Never enable native exec probes on live servers.
 - Never enable `ReflectionScanner` on `arkserver` or `arkserver2` unless the operator has
   explicitly converted that instance into an isolated debug target.

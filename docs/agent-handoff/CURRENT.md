@@ -16,8 +16,7 @@ Updated: 2026-05-27
 - fact: Ragnarok stable baseline is ProcessEvent hook enabled with plugins disabled.
   Preferred markers are
   `/servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook` and
-  `/servidor/ark/obelisk/state/instances/arkserver/disable-plugins`; map markers remain
-  fallback only.
+  `/servidor/ark/obelisk/state/instances/arkserver/disable-plugins`.
 - fact: Runtime/chat baseline is documented in
   `docs/research/2026-05-27-runtime-and-chat-baseline.md`.
 - fact: Reflection/chat metadata audit added shared UE probe layouts and gated

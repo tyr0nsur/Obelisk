@@ -49,24 +49,22 @@ Ragnarok  -> OBELISK_INSTANCE_ID=arkserver
 TheIsland -> OBELISK_INSTANCE_ID=arkserver2
 ```
 
-and checks markers in this order:
+and checks markers only under:
 
 ```text
 state/instances/<instance-id>/<feature>
-state/<feature>-<instance-id>
-state/<feature>-<map>
 ```
 
 ## Marker State
 
-Current disk markers:
+Current disk markers before migration:
 
 ```text
 /servidor/ark/obelisk/state/enable-process-event-hook-ragnarok
 /servidor/ark/obelisk/state/disable-plugins-ragnarok
 ```
 
-Recommended instance-equivalent markers before restart:
+Required instance markers before restart:
 
 ```text
 /servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook
@@ -96,14 +94,23 @@ Optional safety marker for TheIsland while plugin development is settling:
      /servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ObeliskRun.sh
    ```
 
-3. Create instance markers while keeping map markers temporarily for fallback:
+3. Create instance markers:
 
    ```bash
    mkdir -p /servidor/ark/obelisk/state/instances/arkserver
    mkdir -p /servidor/ark/obelisk/state/instances/arkserver2
-   touch /servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook
-   touch /servidor/ark/obelisk/state/instances/arkserver/disable-plugins
-   touch /servidor/ark/obelisk/state/instances/arkserver2/disable-plugins
+  touch /servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook
+  touch /servidor/ark/obelisk/state/instances/arkserver/disable-plugins
+  touch /servidor/ark/obelisk/state/instances/arkserver2/disable-plugins
+  ```
+
+   Remove obsolete map markers after instance markers exist:
+
+   ```bash
+   rm -f /servidor/ark/obelisk/state/enable-process-event-hook-ragnarok
+   rm -f /servidor/ark/obelisk/state/disable-plugins-ragnarok
+   rm -f /servidor/ark/obelisk/state/enable-process-event-hook-theisland
+   rm -f /servidor/ark/obelisk/state/disable-plugins-theisland
    ```
 
 4. Restart one instance at a time through LinuxGSM:

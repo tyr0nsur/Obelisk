@@ -40,8 +40,7 @@ git status --short --ignored
 ```
 
 4. Update `CHANGELOG.md`.
-5. Confirm docs and wrappers prefer `state/instances/<instance-id>/` markers over legacy
-   map markers.
+5. Confirm docs and wrappers use `state/instances/<instance-id>/` markers only.
 6. Tag:
 
 ```bash
