@@ -82,6 +82,7 @@ class EvidencePack:
     manifest_path: Path
     manifest: dict[str, object]
     core: Path
+    core_sha256: str | None
     gobjects: int
     fname_root_slot: int
     binary_sha256: str | None
@@ -113,7 +114,12 @@ def _first_address(manifest: dict[str, object], key: str) -> int:
     return int(str(first["address"]), 0)
 
 
-def load_evidence_pack(path: Path, *, verify_binary_sha: bool = True) -> EvidencePack:
+def load_evidence_pack(
+    path: Path,
+    *,
+    verify_binary_sha: bool = True,
+    verify_core_sha: bool = True,
+) -> EvidencePack:
     manifest_path = _manifest_path(path)
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if not isinstance(manifest, dict):
@@ -125,6 +131,16 @@ def load_evidence_pack(path: Path, *, verify_binary_sha: bool = True) -> Evidenc
     core = Path(str(core_payload["path"]))
     if not core.is_file():
         raise ValueError(f"evidence pack core does not exist: {core}")
+    core_sha256 = core_payload.get("sha256")
+    if not isinstance(core_sha256, str) or not core_sha256:
+        core_sha256 = None
+    if verify_core_sha and core_sha256:
+        observed_core_sha = sha256_file(core)
+        if observed_core_sha != core_sha256:
+            raise ValueError(
+                "evidence pack core sha256 mismatch: "
+                f"expected {core_sha256} observed {observed_core_sha}"
+            )
 
     binary_sha256: str | None = None
     binary_payload = manifest.get("binary")
@@ -148,6 +164,7 @@ def load_evidence_pack(path: Path, *, verify_binary_sha: bool = True) -> Evidenc
         manifest_path=manifest_path,
         manifest=manifest,
         core=core,
+        core_sha256=core_sha256,
         gobjects=_first_address(manifest, "gobjects_candidates"),
         fname_root_slot=_first_address(manifest, "fname_root_slots"),
         binary_sha256=binary_sha256,
@@ -622,6 +639,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="When using --evidence-pack, do not hash the manifest binary path.",
     )
+    parser.add_argument(
+        "--no-verify-core-sha",
+        action="store_true",
+        help="When using --evidence-pack, do not hash the manifest core path even if core.sha256 is present.",
+    )
     parser.add_argument("--json", action="store_true")
     return parser.parse_args()
 
@@ -648,6 +670,7 @@ def main() -> int:
             evidence_pack = load_evidence_pack(
                 args.evidence_pack,
                 verify_binary_sha=not args.no_verify_binary_sha,
+                verify_core_sha=not args.no_verify_core_sha,
             )
         except ValueError as error:
             raise SystemExit(str(error)) from error
@@ -679,6 +702,7 @@ def main() -> int:
         payload["evidence_pack"] = {
             "manifest": str(evidence_pack.manifest_path),
             "binary_sha256": evidence_pack.binary_sha256,
+            "core_sha256": evidence_pack.core_sha256,
         }
     if args.json:
         print(json.dumps(payload, indent=2, sort_keys=True))

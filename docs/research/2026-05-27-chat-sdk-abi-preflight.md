@@ -132,8 +132,8 @@ The public API should remain blocked until all are true:
 
   Evidence-pack mode reads `manifest.json`, uses the recorded core path,
   `gobjects_candidates[0]`, and `fname_root_slots[0]`, and verifies the manifest binary
-  SHA256 when the binary path is present. Raw `--core` remains available for legacy and
-  synthetic fixtures.
+  SHA256 when the binary path is present. It also verifies `core.sha256` when the manifest
+  includes it. Raw `--core` remains available for legacy and synthetic fixtures.
 
 ## Result
 
