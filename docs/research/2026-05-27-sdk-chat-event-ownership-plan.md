@@ -183,20 +183,23 @@ Follow-up local run after adding percentiles and hook-like cases:
 
 ```text
 ./build/chat_reflection_benchmark 50000
-non_chat_filter ns_avg=32 ns_p50=30 ns_p95=40 ns_p99=50 reader_calls_per_iter=0 allocations_per_iter=0
-server_send_chat_match ns_avg=507 ns_p50=461 ns_p95=591 ns_p99=872 reader_calls_per_iter=53 allocations_per_iter=5
-server_send_chat_decode_utf32 ns_avg=46 ns_p50=50 ns_p95=51 ns_p99=51 reader_calls_per_iter=1 allocations_per_iter=0
-hook_like_disabled ns_avg=33 ns_p50=30 ns_p95=40 ns_p99=41 reader_calls_per_iter=0 allocations_per_iter=0
-hook_like_enabled_non_chat ns_avg=34 ns_p50=30 ns_p95=50 ns_p99=51 reader_calls_per_iter=1 allocations_per_iter=0
-hook_like_server_send_chat ns_avg=483 ns_p50=471 ns_p95=501 ns_p99=751 reader_calls_per_iter=54 allocations_per_iter=5
-hook_like_server_send_chat_text ns_avg=549 ns_p50=541 ns_p95=561 ns_p99=582 reader_calls_per_iter=55 allocations_per_iter=5
+non_chat_filter ns_avg=25 ns_p50=30 ns_p95=30 ns_p99=40 reader_calls_per_iter=0 allocations=0 allocations_per_iter=0
+server_send_chat_match ns_avg=437 ns_p50=431 ns_p95=450 ns_p99=471 reader_calls_per_iter=53 allocations=150000 allocations_per_iter=3
+server_send_chat_decode_utf32 ns_avg=238 ns_p50=231 ns_p95=241 ns_p99=381 reader_calls_per_iter=1 allocations=150000 allocations_per_iter=3
+hook_like_disabled ns_avg=35 ns_p50=31 ns_p95=40 ns_p99=41 reader_calls_per_iter=0 allocations=0 allocations_per_iter=0
+hook_like_enabled_non_chat ns_avg=33 ns_p50=30 ns_p95=40 ns_p99=41 reader_calls_per_iter=1 allocations=0 allocations_per_iter=0
+hook_like_server_send_chat ns_avg=459 ns_p50=451 ns_p95=481 ns_p99=501 reader_calls_per_iter=54 allocations=150000 allocations_per_iter=3
+hook_like_server_send_chat_text ns_avg=904 ns_p50=901 ns_p95=932 ns_p99=942 reader_calls_per_iter=55 allocations=350000 allocations_per_iter=7
 ```
 
 Interpretation: the synthetic non-chat enabled path adds one name-index readability check;
 the disabled and non-chat paths now stay allocation-free; reserving reflected parameter
-and field vectors reduced matched-chat temporary allocations from seven to five per
-iteration; and text decode adds one extra reader call plus UTF-8/sanitization work. These
-are local regression signals only, not runtime acceptance evidence.
+and field vectors, then replacing the property-cycle `unordered_set` with a reserved
+linear vector, reduced matched-chat temporary allocations from seven to three per
+iteration. The fixture text intentionally exceeds small-string optimization storage, so
+text decode now shows three allocations and the hook-like text path shows seven
+allocations per iteration. These are local regression signals only, not runtime acceptance
+evidence.
 
 ## Risks
 

@@ -301,7 +301,9 @@ Updated: 2026-05-27
   `allocations_per_iter`, including hook-like disabled, enabled non-chat, matched
   `ServerSendChatMessage`, and text decode cases. The hook-side wrapper keeps disabled and
   non-chat attempts allocation-free in the synthetic benchmark; matched chat paths dropped
-  from seven to five allocations after reserving temporary reflection vectors.
+  from seven to three allocations after reserving temporary reflection vectors and using a
+  reserved linear visited list for cycle detection. The text fixture now exceeds SSO, so
+  hook-like text logging measures seven allocations per iteration locally.
 - fact: `Memory::IsReadable` no longer uses `write(/dev/null)` because that probe returned
   success for invalid and `PROT_NONE` mappings on this host. It is now backed by cached
   readable ranges from `/proc/self/maps`, with `MemoryTests` covering invalid pointers,
@@ -332,9 +334,9 @@ Updated: 2026-05-27
   accepting changed chat FName indices, parameter offsets, or `StrProperty` constants.
 - next-step: Benchmark ProcessEvent overhead with chat reflection enabled vs disabled
   before keeping the marker active for long high-population sessions.
-- next-step: Before drafting public chat API, justify the remaining matched-chat temporary
-  allocations or replace them with bounded stack/small-vector storage, then plan isolated
-  runtime A/B separately.
+- next-step: Before drafting public chat API, justify or reduce the remaining three
+  matched-chat allocations and seven text-log allocations, then plan isolated runtime A/B
+  separately.
 - rollback: remove `enable-chat-reflection` marker and restart the debug server; no plugin
   ABI or config migration is involved.
 - next-step: Generalize the binary-hash-scoped reflection pipeline only after another

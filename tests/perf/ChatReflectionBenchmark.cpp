@@ -69,6 +69,8 @@ namespace
     constexpr int32_t kBytePropertyClassObjectIndex = 533;
     constexpr int32_t kStrPropertyClassNameIndex = 13;
     constexpr int32_t kStrPropertyClassObjectIndex = 547;
+    constexpr char kFixtureChatText[] =
+        "Obelisk benchmark message that exceeds small string optimization storage.";
 
     struct Region
     {
@@ -152,7 +154,7 @@ namespace
         std::array<uint8_t, 0x40> BytePropertyClass{};
         std::array<uint8_t, 0x40> StrPropertyClass{};
         std::array<uint8_t, 0x20> Params{};
-        std::array<uint32_t, 64> FStringData{};
+        std::array<uint32_t, 128> FStringData{};
         ReaderContext Context;
 
         MemoryReader Reader()
@@ -213,15 +215,17 @@ namespace
                       0x10,
                       0x1);
 
-        fixture.FStringData[0] = 'O';
-        fixture.FStringData[1] = 'b';
-        fixture.FStringData[2] = 'e';
-        fixture.FStringData[3] = 'l';
-        fixture.FStringData[4] = 'i';
-        fixture.FStringData[5] = 's';
-        fixture.FStringData[6] = 'k';
-        fixture.FStringData[7] = 0;
-        const FStringHeaderCandidate header{fixture.FStringData.data(), 8, 8};
+        const size_t textLength = sizeof(kFixtureChatText) - 1;
+        if (textLength + 1 > fixture.FStringData.size())
+            throw std::runtime_error("benchmark fixture chat text is too long");
+        for (size_t i = 0; i < textLength; ++i)
+            fixture.FStringData[i] = static_cast<uint8_t>(kFixtureChatText[i]);
+        fixture.FStringData[textLength] = 0;
+        const FStringHeaderCandidate header{
+            fixture.FStringData.data(),
+            static_cast<int32_t>(textLength + 1),
+            static_cast<int32_t>(textLength + 1),
+        };
         WriteAt(fixture.Params, 0x00, header);
         fixture.Params[0x10] = 0;
 
@@ -359,6 +363,7 @@ namespace
                   << " ns_p99=" << Percentile(samples, 0.99)
                   << " ns_max=" << samples.back()
                   << " reader_calls_per_iter=" << (context.Calls / static_cast<uint64_t>(iterations))
+                  << " allocations=" << g_AllocationCount
                   << " allocations_per_iter=" << (g_AllocationCount / static_cast<uint64_t>(iterations))
                   << " accepted=" << accepted
                   << "\n";
@@ -407,7 +412,7 @@ int main(int argc, char** argv)
         std::string out;
         ReadResult result = TryDecodeUtf32Field(
             reader, invocation, ChatReflection::ChatField::ChatMessage, 512, out);
-        return result.Status == ReadStatus::Ok && out == "Obelisk";
+        return result.Status == ReadStatus::Ok && out == kFixtureChatText;
     });
 
     RunCase("hook_like_disabled", iterations, fixture.Context, [&] {

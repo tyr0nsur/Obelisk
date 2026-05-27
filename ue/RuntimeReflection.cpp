@@ -1,9 +1,9 @@
 #include "RuntimeReflection.h"
 
+#include <algorithm>
 #include <cstring>
 #include <limits>
 #include <string>
-#include <unordered_set>
 #include <utility>
 
 namespace Obelisk::UE::RuntimeReflection
@@ -270,15 +270,16 @@ namespace Obelisk::UE::RuntimeReflection
             return ReadResult::Fail(ReadStatus::OutOfBounds, "ReturnValueOffset exceeds ParmsSize");
 
         value.Parameters.reserve(value.NumParms);
-        std::unordered_set<const void*> visited;
+        std::vector<const void*> visited;
         visited.reserve(value.NumParms);
         const void* current = value.Children;
         for (uint16_t i = 0; i < value.NumParms; ++i)
         {
             if (!current)
                 return ReadResult::Fail(ReadStatus::Implausible, "property chain ended before NumParms");
-            if (!visited.insert(current).second)
+            if (std::find(visited.begin(), visited.end(), current) != visited.end())
                 return ReadResult::Fail(ReadStatus::Implausible, "property chain cycle detected");
+            visited.push_back(current);
 
             UPropertyView property;
             if (ReadResult result = ReadProperty(reader, options, function, current, value.ParmsSize, property); !result)
