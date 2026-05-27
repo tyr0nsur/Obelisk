@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -49,6 +50,10 @@ FUOBJECT_ITEM_SIZE = 0x10
 MAX_GOBJECTS_SAMPLE_INDICES = 32
 DEFAULT_POINTER_SCAN_MAX_MAPPING_BYTES = 64 * 1024 * 1024
 DEFAULT_POINTER_SCAN_MAX_HITS = 64
+OBJDUMP_XREF_RE = re.compile(
+    r"^\s*(?P<address>[0-9a-fA-F]+):\s+(?P<body>.*?)"
+    r"(?:#|<)\s*(?P<target>(?:0x)?[0-9a-fA-F]+)"
+)
 
 
 def is_relative_to(path: Path, parent: Path) -> bool:
@@ -123,6 +128,84 @@ def parse_fname_index(value: str) -> tuple[str, int]:
         return label, parse_int(raw_index)
     index = parse_int(value)
     return f"fname_{index}", index
+
+
+def normalize_hex(value: str | int) -> str:
+    return f"0x{int(value, 16) if isinstance(value, str) else value:x}"
+
+
+def classify_xref_access(instruction: str) -> str:
+    tokens = instruction.lower().split()
+    while tokens and re.fullmatch(r"[0-9a-f]{2}", tokens[0]):
+        tokens.pop(0)
+    if not tokens:
+        return "unknown"
+
+    mnemonic = tokens[0]
+    if mnemonic.startswith("call"):
+        return "call"
+    if mnemonic.startswith("j"):
+        return "jump"
+    if mnemonic == "lea":
+        return "address"
+
+    operands = " ".join(tokens[1:])
+    if mnemonic in ("cmp", "test") and ("[rip" in operands or "(%rip)" in operands):
+        return "load"
+    if "[rip" in operands:
+        parts = [part.strip() for part in operands.split(",", 1)]
+        if len(parts) == 2:
+            return "store" if "[rip" in parts[0] else "load"
+    if "(%rip)" in operands:
+        parts = [part.strip() for part in operands.split(",", 1)]
+        if len(parts) == 2:
+            return "load" if "(%rip)" in parts[0] else "store"
+    return "other"
+
+
+def gobjects_static_xref_targets(gobjects_candidates: list[tuple[str, int]]) -> dict[str, str]:
+    targets: dict[str, str] = {}
+    for label, address in gobjects_candidates:
+        targets[normalize_hex(address)] = f"{label}.root"
+        targets[normalize_hex(address + GOBJECTS_DIRECT_CHUNKS_OFFSET)] = f"{label}.chunks"
+        targets[normalize_hex(address + GOBJECTS_DIRECT_COUNT_OFFSET)] = f"{label}.count"
+        targets[normalize_hex(address + 0x58)] = f"{label}.serial"
+    return targets
+
+
+def collect_static_xrefs(objdump_path: Path, targets: dict[str, str]) -> dict[str, object]:
+    xrefs: dict[str, list[dict[str, object]]] = {target: [] for target in targets}
+    with objdump_path.open("r", encoding="utf-8", errors="replace") as handle:
+        for line_number, line in enumerate(handle, start=1):
+            match = OBJDUMP_XREF_RE.search(line.rstrip("\n"))
+            if not match:
+                continue
+            target = normalize_hex(match.group("target"))
+            if target not in targets:
+                continue
+            instruction = " ".join(match.group("body").split())
+            xrefs[target].append(
+                {
+                    "line": line_number,
+                    "instruction_address": normalize_hex(match.group("address")),
+                    "target_address": target,
+                    "target_label": targets[target],
+                    "instruction": instruction,
+                    "access": classify_xref_access(instruction),
+                }
+            )
+
+    access_counts: dict[str, int] = {}
+    for refs in xrefs.values():
+        for ref in refs:
+            access = str(ref["access"])
+            access_counts[access] = access_counts.get(access, 0) + 1
+
+    return {
+        "targets": [{"address": address, "label": label} for address, label in sorted(targets.items())],
+        "xrefs": xrefs,
+        "access_counts": dict(sorted(access_counts.items())),
+    }
 
 
 def validate_gobjects_sample_options(
@@ -743,6 +826,18 @@ def main() -> int:
             encoding="utf-8",
         )
 
+    gobjects_static_xrefs_path = None
+    if gobjects_candidates:
+        static_xrefs = collect_static_xrefs(
+            output_dir / "ShooterGameServer.objdump",
+            gobjects_static_xref_targets(gobjects_candidates),
+        )
+        gobjects_static_xrefs_path = output_dir / "gobjects-static-xrefs.json"
+        gobjects_static_xrefs_path.write_text(
+            json.dumps(static_xrefs, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+
     manifest = {
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "repo_root": str(REPO_ROOT),
@@ -794,6 +889,7 @@ def main() -> int:
             "core_readelf_programs": str(output_dir / "core.readelf-programs.txt"),
             "strings": str(output_dir / "ShooterGameServer.strings.txt"),
             "objdump": str(output_dir / "ShooterGameServer.objdump"),
+            "gobjects_static_xrefs": str(gobjects_static_xrefs_path) if gobjects_static_xrefs_path else None,
             "gdb_commands": str(output_dir / "gdb-core-commands.txt"),
             "gdb_core": str(output_dir / "gdb-core.txt"),
             "core_fname_table_scan": (

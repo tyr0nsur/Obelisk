@@ -166,6 +166,9 @@ work from repository state instead of chat history.
   `1243796`, first object item resolves to `/Script/CoreUObject`, and its class resolves
   to `Package` through the confirmed FName table. See
   `docs/research/2026-05-27-core-gobjects-candidate.md`.
+- `scripts/build_core_dump_evidence_pack.py` writes `gobjects-static-xrefs.json` for
+  `--gobjects-candidate`, covering root, chunks, count, and serial fields. Offline
+  validation for `0x595b7e0` found 3 root, 8016 chunks, 5870 count, and 2 serial xrefs.
 - Offline core UObject enumeration now works through `scripts/enumerate_core_uobjects.py`.
   It found real chat-related `Function` objects in `GObjects`, including `ServerChat`
   index `25447`, `ServerChatTo` index `25449`, and `ServerChatToPlayer` index `25452`;

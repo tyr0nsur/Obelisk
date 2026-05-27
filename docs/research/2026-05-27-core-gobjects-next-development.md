@@ -62,6 +62,10 @@ The next concrete step is an offline candidate loop:
 - optional `--scan-fname-tables` runs `scripts/scan_core_fname_tables.py`, an offline
   legacy FName-table shape scanner that starts from `None`, reconstructs
   entry -> chunk -> table pointer chains, and validates known FName indices.
+- when `--gobjects-candidate` is supplied, the pack now writes
+  `gobjects-static-xrefs.json` from the generated objdump. It summarizes xrefs for the
+  candidate root, direct chunks field `+0x10`, count field `+0x24`, and serial-like field
+  `+0x58`, with access classification.
 
 These commands are evidence generation only. They deliberately do not perform a broad core
 scan by default or infer a final UE4 layout.
@@ -91,6 +95,21 @@ The FName table scanner writes `core.fname-table-scan.json` when enabled. A cand
 that file is still a research candidate, not a stable runtime offset, because it is derived
 from one core image. On large cores this scanner can be slow; run it deliberately, prefer
 bounded limits or `timeout`, and do not enable it in unattended workflows.
+
+Local offline validation on 2026-05-27 wrote a temporary pack under
+`/tmp/obelisk-gobjects-xrefs-20260527-190349` for `gobjects=0x595b7e0`. Its
+`gobjects-static-xrefs.json` reported:
+
+```text
+access_counts={'load': 13884, 'store': 7}
+gobjects.root 0x595b7e0: 3 xrefs
+gobjects.chunks 0x595b7f0: 8016 xrefs
+gobjects.count 0x595b804: 5870 xrefs
+gobjects.serial 0x595b838: 2 xrefs
+```
+
+The `/tmp` pack is a disposable validation artifact; the durable result is the script
+support and these summarized counts.
 
 ## Acceptance Gate
 

@@ -224,6 +224,10 @@ Updated: 2026-05-27
   The first object item resolves to `/Script/CoreUObject`, and its class resolves to
   `Package` through the confirmed FName table; see
   `docs/research/2026-05-27-core-gobjects-candidate.md`.
+- fact: `scripts/build_core_dump_evidence_pack.py` now writes
+  `gobjects-static-xrefs.json` for `--gobjects-candidate`, summarizing objdump xrefs for
+  root, chunks, count, and serial fields. Offline validation for `0x595b7e0` found 3 root,
+  8016 chunks, 5870 count, and 2 serial xrefs.
 - fact: `scripts/enumerate_core_uobjects.py` can enumerate UObjects from the core through
   `0x595b7e0` and `0x5956f30`. It found real chat-related `Function` objects including
   `ServerChat` at index `25447`, `ServerChatTo` at `25449`, and `ServerChatToPlayer` at

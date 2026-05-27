@@ -67,6 +67,11 @@ Static xrefs from the matching `ShooterGameServer.objdump` also support the layo
 - `0x595b7e0` is passed as an immediate first argument to several helper functions,
   consistent with a global object-array root/struct.
 
+`scripts/build_core_dump_evidence_pack.py` now reproduces these xref summaries in
+`gobjects-static-xrefs.json` when run with `--gobjects-candidate`. A local offline pack
+for `0x595b7e0` reported `13884` load xrefs and `7` store xrefs across the tracked root,
+chunks, count, and serial fields.
+
 ## Result
 
 `0x595b7e0` is promoted to `GUObjectArray research-candidate` for this ARK binary hash.

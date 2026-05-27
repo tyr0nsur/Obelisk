@@ -125,6 +125,31 @@ class CoreDumpEvidencePackCommandTests(unittest.TestCase):
             self.assertIn("find /g 0x{start:x}, 0x{end:x}, 0x{value:x}", text)
             self.assertIn("hit {label} value=0x{value:x} slot={text}", text)
 
+    def test_collects_gobjects_static_xrefs_from_objdump(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            objdump = Path(temp_dir) / "ShooterGameServer.objdump"
+            objdump.write_text(
+                """
+  1000: 48 8b 05 00 00 00 00  mov    rax,QWORD PTR [rip+0x1]        # 0x595b7f0
+  1007: 39 3d 00 00 00 00     cmp    DWORD PTR [rip+0x2],edi        # 0x595b804
+  100d: f0 0f c1 05 00 00 00  lock xadd DWORD PTR [rip+0x3],eax     # 0x595b838
+  1015: 48 8d 3d 00 00 00 00  lea    rdi,[rip+0x4]                  # 0x595b7e0
+  1020: 48 8b 05 00 00 00 00  mov    rax,QWORD PTR [rip+0x5]        # 0x12345678
+""",
+                encoding="utf-8",
+            )
+
+            payload = core_pack.collect_static_xrefs(
+                objdump,
+                core_pack.gobjects_static_xref_targets([("gobjects", 0x595B7E0)]),
+            )
+
+        self.assertEqual(payload["access_counts"], {"address": 1, "load": 2, "store": 1})
+        self.assertEqual(payload["xrefs"]["0x595b7e0"][0]["target_label"], "gobjects.root")
+        self.assertEqual(payload["xrefs"]["0x595b7f0"][0]["target_label"], "gobjects.chunks")
+        self.assertEqual(payload["xrefs"]["0x595b804"][0]["target_label"], "gobjects.count")
+        self.assertEqual(payload["xrefs"]["0x595b838"][0]["target_label"], "gobjects.serial")
+
     def test_gobjects_sample_options_require_candidate_and_fname_root(self) -> None:
         self.assertEqual(
             core_pack.validate_gobjects_sample_options([], [0], [("fname", 0x5956F30)]),
