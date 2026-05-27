@@ -8,6 +8,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Use fPIC as it's a shared library
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+enable_testing()
+set(SUBHOOK_NO_TESTS ON CACHE BOOL "Disable subhook tests" FORCE)
+
 # Dependencies
 include(FetchContent)
 
@@ -60,3 +63,12 @@ set_target_properties(obelisk PROPERTIES BUILD_RPATH "\$ORIGIN")
 set_target_properties(obelisk PROPERTIES INSTALL_RPATH "\$ORIGIN")
 
 add_subdirectory(plugins/oBaseEvents)
+
+add_executable(plugin_config_tests
+    tests/core/PluginConfigTests.cpp
+    core/PluginConfig.cpp
+)
+target_include_directories(plugin_config_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(plugin_config_tests PRIVATE stdc++fs)
+
+add_test(NAME PluginConfigTests COMMAND plugin_config_tests)
