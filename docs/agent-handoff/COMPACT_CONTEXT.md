@@ -164,7 +164,6 @@ python3 scripts/analyze_reflectionscanner_capture.py \
 - Ops: get permission to create or designate the isolated ARK debug instance; preferred
   plan is `arkserver-obelisk-debug`.
 - Reflection: improve FName/GNames probes and analyzer fixtures offline.
-- Build/QA: evolve install/package validation toward clean CMake SDK/package exports.
 - Build/QA: keep package/export validation tied to concrete external plugin consumption
   gaps.
 - Core runtime: extend PluginManager coverage only if a new lifecycle risk is identified;
