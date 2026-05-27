@@ -47,6 +47,7 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
     Gate EvaluateGate(const char* enableStructureReflection, bool instanceMarkerEnabled, const char* binarySha256);
     bool IsReflectedStructureNameIndex(int32_t nameIndex);
     bool ShouldAttemptObservation(uint64_t limit);
+    bool ShouldAttemptNameObservation(int32_t nameIndex, uint64_t limit);
     bool ShouldLogObservation(uint64_t observationNumber, uint64_t limit);
     bool TryReserveObservationBudget(std::atomic<uint64_t>& counter, uint64_t limit, uint64_t& observationNumber);
 

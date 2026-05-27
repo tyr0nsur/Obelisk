@@ -44,6 +44,9 @@ work from repository state instead of chat history.
 - Structure reflection is marker-gated in code and wrapper:
   `/servidor/ark/obelisk/state/instances/<instance>/enable-structure-reflection`.
   Env-only structure reflection activation is rejected; budget defaults to `0`.
+- Stable posture rejects structure reflection env, and supervisor snapshots include
+  `structure-reflection.txt`. Structure budget is reserved only after an exact structure
+  FName filter passes.
 - Inventory reflection has no hook-side observer yet. Use
   `docs/research/2026-05-28-inventory-observation-gate-plan.md` before implementing one:
   exact inventory FName filter before budget reservation, marker `enable-inventory-reflection`,

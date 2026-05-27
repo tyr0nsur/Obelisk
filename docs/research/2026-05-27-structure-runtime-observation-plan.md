@@ -92,13 +92,15 @@ recognizer now validates the six compact shapes locally with synthetic memory fi
 disabled-by-default runtime gate:
 
 ```bash
+touch /servidor/ark/obelisk/state/instances/<instance>/enable-structure-reflection
 OBELISK_ENABLE_STRUCTURE_REFLECTION=1
 OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520
 OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT=25
 ```
 
-The log limit is also the observation budget; absence or `0` keeps structure observation
-inactive. It is not deployed, not enabled by default, and not a public SDK or mutation API.
+The runtime now requires the instance marker as well as env/SHA/budget. The log limit is
+also the observation budget; absence or `0` keeps structure observation inactive. It is not
+deployed, not enabled by default, and not a public SDK or mutation API.
 
 ## Next Steps
 

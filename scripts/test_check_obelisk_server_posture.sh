@@ -69,6 +69,16 @@ write_proc_fixture 110 "${stable_maps}" \
 expect_failure chat-text-forbidden-for-production \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 110 --expect-stable --forbid-chat-reflection
 
+write_proc_fixture 111 "${stable_maps}" \
+    "OBELISK_INSTANCE_ID=arkserver" \
+    "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
+    "OBELISK_DISABLE_PLUGINS=1" \
+    "OBELISK_ENABLE_STRUCTURE_REFLECTION=1" \
+    "OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256=abc123" \
+    "OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT=25"
+expect_failure structure-reflection-forbidden-for-stable \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 111 --expect-stable
+
 write_proc_fixture 102 "${stable_maps}" \
     "OBELISK_INSTANCE_ID=arkserver" \
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \

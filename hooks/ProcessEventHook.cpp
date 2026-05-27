@@ -567,6 +567,8 @@ namespace Obelisk::Hooks
         if (!gate.Enabled())
             return;
         const uint64_t limit = GetStructureReflectionLogLimit();
+        if (!ProcessEventStructureReflection::ShouldAttemptNameObservation(nameIndex, limit))
+            return;
         uint64_t observationNumber = 0;
         if (!ProcessEventStructureReflection::TryReserveObservationBudget(
                 s_ReflectedStructureCalls, limit, observationNumber))

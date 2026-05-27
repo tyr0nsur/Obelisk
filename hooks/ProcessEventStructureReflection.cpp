@@ -38,6 +38,11 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
         return limit != 0;
     }
 
+    bool ShouldAttemptNameObservation(int32_t nameIndex, uint64_t limit)
+    {
+        return ShouldAttemptObservation(limit) && IsReflectedStructureNameIndex(nameIndex);
+    }
+
     bool ShouldLogObservation(uint64_t observationNumber, uint64_t limit)
     {
         return ShouldAttemptObservation(limit) && observationNumber != 0 && observationNumber <= limit;

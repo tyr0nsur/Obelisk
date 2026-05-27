@@ -117,6 +117,7 @@ Useful flags:
 state/instances/<instance-id>/enable-process-event-hook
 state/instances/<instance-id>/disable-plugins
 state/instances/<instance-id>/enable-chat-reflection  # experimental
+state/instances/<instance-id>/enable-structure-reflection  # experimental, metadata-only
 ```
 
 `enable-chat-reflection` makes the wrapper set:
@@ -126,6 +127,18 @@ OBELISK_ENABLE_CHAT_REFLECTION=1
 OBELISK_CHAT_REFLECTION_BINARY_SHA256=<supported ARK SHA256>
 OBELISK_CHAT_REFLECTION_LOG_LIMIT=25
 ```
+
+`enable-structure-reflection` makes the wrapper set:
+
+```text
+OBELISK_ENABLE_STRUCTURE_REFLECTION=1
+OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256=<supported ARK SHA256>
+OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT=0
+```
+
+The structure log limit is also the observation budget and defaults to `0`, so the marker
+alone does not read reflected structure fields. A short debug window must set an explicit
+non-zero budget, and stable posture checks reject these variables.
 
 Decoded chat text logging is not enabled by the marker. It requires an additional explicit
 environment gate:

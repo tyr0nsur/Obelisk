@@ -36,6 +36,14 @@ Updated: 2026-05-28
   `/servidor/ark/obelisk/state/instances/<instance>/enable-structure-reflection`.
   The LinuxGSM wrapper exports structure reflection env only from that marker, and the
   hook rejects env-only activation. Default observation budget remains `0`.
+- fact: stable posture checks now reject `OBELISK_ENABLE_STRUCTURE_REFLECTION`,
+  `OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256`, and
+  `OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT`; supervisor snapshots write
+  `structure-reflection.txt` so structure observation cannot be hidden inside chat-centric
+  summaries.
+- fact: structure observation budget is now reserved only after the cheap exact structure
+  FName filter passes. Non-structure `ProcessEvent` calls no longer consume the bounded
+  observation budget.
 - next-step: `sdk.inventory` remains internal recognizer only. Before adding runtime
   observation, follow `docs/research/2026-05-28-inventory-observation-gate-plan.md`:
   exact `CanUse`/`AllowRemoteAddToInventory` FName prefilter first, then budget reserve,

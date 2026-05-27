@@ -14,7 +14,8 @@ Options:
   --pid <pid>               Check a specific process id instead of using pgrep.
   --proc-root <path>        Procfs root. Default: /proc. Intended for offline tests.
   --expect-stable           Require stable dev posture: ProcessEvent on, plugins off,
-                            ReflectionScanner/debug control/native exec probes off.
+                            ReflectionScanner/debug control/native exec probes and
+                            structure reflection off.
   --forbid-chat-reflection  Also require chat reflection and chat text logging to be off.
                             Use this for production/performance posture checks.
   --allow-scanner           Allow OBELISK_ENABLE_REFLECTION_SCANNER=1.
@@ -156,6 +157,9 @@ if [[ "${EXPECT_STABLE}" == "1" ]]; then
     forbid_env OBELISK_DEBUG_ALLOW_PTRACE
     forbid_env OBELISK_ENABLE_DEBUG_CONTROL
     forbid_env OBELISK_ENABLE_NATIVE_EXEC_PROBES
+    forbid_env OBELISK_ENABLE_STRUCTURE_REFLECTION
+    forbid_env OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256
+    forbid_env OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT
 
     if [[ "${ALLOW_SCANNER}" != "1" ]]; then
         forbid_env OBELISK_ENABLE_REFLECTION_SCANNER

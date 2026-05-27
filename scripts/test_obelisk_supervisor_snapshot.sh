@@ -22,6 +22,7 @@ write_obelisk_fixture() {
 
     mkdir -p "${root}/logs/arkserver2" "${root}/state/instances/arkserver2"
     : > "${root}/state/instances/arkserver2/enable-chat-reflection"
+    : > "${root}/state/instances/arkserver2/enable-structure-reflection"
     cat > "${root}/logs/arkserver2/Obelisk.log" <<'EOF'
 [2026-05-27 01:00:00.000] [warning] Experimental chat reflection enabled for ShooterGameServer SHA256 abc123.
 [2026-05-27 01:00:01.000] [info] Reflected chat ProcessEvent #1 function=ServerSendChatMessage fname_index=2697 params=0x123 fields=2
@@ -31,6 +32,10 @@ write_obelisk_fixture() {
 [2026-05-27 01:00:01.004] [info] Reflected chat ProcessEvent #2 function=ClientServerChatMessage fname_index=1984 params=0x789 fields=3 metadata_only=true
 [2026-05-27 01:00:01.005] [info] Reflected chat ProcessEvent #3 function=ClientChatMessage fname_index=1865 params=0xabc fields=1 metadata_only=true
 [2026-05-27 01:00:01.006] [info] Reflected chat ProcessEvent #4 function=ClientServerChatDirectMessage fname_index=1983 params=0xdef fields=3 metadata_only=true
+[2026-05-27 01:00:02.000] [warning] Experimental structure reflection enabled for ShooterGameServer SHA256 abc123.
+[2026-05-27 01:00:02.001] [info] Reflected structure ProcessEvent #1 function=VerifyPinCode fname_index=7636 outer_fname_index=7617 fields=2
+[2026-05-27 01:00:02.002] [info] Reflected structure field pinCode offset=0x0 size=4 sensitive=true has_range=false
+[2026-05-27 01:00:02.003] [info] Reflected structure rejected #2 fname_index=7636 reason=bad_parms_size
 EOF
 }
 
@@ -113,6 +118,15 @@ assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^rejected_chat_lines
 assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^rejected_or_unknown_send_mode_lines=2$'
 assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^send_mode_unknown_lines=1$'
 assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^last_relevant_line=.*ClientServerChatDirectMessage'
+assert_file_contains "${snapshot_dir}/structure-reflection.txt" '^structure_reflection_marker=enabled$'
+assert_file_contains "${snapshot_dir}/structure-reflection.txt" '^structure_reflection_env=<unset>$'
+assert_file_contains "${snapshot_dir}/structure-reflection.txt" '^structure_reflection_binary_sha256=missing$'
+assert_file_contains "${snapshot_dir}/structure-reflection.txt" '^experimental_gate_lines=1$'
+assert_file_contains "${snapshot_dir}/structure-reflection.txt" '^reflected_structure_process_event_lines=1$'
+assert_file_contains "${snapshot_dir}/structure-reflection.txt" '^reflected_structure_rejected_lines=1$'
+assert_file_contains "${snapshot_dir}/structure-reflection.txt" '^reflected_structure_field_lines=1$'
+assert_file_contains "${snapshot_dir}/summary.txt" '^structure_reflection_gate_env=<unset>$'
+assert_file_contains "${snapshot_dir}/summary.txt" '^structure_reflection_binary_sha256=missing$'
 assert_file_not_contains "${snapshot_dir}/disk.txt" '/servidor/ark '
 
 loop_out="${TMP_DIR}/loop-out"
@@ -137,6 +151,7 @@ assert_file_contains "${TMP_DIR}/unstable.err" 'unstable Obelisk posture'
 assert_file_contains "${unstable_out}/latest/summary.txt" '^posture_status=failed$'
 assert_file_contains "${unstable_out}/latest/summary.txt" '^stable_posture_summary=unstable;'
 assert_file_contains "${unstable_out}/latest/chat-reflection.txt" '^skipped_unstable_posture=true$'
+assert_file_contains "${unstable_out}/latest/structure-reflection.txt" '^skipped_unstable_posture=true$'
 
 if OBELISK_ROOT="${unstable_root}" \
     OBELISK_SUPERVISOR_OUT="${TMP_DIR}/loop-fail-out" \

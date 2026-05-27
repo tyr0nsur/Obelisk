@@ -210,6 +210,12 @@ namespace
     {
         Require(!ShouldAttemptObservation(0), "zero structure reflection log limit should skip observation");
         Require(ShouldAttemptObservation(1), "non-zero structure reflection log limit should allow observation");
+        Require(!ShouldAttemptNameObservation(kVerifyPinCodeNameIndex, 0),
+                "zero limit should skip exact structure FName observation");
+        Require(ShouldAttemptNameObservation(kVerifyPinCodeNameIndex, 1),
+                "exact structure FName should pass observation filter with non-zero limit");
+        Require(!ShouldAttemptNameObservation(42, 1),
+                "non-structure FName should not pass observation filter");
         Require(!ShouldLogObservation(0, 25), "zero observation number should not log");
         Require(!ShouldLogObservation(1, 0), "zero structure reflection log limit should disable logs");
         Require(ShouldLogObservation(1, 1), "first observation should log at limit one");

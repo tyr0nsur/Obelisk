@@ -67,6 +67,12 @@ write_unstable_summary() {
         printf 'posture_status=%s\n' "${posture_status}"
         printf 'reason=stable posture was not confirmed; see posture.txt\n'
     } > "${OUT_DIR}/chat-reflection.txt"
+
+    {
+        printf 'skipped_unstable_posture=true\n'
+        printf 'posture_status=%s\n' "${posture_status}"
+        printf 'reason=stable posture was not confirmed; see posture.txt\n'
+    } > "${OUT_DIR}/structure-reflection.txt"
 }
 
 run_capture git-status git -C "${REPO_ROOT}" status -sb
@@ -101,9 +107,13 @@ fi
 
 CHAT_LOG="${OBELISK_ROOT}/logs/${INSTANCE}/Obelisk.log"
 CHAT_MARKER="${OBELISK_ROOT}/state/instances/${INSTANCE}/enable-chat-reflection"
+STRUCTURE_MARKER="${OBELISK_ROOT}/state/instances/${INSTANCE}/enable-structure-reflection"
 PID="$(posture_value pid)"
 CHAT_REFLECTION_ENV="$(posture_value OBELISK_ENABLE_CHAT_REFLECTION)"
 CHAT_REFLECTION_SHA="$(posture_value OBELISK_CHAT_REFLECTION_BINARY_SHA256)"
+STRUCTURE_REFLECTION_ENV="$(posture_value OBELISK_ENABLE_STRUCTURE_REFLECTION)"
+STRUCTURE_REFLECTION_SHA="$(posture_value OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256)"
+STRUCTURE_REFLECTION_LIMIT="$(posture_value OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT)"
 
 {
     printf 'chat_reflection_marker=%s\n' "$([[ -f "${CHAT_MARKER}" ]] && printf enabled || printf disabled)"
@@ -120,7 +130,7 @@ CHAT_REFLECTION_SHA="$(posture_value OBELISK_CHAT_REFLECTION_BINARY_SHA256)"
         metadata_only_lines="$(safe_grep_count 'metadata_only=true' "${CHAT_LOG}")"
         chat_candidate_lines="$(safe_grep_count 'ServerSendChatMessage|ClientChatMessage|ClientServerChatMessage|ClientServerChatDirectMessage' "${CHAT_LOG}")"
         rejected_chat_lines="$(safe_grep_count 'Chat reflection rejected|Reflected chat rejected' "${CHAT_LOG}")"
-        rejected_or_unknown_send_mode_lines="$(safe_grep_count 'rejected|send_mode_known=false' "${CHAT_LOG}")"
+        rejected_or_unknown_send_mode_lines="$(safe_grep_count 'Chat reflection rejected|Reflected chat rejected|send_mode_known=false' "${CHAT_LOG}")"
         send_mode_unknown_lines="$(safe_grep_count 'send_mode_known=false' "${CHAT_LOG}")"
         last_relevant_line="$(grep -E 'Experimental chat reflection|Reflected chat|Chat reflection rejected|ServerSendChatMessage|ClientChatMessage|ClientServerChatMessage|ClientServerChatDirectMessage|metadata_only=true|send_mode_known=false' "${CHAT_LOG}" | tail -n1 || true)"
 
@@ -157,6 +167,36 @@ CHAT_REFLECTION_SHA="$(posture_value OBELISK_CHAT_REFLECTION_BINARY_SHA256)"
     fi
 } > "${OUT_DIR}/chat-reflection.txt" 2>&1
 
+{
+    printf 'structure_reflection_marker=%s\n' "$([[ -f "${STRUCTURE_MARKER}" ]] && printf enabled || printf disabled)"
+    printf 'structure_reflection_env=%s\n' "${STRUCTURE_REFLECTION_ENV:-<unset>}"
+    printf 'structure_reflection_binary_sha256=%s\n' "$([[ -n "${STRUCTURE_REFLECTION_SHA}" ]] && printf present || printf missing)"
+    printf 'structure_reflection_log_limit=%s\n' "${STRUCTURE_REFLECTION_LIMIT:-<unset>}"
+    printf 'log_path=%s\n' "${CHAT_LOG}"
+    if [[ -f "${CHAT_LOG}" ]]; then
+        experimental_structure_gate_lines="$(safe_grep_count 'Experimental structure reflection enabled' "${CHAT_LOG}")"
+        reflected_structure_process_event_lines="$(safe_grep_count 'Reflected structure ProcessEvent' "${CHAT_LOG}")"
+        reflected_structure_rejected_lines="$(safe_grep_count 'Reflected structure rejected' "${CHAT_LOG}")"
+        reflected_structure_field_lines="$(safe_grep_count 'Reflected structure field' "${CHAT_LOG}")"
+        last_relevant_line="$(grep -E 'Experimental structure reflection|Reflected structure ProcessEvent|Reflected structure rejected|Reflected structure field' "${CHAT_LOG}" | tail -n1 || true)"
+
+        printf 'experimental_gate_lines=%s\n' "${experimental_structure_gate_lines}"
+        printf 'reflected_structure_process_event_lines=%s\n' "${reflected_structure_process_event_lines}"
+        printf 'reflected_structure_rejected_lines=%s\n' "${reflected_structure_rejected_lines}"
+        printf 'reflected_structure_field_lines=%s\n' "${reflected_structure_field_lines}"
+        printf 'last_relevant_line=%s\n' "${last_relevant_line:-<none>}"
+        printf '\nrecent_structure_reflection_lines:\n'
+        grep -E 'Experimental structure reflection|Reflected structure ProcessEvent|Reflected structure rejected|Reflected structure field' "${CHAT_LOG}" | tail -n 80 || true
+    else
+        printf 'missing_log=true\n'
+        printf 'experimental_gate_lines=0\n'
+        printf 'reflected_structure_process_event_lines=0\n'
+        printf 'reflected_structure_rejected_lines=0\n'
+        printf 'reflected_structure_field_lines=0\n'
+        printf 'last_relevant_line=<none>\n'
+    fi
+} > "${OUT_DIR}/structure-reflection.txt" 2>&1
+
 if [[ -f "${OBELISK_ROOT}/logs/${INSTANCE}/Obelisk.log" ]]; then
     run_capture obelisk-log-tail tail -n 200 "${OBELISK_ROOT}/logs/${INSTANCE}/Obelisk.log"
 fi
@@ -179,6 +219,9 @@ stable_posture_summary=stable; instance=${INSTANCE}; process_event_hook=1; plugi
 quiet_posture_summary=$([[ "${quiet_posture_status}" == "ok" ]] && printf 'quiet; chat_reflection=0; chat_text_logging=0' || printf 'not_quiet; see quiet-posture.txt and chat-reflection.txt')
 chat_reflection_gate_env=${CHAT_REFLECTION_ENV:-<unset>}
 chat_reflection_binary_sha256=$([[ -n "${CHAT_REFLECTION_SHA}" ]] && printf present || printf missing)
+structure_reflection_gate_env=${STRUCTURE_REFLECTION_ENV:-<unset>}
+structure_reflection_binary_sha256=$([[ -n "${STRUCTURE_REFLECTION_SHA}" ]] && printf present || printf missing)
+structure_reflection_log_limit=${STRUCTURE_REFLECTION_LIMIT:-<unset>}
 
 This snapshot is read-only. It must not be used as proof of an accepted offset,
 signature, or runtime behavior without a follow-up active review.
