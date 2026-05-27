@@ -74,8 +74,15 @@ git diff --check
 cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake --build build -j"$(nproc)"
 ctest --test-dir build --output-on-failure
+python3 -m unittest scripts/test_analyze_reflectionscanner_capture.py
 scripts/test_install_obelisk_layout.sh /tmp/obelisk-install-layout-check
 git status --short --ignored
+```
+
+For runtime/server work, also run the posture check after the server is restored:
+
+```bash
+scripts/check_obelisk_server_posture.sh --expect-stable
 ```
 
 Check that no files matching these patterns are staged:

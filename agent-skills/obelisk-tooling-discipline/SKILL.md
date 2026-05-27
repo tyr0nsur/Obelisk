@@ -57,6 +57,9 @@ Before adopting a tool into the workflow:
 ## Evidence Discipline
 
 - Prefer analyzer JSON evidence packs over hand-written offset summaries.
+- Every runtime capture should have both a capture artifact and a post-capture posture
+  check. Use `scripts/check_obelisk_server_posture.sh --expect-stable` after returning
+  the server to normal mode.
 - A tool result is not accepted unless another engineer can reproduce it from the command,
   binary hash, Obelisk commit, and copied artifacts.
 - UI-only Ghidra conclusions must be translated into text: function/address, xref path,

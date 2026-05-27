@@ -23,6 +23,12 @@ jobs:
             scripts/analyze_reflectionscanner_capture.py \
             scripts/test_analyze_reflectionscanner_capture.py
 
+      - name: Check shell scripts parse
+        run: |
+          bash -n scripts/install_obelisk.sh
+          bash -n scripts/test_install_obelisk_layout.sh
+          bash -n scripts/check_obelisk_server_posture.sh
+
       - name: Run analyzer tests
         run: python3 scripts/test_analyze_reflectionscanner_capture.py
 

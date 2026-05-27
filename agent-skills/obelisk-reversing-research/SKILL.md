@@ -79,6 +79,23 @@ python3 scripts/analyze_reflectionscanner_capture.py --strict /path/to/isolated/
 Strict success is still research evidence, not a committed offset. Require either a second
 isolated capture or static xref validation before promoting a candidate.
 
+For live-like development captures authorized by the operator, keep the run short and
+restore stable posture immediately:
+
+```bash
+scripts/check_obelisk_server_posture.sh --expect-stable
+```
+
+If this fails, fix the server posture before doing more code or agent work.
+
+## Test Strictness
+
+- Analyzer tests must include accepted, rejected, and strict-mode failure fixtures for every
+  new ReflectionScanner log family.
+- Runtime probes must have explicit env gates and default to off.
+- A sample, weak probe, or partial match must not satisfy analyzer `--strict`.
+- Every capture note should include the post-capture stable posture check result.
+
 ## Next Research Goals
 
 1. Resolve `fname_index -> name` through GNames/FNamePool.

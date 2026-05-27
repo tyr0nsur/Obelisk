@@ -63,6 +63,24 @@ Expected logs:
 - Prefer the planned `arkserver-obelisk-debug` instance for scanner captures. Use distinct
   ports, save directory, cluster id, and `OBELISK_LOG_DIR`; do not reuse live map markers.
 
+## Debug Profiles
+
+Use named profiles instead of ad hoc env mixes:
+
+- Stable dev: ProcessEvent hook on, plugins disabled, scanner/static roots/native exec off.
+- Scanner capture: plugins disabled, native exec off, one scanner env family enabled, copied
+  logs analyzed offline, then immediate restart back to stable dev.
+- Plugin capture: scanner off, only the target plugin installed, plugin config backed up,
+  short run, then return to stable dev.
+
+After any scanner/plugin capture, run:
+
+```bash
+scripts/check_obelisk_server_posture.sh --expect-stable
+```
+
+That check must pass before launching another agent round that assumes a stable server.
+
 ## Config Restore Backups
 
 Before SteamCMD/LinuxGSM updates or risky server config work, refresh the gameplay config
@@ -100,6 +118,7 @@ pgrep -af '^./ShooterGameServer'
 tail -n 100 /servidor/ark/obelisk/logs/arkserver/Obelisk.log
 pid=$(pgrep -f '^./ShooterGameServer Ragnarok' | head -n1)
 rg 'libobelisk|libsubhook' /proc/$pid/maps
+scripts/check_obelisk_server_posture.sh --expect-stable
 ```
 
 ## Rollback

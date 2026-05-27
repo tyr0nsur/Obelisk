@@ -125,6 +125,10 @@ work from repository state instead of chat history.
   `static_fname_root_samples` and sample counts by status/reason/target; `--strict` does
   not pass from samples alone. See
   `docs/research/2026-05-27-static-fname-root-sampling.md`.
+- First sampling capture produced 44 samples and all rejected with
+  `implausible_num_elements`; this means the sampler currently rejects too early on
+  counters that are known to be zero for the candidate table. Next runtime change should
+  relax only the sampler path to read bounded entries while still logging counters.
 - UE4 type reconstruction planning is captured in
   `docs/research/2026-05-27-ue4-type-reconstruction-roadmap.md`; keep the milestone
   order as `FName`, `GObjects`, `UFunction`, then bounded params.
@@ -212,10 +216,8 @@ python3 scripts/analyze_reflectionscanner_capture.py \
 
 - Ops: get permission to create or designate the isolated ARK debug instance; preferred
   plan is `arkserver-obelisk-debug`.
-- Reflection: run observed-index static-root sampling on an isolated/debug instance and
-  inspect whether decoded names match the target strings that produced each object.
-- Reflection: redeploy and retest delayed static-root retry for
-  `OBELISK_REFLECTION_STATIC_FNAME_ROOTS=0x5956f30`.
+- Reflection: relax the static-root sampler counter gate and rerun observed-index sampling
+  on an isolated/debug instance.
 - Build/QA: keep package/export validation tied to concrete external plugin consumption
   gaps.
 - Core runtime: extend PluginManager coverage only if a new lifecycle risk is identified;

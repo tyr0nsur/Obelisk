@@ -151,6 +151,11 @@ Updated: 2026-05-27
   plausible `UObject` candidates against env-supplied static roots, and the analyzer
   records sample JSON plus status/reason/target counts. Samples do not satisfy `--strict`
   by themselves; see `docs/research/2026-05-27-static-fname-root-sampling.md`.
+- fact: First Ragnarok sample capture after `fa76213` produced 44 static-root samples, all
+  rejected by `implausible_num_elements`. This does not disprove the table because earlier
+  retry evidence showed entries can be readable while `+0x800/+0x804` counters are zero.
+  The sampler gate is currently too strict for `0x5956f30`; see
+  `docs/research/2026-05-27-static-fname-root-sampling.md`.
 - fact: A controlled Ragnarok dev capture on commit `5754fca` tested
   `OBELISK_REFLECTION_STATIC_FNAME_ROOTS=0x5956f30`. Startup probe rejected it with
   `table=0x0` and `reason=unreadable_table_header`; the server was then restarted without
@@ -202,15 +207,9 @@ Updated: 2026-05-27
 - next-step: Stop trying to promote chat UObject globals directly into GNames. Next FName
   work should use static discovery of the name table global or a bounded alternate name
   storage scanner, then validate with the analyzer.
-- next-step: Use the bounded static-root sampler to validate names using observed
-  `UObject.NamePrivate` indices from scanner output on an isolated/debug instance.
-- next-step: Add an isolated-only explicit static FName root probe that accepts
-  env-supplied global pointer slots such as `0x5956f30` and runs the existing
-  `None`/`ClientMessage`/`ServerChat` clue checks plus header-index validation against
-  the dereferenced table value.
-- next-step: Redeploy the delayed static-root retry and retest
-  `OBELISK_REFLECTION_STATIC_FNAME_ROOTS=0x5956f30`; the previous startup-only capture saw
-  `table=0x0`.
+- next-step: Relax only the static-root sampler path to attempt bounded entry reads even
+  when static-root table counters are zero, while logging counters and keeping samples out
+  of analyzer `--strict`.
 - next-step: After a repeat-confirmed `GNames` research candidate appears, generate
   `objdump -d -M intel` for the matching ShooterGameServer binary and run the analyzer with
   `--binary` plus `--objdump-xrefs`; inspect whether candidate `source_global` references
