@@ -36,6 +36,16 @@ require_path() {
     fi
 }
 
+require_not_contains() {
+    local pattern="$1"
+    local path="$2"
+    if grep -F "${pattern}" "${path}" >/dev/null; then
+        echo "Unexpected local path leak in ${path}: ${pattern}" >&2
+        cat "${path}" >&2
+        exit 1
+    fi
+}
+
 require_cmd "${CXX_BIN}"
 
 "${REPO_DIR}/scripts/install_obelisk.sh" "${INSTALL_ROOT}"
@@ -50,6 +60,11 @@ require_path "${INSTALL_ROOT}/include/obelisk/ObeliskApi.h"
 require_path "${INSTALL_ROOT}/lib/cmake/Obelisk/ObeliskConfig.cmake"
 require_path "${INSTALL_ROOT}/lib/cmake/Obelisk/ObeliskConfigVersion.cmake"
 require_path "${INSTALL_ROOT}/lib/cmake/Obelisk/ObeliskTargets.cmake"
+
+for cmake_package_file in "${INSTALL_ROOT}"/lib/cmake/Obelisk/*.cmake; do
+    require_not_contains "${REPO_DIR}" "${cmake_package_file}"
+    require_not_contains "${REPO_DIR}/build" "${cmake_package_file}"
+done
 
 CONFIG_DIR="${INSTALL_ROOT}/config/install_layout_consumer"
 CONFIG_PATH="${CONFIG_DIR}/config.json"
@@ -239,7 +254,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(Obelisk CONFIG REQUIRED)
+find_package(Obelisk 0.1.0 CONFIG REQUIRED)
 
 add_library(install_layout_consumer SHARED consumer_plugin.cpp)
 target_link_libraries(install_layout_consumer PRIVATE Obelisk::obelisk_sdk)
