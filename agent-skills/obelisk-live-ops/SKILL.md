@@ -35,7 +35,7 @@ Convenience log links may live under:
 
 ## Production Baseline
 
-For Ragnarok live-like stability:
+For Ragnarok live-like stability and player performance validation:
 
 ```bash
 mkdir -p /servidor/ark/obelisk/state/instances/arkserver
@@ -51,17 +51,34 @@ Expected logs:
 - plugin loading disabled
 - server remains joinable
 
+Current operator direction as of 2026-05-27:
+
+- `arkserver` / Ragnarok is reserved for player performance testing. Do not restart it,
+  change markers, deploy new runtime, enable extra logging, run scanners, or attach
+  debuggers unless the operator explicitly opens a maintenance window.
+- `arkserver2` / TheIsland is the designated debug/development target for Obelisk rounds.
+  Prefer it for controlled runtime validation, plugin lifecycle checks, and research
+  captures that need an ARK server harness.
+- Treat `arkserver2` as debug-designated, not automatically scanner-safe. ReflectionScanner,
+  native exec probes, ptrace/gcore, broad ProcessEvent tracing, and text logging still need
+  a specific operator-approved run window, per-instance markers, copied-log evidence, and
+  rollback to stable posture.
+
 ## Experiment Gates
 
 - Keep experimental plugins outside `plugins/` until an isolated server test passes.
 - Enable one marker/config gate at a time and record the exact change.
 - Use instance markers under `state/instances/<instance-id>/`; map markers are obsolete.
 - Never enable native exec probes on live servers.
-- Never enable `ReflectionScanner` on `arkserver` or `arkserver2` unless the operator has
-  explicitly converted that instance into an isolated debug target.
-- Keep `OBELISK_PE_TRACE_LIMIT=0` by default; use short trace windows only for evidence.
-- Prefer the planned `arkserver-obelisk-debug` instance for scanner captures. Use distinct
-  ports, save directory, cluster id, and `OBELISK_LOG_DIR`; do not reuse live map markers.
+- Never enable `ReflectionScanner` on `arkserver`.
+- Enable `ReflectionScanner` on `arkserver2` only after a specific operator-approved debug
+  window confirms TheIsland is isolated enough for that run, with plugins disabled and a
+  marker/env rollback plan recorded.
+- Keep `OBELISK_PE_TRACE_LIMIT=0` by default; use short trace windows only for evidence on
+  `arkserver2` or a dedicated debug instance.
+- A future `arkserver-obelisk-debug` instance remains the cleaner scanner target if we need
+  stronger isolation than TheIsland can provide. Use distinct ports, save directory,
+  cluster id, and `OBELISK_LOG_DIR`; do not reuse live map markers.
 
 ## Debug Profiles
 
@@ -161,6 +178,15 @@ tail -n 100 /servidor/ark/obelisk/logs/arkserver/Obelisk.log
 pid=$(pgrep -f '^./ShooterGameServer Ragnarok' | head -n1)
 rg 'libobelisk|libsubhook' /proc/$pid/maps
 scripts/check_obelisk_server_posture.sh --expect-stable
+```
+
+For TheIsland debug posture, use `arkserver2` paths and map filters instead:
+
+```bash
+tail -n 100 /servidor/ark/obelisk/logs/arkserver2/Obelisk.log
+pid=$(pgrep -f '^./ShooterGameServer TheIsland' | head -n1)
+rg 'libobelisk|libsubhook' /proc/$pid/maps
+scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance-id arkserver2
 ```
 
 ## Rollback

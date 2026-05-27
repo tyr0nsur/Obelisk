@@ -75,18 +75,21 @@ property metadata.
 
 - Keep `OBELISK_ENABLE_PROCESS_EVENT_HOOK=1` plus plugins disabled as the baseline safe
   runtime test.
-- `OBELISK_ENABLE_CHAT_REFLECTION=1` is allowed on the current development `arkserver`
-  only with the matching `OBELISK_CHAT_REFLECTION_BINARY_SHA256` gate and small log limit.
+- `arkserver` / Ragnarok is currently reserved for player performance testing; do not use
+  it for new reversing/debug captures without an explicit maintenance window.
+- `OBELISK_ENABLE_CHAT_REFLECTION=1` belongs on `arkserver2` / TheIsland for future
+  development captures, only with the matching `OBELISK_CHAT_REFLECTION_BINARY_SHA256`
+  gate and small log limit.
 - Do not enable `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` on live servers.
 - Do not enable broad event discovery on a production map until it has survived an
   isolated server test.
-- Do not run `ReflectionScanner` on `arkserver` or `arkserver2` unless one has been
-  explicitly converted into an isolated debug target. Preferred path:
-  `arkserver-obelisk-debug`.
+- Do not run `ReflectionScanner` on `arkserver`. Run it on `arkserver2` only for a
+  specifically approved debug window with plugins disabled, copied-log evidence, and
+  rollback; the cleaner future path remains `arkserver-obelisk-debug`.
 - Use small `OBELISK_PE_TRACE_LIMIT` windows only when capturing evidence; default should
   remain quiet.
 - Prefer the `enable-chat-reflection` marker over ad hoc environment edits; rollback is
-  removing the marker and restarting the debug/development server.
+  removing the marker and restarting `arkserver2` or the debug/development server.
 - If a plugin crashes during load/init, disable plugins first and preserve logs/core files
   for analysis.
 

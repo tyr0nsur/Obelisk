@@ -51,22 +51,26 @@ Own these areas:
   and the scanner still reads zero/invalid tables, change the method instead of extending
   sleep/retry windows.
 - Every new offset or signature must include how it was derived and what binary/version it was tested against.
-- Run scanner captures only on a confirmed isolated/debug instance. The preferred plan is
-  `arkserver-obelisk-debug`; do not reuse live Ragnarok/TheIsland marker posture.
+- Run scanner captures only on a confirmed isolated/debug instance. Current operator
+  direction designates `arkserver2` / TheIsland as the Obelisk debug/development target,
+  but scanner/native-exec/ptrace still require a specific run window and rollback plan.
+  The cleaner future option remains `arkserver-obelisk-debug`.
 
 ## Safe Experiment Pattern
 
-Start with the core stable and plugins disabled:
+Do not use Ragnarok for new reversing/runtime experiments while player performance testing
+is active. For controlled debug work, start with TheIsland core stable and plugins
+disabled:
 
 ```bash
-mkdir -p /servidor/ark/obelisk/state/instances/arkserver
-touch /servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook
-touch /servidor/ark/obelisk/state/instances/arkserver/disable-plugins
-./arkserver restart
+mkdir -p /servidor/ark/obelisk/state/instances/arkserver2
+touch /servidor/ark/obelisk/state/instances/arkserver2/enable-process-event-hook
+touch /servidor/ark/obelisk/state/instances/arkserver2/disable-plugins
+./arkserver2 restart
 ```
 
-On production Ragnarok, stop here unless the goal is only to validate the core hook.
-Chat discovery has been unstable and must not be enabled on the live map as the normal
+On production Ragnarok, stop unless there is an explicit maintenance window. Chat
+discovery has been unstable and must not be enabled on the live map as the normal
 experiment path.
 
 For scanner or event discovery, use only a confirmed isolated/debug instance and enable one
@@ -75,7 +79,7 @@ experiment at a time. The debug wrapper should set explicit environment variable
 ```bash
 export OBELISK_ENABLE_PROCESS_EVENT_HOOK=1
 export OBELISK_DISABLE_PLUGINS=1
-export OBELISK_INSTANCE_ID=arkserver-obelisk-debug
+export OBELISK_INSTANCE_ID=arkserver2
 export OBELISK_PE_TRACE_LIMIT=0
 unset OBELISK_ENABLE_NATIVE_EXEC_PROBES
 ```

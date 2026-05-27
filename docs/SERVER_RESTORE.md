@@ -114,8 +114,10 @@ tr '\0' '\n' < /proc/$(pgrep -f '^./ShooterGameServer Ragnarok' | head -n1)/envi
 
 Expected safe Obelisk posture for development baseline:
 
-- Ragnarok: ProcessEvent hook enabled, plugins disabled.
-- TheIsland: treat as development/live-like unless explicitly converted to isolated debug.
+- Ragnarok: ProcessEvent hook enabled, plugins disabled; currently reserved for player
+  performance testing.
+- TheIsland: designated Obelisk debug/development target as `arkserver2`; still require
+  explicit run-window approval for scanner/native-exec/ptrace or broad tracing.
 - ReflectionScanner disabled unless an isolated/debug run is intentionally authorized.
 - Native exec probes disabled.
 

@@ -25,14 +25,18 @@ work from repository state instead of chat history.
 - Central Obelisk root: `/servidor/ark/obelisk`
 - Gameplay config backup was created at
   `/home/flowcommunity-ark/backups/ark-config-20260527-015805`.
-- Ragnarok stable live posture:
+- Ragnarok stable live posture and player performance test target:
   - `/servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook`
   - `/servidor/ark/obelisk/state/instances/arkserver/disable-plugins`
-- Current development posture uses one active ARK instance:
-  - active: `arkserver` / Ragnarok
-  - stopped: `arkserver2` / TheIsland
+- Current operator direction as of 2026-05-27:
+  - protect `arkserver` / Ragnarok for player performance testing;
+  - use `arkserver2` / TheIsland as the Obelisk debug/development target for future
+    controlled runtime validation and research windows.
+- Do not restart `arkserver`, edit its marker files, deploy to it, attach debuggers, or
+  increase logging while player performance testing is active.
 - Do not restart servers, edit marker files, change `/servidor/ark`, or activate
-  ReflectionScanner without explicit operator permission and an isolated/debug instance.
+  ReflectionScanner without explicit operator permission. For new debug work, target
+  `arkserver2` / TheIsland, not Ragnarok.
 - Latest restart audit:
   `docs/research/2026-05-27-ops-restart-audit-instance-id.md`
   - live `ObeliskRun.sh` exports `OBELISK_INSTANCE_ID=arkserver`
@@ -100,11 +104,11 @@ work from repository state instead of chat history.
 
 - Legacy chat/monitor prototype source has been removed from the release tree.
 - ReflectionScanner is experimental and must stay disabled on live servers.
-- No confirmed isolated/debug ARK instance exists right now.
-- Ops plan now recommends creating `arkserver-obelisk-debug` with isolated ports/saves,
-  no live cluster, debug-only `OBELISK_LOG_DIR`, and wrapper-level Obelisk env instead of
-  map marker reuse; see
-  `docs/research/2026-05-27-isolated-debug-instance-plan.md`.
+- `arkserver2` / TheIsland is now operator-designated as the debug/development target.
+  High-risk scanners/native exec/ptrace still need specific run-window approval and
+  rollback. The cleaner future option remains `arkserver-obelisk-debug` with isolated
+  ports/saves, no live cluster, debug-only `OBELISK_LOG_DIR`, and wrapper-level Obelisk env;
+  see `docs/research/2026-05-27-isolated-debug-instance-plan.md`.
 - General-purpose SDK reflection is not solved yet. However, the current ARK binary has
   binary-hash-scoped evidence for FName, `GUObjectArray`, chat `UFunction` property chains,
   bounded param ranges, and an internal UTF-32 `FString` decoder candidate.
@@ -284,6 +288,8 @@ python3 scripts/analyze_reflectionscanner_capture.py \
 
 - Never enable `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` on live servers.
 - Never enable raw chat discovery on live Ragnarok as a normal test.
+- Do not run Obelisk debug or reversing experiments on `arkserver` while players are
+  testing performance; use `arkserver2` / TheIsland.
 - Do not reintroduce legacy map markers or binary-local `ObeliskPlugins` fallback.
 - Do not treat observed FName indices such as `9619` or `9622` as stable API contracts.
 - Do not promote plugins with HTTP, threads, or file readers until they implement and
@@ -306,10 +312,10 @@ python3 scripts/analyze_reflectionscanner_capture.py \
 
 ## Next Good Rounds
 
-- Ops: get permission to create or designate the isolated ARK debug instance; preferred
-  plan is `arkserver-obelisk-debug`.
-- Runtime chat: wait for one real in-game chat message and confirm
-  `Reflected chat ProcessEvent` in `/servidor/ark/obelisk/logs/arkserver/Obelisk.log`.
+- Ops: use `arkserver2` / TheIsland as the designated debug/development target, but keep
+  scanner/native-exec/ptrace behind explicit run-window approval.
+- Runtime chat: collect future runtime validation on `arkserver2` / TheIsland logs, not
+  `/servidor/ark/obelisk/logs/arkserver/Obelisk.log`.
 - After a real hit, wire `RuntimeReflection::TryDecodeFStringUtf32` into the experimental
   logger and keep it gated/rate-limited; dispatch must only accept `EChatSendMode` `0..3`.
 - `ue/RuntimeReflection.{h,cpp}` exists as the internal gated reader for

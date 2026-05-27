@@ -50,21 +50,25 @@ This is required because `jmp rel32` can fail when `ShooterGameServer` is mapped
 
 ## Safe Runtime Validation
 
-For a live Ragnarok test:
+Ragnarok is currently reserved for player performance testing. Do not restart it, change
+markers, deploy runtime, or increase logging unless the operator opens a maintenance
+window.
+
+For TheIsland debug/development validation:
 
 ```bash
-mkdir -p /servidor/ark/obelisk/state/instances/arkserver
-touch /servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook
-touch /servidor/ark/obelisk/state/instances/arkserver/disable-plugins
-./arkserver restart
+mkdir -p /servidor/ark/obelisk/state/instances/arkserver2
+touch /servidor/ark/obelisk/state/instances/arkserver2/enable-process-event-hook
+touch /servidor/ark/obelisk/state/instances/arkserver2/disable-plugins
+./arkserver2 restart
 ```
 
 Validate:
 
 ```bash
 pgrep -af '^./ShooterGameServer'
-tail -n 80 /servidor/ark/obelisk/logs/arkserver/Obelisk.log
-rg 'libobelisk|libsubhook' /proc/$(pgrep -f '^./ShooterGameServer Ragnarok' | head -n1)/maps
+tail -n 80 /servidor/ark/obelisk/logs/arkserver2/Obelisk.log
+rg 'libobelisk|libsubhook' /proc/$(pgrep -f '^./ShooterGameServer TheIsland' | head -n1)/maps
 ```
 
 Expected:

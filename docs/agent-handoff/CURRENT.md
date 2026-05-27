@@ -17,6 +17,14 @@ Updated: 2026-05-27
   Preferred markers are
   `/servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook` and
   `/servidor/ark/obelisk/state/instances/arkserver/disable-plugins`.
+- fact: Operator direction changed on 2026-05-27: `arkserver` / Ragnarok is reserved for
+  player performance testing. Do not restart, redeploy, change markers, enable extra
+  logging, scan, ptrace, or run debug experiments there without an explicit maintenance
+  window.
+- fact: `arkserver2` / TheIsland is now the designated Obelisk debug/development target.
+  Use it for controlled runtime validation and research harness work instead of Ragnarok,
+  while still requiring explicit per-run approval for ReflectionScanner, native exec,
+  ptrace/gcore, broad ProcessEvent traces, or chat text logging.
 - fact: Runtime/chat baseline is documented in
   `docs/research/2026-05-27-runtime-and-chat-baseline.md`.
 - fact: Reflection/chat metadata audit added shared UE probe layouts and gated
@@ -31,17 +39,19 @@ Updated: 2026-05-27
 - fact: The next isolated ReflectionScanner capture has a reproducible runbook with
   flags, expected logs, GNames accept/reject criteria, and rollback; see
   `docs/research/2026-05-27-reflectionscanner-isolated-capture-runbook.md`.
-- fact: Read-only ops audit found no confirmed isolated/debug ARK instance on
-  `/servidor/ark`; treat both observed instances as live/non-isolated unless an operator
-  confirms otherwise. See
+- fact: Earlier read-only ops audit found no confirmed isolated/debug ARK instance on
+  `/servidor/ark`; the operator has now designated `arkserver2` / TheIsland for debug and
+  development, but historical caveats still apply for high-risk scanners unless a specific
+  run window is approved. See
   `docs/research/2026-05-27-reflectionscanner-isolated-instance-audit.md`.
 - fact: Ops planning recommends a new `arkserver-obelisk-debug` LinuxGSM instance with
   isolated ports, saves, cluster posture, `OBELISK_LOG_DIR`, and wrapper-level Obelisk
   env instead of shared map markers; see
   `docs/research/2026-05-27-isolated-debug-instance-plan.md`.
 - fact: Runtime and wrapper were redeployed from the central install root after removing
-  legacy marker fallbacks. Only `arkserver` / Ragnarok is active for development;
-  `arkserver2` / TheIsland is stopped. See
+  legacy marker fallbacks. Historical audit recorded `arkserver` active and `arkserver2`
+  stopped; current operational policy is to avoid Ragnarok for development and use
+  `arkserver2` for future debug windows. See
   `docs/research/2026-05-27-ops-restart-audit-instance-id.md`.
 - fact: `scripts/analyze_reflectionscanner_capture.py` passively summarizes copied
   ReflectionScanner logs for UObject scores, FName `matched_clues`, delayed globals, and
@@ -326,15 +336,17 @@ Updated: 2026-05-27
 - rejected: ProcessEvent candidate `0x1d11cb0` did not receive gameplay events.
 - risk: Raw FString scanning/discovery must not be enabled on live Ragnarok as
   the normal test path.
+- risk: Runtime/reversing experiments on Ragnarok can invalidate player performance
+  testing; use `arkserver2` / TheIsland for Obelisk debug rounds.
 - risk: Native exec probes must remain disabled on live servers.
 - risk: The `subhook` pin was selected from the existing local checkout without internet
   verification; full offline resilience still needs a mirror or vendored archive.
 
 ## Priority Next Steps
 
-- next-step: If runtime text evidence is needed, deploy the local UTF-32 chat-text logger
-  in a controlled restart window with `OBELISK_CHAT_REFLECTION_LOG_TEXT=1`, review bounded
-  logs, then remove the text gate; keep dispatch blocked.
+- next-step: If runtime text evidence is needed, use a controlled `arkserver2` / TheIsland
+  restart window with `OBELISK_CHAT_REFLECTION_LOG_TEXT=1`, review bounded logs, then
+  remove the text gate; keep dispatch blocked and do not use Ragnarok.
 - next-step: Design plugin-facing chat event ownership only after text is copied into
   Obelisk-owned memory and callback lifetime is covered by tests. Use
   `docs/research/2026-05-27-sdk-chat-event-ownership-plan.md` as the acceptance gate before
@@ -350,8 +362,10 @@ Updated: 2026-05-27
   tests first; only then append public fields to `include/obelisk/ObeliskApi.h`.
 - next-step: Do not connect `ChatEventDispatcher` to `ProcessEvent` or PluginManager until
   the public ABI/capability gate and plugin owner integration plan are ready.
-- rollback: remove `enable-chat-reflection` marker and restart the debug server; no plugin
-  ABI or config migration is involved.
+- rollback: on `arkserver2`, remove the experimental marker/env, keep
+  `disable-plugins`, restart only TheIsland, and run
+  `scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance-id
+  arkserver2`; no plugin ABI or config migration is involved.
 - next-step: Generalize the binary-hash-scoped reflection pipeline only after another
   capture or ARK binary hash validates the same fields.
 - next-step: Add binary hash validation or an instruction decoder before accepting future
