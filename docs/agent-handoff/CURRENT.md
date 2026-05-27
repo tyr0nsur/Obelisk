@@ -2,6 +2,23 @@
 
 Updated: 2026-05-28
 
+## Active Operating Objective
+
+- objective: Run up to 10 hours of supervised priority rounds for Obelisk as a robust
+  Linux runtime/API/SDK core for ARK modding. Each round should produce one concrete
+  outcome: audited evidence, offline reversing/tooling improvement, runtime/API hardening,
+  recognizer/test coverage, documentation/skill updates, or a validated checkpoint.
+- priorities: preserve live server safety first; strengthen UE4 reflection and
+  second-source evidence; keep module recognizers candidate-only until promotion gates are
+  met; optimize tooling/tests that make future reverse engineering faster and more
+  reviewable.
+- guardrails: do not restart servers, edit `/servidor/ark`, change markers, run
+  ReflectionScanner, attach ptrace/gcore, enable broad `ProcessEvent` tracing, or publish
+  runtime observations without explicit operator approval for that run.
+- cadence: use focused agent rounds, integrate findings into repo files, validate with
+  safe offline tests, commit/push stable checkpoints, and record Discord community updates
+  when the configured webhook is functional.
+
 ## Stable Baseline
 
 - fact: Compact recovery context is stored in `docs/agent-handoff/COMPACT_CONTEXT.md` for

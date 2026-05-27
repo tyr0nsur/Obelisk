@@ -5,6 +5,17 @@ Updated: 2026-05-28
 Use this file when conversation context is compacted or an agent needs to resume Obelisk
 work from repository state instead of chat history.
 
+## Active Operating Objective
+
+- Run up to 10 hours of supervised priority rounds for Obelisk as a robust Linux
+  runtime/API/SDK core for ARK modding.
+- Each round should produce audited evidence, offline reversing/tooling improvement,
+  runtime/API hardening, recognizer/test coverage, documentation/skill updates, or a
+  validated checkpoint.
+- Safety remains first: no server restarts, `/servidor/ark` changes, marker edits,
+  ReflectionScanner, ptrace/gcore, broad `ProcessEvent` tracing, or runtime observations
+  without explicit operator approval for that run.
+
 ## Current Repo State
 
 - Repo: `/home/flowcommunity-ark/Obelisk`
