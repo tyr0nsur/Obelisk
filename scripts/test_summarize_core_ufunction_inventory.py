@@ -56,6 +56,44 @@ class UFunctionInventorySummaryTests(unittest.TestCase):
         self.assertEqual(groups["ShooterPlayerController"]["families"], {"Server": 1, "Client": 1})
         self.assertEqual(len(groups["ShooterPlayerController"]["samples"]), 2)
 
+    def test_filter_functions_combines_focus_filters(self) -> None:
+        functions = [
+            {
+                "name": "ServerDoThing",
+                "family": "Server",
+                "outer_name": "ShooterPlayerController",
+                "num_parms": 2,
+            },
+            {
+                "name": "ClientDoThing",
+                "family": "Client",
+                "outer_name": "ShooterPlayerController",
+                "num_parms": 1,
+            },
+            {
+                "name": "ServerDoDinoThing",
+                "family": "Server",
+                "outer_name": "PrimalDinoCharacter",
+                "num_parms": 3,
+            },
+        ]
+
+        filtered = inventory.filter_functions(
+            functions,
+            outer_contains="player",
+            name_contains="do",
+            family="server",
+            min_params=2,
+            max_params=2,
+        )
+
+        self.assertEqual([item["name"] for item in filtered], ["ServerDoThing"])
+
+    def test_filter_functions_rejects_unknown_param_count_when_param_filter_is_set(self) -> None:
+        functions = [{"name": "ServerMaybe", "family": "Server", "outer_name": "Controller", "num_parms": None}]
+
+        self.assertEqual(inventory.filter_functions(functions, min_params=1), [])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -171,6 +171,13 @@ Updated: 2026-05-27
   call, jump, or other in analyzer output and evidence-pack counts. It also adds
   `docs/research/2026-05-27-ue4-type-reconstruction-roadmap.md` for the staged
   `FName -> GObjects -> UFunction -> params` reconstruction path.
+- fact: General function research has pivoted beyond chat. `scripts/summarize_core_ufunction_inventory.py`
+  supports focused filters (`--outer-contains`, `--name-contains`, `--family`,
+  `--min-params`, `--max-params`, `--include-functions`) and
+  `docs/research/2026-05-27-shooterplayercontroller-function-inventory.md` identifies
+  candidate-only player/controller surfaces for inventory, dinos, structures, tribe,
+  transfer, notifications, and admin. Keep these offline until second-core/property-chain
+  validation and SDK ownership gates are satisfied.
 - fact: ReflectionScanner now has opt-in FName rejection evidence behind
   `OBELISK_REFLECTION_LOG_FNAME_REJECTS=1`, and the analyzer records
   `fname_reject_count`, `fname_reject_reason_counts`, and `fname_rejects`; see

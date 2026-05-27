@@ -14,6 +14,8 @@ Added `scripts/summarize_core_ufunction_inventory.py`, an offline-only summarize
 - resolves outer object names/classes through the same FName/GObjects path;
 - reads basic `UFunction` metadata candidates (`FunctionFlags`, `NumParms`, `ParmsSize`);
 - groups functions by outer, outer class, and broad name family.
+- supports focused filters such as `--outer-contains`, `--name-contains`, `--family`,
+  `--min-params`, and `--max-params` for module-specific follow-up reports.
 
 It does not attach to a process, run a scanner, promote offsets, or expose SDK APIs.
 
@@ -86,3 +88,8 @@ to pick reusable module families:
    runtime experiment.
 3. Keep SDK surfaces blocked until object lifetime, parameter ownership, and ABI shape are
    designed.
+
+Follow-up started with
+`docs/research/2026-05-27-shooterplayercontroller-function-inventory.md`, which identifies
+inventory, dino, structure, tribe, transfer, notification, and admin clusters under
+`ShooterPlayerController`.

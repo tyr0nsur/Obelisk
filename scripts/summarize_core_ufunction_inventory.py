@@ -109,6 +109,42 @@ def summarize_functions(functions: list[dict[str, object]], *, max_groups: int) 
     }
 
 
+def contains_filter(value: object, needle: str | None) -> bool:
+    if not needle:
+        return True
+    return needle.lower() in str(value or "").lower()
+
+
+def filter_functions(
+    functions: list[dict[str, object]],
+    *,
+    outer_contains: str | None = None,
+    name_contains: str | None = None,
+    family: str | None = None,
+    min_params: int | None = None,
+    max_params: int | None = None,
+) -> list[dict[str, object]]:
+    filtered: list[dict[str, object]] = []
+    for item in functions:
+        if not contains_filter(item.get("outer_name"), outer_contains):
+            continue
+        if not contains_filter(item.get("name"), name_contains):
+            continue
+        if family and str(item.get("family") or "").lower() != family.lower():
+            continue
+        num_parms = item.get("num_parms")
+        if not isinstance(num_parms, int):
+            if min_params is not None or max_params is not None:
+                continue
+        else:
+            if min_params is not None and num_parms < min_params:
+                continue
+            if max_params is not None and num_parms > max_params:
+                continue
+        filtered.append(item)
+    return filtered
+
+
 def collect_function_inventory(
     memory: uobjects.CoreMemory,
     *,
@@ -185,6 +221,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--fname-root-slot", type=parse_int, default=uobjects.DEFAULT_FNAME_ROOT_SLOT)
     parser.add_argument("--max-objects", type=int, default=DEFAULT_MAX_OBJECTS)
     parser.add_argument("--max-groups", type=int, default=20)
+    parser.add_argument("--outer-contains", help="Limit inventory to functions whose outer name contains this text.")
+    parser.add_argument("--name-contains", help="Limit inventory to function names containing this text.")
+    parser.add_argument("--family", help="Limit inventory to one derived function family, e.g. Server or Client.")
+    parser.add_argument("--min-params", type=int, help="Limit inventory to functions with at least this many params.")
+    parser.add_argument("--max-params", type=int, help="Limit inventory to functions with at most this many params.")
+    parser.add_argument(
+        "--include-functions",
+        action="store_true",
+        help="Include the filtered function rows in JSON output for focused offline review.",
+    )
     parser.add_argument("--json", action="store_true")
     return parser.parse_args()
 
@@ -195,6 +241,12 @@ def main() -> int:
         raise SystemExit("--max-objects must be non-negative")
     if args.max_groups <= 0:
         raise SystemExit("--max-groups must be positive")
+    if args.min_params is not None and args.min_params < 0:
+        raise SystemExit("--min-params must be non-negative")
+    if args.max_params is not None and args.max_params < 0:
+        raise SystemExit("--max-params must be non-negative")
+    if args.min_params is not None and args.max_params is not None and args.min_params > args.max_params:
+        raise SystemExit("--min-params must be less than or equal to --max-params")
 
     core = args.core
     gobjects = args.gobjects
@@ -222,14 +274,26 @@ def main() -> int:
     finally:
         memory.close()
 
+    filters = {
+        "outer_contains": args.outer_contains,
+        "name_contains": args.name_contains,
+        "family": args.family,
+        "min_params": args.min_params,
+        "max_params": args.max_params,
+    }
+    filtered_functions = filter_functions(functions, **filters)
     payload: dict[str, object] = {
         "status": "offline-inventory",
         "core": str(core),
         "metadata": metadata,
-        "summary": summarize_functions(functions, max_groups=args.max_groups),
+        "filters": filters,
+        "unfiltered_function_count": len(functions),
+        "summary": summarize_functions(filtered_functions, max_groups=args.max_groups),
     }
     if evidence_pack_payload:
         payload["evidence_pack"] = evidence_pack_payload
+    if args.include_functions:
+        payload["functions"] = filtered_functions
     if args.json:
         print(json.dumps(payload, indent=2, sort_keys=True))
     else:
