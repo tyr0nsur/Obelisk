@@ -43,6 +43,12 @@ def hex_or_none(value: int | None) -> str | None:
     return None if value is None else f"0x{value:x}"
 
 
+def parse_hex_string(value: object) -> int | None:
+    if not isinstance(value, str) or not value.startswith("0x"):
+        return None
+    return int(value, 16)
+
+
 def read_int(memory: uobjects.CoreMemory, address: int, fmt: str) -> int | None:
     size = struct.calcsize(fmt)
     data = memory.read(address, size)
@@ -204,6 +210,9 @@ class GObjectContext:
 
     def describe_uobject(self, address: int) -> dict[str, object] | None:
         return uobjects.read_uobject(self.memory, address, self.fname_table)
+
+    def index_for_address(self, address: int) -> int | None:
+        return self.address_to_index().get(address)
 
     def resolve_uobject_pointer(self, address: int | None) -> dict[str, object]:
         reject_reasons: list[str] = []
@@ -474,12 +483,22 @@ def inspect_target(
     target["status"] = "candidate" if not reject_reasons else "rejected"
     target["reject_reasons"] = reject_reasons
     target["object_summary"] = object_summary
+    target["object_index"] = context.index_for_address(object_address)
+    target["outer_summary"] = None
+    target["outer_index"] = None
+    if isinstance(object_summary, dict):
+        outer_address = parse_hex_string(object_summary.get("outer"))
+        if outer_address is not None:
+            target["outer_summary"] = context.describe_uobject(outer_address)
+            target["outer_index"] = context.index_for_address(outer_address)
 
     field_specs = [spec for spec in FIELD_SPECS if spec.offset < window_size]
     target["candidate_fields"] = [inspect_scalar_field(context.memory, object_address, spec) for spec in field_specs]
     first_property = context.memory.read_ptr(object_address + 0x38)
     expected_count = read_u16(context.memory, object_address + 0x96)
     parms_size = read_u16(context.memory, object_address + 0x98)
+    target["num_parms"] = expected_count
+    target["parms_size"] = parms_size
     target["property_chain"] = inspect_property_chain(
         context,
         owner_address=object_address,
@@ -505,6 +524,8 @@ def inspect_core(
     fname_root_slot: int,
     object_addresses: Iterable[int],
     indices: Iterable[int],
+    name_contains: Iterable[str] = (),
+    outer_contains: Iterable[str] = (),
     window_size: int,
     max_object_scan: int,
 ) -> dict[str, object]:
@@ -515,22 +536,44 @@ def inspect_core(
         max_object_scan=max_object_scan,
     )
     targets: list[dict[str, object]] = []
+    seen_addresses: set[int] = set()
     for index in indices:
+        object_address = context.object_address_for_index(index)
+        if object_address is not None:
+            seen_addresses.add(object_address)
         targets.append(
             inspect_target(
                 context,
                 target_kind="index",
                 target_value=index,
-                object_address=context.object_address_for_index(index),
+                object_address=object_address,
                 window_size=window_size,
             )
         )
     for address in object_addresses:
+        seen_addresses.add(address)
         targets.append(
             inspect_target(
                 context,
                 target_kind="address",
                 target_value=address,
+                object_address=address,
+                window_size=window_size,
+            )
+        )
+    for index, address in find_matching_function_indices(
+        context,
+        name_contains=name_contains,
+        outer_contains=outer_contains,
+    ):
+        if address in seen_addresses:
+            continue
+        seen_addresses.add(address)
+        targets.append(
+            inspect_target(
+                context,
+                target_kind="index",
+                target_value=index,
                 object_address=address,
                 window_size=window_size,
             )
@@ -546,6 +589,53 @@ def inspect_core(
     }
 
 
+def contains_any(value: object, needles: list[str]) -> bool:
+    if not needles:
+        return True
+    haystack = str(value or "").lower()
+    return any(needle in haystack for needle in needles)
+
+
+def find_matching_function_indices(
+    context: GObjectContext,
+    *,
+    name_contains: Iterable[str],
+    outer_contains: Iterable[str],
+) -> list[tuple[int, int]]:
+    name_filters = [item.lower() for item in name_contains if item]
+    outer_filters = [item.lower() for item in outer_contains if item]
+    if not name_filters and not outer_filters:
+        return []
+    if context.object_count is None:
+        return []
+
+    matches: list[tuple[int, int]] = []
+    limit = min(max(context.max_object_scan, 0), context.object_count)
+    for index in range(limit):
+        address = context.object_address_for_index(index)
+        if not address:
+            continue
+        summary = context.describe_uobject(address)
+        if summary is None:
+            continue
+        class_name = str(summary.get("class_name") or "")
+        if "Function" not in class_name and "Struct" not in class_name:
+            continue
+        if not contains_any(summary.get("name"), name_filters):
+            continue
+
+        outer_name = None
+        outer_address = parse_hex_string(summary.get("outer"))
+        if outer_address is not None:
+            outer_summary = context.describe_uobject(outer_address)
+            if isinstance(outer_summary, dict):
+                outer_name = outer_summary.get("name")
+        if not contains_any(outer_name, outer_filters):
+            continue
+        matches.append((index, address))
+    return matches
+
+
 def format_text(payload: dict[str, object]) -> str:
     metadata = payload["metadata"]
     lines = [
@@ -555,16 +645,28 @@ def format_text(payload: dict[str, object]) -> str:
     ]
     for target in payload["targets"]:
         summary = target.get("object_summary") or {}
+        outer_summary = target.get("outer_summary") or {}
         lines.append(
             "target={target_kind}:{target_value} object={object} status={status} "
-            "reasons={reasons} class={class_name!r} name={name!r}".format(
+            "reasons={reasons} object_index={object_index} class={class_name!r} name={name!r} "
+            "name_index={name_index} outer={outer} outer_index={outer_index} "
+            "outer_name={outer_name!r} outer_name_index={outer_name_index} "
+            "num_parms={num_parms} parms_size={parms_size}".format(
                 target_kind=target["target_kind"],
                 target_value=target["target_value"],
                 object=target["object"],
                 status=target["status"],
                 reasons=",".join(target["reject_reasons"]) if target["reject_reasons"] else "-",
+                object_index=target.get("object_index"),
                 class_name=summary.get("class_name") if isinstance(summary, dict) else None,
                 name=summary.get("name") if isinstance(summary, dict) else None,
+                name_index=summary.get("name_index") if isinstance(summary, dict) else None,
+                outer=summary.get("outer") if isinstance(summary, dict) else None,
+                outer_index=target.get("outer_index"),
+                outer_name=outer_summary.get("name") if isinstance(outer_summary, dict) else None,
+                outer_name_index=outer_summary.get("name_index") if isinstance(outer_summary, dict) else None,
+                num_parms=target.get("num_parms"),
+                parms_size=target.get("parms_size"),
             )
         )
         for field in target.get("candidate_fields", []):
@@ -638,6 +740,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--fname-root-slot", type=parse_int, default=uobjects.DEFAULT_FNAME_ROOT_SLOT)
     parser.add_argument("--object", action="append", type=parse_int, default=[], help="UObject address to inspect.")
     parser.add_argument("--index", action="append", type=parse_int, default=[], help="GObjects index to inspect.")
+    parser.add_argument(
+        "--name-contains",
+        action="append",
+        default=[],
+        help="Inspect Function/Struct objects whose resolved name contains this substring. Repeatable.",
+    )
+    parser.add_argument(
+        "--outer-contains",
+        action="append",
+        default=[],
+        help="Inspect Function/Struct objects whose resolved outer name contains this substring. Repeatable.",
+    )
     parser.add_argument("--window-size", type=parse_int, default=DEFAULT_WINDOW_SIZE)
     parser.add_argument("--max-object-scan", type=int, default=DEFAULT_MAX_OBJECT_SCAN)
     parser.add_argument("--json", action="store_true", help="Emit JSON instead of text.")
@@ -646,8 +760,8 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    if not args.object and not args.index:
-        raise SystemExit("provide at least one --object or --index")
+    if not args.object and not args.index and not args.name_contains and not args.outer_contains:
+        raise SystemExit("provide at least one --object, --index, --name-contains, or --outer-contains")
     if args.window_size <= 0:
         raise SystemExit("--window-size must be positive")
     if args.max_object_scan < 0:
@@ -661,6 +775,8 @@ def main() -> int:
             fname_root_slot=args.fname_root_slot,
             object_addresses=args.object,
             indices=args.index,
+            name_contains=args.name_contains,
+            outer_contains=args.outer_contains,
             window_size=args.window_size,
             max_object_scan=args.max_object_scan,
         )

@@ -37,6 +37,8 @@ def build_core_fixture(path: Path) -> dict[str, int]:
         "owner_class": base + 0x21100,
         "property_object": base + 0x21200,
         "chat_function": base + 0x21300,
+        "chat_message_outer": base + 0x21400,
+        "outer_matched_function": base + 0x21500,
         "readable_non_uobject": base + 0x80000,
     }
 
@@ -85,9 +87,10 @@ def build_core_fixture(path: Path) -> dict[str, int]:
     put_entry(6, b"ShooterGameMode\x00")
     put_entry(7, b"ChatMessage\x00")
     put_entry(8, b"ServerChat\x00")
+    put_entry(9, b"AdminCommand\x00")
 
     put_ptr(addrs["gobjects"] + enum.GOBJECTS_CHUNKS_OFFSET, addrs["gobjects_chunks"])
-    put_i32(addrs["gobjects"] + enum.GOBJECTS_COUNT_OFFSET, 8)
+    put_i32(addrs["gobjects"] + enum.GOBJECTS_COUNT_OFFSET, 10)
     put_ptr(addrs["gobjects_chunks"], addrs["gobjects_chunk0"])
 
     put_uobject(addrs["class_class"], 1, 0, addrs["class_class"], 1, 0)
@@ -98,6 +101,8 @@ def build_core_fixture(path: Path) -> dict[str, int]:
     put_uobject(addrs["owner_class"], 1, 5, addrs["class_class"], 6, addrs["package_object"])
     put_uobject(addrs["property_object"], 1, 6, addrs["property_class"], 7, addrs["chat_function"])
     put_uobject(addrs["chat_function"], 1, 7, addrs["function_class"], 8, addrs["owner_class"])
+    put_uobject(addrs["chat_message_outer"], 1, 8, addrs["class_class"], 7, addrs["package_object"])
+    put_uobject(addrs["outer_matched_function"], 1, 9, addrs["function_class"], 9, addrs["chat_message_outer"])
 
     for index, key in enumerate(
         [
@@ -109,6 +114,8 @@ def build_core_fixture(path: Path) -> dict[str, int]:
             "owner_class",
             "property_object",
             "chat_function",
+            "chat_message_outer",
+            "outer_matched_function",
         ]
     ):
         put_item(index, addrs[key], 100 + index)
@@ -147,6 +154,8 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
                     fname_root_slot=addrs["fname_root_slot"],
                     object_addresses=[],
                     indices=[7],
+                    name_contains=[],
+                    outer_contains=[],
                     window_size=0xC0,
                     max_object_scan=16,
                 )
@@ -190,6 +199,8 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
                     fname_root_slot=addrs["fname_root_slot"],
                     object_addresses=[addrs["package_object"]],
                     indices=[],
+                    name_contains=[],
+                    outer_contains=[],
                     window_size=0x40,
                     max_object_scan=16,
                 )
@@ -227,6 +238,59 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
         payload = json.loads(result.stdout)
         self.assertEqual(payload["targets"][0]["object_summary"]["name"], "ServerChat")
         self.assertEqual(payload["targets"][0]["pointer_window"][2]["label"], "uobject.class")
+
+    def test_cli_name_contains_finds_matching_function(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            core = Path(temp_dir) / "core"
+            addrs = build_core_fixture(core)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "inspect_core_ufunctions.py"),
+                    "--core",
+                    str(core),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--name-contains",
+                    "Chat",
+                    "--json",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual([target["object_summary"]["name"] for target in payload["targets"]], ["ServerChat"])
+        self.assertEqual(payload["targets"][0]["object_index"], 7)
+        self.assertEqual(payload["targets"][0]["outer_summary"]["name"], "ShooterGameMode")
+
+    def test_cli_outer_contains_finds_matching_function(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            core = Path(temp_dir) / "core"
+            addrs = build_core_fixture(core)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "inspect_core_ufunctions.py"),
+                    "--core",
+                    str(core),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--outer-contains",
+                    "ChatMessage",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertIn("object_index=9 class='Function' name='AdminCommand'", result.stdout)
+        self.assertIn("outer_index=8 outer_name='ChatMessage'", result.stdout)
 
     def test_cli_text_mentions_candidate_only_and_reject_reasons(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

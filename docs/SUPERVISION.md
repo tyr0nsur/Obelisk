@@ -18,6 +18,10 @@ For an already supervised open shell, use a finite timer loop instead of install
 
 Use `--count 0` only when a human lead is actively keeping the session open and can stop
 or review it. The loop only runs the same read-only snapshot script.
+Do not edit or redeploy `scripts/obelisk_supervisor_loop.sh` while an instance of that
+same script is sleeping; stop it first or let the finite loop finish. Bash reads script
+files progressively, so changing the file mid-run can make the old process exit with a
+parse error even when the new file is valid.
 
 It writes read-only snapshots under:
 

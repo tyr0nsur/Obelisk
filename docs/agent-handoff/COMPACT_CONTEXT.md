@@ -163,6 +163,10 @@ work from repository state instead of chat history.
   `ServerChat.MessageText` offset `0x0`; `ServerChatTo.SteamID` offset `0x0` and
   `MessageText` offset `0x10`; `ServerChatToPlayer.PlayerName` offset `0x0` and
   `MessageText` offset `0x10`.
+- `scripts/inspect_core_ufunctions.py` supports offline `--name-contains` and
+  `--outer-contains` filters for Function/Struct discovery from core dumps. Use broad
+  substring searches only for discovery; runtime filters should stay exact
+  FName+outer+ParmsSize+property-chain matches.
 - `scripts/verify_chat_reflection_constants.py` verifies the current
   `ue/ChatReflection.cpp` constants against offline core evidence for `ServerChat*` and
   `ServerSendChatMessage`. It passed against
@@ -177,9 +181,14 @@ work from repository state instead of chat history.
   `ParmsSize=0x11`; `SendMode` is `EChatSendMode` with `0 GlobalChat`,
   `1 GlobalTribeChat`, `2 LocalChat`, `3 AllianceChat`, and `>=4` invalid for
   logging/dispatch. This recognizer was deployed to `/servidor/ark/obelisk` on commit
-  `df332d7`. Commit `8281123` adds reflected `send_mode` and `send_mode_name` logging and
-  is deployed on `arkserver` PID `3233586`. See
+  `df332d7`. Commit `8281123` adds reflected `send_mode` and `send_mode_name` logging;
+  current `arkserver` PID is `3243871` after the later `8905996` deployment. See
   `docs/research/2026-05-27-real-chat-ufunction-path-hypotheses.md`.
+- If confirmed real player chat still produces zero `ServerSendChatMessage` hits, the
+  next minimum runtime expansion is metadata-only counters for exact
+  `ShooterPlayerController` candidates `ClientChatMessage`, `ClientServerChatMessage`,
+  and `ClientServerChatDirectMessage`; consider `ShooterGameMode.SendServerChatMessage`
+  only after those are negative.
 - Core-pack tooling now supports direct FName entry reads and bounded
   `--gobjects-candidate` previews for the next `GUObjectArray` investigation.
 - Read-only overnight snapshots are documented in `docs/SUPERVISION.md` and implemented by

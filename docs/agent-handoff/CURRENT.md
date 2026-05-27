@@ -215,6 +215,11 @@ Updated: 2026-05-27
   `ServerChatTo.MessageText` offset `0x10`, `ServerChatToPlayer.PlayerName` offset `0x0`,
   and `ServerChatToPlayer.MessageText` offset `0x10`; see
   `docs/research/2026-05-27-core-ufunction-property-chain.md`.
+- fact: `scripts/inspect_core_ufunctions.py` supports offline `--name-contains` and
+  `--outer-contains` filters for Function/Struct discovery from core dumps. Broad
+  `--name-contains Chat` is discovery-only and too noisy for runtime filters; exact
+  candidates are documented in
+  `docs/research/2026-05-27-real-chat-ufunction-path-hypotheses.md`.
 - fact: `scripts/verify_chat_reflection_constants.py` compares the local
   `ue/ChatReflection.cpp` constants to offline core evidence for `ServerChat`,
   `ServerChatTo`, `ServerChatToPlayer`, and `ServerSendChatMessage`. It passed against
@@ -286,6 +291,10 @@ Updated: 2026-05-27
 - next-step: After one real `ServerSendChatMessage` capture confirms the reflected params
   are being hit, wire UTF-32 text decoding into the experimental chat reflection logger;
   keep dispatch limited to `EChatSendMode` `0..3`.
+- next-step: If confirmed real player chat still produces zero `ServerSendChatMessage`
+  hits, add metadata-only counters for exact `ShooterPlayerController` candidates
+  `ClientChatMessage`, `ClientServerChatMessage`, and `ClientServerChatDirectMessage`
+  before considering `ShooterGameMode` helpers.
 - next-step: Run `scripts/verify_chat_reflection_constants.py` against any new core before
   accepting changed chat FName indices, parameter offsets, or `StrProperty` constants.
 - next-step: Benchmark ProcessEvent overhead with chat reflection enabled vs disabled

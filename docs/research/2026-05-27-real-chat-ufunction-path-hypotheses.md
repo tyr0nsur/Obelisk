@@ -120,6 +120,45 @@ including `ClientServerChatMessage`, `ClientServerChatDirectMessage`, and
 This does not disprove the `ProcessEvent` hook. It explains why a valid hook and valid
 `ServerChat*` metadata can still produce no real chat matches.
 
+### 2026-05-27 Follow-Up Candidate Classification
+
+After adding offline name/outer filters to `scripts/inspect_core_ufunctions.py`, the
+current core was rechecked with exact indices and a broad `--name-contains Chat` scan. The
+broad scan is useful for discovery but too noisy for runtime filtering.
+
+Command:
+
+```bash
+python3 scripts/inspect_core_ufunctions.py \
+  --core /servidor/ark/obelisk/dumps/arkserver-20260527T031311Z/core/arkserver-20260527T031311Z.2902200 \
+  --index 10443 --index 9548 --index 9768 --index 9772 --index 26281 --index 26240 \
+  --max-object-scan 30000 \
+  --json
+```
+
+Candidate summary:
+
+| Function | Object / FName | Outer | Params | Classification |
+| --- | ---: | --- | --- | --- |
+| `ServerSendChatMessage` | `10443` / `2697` | `ShooterPlayerController` | `ChatMessage:StrProperty@0x0`, `SendMode:ByteProperty@0x10`, `ParmsSize=0x11` | inbound probable |
+| `ClientChatMessage` | `9548` / `1865` | `ShooterPlayerController` | `Chat:StructProperty@0x0`, `ParmsSize=0x90` | outbound probable; contains rich `ChatMessage` struct |
+| `ClientServerChatDirectMessage` | `9768` / `1983` | `ShooterPlayerController` | `MessageText@0x0`, `MessageColor@0x10`, `bIsBold@0x20`, `ParmsSize=0x21` | outbound/direct-message probable |
+| `ClientServerChatMessage` | `9772` / `1984` | `ShooterPlayerController` | `MessageText@0x0`, `MessageColor@0x10`, `bIsBold@0x20`, `ParmsSize=0x21` | outbound/broadcast-display probable |
+| `SendServerChatMessage` | `26281` / `9801` | `ShooterGameMode` | `MessageText@0x0`, `MessageColor@0x10`, `bIsBold@0x20`, `ReceiverTeamId@0x24`, `ReceiverPlayerID@0x28`, `ParmsSize=0x2c` | server broadcast helper probable |
+| `OnServerChatMessage__DelegateSignature` | `26240` / `28549` | `ShooterGameMode` | `MessageText@0x0`, `ReceiverTeamId@0x10`, `ReceiverPlayerID@0x14`, `ParmsSize=0x18` | supporting delegate/unknown |
+
+The `ClientChatMessage.Chat` `StructProperty` resolves to `ScriptStruct ChatMessage` with
+fields including `SenderName`, `SenderSteamName`, `SenderTribeName`, `SenderId`,
+`Message`, `Receiver`, `SenderTeamIndex`, `ReceivedTime`, `SendMode`, `RadioFrequency`,
+`ChatType`, `SenderIcon`, and `UserId`.
+
+If confirmed real player chat still produces zero `ServerSendChatMessage` hits, the next
+minimum runtime expansion should be metadata-only counters for exact
+`ShooterPlayerController` candidates: `ClientChatMessage`, `ClientServerChatMessage`, and
+`ClientServerChatDirectMessage`. Only after those are negative should the
+`ShooterGameMode` helper/delegate candidates be considered. Do not broaden to substring
+`Chat` in runtime code.
+
 ## Rejected Paths
 
 - Do not treat the existence of `ServerChat*` UFunction metadata as proof that normal
@@ -138,10 +177,11 @@ This does not disprove the `ProcessEvent` hook. It explains why a valid hook and
 
 ## Next Steps
 
-1. Add a gated, isolated-debug-only recognition path for
-   `ShooterPlayerController.ServerSendChatMessage` using the reflected shape above.
-2. In a confirmed isolated/debug instance, send one real player chat message and use a
+1. In a confirmed isolated/debug instance, send one real player chat message and use a
    small `OBELISK_PE_TRACE_LIMIT` or a dedicated chat-candidate counter to confirm whether
    `ServerSendChatMessage` appears in `ProcessEvent`.
-3. If `ServerSendChatMessage` matches, decode only the reflected `ChatMessage` `FString`
+2. If `ServerSendChatMessage` matches, decode only the reflected `ChatMessage` `FString`
    after `UFunction`, property-chain, and `ParmsSize` validation.
+3. If `ServerSendChatMessage` does not match after confirmed real chat, add exact
+   metadata-only counters for the three `ShooterPlayerController` outbound/chat-display
+   candidates listed above.
