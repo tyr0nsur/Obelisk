@@ -13,12 +13,17 @@ namespace
     using namespace Obelisk::UE;
     using namespace Obelisk::UE::RuntimeReflection;
 
+    constexpr int32_t kServerSendChatMessageNameIndex = 2697;
     constexpr int32_t kServerChatNameIndex = 9619;
     constexpr int32_t kServerChatToNameIndex = 9620;
     constexpr int32_t kServerChatToPlayerNameIndex = 9621;
+    constexpr int32_t kChatMessageNameIndex = 588;
     constexpr int32_t kMessageTextNameIndex = 21409;
+    constexpr int32_t kSendModeNameIndex = 16753;
     constexpr int32_t kSteamIDNameIndex = 20681;
     constexpr int32_t kPlayerNameNameIndex = 16693;
+    constexpr int32_t kBytePropertyClassNameIndex = 1;
+    constexpr int32_t kBytePropertyClassObjectIndex = 533;
     constexpr int32_t kStrPropertyClassNameIndex = 13;
     constexpr int32_t kStrPropertyClassObjectIndex = 547;
 
@@ -105,6 +110,7 @@ namespace
         std::array<uint8_t, 0xb0> Function{};
         std::array<uint8_t, 0x80> PropertyA{};
         std::array<uint8_t, 0x80> PropertyB{};
+        std::array<uint8_t, 0x40> BytePropertyClass{};
         std::array<uint8_t, 0x40> StrPropertyClass{};
         std::array<uint8_t, 0x20> Params{};
         ReaderContext Context;
@@ -115,6 +121,7 @@ namespace
             Context.Regions.push_back({Function.data(), Function.size()});
             Context.Regions.push_back({PropertyA.data(), PropertyA.size()});
             Context.Regions.push_back({PropertyB.data(), PropertyB.size()});
+            Context.Regions.push_back({BytePropertyClass.data(), BytePropertyClass.size()});
             Context.Regions.push_back({StrPropertyClass.data(), StrPropertyClass.size()});
             Context.Regions.push_back({Params.data(), Params.size()});
             return {RegionReader, &Context};
@@ -128,8 +135,17 @@ namespace
                        int32_t firstPropertyNameIndex,
                        int32_t firstOffset,
                        int32_t secondPropertyNameIndex = -1,
-                       int32_t secondOffset = -1)
+                       int32_t secondOffset = -1,
+                       int32_t firstElementSize = 0x10,
+                       int32_t secondElementSize = 0x10,
+                       const void* firstPropertyClass = nullptr,
+                       const void* secondPropertyClass = nullptr)
     {
+        WriteObject(fixture.BytePropertyClass,
+                    kBytePropertyClassNameIndex,
+                    kBytePropertyClassObjectIndex,
+                    nullptr,
+                    nullptr);
         WriteObject(fixture.StrPropertyClass,
                     kStrPropertyClassNameIndex,
                     kStrPropertyClassObjectIndex,
@@ -146,20 +162,20 @@ namespace
         WriteProperty(fixture.PropertyA,
                       second,
                       fixture.Function.data(),
-                      fixture.StrPropertyClass.data(),
+                      firstPropertyClass ? firstPropertyClass : fixture.StrPropertyClass.data(),
                       firstPropertyNameIndex,
                       firstOffset,
-                      0x10);
+                      firstElementSize);
 
         if (numParms > 1)
         {
             WriteProperty(fixture.PropertyB,
                           nullptr,
                           fixture.Function.data(),
-                          fixture.StrPropertyClass.data(),
+                          secondPropertyClass ? secondPropertyClass : fixture.StrPropertyClass.data(),
                           secondPropertyNameIndex,
                           secondOffset,
-                          0x10);
+                          secondElementSize);
         }
 
         const void* children = fixture.PropertyA.data();
@@ -259,6 +275,48 @@ namespace
                 "ServerChatToPlayer MessageText range pointer mismatch");
     }
 
+    void TestRecognizesServerSendChatMessage()
+    {
+        ChatFixture fixture;
+        BuildFunction(fixture,
+                      kServerSendChatMessageNameIndex,
+                      2,
+                      0x11,
+                      kChatMessageNameIndex,
+                      0x00,
+                      kSendModeNameIndex,
+                      0x10,
+                      0x10,
+                      0x1,
+                      fixture.StrPropertyClass.data(),
+                      fixture.BytePropertyClass.data());
+        fixture.Params[0x10] = 0x02;
+
+        ChatReflection::ChatInvocation invocation;
+        ReadResult result = ChatReflection::TryIdentifyChatInvocation(
+            fixture.Reader(),
+            Options(),
+            fixture.Function.data(),
+            fixture.Params.data(),
+            invocation);
+
+        Require(static_cast<bool>(result), result.Reason.c_str());
+        Require(invocation.Function == ChatReflection::ChatFunction::ServerSendChatMessage,
+                "ServerSendChatMessage kind mismatch");
+        Require(invocation.FunctionNameIndex == kServerSendChatMessageNameIndex,
+                "ServerSendChatMessage FName mismatch");
+        Require(invocation.Fields.size() == 2, "ServerSendChatMessage field count mismatch");
+        Require(invocation.Fields[0].Field == ChatReflection::ChatField::ChatMessage,
+                "ChatMessage field mismatch");
+        Require(invocation.Fields[0].Range.Data == fixture.Params.data(),
+                "ChatMessage range pointer mismatch");
+        Require(invocation.Fields[0].Range.Size == 0x10, "ChatMessage range size mismatch");
+        Require(invocation.Fields[1].Field == ChatReflection::ChatField::SendMode, "SendMode field mismatch");
+        Require(invocation.Fields[1].Range.Data == fixture.Params.data() + 0x10,
+                "SendMode range pointer mismatch");
+        Require(invocation.Fields[1].Range.Size == 0x1, "SendMode range size mismatch");
+    }
+
     void TestRejectsSameFNameWithWrongShape()
     {
         ChatFixture fixture;
@@ -346,6 +404,7 @@ int main()
     TestRecognizesServerChatWithBorrowedRange();
     TestRecognizesServerChatToWithoutParams();
     TestRecognizesServerChatToPlayer();
+    TestRecognizesServerSendChatMessage();
     TestRejectsSameFNameWithWrongShape();
     TestRejectsSameFNameWithWrongPropertyName();
     TestRejectsWrongStrPropertyClass();

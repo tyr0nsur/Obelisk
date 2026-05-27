@@ -164,7 +164,8 @@ work from repository state instead of chat history.
   `MessageText` offset `0x10`; `ServerChatToPlayer.PlayerName` offset `0x0` and
   `MessageText` offset `0x10`.
 - `scripts/verify_chat_reflection_constants.py` verifies the current
-  `ue/ChatReflection.cpp` constants against offline core evidence. It passed against
+  `ue/ChatReflection.cpp` constants against offline core evidence for `ServerChat*` and
+  `ServerSendChatMessage`. It passed against
   `/servidor/ark/obelisk/dumps/arkserver-20260527T031311Z/core/arkserver-20260527T031311Z.2902200`
   with `--max-object-scan 30000`; rerun it before promoting chat reflection constants for
   a new binary/core.
@@ -173,7 +174,8 @@ work from repository state instead of chat history.
   `ShooterCheatManager` outer evidence, while
   `ShooterPlayerController.ServerSendChatMessage` has FName index `2697`,
   `StrProperty ChatMessage` offset `0x0`, `ByteProperty SendMode` offset `0x10`, and
-  `ParmsSize=0x11`; see
+  `ParmsSize=0x11`; this recognizer is implemented in source but must be deployed before
+  the next in-game chat test. See
   `docs/research/2026-05-27-real-chat-ufunction-path-hypotheses.md`.
 - Core-pack tooling now supports direct FName entry reads and bounded
   `--gobjects-candidate` previews for the next `GUObjectArray` investigation.

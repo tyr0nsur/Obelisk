@@ -10,15 +10,21 @@ namespace Obelisk::UE::ChatReflection
         constexpr int32_t kServerChatNameIndex = 9619;
         constexpr int32_t kServerChatToNameIndex = 9620;
         constexpr int32_t kServerChatToPlayerNameIndex = 9621;
+        constexpr int32_t kServerSendChatMessageNameIndex = 2697;
 
+        constexpr int32_t kChatMessageNameIndex = 588;
         constexpr int32_t kMessageTextNameIndex = 21409;
+        constexpr int32_t kSendModeNameIndex = 16753;
         constexpr int32_t kSteamIDNameIndex = 20681;
         constexpr int32_t kPlayerNameNameIndex = 16693;
 
+        constexpr int32_t kBytePropertyClassNameIndex = 1;
+        constexpr int32_t kBytePropertyClassObjectIndex = 533;
         constexpr int32_t kStrPropertyClassNameIndex = 13;
         constexpr int32_t kStrPropertyClassObjectIndex = 547;
 
         constexpr size_t kFStringHeaderSize = 0x10;
+        constexpr size_t kBytePropertySize = 0x1;
 
         struct ChatFieldSpec
         {
@@ -26,6 +32,8 @@ namespace Obelisk::UE::ChatReflection
             int32_t NameIndex;
             int32_t Offset;
             size_t Size;
+            int32_t ClassNameIndex;
+            int32_t ClassObjectIndex;
         };
 
         struct ChatFunctionSpec
@@ -39,17 +47,57 @@ namespace Obelisk::UE::ChatReflection
         };
 
         constexpr std::array<ChatFieldSpec, 1> kServerChatFields{{
-            {ChatField::MessageText, kMessageTextNameIndex, 0x00, kFStringHeaderSize},
+            {ChatField::MessageText,
+             kMessageTextNameIndex,
+             0x00,
+             kFStringHeaderSize,
+             kStrPropertyClassNameIndex,
+             kStrPropertyClassObjectIndex},
         }};
 
         constexpr std::array<ChatFieldSpec, 2> kServerChatToFields{{
-            {ChatField::SteamID, kSteamIDNameIndex, 0x00, kFStringHeaderSize},
-            {ChatField::MessageText, kMessageTextNameIndex, 0x10, kFStringHeaderSize},
+            {ChatField::SteamID,
+             kSteamIDNameIndex,
+             0x00,
+             kFStringHeaderSize,
+             kStrPropertyClassNameIndex,
+             kStrPropertyClassObjectIndex},
+            {ChatField::MessageText,
+             kMessageTextNameIndex,
+             0x10,
+             kFStringHeaderSize,
+             kStrPropertyClassNameIndex,
+             kStrPropertyClassObjectIndex},
         }};
 
         constexpr std::array<ChatFieldSpec, 2> kServerChatToPlayerFields{{
-            {ChatField::PlayerName, kPlayerNameNameIndex, 0x00, kFStringHeaderSize},
-            {ChatField::MessageText, kMessageTextNameIndex, 0x10, kFStringHeaderSize},
+            {ChatField::PlayerName,
+             kPlayerNameNameIndex,
+             0x00,
+             kFStringHeaderSize,
+             kStrPropertyClassNameIndex,
+             kStrPropertyClassObjectIndex},
+            {ChatField::MessageText,
+             kMessageTextNameIndex,
+             0x10,
+             kFStringHeaderSize,
+             kStrPropertyClassNameIndex,
+             kStrPropertyClassObjectIndex},
+        }};
+
+        constexpr std::array<ChatFieldSpec, 2> kServerSendChatMessageFields{{
+            {ChatField::ChatMessage,
+             kChatMessageNameIndex,
+             0x00,
+             kFStringHeaderSize,
+             kStrPropertyClassNameIndex,
+             kStrPropertyClassObjectIndex},
+            {ChatField::SendMode,
+             kSendModeNameIndex,
+             0x10,
+             kBytePropertySize,
+             kBytePropertyClassNameIndex,
+             kBytePropertyClassObjectIndex},
         }};
 
         constexpr ChatFunctionSpec kServerChatSpec{
@@ -79,10 +127,21 @@ namespace Obelisk::UE::ChatReflection
             kServerChatToPlayerFields.size(),
         };
 
+        constexpr ChatFunctionSpec kServerSendChatMessageSpec{
+            ChatFunction::ServerSendChatMessage,
+            kServerSendChatMessageNameIndex,
+            2,
+            0x11,
+            kServerSendChatMessageFields.data(),
+            kServerSendChatMessageFields.size(),
+        };
+
         const ChatFunctionSpec* FindSpec(int32_t nameIndex)
         {
             switch (nameIndex)
             {
+            case kServerSendChatMessageNameIndex:
+                return &kServerSendChatMessageSpec;
             case kServerChatNameIndex:
                 return &kServerChatSpec;
             case kServerChatToNameIndex:
@@ -129,9 +188,10 @@ namespace Obelisk::UE::ChatReflection
             return RuntimeReflection::ReadResult::Ok();
         }
 
-        RuntimeReflection::ReadResult ValidateStrPropertyClass(const RuntimeReflection::MemoryReader& reader,
-                                                               const RuntimeReflection::FieldLayout& layout,
-                                                               const RuntimeReflection::UPropertyView& property)
+        RuntimeReflection::ReadResult ValidatePropertyClass(const RuntimeReflection::MemoryReader& reader,
+                                                            const RuntimeReflection::FieldLayout& layout,
+                                                            const RuntimeReflection::UPropertyView& property,
+                                                            const ChatFieldSpec& spec)
         {
             if (!property.Object.ClassPrivate)
                 return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
@@ -143,10 +203,10 @@ namespace Obelisk::UE::ChatReflection
             if (!result)
                 return result;
 
-            if (propertyClass.NamePrivate.ComparisonIndex != kStrPropertyClassNameIndex)
+            if (propertyClass.NamePrivate.ComparisonIndex != spec.ClassNameIndex)
                 return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
-                                                           "chat property class is not StrProperty");
-            if (propertyClass.InternalIndex != kStrPropertyClassObjectIndex)
+                                                           "chat property class FName index mismatch");
+            if (propertyClass.InternalIndex != spec.ClassObjectIndex)
                 return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
                                                            "chat property class object index mismatch");
             return RuntimeReflection::ReadResult::Ok();
@@ -173,7 +233,7 @@ namespace Obelisk::UE::ChatReflection
                 return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
                                                            "chat property ArrayDim mismatch");
 
-            return ValidateStrPropertyClass(reader, layout, property);
+            return ValidatePropertyClass(reader, layout, property, spec);
         }
     }
 

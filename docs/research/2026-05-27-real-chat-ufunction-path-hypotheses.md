@@ -93,6 +93,10 @@ Core UFunction evidence:
   - native exec candidate `0x154a600`;
   - property chain: `StrProperty ChatMessage` offset `0x0`, `ByteProperty SendMode`
     offset `0x10`, `ParmsSize=0x11`.
+  - reflected indices for the runtime recognizer:
+    `ServerSendChatMessage` FName `2697`, `ChatMessage` FName `588`, `SendMode`
+    FName `16753`, `ByteProperty` class FName `1`, and `ByteProperty` class object
+    index `533`.
 - `ClientServerChatMessage` and `ClientServerChatDirectMessage`:
   - object indices `9772` and `9768`;
   - outer class: `ShooterPlayerController`;

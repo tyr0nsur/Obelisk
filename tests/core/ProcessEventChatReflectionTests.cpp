@@ -14,10 +14,15 @@ namespace
     using namespace Obelisk::UE;
     using namespace Obelisk::UE::RuntimeReflection;
 
+    constexpr int32_t kServerSendChatMessageNameIndex = 2697;
     constexpr int32_t kServerChatNameIndex = 9619;
     constexpr int32_t kServerChatToPlayerNameIndex = 9621;
+    constexpr int32_t kChatMessageNameIndex = 588;
     constexpr int32_t kMessageTextNameIndex = 21409;
+    constexpr int32_t kSendModeNameIndex = 16753;
     constexpr int32_t kPlayerNameNameIndex = 16693;
+    constexpr int32_t kBytePropertyClassNameIndex = 1;
+    constexpr int32_t kBytePropertyClassObjectIndex = 533;
     constexpr int32_t kStrPropertyClassNameIndex = 13;
     constexpr int32_t kStrPropertyClassObjectIndex = 547;
 
@@ -87,12 +92,12 @@ namespace
                        const void* owner,
                        const void* klass,
                        int32_t nameIndex,
-                       int32_t offset)
+                       int32_t offset,
+                       int32_t elementSize = 0x10)
     {
         WriteObject(buffer, nameIndex, nameIndex, klass, owner);
 
         const int32_t arrayDim = 1;
-        const int32_t elementSize = 0x10;
         const uint64_t propertyFlags = 0x80;
         WriteAt(buffer, 0x28, next);
         WriteAt(buffer, 0x30, arrayDim);
@@ -106,6 +111,7 @@ namespace
         std::array<uint8_t, 0xb0> Function{};
         std::array<uint8_t, 0x80> PropertyA{};
         std::array<uint8_t, 0x80> PropertyB{};
+        std::array<uint8_t, 0x40> BytePropertyClass{};
         std::array<uint8_t, 0x40> StrPropertyClass{};
         std::array<uint8_t, 0x20> Params{};
         ReaderContext Context;
@@ -116,6 +122,7 @@ namespace
             Context.Regions.push_back({Function.data(), Function.size()});
             Context.Regions.push_back({PropertyA.data(), PropertyA.size()});
             Context.Regions.push_back({PropertyB.data(), PropertyB.size()});
+            Context.Regions.push_back({BytePropertyClass.data(), BytePropertyClass.size()});
             Context.Regions.push_back({StrPropertyClass.data(), StrPropertyClass.size()});
             Context.Regions.push_back({Params.data(), Params.size()});
             return {RegionReader, &Context};
@@ -165,6 +172,50 @@ namespace
         WriteAt(fixture.Function, 0x9a, returnValueOffset);
     }
 
+    void BuildServerSendChatMessage(ChatFixture& fixture)
+    {
+        WriteObject(fixture.BytePropertyClass,
+                    kBytePropertyClassNameIndex,
+                    kBytePropertyClassObjectIndex,
+                    nullptr,
+                    nullptr);
+        WriteObject(fixture.StrPropertyClass,
+                    kStrPropertyClassNameIndex,
+                    kStrPropertyClassObjectIndex,
+                    nullptr,
+                    nullptr);
+        WriteObject(fixture.Function,
+                    kServerSendChatMessageNameIndex,
+                    kServerSendChatMessageNameIndex,
+                    reinterpret_cast<const void*>(0x20000),
+                    reinterpret_cast<const void*>(0x30000));
+
+        WriteProperty(fixture.PropertyA,
+                      fixture.PropertyB.data(),
+                      fixture.Function.data(),
+                      fixture.StrPropertyClass.data(),
+                      kChatMessageNameIndex,
+                      0x00);
+        WriteProperty(fixture.PropertyB,
+                      nullptr,
+                      fixture.Function.data(),
+                      fixture.BytePropertyClass.data(),
+                      kSendModeNameIndex,
+                      0x10,
+                      0x1);
+
+        const void* children = fixture.PropertyA.data();
+        const uint32_t functionFlags = 0x220cc0;
+        const uint16_t numParms = 2;
+        const uint16_t parmsSize = 0x11;
+        const uint16_t returnValueOffset = 0xffff;
+        WriteAt(fixture.Function, 0x38, children);
+        WriteAt(fixture.Function, 0x90, functionFlags);
+        WriteAt(fixture.Function, 0x96, numParms);
+        WriteAt(fixture.Function, 0x98, parmsSize);
+        WriteAt(fixture.Function, 0x9a, returnValueOffset);
+    }
+
     void TestGateEvaluation()
     {
         const char* supportedSha = kSupportedShooterGameServerSha256.data();
@@ -194,6 +245,14 @@ namespace
         Require(!ShouldLogObservation(2, 1), "observation beyond limit should not log");
         Require(ShouldLogObservation(25, 25), "observation equal to limit should log");
         Require(!ShouldLogObservation(26, 25), "observation after default limit should not log");
+    }
+
+    void TestReflectedChatNameFilterIncludesServerSendChatMessage()
+    {
+        Require(IsReflectedChatNameIndex(kServerSendChatMessageNameIndex),
+                "ServerSendChatMessage FName was not accepted by cheap filter");
+        Require(IsReflectedChatNameIndex(kServerChatNameIndex), "ServerChat FName was not accepted by cheap filter");
+        Require(!IsReflectedChatNameIndex(42), "unrelated FName was accepted by cheap filter");
     }
 
     void TestDisabledGateDoesNotRead()
@@ -266,16 +325,46 @@ namespace
                 "message range should be borrowed from params");
         Require(fixture.Context.Calls > 0, "matched invocation did not read through injected reader");
     }
+
+    void TestMatchedServerSendChatMessageReturnsByteRange()
+    {
+        ChatFixture fixture;
+        BuildServerSendChatMessage(fixture);
+        fixture.Params[0x10] = 0x02;
+
+        Attempt attempt = TryIdentifyInvocation(
+            EnabledGate(),
+            kServerSendChatMessageNameIndex,
+            fixture.Reader(),
+            fixture.Function.data(),
+            fixture.Params.data());
+
+        Require(attempt.Status == AttemptStatus::Matched, attempt.Result.Reason.c_str());
+        Require(attempt.Invocation.Function == ChatReflection::ChatFunction::ServerSendChatMessage,
+                "matched ServerSendChatMessage function mismatch");
+        Require(attempt.Invocation.Fields.size() == 2, "matched ServerSendChatMessage field count mismatch");
+        Require(attempt.Invocation.Fields[0].Field == ChatReflection::ChatField::ChatMessage,
+                "first field should be ChatMessage");
+        Require(attempt.Invocation.Fields[0].Range.Data == fixture.Params.data(),
+                "ChatMessage range should be borrowed from params");
+        Require(attempt.Invocation.Fields[1].Field == ChatReflection::ChatField::SendMode,
+                "second field should be SendMode");
+        Require(attempt.Invocation.Fields[1].Range.Data == fixture.Params.data() + 0x10,
+                "SendMode range should be borrowed from params");
+        Require(attempt.Invocation.Fields[1].Range.Size == 0x1, "SendMode range size mismatch");
+    }
 }
 
 int main()
 {
     TestGateEvaluation();
     TestObservationLogLimit();
+    TestReflectedChatNameFilterIncludesServerSendChatMessage();
     TestDisabledGateDoesNotRead();
     TestNonChatNameDoesNotRead();
     TestUnreadableChatFunctionIsRejected();
     TestMatchedChatInvocationReturnsBorrowedRanges();
+    TestMatchedServerSendChatMessageReturnsByteRange();
 
     std::cout << "ProcessEventChatReflectionTests passed\n";
     return 0;

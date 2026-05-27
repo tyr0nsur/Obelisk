@@ -214,7 +214,7 @@ Updated: 2026-05-27
   `docs/research/2026-05-27-core-ufunction-property-chain.md`.
 - fact: `scripts/verify_chat_reflection_constants.py` compares the local
   `ue/ChatReflection.cpp` constants to offline core evidence for `ServerChat`,
-  `ServerChatTo`, and `ServerChatToPlayer`. It passed against
+  `ServerChatTo`, `ServerChatToPlayer`, and `ServerSendChatMessage`. It passed against
   `/servidor/ark/obelisk/dumps/arkserver-20260527T031311Z/core/arkserver-20260527T031311Z.2902200`
   with `--max-object-scan 30000`.
 - fact: `ue/RuntimeReflection.{h,cpp}` now provides an internal, binary-hash-gated
@@ -263,12 +263,10 @@ Updated: 2026-05-27
 
 ## Priority Next Steps
 
-- next-step: Extend the experimental recognizer to validate
-  `ShooterPlayerController.ServerSendChatMessage` before asking an operator to test chat
-  again; the older `ServerChat*` watchlist is probably watching cheat-manager commands.
-- next-step: After `ServerSendChatMessage` is recognized, write one in-game chat message on
-  Ragnarok and tail `/servidor/ark/obelisk/logs/arkserver/Obelisk.log` for a bounded
-  reflected chat/candidate log entry.
+- next-step: Deploy the `ServerSendChatMessage` recognizer to the debug runtime, then write
+  one in-game chat message on Ragnarok and tail
+  `/servidor/ark/obelisk/logs/arkserver/Obelisk.log` for a bounded reflected
+  chat/candidate log entry.
 - next-step: Wire UTF-32 text decoding into the experimental chat reflection logger only
   after one real `ServerSendChatMessage` capture confirms the reflected params are being
   hit.

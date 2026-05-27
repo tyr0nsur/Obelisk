@@ -13,6 +13,7 @@ namespace Obelisk::UE::ChatReflection
         ServerChat,
         ServerChatTo,
         ServerChatToPlayer,
+        ServerSendChatMessage,
     };
 
     enum class ChatField
@@ -20,6 +21,8 @@ namespace Obelisk::UE::ChatReflection
         MessageText,
         SteamID,
         PlayerName,
+        ChatMessage,
+        SendMode,
     };
 
     struct ChatFieldRange

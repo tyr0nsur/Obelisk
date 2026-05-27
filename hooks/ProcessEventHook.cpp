@@ -305,6 +305,8 @@ namespace Obelisk::Hooks
             return "ServerChatTo";
         case ChatFunction::ServerChatToPlayer:
             return "ServerChatToPlayer";
+        case ChatFunction::ServerSendChatMessage:
+            return "ServerSendChatMessage";
         }
         return "Unknown";
     }
@@ -320,6 +322,10 @@ namespace Obelisk::Hooks
             return "SteamID";
         case ChatField::PlayerName:
             return "PlayerName";
+        case ChatField::ChatMessage:
+            return "ChatMessage";
+        case ChatField::SendMode:
+            return "SendMode";
         }
         return "Unknown";
     }
