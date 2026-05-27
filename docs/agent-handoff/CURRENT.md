@@ -6,6 +6,8 @@ Updated: 2026-05-27
 
 - fact: Compact recovery context is stored in `docs/agent-handoff/COMPACT_CONTEXT.md` for
   resuming after conversation compaction.
+- fact: ARK config restore notes are in `docs/SERVER_RESTORE.md`; latest config backup
+  symlink is `/home/flowcommunity-ark/backups/ark-config-latest`.
 - fact: Obelisk central install root is `/servidor/ark/obelisk`.
 - fact: Contributor-facing stability matrix is documented in `docs/STATUS.md`.
 - fact: Ragnarok stable baseline is ProcessEvent hook enabled with plugins disabled:
@@ -29,6 +31,10 @@ Updated: 2026-05-27
   `/servidor/ark`; treat both observed instances as live/non-isolated unless an operator
   confirms otherwise. See
   `docs/research/2026-05-27-reflectionscanner-isolated-instance-audit.md`.
+- fact: Ops planning recommends a new `arkserver-obelisk-debug` LinuxGSM instance with
+  isolated ports, saves, cluster posture, `OBELISK_LOG_DIR`, and wrapper-level Obelisk
+  env instead of shared map markers; see
+  `docs/research/2026-05-27-isolated-debug-instance-plan.md`.
 - fact: `scripts/analyze_reflectionscanner_capture.py` passively summarizes copied
   ReflectionScanner logs for UObject scores, FName `matched_clues`, delayed globals, and
   reject markers; it does not touch server state.
@@ -72,6 +78,8 @@ Updated: 2026-05-27
   the reflection/chat metadata audit.
 - next-step: Resolve `FName` indices through `GNames` or `FNamePool`.
 - next-step: Locate `GUObjectArray`/`GObjects` and enumerate `UFunction` metadata.
+- next-step: Get operator permission to create or designate an isolated/debug instance
+  before running ReflectionScanner; preferred plan is `arkserver-obelisk-debug`.
 - next-step: Use isolated ReflectionScanner captures to compare UObject validation scores
   before accepting any `GObjects`, `GNames`, or `UFunction` offset.
 - next-step: In the next isolated ReflectionScanner capture, compare any

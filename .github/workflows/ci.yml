@@ -10,6 +10,22 @@ permissions:
   contents: read
 
 jobs:
+  scripts:
+    name: Script tests
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compile Python scripts
+        run: |
+          python3 -m py_compile \
+            scripts/analyze_reflectionscanner_capture.py \
+            scripts/test_analyze_reflectionscanner_capture.py
+
+      - name: Run analyzer tests
+        run: python3 scripts/test_analyze_reflectionscanner_capture.py
+
   build:
     name: CMake build
     runs-on: ubuntu-24.04

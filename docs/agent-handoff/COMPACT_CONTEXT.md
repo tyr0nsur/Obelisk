@@ -12,11 +12,15 @@ work from repository state instead of chat history.
 - Current known good commit: `8d3da3c Add plugin shutdown and scanner audit tooling`
 - Local ignored artifacts normally present: `build/`, `Obelisk.log`
 - Do not commit built `.so` files, logs, server config, core dumps, or state markers.
+- Server config restore notes: `docs/SERVER_RESTORE.md`
+- Latest config backup symlink: `/home/flowcommunity-ark/backups/ark-config-latest`
 
 ## Production Server State
 
 - ARK root: `/servidor/ark`
 - Central Obelisk root: `/servidor/ark/obelisk`
+- Gameplay config backup was created at
+  `/home/flowcommunity-ark/backups/ark-config-20260527-015805`.
 - Ragnarok stable live posture:
   - `/servidor/ark/obelisk/state/enable-process-event-hook-ragnarok`
   - `/servidor/ark/obelisk/state/disable-plugins-ragnarok`
@@ -44,6 +48,10 @@ work from repository state instead of chat history.
   build; it needs lifecycle, HTTP security, config, and callback redesign.
 - ReflectionScanner is experimental and must stay disabled on live servers.
 - No confirmed isolated/debug ARK instance exists right now.
+- Ops plan now recommends creating `arkserver-obelisk-debug` with isolated ports/saves,
+  no live cluster, debug-only `OBELISK_LOG_DIR`, and wrapper-level Obelisk env instead of
+  map marker reuse; see
+  `docs/research/2026-05-27-isolated-debug-instance-plan.md`.
 - `GNames`, `GObjects`, `UFunction` metadata, and reflected parameter decoding are not
   solved yet.
 
@@ -85,7 +93,8 @@ python3 scripts/analyze_reflectionscanner_capture.py --json /path/to/isolated/Ob
 
 ## Next Good Rounds
 
-- Ops: design/create a truly isolated ARK debug instance plan without touching live servers.
+- Ops: get permission to create or designate the isolated ARK debug instance; preferred
+  plan is `arkserver-obelisk-debug`.
 - Reflection: improve FName/GNames probes and analyzer fixtures offline.
 - Runtime: add tests/harness for plugin shutdown order and callback cleanup.
 - Build/QA: add lightweight offline tests for scripts/analyzer and ABI layout assumptions.
