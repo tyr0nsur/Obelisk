@@ -315,6 +315,10 @@ namespace
         Require(invocation.Fields[1].Range.Data == fixture.Params.data() + 0x10,
                 "SendMode range pointer mismatch");
         Require(invocation.Fields[1].Range.Size == 0x1, "SendMode range size mismatch");
+
+        uint8_t sendMode = 0xff;
+        Require(ChatReflection::TryGetSendMode(invocation, sendMode), "SendMode helper failed");
+        Require(sendMode == 0x02, "SendMode helper returned wrong byte");
     }
 
     void TestRejectsSameFNameWithWrongShape()

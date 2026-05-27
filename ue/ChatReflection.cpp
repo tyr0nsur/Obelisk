@@ -317,4 +317,23 @@ namespace Obelisk::UE::ChatReflection
         out = std::move(value);
         return RuntimeReflection::ReadResult::Ok();
     }
+
+    bool TryGetSendMode(const ChatInvocation& invocation, uint8_t& out)
+    {
+        if (invocation.Function != ChatFunction::ServerSendChatMessage)
+            return false;
+
+        for (const ChatFieldRange& field : invocation.Fields)
+        {
+            if (field.Field != ChatField::SendMode)
+                continue;
+            if (field.Range.Size != 1 || !field.Range.Data)
+                return false;
+
+            out = field.Range.Data[0];
+            return true;
+        }
+
+        return false;
+    }
 }

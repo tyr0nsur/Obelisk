@@ -368,6 +368,12 @@ namespace Obelisk::Hooks
                      invocation.FunctionNameIndex,
                      params,
                      invocation.Fields.size());
+        uint8_t sendMode = 0;
+        if (Obelisk::UE::ChatReflection::TryGetSendMode(invocation, sendMode))
+        {
+            OBELISK_INFO("Reflected chat ServerSendChatMessage send_mode={}",
+                         static_cast<unsigned int>(sendMode));
+        }
         for (const auto& field : invocation.Fields)
         {
             OBELISK_INFO("Reflected chat field {} offset=0x{:X} size={} has_range={}",

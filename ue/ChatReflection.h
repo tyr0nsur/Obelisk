@@ -48,4 +48,6 @@ namespace Obelisk::UE::ChatReflection
                                                             const void* function,
                                                             const void* params,
                                                             ChatInvocation& out);
+
+    bool TryGetSendMode(const ChatInvocation& invocation, uint8_t& out);
 }
