@@ -99,6 +99,27 @@ def base_snapshot() -> dict[str, object]:
     }
 
 
+def scriptstruct_snapshot() -> dict[str, object]:
+    payload = deepcopy(base_snapshot())
+    payload["schema"] = "obelisk.scriptstruct-chain.snapshot.v1"
+    target = payload["targets"][0]  # type: ignore[index]
+    target["inspection_mode"] = "script_struct"
+    target["target"]["class_name"] = "ScriptStruct"  # type: ignore[index]
+    target["target"]["outer_name"] = "PrimalLocalProfile"  # type: ignore[index]
+    target["target"]["name"] = "ARKTributeDino"  # type: ignore[index]
+    target["properties_size"] = 2  # type: ignore[index]
+    target["min_alignment"] = 0  # type: ignore[index]
+    target.pop("num_parms", None)  # type: ignore[union-attr]
+    target.pop("parms_size", None)  # type: ignore[union-attr]
+    target.pop("function_flags", None)  # type: ignore[union-attr]
+    target.pop("return_value_offset", None)  # type: ignore[union-attr]
+    chain = target["property_chain"]  # type: ignore[index]
+    chain["properties_size"] = 2
+    chain["expected_count"] = None
+    chain.pop("parms_size", None)
+    return payload
+
+
 def write_snapshot(root: Path, payload: dict[str, object], name: str = "PrimalItem.CanUse.snapshot.json") -> Path:
     path = root / name
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
@@ -400,6 +421,63 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         report = json.loads(result.stdout)
         self.assertEqual(report["counts"], {"accepted": 1, "inconclusive": 1, "rejected": 1})
+
+    def test_short_target_filter_matches_multiple_schemas(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            ufunction = rename_target(deepcopy(base_snapshot()), outer="SharedOuter", name="SharedName")
+            scriptstruct = rename_target(scriptstruct_snapshot(), outer="SharedOuter", name="SharedName")
+            write_snapshot(base, ufunction, "SharedOuter.SharedName.ufunction.snapshot.json")
+            write_snapshot(candidate, deepcopy(ufunction), "SharedOuter.SharedName.ufunction.snapshot.json")
+            write_snapshot(base, scriptstruct, "SharedOuter.SharedName.scriptstruct.snapshot.json")
+            write_snapshot(candidate, deepcopy(scriptstruct), "SharedOuter.SharedName.scriptstruct.snapshot.json")
+
+            result = run_compare(base, candidate, "--target", "SharedOuter.SharedName", "--json")
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["counts"], {"accepted": 2, "inconclusive": 0, "rejected": 0})
+        self.assertEqual(
+            sorted(result["target"] for result in report["results"]),
+            [
+                "obelisk.scriptstruct-chain.snapshot.v1:SharedOuter.SharedName",
+                "obelisk.ufunction-chain.snapshot.v1:SharedOuter.SharedName",
+            ],
+        )
+
+    def test_schema_qualified_target_filter_selects_one_schema(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            ufunction = rename_target(deepcopy(base_snapshot()), outer="SharedOuter", name="SharedName")
+            scriptstruct = rename_target(scriptstruct_snapshot(), outer="SharedOuter", name="SharedName")
+            write_snapshot(base, ufunction, "SharedOuter.SharedName.ufunction.snapshot.json")
+            write_snapshot(candidate, deepcopy(ufunction), "SharedOuter.SharedName.ufunction.snapshot.json")
+            write_snapshot(base, scriptstruct, "SharedOuter.SharedName.scriptstruct.snapshot.json")
+            write_snapshot(candidate, deepcopy(scriptstruct), "SharedOuter.SharedName.scriptstruct.snapshot.json")
+
+            result = run_compare(
+                base,
+                candidate,
+                "--target",
+                "obelisk.scriptstruct-chain.snapshot.v1:SharedOuter.SharedName",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["counts"], {"accepted": 1, "inconclusive": 0, "rejected": 0})
+        self.assertEqual(
+            report["results"][0]["target"],
+            "obelisk.scriptstruct-chain.snapshot.v1:SharedOuter.SharedName",
+        )
 
 
 if __name__ == "__main__":
