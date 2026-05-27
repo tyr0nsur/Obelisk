@@ -51,6 +51,6 @@ bounded property chains only.
 
 ## Next Priorities
 
-1. Add ScriptStruct regeneration tooling before struct snapshots.
-2. Start ScriptStruct fixtures with a compact low-risk struct before transfer payloads.
+1. Start ScriptStruct fixtures with a compact low-risk struct before transfer payloads.
+2. Keep transfer payload structs deferred until second-source validation.
 3. Keep admin/NetExec and gameplay-authoritative mutations out of runtime work.
