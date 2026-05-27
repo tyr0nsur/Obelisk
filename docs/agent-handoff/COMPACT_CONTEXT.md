@@ -81,6 +81,9 @@ work from repository state instead of chat history.
 - `scripts/compare_reflection_snapshots.py --target Outer.Name` supports focused
   second-source checks for one UFunction or ScriptStruct without preparing a separate
   fixture root.
+- CI and release validation now run reflection snapshot comparison and ScriptStruct
+  fixture tests. README/STATUS present module-first observers and snapshot tooling instead
+  of a chat-centered roadmap. Mixed-schema target-filter behavior is covered by tests.
 - Latest restart audit:
   `docs/research/2026-05-27-ops-restart-audit-instance-id.md`
   - live `ObeliskRun.sh` exports `OBELISK_INSTANCE_ID=arkserver`

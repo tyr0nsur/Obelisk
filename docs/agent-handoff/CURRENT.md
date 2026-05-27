@@ -82,13 +82,20 @@ Updated: 2026-05-28
   ScriptStruct snapshot sets offline and reports `accepted`, `rejected`, or `inconclusive`
   per target. Use `--target Outer.Name` for focused module checks. It does not read cores
   or touch servers.
+- fact: Commit `f3a47d1` runs reflection snapshot comparison and ScriptStruct fixture
+  tests in CI and release validation.
+- fact: Commit `3451a19` aligns README and `docs/STATUS.md` around module-first runtime
+  observers and candidate-only snapshot tooling instead of a chat-centered roadmap.
+- fact: Commit `74b123d` covers mixed UFunction/ScriptStruct target-filter behavior so
+  short `Outer.Name` filters can match both schemas and schema-qualified filters select
+  exactly one.
 - fact: `sdk.transfers` ScriptStruct fixtures now preserve target/property object and
   FName identity fields like UFunction fixtures. `regenerate_scriptstruct_snapshots.py
   --check-layout` stays semantic/layout-only so second-source gates do not depend on
   unstable FName/GObjects indices.
-- next-step: Use `sdk.buffs` as the next offline module to strengthen the general ARK
-  Linux API/SDK core, but keep runtime hooks, callbacks, return overrides, raw
-  object/class exposure, and gameplay mutation blocked.
+- next-step: Continue priority rounds on general reflection/API substrate: second-source
+  evidence, snapshot tooling, module recognizer coverage, runtime safety gates, and
+  public SDK promotion policy.
 - fact: Runtime/chat baseline is documented in
   `docs/research/2026-05-27-runtime-and-chat-baseline.md`.
 - fact: Reflection/chat metadata audit added shared UE probe layouts and gated
