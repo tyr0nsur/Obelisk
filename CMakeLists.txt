@@ -53,6 +53,7 @@ add_library(obelisk SHARED
     runtime/Logger.cpp
     ue/Memory.cpp
     ue/ChatReflection.cpp
+    ue/InventoryReflection.cpp
     ue/StructureReflection.cpp
     ue/RuntimeReflection.cpp
     ue/ReflectionScanner.cpp
@@ -165,6 +166,15 @@ add_executable(structure_reflection_tests
 target_include_directories(structure_reflection_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_test(NAME StructureReflectionTests COMMAND structure_reflection_tests)
+
+add_executable(inventory_reflection_tests
+    tests/core/InventoryReflectionTests.cpp
+    ue/InventoryReflection.cpp
+    ue/RuntimeReflection.cpp
+)
+target_include_directories(inventory_reflection_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_test(NAME InventoryReflectionTests COMMAND inventory_reflection_tests)
 
 add_executable(process_event_chat_reflection_tests
     tests/core/ProcessEventChatReflectionTests.cpp

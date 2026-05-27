@@ -82,3 +82,7 @@ Blocked:
 compact fixture-backed item policy functions and high modding value. It remains
 gameplay-authoritative, so this plan is recognition-only and must not become public SDK or
 runtime mutation work.
+
+`InventoryReflection` now validates `PrimalItem.CanUse` and
+`PrimalItem.AllowRemoteAddToInventory` locally with synthetic fixtures. It is internal only:
+there is no `ProcessEvent` gate, no public callback, and no item payload decoding.
