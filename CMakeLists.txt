@@ -113,6 +113,11 @@ target_link_libraries(abi_layout_tests PRIVATE obelisk_sdk)
 
 add_test(NAME AbiLayoutTests COMMAND abi_layout_tests)
 
+install(TARGETS obelisk
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    COMPONENT Runtime
+)
+
 install(TARGETS obelisk_sdk
     EXPORT ObeliskTargets
     COMPONENT SDK

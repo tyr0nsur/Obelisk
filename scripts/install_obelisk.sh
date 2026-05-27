@@ -86,6 +86,12 @@ install_file() {
     run install -m "${mode}" "${src}" "${dst}"
 }
 
+install_runtime_package() {
+    require_file "${BUILD_DIR}/libobelisk.so"
+    backup_existing "${ROOT}/lib/libobelisk.so"
+    run cmake --install "${BUILD_DIR}" --prefix "${ROOT}" --component Runtime
+}
+
 install_sdk_package() {
     require_file "${BUILD_DIR}/ObeliskConfig.cmake"
     require_file "${BUILD_DIR}/ObeliskConfigVersion.cmake"
@@ -100,7 +106,7 @@ run mkdir -p \
     "${ROOT}/logs" \
     "${ROOT}/state/instances"
 
-install_file 755 "${BUILD_DIR}/libobelisk.so" "${ROOT}/lib/libobelisk.so"
+install_runtime_package
 install_file 755 "${BUILD_DIR}/_deps/subhook-build/libsubhook.so" "${ROOT}/lib/libsubhook.so"
 install_sdk_package
 

@@ -47,6 +47,7 @@ require_not_contains() {
 }
 
 require_cmd "${CXX_BIN}"
+require_cmd readelf
 
 "${REPO_DIR}/scripts/install_obelisk.sh" "${INSTALL_ROOT}"
 
@@ -65,6 +66,18 @@ for cmake_package_file in "${INSTALL_ROOT}"/lib/cmake/Obelisk/*.cmake; do
     require_not_contains "${REPO_DIR}" "${cmake_package_file}"
     require_not_contains "${REPO_DIR}/build" "${cmake_package_file}"
 done
+
+if readelf -d "${INSTALL_ROOT}/lib/libobelisk.so" | grep -F "${REPO_DIR}" >/dev/null; then
+    echo "Installed libobelisk.so contains a source/build-tree dynamic path leak" >&2
+    readelf -d "${INSTALL_ROOT}/lib/libobelisk.so" >&2
+    exit 1
+fi
+
+if ! readelf -d "${INSTALL_ROOT}/lib/libobelisk.so" | grep -F 'Library runpath: [$ORIGIN]' >/dev/null; then
+    echo "Installed libobelisk.so must resolve bundled runtime dependencies through RUNPATH=\$ORIGIN" >&2
+    readelf -d "${INSTALL_ROOT}/lib/libobelisk.so" >&2
+    exit 1
+fi
 
 CONFIG_DIR="${INSTALL_ROOT}/config/install_layout_consumer"
 CONFIG_PATH="${CONFIG_DIR}/config.json"
