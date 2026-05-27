@@ -129,6 +129,7 @@ def build_core_fixture(path: Path) -> dict[str, int]:
         "inventory_for_waking_tame_property": base + 0x26F00,
         "server_request_dino_char_stats_function": base + 0x27000,
         "the_dino_char_property": base + 0x27100,
+        "server_request_tribe_log_function": base + 0x27200,
         "readable_non_uobject": base + 0x80000,
     }
 
@@ -265,9 +266,10 @@ def build_core_fixture(path: Path) -> dict[str, int]:
     put_entry(82, b"bInventoryForWakingTame\x00")
     put_entry(83, b"ServerRequestDinoCharStats\x00")
     put_entry(84, b"theDinoChar\x00")
+    put_entry(85, b"ServerRequestTribeLog\x00")
 
     put_ptr(addrs["gobjects"] + enum.GOBJECTS_CHUNKS_OFFSET, addrs["gobjects_chunks"])
-    put_i32(addrs["gobjects"] + enum.GOBJECTS_COUNT_OFFSET, 98)
+    put_i32(addrs["gobjects"] + enum.GOBJECTS_COUNT_OFFSET, 99)
     put_ptr(addrs["gobjects_chunks"], addrs["gobjects_chunk0"])
 
     put_uobject(addrs["class_class"], 1, 0, addrs["class_class"], 1, 0)
@@ -818,6 +820,13 @@ def build_core_fixture(path: Path) -> dict[str, int]:
         name_index=84,
         outer_key="server_request_dino_char_stats_function",
     )
+    add_uobject(
+        "server_request_tribe_log_function",
+        object_index=98,
+        class_key="function_class",
+        name_index=85,
+        outer_key="shooter_player_controller_class",
+    )
 
     for index, key in [
         (0, "class_class"),
@@ -1106,6 +1115,7 @@ def build_core_fixture(path: Path) -> dict[str, int]:
         parms_size=8,
         properties=[("the_dino_char_property", 0, 8)],
     )
+    put_function_data(addrs["server_request_tribe_log_function"], first_property=0, num_parms=0, parms_size=0)
 
     write_minimal_elf64_core(path, base, bytes(segment))
     return addrs
@@ -1456,6 +1466,17 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
 
         self.assertEqual(chain["status"], "candidate")
         self.assert_property_sequence(chain, [("theDinoChar", "ObjectProperty", 0, 8)])
+
+    def test_player_controller_tribe_log_zero_param_chain(self) -> None:
+        target = self.inspect_single_by_name_outer("ServerRequestTribeLog", "ShooterPlayerController")
+        chain = target["property_chain"]
+
+        self.assertEqual(target["num_parms"], 0)
+        self.assertEqual(target["parms_size"], 0)
+        self.assertEqual(chain["status"], "candidate")
+        self.assertEqual(chain["expected_count"], 0)
+        self.assertEqual(chain["observed_count"], 0)
+        self.assertEqual(chain["properties"], [])
 
     def test_primal_structure_elevator_server_activate_byte_property_chain(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

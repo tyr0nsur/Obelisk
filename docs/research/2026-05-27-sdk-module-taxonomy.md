@@ -107,6 +107,7 @@ PrimalDinoCharacter.AllowCarryCharacter
 PrimalDinoCharacter.BPAllowCarryCharacter
 PrimalDinoCharacter.SetCharacterStatusTameable
 ShooterPlayerController.ServerRequestDinoCharStats
+ShooterPlayerController.ServerRequestTribeLog
 PrimalStructure.AllowStructureAccess
 PrimalStructure.IsAllowedToDemolish
 PrimalStructure.SetVariant
@@ -148,3 +149,4 @@ params and has higher gameplay-authority risk.
 - `docs/research/2026-05-27-structure-access-policy-fixtures.md`
 - `docs/research/2026-05-27-real-core-ufunction-snapshot-fixtures.md`
 - `docs/research/2026-05-27-missiontype-function-inventory.md`
+- `docs/research/2026-05-27-tribe-control-observation-fixture.md`
