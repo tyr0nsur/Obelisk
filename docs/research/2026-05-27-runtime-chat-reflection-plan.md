@@ -51,6 +51,15 @@ When enabled, it cheaply filters by chat FName index, validates the reflected ch
 and logs only function/field metadata and borrowed parameter ranges. It does not decode
 text, call plugins, expose ABI, or hook native exec pointers.
 
+The LinuxGSM wrapper supports marker-based activation:
+
+```bash
+touch /servidor/ark/obelisk/state/instances/arkserver/enable-chat-reflection
+```
+
+The marker sets `OBELISK_ENABLE_CHAT_REFLECTION=1`, the current supported binary SHA, and
+a default `OBELISK_CHAT_REFLECTION_LOG_LIMIT=25`.
+
 The final chat helper should build on that module and:
 
 - reject null or unreadable pointers;
