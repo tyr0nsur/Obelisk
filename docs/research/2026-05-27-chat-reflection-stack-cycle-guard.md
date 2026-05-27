@@ -88,7 +88,7 @@ hook-like benchmark.
 
 ## Next Steps
 
-1. Consider a fixed-capacity internal view for chat fields only if the remaining two
-   matched-path allocations become promotion blockers.
+1. Consider direct decode-and-sanitize output only if the remaining text-log allocations
+   become promotion blockers.
 2. Keep public SDK chat dispatch blocked until TheIsland A/B runtime validation completes.
 3. Do not enable text logging outside a short approved debug window.
