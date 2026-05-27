@@ -61,6 +61,12 @@
       "outer": "MissionType"
     },
     {
+      "file": "MissionType.GetPlayerUsableItems.snapshot.json",
+      "module": "sdk_missions",
+      "name": "GetPlayerUsableItems",
+      "outer": "MissionType"
+    },
+    {
       "file": "PrimalItem.AllowRemoteAddToInventory.snapshot.json",
       "module": "sdk_inventory",
       "name": "AllowRemoteAddToInventory",
@@ -83,6 +89,12 @@
       "module": "sdk_inventory",
       "name": "ServerRequestInventoryUseItemWithActor",
       "outer": "ShooterPlayerController"
+    },
+    {
+      "file": "PrimalInventoryComponent.InventoryCustomFilter.snapshot.json",
+      "module": "sdk_inventory",
+      "name": "InventoryCustomFilter",
+      "outer": "PrimalInventoryComponent"
     },
     {
       "file": "PrimalBuff.AllowPostProcessEffect.snapshot.json",
@@ -148,6 +160,18 @@
       "file": "ShooterPlayerController.IsInTribe.snapshot.json",
       "module": "sdk_tribes",
       "name": "IsInTribe",
+      "outer": "ShooterPlayerController"
+    },
+    {
+      "file": "ShooterPlayerController.ClientReceiveMyTribeOnlineList.snapshot.json",
+      "module": "sdk_tribes",
+      "name": "ClientReceiveMyTribeOnlineList",
+      "outer": "ShooterPlayerController"
+    },
+    {
+      "file": "ShooterPlayerController.ClientReceiveActiveMissionTags.snapshot.json",
+      "module": "sdk_tribes",
+      "name": "ClientReceiveActiveMissionTags",
       "outer": "ShooterPlayerController"
     }
   ]

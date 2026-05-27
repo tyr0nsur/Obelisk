@@ -1,0 +1,77 @@
+{
+  "address_policy": "absolute core paths and addresses omitted; use full inspector JSON for local evidence review",
+  "evidence": {
+    "ark_binary_sha256": "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+    "generated_by": "scripts/inspect_core_ufunctions.py --snapshot-json",
+    "obelisk_commit": "8820707",
+    "source": "offline_core",
+    "status": "candidate-only"
+  },
+  "interpretation": {
+    "note": "Offsets are candidate observations from this core, not accepted UE4 layout contracts.",
+    "status": "candidate-only"
+  },
+  "metadata": {
+    "max_object_scan": 30000,
+    "object_count": 1243796
+  },
+  "schema": "obelisk.ufunction-chain.snapshot.v1",
+  "targets": [
+    {
+      "function_flags": "0x1020cc0",
+      "membership": {
+        "class": "candidate-uobject",
+        "outer": "candidate-uobject",
+        "target": "candidate-uobject"
+      },
+      "num_parms": 1,
+      "parms_size": 16,
+      "property_chain": {
+        "expected_count": 1,
+        "observed_count": 1,
+        "parms_size": 16,
+        "properties": [
+          {
+            "array_dim": 1,
+            "array_inner_candidate": {
+              "inner_property": {
+                "class_name": "NameProperty",
+                "name": "MissionTags",
+                "name_index": 21385
+              },
+              "membership_status": "candidate-uobject",
+              "reject_reasons": [],
+              "status": "candidate"
+            },
+            "class_membership_status": "candidate-uobject",
+            "class_name": "ArrayProperty",
+            "depth": 0,
+            "element_size": 16,
+            "membership_status": "candidate-uobject",
+            "name": "MissionTags",
+            "name_index": 21385,
+            "offset_internal": 0,
+            "outer_membership_status": "candidate-uobject",
+            "property_flags": "0x282",
+            "reject_reasons": [],
+            "status": "candidate"
+          }
+        ],
+        "reject_reasons": [],
+        "status": "candidate"
+      },
+      "reject_reasons": [],
+      "return_value_offset": "0xffff",
+      "status": "candidate",
+      "target": {
+        "class_name": "Function",
+        "kind": "index",
+        "name": "ClientReceiveActiveMissionTags",
+        "object_index": 9692,
+        "outer_class_name": "Class",
+        "outer_name": "ShooterPlayerController",
+        "value": 9692
+      }
+    }
+  ]
+}
