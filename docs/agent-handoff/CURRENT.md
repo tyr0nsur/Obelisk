@@ -310,6 +310,9 @@ Updated: 2026-05-27
   if `OBELISK_API_CAPABILITY_CHAT_EVENTS` appears. The minimum future promotion path is
   failing ABI layout + installed SDK consumer tests first, then append-only C ABI wrappers
   over the internal `ChatEventDispatcher`.
+- fact: `scripts/test_public_sdk_chat_guardrails.py` and CI now check that public SDK
+  headers and the installed SDK consumer do not accidentally expose or consume experimental
+  chat API symbols before intentional promotion.
 - fact: `ue/ChatReflection.{h,cpp}` now recognizes `ServerChat`, `ServerChatTo`, and
   `ServerChatToPlayer` shapes on top of `RuntimeReflection` and returns borrowed parameter
   ranges when `params` is provided. Runtime text logging is handled through the gated
