@@ -84,7 +84,13 @@ Requirements:
 cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake --build build -j"$(nproc)"
 ctest --test-dir build --output-on-failure
-python3 -m unittest scripts/test_analyze_reflectionscanner_capture.py
+python3 scripts/test_analyze_reflectionscanner_capture.py
+python3 scripts/test_scan_core_fname_tables.py
+python3 scripts/test_enumerate_core_uobjects.py
+python3 scripts/test_inspect_core_ufunctions.py
+python3 scripts/test_build_core_dump_evidence_pack.py
+python3 scripts/test_verify_chat_reflection_constants.py
+python3 scripts/test_research_doc_guardrails.py
 scripts/install_obelisk.sh --dry-run /tmp/obelisk-install-check
 ```
 
