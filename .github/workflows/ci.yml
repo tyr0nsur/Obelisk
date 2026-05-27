@@ -49,6 +49,7 @@ jobs:
           bash -n scripts/test_install_obelisk_layout.sh
           bash -n scripts/check_obelisk_server_posture.sh
           bash -n scripts/test_check_obelisk_server_posture.sh
+          bash -n scripts/test_linuxgsm_wrapper_markers.sh
           bash -n packaging/linuxgsm/ObeliskRun.sh
           bash -n packaging/linuxgsm/ObeliskRunDebug.sh
 
@@ -82,7 +83,9 @@ jobs:
           python3 scripts/test_repo_hygiene.py
 
       - name: Run server posture tests
-        run: scripts/test_check_obelisk_server_posture.sh
+        run: |
+          scripts/test_check_obelisk_server_posture.sh
+          scripts/test_linuxgsm_wrapper_markers.sh
 
   build:
     name: CMake build
