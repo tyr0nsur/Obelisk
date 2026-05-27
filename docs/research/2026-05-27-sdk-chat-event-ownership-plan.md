@@ -218,8 +218,11 @@ This still does not replace TheIsland runtime A/B evidence.
 
 ## Next Steps
 
-- Keep the current code as instrumentation.
-- Run a controlled text-logging validation only when operator-approved.
-- Draft ABI additions only after copied text and callback lifetime tests are designed.
-- Keep Discord/community messaging explicit: chat SDK events are a future goal, not current
-  public API.
+1. Keep the current code as instrumentation.
+2. Run a controlled text-logging validation only when operator-approved.
+3. Draft ABI additions only after copied text and callback lifetime tests are designed.
+4. When public promotion starts, begin with failing ABI and installed SDK consumer tests for
+   the C/POD chat structs and append-only `RegisterOnChatMessage` API. Do not bridge the
+   internal C++ `ChatMessageView` or `std::string_view` types across the public ABI.
+5. Keep Discord/community messaging explicit: chat SDK events are a future goal, not
+   current public API.

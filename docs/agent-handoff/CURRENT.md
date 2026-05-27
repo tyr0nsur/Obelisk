@@ -297,6 +297,11 @@ Updated: 2026-05-27
   reflection reader with tests for bounded `UFunction`/`UProperty` chains and borrowed
   parameter ranges. It is not public ABI; it is used by the experimental hook-side chat
   observation path.
+- fact: Public chat SDK promotion remains blocked by design. `include/obelisk/ObeliskApi.h`
+  has no chat structs/capability/functions, and `tests/abi/AbiLayoutTests.cpp` still fails
+  if `OBELISK_API_CAPABILITY_CHAT_EVENTS` appears. The minimum future promotion path is
+  failing ABI layout + installed SDK consumer tests first, then append-only C ABI wrappers
+  over the internal `ChatEventDispatcher`.
 - fact: `ue/ChatReflection.{h,cpp}` now recognizes `ServerChat`, `ServerChatTo`, and
   `ServerChatToPlayer` shapes on top of `RuntimeReflection` and returns borrowed parameter
   ranges when `params` is provided. Runtime text logging is handled through the gated

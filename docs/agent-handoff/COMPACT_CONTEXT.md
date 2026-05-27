@@ -217,6 +217,11 @@ work from repository state instead of chat history.
   `/servidor/ark/obelisk/dumps/arkserver-20260527T031311Z/core/arkserver-20260527T031311Z.2902200`
   with `--max-object-scan 30000`; rerun it before promoting chat reflection constants for
   a new binary/core.
+- Public chat SDK promotion remains blocked by design. The public header has no chat
+  structs/capability/functions, `AbiLayoutTests` rejects
+  `OBELISK_API_CAPABILITY_CHAT_EVENTS`, and the future path is failing ABI layout +
+  installed SDK consumer tests before append-only C ABI wrappers over the internal
+  `ChatEventDispatcher`.
 - Current best hypothesis for real incoming player chat is not the `ServerChat*`
   watchlist. `ServerChat`, `ServerChatTo`, and `ServerChatToPlayer` have
   `ShooterCheatManager` outer evidence, while

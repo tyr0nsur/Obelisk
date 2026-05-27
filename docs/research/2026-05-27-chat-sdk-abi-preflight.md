@@ -132,8 +132,17 @@ validation are ready.
 
 ## Next Steps
 
-- Keep reducing or bounding the current matched-chat/text temporary allocations.
-- Integrate dispatcher registration with plugin owner resolution only after the public ABI
-  shape and capability gate are ready.
-- Do not expose sender object identity until Obelisk-owned handles and lifetime rules are
-  designed.
+1. Keep reducing or bounding the current matched-chat/text temporary allocations.
+2. After isolated runtime A/B evidence exists, start public chat promotion with failing
+   tests first:
+   - extend `tests/abi/AbiLayoutTests.cpp` for `ObeliskStringView`,
+     `ObeliskChatMessage`, `ObeliskChatMessageSubscription`,
+     `OBELISK_API_CAPABILITY_CHAT_EVENTS`, and append-only function offsets;
+   - extend the installed SDK consumer fixture so a plugin compiles against the public
+     chat declarations;
+   - only then add header fields and `PluginManager` wrappers that bridge the C ABI to the
+     internal `ChatEventDispatcher`.
+3. Keep the current `AbiLayoutTests` guard that rejects `OBELISK_API_CAPABILITY_CHAT_EVENTS`
+   until promotion is intentional.
+4. Do not expose sender object identity until Obelisk-owned handles and lifetime rules are
+   designed.
