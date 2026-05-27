@@ -16,9 +16,9 @@ contributor-facing summary, not a replacement for detailed research notes.
 | Area | Status | Notes |
 | --- | --- | --- |
 | `LD_PRELOAD` bootstrap | Stable baseline | Runtime loads through the central install layout. |
-| Central install root | Stable baseline | `/servidor/ark/obelisk` with `lib/`, `plugins/`, `plugins-disabled/`, `config/plugins/`, `config/instances/`, `logs/`, and `state/`. |
+| Central install root | Stable baseline | `/servidor/ark/obelisk` with `lib/`, `plugins/`, `config/plugins/`, `config/instances/`, `logs/`, and `state/`. |
 | LinuxGSM wrapper templates | Stable baseline | Versioned under `packaging/linuxgsm/`; copy to the ARK binary directory during a maintenance window. |
-| Installer plugin posture | Stable baseline | `scripts/install_obelisk.sh` installs `ChatPlugin.so` into `plugins-disabled/` unless `--enable-chat-plugin` is explicit. |
+| Installer plugin posture | Stable baseline | `scripts/install_obelisk.sh` installs only runtime libraries; plugins are activated only by copying `.so` files into `plugins/`. |
 | Per-map runtime flags | Stable baseline | Marker files gate hooks, plugins, and discovery per server instance. |
 | ProcessEvent hook | Stable baseline | Current Ragnarok posture enables the hook while disabling plugins. |
 | Plugin C ABI loading | Stable baseline | ABI is C-compatible and currently append-only for new metadata fields. |
@@ -44,4 +44,4 @@ disable-plugins-ragnarok
 ```
 
 Do not enable native exec probes on live servers. Keep experimental plugins in
-`plugins-disabled/` until isolated validation passes.
+the repository or another staging location until isolated validation passes.

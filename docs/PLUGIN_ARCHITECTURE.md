@@ -31,7 +31,7 @@ below are separated and validated in isolation.
 | Category | Purpose | Build policy | Runtime policy |
 | --- | --- | --- | --- |
 | `examples/` | Minimal reference plugins that teach one safe pattern. | May be built by CI after review. | Disabled by default unless explicitly installed. |
-| `experimental/` | Research, probes, and prototype integrations. | Excluded from top-level build. | Keep in `plugins-disabled/` except isolated tests. |
+| `experimental/` | Research, probes, and prototype integrations. | Excluded from top-level build by default. | Do not install into `plugins/` except isolated tests. |
 | stable plugin directories | Operational plugins with documented config, tests, and rollback. | Eligible for top-level build after review. | Map-gated rollout only. |
 
 An example plugin should demonstrate exactly one behavior. For example, an HTTP
@@ -102,14 +102,13 @@ The runtime does not need to know how a plugin was compiled. On restart it scans
 The stable operational flow is:
 
 1. Build or obtain `PluginName.so`.
-2. Place it in `${OBELISK_ROOT}/plugins-disabled/` while preparing config.
-3. Ensure `${OBELISK_ROOT}/config/plugins/plugin-name/config.json` exists or that the
+2. Ensure `${OBELISK_ROOT}/config/plugins/plugin-name/config.json` exists or that the
    plugin creates a safe-disabled default on first init.
-4. Move the `.so` into `${OBELISK_ROOT}/plugins/`.
-5. Restart only the target ARK instance.
+3. Copy the `.so` into `${OBELISK_ROOT}/plugins/`.
+4. Restart only the target ARK instance.
 
 Dropping a plugin into `plugins/` is therefore the activation step. Plugins that should not
-load must stay in `plugins-disabled/` or outside the plugin directory.
+load must stay outside the plugin directory.
 
 ## Lifecycle
 

@@ -9,7 +9,7 @@ work from repository state instead of chat history.
 
 - Repo: `/home/flowcommunity-ark/Obelisk`
 - Remote: `git@github.com:tyr0nsur/Obelisk.git`
-- Current known good commit: `7bf0e67 Add restore docs and analyzer tests`
+- Current known good baseline: latest pushed `main` after validation.
 - Local ignored artifacts normally present: `build/`, `Obelisk.log`
 - Do not commit built `.so` files, logs, server config, core dumps, or state markers.
 - Server config restore notes: `docs/SERVER_RESTORE.md`
@@ -37,13 +37,16 @@ work from repository state instead of chat history.
 - Central install layout under `/servidor/ark/obelisk`.
 - Absolute x64 ProcessEvent hook with executable range and known prologue validation.
 - C ABI plugin loading.
+- Stable install only deploys runtime libraries; plugins are activated by placing `.so`
+  files directly in `/servidor/ark/obelisk/plugins/`.
 - Plugin-owned callback cleanup on init failure and unload.
 - Optional plugin export: `extern "C" void ObeliskPlugin_Shutdown()`.
 - `helloworld_plugin` builds as the minimal plugin example.
 
 ## What Is Experimental Or Blocked
 
-- `ChatPlugin` remains experimental and unsafe as a production chat API.
+- `ChatPlugin` remains experimental, is not built by default, and is unsafe as a
+  production chat API.
 - `MonitorPlugin` remains experimental and intentionally excluded from top-level stable
   build; it needs lifecycle, HTTP security, config, and callback redesign.
 - ReflectionScanner is experimental and must stay disabled on live servers.

@@ -18,7 +18,6 @@ Central root:
 /servidor/ark/obelisk/
   lib/
   plugins/
-  plugins-disabled/
   config/plugins/
   logs/
   state/
@@ -54,7 +53,7 @@ Expected logs:
 ## Experiment Gates
 
 - Do not activate `ChatPlugin.so` or chat discovery on a production map as the first test.
-- Keep experimental plugins in `plugins-disabled/` until an isolated server test passes.
+- Keep experimental plugins outside `plugins/` until an isolated server test passes.
 - Enable one marker/config gate at a time and record the exact change.
 - Never enable native exec probes on live servers.
 - Never enable `ReflectionScanner` on `arkserver` or `arkserver2` unless the operator has

@@ -9,9 +9,7 @@ Installs built Obelisk runtime artifacts into a centralized server root.
 
 Options:
   --dry-run              Print actions without changing files.
-  --enable-chat-plugin   Install ChatPlugin.so into plugins/ instead of plugins-disabled/.
-  --backup-existing      Back up replaced runtime/plugin .so files with a timestamp suffix.
-  --force-config         Replace generated plugin config files even if they already exist.
+  --backup-existing      Back up replaced runtime .so files with a timestamp suffix.
   -h, --help             Show this help.
 
 Default root:
@@ -21,9 +19,7 @@ EOF
 
 ROOT="/servidor/ark/obelisk"
 DRY_RUN=0
-ENABLE_CHAT_PLUGIN=0
 BACKUP_EXISTING=0
-FORCE_CONFIG=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -31,16 +27,8 @@ while [[ $# -gt 0 ]]; do
             DRY_RUN=1
             shift
             ;;
-        --enable-chat-plugin)
-            ENABLE_CHAT_PLUGIN=1
-            shift
-            ;;
         --backup-existing)
             BACKUP_EXISTING=1
-            shift
-            ;;
-        --force-config)
-            FORCE_CONFIG=1
             shift
             ;;
         -h|--help)
@@ -98,38 +86,9 @@ install_file() {
     run install -m "${mode}" "${src}" "${dst}"
 }
 
-write_chat_config() {
-    local path="${ROOT}/config/plugins/chat/config.json"
-    local legacy_path="${ROOT}/config/plugins/chat_config.json"
-    if [[ "${FORCE_CONFIG}" != "1" && -f "${path}" ]]; then
-        echo "Keeping existing ${path}"
-        return
-    fi
-
-    if [[ "${DRY_RUN}" == "1" ]]; then
-        echo "DRY-RUN: write ${path}"
-        return
-    fi
-
-    mkdir -p "$(dirname "${path}")"
-    cat > "${path}" <<'JSON'
-{
-    "ClientMessageIndex": -1,
-    "ClientMessageTextOffset": 0,
-    "ServerChatIndex": -1,
-    "ServerChatMessageOffset": -1
-}
-JSON
-
-    if [[ ! -f "${legacy_path}" ]]; then
-        cp -a "${path}" "${legacy_path}"
-    fi
-}
-
 run mkdir -p \
     "${ROOT}/lib" \
     "${ROOT}/plugins" \
-    "${ROOT}/plugins-disabled" \
     "${ROOT}/config/plugins" \
     "${ROOT}/config/instances" \
     "${ROOT}/logs" \
@@ -137,19 +96,5 @@ run mkdir -p \
 
 install_file 755 "${BUILD_DIR}/libobelisk.so" "${ROOT}/lib/libobelisk.so"
 install_file 755 "${BUILD_DIR}/_deps/subhook-build/libsubhook.so" "${ROOT}/lib/libsubhook.so"
-
-if [[ -f "${BUILD_DIR}/plugins/chat/ChatPlugin.so" ]]; then
-    if [[ "${ENABLE_CHAT_PLUGIN}" == "1" ]]; then
-        install_file 755 "${BUILD_DIR}/plugins/chat/ChatPlugin.so" "${ROOT}/plugins/ChatPlugin.so"
-        echo "Installed ChatPlugin.so into plugins/ because --enable-chat-plugin was set."
-    else
-        install_file 755 "${BUILD_DIR}/plugins/chat/ChatPlugin.so" "${ROOT}/plugins-disabled/ChatPlugin.so"
-        echo "Installed ChatPlugin.so into plugins-disabled/ by default."
-    fi
-else
-    echo "ChatPlugin.so not built; skipping optional chat plugin."
-fi
-
-write_chat_config
 
 echo "Obelisk installed to ${ROOT}"

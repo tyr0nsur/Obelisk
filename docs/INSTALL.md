@@ -18,7 +18,6 @@ Recommended root:
 /servidor/ark/obelisk/
   lib/
   plugins/
-  plugins-disabled/
   config/plugins/<plugin-id>/config.json
   config/instances/
   logs/
@@ -36,11 +35,9 @@ The script copies:
 ```text
 build/libobelisk.so                         -> lib/libobelisk.so
 build/_deps/subhook-build/libsubhook.so     -> lib/libsubhook.so
-build/plugins/chat/ChatPlugin.so            -> plugins-disabled/ChatPlugin.so
 ```
 
-It also creates `plugins-disabled`, `config/plugins`, `config/instances`, `logs`, and
-`state`.
+It also creates `plugins`, `config/plugins`, `config/instances`, `logs`, and `state`.
 
 Plugins loaded from `plugins/` are expected to own their config defaults. The preferred
 path for plugin config is:
@@ -50,27 +47,13 @@ path for plugin config is:
 ```
 
 The runtime loads every `.so` directly inside `/servidor/ark/obelisk/plugins/` on restart.
-Use `/servidor/ark/obelisk/plugins-disabled/` as the staging area for plugins that are
-installed but not active.
-
-For the current transitional ChatPlugin, the installer creates both the preferred
-`config/plugins/chat/config.json` and the legacy `config/plugins/chat_config.json` when
-missing.
-
-`ChatPlugin.so` is installed disabled by default. Use `--enable-chat-plugin` only for an
-isolated plugin test:
-
-```bash
-./scripts/install_obelisk.sh --enable-chat-plugin /servidor/ark/obelisk
-```
+If a plugin should not load, do not place it in `plugins/`.
 
 Useful installer flags:
 
 ```text
 --dry-run
 --backup-existing
---force-config
---enable-chat-plugin
 ```
 
 ## LinuxGSM Wrapper

@@ -9,6 +9,9 @@ Updated: 2026-05-27
 - fact: ARK config restore notes are in `docs/SERVER_RESTORE.md`; latest config backup
   symlink is `/home/flowcommunity-ark/backups/ark-config-latest`.
 - fact: Obelisk central install root is `/servidor/ark/obelisk`.
+- fact: Stable installer deploys runtime libraries only. Plugins activate only when their
+  `.so` is copied into `/servidor/ark/obelisk/plugins/`; inactive plugins stay outside the
+  install root.
 - fact: Contributor-facing stability matrix is documented in `docs/STATUS.md`.
 - fact: Ragnarok stable baseline is ProcessEvent hook enabled with plugins disabled:
   `/servidor/ark/obelisk/state/enable-process-event-hook-ragnarok` and
@@ -69,8 +72,9 @@ Updated: 2026-05-27
   shifting existing function-pointer offsets; front-loaded ABI headers remain a future
   major-version plan.
 - fact: Top-level CMake builds `helloworld_plugin/HelloWorldPlugin.so` as the minimal
-  plugin example. `plugins/monitor` remains experimental and intentionally excluded from
-  the top-level build until its structure and safety model are redesigned.
+  plugin example. `plugins/chat` and `plugins/monitor` remain experimental and are
+  intentionally excluded from the default top-level build until their structure and safety
+  model are redesigned.
 - fact: Plugin structure and promotion rules are now documented in
   `docs/PLUGIN_ARCHITECTURE.md`; `plugins/README.md` records the intended
   `examples/` and `experimental/` split without moving code or changing CMake.

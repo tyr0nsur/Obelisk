@@ -19,7 +19,6 @@ Expected outputs:
 ```text
 build/libobelisk.so
 build/_deps/subhook-build/libsubhook.so
-build/plugins/chat/ChatPlugin.so
 build/helloworld_plugin/HelloWorldPlugin.so
 ```
 
@@ -37,7 +36,6 @@ Install layout:
 /servidor/ark/obelisk/
   lib/
   plugins/
-  plugins-disabled/
   config/plugins/
   logs/
   state/
@@ -50,8 +48,8 @@ Do not install runtime artifacts directly into `ShooterGame/Binaries/Linux` exce
 - Pin dependency versions where possible; avoid tracking `master` for reproducible builds.
 - Runtime links currently include `fmt`, `spdlog`, `subhook`, `dl`, and `pthread`.
 - Do not commit `.so` outputs, logs, config state, or build directories.
-- Experimental plugins should go to `plugins-disabled/` or require an explicit install flag.
-  Do not make `ChatPlugin.so` production-enabled by default.
+- Experimental plugins should not be installed into `plugins/` by default. Do not make
+  `ChatPlugin.so` production-enabled by default.
 - Keep `plugins/monitor` out of the top-level stable build until its lifecycle, HTTP
   surface, config, and shutdown model are redesigned.
 

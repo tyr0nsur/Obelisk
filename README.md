@@ -80,10 +80,10 @@ The recommended install layout is:
     libobelisk.so
     libsubhook.so
   plugins/
-    ChatPlugin.so
   config/
     plugins/
-      chat_config.json
+      <plugin-id>/
+        config.json
   logs/
     Obelisk.log
     Obelisk-Ragnarok.log
@@ -116,9 +116,16 @@ Main build outputs:
 
 ```text
 build/libobelisk.so
-build/plugins/chat/ChatPlugin.so
 build/helloworld_plugin/HelloWorldPlugin.so
 build/_deps/subhook-build/libsubhook.so
+```
+
+`plugins/chat` is experimental and is not compiled by default. Build it only for isolated
+research with:
+
+```bash
+cmake -S . -B build -DOBELISK_BUILD_EXPERIMENTAL_CHAT_PLUGIN=ON
+cmake --build build --target ChatPlugin -j"$(nproc)"
 ```
 
 ## Plugin Example
