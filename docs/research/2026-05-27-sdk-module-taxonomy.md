@@ -48,6 +48,7 @@ memory alone, or metadata reads without ownership and lifetime design.
 | `sdk.dinos` | `PrimalDinoCharacter` passenger, carry, attack, tame, flight | Dino event metadata fixtures | Candidate-only |
 | `sdk.structures` | `ServerRequestPlaceStructure`, multiuse/place functions, `PrimalStructure` | Struct-heavy validation surface | Candidate-only; defer runtime |
 | `sdk.missions` | `MissionType` player add/leave hooks, state, leaderboard, spawn functions | Mission metadata fixtures and policy design | Candidate-only; fixture-backed compact chains |
+| `sdk.buffs` | `PrimalBuff` bool-return and zero-param hooks | Buff metadata fixtures and deferred policy design | Candidate-only; minimal snapshot-backed |
 | `sdk.tribes` | Tribe/alliance/log request functions | Low-param observation candidates | Candidate-only |
 | `sdk.transfer` | Upload/download/ARK transfer functions | Future deep struct decoding | Candidate-only; defer |
 | `sdk.admin` | `ShooterCheatManager`, controller admin RPCs | Research and permission-model planning | Documentation-only |
@@ -100,6 +101,12 @@ Current fixture-backed compact, non-chat property chains:
 ShooterPlayerController.ServerRequestInventoryUseItem
 PrimalItem.AllowRemoteAddToInventory
 PrimalItem.CanUse
+PrimalBuff.AllowPostProcessEffect
+PrimalBuff.BuffOverrideInventoryAccessInput
+PrimalBuff.BPCustomAllowAddBuff
+PrimalBuff.BPBuffPreventUploading
+PrimalBuff.BPPreventAddingOtherBuff
+PrimalBuff.BP_OnBuffLifetimeUpdated
 PrimalDinoCharacter.ServerRequestAttack
 PrimalDinoCharacter.BPNotifyAddPassenger
 PrimalDinoCharacter.AddPassenger
@@ -144,6 +151,7 @@ params and has higher gameplay-authority risk.
 - `docs/research/2026-05-27-shooterplayercontroller-function-inventory.md`
 - `docs/research/2026-05-27-primalitem-function-inventory.md`
 - `docs/research/2026-05-27-inventory-controller-snapshot-fixtures.md`
+- `docs/research/2026-05-27-primalbuff-snapshot-fixtures.md`
 - `docs/research/2026-05-27-primaldinocharacter-function-inventory.md`
 - `docs/research/2026-05-27-dino-second-wave-fixtures.md`
 - `docs/research/2026-05-27-primalstructure-function-inventory.md`

@@ -1,0 +1,51 @@
+{
+  "address_policy": "absolute core paths and addresses omitted; use full inspector JSON for local evidence review",
+  "evidence": {
+    "ark_binary_sha256": "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+    "generated_by": "scripts/inspect_core_ufunctions.py --snapshot-json",
+    "obelisk_commit": "1c551af",
+    "source": "offline_core",
+    "status": "candidate-only"
+  },
+  "interpretation": {
+    "note": "Offsets are candidate observations from this core, not accepted UE4 layout contracts.",
+    "status": "candidate-only"
+  },
+  "metadata": {
+    "max_object_scan": 30000,
+    "object_count": 1243796
+  },
+  "schema": "obelisk.ufunction-chain.snapshot.v1",
+  "targets": [
+    {
+      "function_flags": "0xc020800",
+      "membership": {
+        "class": "candidate-uobject",
+        "outer": "candidate-uobject",
+        "target": "candidate-uobject"
+      },
+      "num_parms": 0,
+      "parms_size": 0,
+      "property_chain": {
+        "expected_count": 0,
+        "observed_count": 0,
+        "parms_size": 0,
+        "properties": [],
+        "reject_reasons": [],
+        "status": "candidate"
+      },
+      "reject_reasons": [],
+      "return_value_offset": "0xffff",
+      "status": "candidate",
+      "target": {
+        "class_name": "Function",
+        "kind": "index",
+        "name": "BP_OnBuffLifetimeUpdated",
+        "object_index": 15063,
+        "outer_class_name": "Class",
+        "outer_name": "PrimalBuff",
+        "value": 15063
+      }
+    }
+  ]
+}

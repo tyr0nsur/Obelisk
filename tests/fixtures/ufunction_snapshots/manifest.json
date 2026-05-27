@@ -43,6 +43,42 @@
       "outer": "ShooterPlayerController"
     },
     {
+      "file": "PrimalBuff.AllowPostProcessEffect.snapshot.json",
+      "module": "sdk_buffs",
+      "name": "AllowPostProcessEffect",
+      "outer": "PrimalBuff"
+    },
+    {
+      "file": "PrimalBuff.BuffOverrideInventoryAccessInput.snapshot.json",
+      "module": "sdk_buffs",
+      "name": "BuffOverrideInventoryAccessInput",
+      "outer": "PrimalBuff"
+    },
+    {
+      "file": "PrimalBuff.BPCustomAllowAddBuff.snapshot.json",
+      "module": "sdk_buffs",
+      "name": "BPCustomAllowAddBuff",
+      "outer": "PrimalBuff"
+    },
+    {
+      "file": "PrimalBuff.BP_OnBuffLifetimeUpdated.snapshot.json",
+      "module": "sdk_buffs",
+      "name": "BP_OnBuffLifetimeUpdated",
+      "outer": "PrimalBuff"
+    },
+    {
+      "file": "PrimalBuff.BPBuffPreventUploading.snapshot.json",
+      "module": "sdk_buffs",
+      "name": "BPBuffPreventUploading",
+      "outer": "PrimalBuff"
+    },
+    {
+      "file": "PrimalBuff.BPPreventAddingOtherBuff.snapshot.json",
+      "module": "sdk_buffs",
+      "name": "BPPreventAddingOtherBuff",
+      "outer": "PrimalBuff"
+    },
+    {
       "file": "PrimalDinoCharacter.AddPassenger.snapshot.json",
       "module": "sdk_dinos",
       "name": "AddPassenger",
