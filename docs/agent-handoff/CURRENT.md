@@ -297,6 +297,10 @@ Updated: 2026-05-27
   membership, and `EChatSendMode` enum names. It passed against
   `/servidor/ark/obelisk/dumps/arkserver-20260527T031311Z/core/arkserver-20260527T031311Z.2902200`
   with `--max-object-scan 30000`.
+- fact: `scripts/verify_chat_reflection_constants.py` now supports
+  `--evidence-pack <dir-or-manifest>`. It reads `manifest.json`, takes the recorded core,
+  first `gobjects_candidates` address, first `fname_root_slots` address, and verifies the
+  manifest binary SHA256 when available. Raw `--core` remains legacy/synthetic mode.
 - fact: `ue/RuntimeReflection.{h,cpp}` now provides an internal, binary-hash-gated
   reflection reader with tests for bounded `UFunction`/`UProperty` chains and borrowed
   parameter ranges. It is not public ABI; it is used by the experimental hook-side chat

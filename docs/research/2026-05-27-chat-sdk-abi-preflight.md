@@ -122,6 +122,18 @@ The public API should remain blocked until all are true:
 - Isolated runtime A/B captures chat reflection off, metadata-only on, and text logging on.
 - Binary-hash validation is rerun with `scripts/verify_chat_reflection_constants.py` for
   the target ARK server build.
+- Prefer evidence-pack validation over loose core arguments:
+
+  ```bash
+  python3 scripts/verify_chat_reflection_constants.py \
+    --evidence-pack /path/to/core-pack \
+    --max-object-scan 30000
+  ```
+
+  Evidence-pack mode reads `manifest.json`, uses the recorded core path,
+  `gobjects_candidates[0]`, and `fname_root_slots[0]`, and verifies the manifest binary
+  SHA256 when the binary path is present. Raw `--core` remains available for legacy and
+  synthetic fixtures.
 
 ## Result
 

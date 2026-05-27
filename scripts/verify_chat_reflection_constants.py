@@ -8,6 +8,7 @@ attaches to a running ARK process and never mutates server state.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import struct
@@ -76,8 +77,81 @@ class ChatReflectionSpec:
     functions: dict[str, FunctionSpec]
 
 
+@dataclass(frozen=True)
+class EvidencePack:
+    manifest_path: Path
+    manifest: dict[str, object]
+    core: Path
+    gobjects: int
+    fname_root_slot: int
+    binary_sha256: str | None
+
+
 def parse_int(value: str) -> int:
     return int(value, 0)
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _manifest_path(path: Path) -> Path:
+    return path / "manifest.json" if path.is_dir() else path
+
+
+def _first_address(manifest: dict[str, object], key: str) -> int:
+    values = manifest.get(key)
+    if not isinstance(values, list) or not values:
+        raise ValueError(f"evidence pack manifest missing non-empty {key}")
+    first = values[0]
+    if not isinstance(first, dict) or not isinstance(first.get("address"), str):
+        raise ValueError(f"evidence pack manifest has invalid {key}[0].address")
+    return int(str(first["address"]), 0)
+
+
+def load_evidence_pack(path: Path, *, verify_binary_sha: bool = True) -> EvidencePack:
+    manifest_path = _manifest_path(path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if not isinstance(manifest, dict):
+        raise ValueError("evidence pack manifest must be a JSON object")
+
+    core_payload = manifest.get("core")
+    if not isinstance(core_payload, dict) or not isinstance(core_payload.get("path"), str):
+        raise ValueError("evidence pack manifest missing core.path")
+    core = Path(str(core_payload["path"]))
+    if not core.is_file():
+        raise ValueError(f"evidence pack core does not exist: {core}")
+
+    binary_sha256: str | None = None
+    binary_payload = manifest.get("binary")
+    if isinstance(binary_payload, dict):
+        binary_sha = binary_payload.get("sha256")
+        if isinstance(binary_sha, str) and binary_sha:
+            binary_sha256 = binary_sha
+        binary_path_value = binary_payload.get("path")
+        if verify_binary_sha and binary_sha256 and isinstance(binary_path_value, str):
+            binary_path = Path(binary_path_value)
+            if not binary_path.is_file():
+                raise ValueError(f"evidence pack binary does not exist: {binary_path}")
+            observed_sha = sha256_file(binary_path)
+            if observed_sha != binary_sha256:
+                raise ValueError(
+                    "evidence pack binary sha256 mismatch: "
+                    f"expected {binary_sha256} observed {observed_sha}"
+                )
+
+    return EvidencePack(
+        manifest_path=manifest_path,
+        manifest=manifest,
+        core=core,
+        gobjects=_first_address(manifest, "gobjects_candidates"),
+        fname_root_slot=_first_address(manifest, "fname_root_slots"),
+        binary_sha256=binary_sha256,
+    )
 
 
 def _parse_cpp_int(value: str, constants: dict[str, int]) -> int:
@@ -515,7 +589,13 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Verify ue/ChatReflection.cpp constants against offline core chat UFunction evidence."
     )
-    parser.add_argument("--core", required=True, type=Path, help="Path to an existing ELF core dump.")
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--core", type=Path, help="Path to an existing ELF core dump.")
+    source.add_argument(
+        "--evidence-pack",
+        type=Path,
+        help="Path to a core evidence pack directory or manifest.json. Preferred over raw --core.",
+    )
     parser.add_argument("--chat-reflection-source", type=Path, default=CHAT_REFLECTION_SOURCE)
     parser.add_argument("--gobjects", type=parse_int, default=uobjects.DEFAULT_GOBJECTS)
     parser.add_argument("--fname-root-slot", type=parse_int, default=uobjects.DEFAULT_FNAME_ROOT_SLOT)
@@ -526,6 +606,11 @@ def parse_args() -> argparse.Namespace:
         type=parse_int,
         default=DEFAULT_SERVER_SEND_CHAT_NATIVE_EXEC,
         help="Binary-hash-scoped native exec pointer used only as offline cross-validation evidence.",
+    )
+    parser.add_argument(
+        "--no-verify-binary-sha",
+        action="store_true",
+        help="When using --evidence-pack, do not hash the manifest binary path.",
     )
     parser.add_argument("--json", action="store_true")
     return parser.parse_args()
@@ -538,14 +623,30 @@ def main() -> int:
     if args.window_size <= 0:
         raise SystemExit("--window-size must be positive")
 
+    evidence_pack: EvidencePack | None = None
+    core = args.core
+    gobjects = args.gobjects
+    fname_root_slot = args.fname_root_slot
+    if args.evidence_pack:
+        try:
+            evidence_pack = load_evidence_pack(
+                args.evidence_pack,
+                verify_binary_sha=not args.no_verify_binary_sha,
+            )
+        except ValueError as error:
+            raise SystemExit(str(error)) from error
+        core = evidence_pack.core
+        gobjects = evidence_pack.gobjects
+        fname_root_slot = evidence_pack.fname_root_slot
+
     chat_spec = parse_chat_reflection_source(args.chat_reflection_source)
-    memory = uobjects.CoreMemory(args.core)
+    memory = uobjects.CoreMemory(core)
     try:
         payload = verify_core(
             memory,
             chat_spec=chat_spec,
-            gobjects=args.gobjects,
-            fname_root_slot=args.fname_root_slot,
+            gobjects=gobjects,
+            fname_root_slot=fname_root_slot,
             max_object_scan=args.max_object_scan,
             window_size=args.window_size,
             expected_server_send_chat_native=args.expected_server_send_chat_native,
@@ -553,7 +654,16 @@ def main() -> int:
     finally:
         memory.close()
 
-    payload = {"core": str(args.core), "chat_reflection_source": str(args.chat_reflection_source), **payload}
+    payload = {
+        "core": str(core),
+        "chat_reflection_source": str(args.chat_reflection_source),
+        **payload,
+    }
+    if evidence_pack:
+        payload["evidence_pack"] = {
+            "manifest": str(evidence_pack.manifest_path),
+            "binary_sha256": evidence_pack.binary_sha256,
+        }
     if args.json:
         print(json.dumps(payload, indent=2, sort_keys=True))
     else:

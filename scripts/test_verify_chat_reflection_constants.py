@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import struct
 import subprocess
 import sys
@@ -772,6 +773,83 @@ class VerifyChatReflectionConstantsTests(unittest.TestCase):
         payload = json.loads(result.stdout)
         self.assertEqual(payload["status"], "ok")
         self.assertEqual(payload["functions"][0]["function"], "ServerChat")
+
+    def test_cli_json_accepts_evidence_pack_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            binary = root / "ShooterGameServer"
+            binary.write_bytes(b"synthetic-binary")
+            source = root / "ChatReflection.cpp"
+            source.write_text(CHAT_REFLECTION_CPP, encoding="utf-8")
+            addrs = build_chat_core_fixture(core)
+            manifest = {
+                "binary": {
+                    "path": str(binary),
+                    "sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
+                    "size_bytes": binary.stat().st_size,
+                },
+                "core": {"path": str(core), "sha256": None, "size_bytes": core.stat().st_size},
+                "gobjects_candidates": [{"label": "gobjects", "address": hex(addrs["gobjects"])}],
+                "fname_root_slots": [{"label": "fname", "address": hex(addrs["fname_root_slot"])}],
+            }
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "verify_chat_reflection_constants.py"),
+                    "--evidence-pack",
+                    str(root),
+                    "--chat-reflection-source",
+                    str(source),
+                    "--expected-server-send-chat-native",
+                    hex(addrs["native_exec"]),
+                    "--json",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["metadata"]["gobjects"], hex(addrs["gobjects"]))
+        self.assertEqual(payload["metadata"]["fname_root_slot"], hex(addrs["fname_root_slot"]))
+        self.assertEqual(payload["evidence_pack"]["manifest"], str(manifest_path))
+
+    def test_evidence_pack_rejects_binary_sha_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            binary = root / "ShooterGameServer"
+            binary.write_bytes(b"synthetic-binary")
+            build_chat_core_fixture(core)
+            manifest = {
+                "binary": {"path": str(binary), "sha256": "0" * 64},
+                "core": {"path": str(core)},
+                "gobjects_candidates": [{"label": "gobjects", "address": "0x595b7e0"}],
+                "fname_root_slots": [{"label": "fname", "address": "0x5956f30"}],
+            }
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "binary sha256 mismatch"):
+                verifier.load_evidence_pack(manifest_path)
+
+    def test_evidence_pack_requires_gobjects_and_fname_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            build_chat_core_fixture(core)
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(
+                json.dumps({"core": {"path": str(core)}, "fname_root_slots": []}),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ValueError, "gobjects_candidates"):
+                verifier.load_evidence_pack(manifest_path, verify_binary_sha=False)
 
 
 if __name__ == "__main__":
