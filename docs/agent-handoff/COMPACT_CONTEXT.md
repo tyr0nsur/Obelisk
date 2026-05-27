@@ -132,6 +132,13 @@ work from repository state instead of chat history.
   `implausible_num_elements`; this means the sampler currently rejects too early on
   counters that are known to be zero for the candidate table. Next runtime change should
   relax only the sampler path to read bounded entries while still logging counters.
+- Authorized `arkserver` core dump evidence changed the FName status. With
+  `OBELISK_DEBUG_ALLOW_PTRACE=1`, `gcore` captured PID `2902200` to
+  `/servidor/ark/obelisk/dumps/arkserver-20260527T031311Z`. The server was then restored
+  to stable posture. The core confirms static FName slot `0x5956f30 -> 0x2ae5c660`,
+  `num_elements=0x4516e`, `num_chunks=0x12`, `0 -> None`,
+  `4884 -> ClientMessage`, and `9619 -> ServerChat`; see
+  `docs/research/2026-05-27-arkserver-core-fname-evidence.md`.
 - UE4 type reconstruction planning is captured in
   `docs/research/2026-05-27-ue4-type-reconstruction-roadmap.md`; keep the milestone
   order as `FName`, `GObjects`, `UFunction`, then bounded params.
@@ -223,8 +230,8 @@ python3 scripts/analyze_reflectionscanner_capture.py \
 
 - Ops: get permission to create or designate the isolated ARK debug instance; preferred
   plan is `arkserver-obelisk-debug`.
-- Reflection: relax the static-root sampler counter gate and rerun observed-index sampling
-  on an isolated/debug instance.
+- Reflection: deploy corrected FName clue indices and run a short static-root scanner
+  capture for `OBELISK_REFLECTION_STATIC_FNAME_ROOTS=0x5956f30`.
 - Evidence: after any isolated scanner capture, run
   `scripts/build_reflection_evidence_pack.py` against copied logs and the matching binary
   before promoting candidates.

@@ -165,6 +165,15 @@ Updated: 2026-05-27
   retry evidence showed entries can be readable while `+0x800/+0x804` counters are zero.
   The sampler gate is currently too strict for `0x5956f30`; see
   `docs/research/2026-05-27-static-fname-root-sampling.md`.
+- fact: Commit `9f320a0` added an opt-in debug ptrace workflow. `OBELISK_DEBUG_ALLOW_PTRACE=1`
+  calls `prctl(PR_SET_PTRACER, PR_SET_PTRACER_ANY)` for authorized core dumps, and stable
+  posture checks reject that env after debug work.
+- fact: An authorized `arkserver` core dump confirmed static FName slot `0x5956f30` points
+  to a plausible table for binary SHA256
+  `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`: table
+  `0x2ae5c660`, `num_elements=0x4516e`, `num_chunks=0x12`, index `0 -> None`,
+  `4884 -> ClientMessage`, and `9619 -> ServerChat`. See
+  `docs/research/2026-05-27-arkserver-core-fname-evidence.md`.
 - fact: A controlled Ragnarok dev capture on commit `5754fca` tested
   `OBELISK_REFLECTION_STATIC_FNAME_ROOTS=0x5956f30`. Startup probe rejected it with
   `table=0x0` and `reason=unreadable_table_header`; the server was then restarted without
@@ -216,9 +225,9 @@ Updated: 2026-05-27
 - next-step: Stop trying to promote chat UObject globals directly into GNames. Next FName
   work should use static discovery of the name table global or a bounded alternate name
   storage scanner, then validate with the analyzer.
-- next-step: Relax only the static-root sampler path to attempt bounded entry reads even
-  when static-root table counters are zero, while logging counters and keeping samples out
-  of analyzer `--strict`.
+- next-step: Deploy the corrected ReflectionScanner clues and run a short scanner capture
+  with `OBELISK_REFLECTION_STATIC_FNAME_ROOTS=0x5956f30` to confirm analyzer strict mode
+  now accepts the static-root candidate.
 - next-step: After a repeat-confirmed `GNames` research candidate appears, generate
   `objdump -d -M intel` for the matching ShooterGameServer binary and run the analyzer with
   `--binary` plus `--objdump-xrefs`; inspect whether candidate `source_global` references

@@ -409,8 +409,8 @@ namespace Obelisk::UE
 
         constexpr std::array<FNameEntryClue, 3> s_FNameClues = {
             FNameEntryClue{0, "None"},
-            FNameEntryClue{9619, "ClientMessage"},
-            FNameEntryClue{9622, "ServerChat"},
+            FNameEntryClue{4884, "ClientMessage"},
+            FNameEntryClue{9619, "ServerChat"},
         };
 
         enum class FNameProbeFailure
