@@ -240,8 +240,8 @@ Updated: 2026-05-27
   gates and default log limit on restart.
 - fact: Latest local runtime from `main` including commits through `751a7c3` was deployed to
   `/servidor/ark/obelisk`; later deploy on commit `df332d7` installed the
-  `ServerSendChatMessage` recognizer. Commit `f504ed4` added reflected `SendMode` byte
-  logging and was deployed afterward. Current PID `3229615` has
+  `ServerSendChatMessage` recognizer. Commit `8281123` added reflected `SendMode` name
+  logging and was deployed afterward. Current PID `3233586` has
   `OBELISK_ENABLE_CHAT_REFLECTION=1`, matching SHA gate, ProcessEvent hook installed at
   `0x1d34e20`, plugins disabled, and stable posture confirmed.
 - fact: Manual post-deploy `ServerSendChatMessage` chat validation commands, expected log
