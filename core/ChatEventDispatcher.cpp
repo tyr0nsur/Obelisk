@@ -82,8 +82,8 @@ namespace Obelisk::Core
         };
 
         std::vector<DispatchRegistration> callbacks;
+        std::lock_guard<std::mutex> dispatchLock(m_DispatchMutex);
         {
-            std::lock_guard<std::mutex> dispatchLock(m_DispatchMutex);
             std::lock_guard<std::mutex> lock(m_Mutex);
             callbacks.reserve(m_Registrations.size());
             for (const Registration& item : m_Registrations)

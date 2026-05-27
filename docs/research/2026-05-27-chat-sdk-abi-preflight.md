@@ -94,6 +94,9 @@ Before dispatch is connected to `ProcessEvent`:
   remains pending.
 - Verify plugin exceptions are caught before returning to runtime code. Covered by
   `TestExceptionsDoNotStopDispatch`.
+- Keep a dispatch mutex held across callback invocation so plugin owner cleanup cannot
+  remove callbacks and `dlclose` a plugin while a copied callback is still executing. This
+  mirrors `EventManager` lifecycle protection.
 - Verify installed SDK consumer can compile and load a plugin using the chat declarations.
   Pending until the public SDK header is intentionally promoted.
 

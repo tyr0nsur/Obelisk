@@ -300,6 +300,9 @@ Updated: 2026-05-27
   for future chat events. `ChatEventDispatcherTests` cover copied callback-duration text,
   opaque registration ids, invalid registration rejection, idempotent unregister,
   owner cleanup, `send_mode >= 4` rejection, and exception isolation.
+- fact: `ChatEventDispatcher::Dispatch()` holds its dispatch mutex across callback
+  invocation so owner cleanup cannot race plugin `dlclose` while a copied callback is
+  executing.
 - fact: Commit `76356bf` adds `chat_reflection_benchmark`, an excluded-from-default-build
   local helper for synthetic `TryIdentifyInvocation()` and UTF-32 decode measurements. It
   does not cover hook-side `GetFunctionNameIndex()` / `Memory::IsReadable()` overhead.
