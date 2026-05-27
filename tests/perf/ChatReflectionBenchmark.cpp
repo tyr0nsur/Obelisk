@@ -293,11 +293,11 @@ namespace
         if (options.DecodeText)
         {
             std::string text;
-            ReadResult result = TryDecodeUtf32Field(
+            ReadResult result = TryDecodeUtf32FieldForLog(
                 reader, attempt.Invocation, ChatReflection::ChatField::ChatMessage, 512, text);
             if (!result)
                 return false;
-            volatile size_t sanitizedSize = SanitizeTextForLog(text).size();
+            volatile size_t sanitizedSize = text.size();
             (void)sanitizedSize;
         }
 

@@ -386,7 +386,7 @@ python3 scripts/analyze_reflectionscanner_capture.py \
   enabled non-chat hook-like paths are allocation-free locally; matched chat paths are
   allocation-free after fixed internal parameter/field storage. Standalone UTF-32 decode
   reserves output and currently allows one allocation for a non-SSO fixture; hook-like text
-  logging currently shows two allocations in the text path.
+  logging currently shows one allocation in the text path.
   `OBELISK_CHAT_REFLECTION_LOG_LIMIT=0` now short-circuits observation reflection work. See
   `docs/research/2026-05-27-chat-reflection-stack-cycle-guard.md`.
 - `scripts/check_chat_reflection_benchmark.py` gates benchmark output for allocation-free

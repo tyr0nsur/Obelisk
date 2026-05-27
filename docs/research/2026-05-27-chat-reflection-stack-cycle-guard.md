@@ -63,7 +63,7 @@ hook_like_chat_limit_zero allocations_per_iter=0
 server_send_chat_match allocations_per_iter=0
 server_send_chat_decode_utf32 allocations_per_iter=1
 hook_like_server_send_chat allocations_per_iter=0
-hook_like_server_send_chat_text allocations_per_iter=2
+hook_like_server_send_chat_text allocations_per_iter=1
 ```
 
 The matched metadata path previously allowed 3 allocations per iteration; the text path
@@ -83,7 +83,7 @@ hook-like benchmark.
 - This is still synthetic evidence. It does not include live server tick/hitch behavior.
 - Matched chat reflection still allocates for reflected parameter storage and field
   storage.
-- Text logging still allocates for UTF-8 decode and sanitized log text, and remains behind
+- Text logging still allocates for the sanitized log string and remains behind
   `OBELISK_CHAT_REFLECTION_LOG_TEXT=1`.
 
 ## Next Steps

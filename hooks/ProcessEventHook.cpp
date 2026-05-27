@@ -415,18 +415,18 @@ namespace Obelisk::Hooks
             sendModeKnown &&
             IsChatReflectionTextLoggingEnabled())
         {
-            std::string chatText;
+            std::string sanitizedChatText;
             Obelisk::UE::RuntimeReflection::ReadResult textResult =
-                ProcessEventChatReflection::TryDecodeUtf32Field(
+                ProcessEventChatReflection::TryDecodeUtf32FieldForLog(
                     reader,
                     invocation,
                     Obelisk::UE::ChatReflection::ChatField::ChatMessage,
                     512,
-                    chatText);
+                    sanitizedChatText);
             if (textResult)
             {
                 OBELISK_INFO("Reflected chat ServerSendChatMessage text=\"{}\"",
-                             ProcessEventChatReflection::SanitizeTextForLog(chatText));
+                             sanitizedChatText);
             }
             else
             {

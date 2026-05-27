@@ -55,6 +55,14 @@ namespace Obelisk::Hooks::ProcessEventChatReflection
         int32_t maxChars,
         std::string& out);
 
+    Obelisk::UE::RuntimeReflection::ReadResult TryDecodeUtf32FieldForLog(
+        const Obelisk::UE::RuntimeReflection::MemoryReader& reader,
+        const Obelisk::UE::ChatReflection::ChatInvocation& invocation,
+        Obelisk::UE::ChatReflection::ChatField field,
+        int32_t maxChars,
+        std::string& out,
+        size_t maxLoggedBytes = 256);
+
     void SanitizeTextForLog(std::string_view text, std::string& out, size_t maxLoggedBytes = 256);
     std::string SanitizeTextForLog(std::string_view text, size_t maxLoggedBytes = 256);
 

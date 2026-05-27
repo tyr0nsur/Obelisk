@@ -93,7 +93,7 @@ Expected:
   disabled, non-chat, and `OBELISK_CHAT_REFLECTION_LOG_LIMIT=0` paths must stay
   allocation-free in `chat_reflection_benchmark`; matched metadata-only
   `ServerSendChatMessage` should also remain allocation-free unless a research note
-  justifies the regression.
+  justifies the regression. Hook-like text logging should stay at one allocation or lower.
 - Any text logging work must keep `OBELISK_CHAT_REFLECTION_LOG_TEXT=1` as a separate gate,
   sanitize output through the tested `ProcessEventChatReflection` helper, and avoid
   publishing player chat contents in docs or Discord updates.

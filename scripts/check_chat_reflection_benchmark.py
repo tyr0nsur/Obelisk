@@ -26,7 +26,7 @@ DEFAULT_LIMITS = {
     "hook_like_enabled_non_chat": {"allocations_per_iter": 0, "reader_calls_per_iter": 1},
     "hook_like_chat_limit_zero": {"allocations_per_iter": 0, "reader_calls_per_iter": 1},
     "hook_like_server_send_chat": {"allocations_per_iter": 0, "reader_calls_per_iter": 60},
-    "hook_like_server_send_chat_text": {"allocations_per_iter": 2, "reader_calls_per_iter": 65},
+    "hook_like_server_send_chat_text": {"allocations_per_iter": 1, "reader_calls_per_iter": 65},
 }
 
 METRIC_RE = re.compile(r"(?P<key>[A-Za-z0-9_]+)=(?P<value>[0-9]+)")

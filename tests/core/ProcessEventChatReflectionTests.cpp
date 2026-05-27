@@ -440,6 +440,54 @@ namespace
         Require(result.Status == RuntimeReflection::ReadStatus::InvalidArgument,
                 "missing chat field did not fail closed");
     }
+
+    void TestDecodesServerSendChatMessageTextForLog()
+    {
+        ChatFixture fixture;
+        BuildServerSendChatMessage(fixture);
+        fixture.FStringData[0] = 'Q';
+        fixture.FStringData[1] = '"';
+        fixture.FStringData[2] = '\n';
+        fixture.FStringData[3] = 0x1f600;
+        fixture.FStringData[4] = 0;
+
+        RuntimeReflection::FStringHeaderCandidate header{
+            fixture.FStringData.data(),
+            5,
+            5,
+        };
+        WriteAt(fixture.Params, 0x00, header);
+        fixture.Params[0x10] = 0x00;
+
+        MemoryReader reader = fixture.Reader();
+        Attempt attempt = TryIdentifyInvocation(
+            EnabledGate(),
+            kServerSendChatMessageNameIndex,
+            reader,
+            fixture.Function.data(),
+            fixture.Params.data());
+
+        Require(attempt.Status == AttemptStatus::Matched, attempt.Result.Reason.c_str());
+        std::string text;
+        RuntimeReflection::ReadResult result = TryDecodeUtf32FieldForLog(
+            reader,
+            attempt.Invocation,
+            ChatReflection::ChatField::ChatMessage,
+            512,
+            text);
+        Require(result.Status == RuntimeReflection::ReadStatus::Ok, result.Reason.c_str());
+        Require(text == "Q\\\"\\n\xF0\x9F\x98\x80", "sanitized decoded chat text mismatch");
+
+        result = TryDecodeUtf32FieldForLog(
+            reader,
+            attempt.Invocation,
+            ChatReflection::ChatField::ChatMessage,
+            512,
+            text,
+            3);
+        Require(result.Status == RuntimeReflection::ReadStatus::Ok, result.Reason.c_str());
+        Require(text == "Q\\\"...", "sanitized decoded chat truncation mismatch");
+    }
 }
 
 int main()
@@ -454,6 +502,7 @@ int main()
     TestMatchedChatInvocationReturnsBorrowedRanges();
     TestMatchedServerSendChatMessageReturnsByteRange();
     TestDecodesServerSendChatMessageText();
+    TestDecodesServerSendChatMessageTextForLog();
 
     std::cout << "ProcessEventChatReflectionTests passed\n";
     return 0;

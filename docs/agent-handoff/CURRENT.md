@@ -372,7 +372,7 @@ Updated: 2026-05-27
   non-chat attempts allocation-free in the synthetic benchmark. Fixed internal storage in
   `RuntimeReflection::TryReadUFunction()` / `ChatInvocation` and UTF-8 output reservation
   lower matched chat to zero allocations, standalone UTF-32 decode to one allocation, and
-  hook-like text logging to two allocations per iteration locally.
+  hook-like text logging to one allocation per iteration locally.
   `OBELISK_CHAT_REFLECTION_LOG_LIMIT=0`
   now short-circuits observation reflection work; see
   `docs/research/2026-05-27-chat-reflection-stack-cycle-guard.md`.
@@ -419,8 +419,8 @@ Updated: 2026-05-27
   accepting changed chat FName indices, parameter offsets, or `StrProperty` constants.
 - next-step: Benchmark ProcessEvent overhead with chat reflection enabled vs disabled
   before keeping the marker active for long high-population sessions.
-- next-step: Before drafting public chat API, justify or reduce the remaining two
-  text-log allocations, then plan isolated runtime A/B
+- next-step: Before drafting public chat API, justify or reduce the remaining one
+  text-log allocation, then plan isolated runtime A/B
   separately.
 - next-step: When chat API work resumes, add ABI layout tests and dispatcher ownership
   tests first; only then append public fields to `include/obelisk/ObeliskApi.h`.
