@@ -58,6 +58,7 @@ add_library(obelisk SHARED
     hooks/HookManager.cpp
     hooks/ProcessEventChatReflection.cpp
     hooks/ProcessEventHook.cpp
+    core/ChatEventDispatcher.cpp
     core/EventManager.cpp
     core/PluginConfig.cpp
     core/PluginManager.cpp
@@ -95,6 +96,16 @@ target_include_directories(event_manager_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DI
 target_link_libraries(event_manager_tests PRIVATE obelisk_sdk fmt::fmt spdlog::spdlog)
 
 add_test(NAME EventManagerTests COMMAND event_manager_tests)
+
+add_executable(chat_event_dispatcher_tests
+    tests/core/ChatEventDispatcherTests.cpp
+    core/ChatEventDispatcher.cpp
+    runtime/Logger.cpp
+)
+target_include_directories(chat_event_dispatcher_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(chat_event_dispatcher_tests PRIVATE fmt::fmt spdlog::spdlog)
+
+add_test(NAME ChatEventDispatcherTests COMMAND chat_event_dispatcher_tests)
 
 add_executable(plugin_manager_tests
     tests/core/PluginManagerTests.cpp

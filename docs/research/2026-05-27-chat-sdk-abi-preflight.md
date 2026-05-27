@@ -81,15 +81,21 @@ ABI note and version strategy.
 Before dispatch is connected to `ProcessEvent`:
 
 - Unit-test a dedicated chat dispatcher with copied UTF-8 text stored in runtime-owned
-  memory for callback duration.
+  memory for callback duration. Implemented internally by `core/ChatEventDispatcher.*`
+  and covered by `ChatEventDispatcherTests`.
 - Verify callback receives valid data during the call and no borrowed UE4 param pointer
-  crosses the ABI.
-- Verify `send_mode` accepts only `0..3` and rejects `>=4`.
-- Verify register returns an opaque `uint64_t` id.
-- Verify unregister is idempotent.
+  crosses the ABI. Covered by `TestDispatchCopiesInputForCallbackDuration`.
+- Verify `send_mode` accepts only `0..3` and rejects `>=4`. Covered by
+  `TestRejectsUnknownSendMode`.
+- Verify register returns an opaque `uint64_t` id. Covered by registration tests.
+- Verify unregister is idempotent. Covered by `TestUnregisterIsIdempotent`.
 - Verify plugin init failure, explicit unload, and shutdown cleanup remove callbacks.
-- Verify plugin exceptions are caught before returning to runtime code.
+  Owner cleanup is covered internally by `TestOwnerCleanup`; plugin-manager integration
+  remains pending.
+- Verify plugin exceptions are caught before returning to runtime code. Covered by
+  `TestExceptionsDoNotStopDispatch`.
 - Verify installed SDK consumer can compile and load a plugin using the chat declarations.
+  Pending until the public SDK header is intentionally promoted.
 
 ## Promotion Gates
 
@@ -106,13 +112,15 @@ The public API should remain blocked until all are true:
 
 ## Result
 
-This is a preflight checklist, not an ABI change. `include/obelisk/ObeliskApi.h` remains
-unchanged until the ABI tests, dispatcher ownership tests, and isolated runtime validation
-are ready.
+This is a preflight checklist, not an ABI change. The internal dispatcher test foundation
+exists, but `include/obelisk/ObeliskApi.h` remains unchanged until ABI layout tests,
+plugin-manager integration, installed SDK consumer coverage, and isolated runtime
+validation are ready.
 
 ## Next Steps
 
 - Keep reducing or bounding the current matched-chat/text temporary allocations.
-- Draft internal dispatcher tests before appending public SDK fields.
+- Integrate dispatcher registration with plugin owner resolution only after the public ABI
+  shape and capability gate are ready.
 - Do not expose sender object identity until Obelisk-owned handles and lifetime rules are
   designed.

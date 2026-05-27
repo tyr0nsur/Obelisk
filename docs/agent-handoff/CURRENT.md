@@ -296,6 +296,10 @@ Updated: 2026-05-27
   `docs/research/2026-05-27-sdk-chat-event-ownership-plan.md`.
 - fact: `docs/research/2026-05-27-chat-sdk-abi-preflight.md` records the test-first ABI
   and dispatcher gates for future `OnChatMessage` without changing the public SDK header.
+- fact: `core/ChatEventDispatcher.{h,cpp}` is an internal, non-SDK dispatcher foundation
+  for future chat events. `ChatEventDispatcherTests` cover copied callback-duration text,
+  opaque registration ids, invalid registration rejection, idempotent unregister,
+  owner cleanup, `send_mode >= 4` rejection, and exception isolation.
 - fact: Commit `76356bf` adds `chat_reflection_benchmark`, an excluded-from-default-build
   local helper for synthetic `TryIdentifyInvocation()` and UTF-32 decode measurements. It
   does not cover hook-side `GetFunctionNameIndex()` / `Memory::IsReadable()` overhead.
@@ -341,6 +345,8 @@ Updated: 2026-05-27
   separately.
 - next-step: When chat API work resumes, add ABI layout tests and dispatcher ownership
   tests first; only then append public fields to `include/obelisk/ObeliskApi.h`.
+- next-step: Do not connect `ChatEventDispatcher` to `ProcessEvent` or PluginManager until
+  the public ABI/capability gate and plugin owner integration plan are ready.
 - rollback: remove `enable-chat-reflection` marker and restart the debug server; no plugin
   ABI or config migration is involved.
 - next-step: Generalize the binary-hash-scoped reflection pipeline only after another

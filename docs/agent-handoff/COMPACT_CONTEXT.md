@@ -348,6 +348,8 @@ python3 scripts/analyze_reflectionscanner_capture.py \
   future `OnChatMessage`: ABI layout tests, copied UTF-8 dispatcher tests, capability gate,
   opaque registration id, idempotent unregister, owner cleanup, and installed SDK consumer
   coverage before public header promotion.
+- `core/ChatEventDispatcher.{h,cpp}` now exists as an internal dispatcher foundation only.
+  It is tested but not connected to `ProcessEvent`, PluginManager, or public SDK fields.
 - Evidence: after any isolated scanner capture, run
   `scripts/build_reflection_evidence_pack.py` against copied logs and the matching binary
   before promoting candidates.
