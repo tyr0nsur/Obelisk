@@ -110,10 +110,12 @@ From `docs/research/2026-05-27-core-ufunction-property-chain.md`:
 - `ChatReflectionTests` cover valid `ServerChat`, `ServerChatTo`, and
   `ServerChatToPlayer` shapes; same-FName wrong shapes; wrong property names; wrong
   `StrProperty` class; and disabled/unsupported gates.
-- Still needed: hook-level dispatch tests for the new observation path.
+- `ProcessEventChatReflectionTests` cover the extracted hook helper gates and ensure
+  disabled/non-chat paths avoid memory reads while valid chat invocations return borrowed
+  parameter ranges.
+- Still needed: a runtime smoke test with one real in-game chat message.
 
 ## Next Step
 
-Deploy to an isolated debug server with the two environment gates above and
-`OBELISK_CHAT_REFLECTION_LOG_LIMIT` set to a small value. Then write one chat message and
-check for `Reflected chat ProcessEvent` log entries.
+Write one in-game chat message on the debug server and check for
+`Reflected chat ProcessEvent` log entries.

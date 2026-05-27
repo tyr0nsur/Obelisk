@@ -230,6 +230,9 @@ Updated: 2026-05-27
   and `arkserver` was restarted. Current PID `3154298` has
   `OBELISK_ENABLE_CHAT_REFLECTION=1`, matching SHA gate, ProcessEvent hook installed at
   `0x1d34e20`, plugins disabled, and stable posture confirmed.
+- fact: `hooks/ProcessEventChatReflection.{h,cpp}` extracts gate/recognition logic from
+  the hook for direct tests. `ProcessEventChatReflectionTests` cover disabled and non-chat
+  short-circuit behavior plus valid borrowed param ranges.
 
 ## Rejected Or Unsafe
 

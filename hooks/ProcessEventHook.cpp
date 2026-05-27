@@ -1,7 +1,6 @@
 #include "ProcessEventHook.h"
+#include "ProcessEventChatReflection.h"
 #include "ue/Memory.h"
-#include "ue/ChatReflection.h"
-#include "ue/RuntimeReflection.h"
 #include "runtime/Logger.h"
 #include "core/EventManager.h"
 #include <array>
@@ -249,35 +248,39 @@ namespace Obelisk::Hooks
         return Memory::IsReadable(const_cast<void*>(address), size);
     }
 
-    static bool IsReflectedChatNameIndex(int32_t nameIndex)
+    static const ProcessEventChatReflection::Gate& GetChatReflectionGate()
     {
-        return nameIndex == 9619 || nameIndex == 9620 || nameIndex == 9621;
+        static ProcessEventChatReflection::Gate gate = [] {
+            ProcessEventChatReflection::Gate value =
+                ProcessEventChatReflection::EvaluateGate(
+                    std::getenv("OBELISK_ENABLE_CHAT_REFLECTION"),
+                    std::getenv("OBELISK_CHAT_REFLECTION_BINARY_SHA256"));
+
+            switch (value.Status)
+            {
+            case ProcessEventChatReflection::GateStatus::Disabled:
+                break;
+            case ProcessEventChatReflection::GateStatus::MissingBinarySha256:
+                OBELISK_WARN("Chat reflection disabled: OBELISK_CHAT_REFLECTION_BINARY_SHA256 is required.");
+                break;
+            case ProcessEventChatReflection::GateStatus::UnsupportedBinarySha256:
+                OBELISK_WARN("Chat reflection disabled: unsupported ShooterGameServer SHA256 '{}'.",
+                             value.BinarySha256);
+                break;
+            case ProcessEventChatReflection::GateStatus::Enabled:
+                OBELISK_WARN("Experimental chat reflection enabled for ShooterGameServer SHA256 {}.",
+                             value.BinarySha256);
+                break;
+            }
+
+            return value;
+        }();
+        return gate;
     }
 
     static bool IsChatReflectionEnabled()
     {
-        static bool enabled = [] {
-            const char* gate = std::getenv("OBELISK_ENABLE_CHAT_REFLECTION");
-            if (!gate || std::strcmp(gate, "1") != 0)
-                return false;
-
-            const char* binarySha = std::getenv("OBELISK_CHAT_REFLECTION_BINARY_SHA256");
-            if (!binarySha || binarySha[0] == '\0')
-            {
-                OBELISK_WARN("Chat reflection disabled: OBELISK_CHAT_REFLECTION_BINARY_SHA256 is required.");
-                return false;
-            }
-
-            if (binarySha != Obelisk::UE::RuntimeReflection::kSupportedShooterGameServerSha256)
-            {
-                OBELISK_WARN("Chat reflection disabled: unsupported ShooterGameServer SHA256 '{}'.", binarySha);
-                return false;
-            }
-
-            OBELISK_WARN("Experimental chat reflection enabled for ShooterGameServer SHA256 {}.", binarySha);
-            return true;
-        }();
-        return enabled;
+        return GetChatReflectionGate().Enabled();
     }
 
     static uint64_t GetChatReflectionLogLimit()
@@ -322,25 +325,26 @@ namespace Obelisk::Hooks
 
     static void TraceReflectedChatInvocation(int32_t nameIndex, void* function, void* params)
     {
-        if (!IsChatReflectionEnabled() || !IsReflectedChatNameIndex(nameIndex))
+        const ProcessEventChatReflection::Gate& gate = GetChatReflectionGate();
+        if (!gate.Enabled())
             return;
 
         Obelisk::UE::RuntimeReflection::MemoryReader reader{RuntimeReflectionReader, nullptr};
-        Obelisk::UE::RuntimeReflection::ReadOptions options =
-            Obelisk::UE::RuntimeReflection::MakeReadOptionsForBinary(
-                Obelisk::UE::RuntimeReflection::kSupportedShooterGameServerSha256,
-                true);
-
-        Obelisk::UE::ChatReflection::ChatInvocation invocation;
-        Obelisk::UE::RuntimeReflection::ReadResult result =
-            Obelisk::UE::ChatReflection::TryIdentifyChatInvocation(reader, options, function, params, invocation);
-        if (!result)
+        ProcessEventChatReflection::Attempt attempt =
+            ProcessEventChatReflection::TryIdentifyInvocation(gate, nameIndex, reader, function, params);
+        if (attempt.Status == ProcessEventChatReflection::AttemptStatus::Disabled ||
+            attempt.Status == ProcessEventChatReflection::AttemptStatus::NonChatFunction)
+        {
+            return;
+        }
+        if (attempt.Status == ProcessEventChatReflection::AttemptStatus::Rejected)
         {
             OBELISK_TRACE("Chat reflection rejected fname_index={} function={} reason={}",
-                          nameIndex, function, result.Reason);
+                          nameIndex, function, attempt.Result.Reason);
             return;
         }
 
+        const Obelisk::UE::ChatReflection::ChatInvocation& invocation = attempt.Invocation;
         const uint64_t callNumber = ++s_ReflectedChatCalls;
         const uint64_t limit = GetChatReflectionLogLimit();
         if (limit != 0 && callNumber > limit)

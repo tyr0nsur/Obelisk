@@ -1,0 +1,271 @@
+#include "hooks/ProcessEventChatReflection.h"
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <iostream>
+#include <stdexcept>
+#include <vector>
+
+namespace
+{
+    using namespace Obelisk::Hooks::ProcessEventChatReflection;
+    using namespace Obelisk::UE;
+    using namespace Obelisk::UE::RuntimeReflection;
+
+    constexpr int32_t kServerChatNameIndex = 9619;
+    constexpr int32_t kServerChatToPlayerNameIndex = 9621;
+    constexpr int32_t kMessageTextNameIndex = 21409;
+    constexpr int32_t kPlayerNameNameIndex = 16693;
+    constexpr int32_t kStrPropertyClassNameIndex = 13;
+    constexpr int32_t kStrPropertyClassObjectIndex = 547;
+
+    struct Region
+    {
+        const uint8_t* Start = nullptr;
+        size_t Size = 0;
+    };
+
+    struct ReaderContext
+    {
+        std::vector<Region> Regions;
+        int Calls = 0;
+    };
+
+    bool RegionReader(const void* address, size_t size, void* context)
+    {
+        auto* reader = static_cast<ReaderContext*>(context);
+        ++reader->Calls;
+        const auto* ptr = static_cast<const uint8_t*>(address);
+        for (const Region& region : reader->Regions)
+        {
+            if (ptr < region.Start)
+                continue;
+            const size_t offset = static_cast<size_t>(ptr - region.Start);
+            if (offset <= region.Size && size <= region.Size - offset)
+                return true;
+        }
+        return false;
+    }
+
+    void Require(bool condition, const char* message)
+    {
+        if (!condition)
+            throw std::runtime_error(message);
+    }
+
+    template <typename T, size_t N>
+    void WriteAt(std::array<uint8_t, N>& buffer, size_t offset, const T& value)
+    {
+        Require(offset <= buffer.size() && sizeof(T) <= buffer.size() - offset, "test write out of bounds");
+        std::memcpy(buffer.data() + offset, &value, sizeof(T));
+    }
+
+    template <size_t N>
+    void WriteObject(std::array<uint8_t, N>& buffer,
+                     int32_t nameIndex,
+                     int32_t internalIndex,
+                     const void* klass,
+                     const void* outer)
+    {
+        const void* vtable = reinterpret_cast<const void*>(0x10000);
+        const int32_t flags = 1;
+        const FNameValue name{nameIndex, 0};
+
+        WriteAt(buffer, 0x00, vtable);
+        WriteAt(buffer, 0x08, flags);
+        WriteAt(buffer, 0x0c, internalIndex);
+        WriteAt(buffer, 0x10, klass);
+        WriteAt(buffer, 0x18, name);
+        WriteAt(buffer, 0x20, outer);
+    }
+
+    template <size_t N>
+    void WriteProperty(std::array<uint8_t, N>& buffer,
+                       const void* next,
+                       const void* owner,
+                       const void* klass,
+                       int32_t nameIndex,
+                       int32_t offset)
+    {
+        WriteObject(buffer, nameIndex, nameIndex, klass, owner);
+
+        const int32_t arrayDim = 1;
+        const int32_t elementSize = 0x10;
+        const uint64_t propertyFlags = 0x80;
+        WriteAt(buffer, 0x28, next);
+        WriteAt(buffer, 0x30, arrayDim);
+        WriteAt(buffer, 0x34, elementSize);
+        WriteAt(buffer, 0x38, propertyFlags);
+        WriteAt(buffer, 0x4c, offset);
+    }
+
+    struct ChatFixture
+    {
+        std::array<uint8_t, 0xb0> Function{};
+        std::array<uint8_t, 0x80> PropertyA{};
+        std::array<uint8_t, 0x80> PropertyB{};
+        std::array<uint8_t, 0x40> StrPropertyClass{};
+        std::array<uint8_t, 0x20> Params{};
+        ReaderContext Context;
+
+        MemoryReader Reader()
+        {
+            Context.Regions.clear();
+            Context.Regions.push_back({Function.data(), Function.size()});
+            Context.Regions.push_back({PropertyA.data(), PropertyA.size()});
+            Context.Regions.push_back({PropertyB.data(), PropertyB.size()});
+            Context.Regions.push_back({StrPropertyClass.data(), StrPropertyClass.size()});
+            Context.Regions.push_back({Params.data(), Params.size()});
+            return {RegionReader, &Context};
+        }
+    };
+
+    Gate EnabledGate()
+    {
+        return {GateStatus::Enabled, std::string(kSupportedShooterGameServerSha256)};
+    }
+
+    void BuildServerChatToPlayer(ChatFixture& fixture)
+    {
+        WriteObject(fixture.StrPropertyClass,
+                    kStrPropertyClassNameIndex,
+                    kStrPropertyClassObjectIndex,
+                    nullptr,
+                    nullptr);
+        WriteObject(fixture.Function,
+                    kServerChatToPlayerNameIndex,
+                    kServerChatToPlayerNameIndex,
+                    reinterpret_cast<const void*>(0x20000),
+                    reinterpret_cast<const void*>(0x30000));
+
+        WriteProperty(fixture.PropertyA,
+                      fixture.PropertyB.data(),
+                      fixture.Function.data(),
+                      fixture.StrPropertyClass.data(),
+                      kPlayerNameNameIndex,
+                      0x00);
+        WriteProperty(fixture.PropertyB,
+                      nullptr,
+                      fixture.Function.data(),
+                      fixture.StrPropertyClass.data(),
+                      kMessageTextNameIndex,
+                      0x10);
+
+        const void* children = fixture.PropertyA.data();
+        const uint32_t functionFlags = 0x204000;
+        const uint16_t numParms = 2;
+        const uint16_t parmsSize = 0x20;
+        const uint16_t returnValueOffset = 0xffff;
+        WriteAt(fixture.Function, 0x38, children);
+        WriteAt(fixture.Function, 0x90, functionFlags);
+        WriteAt(fixture.Function, 0x96, numParms);
+        WriteAt(fixture.Function, 0x98, parmsSize);
+        WriteAt(fixture.Function, 0x9a, returnValueOffset);
+    }
+
+    void TestGateEvaluation()
+    {
+        const char* supportedSha = kSupportedShooterGameServerSha256.data();
+
+        Require(EvaluateGate(nullptr, supportedSha).Status == GateStatus::Disabled,
+                "missing enable env should disable chat reflection");
+        Require(EvaluateGate("0", supportedSha).Status == GateStatus::Disabled,
+                "non-1 enable env should disable chat reflection");
+        Require(EvaluateGate("1", nullptr).Status == GateStatus::MissingBinarySha256,
+                "missing binary SHA gate was not rejected");
+        Require(EvaluateGate("1", "").Status == GateStatus::MissingBinarySha256,
+                "empty binary SHA gate was not rejected");
+        Require(EvaluateGate("1", "not-this-binary").Status == GateStatus::UnsupportedBinarySha256,
+                "unsupported binary SHA gate was not rejected");
+
+        Gate gate = EvaluateGate("1", supportedSha);
+        Require(gate.Status == GateStatus::Enabled, "supported chat reflection gate did not enable");
+        Require(gate.Enabled(), "enabled chat reflection gate did not report enabled");
+        Require(gate.BinarySha256 == kSupportedShooterGameServerSha256, "enabled gate did not retain binary SHA");
+    }
+
+    void TestDisabledGateDoesNotRead()
+    {
+        ReaderContext context;
+        MemoryReader reader{RegionReader, &context};
+        Attempt attempt = TryIdentifyInvocation(
+            {},
+            kServerChatNameIndex,
+            reader,
+            reinterpret_cast<void*>(0x10000),
+            reinterpret_cast<void*>(0x20000));
+
+        Require(attempt.Status == AttemptStatus::Disabled, "disabled gate did not short-circuit");
+        Require(context.Calls == 0, "disabled gate touched UFunction memory");
+    }
+
+    void TestNonChatNameDoesNotRead()
+    {
+        ReaderContext context;
+        MemoryReader reader{RegionReader, &context};
+        Attempt attempt = TryIdentifyInvocation(
+            EnabledGate(),
+            42,
+            reader,
+            reinterpret_cast<void*>(0x10000),
+            reinterpret_cast<void*>(0x20000));
+
+        Require(attempt.Status == AttemptStatus::NonChatFunction, "non-chat FName did not short-circuit");
+        Require(context.Calls == 0, "non-chat FName touched UFunction memory");
+    }
+
+    void TestUnreadableChatFunctionIsRejected()
+    {
+        ReaderContext context;
+        MemoryReader reader{RegionReader, &context};
+        Attempt attempt = TryIdentifyInvocation(
+            EnabledGate(),
+            kServerChatNameIndex,
+            reader,
+            reinterpret_cast<void*>(0x10000),
+            reinterpret_cast<void*>(0x20000));
+
+        Require(attempt.Status == AttemptStatus::Rejected, "unreadable chat function was not rejected");
+        Require(context.Calls > 0, "chat FName did not attempt bounded reflection read");
+    }
+
+    void TestMatchedChatInvocationReturnsBorrowedRanges()
+    {
+        ChatFixture fixture;
+        BuildServerChatToPlayer(fixture);
+        fixture.Params[0x10] = 0x42;
+
+        Attempt attempt = TryIdentifyInvocation(
+            EnabledGate(),
+            kServerChatToPlayerNameIndex,
+            fixture.Reader(),
+            fixture.Function.data(),
+            fixture.Params.data());
+
+        Require(attempt.Status == AttemptStatus::Matched, attempt.Result.Reason.c_str());
+        Require(attempt.Invocation.Function == ChatReflection::ChatFunction::ServerChatToPlayer,
+                "matched invocation function mismatch");
+        Require(attempt.Invocation.Fields.size() == 2, "matched invocation field count mismatch");
+        Require(attempt.Invocation.Fields[0].Field == ChatReflection::ChatField::PlayerName,
+                "first field should be PlayerName");
+        Require(attempt.Invocation.Fields[1].Field == ChatReflection::ChatField::MessageText,
+                "second field should be MessageText");
+        Require(attempt.Invocation.Fields[1].Range.Data == fixture.Params.data() + 0x10,
+                "message range should be borrowed from params");
+        Require(fixture.Context.Calls > 0, "matched invocation did not read through injected reader");
+    }
+}
+
+int main()
+{
+    TestGateEvaluation();
+    TestDisabledGateDoesNotRead();
+    TestNonChatNameDoesNotRead();
+    TestUnreadableChatFunctionIsRejected();
+    TestMatchedChatInvocationReturnsBorrowedRanges();
+
+    std::cout << "ProcessEventChatReflectionTests passed\n";
+    return 0;
+}
