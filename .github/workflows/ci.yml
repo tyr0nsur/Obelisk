@@ -32,6 +32,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install build tools
         run: |
@@ -48,6 +50,19 @@ jobs:
 
       - name: Build
         run: cmake --build build --parallel
+
+      - name: Run CTest
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Check diff whitespace
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git diff --check "origin/${{ github.base_ref }}"...HEAD
+          elif [[ "${{ github.event.before }}" =~ ^0+$ ]]; then
+            git diff --check
+          else
+            git diff --check "${{ github.event.before }}" "${{ github.sha }}"
+          fi
 
       - name: Installer dry run
         run: scripts/install_obelisk.sh --dry-run /tmp/obelisk-ci-install

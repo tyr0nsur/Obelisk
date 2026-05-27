@@ -68,6 +68,7 @@ set_target_properties(obelisk PROPERTIES BUILD_RPATH "\$ORIGIN")
 set_target_properties(obelisk PROPERTIES INSTALL_RPATH "\$ORIGIN")
 
 add_subdirectory(plugins/oBaseEvents)
+add_subdirectory(tests/sdk_consumer)
 
 add_executable(plugin_config_tests
     tests/core/PluginConfigTests.cpp
