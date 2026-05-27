@@ -57,14 +57,9 @@ Ragnarok is currently reserved for player performance testing. Do not restart it
 markers, deploy runtime, or increase logging unless the operator opens a maintenance
 window.
 
-For TheIsland debug/development validation:
-
-```bash
-mkdir -p /servidor/ark/obelisk/state/instances/arkserver2
-touch /servidor/ark/obelisk/state/instances/arkserver2/enable-process-event-hook
-touch /servidor/ark/obelisk/state/instances/arkserver2/disable-plugins
-./arkserver2 restart
-```
+For TheIsland debug/development validation, first obtain explicit operator approval for
+the target instance, marker changes, restart window, and rollback plan. TheIsland is the
+debug/development fallback; it is not automatic permission to edit markers or restart.
 
 Validate:
 
@@ -72,6 +67,7 @@ Validate:
 pgrep -af '^./ShooterGameServer'
 tail -n 80 /servidor/ark/obelisk/logs/arkserver2/Obelisk.log
 rg 'libobelisk|libsubhook' /proc/$(pgrep -f '^./ShooterGameServer TheIsland' | head -n1)/maps
+scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance arkserver2
 ```
 
 Expected:

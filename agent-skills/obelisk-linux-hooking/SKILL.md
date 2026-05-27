@@ -53,17 +53,15 @@ When patching `.text`:
 
 ## Validation
 
-Run this only during an approved TheIsland/debug window. For high-risk hook/scanner
-captures, prefer `arkserver-obelisk-debug`; do not validate hooks on Ragnarok while player
-performance testing is active.
+Run live validation only during an approved TheIsland/debug window with explicit approval
+for target instance, marker changes, restart window, and rollback plan. For high-risk
+hook/scanner captures, prefer `arkserver-obelisk-debug`; do not validate hooks on Ragnarok
+while player performance testing is active.
 
 ```bash
 cmake --build build -j"$(nproc)"
-mkdir -p /servidor/ark/obelisk/state/instances/arkserver2
-touch /servidor/ark/obelisk/state/instances/arkserver2/enable-process-event-hook
-touch /servidor/ark/obelisk/state/instances/arkserver2/disable-plugins
-./arkserver2 restart
 tail -n 80 /servidor/ark/obelisk/logs/arkserver2/Obelisk.log
+scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance arkserver2
 ```
 
 Expected:
