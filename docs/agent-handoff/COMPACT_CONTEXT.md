@@ -127,7 +127,9 @@ Next technical milestone is `FName -> string` resolution:
 
 1. Run `ReflectionScanner` only on a confirmed isolated/debug instance.
 2. Use `docs/research/2026-05-27-reflectionscanner-isolated-capture-runbook.md`.
-3. Analyze copied logs with:
+3. Add `OBELISK_REFLECTION_LOG_FNAME_REJECTS=1` during isolated captures when we need
+   diagnostic reasons for rejected FName candidates.
+4. Analyze copied logs with:
 
 ```bash
 python3 scripts/analyze_reflectionscanner_capture.py /path/to/isolated/Obelisk.log
@@ -140,10 +142,10 @@ python3 scripts/analyze_reflectionscanner_capture.py \
   /path/to/isolated/Obelisk.log
 ```
 
-4. Treat `GNames` only as a research candidate when `matched_clues=3/3` repeats for the
+5. Treat `GNames` only as a research candidate when `matched_clues=3/3` repeats for the
    same table pointer through distinct `source_global` values or distinct targets, and
    there are no reject markers.
-5. Before committing offsets, require a second isolated capture or static xref validation.
+6. Before committing offsets, require a second isolated capture or static xref validation.
    Static xrefs are supporting evidence only; inspect whether they are real load/store paths
    before designing runtime name-resolution code.
 

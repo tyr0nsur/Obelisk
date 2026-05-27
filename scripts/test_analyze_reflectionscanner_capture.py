@@ -38,6 +38,32 @@ def fname_probe(
     )
 
 
+def fname_reject(
+    *,
+    target: str = "candidate",
+    source_global: str = "0x600000",
+    table: str = "0x7f0000001000",
+    reason: str = "unreadable_chunk_pointer",
+    readable: int = 0,
+    readable_max: int = 3,
+    matched: int = 0,
+    matched_max: int = 3,
+    num_elements: int = 10000,
+    num_chunks: int = 1,
+    none: str = "",
+    client_message: str = "",
+    server_chat: str = "",
+) -> str:
+    return (
+        f"[ReflectionScanner] {target} FName indirect-table reject: "
+        f"source_global={source_global} table={table} reason={reason} "
+        f"readable_clues={readable}/{readable_max} matched_clues={matched}/{matched_max} "
+        f"num_elements={num_elements} num_chunks={num_chunks} "
+        f"none='{none}' client_message='{client_message}' "
+        f"server_chat='{server_chat}'"
+    )
+
+
 class ReflectionScannerAnalyzerStrictTests(unittest.TestCase):
     def run_analyzer(
         self,
@@ -169,6 +195,42 @@ class ReflectionScannerAnalyzerStrictTests(unittest.TestCase):
         self.assertEqual(tables["0x7f0000001000"]["research_candidate_count"], 2)
         self.assertEqual(tables["0x7f0000002000"]["status"], "rejected")
         self.assertIn("preview mismatch observed", tables["0x7f0000002000"]["reason"])
+
+    def test_json_summarizes_fname_rejects(self) -> None:
+        result = self.run_analyzer(
+            [
+                fname_reject(reason="unreadable_chunk_pointer"),
+                fname_reject(source_global="0x600008", reason="preview_mismatch"),
+                fname_reject(source_global="0x600010", reason="preview_mismatch"),
+            ],
+            "--json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        summary = json.loads(result.stdout)
+        self.assertEqual(summary["evidence_pack"]["status"], "inconclusive")
+        self.assertEqual(summary["evidence_pack"]["fname_probe_count"], 0)
+        self.assertEqual(summary["evidence_pack"]["fname_reject_count"], 3)
+        self.assertEqual(
+            summary["evidence_pack"]["fname_reject_reason_counts"],
+            {"preview_mismatch": 2, "unreadable_chunk_pointer": 1},
+        )
+        self.assertEqual(summary["fname_rejects"][0]["reason"], "unreadable_chunk_pointer")
+        self.assertEqual(summary["fname_rejects"][1]["source_global"], "0x600008")
+
+    def test_fname_rejects_do_not_satisfy_strict(self) -> None:
+        result = self.run_analyzer(
+            [
+                fname_reject(reason="preview_mismatch"),
+                fname_reject(source_global="0x600008", reason="preview_mismatch"),
+            ],
+            "--strict",
+        )
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("FName probes: 0", result.stdout)
+        self.assertIn("FName rejects: 2", result.stdout)
+        self.assertIn("preview_mismatch: 2", result.stdout)
 
     def test_json_annotates_static_xrefs_from_objdump_text(self) -> None:
         result = self.run_analyzer(

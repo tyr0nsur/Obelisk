@@ -41,6 +41,18 @@ FNAME_RE = re.compile(
     r"server_chat='(?P<server_chat>[^']*)'"
 )
 
+FNAME_REJECT_RE = re.compile(
+    r"\[ReflectionScanner\] (?P<target>\S+) FName indirect-table reject: "
+    r"(?:source_global=(?P<source_global>\S+) )?"
+    r"table=(?P<table>\S+) reason=(?P<reason>\S+) "
+    r"readable_clues=(?P<readable_clues>\d+)/(?P<readable_clues_max>\d+) "
+    r"matched_clues=(?P<matched_clues>\d+)/(?P<matched_clues_max>\d+) "
+    r"num_elements=(?P<num_elements>-?\d+) num_chunks=(?P<num_chunks>-?\d+) "
+    r"none='(?P<none>[^']*)' "
+    r"client_message='(?P<client_message>[^']*)' "
+    r"server_chat='(?P<server_chat>[^']*)'"
+)
+
 DELAYED_RE = re.compile(
     r"\[ReflectionScanner\] delayed global resolved after (?P<seconds>\d+)s: "
     r"(?P<target>\S+) (?P<global>\S+) -> (?P<value>\S+)"
@@ -113,6 +125,24 @@ class FNameProbe:
     @property
     def research_candidate(self) -> bool:
         return self.exact_name_match and self.plausible_counts
+
+
+@dataclass(frozen=True)
+class FNameReject:
+    line: int
+    target: str
+    source_global: str
+    table: str
+    reason: str
+    readable_clues: int
+    readable_clues_max: int
+    matched_clues: int
+    matched_clues_max: int
+    num_elements: int
+    num_chunks: int
+    none: str
+    client_message: str
+    server_chat: str
 
 
 @dataclass(frozen=True)
@@ -367,6 +397,7 @@ def parse_logs(
 ) -> dict[str, object]:
     uobjects: list[UObjectValidation] = []
     fnames: list[FNameProbe] = []
+    fname_rejects: list[FNameReject] = []
     delayed: list[DelayedGlobal] = []
     candidate_globals: list[CandidateGlobal] = []
     reject_markers: list[LogMatch] = []
@@ -407,6 +438,28 @@ def parse_logs(
                     table=groups["table"],
                     score=int(groups["score"]),
                     score_max=int(groups["score_max"]),
+                    readable_clues=int(groups["readable_clues"]),
+                    readable_clues_max=int(groups["readable_clues_max"]),
+                    matched_clues=int(groups["matched_clues"]),
+                    matched_clues_max=int(groups["matched_clues_max"]),
+                    num_elements=int(groups["num_elements"]),
+                    num_chunks=int(groups["num_chunks"]),
+                    none=groups["none"],
+                    client_message=groups["client_message"],
+                    server_chat=groups["server_chat"],
+                )
+            )
+            continue
+
+        if match := FNAME_REJECT_RE.search(line):
+            groups = match.groupdict()
+            fname_rejects.append(
+                FNameReject(
+                    line=line_number,
+                    target=groups["target"],
+                    source_global=groups.get("source_global") or "unknown",
+                    table=groups["table"],
+                    reason=groups["reason"],
                     readable_clues=int(groups["readable_clues"]),
                     readable_clues_max=int(groups["readable_clues_max"]),
                     matched_clues=int(groups["matched_clues"]),
@@ -462,6 +515,11 @@ def parse_logs(
         if probe.source_global != "unknown"
     }
     static_targets.update(
+        normalize_hex(reject.source_global)
+        for reject in fname_rejects
+        if reject.source_global != "unknown"
+    )
+    static_targets.update(
         normalize_hex(item.global_address)
         for item in candidate_globals
     )
@@ -489,6 +547,11 @@ def parse_logs(
     repeat_confirmed_tables = [
         item for item in table_summaries if item["status"] == "research-candidate"
     ]
+    fname_reject_reason_counts: dict[str, int] = {}
+    for reject in fname_rejects:
+        fname_reject_reason_counts[reject.reason] = (
+            fname_reject_reason_counts.get(reject.reason, 0) + 1
+        )
 
     return {
         "evidence_pack": {
@@ -501,6 +564,8 @@ def parse_logs(
             "static_xref_access_counts": dict(sorted(static_xref_access_counts.items())),
             "reject_marker_count": len(reject_markers),
             "fname_probe_count": len(fnames),
+            "fname_reject_count": len(fname_rejects),
+            "fname_reject_reason_counts": dict(sorted(fname_reject_reason_counts.items())),
             "gname_table_candidate_count": len(repeat_confirmed_tables),
             "status": "research-candidate"
             if repeat_confirmed_tables and not reject_markers
@@ -531,6 +596,7 @@ def parse_logs(
             }
             for item in fnames
         ],
+        "fname_rejects": [asdict(item) for item in fname_rejects],
         "gname_table_candidates": table_summaries,
         "delayed_globals": [asdict(item) for item in delayed],
         "candidate_globals": [asdict(item) for item in candidate_globals],
@@ -546,6 +612,7 @@ def print_human(summary: dict[str, object]) -> None:
     reject_markers = summary["reject_markers"]
     uobjects = summary["uobject_validations"]
     fnames = summary["fname_probes"]
+    fname_rejects = summary["fname_rejects"]
     delayed = summary["delayed_globals"]
     candidate_globals = summary["candidate_globals"]
     static_xrefs = summary["static_xrefs"]
@@ -565,6 +632,7 @@ def print_human(summary: dict[str, object]) -> None:
     print(f"delayed globals: {len(delayed)}")
     print(f"UObject validations: {len(uobjects)}")
     print(f"FName probes: {len(fnames)}")
+    print(f"FName rejects: {len(fname_rejects)}")
 
     if reject_markers:
         print("\nreject markers:")
@@ -615,6 +683,19 @@ def print_human(summary: dict[str, object]) -> None:
                 "server_chat='{server_chat}' elements={num_elements} chunks={num_chunks}".format(
                     **item
                 )
+            )
+
+    if fname_rejects:
+        reason_counts = evidence_pack["fname_reject_reason_counts"]
+        print("\nFName reject reasons:")
+        for reason, count in reason_counts.items():
+            print(f"- {reason}: {count}")
+        print("\nFName reject samples:")
+        for item in fname_rejects[:10]:
+            print(
+                "- line {line}: target={target} source_global={source_global} table={table} "
+                "reason={reason} matched={matched_clues}/{matched_clues_max} "
+                "elements={num_elements} chunks={num_chunks}".format(**item)
             )
 
     print("\ntop UObject validation scores:")

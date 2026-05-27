@@ -120,6 +120,10 @@ Updated: 2026-05-27
   call, jump, or other in analyzer output and evidence-pack counts. It also adds
   `docs/research/2026-05-27-ue4-type-reconstruction-roadmap.md` for the staged
   `FName -> GObjects -> UFunction -> params` reconstruction path.
+- fact: ReflectionScanner now has opt-in FName rejection evidence behind
+  `OBELISK_REFLECTION_LOG_FNAME_REJECTS=1`, and the analyzer records
+  `fname_reject_count`, `fname_reject_reason_counts`, and `fname_rejects`; see
+  `docs/research/2026-05-27-fname-reject-evidence-logging.md`.
 
 ## Rejected Or Unsafe
 
@@ -163,6 +167,9 @@ Updated: 2026-05-27
   `FName indirect-table probe` lines against `None`, `ClientMessage`, and `ServerChat`;
   require `matched_clues=3/3` plus repeat confirmation through distinct `source_global`
   values or distinct targets before treating a table as a `GNames` research candidate.
+- next-step: For the next isolated ReflectionScanner run, add
+  `OBELISK_REFLECTION_LOG_FNAME_REJECTS=1` so rejected FName candidates produce reason
+  counts without satisfying strict evidence gates.
 - next-step: After a repeat-confirmed `GNames` research candidate appears, generate
   `objdump -d -M intel` for the matching ShooterGameServer binary and run the analyzer with
   `--binary` plus `--objdump-xrefs`; inspect whether candidate `source_global` references
