@@ -49,6 +49,6 @@ bounded property chains only.
 
 ## Next Priorities
 
-1. Add second-source validation for array inner and compact transfer metadata.
-2. Decide fixture root/manifest schema for ScriptStruct field snapshots.
+1. Add a dedicated ScriptStruct fixture manifest and validator before struct snapshots.
+2. Start ScriptStruct fixtures with a compact low-risk struct before transfer payloads.
 3. Keep admin/NetExec and gameplay-authoritative mutations out of runtime work.
