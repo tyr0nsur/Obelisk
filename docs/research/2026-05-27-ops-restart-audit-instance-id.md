@@ -99,14 +99,13 @@ Optional safety marker for TheIsland while plugin development is settling:
      /servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ObeliskRun.sh
    ```
 
-3. Create instance markers:
+3. Historical instance marker creation from this maintenance window:
 
-   ```bash
-   mkdir -p /servidor/ark/obelisk/state/instances/arkserver
-   mkdir -p /servidor/ark/obelisk/state/instances/arkserver2
-  touch /servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook
-  touch /servidor/ark/obelisk/state/instances/arkserver/disable-plugins
-  touch /servidor/ark/obelisk/state/instances/arkserver2/disable-plugins
+   ```text
+   Historical only; do not rerun on Ragnarok during normal agent rounds.
+   state/instances/arkserver/enable-process-event-hook
+   state/instances/arkserver/disable-plugins
+   state/instances/arkserver2/disable-plugins
   ```
 
    Remove obsolete map markers after instance markers exist:

@@ -84,8 +84,11 @@ git status --short --ignored
 For runtime/server work, also run the posture check after the server is restored:
 
 ```bash
-scripts/check_obelisk_server_posture.sh --expect-stable
+scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance arkserver2
 ```
+
+Use explicit `--map` and `--instance`; do not rely on script defaults during Obelisk debug
+rounds.
 
 Check that no files matching these patterns are staged:
 

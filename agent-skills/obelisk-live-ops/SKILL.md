@@ -110,10 +110,11 @@ Use named profiles instead of ad hoc env mixes:
 After any scanner/plugin capture, run:
 
 ```bash
-scripts/check_obelisk_server_posture.sh --expect-stable
+scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance arkserver2
 ```
 
-That check must pass before launching another agent round that assumes a stable server.
+Use the matching explicit `--map` and `--instance` for the approved debug target. That
+check must pass before launching another agent round that assumes a stable server.
 In `--expect-stable` mode it must fail closed if `libobelisk.so` is not mapped, if a
 deleted `libobelisk` mapping remains after redeploy, or if scanner/native-exec variables
 are still present. Its parser is tested offline with procfs fixtures; do not weaken those
@@ -211,8 +212,9 @@ If a live map crashes after an Obelisk change, preserve logs/core files first. R
 Ragnarok is maintenance-window work and should be lead/operator approved:
 
 ```bash
-mkdir -p /servidor/ark/obelisk/state/instances/arkserver
-touch /servidor/ark/obelisk/state/instances/arkserver/disable-plugins
+# Maintenance-window-only for Ragnarok; do not run during normal agent rounds.
+# mkdir -p /servidor/ark/obelisk/state/instances/arkserver
+# touch /servidor/ark/obelisk/state/instances/arkserver/disable-plugins
 # ./arkserver start  # Maintenance-window-only for Ragnarok.
 ```
 

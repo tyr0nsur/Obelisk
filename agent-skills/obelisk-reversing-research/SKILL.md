@@ -102,10 +102,11 @@ For live-like development captures authorized by the operator, keep the run shor
 restore stable posture immediately:
 
 ```bash
-scripts/check_obelisk_server_posture.sh --expect-stable
+scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance arkserver2
 ```
 
-If this fails, fix the server posture before doing more code or agent work.
+Use explicit target flags for the approved debug instance. If this fails, fix the server
+posture before doing more code or agent work.
 
 ## Test Strictness
 

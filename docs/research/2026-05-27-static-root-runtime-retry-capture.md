@@ -18,7 +18,7 @@ FName clue indices from core-dump evidence.
 ## Environment
 
 - Repo head before this note: `c7ccdb6`
-- Server: `arkserver` / Ragnarok debug harness
+- Server: historical `arkserver` / Ragnarok capture; not a current debug target
 - Runtime env during capture:
   - `OBELISK_ENABLE_REFLECTION_SCANNER=1`
   - `OBELISK_REFLECTION_STATIC_FNAME_ROOTS=0x5956f30`
@@ -27,8 +27,9 @@ FName clue indices from core-dump evidence.
   - native exec probes unset
 - Capture directory:
   `/servidor/ark/obelisk/dumps/static-root-capture-20260527T032535Z`
-- Stable posture after capture: restored and verified with
-  `scripts/check_obelisk_server_posture.sh --expect-stable`
+- Stable posture after capture: historically restored and verified with the posture check
+  available at that time. Current debug targets should use explicit `--map` and
+  `--instance` posture checks.
 
 ## Evidence
 

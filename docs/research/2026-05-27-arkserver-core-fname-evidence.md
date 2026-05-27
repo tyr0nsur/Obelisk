@@ -15,11 +15,13 @@ current static FName root candidate and corrected ReflectionScanner clue indices
 
 - Repo: `/home/flowcommunity-ark/Obelisk`
 - Commit deployed for dump: `9f320a0`
-- Server: `arkserver` / Ragnarok, explicitly designated as Obelisk debug harness
+- Server: historical operator-authorized `arkserver` / Ragnarok capture; Ragnarok is no
+  longer a current debug target
 - Runtime posture for dump: `OBELISK_DEBUG_ALLOW_PTRACE=1`, plugins disabled,
   ProcessEvent hook enabled, ReflectionScanner disabled
-- Stable posture after dump: restored; `scripts/check_obelisk_server_posture.sh
-  --expect-stable` passed for PID `2906605`
+- Stable posture after dump: historically restored; the posture check passed for PID
+  `2906605`. Current debug targets should use explicit `--map` and `--instance` posture
+  checks.
 - Core dump directory:
   `/servidor/ark/obelisk/dumps/arkserver-20260527T031311Z`
 - Core evidence pack:
