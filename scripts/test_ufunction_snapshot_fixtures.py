@@ -142,6 +142,17 @@ class UFunctionSnapshotFixtureTests(unittest.TestCase):
                     size = prop.get("element_size")
                     self.assertIsInstance(offset, int)
                     self.assertIsInstance(size, int)
+                    enum_candidate = prop.get("enum_candidate")
+                    if enum_candidate is not None:
+                        self.assertEqual(enum_candidate.get("status"), "candidate")
+                        self.assertEqual(enum_candidate.get("reject_reasons"), [])
+                        enum_values = enum_candidate.get("values")
+                        self.assertIsInstance(enum_values, list)
+                        self.assertGreater(len(enum_values), 0)
+                        for value in enum_values:
+                            self.assertIsInstance(value, str)
+                            self.assertNotEqual(value.strip(), "")
+                            self.assertIsNone(ADDRESS_RE.search(value), value)
                     if prop.get("status") == "candidate":
                         self.assertLessEqual(offset + size, parms_size)
 
