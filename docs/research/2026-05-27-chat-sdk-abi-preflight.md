@@ -92,6 +92,8 @@ Before dispatch is connected to `ProcessEvent`:
 - Verify a callback can unregister its own registration without deadlocking. Covered by
   `TestCallbackCanUnregisterItself`; owner cleanup from another thread still waits for the
   dispatch mutex before `dlclose`.
+- Verify owner cleanup from another thread cannot complete while a chat callback is still
+  executing. Covered by `TestOwnerCleanupWaitsForInFlightDispatch`.
 - Verify plugin init failure, explicit unload, and shutdown cleanup remove callbacks.
   Owner cleanup is covered internally by `TestOwnerCleanup`; PluginManager integration is
   covered by `PluginManagerTests` with an injected `ChatEventDispatcher`.

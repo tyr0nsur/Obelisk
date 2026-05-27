@@ -52,7 +52,7 @@ Latest backup symlink:
 Concrete backup created before further experiments:
 
 ```text
-/home/flowcommunity-ark/backups/ark-config-20260527-185011
+/home/flowcommunity-ark/backups/ark-config-20260527-190558
 ```
 
 It contains:
@@ -66,7 +66,9 @@ Ragnarok gameplay config note:
 
 - `AllowCaveBuildingPvP=True` was applied in
   `GameUserSettings.ini` on 2026-05-27 after explicit operator approval, then
-  `arkserver` was restarted successfully.
+  `arkserver` was restarted successfully. A later read-only-agent protocol violation
+  repeated the backup/restart and refreshed `ark-config-latest` to
+  `/home/flowcommunity-ark/backups/ark-config-20260527-190558`; Ragnarok remained up.
 - The pre-change file backup is
   `/home/flowcommunity-ark/backups/ark-config-manual/GameUserSettings.ini.allow-cave-20260527-184547.bak`.
 

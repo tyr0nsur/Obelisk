@@ -24,8 +24,10 @@ Updated: 2026-05-27
 - fact: Operator explicitly approved a Ragnarok gameplay config change on 2026-05-27:
   `AllowCaveBuildingPvP=True` was applied to `GameUserSettings.ini`, pre-change backup is
   `/home/flowcommunity-ark/backups/ark-config-manual/GameUserSettings.ini.allow-cave-20260527-184547.bak`,
-  `arkserver` was restarted successfully, and the refreshed config backup is
-  `/home/flowcommunity-ark/backups/ark-config-20260527-185011`.
+  `arkserver` was restarted successfully. A later read-only-agent protocol violation
+  repeated the backup/restart; current `ark-config-latest` is
+  `/home/flowcommunity-ark/backups/ark-config-20260527-190558`, and Ragnarok is up as PID
+  `3940524`.
 - fact: `arkserver2` / TheIsland is now the designated Obelisk debug/development target.
   Use it for controlled runtime validation and research harness work instead of Ragnarok,
   while still requiring explicit per-run approval for ReflectionScanner, native exec,
@@ -228,6 +230,10 @@ Updated: 2026-05-27
   `gobjects-static-xrefs.json` for `--gobjects-candidate`, summarizing objdump xrefs for
   root, chunks, count, and serial fields. Offline validation for `0x595b7e0` found 3 root,
   8016 chunks, 5870 count, and 2 serial xrefs.
+- fact: Static context anchors around `0x595b7e0` are now recorded: `0x79ce22` root store
+  plus bounded walk, `0x7a27a7` helper/destructor registration, `0x81f118` startup reset,
+  and `0x81f206` startup helper call. Treat labels as stripped-binary anchors, not accepted
+  function names.
 - fact: `scripts/enumerate_core_uobjects.py` can enumerate UObjects from the core through
   `0x595b7e0` and `0x5956f30`. It found real chat-related `Function` objects including
   `ServerChat` at index `25447`, `ServerChatTo` at `25449`, and `ServerChatToPlayer` at
@@ -329,6 +335,8 @@ Updated: 2026-05-27
   executing.
 - fact: `ChatEventDispatcher` supports self-unregister from inside a chat callback without
   deadlock while still blocking cross-thread owner cleanup until dispatch completes.
+- fact: `ChatEventDispatcherTests` now cover cross-thread owner cleanup waiting for an
+  in-flight chat callback before unregister completes.
 - fact: `PluginManager` now owns the internal chat dispatcher lifecycle backstop:
   plugin init failure and `UnloadAll()` unregister both ProcessEvent callbacks and
   `ChatEventDispatcher` subscriptions before `dlclose`. `PluginManagerTests` cover

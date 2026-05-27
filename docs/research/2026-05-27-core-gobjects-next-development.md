@@ -111,6 +111,19 @@ gobjects.serial 0x595b838: 2 xrefs
 The `/tmp` pack is a disposable validation artifact; the durable result is the script
 support and these summarized counts.
 
+Manual context review from the same pack identified useful anchors for follow-up:
+
+- `0x79ce22`: stores immediate `0x595b7e0` into a nearby global slot, then reads
+  `0x595b804` and `0x595b7f0` in a bounded walk.
+- `0x7a27a7`: passes `0x595b7e0` to a helper and registers a destructor-like callback
+  through `__cxa_atexit`.
+- `0x81f118`: clears `0x595b7e0` during startup/reset flow.
+- `0x81f206`: passes `0x595b7e0` to another startup helper.
+
+Treat these as static context anchors for decompiler/rizin follow-up. They are not
+accepted function names, because this stripped binary's objdump labels often point to
+nearest exported symbols rather than real internal functions.
+
 ## Acceptance Gate
 
 A `GObjects` candidate remains inconclusive until all of these are available:
@@ -126,3 +139,7 @@ A `GObjects` candidate remains inconclusive until all of these are available:
 Find one or more static `GUObjectArray` slot candidates in the matching
 `ShooterGameServer` binary, then run the enhanced core evidence pack against only those
 addresses.
+
+After `0x595b7e0`, the next offline step is to inspect the four context anchors above in a
+decompiler/disassembler and classify each as initialization, reset, destructor, or lookup.
+Record the result here before considering any runtime probe.

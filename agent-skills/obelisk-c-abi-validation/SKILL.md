@@ -88,6 +88,8 @@ Validation rules:
   for a plugin owner on init failure and before `dlclose` during unload.
 - Chat callback unregister must be idempotent and safe when called by the callback itself;
   cross-thread owner cleanup must still wait until in-flight dispatch finishes.
+- Keep tests for both self-unregister and cross-thread owner cleanup waiting before
+  exposing any chat callback registration through the public SDK.
 - Prefer opaque `uint64_t` registration ids plus explicit unregister for new event APIs.
   Keep owner-token cleanup on init failure/unload as the backstop, and include `user_data`
   in callback subscriptions instead of asking plugins to capture global state.

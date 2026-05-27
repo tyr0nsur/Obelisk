@@ -72,6 +72,22 @@ Static xrefs from the matching `ShooterGameServer.objdump` also support the layo
 for `0x595b7e0` reported `13884` load xrefs and `7` store xrefs across the tracked root,
 chunks, count, and serial fields.
 
+Concrete static contexts observed from that pack:
+
+```text
+0x79ce22: stores immediate 0x595b7e0 into a nearby global slot, then reads
+          0x595b804 and 0x595b7f0 for a bounded object-array walk.
+0x7a27a7: passes 0x595b7e0 as the first argument to a helper and then registers a
+          destructor-like callback through __cxa_atexit with 0x595b7e0 as state.
+0x81f118: writes zero to 0x595b7e0 during startup/reset flow.
+0x81f206: later passes 0x595b7e0 to another helper in the same startup path.
+```
+
+Interpretation: these contexts are stronger than raw xref volume because they show root
+initialization/reset, destructor registration, and lookup/walk behavior. The symbol names
+in stripped objdump are often nearest exported labels and should not be treated as true
+function names.
+
 ## Result
 
 `0x595b7e0` is promoted to `GUObjectArray research-candidate` for this ARK binary hash.

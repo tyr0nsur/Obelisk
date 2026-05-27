@@ -1,9 +1,14 @@
 #include "core/ChatEventDispatcher.h"
 
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <iostream>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <thread>
 
 namespace
 {
@@ -129,6 +134,67 @@ namespace
         Require(dispatcher.Dispatch(MakeMessage()) == 0, "self-unregistered callback ran twice");
     }
 
+    struct BlockingCallbackState
+    {
+        std::mutex mutex;
+        std::condition_variable cv;
+        bool entered = false;
+        bool release = false;
+    };
+
+    void BlockingCallback(const Obelisk::Core::ChatMessageView&, void* userData)
+    {
+        auto* state = static_cast<BlockingCallbackState*>(userData);
+        std::unique_lock<std::mutex> lock(state->mutex);
+        state->entered = true;
+        state->cv.notify_all();
+        state->cv.wait(lock, [&state]() { return state->release; });
+    }
+
+    void TestOwnerCleanupWaitsForInFlightDispatch()
+    {
+        Obelisk::Core::ChatEventDispatcher dispatcher;
+        int owner = 0;
+        BlockingCallbackState state;
+        std::atomic<bool> cleanupFinished{false};
+        size_t removed = 0;
+
+        const uint64_t id = dispatcher.Register(&owner, {BlockingCallback, &state});
+        Require(id != 0, "blocking callback registration failed");
+
+        std::thread dispatchThread([&dispatcher]() {
+            Require(dispatcher.Dispatch(MakeMessage()) == 1, "blocking callback did not dispatch");
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.mutex);
+            Require(state.cv.wait_for(lock, std::chrono::seconds(2), [&state]() { return state.entered; }),
+                    "blocking callback did not enter");
+        }
+
+        std::thread cleanupThread([&]() {
+            removed = dispatcher.UnregisterCallbacksForOwner(&owner);
+            cleanupFinished.store(true, std::memory_order_release);
+        });
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        Require(!cleanupFinished.load(std::memory_order_acquire),
+                "owner cleanup completed while callback was still in flight");
+
+        {
+            std::lock_guard<std::mutex> lock(state.mutex);
+            state.release = true;
+        }
+        state.cv.notify_all();
+
+        dispatchThread.join();
+        cleanupThread.join();
+
+        Require(cleanupFinished.load(std::memory_order_acquire), "owner cleanup did not complete");
+        Require(removed == 1, "owner cleanup removed wrong callback count after dispatch");
+        Require(dispatcher.SubscriptionCount() == 0, "owner callback survived cleanup after dispatch");
+    }
+
     void TestOwnerCleanup()
     {
         Obelisk::Core::ChatEventDispatcher dispatcher;
@@ -179,6 +245,7 @@ int main()
     TestRegisterRejectsInvalidInput();
     TestUnregisterIsIdempotent();
     TestCallbackCanUnregisterItself();
+    TestOwnerCleanupWaitsForInFlightDispatch();
     TestOwnerCleanup();
     TestRejectsUnknownSendMode();
     TestExceptionsDoNotStopDispatch();
