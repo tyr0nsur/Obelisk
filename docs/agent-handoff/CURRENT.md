@@ -311,6 +311,12 @@ Updated: 2026-05-27
   first `gobjects_candidates` address, first `fname_root_slots` address, and verifies the
   manifest binary SHA256 and `core.sha256` when available. Raw `--core` remains
   legacy/synthetic mode.
+- fact: `scripts/summarize_core_ufunction_inventory.py` now provides a broad offline
+  `UFunction` inventory from core/evidence packs. On the current core it found `5269`
+  Function objects in the first `30000` GObjects entries; top outers include
+  `ShooterPlayerController`, `PrimalDinoCharacter`, `PrimalCharacter`,
+  `ShooterCheatManager`, and `PrimalItem`. See
+  `docs/research/2026-05-27-general-ufunction-inventory.md`.
 - fact: `ue/RuntimeReflection.{h,cpp}` now provides an internal, binary-hash-gated
   reflection reader with tests for bounded `UFunction`/`UProperty` chains and borrowed
   parameter ranges. It is not public ABI; it is used by the experimental hook-side chat
