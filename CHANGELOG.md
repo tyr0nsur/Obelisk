@@ -1,8 +1,11 @@
 # Changelog
 
-## 0.1.0 - Unreleased
+## 0.1.0-dev
 
-Initial release scope:
+Active development toward a future `v0.1.0`. This is not a release tag and does not promise
+stable plugin or reflection compatibility yet. See `docs/VERSIONING.md`.
+
+Current baseline:
 
 - Linux `LD_PRELOAD` runtime bootstrap validated through the ARK: Survival Evolved
   dedicated server debug harness.
@@ -14,6 +17,14 @@ Initial release scope:
 - LinuxGSM wrapper templates for the current ARK debug harness.
 - `oBaseEvents` as the first official plugin example.
 - Offline reflection capture analyzer tooling.
+- CTest coverage for plugin config, ABI layout, and a minimal external SDK consumer.
+
+Breaking/development changes:
+
+- Legacy binary-local plugin fallback and map-marker fallback paths were removed.
+- Legacy chat/monitor prototype code was removed from the release tree.
+- Public plugin config is now runtime-owned under
+  `${OBELISK_CONFIG_DIR}/<plugin-id>/config.json`.
 
 Not included yet:
 

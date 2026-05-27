@@ -11,6 +11,8 @@ work from repository state instead of chat history.
 - Remote: `git@github.com:tyr0nsur/Obelisk.git`
 - Current known good baseline: latest pushed `main` after validation, currently
   `ef6cfc5 Add SDK consumer CI quality gate`.
+- Current development version line: `0.1.0-dev`. This is a coordination label, not a
+  release tag. See `docs/VERSIONING.md`.
 - Local ignored artifacts normally present: `build/`, `Obelisk.log`
 - Do not commit built `.so` files, logs, server config, core dumps, or state markers.
 - Server config restore notes: `docs/SERVER_RESTORE.md`
@@ -67,6 +69,13 @@ work from repository state instead of chat history.
   - `AbiLayoutTests` locks ABI v1 layout on Linux x86_64
   - `tests/sdk_consumer` builds and loads a minimal external plugin against the public SDK
     through CTest
+- `EventManagerTests` cover global/filtered pre callbacks, blocking behavior, post
+  callbacks, owner cleanup, and null callback handling.
+- Installed SDK layout validation exists through `scripts/test_install_obelisk_layout.sh`
+  and is run by CI.
+- Versioning policy is documented in `docs/VERSIONING.md`: no stable `0.1.0` tag yet;
+  use `0.1.0-alpha.N` only for intentional contributor previews and `0.1.0-rc.N` only
+  after scope freeze.
 
 ## What Is Experimental Or Blocked
 
@@ -79,6 +88,10 @@ work from repository state instead of chat history.
   `docs/research/2026-05-27-isolated-debug-instance-plan.md`.
 - `GNames`, `GObjects`, `UFunction` metadata, and reflected parameter decoding are not
   solved yet.
+- Analyzer-level GNames table triage is available in
+  `scripts/analyze_reflectionscanner_capture.py` and documented in
+  `docs/research/2026-05-27-reflectionscanner-gname-table-triage.md`. A
+  `research-candidate` label is evidence for follow-up only, not an accepted offset.
 
 ## Current Research Direction
 
@@ -123,5 +136,4 @@ python3 scripts/analyze_reflectionscanner_capture.py --json /path/to/isolated/Ob
 - Ops: get permission to create or designate the isolated ARK debug instance; preferred
   plan is `arkserver-obelisk-debug`.
 - Reflection: improve FName/GNames probes and analyzer fixtures offline.
-- Build/QA: add install/package validation for public SDK headers, runtime libraries, and
-  example plugin layout.
+- Build/QA: evolve install/package validation toward clean CMake SDK/package exports.

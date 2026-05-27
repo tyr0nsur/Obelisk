@@ -67,6 +67,17 @@ Updated: 2026-05-27
 - fact: Commit `ef6cfc5` added an SDK consumer fixture that builds a minimal external
   plugin against `obelisk_sdk`, loads it with `dlopen`, validates the metadata/config ABI,
   and runs under CTest. CI now also runs CTest and `git diff --check`.
+- fact: Commit `1cacbca` added analyzer-level GNames table triage. The analyzer groups
+  FName indirect-table probes by table pointer, labels table groups as
+  `research-candidate` or `rejected`, and keeps strict mode tied to repeat-confirmed table
+  evidence.
+- fact: Commit `ea2f63f` added `EventManagerTests` for global/filtered pre callbacks,
+  blocking behavior, post callbacks, owner cleanup, and null callback handling.
+- fact: Commit `f5ab352` runs installed SDK layout validation in CI through
+  `scripts/test_install_obelisk_layout.sh`.
+- fact: Development versioning policy is documented in `docs/VERSIONING.md`. The current
+  line is `0.1.0-dev`, not a release tag; use alpha/rc tags only when external testing or
+  release-candidate validation needs a fixed checkpoint.
 
 ## Rejected Or Unsafe
 
@@ -113,9 +124,10 @@ Updated: 2026-05-27
 - next-step: Replace raw chat parameter probing with reflected parameter decoding.
 - next-step: Add binary hash validation or an instruction decoder before accepting future
   ProcessEvent prologue changes.
-- next-step: Add install/package validation that proves a fresh tree exposes the public
-  SDK headers, runtime libraries, and example plugin layout without relying on local build
-  artifacts.
+- next-step: Broaden install/package validation from shell-level SDK layout checks toward a
+  CMake package/export story once public SDK consumption stabilizes.
+- next-step: Later integrate `docs/VERSIONING.md` into README/STATUS/RELEASE once the
+  versioning policy has settled; avoid claiming `0.1.0` is imminent.
 
 ## Agent Protocol
 
