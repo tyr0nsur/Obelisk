@@ -83,9 +83,10 @@ property metadata.
 - Do not enable `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` on live servers.
 - Do not enable broad event discovery on a production map until it has survived an
   isolated server test.
-- Do not run `ReflectionScanner` on `arkserver`. Run it on `arkserver2` only for a
-  specifically approved debug window with plugins disabled, copied-log evidence, and
-  rollback; the cleaner future path remains `arkserver-obelisk-debug`.
+- Do not run `ReflectionScanner` on `arkserver`. Prefer `arkserver-obelisk-debug` for
+  ReflectionScanner, `gcore`/`ptrace`, broad tracing, and scanner-like captures. Run those
+  on `arkserver2` only for a specifically approved fallback debug window with plugins
+  disabled, copied-log evidence, and rollback.
 - Use small `OBELISK_PE_TRACE_LIMIT` windows only when capturing evidence; default should
   remain quiet.
 - Prefer the `enable-chat-reflection` marker over ad hoc environment edits; rollback is

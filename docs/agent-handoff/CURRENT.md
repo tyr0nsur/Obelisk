@@ -421,7 +421,12 @@ Updated: 2026-05-27
 - risk: Raw FString scanning/discovery must not be enabled on live Ragnarok as
   the normal test path.
 - risk: Runtime/reversing experiments on Ragnarok can invalidate player performance
-  testing; use `arkserver2` / TheIsland for Obelisk debug rounds.
+  testing; keep `arkserver` / Ragnarok protected unless the operator opens an explicit
+  maintenance window.
+- risk: `arkserver2` / TheIsland is the controlled debug/development fallback, not the
+  default target for high-risk tooling. For `gcore`, `ptrace`, `ReflectionScanner`, broad
+  tracing, and scanner-like captures, prefer a dedicated `arkserver-obelisk-debug`
+  instance with separate ports/save/cluster/logs.
 - risk: Native exec probes must remain disabled on live servers.
 - risk: The `subhook` pin was selected from the existing local checkout without internet
   verification; full offline resilience still needs a mirror or vendored archive.
@@ -432,6 +437,9 @@ Updated: 2026-05-27
   restart window with `OBELISK_CHAT_REFLECTION_LOG_TEXT=1`, review bounded logs, then
   remove the text gate; use the TheIsland A/B runbook, keep dispatch blocked, and do not
   use Ragnarok.
+- next-step: Before any second-source core or scanner capture, create or confirm
+  `arkserver-obelisk-debug`; use TheIsland only as an explicit operator-approved fallback
+  and record rollback/posture evidence.
 - next-step: When an operator-approved Ragnarok maintenance window exists, remove the chat
   reflection gate and restart only `arkserver`, then validate with
   `--expect-stable --forbid-chat-reflection`.

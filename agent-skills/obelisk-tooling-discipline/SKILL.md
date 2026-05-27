@@ -51,10 +51,14 @@ Forbidden on live/shared instances:
 - Prefer copied logs over live attach.
 - Prefer deterministic scripts over manual UI-only conclusions.
 - Use Ghidra for decompilation and manual xref reasoning, but summarize evidence in text.
-- Use `arkserver2` / TheIsland for Obelisk debug/development runtime probes while
-  `arkserver` / Ragnarok is reserved for player performance testing.
+- Use `arkserver2` / TheIsland for controlled Obelisk debug/development runtime validation
+  while `arkserver` / Ragnarok is reserved for player performance testing.
+- Treat `arkserver2` as an explicit fallback for high-risk tooling, not the default target.
+  For `gcore`, `ptrace`, `ReflectionScanner`, Frida/rr, broad event tracing, or scanner-like
+  probes, prefer a dedicated `arkserver-obelisk-debug` instance with separate ports, save,
+  cluster id, and log directory.
 - Use Frida/rr only after there is a specifically approved debug window and a rollback
-  plan; prefer a dedicated isolated instance for those tools when available.
+  plan.
 - Do not introduce `/dev/null` write probes as memory-readability checks on Linux; current
   evidence shows they can report invalid mappings as readable.
 

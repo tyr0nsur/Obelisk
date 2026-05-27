@@ -52,15 +52,16 @@ Own these areas:
   sleep/retry windows.
 - Every new offset or signature must include how it was derived and what binary/version it was tested against.
 - Run scanner captures only on a confirmed isolated/debug instance. Current operator
-  direction designates `arkserver2` / TheIsland as the Obelisk debug/development target,
-  but scanner/native-exec/ptrace still require a specific run window and rollback plan.
-  The cleaner future option remains `arkserver-obelisk-debug`.
+  direction designates `arkserver2` / TheIsland as the Obelisk debug/development target for
+  controlled runtime validation, but scanner/native-exec/ptrace/gcore and broad tracing
+  should prefer a dedicated `arkserver-obelisk-debug` instance. Use TheIsland for those
+  high-risk captures only as an explicit approved fallback with a rollback plan.
 
 ## Safe Experiment Pattern
 
 Do not use Ragnarok for new reversing/runtime experiments while player performance testing
-is active. For controlled debug work, start with TheIsland core stable and plugins
-disabled:
+is active. For low-risk controlled runtime validation, start with TheIsland core stable and
+plugins disabled:
 
 ```bash
 mkdir -p /servidor/ark/obelisk/state/instances/arkserver2
@@ -73,8 +74,10 @@ On production Ragnarok, stop unless there is an explicit maintenance window. Cha
 discovery has been unstable and must not be enabled on the live map as the normal
 experiment path.
 
-For scanner or event discovery, use only a confirmed isolated/debug instance and enable one
-experiment at a time. The debug wrapper should set explicit environment variables such as:
+For scanner, `gcore`/`ptrace`, native exec experiments, or broad event discovery, use a
+confirmed isolated/debug instance and enable one experiment at a time. Prefer
+`arkserver-obelisk-debug`; use `arkserver2` / TheIsland only during an approved fallback
+window. The debug wrapper should set explicit environment variables such as:
 
 ```bash
 export OBELISK_ENABLE_PROCESS_EVENT_HOOK=1
