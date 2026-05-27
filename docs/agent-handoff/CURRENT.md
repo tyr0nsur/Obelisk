@@ -240,8 +240,9 @@ Updated: 2026-05-27
   `docs/research/2026-05-27-core-gobjects-candidate.md`.
 - fact: `scripts/build_core_dump_evidence_pack.py` now writes
   `gobjects-static-xrefs.json` for `--gobjects-candidate`, summarizing objdump xrefs for
-  root, chunks, count, and serial fields. Offline validation for `0x595b7e0` found 3 root,
-  8016 chunks, 5870 count, and 2 serial xrefs.
+  root, chunks, count, and serial fields. Its manifest records the Obelisk commit used for
+  the pack. Offline validation for `0x595b7e0` found 3 root, 8016 chunks, 5870 count, and
+  2 serial xrefs.
 - fact: Static context anchors around `0x595b7e0` are now recorded: `0x79ce22` root store
   plus bounded walk, `0x7a27a7` helper/destructor registration, `0x81f118` startup reset,
   and `0x81f206` startup helper call. Treat labels as stripped-binary anchors, not accepted
@@ -253,6 +254,11 @@ Updated: 2026-05-27
   `0x595b7e0` and `0x5956f30`. It found real chat-related `Function` objects including
   `ServerChat` at index `25447`, `ServerChatTo` at `25449`, and `ServerChatToPlayer` at
   `25452`; see `docs/research/2026-05-27-core-uobject-enumeration.md`.
+- next-step: Do not restart the `GObjects` investigation by looking for another broad
+  candidate. The priority is a second static path: classify `0x12d1400`, `0x79ce22`,
+  `0x7a27a7`, `0x81f118`, and `0x81f206` as init/reset/destructor/lookup context, then add
+  class/outer back-reference validation before promoting any runtime-stable reflection
+  contract.
 - fact: `scripts/inspect_core_ufunctions.py` can walk legacy `UStruct.Children +0x38` and
   `UField.Next +0x28` property chains from the core. Chat parameter evidence:
   `ServerChat.MessageText` offset `0x0`, `ServerChatTo.SteamID` offset `0x0`,

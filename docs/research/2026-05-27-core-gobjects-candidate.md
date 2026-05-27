@@ -116,18 +116,26 @@ The current best model from this core is:
 - GDB warned that the currently installed `libobelisk.so` build id does not match the core.
   The ARK binary hash still matches the target executable, and this evidence reads ARK/core
   data, not Obelisk symbols.
-- This validates item 0 only. Promotion beyond `research-candidate` requires validating
-  multiple object indices, class/outer relationships, and static xrefs.
+- Initial validation covered item 0 only; later offline enumeration validated multiple
+  object indices and FName-backed names in `2026-05-27-core-uobject-enumeration.md`.
+  Promotion beyond `research-candidate` still requires stronger class/outer back-reference
+  checks and a second independent evidence path.
 - `0x595b7e0` is binary-hash-specific evidence.
 
 ## Next Steps
 
-1. Extend core tooling to validate several `FUObjectItem` indices from a candidate
-   `GUObjectArray`.
-2. Resolve each object's `NamePrivate` through the confirmed FName table.
+Completed/superseded by `scripts/enumerate_core_uobjects.py` and
+`2026-05-27-core-uobject-enumeration.md`:
+
+1. Validate several `FUObjectItem` indices from the candidate `GUObjectArray`.
+2. Resolve object `NamePrivate` through the confirmed FName table.
 3. Check that `InternalIndex` matches the array index for sampled objects.
-4. Check that `ClassPrivate` and non-null `OuterPrivate` are plausible UObjects or appear
+
+Remaining:
+
+1. Check that `ClassPrivate` and non-null `OuterPrivate` are plausible UObjects or appear
    in the object array.
-5. Search static xrefs around the candidate to identify initialization and access paths.
-6. After object enumeration works offline, enumerate `UClass`/`UFunction` candidates and
-   only then return to chat command interception through reflected params.
+2. Classify static xrefs around the candidate to identify initialization, reset,
+   destructor, and lookup paths.
+3. Repeat the core/object enumeration against a second isolated capture before promoting
+   runtime-stable reflection contracts.

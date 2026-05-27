@@ -149,11 +149,13 @@ A `GObjects` candidate remains inconclusive until all of these are available:
 - multiple object samples with names resolved through the validated FName table;
 - a second isolated capture or independent static path before runtime code.
 
-## Next Step
+## Current Follow-Up
 
-Find one or more static `GUObjectArray` slot candidates in the matching
-`ShooterGameServer` binary, then run the enhanced core evidence pack against only those
-addresses.
+The original slot-finding step is superseded by `0x595b7e0`, now documented in
+`2026-05-27-core-gobjects-candidate.md` as a binary-hash-specific
+`GUObjectArray research-candidate`. The evidence pack direct-sample mode is the correct
+path for this candidate; the older legacy `--gobjects-candidate` preview treats `ADDR` as
+an indirect slot and is only useful for unresolved slot-style candidates.
 
 After `0x595b7e0`, the next offline step is to inspect the four context anchors above in a
 decompiler/disassembler and classify each as initialization, reset, destructor, or lookup.

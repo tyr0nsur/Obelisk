@@ -83,16 +83,27 @@ param scanning. The next concrete targets are:
 ## Risks
 
 - This is still core-specific evidence, not a runtime-stable offset contract.
-- `UFunction` metadata offsets and property chains are not accepted yet.
+- `UFunction` metadata offsets and property chains now have candidate-only offline
+  evidence in `2026-05-27-core-ufunction-property-chain.md`, but they are not accepted as
+  runtime-stable or SDK-visible contracts yet.
 - The enumerator currently targets the legacy FName table shape confirmed in this core.
 - Name/class matches are necessary but not sufficient; each target needs metadata and
   property-chain validation before any runtime chat decoder.
 
 ## Next Steps
 
+Completed/superseded by `scripts/inspect_core_ufunctions.py` and
+`2026-05-27-core-ufunction-property-chain.md`:
+
 1. Add an offline `UFunction` inspection pass for the function objects above.
 2. Inspect candidate windows for `FunctionFlags`, `NumParms`, `ParmsSize`,
    `ReturnValueOffset`, and property/children chain roots.
 3. Resolve property object names/classes through the same FName/GObjects path.
-4. Only after property offsets are bounded, implement a runtime `ProcessEvent` filter for
-   validated `UFunction*` targets.
+
+Remaining:
+
+1. Strengthen `ClassPrivate`/`OuterPrivate` back-reference validation for UObject and
+   property objects.
+2. Repeat the inspector against a second core before promoting any runtime-stable contract.
+3. Keep runtime `ProcessEvent` recognition gated to validated `UFunction*` targets and
+   isolated debug windows.

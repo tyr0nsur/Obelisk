@@ -171,6 +171,7 @@ work from repository state instead of chat history.
 - `scripts/build_core_dump_evidence_pack.py` writes `gobjects-static-xrefs.json` for
   `--gobjects-candidate`, covering root, chunks, count, and serial fields. Offline
   validation for `0x595b7e0` found 3 root, 8016 chunks, 5870 count, and 2 serial xrefs.
+  New packs record the Obelisk commit in `manifest.json`.
 - Static context anchors for `0x595b7e0`: `0x79ce22` root store plus bounded walk,
   `0x7a27a7` helper/destructor registration, `0x81f118` startup reset, and `0x81f206`
   startup helper call. Labels are anchors only, not accepted function names.
@@ -181,6 +182,9 @@ work from repository state instead of chat history.
   It found real chat-related `Function` objects in `GObjects`, including `ServerChat`
   index `25447`, `ServerChatTo` index `25449`, and `ServerChatToPlayer` index `25452`;
   see `docs/research/2026-05-27-core-uobject-enumeration.md`.
+- Do not restart `GObjects` discovery from broad candidate search. Current priority is a
+  second static path for `0x595b7e0`: classify `0x12d1400`, `0x79ce22`, `0x7a27a7`,
+  `0x81f118`, and `0x81f206`, then strengthen class/outer back-reference validation.
 - Offline `UFunction` property-chain inspection now works through
   `scripts/inspect_core_ufunctions.py`. Current chat evidence:
   `ServerChat.MessageText` offset `0x0`; `ServerChatTo.SteamID` offset `0x0` and

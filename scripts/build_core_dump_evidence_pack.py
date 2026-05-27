@@ -73,6 +73,20 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def detect_obelisk_commit(repo_root: Path) -> str:
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_root), "rev-parse", "--short=12", "HEAD"],
+            check=True,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+    return result.stdout.strip() or "unknown"
+
+
 def run_command(command: list[str], output_path: Path) -> dict[str, object]:
     result = subprocess.run(
         command,
@@ -686,6 +700,14 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Skip hashing the core file when it is too large for a quick triage run.",
     )
+    parser.add_argument(
+        "--obelisk-commit",
+        default=None,
+        help=(
+            "Obelisk commit to record in manifest.json. Defaults to the current "
+            "repository HEAD short hash, or 'unknown' outside a Git checkout."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -880,6 +902,9 @@ def main() -> int:
     manifest = {
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "repo_root": str(REPO_ROOT),
+        "obelisk": {
+            "commit": args.obelisk_commit or detect_obelisk_commit(REPO_ROOT),
+        },
         "binary": {
             "path": str(binary),
             "sha256": binary_sha256,

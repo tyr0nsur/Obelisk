@@ -18,7 +18,9 @@ behavior, or require touching `/servidor/ark`.
   promotes `0x595b7e0` to `GUObjectArray research-candidate`.
 - Offline UObject enumeration now finds real chat-related `Function` objects through
   `GObjects` and FName-backed names. `UFunction` metadata, property chain, and parameter
-  layout are not accepted yet.
+  layout have candidate-only offline evidence in
+  `2026-05-27-core-ufunction-property-chain.md`; they are not accepted as runtime-stable
+  or SDK-visible contracts yet.
 - Old chat-related clue mapping `9619 -> ClientMessage` and `9622 -> ServerChat` is stale.
   Current core evidence has `4884 -> ClientMessage`, `9619 -> ServerChat`, and
   `9622 -> SetActiveMissionDebugFlags`.
@@ -267,10 +269,12 @@ Do not implement yet:
 ## Recommended Shortest Path
 
 1. Keep FName/GObjects evidence binary-hash-scoped until second-source validation exists.
-2. Use offline `GObjects` enumeration to inspect known chat `Function` objects.
-3. Add `UFunction` metadata logs or offline evidence for `FunctionFlags`, `NumParms`,
-   `ParmsSize`, and property root candidates.
-4. Add property chain logs.
+2. Classify the strongest static `GUObjectArray` xref anchors for `0x595b7e0`
+   (`0x12d1400`, `0x79ce22`, `0x7a27a7`, `0x81f118`, `0x81f206`) as init/reset/destructor
+   or lookup paths.
+3. Strengthen offline UObject validation with class/outer back-reference checks.
+4. Repeat `GObjects -> UObject -> UFunction -> property chain` inspection against a second
+   isolated core.
 5. Decode params only for one known function in a copied/isolated capture.
 
 ## Risks

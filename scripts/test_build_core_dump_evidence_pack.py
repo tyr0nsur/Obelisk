@@ -194,6 +194,10 @@ class CoreDumpEvidencePackCommandTests(unittest.TestCase):
             f"{core_pack.MAX_GOBJECTS_SAMPLE_INDICES} times",
         )
 
+    def test_detect_obelisk_commit_reports_unknown_outside_git(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            self.assertEqual(core_pack.detect_obelisk_commit(Path(temp_dir)), "unknown")
+
 
 if __name__ == "__main__":
     unittest.main()
