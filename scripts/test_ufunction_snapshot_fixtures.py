@@ -110,6 +110,7 @@ class UFunctionSnapshotFixtureTests(unittest.TestCase):
                 self.assertEqual(len(targets), 1)
                 target = targets[0]
                 self.assertIn(target.get("status"), {"candidate", "rejected"})
+                self.assertEqual(target.get("target", {}).get("class_name"), "Function")
                 self.assertEqual(
                     target.get("membership"),
                     {"target": "candidate-uobject", "class": "candidate-uobject", "outer": "candidate-uobject"},
