@@ -384,9 +384,11 @@ python3 scripts/analyze_reflectionscanner_capture.py \
   include hook-side `GetFunctionNameIndex()` / `Memory::IsReadable()` overhead.
 - `chat_reflection_benchmark` reports tail latency and allocation counts. Disabled and
   enabled non-chat hook-like paths are allocation-free locally; matched chat paths still
-  allocate three temporary vectors/strings after reserve hardening and need justification or
-  bounded stack/small-vector storage before SDK promotion. Text decode is measured with a
-  non-SSO fixture string and currently shows seven allocations in the hook-like text path.
+  allocate two temporary vectors/strings after stack cycle-guard hardening and need
+  justification or bounded stack/small-vector storage before SDK promotion. Standalone
+  UTF-32 decode reserves output and currently allows one allocation for a non-SSO fixture;
+  hook-like text logging currently shows four allocations in the text path. See
+  `docs/research/2026-05-27-chat-reflection-stack-cycle-guard.md`.
 - `scripts/check_chat_reflection_benchmark.py` gates benchmark output for allocation-free
   disabled/non-chat paths and documented matched/text ceilings. It is a local regression
   gate only, not isolated runtime A/B acceptance.

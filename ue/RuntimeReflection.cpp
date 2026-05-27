@@ -1,6 +1,7 @@
 #include "RuntimeReflection.h"
 
 #include <algorithm>
+#include <array>
 #include <cstring>
 #include <limits>
 #include <string>
@@ -270,16 +271,19 @@ namespace Obelisk::UE::RuntimeReflection
             return ReadResult::Fail(ReadStatus::OutOfBounds, "ReturnValueOffset exceeds ParmsSize");
 
         value.Parameters.reserve(value.NumParms);
-        std::vector<const void*> visited;
-        visited.reserve(value.NumParms);
+        std::array<const void*, 64> visited{};
+        if (value.NumParms > visited.size())
+            return ReadResult::Fail(ReadStatus::OutOfBounds, "UFunction NumParms exceeds cycle guard capacity");
+        size_t visitedCount = 0;
         const void* current = value.Children;
         for (uint16_t i = 0; i < value.NumParms; ++i)
         {
             if (!current)
                 return ReadResult::Fail(ReadStatus::Implausible, "property chain ended before NumParms");
-            if (std::find(visited.begin(), visited.end(), current) != visited.end())
+            if (std::find(visited.data(), visited.data() + visitedCount, current) !=
+                visited.data() + visitedCount)
                 return ReadResult::Fail(ReadStatus::Implausible, "property chain cycle detected");
-            visited.push_back(current);
+            visited[visitedCount++] = current;
 
             UPropertyView property;
             if (ReadResult result = ReadProperty(reader, options, function, current, value.ParmsSize, property); !result)
@@ -384,6 +388,7 @@ namespace Obelisk::UE::RuntimeReflection
         if (!reader.CanRead(header.Data, byteSize))
             return ReadResult::Fail(ReadStatus::Unreadable, "FString data is unreadable");
 
+        out.reserve(charCount - 1);
         const auto* cursor = static_cast<const uint8_t*>(header.Data);
         for (size_t i = 0; i < charCount; ++i)
         {
