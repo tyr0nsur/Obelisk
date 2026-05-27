@@ -62,6 +62,11 @@ Updated: 2026-05-27
 - fact: Commit `e9dfbaf` added the canonical SDK header at
   `include/obelisk/ObeliskApi.h`, kept `api/ObeliskApi.h` as a transition wrapper,
   made `oBaseEvents` consume `obelisk_sdk`, and added `AbiLayoutTests`.
+- fact: Commit `065d68d` refreshed the top-level README around the current SDK/runtime
+  direction, stable/experimental boundaries, install layout, plugin ABI, and roadmap.
+- fact: Commit `ef6cfc5` added an SDK consumer fixture that builds a minimal external
+  plugin against `obelisk_sdk`, loads it with `dlopen`, validates the metadata/config ABI,
+  and runs under CTest. CI now also runs CTest and `git diff --check`.
 
 ## Rejected Or Unsafe
 
@@ -108,8 +113,9 @@ Updated: 2026-05-27
 - next-step: Replace raw chat parameter probing with reflected parameter decoding.
 - next-step: Add binary hash validation or an instruction decoder before accepting future
   ProcessEvent prologue changes.
-- next-step: Add CI quality gates for `ctest`, `git diff --check`, installer dry-run,
-  and an SDK consumer fixture before adding gameplay APIs.
+- next-step: Add install/package validation that proves a fresh tree exposes the public
+  SDK headers, runtime libraries, and example plugin layout without relying on local build
+  artifacts.
 
 ## Agent Protocol
 
