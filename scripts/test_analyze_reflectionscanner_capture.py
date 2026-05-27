@@ -39,12 +39,23 @@ def fname_probe(
 
 
 class ReflectionScannerAnalyzerStrictTests(unittest.TestCase):
-    def run_analyzer(self, lines: list[str], *extra_args: str) -> subprocess.CompletedProcess[str]:
+    def run_analyzer(
+        self,
+        lines: list[str],
+        *extra_args: str,
+        objdump_text: str | None = None,
+    ) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory() as temp_dir:
             log_path = Path(temp_dir) / "Obelisk.log"
             log_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            args = [sys.executable, str(ANALYZER), *extra_args]
+            if objdump_text is not None:
+                objdump_path = Path(temp_dir) / "ShooterGameServer.objdump"
+                objdump_path.write_text(objdump_text, encoding="utf-8")
+                args.extend(["--objdump-xrefs", str(objdump_path)])
+            args.append(str(log_path))
             return subprocess.run(
-                [sys.executable, str(ANALYZER), *extra_args, str(log_path)],
+                args,
                 check=False,
                 text=True,
                 stdout=subprocess.PIPE,
@@ -151,6 +162,41 @@ class ReflectionScannerAnalyzerStrictTests(unittest.TestCase):
         self.assertEqual(tables["0x7f0000001000"]["research_candidate_count"], 2)
         self.assertEqual(tables["0x7f0000002000"]["status"], "rejected")
         self.assertIn("preview mismatch observed", tables["0x7f0000002000"]["reason"])
+
+    def test_json_annotates_static_xrefs_from_objdump_text(self) -> None:
+        result = self.run_analyzer(
+            [
+                fname_probe(source_global="0x600000"),
+                fname_probe(source_global="0x600008"),
+            ],
+            "--json",
+            objdump_text="""
+0000000000410000 <.text>:
+  410010: 48 89 1d e9 ff 1e 00    mov    %rbx,0x1effe9(%rip)        # 0x600000
+  410020: 48 8b 05 e1 ff 1e 00    mov    0x1effe1(%rip),%rax        # 0x600008
+  410030: 48 8b 05 d9 ff 1e 00    mov    0x1effd9(%rip),%rax        # 0x600010
+""",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        summary = json.loads(result.stdout)
+        self.assertEqual(len(summary["static_xrefs"]["0x600000"]), 1)
+        self.assertEqual(len(summary["static_xrefs"]["0x600008"]), 1)
+        self.assertNotIn("0x600010", summary["static_xrefs"])
+
+    def test_human_output_reports_static_xrefs(self) -> None:
+        result = self.run_analyzer(
+            [fname_probe(source_global="0x600000")],
+            objdump_text=(
+                "  410010: 48 89 1d e9 ff 1e 00    "
+                "mov    %rbx,0x1effe9(%rip)        # 0x600000\n"
+            ),
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("static xrefs:", result.stdout)
+        self.assertIn("0x600000: 1 reference(s)", result.stdout)
+        self.assertIn("0x410010", result.stdout)
 
 
 if __name__ == "__main__":

@@ -49,6 +49,11 @@ CANDIDATE_RE = re.compile(
     r"(?P<global>\S+) -> (?P<value>\S+)"
 )
 
+OBJDUMP_XREF_RE = re.compile(
+    r"^\s*(?P<address>[0-9a-fA-F]+):\s+(?P<body>.*?)"
+    r"(?:#|<)\s*(?P<target>0x[0-9a-fA-F]+)"
+)
+
 
 @dataclass(frozen=True)
 class LogMatch:
@@ -125,6 +130,21 @@ class CandidateGlobal:
     value: str
 
 
+@dataclass(frozen=True)
+class StaticXref:
+    line: int
+    instruction_address: str
+    target_address: str
+    instruction: str
+
+
+def normalize_hex(value: str) -> str:
+    try:
+        return f"0x{int(value, 16):x}"
+    except ValueError:
+        return value.lower()
+
+
 def summarize_gname_tables(fnames: list[FNameProbe]) -> list[dict[str, object]]:
     probes_by_table: dict[str, list[FNameProbe]] = {}
     for probe in fnames:
@@ -197,6 +217,32 @@ def summarize_gname_tables(fnames: list[FNameProbe]) -> list[dict[str, object]]:
     return summaries
 
 
+def parse_objdump_xrefs(path: Path, targets: set[str]) -> dict[str, list[StaticXref]]:
+    normalized_targets = {normalize_hex(target) for target in targets}
+    xrefs: dict[str, list[StaticXref]] = {target: [] for target in normalized_targets}
+
+    with path.open("r", encoding="utf-8", errors="replace") as handle:
+        for line_number, line in enumerate(handle, start=1):
+            match = OBJDUMP_XREF_RE.search(line.rstrip("\n"))
+            if not match:
+                continue
+
+            target = normalize_hex(match.group("target"))
+            if target not in normalized_targets:
+                continue
+
+            xrefs[target].append(
+                StaticXref(
+                    line=line_number,
+                    instruction_address=f"0x{int(match.group('address'), 16):x}",
+                    target_address=target,
+                    instruction=" ".join(match.group("body").split()),
+                )
+            )
+
+    return xrefs
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -218,6 +264,14 @@ def parse_args() -> argparse.Namespace:
             "matched_clues=3/3 FName research candidate is found."
         ),
     )
+    parser.add_argument(
+        "--objdump-xrefs",
+        type=Path,
+        help=(
+            "Annotate candidate source globals with references from a pre-generated "
+            "objdump -d text file. This is offline evidence only."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -234,7 +288,7 @@ def iter_lines(paths: list[str]) -> Iterable[tuple[str, int, str]]:
                 yield str(path), line_number, line.rstrip("\n")
 
 
-def parse_logs(paths: list[str]) -> dict[str, object]:
+def parse_logs(paths: list[str], objdump_xrefs_path: Path | None = None) -> dict[str, object]:
     uobjects: list[UObjectValidation] = []
     fnames: list[FNameProbe] = []
     delayed: list[DelayedGlobal] = []
@@ -326,6 +380,21 @@ def parse_logs(paths: list[str]) -> dict[str, object]:
             if probe.source_global != "unknown":
                 table_source_globals.setdefault(probe.table, set()).add(probe.source_global)
 
+    static_targets = {
+        normalize_hex(probe.source_global)
+        for probe in fnames
+        if probe.source_global != "unknown"
+    }
+    static_targets.update(
+        normalize_hex(item.global_address)
+        for item in candidate_globals
+    )
+    static_xrefs = (
+        parse_objdump_xrefs(objdump_xrefs_path, static_targets)
+        if objdump_xrefs_path is not None
+        else {}
+    )
+
     return {
         "files": sorted(files),
         "reject_markers": [asdict(item) for item in reject_markers],
@@ -351,6 +420,10 @@ def parse_logs(paths: list[str]) -> dict[str, object]:
         "gname_table_candidates": summarize_gname_tables(fnames),
         "delayed_globals": [asdict(item) for item in delayed],
         "candidate_globals": [asdict(item) for item in candidate_globals],
+        "static_xrefs": {
+            target: [asdict(item) for item in refs]
+            for target, refs in sorted(static_xrefs.items())
+        },
     }
 
 
@@ -360,6 +433,7 @@ def print_human(summary: dict[str, object]) -> None:
     fnames = summary["fname_probes"]
     delayed = summary["delayed_globals"]
     candidate_globals = summary["candidate_globals"]
+    static_xrefs = summary["static_xrefs"]
 
     print("ReflectionScanner capture summary")
     print(f"files: {', '.join(summary['files'])}")
@@ -433,10 +507,22 @@ def print_human(summary: dict[str, object]) -> None:
             "vtable_exec={vtable_exec} fname_plausible={fname_plausible}".format(**item)
         )
 
+    if static_xrefs:
+        print("\nstatic xrefs:")
+        for target, refs in static_xrefs.items():
+            if not refs:
+                print(f"- {target}: none")
+                continue
+            print(f"- {target}: {len(refs)} reference(s)")
+            for ref in refs[:5]:
+                print(
+                    "  line {line}: {instruction_address} {instruction}".format(**ref)
+                )
+
 
 def main() -> int:
     args = parse_args()
-    summary = parse_logs(args.logs)
+    summary = parse_logs(args.logs, args.objdump_xrefs)
 
     if args.json:
         print(json.dumps(summary, indent=2, sort_keys=True))
