@@ -222,7 +222,8 @@ Updated: 2026-05-27
   `docs/research/2026-05-27-real-chat-ufunction-path-hypotheses.md`.
 - fact: `scripts/verify_chat_reflection_constants.py` compares the local
   `ue/ChatReflection.cpp` constants to offline core evidence for `ServerChat`,
-  `ServerChatTo`, `ServerChatToPlayer`, and `ServerSendChatMessage`. It passed against
+  `ServerChatTo`, `ServerChatToPlayer`, `ServerSendChatMessage`, `ClientChatMessage`,
+  `ClientServerChatDirectMessage`, and `ClientServerChatMessage`. It passed against
   `/servidor/ark/obelisk/dumps/arkserver-20260527T031311Z/core/arkserver-20260527T031311Z.2902200`
   with `--max-object-scan 30000`.
 - fact: `ue/RuntimeReflection.{h,cpp}` now provides an internal, binary-hash-gated
@@ -245,6 +246,11 @@ Updated: 2026-05-27
   `1 GlobalTribeChat`, `2 LocalChat`, `3 AllianceChat`; values `>=4` are invalid for
   logging/dispatch. See
   `docs/research/2026-05-27-real-chat-ufunction-path-hypotheses.md`.
+- fact: Local code now has gated, metadata-only recognizers for exact
+  `ShooterPlayerController` fallback candidates `ClientChatMessage`,
+  `ClientServerChatDirectMessage`, and `ClientServerChatMessage`. They log
+  `metadata_only=true`, do not decode text, do not dispatch plugin events, and do not
+  change public ABI.
 - fact: `packaging/linuxgsm/ObeliskRun.sh` supports
   `state/instances/<id>/enable-chat-reflection` to set the experimental chat reflection
   gates and default log limit on restart.
@@ -292,9 +298,9 @@ Updated: 2026-05-27
   are being hit, wire UTF-32 text decoding into the experimental chat reflection logger;
   keep dispatch limited to `EChatSendMode` `0..3`.
 - next-step: If confirmed real player chat still produces zero `ServerSendChatMessage`
-  hits, add metadata-only counters for exact `ShooterPlayerController` candidates
+  hits after deploying the local metadata-only recognizers, review exact
   `ClientChatMessage`, `ClientServerChatMessage`, and `ClientServerChatDirectMessage`
-  before considering `ShooterGameMode` helpers.
+  lines before considering `ShooterGameMode` helpers.
 - next-step: Run `scripts/verify_chat_reflection_constants.py` against any new core before
   accepting changed chat FName indices, parameter offsets, or `StrProperty` constants.
 - next-step: Benchmark ProcessEvent overhead with chat reflection enabled vs disabled

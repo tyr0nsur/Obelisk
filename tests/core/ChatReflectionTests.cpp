@@ -18,6 +18,10 @@ namespace
     constexpr int32_t kServerChatNameIndex = 9619;
     constexpr int32_t kServerChatToNameIndex = 9620;
     constexpr int32_t kServerChatToPlayerNameIndex = 9621;
+    constexpr int32_t kClientChatMessageNameIndex = 1865;
+    constexpr int32_t kClientServerChatDirectMessageNameIndex = 1983;
+    constexpr int32_t kClientServerChatMessageNameIndex = 1984;
+    constexpr int32_t kShooterPlayerControllerNameIndex = 101;
     constexpr int32_t kChatMessageNameIndex = 588;
     constexpr int32_t kMessageTextNameIndex = 21409;
     constexpr int32_t kSendModeNameIndex = 16753;
@@ -25,8 +29,13 @@ namespace
     constexpr int32_t kPlayerNameNameIndex = 16693;
     constexpr int32_t kBytePropertyClassNameIndex = 1;
     constexpr int32_t kBytePropertyClassObjectIndex = 533;
+    constexpr int32_t kBoolPropertyClassNameIndex = 3;
+    constexpr int32_t kStructPropertyClassNameIndex = 10;
     constexpr int32_t kStrPropertyClassNameIndex = 13;
     constexpr int32_t kStrPropertyClassObjectIndex = 547;
+    constexpr int32_t kUnvalidatedChatPropertyNameIndex = 4242;
+    constexpr int32_t kUnvalidatedMessageColorNameIndex = 4243;
+    constexpr int32_t kUnvalidatedBIsBoldNameIndex = 4244;
 
     struct Region
     {
@@ -111,9 +120,13 @@ namespace
         std::array<uint8_t, 0xb0> Function{};
         std::array<uint8_t, 0x80> PropertyA{};
         std::array<uint8_t, 0x80> PropertyB{};
+        std::array<uint8_t, 0x80> PropertyC{};
         std::array<uint8_t, 0x40> BytePropertyClass{};
+        std::array<uint8_t, 0x40> BoolPropertyClass{};
         std::array<uint8_t, 0x40> StrPropertyClass{};
-        std::array<uint8_t, 0x20> Params{};
+        std::array<uint8_t, 0x40> StructPropertyClass{};
+        std::array<uint8_t, 0x40> OwnerClass{};
+        std::array<uint8_t, 0x90> Params{};
         ReaderContext Context;
 
         MemoryReader Reader()
@@ -122,8 +135,12 @@ namespace
             Context.Regions.push_back({Function.data(), Function.size()});
             Context.Regions.push_back({PropertyA.data(), PropertyA.size()});
             Context.Regions.push_back({PropertyB.data(), PropertyB.size()});
+            Context.Regions.push_back({PropertyC.data(), PropertyC.size()});
             Context.Regions.push_back({BytePropertyClass.data(), BytePropertyClass.size()});
+            Context.Regions.push_back({BoolPropertyClass.data(), BoolPropertyClass.size()});
             Context.Regions.push_back({StrPropertyClass.data(), StrPropertyClass.size()});
+            Context.Regions.push_back({StructPropertyClass.data(), StructPropertyClass.size()});
+            Context.Regions.push_back({OwnerClass.data(), OwnerClass.size()});
             Context.Regions.push_back({Params.data(), Params.size()});
             return {RegionReader, &Context};
         }
@@ -140,11 +157,20 @@ namespace
                        int32_t firstElementSize = 0x10,
                        int32_t secondElementSize = 0x10,
                        const void* firstPropertyClass = nullptr,
-                       const void* secondPropertyClass = nullptr)
+                       const void* secondPropertyClass = nullptr,
+                       int32_t thirdPropertyNameIndex = -1,
+                       int32_t thirdOffset = -1,
+                       int32_t thirdElementSize = 0x10,
+                       const void* thirdPropertyClass = nullptr)
     {
         WriteObject(fixture.BytePropertyClass,
                     kBytePropertyClassNameIndex,
                     kBytePropertyClassObjectIndex,
+                    nullptr,
+                    nullptr);
+        WriteObject(fixture.BoolPropertyClass,
+                    kBoolPropertyClassNameIndex,
+                    kBoolPropertyClassNameIndex,
                     nullptr,
                     nullptr);
         WriteObject(fixture.StrPropertyClass,
@@ -152,14 +178,25 @@ namespace
                     kStrPropertyClassObjectIndex,
                     nullptr,
                     nullptr);
+        WriteObject(fixture.StructPropertyClass,
+                    kStructPropertyClassNameIndex,
+                    kStructPropertyClassNameIndex,
+                    nullptr,
+                    nullptr);
+        WriteObject(fixture.OwnerClass,
+                    kShooterPlayerControllerNameIndex,
+                    kShooterPlayerControllerNameIndex,
+                    nullptr,
+                    nullptr);
 
         WriteObject(fixture.Function,
                     functionNameIndex,
                     functionNameIndex,
                     reinterpret_cast<const void*>(0x20000),
-                    reinterpret_cast<const void*>(0x30000));
+                    fixture.OwnerClass.data());
 
         const void* second = numParms > 1 ? fixture.PropertyB.data() : nullptr;
+        const void* third = numParms > 2 ? fixture.PropertyC.data() : nullptr;
         WriteProperty(fixture.PropertyA,
                       second,
                       fixture.Function.data(),
@@ -171,12 +208,22 @@ namespace
         if (numParms > 1)
         {
             WriteProperty(fixture.PropertyB,
-                          nullptr,
+                          third,
                           fixture.Function.data(),
                           secondPropertyClass ? secondPropertyClass : fixture.StrPropertyClass.data(),
                           secondPropertyNameIndex,
                           secondOffset,
                           secondElementSize);
+        }
+        if (numParms > 2)
+        {
+            WriteProperty(fixture.PropertyC,
+                          nullptr,
+                          fixture.Function.data(),
+                          thirdPropertyClass ? thirdPropertyClass : fixture.StrPropertyClass.data(),
+                          thirdPropertyNameIndex,
+                          thirdOffset,
+                          thirdElementSize);
         }
 
         const void* children = fixture.PropertyA.data();
@@ -334,6 +381,210 @@ namespace
         Require(!ChatReflection::IsKnownSendMode(sendMode), "mutated SendMode should be unknown");
     }
 
+    void TestRecognizesClientChatMessageAsMetadataOnly()
+    {
+        ChatFixture fixture;
+        BuildFunction(fixture,
+                      kClientChatMessageNameIndex,
+                      1,
+                      0x90,
+                      kUnvalidatedChatPropertyNameIndex,
+                      0x00,
+                      -1,
+                      -1,
+                      0x90,
+                      0x10,
+                      fixture.StructPropertyClass.data());
+
+        ChatReflection::ChatInvocation invocation;
+        ReadResult result = ChatReflection::TryIdentifyChatInvocation(
+            fixture.Reader(),
+            Options(),
+            fixture.Function.data(),
+            nullptr,
+            invocation);
+
+        Require(static_cast<bool>(result), result.Reason.c_str());
+        Require(invocation.Function == ChatReflection::ChatFunction::ClientChatMessage,
+                "ClientChatMessage kind mismatch");
+        Require(invocation.FunctionNameIndex == kClientChatMessageNameIndex,
+                "ClientChatMessage FName mismatch");
+        Require(invocation.MetadataOnlyCandidate, "ClientChatMessage should be metadata-only");
+        Require(!invocation.HasParameterRanges, "null params should not produce ranges");
+        Require(invocation.Fields.size() == 1, "ClientChatMessage field count mismatch");
+        Require(invocation.Fields[0].Field == ChatReflection::ChatField::Chat, "Chat field mismatch");
+        Require(invocation.Fields[0].Size == 0x90, "Chat struct field size mismatch");
+    }
+
+    void TestRecognizesClientServerChatDirectMessageAsMetadataOnly()
+    {
+        ChatFixture fixture;
+        BuildFunction(fixture,
+                      kClientServerChatDirectMessageNameIndex,
+                      3,
+                      0x21,
+                      kMessageTextNameIndex,
+                      0x00,
+                      kUnvalidatedMessageColorNameIndex,
+                      0x10,
+                      0x10,
+                      0x10,
+                      fixture.StrPropertyClass.data(),
+                      fixture.StructPropertyClass.data(),
+                      kUnvalidatedBIsBoldNameIndex,
+                      0x20,
+                      0x1,
+                      fixture.BoolPropertyClass.data());
+
+        ChatReflection::ChatInvocation invocation;
+        ReadResult result = ChatReflection::TryIdentifyChatInvocation(
+            fixture.Reader(),
+            Options(),
+            fixture.Function.data(),
+            fixture.Params.data(),
+            invocation);
+
+        Require(static_cast<bool>(result), result.Reason.c_str());
+        Require(invocation.Function == ChatReflection::ChatFunction::ClientServerChatDirectMessage,
+                "ClientServerChatDirectMessage kind mismatch");
+        Require(invocation.MetadataOnlyCandidate, "ClientServerChatDirectMessage should be metadata-only");
+        Require(invocation.Fields.size() == 3, "ClientServerChatDirectMessage field count mismatch");
+        Require(invocation.Fields[0].Field == ChatReflection::ChatField::MessageText,
+                "MessageText field mismatch");
+        Require(invocation.Fields[1].Field == ChatReflection::ChatField::MessageColor,
+                "MessageColor field mismatch");
+        Require(invocation.Fields[1].Range.Data == fixture.Params.data() + 0x10,
+                "MessageColor range pointer mismatch");
+        Require(invocation.Fields[2].Field == ChatReflection::ChatField::BIsBold,
+                "bIsBold field mismatch");
+        Require(invocation.Fields[2].Range.Data == fixture.Params.data() + 0x20,
+                "bIsBold range pointer mismatch");
+        Require(invocation.Fields[2].Range.Size == 0x1, "bIsBold range size mismatch");
+    }
+
+    void TestRecognizesClientServerChatMessageAsMetadataOnly()
+    {
+        ChatFixture fixture;
+        BuildFunction(fixture,
+                      kClientServerChatMessageNameIndex,
+                      3,
+                      0x21,
+                      kMessageTextNameIndex,
+                      0x00,
+                      kUnvalidatedMessageColorNameIndex,
+                      0x10,
+                      0x10,
+                      0x10,
+                      fixture.StrPropertyClass.data(),
+                      fixture.StructPropertyClass.data(),
+                      kUnvalidatedBIsBoldNameIndex,
+                      0x20,
+                      0x1,
+                      fixture.BoolPropertyClass.data());
+
+        ChatReflection::ChatInvocation invocation;
+        ReadResult result = ChatReflection::TryIdentifyChatInvocation(
+            fixture.Reader(),
+            Options(),
+            fixture.Function.data(),
+            fixture.Params.data(),
+            invocation);
+
+        Require(static_cast<bool>(result), result.Reason.c_str());
+        Require(invocation.Function == ChatReflection::ChatFunction::ClientServerChatMessage,
+                "ClientServerChatMessage kind mismatch");
+        Require(invocation.MetadataOnlyCandidate, "ClientServerChatMessage should be metadata-only");
+        Require(invocation.Fields.size() == 3, "ClientServerChatMessage field count mismatch");
+        Require(invocation.Fields[0].Field == ChatReflection::ChatField::MessageText,
+                "MessageText field mismatch");
+        Require(invocation.Fields[1].Field == ChatReflection::ChatField::MessageColor,
+                "MessageColor field mismatch");
+        Require(invocation.Fields[2].Field == ChatReflection::ChatField::BIsBold,
+                "bIsBold field mismatch");
+    }
+
+    void TestRejectsMetadataOnlyCandidatesWithWrongShape()
+    {
+        {
+            ChatFixture fixture;
+            BuildFunction(fixture,
+                          kClientChatMessageNameIndex,
+                          1,
+                          0x80,
+                          kUnvalidatedChatPropertyNameIndex,
+                          0x00,
+                          -1,
+                          -1,
+                          0x80,
+                          0x10,
+                          fixture.StructPropertyClass.data());
+
+            ChatReflection::ChatInvocation invocation;
+            ReadResult result = ChatReflection::TryIdentifyChatInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible,
+                    "wrong ClientChatMessage shape was accepted");
+        }
+        {
+            ChatFixture fixture;
+            BuildFunction(fixture,
+                          kClientServerChatDirectMessageNameIndex,
+                          3,
+                          0x21,
+                          kMessageTextNameIndex,
+                          0x00,
+                          kUnvalidatedMessageColorNameIndex,
+                          0x10,
+                          0x10,
+                          0x10,
+                          fixture.StrPropertyClass.data(),
+                          fixture.StructPropertyClass.data(),
+                          kUnvalidatedBIsBoldNameIndex,
+                          0x20,
+                          0x10,
+                          fixture.BoolPropertyClass.data());
+
+            ChatReflection::ChatInvocation invocation;
+            ReadResult result = ChatReflection::TryIdentifyChatInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::OutOfBounds || result.Status == ReadStatus::Implausible,
+                    "wrong ClientServerChatDirectMessage shape was accepted");
+        }
+        {
+            ChatFixture fixture;
+            BuildFunction(fixture,
+                          kClientServerChatMessageNameIndex,
+                          2,
+                          0x20,
+                          kMessageTextNameIndex,
+                          0x00,
+                          kUnvalidatedMessageColorNameIndex,
+                          0x10,
+                          0x10,
+                          0x10,
+                          fixture.StrPropertyClass.data(),
+                          fixture.StructPropertyClass.data());
+
+            ChatReflection::ChatInvocation invocation;
+            ReadResult result = ChatReflection::TryIdentifyChatInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible,
+                    "wrong ClientServerChatMessage shape was accepted");
+        }
+    }
+
     void TestRejectsServerSendChatMessageWhenSendModeByteUnreadable()
     {
         ChatFixture fixture;
@@ -353,8 +604,12 @@ namespace
         fixture.Context.Regions.push_back({fixture.Function.data(), fixture.Function.size()});
         fixture.Context.Regions.push_back({fixture.PropertyA.data(), fixture.PropertyA.size()});
         fixture.Context.Regions.push_back({fixture.PropertyB.data(), fixture.PropertyB.size()});
+        fixture.Context.Regions.push_back({fixture.PropertyC.data(), fixture.PropertyC.size()});
         fixture.Context.Regions.push_back({fixture.BytePropertyClass.data(), fixture.BytePropertyClass.size()});
+        fixture.Context.Regions.push_back({fixture.BoolPropertyClass.data(), fixture.BoolPropertyClass.size()});
         fixture.Context.Regions.push_back({fixture.StrPropertyClass.data(), fixture.StrPropertyClass.size()});
+        fixture.Context.Regions.push_back({fixture.StructPropertyClass.data(), fixture.StructPropertyClass.size()});
+        fixture.Context.Regions.push_back({fixture.OwnerClass.data(), fixture.OwnerClass.size()});
         fixture.Context.Regions.push_back({fixture.Params.data(), 0x10});
         MemoryReader reader{RegionReader, &fixture.Context};
 
@@ -457,6 +712,10 @@ int main()
     TestRecognizesServerChatToWithoutParams();
     TestRecognizesServerChatToPlayer();
     TestRecognizesServerSendChatMessage();
+    TestRecognizesClientChatMessageAsMetadataOnly();
+    TestRecognizesClientServerChatDirectMessageAsMetadataOnly();
+    TestRecognizesClientServerChatMessageAsMetadataOnly();
+    TestRejectsMetadataOnlyCandidatesWithWrongShape();
     TestRejectsServerSendChatMessageWhenSendModeByteUnreadable();
     TestRejectsSameFNameWithWrongShape();
     TestRejectsSameFNameWithWrongPropertyName();

@@ -17,6 +17,9 @@ namespace
     constexpr int32_t kServerSendChatMessageNameIndex = 2697;
     constexpr int32_t kServerChatNameIndex = 9619;
     constexpr int32_t kServerChatToPlayerNameIndex = 9621;
+    constexpr int32_t kClientChatMessageNameIndex = 1865;
+    constexpr int32_t kClientServerChatDirectMessageNameIndex = 1983;
+    constexpr int32_t kClientServerChatMessageNameIndex = 1984;
     constexpr int32_t kChatMessageNameIndex = 588;
     constexpr int32_t kMessageTextNameIndex = 21409;
     constexpr int32_t kSendModeNameIndex = 16753;
@@ -249,6 +252,12 @@ namespace
 
     void TestReflectedChatNameFilterIncludesServerSendChatMessage()
     {
+        Require(IsReflectedChatNameIndex(kClientChatMessageNameIndex),
+                "ClientChatMessage FName was not accepted by cheap filter");
+        Require(IsReflectedChatNameIndex(kClientServerChatDirectMessageNameIndex),
+                "ClientServerChatDirectMessage FName was not accepted by cheap filter");
+        Require(IsReflectedChatNameIndex(kClientServerChatMessageNameIndex),
+                "ClientServerChatMessage FName was not accepted by cheap filter");
         Require(IsReflectedChatNameIndex(kServerSendChatMessageNameIndex),
                 "ServerSendChatMessage FName was not accepted by cheap filter");
         Require(IsReflectedChatNameIndex(kServerChatNameIndex), "ServerChat FName was not accepted by cheap filter");

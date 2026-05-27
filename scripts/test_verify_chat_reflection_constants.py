@@ -25,6 +25,9 @@ constexpr int32_t kServerChatNameIndex = 9619;
 constexpr int32_t kServerChatToNameIndex = 9620;
 constexpr int32_t kServerChatToPlayerNameIndex = 9621;
 constexpr int32_t kServerSendChatMessageNameIndex = 2697;
+constexpr int32_t kClientChatMessageNameIndex = 1865;
+constexpr int32_t kClientServerChatDirectMessageNameIndex = 1983;
+constexpr int32_t kClientServerChatMessageNameIndex = 1984;
 constexpr int32_t kChatMessageNameIndex = 588;
 constexpr int32_t kMessageTextNameIndex = 21409;
 constexpr int32_t kSendModeNameIndex = 16753;
@@ -32,10 +35,18 @@ constexpr int32_t kSteamIDNameIndex = 20681;
 constexpr int32_t kPlayerNameNameIndex = 16693;
 constexpr int32_t kBytePropertyClassNameIndex = 1;
 constexpr int32_t kBytePropertyClassObjectIndex = 533;
+constexpr int32_t kBoolPropertyClassNameIndex = 3;
+constexpr int32_t kStructPropertyClassNameIndex = 10;
 constexpr int32_t kStrPropertyClassNameIndex = 13;
 constexpr int32_t kStrPropertyClassObjectIndex = 547;
 constexpr size_t kFStringHeaderSize = 0x10;
 constexpr size_t kBytePropertySize = 0x1;
+constexpr size_t kBoolPropertySize = 0x1;
+constexpr size_t kStructPropertySize = 0x10;
+constexpr size_t kChatStructPropertySize = 0x90;
+constexpr int32_t kAnyNameIndex = -1;
+constexpr int32_t kAnyObjectIndex = -1;
+constexpr int32_t kAnyOuterNameIndex = -1;
 constexpr std::array<ChatFieldSpec, 1> kServerChatFields{{
     {ChatField::MessageText, kMessageTextNameIndex, 0x00, kFStringHeaderSize,
      kStrPropertyClassNameIndex, kStrPropertyClassObjectIndex},
@@ -58,6 +69,18 @@ constexpr std::array<ChatFieldSpec, 2> kServerSendChatMessageFields{{
     {ChatField::SendMode, kSendModeNameIndex, 0x10, kBytePropertySize,
      kBytePropertyClassNameIndex, kBytePropertyClassObjectIndex},
 }};
+constexpr std::array<ChatFieldSpec, 1> kClientChatMessageFields{{
+    {ChatField::Chat, kAnyNameIndex, 0x00, kChatStructPropertySize,
+     kStructPropertyClassNameIndex, kAnyObjectIndex},
+}};
+constexpr std::array<ChatFieldSpec, 3> kClientServerChatMessageFields{{
+    {ChatField::MessageText, kMessageTextNameIndex, 0x00, kFStringHeaderSize,
+     kStrPropertyClassNameIndex, kStrPropertyClassObjectIndex},
+    {ChatField::MessageColor, kAnyNameIndex, 0x10, kStructPropertySize,
+     kStructPropertyClassNameIndex, kAnyObjectIndex},
+    {ChatField::BIsBold, kAnyNameIndex, 0x20, kBoolPropertySize,
+     kBoolPropertyClassNameIndex, kAnyObjectIndex},
+}};
 constexpr ChatFunctionSpec kServerChatSpec{
     ChatFunction::ServerChat,
     kServerChatNameIndex,
@@ -65,6 +88,8 @@ constexpr ChatFunctionSpec kServerChatSpec{
     0x10,
     kServerChatFields.data(),
     kServerChatFields.size(),
+    kAnyOuterNameIndex,
+    false,
 };
 constexpr ChatFunctionSpec kServerChatToSpec{
     ChatFunction::ServerChatTo,
@@ -73,6 +98,8 @@ constexpr ChatFunctionSpec kServerChatToSpec{
     0x20,
     kServerChatToFields.data(),
     kServerChatToFields.size(),
+    kAnyOuterNameIndex,
+    false,
 };
 constexpr ChatFunctionSpec kServerChatToPlayerSpec{
     ChatFunction::ServerChatToPlayer,
@@ -81,6 +108,8 @@ constexpr ChatFunctionSpec kServerChatToPlayerSpec{
     0x20,
     kServerChatToPlayerFields.data(),
     kServerChatToPlayerFields.size(),
+    kAnyOuterNameIndex,
+    false,
 };
 constexpr ChatFunctionSpec kServerSendChatMessageSpec{
     ChatFunction::ServerSendChatMessage,
@@ -89,6 +118,38 @@ constexpr ChatFunctionSpec kServerSendChatMessageSpec{
     0x11,
     kServerSendChatMessageFields.data(),
     kServerSendChatMessageFields.size(),
+    kAnyOuterNameIndex,
+    false,
+};
+constexpr ChatFunctionSpec kClientChatMessageSpec{
+    ChatFunction::ClientChatMessage,
+    kClientChatMessageNameIndex,
+    1,
+    0x90,
+    kClientChatMessageFields.data(),
+    kClientChatMessageFields.size(),
+    kAnyOuterNameIndex,
+    true,
+};
+constexpr ChatFunctionSpec kClientServerChatDirectMessageSpec{
+    ChatFunction::ClientServerChatDirectMessage,
+    kClientServerChatDirectMessageNameIndex,
+    3,
+    0x21,
+    kClientServerChatMessageFields.data(),
+    kClientServerChatMessageFields.size(),
+    kAnyOuterNameIndex,
+    true,
+};
+constexpr ChatFunctionSpec kClientServerChatMessageSpec{
+    ChatFunction::ClientServerChatMessage,
+    kClientServerChatMessageNameIndex,
+    3,
+    0x21,
+    kClientServerChatMessageFields.data(),
+    kClientServerChatMessageFields.size(),
+    kAnyOuterNameIndex,
+    true,
 };
 }}}
 """
@@ -109,11 +170,16 @@ def build_chat_core_fixture(path: Path, *, mismatch_message_offset: bool = False
         "function_class": base + 0x20100,
         "str_property_class": base + 0x20200,
         "byte_property_class": base + 0x20280,
+        "bool_property_class": base + 0x202c0,
+        "struct_property_class": base + 0x202e0,
         "owner_class": base + 0x20300,
         "server_chat": base + 0x30000,
         "server_chat_to": base + 0x30100,
         "server_chat_to_player": base + 0x30200,
         "server_send_chat_message": base + 0x30300,
+        "client_chat_message": base + 0x30400,
+        "client_server_chat_direct_message": base + 0x30500,
+        "client_server_chat_message": base + 0x30600,
         "server_chat_message": base + 0x40000,
         "server_chat_to_steam": base + 0x40100,
         "server_chat_to_message": base + 0x40200,
@@ -121,6 +187,13 @@ def build_chat_core_fixture(path: Path, *, mismatch_message_offset: bool = False
         "server_chat_to_player_message": base + 0x40400,
         "server_send_chat_chat_message": base + 0x40500,
         "server_send_chat_send_mode": base + 0x40600,
+        "client_chat_chat": base + 0x40700,
+        "client_server_direct_message_text": base + 0x40800,
+        "client_server_direct_message_color": base + 0x40900,
+        "client_server_direct_b_is_bold": base + 0x40a00,
+        "client_server_message_text": base + 0x40b00,
+        "client_server_message_color": base + 0x40c00,
+        "client_server_b_is_bold": base + 0x40d00,
     }
 
     def put_ptr(address: int, value: int) -> None:
@@ -135,8 +208,12 @@ def build_chat_core_fixture(path: Path, *, mismatch_message_offset: bool = False
     def put_u32(address: int, value: int) -> None:
         struct.pack_into("<I", segment, address - base, value)
 
+    fname_entry_cursor = 0
+
     def put_entry(index: int, text: bytes) -> None:
-        entry = base + 0x80000 + index * 0x20
+        nonlocal fname_entry_cursor
+        entry = base + 0x80000 + fname_entry_cursor * 0x80
+        fname_entry_cursor += 1
         put_ptr(addrs["fname_chunk"] + index * 8, entry)
         put_u32(entry, index * 2)
         segment[entry - base + 0x10 : entry - base + 0x10 + len(text)] = text
@@ -179,14 +256,22 @@ def build_chat_core_fixture(path: Path, *, mismatch_message_offset: bool = False
     for index, text in {
         1: b"ByteProperty\x00",
         2: b"Class\x00",
+        3: b"BoolProperty\x00",
+        10: b"StructProperty\x00",
         13: b"StrProperty\x00",
         100: b"Function\x00",
         101: b"ShooterPlayerController\x00",
         588: b"ChatMessage\x00",
+        1865: b"ClientChatMessage\x00",
+        1983: b"ClientServerChatDirectMessage\x00",
+        1984: b"ClientServerChatMessage\x00",
         2697: b"ServerSendChatMessage\x00",
         9619: b"ServerChat\x00",
         9620: b"ServerChatTo\x00",
         9621: b"ServerChatToPlayer\x00",
+        12000: b"Chat\x00",
+        12001: b"MessageColor\x00",
+        12002: b"bIsBold\x00",
         16753: b"SendMode\x00",
         16693: b"PlayerName\x00",
         20681: b"SteamID\x00",
@@ -202,11 +287,22 @@ def build_chat_core_fixture(path: Path, *, mismatch_message_offset: bool = False
     put_uobject(addrs["function_class"], 100, addrs["class_class"], 100)
     put_uobject(addrs["owner_class"], 200, addrs["class_class"], 101)
     put_uobject(addrs["byte_property_class"], 533, addrs["class_class"], 1)
+    put_uobject(addrs["bool_property_class"], 540, addrs["class_class"], 3)
+    put_uobject(addrs["struct_property_class"], 541, addrs["class_class"], 10)
     put_uobject(addrs["str_property_class"], 547, addrs["class_class"], 13)
     put_uobject(addrs["server_chat"], 25447, addrs["function_class"], 9619, addrs["owner_class"])
     put_uobject(addrs["server_chat_to"], 25449, addrs["function_class"], 9620, addrs["owner_class"])
     put_uobject(addrs["server_chat_to_player"], 25452, addrs["function_class"], 9621, addrs["owner_class"])
     put_uobject(addrs["server_send_chat_message"], 10443, addrs["function_class"], 2697, addrs["owner_class"])
+    put_uobject(addrs["client_chat_message"], 9548, addrs["function_class"], 1865, addrs["owner_class"])
+    put_uobject(
+        addrs["client_server_chat_direct_message"],
+        9768,
+        addrs["function_class"],
+        1983,
+        addrs["owner_class"],
+    )
+    put_uobject(addrs["client_server_chat_message"], 9772, addrs["function_class"], 1984, addrs["owner_class"])
     put_uobject(addrs["server_chat_message"], 1000, addrs["str_property_class"], 21409, addrs["server_chat"])
     put_uobject(addrs["server_chat_to_steam"], 1001, addrs["str_property_class"], 20681, addrs["server_chat_to"])
     put_uobject(addrs["server_chat_to_message"], 1002, addrs["str_property_class"], 21409, addrs["server_chat_to"])
@@ -232,12 +328,57 @@ def build_chat_core_fixture(path: Path, *, mismatch_message_offset: bool = False
         16753,
         addrs["server_send_chat_message"],
     )
+    put_uobject(addrs["client_chat_chat"], 1007, addrs["struct_property_class"], 12000, addrs["client_chat_message"])
+    put_uobject(
+        addrs["client_server_direct_message_text"],
+        1008,
+        addrs["str_property_class"],
+        21409,
+        addrs["client_server_chat_direct_message"],
+    )
+    put_uobject(
+        addrs["client_server_direct_message_color"],
+        1009,
+        addrs["struct_property_class"],
+        12001,
+        addrs["client_server_chat_direct_message"],
+    )
+    put_uobject(
+        addrs["client_server_direct_b_is_bold"],
+        1010,
+        addrs["bool_property_class"],
+        12002,
+        addrs["client_server_chat_direct_message"],
+    )
+    put_uobject(
+        addrs["client_server_message_text"],
+        1011,
+        addrs["str_property_class"],
+        21409,
+        addrs["client_server_chat_message"],
+    )
+    put_uobject(
+        addrs["client_server_message_color"],
+        1012,
+        addrs["struct_property_class"],
+        12001,
+        addrs["client_server_chat_message"],
+    )
+    put_uobject(
+        addrs["client_server_b_is_bold"],
+        1013,
+        addrs["bool_property_class"],
+        12002,
+        addrs["client_server_chat_message"],
+    )
 
     for index, key in [
         (0, "class_class"),
         (100, "function_class"),
         (200, "owner_class"),
         (533, "byte_property_class"),
+        (540, "bool_property_class"),
+        (541, "struct_property_class"),
         (547, "str_property_class"),
         (1000, "server_chat_message"),
         (1001, "server_chat_to_steam"),
@@ -246,6 +387,16 @@ def build_chat_core_fixture(path: Path, *, mismatch_message_offset: bool = False
         (1004, "server_chat_to_player_message"),
         (1005, "server_send_chat_chat_message"),
         (1006, "server_send_chat_send_mode"),
+        (1007, "client_chat_chat"),
+        (1008, "client_server_direct_message_text"),
+        (1009, "client_server_direct_message_color"),
+        (1010, "client_server_direct_b_is_bold"),
+        (1011, "client_server_message_text"),
+        (1012, "client_server_message_color"),
+        (1013, "client_server_b_is_bold"),
+        (9548, "client_chat_message"),
+        (9768, "client_server_chat_direct_message"),
+        (9772, "client_server_chat_message"),
         (10443, "server_send_chat_message"),
         (25447, "server_chat"),
         (25449, "server_chat_to"),
@@ -257,6 +408,9 @@ def build_chat_core_fixture(path: Path, *, mismatch_message_offset: bool = False
     put_function(addrs["server_chat_to"], addrs["server_chat_to_steam"], 2, 0x20)
     put_function(addrs["server_chat_to_player"], addrs["server_chat_to_player_name"], 2, 0x20)
     put_function(addrs["server_send_chat_message"], addrs["server_send_chat_chat_message"], 2, 0x11)
+    put_function(addrs["client_chat_message"], addrs["client_chat_chat"], 1, 0x90)
+    put_function(addrs["client_server_chat_direct_message"], addrs["client_server_direct_message_text"], 3, 0x21)
+    put_function(addrs["client_server_chat_message"], addrs["client_server_message_text"], 3, 0x21)
     put_property(addrs["server_chat_message"], 0, 0)
     put_property(addrs["server_chat_to_steam"], addrs["server_chat_to_message"], 0)
     put_property(addrs["server_chat_to_message"], 0, 0x18 if mismatch_message_offset else 0x10)
@@ -264,6 +418,13 @@ def build_chat_core_fixture(path: Path, *, mismatch_message_offset: bool = False
     put_property(addrs["server_chat_to_player_message"], 0, 0x10)
     put_property(addrs["server_send_chat_chat_message"], addrs["server_send_chat_send_mode"], 0)
     put_property(addrs["server_send_chat_send_mode"], 0, 0x10, 0x1)
+    put_property(addrs["client_chat_chat"], 0, 0, 0x90)
+    put_property(addrs["client_server_direct_message_text"], addrs["client_server_direct_message_color"], 0)
+    put_property(addrs["client_server_direct_message_color"], addrs["client_server_direct_b_is_bold"], 0x10)
+    put_property(addrs["client_server_direct_b_is_bold"], 0, 0x20, 0x1)
+    put_property(addrs["client_server_message_text"], addrs["client_server_message_color"], 0)
+    put_property(addrs["client_server_message_color"], addrs["client_server_b_is_bold"], 0x10)
+    put_property(addrs["client_server_b_is_bold"], 0, 0x20, 0x1)
 
     write_minimal_elf64_core(path, base, bytes(segment))
     return addrs

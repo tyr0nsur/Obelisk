@@ -168,8 +168,10 @@ work from repository state instead of chat history.
   substring searches only for discovery; runtime filters should stay exact
   FName+outer+ParmsSize+property-chain matches.
 - `scripts/verify_chat_reflection_constants.py` verifies the current
-  `ue/ChatReflection.cpp` constants against offline core evidence for `ServerChat*` and
-  `ServerSendChatMessage`. It passed against
+  `ue/ChatReflection.cpp` constants against offline core evidence for `ServerChat*`,
+  `ServerSendChatMessage`, and the metadata-only `ShooterPlayerController` candidates
+  `ClientChatMessage`, `ClientServerChatDirectMessage`, and `ClientServerChatMessage`.
+  It passed against
   `/servidor/ark/obelisk/dumps/arkserver-20260527T031311Z/core/arkserver-20260527T031311Z.2902200`
   with `--max-object-scan 30000`; rerun it before promoting chat reflection constants for
   a new binary/core.
@@ -184,11 +186,12 @@ work from repository state instead of chat history.
   `df332d7`. Commit `8281123` adds reflected `send_mode` and `send_mode_name` logging;
   current `arkserver` PID is `3243871` after the later `8905996` deployment. See
   `docs/research/2026-05-27-real-chat-ufunction-path-hypotheses.md`.
-- If confirmed real player chat still produces zero `ServerSendChatMessage` hits, the
-  next minimum runtime expansion is metadata-only counters for exact
-  `ShooterPlayerController` candidates `ClientChatMessage`, `ClientServerChatMessage`,
-  and `ClientServerChatDirectMessage`; consider `ShooterGameMode.SendServerChatMessage`
-  only after those are negative.
+- Local code has gated metadata-only recognizers for exact `ShooterPlayerController`
+  candidates `ClientChatMessage`, `ClientServerChatMessage`, and
+  `ClientServerChatDirectMessage`. They log `metadata_only=true`, do not decode text, do
+  not dispatch plugin events, and do not change public ABI. If confirmed real player chat
+  still produces zero `ServerSendChatMessage` hits after deploying them, review those
+  exact fallback lines before considering `ShooterGameMode.SendServerChatMessage`.
 - Core-pack tooling now supports direct FName entry reads and bounded
   `--gobjects-candidate` previews for the next `GUObjectArray` investigation.
 - Read-only overnight snapshots are documented in `docs/SUPERVISION.md` and implemented by
@@ -301,9 +304,10 @@ python3 scripts/analyze_reflectionscanner_capture.py \
   `UObject`/`UFunction`/`UProperty`, bounded parameter ranges, and UTF-32 `FString`
   decoding. It is tested and used by hook-side chat observation.
 - `ue/ChatReflection.{h,cpp}` exists as the internal recognizer for `ServerChat`,
-  `ServerChatTo`, `ServerChatToPlayer`, and `ServerSendChatMessage` shapes. It is tested,
-  returns borrowed param ranges, logs accepted `send_mode`/`send_mode_name`, and does not
-  decode `FString` in runtime logs yet.
+  `ServerChatTo`, `ServerChatToPlayer`, `ServerSendChatMessage`, and exact metadata-only
+  `ShooterPlayerController` fallback shapes. It is tested, returns borrowed param ranges,
+  logs accepted `send_mode`/`send_mode_name`, and does not decode `FString` in runtime
+  logs yet.
 - `ProcessEvent_Detour` has experimental chat observation wiring, disabled unless
   `OBELISK_ENABLE_CHAT_REFLECTION=1` and `OBELISK_CHAT_REFLECTION_BINARY_SHA256` matches
   the supported ARK SHA. It logs metadata/ranges only, not text.

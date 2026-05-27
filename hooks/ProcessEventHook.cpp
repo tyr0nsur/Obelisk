@@ -307,6 +307,12 @@ namespace Obelisk::Hooks
             return "ServerChatToPlayer";
         case ChatFunction::ServerSendChatMessage:
             return "ServerSendChatMessage";
+        case ChatFunction::ClientChatMessage:
+            return "ClientChatMessage";
+        case ChatFunction::ClientServerChatDirectMessage:
+            return "ClientServerChatDirectMessage";
+        case ChatFunction::ClientServerChatMessage:
+            return "ClientServerChatMessage";
         }
         return "Unknown";
     }
@@ -326,6 +332,12 @@ namespace Obelisk::Hooks
             return "ChatMessage";
         case ChatField::SendMode:
             return "SendMode";
+        case ChatField::Chat:
+            return "Chat";
+        case ChatField::MessageColor:
+            return "MessageColor";
+        case ChatField::BIsBold:
+            return "bIsBold";
         }
         return "Unknown";
     }
@@ -362,12 +374,13 @@ namespace Obelisk::Hooks
         if (!ProcessEventChatReflection::ShouldLogObservation(callNumber, limit))
             return;
 
-        OBELISK_INFO("Reflected chat ProcessEvent #{} function={} fname_index={} params={} fields={}",
+        OBELISK_INFO("Reflected chat ProcessEvent #{} function={} fname_index={} params={} fields={} metadata_only={}",
                      callNumber,
                      ChatFunctionName(invocation.Function),
                      invocation.FunctionNameIndex,
                      params,
-                     invocation.Fields.size());
+                     invocation.Fields.size(),
+                     invocation.MetadataOnlyCandidate);
         uint8_t sendMode = 0;
         if (Obelisk::UE::ChatReflection::TryGetSendMode(invocation, sendMode))
         {

@@ -159,6 +159,21 @@ minimum runtime expansion should be metadata-only counters for exact
 `ShooterGameMode` helper/delegate candidates be considered. Do not broaden to substring
 `Chat` in runtime code.
 
+Commit-local runtime support now recognizes those three `ShooterPlayerController`
+candidates only as `metadata_only=true` observations behind the same chat reflection gate
+and binary SHA guard. It does not decode text, dispatch plugin events, expose SDK ABI, or
+instrument native exec functions. `scripts/verify_chat_reflection_constants.py` now checks
+all seven chat/reflection targets against the offline core; the current core reports
+`status=ok` for:
+
+- `ServerChat`
+- `ServerChatTo`
+- `ServerChatToPlayer`
+- `ServerSendChatMessage`
+- `ClientChatMessage`
+- `ClientServerChatDirectMessage`
+- `ClientServerChatMessage`
+
 ## Rejected Paths
 
 - Do not treat the existence of `ServerChat*` UFunction metadata as proof that normal

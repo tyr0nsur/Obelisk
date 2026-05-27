@@ -14,6 +14,9 @@ namespace Obelisk::UE::ChatReflection
         ServerChatTo,
         ServerChatToPlayer,
         ServerSendChatMessage,
+        ClientChatMessage,
+        ClientServerChatDirectMessage,
+        ClientServerChatMessage,
     };
 
     enum class ChatField
@@ -23,6 +26,9 @@ namespace Obelisk::UE::ChatReflection
         PlayerName,
         ChatMessage,
         SendMode,
+        Chat,
+        MessageColor,
+        BIsBold,
     };
 
     struct ChatFieldRange
@@ -40,6 +46,7 @@ namespace Obelisk::UE::ChatReflection
         int32_t FunctionNameIndex = -1;
         RuntimeReflection::UFunctionView ReflectedFunction;
         bool HasParameterRanges = false;
+        bool MetadataOnlyCandidate = false;
         std::vector<ChatFieldRange> Fields;
     };
 

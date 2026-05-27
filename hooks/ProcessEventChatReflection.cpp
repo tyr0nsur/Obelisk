@@ -22,7 +22,13 @@ namespace Obelisk::Hooks::ProcessEventChatReflection
 
     bool IsReflectedChatNameIndex(int32_t nameIndex)
     {
-        return nameIndex == 2697 || nameIndex == 9619 || nameIndex == 9620 || nameIndex == 9621;
+        return nameIndex == 1865 ||
+               nameIndex == 1983 ||
+               nameIndex == 1984 ||
+               nameIndex == 2697 ||
+               nameIndex == 9619 ||
+               nameIndex == 9620 ||
+               nameIndex == 9621;
     }
 
     bool ShouldLogObservation(uint64_t observationNumber, uint64_t limit)

@@ -23,7 +23,15 @@ import inspect_core_ufunctions as inspector  # noqa: E402
 
 
 CHAT_REFLECTION_SOURCE = REPO_ROOT / "ue" / "ChatReflection.cpp"
-DEFAULT_TARGETS = ("ServerChat", "ServerChatTo", "ServerChatToPlayer", "ServerSendChatMessage")
+DEFAULT_TARGETS = (
+    "ServerChat",
+    "ServerChatTo",
+    "ServerChatToPlayer",
+    "ServerSendChatMessage",
+    "ClientChatMessage",
+    "ClientServerChatDirectMessage",
+    "ClientServerChatMessage",
+)
 
 
 @dataclass(frozen=True)
@@ -68,7 +76,7 @@ def parse_chat_reflection_source(path: Path = CHAT_REFLECTION_SOURCE) -> ChatRef
     constants: dict[str, int] = {}
     for match in re.finditer(
         r"constexpr\s+(?:int32_t|uint16_t|size_t)\s+"
-        r"(?P<name>k[A-Za-z0-9_]+)\s*=\s*(?P<value>0x[0-9A-Fa-f]+|\d+)\s*;",
+        r"(?P<name>k[A-Za-z0-9_]+)\s*=\s*(?P<value>0x[0-9A-Fa-f]+|-?\d+)\s*;",
         text,
     ):
         constants[match.group("name")] = int(match.group("value"), 0)
@@ -86,7 +94,7 @@ def parse_chat_reflection_source(path: Path = CHAT_REFLECTION_SOURCE) -> ChatRef
             r"\{\s*ChatField::(?P<field>\w+)\s*,\s*(?P<name_const>k\w+NameIndex)\s*,\s*"
             r"(?P<offset>0x[0-9A-Fa-f]+|\d+)\s*,\s*(?P<size>k\w+|\d+|0x[0-9A-Fa-f]+)"
             r"(?:\s*,\s*(?P<class_name_const>k\w+ClassNameIndex)\s*,\s*"
-            r"(?P<class_object_const>k\w+ClassObjectIndex))?\s*\}",
+            r"(?P<class_object_const>k\w+ObjectIndex))?\s*\}",
             re.S,
         )
         for match in field_pattern.finditer(array_match.group("body")):
@@ -110,6 +118,9 @@ def parse_chat_reflection_source(path: Path = CHAT_REFLECTION_SOURCE) -> ChatRef
         "ServerChatTo": parse_fields("kServerChatToFields"),
         "ServerChatToPlayer": parse_fields("kServerChatToPlayerFields"),
         "ServerSendChatMessage": parse_fields("kServerSendChatMessageFields"),
+        "ClientChatMessage": parse_fields("kClientChatMessageFields"),
+        "ClientServerChatDirectMessage": parse_fields("kClientServerChatMessageFields"),
+        "ClientServerChatMessage": parse_fields("kClientServerChatMessageFields"),
     }
 
     for function in DEFAULT_TARGETS:
@@ -139,6 +150,8 @@ def parse_chat_reflection_source(path: Path = CHAT_REFLECTION_SOURCE) -> ChatRef
         "kStrPropertyClassNameIndex",
         "kStrPropertyClassObjectIndex",
         "kFStringHeaderSize",
+        "kAnyNameIndex",
+        "kAnyObjectIndex",
     }
     missing = sorted(required - constants.keys())
     if missing:
@@ -263,13 +276,22 @@ def verify_core(
                 uobjects.resolve_fname(memory, fname_table, expected_class_name_index).text
                 or expected_class_name_index
             )
-            _add_check(
-                checks,
-                prop_summary.get("name_index") == expected_prop_name_index,
-                f"{prefix} property FName index",
-                expected_prop_name_index,
-                prop_summary.get("name_index"),
-            )
+            if expected_prop_name_index == chat_spec.constants["kAnyNameIndex"]:
+                _add_check(
+                    checks,
+                    True,
+                    f"{prefix} property FName index",
+                    "any",
+                    prop_summary.get("name_index"),
+                )
+            else:
+                _add_check(
+                    checks,
+                    prop_summary.get("name_index") == expected_prop_name_index,
+                    f"{prefix} property FName index",
+                    expected_prop_name_index,
+                    prop_summary.get("name_index"),
+                )
             _add_check(
                 checks,
                 prop_summary.get("class_name") == expected_class_name,
@@ -289,13 +311,22 @@ def verify_core(
                 expected_class_name_index,
                 class_summary.get("name_index") if class_summary else None,
             )
-            _add_check(
-                checks,
-                bool(class_summary) and class_summary.get("internal_index") == expected_class_object_index,
-                f"{prefix} property class object index",
-                expected_class_object_index,
-                class_summary.get("internal_index") if class_summary else None,
-            )
+            if expected_class_object_index == chat_spec.constants["kAnyObjectIndex"]:
+                _add_check(
+                    checks,
+                    bool(class_summary),
+                    f"{prefix} property class object index",
+                    "any",
+                    class_summary.get("internal_index") if class_summary else None,
+                )
+            else:
+                _add_check(
+                    checks,
+                    bool(class_summary) and class_summary.get("internal_index") == expected_class_object_index,
+                    f"{prefix} property class object index",
+                    expected_class_object_index,
+                    class_summary.get("internal_index") if class_summary else None,
+                )
 
         status = "ok" if all(check["status"] == "ok" for check in checks) else "mismatch"
         function_results.append(
