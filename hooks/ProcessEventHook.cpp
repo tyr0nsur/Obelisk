@@ -4,12 +4,12 @@
 #include "ProcessEventStructureReflection.h"
 #include "ue/Memory.h"
 #include "runtime/Logger.h"
+#include "runtime/RuntimeMarkers.h"
 #include "core/EventManager.h"
 #include <array>
 #include <atomic>
 #include <cstdlib>
 #include <cstring>
-#include <filesystem>
 #include <string>
 #include <string_view>
 #include <sys/mman.h>
@@ -293,26 +293,15 @@ namespace Obelisk::Hooks
         return GetChatReflectionGate().Enabled();
     }
 
-    static bool IsInstanceMarkerEnabled(const char* markerName)
-    {
-        const char* root = std::getenv("OBELISK_ROOT");
-        const char* instance = std::getenv("OBELISK_INSTANCE_ID");
-        if (!root || root[0] == '\0' || !instance || instance[0] == '\0' || !markerName || markerName[0] == '\0')
-            return false;
-
-        const std::filesystem::path markerPath =
-            std::filesystem::path(root) / "state" / "instances" / instance / markerName;
-        std::error_code ec;
-        return std::filesystem::is_regular_file(markerPath, ec);
-    }
-
     static const ProcessEventStructureReflection::Gate& GetStructureReflectionGate()
     {
         static ProcessEventStructureReflection::Gate gate = [] {
             ProcessEventStructureReflection::Gate value =
                 ProcessEventStructureReflection::EvaluateGate(
                     std::getenv("OBELISK_ENABLE_STRUCTURE_REFLECTION"),
-                    IsInstanceMarkerEnabled("enable-structure-reflection"),
+                    Runtime::IsInstanceMarkerEnabled(std::getenv("OBELISK_ROOT"),
+                                                     std::getenv("OBELISK_INSTANCE_ID"),
+                                                     "enable-structure-reflection"),
                     std::getenv("OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256"));
 
             switch (value.Status)
@@ -351,7 +340,9 @@ namespace Obelisk::Hooks
             ProcessEventInventoryReflection::Gate value =
                 ProcessEventInventoryReflection::EvaluateGate(
                     std::getenv("OBELISK_ENABLE_INVENTORY_REFLECTION"),
-                    IsInstanceMarkerEnabled("enable-inventory-reflection"),
+                    Runtime::IsInstanceMarkerEnabled(std::getenv("OBELISK_ROOT"),
+                                                     std::getenv("OBELISK_INSTANCE_ID"),
+                                                     "enable-inventory-reflection"),
                     std::getenv("OBELISK_INVENTORY_REFLECTION_BINARY_SHA256"));
 
             switch (value.Status)

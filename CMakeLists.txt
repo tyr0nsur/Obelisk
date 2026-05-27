@@ -51,6 +51,7 @@ FetchContent_MakeAvailable(subhook)
 add_library(obelisk SHARED
     loader/Bootstrap.cpp
     runtime/Logger.cpp
+    runtime/RuntimeMarkers.cpp
     ue/Memory.cpp
     ue/ChatReflection.cpp
     ue/InventoryReflection.cpp
@@ -149,6 +150,14 @@ target_include_directories(memory_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(memory_tests PRIVATE fmt::fmt spdlog::spdlog)
 
 add_test(NAME MemoryTests COMMAND memory_tests)
+
+add_executable(runtime_marker_tests
+    tests/core/RuntimeMarkerTests.cpp
+    runtime/RuntimeMarkers.cpp
+)
+target_include_directories(runtime_marker_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_test(NAME RuntimeMarkerTests COMMAND runtime_marker_tests)
 
 add_executable(chat_reflection_tests
     tests/core/ChatReflectionTests.cpp
