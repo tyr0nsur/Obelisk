@@ -9,6 +9,8 @@ snapshot rounds, without implying public SDK or runtime readiness.
 
 - Snapshot manifest:
   `tests/fixtures/ufunction_snapshots/manifest.json`
+- ScriptStruct fixture manifest:
+  `tests/fixtures/scriptstruct_snapshots/manifest.json`
 - Snapshot binary SHA256:
   `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`
 - Obelisk baseline:
@@ -49,6 +51,6 @@ bounded property chains only.
 
 ## Next Priorities
 
-1. Add a dedicated ScriptStruct fixture manifest and validator before struct snapshots.
+1. Add ScriptStruct regeneration tooling before struct snapshots.
 2. Start ScriptStruct fixtures with a compact low-risk struct before transfer payloads.
 3. Keep admin/NetExec and gameplay-authoritative mutations out of runtime work.
