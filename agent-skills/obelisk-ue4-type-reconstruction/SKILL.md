@@ -27,6 +27,10 @@ Do not jump straight to chat params. Build the type chain in this order:
   are mutually plausible.
 - A `UFunction` is not accepted from string proximity alone; it needs resolved name,
   class/outer context, function flags, and parameter metadata.
+- Offline `UObject`/`UFunction`/`UProperty` evidence should validate target, class, and
+  outer pointers through direct `GObjects[InternalIndex]` back-references when a candidate
+  `GUObjectArray` is available. Do not substitute broad address-to-index scans for this
+  point check.
 - Parameter buffers must be bounded by reflected `ParmsSize`.
 - `FString` decoding requires a validated layout for this binary. Do not accept arbitrary
   readable pointer/length pairs as chat text.

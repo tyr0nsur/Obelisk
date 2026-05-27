@@ -190,6 +190,10 @@ work from repository state instead of chat history.
   `ServerChat.MessageText` offset `0x0`; `ServerChatTo.SteamID` offset `0x0` and
   `MessageText` offset `0x10`; `ServerChatToPlayer.PlayerName` offset `0x0` and
   `MessageText` offset `0x10`.
+- `scripts/inspect_core_ufunctions.py` now validates target/class/outer/property objects
+  with direct `GObjects[InternalIndex]` back-references. Existing core checks pass for
+  `ServerChat` and `SendServerChatMessage`; see
+  `docs/research/2026-05-27-ufunction-membership-backrefs.md`.
 - `scripts/inspect_core_ufunctions.py` supports offline `--name-contains` and
   `--outer-contains` filters for Function/Struct discovery from core dumps. Use broad
   substring searches only for discovery; runtime filters should stay exact

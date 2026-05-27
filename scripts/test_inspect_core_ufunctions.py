@@ -199,6 +199,12 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
         target = payload["targets"][0]
         self.assertEqual(target["status"], "candidate")
         self.assertEqual(target["object"], hex(addrs["chat_function"]))
+        self.assertEqual(target["object_membership_status"], "candidate-uobject")
+        self.assertEqual(target["object_gobjects_index"], 7)
+        self.assertEqual(target["class_membership_status"], "candidate-uobject")
+        self.assertEqual(target["class_index"], 2)
+        self.assertEqual(target["outer_membership_status"], "candidate-uobject")
+        self.assertEqual(target["outer_index"], 5)
         self.assertEqual(target["object_summary"]["name"], "ServerChat")
         self.assertEqual(target["object_summary"]["class_name"], "Function")
 
@@ -218,8 +224,15 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
         self.assertEqual(fields["ufunction.return_value_offset"]["value_hex"], "0xffff")
         self.assertEqual(target["property_chain"]["status"], "candidate")
         self.assertEqual(target["property_chain"]["observed_count"], 1)
-        self.assertEqual(target["property_chain"]["properties"][0]["summary"]["name"], "ChatMessage")
-        self.assertEqual(target["property_chain"]["properties"][0]["offset_internal"], 0)
+        prop = target["property_chain"]["properties"][0]
+        self.assertEqual(prop["summary"]["name"], "ChatMessage")
+        self.assertEqual(prop["offset_internal"], 0)
+        self.assertEqual(prop["membership_status"], "candidate-uobject")
+        self.assertEqual(prop["gobjects_index"], 6)
+        self.assertEqual(prop["class_membership_status"], "candidate-uobject")
+        self.assertEqual(prop["class_gobjects_index"], 3)
+        self.assertEqual(prop["outer_membership_status"], "candidate-uobject")
+        self.assertEqual(prop["outer_gobjects_index"], 7)
 
     def test_rejects_non_function_target_without_promoting_layout(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -392,6 +405,9 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
         self.assertIn("label=ufunction.function_flags", result.stdout)
         self.assertIn("property_chain", result.stdout)
         self.assertIn("prop depth=0", result.stdout)
+        self.assertIn("object_membership=candidate-uobject", result.stdout)
+        self.assertIn("class_membership=candidate-uobject", result.stdout)
+        self.assertIn("outer_membership=candidate-uobject", result.stdout)
 
 
 if __name__ == "__main__":

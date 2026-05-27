@@ -265,6 +265,10 @@ Updated: 2026-05-27
   `ServerChatTo.MessageText` offset `0x10`, `ServerChatToPlayer.PlayerName` offset `0x0`,
   and `ServerChatToPlayer.MessageText` offset `0x10`; see
   `docs/research/2026-05-27-core-ufunction-property-chain.md`.
+- fact: `scripts/inspect_core_ufunctions.py` now validates inspected target, class, outer,
+  and property objects with direct `GObjects[InternalIndex]` back-references. On the
+  existing core, `ServerChat` and `SendServerChatMessage` plus their property chains pass;
+  see `docs/research/2026-05-27-ufunction-membership-backrefs.md`.
 - fact: `scripts/inspect_core_ufunctions.py` supports offline `--name-contains` and
   `--outer-contains` filters for Function/Struct discovery from core dumps. Broad
   `--name-contains Chat` is discovery-only and too noisy for runtime filters; exact

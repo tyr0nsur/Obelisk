@@ -216,6 +216,7 @@ class GObjectContext:
 
     def resolve_uobject_pointer(self, address: int | None) -> dict[str, object]:
         reject_reasons: list[str] = []
+        gobjects_index: int | None = None
         if address is None:
             return {"status": "rejected", "reject_reasons": ["unreadable_pointer_value"]}
         if address == 0:
@@ -251,13 +252,15 @@ class GObjectContext:
                 reject_reasons.append("gobjects_index_unreadable")
             elif indexed_address != address:
                 reject_reasons.append("gobjects_internal_index_mismatch")
+            else:
+                gobjects_index = internal_index
 
         status = "candidate-uobject" if not reject_reasons else "rejected"
         return {
             "status": status,
             "reject_reasons": reject_reasons,
             "uobject": summary,
-            "gobjects_index": self.address_to_index().get(address),
+            "gobjects_index": gobjects_index,
         }
 
 
@@ -358,6 +361,14 @@ def read_u64(memory: uobjects.CoreMemory, address: int) -> int | None:
     return read_int(memory, address, "<Q")
 
 
+def membership_fields(resolved: dict[str, object], prefix: str = "") -> dict[str, object]:
+    return {
+        f"{prefix}membership_status": resolved["status"],
+        f"{prefix}membership_reject_reasons": resolved["reject_reasons"],
+        f"{prefix}gobjects_index": resolved.get("gobjects_index"),
+    }
+
+
 def inspect_enum_candidate(context: GObjectContext, property_address: int) -> dict[str, object]:
     enum_address = context.memory.read_ptr(property_address + 0x70)
     if not enum_address:
@@ -430,15 +441,37 @@ def inspect_property_chain(
             break
         seen.add(current)
 
-        summary = context.describe_uobject(current)
-        if summary is None:
+        resolved_property = context.resolve_uobject_pointer(current)
+        summary = resolved_property.get("uobject")
+        if not isinstance(summary, dict):
             reject_reasons.append(f"property_{depth}_not_readable_as_uobject")
             break
+
+        property_rejects: list[str] = []
+        if resolved_property["status"] != "candidate-uobject":
+            property_rejects.extend(
+                f"membership_{reason}" for reason in resolved_property["reject_reasons"]
+            )
 
         owner = summary.get("outer")
         owner_matches = owner == f"0x{owner_address:x}"
         if not owner_matches:
             reject_reasons.append(f"property_{depth}_outer_mismatch")
+            property_rejects.append("outer_mismatch")
+
+        class_address = parse_hex_string(summary.get("class"))
+        resolved_class = context.resolve_uobject_pointer(class_address)
+        if resolved_class["status"] != "candidate-uobject":
+            property_rejects.extend(
+                f"class_membership_{reason}" for reason in resolved_class["reject_reasons"]
+            )
+
+        outer_address = parse_hex_string(summary.get("outer"))
+        resolved_outer = context.resolve_uobject_pointer(outer_address)
+        if resolved_outer["status"] != "candidate-uobject":
+            property_rejects.extend(
+                f"outer_membership_{reason}" for reason in resolved_outer["reject_reasons"]
+            )
 
         array_dim = read_i32(context.memory, current + 0x30)
         element_size = read_i32(context.memory, current + 0x34)
@@ -447,7 +480,6 @@ def inspect_property_chain(
         next_field = context.memory.read_ptr(current + 0x28)
         next_property = context.memory.read_ptr(current + 0x50)
 
-        property_rejects: list[str] = []
         if array_dim is None or array_dim <= 0 or array_dim > 4096:
             property_rejects.append("implausible_array_dim")
         if element_size is None or element_size <= 0 or element_size > 0x10000:
@@ -474,7 +506,12 @@ def inspect_property_chain(
             "offset_internal_hex": hex_or_none(offset_internal),
             "next_field": hex_or_none(next_field),
             "next_property": hex_or_none(next_property),
-            "status": "candidate" if not property_rejects and owner_matches else "rejected",
+            **membership_fields(resolved_property),
+            **membership_fields(resolved_class, "class_"),
+            **membership_fields(resolved_outer, "outer_"),
+            "class_summary": resolved_class.get("uobject"),
+            "outer_summary": resolved_outer.get("uobject"),
+            "status": "candidate" if not property_rejects else "rejected",
             "reject_reasons": property_rejects,
         }
         if summary.get("class_name") == "ByteProperty":
@@ -534,14 +571,31 @@ def inspect_target(
     target["status"] = "candidate" if not reject_reasons else "rejected"
     target["reject_reasons"] = reject_reasons
     target["object_summary"] = object_summary
-    target["object_index"] = context.index_for_address(object_address)
+    target["object_index"] = resolved.get("gobjects_index")
+    target.update(membership_fields(resolved, "object_"))
+    target["class_summary"] = None
+    target["class_index"] = None
+    target["class_membership_status"] = None
+    target["class_membership_reject_reasons"] = []
     target["outer_summary"] = None
     target["outer_index"] = None
+    target["outer_membership_status"] = None
+    target["outer_membership_reject_reasons"] = []
     if isinstance(object_summary, dict):
+        class_address = parse_hex_string(object_summary.get("class"))
+        if class_address is not None:
+            resolved_class = context.resolve_uobject_pointer(class_address)
+            target["class_summary"] = resolved_class.get("uobject")
+            target["class_index"] = resolved_class.get("gobjects_index")
+            target["class_membership_status"] = resolved_class["status"]
+            target["class_membership_reject_reasons"] = resolved_class["reject_reasons"]
         outer_address = parse_hex_string(object_summary.get("outer"))
         if outer_address is not None:
-            target["outer_summary"] = context.describe_uobject(outer_address)
-            target["outer_index"] = context.index_for_address(outer_address)
+            resolved_outer = context.resolve_uobject_pointer(outer_address)
+            target["outer_summary"] = resolved_outer.get("uobject")
+            target["outer_index"] = resolved_outer.get("gobjects_index")
+            target["outer_membership_status"] = resolved_outer["status"]
+            target["outer_membership_reject_reasons"] = resolved_outer["reject_reasons"]
 
     field_specs = [spec for spec in FIELD_SPECS if spec.offset < window_size]
     target["candidate_fields"] = [inspect_scalar_field(context.memory, object_address, spec) for spec in field_specs]
@@ -702,6 +756,8 @@ def format_text(payload: dict[str, object]) -> str:
             "reasons={reasons} object_index={object_index} class={class_name!r} name={name!r} "
             "name_index={name_index} outer={outer} outer_index={outer_index} "
             "outer_name={outer_name!r} outer_name_index={outer_name_index} "
+            "object_membership={object_membership} class_membership={class_membership} "
+            "outer_membership={outer_membership} "
             "num_parms={num_parms} parms_size={parms_size}".format(
                 target_kind=target["target_kind"],
                 target_value=target["target_value"],
@@ -716,6 +772,9 @@ def format_text(payload: dict[str, object]) -> str:
                 outer_index=target.get("outer_index"),
                 outer_name=outer_summary.get("name") if isinstance(outer_summary, dict) else None,
                 outer_name_index=outer_summary.get("name_index") if isinstance(outer_summary, dict) else None,
+                object_membership=target.get("object_membership_status"),
+                class_membership=target.get("class_membership_status"),
+                outer_membership=target.get("outer_membership_status"),
                 num_parms=target.get("num_parms"),
                 parms_size=target.get("parms_size"),
             )
@@ -766,7 +825,8 @@ def format_text(payload: dict[str, object]) -> str:
                 lines.append(
                     "    prop depth={depth} address={address} class={class_name!r} name={name!r} "
                     "offset={offset} element_size={element_size} flags={flags} next={next_field} "
-                    "status={status} reasons={reasons}".format(
+                    "membership={membership} class_membership={class_membership} "
+                    "outer_membership={outer_membership} status={status} reasons={reasons}".format(
                         depth=prop["depth"],
                         address=prop["address"],
                         class_name=prop_summary.get("class_name") if isinstance(prop_summary, dict) else None,
@@ -775,6 +835,9 @@ def format_text(payload: dict[str, object]) -> str:
                         element_size=prop.get("element_size"),
                         flags=prop.get("property_flags"),
                         next_field=prop.get("next_field"),
+                        membership=prop.get("membership_status"),
+                        class_membership=prop.get("class_membership_status"),
+                        outer_membership=prop.get("outer_membership_status"),
                         status=prop.get("status"),
                         reasons=",".join(prop.get("reject_reasons", [])) if prop.get("reject_reasons") else "-",
                     )

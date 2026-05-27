@@ -25,6 +25,8 @@ Added `scripts/inspect_core_ufunctions.py`, an offline-only core inspector that:
 - prints candidate scalar fields for `UObjectBase`, `UStruct`, `UFunction`, and
   `UProperty`;
 - resolves pointer slots through `GObjects` and FName-backed `UObject` summaries;
+- validates target, class, outer, and property-chain membership through direct
+  `GObjects[InternalIndex]` back-references;
 - walks the legacy `UStruct.Children +0x38` and `UField.Next +0x28` chain;
 - validates property count against `UFunction.NumParms`;
 - validates each property `Offset_Internal + ElementSize` against `ParmsSize`;
@@ -115,6 +117,10 @@ ServerSendChatMessage:
 
 This promotes chat parameter discovery from raw memory guessing to reflection-backed
 offline evidence for this binary hash and captured process.
+
+Later tooling hardening in `2026-05-27-ufunction-membership-backrefs.md` confirmed
+`ServerChat` and `SendServerChatMessage` target/class/outer/property membership through
+direct `GObjects[InternalIndex]` back-references.
 
 The next runtime implementation should filter `ProcessEvent` by validated `UFunction*`
 targets and decode only reflected parameter buffers bounded by `ParmsSize`. For the first
