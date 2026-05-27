@@ -46,9 +46,10 @@ Updated: 2026-05-27
 - fact: `scripts/analyze_reflectionscanner_capture.py` passively summarizes copied
   ReflectionScanner logs for UObject scores, FName `matched_clues`, delayed globals, and
   reject markers; it does not touch server state.
-- fact: ReflectionScanner FName analyzer review tightened offline count bounds and now
-  distinguishes exact single-hit candidates from repeat-confirmed candidates; see
-  `docs/research/2026-05-27-reflectionscanner-analyzer-review.md`.
+- fact: Commit `c890c2a` tightened FName probe confirmation. ReflectionScanner now logs
+  `source_global` for FName indirect-table probes, and the analyzer only treats exact
+  hits as repeat-confirmed when the same table appears from distinct source globals or
+  distinct targets; see `docs/research/2026-05-27-reflectionscanner-analyzer-review.md`.
 - fact: Top-level CMake now pins `subhook` to local FetchContent commit
   `568d2e5a5d6013907e8008857968906b33ef3b7d` instead of `master`; see
   `docs/research/2026-05-27-subhook-reproducibility.md`.
@@ -73,12 +74,13 @@ Updated: 2026-05-27
 - fact: Runtime now supports optional `extern "C" void ObeliskPlugin_Shutdown()`,
   resolved outside `ObeliskApi` and called before callback owner cleanup and `dlclose`;
   see `docs/research/2026-05-27-plugin-shutdown-lifecycle.md`.
-- fact: `ObeliskApi` now appends `abi_version`, `struct_size`, and `capabilities` without
-  shifting existing function-pointer offsets; front-loaded ABI headers remain a future
-  major-version plan.
+- fact: Commit `6f20a2c` introduced the strict plugin metadata/config ABI. Plugins must
+  export `ObeliskPlugin_GetInfo`, the runtime creates/validates
+  `${OBELISK_CONFIG_DIR}/<plugin-id>/config.json`, and `ObeliskPlugin_Init` receives an
+  `ObeliskPluginInitContext`.
 - fact: Top-level CMake builds `plugins/oBaseEvents/oBaseEvents.so` as the first official
-  plugin example. Legacy chat/monitor prototype source has been removed from the release
-  tree.
+  plugin example. `oBaseEvents` has migrated to the metadata/config ABI; legacy
+  chat/monitor prototype source has been removed from the release tree.
 - fact: Plugin structure and promotion rules are now documented in
   `docs/PLUGIN_ARCHITECTURE.md`; `plugins/README.md` records the intended
   `examples/` and `experimental/` split without moving code or changing CMake.
@@ -92,10 +94,15 @@ Updated: 2026-05-27
   before accepting any `GObjects`, `GNames`, or `UFunction` offset.
 - next-step: In the next isolated ReflectionScanner capture, compare any
   `FName indirect-table probe` lines against `None`, `ClientMessage`, and `ServerChat`;
-  require `matched_clues=3/3` before treating a table as a `GNames` research candidate.
+  require `matched_clues=3/3` plus repeat confirmation through distinct `source_global`
+  values or distinct targets before treating a table as a `GNames` research candidate.
 - next-step: Replace raw chat parameter probing with reflected parameter decoding.
 - next-step: Add binary hash validation or an instruction decoder before accepting future
   ProcessEvent prologue changes.
+- next-step: Reposition public docs around Obelisk as a Linux modding runtime/API/SDK and
+  keep `/servidor/ark`/LinuxGSM framed as a debug harness, not the project center.
+- next-step: Add SDK layout, CTest-based offline tests, ABI layout checks, and CI quality
+  gates before adding gameplay APIs.
 
 ## Agent Protocol
 

@@ -9,7 +9,8 @@ work from repository state instead of chat history.
 
 - Repo: `/home/flowcommunity-ark/Obelisk`
 - Remote: `git@github.com:tyr0nsur/Obelisk.git`
-- Current known good baseline: latest pushed `main` after validation.
+- Current known good baseline: latest pushed `main` after validation, currently
+  `6f20a2c Add strict plugin metadata config ABI`.
 - Local ignored artifacts normally present: `build/`, `Obelisk.log`
 - Do not commit built `.so` files, logs, server config, core dumps, or state markers.
 - Server config restore notes: `docs/SERVER_RESTORE.md`
@@ -44,6 +45,10 @@ work from repository state instead of chat history.
 - ProcessEvent direct-offset fallback is removed from active runtime code; a unique
   signature match is required.
 - C ABI plugin loading.
+- Strict plugin metadata/config ABI:
+  - plugins must export `ObeliskPlugin_GetInfo`
+  - runtime creates/validates `${OBELISK_CONFIG_DIR}/<plugin-id>/config.json`
+  - `ObeliskPlugin_Init` receives `ObeliskPluginInitContext`
 - Stable install only deploys runtime libraries; plugins are activated by placing `.so`
   files directly in `/servidor/ark/obelisk/plugins/`.
 - Plugin-owned callback cleanup on init failure and unload.
@@ -76,7 +81,8 @@ python3 scripts/analyze_reflectionscanner_capture.py --json /path/to/isolated/Ob
 ```
 
 4. Treat `GNames` only as a research candidate when `matched_clues=3/3` repeats for the
-   same table pointer and there are no reject markers.
+   same table pointer through distinct `source_global` values or distinct targets, and
+   there are no reject markers.
 5. Before committing offsets, require a second isolated capture or static xref validation.
 
 ## Hard Rules
@@ -104,5 +110,8 @@ python3 scripts/analyze_reflectionscanner_capture.py --json /path/to/isolated/Ob
 - Ops: get permission to create or designate the isolated ARK debug instance; preferred
   plan is `arkserver-obelisk-debug`.
 - Reflection: improve FName/GNames probes and analyzer fixtures offline.
-- Runtime: add tests/harness for plugin shutdown order and callback cleanup.
-- Build/QA: add lightweight offline tests for scripts/analyzer and ABI layout assumptions.
+- Docs: reposition the repo as a Linux modding runtime/API/SDK; keep ARK/LinuxGSM as a
+  debug harness.
+- Runtime/SDK: add tests/harness for plugin config, plugin loading, shutdown order, and
+  callback cleanup.
+- Build/QA: add CTest, ABI layout checks, SDK consumer fixtures, and CI quality gates.
