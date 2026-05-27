@@ -40,14 +40,32 @@ class0 flags=0xc7 internal=516 class=0x2b1dda80 name_index=207 name_number=0 out
 class0 name ... header=0x19e string="Package"
 ```
 
+Generated evidence-pack sample commands later validated multiple object items:
+
+```text
+sample[0]: object=0x79b62f8ff000 internal_index=0 name="/Script/CoreUObject" class="Package"
+sample[1]: object=0x2aed7340 internal_index=1 name="Object" class="Class"
+```
+
 The FName headers match `index * 2`:
 
 - `2866 * 2 = 0x1664`
 - `207 * 2 = 0x19e`
 
-This confirms that at least the first object item points to a plausible `UObjectBase`, and
-the object's name and class name resolve through the same FName table previously validated
-from the core.
+This confirms that multiple early object items point to plausible `UObjectBase` values,
+their `InternalIndex` fields match their array indices, and their object/class names
+resolve through the same FName table previously validated from the core.
+
+Static xrefs from the matching `ShooterGameServer.objdump` also support the layout:
+
+- `0x595b7f0` has thousands of code references using a chunked object lookup shape:
+  load chunk pointer, derive `index >> 16`, load chunk, then access item with
+  `index * 0x10`.
+- `0x595b804` is repeatedly compared against requested object indices as a count-like
+  upper bound.
+- `0x595b838` is updated through `lock xadd`, consistent with a serial-number source.
+- `0x595b7e0` is passed as an immediate first argument to several helper functions,
+  consistent with a global object-array root/struct.
 
 ## Result
 

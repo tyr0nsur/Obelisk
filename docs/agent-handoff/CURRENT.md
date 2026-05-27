@@ -248,12 +248,8 @@ Updated: 2026-05-27
 - next-step: Stop trying to promote chat UObject globals directly into GNames. Next FName
   work should use static discovery of the name table global or a bounded alternate name
   storage scanner, then validate with the analyzer.
-- next-step: Deploy the 10-minute static-root retry build, run one scanner capture, wait at
-  least 10 minutes, then analyze copied logs with `--strict`.
 - next-step: Replace blind startup/static-slot waits with a bounded live data-mapping
   scanner or offline core scanner for FName-table-shaped pointers.
-- next-step: Search statically for one or more `GUObjectArray` candidate slots and inspect
-  them through `scripts/build_core_dump_evidence_pack.py --gobjects-candidate`.
 - next-step: Extend core tooling to validate multiple `FUObjectItem` indices from
   `0x595b7e0`, including `InternalIndex`, `ClassPrivate`, `OuterPrivate`, and FName
   resolution.

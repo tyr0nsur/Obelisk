@@ -1,5 +1,10 @@
 # Static Root Runtime Retry Capture
 
+Superseded note: this capture is useful historical evidence, but later post-start
+debug-control probing showed that waiting longer in bootstrap is not a coherent primary
+strategy. New work should prefer post-start probes, offline core evidence packs, or
+bounded live data-mapping scanners.
+
 ## Objective
 
 Retest `OBELISK_REFLECTION_STATIC_FNAME_ROOTS=0x5956f30` after correcting the static

@@ -14,10 +14,14 @@ or parameter decoding for ARK's Linux UE4 server.
   validated Ragnarok binary.
 - `UObjectBase::NamePrivate.ComparisonIndex` has been observed at object offset `0x18`
   and `Number` at `0x1c`.
-- The chat experiment has seen likely `FName` indices:
-  - `ServerChat`: `9622`
-  - `ClientMessage`: `9619`
-- These indices are useful research clues, not a stable public API.
+- Confirmed core FName clues for the current ARK binary hash include:
+  - `4884 -> ClientMessage`
+  - `9619 -> ServerChat`
+  - `9622 -> SetActiveMissionDebugFlags`
+- Older chat experiments that assumed `9619 -> ClientMessage` and `9622 -> ServerChat`
+  are obsolete. Treat historical chat indices as research clues, not stable API.
+- Core evidence promotes `0x595b7e0` to a binary-specific `GUObjectArray`
+  research-candidate; use it to enumerate objects before returning to chat params.
 - Prior raw chat experiments used parameter probing and FString heuristics. Treat that as
   historical discovery code, not the final architecture.
 - `ReflectionScanner` FName table output must be treated as candidate ranking. Analyzer

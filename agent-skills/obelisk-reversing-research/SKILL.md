@@ -23,9 +23,14 @@ Own these areas:
   evidence, not a universal formula.
 - Previous candidate `0x1d11cb0` was a false positive and did not receive gameplay events.
 - Vtable-derived ProcessEvent slot observed around slot 61.
-- Raw scanner found likely chat-related FName/object indices:
-  - `ClientMessageIndex`: `9619`
-  - `ServerChatIndex`: `9622`
+- Confirmed core FName clues for the current ARK binary hash:
+  - `4884 -> ClientMessage`
+  - `9619 -> ServerChat`
+  - `9622 -> SetActiveMissionDebugFlags`
+- Older notes that used `9619 -> ClientMessage` and `9622 -> ServerChat` are obsolete
+  historical evidence.
+- Core evidence promotes `0x595b7e0` to `GUObjectArray research-candidate`; first object
+  resolves to `/Script/CoreUObject` and class resolves to `Package`.
 - Native exec field patching was unsafe and must remain disabled. Do not use
   `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` unless a future written plan proves a separate
   throwaway process can tolerate crashes.

@@ -53,6 +53,10 @@ The next concrete step is an offline candidate loop:
 - direct FName entry reads from `--fname-root-slot` using `--fname-index` values;
 - default FName clues for `0`, `4884`, and `9619`;
 - bounded `--gobjects-candidate LABEL=ADDR` global-slot and pointer-window previews.
+- bounded `--gobjects-sample-index INDEX` reads `FUObjectItem` samples from each
+  `--gobjects-candidate` interpreted as a direct `GUObjectArray` struct. This is intended
+  for candidates such as `0x595b7e0`; when sampling is enabled, the older indirect
+  slot-preview block is skipped.
 - bounded `--scan-pointer-value LABEL=ADDR` searches across small readable/writable core
   mappings to find slots that point to a confirmed in-memory table/root value.
 - optional `--scan-fname-tables` runs `scripts/scan_core_fname_tables.py`, an offline

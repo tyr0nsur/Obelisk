@@ -1,5 +1,11 @@
 # FName Indirect Table Probe
 
+Superseded note: this historical probe used stale clue indices
+`9619 -> ClientMessage` and `9622 -> ServerChat`. Current core evidence for this binary is
+`4884 -> ClientMessage`, `9619 -> ServerChat`, and
+`9622 -> SetActiveMissionDebugFlags`. Do not reuse the stale clue mapping for new
+validation.
+
 ## Objective
 
 Advance `FName`/`GNames` research without enabling live plugins, native exec probes, or

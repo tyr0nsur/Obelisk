@@ -5,8 +5,11 @@
 Prepare the next isolated `ReflectionScanner` capture to validate two scanner-only signals:
 
 - `UObject validation` score for already-discovered candidate globals.
-- `FName indirect-table probe` against index `0 == None`, `9619 == ClientMessage`, and
-  `9622 == ServerChat`.
+- Historical note: this runbook originally used stale FName clues
+  `9619 == ClientMessage` and `9622 == ServerChat`. Do not reuse those for new
+  validation. Current core evidence for this binary uses `0 == None`,
+  `4884 == ClientMessage`, `9619 == ServerChat`, and
+  `9622 == SetActiveMissionDebugFlags`.
 
 This runbook is for an isolated/debug ARK instance only. Do not use it to enable
 raw event discovery or native exec probes on the active development server.
@@ -62,9 +65,10 @@ git -C /home/flowcommunity-ark/Obelisk status --short
 ./arkserver restart
 ```
 
-Let the process reach normal startup and leave it up for at least 10 minutes. The scanner
-runs at startup and also has a delayed candidate-global watch that may resolve globals up
-to 120 iterations at 5-second intervals.
+Let the process reach normal startup before copying logs. Do not rely on blind
+bootstrap/static-root waits as the main strategy; later runtime debug-control probing
+showed that extending startup waits can preserve a bad method. Prefer post-start debug
+control probes or offline core evidence packs when validating roots.
 
 Collect only the relevant scanner lines:
 

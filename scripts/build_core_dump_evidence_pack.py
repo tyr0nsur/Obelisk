@@ -42,6 +42,11 @@ DEFAULT_FNAME_INDICES = [
 
 FNAME_CHUNK_SIZE = 0x4000
 GOBJECTS_POINTER_OFFSETS = (0x0, 0x8, 0x10, 0x18, 0x20)
+GOBJECTS_DIRECT_CHUNKS_OFFSET = 0x10
+GOBJECTS_DIRECT_COUNT_OFFSET = 0x24
+GOBJECTS_CHUNK_SIZE = 0x10000
+FUOBJECT_ITEM_SIZE = 0x10
+MAX_GOBJECTS_SAMPLE_INDICES = 32
 DEFAULT_POINTER_SCAN_MAX_MAPPING_BYTES = 64 * 1024 * 1024
 DEFAULT_POINTER_SCAN_MAX_HITS = 64
 
@@ -120,6 +125,29 @@ def parse_fname_index(value: str) -> tuple[str, int]:
     return f"fname_{index}", index
 
 
+def validate_gobjects_sample_options(
+    gobjects_candidates: list[tuple[str, int]],
+    gobjects_sample_indices: list[int],
+    fname_root_slots: list[tuple[str, int]],
+) -> str | None:
+    for index in gobjects_sample_indices:
+        if index < 0:
+            return "--gobjects-sample-index must be non-negative"
+    if gobjects_sample_indices and not gobjects_candidates:
+        return "--gobjects-sample-index requires at least one --gobjects-candidate"
+    if gobjects_sample_indices and not fname_root_slots:
+        return (
+            "--gobjects-sample-index requires at least one --fname-root-slot for "
+            "NamePrivate resolution"
+        )
+    if len(gobjects_sample_indices) > MAX_GOBJECTS_SAMPLE_INDICES:
+        return (
+            "--gobjects-sample-index may be repeated at most "
+            f"{MAX_GOBJECTS_SAMPLE_INDICES} times"
+        )
+    return None
+
+
 def extend_candidate_dump_commands(
     lines: list[str],
     candidates: list[tuple[str, int]],
@@ -194,6 +222,84 @@ def extend_gobjects_candidate_commands(
             )
 
 
+def extend_gobjects_sample_commands(
+    lines: list[str],
+    gobjects_candidates: list[tuple[str, int]],
+    sample_indices: list[int],
+    fname_root_slots: list[tuple[str, int]],
+) -> None:
+    if not gobjects_candidates or not sample_indices:
+        return
+
+    for label, address in gobjects_candidates:
+        for index in sample_indices:
+            chunk_index = index // GOBJECTS_CHUNK_SIZE
+            chunk_offset = chunk_index * 8
+            item_offset = (index % GOBJECTS_CHUNK_SIZE) * FUOBJECT_ITEM_SIZE
+            lines.extend(
+                [
+                    f'printf "\\n== gobjects sample {label}[{index}] direct @ 0x{address:x} ==\\n"',
+                    f"set $gobjects_direct = (char*)0x{address:x}",
+                    f"set $gobjects_chunks = *(void**)($gobjects_direct+0x{GOBJECTS_DIRECT_CHUNKS_OFFSET:x})",
+                    f"set $gobjects_count = *(int*)($gobjects_direct+0x{GOBJECTS_DIRECT_COUNT_OFFSET:x})",
+                    'printf "chunks = %p count = %d\\n", $gobjects_chunks, $gobjects_count',
+                    f"set $gobjects_chunk = *(void**)(((char*)$gobjects_chunks)+0x{chunk_offset:x})",
+                    f"set $fuobject_item = ((char*)$gobjects_chunk)+0x{item_offset:x}",
+                    'printf "chunk = %p item = %p\\n", $gobjects_chunk, $fuobject_item',
+                    "x/2gx $fuobject_item",
+                    "set $uobject = *(void**)$fuobject_item",
+                    "set $fuobject_metadata = *(unsigned long long*)(((char*)$fuobject_item)+0x8)",
+                    "set $fuobject_flags = *(int*)(((char*)$fuobject_item)+0x8)",
+                    "set $fuobject_serial = *(int*)(((char*)$fuobject_item)+0xc)",
+                    (
+                        'printf "object = %p item_metadata = 0x%llx item_flags = 0x%x '
+                        'serial = %d\\n", $uobject, $fuobject_metadata, '
+                        "$fuobject_flags, $fuobject_serial"
+                    ),
+                    "x/8gx $uobject",
+                    "set $uobject_vtable = *(void**)$uobject",
+                    "set $uobject_flags = *(int*)(((char*)$uobject)+0x8)",
+                    "set $uobject_internal_index = *(int*)(((char*)$uobject)+0xc)",
+                    "set $uobject_class = *(void**)(((char*)$uobject)+0x10)",
+                    "set $uobject_name_index = *(int*)(((char*)$uobject)+0x18)",
+                    "set $uobject_name_number = *(int*)(((char*)$uobject)+0x1c)",
+                    "set $uobject_outer = *(void**)(((char*)$uobject)+0x20)",
+                    (
+                        'printf "vtable = %p flags = 0x%x internal_index = %d '
+                        'class = %p name_index = %d name_number = %d outer = %p\\n", '
+                        "$uobject_vtable, $uobject_flags, $uobject_internal_index, "
+                        "$uobject_class, $uobject_name_index, $uobject_name_number, "
+                        "$uobject_outer"
+                    ),
+                    (
+                        f'printf "sample_index = {index} internal_index_match = %d\\n", '
+                        f"$uobject_internal_index == {index}"
+                    ),
+                    "x/8gx $uobject_class",
+                    "set $class_name_index = *(int*)(((char*)$uobject_class)+0x18)",
+                    "set $class_name_number = *(int*)(((char*)$uobject_class)+0x1c)",
+                    'printf "class_name_index = %d class_name_number = %d\\n", $class_name_index, $class_name_number',
+                ]
+            )
+            for fname_label, fname_address in fname_root_slots:
+                lines.extend(
+                    [
+                        f'printf "\\n-- resolve sample names through {fname_label} @ 0x{fname_address:x} --\\n"',
+                        f"set $fname_table = *(void**)0x{fname_address:x}",
+                        'printf "fname_table = %p\\n", $fname_table',
+                        f"set $object_fname_chunk = *(void**)(((char*)$fname_table)+(($uobject_name_index/{FNAME_CHUNK_SIZE})*8))",
+                        f"set $object_fname_entry = *(void**)(((char*)$object_fname_chunk)+(($uobject_name_index%{FNAME_CHUNK_SIZE})*8))",
+                        f"set $class_fname_chunk = *(void**)(((char*)$fname_table)+(($class_name_index/{FNAME_CHUNK_SIZE})*8))",
+                        f"set $class_fname_entry = *(void**)(((char*)$class_fname_chunk)+(($class_name_index%{FNAME_CHUNK_SIZE})*8))",
+                        'printf "object_fname_entry = %p class_fname_entry = %p\\n", $object_fname_entry, $class_fname_entry',
+                        'printf "object name: "',
+                        "x/s ((char*)$object_fname_entry)+0x10",
+                        'printf "class name: "',
+                        "x/s ((char*)$class_fname_entry)+0x10",
+                    ]
+                )
+
+
 def extend_pointer_scan_commands(
     lines: list[str],
     pointer_values: list[tuple[str, int]],
@@ -258,6 +364,7 @@ def write_gdb_command_file(
     fname_root_slots: list[tuple[str, int]],
     fname_indices: list[tuple[str, int]],
     gobjects_candidates: list[tuple[str, int]],
+    gobjects_sample_indices: list[int] | None = None,
     pointer_scan_values: list[tuple[str, int]] | None = None,
     pointer_scan_max_mapping_bytes: int = DEFAULT_POINTER_SCAN_MAX_MAPPING_BYTES,
     pointer_scan_max_hits: int = DEFAULT_POINTER_SCAN_MAX_HITS,
@@ -277,7 +384,15 @@ def write_gdb_command_file(
 
     extend_candidate_dump_commands(lines, candidates)
     extend_fname_root_commands(lines, fname_root_slots, fname_indices)
-    extend_gobjects_candidate_commands(lines, gobjects_candidates)
+    sample_indices = gobjects_sample_indices or []
+    extend_gobjects_sample_commands(
+        lines,
+        gobjects_candidates,
+        sample_indices,
+        fname_root_slots,
+    )
+    if not sample_indices:
+        extend_gobjects_candidate_commands(lines, gobjects_candidates)
     extend_pointer_scan_commands(
         lines,
         pointer_scan_values or [],
@@ -372,9 +487,24 @@ def parse_args() -> argparse.Namespace:
         default=[],
         metavar="LABEL=ADDR",
         help=(
-            "Candidate GUObjectArray/GObjects global slot address to preview from the "
-            "core. May be repeated. Use --candidate for raw root/window dumps. This is "
+            "Candidate GUObjectArray/GObjects address to preview from the core. The "
+            "legacy preview treats ADDR as a pointer slot; --gobjects-sample-index "
+            "treats ADDR as a direct GUObjectArray struct. May be repeated. This is "
             "bounded triage only."
+        ),
+    )
+    parser.add_argument(
+        "--gobjects-sample-index",
+        action="append",
+        type=parse_int,
+        default=[],
+        metavar="INDEX",
+        help=(
+            "Emit bounded GDB reads for FUObjectItem INDEX from each "
+            "--gobjects-candidate interpreted as a direct GUObjectArray struct. When "
+            "sampling is enabled, the legacy indirect slot-preview block is skipped. The "
+            "sample prints chunk/item/object fields and resolves UObject/Class "
+            "NamePrivate through each --fname-root-slot. May be repeated."
         ),
     )
     parser.add_argument(
@@ -477,8 +607,17 @@ def main() -> int:
         fname_indices.extend(DEFAULT_FNAME_INDICES)
     fname_indices.extend(args.fname_index)
     gobjects_candidates = list(args.gobjects_candidate)
+    gobjects_sample_indices = list(args.gobjects_sample_index)
     pointer_scan_values = list(args.scan_pointer_value)
 
+    gobjects_sample_error = validate_gobjects_sample_options(
+        gobjects_candidates,
+        gobjects_sample_indices,
+        fname_root_slots,
+    )
+    if gobjects_sample_error:
+        print(gobjects_sample_error, file=sys.stderr)
+        return 2
     if args.pointer_scan_max_mapping_bytes <= 0:
         print("--pointer-scan-max-mapping-bytes must be positive", file=sys.stderr)
         return 2
@@ -545,6 +684,7 @@ def main() -> int:
                 fname_root_slots,
                 fname_indices,
                 gobjects_candidates,
+                gobjects_sample_indices,
                 pointer_scan_values,
                 args.pointer_scan_max_mapping_bytes,
                 args.pointer_scan_max_hits,
@@ -630,6 +770,7 @@ def main() -> int:
             {"label": label, "address": f"0x{address:x}"}
             for label, address in gobjects_candidates
         ],
+        "gobjects_sample_indices": gobjects_sample_indices,
         "pointer_scan_values": [
             {"label": label, "address": f"0x{address:x}"}
             for label, address in pointer_scan_values

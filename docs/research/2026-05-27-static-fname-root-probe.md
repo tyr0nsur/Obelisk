@@ -1,5 +1,10 @@
 # Static FName root probe
 
+Historical note: startup and delayed retry probing are no longer the preferred validation
+path for static roots. New work should use post-start debug-control probes, offline core
+scanner evidence, or bounded live data-mapping scanners before accepting or rejecting a
+candidate.
+
 ## Objective
 
 Add a bounded runtime probe for static FName/GNames root candidates found by offline
