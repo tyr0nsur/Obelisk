@@ -75,10 +75,31 @@ still does not promote a runtime-stable offset.
 - `function_groups` include `first_xref`, `last_xref`, `xref_span_bytes`, and
   `oversized`, plus separate `anchor_groups` built from small instruction windows.
 
+Follow-up hardening added explicit interpretation fields:
+
+- oversized function groups are tagged
+  `interpretation=contaminated-nearest-symbol-bucket`,
+  `recommended_for_decompile=false`, and include a `reject_reason` pointing readers to
+  `anchor_groups` or exact instruction windows;
+- non-oversized function groups are tagged `concrete-instruction-window` and
+  `recommended_for_decompile=true`;
+- anchor groups now record `anchor_span_bytes`, `oversized`, and `interpretation`, so even
+  dense local windows can be rejected as `contaminated-anchor-window`.
+
 Validation against the local 1.1GB objdump completed in about 12 seconds and recovered
 `13938` xrefs. Large nearest-symbol buckets were marked `oversized=True`, including
 `0x886d80`, `0xeaa3a0`, `0x12d1400`, and `0x81dc59`; the concrete `0x648400` neighborhood
 containing `0x79ce22`, `0x7a27a7`, and `0x7a27b6` remained non-oversized.
+
+The hardened pass labels the top contaminated groups directly:
+
+```text
+0x886d80: xrefs=6300 span=6376614 interpretation=contaminated-nearest-symbol-bucket
+0xeaa3a0: xrefs=4013 span=4315714 interpretation=contaminated-nearest-symbol-bucket
+0x12d1400: xrefs=3529 span=35999114 interpretation=contaminated-nearest-symbol-bucket
+0x81dc59: xrefs=91 span=313717 interpretation=contaminated-nearest-symbol-bucket
+0x648400: xrefs=5 span=22932 interpretation=concrete-instruction-window
+```
 
 ## Risks
 

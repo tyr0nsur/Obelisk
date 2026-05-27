@@ -253,14 +253,18 @@ Updated: 2026-05-27
   `0x79ce22` lookup/bootstrap cache, `0x7a27a7` init/destructor registration, `0x81f118`
   startup reset, `0x81f206` startup helper; see
   `docs/research/2026-05-27-gobjects-static-anchor-classification.md`.
+- fact: `scripts/build_core_dump_evidence_pack.py` now labels xref groups with
+  interpretation metadata. Oversized nearest-symbol buckets are
+  `contaminated-nearest-symbol-bucket` and `recommended_for_decompile=false`; anchor groups
+  carry `anchor_span_bytes`, `oversized`, and `interpretation` so dense local windows can
+  also be rejected.
 - fact: `scripts/enumerate_core_uobjects.py` can enumerate UObjects from the core through
   `0x595b7e0` and `0x5956f30`. It found real chat-related `Function` objects including
   `ServerChat` at index `25447`, `ServerChatTo` at `25449`, and `ServerChatToPlayer` at
   `25452`; see `docs/research/2026-05-27-core-uobject-enumeration.md`.
 - next-step: Do not restart the `GObjects` investigation by looking for another broad
-  candidate. The priority is improving xref grouping so broad nearest-symbol ranges are
-  flagged, then repeating the classified context checks on a second isolated core or future
-  binary before promoting any runtime-stable reflection contract.
+  candidate. The priority is repeating the classified context checks on a second isolated
+  core or future binary before promoting any runtime-stable reflection contract.
 - next-step: No second isolated core is currently available; read-only dump inventory only
   found the existing Ragnarok-derived core and derivative packs. When the operator opens a
   core window, prefer dedicated `arkserver-obelisk-debug`; use `arkserver2` / TheIsland

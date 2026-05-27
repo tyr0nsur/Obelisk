@@ -60,6 +60,8 @@ HEX_LITERAL_RE = re.compile(r"0x[0-9a-fA-F]+")
 ANCHOR_GROUP_MAX_GAP_BYTES = 0x100
 OVERSIZED_FUNCTION_GROUP_XREFS = 512
 OVERSIZED_FUNCTION_GROUP_SPAN_BYTES = 0x10000
+ANCHOR_GROUP_OVERSIZED_XREFS = 64
+ANCHOR_GROUP_OVERSIZED_SPAN_BYTES = 0x1000
 
 
 def is_relative_to(path: Path, parent: Path) -> bool:
@@ -269,6 +271,17 @@ def build_function_groups(xrefs: dict[str, list[dict[str, object]]]) -> list[dic
                 int(group["xref_count"]) >= OVERSIZED_FUNCTION_GROUP_XREFS
                 or int(group["xref_span_bytes"]) >= OVERSIZED_FUNCTION_GROUP_SPAN_BYTES
             )
+            if bool(group["oversized"]):
+                group["interpretation"] = "contaminated-nearest-symbol-bucket"
+                group["recommended_for_decompile"] = False
+                group["reject_reason"] = (
+                    "xref group spans too much code or has too many references; use "
+                    "anchor_groups or exact instruction windows instead"
+                )
+            else:
+                group["interpretation"] = "concrete-instruction-window"
+                group["recommended_for_decompile"] = True
+                group["reject_reason"] = None
     return sorted(
         function_groups.values(),
         key=lambda item: (-int(item["xref_count"]), str(item["function_start"])),
@@ -294,11 +307,23 @@ def build_anchor_groups(xrefs: dict[str, list[dict[str, object]]]) -> list[dict[
                 "target_labels": [],
                 "access_counts": {},
                 "sample_instruction_addresses": [],
+                "anchor_span_bytes": 0,
+                "oversized": False,
+                "interpretation": "concrete-instruction-window",
             }
             groups.append(current)
 
         current["anchor_end"] = ref["instruction_address"]
         current["xref_count"] = int(current["xref_count"]) + 1
+        start_address = int(str(current["anchor_start"]), 16)
+        current["anchor_span_bytes"] = address - start_address
+        current["oversized"] = (
+            int(current["xref_count"]) >= ANCHOR_GROUP_OVERSIZED_XREFS
+            or int(current["anchor_span_bytes"]) >= ANCHOR_GROUP_OVERSIZED_SPAN_BYTES
+        )
+        current["interpretation"] = (
+            "contaminated-anchor-window" if bool(current["oversized"]) else "concrete-instruction-window"
+        )
         target_labels = current["target_labels"]
         if isinstance(target_labels, list) and ref["target_label"] not in target_labels:
             target_labels.append(ref["target_label"])

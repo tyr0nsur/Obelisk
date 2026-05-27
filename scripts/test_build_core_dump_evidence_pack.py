@@ -161,11 +161,17 @@ class CoreDumpEvidencePackCommandTests(unittest.TestCase):
         self.assertEqual(groups["LookupObjects"]["last_xref"], "0x100d")
         self.assertEqual(groups["LookupObjects"]["xref_span_bytes"], 0xD)
         self.assertFalse(groups["LookupObjects"]["oversized"])
+        self.assertEqual(groups["LookupObjects"]["interpretation"], "concrete-instruction-window")
+        self.assertTrue(groups["LookupObjects"]["recommended_for_decompile"])
+        self.assertIsNone(groups["LookupObjects"]["reject_reason"])
         self.assertEqual(groups["LookupObjects"]["xref_count"], 3)
         self.assertEqual(groups["InitObjects"]["target_labels"], ["gobjects.root"])
         self.assertEqual(groups["InitObjects"]["xref_count"], 3)
         self.assertEqual(payload["anchor_groups"][0]["anchor_start"], "0x1000")
         self.assertEqual(payload["anchor_groups"][0]["anchor_end"], "0x1024")
+        self.assertEqual(payload["anchor_groups"][0]["anchor_span_bytes"], 0x24)
+        self.assertFalse(payload["anchor_groups"][0]["oversized"])
+        self.assertEqual(payload["anchor_groups"][0]["interpretation"], "concrete-instruction-window")
         self.assertEqual(payload["anchor_groups"][0]["xref_count"], 6)
 
     def test_static_xref_groups_mark_oversized_symbol_buckets(self) -> None:
@@ -190,8 +196,32 @@ class CoreDumpEvidencePackCommandTests(unittest.TestCase):
         self.assertEqual(group["first_xref"], "0x1000")
         self.assertEqual(group["last_xref"], "0x22000")
         self.assertTrue(group["oversized"])
+        self.assertEqual(group["interpretation"], "contaminated-nearest-symbol-bucket")
+        self.assertFalse(group["recommended_for_decompile"])
+        self.assertIn("anchor_groups", str(group["reject_reason"]))
         self.assertEqual(len(payload["anchor_groups"]), 2)
         self.assertEqual(payload["anchor_groups"][0]["xref_count"], 1)
+
+    def test_anchor_groups_mark_contaminated_windows(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            objdump = Path(temp_dir) / "ShooterGameServer.objdump"
+            lines = ["0000000000010000 <DenseAnchor>:"]
+            for index in range(core_pack.ANCHOR_GROUP_OVERSIZED_XREFS):
+                address = 0x1000 + index
+                lines.append(
+                    f"  {address:x}: 48 8b 05 00 00 00 00  mov    rax,QWORD PTR [rip+0x1]        # 0x595b7f0"
+                )
+            objdump.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+            payload = core_pack.collect_static_xrefs(
+                objdump,
+                core_pack.gobjects_static_xref_targets([("gobjects", 0x595B7E0)]),
+            )
+
+        anchor_group = payload["anchor_groups"][0]
+        self.assertEqual(anchor_group["xref_count"], core_pack.ANCHOR_GROUP_OVERSIZED_XREFS)
+        self.assertTrue(anchor_group["oversized"])
+        self.assertEqual(anchor_group["interpretation"], "contaminated-anchor-window")
 
     def test_gobjects_sample_options_require_candidate_and_fname_root(self) -> None:
         self.assertEqual(
