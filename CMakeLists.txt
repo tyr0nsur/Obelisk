@@ -52,6 +52,7 @@ add_library(obelisk SHARED
     loader/Bootstrap.cpp
     runtime/Logger.cpp
     ue/Memory.cpp
+    ue/RuntimeReflection.cpp
     ue/ReflectionScanner.cpp
     hooks/HookManager.cpp
     hooks/ProcessEventHook.cpp
@@ -112,6 +113,14 @@ add_executable(abi_layout_tests
 target_link_libraries(abi_layout_tests PRIVATE obelisk_sdk)
 
 add_test(NAME AbiLayoutTests COMMAND abi_layout_tests)
+
+add_executable(runtime_reflection_tests
+    tests/core/RuntimeReflectionTests.cpp
+    ue/RuntimeReflection.cpp
+)
+target_include_directories(runtime_reflection_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_test(NAME RuntimeReflectionTests COMMAND runtime_reflection_tests)
 
 install(TARGETS obelisk
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}

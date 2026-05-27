@@ -269,6 +269,12 @@ python3 scripts/analyze_reflectionscanner_capture.py \
   before returning to runtime chat interception.
 - Runtime chat: next implementation should filter `ProcessEvent` by validated
   `UFunction*` and decode only reflected `FString` offsets in isolated debug mode.
+- Preferred runtime integration point: `hooks/ProcessEventHook.cpp` inside
+  `ProcessEvent_Detour`, immediately after FName index extraction and before pre callback
+  dispatch. Keep helper internal; do not change public plugin ABI yet.
+- `ue/RuntimeReflection.{h,cpp}` exists as the internal gated reader for
+  `UObject`/`UFunction`/`UProperty` and bounded parameter ranges. It is tested but not wired
+  into `ProcessEvent` yet.
 - Evidence: after any isolated scanner capture, run
   `scripts/build_reflection_evidence_pack.py` against copied logs and the matching binary
   before promoting candidates.

@@ -212,6 +212,9 @@ Updated: 2026-05-27
   `ServerChatTo.MessageText` offset `0x10`, `ServerChatToPlayer.PlayerName` offset `0x0`,
   and `ServerChatToPlayer.MessageText` offset `0x10`; see
   `docs/research/2026-05-27-core-ufunction-property-chain.md`.
+- fact: `ue/RuntimeReflection.{h,cpp}` now provides an internal, binary-hash-gated
+  reflection reader with tests for bounded `UFunction`/`UProperty` chains and borrowed
+  parameter ranges. It is not public ABI and is not wired into `ProcessEvent` yet.
 
 ## Rejected Or Unsafe
 
@@ -268,6 +271,11 @@ Updated: 2026-05-27
 - next-step: Implement a gated runtime reflection resolver and `ProcessEvent` filter for
   validated chat `UFunction*` calls, then decode only reflected `FString` param offsets in
   isolated debug mode.
+- next-step: Preferred integration point is `hooks/ProcessEventHook.cpp` inside
+  `ProcessEvent_Detour`, after FName index extraction and before pre callback dispatch;
+  see `docs/research/2026-05-27-runtime-chat-reflection-plan.md`.
+- next-step: Add a chat-specific recognizer on top of `ue/RuntimeReflection` before
+  adding runtime logging/dispatch for decoded chat text.
 - next-step: After a repeat-confirmed `GNames` research candidate appears, generate
   `objdump -d -M intel` for the matching ShooterGameServer binary and run the analyzer with
   `--binary` plus `--objdump-xrefs`; inspect whether candidate `source_global` references
