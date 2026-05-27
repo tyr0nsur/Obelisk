@@ -1,9 +1,14 @@
 # Static FName root live capture
 
+> Historical capture note. Do not repeat this workflow on `arkserver` / Ragnarok while
+> player performance testing is active. Future static-root or ReflectionScanner captures
+> should prefer `arkserver-obelisk-debug`; use `arkserver2` / TheIsland only during an
+> explicitly approved fallback debug window.
+
 ## Objective
 
-Validate the offline static FName root slot candidate `0x5956f30` with the new
-`StaticFNameRoot` runtime probe.
+Record the historical attempt to validate offline static FName root slot candidate
+`0x5956f30` with the `StaticFNameRoot` runtime probe.
 
 ## Environment
 
@@ -21,14 +26,15 @@ Validate the offline static FName root slot candidate `0x5956f30` with the new
 
 ## Method
 
-The runtime was deployed with:
+The historical runtime was deployed with:
 
 ```bash
 ./scripts/install_obelisk.sh --backup-existing /servidor/ark/obelisk
 ```
 
 Ragnarok was restarted once with the capture env, logs were analyzed, then Ragnarok was
-restarted again without scanner/static-root env.
+restarted again without scanner/static-root env. This is no longer the approved repeat
+pattern; use `arkserver-obelisk-debug` first for any future scanner/static-root capture.
 
 Analyzer artifacts:
 
@@ -76,12 +82,13 @@ This does not fully disprove the static analysis. It may mean:
 
 ## Retry Capture After `d3303cb`
 
-After adding delayed retries, Ragnarok was restarted again with:
+Historical retry after adding delayed retries:
 
 ```bash
+# Historical only: do not run on Ragnarok during player performance testing.
 OBELISK_ENABLE_REFLECTION_SCANNER=1
 OBELISK_REFLECTION_STATIC_FNAME_ROOTS=0x5956f30
-/servidor/ark/arkserver start
+# Start only an approved isolated/debug instance for future retries.
 ```
 
 Analyzer artifact:

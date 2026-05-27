@@ -81,6 +81,8 @@ For current Obelisk debug/development work, use `arkserver2` / TheIsland instead
 Ragnarok. For scanner or reflection research that needs stronger isolation, use the debug
 wrapper from `ObeliskRunDebug.sh` on a separate instance such as
 `arkserver-obelisk-debug`; do not reuse live map markers for debug captures.
+For `gcore`, `ptrace`, ReflectionScanner, broad tracing, or scanner-like probes,
+`arkserver2` is an explicit fallback, not the default target.
 
 ## Instance Identity
 

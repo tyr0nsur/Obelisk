@@ -79,6 +79,11 @@ Optional safety marker for TheIsland while plugin development is settling:
 
 ## Restart Plan
 
+> Historical restart plan. Do not execute the Ragnarok portion while player performance
+> testing is active. Any `arkserver` restart now requires an explicit operator maintenance
+> window; debug/development validation should use `arkserver2` or, for high-risk captures,
+> `arkserver-obelisk-debug`.
+
 1. Build and install the current repo runtime into the centralized root:
 
    ```bash
@@ -113,12 +118,12 @@ Optional safety marker for TheIsland while plugin development is settling:
    rm -f /servidor/ark/obelisk/state/disable-plugins-theisland
    ```
 
-4. Restart one instance at a time through LinuxGSM:
+4. Restart one approved instance at a time through LinuxGSM:
 
    ```bash
    cd /servidor/ark
    ./arkserver2 restart
-   ./arkserver restart
+   # ./arkserver restart  # Maintenance-window-only for Ragnarok.
    ```
 
    `arkserver2` should go first because it is still carrying the old binary-local runtime

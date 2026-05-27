@@ -57,6 +57,8 @@ passes.
 
 While Ragnarok is under player performance testing, use `arkserver2` / TheIsland as the
 Obelisk debug/development harness instead of changing Ragnarok markers or restarting it.
+For `gcore`, `ptrace`, ReflectionScanner, broad tracing, or scanner-like probes, prefer
+`arkserver-obelisk-debug`; use `arkserver2` only as an explicit approved fallback.
 
 After any scanner/plugin capture or runtime redeploy on TheIsland, run
 `scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance

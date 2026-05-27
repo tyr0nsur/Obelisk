@@ -65,6 +65,14 @@ class ResearchDocGuardrailTests(unittest.TestCase):
         self.assertIn("only with explicit operator approval", text)
         self.assertNotIn("touch /servidor/ark/obelisk/state/instances/arkserver-obelisk-debug/disable-plugins\n./arkserver2 restart", text)
 
+    def test_static_fname_capture_is_historical_not_ragnarok_retry(self) -> None:
+        note = REPO_ROOT / "docs/research/2026-05-27-static-fname-root-live-capture.md"
+        text = note.read_text(encoding="utf-8")
+
+        self.assertIn("Historical capture note", text)
+        self.assertIn("arkserver-obelisk-debug", text)
+        self.assertNotIn("/servidor/ark/arkserver start", text)
+
 
 if __name__ == "__main__":
     unittest.main()
