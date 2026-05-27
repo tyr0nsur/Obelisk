@@ -89,6 +89,19 @@ target_link_libraries(event_manager_tests PRIVATE obelisk_sdk fmt::fmt spdlog::s
 
 add_test(NAME EventManagerTests COMMAND event_manager_tests)
 
+add_executable(plugin_manager_tests
+    tests/core/PluginManagerTests.cpp
+    core/EventManager.cpp
+    core/PluginConfig.cpp
+    core/PluginManager.cpp
+    runtime/Logger.cpp
+    tests/core/ProcessEventHookStub.cpp
+)
+target_include_directories(plugin_manager_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(plugin_manager_tests PRIVATE obelisk_sdk fmt::fmt spdlog::spdlog dl stdc++fs)
+
+add_test(NAME PluginManagerTests COMMAND plugin_manager_tests)
+
 add_executable(abi_layout_tests
     tests/abi/AbiLayoutTests.cpp
 )

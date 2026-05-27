@@ -22,6 +22,48 @@ namespace Obelisk::Core
         using InitFunc = bool(*)(ObeliskApi*, const ObeliskPluginInitContext*);
         using ShutdownFunc = void(*)();
 
+        class DlopenLibraryLoader final : public PluginManager::LibraryLoader
+        {
+        public:
+            void* Open(const fs::path& path, std::string& error) override
+            {
+                dlerror();
+                void* handle = dlopen(path.string().c_str(), RTLD_NOW | RTLD_LOCAL);
+                if (!handle)
+                    error = dlerror();
+                return handle;
+            }
+
+            void* Resolve(void* handle, const char* symbolName, std::string& error) override
+            {
+                dlerror();
+                void* symbol = dlsym(handle, symbolName);
+                const char* symbolError = dlerror();
+                if (symbolError || !symbol)
+                    error = symbolError ? symbolError : "unknown dlsym error";
+                return symbol;
+            }
+
+            void* GetSymbolOwner(void* handle, void* symbol) override
+            {
+                Dl_info symbolInfo{};
+                if (dladdr(symbol, &symbolInfo) != 0 && symbolInfo.dli_fbase)
+                    return symbolInfo.dli_fbase;
+                return handle;
+            }
+
+            void Close(void* handle) override
+            {
+                dlclose(handle);
+            }
+        };
+
+        DlopenLibraryLoader& DefaultLoader()
+        {
+            static DlopenLibraryLoader loader;
+            return loader;
+        }
+
         void* ResolveCallbackOwner(OnProcessEventCallback callback)
         {
             if (g_CurrentPluginOwner)
@@ -37,12 +79,11 @@ namespace Obelisk::Core
             return info.dli_fbase;
         }
 
-        ShutdownFunc ResolveShutdownFunc(void* handle, const std::string& pluginName)
+        ShutdownFunc ResolveShutdownFunc(PluginManager::LibraryLoader& loader, void* handle, const std::string& pluginName)
         {
-            dlerror();
-            ShutdownFunc shutdownFunc = reinterpret_cast<ShutdownFunc>(dlsym(handle, "ObeliskPlugin_Shutdown"));
-            const char* symbolError = dlerror();
-            if (symbolError || !shutdownFunc)
+            std::string error;
+            ShutdownFunc shutdownFunc = reinterpret_cast<ShutdownFunc>(loader.Resolve(handle, "ObeliskPlugin_Shutdown", error));
+            if (!shutdownFunc)
             {
                 OBELISK_INFO("Plugin {} does not export ObeliskPlugin_Shutdown; unload will use callback owner cleanup only.", pluginName);
                 return nullptr;
@@ -102,6 +143,12 @@ namespace Obelisk::Core
     }
 
     PluginManager::PluginManager()
+        : PluginManager(DefaultLoader())
+    {
+    }
+
+    PluginManager::PluginManager(LibraryLoader& loader)
+        : m_Loader(&loader)
     {
         m_Api.LogInfo = PluginLogInfo;
         m_Api.LogWarn = PluginLogWarn;
@@ -155,41 +202,37 @@ namespace Obelisk::Core
 
             for (const auto& path : plugins)
             {
-                std::string pluginPath = path.string();
                 std::string pluginName = path.filename().string();
 
                 OBELISK_INFO("Loading plugin: {}", pluginName);
 
-                void* handle = dlopen(pluginPath.c_str(), RTLD_NOW | RTLD_LOCAL);
+                std::string loaderError;
+                void* handle = m_Loader->Open(path, loaderError);
                 if (!handle)
                 {
-                    OBELISK_ERROR("Failed to load plugin {}: {}", pluginName, dlerror());
+                    OBELISK_ERROR("Failed to load plugin {}: {}", pluginName, loaderError);
                     continue;
                 }
 
-                dlerror();
-                InitFunc initFunc = reinterpret_cast<InitFunc>(dlsym(handle, "ObeliskPlugin_Init"));
-                const char* symbolError = dlerror();
-
-                if (symbolError || !initFunc)
+                std::string symbolError;
+                InitFunc initFunc = reinterpret_cast<InitFunc>(m_Loader->Resolve(handle, "ObeliskPlugin_Init", symbolError));
+                if (!initFunc)
                 {
-                    OBELISK_ERROR("Plugin {} is missing ObeliskPlugin_Init: {}. Unloading.", pluginName, symbolError ? symbolError : "unknown dlsym error");
-                    dlclose(handle);
+                    OBELISK_ERROR("Plugin {} is missing ObeliskPlugin_Init: {}. Unloading.", pluginName, symbolError);
+                    m_Loader->Close(handle);
                     continue;
                 }
 
-                dlerror();
-                GetInfoFunc getInfoFunc = reinterpret_cast<GetInfoFunc>(dlsym(handle, "ObeliskPlugin_GetInfo"));
-                symbolError = dlerror();
-
-                if (symbolError || !getInfoFunc)
+                symbolError.clear();
+                GetInfoFunc getInfoFunc = reinterpret_cast<GetInfoFunc>(m_Loader->Resolve(handle, "ObeliskPlugin_GetInfo", symbolError));
+                if (!getInfoFunc)
                 {
-                    OBELISK_ERROR("Plugin {} is missing ObeliskPlugin_GetInfo: {}. Unloading.", pluginName, symbolError ? symbolError : "unknown dlsym error");
-                    dlclose(handle);
+                    OBELISK_ERROR("Plugin {} is missing ObeliskPlugin_GetInfo: {}. Unloading.", pluginName, symbolError);
+                    m_Loader->Close(handle);
                     continue;
                 }
 
-                ShutdownFunc shutdownFunc = ResolveShutdownFunc(handle, pluginName);
+                ShutdownFunc shutdownFunc = ResolveShutdownFunc(*m_Loader, handle, pluginName);
 
                 ObeliskPluginMetadata metadata{};
                 bool metadataLoaded = false;
@@ -209,7 +252,7 @@ namespace Obelisk::Core
                 if (!metadataLoaded)
                 {
                     OBELISK_ERROR("Plugin {} failed to report metadata. Unloading.", pluginName);
-                    dlclose(handle);
+                    m_Loader->Close(handle);
                     continue;
                 }
 
@@ -218,7 +261,7 @@ namespace Obelisk::Core
                 if (!PreparePluginConfig(metadata, configRoot, preparedConfig, configError))
                 {
                     OBELISK_ERROR("Plugin {} metadata/config rejected: {}. Unloading.", pluginName, configError);
-                    dlclose(handle);
+                    m_Loader->Close(handle);
                     continue;
                 }
 
@@ -232,10 +275,7 @@ namespace Obelisk::Core
                     instanceId.c_str()
                 };
 
-                Dl_info initInfo{};
-                void* pluginOwner = nullptr;
-                if (dladdr(reinterpret_cast<void*>(initFunc), &initInfo) != 0)
-                    pluginOwner = initInfo.dli_fbase;
+                void* pluginOwner = m_Loader->GetSymbolOwner(handle, reinterpret_cast<void*>(initFunc));
                 if (!pluginOwner)
                     pluginOwner = handle;
 
@@ -268,7 +308,7 @@ namespace Obelisk::Core
                     const size_t removed = EventManager::Get().UnregisterCallbacksForOwner(pluginOwner);
                     if (removed > 0)
                         OBELISK_WARN("Removed {} callback(s) registered by failed plugin {} before dlclose.", removed, pluginName);
-                    dlclose(handle);
+                    m_Loader->Close(handle);
                 }
             }
         }
@@ -291,7 +331,7 @@ namespace Obelisk::Core
             const size_t removed = EventManager::Get().UnregisterCallbacksForOwner(plugin.owner);
             if (removed > 0)
                 OBELISK_INFO("Removed {} callback(s) registered by plugin {} before dlclose.", removed, plugin.name);
-            dlclose(plugin.handle);
+            m_Loader->Close(plugin.handle);
         }
         m_LoadedPlugins.clear();
     }
