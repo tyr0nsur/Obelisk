@@ -81,7 +81,11 @@ chat reflection observation logs.
 
 `server_send_chat_message_lines` counts any log line mentioning `ServerSendChatMessage`,
 including the main `ProcessEvent` line and the send-mode summary. Use it as a pointer to
-review the lines, not as a count of player messages. `rejected_or_unknown_send_mode_lines`
+review the lines, not as a count of player messages. The `client_chat_message_lines`,
+`client_server_chat_message_lines`, and `client_server_chat_direct_message_lines`
+counters track exact metadata-only fallback candidates. `metadata_only_lines` counts
+fallback observations that must not be treated as confirmed inbound chat. `chat_candidate_lines`
+counts all exact chat candidate function-name lines. `rejected_or_unknown_send_mode_lines`
 counts either reflected rejection lines or `send_mode_known=false`; non-zero means the
 snapshot found evidence that needs active review before promotion. `last_relevant_line`
 shows the last chat/reflection line matched by the snapshot.
@@ -97,7 +101,7 @@ Before sending chat, start a live tail in one shell:
 
 ```bash
 tail -Fn 0 /servidor/ark/obelisk/logs/arkserver/Obelisk.log \
-  | rg --line-buffered 'Experimental chat reflection|Reflected chat|Chat reflection rejected|Reflected chat rejected'
+  | rg --line-buffered 'Experimental chat reflection|Reflected chat|Chat reflection rejected|Reflected chat rejected|metadata_only=true|ClientChatMessage|ClientServerChatMessage|ClientServerChatDirectMessage'
 ```
 
 In another shell, keep a read-only snapshot command ready:
@@ -120,6 +124,11 @@ also appear when the parameter range is readable. This proves the reflected `Pro
 path was hit; it does not by itself promote public plugin ABI or justify broader
 chat-name scans.
 
+If `ServerSendChatMessage` does not appear but a `ClientChatMessage`,
+`ClientServerChatMessage`, or `ClientServerChatDirectMessage` line appears with
+`metadata_only=true`, record it as fallback evidence only. It can guide the next runtime
+investigation, but it must not dispatch plugin chat events or decode text.
+
 Interpret the snapshot counters this way:
 
 - `reflected_chat_process_event_lines=0`: no accepted reflected chat hit is present in the reviewed log.
@@ -130,6 +139,11 @@ Interpret the snapshot counters this way:
   lines are cheat-manager coverage, not proof of normal player chat.
 - `server_send_chat_message_lines>0`: review the matching lines; this counter can include
   field or send-mode diagnostics for the same ProcessEvent hit.
+- `metadata_only_lines>0`: review exact fallback lines. These are useful path evidence,
+  not accepted inbound chat.
+- `client_chat_message_lines>0`, `client_server_chat_message_lines>0`, or
+  `client_server_chat_direct_message_lines>0`: review the matching fallback candidate
+  lines and keep them separate from `ServerSendChatMessage`.
 - `rejected_chat_lines>0`: the cheap chat filter saw a candidate FName, but reflected
   `UFunction`/property/`ParmsSize` validation rejected it. Rejections are useful evidence
   for debugging constants, but they are not successful chat capture.
