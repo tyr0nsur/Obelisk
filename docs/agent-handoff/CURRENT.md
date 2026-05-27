@@ -56,6 +56,9 @@ Updated: 2026-05-27
 - fact: Commit `f755c43` repositioned public docs around Obelisk as a Linux
   modding runtime/API/SDK. ARK/LinuxGSM are now framed as debug harness/adapters,
   not the project center.
+- fact: Commit `27de1fb` enabled CTest and added offline `PluginConfigTests`.
+  The suite covers safe-disabled default creation, metadata rejection, corrupt JSON,
+  `instance_allowlist` typing, and preserving existing valid config.
 
 ## Rejected Or Unsafe
 
@@ -102,8 +105,10 @@ Updated: 2026-05-27
 - next-step: Replace raw chat parameter probing with reflected parameter decoding.
 - next-step: Add binary hash validation or an instruction decoder before accepting future
   ProcessEvent prologue changes.
-- next-step: Add SDK layout, CTest-based offline tests, ABI layout checks, and CI quality
-  gates before adding gameplay APIs.
+- next-step: Add canonical SDK include layout with `include/obelisk/ObeliskApi.h`,
+  keep `api/ObeliskApi.h` as a transition wrapper, and make `oBaseEvents` consume
+  an `obelisk_sdk` CMake target.
+- next-step: Add ABI layout checks and CI quality gates before adding gameplay APIs.
 
 ## Agent Protocol
 

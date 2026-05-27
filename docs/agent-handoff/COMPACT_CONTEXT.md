@@ -10,7 +10,7 @@ work from repository state instead of chat history.
 - Repo: `/home/flowcommunity-ark/Obelisk`
 - Remote: `git@github.com:tyr0nsur/Obelisk.git`
 - Current known good baseline: latest pushed `main` after validation, currently
-  `f755c43 Reposition Obelisk as runtime SDK`.
+  `27de1fb Add PluginConfig CTest coverage`.
 - Local ignored artifacts normally present: `build/`, `Obelisk.log`
 - Do not commit built `.so` files, logs, server config, core dumps, or state markers.
 - Server config restore notes: `docs/SERVER_RESTORE.md`
@@ -56,6 +56,8 @@ work from repository state instead of chat history.
 - `plugins/oBaseEvents` builds as the first official plugin example.
 - Public docs present Obelisk as a Linux modding runtime/API/SDK. ARK/LinuxGSM are
   debug harness/adapters, not the project center.
+- CTest is enabled. `PluginConfigTests` is the first offline C++ test suite and
+  validates runtime-owned plugin config defaults and rejection paths.
 
 ## What Is Experimental Or Blocked
 
@@ -112,6 +114,5 @@ python3 scripts/analyze_reflectionscanner_capture.py --json /path/to/isolated/Ob
 - Ops: get permission to create or designate the isolated ARK debug instance; preferred
   plan is `arkserver-obelisk-debug`.
 - Reflection: improve FName/GNames probes and analyzer fixtures offline.
-- Runtime/SDK: add tests/harness for plugin config, plugin loading, shutdown order, and
-  callback cleanup.
-- Build/QA: add CTest, ABI layout checks, SDK consumer fixtures, and CI quality gates.
+- Runtime/SDK: add canonical SDK include layout and make `oBaseEvents` consume it.
+- Build/QA: add ABI layout checks, SDK consumer fixtures, and CI quality gates.
