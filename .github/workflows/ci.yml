@@ -82,6 +82,12 @@ jobs:
       - name: Run CTest
         run: ctest --test-dir build --output-on-failure
 
+      - name: Run chat reflection benchmark gate
+        run: |
+          cmake --build build --target chat_reflection_benchmark --parallel
+          ./build/chat_reflection_benchmark 5000 > /tmp/obelisk-chat-reflection-benchmark.txt
+          python3 scripts/check_chat_reflection_benchmark.py /tmp/obelisk-chat-reflection-benchmark.txt
+
       - name: Check diff whitespace
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
