@@ -234,7 +234,7 @@ namespace
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_disabled");
         ConfigureEnvironment(root);
 
-        FakePlugin plugin{.filename = "disabled.so"};
+        FakePlugin plugin{.filename = "disabled.so", .hasInit = false};
         FakeLoader loader;
         loader.Add(plugin);
         TouchPlugin(root, plugin.filename);
@@ -310,7 +310,7 @@ namespace
         Obelisk::Core::PluginManager manager(loader);
         manager.LoadPlugins((root / "plugins").string());
 
-        Require(plugin.getInfoCalls == 0, "plugin without Init reached GetInfo");
+        Require(plugin.getInfoCalls == 1, "plugin without Init did not report metadata before rejection");
         Require(plugin.closeCalls == 1, "plugin without Init was not closed");
 
         CleanupPlugin(plugin);

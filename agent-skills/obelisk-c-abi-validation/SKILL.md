@@ -1,6 +1,6 @@
 ---
 name: obelisk-c-abi-validation
-description: Validates Obelisk runtime/plugin API changes so shared libraries keep a stable C ABI, explicit ownership, and safe callback lifetimes.
+description: "Validates Obelisk runtime/plugin API changes so shared libraries keep a stable C ABI, explicit ownership, and safe callback lifetimes."
 ---
 
 # Obelisk C ABI Validation Skill
@@ -23,6 +23,9 @@ that a `.so` will consume.
 - Plugins may optionally export `extern "C" void ObeliskPlugin_Shutdown()`. The runtime
   resolves it with `dlsym` outside the `ObeliskApi` table and calls it before callback
   owner cleanup and before `dlclose`.
+- The runtime should resolve `ObeliskPlugin_GetInfo` and prepare/apply config gates before
+  resolving mandatory `ObeliskPlugin_Init`. A disabled plugin may be discovered and get a
+  default safe-disabled config without requiring its init symbol to be usable.
 
 ## Required Boundary Rules
 

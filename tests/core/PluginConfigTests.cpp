@@ -91,6 +91,7 @@ namespace
                 "created default config is not safe-disabled");
         Require(created.find("\"instance_allowlist\"") != std::string::npos,
                 "created default config is missing instance_allowlist");
+        Require(!fs::exists(prepared.path.string() + ".tmp"), "temporary config file survived successful write");
     }
 
     void TestRejectsUnsafePluginId(const fs::path& root)

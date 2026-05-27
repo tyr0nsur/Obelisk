@@ -217,15 +217,6 @@ namespace Obelisk::Core
                 }
 
                 std::string symbolError;
-                InitFunc initFunc = reinterpret_cast<InitFunc>(m_Loader->Resolve(handle, "ObeliskPlugin_Init", symbolError));
-                if (!initFunc)
-                {
-                    OBELISK_ERROR("Plugin {} is missing ObeliskPlugin_Init: {}. Unloading.", pluginName, symbolError);
-                    m_Loader->Close(handle);
-                    continue;
-                }
-
-                symbolError.clear();
                 GetInfoFunc getInfoFunc = reinterpret_cast<GetInfoFunc>(m_Loader->Resolve(handle, "ObeliskPlugin_GetInfo", symbolError));
                 if (!getInfoFunc)
                 {
@@ -233,8 +224,6 @@ namespace Obelisk::Core
                     m_Loader->Close(handle);
                     continue;
                 }
-
-                ShutdownFunc shutdownFunc = ResolveShutdownFunc(*m_Loader, handle, pluginName);
 
                 ObeliskPluginMetadata metadata{};
                 bool metadataLoaded = false;
@@ -287,6 +276,17 @@ namespace Obelisk::Core
                     m_Loader->Close(handle);
                     continue;
                 }
+
+                symbolError.clear();
+                InitFunc initFunc = reinterpret_cast<InitFunc>(m_Loader->Resolve(handle, "ObeliskPlugin_Init", symbolError));
+                if (!initFunc)
+                {
+                    OBELISK_ERROR("Plugin {} is missing ObeliskPlugin_Init: {}. Unloading.", pluginName, symbolError);
+                    m_Loader->Close(handle);
+                    continue;
+                }
+
+                ShutdownFunc shutdownFunc = ResolveShutdownFunc(*m_Loader, handle, pluginName);
 
                 const std::string configDir = preparedConfig.directory.string();
                 const std::string configPath = preparedConfig.path.string();

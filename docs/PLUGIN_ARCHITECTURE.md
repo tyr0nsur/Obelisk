@@ -104,8 +104,9 @@ The stable operational flow is:
 3. Copy the `.so` into `${OBELISK_ROOT}/plugins/`.
 4. Restart only the target ARK instance.
 
-Dropping a plugin into `plugins/` is therefore the activation step. Plugins that should not
-load must stay outside the plugin directory.
+Dropping a plugin into `plugins/` is therefore the discovery and config-preparation step.
+Runtime activation still requires `enabled=true` and a matching `instance_allowlist`.
+Plugins that should not even be discovered must stay outside the plugin directory.
 
 ## Lifecycle
 
