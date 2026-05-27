@@ -218,6 +218,73 @@ class ReflectionScannerAnalyzerStrictTests(unittest.TestCase):
         self.assertEqual(summary["fname_rejects"][0]["reason"], "unreadable_chunk_pointer")
         self.assertEqual(summary["fname_rejects"][1]["source_global"], "0x600008")
 
+    def test_json_groups_fname_rejects_by_target_source_and_reason(self) -> None:
+        result = self.run_analyzer(
+            [
+                fname_reject(
+                    target="ServerChat",
+                    source_global="0x600000",
+                    reason="preview_mismatch",
+                    matched=1,
+                    num_elements=12000,
+                ),
+                fname_reject(
+                    target="ServerChat",
+                    source_global="0x600000",
+                    table="0x7f0000002000",
+                    reason="preview_mismatch",
+                    matched=2,
+                    num_elements=13000,
+                ),
+                fname_reject(
+                    target="ClientMessage",
+                    source_global="0x600008",
+                    reason="implausible_num_elements",
+                    num_elements=5,
+                ),
+            ],
+            "--json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        summary = json.loads(result.stdout)
+        groups = {
+            (item["target"], item["source_global"], item["reason"]): item
+            for item in summary["fname_reject_groups"]
+        }
+        server_chat_group = groups[
+            ("ServerChat", "0x600000", "preview_mismatch")
+        ]
+        self.assertEqual(server_chat_group["count"], 2)
+        self.assertEqual(
+            server_chat_group["tables"],
+            ["0x7f0000001000", "0x7f0000002000"],
+        )
+        self.assertEqual(server_chat_group["best_matched_clues"], 2)
+        self.assertEqual(server_chat_group["best_num_elements"], 13000)
+        self.assertEqual(
+            groups[
+                ("ClientMessage", "0x600008", "implausible_num_elements")
+            ]["count"],
+            1,
+        )
+
+    def test_human_output_reports_fname_reject_groups(self) -> None:
+        result = self.run_analyzer(
+            [
+                fname_reject(reason="preview_mismatch"),
+                fname_reject(table="0x7f0000002000", reason="preview_mismatch"),
+            ],
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("FName reject groups:", result.stdout)
+        self.assertIn(
+            "target=candidate source_global=0x600000 reason=preview_mismatch "
+            "count=2",
+            result.stdout,
+        )
+
     def test_fname_rejects_do_not_satisfy_strict(self) -> None:
         result = self.run_analyzer(
             [

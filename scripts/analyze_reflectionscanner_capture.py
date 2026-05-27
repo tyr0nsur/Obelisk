@@ -280,6 +280,46 @@ def summarize_gname_tables(fnames: list[FNameProbe]) -> list[dict[str, object]]:
     return summaries
 
 
+def summarize_fname_rejects(rejects: list[FNameReject]) -> list[dict[str, object]]:
+    groups: dict[tuple[str, str, str], list[FNameReject]] = {}
+    for reject in rejects:
+        key = (reject.target, reject.source_global, reject.reason)
+        groups.setdefault(key, []).append(reject)
+
+    summaries: list[dict[str, object]] = []
+    for (target, source_global, reason), items in sorted(groups.items()):
+        best_item = max(
+            items,
+            key=lambda item: (
+                item.matched_clues,
+                item.readable_clues,
+                item.num_elements,
+                item.num_chunks,
+            ),
+        )
+        summaries.append(
+            {
+                "target": target,
+                "source_global": source_global,
+                "reason": reason,
+                "count": len(items),
+                "lines": [item.line for item in items],
+                "tables": sorted({item.table for item in items}),
+                "best_readable_clues": best_item.readable_clues,
+                "best_readable_clues_max": best_item.readable_clues_max,
+                "best_matched_clues": best_item.matched_clues,
+                "best_matched_clues_max": best_item.matched_clues_max,
+                "best_num_elements": best_item.num_elements,
+                "best_num_chunks": best_item.num_chunks,
+                "best_none": best_item.none,
+                "best_client_message": best_item.client_message,
+                "best_server_chat": best_item.server_chat,
+            }
+        )
+
+    return summaries
+
+
 def parse_objdump_xrefs(path: Path, targets: set[str]) -> dict[str, list[StaticXref]]:
     normalized_targets = {normalize_hex(target) for target in targets}
     xrefs: dict[str, list[StaticXref]] = {target: [] for target in normalized_targets}
@@ -553,6 +593,8 @@ def parse_logs(
             fname_reject_reason_counts.get(reject.reason, 0) + 1
         )
 
+    fname_reject_groups = summarize_fname_rejects(fname_rejects)
+
     return {
         "evidence_pack": {
             "obelisk_commit": obelisk_commit
@@ -597,6 +639,7 @@ def parse_logs(
             for item in fnames
         ],
         "fname_rejects": [asdict(item) for item in fname_rejects],
+        "fname_reject_groups": fname_reject_groups,
         "gname_table_candidates": table_summaries,
         "delayed_globals": [asdict(item) for item in delayed],
         "candidate_globals": [asdict(item) for item in candidate_globals],
@@ -613,6 +656,7 @@ def print_human(summary: dict[str, object]) -> None:
     uobjects = summary["uobject_validations"]
     fnames = summary["fname_probes"]
     fname_rejects = summary["fname_rejects"]
+    fname_reject_groups = summary["fname_reject_groups"]
     delayed = summary["delayed_globals"]
     candidate_globals = summary["candidate_globals"]
     static_xrefs = summary["static_xrefs"]
@@ -696,6 +740,17 @@ def print_human(summary: dict[str, object]) -> None:
                 "- line {line}: target={target} source_global={source_global} table={table} "
                 "reason={reason} matched={matched_clues}/{matched_clues_max} "
                 "elements={num_elements} chunks={num_chunks}".format(**item)
+            )
+        print("\nFName reject groups:")
+        for item in fname_reject_groups[:10]:
+            print(
+                "- target={target} source_global={source_global} reason={reason} "
+                "count={count} lines={lines} tables={table_count} "
+                "best_matched={best_matched_clues}/{best_matched_clues_max} "
+                "best_elements={best_num_elements} best_chunks={best_num_chunks}".format(
+                    **item,
+                    table_count=len(item["tables"]),
+                )
             )
 
     print("\ntop UObject validation scores:")
