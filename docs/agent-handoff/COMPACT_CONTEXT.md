@@ -47,10 +47,9 @@ work from repository state instead of chat history.
 - Stable posture rejects structure reflection env, and supervisor snapshots include
   `structure-reflection.txt`. Structure budget is reserved only after an exact structure
   FName filter passes.
-- Inventory reflection has no hook-side observer yet. Use
-  `docs/research/2026-05-28-inventory-observation-gate-plan.md` before implementing one:
-  exact inventory FName filter before budget reservation, marker `enable-inventory-reflection`,
-  no gameplay mutation or public callbacks.
+- Inventory reflection now has an internal hook-side observer and test target. It remains
+  disabled by default, marker/env/SHA/budget gated, metadata-only, and not a public SDK
+  event.
 - Latest restart audit:
   `docs/research/2026-05-27-ops-restart-audit-instance-id.md`
   - live `ObeliskRun.sh` exports `OBELISK_INSTANCE_ID=arkserver`

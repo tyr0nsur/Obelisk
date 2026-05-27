@@ -69,14 +69,21 @@ assert_contains "${capture_no_marker}" '^OBELISK_INSTANCE_ID=arkserver2$'
 assert_not_contains "${capture_no_marker}" '^OBELISK_ENABLE_STRUCTURE_REFLECTION='
 assert_not_contains "${capture_no_marker}" '^OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256='
 assert_not_contains "${capture_no_marker}" '^OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT='
+assert_not_contains "${capture_no_marker}" '^OBELISK_ENABLE_INVENTORY_REFLECTION='
+assert_not_contains "${capture_no_marker}" '^OBELISK_INVENTORY_REFLECTION_BINARY_SHA256='
+assert_not_contains "${capture_no_marker}" '^OBELISK_INVENTORY_REFLECTION_LOG_LIMIT='
 
 root_marker="${TMP_DIR}/root-marker"
 capture_marker="${TMP_DIR}/marker.env"
 prepare_root "${root_marker}"
 : > "${root_marker}/state/instances/arkserver2/enable-structure-reflection"
+: > "${root_marker}/state/instances/arkserver2/enable-inventory-reflection"
 run_wrapper "${root_marker}" "${capture_marker}" TheIsland?listen
 
 assert_contains "${capture_marker}" '^OBELISK_INSTANCE_ID=arkserver2$'
+assert_contains "${capture_marker}" '^OBELISK_ENABLE_INVENTORY_REFLECTION=1$'
+assert_contains "${capture_marker}" '^OBELISK_INVENTORY_REFLECTION_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520$'
+assert_contains "${capture_marker}" '^OBELISK_INVENTORY_REFLECTION_LOG_LIMIT=0$'
 assert_contains "${capture_marker}" '^OBELISK_ENABLE_STRUCTURE_REFLECTION=1$'
 assert_contains "${capture_marker}" '^OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520$'
 assert_contains "${capture_marker}" '^OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT=0$'
@@ -85,14 +92,17 @@ root_override="${TMP_DIR}/root-override"
 capture_override="${TMP_DIR}/override.env"
 prepare_root "${root_override}"
 : > "${root_override}/state/instances/arkserver2/enable-structure-reflection"
+: > "${root_override}/state/instances/arkserver2/enable-inventory-reflection"
 (
     cd "${TMP_DIR}"
     OBELISK_ROOT="${root_override}" \
     OBELISK_WRAPPER_CAPTURE="${capture_override}" \
+    OBELISK_INVENTORY_REFLECTION_LOG_LIMIT=5 \
     OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT=7 \
     "${WRAPPER}" TheIsland?listen
 )
 
+assert_contains "${capture_override}" '^OBELISK_INVENTORY_REFLECTION_LOG_LIMIT=5$'
 assert_contains "${capture_override}" '^OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT=7$'
 
 echo "test_linuxgsm_wrapper_markers passed"

@@ -32,6 +32,14 @@ configure_structure_reflection() {
     export OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT="${OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT:-0}"
 }
 
+configure_inventory_reflection() {
+    enable_marker "enable-inventory-reflection" || return 0
+
+    export OBELISK_ENABLE_INVENTORY_REFLECTION=1
+    export OBELISK_INVENTORY_REFLECTION_BINARY_SHA256="${OBELISK_INVENTORY_REFLECTION_BINARY_SHA256:-7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520}"
+    export OBELISK_INVENTORY_REFLECTION_LOG_LIMIT="${OBELISK_INVENTORY_REFLECTION_LOG_LIMIT:-0}"
+}
+
 case "${1:-}" in
     Ragnarok*)
         export OBELISK_INSTANCE_ID="${OBELISK_INSTANCE_ID:-arkserver}"
@@ -40,6 +48,7 @@ case "${1:-}" in
         enable_marker "allow-ptrace" && export OBELISK_DEBUG_ALLOW_PTRACE=1
         enable_marker "enable-debug-control" && export OBELISK_ENABLE_DEBUG_CONTROL=1
         configure_chat_reflection
+        configure_inventory_reflection
         configure_structure_reflection
         ;;
     TheIsland*)
@@ -49,6 +58,7 @@ case "${1:-}" in
         enable_marker "allow-ptrace" && export OBELISK_DEBUG_ALLOW_PTRACE=1
         enable_marker "enable-debug-control" && export OBELISK_ENABLE_DEBUG_CONTROL=1
         configure_chat_reflection
+        configure_inventory_reflection
         configure_structure_reflection
         ;;
 esac

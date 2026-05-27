@@ -44,10 +44,10 @@ Updated: 2026-05-28
 - fact: structure observation budget is now reserved only after the cheap exact structure
   FName filter passes. Non-structure `ProcessEvent` calls no longer consume the bounded
   observation budget.
-- next-step: `sdk.inventory` remains internal recognizer only. Before adding runtime
-  observation, follow `docs/research/2026-05-28-inventory-observation-gate-plan.md`:
-  exact `CanUse`/`AllowRemoteAddToInventory` FName prefilter first, then budget reserve,
-  no return override, no param mutation, no public plugin dispatch.
+- fact: `sdk.inventory` now has an internal hook-side observer behind
+  `enable-inventory-reflection`, env/SHA, and explicit non-zero budget gates. It logs
+  metadata only, filters exact inventory FNames before reserving budget, and has no public
+  SDK callback or gameplay mutation path.
 - fact: Runtime/chat baseline is documented in
   `docs/research/2026-05-27-runtime-and-chat-baseline.md`.
 - fact: Reflection/chat metadata audit added shared UE probe layouts and gated

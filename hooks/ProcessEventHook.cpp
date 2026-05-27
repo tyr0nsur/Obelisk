@@ -1,5 +1,6 @@
 #include "ProcessEventHook.h"
 #include "ProcessEventChatReflection.h"
+#include "ProcessEventInventoryReflection.h"
 #include "ProcessEventStructureReflection.h"
 #include "ue/Memory.h"
 #include "runtime/Logger.h"
@@ -56,6 +57,8 @@ namespace Obelisk::Hooks
     static std::atomic<uint64_t> s_ProcessEventCalls{0};
     static std::atomic<uint64_t> s_ReflectedChatCalls{0};
     static std::atomic<uint64_t> s_ReflectedChatRejects{0};
+    static std::atomic<uint64_t> s_ReflectedInventoryCalls{0};
+    static std::atomic<uint64_t> s_ReflectedInventoryRejects{0};
     static std::atomic<uint64_t> s_ReflectedStructureCalls{0};
     static std::atomic<uint64_t> s_ReflectedStructureRejects{0};
 
@@ -342,6 +345,45 @@ namespace Obelisk::Hooks
         return GetStructureReflectionGate().Enabled();
     }
 
+    static const ProcessEventInventoryReflection::Gate& GetInventoryReflectionGate()
+    {
+        static ProcessEventInventoryReflection::Gate gate = [] {
+            ProcessEventInventoryReflection::Gate value =
+                ProcessEventInventoryReflection::EvaluateGate(
+                    std::getenv("OBELISK_ENABLE_INVENTORY_REFLECTION"),
+                    IsInstanceMarkerEnabled("enable-inventory-reflection"),
+                    std::getenv("OBELISK_INVENTORY_REFLECTION_BINARY_SHA256"));
+
+            switch (value.Status)
+            {
+            case ProcessEventInventoryReflection::GateStatus::Disabled:
+                break;
+            case ProcessEventInventoryReflection::GateStatus::MissingInstanceMarker:
+                OBELISK_WARN("Inventory reflection disabled: instance marker enable-inventory-reflection is required.");
+                break;
+            case ProcessEventInventoryReflection::GateStatus::MissingBinarySha256:
+                OBELISK_WARN("Inventory reflection disabled: OBELISK_INVENTORY_REFLECTION_BINARY_SHA256 is required.");
+                break;
+            case ProcessEventInventoryReflection::GateStatus::UnsupportedBinarySha256:
+                OBELISK_WARN("Inventory reflection disabled: unsupported ShooterGameServer SHA256 '{}'.",
+                             value.BinarySha256);
+                break;
+            case ProcessEventInventoryReflection::GateStatus::Enabled:
+                OBELISK_WARN("Experimental inventory reflection enabled for ShooterGameServer SHA256 {}.",
+                             value.BinarySha256);
+                break;
+            }
+
+            return value;
+        }();
+        return gate;
+    }
+
+    static bool IsInventoryReflectionEnabled()
+    {
+        return GetInventoryReflectionGate().Enabled();
+    }
+
     static uint64_t GetChatReflectionLogLimit()
     {
         static uint64_t limit = [] {
@@ -371,10 +413,26 @@ namespace Obelisk::Hooks
         return limit;
     }
 
+    static uint64_t GetInventoryReflectionLogLimit()
+    {
+        static uint64_t limit = [] {
+            const char* env = std::getenv("OBELISK_INVENTORY_REFLECTION_LOG_LIMIT");
+            if (!env || env[0] == '\0') return uint64_t{0};
+            return static_cast<uint64_t>(std::strtoull(env, nullptr, 10));
+        }();
+        return limit;
+    }
+
     static bool IsStructureObservationActive()
     {
         return IsStructureReflectionEnabled() &&
                ProcessEventStructureReflection::ShouldAttemptObservation(GetStructureReflectionLogLimit());
+    }
+
+    static bool IsInventoryObservationActive()
+    {
+        return IsInventoryReflectionEnabled() &&
+               ProcessEventInventoryReflection::ShouldAttemptObservation(GetInventoryReflectionLogLimit());
     }
 
     static const char* ChatFunctionName(Obelisk::UE::ChatReflection::ChatFunction function)
@@ -472,6 +530,38 @@ namespace Obelisk::Hooks
         case StructureField::BForce:
             return "bForce";
         case StructureField::ReturnValue:
+            return "ReturnValue";
+        }
+        return "Unknown";
+    }
+
+    static const char* InventoryFunctionName(Obelisk::UE::InventoryReflection::InventoryFunction function)
+    {
+        using Obelisk::UE::InventoryReflection::InventoryFunction;
+        switch (function)
+        {
+        case InventoryFunction::AllowRemoteAddToInventory:
+            return "AllowRemoteAddToInventory";
+        case InventoryFunction::CanUse:
+            return "CanUse";
+        }
+        return "Unknown";
+    }
+
+    static const char* InventoryFieldName(Obelisk::UE::InventoryReflection::InventoryField field)
+    {
+        using Obelisk::UE::InventoryReflection::InventoryField;
+        switch (field)
+        {
+        case InventoryField::InventoryComponent:
+            return "InventoryComponent";
+        case InventoryField::ByPC:
+            return "ByPC";
+        case InventoryField::BRequestedByPlayer:
+            return "bRequestedByPlayer";
+        case InventoryField::BIgnoreCooldown:
+            return "bIgnoreCooldown";
+        case InventoryField::ReturnValue:
             return "ReturnValue";
         }
         return "Unknown";
@@ -616,6 +706,60 @@ namespace Obelisk::Hooks
         }
     }
 
+    static void TraceReflectedInventoryInvocation(int32_t nameIndex, void* function, void* params)
+    {
+        const ProcessEventInventoryReflection::Gate& gate = GetInventoryReflectionGate();
+        if (!gate.Enabled())
+            return;
+        const uint64_t limit = GetInventoryReflectionLogLimit();
+        if (!ProcessEventInventoryReflection::ShouldAttemptNameObservation(nameIndex, limit))
+            return;
+        uint64_t observationNumber = 0;
+        if (!ProcessEventInventoryReflection::TryReserveObservationBudget(
+                s_ReflectedInventoryCalls, limit, observationNumber))
+        {
+            return;
+        }
+
+        Obelisk::UE::RuntimeReflection::MemoryReader reader{RuntimeReflectionReader, nullptr};
+        ProcessEventInventoryReflection::Attempt attempt =
+            ProcessEventInventoryReflection::TryIdentifyInvocation(gate, nameIndex, reader, function, params);
+        if (attempt.Status == ProcessEventInventoryReflection::AttemptStatus::Disabled ||
+            attempt.Status == ProcessEventInventoryReflection::AttemptStatus::NonInventoryFunction)
+        {
+            return;
+        }
+        if (attempt.Status == ProcessEventInventoryReflection::AttemptStatus::Rejected)
+        {
+            ++s_ReflectedInventoryRejects;
+            if (ProcessEventInventoryReflection::ShouldLogObservation(observationNumber, limit))
+            {
+                OBELISK_INFO("Reflected inventory rejected #{} fname_index={} reason={}",
+                             observationNumber, nameIndex, attempt.Result.Reason);
+            }
+            return;
+        }
+
+        const Obelisk::UE::InventoryReflection::InventoryInvocation& invocation = attempt.Invocation;
+        if (!ProcessEventInventoryReflection::ShouldLogObservation(observationNumber, limit))
+            return;
+
+        OBELISK_INFO("Reflected inventory ProcessEvent #{} function={} fname_index={} outer_fname_index={} fields={}",
+                     observationNumber,
+                     InventoryFunctionName(invocation.Function),
+                     invocation.FunctionNameIndex,
+                     invocation.OuterNameIndex,
+                     invocation.Fields.size());
+        for (const auto& field : invocation.Fields)
+        {
+            OBELISK_INFO("Reflected inventory field {} offset=0x{:X} size={} has_range={}",
+                         InventoryFieldName(field.Field),
+                         static_cast<unsigned int>(field.Offset),
+                         field.Size,
+                         field.Range.Data != nullptr);
+        }
+    }
+
     void ProcessEvent_Detour(void* object, void* function, void* params)
     {
         uint64_t callNumber = ++s_ProcessEventCalls;
@@ -625,12 +769,15 @@ namespace Obelisk::Hooks
         const bool hasPreCallbacks = eventManager.HasPreProcessEventCallbacks();
         const bool hasPostCallbacks = eventManager.HasPostProcessEventCallbacks();
         const bool chatReflectionEnabled = IsChatReflectionEnabled();
+        const bool inventoryObservationActive = IsInventoryObservationActive();
         const bool structureObservationActive = IsStructureObservationActive();
         const bool needsNameIndex =
-            hasPreCallbacks || hasPostCallbacks || chatReflectionEnabled || structureObservationActive;
+            hasPreCallbacks || hasPostCallbacks || chatReflectionEnabled ||
+            inventoryObservationActive || structureObservationActive;
         const int32_t nameIndex = needsNameIndex ? GetFunctionNameIndex(function) : -1;
 
         TraceReflectedChatInvocation(nameIndex, function, params);
+        TraceReflectedInventoryInvocation(nameIndex, function, params);
         TraceReflectedStructureInvocation(nameIndex, function, params);
 
         if (hasPreCallbacks &&

@@ -79,6 +79,16 @@ write_proc_fixture 111 "${stable_maps}" \
 expect_failure structure-reflection-forbidden-for-stable \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 111 --expect-stable
 
+write_proc_fixture 112 "${stable_maps}" \
+    "OBELISK_INSTANCE_ID=arkserver" \
+    "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
+    "OBELISK_DISABLE_PLUGINS=1" \
+    "OBELISK_ENABLE_INVENTORY_REFLECTION=1" \
+    "OBELISK_INVENTORY_REFLECTION_BINARY_SHA256=abc123" \
+    "OBELISK_INVENTORY_REFLECTION_LOG_LIMIT=25"
+expect_failure inventory-reflection-forbidden-for-stable \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 112 --expect-stable
+
 write_proc_fixture 102 "${stable_maps}" \
     "OBELISK_INSTANCE_ID=arkserver" \
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \

@@ -87,8 +87,7 @@ scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection
   gates. Current observer markers:
   - `enable-chat-reflection`
   - `enable-structure-reflection`
-  Future inventory observation must use `enable-inventory-reflection` before any runtime
-  activation.
+  - `enable-inventory-reflection`
 - Never enable native exec probes on live servers.
 - Never enable `ReflectionScanner` on `arkserver`.
 - Enable `ReflectionScanner` on `arkserver2` only after a specific operator-approved debug

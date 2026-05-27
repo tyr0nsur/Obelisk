@@ -14,8 +14,8 @@ authorized by this document.
   - `PrimalItem.AllowRemoteAddToInventory`, FName index `6236`
 - Current binary SHA256:
   `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`
-- Current status: internal recognizer only. There is no hook-side runtime observer and no
-  public SDK event.
+- Current status: internal hook-side observer is being added behind marker/env/SHA/budget
+  gates. There is no public SDK event.
 
 ## Required Gate Shape
 
@@ -75,5 +75,5 @@ performance testing is active.
 
 ## Current Status
 
-Blocked before runtime. Next engineering step is a hook-side observer with tests, not a
-server run.
+Blocked before runtime. The next engineering step after the hook-side observer is more
+offline validation and posture review, not a server run.

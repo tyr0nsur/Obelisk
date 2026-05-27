@@ -117,6 +117,7 @@ Useful flags:
 state/instances/<instance-id>/enable-process-event-hook
 state/instances/<instance-id>/disable-plugins
 state/instances/<instance-id>/enable-chat-reflection  # experimental
+state/instances/<instance-id>/enable-inventory-reflection  # experimental, metadata-only
 state/instances/<instance-id>/enable-structure-reflection  # experimental, metadata-only
 ```
 
@@ -139,6 +140,17 @@ OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT=0
 The structure log limit is also the observation budget and defaults to `0`, so the marker
 alone does not read reflected structure fields. A short debug window must set an explicit
 non-zero budget, and stable posture checks reject these variables.
+
+`enable-inventory-reflection` follows the same policy:
+
+```text
+OBELISK_ENABLE_INVENTORY_REFLECTION=1
+OBELISK_INVENTORY_REFLECTION_BINARY_SHA256=<supported ARK SHA256>
+OBELISK_INVENTORY_REFLECTION_LOG_LIMIT=0
+```
+
+Inventory reflection is internal metadata observation only. It must not expose item ids,
+contents, player identity, or gameplay-authoritative overrides.
 
 Decoded chat text logging is not enabled by the marker. It requires an additional explicit
 environment gate:
