@@ -13,17 +13,21 @@
 
 static bool g_ObeliskStarted = false;
 
-static std::string GetObeliskPath(const char* specificEnv, const char* fallbackChild, const char* legacyFallback)
+static std::string GetPluginDirectory()
 {
-    const char* specific = std::getenv(specificEnv);
+    const char* specific = std::getenv("OBELISK_PLUGIN_DIR");
     if (specific && specific[0] != '\0')
         return specific;
 
     const char* root = std::getenv("OBELISK_ROOT");
     if (root && root[0] != '\0')
-        return (std::filesystem::path(root) / fallbackChild).string();
+        return (std::filesystem::path(root) / "plugins").string();
 
-    return legacyFallback;
+    const char* legacy = std::getenv("OBELISK_ENABLE_LEGACY_PLUGIN_DIR");
+    if (legacy && std::strcmp(legacy, "1") == 0)
+        return "ObeliskPlugins";
+
+    return "plugins";
 }
 
 // The constructor attribute ensures this function runs as soon as the shared library 
@@ -67,7 +71,7 @@ void Obelisk_Init()
         }
         else
         {
-            Obelisk::Core::PluginManager::Get().LoadPlugins(GetObeliskPath("OBELISK_PLUGIN_DIR", "plugins", "ObeliskPlugins"));
+            Obelisk::Core::PluginManager::Get().LoadPlugins(GetPluginDirectory());
         }
     }
     catch (const std::exception& e)

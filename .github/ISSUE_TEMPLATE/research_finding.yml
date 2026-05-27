@@ -1,0 +1,26 @@
+name: Research finding
+description: Record ARK/UE4 reversing evidence.
+title: "[Research]: "
+labels: ["research"]
+body:
+  - type: textarea
+    id: finding
+    attributes:
+      label: Finding
+      description: What did you discover?
+    validations:
+      required: true
+  - type: input
+    id: binary
+    attributes:
+      label: Binary hash or version
+      description: SHA256, ARK build, or other identifier.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Logs, offsets, signatures, screenshots, or reproduction notes.
+    validations:
+      required: true

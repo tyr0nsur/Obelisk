@@ -1,4 +1,5 @@
 #include "api/ObeliskApi.h"
+#include "extern/nlohmann/json.hpp"
 
 #include <atomic>
 #include <cstdint>
@@ -7,11 +8,16 @@
 #include <fstream>
 #include <mutex>
 #include <string>
+#include <system_error>
+
+using json = nlohmann::json;
 
 namespace
 {
     ObeliskApi* g_Api = nullptr;
     std::mutex g_ConfigMutex;
+    bool g_Enabled = false;
+    bool g_ProcessEventEnabled = false;
     int32_t g_FilteredFunctionIndex = -1;
     int g_LogLimit = 5;
     std::atomic<int> g_LoggedEvents{0};
@@ -27,44 +33,60 @@ namespace
         if (const char* configDir = std::getenv("OBELISK_CONFIG_DIR");
             configDir && configDir[0] != '\0')
         {
-            return std::filesystem::path(configDir) / "plugins" / "oBaseEvents" / "config.conf";
+            return std::filesystem::path(configDir) / "plugins" / "oBaseEvents" / "config.json";
         }
 
         if (const char* root = std::getenv("OBELISK_ROOT");
             root && root[0] != '\0')
         {
-            return std::filesystem::path(root) / "config" / "plugins" / "oBaseEvents" / "config.conf";
+            return std::filesystem::path(root) / "config" / "plugins" / "oBaseEvents" / "config.json";
         }
 
-        return std::filesystem::path("oBaseEvents.conf");
+        return std::filesystem::path("oBaseEvents.json");
     }
 
-    void WriteDefaultConfig(const std::filesystem::path& path)
+    json DefaultConfig()
     {
+        return {
+            {"enabled", false},
+            {"log_level", "info"},
+            {"map_allowlist", json::array()},
+            {"process_event", {
+                {"enabled", false},
+                {"filtered_function_index", -1},
+                {"log_limit", 5}
+            }}
+        };
+    }
+
+    void WriteDefaultConfig(const std::filesystem::path& path, const json& config)
+    {
+        std::error_code ec;
         const std::filesystem::path parent = path.parent_path();
         if (!parent.empty())
-            std::filesystem::create_directories(parent);
+        {
+            std::filesystem::create_directories(parent, ec);
+            if (ec)
+                return;
+        }
+
         std::ofstream out(path);
         if (!out.is_open())
             return;
 
-        out
-            << "# oBaseEvents example config\n"
-            << "# filtered_function_index=-1 keeps the event callback disabled.\n"
-            << "filtered_function_index=-1\n"
-            << "log_limit=5\n";
+        out << config.dump(4) << '\n';
     }
 
-    void LoadConfig()
+    json LoadConfigDocument(const std::filesystem::path& path)
     {
-        const std::filesystem::path path = ResolveConfigPath();
-        std::lock_guard<std::mutex> lock(g_ConfigMutex);
-
-        if (!std::filesystem::exists(path))
+        json config = DefaultConfig();
+        std::error_code ec;
+        if (!std::filesystem::exists(path, ec))
         {
-            WriteDefaultConfig(path);
+            WriteDefaultConfig(path, config);
             if (g_Api)
                 g_Api->LogInfo("[oBaseEvents] Default config created.");
+            return config;
         }
 
         std::ifstream in(path);
@@ -72,35 +94,42 @@ namespace
         {
             if (g_Api)
                 g_Api->LogWarn("[oBaseEvents] Config not readable; using safe defaults.");
-            return;
+            return config;
         }
 
-        std::string line;
-        while (std::getline(in, line))
+        try
         {
-            if (line.empty() || line[0] == '#')
-                continue;
-
-            const std::string::size_type eq = line.find('=');
-            if (eq == std::string::npos)
-                continue;
-
-            const std::string key = line.substr(0, eq);
-            const std::string value = line.substr(eq + 1);
-
-            try
-            {
-                if (key == "filtered_function_index")
-                    g_FilteredFunctionIndex = static_cast<int32_t>(std::stoi(value));
-                else if (key == "log_limit")
-                    g_LogLimit = std::stoi(value);
-            }
-            catch (...)
-            {
-                if (g_Api)
-                    g_Api->LogWarn("[oBaseEvents] Ignoring invalid config value.");
-            }
+            json parsed = json::parse(in);
+            if (parsed.is_object())
+                return parsed;
         }
+        catch (...)
+        {
+            if (g_Api)
+                g_Api->LogWarn("[oBaseEvents] Config parse failed; using safe defaults.");
+        }
+
+        return config;
+    }
+
+    void LoadConfig()
+    {
+        const std::filesystem::path path = ResolveConfigPath();
+        std::lock_guard<std::mutex> lock(g_ConfigMutex);
+
+        const json config = LoadConfigDocument(path);
+        g_Enabled = config.value("enabled", false);
+
+        const json processEvent = config.value("process_event", json::object());
+        if (processEvent.is_object())
+        {
+            g_ProcessEventEnabled = processEvent.value("enabled", false);
+            g_FilteredFunctionIndex = processEvent.value("filtered_function_index", -1);
+            g_LogLimit = processEvent.value("log_limit", 5);
+        }
+
+        if (g_LogLimit < 0)
+            g_LogLimit = 0;
     }
 
     bool OnFilteredProcessEvent(void* caller, void* function, void* params)
@@ -122,8 +151,6 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(Obelis
     if (!api)
         return false;
 
-    g_Api = api;
-
     if (api->abi_version != OBELISK_API_ABI_VERSION ||
         api->struct_size < sizeof(ObeliskApi))
     {
@@ -131,17 +158,26 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(Obelis
         return false;
     }
 
+    g_Api = api;
+    g_LoggedEvents.store(0);
+
     LoadConfig();
     api->LogInfo("[oBaseEvents] Loaded.");
 
-    if (g_FilteredFunctionIndex >= 0)
+    if (!g_Enabled)
+    {
+        api->LogInfo("[oBaseEvents] Disabled by config.");
+        return true;
+    }
+
+    if (g_ProcessEventEnabled && g_FilteredFunctionIndex >= 0)
     {
         api->RegisterPreProcessEventForNameIndex(g_FilteredFunctionIndex, OnFilteredProcessEvent);
         api->LogInfo("[oBaseEvents] Registered filtered ProcessEvent callback.");
     }
     else
     {
-        api->LogInfo("[oBaseEvents] Event callback disabled by config.");
+        api->LogInfo("[oBaseEvents] ProcessEvent example disabled by config.");
     }
 
     return true;
@@ -151,5 +187,11 @@ extern "C" __attribute__((visibility("default"))) void ObeliskPlugin_Shutdown()
 {
     if (g_Api)
         g_Api->LogInfo("[oBaseEvents] Shutdown.");
+
     g_Api = nullptr;
+    g_Enabled = false;
+    g_ProcessEventEnabled = false;
+    g_FilteredFunctionIndex = -1;
+    g_LogLimit = 5;
+    g_LoggedEvents.store(0);
 }

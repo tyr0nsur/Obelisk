@@ -12,12 +12,10 @@ case "${1:-}" in
     Ragnarok*)
         [[ -f "${OBELISK_ROOT}/state/enable-process-event-hook-ragnarok" ]] && export OBELISK_ENABLE_PROCESS_EVENT_HOOK=1
         [[ -f "${OBELISK_ROOT}/state/disable-plugins-ragnarok" ]] && export OBELISK_DISABLE_PLUGINS=1
-        [[ -f "${OBELISK_ROOT}/state/enable-chat-discovery-ragnarok" ]] && export OBELISK_CHAT_DISCOVERY=1
         ;;
     TheIsland*)
         [[ -f "${OBELISK_ROOT}/state/enable-process-event-hook-theisland" ]] && export OBELISK_ENABLE_PROCESS_EVENT_HOOK=1
         [[ -f "${OBELISK_ROOT}/state/disable-plugins-theisland" ]] && export OBELISK_DISABLE_PLUGINS=1
-        [[ -f "${OBELISK_ROOT}/state/enable-chat-discovery-theisland" ]] && export OBELISK_CHAT_DISCOVERY=1
         ;;
 esac
 

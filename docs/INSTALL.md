@@ -49,6 +49,13 @@ directory for plugin config is:
 The runtime loads every `.so` directly inside `/servidor/ark/obelisk/plugins/` on restart.
 If a plugin should not load, do not place it in `plugins/`.
 
+The old binary-local `ObeliskPlugins/` fallback is disabled by default. It exists only for
+manual legacy recovery with:
+
+```bash
+export OBELISK_ENABLE_LEGACY_PLUGIN_DIR=1
+```
+
 Useful installer flags:
 
 ```text
@@ -97,10 +104,8 @@ Useful flags:
 ```text
 enable-process-event-hook-ragnarok
 disable-plugins-ragnarok
-enable-chat-discovery-ragnarok
 enable-process-event-hook-theisland
 disable-plugins-theisland
-enable-chat-discovery-theisland
 ```
 
 ## Logs

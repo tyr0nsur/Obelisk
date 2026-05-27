@@ -1,0 +1,26 @@
+name: Plugin proposal
+description: Propose a first-party or example plugin.
+title: "[Plugin]: "
+labels: ["plugin"]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What should the plugin do?
+    validations:
+      required: true
+  - type: textarea
+    id: runtime
+    attributes:
+      label: Runtime behavior
+      description: Hooks, callbacks, background threads, files, network services, and config.
+    validations:
+      required: true
+  - type: textarea
+    id: safety
+    attributes:
+      label: Safety model
+      description: How is it gated, configured, tested, and rolled back?
+    validations:
+      required: true

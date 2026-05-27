@@ -67,13 +67,13 @@ class ReflectionScannerAnalyzerStrictTests(unittest.TestCase):
             [
                 fname_probe(),
                 fname_probe(),
-                "[ChatPlugin] discovery enabled in this copied log",
+                "[LegacyPlugin] discovery enabled in this copied log",
             ]
         )
 
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("reject markers:", result.stdout)
-        self.assertIn("[ChatPlugin]", result.stdout)
+        self.assertIn("[LegacyPlugin]", result.stdout)
 
     def test_bad_counts_fail_strict(self) -> None:
         result = self.run_analyzer(

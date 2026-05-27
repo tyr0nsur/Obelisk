@@ -57,7 +57,7 @@ ${OBELISK_CONFIG_DIR}/plugins/<plugin-id>/<plugin-config-file>
 Fallback order:
 
 1. A plugin-specific override env var, for example
-   `OBASEEVENTS_CONFIG=/path/to/config.conf`.
+   `OBASEEVENTS_CONFIG=/path/to/config.json`.
 2. `${OBELISK_CONFIG_DIR}/plugins/<plugin-id>/<plugin-config-file>`.
 3. `${OBELISK_CONFIG_DIR}/plugins/<plugin-id>.json` for legacy plugins.
 4. `${OBELISK_ROOT}/config/plugins/<plugin-id>/<plugin-config-file>`.

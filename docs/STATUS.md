@@ -25,7 +25,7 @@ contributor-facing summary, not a replacement for detailed research notes.
 | Filtered ProcessEvent callbacks | Stable baseline | Prefer callbacks scoped by `FName` index over global callbacks. |
 | Plugin callback ownership | Stable baseline | Callback owner tokens are unregistered on init failure and before plugin unload. |
 | Plugin architecture policy | Stable baseline | See `docs/PLUGIN_ARCHITECTURE.md`; examples must stay small and experimental plugins stay out of top-level build. |
-| `oBaseEvents` | Stable baseline | First official example plugin; demonstrates ABI validation, config creation, filtered callbacks, and shutdown. |
+| `oBaseEvents` | Release example | First official example plugin; demonstrates ABI validation, config creation, filtered callbacks, and shutdown. |
 | ReflectionScanner | Experimental | Use for isolated captures with explicit gates; keep disabled by default. |
 | Raw FString/FName inference | Experimental | Evidence gathering only until reflection-backed decoding replaces it. |
 | GNames/FNamePool resolution | Not ready | Priority research item. |

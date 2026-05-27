@@ -171,7 +171,7 @@ def parse_logs(paths: list[str]) -> dict[str, object]:
     for source, line_number, line in iter_lines(paths):
         files.add(source)
 
-        if "[NativeExecProbe] installed" in line or "[ChatPlugin]" in line:
+        if "[NativeExecProbe] installed" in line or "[LegacyPlugin]" in line:
             reject_markers.append(LogMatch(line_number, line))
 
         if match := UOBJECT_RE.search(line):

@@ -59,9 +59,8 @@ loader/              LD_PRELOAD bootstrap
 runtime/             Logging and runtime services
 ue/                  UE4 memory/reflection helpers
 plugins/oBaseEvents/ First official example plugin for events and plugin structure
-agent-skills/        Local engineering/reversing notes
-docs/                Contributor and operator documentation
-scripts/             Install/deploy helpers
+  docs/                Contributor and operator documentation
+  scripts/             Install/deploy helpers
 ```
 
 Plugin structure and promotion rules are documented in
@@ -121,6 +120,8 @@ build/_deps/subhook-build/libsubhook.so
 the C ABI, creates a safe default config, demonstrates a filtered `ProcessEvent` callback,
 and exports `ObeliskPlugin_Shutdown`.
 
+See [docs/oBaseEvents.md](docs/oBaseEvents.md).
+
 ## Plugin Example
 
 ```cpp
@@ -134,6 +135,12 @@ static bool OnProcessEvent(void* caller, void* function, void* params)
 extern "C" __attribute__((visibility("default")))
 bool ObeliskPlugin_Init(ObeliskApi* api)
 {
+    if (!api)
+        return false;
+    if (api->abi_version != OBELISK_API_ABI_VERSION ||
+        api->struct_size < sizeof(ObeliskApi))
+        return false;
+
     api->LogInfo("Plugin loaded");
 
     // Use a validated FName index from your own reflection research/config.

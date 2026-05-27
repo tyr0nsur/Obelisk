@@ -106,7 +106,6 @@ If a live map crashes after an Obelisk change:
 
 ```bash
 touch /servidor/ark/obelisk/state/disable-plugins-ragnarok
-rm -f /servidor/ark/obelisk/state/enable-chat-discovery-ragnarok
 ./arkserver start
 ```
 
