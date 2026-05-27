@@ -58,6 +58,9 @@ Known research targets:
   when the ARK binary hash changes.
 - Confirm deployed chat reflection with a real in-game chat message before promoting text
   decoding or plugin-facing events.
+- For normal incoming player chat, prioritize
+  `ShooterPlayerController.ServerSendChatMessage` over `ServerChat*`; the latter currently
+  looks like `ShooterCheatManager` command coverage.
 - Recover additional event families only after repeating the reflection path: object,
   function, property chain, bounded params, then decoder.
 - Use copied logs with `scripts/analyze_reflectionscanner_capture.py`; `--strict` requires

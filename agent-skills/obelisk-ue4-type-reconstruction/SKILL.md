@@ -50,7 +50,8 @@ For each reconstructed field:
 
 - Put reusable structs and guarded readers under `ue/`.
 - Current internal layers are `ue/RuntimeReflection` for bounded type reads and
-  `ue/ChatReflection` for `ServerChat`/`ServerChatTo`/`ServerChatToPlayer` recognition.
+  `ue/ChatReflection` for `ServerChat`/`ServerChatTo`/`ServerChatToPlayer` plus
+  `ServerSendChatMessage` recognition.
 - Keep scanners gated and bounded.
 - Log candidate scores and reasons, not just addresses.
 - Prefer analyzer fixtures before runtime reads.
@@ -72,6 +73,6 @@ For each reconstructed field:
 - Core evidence has already produced a binary-hash-scoped FName table, `GUObjectArray`
   candidate, UObject enumeration, UFunction property chains, and internal runtime readers.
 - The active blocker for chat is not more raw scanning; it is a real in-game chat message
-  confirming `Reflected chat ProcessEvent` in the deployed gated runtime.
+  confirming the deployed `ServerSendChatMessage` recognizer in the gated runtime.
 - Do not promote decoded chat text to public SDK until the live capture confirms the
   reflected params and `FString` decoder against the running process.

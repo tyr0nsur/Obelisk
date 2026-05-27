@@ -27,11 +27,16 @@ or parameter decoding for ARK's Linux UE4 server.
 - Internal runtime layers exist:
   - `ue/RuntimeReflection` for binary-hash-gated `UObject`/`UFunction`/`UProperty`
     validation and UTF-32 `FString` decoding helpers.
-  - `ue/ChatReflection` for `ServerChat`, `ServerChatTo`, and `ServerChatToPlayer`
-    recognition.
+  - `ue/ChatReflection` for `ServerChat`, `ServerChatTo`, `ServerChatToPlayer`, and
+    `ShooterPlayerController.ServerSendChatMessage` recognition.
   - `hooks/ProcessEventChatReflection` for hook-side gate/recognition tests.
 - Deployed `arkserver` uses `state/instances/arkserver/enable-chat-reflection`; current
   logs show the experimental gate is enabled but no real chat hit has been observed yet.
+- `ServerChat`, `ServerChatTo`, and `ServerChatToPlayer` have `ShooterCheatManager` outer
+  evidence and should not be treated as the primary normal player chat path. Current best
+  incoming player chat candidate is `ServerSendChatMessage` with FName index `2697`,
+  `StrProperty ChatMessage` at offset `0x0`, `ByteProperty SendMode` at offset `0x10`,
+  and `ParmsSize=0x11`.
 - Prior raw chat experiments used parameter probing and FString heuristics. Treat that as
   historical discovery code, not the final architecture.
 - `ReflectionScanner` FName table output must be treated as candidate ranking. Analyzer
@@ -67,8 +72,8 @@ Build toward a real UE4 metadata pipeline:
 
 ## Chat/Event Guidance
 
-- Keep chat interception experimental until `ServerChat` and outbound message functions are
-  resolved through reflection and a live chat message confirms the deployed hook path.
+- Keep chat interception experimental until `ServerSendChatMessage` is confirmed by a live
+  in-game chat message in the deployed hook path.
 - Do not expand raw `0x00..0x80` param scanning as the long-term fix.
 - Avoid manual construction of `ClientMessage` params until the real property layout is
   decoded.
