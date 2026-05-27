@@ -32,6 +32,8 @@ header, reducing reallocations for non-SSO chat text without changing decode sem
   with fixed-capacity internal storage.
 - Stopped carrying the full reflected `UFunctionView` in `ChatInvocation` after fields are
   validated, avoiding unnecessary fixed-array copies on return.
+- Moved chat text log sanitization into a tested helper covering quotes, backslashes,
+  controls, truncation, and UTF-8 sequence boundaries.
 - Kept the existing `MaxProperties` and `NumParms` checks.
 - Added a fail-closed guard if `NumParms` exceeds the stack cycle guard capacity.
 - Reserved UTF-8 output capacity once the reflected `FString` char count is validated.

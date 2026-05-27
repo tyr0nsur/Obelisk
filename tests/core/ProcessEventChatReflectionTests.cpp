@@ -257,6 +257,28 @@ namespace
         Require(!ShouldLogObservation(26, 25), "observation after default limit should not log");
     }
 
+    void TestSanitizesChatTextForLog()
+    {
+        std::string out;
+        SanitizeTextForLog("plain", out);
+        Require(out == "plain", "plain text sanitizer mismatch");
+
+        SanitizeTextForLog("quote\"slash\\", out);
+        Require(out == "quote\\\"slash\\\\", "quote/backslash sanitizer mismatch");
+
+        SanitizeTextForLog("line\nzero\x01", out);
+        Require(out == "line\\nzero?", "control sanitizer mismatch");
+
+        SanitizeTextForLog("abcdef", out, 4);
+        Require(out == "abcd...", "truncation sanitizer mismatch");
+
+        SanitizeTextForLog("\xF0\x9F\x98\x80!", out, 4);
+        Require(out == "\xF0\x9F\x98\x80...", "utf8 boundary sanitizer mismatch");
+
+        SanitizeTextForLog("\xF0\x9F\x98\x80!", out, 3);
+        Require(out == "...", "partial utf8 sanitizer mismatch");
+    }
+
     void TestReflectedChatNameFilterIncludesServerSendChatMessage()
     {
         Require(IsReflectedChatNameIndex(kClientChatMessageNameIndex),
@@ -424,6 +446,7 @@ int main()
 {
     TestGateEvaluation();
     TestObservationLogLimit();
+    TestSanitizesChatTextForLog();
     TestReflectedChatNameFilterIncludesServerSendChatMessage();
     TestDisabledGateDoesNotRead();
     TestNonChatNameDoesNotRead();

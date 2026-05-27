@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 
 namespace Obelisk::Hooks::ProcessEventChatReflection
 {
@@ -53,6 +54,9 @@ namespace Obelisk::Hooks::ProcessEventChatReflection
         Obelisk::UE::ChatReflection::ChatField field,
         int32_t maxChars,
         std::string& out);
+
+    void SanitizeTextForLog(std::string_view text, std::string& out, size_t maxLoggedBytes = 256);
+    std::string SanitizeTextForLog(std::string_view text, size_t maxLoggedBytes = 256);
 
     Attempt TryIdentifyInvocation(const Gate& gate,
                                   int32_t nameIndex,

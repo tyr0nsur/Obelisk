@@ -77,6 +77,74 @@ namespace Obelisk::Hooks::ProcessEventChatReflection
             "chat field is not present in invocation");
     }
 
+    void SanitizeTextForLog(std::string_view text, std::string& out, size_t maxLoggedBytes)
+    {
+        out.clear();
+        if (maxLoggedBytes == 0)
+            return;
+
+        out.reserve(text.size() < maxLoggedBytes ? text.size() : maxLoggedBytes);
+        bool truncated = false;
+        for (size_t i = 0; i < text.size();)
+        {
+            const unsigned char byte = static_cast<unsigned char>(text[i]);
+            if (out.size() >= maxLoggedBytes)
+            {
+                truncated = true;
+                break;
+            }
+
+            if (byte == '"' || byte == '\\')
+            {
+                if (out.size() + 2 > maxLoggedBytes)
+                {
+                    truncated = true;
+                    break;
+                }
+                out.push_back('\\');
+                out.push_back(static_cast<char>(byte));
+                ++i;
+                continue;
+            }
+            if (byte < 0x20 || byte == 0x7f)
+            {
+                const std::string_view replacement = byte == '\n' ? std::string_view{"\\n"} : std::string_view{"?"};
+                if (out.size() + replacement.size() > maxLoggedBytes)
+                {
+                    truncated = true;
+                    break;
+                }
+                out.append(replacement);
+                ++i;
+                continue;
+            }
+
+            size_t sequenceLength = 1;
+            if ((byte & 0xe0) == 0xc0)
+                sequenceLength = 2;
+            else if ((byte & 0xf0) == 0xe0)
+                sequenceLength = 3;
+            else if ((byte & 0xf8) == 0xf0)
+                sequenceLength = 4;
+            if (sequenceLength > text.size() - i || out.size() + sequenceLength > maxLoggedBytes)
+            {
+                truncated = true;
+                break;
+            }
+            out.append(text.substr(i, sequenceLength));
+            i += sequenceLength;
+        }
+        if (truncated)
+            out += "...";
+    }
+
+    std::string SanitizeTextForLog(std::string_view text, size_t maxLoggedBytes)
+    {
+        std::string out;
+        SanitizeTextForLog(text, out, maxLoggedBytes);
+        return out;
+    }
+
     Attempt TryIdentifyInvocation(const Gate& gate,
                                   int32_t nameIndex,
                                   const Obelisk::UE::RuntimeReflection::MemoryReader& reader,

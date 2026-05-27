@@ -253,28 +253,6 @@ namespace
         return true;
     }
 
-    std::string SanitizeForSyntheticLog(std::string text)
-    {
-        std::string out;
-        out.reserve(text.size());
-        for (char ch : text)
-        {
-            if (ch == '"' || ch == '\\')
-            {
-                out.push_back('\\');
-                out.push_back(ch);
-                continue;
-            }
-            if (static_cast<unsigned char>(ch) < 0x20)
-            {
-                out.push_back('?');
-                continue;
-            }
-            out.push_back(ch);
-        }
-        return out;
-    }
-
     struct HookLikeOptions
     {
         const Gate* ChatGate = nullptr;
@@ -319,7 +297,7 @@ namespace
                 reader, attempt.Invocation, ChatReflection::ChatField::ChatMessage, 512, text);
             if (!result)
                 return false;
-            volatile size_t sanitizedSize = SanitizeForSyntheticLog(std::move(text)).size();
+            volatile size_t sanitizedSize = SanitizeTextForLog(text).size();
             (void)sanitizedSize;
         }
 
