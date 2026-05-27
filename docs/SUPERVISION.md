@@ -100,9 +100,11 @@ Then send exactly one normal in-game chat message from a client on Ragnarok. Exp
 successful evidence is a bounded `Reflected chat ProcessEvent` line for
 `ServerSendChatMessage`, with reflected metadata showing the
 `ShooterPlayerController.ServerSendChatMessage` path and parameter ranges for
-`ChatMessage` at offset `0x0` and `SendMode` at offset `0x10`. This proves the reflected
-`ProcessEvent` path was hit; it does not by itself promote public plugin ABI or justify
-broader chat-name scans.
+`ChatMessage` at offset `0x0` and `SendMode` at offset `0x10`. A supporting
+`Reflected chat ServerSendChatMessage send_mode=<n> send_mode_name=<name>` line should
+also appear when the parameter range is readable. This proves the reflected `ProcessEvent`
+path was hit; it does not by itself promote public plugin ABI or justify broader
+chat-name scans.
 
 Interpret the snapshot counters this way:
 
