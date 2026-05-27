@@ -53,11 +53,13 @@ from the ELF executable segment plus runtime maps over guesses from one crash lo
 
 Known research targets:
 
-- Locate `GNames`/`FNamePool` and implement `FName` index-to-string.
-- Locate `GUObjectArray`/`GObjects`.
-- Enumerate `UFunction` objects and validate names for `ServerChat`, `ClientMessage`, and
-  related ShooterGame functions.
-- Recover enough property metadata to decode `ProcessEvent` parameter buffers.
+- Maintain the current FName/GObjects/UFunction evidence against future binary updates.
+- Re-run `scripts/enumerate_core_uobjects.py` and `scripts/inspect_core_ufunctions.py`
+  when the ARK binary hash changes.
+- Confirm deployed chat reflection with a real in-game chat message before promoting text
+  decoding or plugin-facing events.
+- Recover additional event families only after repeating the reflection path: object,
+  function, property chain, bounded params, then decoder.
 - Use copied logs with `scripts/analyze_reflectionscanner_capture.py`; `--strict` requires
   repeat-confirmed exact FName table clues and should fail on single-hit candidates.
 
@@ -70,6 +72,8 @@ property metadata.
 
 - Keep `OBELISK_ENABLE_PROCESS_EVENT_HOOK=1` plus plugins disabled as the baseline safe
   runtime test.
+- `OBELISK_ENABLE_CHAT_REFLECTION=1` is allowed on the current development `arkserver`
+  only with the matching `OBELISK_CHAT_REFLECTION_BINARY_SHA256` gate and small log limit.
 - Do not enable `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` on live servers.
 - Do not enable broad event discovery on a production map until it has survived an
   isolated server test.
@@ -78,6 +82,8 @@ property metadata.
   `arkserver-obelisk-debug`.
 - Use small `OBELISK_PE_TRACE_LIMIT` windows only when capturing evidence; default should
   remain quiet.
+- Prefer the `enable-chat-reflection` marker over ad hoc environment edits; rollback is
+  removing the marker and restarting the debug/development server.
 - If a plugin crashes during load/init, disable plugins first and preserve logs/core files
   for analysis.
 

@@ -29,11 +29,19 @@ Isolated-debug only:
 - `OBELISK_ENABLE_DEBUG_CONTROL=1` marker-triggered runtime probes,
 - broad `ProcessEvent` tracing.
 
+Development-server gated:
+
+- `OBELISK_ENABLE_CHAT_REFLECTION=1` only when paired with the exact supported
+  `OBELISK_CHAT_REFLECTION_BINARY_SHA256`, a small log limit, plugins disabled, and a
+  post-change `scripts/check_obelisk_server_posture.sh --expect-stable`.
+
 Forbidden on live/shared instances:
 
 - `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1`,
 - raw chat/FString discovery loops,
 - broad unbounded ProcessEvent logging,
+- decoded chat text logging without reflected `UFunction`/`UProperty` validation and a
+  confirmed `FString` layout,
 - patching unknown UE function pointers,
 - external instrumentation that changes thread/process behavior.
 

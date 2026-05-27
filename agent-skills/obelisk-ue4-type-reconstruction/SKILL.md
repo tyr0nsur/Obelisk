@@ -30,6 +30,10 @@ Do not jump straight to chat params. Build the type chain in this order:
 - Parameter buffers must be bounded by reflected `ParmsSize`.
 - `FString` decoding requires a validated layout for this binary. Do not accept arbitrary
   readable pointer/length pairs as chat text.
+- For the current validated ARK Linux hash, `FString` is an internal candidate of
+  `{Data, ArrayNum, ArrayMax}` with UTF-32LE `TCHAR`; use
+  `RuntimeReflection::TryDecodeFStringUtf32` only after reflected `StrProperty`
+  validation.
 
 ## Evidence To Record
 
@@ -45,6 +49,8 @@ For each reconstructed field:
 ## Implementation Shape
 
 - Put reusable structs and guarded readers under `ue/`.
+- Current internal layers are `ue/RuntimeReflection` for bounded type reads and
+  `ue/ChatReflection` for `ServerChat`/`ServerChatTo`/`ServerChatToPlayer` recognition.
 - Keep scanners gated and bounded.
 - Log candidate scores and reasons, not just addresses.
 - Prefer analyzer fixtures before runtime reads.
@@ -61,9 +67,11 @@ For each reconstructed field:
 - [ ] Research notes describe why false positives were rejected.
 - [ ] No live server mutation is required to validate the field.
 
-## `GNames/FNamePool` First Milestone
+## Current Milestones
 
-The first accepted reflection milestone is not chat. It is a bounded `FName` resolver that
-can turn known indices like `9619` and `9622` into expected strings on the validated binary.
-Do not move to `GObjects`, `UFunction`, or params until this is repeatable from evidence
-packs plus guarded runtime reads.
+- Core evidence has already produced a binary-hash-scoped FName table, `GUObjectArray`
+  candidate, UObject enumeration, UFunction property chains, and internal runtime readers.
+- The active blocker for chat is not more raw scanning; it is a real in-game chat message
+  confirming `Reflected chat ProcessEvent` in the deployed gated runtime.
+- Do not promote decoded chat text to public SDK until the live capture confirms the
+  reflected params and `FString` decoder against the running process.

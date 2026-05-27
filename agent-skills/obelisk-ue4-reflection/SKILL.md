@@ -22,6 +22,16 @@ or parameter decoding for ARK's Linux UE4 server.
   are obsolete. Treat historical chat indices as research clues, not stable API.
 - Core evidence promotes `0x595b7e0` to a binary-specific `GUObjectArray`
   research-candidate; use it to enumerate objects before returning to chat params.
+- `scripts/enumerate_core_uobjects.py` and `scripts/inspect_core_ufunctions.py` can
+  reproduce the current offline path from core dump to chat `UFunction` property chains.
+- Internal runtime layers exist:
+  - `ue/RuntimeReflection` for binary-hash-gated `UObject`/`UFunction`/`UProperty`
+    validation and UTF-32 `FString` decoding helpers.
+  - `ue/ChatReflection` for `ServerChat`, `ServerChatTo`, and `ServerChatToPlayer`
+    recognition.
+  - `hooks/ProcessEventChatReflection` for hook-side gate/recognition tests.
+- Deployed `arkserver` uses `state/instances/arkserver/enable-chat-reflection`; current
+  logs show the experimental gate is enabled but no real chat hit has been observed yet.
 - Prior raw chat experiments used parameter probing and FString heuristics. Treat that as
   historical discovery code, not the final architecture.
 - `ReflectionScanner` FName table output must be treated as candidate ranking. Analyzer
@@ -48,6 +58,8 @@ Build toward a real UE4 metadata pipeline:
 - Validate `ParmsSize` before reading a parameter buffer.
 - Decode strings with a known UE4 `FString` layout for this binary, not by accepting any
   readable pointer-like value.
+- For this ARK Linux binary, the internal `FString` candidate is 16 bytes and points to
+  UTF-32LE `TCHAR`; keep it behind reflected `StrProperty` validation.
 - Do not send chat or client messages from inside a pre-hook until reentrancy and caller
   object semantics are understood.
 - Do not cache a `UFunction*` or caller object as valid unless it has been verified against
@@ -56,7 +68,7 @@ Build toward a real UE4 metadata pipeline:
 ## Chat/Event Guidance
 
 - Keep chat interception experimental until `ServerChat` and outbound message functions are
-  resolved through reflection.
+  resolved through reflection and a live chat message confirms the deployed hook path.
 - Do not expand raw `0x00..0x80` param scanning as the long-term fix.
 - Avoid manual construction of `ClientMessage` params until the real property layout is
   decoded.
