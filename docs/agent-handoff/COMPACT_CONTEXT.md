@@ -256,6 +256,11 @@ work from repository state instead of chat history.
   production/performance or quiet-baseline posture. It rejects
   `OBELISK_ENABLE_CHAT_REFLECTION`, the chat SHA/log-limit env, and
   `OBELISK_CHAT_REFLECTION_LOG_TEXT`.
+- Read-only quiet-posture audit at commit `5da65d6` found Ragnarok PID `3940524` still
+  has `OBELISK_ENABLE_CHAT_REFLECTION=1`, so it fails the stricter
+  production/performance guard. TheIsland was not running. Do not auto-fix this without an
+  operator-approved restart window; see
+  `docs/research/2026-05-27-quiet-posture-readonly-audit.md`.
 - `Memory::IsReadable` was changed away from `write(/dev/null)` after local evidence showed
   that probe reports invalid and `PROT_NONE` mappings as readable. The replacement uses
   cached readable ranges from `/proc/self/maps` and has `MemoryTests`. Commit `257f432` is

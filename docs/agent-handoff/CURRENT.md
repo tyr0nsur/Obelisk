@@ -141,6 +141,11 @@ Updated: 2026-05-27
   production/performance posture guard that rejects experimental chat reflection and chat
   text logging env. Use it with `--expect-stable` for Ragnarok player-performance checks
   and for TheIsland Phase A / rollback checks.
+- fact: Read-only quiet-posture audit at commit `5da65d6` found Ragnarok PID `3940524`
+  still has `OBELISK_ENABLE_CHAT_REFLECTION=1`, so it fails the stricter
+  production/performance guard. TheIsland was not running. Do not auto-fix this without an
+  operator-approved restart window; see
+  `docs/research/2026-05-27-quiet-posture-readonly-audit.md`.
 - fact: Current available Ragnarok logs are not enough for a GNames/FNamePool candidate:
   ReflectionScanner is disabled and analyzer output is `inconclusive`; see
   `docs/research/2026-05-27-current-gname-evidence-pack-audit.md`.
@@ -397,6 +402,9 @@ Updated: 2026-05-27
   restart window with `OBELISK_CHAT_REFLECTION_LOG_TEXT=1`, review bounded logs, then
   remove the text gate; use the TheIsland A/B runbook, keep dispatch blocked, and do not
   use Ragnarok.
+- next-step: When an operator-approved Ragnarok maintenance window exists, remove the chat
+  reflection gate and restart only `arkserver`, then validate with
+  `--expect-stable --forbid-chat-reflection`.
 - next-step: Design plugin-facing chat event ownership only after text is copied into
   Obelisk-owned memory and callback lifetime is covered by tests. Use
   `docs/research/2026-05-27-sdk-chat-event-ownership-plan.md` as the acceptance gate before
