@@ -143,6 +143,9 @@ work from repository state instead of chat history.
   - C ABI coverage: public SDK structs have C typedef names, and the SDK consumer suite
     builds and loads a C-language plugin through the documented `ObeliskPlugin_GetInfo`,
     `ObeliskPlugin_Init`, and optional `ObeliskPlugin_Shutdown` exports;
+  - build/install consistency: runtime installer accepts `--build-dir` and honors
+    `OBELISK_BUILD_DIR`; release readiness passes the same build dir into layout and
+    dry-run installer validation; runtime/plugin installers reject extra positional args;
   - event dispatch hardening: EventManager tests initialize logger and verify throwing
     pre/post callbacks are logged without propagating and without stopping later
     callbacks;

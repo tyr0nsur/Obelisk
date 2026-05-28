@@ -23,6 +23,7 @@ ROOT="/servidor/ark/obelisk"
 DRY_RUN=0
 BACKUP_EXISTING=0
 PLUGIN_SRC=""
+ROOT_SET=0
 STAMP="$(date +%Y%m%d-%H%M%S)"
 
 while [[ $# -gt 0 ]]; do
@@ -48,7 +49,13 @@ while [[ $# -gt 0 ]]; do
             if [[ -z "${PLUGIN_SRC}" ]]; then
                 PLUGIN_SRC="$1"
             else
+                if [[ "${ROOT_SET}" == "1" ]]; then
+                    echo "Unexpected extra argument: $1" >&2
+                    usage >&2
+                    exit 2
+                fi
                 ROOT="$1"
+                ROOT_SET=1
             fi
             shift
             ;;

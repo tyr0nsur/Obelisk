@@ -2,6 +2,10 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BUILD_DIR="${OBELISK_BUILD_DIR:-${REPO_DIR}/build}"
+if [[ "${BUILD_DIR}" != /* ]]; then
+    BUILD_DIR="${REPO_DIR}/${BUILD_DIR}"
+fi
 INSTALL_ROOT="${1:-}"
 if [[ -z "${INSTALL_ROOT}" ]]; then
     INSTALL_ROOT="$(mktemp -d /tmp/obelisk-install-layout.XXXXXX)"
@@ -62,6 +66,17 @@ for invalid_root in "" "/" "." "relative/root"; do
     fi
 done
 
+if "${REPO_DIR}/scripts/install_obelisk.sh" --dry-run /tmp/obelisk-extra-root /tmp/obelisk-other-root \
+    >"${WORK_DIR}/extra-root.out" 2>"${WORK_DIR}/extra-root.err"; then
+    echo "install_obelisk.sh accepted an extra positional root" >&2
+    exit 1
+fi
+if ! grep -F 'Unexpected extra argument' "${WORK_DIR}/extra-root.err" >/dev/null; then
+    echo "extra root error was unclear" >&2
+    cat "${WORK_DIR}/extra-root.err" >&2
+    exit 1
+fi
+
 symlink_target="${WORK_DIR}/root-target"
 symlink_root="${WORK_DIR}/root-symlink"
 mkdir -p "${symlink_target}"
@@ -90,7 +105,7 @@ done
 exec /usr/bin/mv "$@"
 SH
 chmod +x "${fake_bin}/mv"
-if PATH="${fake_bin}:${PATH}" "${REPO_DIR}/scripts/install_obelisk.sh" "${failure_root}" \
+if PATH="${fake_bin}:${PATH}" "${REPO_DIR}/scripts/install_obelisk.sh" --build-dir "${BUILD_DIR}" "${failure_root}" \
     >"${WORK_DIR}/fail-mv.out" 2>"${WORK_DIR}/fail-mv.err"; then
     echo "install_obelisk.sh succeeded despite failing runtime rename" >&2
     exit 1
@@ -133,7 +148,7 @@ SH
 chmod +x "${fake_bin}/mv"
 fake_mv_count="${WORK_DIR}/fake-mv-count"
 if OBELISK_FAKE_MV_COUNT="${fake_mv_count}" PATH="${fake_bin}:${PATH}" \
-    "${REPO_DIR}/scripts/install_obelisk.sh" "${pair_failure_root}" \
+    "${REPO_DIR}/scripts/install_obelisk.sh" --build-dir "${BUILD_DIR}" "${pair_failure_root}" \
     >"${WORK_DIR}/pair-fail-mv.out" 2>"${WORK_DIR}/pair-fail-mv.err"; then
     echo "install_obelisk.sh succeeded despite failing second runtime rename" >&2
     exit 1
@@ -154,7 +169,7 @@ if find "${pair_failure_root}" \( -name '*.incoming.*' -o -name '.install-runtim
     exit 1
 fi
 
-"${REPO_DIR}/scripts/install_obelisk.sh" "${INSTALL_ROOT}"
+"${REPO_DIR}/scripts/install_obelisk.sh" --build-dir "${BUILD_DIR}" "${INSTALL_ROOT}"
 
 require_path "${INSTALL_ROOT}/lib/libobelisk.so"
 require_path "${INSTALL_ROOT}/lib/libsubhook.so"
@@ -196,7 +211,7 @@ if ! readelf -d "${INSTALL_ROOT}/lib/libobelisk.so" | grep -F 'Library runpath: 
     exit 1
 fi
 
-"${REPO_DIR}/scripts/install_obelisk.sh" --backup-existing "${INSTALL_ROOT}" >/tmp/obelisk-install-layout-reinstall.log
+"${REPO_DIR}/scripts/install_obelisk.sh" --build-dir "${BUILD_DIR}" --backup-existing "${INSTALL_ROOT}" >/tmp/obelisk-install-layout-reinstall.log
 obelisk_backup_count="$(find "${INSTALL_ROOT}/lib" -maxdepth 1 -name 'libobelisk.so.*.bak' | wc -l)"
 subhook_backup_count="$(find "${INSTALL_ROOT}/lib" -maxdepth 1 -name 'libsubhook.so.*.bak' | wc -l)"
 if [[ "${obelisk_backup_count}" != "1" || "${subhook_backup_count}" != "1" ]]; then

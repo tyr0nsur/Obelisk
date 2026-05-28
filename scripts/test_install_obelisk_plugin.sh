@@ -58,6 +58,13 @@ dry_root="${TMP_DIR}/dry-root"
 assert_not_exists "${dry_root}"
 assert_contains "${TMP_DIR}/dry-run.out" 'DRY-RUN:'
 
+if "${INSTALLER}" --dry-run "${plugin_src}" "${dry_root}" "${TMP_DIR}/other-root" \
+    >"${TMP_DIR}/extra-root.out" 2>"${TMP_DIR}/extra-root.err"; then
+    echo "Installer accepted an extra positional root" >&2
+    exit 1
+fi
+assert_contains "${TMP_DIR}/extra-root.err" 'Unexpected extra argument'
+
 bad_ext="${TMP_DIR}/BadPlugin.txt"
 printf 'bad\n' > "${bad_ext}"
 if "${INSTALLER}" "${bad_ext}" "${root}" >"${TMP_DIR}/bad-ext.out" 2>"${TMP_DIR}/bad-ext.err"; then

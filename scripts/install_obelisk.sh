@@ -12,6 +12,7 @@ published with atomic renames, so ARK restarts do not observe partial shared lib
 Options:
   --dry-run              Print actions without changing files.
   --backup-existing      Back up replaced runtime .so files with a timestamp suffix.
+  --build-dir <dir>      Use a specific CMake build directory (default: build or OBELISK_BUILD_DIR).
   -h, --help             Show this help.
 
 Default root:
@@ -22,6 +23,8 @@ EOF
 ROOT="/servidor/ark/obelisk"
 DRY_RUN=0
 BACKUP_EXISTING=0
+BUILD_DIR_INPUT="${OBELISK_BUILD_DIR:-build}"
+ROOT_SET=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -33,6 +36,15 @@ while [[ $# -gt 0 ]]; do
             BACKUP_EXISTING=1
             shift
             ;;
+        --build-dir)
+            if [[ $# -lt 2 || -z "$2" ]]; then
+                echo "Missing value for --build-dir" >&2
+                usage >&2
+                exit 2
+            fi
+            BUILD_DIR_INPUT="$2"
+            shift 2
+            ;;
         -h|--help)
             usage
             exit 0
@@ -43,14 +55,24 @@ while [[ $# -gt 0 ]]; do
             exit 2
             ;;
         *)
+            if [[ "${ROOT_SET}" == "1" ]]; then
+                echo "Unexpected extra argument: $1" >&2
+                usage >&2
+                exit 2
+            fi
             ROOT="$1"
+            ROOT_SET=1
             shift
             ;;
     esac
 done
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BUILD_DIR="${REPO_DIR}/build"
+if [[ "${BUILD_DIR_INPUT}" == /* ]]; then
+    BUILD_DIR="${BUILD_DIR_INPUT}"
+else
+    BUILD_DIR="${REPO_DIR}/${BUILD_DIR_INPUT}"
+fi
 STAMP="$(date +%Y%m%d-%H%M%S)"
 STAGE_ROOT="${ROOT}/.install-runtime.${STAMP}.$$"
 ROLLBACK_ROOT="${ROOT}/.install-rollback.${STAMP}.$$"

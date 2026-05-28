@@ -69,9 +69,9 @@ run_step cmake -S . -B "${BUILD_DIR}" -DCMAKE_BUILD_TYPE=RelWithDebInfo
 run_step cmake --build "${BUILD_DIR}" -j"${JOBS}"
 run_step ctest --test-dir "${BUILD_DIR}" --output-on-failure
 run_step scripts/run_script_tests.sh
-run_step scripts/test_install_obelisk_layout.sh "${LAYOUT_CHECK_ROOT}"
+run_step env OBELISK_BUILD_DIR="${BUILD_DIR}" scripts/test_install_obelisk_layout.sh "${LAYOUT_CHECK_ROOT}"
 run_step scripts/obelisk.py --root "${LAYOUT_CHECK_ROOT}" status
-run_step scripts/install_obelisk.sh --dry-run "${RELEASE_CHECK_ROOT}"
+run_step scripts/install_obelisk.sh --build-dir "${BUILD_DIR}" --dry-run "${RELEASE_CHECK_ROOT}"
 run_step scripts/install_obelisk_plugin.sh --dry-run \
     "${BUILD_DIR}/plugins/oBaseEvents/oBaseEvents.so" "${RELEASE_CHECK_ROOT}"
 run_step git diff --check
