@@ -138,7 +138,7 @@ if ! capture_command quiet-posture "${QUIET_POSTURE_CMD[@]}"; then
     quiet_posture_status=failed
 fi
 
-CHAT_LOG="${OBELISK_ROOT}/logs/${INSTANCE}/Obelisk.log"
+OBELISK_LOG="${OBELISK_ROOT}/logs/${INSTANCE}/Obelisk.log"
 CHAT_MARKER="${OBELISK_ROOT}/state/instances/${INSTANCE}/enable-chat-reflection"
 INVENTORY_MARKER="${OBELISK_ROOT}/state/instances/${INSTANCE}/enable-inventory-reflection"
 STRUCTURE_MARKER="${OBELISK_ROOT}/state/instances/${INSTANCE}/enable-structure-reflection"
@@ -156,20 +156,20 @@ STRUCTURE_REFLECTION_LIMIT="$(posture_value OBELISK_STRUCTURE_REFLECTION_LOG_LIM
     printf 'chat_reflection_marker=%s\n' "$(marker_status "${CHAT_MARKER}")"
     printf 'chat_reflection_env=%s\n' "${CHAT_REFLECTION_ENV:-<unset>}"
     printf 'chat_reflection_binary_sha256=%s\n' "$([[ -n "${CHAT_REFLECTION_SHA}" ]] && printf present || printf missing)"
-    printf 'log_path=%s\n' "${CHAT_LOG}"
-    if [[ -f "${CHAT_LOG}" ]]; then
-        experimental_gate_lines="$(safe_grep_count 'Experimental chat reflection enabled' "${CHAT_LOG}")"
-        reflected_chat_process_event_lines="$(safe_grep_count 'Reflected chat ProcessEvent' "${CHAT_LOG}")"
-        server_send_chat_message_lines="$(safe_grep_count 'ServerSendChatMessage' "${CHAT_LOG}")"
-        client_chat_message_lines="$(safe_grep_count 'ClientChatMessage' "${CHAT_LOG}")"
-        client_server_chat_message_lines="$(safe_grep_count 'ClientServerChatMessage' "${CHAT_LOG}")"
-        client_server_chat_direct_message_lines="$(safe_grep_count 'ClientServerChatDirectMessage' "${CHAT_LOG}")"
-        metadata_only_lines="$(safe_grep_count 'metadata_only=true' "${CHAT_LOG}")"
-        chat_candidate_lines="$(safe_grep_count 'ServerSendChatMessage|ClientChatMessage|ClientServerChatMessage|ClientServerChatDirectMessage' "${CHAT_LOG}")"
-        rejected_chat_lines="$(safe_grep_count 'Chat reflection rejected|Reflected chat rejected' "${CHAT_LOG}")"
-        rejected_or_unknown_send_mode_lines="$(safe_grep_count 'Chat reflection rejected|Reflected chat rejected|send_mode_known=false' "${CHAT_LOG}")"
-        send_mode_unknown_lines="$(safe_grep_count 'send_mode_known=false' "${CHAT_LOG}")"
-        last_relevant_line="$(grep -E 'Experimental chat reflection|Reflected chat|Chat reflection rejected|ServerSendChatMessage|ClientChatMessage|ClientServerChatMessage|ClientServerChatDirectMessage|metadata_only=true|send_mode_known=false' "${CHAT_LOG}" | tail -n1 || true)"
+    printf 'log_path=%s\n' "${OBELISK_LOG}"
+    if [[ -f "${OBELISK_LOG}" ]]; then
+        experimental_gate_lines="$(safe_grep_count 'Experimental chat reflection enabled' "${OBELISK_LOG}")"
+        reflected_chat_process_event_lines="$(safe_grep_count 'Reflected chat ProcessEvent' "${OBELISK_LOG}")"
+        server_send_chat_message_lines="$(safe_grep_count 'ServerSendChatMessage' "${OBELISK_LOG}")"
+        client_chat_message_lines="$(safe_grep_count 'ClientChatMessage' "${OBELISK_LOG}")"
+        client_server_chat_message_lines="$(safe_grep_count 'ClientServerChatMessage' "${OBELISK_LOG}")"
+        client_server_chat_direct_message_lines="$(safe_grep_count 'ClientServerChatDirectMessage' "${OBELISK_LOG}")"
+        metadata_only_lines="$(safe_grep_count 'metadata_only=true' "${OBELISK_LOG}")"
+        chat_candidate_lines="$(safe_grep_count 'ServerSendChatMessage|ClientChatMessage|ClientServerChatMessage|ClientServerChatDirectMessage' "${OBELISK_LOG}")"
+        rejected_chat_lines="$(safe_grep_count 'Chat reflection rejected|Reflected chat rejected' "${OBELISK_LOG}")"
+        rejected_or_unknown_send_mode_lines="$(safe_grep_count 'Chat reflection rejected|Reflected chat rejected|send_mode_known=false' "${OBELISK_LOG}")"
+        send_mode_unknown_lines="$(safe_grep_count 'send_mode_known=false' "${OBELISK_LOG}")"
+        last_relevant_line="$(grep -E 'Experimental chat reflection|Reflected chat|Chat reflection rejected|ServerSendChatMessage|ClientChatMessage|ClientServerChatMessage|ClientServerChatDirectMessage|metadata_only=true|send_mode_known=false' "${OBELISK_LOG}" | tail -n1 || true)"
 
         printf 'experimental_gate_lines=%s\n' "${experimental_gate_lines}"
         printf 'reflected_chat_lines=%s\n' "${reflected_chat_process_event_lines}"
@@ -185,7 +185,7 @@ STRUCTURE_REFLECTION_LIMIT="$(posture_value OBELISK_STRUCTURE_REFLECTION_LOG_LIM
         printf 'send_mode_unknown_lines=%s\n' "${send_mode_unknown_lines}"
         printf 'last_relevant_line=%s\n' "${last_relevant_line:-<none>}"
         printf '\nrecent_chat_reflection_lines:\n'
-        grep -E 'Experimental chat reflection|Reflected chat|Chat reflection rejected|ServerSendChatMessage|ClientChatMessage|ClientServerChatMessage|ClientServerChatDirectMessage|metadata_only=true|send_mode_known=false' "${CHAT_LOG}" | tail -n 80 || true
+        grep -E 'Experimental chat reflection|Reflected chat|Chat reflection rejected|ServerSendChatMessage|ClientChatMessage|ClientServerChatMessage|ClientServerChatDirectMessage|metadata_only=true|send_mode_known=false' "${OBELISK_LOG}" | tail -n 80 || true
     else
         printf 'missing_log=true\n'
         printf 'experimental_gate_lines=0\n'
@@ -209,13 +209,13 @@ STRUCTURE_REFLECTION_LIMIT="$(posture_value OBELISK_STRUCTURE_REFLECTION_LOG_LIM
     printf 'inventory_reflection_env=%s\n' "${INVENTORY_REFLECTION_ENV:-<unset>}"
     printf 'inventory_reflection_binary_sha256=%s\n' "$([[ -n "${INVENTORY_REFLECTION_SHA}" ]] && printf present || printf missing)"
     printf 'inventory_reflection_log_limit=%s\n' "${INVENTORY_REFLECTION_LIMIT:-<unset>}"
-    printf 'log_path=%s\n' "${CHAT_LOG}"
-    if [[ -f "${CHAT_LOG}" ]]; then
-        experimental_inventory_gate_lines="$(safe_grep_count 'Experimental inventory reflection enabled' "${CHAT_LOG}")"
-        reflected_inventory_process_event_lines="$(safe_grep_count 'Reflected inventory ProcessEvent' "${CHAT_LOG}")"
-        reflected_inventory_rejected_lines="$(safe_grep_count 'Reflected inventory rejected' "${CHAT_LOG}")"
-        reflected_inventory_field_lines="$(safe_grep_count 'Reflected inventory field' "${CHAT_LOG}")"
-        last_relevant_line="$(grep -E 'Experimental inventory reflection|Reflected inventory ProcessEvent|Reflected inventory rejected|Reflected inventory field' "${CHAT_LOG}" | tail -n1 || true)"
+    printf 'log_path=%s\n' "${OBELISK_LOG}"
+    if [[ -f "${OBELISK_LOG}" ]]; then
+        experimental_inventory_gate_lines="$(safe_grep_count 'Experimental inventory reflection enabled' "${OBELISK_LOG}")"
+        reflected_inventory_process_event_lines="$(safe_grep_count 'Reflected inventory ProcessEvent' "${OBELISK_LOG}")"
+        reflected_inventory_rejected_lines="$(safe_grep_count 'Reflected inventory rejected' "${OBELISK_LOG}")"
+        reflected_inventory_field_lines="$(safe_grep_count 'Reflected inventory field' "${OBELISK_LOG}")"
+        last_relevant_line="$(grep -E 'Experimental inventory reflection|Reflected inventory ProcessEvent|Reflected inventory rejected|Reflected inventory field' "${OBELISK_LOG}" | tail -n1 || true)"
 
         printf 'experimental_gate_lines=%s\n' "${experimental_inventory_gate_lines}"
         printf 'reflected_inventory_process_event_lines=%s\n' "${reflected_inventory_process_event_lines}"
@@ -223,7 +223,7 @@ STRUCTURE_REFLECTION_LIMIT="$(posture_value OBELISK_STRUCTURE_REFLECTION_LOG_LIM
         printf 'reflected_inventory_field_lines=%s\n' "${reflected_inventory_field_lines}"
         printf 'last_relevant_line=%s\n' "${last_relevant_line:-<none>}"
         printf '\nrecent_inventory_reflection_lines:\n'
-        grep -E 'Experimental inventory reflection|Reflected inventory ProcessEvent|Reflected inventory rejected|Reflected inventory field' "${CHAT_LOG}" | tail -n 80 || true
+        grep -E 'Experimental inventory reflection|Reflected inventory ProcessEvent|Reflected inventory rejected|Reflected inventory field' "${OBELISK_LOG}" | tail -n 80 || true
     else
         printf 'missing_log=true\n'
         printf 'experimental_gate_lines=0\n'
@@ -239,13 +239,13 @@ STRUCTURE_REFLECTION_LIMIT="$(posture_value OBELISK_STRUCTURE_REFLECTION_LOG_LIM
     printf 'structure_reflection_env=%s\n' "${STRUCTURE_REFLECTION_ENV:-<unset>}"
     printf 'structure_reflection_binary_sha256=%s\n' "$([[ -n "${STRUCTURE_REFLECTION_SHA}" ]] && printf present || printf missing)"
     printf 'structure_reflection_log_limit=%s\n' "${STRUCTURE_REFLECTION_LIMIT:-<unset>}"
-    printf 'log_path=%s\n' "${CHAT_LOG}"
-    if [[ -f "${CHAT_LOG}" ]]; then
-        experimental_structure_gate_lines="$(safe_grep_count 'Experimental structure reflection enabled' "${CHAT_LOG}")"
-        reflected_structure_process_event_lines="$(safe_grep_count 'Reflected structure ProcessEvent' "${CHAT_LOG}")"
-        reflected_structure_rejected_lines="$(safe_grep_count 'Reflected structure rejected' "${CHAT_LOG}")"
-        reflected_structure_field_lines="$(safe_grep_count 'Reflected structure field' "${CHAT_LOG}")"
-        last_relevant_line="$(grep -E 'Experimental structure reflection|Reflected structure ProcessEvent|Reflected structure rejected|Reflected structure field' "${CHAT_LOG}" | tail -n1 || true)"
+    printf 'log_path=%s\n' "${OBELISK_LOG}"
+    if [[ -f "${OBELISK_LOG}" ]]; then
+        experimental_structure_gate_lines="$(safe_grep_count 'Experimental structure reflection enabled' "${OBELISK_LOG}")"
+        reflected_structure_process_event_lines="$(safe_grep_count 'Reflected structure ProcessEvent' "${OBELISK_LOG}")"
+        reflected_structure_rejected_lines="$(safe_grep_count 'Reflected structure rejected' "${OBELISK_LOG}")"
+        reflected_structure_field_lines="$(safe_grep_count 'Reflected structure field' "${OBELISK_LOG}")"
+        last_relevant_line="$(grep -E 'Experimental structure reflection|Reflected structure ProcessEvent|Reflected structure rejected|Reflected structure field' "${OBELISK_LOG}" | tail -n1 || true)"
 
         printf 'experimental_gate_lines=%s\n' "${experimental_structure_gate_lines}"
         printf 'reflected_structure_process_event_lines=%s\n' "${reflected_structure_process_event_lines}"
@@ -253,7 +253,7 @@ STRUCTURE_REFLECTION_LIMIT="$(posture_value OBELISK_STRUCTURE_REFLECTION_LOG_LIM
         printf 'reflected_structure_field_lines=%s\n' "${reflected_structure_field_lines}"
         printf 'last_relevant_line=%s\n' "${last_relevant_line:-<none>}"
         printf '\nrecent_structure_reflection_lines:\n'
-        grep -E 'Experimental structure reflection|Reflected structure ProcessEvent|Reflected structure rejected|Reflected structure field' "${CHAT_LOG}" | tail -n 80 || true
+        grep -E 'Experimental structure reflection|Reflected structure ProcessEvent|Reflected structure rejected|Reflected structure field' "${OBELISK_LOG}" | tail -n 80 || true
     else
         printf 'missing_log=true\n'
         printf 'experimental_gate_lines=0\n'
