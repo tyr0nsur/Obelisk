@@ -145,12 +145,11 @@ assert_file_contains "${default_snapshot_dir}/summary.txt" '^linuxgsm_wrapper_dr
 assert_file_contains "${default_snapshot_dir}/wrapper-drift.txt" '^LinuxGSM wrapper matches versioned template: '
 assert_file_contains "${default_snapshot_dir}/wrapper-drift.txt" '^sha256='
 
-stable_root="${TMP_DIR}/stable-root"
-stable_out="${TMP_DIR}/stable-out"
-write_obelisk_fixture "${stable_root}" "arkserver2" "chat"
-write_proc_fixture 4242 "7f000000-7f001000 r-xp 00000000 00:00 0 ${stable_root}/lib/libobelisk.so" \
-    "OBELISK_ROOT=${stable_root}" \
-    "LD_PRELOAD=${stable_root}/lib/libobelisk.so" \
+chat_root="${TMP_DIR}/chat-root"
+write_obelisk_fixture "${chat_root}" "arkserver2" "chat"
+write_proc_fixture 4242 "7f000000-7f001000 r-xp 00000000 00:00 0 ${chat_root}/lib/libobelisk.so" \
+    "OBELISK_ROOT=${chat_root}" \
+    "LD_PRELOAD=${chat_root}/lib/libobelisk.so" \
     "OBELISK_INSTANCE_ID=arkserver2" \
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
     "OBELISK_DISABLE_PLUGINS=1" \
@@ -158,7 +157,7 @@ write_proc_fixture 4242 "7f000000-7f001000 r-xp 00000000 00:00 0 ${stable_root}/
     "OBELISK_CHAT_REFLECTION_BINARY_SHA256=abc123"
 
 chat_forbidden_out="${TMP_DIR}/chat-forbidden-out"
-if run_snapshot "${stable_root}" "${chat_forbidden_out}" 4242 >/dev/null 2>"${TMP_DIR}/chat-forbidden.err"; then
+if run_snapshot "${chat_root}" "${chat_forbidden_out}" 4242 >/dev/null 2>"${TMP_DIR}/chat-forbidden.err"; then
     echo "Expected chat reflection to fail default supervisor posture" >&2
     exit 1
 fi
@@ -166,17 +165,26 @@ assert_file_contains "${TMP_DIR}/chat-forbidden.err" 'unstable Obelisk posture'
 assert_file_contains "${chat_forbidden_out}/latest/posture.txt" 'Forbidden OBELISK_ENABLE_CHAT_REFLECTION'
 assert_file_contains "${chat_forbidden_out}/latest/summary.txt" '^posture_status=failed$'
 
-snapshot_dir="$(run_snapshot "${stable_root}" "${stable_out}" 4242 1)"
-assert_file_contains "${snapshot_dir}/summary.txt" '^pid=4242$'
+stable_root="${TMP_DIR}/stable-root"
+stable_out="${TMP_DIR}/stable-out"
+write_obelisk_fixture "${stable_root}" "arkserver2" "none"
+write_proc_fixture 4243 "7f000000-7f001000 r-xp 00000000 00:00 0 ${stable_root}/lib/libobelisk.so" \
+    "OBELISK_ROOT=${stable_root}" \
+    "LD_PRELOAD=${stable_root}/lib/libobelisk.so" \
+    "OBELISK_INSTANCE_ID=arkserver2" \
+    "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
+    "OBELISK_DISABLE_PLUGINS=1"
+
+snapshot_dir="$(run_snapshot "${stable_root}" "${stable_out}" 4243)"
+assert_file_contains "${snapshot_dir}/summary.txt" '^pid=4243$'
 assert_file_contains "${snapshot_dir}/summary.txt" '^linuxgsm_wrapper_drift_status=ok$'
 assert_file_contains "${snapshot_dir}/summary.txt" '^posture_status=ok$'
-assert_file_contains "${snapshot_dir}/summary.txt" '^quiet_posture_status=failed$'
+assert_file_contains "${snapshot_dir}/summary.txt" '^quiet_posture_status=ok$'
 assert_file_contains "${snapshot_dir}/summary.txt" '^stable_posture_summary=stable;'
-assert_file_contains "${snapshot_dir}/summary.txt" '^quiet_posture_summary=not_quiet;'
-assert_file_contains "${snapshot_dir}/quiet-posture.txt" 'Forbidden OBELISK_ENABLE_CHAT_REFLECTION'
-assert_file_contains "${snapshot_dir}/summary.txt" '^chat_reflection_gate_env=1$'
-assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^chat_reflection_marker=enabled$'
-assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^chat_reflection_env=1$'
+assert_file_contains "${snapshot_dir}/summary.txt" '^quiet_posture_summary=quiet;'
+assert_file_contains "${snapshot_dir}/summary.txt" '^chat_reflection_gate_env=<unset>$'
+assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^chat_reflection_marker=disabled$'
+assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^chat_reflection_env=<unset>$'
 assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^experimental_gate_lines=1$'
 assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^reflected_chat_process_event_lines=4$'
 assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^server_send_chat_message_lines=2$'
@@ -218,8 +226,7 @@ drift_snapshot_dir="$(
     OBELISK_SUPERVISOR_PROC_ROOT="${TMP_DIR}/proc" \
     OBELISK_SUPERVISOR_INSTANCE=arkserver2 \
     OBELISK_SUPERVISOR_MAP=TheIsland \
-    OBELISK_SUPERVISOR_PID=4242 \
-    OBELISK_SUPERVISOR_ALLOW_CHAT_REFLECTION=1 \
+    OBELISK_SUPERVISOR_PID=4243 \
     OBELISK_SUPERVISOR_WRAPPER_EXPECTED="${WRAPPER_EXPECTED_FIXTURE}" \
     OBELISK_SUPERVISOR_WRAPPER_INSTALLED="${drift_wrapper}" \
     "${SNAPSHOT}"
@@ -229,9 +236,9 @@ assert_file_contains "${drift_snapshot_dir}/summary.txt" '^linuxgsm_wrapper_drif
 assert_file_contains "${drift_snapshot_dir}/wrapper-drift.txt" '^LinuxGSM wrapper drift detected\.'
 
 loop_out="${TMP_DIR}/loop-out"
-OBELISK_SUPERVISOR_ALLOW_CHAT_REFLECTION=1 run_loop_once "${stable_root}" "${loop_out}" 4242 >/dev/null
+run_loop_once "${stable_root}" "${loop_out}" 4243 >/dev/null
 assert_file_contains "${loop_out}/latest/summary.txt" '^posture_status=ok$'
-assert_file_contains "${loop_out}/latest/summary.txt" '^quiet_posture_status=failed$'
+assert_file_contains "${loop_out}/latest/summary.txt" '^quiet_posture_status=ok$'
 
 unstable_root="${TMP_DIR}/unstable-root"
 unstable_out="${TMP_DIR}/unstable-out"

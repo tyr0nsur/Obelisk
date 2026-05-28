@@ -15,9 +15,9 @@ Options:
   --proc-root <path>        Procfs root. Default: /proc. Intended for offline tests.
   --expect-stable           Require stable dev posture: ProcessEvent on, plugins off,
                             ReflectionScanner/debug control/native exec probes,
-                            broad ProcessEvent tracing, and structure reflection off.
-  --forbid-chat-reflection  Also require chat reflection and chat text logging to be off.
-                            Use this for production/performance posture checks.
+                            broad ProcessEvent tracing, and experimental observers off.
+  --forbid-chat-reflection  Compatibility flag. Chat reflection is already forbidden by
+                            --expect-stable.
   -h, --help                Show this help.
 EOF
 }
@@ -238,6 +238,10 @@ if [[ "${EXPECT_STABLE}" == "1" ]]; then
     forbid_env OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS
     forbid_env OBELISK_ALLOW_CALL_PROCESS_EVENT
     forbid_nonzero_env OBELISK_PE_TRACE_LIMIT
+    forbid_env OBELISK_ENABLE_CHAT_REFLECTION
+    forbid_env OBELISK_CHAT_REFLECTION_BINARY_SHA256
+    forbid_env OBELISK_CHAT_REFLECTION_LOG_LIMIT
+    forbid_env OBELISK_CHAT_REFLECTION_LOG_TEXT
     forbid_env OBELISK_ENABLE_INVENTORY_REFLECTION
     forbid_env OBELISK_INVENTORY_REFLECTION_BINARY_SHA256
     forbid_env OBELISK_INVENTORY_REFLECTION_LOG_LIMIT
@@ -256,6 +260,7 @@ if [[ "${EXPECT_STABLE}" == "1" ]]; then
     forbid_marker enable-native-exec-probes
     forbid_marker allow-global-process-event-callbacks
     forbid_marker allow-call-process-event
+    forbid_marker enable-chat-reflection
     forbid_marker enable-inventory-reflection
     forbid_marker enable-structure-reflection
     forbid_marker enable-reflection-scanner

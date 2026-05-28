@@ -117,7 +117,7 @@ operator has approved that exact maintenance window:
 ```bash
 pgrep -af '^./ShooterGameServer'
 tail -n 80 /path/to/copied/Obelisk.log
-scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map <map> --instance <instance-id>
+scripts/check_obelisk_server_posture.sh --expect-stable --map <map> --instance <instance-id>
 ```
 
 Expected:

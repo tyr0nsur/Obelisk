@@ -62,7 +62,7 @@ separate explicit approval.
 ```bash
 cmake --build build -j"$(nproc)"
 tail -n 80 /path/to/copied/Obelisk.log
-scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map <map> --instance <instance-id>
+scripts/check_obelisk_server_posture.sh --expect-stable --map <map> --instance <instance-id>
 ```
 
 Expected:

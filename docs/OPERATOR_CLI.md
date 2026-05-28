@@ -34,7 +34,9 @@ and helps operators find shared-root escapes before a restart.
 
 This is a restart-posture summary, not proof that a currently running process has the same
 environment. Use `scripts/check_obelisk_server_posture.sh --expect-stable --map <map>
---instance <instance-id>` for live process validation.
+--instance <instance-id>` for live process validation. `--expect-stable` rejects
+experimental observer env and markers, including chat, inventory, and structure
+reflection.
 
 `status` reports valid instance directories separately from `invalid_instance_entries` so
 unsafe marker entries are visible even before listing per-instance details.

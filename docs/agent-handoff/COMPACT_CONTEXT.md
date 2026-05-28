@@ -148,9 +148,9 @@ work from repository state instead of chat history.
   public `CallProcessEvent` plugin behavior, borrowed UE memory, and higher-level gameplay
   SDK modules stay blocked.
 - Stable posture rejects scanner env, non-zero `OBELISK_PE_TRACE_LIMIT`, global callbacks,
-  public `CallProcessEvent`, and module observer env. Quiet Ragnarok/release checks should
-  use `scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection
-  --map Ragnarok --instance arkserver`.
+  public `CallProcessEvent`, and chat/inventory/structure observer env and markers. Use
+  `scripts/check_obelisk_server_posture.sh --expect-stable --map Ragnarok --instance
+  arkserver` for production-like live validation.
 - Second-source snapshot comparison requires distinct sanitized evidence identity. Missing
   identity, fully matching identity, or shared `artifact_sha256`, `capture_id`, or
   `evidence_pack_id` is `inconclusive`, even when layouts match.
@@ -505,10 +505,10 @@ work from repository state instead of chat history.
   and requires explicit `--map` unless `--pid` is provided. It has offline procfs fixture
   coverage in
   `scripts/test_check_obelisk_server_posture.sh`.
-- Add `--forbid-chat-reflection` to the posture check when validating
-  production/performance or quiet-baseline posture. It rejects
-  `OBELISK_ENABLE_CHAT_REFLECTION`, the chat SHA/log-limit env, and
-  `OBELISK_CHAT_REFLECTION_LOG_TEXT`, plus the `enable-chat-reflection` marker.
+- `scripts/check_obelisk_server_posture.sh --expect-stable` rejects experimental chat
+  reflection and chat text logging directly, including `OBELISK_ENABLE_CHAT_REFLECTION`,
+  the chat SHA/log-limit/text env, and the `enable-chat-reflection` marker.
+  `--forbid-chat-reflection` remains a compatibility flag, not a separate stable boundary.
 - Historical read-only quiet-posture audit at commit `5da65d6` found Ragnarok PID
   `3940524` still had `OBELISK_ENABLE_CHAT_REFLECTION=1`, so it failed the stricter
   production/performance guard. Later handoff entries may record separate quiet-posture

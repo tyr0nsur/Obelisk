@@ -50,7 +50,7 @@ expect_success stable-posture \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable --instance arkserver
 expect_success stable-posture-instance-id-alias \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable --instance-id arkserver
-expect_success stable-posture-chat-forbidden-clean \
+expect_success stable-posture-legacy-chat-forbidden-flag-clean \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable --forbid-chat-reflection --instance arkserver
 
 expect_failure missing-explicit-instance \
@@ -101,9 +101,9 @@ write_proc_fixture 109 "${stable_maps}" \
     "OBELISK_ENABLE_CHAT_REFLECTION=1" \
     "OBELISK_CHAT_REFLECTION_BINARY_SHA256=abc123" \
     "OBELISK_CHAT_REFLECTION_LOG_LIMIT=25"
-expect_success chat-reflection-allowed-in-debug-stable \
+expect_failure chat-reflection-forbidden-for-stable \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 109 --expect-stable --instance arkserver
-expect_failure chat-reflection-forbidden-for-production \
+expect_failure chat-reflection-forbidden-for-stable-legacy-flag \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 109 --expect-stable --forbid-chat-reflection --instance arkserver
 
 write_proc_fixture 110 "${stable_maps}" \
@@ -112,8 +112,8 @@ write_proc_fixture 110 "${stable_maps}" \
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
     "OBELISK_DISABLE_PLUGINS=1" \
     "OBELISK_CHAT_REFLECTION_LOG_TEXT=1"
-expect_failure chat-text-forbidden-for-production \
-    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 110 --expect-stable --forbid-chat-reflection --instance arkserver
+expect_failure chat-text-forbidden-for-stable \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 110 --expect-stable --instance arkserver
 
 write_proc_fixture 111 "${stable_maps}" \
     "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
@@ -241,6 +241,7 @@ for marker in \
     enable-native-exec-probes \
     allow-global-process-event-callbacks \
     allow-call-process-event \
+    enable-chat-reflection \
     enable-inventory-reflection \
     enable-structure-reflection \
     enable-reflection-scanner
@@ -261,9 +262,10 @@ expect_success completed-debug-request-marker-allowed-for-stable \
 rm -f "${TEST_OBELISK_ROOT}/state/instances/arkserver/request-static-fname-probe.done.1234"
 
 : > "${TEST_OBELISK_ROOT}/state/instances/arkserver/enable-chat-reflection"
-expect_success chat-marker-allowed-in-debug-stable \
+expect_failure chat-marker-forbidden-for-stable \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable --instance arkserver
-expect_failure chat-marker-forbidden-for-production \
+expect_failure chat-marker-forbidden-for-stable-legacy-flag \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable --forbid-chat-reflection --instance arkserver
+rm -f "${TEST_OBELISK_ROOT}/state/instances/arkserver/enable-chat-reflection"
 
 echo "check_obelisk_server_posture offline tests passed"

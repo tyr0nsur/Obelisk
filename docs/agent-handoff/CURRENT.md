@@ -46,9 +46,14 @@ Updated: 2026-05-28
   `OBELISK_ENABLE_STRUCTURE_REFLECTION=1` in its environment. Instance markers
   `enable-chat-reflection`, `enable-inventory-reflection`, and `enable-structure-reflection`
   were present under `/servidor/ark/obelisk/state/instances/arkserver`. The check
-  `scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map
-  Ragnarok --instance arkserver` fails. Do not fix by restarting while users are active;
-  cleanup requires explicit maintenance approval.
+  `scripts/check_obelisk_server_posture.sh --expect-stable --map Ragnarok --instance
+  arkserver` fails. Do not fix by restarting while users are active; cleanup requires
+  explicit maintenance approval.
+- fact: Operator-provided live log evidence on 2026-05-28 confirms the active Ragnarok
+  chat observer is receiving reflected `ServerSendChatMessage` events and logging send
+  mode plus field metadata. The provided lines did not include player message text.
+  Preserve this as operational evidence only; do not add payload logging, publish chat
+  contents, or restart the live instance without an approved maintenance window.
 - fact: The LinuxGSM wrapper now scrubs inherited marker-managed Obelisk env vars before
   selecting an instance profile. ProcessEvent hook, plugin-disable, ptrace/debug-control,
   native exec probes, global callbacks, and chat/inventory/structure reflection env must be
@@ -216,10 +221,11 @@ Updated: 2026-05-28
   dinos, structures, missions, transfers, permissions, timers, admin, and commands. Public
   examples and first-party plugins are also guarded against using the `CallProcessEvent`
   escape hatch.
-- fact: Stable posture no longer has a scanner escape hatch: `--expect-stable` rejects
-  ReflectionScanner env, non-zero `OBELISK_PE_TRACE_LIMIT`, global ProcessEvent callbacks,
-  public `CallProcessEvent`, and module observer env. Use `--forbid-chat-reflection` for
-  quiet Ragnarok/post-release checks; release docs now require that command explicitly.
+- fact: Stable posture no longer has scanner or observer escape hatches:
+  `--expect-stable` rejects ReflectionScanner env, non-zero `OBELISK_PE_TRACE_LIMIT`,
+  global ProcessEvent callbacks, public `CallProcessEvent`, and chat/inventory/structure
+  observer env/markers. `--forbid-chat-reflection` is retained as a compatibility flag,
+  but stable production-like validation no longer depends on it.
 - fact: Older TheIsland/`arkserver2` research runbooks are marked historical/superseded
   unless the operator approves a new scoped `arkserver2` window. The operational doc
   guardrail now scans research docs with live marker/restart snippets and requires an
@@ -643,11 +649,10 @@ Updated: 2026-05-28
   coverage is in `scripts/test_check_obelisk_server_posture.sh`. The checker now requires
   explicit `--instance` and requires `--map` unless `--pid` is provided, so it cannot
   silently fall back to Ragnarok/`arkserver`.
-- fact: `scripts/check_obelisk_server_posture.sh --forbid-chat-reflection` adds a
-  production/performance posture guard that rejects experimental chat reflection and chat
-  text logging env plus the `enable-chat-reflection` marker. Use it with
-  `--expect-stable` for Ragnarok player-performance checks and for TheIsland Phase A /
-  rollback checks.
+- fact: `scripts/check_obelisk_server_posture.sh --expect-stable` now rejects
+  experimental chat reflection, chat text logging env, and the `enable-chat-reflection`
+  marker directly. `--forbid-chat-reflection` remains accepted for compatibility but is no
+  longer the production/performance boundary.
 - fact: `scripts/obelisk.py instances list` now reports persistent restart posture per
   instance: `stable`, `incomplete`, `experimental`, `experimental+incomplete`, or `invalid`
   for unsafe instance marker entries such as symlinked instance directories.

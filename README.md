@@ -269,6 +269,9 @@ handles only in process-local state, and unregister them with
 state: never write them into shared plugin config or assume they are valid in another ARK
 server process. Legacy registration functions reject callbacks that cannot be attributed
 to the initializing plugin or an already-loaded plugin shared object.
+Apply the same rule to owner tokens, worker threads, sockets, caches, open file handles,
+borrowed UE pointers, and other mutable runtime state: keep them process-local unless the
+plugin documents and tests explicit cross-process ownership and locking.
 
 `ObeliskApi*` and `ObeliskPluginInitContext*` are borrowed for `ObeliskPlugin_Init` only.
 Copy the `ObeliskApi` table by value if shutdown, worker threads, or later callbacks need

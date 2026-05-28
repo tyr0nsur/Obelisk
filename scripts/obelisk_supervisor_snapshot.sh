@@ -121,9 +121,7 @@ fi
 if [[ -n "${OBELISK_SUPERVISOR_PID:-}" ]]; then
     POSTURE_CMD+=(--pid "${OBELISK_SUPERVISOR_PID}")
 fi
-if [[ "${OBELISK_SUPERVISOR_ALLOW_CHAT_REFLECTION:-0}" != "1" ]]; then
-    POSTURE_CMD+=(--forbid-chat-reflection)
-fi
+POSTURE_CMD+=(--forbid-chat-reflection)
 
 posture_status=ok
 if ! capture_command posture "${POSTURE_CMD[@]}"; then

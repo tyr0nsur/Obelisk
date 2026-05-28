@@ -111,6 +111,10 @@ input. Plugin-owned mutable state should be instance-scoped by default, using th
 `instance_id` or an operator-configured per-instance path. A plugin may use shared mutable
 state only when it documents the file/process ownership model and uses atomic writes or
 locking that is safe across multiple server processes.
+Runtime values are process-local unless the plugin explicitly builds a cross-process
+protocol around them. Callback handles, owner tokens, worker threads, sockets, in-memory
+caches, borrowed UE pointers, and open file descriptors must not be persisted into shared
+config or reused by another ARK server process.
 
 Callback registration handles are process-local runtime values. Do not write them into
 shared config, cluster state, or cross-instance files; a handle from one ARK process is not
@@ -283,6 +287,9 @@ Before a plugin is promoted to stable or added to the top-level build:
 - [ ] No global `ProcessEvent` callback outside a documented debug gate.
 - [ ] Callback lifetime is covered by runtime owner cleanup and plugin-local
       shutdown design.
+- [ ] Runtime handles, owner tokens, worker threads, sockets, caches, and mutable files are
+      process-local by default, or have a documented cross-process ownership and locking
+      design.
 - [ ] Helper-module or background-thread callbacks use handle-returning owner-token
       registration and explicit unregister before their code/state is released.
 - [ ] Background threads, sockets, and file readers have a stop and join path.

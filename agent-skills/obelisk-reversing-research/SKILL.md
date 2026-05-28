@@ -99,7 +99,7 @@ For live-like development captures authorized by the operator, keep the run shor
 restore stable posture immediately:
 
 ```bash
-scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map <map> --instance <instance-id>
+scripts/check_obelisk_server_posture.sh --expect-stable --map <map> --instance <instance-id>
 ```
 
 Use explicit target flags for the approved debug instance. If this fails, fix the server

@@ -73,6 +73,28 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                     f"{path.relative_to(REPO_ROOT)} documents handle callbacks without owner-token capability",
                 )
 
+    def test_public_sdk_guidance_keeps_multi_instance_runtime_state_process_local(self) -> None:
+        docs = [
+            REPO_ROOT / "README.md",
+            REPO_ROOT / "docs/PLUGIN_ARCHITECTURE.md",
+        ]
+        required_terms = (
+            "process-local",
+            "owner tokens",
+            "worker threads",
+            "sockets",
+            "caches",
+            "mutable",
+            "cross-process",
+            "locking",
+        )
+
+        for path in docs:
+            text = path.read_text(encoding="utf-8")
+            with self.subTest(path=path.relative_to(REPO_ROOT)):
+                for term in required_terms:
+                    self.assertIn(term, text)
+
     def test_public_header_has_no_chat_api_until_promotion(self) -> None:
         header = (REPO_ROOT / "include/obelisk/ObeliskApi.h").read_text(encoding="utf-8")
         forbidden = [

@@ -70,11 +70,10 @@ Expected logs:
 - server remains joinable
 
 Post-checks after an approved runtime experiment should use the same approved target and
-should reject experimental chat reflection unless the maintenance plan explicitly says
-otherwise:
+should reject experimental observers unless the maintenance plan explicitly says otherwise:
 
 ```bash
-scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection \
+scripts/check_obelisk_server_posture.sh --expect-stable \
   --map <map> --instance <instance-id>
 ```
 
@@ -126,7 +125,7 @@ Use named profiles instead of ad hoc env mixes:
 After any scanner/plugin capture, run the posture check for the same approved debug target:
 
 ```bash
-scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection \
+scripts/check_obelisk_server_posture.sh --expect-stable \
   --map <map> --instance <instance-id>
 ```
 
@@ -136,9 +135,10 @@ In `--expect-stable` mode it must fail closed if `libobelisk.so` is not mapped, 
 deleted `libobelisk` mapping remains after redeploy, if `LD_PRELOAD` does not include the
 central `${OBELISK_ROOT}/lib/libobelisk.so`, if scanner/native-exec variables are still
 present, if stable markers `enable-process-event-hook` and `disable-plugins` are missing,
-if the instance id or marker directory would be rejected by the wrapper/runtime, or if
-per-instance marker entries would re-enable forbidden experimental features at the next
-restart. It rejects a forbidden marker name even when the entry is malformed or a symlink.
+if the instance id or marker directory would be rejected by the wrapper/runtime, if
+chat/inventory/structure observer variables are present, or if per-instance marker entries
+would re-enable forbidden experimental features at the next restart. It rejects a
+forbidden marker name even when the entry is malformed or a symlink.
 Its parser is tested offline with procfs fixtures; do not weaken those tests to depend on a
 live ARK process.
 
@@ -218,7 +218,7 @@ pgrep -af '^./ShooterGameServer'
 tail -n 100 /path/to/copied/Obelisk.log
 pid=$(pgrep -f '^./ShooterGameServer <map>' | head -n1)
 rg 'libobelisk|libsubhook' /proc/$pid/maps
-scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection \
+scripts/check_obelisk_server_posture.sh --expect-stable \
   --map <map> --instance <instance-id>
 ```
 
@@ -229,7 +229,7 @@ powered off, runs the scoped test, then shuts down:
 tail -n 100 /servidor/ark/obelisk/logs/arkserver2/Obelisk.log
 pid=$(pgrep -f '^./ShooterGameServer TheIsland' | head -n1)
 rg 'libobelisk|libsubhook' /proc/$pid/maps
-scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection \
+scripts/check_obelisk_server_posture.sh --expect-stable \
   --map TheIsland --instance arkserver2
 ```
 
