@@ -640,6 +640,8 @@ python3 scripts/analyze_reflectionscanner_capture.py \
 ## Key Files To Read First
 
 - `docs/agent-handoff/CURRENT.md`
+  - Current routing table only; historical pre-compaction handoff detail is archived in
+    `docs/agent-handoff/HISTORY-2026-05-28-pre-current-compaction.md`.
 - `docs/STATUS.md`
 - `docs/PLUGIN_ARCHITECTURE.md`
 - `docs/research/README.md`

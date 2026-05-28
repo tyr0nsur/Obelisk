@@ -10,6 +10,8 @@ longer investigation notes.
 - `CURRENT.md`: current state, risks, blockers, and next steps.
 - `COMPACT_CONTEXT.md`: compact resume baseline for context compaction or a fresh lead
   session.
+- `HISTORY-*.md`: archived handoff snapshots kept only to preserve older coordination
+  detail after compaction. Do not use history files as the active source of truth.
 
 These files are internal coordination notes for agents and the project lead. Public
 contributor workflow belongs in `CONTRIBUTING.md`.
@@ -21,3 +23,5 @@ contributor workflow belongs in `CONTRIBUTING.md`.
 - Reference commits, files, logs, or research notes when possible.
 - Do not paste raw logs here.
 - Update this file before closing an agent or handing work to another agent.
+- Keep `CURRENT.md` as a routing table. Move durable evidence to `docs/research/` and
+  archive stale handoff detail instead of letting active state grow into a research log.
