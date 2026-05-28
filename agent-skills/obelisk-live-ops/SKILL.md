@@ -88,6 +88,8 @@ scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection
   - `enable-reflection-scanner`
   - `enable-native-exec-probes`
 - Never enable native exec probes without explicit approval for the named `arkserver` run.
+- Do not set `OBELISK_DEBUG_ALLOW_PTRACE=1` by default in debug wrappers. Ptrace requires
+  an approved isolated run plus the `allow-ptrace` marker.
 - Never enable `ReflectionScanner` on `arkserver` without a specific operator-approved
   debug window, plugins disabled, copied-log evidence, and a marker/env rollback plan.
 - Keep `OBELISK_PE_TRACE_LIMIT=0` by default; use short trace windows only for approved

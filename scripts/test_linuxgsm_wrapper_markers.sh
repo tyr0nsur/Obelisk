@@ -3,6 +3,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WRAPPER="${REPO_ROOT}/packaging/linuxgsm/ObeliskRun.sh"
+DEBUG_WRAPPER="${REPO_ROOT}/packaging/linuxgsm/ObeliskRunDebug.sh"
 TMP_DIR="$(mktemp -d /tmp/obelisk-wrapper-markers.XXXXXX)"
 trap 'rm -rf "${TMP_DIR}"' EXIT
 LIBC_SO="$(ldconfig -p | awk '/libc\.so\.6/{print $NF; exit}')"
@@ -156,6 +157,8 @@ prepare_root "${root_inherited}"
     OBELISK_ROOT="${root_inherited}" \
     OBELISK_WRAPPER_CAPTURE="${capture_inherited}" \
     OBELISK_PLUGIN_DIR=/tmp/unsafe-obelisk-plugins \
+    OBELISK_CONFIG_DIR=/tmp/unsafe-obelisk-config \
+    OBELISK_LOG_DIR=/tmp/unsafe-obelisk-logs \
     OBELISK_ENABLE_PROCESS_EVENT_HOOK=1 \
     OBELISK_DISABLE_PLUGINS=1 \
     OBELISK_DEBUG_ALLOW_PTRACE=1 \
@@ -178,7 +181,11 @@ prepare_root "${root_inherited}"
 
 assert_contains "${capture_inherited}" '^OBELISK_INSTANCE_ID=arkserver$'
 assert_contains "${capture_inherited}" "^OBELISK_PLUGIN_DIR=${root_inherited}/plugins$"
+assert_contains "${capture_inherited}" "^OBELISK_CONFIG_DIR=${root_inherited}/config$"
+assert_contains "${capture_inherited}" "^OBELISK_LOG_DIR=${root_inherited}/logs$"
 assert_not_contains "${capture_inherited}" '^OBELISK_PLUGIN_DIR=/tmp/unsafe-obelisk-plugins$'
+assert_not_contains "${capture_inherited}" '^OBELISK_CONFIG_DIR=/tmp/unsafe-obelisk-config$'
+assert_not_contains "${capture_inherited}" '^OBELISK_LOG_DIR=/tmp/unsafe-obelisk-logs$'
 assert_not_contains "${capture_inherited}" '^OBELISK_ENABLE_PROCESS_EVENT_HOOK='
 assert_not_contains "${capture_inherited}" '^OBELISK_DISABLE_PLUGINS='
 assert_not_contains "${capture_inherited}" '^OBELISK_DEBUG_ALLOW_PTRACE='
@@ -205,5 +212,33 @@ ln -sf "${LIBC_SO}" "${root_symlink_instance}/lib/libobelisk.so"
 ln -s "${root_symlink_instance}/real-instance" "${root_symlink_instance}/state/instances/arkserver2"
 run_wrapper "${root_symlink_instance}" "${capture_symlink_instance}" TheIsland?listen
 assert_not_contains "${capture_symlink_instance}" '^OBELISK_ENABLE_INVENTORY_REFLECTION='
+
+capture_debug_default="${TMP_DIR}/debug-default.env"
+root_debug_default="${TMP_DIR}/root-debug-default"
+prepare_root "${root_debug_default}"
+(
+    cd "${TMP_DIR}"
+    OBELISK_ROOT="${root_debug_default}" \
+    OBELISK_WRAPPER_CAPTURE="${capture_debug_default}" \
+    "${DEBUG_WRAPPER}" TheIsland?listen
+)
+
+assert_contains "${capture_debug_default}" '^OBELISK_INSTANCE_ID=arkserver-obelisk-debug$'
+assert_contains "${capture_debug_default}" '^OBELISK_ENABLE_PROCESS_EVENT_HOOK=1$'
+assert_contains "${capture_debug_default}" '^OBELISK_DISABLE_PLUGINS=1$'
+assert_contains "${capture_debug_default}" '^OBELISK_PE_TRACE_LIMIT=0$'
+assert_not_contains "${capture_debug_default}" '^OBELISK_DEBUG_ALLOW_PTRACE='
+assert_not_contains "${capture_debug_default}" '^OBELISK_ENABLE_NATIVE_EXEC_PROBES='
+
+capture_debug_ptrace="${TMP_DIR}/debug-ptrace.env"
+(
+    cd "${TMP_DIR}"
+    OBELISK_ROOT="${root_debug_default}" \
+    OBELISK_WRAPPER_CAPTURE="${capture_debug_ptrace}" \
+    OBELISK_DEBUG_ALLOW_PTRACE=1 \
+    "${DEBUG_WRAPPER}" TheIsland?listen
+)
+
+assert_contains "${capture_debug_ptrace}" '^OBELISK_DEBUG_ALLOW_PTRACE=1$'
 
 echo "test_linuxgsm_wrapper_markers passed"

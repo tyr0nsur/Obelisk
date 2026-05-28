@@ -511,6 +511,9 @@ Updated: 2026-05-28
 - fact: Commit `9f320a0` added an opt-in debug ptrace workflow. `OBELISK_DEBUG_ALLOW_PTRACE=1`
   calls `prctl(PR_SET_PTRACER, PR_SET_PTRACER_ANY)` for authorized core dumps, and stable
   posture checks reject that env after debug work.
+- fact: LinuxGSM wrappers must not inherit unsafe production config/log/plugin env from a
+  shell session. The production wrapper pins plugin/config/log dirs under `OBELISK_ROOT`;
+  the debug wrapper no longer enables `OBELISK_DEBUG_ALLOW_PTRACE=1` by default.
 - fact: An authorized `arkserver` core dump confirmed static FName slot `0x5956f30` points
   to a plausible table for binary SHA256
   `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`: table

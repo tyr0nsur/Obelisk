@@ -183,7 +183,10 @@ work from repository state instead of chat history.
 
 - LD_PRELOAD runtime bootstrap.
 - Central install layout under `/servidor/ark/obelisk`.
-- `OBELISK_INSTANCE_ID` separates logs and preferred state markers per LinuxGSM instance.
+- `OBELISK_INSTANCE_ID` separates logs and preferred state markers per LinuxGSM instance;
+  plugin loading fails closed if it is missing or unsafe.
+- LinuxGSM production wrapper pins plugin/config/log dirs under `OBELISK_ROOT`; debug
+  wrapper does not enable ptrace by default.
 - Absolute x64 ProcessEvent hook with executable range and known prologue validation.
 - ProcessEvent direct-offset fallback is removed from active runtime code; a unique
   signature match is required.
