@@ -141,6 +141,28 @@ namespace Obelisk::Core
             return (g_ApiCapabilities.load(std::memory_order_acquire) &
                     OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS) != 0;
         }
+
+        bool ValidateProcessEventCallback(const char* apiName, OnProcessEventCallback callback)
+        {
+            if (callback)
+                return true;
+
+            OBELISK_WARN("{} rejected null callback.", apiName);
+            return false;
+        }
+
+        bool ValidateFilteredProcessEventCallback(const char* apiName,
+                                                  int32_t nameIndex,
+                                                  OnProcessEventCallback callback)
+        {
+            if (!ValidateProcessEventCallback(apiName, callback))
+                return false;
+            if (nameIndex >= 0)
+                return true;
+
+            OBELISK_WARN("{} rejected invalid negative FName index {}.", apiName, nameIndex);
+            return false;
+        }
     }
 
     // C-API Wrappers for Plugins
@@ -150,6 +172,8 @@ namespace Obelisk::Core
         void PluginLogError(const char* message) { OBELISK_ERROR("[Plugin] {}", message ? message : ""); }
 
         void PluginRegisterPreProcessEvent(OnProcessEventCallback callback) {
+            if (!ValidateProcessEventCallback("RegisterPreProcessEvent", callback))
+                return;
             if (!IsGlobalProcessEventCallbackCapabilityEnabled())
             {
                 OBELISK_WARN("Global PreProcessEvent callback rejected. Use RegisterPreProcessEventForNameIndex or enable allow-global-process-event-callbacks for a controlled debug window.");
@@ -158,6 +182,8 @@ namespace Obelisk::Core
             EventManager::Get().RegisterPreProcessEventOwned(ResolveCallbackOwner(callback), callback);
         }
         void PluginRegisterPostProcessEvent(OnProcessEventCallback callback) {
+            if (!ValidateProcessEventCallback("RegisterPostProcessEvent", callback))
+                return;
             if (!IsGlobalProcessEventCallbackCapabilityEnabled())
             {
                 OBELISK_WARN("Global PostProcessEvent callback rejected. Use RegisterPostProcessEventForNameIndex or enable allow-global-process-event-callbacks for a controlled debug window.");
@@ -166,9 +192,13 @@ namespace Obelisk::Core
             EventManager::Get().RegisterPostProcessEventOwned(ResolveCallbackOwner(callback), callback);
         }
         void PluginRegisterPreProcessEventForNameIndex(int32_t nameIndex, OnProcessEventCallback callback) {
+            if (!ValidateFilteredProcessEventCallback("RegisterPreProcessEventForNameIndex", nameIndex, callback))
+                return;
             EventManager::Get().RegisterPreProcessEventForNameIndexOwned(ResolveCallbackOwner(callback), nameIndex, callback);
         }
         void PluginRegisterPostProcessEventForNameIndex(int32_t nameIndex, OnProcessEventCallback callback) {
+            if (!ValidateFilteredProcessEventCallback("RegisterPostProcessEventForNameIndex", nameIndex, callback))
+                return;
             EventManager::Get().RegisterPostProcessEventForNameIndexOwned(ResolveCallbackOwner(callback), nameIndex, callback);
         }
         void PluginCallProcessEvent(void* caller, void* function, void* parms) {

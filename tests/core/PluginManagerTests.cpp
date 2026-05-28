@@ -30,7 +30,10 @@ namespace
         bool initResult = true;
         bool validMetadata = true;
         bool registerCallback = false;
+        bool registerNullCallback = false;
         bool registerFilteredCallback = false;
+        bool registerInvalidFilteredCallback = false;
+        bool registerNullFilteredCallback = false;
         bool registerChatCallback = false;
         int getInfoCalls = 0;
         int initCalls = 0;
@@ -102,8 +105,17 @@ namespace
         if (g_CurrentFakePlugin->registerCallback)
             api->RegisterPreProcessEvent(FakeCallback);
 
+        if (g_CurrentFakePlugin->registerNullCallback)
+            api->RegisterPreProcessEvent(nullptr);
+
         if (g_CurrentFakePlugin->registerFilteredCallback)
             api->RegisterPreProcessEventForNameIndex(42, FakeCallback);
+
+        if (g_CurrentFakePlugin->registerInvalidFilteredCallback)
+            api->RegisterPreProcessEventForNameIndex(-1, FakeCallback);
+
+        if (g_CurrentFakePlugin->registerNullFilteredCallback)
+            api->RegisterPreProcessEventForNameIndex(42, nullptr);
 
         if (g_CurrentFakePlugin->registerChatCallback)
         {
@@ -306,6 +318,34 @@ namespace
 
         Require(Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
                 "filtered callback was rejected by default");
+
+        manager.UnloadAll();
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestInvalidProcessEventCallbacksAreRejected()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_invalid_callbacks");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "invalid_callbacks.so",
+            .registerNullCallback = true,
+            .registerInvalidFilteredCallback = true,
+            .registerNullFilteredCallback = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "invalid-callback plugin was not initialized");
+        Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
+                "invalid ProcessEvent callbacks were registered");
 
         manager.UnloadAll();
         CleanupPlugin(plugin);
@@ -588,6 +628,7 @@ int main()
     TestValidPluginLoadsAndUnloadCleansCallbacks();
     TestGlobalProcessEventCallbackRejectedByDefault();
     TestFilteredProcessEventCallbackAllowedByDefault();
+    TestInvalidProcessEventCallbacksAreRejected();
     TestGlobalProcessEventCallbackAllowedWithGate();
     TestDisabledPluginPreparesConfigButDoesNotInit();
     TestInstanceDisallowedPluginDoesNotInit();

@@ -96,6 +96,9 @@ Updated: 2026-05-28
 - fact: Chat, inventory, and structure ProcessEvent observers all require runtime-side
   env+instance-marker gates plus binary SHA validation before activation. Chat now matches
   the inventory/structure marker discipline with `enable-chat-reflection`.
+- fact: Plugin API ProcessEvent registration wrappers reject null callbacks and negative
+  filtered FName indices before registering callbacks. `-1` remains a runtime sentinel for
+  unknown function names, not a valid plugin subscription target.
 - fact: Runtime observer marker checks use `runtime/RuntimeMarkers.*`, which rejects empty
   components, path traversal, slashes, dots, spaces, directory markers, symlink markers, and
   symlink instance directories before checking `state/instances/<instance>/<marker>`.
