@@ -515,6 +515,106 @@ namespace
 
         Require(attempt.Status == AttemptStatus::Rejected, "wrong structure outer was accepted");
     }
+
+    void TestBuildsCopiedStructureEventWithoutBorrowedObjectOrSensitiveFields()
+    {
+        StructureFixture fixture;
+        BuildVerifyPinCode(fixture);
+        fixture.Params[0] = 1;
+        fixture.Params[1] = 2;
+        fixture.Params[2] = 3;
+        fixture.Params[3] = 4;
+        fixture.Params[4] = 1;
+
+        Attempt attempt = TryIdentifyInvocation(
+            EnabledGate(),
+            kVerifyPinCodeNameIndex,
+            fixture.Reader(),
+            fixture.Function.data(),
+            fixture.Params.data());
+        Require(attempt.Status == AttemptStatus::Matched, attempt.Result.Reason.c_str());
+
+        CopiedStructureEvent event;
+        Require(TryBuildCopiedStructureEvent(attempt.Invocation, event),
+                "failed to build copied VerifyPinCode event");
+        Require(event.View.Kind == Obelisk::Core::StructureEventKind::VerifyPinCode,
+                "VerifyPinCode event kind mismatch");
+        Require(event.View.FunctionNameIndex == kVerifyPinCodeNameIndex,
+                "VerifyPinCode event function index mismatch");
+        Require(event.View.OuterNameIndex == kPrimalStructureItemContainerNameIndex,
+                "VerifyPinCode event outer index mismatch");
+        Require(event.View.Scalars.size() == 1, "VerifyPinCode copied sensitive pin code");
+        Require(event.View.Scalars[0].Field == Obelisk::Core::StructureScalarField::ReturnValue,
+                "VerifyPinCode return scalar field mismatch");
+        Require(event.View.Scalars[0].Type == Obelisk::Core::StructureScalarType::Bool,
+                "VerifyPinCode return scalar type mismatch");
+        Require(event.View.Scalars[0].BoolValue, "VerifyPinCode return scalar value mismatch");
+    }
+
+    void TestBuildsCopiedStructureEventForScalarStructureTargets()
+    {
+        {
+            StructureFixture fixture;
+            BuildSetVariant(fixture);
+            const int32_t variant = 11;
+            WriteAt(fixture.Params, 0x00, variant);
+            fixture.Params[0x04] = 1;
+            fixture.Params[0x05] = 0;
+
+            Attempt attempt = TryIdentifyInvocation(
+                EnabledGate(),
+                kSetVariantNameIndex,
+                fixture.Reader(),
+                fixture.Function.data(),
+                fixture.Params.data());
+            Require(attempt.Status == AttemptStatus::Matched, attempt.Result.Reason.c_str());
+
+            CopiedStructureEvent event;
+            Require(TryBuildCopiedStructureEvent(attempt.Invocation, event),
+                    "failed to build copied SetVariant event");
+            Require(event.View.Kind == Obelisk::Core::StructureEventKind::SetVariant,
+                    "SetVariant event kind mismatch");
+            Require(event.View.Scalars.size() == 3, "SetVariant scalar count mismatch");
+            Require(event.View.Scalars[0].Field == Obelisk::Core::StructureScalarField::VariantIndex,
+                    "SetVariant variant field mismatch");
+            Require(event.View.Scalars[0].Type == Obelisk::Core::StructureScalarType::Int32,
+                    "SetVariant variant type mismatch");
+            Require(event.View.Scalars[0].Int32Value == 11, "SetVariant variant value mismatch");
+            Require(event.View.Scalars[1].Field == Obelisk::Core::StructureScalarField::BForceSet,
+                    "SetVariant bForceSet field mismatch");
+            Require(event.View.Scalars[1].BoolValue, "SetVariant bForceSet value mismatch");
+            Require(event.View.Scalars[2].Field == Obelisk::Core::StructureScalarField::ReturnValue,
+                    "SetVariant return field mismatch");
+            Require(!event.View.Scalars[2].BoolValue, "SetVariant return value mismatch");
+        }
+        {
+            StructureFixture fixture;
+            BuildCanSeat(fixture);
+            fixture.Params[0x10] = 1;
+            fixture.Params[0x11] = 1;
+
+            Attempt attempt = TryIdentifyInvocation(
+                EnabledGate(),
+                kCanSeatNameIndex,
+                fixture.Reader(),
+                fixture.Function.data(),
+                fixture.Params.data());
+            Require(attempt.Status == AttemptStatus::Matched, attempt.Result.Reason.c_str());
+
+            CopiedStructureEvent event;
+            Require(TryBuildCopiedStructureEvent(attempt.Invocation, event),
+                    "failed to build copied CanSeat event");
+            Require(event.View.Kind == Obelisk::Core::StructureEventKind::CanSeat,
+                    "CanSeat event kind mismatch");
+            Require(event.View.Scalars.size() == 2, "CanSeat copied object parameters");
+            Require(event.View.Scalars[0].Field == Obelisk::Core::StructureScalarField::BForce,
+                    "CanSeat bForce field mismatch");
+            Require(event.View.Scalars[0].BoolValue, "CanSeat bForce value mismatch");
+            Require(event.View.Scalars[1].Field == Obelisk::Core::StructureScalarField::ReturnValue,
+                    "CanSeat return field mismatch");
+            Require(event.View.Scalars[1].BoolValue, "CanSeat return value mismatch");
+        }
+    }
 }
 
 int main()
@@ -527,6 +627,8 @@ int main()
     TestIdentifiesVerifyPinCodeWithoutPinRange();
     TestIdentifiesAllStructureHookTargets();
     TestRejectsStructureHookWrongOuter();
+    TestBuildsCopiedStructureEventWithoutBorrowedObjectOrSensitiveFields();
+    TestBuildsCopiedStructureEventForScalarStructureTargets();
 
     std::cout << "ProcessEventStructureReflectionTests passed\n";
     return 0;

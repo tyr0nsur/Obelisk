@@ -132,9 +132,9 @@ Do not skip steps because a single core, log line, or recognizer test looks conv
   safety gates are complete.
 - Internal copied-data dispatchers are the required bridge between candidate recognizers
   and public SDK modules. `core/StructureEventDispatcher` is the current structure example:
-  copy scalar values only, hide object/string/array/raw param storage, keep owner cleanup
-  tested, and do not expose it through the public ABI until the remaining promotion gates
-  are complete.
+  copy scalar values only through `ProcessEventStructureReflection` event building, hide
+  object/string/array/raw param storage, keep owner cleanup tested, and do not expose it
+  through the public ABI until the remaining promotion gates are complete.
 - Use snapshot fixtures and `compare_reflection_snapshots.py` before promoting any
   UFunction or ScriptStruct shape beyond candidate-only.
 - `compare_reflection_snapshots.py --target <Outer.Name>` is offline. It compares

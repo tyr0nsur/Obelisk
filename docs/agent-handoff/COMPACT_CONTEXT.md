@@ -369,6 +369,9 @@ work from repository state instead of chat history.
 - `core/StructureEventDispatcher` is an internal copied scalar-only bridge for future
   structure events. It has owner cleanup, self-unregister, in-flight cleanup wait, unknown
   shape rejection, and copied-storage tests; it is not public ABI/plugin SDK.
+- `ProcessEventStructureReflection::TryBuildCopiedStructureEvent` turns matched structure
+  recognizer output into copied scalar-only event storage. Sensitive pin values and object
+  params are omitted; `SetVariant`/`CanSeat` scalars are copied in hook-side tests.
 - `PluginManagerTests` cover plugin lifecycle and rejection paths with a fake loader:
   valid load/unload, missing entry points, invalid metadata, init failure, callback cleanup,
   shutdown, disabled/default config skip, instance allowlist skip, duplicate `plugin_id`,

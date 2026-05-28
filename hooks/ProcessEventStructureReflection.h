@@ -1,10 +1,13 @@
 #pragma once
 
+#include "core/StructureEventDispatcher.h"
 #include "ue/RuntimeReflection.h"
 #include "ue/StructureReflection.h"
 
-#include <cstdint>
+#include <array>
 #include <atomic>
+#include <cstddef>
+#include <cstdint>
 #include <string>
 
 namespace Obelisk::Hooks::ProcessEventStructureReflection
@@ -44,6 +47,13 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
         Obelisk::UE::StructureReflection::StructureInvocation Invocation;
     };
 
+    struct CopiedStructureEvent
+    {
+        Obelisk::Core::StructureEventView View;
+        std::array<Obelisk::Core::StructureScalarValue, 6> ScalarStorage{};
+        size_t ScalarCount = 0;
+    };
+
     Gate EvaluateGate(const char* enableStructureReflection, bool instanceMarkerEnabled, const char* binarySha256);
     bool IsReflectedStructureNameIndex(int32_t nameIndex);
     bool ShouldAttemptObservation(uint64_t limit);
@@ -56,4 +66,6 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
                                   const Obelisk::UE::RuntimeReflection::MemoryReader& reader,
                                   void* function,
                                   void* params);
+    bool TryBuildCopiedStructureEvent(const Obelisk::UE::StructureReflection::StructureInvocation& invocation,
+                                      CopiedStructureEvent& out);
 }

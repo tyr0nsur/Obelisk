@@ -1,6 +1,8 @@
 #include "ProcessEventStructureReflection.h"
 
+#include <cstdint>
 #include <cstring>
+#include <span>
 #include <string_view>
 #include <utility>
 
@@ -68,6 +70,91 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
         return false;
     }
 
+    namespace
+    {
+        Obelisk::Core::StructureEventKind ToEventKind(
+            Obelisk::UE::StructureReflection::StructureFunction function)
+        {
+            using Obelisk::Core::StructureEventKind;
+            using Obelisk::UE::StructureReflection::StructureFunction;
+            switch (function)
+            {
+            case StructureFunction::AllowStructureAccess:
+                return StructureEventKind::AllowStructureAccess;
+            case StructureFunction::IsAllowedToDemolish:
+                return StructureEventKind::IsAllowedToDemolish;
+            case StructureFunction::SetVariant:
+                return StructureEventKind::SetVariant;
+            case StructureFunction::AllowToggleActivation:
+                return StructureEventKind::AllowToggleActivation;
+            case StructureFunction::VerifyPinCode:
+                return StructureEventKind::VerifyPinCode;
+            case StructureFunction::CanSeat:
+                return StructureEventKind::CanSeat;
+            }
+            return StructureEventKind::VerifyPinCode;
+        }
+
+        bool TryGetScalarField(Obelisk::UE::StructureReflection::StructureField source,
+                               Obelisk::Core::StructureScalarField& out)
+        {
+            using Obelisk::Core::StructureScalarField;
+            using Obelisk::UE::StructureReflection::StructureField;
+            switch (source)
+            {
+            case StructureField::VariantIndex:
+                out = StructureScalarField::VariantIndex;
+                return true;
+            case StructureField::BForceSet:
+                out = StructureScalarField::BForceSet;
+                return true;
+            case StructureField::BForce:
+                out = StructureScalarField::BForce;
+                return true;
+            case StructureField::ReturnValue:
+                out = StructureScalarField::ReturnValue;
+                return true;
+            case StructureField::ForPC:
+            case StructureField::ForCharacter:
+            case StructureField::PinCode:
+                return false;
+            }
+            return false;
+        }
+
+        bool TryCopyScalar(const Obelisk::UE::StructureReflection::StructureFieldRange& field,
+                           Obelisk::Core::StructureScalarValue& out)
+        {
+            Obelisk::Core::StructureScalarField scalarField;
+            if (!TryGetScalarField(field.Field, scalarField))
+                return false;
+            if (!field.ExposesRange || !field.Range.Data)
+                return false;
+
+            out.Field = scalarField;
+            if (field.Size == sizeof(int32_t))
+            {
+                int32_t value = 0;
+                std::memcpy(&value, field.Range.Data, sizeof(value));
+                out.Type = Obelisk::Core::StructureScalarType::Int32;
+                out.BoolValue = false;
+                out.Int32Value = value;
+                return true;
+            }
+            if (field.Size == sizeof(uint8_t))
+            {
+                uint8_t value = 0;
+                std::memcpy(&value, field.Range.Data, sizeof(value));
+                out.Type = Obelisk::Core::StructureScalarType::Bool;
+                out.BoolValue = value != 0;
+                out.Int32Value = 0;
+                return true;
+            }
+
+            return false;
+        }
+    }
+
     Attempt TryIdentifyInvocation(const Gate& gate,
                                   int32_t nameIndex,
                                   const Obelisk::UE::RuntimeReflection::MemoryReader& reader,
@@ -97,5 +184,29 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
             return {AttemptStatus::Rejected, std::move(result), {}};
 
         return {AttemptStatus::Matched, std::move(result), std::move(invocation)};
+    }
+
+    bool TryBuildCopiedStructureEvent(const Obelisk::UE::StructureReflection::StructureInvocation& invocation,
+                                      CopiedStructureEvent& out)
+    {
+        out = {};
+        out.View.Kind = ToEventKind(invocation.Function);
+        out.View.FunctionNameIndex = invocation.FunctionNameIndex;
+        out.View.OuterNameIndex = invocation.OuterNameIndex;
+
+        for (const Obelisk::UE::StructureReflection::StructureFieldRange& field : invocation.Fields)
+        {
+            Obelisk::Core::StructureScalarValue scalar;
+            if (!TryCopyScalar(field, scalar))
+                continue;
+            if (out.ScalarCount >= out.ScalarStorage.size())
+                return false;
+
+            out.ScalarStorage[out.ScalarCount++] = scalar;
+        }
+
+        out.View.Scalars = std::span<const Obelisk::Core::StructureScalarValue>(
+            out.ScalarStorage.data(), out.ScalarCount);
+        return true;
     }
 }
