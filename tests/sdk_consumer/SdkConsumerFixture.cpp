@@ -2,8 +2,11 @@
 
 #include <dlfcn.h>
 
+#include <cstdlib>
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -53,6 +56,20 @@ namespace
         return true;
     }
 
+    std::filesystem::path CreateConfigDir(const char* defaultConfigJson)
+    {
+        char templatePath[] = "/tmp/obelisk-sdk-consumer.XXXXXX";
+        char* directory = mkdtemp(templatePath);
+        Require(directory != nullptr, "mkdtemp failed");
+
+        const std::filesystem::path configDir = directory;
+        std::ofstream config(configDir / "config.json");
+        Require(config.is_open(), "failed to create plugin config");
+        config << defaultConfigJson;
+        config.close();
+        return configDir;
+    }
+
     template <typename T>
     T ResolveRequired(void* handle, const char* symbol)
     {
@@ -80,7 +97,8 @@ int main(int argc, char** argv)
 {
     try
     {
-        Require(argc == 2, "usage: sdk_consumer_fixture <plugin-so>");
+        Require(argc == 2 || argc == 3, "usage: sdk_consumer_fixture <plugin-so> [expected-plugin-id]");
+        const char* expectedPluginId = argc == 3 ? argv[2] : "sdk_consumer_minimal";
 
         void* handle = dlopen(argv[1], RTLD_NOW | RTLD_LOCAL);
         if (!handle)
@@ -102,9 +120,14 @@ int main(int argc, char** argv)
         Require(getInfo(&metadata), "ObeliskPlugin_GetInfo failed");
         Require(metadata.abi_version == OBELISK_PLUGIN_METADATA_ABI_VERSION, "metadata ABI mismatch");
         Require(metadata.struct_size >= sizeof(ObeliskPluginMetadata), "metadata size mismatch");
-        Require(std::strcmp(metadata.plugin_id, "sdk_consumer_minimal") == 0, "plugin_id mismatch");
+        Require(std::strcmp(metadata.plugin_id, expectedPluginId) == 0, "plugin_id mismatch");
         Require(std::strcmp(metadata.config_file, "config.json") == 0, "config file mismatch");
         Require(metadata.default_config_json != nullptr, "missing default config");
+        std::filesystem::path configDir = CreateConfigDir(metadata.default_config_json);
+        const auto cleanupConfigDir = [&configDir]() {
+            if (!configDir.empty())
+                std::filesystem::remove_all(configDir);
+        };
 
         ObeliskApi api{};
         api.LogInfo = NoOpLog;
@@ -128,14 +151,17 @@ int main(int argc, char** argv)
         ObeliskPluginInitContext context{};
         context.abi_version = OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION;
         context.struct_size = sizeof(ObeliskPluginInitContext);
-        context.config_dir = "/tmp/obelisk-sdk-consumer";
-        context.config_path = "/tmp/obelisk-sdk-consumer/config.json";
+        const std::string configDirString = configDir.string();
+        const std::string configPathString = (configDir / "config.json").string();
+        context.config_dir = configDirString.c_str();
+        context.config_path = configPathString.c_str();
         context.instance_id = "sdk-consumer-test";
         context.plugin_owner_token = 0xC0FFEE;
 
         Require(init(&api, &context), "ObeliskPlugin_Init failed");
         if (shutdown)
             shutdown();
+        cleanupConfigDir();
         closeHandle();
     }
     catch (const std::exception& e)

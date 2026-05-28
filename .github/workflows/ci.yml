@@ -113,3 +113,25 @@ jobs:
               print("\n".join(bad))
               sys.exit(1)
           PY
+
+  release-readiness:
+    name: Release readiness
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            ca-certificates \
+            cmake \
+            git \
+            ninja-build
+
+      - name: Run first-stable release gate
+        run: scripts/check_release_readiness.sh

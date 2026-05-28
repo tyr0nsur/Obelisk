@@ -130,6 +130,10 @@ Updated: 2026-05-28
   tests, validates installed runtime/SDK layout, exercises read-only operator CLI status,
   dry-runs runtime/plugin installers, and runs `git diff --check` without touching live
   ARK server roots.
+- fact: Release readiness now fails closed on tracked or untracked non-ignored worktree
+  changes unless `--allow-dirty` is used while developing the gate. CTest also loads the
+  real `oBaseEvents` plugin through the SDK consumer fixture, validating its exported
+  `GetInfo`/`Init`/optional `Shutdown` path against the public ABI.
 - fact: Shared plugin config default creation is hardened for concurrent multi-instance
   startup: each process uses a unique temporary file and atomically installs the default
   only if the config path is still absent, with coverage in `PluginConfigTests`.

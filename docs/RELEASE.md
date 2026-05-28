@@ -31,8 +31,9 @@ Excluded:
 scripts/check_release_readiness.sh
 ```
 
-Set `OBELISK_KEEP_RELEASE_CHECK_ROOTS=1` to keep the temporary install roots for manual
-inspection after the script completes.
+The script requires a clean worktree by default. Use `--allow-dirty` only while developing
+the release gate itself. Set `OBELISK_KEEP_RELEASE_CHECK_ROOTS=1` to keep the temporary
+install roots for manual inspection after the script completes.
 
 3. Confirm `scripts/test_install_obelisk_layout.sh` covered runtime backup reinstall:
    one backup each for `libobelisk.so` and `libsubhook.so`, no `.incoming.*` files, no

@@ -32,3 +32,8 @@ add_test(
     NAME SdkConsumerFixtureNoShutdown
     COMMAND sdk_consumer_fixture "$<TARGET_FILE:sdk_consumer_minimal_no_shutdown_plugin>"
 )
+
+add_test(
+    NAME SdkConsumerFixtureOBaseEvents
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oBaseEvents>" oBaseEvents
+)
