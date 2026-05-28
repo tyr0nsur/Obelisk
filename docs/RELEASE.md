@@ -103,7 +103,8 @@ satisfied.
 3. Confirm `scripts/test_install_obelisk_layout.sh` covered runtime backup reinstall:
    one backup each for `libobelisk.so` and `libsubhook.so`, no `.incoming.*` files, no
    `.install-runtime.*` staging directory, invalid install roots rejected, failed runtime
-   rename cleanup, and installed `RUNPATH=$ORIGIN`.
+   rename cleanup, required positional install roots even when `OBELISK_ROOT` is set, and
+   installed `RUNPATH=$ORIGIN`.
 4. Confirm no generated artifacts are staged:
 
 ```bash

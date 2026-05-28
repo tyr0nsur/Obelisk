@@ -30,6 +30,9 @@ Use:
 ./scripts/install_obelisk.sh /servidor/ark/obelisk
 ```
 
+The install root is positional and mandatory; installers must not publish to a default root
+or use inherited `OBELISK_ROOT` when the root argument is omitted.
+
 Install layout:
 
 ```text

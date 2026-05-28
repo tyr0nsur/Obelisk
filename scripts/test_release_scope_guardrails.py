@@ -166,6 +166,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("--second-source-report-dir", pr_template)
         self.assertIn("--second-source-report-dir", script)
         self.assertIn("--fail-on-readiness-gaps", script)
+        self.assertIn("required positional install roots even when `OBELISK_ROOT` is set", release)
         self.assertIn("analyze_runtime_observer_log.py --fail-on-quality-blockers", release)
         self.assertIn("not a release gate", release)
         self.assertIn("not\nsecond-source promotion evidence", release)

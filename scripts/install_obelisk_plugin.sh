@@ -3,23 +3,22 @@ set -euo pipefail
 
 usage() {
     cat <<'EOF'
-Usage: scripts/install_obelisk_plugin.sh [options] <PluginName.so> [root]
+Usage: scripts/install_obelisk_plugin.sh [options] <PluginName.so> <root>
 
 Installs one Obelisk plugin into the shared plugin directory using a staged copy and
 atomic rename inside the destination directory. The staged filename does not end in .so, so
 runtime plugin discovery will not try to dlopen a partial copy.
+The install root must be supplied as a positional argument.
 
 Options:
   --dry-run              Print actions without changing files.
   --backup-existing      Back up a replaced plugin .so with a timestamp suffix.
   -h, --help             Show this help.
 
-Default root:
-  /servidor/ark/obelisk
 EOF
 }
 
-ROOT="/servidor/ark/obelisk"
+ROOT=""
 DRY_RUN=0
 BACKUP_EXISTING=0
 PLUGIN_SRC=""

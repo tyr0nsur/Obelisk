@@ -37,6 +37,22 @@ plugin_src="${TMP_DIR}/ExamplePlugin.so"
 root="${TMP_DIR}/root"
 printf 'first\n' > "${plugin_src}"
 
+if env -u OBELISK_ROOT "${INSTALLER}" --dry-run "${plugin_src}" \
+    >"${TMP_DIR}/missing-root.out" 2>"${TMP_DIR}/missing-root.err"; then
+    echo "Installer accepted a missing install root" >&2
+    exit 1
+fi
+assert_contains "${TMP_DIR}/missing-root.err" 'Install root must be a non-root absolute path'
+
+env_root="${TMP_DIR}/env-root"
+if OBELISK_ROOT="${env_root}" "${INSTALLER}" --dry-run "${plugin_src}" \
+    >"${TMP_DIR}/env-root.out" 2>"${TMP_DIR}/env-root.err"; then
+    echo "Installer accepted OBELISK_ROOT without a positional root" >&2
+    exit 1
+fi
+assert_contains "${TMP_DIR}/env-root.err" 'Install root must be a non-root absolute path'
+assert_not_exists "${env_root}"
+
 "${INSTALLER}" "${plugin_src}" "${root}" > "${TMP_DIR}/install.out"
 assert_exists "${root}/plugins/ExamplePlugin.so"
 assert_not_exists "${root}/plugins/.ExamplePlugin.so.incoming.$$"

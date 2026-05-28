@@ -3,11 +3,12 @@ set -euo pipefail
 
 usage() {
     cat <<'EOF'
-Usage: scripts/install_obelisk.sh [options] [root]
+Usage: scripts/install_obelisk.sh [options] <root>
 
 Installs built Obelisk runtime artifacts into a centralized server root.
 Runtime .so files are staged under temporary names in the destination directory and then
 published with atomic renames, so ARK restarts do not observe partial shared libraries.
+The install root must be supplied as a positional argument.
 
 Options:
   --dry-run              Print actions without changing files.
@@ -15,12 +16,10 @@ Options:
   --build-dir <dir>      Use a specific CMake build directory (default: build or OBELISK_BUILD_DIR).
   -h, --help             Show this help.
 
-Default root:
-  /servidor/ark/obelisk
 EOF
 }
 
-ROOT="/servidor/ark/obelisk"
+ROOT=""
 DRY_RUN=0
 BACKUP_EXISTING=0
 BUILD_DIR_INPUT="${OBELISK_BUILD_DIR:-build}"

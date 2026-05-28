@@ -142,7 +142,7 @@ The stable operational flow is:
 1. Build or obtain `PluginName.so`.
 2. Ensure `${OBELISK_CONFIG_DIR}/<plugin-id>/config.json` exists or let the runtime
    create the safe-disabled default on first load.
-3. Install the `.so` with `scripts/install_obelisk_plugin.sh PluginName.so ${OBELISK_ROOT}`.
+3. Install the `.so` with `scripts/install_obelisk_plugin.sh PluginName.so <obelisk-root>`.
 4. Restart only the target ARK instance.
 
 The plugin installer copies to a temporary non-`.so` name in the destination directory and

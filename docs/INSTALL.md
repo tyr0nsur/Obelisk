@@ -29,11 +29,12 @@ Install the runtime:
 ./scripts/install_obelisk.sh --backup-existing /servidor/ark/obelisk
 ```
 
-The install root must be a non-root absolute path and must not be a symlink. Managed
-subdirectories must also be real directories, not symlinks: `lib`, `plugins`, `include`,
-`config`, `logs`, `state`, and `state/instances`. The installer rejects empty, relative,
-`/`, symlink roots, and symlinked managed paths before creating directories or publishing
-artifacts.
+The install root must be supplied explicitly as a positional argument; the installer does
+not default to the live root and does not use inherited `OBELISK_ROOT` when omitted. The
+root must be a non-root absolute path and must not be a symlink. Managed subdirectories
+must also be real directories, not symlinks: `lib`, `plugins`, `include`, `config`, `logs`,
+`state`, and `state/instances`. The installer rejects empty, relative, `/`, symlink roots,
+and symlinked managed paths before creating directories or publishing artifacts.
 
 The script copies:
 
@@ -80,8 +81,9 @@ If a plugin should not load, do not place it in `plugins/`.
 Install plugin `.so` files with `scripts/install_obelisk_plugin.sh <PluginName.so>
 /servidor/ark/obelisk`; it stages the copy under a non-`.so` name and publishes it with an
 atomic rename inside the shared plugin directory. The plugin installer also rejects a
-symlinked `plugins` directory. Do not copy plugins directly into the active directory while
-ARK instances may restart.
+missing positional root, ignores inherited `OBELISK_ROOT` as an install target, and rejects
+a symlinked `plugins` directory. Do not copy plugins directly into the active directory
+while ARK instances may restart.
 
 Useful installer flags:
 

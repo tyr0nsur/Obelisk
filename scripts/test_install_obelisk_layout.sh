@@ -53,6 +53,28 @@ require_not_contains() {
 require_cmd "${CXX_BIN}"
 require_cmd readelf
 
+if env -u OBELISK_ROOT "${REPO_DIR}/scripts/install_obelisk.sh" --dry-run \
+    >"${WORK_DIR}/missing-root.out" 2>"${WORK_DIR}/missing-root.err"; then
+    echo "install_obelisk.sh accepted a missing install root" >&2
+    exit 1
+fi
+if ! grep -F 'Install root must be a non-root absolute path' "${WORK_DIR}/missing-root.err" >/dev/null; then
+    echo "missing root error was unclear" >&2
+    cat "${WORK_DIR}/missing-root.err" >&2
+    exit 1
+fi
+
+if OBELISK_ROOT="${WORK_DIR}/env-root" "${REPO_DIR}/scripts/install_obelisk.sh" --dry-run \
+    >"${WORK_DIR}/env-root.out" 2>"${WORK_DIR}/env-root.err"; then
+    echo "install_obelisk.sh accepted OBELISK_ROOT without a positional root" >&2
+    exit 1
+fi
+if ! grep -F 'Install root must be a non-root absolute path' "${WORK_DIR}/env-root.err" >/dev/null; then
+    echo "OBELISK_ROOT fallback rejection was unclear" >&2
+    cat "${WORK_DIR}/env-root.err" >&2
+    exit 1
+fi
+
 for invalid_root in "" "/" "." "relative/root"; do
     if "${REPO_DIR}/scripts/install_obelisk.sh" --dry-run "${invalid_root}" \
         >"${WORK_DIR}/invalid-root.out" 2>"${WORK_DIR}/invalid-root.err"; then
