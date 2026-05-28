@@ -29,6 +29,9 @@ Install the runtime:
 ./scripts/install_obelisk.sh --backup-existing /servidor/ark/obelisk
 ```
 
+The install root must be a non-root absolute path and must not be a symlink. The installer
+rejects empty, relative, `/`, and symlink roots before creating directories.
+
 The script copies:
 
 ```text
@@ -44,6 +47,8 @@ CMake `Runtime` component in a temporary install root, then both `libsubhook.so`
 `libobelisk.so` are installed under temporary `.incoming.<pid>` names and atomically
 renamed to their final paths. With `--backup-existing`, matching timestamped backups are
 created for both runtime libraries before replacement.
+If a staged runtime rename fails, temporary `.incoming.<pid>` files and the temporary
+runtime install root are removed by the installer cleanup trap.
 
 Rollback should restore `libobelisk.so` and `libsubhook.so` as a compatible pair from the
 same backup timestamp, then restart only the approved target instance and re-run the stable

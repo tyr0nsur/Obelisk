@@ -53,6 +53,7 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="${REPO_DIR}/build"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 STAGE_ROOT="${ROOT}/.install-runtime.${STAMP}.$$"
+TEMP_PATHS=()
 
 run() {
     if [[ "${DRY_RUN}" == "1" ]]; then
@@ -80,12 +81,27 @@ backup_existing() {
     fi
 }
 
-cleanup_stage() {
+validate_root() {
+    if [[ -z "${ROOT}" || "${ROOT}" != /* || "${ROOT}" == "/" ]]; then
+        echo "Install root must be a non-root absolute path: ${ROOT:-<empty>}" >&2
+        exit 2
+    fi
+
+    if [[ -L "${ROOT}" ]]; then
+        echo "Install root must not be a symlink: ${ROOT}" >&2
+        exit 2
+    fi
+}
+
+cleanup_temp_paths() {
     if [[ "${DRY_RUN}" != "1" ]]; then
+        for temp_path in "${TEMP_PATHS[@]}"; do
+            rm -f "${temp_path}"
+        done
         rm -rf "${STAGE_ROOT}"
     fi
 }
-trap cleanup_stage EXIT
+trap cleanup_temp_paths EXIT
 
 install_staged_file() {
     local mode="$1"
@@ -96,6 +112,7 @@ install_staged_file() {
         require_file "${src}"
     fi
     backup_existing "${dst}"
+    TEMP_PATHS+=("${tmp}")
     run install -m "${mode}" "${src}" "${tmp}"
     run mv -f "${tmp}" "${dst}"
 }
@@ -115,6 +132,8 @@ install_sdk_package() {
     require_file "${BUILD_DIR}/ObeliskConfigVersion.cmake"
     run cmake --install "${BUILD_DIR}" --prefix "${ROOT}" --component SDK
 }
+
+validate_root
 
 run mkdir -p \
     "${ROOT}/lib" \

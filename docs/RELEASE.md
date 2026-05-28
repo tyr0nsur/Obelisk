@@ -39,7 +39,8 @@ scripts/install_obelisk_plugin.sh --dry-run build/plugins/oBaseEvents/oBaseEvent
 
 3. Confirm `scripts/test_install_obelisk_layout.sh` covered runtime backup reinstall:
    one backup each for `libobelisk.so` and `libsubhook.so`, no `.incoming.*` files, no
-   `.install-runtime.*` staging directory, and installed `RUNPATH=$ORIGIN`.
+   `.install-runtime.*` staging directory, invalid install roots rejected, failed runtime
+   rename cleanup, and installed `RUNPATH=$ORIGIN`.
 4. Confirm no generated artifacts are staged:
 
 ```bash

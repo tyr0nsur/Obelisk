@@ -49,6 +49,61 @@ require_not_contains() {
 require_cmd "${CXX_BIN}"
 require_cmd readelf
 
+for invalid_root in "" "/" "." "relative/root"; do
+    if "${REPO_DIR}/scripts/install_obelisk.sh" --dry-run "${invalid_root}" \
+        >"${WORK_DIR}/invalid-root.out" 2>"${WORK_DIR}/invalid-root.err"; then
+        echo "install_obelisk.sh accepted invalid root '${invalid_root}'" >&2
+        exit 1
+    fi
+    if ! grep -F 'Install root must be a non-root absolute path' "${WORK_DIR}/invalid-root.err" >/dev/null; then
+        echo "invalid root error was unclear for '${invalid_root}'" >&2
+        cat "${WORK_DIR}/invalid-root.err" >&2
+        exit 1
+    fi
+done
+
+symlink_target="${WORK_DIR}/root-target"
+symlink_root="${WORK_DIR}/root-symlink"
+mkdir -p "${symlink_target}"
+ln -s "${symlink_target}" "${symlink_root}"
+if "${REPO_DIR}/scripts/install_obelisk.sh" --dry-run "${symlink_root}" \
+    >"${WORK_DIR}/symlink-root.out" 2>"${WORK_DIR}/symlink-root.err"; then
+    echo "install_obelisk.sh accepted symlink root" >&2
+    exit 1
+fi
+if ! grep -F 'Install root must not be a symlink' "${WORK_DIR}/symlink-root.err" >/dev/null; then
+    echo "symlink root error was unclear" >&2
+    cat "${WORK_DIR}/symlink-root.err" >&2
+    exit 1
+fi
+
+fake_bin="${WORK_DIR}/fake-bin"
+failure_root="${WORK_DIR}/failure-root"
+mkdir -p "${fake_bin}"
+cat > "${fake_bin}/mv" <<'SH'
+#!/usr/bin/env bash
+if [[ "$*" == *'.incoming.'* ]]; then
+    exit 77
+fi
+exec /usr/bin/mv "$@"
+SH
+chmod +x "${fake_bin}/mv"
+if PATH="${fake_bin}:${PATH}" "${REPO_DIR}/scripts/install_obelisk.sh" "${failure_root}" \
+    >"${WORK_DIR}/fail-mv.out" 2>"${WORK_DIR}/fail-mv.err"; then
+    echo "install_obelisk.sh succeeded despite failing runtime rename" >&2
+    exit 1
+fi
+if find "${failure_root}" -name '*.incoming.*' | grep -q .; then
+    echo "failed runtime install left incoming temporary files" >&2
+    find "${failure_root}" -print >&2
+    exit 1
+fi
+if find "${failure_root}" -maxdepth 1 -name '.install-runtime.*' | grep -q .; then
+    echo "failed runtime install left staging directories" >&2
+    find "${failure_root}" -maxdepth 1 -print >&2
+    exit 1
+fi
+
 "${REPO_DIR}/scripts/install_obelisk.sh" "${INSTALL_ROOT}"
 
 require_path "${INSTALL_ROOT}/lib/libobelisk.so"

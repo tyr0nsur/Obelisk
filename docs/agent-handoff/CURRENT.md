@@ -442,6 +442,9 @@ Updated: 2026-05-28
   in a temporary install root, then publishes `libsubhook.so` and `libobelisk.so` with
   destination-local `.incoming.<pid>` names plus atomic rename. Backup reinstall coverage
   requires one matching backup each for both runtime libraries and no temporary leftovers.
+- fact: `scripts/install_obelisk.sh` rejects empty, relative, `/`, and symlink install
+  roots, and its cleanup trap removes destination `.incoming.<pid>` files plus the runtime
+  staging root on failed runtime renames.
 - fact: Commit `96b53d2` hardened installed SDK package validation by requiring
   `find_package(Obelisk 0.1.0 CONFIG REQUIRED)` and rejecting source/build tree
   path leaks in installed CMake package files.
