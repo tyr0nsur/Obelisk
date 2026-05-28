@@ -65,6 +65,16 @@ add_test(
 )
 
 add_test(
+    NAME SdkConsumerFixtureOBaseEventsCallbackNoThrow
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oBaseEvents>" oBaseEvents callback-throw-log
+)
+
+add_test(
+    NAME SdkConsumerFixtureOBaseEventsNoThrowBoundary
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oBaseEvents>" oBaseEvents throw-log-init
+)
+
+add_test(
     NAME SdkConsumerFixtureOBaseEventsRejectsMapAllowlist
     COMMAND sdk_consumer_fixture "$<TARGET_FILE:oBaseEvents>" oBaseEvents unsupported-map-allowlist
 )

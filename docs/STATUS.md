@@ -30,7 +30,7 @@ define or protect runtime behavior.
 | Installer plugin posture | Stable baseline | `scripts/install_obelisk.sh` installs runtime/SDK artifacts; plugins are published with `scripts/install_obelisk_plugin.sh`, which stages under a non-`.so` name before atomic rename into `plugins/`. |
 | Operator CLI | Experimental | `scripts/obelisk.py` exposes read-only `status`, `instances list`, `plugins list`, and `plugins show`; lifecycle commands are planned after LinuxGSM integration and explicit restart safety gates. |
 | Per-instance runtime flags | Stable baseline | `OBELISK_INSTANCE_ID` selects logs and markers under `state/instances/<id>/`; map markers are obsolete. |
-| ProcessEvent hook | Stable baseline | Current Ragnarok posture enables the hook while disabling plugins. |
+| ProcessEvent hook | Stable baseline | The preferred Ragnarok baseline enables the hook while disabling plugins, but current live posture must be verified from `docs/agent-handoff/CURRENT.md` and `check_obelisk_server_posture.sh` before making claims. |
 | Server posture check | Stable baseline | `scripts/check_obelisk_server_posture.sh --expect-stable --map <map> --instance <instance-id>` validates stable env flags, requires central `${OBELISK_ROOT}/lib/libobelisk.so` in `LD_PRELOAD` and maps, requires a safe instance id, a non-symlink marker directory, and the stable per-instance markers, rejects deleted runtime mappings, and fails closed on forbidden per-instance marker entries that would reactivate experimental features at next restart. Covered by offline procfs-fixture tests. `--forbid-chat-reflection` remains a legacy compatibility flag because chat observers are already forbidden by `--expect-stable`. |
 | Plugin C ABI loading | Stable baseline | ABI is C-compatible and currently append-only for new metadata fields. |
 | Filtered ProcessEvent callbacks | Stable baseline | Prefer callbacks scoped by `FName` index over global callbacks. |
@@ -69,7 +69,7 @@ Blocked from stable plugin APIs until promoted with evidence:
 
 ## Harness Safety Baseline
 
-For the current protected Ragnarok performance posture, the documented stable markers are:
+For the protected Ragnarok performance baseline, the documented stable markers are:
 
 ```text
 state/instances/arkserver/enable-process-event-hook

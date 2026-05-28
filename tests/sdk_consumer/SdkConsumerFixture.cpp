@@ -20,6 +20,7 @@ namespace
     int g_RegisterCount = 0;
     int g_UnregisterCount = 0;
     bool g_ThrowLog = false;
+    OnProcessEventCallback g_RegisteredCallback = nullptr;
 
     void Require(bool condition, const char* message)
     {
@@ -52,6 +53,7 @@ namespace
         Require(ownerToken == 0xC0FFEE, "unexpected owner token in callback registration");
         Require(nameIndex == 42, "unexpected callback FName index");
         Require(callback != nullptr, "callback registration received null callback");
+        g_RegisteredCallback = callback;
         ++g_RegisterCount;
         return 1001;
     }
@@ -60,6 +62,7 @@ namespace
     {
         Require(ownerToken == 0xC0FFEE, "unexpected owner token in callback unregister");
         Require(registrationId == 1001, "unexpected callback registration id");
+        g_RegisteredCallback = nullptr;
         ++g_UnregisterCount;
         return true;
     }
@@ -160,7 +163,7 @@ int main(int argc, char** argv)
         Require(std::strcmp(metadata.config_file, "config.json") == 0, "config file mismatch");
         Require(metadata.default_config_json != nullptr, "missing default config");
         const char* configJson = metadata.default_config_json;
-        if (mode == "active-process-event")
+        if (mode == "active-process-event" || mode == "callback-throw-log")
             configJson = kActiveOBaseEventsConfig;
         else if (mode == "unsupported-map-allowlist")
             configJson = kUnsupportedMapAllowlistConfig;
@@ -236,13 +239,22 @@ int main(int argc, char** argv)
         }
 
         Require(initSucceeded, "ObeliskPlugin_Init failed");
+        if (mode == "callback-throw-log")
+        {
+            Require(g_RegisterCount == 1, "active plugin did not register one callback");
+            Require(g_RegisteredCallback != nullptr, "active plugin did not expose callback to fixture");
+            g_ThrowLog = true;
+            Require(g_RegisteredCallback(nullptr, nullptr, nullptr), "callback returned false");
+            g_ThrowLog = false;
+        }
         api = {};
         if (shutdown)
             shutdown();
-        if (mode == "active-process-event")
+        if (mode == "active-process-event" || mode == "callback-throw-log")
         {
             Require(g_RegisterCount == 1, "active plugin did not register one callback");
             Require(g_UnregisterCount == 1, "active plugin did not unregister one callback");
+            Require(g_RegisteredCallback == nullptr, "active plugin callback survived shutdown unregister");
         }
         else if (std::strcmp(expectedPluginId, "oBaseEvents") == 0)
         {

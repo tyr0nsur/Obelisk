@@ -40,6 +40,8 @@ FORBIDDEN_STALE_PHRASES = [
     "Current default validation uses",
     "default read-only validation target",
     "default validation target is",
+    "Current Ragnarok posture enables",
+    "current protected Ragnarok performance posture",
     "Under the current RAM\n  constraint",
     "`arkserver` / Ragnarok available for Obelisk tests",
     "`arkserver` / Ragnarok is available as the Obelisk debug/development",
