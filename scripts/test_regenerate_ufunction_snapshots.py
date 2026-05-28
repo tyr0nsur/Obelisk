@@ -696,6 +696,50 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
         self.assertIn("layout diff", result.stdout)
         self.assertIn("layout drift detected", result.stderr)
 
+    def test_check_layout_detects_target_membership_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            manifest = root / "manifest.json"
+            output_root = root / "out"
+            output = output_root / "7e7ded49e0c6" / "sdk_test" / "PrimalStructure.AllowStructureAccess.snapshot.json"
+            addrs = build_core_fixture(core)
+            self.write_manifest(manifest)
+            common_args = [
+                sys.executable,
+                str(SCRIPT_DIR / "regenerate_ufunction_snapshots.py"),
+                "--core",
+                str(core),
+                "--manifest",
+                str(manifest),
+                "--output-root",
+                str(output_root),
+                "--gobjects",
+                hex(addrs["gobjects"]),
+                "--fname-root-slot",
+                hex(addrs["fname_root_slot"]),
+                "--obelisk-commit",
+                "abcdef1",
+            ]
+
+            subprocess.run([*common_args, "--write"], check=True, capture_output=True, text=True)
+            payload = json.loads(output.read_text(encoding="utf-8"))
+            payload["targets"][0]["membership"]["target"] = "missing"  # type: ignore[index]
+            payload["targets"][0]["reject_reasons"] = ["target_not_in_gobjects"]  # type: ignore[index]
+            payload["targets"][0]["property_chain"]["reject_reasons"] = ["weak_target_membership"]  # type: ignore[index]
+            output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+            result = subprocess.run(
+                [*common_args, *self.SECOND_SOURCE_ARGS, "--check-layout"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("layout diff", result.stdout)
+        self.assertIn("layout drift detected", result.stderr)
+
     def test_check_layout_requires_second_source_identity(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

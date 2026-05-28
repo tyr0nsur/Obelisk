@@ -962,6 +962,10 @@ Updated: 2026-05-28
 - fact: Chat reflection is being aligned with the general observer policy: the wrapper and
   runtime should default `OBELISK_CHAT_REFLECTION_LOG_LIMIT` to `0`; any field-reading
   observer capture requires an explicit positive budget in an approved debug window.
+- fact: UFunction and ScriptStruct `--check-layout` regeneration now compares target
+  membership, target reject reasons, and property-chain reject reasons. Layout checks must
+  not report success when a second-source artifact only matches offsets/names but loses
+  plausible `GObjects` membership evidence.
 
 ## Agent Protocol
 

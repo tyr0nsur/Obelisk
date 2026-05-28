@@ -270,6 +270,8 @@ def target_layout(payload: dict[str, object]) -> object:
                 "outer_name": identity.get("outer_name"),
                 "outer_class_name": identity.get("outer_class_name"),
             },
+            "membership": target.get("membership"),
+            "reject_reasons": target.get("reject_reasons"),
             "status": target.get("status"),
             "num_parms": target.get("num_parms"),
             "parms_size": target.get("parms_size"),
@@ -277,6 +279,7 @@ def target_layout(payload: dict[str, object]) -> object:
             "return_value_offset": target.get("return_value_offset"),
             "property_chain": {
                 "status": chain.get("status"),
+                "reject_reasons": chain.get("reject_reasons"),
                 "expected_count": chain.get("expected_count"),
                 "observed_count": chain.get("observed_count"),
                 "parms_size": chain.get("parms_size"),
