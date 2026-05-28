@@ -18,9 +18,6 @@ Updated: 2026-05-28
 - guardrails: do not restart servers, edit `/servidor/ark`, change markers, run
   ReflectionScanner, attach ptrace/gcore, enable broad `ProcessEvent` tracing, or publish
   runtime observations without explicit operator approval for that run.
-- cadence: use focused agent rounds, integrate findings into repo files, validate with
-  safe offline tests, and commit/push stable checkpoints. Community announcement policy
-  is lead-owned in `agent-skills/obelisk-github-research-workflow/SKILL.md`.
 
 ## Stable Baseline
 
@@ -322,9 +319,10 @@ Updated: 2026-05-28
   `--fname-root-slot` for the sampled artifact so UObject/Class names are not resolved
   through a primary-core-only default.
 - fact: `scripts/regenerate_ufunction_snapshots.py --check-layout` now supports
-  UFunction layout-only verification for second-source intake. It ignores unstable
-  identity/evidence indices while preserving target identity, UFunction fields, and
-  property-chain layout drift.
+  UFunction layout-only verification for second-source intake, and both UFunction and
+  ScriptStruct `--check-layout` runs require full artifact identity plus explicit
+  `--fname-root-slot`. They ignore unstable identity/evidence indices while preserving
+  target identity, reflected fields, and property-chain layout drift.
 - fact: UFunction and ScriptStruct snapshot regenerators accept sanitized artifact
   identity flags (`--artifact-kind`, `--artifact-sha256`, `--capture-id`,
   `--evidence-pack-id`) for second-source evidence packs. The committed primary fixtures
@@ -412,7 +410,8 @@ Updated: 2026-05-28
 - fact: `sdk.transfers` ScriptStruct fixtures now preserve target/property object and
   FName identity fields like UFunction fixtures. `regenerate_scriptstruct_snapshots.py
   --check-layout` stays semantic/layout-only so second-source gates do not depend on
-  unstable FName/GObjects indices.
+  unstable FName/GObjects indices, but it now requires full artifact identity and explicit
+  `--fname-root-slot`.
 - next-step: Continue priority rounds on general reflection/API substrate. Immediate safe
   priorities are: use the minimal second-source intake in
   `docs/research/2026-05-28-second-source-reversing-gap-matrix.md` before expanding more

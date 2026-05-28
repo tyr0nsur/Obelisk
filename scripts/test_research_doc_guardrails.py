@@ -78,6 +78,39 @@ class ResearchDocGuardrailTests(unittest.TestCase):
             self.assertIn("arkserver-obelisk-debug", text, str(note))
             self.assertNotIn("/servidor/ark/arkserver start", text, str(note))
 
+    def test_module_readiness_uses_current_debug_target_language(self) -> None:
+        notes = [
+            REPO_ROOT / "docs/research/2026-05-27-module-readiness-matrix.md",
+            REPO_ROOT / "docs/research/2026-05-27-mission-tribe-function-snapshot-fixtures.md",
+            REPO_ROOT / "docs/research/2026-05-27-structure-function-snapshot-fixtures.md",
+            REPO_ROOT / "docs/research/2026-05-27-primaldinocharacter-function-inventory.md",
+            REPO_ROOT / "docs/research/2026-05-27-primalbuff-snapshot-fixtures.md",
+            REPO_ROOT / "docs/research/2026-05-27-chat-reflection-stack-cycle-guard.md",
+            REPO_ROOT / "docs/research/2026-05-27-structure-runtime-observation-plan.md",
+            REPO_ROOT / "docs/research/2026-05-28-inventory-observation-gate-plan.md",
+            REPO_ROOT / "docs/research/2026-05-27-transfer-upload-download-fixture-triage.md",
+            REPO_ROOT / "docs/research/2026-05-27-tribe-control-observation-fixture.md",
+            REPO_ROOT / "docs/research/2026-05-27-inventory-controller-snapshot-fixtures.md",
+            REPO_ROOT / "docs/research/2026-05-27-primalitem-function-inventory.md",
+            REPO_ROOT / "docs/research/2026-05-27-real-core-ufunction-snapshot-fixtures.md",
+        ]
+        forbidden = [
+            "TheIsland/debug",
+            "TheIsland A/B",
+            "gated to TheIsland",
+            "Use only TheIsland",
+            "TheIsland/debug-instance",
+        ]
+
+        offenders: list[str] = []
+        for note in notes:
+            text = note.read_text(encoding="utf-8")
+            for phrase in forbidden:
+                if phrase in text:
+                    offenders.append(f"{note.relative_to(REPO_ROOT)}: {phrase}")
+
+        self.assertEqual(offenders, [])
+
 
 if __name__ == "__main__":
     unittest.main()

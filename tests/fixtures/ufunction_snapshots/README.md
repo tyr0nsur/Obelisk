@@ -17,8 +17,9 @@ python3 scripts/regenerate_ufunction_snapshots.py \
 
 Omit `--write` for a dry-run, or use `--check` to compare regenerated output against the
 committed fixtures without modifying files. For second-core regeneration where the evidence
-commit or capture-specific identity indices naturally differ, use `--check-layout` to
-compare only target identity, UFunction fields, and property-chain layout. Use
+commit or capture-specific identity indices naturally differ, use `--check-layout` with
+the full artifact identity and explicit `--fname-root-slot` to compare only target
+identity, UFunction fields, and property-chain layout. Use
 `--target Outer.Function` to regenerate or check one manifest entry.
 The artifact fields are sanitized identifiers used by the comparator to mark
 self-comparison, shared artifact identity, or missing second-source identity as

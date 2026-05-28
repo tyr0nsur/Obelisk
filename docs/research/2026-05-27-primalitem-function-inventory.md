@@ -159,5 +159,5 @@ No candidate is safe to invoke and no public SDK item API is ready.
 2. Compare item-use property chains against the controller-side
    `ServerRequestInventoryUseItem*` functions.
 3. Produce the next focused report for `PrimalDinoCharacter`.
-4. Keep runtime validation gated to TheIsland or a dedicated debug instance after explicit
-   approval.
+4. Keep runtime validation gated to the currently approved debug/development target or a
+   dedicated debug instance after explicit approval.

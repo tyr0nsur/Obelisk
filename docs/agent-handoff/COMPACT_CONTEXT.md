@@ -79,8 +79,9 @@ work from repository state instead of chat history.
   hooks, callbacks, return overrides, raw object/class exposure, and gameplay mutation
   blocked.
 - `sdk.transfers` ScriptStruct snapshots preserve target/property object and FName
-  identity fields, while `regenerate_scriptstruct_snapshots.py --check-layout` remains a
-  semantic/layout-only gate for second-source portability.
+  identity fields. UFunction and ScriptStruct `--check-layout` runs are semantic/layout
+  gates for second-source portability and require full artifact identity plus explicit
+  `--fname-root-slot`.
 - `scripts/compare_reflection_snapshots.py --target Outer.Name` supports focused
   second-source checks for one UFunction or ScriptStruct without preparing a separate
   fixture root. Use `--list-target-sets` to print named intakes such as

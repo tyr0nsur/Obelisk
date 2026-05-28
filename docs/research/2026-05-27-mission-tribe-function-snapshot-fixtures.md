@@ -61,8 +61,8 @@ shape and a membership bool-return query. These remain offline metadata fixtures
 - The tribe permission enum values are metadata evidence, not an accepted public enum
   contract.
 - Mission lifecycle names describe gameplay intent, but no runtime behavior is validated.
-- Runtime probing remains gated to TheIsland or an isolated debug instance in an approved
-  window.
+- Runtime probing remains gated to the currently approved debug/development target or an
+  isolated debug instance in an approved window.
 
 ## Next Steps
 

@@ -18,8 +18,8 @@ python3 scripts/regenerate_scriptstruct_snapshots.py \
 ```
 
 For second-core comparisons where the evidence commit naturally differs, use
-`--check-layout` as a semantic layout check that ignores capture-specific identity
-indices:
+`--check-layout` with the full artifact identity and explicit `--fname-root-slot` as a
+semantic layout check that ignores capture-specific identity indices:
 
 ```bash
 python3 scripts/regenerate_scriptstruct_snapshots.py \
@@ -29,6 +29,7 @@ python3 scripts/regenerate_scriptstruct_snapshots.py \
   --artifact-sha256 <core-or-evidence-artifact-sha256> \
   --capture-id <sanitized-capture-id> \
   --evidence-pack-id <sanitized-evidence-pack-id> \
+  --fname-root-slot <verified-artifact-fname-root-slot> \
   --check-layout
 ```
 

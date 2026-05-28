@@ -107,5 +107,5 @@ deployed, not enabled by default, and not a public SDK or mutation API.
 1. Extend `StructureReflection` only if the next target stays scalar-only and
    fixture-backed.
 2. Add an operator runbook for the disabled-by-default structure observation gate.
-3. Schedule a controlled TheIsland/debug validation only after the recognizer and negative
-   gates pass locally.
+3. Schedule controlled debug/development validation only after the recognizer and negative
+   gates pass locally and the operator approves the target window.

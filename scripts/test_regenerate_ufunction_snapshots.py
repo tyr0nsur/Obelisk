@@ -16,6 +16,17 @@ from test_inspect_core_ufunctions import build_core_fixture  # noqa: E402
 
 
 class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
+    SECOND_SOURCE_ARGS = [
+        "--artifact-kind",
+        "offline_core",
+        "--artifact-sha256",
+        "3" * 64,
+        "--capture-id",
+        "layout-check",
+        "--evidence-pack-id",
+        "layout-pack",
+    ]
+
     def write_manifest(
         self,
         path: Path,
@@ -296,7 +307,7 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
             output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
             layout = subprocess.run(
-                [*common_args, "--obelisk-commit", "1234567", "--check-layout"],
+                [*common_args, "--obelisk-commit", "1234567", *self.SECOND_SOURCE_ARGS, "--check-layout"],
                 check=False,
                 capture_output=True,
                 text=True,
@@ -344,11 +355,51 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
             payload["targets"][0]["property_chain"]["properties"][0]["offset_internal"] = 4  # type: ignore[index]
             output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
-            result = subprocess.run([*common_args, "--check-layout"], check=False, capture_output=True, text=True)
+            result = subprocess.run(
+                [*common_args, *self.SECOND_SOURCE_ARGS, "--check-layout"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("layout diff", result.stdout)
         self.assertIn("layout drift detected", result.stderr)
+
+    def test_check_layout_requires_second_source_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            manifest = root / "manifest.json"
+            output_root = root / "out"
+            addrs = build_core_fixture(core)
+            self.write_manifest(manifest)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "regenerate_ufunction_snapshots.py"),
+                    "--core",
+                    str(core),
+                    "--manifest",
+                    str(manifest),
+                    "--output-root",
+                    str(output_root),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--obelisk-commit",
+                    "abcdef1",
+                    "--check-layout",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--check-layout is reserved for second-source layout validation", result.stderr)
 
     def test_check_layout_is_mutually_exclusive_with_full_check(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

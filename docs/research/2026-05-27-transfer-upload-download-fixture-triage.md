@@ -67,8 +67,8 @@ public SDK readiness.
 - Transfer/upload/download names are gameplay-sensitive; fixtures record candidate metadata
   shape only.
 - Object/class params are not ownership or lifetime contracts.
-- Runtime probing remains gated to TheIsland or an isolated debug instance in an approved
-  window.
+- Runtime probing remains gated to the currently approved debug/development target or an
+  isolated debug instance in an approved window.
 
 ## Next Steps
 

@@ -158,5 +158,5 @@ No runtime hook, invocation, or public SDK dino API is ready from this evidence 
 2. Compare dino object params with `ShooterPlayerController` dino request candidates.
 3. Build a module taxonomy that groups player, item, dino, and structure candidates into
    future SDK areas while keeping SDK promotion blocked.
-4. Use only TheIsland or a dedicated debug instance for future runtime validation after
-   explicit approval.
+4. Use only the currently approved debug/development target or a dedicated debug instance
+   for future runtime validation after explicit approval.

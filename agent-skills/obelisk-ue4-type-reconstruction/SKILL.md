@@ -91,10 +91,10 @@ For each reconstructed field:
   missing identity, fully matching identity, or shared `artifact_sha256`, `capture_id`, or
   `evidence_pack_id` is `inconclusive`, so self-comparison or partial capture reuse cannot
   satisfy second-source evidence.
-- When regenerating UFunction or ScriptStruct snapshots with artifact identity fields,
-  pass a FName root/table verified for that artifact. The regenerators must reject artifact
-  identity runs that omit explicit `--fname-root-slot`; do not let the primary-core default
-  become second-source evidence.
+- When using `--check-layout` for UFunction or ScriptStruct snapshots, pass all artifact
+  identity fields plus a FName root/table verified for that artifact. The regenerators
+  must reject layout-only second-source runs that omit explicit `--fname-root-slot`; do not
+  let the primary-core default become second-source evidence.
 - GObjects/UObject second-source sampling also needs an explicit per-artifact FName root.
   `build_core_dump_evidence_pack.py --gobjects-sample-index` must not resolve names through
   the primary-core default slot.

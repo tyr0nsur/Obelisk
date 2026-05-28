@@ -124,7 +124,7 @@ runtime observation plan.
 - Large `PrimalBuff_Grappled`, `PrimalBuff_Companion`, and damage/movement functions are
   deferred because many carry larger structs, vectors, arrays, strings, or gameplay state.
 - Blueprint-heavy hooks remain metadata-only until policy and runtime semantics are clear.
-- Runtime observation remains blocked without a TheIsland/debug-instance approved window.
+- Runtime observation remains blocked without an approved debug/development window.
 
 ## Risks
 

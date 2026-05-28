@@ -16,6 +16,17 @@ from test_inspect_core_ufunctions import build_core_fixture  # noqa: E402
 
 
 class RegenerateScriptStructSnapshotsTests(unittest.TestCase):
+    SECOND_SOURCE_ARGS = [
+        "--artifact-kind",
+        "offline_core",
+        "--artifact-sha256",
+        "3" * 64,
+        "--capture-id",
+        "layout-check",
+        "--evidence-pack-id",
+        "layout-pack",
+    ]
+
     def write_manifest(self, path: Path, *, module: str = "sdk_test", name: str = "ARKTributeDino") -> None:
         manifest = {
             "schema": "obelisk.scriptstruct-snapshot-manifest.v1",
@@ -242,7 +253,7 @@ class RegenerateScriptStructSnapshotsTests(unittest.TestCase):
                 text=True,
             )
             result = subprocess.run(
-                [*common_args, "--obelisk-commit", "1234567", "--check-layout"],
+                [*common_args, "--obelisk-commit", "1234567", *self.SECOND_SOURCE_ARGS, "--check-layout"],
                 check=True,
                 capture_output=True,
                 text=True,
@@ -289,7 +300,12 @@ class RegenerateScriptStructSnapshotsTests(unittest.TestCase):
             payload["targets"][0]["target"]["object_index"] = 999999  # type: ignore[index]
             output.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
-            result = subprocess.run([*common_args, "--check-layout"], check=False, capture_output=True, text=True)
+            result = subprocess.run(
+                [*common_args, *self.SECOND_SOURCE_ARGS, "--check-layout"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("layout ok", result.stdout)
@@ -329,10 +345,50 @@ class RegenerateScriptStructSnapshotsTests(unittest.TestCase):
             prop["class_object_index"] = 999994
             output.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
-            result = subprocess.run([*common_args, "--check-layout"], check=False, capture_output=True, text=True)
+            result = subprocess.run(
+                [*common_args, *self.SECOND_SOURCE_ARGS, "--check-layout"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("layout ok", result.stdout)
+
+    def test_check_layout_requires_second_source_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            manifest = root / "manifest.json"
+            output_root = root / "out"
+            addrs = build_core_fixture(core)
+            self.write_manifest(manifest)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "regenerate_scriptstruct_snapshots.py"),
+                    "--core",
+                    str(core),
+                    "--manifest",
+                    str(manifest),
+                    "--output-root",
+                    str(output_root),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--obelisk-commit",
+                    "abcdef1",
+                    "--check-layout",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--check-layout is reserved for second-source layout validation", result.stderr)
 
 
 if __name__ == "__main__":

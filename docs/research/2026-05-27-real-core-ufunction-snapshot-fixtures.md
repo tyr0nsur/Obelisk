@@ -89,7 +89,7 @@ improves regression evidence and reviewability, not public SDK readiness.
 
 - Snapshots are scoped to one binary hash and one core.
 - GObjects indices are evidence, not runtime contracts.
-- Runtime observation still needs a controlled TheIsland/debug-instance window.
+- Runtime observation still needs a controlled approved debug/development window.
 
 ## Next Steps
 

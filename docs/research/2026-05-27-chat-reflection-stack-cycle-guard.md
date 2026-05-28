@@ -90,5 +90,6 @@ hook-like benchmark.
 
 1. Consider direct decode-and-sanitize output only if the remaining text-log allocations
    become promotion blockers.
-2. Keep public SDK chat dispatch blocked until TheIsland A/B runtime validation completes.
+2. Keep public SDK chat dispatch blocked until approved debug/development A/B runtime
+   validation completes.
 3. Do not enable text logging outside a short approved debug window.

@@ -91,7 +91,7 @@ exposure.
 
 - Transform-heavy item use and item NetExec surfaces remain deferred because they include
   larger structs or command-like behavior.
-- Runtime observation remains blocked without a TheIsland/debug-instance approved window.
+- Runtime observation remains blocked without an approved debug/development window.
 
 ## Risks
 

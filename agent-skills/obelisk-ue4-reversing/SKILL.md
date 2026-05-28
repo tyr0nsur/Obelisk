@@ -86,10 +86,11 @@ cross-validated by object and property metadata.
   `enable-native-exec-probes` on live servers.
 - Do not enable broad event discovery on a production map until it has survived an
   isolated server test.
-- Do not run `ReflectionScanner` on `arkserver`. Prefer `arkserver-obelisk-debug` for
-  ReflectionScanner, `gcore`/`ptrace`, broad tracing, and scanner-like captures. Run those
-  on `arkserver2` only for a specifically approved fallback debug window with plugins
-  disabled, copied-log evidence, and rollback.
+- Do not run `ReflectionScanner`, `gcore`/`ptrace`, broad tracing, native exec probes, or
+  scanner-like captures on `arkserver` unless the operator approves that exact run window.
+  Prefer `arkserver-obelisk-debug` for these high-risk captures; run them on `arkserver2`
+  only for a specifically approved fallback debug window with plugins disabled,
+  copied-log evidence, and rollback.
 - Use small `OBELISK_PE_TRACE_LIMIT` windows only when capturing evidence; default should
   remain quiet.
 - Prefer per-instance markers over ad hoc environment edits for approved debug captures.

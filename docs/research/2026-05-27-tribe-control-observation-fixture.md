@@ -61,7 +61,7 @@ gameplay exact target, no params, no param buffer reads.
 
 - Broader tribe/alliance policy remains deferred until a focused inventory identifies
   compact non-admin surfaces.
-- Runtime observation is still blocked pending a TheIsland/debug-instance approved window.
+- Runtime observation is still blocked pending an approved debug/development window.
 
 ## Risks
 

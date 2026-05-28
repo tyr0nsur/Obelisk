@@ -80,20 +80,20 @@ python3 scripts/compare_reflection_snapshots.py \
 
 For `sdk.transfers` ScriptStruct fixtures, the committed snapshots now preserve
 target/property object indices and FName identity fields. Regeneration remains an offline
-core workflow; use `regenerate_scriptstruct_snapshots.py --check-layout` as a
-semantic/layout-only check that ignores evidence commit churn and unstable capture-specific
-indices, then use `compare_reflection_snapshots.py` for cross-source semantic layout
-comparison. Use strict identity comparison only when intentionally checking same-binary
-identity evidence.
+core workflow; use `regenerate_scriptstruct_snapshots.py --check-layout` only with full
+artifact identity and an explicit per-artifact `--fname-root-slot` as a
+semantic/layout-only check that ignores evidence commit churn and unstable
+capture-specific indices, then use `compare_reflection_snapshots.py` for cross-source
+semantic layout comparison. Use strict identity comparison only when intentionally
+checking same-binary identity evidence.
 
 For UFunction fixtures, `regenerate_ufunction_snapshots.py --check-layout` provides the
-same same-target semantic regeneration gate: it ignores evidence commit churn and unstable
-identity indices while still checking `NumParms`, `ParmsSize`, function flags, return
-offset, and property-chain layout.
-When artifact identity flags are supplied to either UFunction or ScriptStruct
-regeneration, the scripts require an explicit `--fname-root-slot`. This prevents
-second-source evidence packs from silently reusing the primary-core FName root default;
-derive or scan the FName root for the artifact first.
+same same-target semantic regeneration gate and also requires full artifact identity plus
+an explicit per-artifact `--fname-root-slot`: it ignores evidence commit churn and
+unstable identity indices while still checking `NumParms`, `ParmsSize`, function flags,
+return offset, and property-chain layout. This prevents second-source evidence packs from
+silently reusing the primary-core FName root default; derive or scan the FName root for the
+artifact first.
 Likewise, `build_core_dump_evidence_pack.py --gobjects-sample-index` now requires an
 explicit `--fname-root-slot` for the sampled artifact and resolves sampled names only
 through explicit roots in that mode. Use `--scan-fname-tables` or a static derivation

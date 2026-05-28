@@ -316,6 +316,12 @@ def main() -> int:
             "--fname-root-slot is required when recording artifact identity; "
             "derive or scan a FName root for this artifact instead of using the primary-core default"
         )
+    if args.check_layout and not artifact_identity_supplied:
+        raise SystemExit(
+            "--check-layout is reserved for second-source layout validation and requires "
+            "--artifact-kind, --artifact-sha256, --capture-id, --evidence-pack-id, "
+            "and --fname-root-slot"
+        )
     fname_root_slot = (
         args.fname_root_slot
         if args.fname_root_slot is not None

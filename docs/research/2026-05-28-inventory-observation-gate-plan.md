@@ -56,7 +56,8 @@ index, field count, field names, offsets, sizes, and `has_range`. `bIgnoreCooldo
 
 ## Tests Before Runtime
 
-Before implementation can be used in an approved TheIsland/debug window, add tests proving:
+Before implementation can be used in an approved debug/development window, add tests
+proving:
 
 - disabled gate does not read memory;
 - missing marker does not enable observation;

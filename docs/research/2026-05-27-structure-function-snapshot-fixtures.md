@@ -62,8 +62,8 @@ do not imply public SDK surface, permission behavior, or safe runtime dispatch.
 
 - Names describe gameplay intent, but the snapshots only prove reflected metadata shape.
 - Object parameters remain pointer metadata, not ownership or lifetime guarantees.
-- Runtime probing stays gated to TheIsland or an isolated debug instance in an approved
-  window.
+- Runtime probing stays gated to the currently approved debug/development target or an
+  isolated debug instance in an approved window.
 
 ## Next Steps
 

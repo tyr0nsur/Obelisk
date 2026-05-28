@@ -42,13 +42,18 @@ For future second-core comparison, prefer layout-only comparison so an expected
 python3 scripts/regenerate_scriptstruct_snapshots.py \
   --core /path/to/second/offline/core \
   --obelisk-commit <current-commit> \
+  --artifact-kind offline_core \
+  --artifact-sha256 <second-core-or-evidence-artifact-sha256> \
+  --capture-id <sanitized-second-capture-id> \
+  --evidence-pack-id <sanitized-second-evidence-pack-id> \
+  --fname-root-slot <verified-second-artifact-fname-root-slot> \
   --check-layout
 ```
 
 ## Second-Source Options
 
-1. Best: another isolated offline core from `arkserver2` or a dedicated debug instance,
-   captured during an approved window with plugins disabled.
+1. Best: another isolated offline core from a dedicated debug instance, captured during an
+   approved window with plugins disabled.
 2. Acceptable auxiliary source: static binary evidence that confirms symbol/string
    families or constructor/use sites. This can support confidence but cannot prove runtime
    field offsets alone.
@@ -78,9 +83,11 @@ offline planning, not SDK promotion or runtime transfer decoding.
 
 ## Next Steps
 
-1. Prepare an approved debug-window checklist for `arkserver2` or a dedicated debug
-   instance to produce a second core.
-2. Re-run ScriptStruct regeneration against that second core with `--check-layout` and
-   compare field names, offsets, sizes, array inners, and `properties_size`.
-3. Document mismatches as blockers; only matching layouts can move from single-core
+1. Prepare an approved debug-window checklist for a dedicated debug instance to produce a
+   second core.
+2. Derive or scan the second artifact FName root, then re-run ScriptStruct regeneration
+   against that second core with `--check-layout`, full artifact identity, and explicit
+   `--fname-root-slot`.
+3. Compare field names, offsets, sizes, array inners, and `properties_size`.
+4. Document mismatches as blockers; only matching layouts can move from single-core
    fixture evidence toward runtime-observed planning.
