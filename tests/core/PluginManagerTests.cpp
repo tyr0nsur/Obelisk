@@ -42,6 +42,7 @@ namespace
         bool throwOnShutdown = false;
         bool throwOnClose = false;
         bool captureApi = false;
+        bool mutateApiInInit = false;
         int getInfoCalls = 0;
         int initCalls = 0;
         int shutdownCalls = 0;
@@ -162,6 +163,13 @@ namespace
 
         if (g_CurrentFakePlugin->orderLog)
             g_CurrentFakePlugin->orderLog->push_back("init:" + g_CurrentFakePlugin->filename);
+
+        if (g_CurrentFakePlugin->mutateApiInInit)
+        {
+            api->LogInfo = nullptr;
+            api->capabilities = 0;
+            api->abi_version = 0;
+        }
 
         if (g_CurrentFakePlugin->throwInInitAfterCallbacks)
             throw std::runtime_error("fake init failure after callback registration");
@@ -999,6 +1007,49 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestPluginApiMutationDoesNotPoisonLaterPlugins()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_api_mutation");
+        ConfigureEnvironment(root);
+
+        FakePlugin pluginA{
+            .filename = "a_mutates_api.so",
+            .pluginId = "plugin_a",
+            .mutateApiInInit = true,
+        };
+        FakePlugin pluginB{
+            .filename = "b_requires_clean_api.so",
+            .pluginId = "plugin_b",
+            .captureApi = true,
+        };
+        FakeLoader loader;
+        loader.Add(pluginA);
+        loader.Add(pluginB);
+        TouchPlugin(root, pluginA.filename);
+        TouchPlugin(root, pluginB.filename);
+        WritePluginConfig(root, pluginA.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+        WritePluginConfig(root, pluginB.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        const uint64_t expectedCapabilities = manager.ApiCapabilitiesForTesting();
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(pluginA.initCalls == 1, "API-mutating plugin was not initialized");
+        Require(pluginB.initCalls == 1, "later plugin did not initialize after API mutation");
+        Require(pluginB.capturedApi.LogInfo != nullptr, "later plugin received corrupted LogInfo pointer");
+        Require(pluginB.capturedApi.abi_version == OBELISK_API_ABI_VERSION,
+                "later plugin received corrupted API ABI version");
+        Require(pluginB.capturedApi.capabilities == expectedCapabilities,
+                "later plugin received corrupted API capabilities");
+        Require(manager.ApiCapabilitiesForTesting() == expectedCapabilities,
+                "manager API template was corrupted by plugin mutation");
+
+        manager.UnloadAll();
+        CleanupPlugin(pluginA);
+        CleanupPlugin(pluginB);
+        fs::remove_all(root);
+    }
+
     void TestUnloadAllContinuesAfterCloseException()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_close_throw");
@@ -1166,6 +1217,7 @@ int main()
     TestInitFailureCleansCallbacksAndCloses();
     TestInitExceptionCleansCallbacksAndCloses();
     TestMultiplePluginsLoadSortedAndUnloadReverse();
+    TestPluginApiMutationDoesNotPoisonLaterPlugins();
     TestUnloadAllContinuesAfterCloseException();
     TestUnloadAllCleansAfterShutdownException();
     TestDuplicatePluginIdRejectsSecondPlugin();

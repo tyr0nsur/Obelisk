@@ -156,6 +156,10 @@ Updated: 2026-05-28
 - fact: `EventManagerTests` now initialize the runtime logger and cover throwing
   pre/post callbacks. Exceptions are logged, do not propagate, and do not stop later
   callbacks from running; only an explicit `false` pre-callback blocks dispatch.
+- fact: Plugin init now receives a per-plugin copy of the `ObeliskApi` table. A plugin
+  that mutates its received function table cannot corrupt the manager template or poison
+  later plugin loads; `PluginManagerTests` covers this with a mutating plugin followed by
+  a clean plugin.
 - fact: Commit `c0d1e4c` pushed the hardened first-stable gates. On 2026-05-28,
   `scripts/check_release_readiness.sh` passed from a clean tracked/untracked worktree
   (ignored `build/` and `scripts/__pycache__/` only), and the read-only Ragnarok posture

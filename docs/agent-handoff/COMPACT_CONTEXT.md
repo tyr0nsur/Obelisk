@@ -134,7 +134,8 @@ work from repository state instead of chat history.
   - lifecycle hardening: PluginManager regression tests cover init-time helper-thread
     owner-token callbacks when `Init` returns false or throws, invalidating tokens and
     cleaning callbacks before close; `UnloadAll` also covers cleanup when plugin
-    `Shutdown` throws;
+    `Shutdown` throws; each plugin init receives a per-plugin `ObeliskApi` copy so a
+    plugin cannot mutate the manager template or poison later plugin loads;
   - event dispatch hardening: EventManager tests initialize logger and verify throwing
     pre/post callbacks are logged without propagating and without stopping later
     callbacks;

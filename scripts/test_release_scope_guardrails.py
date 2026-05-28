@@ -63,7 +63,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         changelog = read("CHANGELOG.md")
 
         for item in [
-            "Stable chat command interception",
+            "Stable gameplay module interception APIs",
             "Full UE4 reflection",
             "Higher-level gameplay SDK APIs",
             "Production HTTP plugins",
@@ -83,9 +83,8 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
                 self.assertIn(item, status)
 
         for item in [
-            "Stable chat command API",
             "GNames/GObjects-backed reflection layer",
-            "timer SDKs",
+            "timer SDKs, including chat/command APIs",
             "Mutable operator lifecycle commands",
             "Production-ready HTTP plugins",
         ]:

@@ -707,7 +707,8 @@ namespace Obelisk::Core
                 initAttempted = true;
                 try
                 {
-                    initialized = initFunc(&m_Api, &initContext);
+                    ObeliskApi pluginApi = m_Api;
+                    initialized = initFunc(&pluginApi, &initContext);
                 }
                 catch (const std::exception& e)
                 {

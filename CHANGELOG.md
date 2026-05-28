@@ -41,10 +41,9 @@ Breaking/development changes:
 
 Not included yet:
 
-- Stable chat command API.
 - GNames/GObjects-backed reflection layer.
 - Player, tribe, inventory, item, structure, dino, transfer, admin, permission, command, or
-  timer SDKs.
+  timer SDKs, including chat/command APIs.
 - Mutable operator lifecycle commands such as `obelisk restart` and
   `obelisk plugins enable/disable`; these are post-first-stable TODOs.
 - Production-ready HTTP plugins.

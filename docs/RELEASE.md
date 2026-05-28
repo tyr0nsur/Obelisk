@@ -17,7 +17,7 @@ Included:
 
 Excluded:
 
-- Stable chat command interception.
+- Stable gameplay module interception APIs.
 - Full UE4 reflection.
 - Higher-level gameplay SDK APIs.
 - Production HTTP plugins.
