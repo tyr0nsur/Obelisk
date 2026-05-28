@@ -155,6 +155,7 @@ prepare_root "${root_inherited}"
     cd "${TMP_DIR}"
     OBELISK_ROOT="${root_inherited}" \
     OBELISK_WRAPPER_CAPTURE="${capture_inherited}" \
+    OBELISK_PLUGIN_DIR=/tmp/unsafe-obelisk-plugins \
     OBELISK_ENABLE_PROCESS_EVENT_HOOK=1 \
     OBELISK_DISABLE_PLUGINS=1 \
     OBELISK_DEBUG_ALLOW_PTRACE=1 \
@@ -176,6 +177,8 @@ prepare_root "${root_inherited}"
 )
 
 assert_contains "${capture_inherited}" '^OBELISK_INSTANCE_ID=arkserver$'
+assert_contains "${capture_inherited}" "^OBELISK_PLUGIN_DIR=${root_inherited}/plugins$"
+assert_not_contains "${capture_inherited}" '^OBELISK_PLUGIN_DIR=/tmp/unsafe-obelisk-plugins$'
 assert_not_contains "${capture_inherited}" '^OBELISK_ENABLE_PROCESS_EVENT_HOOK='
 assert_not_contains "${capture_inherited}" '^OBELISK_DISABLE_PLUGINS='
 assert_not_contains "${capture_inherited}" '^OBELISK_DEBUG_ALLOW_PTRACE='

@@ -56,6 +56,10 @@ Updated: 2026-05-28
   reintroduced by instance markers instead of leaking from the parent environment. The live
   wrapper was updated without restart; backup:
   `/home/flowcommunity-ark/backups/ObeliskRun.sh.20260528-024702.bak`.
+- fact: The normal LinuxGSM wrapper pins `OBELISK_PLUGIN_DIR` to
+  `${OBELISK_ROOT}/plugins` so inherited parent environments cannot redirect plugin
+  loading outside the central install root. The live wrapper was refreshed without
+  restart; backup: `/home/flowcommunity-ark/backups/ObeliskRun.sh.20260528-031006.bak`.
 - fact: Runtime-side debug/scanner gates now require env+instance marker, so direct
   `LD_PRELOAD` launches cannot enable ProcessEvent hook, ptrace, debug-control,
   ReflectionScanner, or native exec probes by env alone. Marker names:

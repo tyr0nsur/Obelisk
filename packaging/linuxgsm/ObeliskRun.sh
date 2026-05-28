@@ -2,7 +2,7 @@
 set -euo pipefail
 
 export OBELISK_ROOT="${OBELISK_ROOT:-/servidor/ark/obelisk}"
-export OBELISK_PLUGIN_DIR="${OBELISK_PLUGIN_DIR:-${OBELISK_ROOT}/plugins}"
+export OBELISK_PLUGIN_DIR="${OBELISK_ROOT}/plugins"
 export OBELISK_CONFIG_DIR="${OBELISK_CONFIG_DIR:-${OBELISK_ROOT}/config}"
 export OBELISK_LOG_DIR="${OBELISK_LOG_DIR:-${OBELISK_ROOT}/logs}"
 export LD_LIBRARY_PATH="${OBELISK_ROOT}/lib:${LD_LIBRARY_PATH:-}"
