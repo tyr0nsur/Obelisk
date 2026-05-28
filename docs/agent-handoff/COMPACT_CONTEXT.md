@@ -240,6 +240,9 @@ work from repository state instead of chat history.
   rejects installed CMake package files that leak local source or build paths.
 - Runtime install uses the CMake `Runtime` component for `libobelisk.so`, which preserves
   the intended installed `RUNPATH=$ORIGIN` and avoids build-tree dependency path leaks.
+  Runtime libs are staged and published by atomic rename; backup reinstall validation
+  expects paired `libobelisk.so`/`libsubhook.so` backups and no `.incoming.*` or
+  `.install-runtime.*` leftovers.
 - Versioning policy is documented in `docs/VERSIONING.md`: no stable `0.1.0` tag yet;
   use `0.1.0-alpha.N` only for intentional contributor previews and `0.1.0-rc.N` only
   after scope freeze.

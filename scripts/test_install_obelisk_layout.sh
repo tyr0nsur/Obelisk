@@ -62,6 +62,18 @@ require_path "${INSTALL_ROOT}/lib/cmake/Obelisk/ObeliskConfig.cmake"
 require_path "${INSTALL_ROOT}/lib/cmake/Obelisk/ObeliskConfigVersion.cmake"
 require_path "${INSTALL_ROOT}/lib/cmake/Obelisk/ObeliskTargets.cmake"
 
+if find "${INSTALL_ROOT}/lib" -maxdepth 1 -name '*.incoming.*' | grep -q .; then
+    echo "Runtime install left incoming temporary files in ${INSTALL_ROOT}/lib" >&2
+    find "${INSTALL_ROOT}/lib" -maxdepth 1 -print >&2
+    exit 1
+fi
+
+if find "${INSTALL_ROOT}" -maxdepth 1 -name '.install-runtime.*' | grep -q .; then
+    echo "Runtime install left staging directories in ${INSTALL_ROOT}" >&2
+    find "${INSTALL_ROOT}" -maxdepth 1 -print >&2
+    exit 1
+fi
+
 for cmake_package_file in "${INSTALL_ROOT}"/lib/cmake/Obelisk/*.cmake; do
     require_not_contains "${REPO_DIR}" "${cmake_package_file}"
     require_not_contains "${REPO_DIR}/build" "${cmake_package_file}"
@@ -76,6 +88,27 @@ fi
 if ! readelf -d "${INSTALL_ROOT}/lib/libobelisk.so" | grep -F 'Library runpath: [$ORIGIN]' >/dev/null; then
     echo "Installed libobelisk.so must resolve bundled runtime dependencies through RUNPATH=\$ORIGIN" >&2
     readelf -d "${INSTALL_ROOT}/lib/libobelisk.so" >&2
+    exit 1
+fi
+
+"${REPO_DIR}/scripts/install_obelisk.sh" --backup-existing "${INSTALL_ROOT}" >/tmp/obelisk-install-layout-reinstall.log
+obelisk_backup_count="$(find "${INSTALL_ROOT}/lib" -maxdepth 1 -name 'libobelisk.so.*.bak' | wc -l)"
+subhook_backup_count="$(find "${INSTALL_ROOT}/lib" -maxdepth 1 -name 'libsubhook.so.*.bak' | wc -l)"
+if [[ "${obelisk_backup_count}" != "1" || "${subhook_backup_count}" != "1" ]]; then
+    echo "Expected one backup each for libobelisk.so and libsubhook.so after backup reinstall" >&2
+    find "${INSTALL_ROOT}/lib" -maxdepth 1 -print >&2
+    exit 1
+fi
+
+if find "${INSTALL_ROOT}/lib" -maxdepth 1 -name '*.incoming.*' | grep -q .; then
+    echo "Runtime reinstall left incoming temporary files in ${INSTALL_ROOT}/lib" >&2
+    find "${INSTALL_ROOT}/lib" -maxdepth 1 -print >&2
+    exit 1
+fi
+
+if find "${INSTALL_ROOT}" -maxdepth 1 -name '.install-runtime.*' | grep -q .; then
+    echo "Runtime reinstall left staging directories in ${INSTALL_ROOT}" >&2
+    find "${INSTALL_ROOT}" -maxdepth 1 -print >&2
     exit 1
 fi
 

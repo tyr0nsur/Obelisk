@@ -6,6 +6,8 @@ usage() {
 Usage: scripts/install_obelisk.sh [options] [root]
 
 Installs built Obelisk runtime artifacts into a centralized server root.
+Runtime .so files are staged under temporary names in the destination directory and then
+published with atomic renames, so ARK restarts do not observe partial shared libraries.
 
 Options:
   --dry-run              Print actions without changing files.
@@ -50,6 +52,7 @@ done
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="${REPO_DIR}/build"
 STAMP="$(date +%Y%m%d-%H%M%S)"
+STAGE_ROOT="${ROOT}/.install-runtime.${STAMP}.$$"
 
 run() {
     if [[ "${DRY_RUN}" == "1" ]]; then
@@ -77,19 +80,34 @@ backup_existing() {
     fi
 }
 
-install_file() {
+cleanup_stage() {
+    if [[ "${DRY_RUN}" != "1" ]]; then
+        rm -rf "${STAGE_ROOT}"
+    fi
+}
+trap cleanup_stage EXIT
+
+install_staged_file() {
     local mode="$1"
     local src="$2"
     local dst="$3"
-    require_file "${src}"
+    local tmp="${dst}.incoming.$$"
+    if [[ "${DRY_RUN}" != "1" || -f "${src}" ]]; then
+        require_file "${src}"
+    fi
     backup_existing "${dst}"
-    run install -m "${mode}" "${src}" "${dst}"
+    run install -m "${mode}" "${src}" "${tmp}"
+    run mv -f "${tmp}" "${dst}"
 }
 
 install_runtime_package() {
     require_file "${BUILD_DIR}/libobelisk.so"
-    backup_existing "${ROOT}/lib/libobelisk.so"
-    run cmake --install "${BUILD_DIR}" --prefix "${ROOT}" --component Runtime
+    require_file "${BUILD_DIR}/_deps/subhook-build/libsubhook.so"
+    run rm -rf "${STAGE_ROOT}"
+    run cmake --install "${BUILD_DIR}" --prefix "${STAGE_ROOT}" --component Runtime
+    install_staged_file 755 "${BUILD_DIR}/_deps/subhook-build/libsubhook.so" "${ROOT}/lib/libsubhook.so"
+    install_staged_file 755 "${STAGE_ROOT}/lib/libobelisk.so" "${ROOT}/lib/libobelisk.so"
+    run rm -rf "${STAGE_ROOT}"
 }
 
 install_sdk_package() {
@@ -107,7 +125,6 @@ run mkdir -p \
     "${ROOT}/state/instances"
 
 install_runtime_package
-install_file 755 "${BUILD_DIR}/_deps/subhook-build/libsubhook.so" "${ROOT}/lib/libsubhook.so"
 install_sdk_package
 
 echo "Obelisk installed to ${ROOT}"

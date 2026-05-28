@@ -39,6 +39,15 @@ build/ObeliskConfig*.cmake                  -> lib/cmake/Obelisk/
 ```
 
 It also creates `plugins`, `config`, `logs`, and `state/instances`.
+Runtime libraries are staged before publication: `libobelisk.so` is produced through the
+CMake `Runtime` component in a temporary install root, then both `libsubhook.so` and
+`libobelisk.so` are installed under temporary `.incoming.<pid>` names and atomically
+renamed to their final paths. With `--backup-existing`, matching timestamped backups are
+created for both runtime libraries before replacement.
+
+Rollback should restore `libobelisk.so` and `libsubhook.so` as a compatible pair from the
+same backup timestamp, then restart only the approved target instance and re-run the stable
+posture check.
 
 External plugins can consume the installed SDK through the exported CMake package:
 

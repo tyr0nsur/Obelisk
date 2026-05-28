@@ -37,15 +37,18 @@ scripts/install_obelisk.sh --dry-run /tmp/obelisk-release-check
 scripts/install_obelisk_plugin.sh --dry-run build/plugins/oBaseEvents/oBaseEvents.so /tmp/obelisk-release-check
 ```
 
-3. Confirm no generated artifacts are staged:
+3. Confirm `scripts/test_install_obelisk_layout.sh` covered runtime backup reinstall:
+   one backup each for `libobelisk.so` and `libsubhook.so`, no `.incoming.*` files, no
+   `.install-runtime.*` staging directory, and installed `RUNPATH=$ORIGIN`.
+4. Confirm no generated artifacts are staged:
 
 ```bash
 git status --short --ignored
 ```
 
-4. Update `CHANGELOG.md`.
-5. Confirm docs and wrappers use `state/instances/<instance-id>/` markers only.
-6. Tag:
+5. Update `CHANGELOG.md`.
+6. Confirm docs and wrappers use `state/instances/<instance-id>/` markers only.
+7. Tag:
 
 ```bash
 git tag -a v0.1.0 -m "Obelisk 0.1.0"
