@@ -77,8 +77,6 @@ Config files should include:
   Entries must be non-empty safe tokens using only letters, digits, `_`, or `-`.
 - `allow_all_instances`: explicit boolean escape hatch for operators who intentionally
   want `enabled=true` to run on every instance sharing the config.
-- `map_allowlist`: optional plugin-owned map filter only after the plugin has a reliable
-  map identity source; the runtime does not enforce this field today.
 - `log_level`: plugin-local verbosity.
 - Feature gates for every risky subsystem, such as `http.enabled`,
   `process_event.enabled`, and `discovery.enabled`.
@@ -98,7 +96,8 @@ The runtime interprets the common activation envelope before initialization:
 `instance_allowlist` skips `ObeliskPlugin_Init` and closes the shared object. An enabled
 plugin may run on every instance only when `allow_all_instances=true` is present. Plugin-
 specific feature gates remain owned by the plugin and must be checked before registering
-callbacks or starting background work.
+callbacks or starting background work. Do not publish map-scoped config fields until the
+plugin has a reliable map identity source; the runtime does not enforce map identity today.
 
 In clustered deployments, multiple ARK processes may share the same `${OBELISK_CONFIG_DIR}`
 and plugin binaries. Plugin config should therefore be treated as shared, mostly-static

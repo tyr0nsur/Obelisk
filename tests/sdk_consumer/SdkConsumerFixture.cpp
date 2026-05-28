@@ -17,6 +17,9 @@ namespace
     using InitFn = bool (*)(ObeliskApi*, const ObeliskPluginInitContext*);
     using ShutdownFn = void (*)();
 
+    int g_RegisterCount = 0;
+    int g_UnregisterCount = 0;
+
     void Require(bool condition, const char* message)
     {
         if (!condition)
@@ -46,6 +49,7 @@ namespace
         Require(ownerToken == 0xC0FFEE, "unexpected owner token in callback registration");
         Require(nameIndex == 42, "unexpected callback FName index");
         Require(callback != nullptr, "callback registration received null callback");
+        ++g_RegisterCount;
         return 1001;
     }
 
@@ -53,8 +57,21 @@ namespace
     {
         Require(ownerToken == 0xC0FFEE, "unexpected owner token in callback unregister");
         Require(registrationId == 1001, "unexpected callback registration id");
+        ++g_UnregisterCount;
         return true;
     }
+
+    constexpr const char* kActiveOBaseEventsConfig = R"json({
+    "enabled": true,
+    "log_level": "info",
+    "allow_all_instances": false,
+    "instance_allowlist": ["sdk-consumer-test"],
+    "process_event": {
+        "enabled": true,
+        "filtered_function_index": 42,
+        "log_limit": 1
+    }
+})json";
 
     std::filesystem::path CreateConfigDir(const char* defaultConfigJson)
     {
@@ -97,8 +114,11 @@ int main(int argc, char** argv)
 {
     try
     {
-        Require(argc == 2 || argc == 3, "usage: sdk_consumer_fixture <plugin-so> [expected-plugin-id]");
+        Require(argc >= 2 && argc <= 4, "usage: sdk_consumer_fixture <plugin-so> [expected-plugin-id] [mode]");
         const char* expectedPluginId = argc == 3 ? argv[2] : "sdk_consumer_minimal";
+        if (argc == 4)
+            expectedPluginId = argv[2];
+        const std::string mode = argc == 4 ? argv[3] : "";
 
         void* handle = dlopen(argv[1], RTLD_NOW | RTLD_LOCAL);
         if (!handle)
@@ -123,7 +143,8 @@ int main(int argc, char** argv)
         Require(std::strcmp(metadata.plugin_id, expectedPluginId) == 0, "plugin_id mismatch");
         Require(std::strcmp(metadata.config_file, "config.json") == 0, "config file mismatch");
         Require(metadata.default_config_json != nullptr, "missing default config");
-        std::filesystem::path configDir = CreateConfigDir(metadata.default_config_json);
+        const char* configJson = mode == "active-process-event" ? kActiveOBaseEventsConfig : metadata.default_config_json;
+        std::filesystem::path configDir = CreateConfigDir(configJson);
         const auto cleanupConfigDir = [&configDir]() {
             if (!configDir.empty())
                 std::filesystem::remove_all(configDir);
@@ -161,6 +182,16 @@ int main(int argc, char** argv)
         Require(init(&api, &context), "ObeliskPlugin_Init failed");
         if (shutdown)
             shutdown();
+        if (mode == "active-process-event")
+        {
+            Require(g_RegisterCount == 1, "active plugin did not register one callback");
+            Require(g_UnregisterCount == 1, "active plugin did not unregister one callback");
+        }
+        else if (std::strcmp(expectedPluginId, "oBaseEvents") == 0)
+        {
+            Require(g_RegisterCount == 0, "disabled oBaseEvents unexpectedly registered a callback");
+            Require(g_UnregisterCount == 0, "disabled oBaseEvents unexpectedly unregistered a callback");
+        }
         cleanupConfigDir();
         closeHandle();
     }

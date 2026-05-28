@@ -134,6 +134,13 @@ Updated: 2026-05-28
   changes unless `--allow-dirty` is used while developing the gate. CTest also loads the
   real `oBaseEvents` plugin through the SDK consumer fixture, validating its exported
   `GetInfo`/`Init`/optional `Shutdown` path against the public ABI.
+- fact: First-stable hardening now covers the active `oBaseEvents` callback path: SDK
+  consumer CTest enables `oBaseEvents` with `process_event.enabled=true` and verifies one
+  owner-token handle registration plus one owner-scoped unregister during shutdown.
+  `oBaseEvents` no longer publishes `map_allowlist` in its default config; non-empty
+  legacy `map_allowlist` values are rejected until a reliable map identity contract exists.
+  `scripts/install_obelisk_plugin.sh` uses the same non-root absolute path and symlink-root
+  validation as the runtime installer.
 - fact: Commit `c0d1e4c` pushed the hardened first-stable gates. On 2026-05-28,
   `scripts/check_release_readiness.sh` passed from a clean tracked/untracked worktree
   (ignored `build/` and `scripts/__pycache__/` only), and the read-only Ragnarok posture
@@ -145,8 +152,8 @@ Updated: 2026-05-28
 - fact: Enabled plugin configs fail closed for shared clusters: `enabled=true` now
   requires either a matching non-empty `instance_allowlist` or explicit
   `allow_all_instances=true`. Missing/empty allowlists are skipped instead of activating
-  on every ARK process sharing the config. `map_allowlist` remains plugin-owned/inert
-  until a reliable map identity enters the ABI or plugin contract.
+  on every ARK process sharing the config. Do not publish map-scoped config fields until a
+  reliable map identity enters the ABI or plugin contract.
 - fact: Plugin metadata `default_config_json` must declare the shared-cluster activation
   envelope explicitly: `enabled=false`, an `instance_allowlist` array, and
   `allow_all_instances=false`. Existing configs may omit `allow_all_instances`; enabled

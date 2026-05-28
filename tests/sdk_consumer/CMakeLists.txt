@@ -37,3 +37,8 @@ add_test(
     NAME SdkConsumerFixtureOBaseEvents
     COMMAND sdk_consumer_fixture "$<TARGET_FILE:oBaseEvents>" oBaseEvents
 )
+
+add_test(
+    NAME SdkConsumerFixtureOBaseEventsActive
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oBaseEvents>" oBaseEvents active-process-event
+)

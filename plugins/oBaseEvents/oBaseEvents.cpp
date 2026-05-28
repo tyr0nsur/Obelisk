@@ -28,7 +28,6 @@ namespace
     "log_level": "info",
     "allow_all_instances": false,
     "instance_allowlist": [],
-    "map_allowlist": [],
     "process_event": {
         "enabled": false,
         "filtered_function_index": -1,
@@ -153,6 +152,12 @@ namespace
         {
             if (g_Api)
                 g_Api->LogError("[oBaseEvents] Config field map_allowlist must be an array of strings.");
+            return false;
+        }
+        if (config.contains("map_allowlist") && !config["map_allowlist"].empty())
+        {
+            if (g_Api)
+                g_Api->LogError("[oBaseEvents] Config field map_allowlist is not supported yet and must be empty.");
             return false;
         }
 

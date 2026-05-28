@@ -59,7 +59,6 @@ Default generated config:
     "log_level": "info",
     "allow_all_instances": false,
     "instance_allowlist": [],
-    "map_allowlist": [],
     "process_event": {
         "enabled": false,
         "filtered_function_index": -1,

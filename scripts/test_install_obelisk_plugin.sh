@@ -74,4 +74,22 @@ if "${INSTALLER}" "${symlink_src}" "${root}" >"${TMP_DIR}/symlink.out" 2>"${TMP_
 fi
 assert_contains "${TMP_DIR}/symlink.err" 'regular non-symlink'
 
+for invalid_root in "" "/" "." "relative/root"; do
+    if "${INSTALLER}" --dry-run "${plugin_src}" "${invalid_root}" \
+        >"${TMP_DIR}/invalid-root.out" 2>"${TMP_DIR}/invalid-root.err"; then
+        echo "Installer accepted invalid root '${invalid_root}'" >&2
+        exit 1
+    fi
+    assert_contains "${TMP_DIR}/invalid-root.err" 'Install root must be a non-root absolute path'
+done
+
+symlink_root="${TMP_DIR}/root-symlink"
+ln -s "${root}" "${symlink_root}"
+if "${INSTALLER}" --dry-run "${plugin_src}" "${symlink_root}" \
+    >"${TMP_DIR}/symlink-root.out" 2>"${TMP_DIR}/symlink-root.err"; then
+    echo "Installer accepted symlink root" >&2
+    exit 1
+fi
+assert_contains "${TMP_DIR}/symlink-root.err" 'Install root must not be a symlink'
+
 echo "test_install_obelisk_plugin passed"

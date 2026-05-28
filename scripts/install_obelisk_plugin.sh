@@ -72,6 +72,20 @@ if [[ "${plugin_name}" != *.so || "${plugin_name}" == ".so" ]]; then
     exit 1
 fi
 
+validate_root() {
+    if [[ -z "${ROOT}" || "${ROOT}" != /* || "${ROOT}" == "/" ]]; then
+        echo "Install root must be a non-root absolute path: ${ROOT:-<empty>}" >&2
+        exit 2
+    fi
+
+    if [[ -L "${ROOT}" ]]; then
+        echo "Install root must not be a symlink: ${ROOT}" >&2
+        exit 2
+    fi
+}
+
+validate_root
+
 PLUGIN_DIR="${ROOT}/plugins"
 PLUGIN_DST="${PLUGIN_DIR}/${plugin_name}"
 PLUGIN_TMP="${PLUGIN_DIR}/.${plugin_name}.incoming.$$"
