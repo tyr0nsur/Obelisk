@@ -136,3 +136,31 @@ jobs:
       - name: Run first-stable core release gate
         # Gameplay/module promotion requires scripts/check_release_readiness.sh --require-second-source-readiness.
         run: scripts/check_release_readiness.sh
+
+  reflection-base-readiness:
+    name: Reflection base readiness
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check committed UFunction promotion target sets
+        run: |
+          python3 scripts/compare_reflection_snapshots.py \
+            --base-root tests/fixtures/ufunction_snapshots \
+            --readiness-report \
+            --fail-on-base-readiness-gaps \
+            --target-set minimal-second-source-intake \
+            --target-set buff-compact-intake \
+            --target-set dino-compact-intake \
+            --target-set mission-compact-intake \
+            --target-set tribe-compact-intake \
+            --target-set transfer-ufunction-intake
+
+      - name: Check committed ScriptStruct promotion target sets
+        run: |
+          python3 scripts/compare_reflection_snapshots.py \
+            --base-root tests/fixtures/scriptstruct_snapshots \
+            --readiness-report \
+            --fail-on-base-readiness-gaps \
+            --target-set transfer-scriptstruct

@@ -60,15 +60,16 @@ work from repository state instead of chat history.
 - Do not restart servers, edit marker files, change `/servidor/ark`, or activate
   ReflectionScanner unless it is part of an explicit approved `arkserver2` / TheIsland
   test window with shutdown afterward.
-- Structure reflection is marker-gated in code and wrapper:
+- Structure reflection is gated in code and wrapper by both
+  `allow-experimental-observers` and
   `/servidor/ark/obelisk/state/instances/<instance>/enable-structure-reflection`.
-  Env-only structure reflection activation is rejected; budget defaults to `0`.
+  Env-only or observer-marker-only activation is rejected; budget defaults to `0`.
 - Stable posture rejects structure reflection env, and supervisor snapshots include
   `structure-reflection.txt`. Structure budget is reserved only after an exact structure
   FName filter passes.
 - Inventory reflection now has an internal hook-side observer and test target. It remains
-  disabled by default, marker/env/SHA/budget gated, metadata-only, and not a public SDK
-  event.
+  disabled by default, `allow-experimental-observers` plus observer marker/env/SHA/budget
+  gated, metadata-only, and not a public SDK event.
 - Runtime observer marker checks are centralized in `runtime/RuntimeMarkers.*`; unsafe
   path components, directory markers, symlink markers, and symlink instance directories are
   rejected before observers can enable.

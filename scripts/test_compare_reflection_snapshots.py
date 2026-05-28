@@ -1193,6 +1193,49 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(report["totals"]["blocked"], 0)
         self.assertEqual(report["totals"]["second_source_missing"], 1)
 
+    def test_base_readiness_gap_flag_ignores_missing_second_source_only(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base" / "sha" / "sdk_inventory"
+            base.mkdir(parents=True)
+            write_snapshot(base, base_snapshot())
+
+            result = run_compare(
+                root / "base",
+                None,
+                "--readiness-report",
+                "--target",
+                "PrimalItem.CanUse",
+                "--fail-on-base-readiness-gaps",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["totals"]["blocked"], 0)
+        self.assertEqual(report["totals"]["second_source_missing"], 1)
+
+    def test_base_readiness_gap_flag_fails_on_missing_base_targets(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base" / "sha" / "sdk_inventory"
+            base.mkdir(parents=True)
+            write_snapshot(base, base_snapshot())
+
+            result = run_compare(
+                root / "base",
+                None,
+                "--readiness-report",
+                "--target-set",
+                "minimal-second-source-intake",
+                "--fail-on-base-readiness-gaps",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 1)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["totals"]["blocked"], 3)
+
     def test_readiness_report_supports_scriptstruct_target_filter(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

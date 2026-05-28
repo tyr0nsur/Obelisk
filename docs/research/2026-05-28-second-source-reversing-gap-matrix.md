@@ -82,6 +82,13 @@ python3 scripts/compare_reflection_snapshots.py \
   --readiness-report
 ```
 
+CI enforces base readiness for the committed promotion target sets with
+`--fail-on-base-readiness-gaps`. That gate only proves the requested target sets have
+non-empty comparable primary fixtures; it deliberately does not require candidate
+second-source roots. Use the stricter `--fail-on-readiness-gaps` or
+`scripts/check_release_readiness.sh --require-second-source-readiness` when reviewing an
+actual promotion artifact.
+
 For `sdk.transfers` ScriptStruct fixtures, the committed snapshots now preserve
 target/property object indices and FName identity fields. Regeneration remains an offline
 core workflow; use `regenerate_scriptstruct_snapshots.py --check-layout` only with full

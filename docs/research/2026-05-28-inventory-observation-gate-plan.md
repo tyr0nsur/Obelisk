@@ -24,6 +24,8 @@ A future `ProcessEventInventoryReflection` gate must require all of these:
 - `OBELISK_ENABLE_INVENTORY_REFLECTION=1`
 - exact supported ShooterGameServer SHA256
 - explicit non-zero observation budget, defaulting to `0`
+- global experimental observer marker for the same instance:
+  `/servidor/ark/obelisk/state/instances/<instance>/allow-experimental-observers`
 - per-instance marker:
   `/servidor/ark/obelisk/state/instances/<instance>/enable-inventory-reflection`
 - ProcessEvent hook enabled on an approved debug instance

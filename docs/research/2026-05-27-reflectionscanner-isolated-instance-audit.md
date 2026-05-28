@@ -1,5 +1,12 @@
 # ReflectionScanner Isolated Instance Audit
 
+> Supersession note: this note records a read-only audit of the host state at commit
+> `1870682`. Current wrappers can translate approved per-instance markers such as
+> `enable-reflection-scanner` into scanner environment under the current marker-gated
+> policy. Scanner, debug-control, native-exec, ptrace, and `gcore` work still requires an
+> explicit operator-approved debug window and rollback plan; treat the wrapper observations
+> below as historical evidence, not current enablement rules.
+
 ## Objective
 
 Determine, without changing server state, whether this host has an isolated/debug ARK
@@ -79,9 +86,11 @@ LinuxGSM config evidence:
 
 Wrapper evidence:
 
-- `ObeliskRun.sh` has map-specific marker handling only for `Ragnarok*` and `TheIsland*`.
-- The wrapper does not translate any marker into `OBELISK_ENABLE_REFLECTION_SCANNER=1`;
-  the scanner still requires an explicit environment variable at launch time.
+- Historical at this commit: `ObeliskRun.sh` had map-specific marker handling only for
+  `Ragnarok*` and `TheIsland*`, and did not translate any marker into
+  `OBELISK_ENABLE_REFLECTION_SCANNER=1`. Current wrapper behavior is marker-managed; read
+  `packaging/linuxgsm/ObeliskRun.sh` and `docs/agent-handoff/CURRENT.md` before planning
+  any scanner window.
 
 ## Result
 
@@ -98,8 +107,9 @@ until an operator confirms otherwise.
 - No dedicated debug or isolated LinuxGSM instance was present.
 - No non-public session name, separate cluster id, separate save root, or local-only bind
   was observed for any instance.
-- `ReflectionScanner` cannot be enabled by current marker files; it requires launch
-  environment changes and therefore a controlled restart/start operation.
+- Historical at this commit: `ReflectionScanner` could not be enabled by marker files and
+  required launch environment changes. Current behavior is marker-managed but still
+  requires a controlled restart/start operation in an approved debug window.
 - TheIsland currently has evidence of old binary-local Obelisk artifacts and `ChatPlugin`
   loaded, which conflicts with the scanner runbook's plugin-disabled requirement.
 

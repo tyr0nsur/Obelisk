@@ -76,9 +76,11 @@ Updated: 2026-05-28
 - fact: Active server-backed debug target is now `arkserver2` / TheIsland, but it is
   powered off. Start it only with explicit operator approval for a scoped test, then shut
   it down afterward. Keep `arkserver` / Ragnarok untouched while users are active.
-- fact: `sdk.structures` runtime observation now requires both env/SHA/budget gates and
+- fact: `sdk.structures` runtime observation now requires
+  `allow-experimental-observers`, the observer marker, and env/SHA/budget gates for the
+  same instance:
   `/servidor/ark/obelisk/state/instances/<instance>/enable-structure-reflection`.
-  The LinuxGSM wrapper exports structure reflection env only from that marker, and the
+  The LinuxGSM wrapper exports structure reflection env only from those markers, and the
   hook rejects env-only activation. Default observation budget remains `0`.
 - fact: stable posture checks now reject `OBELISK_ENABLE_STRUCTURE_REFLECTION`,
   `OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256`, and
@@ -89,12 +91,13 @@ Updated: 2026-05-28
   FName filter passes. Non-structure `ProcessEvent` calls no longer consume the bounded
   observation budget.
 - fact: `sdk.inventory` now has an internal hook-side observer behind
-  `enable-inventory-reflection`, env/SHA, and explicit non-zero budget gates. It logs
-  metadata only, filters exact inventory FNames before reserving budget, and has no public
-  SDK callback or gameplay mutation path.
+  `allow-experimental-observers`, `enable-inventory-reflection`, env/SHA, and explicit
+  non-zero budget gates. It logs metadata only, filters exact inventory FNames before
+  reserving budget, and has no public SDK callback or gameplay mutation path.
 - fact: Chat, inventory, and structure ProcessEvent observers all require runtime-side
-  env+instance-marker gates plus binary SHA validation before activation. Chat now matches
-  the inventory/structure marker discipline with `enable-chat-reflection`.
+  env+instance-marker gates plus `allow-experimental-observers` and binary SHA validation
+  before activation. Chat now matches the inventory/structure marker discipline with
+  `enable-chat-reflection`.
 - fact: Plugin API ProcessEvent registration wrappers reject null callbacks and negative
   filtered FName indices before registering callbacks. `-1` remains a runtime sentinel for
   unknown function names, not a valid plugin subscription target.
@@ -257,11 +260,12 @@ Updated: 2026-05-28
   returns nonzero. `--allow-partial-gdb` is available only for triage artifacts and writes
   `evidence_status.status=partial-gdb-failed`; partial GDB packs must not be used as
   promoted reversing evidence.
-- fact: Commit `c0d1e4c` pushed the hardened first-stable gates. On 2026-05-28,
+- historical: Commit `c0d1e4c` pushed the hardened first-stable gates. On 2026-05-28,
   `scripts/check_release_readiness.sh` passed from a clean tracked/untracked worktree
-  (ignored `build/` and `scripts/__pycache__/` only), and the read-only Ragnarok posture
-  check passed with `--expect-stable --forbid-chat-reflection --map Ragnarok --instance
-  arkserver`.
+  (ignored `build/` and `scripts/__pycache__/` only). A read-only Ragnarok posture check
+  also passed with `--forbid-chat-reflection`, but that posture result is superseded by
+  later read-only evidence that active observer env/markers were present. Do not use this
+  historical pass to claim current Ragnarok quiet posture.
 - fact: Shared plugin config default creation is hardened for concurrent multi-instance
   startup: each process uses a unique temporary file and atomically installs the default
   only if the config path is still absent, with coverage in `PluginConfigTests`.
@@ -647,12 +651,13 @@ Updated: 2026-05-28
 - fact: `scripts/obelisk.py instances list` now reports persistent restart posture per
   instance: `stable`, `incomplete`, `experimental`, `experimental+incomplete`, or `invalid`
   for unsafe instance marker entries such as symlinked instance directories.
-- fact: Historical read-only quiet-posture audit at commit `5da65d6` found Ragnarok PID
+- historical: Read-only quiet-posture audit at commit `5da65d6` found Ragnarok PID
   `3940524` still had `OBELISK_ENABLE_CHAT_REFLECTION=1`, so it failed the stricter
-  production/performance guard. This was superseded on 2026-05-28 when the
-  operator-approved restart removed `enable-chat-reflection` and
-  `--forbid-chat-reflection` passed; see
-  `docs/research/2026-05-27-quiet-posture-readonly-audit.md`.
+  production/performance guard. A later restart produced a temporary
+  `--forbid-chat-reflection` pass, but that pass is superseded by subsequent read-only
+  evidence that active observer env/markers existed again. See
+  `docs/research/2026-05-27-quiet-posture-readonly-audit.md`; keep current posture claims
+  anchored to the latest active-state notes near the top of this handoff.
 - fact: `scripts/obelisk_supervisor_snapshot.sh` now writes `quiet-posture.txt` and
   `quiet_posture_status` so debug-stable snapshots do not hide active chat reflection from
   production/performance review.
@@ -970,6 +975,10 @@ Updated: 2026-05-28
   `ObeliskPlugin_*` entry points in `try/catch (...)`. The SDK consumer fixture includes
   an injected logging exception mode so example plugins prove they return failure instead
   of unwinding across the C ABI boundary.
+- fact: CI runs a reflection base-readiness gate with
+  `compare_reflection_snapshots.py --fail-on-base-readiness-gaps` for named UFunction and
+  ScriptStruct promotion target sets. This checks committed primary fixtures stay present
+  and comparable without requiring missing second-source artifacts.
 
 ## Agent Protocol
 

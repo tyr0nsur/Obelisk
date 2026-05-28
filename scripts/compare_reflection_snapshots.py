@@ -130,6 +130,15 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--fail-on-base-readiness-gaps",
+        action="store_true",
+        help=(
+            "With --readiness-report, return non-zero when requested base target sets are "
+            "empty or have blocked/missing/non-comparable committed snapshots. Does not "
+            "require candidate second-source evidence."
+        ),
+    )
+    parser.add_argument(
         "--list-target-sets",
         action="store_true",
         help="List named target sets and exit without reading snapshot roots.",
@@ -856,6 +865,10 @@ def main() -> int:
     else:
         print_text(report)
     if report["schema"] == "obelisk.reflection-snapshot-readiness.v1":
+        if args.fail_on_base_readiness_gaps:
+            totals = report["totals"]
+            if totals["targets"] == 0 or totals["blocked"]:
+                return 1
         if args.fail_on_readiness_gaps:
             totals = report["totals"]
             if totals["targets"] == 0:

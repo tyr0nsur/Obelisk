@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 import unittest
 from pathlib import Path
 
@@ -141,6 +142,16 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("not release readiness or second-source promotion evidence", pr_template)
         self.assertIn("Core-first release readiness", ci)
         self.assertIn("first-stable core release gate", ci)
+        self.assertIn("Reflection base readiness", ci)
+        self.assertIn("--fail-on-base-readiness-gaps", ci)
+        self.assertRegex(
+            ci,
+            re.compile(
+                r"run:\s*\|\s*\n(?:\s+.*\n)*?\s+python3 scripts/compare_reflection_snapshots\.py"
+                r"(?:\s+.*\n)*?\s+--fail-on-base-readiness-gaps",
+                re.M,
+            ),
+        )
         self.assertIn("--require-second-source-readiness", ci)
         self.assertIn("Release readiness requires a clean worktree", script)
         self.assertIn("first-stable core release gate", script)
