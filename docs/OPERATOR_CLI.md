@@ -14,9 +14,13 @@ The CLI reads the central install root, plugin publication state, plugin config 
 and per-instance marker directories. It does not edit config, markers, plugin binaries, or
 LinuxGSM state.
 
-## Planned Lifecycle Commands
+## Post-Stable Lifecycle TODO
 
-The target operator shape is:
+The first stable Obelisk line should not depend on mutable lifecycle commands. Keep the
+CLI read-only until the runtime/API/plugin config contract is stable enough for external
+modders and operators.
+
+After the first stable production version, the target operator shape is:
 
 ```text
 obelisk start <instance>
@@ -45,6 +49,10 @@ commands and Obelisk's staged installers. They must:
 - preserve the stable posture gates from `docs/INSTALL.md`;
 - use `scripts/install_obelisk_plugin.sh` for plugin publication;
 - keep plugin activation scoped by `instance_allowlist` or explicit `allow_all_instances`;
+- reject per-instance disable when `allow_all_instances=true` unless the operator chooses
+  a clearly global operation;
+- use dry-run output, backups, symlink rejection, and destination-local atomic writes for
+  shared plugin configs;
 - run `scripts/check_obelisk_server_posture.sh` after restart when the instance is expected
   to run with Obelisk.
 

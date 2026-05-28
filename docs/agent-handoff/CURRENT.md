@@ -117,6 +117,11 @@ Updated: 2026-05-28
   runtime libraries, plugin binaries, and shared plugin config, with unique
   `OBELISK_INSTANCE_ID` values, per-instance logs, and per-instance markers/runtime state.
   Mutable shared plugin state requires explicit plugin-level locking/atomic-write design.
+- fact: Operator CLI lifecycle/mutation commands are intentionally post-first-stable TODOs,
+  not current production requirements. The current CLI remains read-only; future
+  `plugins enable/disable/start/stop/restart` commands must wrap instance-scoped
+  LinuxGSM/staged-installer operations, reject unsafe per-instance mutations from
+  `allow_all_instances=true`, and use dry-run/backups/symlink rejection/atomic writes.
 - fact: Shared plugin config default creation is hardened for concurrent multi-instance
   startup: each process uses a unique temporary file and atomically installs the default
   only if the config path is still absent, with coverage in `PluginConfigTests`.
