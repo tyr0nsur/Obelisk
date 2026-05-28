@@ -94,3 +94,6 @@ For each reconstructed field:
   pass a FName root/table verified for that artifact. The regenerators must reject artifact
   identity runs that omit explicit `--fname-root-slot`; do not let the primary-core default
   become second-source evidence.
+- GObjects/UObject second-source sampling also needs an explicit per-artifact FName root.
+  `build_core_dump_evidence_pack.py --gobjects-sample-index` must not resolve names through
+  the primary-core default slot.

@@ -241,6 +241,26 @@ class CoreDumpEvidencePackCommandTests(unittest.TestCase):
             )
         )
 
+    def test_gobjects_sample_options_require_explicit_fname_root_when_checked(self) -> None:
+        self.assertEqual(
+            core_pack.validate_gobjects_sample_options(
+                [("gobjects", 0x595B7E0)],
+                [0],
+                [("static_fname_root_slot", 0x5956F30)],
+                [],
+            ),
+            "--gobjects-sample-index requires an explicit --fname-root-slot for this "
+            "artifact; do not rely on the primary-core default for NamePrivate resolution",
+        )
+        self.assertIsNone(
+            core_pack.validate_gobjects_sample_options(
+                [("gobjects", 0x595B7E0)],
+                [0],
+                [("verified_fname_root", 0x1234000)],
+                [("verified_fname_root", 0x1234000)],
+            )
+        )
+
     def test_gobjects_sample_options_are_bounded(self) -> None:
         self.assertEqual(
             core_pack.validate_gobjects_sample_options(

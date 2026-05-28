@@ -405,6 +405,7 @@ def validate_gobjects_sample_options(
     gobjects_candidates: list[tuple[str, int]],
     gobjects_sample_indices: list[int],
     fname_root_slots: list[tuple[str, int]],
+    explicit_fname_root_slots: list[tuple[str, int]] | None = None,
 ) -> str | None:
     for index in gobjects_sample_indices:
         if index < 0:
@@ -415,6 +416,11 @@ def validate_gobjects_sample_options(
         return (
             "--gobjects-sample-index requires at least one --fname-root-slot for "
             "NamePrivate resolution"
+        )
+    if gobjects_sample_indices and explicit_fname_root_slots is not None and not explicit_fname_root_slots:
+        return (
+            "--gobjects-sample-index requires an explicit --fname-root-slot for this "
+            "artifact; do not rely on the primary-core default for NamePrivate resolution"
         )
     if len(gobjects_sample_indices) > MAX_GOBJECTS_SAMPLE_INDICES:
         return (
@@ -780,7 +786,7 @@ def parse_args() -> argparse.Namespace:
             "--gobjects-candidate interpreted as a direct GUObjectArray struct. When "
             "sampling is enabled, the legacy indirect slot-preview block is skipped. The "
             "sample prints chunk/item/object fields and resolves UObject/Class "
-            "NamePrivate through each --fname-root-slot. May be repeated."
+            "NamePrivate through each explicit --fname-root-slot. May be repeated."
         ),
     )
     parser.add_argument(
@@ -898,6 +904,7 @@ def main() -> int:
         gobjects_candidates,
         gobjects_sample_indices,
         fname_root_slots,
+        args.fname_root_slot,
     )
     if gobjects_sample_error:
         print(gobjects_sample_error, file=sys.stderr)

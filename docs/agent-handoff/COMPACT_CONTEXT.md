@@ -167,7 +167,8 @@ work from repository state instead of chat history.
   default. First derive or scan a verified per-artifact FName root/table, then pass it
   explicitly to UObjects/UFunction/ScriptStruct tools. UFunction and ScriptStruct
   regenerators now require explicit `--fname-root-slot` when artifact identity flags are
-  supplied.
+  supplied, and GObjects sampling with `build_core_dump_evidence_pack.py
+  --gobjects-sample-index` requires an explicit `--fname-root-slot`.
 - Latest restart audit:
   `docs/research/2026-05-27-ops-restart-audit-instance-id.md`
   - live `ObeliskRun.sh` exports `OBELISK_INSTANCE_ID=arkserver`

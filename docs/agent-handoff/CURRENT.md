@@ -180,6 +180,10 @@ Updated: 2026-05-28
 - fact: UFunction and ScriptStruct regenerators now enforce that rule when artifact
   identity flags are supplied: `--fname-root-slot` is required instead of silently using
   the primary-core default.
+- fact: GObjects sample evidence now has the same guardrail:
+  `build_core_dump_evidence_pack.py --gobjects-sample-index` requires an explicit
+  `--fname-root-slot` for the sampled artifact so UObject/Class names are not resolved
+  through a primary-core-only default.
 - fact: `scripts/regenerate_ufunction_snapshots.py --check-layout` now supports
   UFunction layout-only verification for second-source intake. It ignores unstable
   identity/evidence indices while preserving target identity, UFunction fields, and

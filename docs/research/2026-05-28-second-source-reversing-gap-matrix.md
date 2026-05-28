@@ -93,6 +93,9 @@ When artifact identity flags are supplied to either UFunction or ScriptStruct
 regeneration, the scripts require an explicit `--fname-root-slot`. This prevents
 second-source evidence packs from silently reusing the primary-core FName root default;
 derive or scan the FName root for the artifact first.
+Likewise, `build_core_dump_evidence_pack.py --gobjects-sample-index` now requires an
+explicit `--fname-root-slot` for the sampled artifact. Use `--scan-fname-tables` or a
+static derivation first, then pass the verified root to GObjects/UObject sampling.
 
 ## P1 Module Fixture Matrix
 
