@@ -122,6 +122,12 @@ work from repository state instead of chat history.
 - Runtime/plugin installers reject symlinked managed subdirectories before writing
   artifacts. Keep `lib`, `plugins`, `include`, `config`, `logs`, `state`, and
   `state/instances` as real directories under the central Obelisk root.
+- Runtime and SDK install are treated as one compatibility unit: required artifacts are
+  preflighted before runtime publication, and a later SDK install failure rolls back the
+  published `libsubhook.so`/`libobelisk.so` runtime pair.
+- Core dump evidence packs fail by default when GDB core inspection returns nonzero.
+  `--allow-partial-gdb` is triage-only and marks the manifest
+  `evidence_status.status=partial-gdb-failed`; do not promote partial GDB evidence.
 - `arkserver2` / TheIsland runbooks from 2026-05-27 are historical/superseded while RAM is
   constrained unless the operator explicitly reopens that server. Research docs with live
   marker/restart snippets must carry a historical or approved-runbook banner.

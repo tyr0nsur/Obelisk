@@ -40,6 +40,10 @@ radare2 -A -q -c 'iz; afl; q' ShooterGameServer
 Use Ghidra for manual decompilation/xref confirmation when command-line evidence is
 ambiguous. Save conclusions in `docs/research/`, not screenshots.
 
+Core dump evidence packs must not report ordinary success when GDB core inspection fails.
+Use `--allow-partial-gdb` only for triage-only artifacts; such manifests are marked
+`partial-gdb-failed` and must not be used as promoted evidence.
+
 ## Tool Selection
 
 - Start with `readelf`/`objdump`/analyzer evidence because it is reproducible in CI-like

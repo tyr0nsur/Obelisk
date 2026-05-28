@@ -69,6 +69,9 @@ Do not install runtime artifacts directly into `ShooterGame/Binaries/Linux` exce
 - Install roots and managed subdirectories must not be symlinks. Reject existing symlinks
   for `lib`, `plugins`, `include`, `config`, `logs`, and `state/instances` before writing
   runtime, SDK, or plugin artifacts.
+- Runtime and SDK publication are one compatibility unit. Preflight all required runtime
+  and SDK build artifacts before publishing runtime libraries, and roll back the published
+  runtime pair if SDK install fails after runtime publication.
 
 ## Before Commit
 

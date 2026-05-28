@@ -6,6 +6,7 @@ from __future__ import annotations
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -14,6 +15,77 @@ import build_core_dump_evidence_pack as core_pack
 
 
 class CoreDumpEvidencePackCommandTests(unittest.TestCase):
+    def run_main_with_gdb_status(self, gdb_returncode: int, extra_args: list[str] | None = None) -> tuple[int, Path]:
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        temp_dir = Path(temp.name)
+        binary = temp_dir / "ShooterGameServer"
+        core = temp_dir / "core"
+        output_dir = temp_dir / "pack"
+        binary.write_bytes(b"binary")
+        core.write_bytes(b"core")
+
+        def fake_run_command(command: list[str], output_path: Path) -> dict[str, object]:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text("", encoding="utf-8")
+            returncode = gdb_returncode if command and command[0] == "gdb" else 0
+            stderr_path = output_path.with_suffix(output_path.suffix + ".stderr")
+            if returncode:
+                stderr_path.write_text("gdb failed\n", encoding="utf-8")
+            return {
+                "command": command,
+                "returncode": returncode,
+                "stdout": str(output_path),
+                "stderr": str(stderr_path) if returncode else None,
+            }
+
+        argv = [
+            "build_core_dump_evidence_pack.py",
+            "--binary",
+            str(binary),
+            "--core",
+            str(core),
+            "--output-dir",
+            str(output_dir),
+            "--obelisk-commit",
+            "test-commit",
+        ]
+        if extra_args:
+            argv.extend(extra_args)
+
+        with (
+            mock.patch.object(sys, "argv", argv),
+            mock.patch.object(core_pack.shutil, "which", return_value="/usr/bin/gdb"),
+            mock.patch.object(core_pack, "run_command", side_effect=fake_run_command),
+            mock.patch.object(core_pack, "sha256_file", return_value="sha256"),
+        ):
+            return core_pack.main(), output_dir
+
+    def test_main_rejects_failed_gdb_by_default(self) -> None:
+        result, output_dir = self.run_main_with_gdb_status(1)
+
+        self.assertEqual(result, 1)
+        self.assertFalse((output_dir / "manifest.json").exists())
+        self.assertTrue((output_dir / "gdb-core.txt.stderr").exists())
+
+    def test_main_marks_allowed_gdb_failure_as_partial(self) -> None:
+        result, output_dir = self.run_main_with_gdb_status(1, ["--allow-partial-gdb"])
+
+        self.assertEqual(result, 0)
+        manifest = core_pack.json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["evidence_status"]["status"], "partial-gdb-failed")
+        self.assertTrue(manifest["evidence_status"]["gdb_core_failed"])
+        self.assertTrue(manifest["evidence_status"]["allow_partial_gdb"])
+
+    def test_main_marks_successful_gdb_as_complete(self) -> None:
+        result, output_dir = self.run_main_with_gdb_status(0)
+
+        self.assertEqual(result, 0)
+        manifest = core_pack.json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["evidence_status"]["status"], "complete")
+        self.assertFalse(manifest["evidence_status"]["gdb_core_failed"])
+        self.assertFalse(manifest["evidence_status"]["allow_partial_gdb"])
+
     def test_gdb_commands_include_direct_fname_entry_reads(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             command_file = Path(temp_dir) / "gdb.txt"

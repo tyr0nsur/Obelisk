@@ -184,6 +184,46 @@ if find "${pair_failure_root}" \( -name '*.incoming.*' -o -name '.install-runtim
     exit 1
 fi
 
+sdk_failure_root="${WORK_DIR}/sdk-failure-root"
+sdk_fake_bin="${WORK_DIR}/sdk-fake-bin"
+mkdir -p "${sdk_failure_root}/lib" "${sdk_fake_bin}"
+printf 'old-subhook\n' > "${sdk_failure_root}/lib/libsubhook.so"
+printf 'old-obelisk\n' > "${sdk_failure_root}/lib/libobelisk.so"
+real_cmake="$(command -v cmake)"
+cat > "${sdk_fake_bin}/cmake" <<'SH'
+#!/usr/bin/env bash
+previous=""
+for arg in "$@"; do
+    if [[ "${previous}" == "--component" && "${arg}" == "SDK" ]]; then
+        exit 78
+    fi
+    previous="${arg}"
+done
+exec "${OBELISK_REAL_CMAKE}" "$@"
+SH
+chmod +x "${sdk_fake_bin}/cmake"
+if OBELISK_REAL_CMAKE="${real_cmake}" PATH="${sdk_fake_bin}:${PATH}" \
+    "${REPO_DIR}/scripts/install_obelisk.sh" --build-dir "${BUILD_DIR}" "${sdk_failure_root}" \
+    >"${WORK_DIR}/sdk-fail.out" 2>"${WORK_DIR}/sdk-fail.err"; then
+    echo "install_obelisk.sh succeeded despite failing SDK install" >&2
+    exit 1
+fi
+if [[ "$(cat "${sdk_failure_root}/lib/libsubhook.so")" != "old-subhook" ]]; then
+    echo "failed SDK install did not restore original libsubhook.so" >&2
+    ls -la "${sdk_failure_root}/lib" >&2
+    exit 1
+fi
+if [[ "$(cat "${sdk_failure_root}/lib/libobelisk.so")" != "old-obelisk" ]]; then
+    echo "failed SDK install did not restore original libobelisk.so" >&2
+    ls -la "${sdk_failure_root}/lib" >&2
+    exit 1
+fi
+if find "${sdk_failure_root}" \( -name '*.incoming.*' -o -name '.install-runtime.*' -o -name '.install-rollback.*' \) | grep -q .; then
+    echo "failed SDK install left temporary files" >&2
+    find "${sdk_failure_root}" -print >&2
+    exit 1
+fi
+
 "${REPO_DIR}/scripts/install_obelisk.sh" --build-dir "${BUILD_DIR}" "${INSTALL_ROOT}"
 
 require_path "${INSTALL_ROOT}/lib/libobelisk.so"

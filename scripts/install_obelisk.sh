@@ -197,9 +197,14 @@ publish_runtime_pair() {
         publish_runtime_file "${obelisk_tmp}" "${obelisk_dst}"
 }
 
-install_runtime_package() {
+validate_build_artifacts() {
     require_file "${BUILD_DIR}/libobelisk.so"
     require_file "${BUILD_DIR}/_deps/subhook-build/libsubhook.so"
+    require_file "${BUILD_DIR}/ObeliskConfig.cmake"
+    require_file "${BUILD_DIR}/ObeliskConfigVersion.cmake"
+}
+
+install_runtime_package() {
     run rm -rf "${STAGE_ROOT}"
     run cmake --install "${BUILD_DIR}" --prefix "${STAGE_ROOT}" --component Runtime
     local subhook_dst="${ROOT}/lib/libsubhook.so"
@@ -225,8 +230,6 @@ install_runtime_package() {
 }
 
 install_sdk_package() {
-    require_file "${BUILD_DIR}/ObeliskConfig.cmake"
-    require_file "${BUILD_DIR}/ObeliskConfigVersion.cmake"
     run cmake --install "${BUILD_DIR}" --prefix "${ROOT}" --component SDK
 }
 
@@ -249,7 +252,13 @@ run mkdir -p \
     "${ROOT}/logs" \
     "${ROOT}/state/instances"
 
+validate_build_artifacts
 install_runtime_package
-install_sdk_package
+if ! install_sdk_package; then
+    if [[ "${DRY_RUN}" != "1" ]]; then
+        rollback_runtime_publish
+    fi
+    exit 1
+fi
 
 echo "Obelisk installed to ${ROOT}"

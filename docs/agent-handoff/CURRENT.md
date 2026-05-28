@@ -215,6 +215,14 @@ Updated: 2026-05-28
   writing. Runtime install checks `lib`, `plugins`, `include`, `include/obelisk`, `config`,
   `logs`, `state`, and `state/instances`; plugin install checks `plugins`. This prevents
   atomic publication from escaping the central Obelisk root through pre-existing symlinks.
+- fact: Runtime and SDK installation now preflights required artifacts as one
+  compatibility unit. If SDK install fails after runtime libraries were published,
+  `scripts/install_obelisk.sh` rolls back the published `libsubhook.so`/`libobelisk.so`
+  pair and layout tests cover the simulated SDK failure.
+- fact: `build_core_dump_evidence_pack.py` now fails by default when GDB core inspection
+  returns nonzero. `--allow-partial-gdb` is available only for triage artifacts and writes
+  `evidence_status.status=partial-gdb-failed`; partial GDB packs must not be used as
+  promoted reversing evidence.
 - fact: Commit `c0d1e4c` pushed the hardened first-stable gates. On 2026-05-28,
   `scripts/check_release_readiness.sh` passed from a clean tracked/untracked worktree
   (ignored `build/` and `scripts/__pycache__/` only), and the read-only Ragnarok posture

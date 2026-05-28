@@ -857,6 +857,14 @@ def parse_args() -> argparse.Namespace:
         help="Skip hashing the core file when it is too large for a quick triage run.",
     )
     parser.add_argument(
+        "--allow-partial-gdb",
+        action="store_true",
+        help=(
+            "Allow manifest creation when the GDB core inspection command fails. The "
+            "evidence pack is marked partial and must not be used as promoted evidence."
+        ),
+    )
+    parser.add_argument(
         "--obelisk-commit",
         default=None,
         help=(
@@ -1032,6 +1040,12 @@ def main() -> int:
             if name == "gdb_core":
                 continue
             require_success(record)
+        gdb_failed = commands["gdb_core"]["returncode"] != 0
+        if gdb_failed and not args.allow_partial_gdb:
+            raise RuntimeError(
+                "gdb core inspection failed; inspect gdb-core.txt.stderr or rerun with "
+                "--allow-partial-gdb for triage-only evidence"
+            )
     except (OSError, RuntimeError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
@@ -1125,6 +1139,11 @@ def main() -> int:
             ),
         },
         "commands": commands,
+        "evidence_status": {
+            "status": "partial-gdb-failed" if gdb_failed else "complete",
+            "gdb_core_failed": gdb_failed,
+            "allow_partial_gdb": args.allow_partial_gdb,
+        },
         "promotion_gate": (
             "Core dump evidence can confirm in-memory values for this one process image, "
             "but it does not by itself promote stable offsets or prove initialization flow. "
