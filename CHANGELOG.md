@@ -12,6 +12,11 @@ Current baseline:
 - Absolute x86_64 `UObject::ProcessEvent` hook with guarded validation.
 - C plugin ABI with logging, filtered ProcessEvent callbacks, owner cleanup, owner-token
   callback handles, owner-scoped unregister, and optional plugin shutdown.
+- Runtime default-deny gates for global ProcessEvent callbacks, public `CallProcessEvent`,
+  and plugin callback blocking of the original ProcessEvent path. These require explicit
+  debug-window env, marker, and capability posture before they behave as active features.
+- Fail-closed ProcessEvent hook removal: restore/reprotect failures now preserve hook
+  state and trampoline ownership instead of claiming a clean removal.
 - Central install layout under an operator-chosen Obelisk root, with runtime libraries
   staged before atomic publication.
 - Plugin publication through `scripts/install_obelisk_plugin.sh`, using a staged non-`.so`
@@ -20,11 +25,15 @@ Current baseline:
   `OBELISK_INSTANCE_ID` scopes logs, markers, plugin activation, and process-local runtime
   handles.
 - LinuxGSM wrapper templates for the current ARK debug harness.
-- `oBaseEvents` as the first official plugin example.
+- `oBaseEvents` as the first official plugin example, including owner-token handle
+  registration and safe `instance_allowlist` validation.
 - Read-only operator CLI for install, instance, and plugin state inspection.
 - Release readiness script covering build, CTest, script tests, installed SDK layout,
   read-only CLI status, installer dry-runs, and whitespace checks.
-- Offline reflection capture analyzer, snapshot comparison, and evidence-pack tooling.
+- Offline reflection capture analyzer, shared target-set snapshot comparison/regeneration,
+  and evidence-pack tooling for second-source reflection research.
+- Agent handoff guardrails that keep active coordination concise and archive historical
+  context outside the current routing table.
 - CTest coverage for plugin config, ABI layout, plugin lifecycle, callback ownership,
   runtime markers, module recognizers, and external SDK consumers.
 

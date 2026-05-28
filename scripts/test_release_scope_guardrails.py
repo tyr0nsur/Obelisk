@@ -46,7 +46,11 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "Central install layout",
             "LinuxGSM wrapper templates",
             "`oBaseEvents` as the first official plugin example",
+            "Runtime default-deny gates for global ProcessEvent callbacks",
+            "Fail-closed ProcessEvent hook removal",
+            "safe `instance_allowlist` validation",
             "Multi-instance shared-root posture",
+            "shared target-set snapshot comparison/regeneration",
         ]
 
         for item in required_release_items:
