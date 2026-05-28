@@ -87,4 +87,6 @@ For each reconstructed field:
   transfers, admin, and chat must stay internal until the common promotion gates pass.
 - Use sanitized snapshots and `compare_reflection_snapshots.py --target <Outer.Name>` to
   compare semantic layouts before accepting any UFunction or ScriptStruct shape beyond
-  candidate-only.
+  candidate-only. Acceptance requires distinct sanitized artifact identity on both roots;
+  missing or matching identity is `inconclusive`, so self-comparison cannot satisfy
+  second-source evidence.

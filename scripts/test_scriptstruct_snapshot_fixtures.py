@@ -13,6 +13,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "scriptstruct_snapshots"
 READINESS_DOC = REPO_ROOT / "docs" / "research" / "2026-05-27-module-readiness-matrix.md"
 EXPECTED_ARK_SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
+EXPECTED_ARTIFACT_SHA = "1c4bf8876706b3af40bd9b73fbeb907a31356e62d6c9ff93aed0158d2cb2fe5e"
 MANIFEST_SCHEMA = "obelisk.scriptstruct-snapshot-manifest.v1"
 SNAPSHOT_SCHEMA = "obelisk.scriptstruct-chain.snapshot.v1"
 ADDRESS_RE = re.compile(r"0x[0-9a-fA-F]{8,}")
@@ -112,6 +113,10 @@ class ScriptStructSnapshotFixtureTests(unittest.TestCase):
                 self.assertRegex(str(evidence.get("obelisk_commit")), r"^[0-9a-f]{7,40}$")
                 self.assertEqual(evidence.get("source"), "offline_core")
                 self.assertEqual(evidence.get("status"), "candidate-only")
+                self.assertEqual(evidence.get("artifact_kind"), "offline_core")
+                self.assertEqual(evidence.get("artifact_sha256"), EXPECTED_ARTIFACT_SHA)
+                self.assertEqual(evidence.get("capture_id"), "primary_core_20260527T031311Z")
+                self.assertEqual(evidence.get("evidence_pack_id"), "primary_core_pack_20260527T031311Z")
                 self.assertEqual(evidence.get("generated_by"), GENERATED_BY)
 
                 serialized = json.dumps(payload, sort_keys=True)

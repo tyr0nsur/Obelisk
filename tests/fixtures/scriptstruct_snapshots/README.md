@@ -32,8 +32,9 @@ python3 scripts/regenerate_scriptstruct_snapshots.py \
   --check-layout
 ```
 
-The artifact fields are sanitized identifiers used by the comparator to reject
-self-comparison or missing second-source identity; do not store absolute core paths here.
+The artifact fields are sanitized identifiers used by the comparator to mark
+self-comparison or missing second-source identity as `inconclusive`; do not store absolute
+core paths here.
 
 Accepted fixtures use:
 

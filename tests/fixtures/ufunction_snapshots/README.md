@@ -20,8 +20,9 @@ committed fixtures without modifying files. For second-core regeneration where t
 commit or capture-specific identity indices naturally differ, use `--check-layout` to
 compare only target identity, UFunction fields, and property-chain layout. Use
 `--target Outer.Function` to regenerate or check one manifest entry.
-The artifact fields are sanitized identifiers used by the comparator to reject
-self-comparison or missing second-source identity; do not store absolute core paths here.
+The artifact fields are sanitized identifiers used by the comparator to mark
+self-comparison or missing second-source identity as `inconclusive`; do not store absolute
+core paths here.
 
 Compare sanitized snapshot layouts between two evidence roots with:
 

@@ -247,9 +247,9 @@ Updated: 2026-05-28
 - fact: Commit `4e4f5cf` adds
   `scripts/compare_reflection_snapshots.py --readiness-report`. It summarizes comparable
   snapshot coverage and second-source status by schema/module without requiring a live
-  server. Current fixture readiness: UFunction `35/35` comparable, ScriptStruct `2/2`
-  comparable, both blocked only by missing second-source roots; self-comparison accepts all
-  fixtures.
+  server. Current fixture readiness: UFunction `35/35` comparable and ScriptStruct `2/2`
+  comparable. Second-source acceptance now additionally requires independent sanitized
+  artifact identity; self-comparison is inconclusive.
 - fact: `sdk.transfers` ScriptStruct fixtures now preserve target/property object and
   FName identity fields like UFunction fixtures. `regenerate_scriptstruct_snapshots.py
   --check-layout` stays semantic/layout-only so second-source gates do not depend on

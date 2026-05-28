@@ -10,7 +10,8 @@ ReflectionScanner, native exec probes, or runtime observation.
 ## Environment
 
 - Repo: `/home/flowcommunity-ark/Obelisk`
-- Current baseline: `20e3b79 Reject invalid runtime marker paths`
+- Current baseline for artifact-identity gates:
+  `e6367bf Require independent snapshot evidence identity`
 - Current ARK binary SHA256:
   `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`
 - Existing primary core source:
@@ -140,12 +141,15 @@ python3 scripts/compare_reflection_snapshots.py \
   --json
 ```
 
-Promotion requires all four targets to be `accepted` layout-only, with evidence recorded
-for binary SHA, Obelisk commit, artifact path, commands, reject conditions checked, and an
-explicit statement that no live server was touched unless the artifact came from an
-operator-approved debug capture. Even after layout acceptance, runtime observation remains
-separate and must use a named debug instance, marker/env/SHA/budget gates, no value
-logging, and no public SDK callbacks.
+Promotion requires all four targets to be `accepted` by
+`compare_reflection_snapshots.py`, with non-empty and distinct sanitized artifact identity
+on both roots: `artifact_kind`, `artifact_sha256`, `capture_id`, and
+`evidence_pack_id`. Missing or matching artifact identity remains `inconclusive`, even
+when layouts match. Evidence must also record binary SHA, Obelisk commit, artifact path,
+commands, reject conditions checked, and an explicit statement that no live server was
+touched unless the artifact came from an operator-approved debug capture. Even after
+layout acceptance, runtime observation remains separate and must use a named debug
+instance, marker/env/SHA/budget gates, no value logging, and no public SDK callbacks.
 
 ## Transfer ScriptStruct Intake
 
@@ -184,6 +188,8 @@ Every second-source note or evidence pack should record:
 - target instance and map;
 - ARK binary path and SHA256;
 - Obelisk commit;
+- sanitized artifact identity fields: `artifact_kind`, `artifact_sha256`, `capture_id`,
+  and `evidence_pack_id`;
 - core/log path and SHA256 where applicable;
 - active Obelisk env and markers;
 - command lines used;

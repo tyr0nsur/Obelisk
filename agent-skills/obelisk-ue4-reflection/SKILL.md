@@ -94,7 +94,10 @@ transfers, admin, and future module surfaces:
 2. Fixture-backed: sanitized UFunction/ScriptStruct snapshots and tests cover accepted and
    rejected shapes.
 3. Second-source checked: another isolated core or independent static path repeats the
-   semantic layout; unstable FName/GObjects indices are not promotion criteria.
+   semantic layout; unstable FName/GObjects indices are not promotion criteria. Snapshot
+   comparison acceptance requires distinct sanitized artifact identity on both roots;
+   missing or matching identity is `inconclusive`, so self-comparison cannot satisfy
+   second-source evidence.
 4. Runtime-observed: an approved isolated/debug window sees the exact metadata shape with
    bounded params, no mutation, and rollback/posture evidence.
 5. Internal event: exposed data is copied into Obelisk-owned memory and callback owner
@@ -130,6 +133,8 @@ Do not skip steps because a single core, log line, or recognizer test looks conv
   sanitized JSON only, does not read cores, and does not touch servers.
 - For ScriptStructs and cross-source checks, compare semantic layout by default; use strict
   identity indices only when intentionally checking same-binary identity evidence.
+- For snapshot comparisons, acceptance requires distinct sanitized artifact identity on
+  both roots; missing or matching identity is `inconclusive`.
 - Do not expand raw `0x00..0x80` param scanning as the long-term fix for any module.
 - Avoid manual construction of UE params until the real reflected property layout and
   caller semantics are decoded.

@@ -157,8 +157,8 @@ work from repository state instead of chat history.
 - Commit `4e4f5cf` adds
   `scripts/compare_reflection_snapshots.py --readiness-report`. Use it to summarize
   comparable snapshot coverage and second-source status by schema/module. Current fixtures
-  are fully comparable against themselves: UFunction `35/35`, ScriptStruct `2/2`; both
-  still need a real second sanitized snapshot root before promotion.
+  are layout-comparable: UFunction `35/35`, ScriptStruct `2/2`; both still need a real
+  second sanitized snapshot root with independent artifact identity before promotion.
 - Minimal second-source intake should run before expanding more gameplay surfaces:
   `PrimalItem.CanUse`, `PrimalItem.AllowRemoteAddToInventory`,
   `PrimalStructure.AllowStructureAccess`, and `PrimalStructure.IsAllowedToDemolish`.
