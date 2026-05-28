@@ -56,4 +56,24 @@ if ! grep -Fq -- "Second-source roots or report dirs require --require-second-so
     exit 1
 fi
 
+set +e
+report_dir_output="$(
+    scripts/check_release_readiness.sh \
+        --require-second-source-readiness \
+        --second-source-report-dir second-source-reports 2>&1
+)"
+status=$?
+set -e
+
+if [[ "${status}" -ne 2 ]]; then
+    printf 'expected in-repo report dir validation to exit 2, got %s\n%s\n' \
+        "${status}" "${report_dir_output}" >&2
+    exit 1
+fi
+
+if ! grep -Fq -- "Second-source report dir inside the repository must be ignored" <<<"${report_dir_output}"; then
+    printf 'missing in-repo report dir validation error\n%s\n' "${report_dir_output}" >&2
+    exit 1
+fi
+
 echo "test_check_release_readiness_options passed"

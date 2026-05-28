@@ -308,7 +308,7 @@ Updated: 2026-05-28
   `--second-source-report-dir`; the release gate writes JSON readiness artifacts for both
   target sets and still runs both checks before returning the first non-zero gate status.
   Put `--second-source-report-dir` outside the repository or under an ignored artifact
-  path, because release readiness ends with a clean-worktree check.
+  path; unignored in-repo report paths are rejected before the release build starts.
 - fact: `ue/BuffReflection.*` adds an offline internal `sdk.buffs` recognizer for exact
   compact `PrimalBuff` fixtures. It has no runtime hook, no public callback, no return
   override, and exposes only bounded bool ranges; object/class pointer ranges stay

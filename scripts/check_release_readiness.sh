@@ -77,6 +77,19 @@ if [[ -n "${UFUNCTION_SECOND_SOURCE_ROOT}${SCRIPTSTRUCT_SECOND_SOURCE_ROOT}${SEC
     exit 2
 fi
 
+if [[ -n "${SECOND_SOURCE_REPORT_DIR}" ]]; then
+    report_dir_abs="$(realpath -m "${SECOND_SOURCE_REPORT_DIR}")"
+    repo_abs="$(realpath -m "${REPO_ROOT}")"
+    if [[ "${report_dir_abs}" == "${repo_abs}" || "${report_dir_abs}" == "${repo_abs}/"* ]]; then
+        report_dir_rel="${report_dir_abs#${repo_abs}/}"
+        if ! git check-ignore -q -- "${report_dir_rel}" "${report_dir_rel}/"; then
+            printf 'Second-source report dir inside the repository must be ignored: %s\n' \
+                "${SECOND_SOURCE_REPORT_DIR}" >&2
+            exit 2
+        fi
+    fi
+fi
+
 cleanup() {
     if [[ "${OBELISK_KEEP_RELEASE_CHECK_ROOTS:-0}" != "1" ]]; then
         if [[ -n "${RELEASE_CHECK_ROOT}" ]]; then

@@ -51,7 +51,8 @@ complete, distinct second-source evidence.
 
 When sanitized second-source snapshot roots exist, pass them into the same gate and keep
 JSON reports as promotion artifacts. Write the report directory outside the repository
-or under an ignored artifact path so the final clean-worktree check stays meaningful:
+or under an ignored artifact path; unignored in-repo report paths are rejected before the
+release build starts so the final clean-worktree check stays meaningful:
 
 ```bash
 scripts/check_release_readiness.sh \
