@@ -50,13 +50,15 @@ touch /servidor/ark/obelisk/state/instances/<instance>/enable-structure-reflecti
 export OBELISK_ENABLE_STRUCTURE_REFLECTION=1
 export OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520
 export OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT=25
+export OBELISK_STRUCTURE_REFLECTION_DISPATCH_LIMIT=0
 ```
 
 The LinuxGSM wrapper exports these variables only when both markers are present. The hook
 also checks the markers itself, so manually setting the env without both markers will not
-enable observation. The log limit is also the observation budget. When it is absent or
-`0`, structure observation does not read `UFunction` names or reflected fields. Keep the
-budget small for debug windows.
+enable observation. The log and internal-dispatch limits are separate budgets. When both
+are absent or `0`, structure observation does not read `UFunction` names or reflected
+fields. Keep both budgets small for debug windows and leave dispatch at `0` unless the
+window explicitly needs internal copied-event dispatch.
 
 Keep these unset unless the debug window is active:
 
@@ -98,6 +100,7 @@ Unset the structure gate and restore the approved instance only:
 unset OBELISK_ENABLE_STRUCTURE_REFLECTION
 unset OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256
 unset OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT
+unset OBELISK_STRUCTURE_REFLECTION_DISPATCH_LIMIT
 rm -f /servidor/ark/obelisk/state/instances/<instance>/enable-structure-reflection
 ```
 

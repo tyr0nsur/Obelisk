@@ -64,11 +64,11 @@ work from repository state instead of chat history.
   `OBELISK_WRAPPER_PROFILE=observer-debug`, `allow-observer-debug-window`,
   `allow-experimental-observers`, and
   `/servidor/ark/obelisk/state/instances/<instance>/enable-structure-reflection`.
-  Env-only, profile-only, or observer-marker-only activation is rejected; budget defaults
-  to `0`.
+  Env-only, profile-only, or observer-marker-only activation is rejected; log and
+  internal-dispatch budgets default to `0`.
 - Stable posture rejects structure reflection env, and supervisor snapshots include
-  `structure-reflection.txt`. Structure budget is reserved only after an exact structure
-  FName filter passes.
+  `structure-reflection.txt`. Structure log and dispatch budgets are separate and are
+  reserved only after an exact structure FName filter passes.
 - Inventory reflection now has an internal hook-side observer and test target. It remains
   disabled by default, observer-debug profile plus `allow-observer-debug-window`,
   `allow-experimental-observers`, observer marker/env/SHA/budget gated, metadata-only, and

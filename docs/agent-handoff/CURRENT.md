@@ -95,15 +95,16 @@ Updated: 2026-05-28
   same instance:
   `/servidor/ark/obelisk/state/instances/<instance>/enable-structure-reflection`.
   The LinuxGSM wrapper exports structure reflection env only from those markers, and the
-  hook rejects env-only activation. Default observation budget remains `0`.
+  hook rejects env-only activation. Default log and internal-dispatch budgets remain `0`.
 - fact: stable posture checks now reject `OBELISK_ENABLE_STRUCTURE_REFLECTION`,
   `OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256`, and
-  `OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT`; supervisor snapshots write
+  `OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT`, and
+  `OBELISK_STRUCTURE_REFLECTION_DISPATCH_LIMIT`; supervisor snapshots write
   `structure-reflection.txt` so structure observation is reported as its own runtime
   observer family.
-- fact: structure observation budget is now reserved only after the cheap exact structure
-  FName filter passes. Non-structure `ProcessEvent` calls no longer consume the bounded
-  observation budget.
+- fact: structure log and internal-dispatch budgets are separate and are reserved only
+  after the cheap exact structure FName filter passes. Non-structure `ProcessEvent` calls
+  no longer consume either bounded budget.
 - fact: `sdk.inventory` now has an internal hook-side observer behind
   `OBELISK_WRAPPER_PROFILE=observer-debug`, `allow-observer-debug-window`,
   `allow-experimental-observers`, `enable-inventory-reflection`, env/SHA, and explicit
@@ -340,7 +341,8 @@ Updated: 2026-05-28
 - fact: Hook-side structure observation now dispatches matched copied scalar-only
   structure events through the internal `StructureEventDispatcher` after the original
   `ProcessEvent` path reports that the original call ran. This remains internal-only,
-  observer-gated, budget-limited, and not public ABI/plugin SDK.
+  observer-gated, dispatch-budget-limited, and not public ABI/plugin SDK; logging uses a
+  separate log budget.
 - fact: `ObeliskPluginInitContext` string pointers are documented as borrowed only for
   `ObeliskPlugin_Init`; plugins must copy `config_dir`, `config_path`, or `instance_id`
   before using them from shutdown, worker threads, or later callbacks.

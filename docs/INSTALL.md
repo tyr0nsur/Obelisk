@@ -224,11 +224,13 @@ chat reflection reads or logs fields.
 OBELISK_ENABLE_STRUCTURE_REFLECTION=1
 OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256=<supported ARK SHA256>
 OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT=0
+OBELISK_STRUCTURE_REFLECTION_DISPATCH_LIMIT=0
 ```
 
-The structure log limit is also the observation budget and defaults to `0`, so the marker
-alone does not read reflected structure fields. A short debug window must set an explicit
-non-zero budget, and stable posture checks reject these variables.
+Structure log and internal-dispatch budgets are separate and both default to `0`, so the
+marker alone does not read reflected structure fields or dispatch copied internal events.
+A short debug window must set an explicit non-zero budget for the intended path, and stable
+posture checks reject these variables.
 
 `enable-inventory-reflection` follows the same policy:
 

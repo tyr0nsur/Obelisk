@@ -77,6 +77,7 @@ namespace Obelisk::Hooks
     static std::atomic<uint64_t> s_ReflectedInventoryCalls{0};
     static std::atomic<uint64_t> s_ReflectedInventoryRejects{0};
     static std::atomic<uint64_t> s_ReflectedStructureCalls{0};
+    static std::atomic<uint64_t> s_ReflectedStructureDispatches{0};
     static std::atomic<uint64_t> s_ReflectedStructureRejects{0};
 
     static void WriteAbsoluteJump(uint8_t* at, void* destination)
@@ -477,6 +478,16 @@ namespace Obelisk::Hooks
         return limit;
     }
 
+    static uint64_t GetStructureReflectionDispatchLimit()
+    {
+        static uint64_t limit = [] {
+            const char* env = std::getenv("OBELISK_STRUCTURE_REFLECTION_DISPATCH_LIMIT");
+            if (!env || env[0] == '\0') return uint64_t{0};
+            return static_cast<uint64_t>(std::strtoull(env, nullptr, 10));
+        }();
+        return limit;
+    }
+
     static uint64_t GetInventoryReflectionLogLimit()
     {
         static uint64_t limit = [] {
@@ -490,7 +501,9 @@ namespace Obelisk::Hooks
     static bool IsStructureObservationActive()
     {
         return IsStructureReflectionEnabled() &&
-               ProcessEventStructureReflection::ShouldAttemptObservation(GetStructureReflectionLogLimit());
+               ProcessEventStructureReflection::ShouldAttemptRuntimeObservation(
+                   GetStructureReflectionLogLimit(),
+                   GetStructureReflectionDispatchLimit());
     }
 
     static bool IsInventoryObservationActive()
@@ -720,15 +733,13 @@ namespace Obelisk::Hooks
         const ProcessEventStructureReflection::Gate& gate = GetStructureReflectionGate();
         if (!gate.Enabled())
             return;
-        const uint64_t limit = GetStructureReflectionLogLimit();
-        if (!ProcessEventStructureReflection::ShouldAttemptNameObservation(nameIndex, limit))
+        const uint64_t logLimit = GetStructureReflectionLogLimit();
+        const uint64_t dispatchLimit = GetStructureReflectionDispatchLimit();
+        if (!ProcessEventStructureReflection::ShouldAttemptNameObservation(nameIndex, logLimit, dispatchLimit))
             return;
-        uint64_t observationNumber = 0;
-        if (!ProcessEventStructureReflection::TryReserveObservationBudget(
-                s_ReflectedStructureCalls, limit, observationNumber))
-        {
-            return;
-        }
+        uint64_t logObservationNumber = 0;
+        const bool logReserved = ProcessEventStructureReflection::TryReserveObservationBudget(
+            s_ReflectedStructureCalls, logLimit, logObservationNumber);
 
         Obelisk::UE::RuntimeReflection::MemoryReader reader{RuntimeReflectionReader, nullptr};
         ProcessEventStructureReflection::Attempt attempt =
@@ -741,22 +752,28 @@ namespace Obelisk::Hooks
         if (attempt.Status == ProcessEventStructureReflection::AttemptStatus::Rejected)
         {
             ++s_ReflectedStructureRejects;
-            if (ProcessEventStructureReflection::ShouldLogObservation(observationNumber, limit))
+            if (logReserved && ProcessEventStructureReflection::ShouldLogObservation(logObservationNumber, logLimit))
             {
                 OBELISK_INFO("Reflected structure rejected #{} fname_index={} reason={}",
-                             observationNumber, nameIndex, attempt.Result.Reason);
+                             logObservationNumber, nameIndex, attempt.Result.Reason);
             }
             return;
         }
 
         const Obelisk::UE::StructureReflection::StructureInvocation& invocation = attempt.Invocation;
-        const size_t dispatched =
-            ProcessEventStructureReflection::DispatchCopiedStructureEvent(invocation);
-        if (!ProcessEventStructureReflection::ShouldLogObservation(observationNumber, limit))
+        uint64_t dispatchObservationNumber = 0;
+        size_t dispatched = 0;
+        if (ProcessEventStructureReflection::TryReserveObservationBudget(
+                s_ReflectedStructureDispatches, dispatchLimit, dispatchObservationNumber))
+        {
+            dispatched = ProcessEventStructureReflection::DispatchCopiedStructureEvent(invocation);
+        }
+
+        if (!logReserved || !ProcessEventStructureReflection::ShouldLogObservation(logObservationNumber, logLimit))
             return;
 
         OBELISK_INFO("Reflected structure ProcessEvent #{} function={} fname_index={} outer_fname_index={} fields={}",
-                     observationNumber,
+                     logObservationNumber,
                      StructureFunctionName(invocation.Function),
                      invocation.FunctionNameIndex,
                      invocation.OuterNameIndex,

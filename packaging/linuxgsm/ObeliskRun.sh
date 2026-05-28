@@ -53,6 +53,7 @@ inherited_inventory_reflection_binary_sha256="${OBELISK_INVENTORY_REFLECTION_BIN
 inherited_inventory_reflection_log_limit="${OBELISK_INVENTORY_REFLECTION_LOG_LIMIT:-}"
 inherited_structure_reflection_binary_sha256="${OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256:-}"
 inherited_structure_reflection_log_limit="${OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT:-}"
+inherited_structure_reflection_dispatch_limit="${OBELISK_STRUCTURE_REFLECTION_DISPATCH_LIMIT:-}"
 
 unset OBELISK_ENABLE_PROCESS_EVENT_HOOK
 unset OBELISK_DISABLE_PLUGINS
@@ -73,6 +74,7 @@ unset OBELISK_INVENTORY_REFLECTION_LOG_LIMIT
 unset OBELISK_ENABLE_STRUCTURE_REFLECTION
 unset OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256
 unset OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT
+unset OBELISK_STRUCTURE_REFLECTION_DISPATCH_LIMIT
 
 enable_marker() {
     local feature="$1"
@@ -154,6 +156,7 @@ configure_structure_reflection() {
     export OBELISK_ENABLE_STRUCTURE_REFLECTION=1
     export OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256="${inherited_structure_reflection_binary_sha256:-7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520}"
     export OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT="${inherited_structure_reflection_log_limit:-0}"
+    export OBELISK_STRUCTURE_REFLECTION_DISPATCH_LIMIT="${inherited_structure_reflection_dispatch_limit:-0}"
 }
 
 configure_inventory_reflection() {

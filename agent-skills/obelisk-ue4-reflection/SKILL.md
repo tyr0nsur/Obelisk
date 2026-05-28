@@ -134,8 +134,9 @@ Do not skip steps because a single core, log line, or recognizer test looks conv
   and public SDK modules. `core/StructureEventDispatcher` is the current structure example:
   copy scalar values only through `ProcessEventStructureReflection` event building,
   dispatch internally only after the original `ProcessEvent` path reports that the original
-  call ran, hide object/string/array/raw param storage, keep owner cleanup tested, and do
-  not expose it through the public ABI until the remaining promotion gates are complete.
+  call ran, keep log and internal-dispatch budgets separate, hide object/string/array/raw
+  param storage, keep owner cleanup tested, and do not expose it through the public ABI
+  until the remaining promotion gates are complete.
 - Use snapshot fixtures and `compare_reflection_snapshots.py` before promoting any
   UFunction or ScriptStruct shape beyond candidate-only.
 - `compare_reflection_snapshots.py --target <Outer.Name>` is offline. It compares

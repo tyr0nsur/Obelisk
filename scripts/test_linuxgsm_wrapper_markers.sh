@@ -113,6 +113,7 @@ assert_contains "${capture_no_marker}" '^OBELISK_INSTANCE_ID=arkserver2$'
 assert_not_contains "${capture_no_marker}" '^OBELISK_ENABLE_STRUCTURE_REFLECTION='
 assert_not_contains "${capture_no_marker}" '^OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256='
 assert_not_contains "${capture_no_marker}" '^OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT='
+assert_not_contains "${capture_no_marker}" '^OBELISK_STRUCTURE_REFLECTION_DISPATCH_LIMIT='
 assert_not_contains "${capture_no_marker}" '^OBELISK_ENABLE_INVENTORY_REFLECTION='
 assert_not_contains "${capture_no_marker}" '^OBELISK_INVENTORY_REFLECTION_BINARY_SHA256='
 assert_not_contains "${capture_no_marker}" '^OBELISK_INVENTORY_REFLECTION_LOG_LIMIT='
@@ -156,6 +157,7 @@ assert_contains "${capture_marker}" '^OBELISK_INVENTORY_REFLECTION_LOG_LIMIT=0$'
 assert_contains "${capture_marker}" '^OBELISK_ENABLE_STRUCTURE_REFLECTION=1$'
 assert_contains "${capture_marker}" '^OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520$'
 assert_contains "${capture_marker}" '^OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT=0$'
+assert_contains "${capture_marker}" '^OBELISK_STRUCTURE_REFLECTION_DISPATCH_LIMIT=0$'
 
 root_ragnarok_stale="${TMP_DIR}/root-ragnarok-stale"
 capture_ragnarok_stale="${TMP_DIR}/ragnarok-stale.env"
@@ -189,11 +191,13 @@ prepare_root "${root_override}"
     OBELISK_WRAPPER_PROFILE=observer-debug \
     OBELISK_INVENTORY_REFLECTION_LOG_LIMIT=5 \
     OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT=7 \
+    OBELISK_STRUCTURE_REFLECTION_DISPATCH_LIMIT=9 \
     "${WRAPPER}" TheIsland?listen
 )
 
 assert_contains "${capture_override}" '^OBELISK_INVENTORY_REFLECTION_LOG_LIMIT=5$'
 assert_contains "${capture_override}" '^OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT=7$'
+assert_contains "${capture_override}" '^OBELISK_STRUCTURE_REFLECTION_DISPATCH_LIMIT=9$'
 
 root_invalid="${TMP_DIR}/root-invalid"
 capture_wrong_instance="${TMP_DIR}/wrong-instance.env"
@@ -256,6 +260,7 @@ prepare_root "${root_inherited}"
     OBELISK_ENABLE_STRUCTURE_REFLECTION=1 \
     OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256=bad-structure-sha \
     OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT=77 \
+    OBELISK_STRUCTURE_REFLECTION_DISPATCH_LIMIT=66 \
     "${WRAPPER}" Ragnarok?listen
 )
 
@@ -285,6 +290,7 @@ assert_not_contains "${capture_inherited}" '^OBELISK_INVENTORY_REFLECTION_LOG_LI
 assert_not_contains "${capture_inherited}" '^OBELISK_ENABLE_STRUCTURE_REFLECTION='
 assert_not_contains "${capture_inherited}" '^OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256='
 assert_not_contains "${capture_inherited}" '^OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT='
+assert_not_contains "${capture_inherited}" '^OBELISK_STRUCTURE_REFLECTION_DISPATCH_LIMIT='
 
 capture_symlink_instance="${TMP_DIR}/symlink-instance.env"
 root_symlink_instance="${TMP_DIR}/root-symlink-instance"

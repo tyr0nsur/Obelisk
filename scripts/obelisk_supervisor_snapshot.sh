@@ -158,6 +158,7 @@ INVENTORY_REFLECTION_LIMIT="$(posture_value OBELISK_INVENTORY_REFLECTION_LOG_LIM
 STRUCTURE_REFLECTION_ENV="$(posture_value OBELISK_ENABLE_STRUCTURE_REFLECTION)"
 STRUCTURE_REFLECTION_SHA="$(posture_value OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256)"
 STRUCTURE_REFLECTION_LIMIT="$(posture_value OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT)"
+STRUCTURE_REFLECTION_DISPATCH_LIMIT="$(posture_value OBELISK_STRUCTURE_REFLECTION_DISPATCH_LIMIT)"
 
 {
     printf 'chat_reflection_marker=%s\n' "$(marker_status "${CHAT_MARKER}")"
@@ -246,26 +247,30 @@ STRUCTURE_REFLECTION_LIMIT="$(posture_value OBELISK_STRUCTURE_REFLECTION_LOG_LIM
     printf 'structure_reflection_env=%s\n' "${STRUCTURE_REFLECTION_ENV:-<unset>}"
     printf 'structure_reflection_binary_sha256=%s\n' "$([[ -n "${STRUCTURE_REFLECTION_SHA}" ]] && printf present || printf missing)"
     printf 'structure_reflection_log_limit=%s\n' "${STRUCTURE_REFLECTION_LIMIT:-<unset>}"
+    printf 'structure_reflection_dispatch_limit=%s\n' "${STRUCTURE_REFLECTION_DISPATCH_LIMIT:-<unset>}"
     printf 'log_path=%s\n' "${OBELISK_LOG}"
     if [[ -f "${OBELISK_LOG}" ]]; then
         experimental_structure_gate_lines="$(safe_grep_count 'Experimental structure reflection enabled' "${OBELISK_LOG}")"
         reflected_structure_process_event_lines="$(safe_grep_count 'Reflected structure ProcessEvent' "${OBELISK_LOG}")"
         reflected_structure_rejected_lines="$(safe_grep_count 'Reflected structure rejected' "${OBELISK_LOG}")"
+        reflected_structure_dispatched_lines="$(safe_grep_count 'Reflected structure dispatched' "${OBELISK_LOG}")"
         reflected_structure_field_lines="$(safe_grep_count 'Reflected structure field' "${OBELISK_LOG}")"
-        last_relevant_line="$(grep -E 'Experimental structure reflection|Reflected structure ProcessEvent|Reflected structure rejected|Reflected structure field' "${OBELISK_LOG}" | tail -n1 || true)"
+        last_relevant_line="$(grep -E 'Experimental structure reflection|Reflected structure ProcessEvent|Reflected structure rejected|Reflected structure dispatched|Reflected structure field' "${OBELISK_LOG}" | tail -n1 || true)"
 
         printf 'experimental_gate_lines=%s\n' "${experimental_structure_gate_lines}"
         printf 'reflected_structure_process_event_lines=%s\n' "${reflected_structure_process_event_lines}"
         printf 'reflected_structure_rejected_lines=%s\n' "${reflected_structure_rejected_lines}"
+        printf 'reflected_structure_dispatched_lines=%s\n' "${reflected_structure_dispatched_lines}"
         printf 'reflected_structure_field_lines=%s\n' "${reflected_structure_field_lines}"
         printf 'last_relevant_line=%s\n' "${last_relevant_line:-<none>}"
         printf '\nrecent_structure_reflection_lines:\n'
-        grep -E 'Experimental structure reflection|Reflected structure ProcessEvent|Reflected structure rejected|Reflected structure field' "${OBELISK_LOG}" | tail -n 80 || true
+        grep -E 'Experimental structure reflection|Reflected structure ProcessEvent|Reflected structure rejected|Reflected structure dispatched|Reflected structure field' "${OBELISK_LOG}" | tail -n 80 || true
     else
         printf 'missing_log=true\n'
         printf 'experimental_gate_lines=0\n'
         printf 'reflected_structure_process_event_lines=0\n'
         printf 'reflected_structure_rejected_lines=0\n'
+        printf 'reflected_structure_dispatched_lines=0\n'
         printf 'reflected_structure_field_lines=0\n'
         printf 'last_relevant_line=<none>\n'
     fi
@@ -300,6 +305,7 @@ inventory_reflection_log_limit=${INVENTORY_REFLECTION_LIMIT:-<unset>}
 structure_reflection_gate_env=${STRUCTURE_REFLECTION_ENV:-<unset>}
 structure_reflection_binary_sha256=$([[ -n "${STRUCTURE_REFLECTION_SHA}" ]] && printf present || printf missing)
 structure_reflection_log_limit=${STRUCTURE_REFLECTION_LIMIT:-<unset>}
+structure_reflection_dispatch_limit=${STRUCTURE_REFLECTION_DISPATCH_LIMIT:-<unset>}
 
 This snapshot is read-only. It must not be used as proof of an accepted offset,
 signature, or runtime behavior without a follow-up active review.
