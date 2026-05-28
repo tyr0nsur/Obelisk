@@ -128,8 +128,11 @@ Use the matching explicit `--map` and `--instance` for the approved debug target
 check must pass before launching another agent round that assumes a stable server.
 In `--expect-stable` mode it must fail closed if `libobelisk.so` is not mapped, if a
 deleted `libobelisk` mapping remains after redeploy, if `LD_PRELOAD` does not include the
-central `${OBELISK_ROOT}/lib/libobelisk.so`, or if scanner/native-exec variables are still
-present. Its parser is tested offline with procfs fixtures; do not weaken those tests to
+central `${OBELISK_ROOT}/lib/libobelisk.so`, if scanner/native-exec variables are still
+present, if stable markers `enable-process-event-hook` and `disable-plugins` are missing,
+or if per-instance marker entries would re-enable forbidden experimental features at the
+next restart. It rejects a forbidden marker name even when the entry is malformed or a
+symlink. Its parser is tested offline with procfs fixtures; do not weaken those tests to
 depend on a live ARK process.
 
 ## Runtime Debug Control

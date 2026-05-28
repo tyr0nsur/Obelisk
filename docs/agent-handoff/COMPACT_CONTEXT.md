@@ -437,12 +437,14 @@ work from repository state instead of chat history.
 - `scripts/check_obelisk_server_posture.sh --expect-stable` is the required read-only
   guardrail after server debug work. It checks expected env, requires central
   `${OBELISK_ROOT}/lib/libobelisk.so` in `LD_PRELOAD` and maps, rejects deleted Obelisk
-  mappings, and has offline procfs fixture coverage in
+  mappings, requires stable markers `enable-process-event-hook` / `disable-plugins`,
+  rejects forbidden per-instance marker entries that would re-enable experimental features
+  at next restart, and has offline procfs fixture coverage in
   `scripts/test_check_obelisk_server_posture.sh`.
 - Add `--forbid-chat-reflection` to the posture check when validating
   production/performance or quiet-baseline posture. It rejects
   `OBELISK_ENABLE_CHAT_REFLECTION`, the chat SHA/log-limit env, and
-  `OBELISK_CHAT_REFLECTION_LOG_TEXT`.
+  `OBELISK_CHAT_REFLECTION_LOG_TEXT`, plus the `enable-chat-reflection` marker.
 - Historical read-only quiet-posture audit at commit `5da65d6` found Ragnarok PID
   `3940524` still had `OBELISK_ENABLE_CHAT_REFLECTION=1`, so it failed the stricter
   production/performance guard. This was superseded on 2026-05-28 when the

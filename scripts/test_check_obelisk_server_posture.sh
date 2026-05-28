@@ -5,6 +5,10 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPT="${REPO_ROOT}/scripts/check_obelisk_server_posture.sh"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "${TMP_DIR}"' EXIT
+TEST_OBELISK_ROOT="${TMP_DIR}/obelisk-root"
+mkdir -p "${TEST_OBELISK_ROOT}/state/instances/arkserver"
+: > "${TEST_OBELISK_ROOT}/state/instances/arkserver/enable-process-event-hook"
+: > "${TEST_OBELISK_ROOT}/state/instances/arkserver/disable-plugins"
 
 write_proc_fixture() {
     local pid="$1"
@@ -12,7 +16,7 @@ write_proc_fixture() {
     shift 2
 
     mkdir -p "${TMP_DIR}/proc/${pid}"
-    printf '%s\0' "$@" > "${TMP_DIR}/proc/${pid}/environ"
+    printf '%s\0' "OBELISK_ROOT=${TEST_OBELISK_ROOT}" "$@" > "${TMP_DIR}/proc/${pid}/environ"
     printf '%s\n' "${maps}" > "${TMP_DIR}/proc/${pid}/maps"
 }
 
@@ -35,10 +39,10 @@ expect_failure() {
     fi
 }
 
-stable_maps="7f000000-7f001000 r-xp 00000000 00:00 0 /servidor/ark/obelisk/lib/libobelisk.so"
+stable_maps="7f000000-7f001000 r-xp 00000000 00:00 0 ${TEST_OBELISK_ROOT}/lib/libobelisk.so"
 
 write_proc_fixture 101 "${stable_maps}" \
-    "LD_PRELOAD=/servidor/ark/obelisk/lib/libobelisk.so" \
+    "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
     "OBELISK_INSTANCE_ID=arkserver" \
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
     "OBELISK_DISABLE_PLUGINS=1"
@@ -48,6 +52,16 @@ expect_success stable-posture-instance-id-alias \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable --instance-id arkserver
 expect_success stable-posture-chat-forbidden-clean \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable --forbid-chat-reflection
+
+rm -f "${TEST_OBELISK_ROOT}/state/instances/arkserver/enable-process-event-hook"
+expect_failure missing-process-event-marker-for-stable \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable
+: > "${TEST_OBELISK_ROOT}/state/instances/arkserver/enable-process-event-hook"
+
+rm -f "${TEST_OBELISK_ROOT}/state/instances/arkserver/disable-plugins"
+expect_failure missing-disable-plugins-marker-for-stable \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable
+: > "${TEST_OBELISK_ROOT}/state/instances/arkserver/disable-plugins"
 
 write_proc_fixture 114 "${stable_maps}" \
     "OBELISK_INSTANCE_ID=arkserver" \
@@ -65,7 +79,7 @@ expect_failure relative-ld-preload-for-stable \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 115 --expect-stable
 
 write_proc_fixture 109 "${stable_maps}" \
-    "LD_PRELOAD=/servidor/ark/obelisk/lib/libobelisk.so" \
+    "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
     "OBELISK_INSTANCE_ID=arkserver" \
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
     "OBELISK_DISABLE_PLUGINS=1" \
@@ -78,7 +92,7 @@ expect_failure chat-reflection-forbidden-for-production \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 109 --expect-stable --forbid-chat-reflection
 
 write_proc_fixture 110 "${stable_maps}" \
-    "LD_PRELOAD=/servidor/ark/obelisk/lib/libobelisk.so" \
+    "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
     "OBELISK_INSTANCE_ID=arkserver" \
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
     "OBELISK_DISABLE_PLUGINS=1" \
@@ -87,7 +101,7 @@ expect_failure chat-text-forbidden-for-production \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 110 --expect-stable --forbid-chat-reflection
 
 write_proc_fixture 111 "${stable_maps}" \
-    "LD_PRELOAD=/servidor/ark/obelisk/lib/libobelisk.so" \
+    "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
     "OBELISK_INSTANCE_ID=arkserver" \
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
     "OBELISK_DISABLE_PLUGINS=1" \
@@ -98,7 +112,7 @@ expect_failure structure-reflection-forbidden-for-stable \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 111 --expect-stable
 
 write_proc_fixture 112 "${stable_maps}" \
-    "LD_PRELOAD=/servidor/ark/obelisk/lib/libobelisk.so" \
+    "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
     "OBELISK_INSTANCE_ID=arkserver" \
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
     "OBELISK_DISABLE_PLUGINS=1" \
@@ -109,7 +123,7 @@ expect_failure inventory-reflection-forbidden-for-stable \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 112 --expect-stable
 
 write_proc_fixture 113 "${stable_maps}" \
-    "LD_PRELOAD=/servidor/ark/obelisk/lib/libobelisk.so" \
+    "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
     "OBELISK_INSTANCE_ID=arkserver" \
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
     "OBELISK_DISABLE_PLUGINS=1" \
@@ -118,7 +132,7 @@ expect_failure global-process-event-callbacks-forbidden-for-stable \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 113 --expect-stable
 
 write_proc_fixture 114 "${stable_maps}" \
-    "LD_PRELOAD=/servidor/ark/obelisk/lib/libobelisk.so" \
+    "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
     "OBELISK_INSTANCE_ID=arkserver" \
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
     "OBELISK_DISABLE_PLUGINS=1" \
@@ -127,7 +141,7 @@ expect_failure call-process-event-forbidden-for-stable \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 114 --expect-stable
 
 write_proc_fixture 102 "${stable_maps}" \
-    "LD_PRELOAD=/servidor/ark/obelisk/lib/libobelisk.so" \
+    "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
     "OBELISK_INSTANCE_ID=arkserver" \
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
     "OBELISK_DISABLE_PLUGINS=1" \
@@ -136,7 +150,7 @@ expect_failure scanner-forbidden \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 102 --expect-stable
 
 write_proc_fixture 107 "${stable_maps}" \
-    "LD_PRELOAD=/servidor/ark/obelisk/lib/libobelisk.so" \
+    "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
     "OBELISK_INSTANCE_ID=arkserver" \
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
     "OBELISK_DISABLE_PLUGINS=1" \
@@ -145,7 +159,7 @@ expect_failure scanner-empty-env-forbidden \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 107 --expect-stable
 
 write_proc_fixture 116 "${stable_maps}" \
-    "LD_PRELOAD=/servidor/ark/obelisk/lib/libobelisk.so" \
+    "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
     "OBELISK_INSTANCE_ID=arkserver" \
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
     "OBELISK_DISABLE_PLUGINS=1" \
@@ -154,7 +168,7 @@ expect_failure pe-trace-limit-forbidden-for-stable \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 116 --expect-stable
 
 write_proc_fixture 117 "${stable_maps}" \
-    "LD_PRELOAD=/servidor/ark/obelisk/lib/libobelisk.so" \
+    "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
     "OBELISK_INSTANCE_ID=arkserver" \
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
     "OBELISK_DISABLE_PLUGINS=1" \
@@ -163,7 +177,7 @@ expect_success pe-trace-limit-zero-allowed \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 117 --expect-stable
 
 write_proc_fixture 103 "7f000000-7f001000 r-xp 00000000 00:00 0 /usr/lib/libc.so" \
-    "LD_PRELOAD=/servidor/ark/obelisk/lib/libobelisk.so" \
+    "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
     "OBELISK_INSTANCE_ID=arkserver" \
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
     "OBELISK_DISABLE_PLUGINS=1"
@@ -171,7 +185,7 @@ expect_failure missing-runtime-mapping \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 103 --expect-stable
 
 write_proc_fixture 104 "${stable_maps} (deleted)" \
-    "LD_PRELOAD=/servidor/ark/obelisk/lib/libobelisk.so" \
+    "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
     "OBELISK_INSTANCE_ID=arkserver" \
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
     "OBELISK_DISABLE_PLUGINS=1"
@@ -179,7 +193,7 @@ expect_failure deleted-runtime-mapping \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 104 --expect-stable
 
 write_proc_fixture 105 "${stable_maps}" \
-    "LD_PRELOAD=/servidor/ark/obelisk/lib/libobelisk.so" \
+    "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
     "OBELISK_INSTANCE_ID=arkserver" \
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
     "OBELISK_DISABLE_PLUGINS=1" \
@@ -188,7 +202,7 @@ expect_failure native-exec-forbidden \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 105 --expect-stable
 
 write_proc_fixture 106 "${stable_maps}" \
-    "LD_PRELOAD=/servidor/ark/obelisk/lib/libobelisk.so" \
+    "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
     "OBELISK_INSTANCE_ID=arkserver" \
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
     "OBELISK_DISABLE_PLUGINS=1" \
@@ -197,12 +211,43 @@ expect_failure debug-ptrace-forbidden \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 106 --expect-stable
 
 write_proc_fixture 108 "${stable_maps}" \
-    "LD_PRELOAD=/servidor/ark/obelisk/lib/libobelisk.so" \
+    "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
     "OBELISK_INSTANCE_ID=arkserver" \
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
     "OBELISK_DISABLE_PLUGINS=1" \
     "OBELISK_ENABLE_DEBUG_CONTROL=1"
 expect_failure debug-control-forbidden \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 108 --expect-stable
+
+for marker in \
+    allow-ptrace \
+    enable-debug-control \
+    enable-native-exec-probes \
+    allow-global-process-event-callbacks \
+    allow-call-process-event \
+    enable-inventory-reflection \
+    enable-structure-reflection \
+    enable-reflection-scanner
+do
+    : > "${TEST_OBELISK_ROOT}/state/instances/arkserver/${marker}"
+    expect_failure "forbidden-marker-${marker}" \
+        "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable
+    rm -f "${TEST_OBELISK_ROOT}/state/instances/arkserver/${marker}"
+done
+
+: > "${TEST_OBELISK_ROOT}/state/instances/arkserver/request-static-fname-probe"
+expect_failure active-debug-request-marker-forbidden-for-stable \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable
+mv "${TEST_OBELISK_ROOT}/state/instances/arkserver/request-static-fname-probe" \
+    "${TEST_OBELISK_ROOT}/state/instances/arkserver/request-static-fname-probe.done.1234"
+expect_success completed-debug-request-marker-allowed-for-stable \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable
+rm -f "${TEST_OBELISK_ROOT}/state/instances/arkserver/request-static-fname-probe.done.1234"
+
+: > "${TEST_OBELISK_ROOT}/state/instances/arkserver/enable-chat-reflection"
+expect_success chat-marker-allowed-in-debug-stable \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable
+expect_failure chat-marker-forbidden-for-production \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable --forbid-chat-reflection
 
 echo "check_obelisk_server_posture offline tests passed"

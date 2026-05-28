@@ -156,6 +156,24 @@ forbid_nonzero_env() {
     fi
 }
 
+forbid_marker() {
+    local marker="$1"
+    local path="${marker_dir}/${marker}"
+    if [[ -e "${path}" || -L "${path}" ]]; then
+        echo "Forbidden marker ${path} exists." >&2
+        return 1
+    fi
+}
+
+require_marker() {
+    local marker="$1"
+    local path="${marker_dir}/${marker}"
+    if [[ ! -f "${path}" || -L "${path}" ]]; then
+        echo "Expected marker ${path} to exist as a regular non-symlink file." >&2
+        return 1
+    fi
+}
+
 require_mapped_library() {
     local library="$1"
     if ! printf '%s\n' "${maps_dump}" | grep -F -- "${library}" >/dev/null; then
@@ -174,9 +192,11 @@ forbid_deleted_obelisk_mapping() {
 echo "pid=${PID}"
 printf '%s\n' "${env_dump}" | grep -E '^(OBELISK_|LD_PRELOAD=|LD_LIBRARY_PATH=)' || true
 
+obelisk_root="$(get_env OBELISK_ROOT)"
+obelisk_root="${obelisk_root:-/servidor/ark/obelisk}"
+marker_dir="${obelisk_root%/}/state/instances/${INSTANCE}"
+
 if [[ "${EXPECT_STABLE}" == "1" ]]; then
-    obelisk_root="$(get_env OBELISK_ROOT)"
-    obelisk_root="${obelisk_root:-/servidor/ark/obelisk}"
     expected_runtime="${obelisk_root%/}/lib/libobelisk.so"
 
     require_env OBELISK_INSTANCE_ID "${INSTANCE}"
@@ -184,6 +204,8 @@ if [[ "${EXPECT_STABLE}" == "1" ]]; then
     require_env OBELISK_DISABLE_PLUGINS 1
     require_env_path_list_contains LD_PRELOAD "${expected_runtime}"
     require_mapped_library "${expected_runtime}"
+    require_marker enable-process-event-hook
+    require_marker disable-plugins
     forbid_deleted_obelisk_mapping
     forbid_env OBELISK_DEBUG_ALLOW_PTRACE
     forbid_env OBELISK_ENABLE_DEBUG_CONTROL
@@ -202,6 +224,16 @@ if [[ "${EXPECT_STABLE}" == "1" ]]; then
     forbid_env OBELISK_REFLECTION_STATIC_FNAME_ROOTS
     forbid_env OBELISK_REFLECTION_SAMPLE_STATIC_FNAME_ROOTS
     forbid_env OBELISK_REFLECTION_LOG_FNAME_REJECTS
+
+    forbid_marker allow-ptrace
+    forbid_marker enable-debug-control
+    forbid_marker enable-native-exec-probes
+    forbid_marker allow-global-process-event-callbacks
+    forbid_marker allow-call-process-event
+    forbid_marker enable-inventory-reflection
+    forbid_marker enable-structure-reflection
+    forbid_marker enable-reflection-scanner
+    forbid_marker request-static-fname-probe
 fi
 
 if [[ "${FORBID_CHAT_REFLECTION}" == "1" ]]; then
@@ -209,4 +241,5 @@ if [[ "${FORBID_CHAT_REFLECTION}" == "1" ]]; then
     forbid_env OBELISK_CHAT_REFLECTION_BINARY_SHA256
     forbid_env OBELISK_CHAT_REFLECTION_LOG_LIMIT
     forbid_env OBELISK_CHAT_REFLECTION_LOG_TEXT
+    forbid_marker enable-chat-reflection
 fi

@@ -134,6 +134,8 @@ uses `/servidor/ark/obelisk`:
         enable-debug-control  # approved debug window only
         enable-reflection-scanner  # approved debug window only
         enable-native-exec-probes  # never on live/shared instances
+        allow-global-process-event-callbacks  # experimental SDK callback scope
+        allow-call-process-event  # experimental outbound UE call surface
 ```
 
 The target binary directory should only need a thin launcher/wrapper. Runtime

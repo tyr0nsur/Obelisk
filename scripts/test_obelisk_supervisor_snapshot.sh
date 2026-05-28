@@ -20,11 +20,27 @@ write_proc_fixture() {
 write_obelisk_fixture() {
     local root="$1"
     local instance="${2:-arkserver2}"
+    local experimental_markers="${3:-all}"
 
     mkdir -p "${root}/logs/${instance}" "${root}/state/instances/${instance}"
-    : > "${root}/state/instances/${instance}/enable-chat-reflection"
-    : > "${root}/state/instances/${instance}/enable-inventory-reflection"
-    : > "${root}/state/instances/${instance}/enable-structure-reflection"
+    : > "${root}/state/instances/${instance}/enable-process-event-hook"
+    : > "${root}/state/instances/${instance}/disable-plugins"
+    case "${experimental_markers}" in
+        all)
+            : > "${root}/state/instances/${instance}/enable-chat-reflection"
+            : > "${root}/state/instances/${instance}/enable-inventory-reflection"
+            : > "${root}/state/instances/${instance}/enable-structure-reflection"
+            ;;
+        chat)
+            : > "${root}/state/instances/${instance}/enable-chat-reflection"
+            ;;
+        none)
+            ;;
+        *)
+            echo "Unknown experimental marker fixture mode: ${experimental_markers}" >&2
+            exit 2
+            ;;
+    esac
     cat > "${root}/logs/${instance}/Obelisk.log" <<'EOF'
 [2026-05-27 01:00:00.000] [warning] Experimental chat reflection enabled for ShooterGameServer SHA256 abc123.
 [2026-05-27 01:00:01.000] [info] Reflected chat ProcessEvent #1 function=ServerSendChatMessage fname_index=2697 params=0x123 fields=2
@@ -95,13 +111,12 @@ assert_file_not_contains() {
     fi
 }
 
-stable_maps="7f000000-7f001000 r-xp 00000000 00:00 0 /servidor/ark/obelisk/lib/libobelisk.so"
-
 default_root="${TMP_DIR}/default-root"
 default_out="${TMP_DIR}/default-out"
-write_obelisk_fixture "${default_root}" "arkserver-obelisk-debug"
-write_proc_fixture 4141 "${stable_maps}" \
-    "LD_PRELOAD=/servidor/ark/obelisk/lib/libobelisk.so" \
+write_obelisk_fixture "${default_root}" "arkserver-obelisk-debug" "none"
+write_proc_fixture 4141 "7f000000-7f001000 r-xp 00000000 00:00 0 ${default_root}/lib/libobelisk.so" \
+    "OBELISK_ROOT=${default_root}" \
+    "LD_PRELOAD=${default_root}/lib/libobelisk.so" \
     "OBELISK_INSTANCE_ID=arkserver-obelisk-debug" \
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
     "OBELISK_DISABLE_PLUGINS=1"
@@ -118,9 +133,10 @@ assert_file_contains "${default_snapshot_dir}/summary.txt" '^posture_status=ok$'
 
 stable_root="${TMP_DIR}/stable-root"
 stable_out="${TMP_DIR}/stable-out"
-write_obelisk_fixture "${stable_root}"
-write_proc_fixture 4242 "${stable_maps}" \
-    "LD_PRELOAD=/servidor/ark/obelisk/lib/libobelisk.so" \
+write_obelisk_fixture "${stable_root}" "arkserver2" "chat"
+write_proc_fixture 4242 "7f000000-7f001000 r-xp 00000000 00:00 0 ${stable_root}/lib/libobelisk.so" \
+    "OBELISK_ROOT=${stable_root}" \
+    "LD_PRELOAD=${stable_root}/lib/libobelisk.so" \
     "OBELISK_INSTANCE_ID=arkserver2" \
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
     "OBELISK_DISABLE_PLUGINS=1" \
@@ -158,7 +174,7 @@ assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^rejected_chat_lines
 assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^rejected_or_unknown_send_mode_lines=2$'
 assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^send_mode_unknown_lines=1$'
 assert_file_contains "${snapshot_dir}/chat-reflection.txt" '^last_relevant_line=.*ClientServerChatDirectMessage'
-assert_file_contains "${snapshot_dir}/inventory-reflection.txt" '^inventory_reflection_marker=enabled$'
+assert_file_contains "${snapshot_dir}/inventory-reflection.txt" '^inventory_reflection_marker=disabled$'
 assert_file_contains "${snapshot_dir}/inventory-reflection.txt" '^inventory_reflection_env=<unset>$'
 assert_file_contains "${snapshot_dir}/inventory-reflection.txt" '^inventory_reflection_binary_sha256=missing$'
 assert_file_contains "${snapshot_dir}/inventory-reflection.txt" '^experimental_gate_lines=1$'
@@ -167,7 +183,7 @@ assert_file_contains "${snapshot_dir}/inventory-reflection.txt" '^reflected_inve
 assert_file_contains "${snapshot_dir}/inventory-reflection.txt" '^reflected_inventory_field_lines=1$'
 assert_file_contains "${snapshot_dir}/summary.txt" '^inventory_reflection_gate_env=<unset>$'
 assert_file_contains "${snapshot_dir}/summary.txt" '^inventory_reflection_binary_sha256=missing$'
-assert_file_contains "${snapshot_dir}/structure-reflection.txt" '^structure_reflection_marker=enabled$'
+assert_file_contains "${snapshot_dir}/structure-reflection.txt" '^structure_reflection_marker=disabled$'
 assert_file_contains "${snapshot_dir}/structure-reflection.txt" '^structure_reflection_env=<unset>$'
 assert_file_contains "${snapshot_dir}/structure-reflection.txt" '^structure_reflection_binary_sha256=missing$'
 assert_file_contains "${snapshot_dir}/structure-reflection.txt" '^experimental_gate_lines=1$'
@@ -185,8 +201,10 @@ assert_file_contains "${loop_out}/latest/summary.txt" '^quiet_posture_status=fai
 
 unstable_root="${TMP_DIR}/unstable-root"
 unstable_out="${TMP_DIR}/unstable-out"
-write_obelisk_fixture "${unstable_root}"
-write_proc_fixture 4343 "${stable_maps}" \
+write_obelisk_fixture "${unstable_root}" "arkserver2" "none"
+write_proc_fixture 4343 "7f000000-7f001000 r-xp 00000000 00:00 0 ${unstable_root}/lib/libobelisk.so" \
+    "OBELISK_ROOT=${unstable_root}" \
+    "LD_PRELOAD=${unstable_root}/lib/libobelisk.so" \
     "OBELISK_INSTANCE_ID=arkserver2" \
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
     "OBELISK_DISABLE_PLUGINS=1" \
@@ -205,21 +223,24 @@ assert_file_contains "${unstable_out}/latest/structure-reflection.txt" '^skipped
 
 invalid_root="${TMP_DIR}/invalid-root"
 invalid_out="${TMP_DIR}/invalid-out"
-write_obelisk_fixture "${invalid_root}"
-rm -f "${invalid_root}/state/instances/arkserver2/enable-inventory-reflection"
-rm -f "${invalid_root}/state/instances/arkserver2/enable-structure-reflection"
+write_obelisk_fixture "${invalid_root}" "arkserver2" "none"
 mkdir -p "${invalid_root}/state/instances/arkserver2/enable-inventory-reflection"
 : > "${TMP_DIR}/external-structure-marker"
 ln -s "${TMP_DIR}/external-structure-marker" "${invalid_root}/state/instances/arkserver2/enable-structure-reflection"
-write_proc_fixture 4444 "${stable_maps}" \
-    "LD_PRELOAD=/servidor/ark/obelisk/lib/libobelisk.so" \
+write_proc_fixture 4444 "7f000000-7f001000 r-xp 00000000 00:00 0 ${invalid_root}/lib/libobelisk.so" \
+    "OBELISK_ROOT=${invalid_root}" \
+    "LD_PRELOAD=${invalid_root}/lib/libobelisk.so" \
     "OBELISK_INSTANCE_ID=arkserver2" \
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
     "OBELISK_DISABLE_PLUGINS=1"
 
-invalid_snapshot_dir="$(run_snapshot "${invalid_root}" "${invalid_out}" 4444)"
-assert_file_contains "${invalid_snapshot_dir}/inventory-reflection.txt" '^inventory_reflection_marker=invalid$'
-assert_file_contains "${invalid_snapshot_dir}/structure-reflection.txt" '^structure_reflection_marker=invalid$'
+if run_snapshot "${invalid_root}" "${invalid_out}" 4444 >/dev/null 2>"${TMP_DIR}/invalid.err"; then
+    echo "Expected invalid marker entries to fail stable posture" >&2
+    exit 1
+fi
+assert_file_contains "${TMP_DIR}/invalid.err" 'unstable Obelisk posture'
+assert_file_contains "${invalid_out}/latest/summary.txt" '^posture_status=failed$'
+assert_file_contains "${invalid_out}/latest/posture.txt" 'Forbidden marker .*/enable-inventory-reflection exists\.'
 
 if OBELISK_ROOT="${unstable_root}" \
     OBELISK_SUPERVISOR_OUT="${TMP_DIR}/loop-fail-out" \
