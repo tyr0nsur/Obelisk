@@ -55,12 +55,22 @@ class RegenerateScriptStructSnapshotsTests(unittest.TestCase):
         fname_root_slot: int,
         gobjects: int,
         extra_gobjects: bool = False,
+        binary_sha: str = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+        evidence_status: dict[str, object] | None = None,
     ) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         manifest = {
+            "binary": {
+                "sha256": binary_sha,
+            },
             "core": {
                 "path": str(core),
                 "sha256": "4" * 64,
+            },
+            "evidence_status": evidence_status
+            or {
+                "status": "complete",
+                "gdb_core_failed": False,
             },
             "fname_root_slots": [
                 {
@@ -344,6 +354,82 @@ class RegenerateScriptStructSnapshotsTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("--capture-id conflicts with --evidence-pack-manifest", result.stderr)
+
+    def test_evidence_pack_manifest_rejects_wrong_binary_sha(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "second-core"
+            manifest = root / "manifest.json"
+            evidence_pack = root / "second-pack" / "manifest.json"
+            output_root = root / "out"
+            addrs = build_core_fixture(core)
+            self.write_manifest(manifest)
+            self.write_evidence_pack_manifest(
+                evidence_pack,
+                core=core,
+                fname_root_slot=addrs["fname_root_slot"],
+                gobjects=addrs["gobjects"],
+                binary_sha="8" * 64,
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "regenerate_scriptstruct_snapshots.py"),
+                    "--core",
+                    str(core),
+                    "--manifest",
+                    str(manifest),
+                    "--output-root",
+                    str(output_root),
+                    "--evidence-pack-manifest",
+                    str(evidence_pack),
+                    "--write",
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("binary.sha256 conflicts with snapshot manifest", result.stderr)
+
+    def test_evidence_pack_manifest_rejects_partial_gdb_failed_pack(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "second-core"
+            manifest = root / "manifest.json"
+            evidence_pack = root / "second-pack" / "manifest.json"
+            output_root = root / "out"
+            addrs = build_core_fixture(core)
+            self.write_manifest(manifest)
+            self.write_evidence_pack_manifest(
+                evidence_pack,
+                core=core,
+                fname_root_slot=addrs["fname_root_slot"],
+                gobjects=addrs["gobjects"],
+                evidence_status={"status": "partial-gdb-failed", "gdb_core_failed": True},
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "regenerate_scriptstruct_snapshots.py"),
+                    "--core",
+                    str(core),
+                    "--manifest",
+                    str(manifest),
+                    "--output-root",
+                    str(output_root),
+                    "--evidence-pack-manifest",
+                    str(evidence_pack),
+                    "--write",
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("evidence pack status is not complete", result.stderr)
 
     def test_evidence_pack_manifest_rejects_conflicting_gobjects(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

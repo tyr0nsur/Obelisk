@@ -233,6 +233,10 @@ Updated: 2026-05-28
 - fact: UFunction and ScriptStruct snapshot regenerators share evidence-pack manifest
   parsing through `scripts/snapshot_evidence_pack.py`. Keep future core/FName/GObjects
   manifest-default rules centralized there so the two promotion paths cannot diverge.
+  Evidence-pack manifests used for regeneration must match the snapshot manifest
+  `ark_binary_sha256`, must have `evidence_status.status=complete`, and must not have
+  `gdb_core_failed=true`; wrong-binary or partial-GDB packs are rejected before snapshots
+  are generated.
 - fact: `build_core_dump_evidence_pack.py --gobjects-sample-index` uses only explicit
   `--fname-root-slot` values for sampled UObject/class name resolution. Default primary
   FName roots are not mixed into second-source GObjects sampling.
@@ -279,7 +283,9 @@ Updated: 2026-05-28
   missing, empty, or contains anything outside letters, digits, `_`, or `-`. Config
   `instance_allowlist` entries use the same safe-token rule.
 - fact: Plugin config preparation rejects symlinked plugin config directories, symlinked
-  `config.json`, and non-regular `config.json` files before parsing shared config.
+  `config.json`, and non-regular `config.json` files before parsing shared config. It now
+  also rejects a symlinked per-plugin config directory before first-run default config
+  creation, so default publication cannot write through a symlink escape.
 - fact: `ObeliskPluginInitContext` string pointers are documented as borrowed only for
   `ObeliskPlugin_Init`; plugins must copy `config_dir`, `config_path`, or `instance_id`
   before using them from shutdown, worker threads, or later callbacks.
@@ -369,9 +375,11 @@ Updated: 2026-05-28
   the primary-core default. They also accept
   `--evidence-pack-manifest <pack>/manifest.json` to import `core.sha256`, a sanitized
   capture id from `core.path`, the pack directory name as `evidence_pack_id`, and the
-  selected `fname_root_slots` and `gobjects_candidates` addresses; CLI core, identity,
-  FName-root, or GObjects values that contradict the pack manifest abort before snapshot
-  generation. Use `--evidence-pack-fname-root-label` or
+  selected `fname_root_slots` and `gobjects_candidates` addresses. They reject manifests
+  whose `binary.sha256` conflicts with the snapshot manifest, whose
+  `evidence_status.status` is not `complete`, or whose `gdb_core_failed` is true. CLI core,
+  identity, FName-root, or GObjects values that contradict the pack manifest abort before
+  snapshot generation. Use `--evidence-pack-fname-root-label` or
   `--evidence-pack-gobjects-label` when the pack has multiple candidates.
 - fact: GObjects sample evidence now has the same guardrail:
   `build_core_dump_evidence_pack.py --gobjects-sample-index` requires an explicit

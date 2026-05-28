@@ -43,6 +43,9 @@ ambiguous. Save conclusions in `docs/research/`, not screenshots.
 Core dump evidence packs must not report ordinary success when GDB core inspection fails.
 Use `--allow-partial-gdb` only for triage-only artifacts; such manifests are marked
 `partial-gdb-failed` and must not be used as promoted evidence.
+Snapshot regenerators that consume `--evidence-pack-manifest` must reject packs whose
+`binary.sha256` does not match the snapshot manifest, whose
+`evidence_status.status` is not `complete`, or whose `gdb_core_failed` is true.
 
 ## Tool Selection
 

@@ -51,6 +51,9 @@ Own these areas:
 - Reject plugin callback registrations that cannot be attributed to the currently
   initializing plugin or an already-loaded plugin owner. Do not allow ownerless callbacks
   through the public plugin API.
+- Plugin config default creation must validate the config root and per-plugin directory
+  before writing. Reject symlinked plugin config directories before first-run default
+  config creation, not only before parsing an existing `config.json`.
 - Owner-token callback registration is the supported path for helper-module or
   background-thread callbacks whose function pointer does not live in the plugin `.so`.
   The runtime accepts owner-token registrations from helper/background threads during

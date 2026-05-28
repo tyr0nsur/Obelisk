@@ -68,9 +68,26 @@ def evidence_pack_defaults(
     path: Path,
     root_label: str | None,
     gobjects_label: str | None,
+    expected_ark_binary_sha256: str,
     parse_int: Callable[[str], int],
 ) -> EvidencePackDefaults:
     payload = json.loads(path.read_text(encoding="utf-8"))
+    binary = payload.get("binary")
+    if not isinstance(binary, dict):
+        raise SystemExit(f"{path}: evidence pack manifest missing binary object")
+    binary_sha = binary.get("sha256")
+    if not isinstance(binary_sha, str) or SHA256_RE.fullmatch(binary_sha) is None:
+        raise SystemExit(f"{path}: evidence pack manifest must include binary.sha256")
+    if binary_sha != expected_ark_binary_sha256:
+        raise SystemExit(f"{path}: binary.sha256 conflicts with snapshot manifest ark_binary_sha256")
+    evidence_status = payload.get("evidence_status")
+    if not isinstance(evidence_status, dict):
+        raise SystemExit(f"{path}: evidence pack manifest missing evidence_status object")
+    status = evidence_status.get("status")
+    if status != "complete":
+        raise SystemExit(f"{path}: evidence pack status is not complete: {status}")
+    if evidence_status.get("gdb_core_failed") is True:
+        raise SystemExit(f"{path}: evidence pack has gdb_core_failed=true")
     core = payload.get("core")
     if not isinstance(core, dict):
         raise SystemExit(f"{path}: evidence pack manifest missing core object")

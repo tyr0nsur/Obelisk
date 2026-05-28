@@ -152,7 +152,10 @@ work from repository state instead of chat history.
   second-source sample.
 - Snapshot regenerators share evidence-pack manifest parsing through
   `scripts/snapshot_evidence_pack.py`; keep future FName/GObjects/core manifest-default
-  rules centralized there for both UFunction and ScriptStruct paths.
+  rules centralized there for both UFunction and ScriptStruct paths. Evidence-pack
+  manifests used for regeneration must match the snapshot manifest `ark_binary_sha256`,
+  must have `evidence_status.status=complete`, and must not have `gdb_core_failed=true`;
+  wrong-binary or partial-GDB packs are rejected before snapshots are generated.
 - Passive operator-supplied runtime evidence from 2026-05-28 is recorded in
   `docs/research/2026-05-28-passive-chat-reflection-live-observation.md`: it observed
   experimental `ServerSendChatMessage` metadata with `GlobalChat` and `GlobalTribeChat`,
@@ -165,6 +168,9 @@ work from repository state instead of chat history.
 - Runtime/plugin installers reject symlinked managed subdirectories before writing
   artifacts. Keep `lib`, `plugins`, `include`, `config`, `logs`, `state`, and
   `state/instances` as real directories under the central Obelisk root.
+- Plugin config preparation rejects a symlinked per-plugin config directory before
+  first-run default config creation, so default publication cannot write through a config
+  symlink escape.
 - Runtime and SDK install are treated as one compatibility unit: required artifacts are
   preflighted before runtime publication, the SDK component is staged into a temporary
   root, only expected public header/CMake package files are published, and SDK install or
@@ -278,10 +284,10 @@ work from repository state instead of chat history.
   supplied, and GObjects sampling with `build_core_dump_evidence_pack.py
   --gobjects-sample-index` requires an explicit `--fname-root-slot`. Prefer
   `--evidence-pack-manifest <pack>/manifest.json` for UFunction/ScriptStruct regeneration
-  so `core.sha256`, `capture_id`, `evidence_pack_id`, selected FName root, and selected
-  GObjects candidate come from the evidence pack instead of manual CLI transcription; use
-  `--evidence-pack-fname-root-label` or `--evidence-pack-gobjects-label` when the pack has
-  multiple candidates.
+  so `binary.sha256`, complete `evidence_status`, `core.sha256`, `capture_id`,
+  `evidence_pack_id`, selected FName root, and selected GObjects candidate come from the
+  evidence pack instead of manual CLI transcription; use `--evidence-pack-fname-root-label`
+  or `--evidence-pack-gobjects-label` when the pack has multiple candidates.
 - Latest restart audit:
   `docs/research/2026-05-27-ops-restart-audit-instance-id.md`
   - live `ObeliskRun.sh` exports `OBELISK_INSTANCE_ID=arkserver`

@@ -381,6 +381,23 @@ namespace
         Require(error.find("symlink") != std::string::npos, "symlink config directory error was unclear");
     }
 
+    void TestRejectsEmptyConfigDirectorySymlinkBeforeDefaultWrite(const fs::path& root)
+    {
+        Obelisk::Core::PreparedPluginConfig prepared;
+        std::string error;
+
+        const fs::path externalDir = root / "empty-external-config-dir";
+        fs::create_directories(externalDir);
+        fs::create_symlink(externalDir, root / "empty_directory_symlink");
+
+        Require(!Prepare(Metadata("empty_directory_symlink"), root, prepared, error),
+                "empty symlink config directory was accepted");
+        Require(error.find("symlink") != std::string::npos,
+                "empty symlink config directory error was unclear");
+        Require(!fs::exists(externalDir / "config.json"),
+                "default config was written through a symlinked config directory");
+    }
+
     void TestRejectsNonRegularConfigFile(const fs::path& root)
     {
         Obelisk::Core::PreparedPluginConfig prepared;
@@ -416,6 +433,7 @@ int main()
         TestRejectsMistypedExistingAllowlist(root);
         TestRejectsConfigSymlinkEscape(root);
         TestRejectsConfigDirectorySymlinkEscape(root);
+        TestRejectsEmptyConfigDirectorySymlinkBeforeDefaultWrite(root);
         TestRejectsNonRegularConfigFile(root);
         fs::remove_all(root);
     }

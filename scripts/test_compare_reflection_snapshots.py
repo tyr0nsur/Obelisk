@@ -173,6 +173,16 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         sets = {item["name"]: item["targets"] for item in report["target_sets"]}
         self.assertIn("minimal-second-source-intake", sets)
         self.assertIn("obelisk.ufunction-chain.snapshot.v1:PrimalItem.CanUse", sets["minimal-second-source-intake"])
+        self.assertIn("buff-compact-intake", sets)
+        self.assertIn(
+            "obelisk.ufunction-chain.snapshot.v1:PrimalBuff.BPBuffPreventUploading",
+            sets["buff-compact-intake"],
+        )
+        self.assertIn("dino-compact-intake", sets)
+        self.assertIn(
+            "obelisk.ufunction-chain.snapshot.v1:PrimalDinoCharacter.AllowCarryCharacter",
+            sets["dino-compact-intake"],
+        )
         self.assertIn("transfer-scriptstruct", sets)
 
     def test_requires_base_root_unless_listing_target_sets(self) -> None:

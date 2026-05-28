@@ -40,6 +40,15 @@ EVIDENCE_ARTIFACT_IDENTITY_KEYS = (
 )
 ALLOWED_ARTIFACT_KINDS = {"offline_core"}
 TARGET_SETS = {
+    "buff-compact-intake": (
+        "obelisk.ufunction-chain.snapshot.v1:PrimalBuff.AllowPostProcessEffect",
+        "obelisk.ufunction-chain.snapshot.v1:PrimalBuff.BPBuffPreventUploading",
+        "obelisk.ufunction-chain.snapshot.v1:PrimalBuff.BP_OnBuffLifetimeUpdated",
+    ),
+    "dino-compact-intake": (
+        "obelisk.ufunction-chain.snapshot.v1:PrimalDinoCharacter.AddPassenger",
+        "obelisk.ufunction-chain.snapshot.v1:PrimalDinoCharacter.AllowCarryCharacter",
+    ),
     "minimal-second-source-intake": (
         "obelisk.ufunction-chain.snapshot.v1:PrimalItem.CanUse",
         "obelisk.ufunction-chain.snapshot.v1:PrimalItem.AllowRemoteAddToInventory",

@@ -40,7 +40,7 @@ The comparator ignores unstable FName/GObjects indices by default. Use
 `--strict-identity-indices` only for intentional same-binary identity checks.
 
 Before a second evidence root exists, summarize current fixture coverage and the remaining
-second-source gap with:
+second-source gap with a named target set:
 
 ```bash
 python3 scripts/compare_reflection_snapshots.py \
@@ -64,6 +64,12 @@ List the named target sets used by focused readiness checks with:
 ```bash
 python3 scripts/compare_reflection_snapshots.py --list-target-sets
 ```
+
+Current UFunction target sets:
+
+- `minimal-second-source-intake`: first inventory/structure promotion gate.
+- `buff-compact-intake`: compact `PrimalBuff` bool/scalar shapes for P1 research.
+- `dino-compact-intake`: compact dino passenger/carry shapes for P1 research.
 
 Naming:
 

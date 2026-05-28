@@ -24,12 +24,22 @@ class SnapshotEvidencePackTests(unittest.TestCase):
         fname_roots: list[dict[str, str]] | None = None,
         gobjects: list[dict[str, str]] | None = None,
         sha: str = "4" * 64,
+        binary_sha: str = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+        evidence_status: dict[str, object] | None = None,
     ) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
+            "binary": {
+                "sha256": binary_sha,
+            },
             "core": {
                 "path": str(core_path),
                 "sha256": sha,
+            },
+            "evidence_status": evidence_status
+            or {
+                "status": "complete",
+                "gdb_core_failed": False,
             },
             "fname_root_slots": fname_roots
             or [
@@ -55,7 +65,13 @@ class SnapshotEvidencePackTests(unittest.TestCase):
             manifest = root / "pack-A" / "manifest.json"
             self.write_pack(manifest, core_path=core)
 
-            defaults = evidence_pack_defaults(manifest, None, None, parse_int)
+            defaults = evidence_pack_defaults(
+                manifest,
+                None,
+                None,
+                "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                parse_int,
+            )
 
         self.assertEqual(defaults.artifact_kind, "offline_core")
         self.assertEqual(defaults.artifact_sha256, "4" * 64)
@@ -79,9 +95,21 @@ class SnapshotEvidencePackTests(unittest.TestCase):
             )
 
             with self.assertRaisesRegex(SystemExit, "--evidence-pack-gobjects-label"):
-                evidence_pack_defaults(manifest, None, None, parse_int)
+                evidence_pack_defaults(
+                    manifest,
+                    None,
+                    None,
+                    "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                    parse_int,
+                )
 
-            defaults = evidence_pack_defaults(manifest, None, "alternate_gobjects", parse_int)
+            defaults = evidence_pack_defaults(
+                manifest,
+                None,
+                "alternate_gobjects",
+                "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                parse_int,
+            )
 
         self.assertEqual(defaults.gobjects, 0x3000)
 
@@ -98,7 +126,47 @@ class SnapshotEvidencePackTests(unittest.TestCase):
             self.write_pack(manifest, core_path=root / "core")
 
             with self.assertRaisesRegex(SystemExit, "unsafe evidence-pack-id"):
-                evidence_pack_defaults(manifest, None, None, parse_int)
+                evidence_pack_defaults(
+                    manifest,
+                    None,
+                    None,
+                    "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                    parse_int,
+                )
+
+    def test_rejects_wrong_binary_sha(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            manifest = root / "pack-A" / "manifest.json"
+            self.write_pack(manifest, core_path=root / "core", binary_sha="8" * 64)
+
+            with self.assertRaisesRegex(SystemExit, "binary.sha256 conflicts"):
+                evidence_pack_defaults(
+                    manifest,
+                    None,
+                    None,
+                    "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                    parse_int,
+                )
+
+    def test_rejects_partial_gdb_failed_pack(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            manifest = root / "pack-A" / "manifest.json"
+            self.write_pack(
+                manifest,
+                core_path=root / "core",
+                evidence_status={"status": "partial-gdb-failed", "gdb_core_failed": True},
+            )
+
+            with self.assertRaisesRegex(SystemExit, "status is not complete"):
+                evidence_pack_defaults(
+                    manifest,
+                    None,
+                    None,
+                    "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                    parse_int,
+                )
 
 
 if __name__ == "__main__":

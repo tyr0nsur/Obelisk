@@ -197,6 +197,51 @@ namespace Obelisk::Core
             return true;
         }
 
+        bool ValidateConfigDirectoryForWrite(const fs::path& directory,
+                                             const char* label,
+                                             bool allowMissing,
+                                             std::string& error)
+        {
+            std::error_code ec;
+            const fs::file_status directorySymlinkStatus = fs::symlink_status(directory, ec);
+            if (directorySymlinkStatus.type() == fs::file_type::not_found)
+            {
+                if (allowMissing)
+                    return true;
+                error = std::string(label) + " must exist";
+                return false;
+            }
+            if (ec)
+            {
+                error = std::string(label) + " is not accessible: " + ec.message();
+                return false;
+            }
+
+            if (fs::is_symlink(directorySymlinkStatus))
+            {
+                error = std::string(label) + " must not be a symlink";
+                return false;
+            }
+
+            if (fs::exists(directorySymlinkStatus))
+            {
+                if (!fs::is_directory(directorySymlinkStatus))
+                {
+                    error = std::string(label) + " must be a directory";
+                    return false;
+                }
+                return true;
+            }
+
+            if (!allowMissing)
+            {
+                error = std::string(label) + " must exist";
+                return false;
+            }
+
+            return true;
+        }
+
         bool InstanceAllowed(const json& config, const std::string& instanceId, bool enabled)
         {
             if (!enabled)
@@ -330,12 +375,20 @@ namespace Obelisk::Core
         std::error_code ec;
         if (!fs::exists(prepared.path, ec))
         {
+            if (!ValidateConfigDirectoryForWrite(configRoot, "plugin config root", true, error))
+                return false;
+            if (!ValidateConfigDirectoryForWrite(prepared.directory, "plugin config directory", true, error))
+                return false;
+
             fs::create_directories(prepared.directory, ec);
             if (ec)
             {
                 error = "failed to create plugin config directory: " + ec.message();
                 return false;
             }
+
+            if (!ValidateConfigDirectoryForWrite(prepared.directory, "plugin config directory", false, error))
+                return false;
 
             if (!WriteDefaultConfigAtomically(prepared.path, defaultConfig, error))
                 return false;

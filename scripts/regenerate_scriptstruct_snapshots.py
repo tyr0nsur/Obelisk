@@ -307,6 +307,7 @@ def main() -> int:
             args.evidence_pack_manifest,
             args.evidence_pack_fname_root_label,
             args.evidence_pack_gobjects_label,
+            ark_sha,
             inspector.parse_int,
         )
         if args.evidence_pack_manifest is not None

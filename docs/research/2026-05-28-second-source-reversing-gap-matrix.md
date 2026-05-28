@@ -98,13 +98,15 @@ unstable identity indices while still checking `NumParms`, `ParmsSize`, function
 return offset, and property-chain layout. This prevents second-source evidence packs from
 silently reusing the primary-core FName root default; derive or scan the FName root for the
 artifact first. To reduce manual transcription, both UFunction and ScriptStruct
-regenerators accept `--evidence-pack-manifest <pack>/manifest.json`; they read
-`core.sha256`, derive a sanitized capture id from `core.path`, use the pack directory name
-as `evidence_pack_id`, import the selected `fname_root_slots` address, and import the
-selected `gobjects_candidates` address. If a pack has multiple roots or GObjects
-candidates, pass `--evidence-pack-fname-root-label <label>` or
-`--evidence-pack-gobjects-label <label>`. Explicit CLI core, identity, FName-root, or
-GObjects values must match the manifest or regeneration aborts.
+regenerators accept `--evidence-pack-manifest <pack>/manifest.json`; they require
+`binary.sha256` to match the snapshot manifest `ark_binary_sha256`, require
+`evidence_status.status=complete`, reject `gdb_core_failed=true`, read `core.sha256`,
+derive a sanitized capture id from `core.path`, use the pack directory name as
+`evidence_pack_id`, import the selected `fname_root_slots` address, and import the selected
+`gobjects_candidates` address. If a pack has multiple roots or GObjects candidates, pass
+`--evidence-pack-fname-root-label <label>` or `--evidence-pack-gobjects-label <label>`.
+Explicit CLI core, identity, FName-root, or GObjects values must match the manifest or
+regeneration aborts.
 Likewise, `build_core_dump_evidence_pack.py --gobjects-sample-index` now requires an
 explicit `--fname-root-slot` for the sampled artifact and resolves sampled names only
 through explicit roots in that mode. Use `--scan-fname-tables` or a static derivation
@@ -125,6 +127,24 @@ remain non-actionable.
 | `sdk.tribes` | Offline permission/membership fixtures. | Second-source scalar permission targets with identity redaction policy. | Tribe logs, online arrays, player/tribe identity callbacks. |
 | `sdk.missions` | Offline lifecycle fixtures. | Second-source compact lifecycle targets with arrays metadata-only. | Usable-item arrays, mission payload dispatch. |
 | `sdk.transfers` | UFunction fixtures plus two candidate ScriptStruct fixtures. | Second-source layout-only comparison for `ARKTributeDino` and `ArkTributePlayerData`. | `ItemNetInfo`, upload/download runtime dispatch, nested arrays/strings. |
+
+The executable named target sets for the current P1 offline intakes are:
+
+```bash
+python3 scripts/compare_reflection_snapshots.py \
+  --base-root tests/fixtures/ufunction_snapshots \
+  --readiness-report \
+  --target-set buff-compact-intake
+
+python3 scripts/compare_reflection_snapshots.py \
+  --base-root tests/fixtures/ufunction_snapshots \
+  --readiness-report \
+  --target-set dino-compact-intake
+```
+
+These target sets are readiness/intake tools, not release gates by default. Add
+`--fail-on-readiness-gaps` only when reviewing a second-source candidate root for that
+module.
 
 ## Minimal Second-Source Intake
 
