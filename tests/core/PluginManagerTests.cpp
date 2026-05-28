@@ -38,6 +38,7 @@ namespace
         bool throwOnGetInfoResolve = false;
         bool throwInInitAfterCallbacks = false;
         bool throwOnClose = false;
+        bool captureApi = false;
         int getInfoCalls = 0;
         int initCalls = 0;
         int shutdownCalls = 0;
@@ -48,6 +49,7 @@ namespace
         void* owner = this;
         std::vector<std::string>* orderLog = nullptr;
         Obelisk::Core::ChatEventDispatcher* chatDispatcher = nullptr;
+        ObeliskApi capturedApi{};
         bool eventCallbacksAtShutdown = false;
         size_t chatSubscriptionsAtShutdown = 0;
         size_t chatSubscriptionsAtClose = 0;
@@ -106,6 +108,9 @@ namespace
         Require(api->struct_size == sizeof(ObeliskApi), "plugin init received wrong API struct size");
         Require((api->capabilities & OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS) != 0,
                 "plugin init received API without owned callback capability");
+
+        if (g_CurrentFakePlugin->captureApi)
+            g_CurrentFakePlugin->capturedApi = *api;
 
         if (g_CurrentFakePlugin->registerCallback)
             api->RegisterPreProcessEvent(FakeCallback);
@@ -339,6 +344,30 @@ namespace
 
         Require(Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
                 "filtered callback was rejected by default");
+
+        manager.UnloadAll();
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestPostInitUnownedCallbackRegistrationIsRejected()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_post_init_unowned");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{.filename = "post_init_unowned.so", .captureApi = true};
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "post-init plugin was not initialized");
+        plugin.capturedApi.RegisterPreProcessEventForNameIndex(42, FakeCallback);
+        Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
+                "post-init unowned callback was registered");
 
         manager.UnloadAll();
         CleanupPlugin(plugin);
@@ -769,6 +798,7 @@ int main()
     TestValidPluginLoadsAndUnloadCleansCallbacks();
     TestGlobalProcessEventCallbackRejectedByDefault();
     TestFilteredProcessEventCallbackAllowedByDefault();
+    TestPostInitUnownedCallbackRegistrationIsRejected();
     TestInvalidProcessEventCallbacksAreRejected();
     TestGlobalProcessEventCallbackAllowedWithGate();
     TestDisabledPluginPreparesConfigButDoesNotInit();

@@ -93,6 +93,10 @@ Updated: 2026-05-28
 - fact: Plugin API ProcessEvent registration wrappers reject null callbacks and negative
   filtered FName indices before registering callbacks. `-1` remains a runtime sentinel for
   unknown function names, not a valid plugin subscription target.
+- fact: Plugin API ProcessEvent registration wrappers also reject callbacks whose owner
+  cannot be attributed to the currently initializing plugin or an already-loaded Obelisk
+  plugin shared object. This prevents ownerless callbacks from surviving plugin unload;
+  helper-module callbacks remain future work for an explicit owner-token API.
 - fact: `oBaseEvents` C exports catch plugin-side exceptions before returning across the
   runtime/plugin ABI. `ObeliskPlugin_Init` resets plugin state on config failure or thrown
   exception, and `ObeliskPlugin_Shutdown` is idempotent.
@@ -231,8 +235,9 @@ Updated: 2026-05-28
   `PrimalItem.AllowRemoteAddToInventory`, `PrimalStructure.AllowStructureAccess`, and
   `PrimalStructure.IsAllowedToDemolish`; current readiness is `4/4` comparable and blocked
   only by missing second-source root.
-- next-step: Runtime/API debt from the latest read-only audit: harden `PluginManager`
-  ownership/cleanup around callback registrations outside init.
+- next-step: Runtime/API debt from the latest read-only audit: design an append-only
+  explicit owner-token callback API for helpers/background threads before declaring
+  post-init helper-module registrations stable.
 - fact: Runtime/chat baseline is documented in
   `docs/research/2026-05-27-runtime-and-chat-baseline.md`.
 - fact: Reflection/chat metadata audit added shared UE probe layouts and gated

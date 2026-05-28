@@ -20,6 +20,9 @@ that a `.so` will consume.
 - Callback ownership and unregister-on-unload exist for plugin ProcessEvent callbacks.
   Preserve that behavior: raw callback pointers must not survive plugin init failure,
   plugin unload, or `dlclose`.
+- Plugin callback registration wrappers reject callbacks whose owner cannot be resolved to
+  the plugin currently initializing or an already-loaded Obelisk plugin shared object.
+  Helper-module callbacks need a future explicit owner-token API before they are stable.
 - Plugins may optionally export `extern "C" void ObeliskPlugin_Shutdown()`. The runtime
   resolves it with `dlsym` outside the `ObeliskApi` table and calls it before callback
   owner cleanup and before `dlclose`.
@@ -86,6 +89,9 @@ Validation rules:
   the `ProcessEvent` hook.
 - `PluginManager` must unregister both `EventManager` and `ChatEventDispatcher` callbacks
   for a plugin owner on init failure and before `dlclose` during unload.
+- Current public callback registration functions must not create ownerless registrations.
+  If owner resolution fails outside `ObeliskPlugin_Init`, reject the registration with a
+  warning instead of relying on `dladdr` fallback blindly.
 - Chat callback unregister must be idempotent and safe when called by the callback itself;
   cross-thread owner cleanup must still wait until in-flight dispatch finishes.
 - Keep tests for both self-unregister and cross-thread owner cleanup waiting before

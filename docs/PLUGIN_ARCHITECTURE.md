@@ -45,6 +45,10 @@ Plugins must treat `include/obelisk/ObeliskApi.h` as a C ABI boundary:
 Runtime-owned callback cleanup is already part of the stable baseline. Plugin
 authors must still make callback registration explicit and avoid registering
 callbacks from background threads unless the runtime API documents that path.
+Callbacks registered through the current ABI are accepted only when the runtime can assign
+them to the plugin being initialized or to an already-loaded plugin shared object. Callback
+functions in helper `.so` files, external thunks, or modules that are not loaded as the
+Obelisk plugin are rejected until an explicit owner-token API exists.
 
 ## Configuration Convention
 
@@ -125,6 +129,12 @@ Every non-trivial plugin should be designed around these phases:
 4. Start optional background services after callback registration succeeds.
 5. On shutdown, stop external ingress first, unregister callbacks, drain worker
    queues, join threads, then release state.
+
+The safest callback registration point is `ObeliskPlugin_Init`, where the runtime assigns
+the current plugin owner explicitly. Post-init registration is allowed only for callbacks
+whose function pointer resolves back to an already-loaded Obelisk plugin shared object.
+Do not register callbacks from helper modules or background threads unless the callback
+function itself lives in the plugin `.so` and the registration path is covered by tests.
 
 The ABI exposes metadata/config through `ObeliskPlugin_GetInfo`, initialization
 through `ObeliskPlugin_Init`, and supports an

@@ -39,6 +39,9 @@ Own these areas:
   the stable plugin path.
 - Treat callback ownership as runtime-critical: callbacks registered by a plugin must be
   unregistered if init fails, before unload, and before `dlclose`.
+- Reject plugin callback registrations that cannot be attributed to the currently
+  initializing plugin or an already-loaded plugin owner. Do not allow ownerless callbacks
+  through the public plugin API.
 - Keep plugin-owned lifecycle cleanup shared across `EventManager` and the internal
   `ChatEventDispatcher`; future event families must join the same owner cleanup path before
   any public SDK exposure.
