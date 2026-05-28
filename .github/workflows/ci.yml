@@ -43,6 +43,7 @@ jobs:
             scripts/test_regenerate_scriptstruct_snapshots.py \
             scripts/test_research_doc_guardrails.py \
             scripts/test_operational_doc_guardrails.py \
+            scripts/test_public_sdk_guardrails.py \
             scripts/test_public_sdk_chat_guardrails.py \
             scripts/test_dependency_pins.py \
             scripts/test_versioning_guardrails.py \
@@ -89,6 +90,7 @@ jobs:
         run: |
           python3 scripts/test_research_doc_guardrails.py
           python3 scripts/test_operational_doc_guardrails.py
+          python3 scripts/test_public_sdk_guardrails.py
           python3 scripts/test_public_sdk_chat_guardrails.py
           python3 scripts/test_dependency_pins.py
           python3 scripts/test_versioning_guardrails.py
