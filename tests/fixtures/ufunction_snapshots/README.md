@@ -12,8 +12,10 @@ python3 scripts/regenerate_ufunction_snapshots.py \
 ```
 
 Omit `--write` for a dry-run, or use `--check` to compare regenerated output against the
-committed fixtures without modifying files. Use `--target Outer.Function` to regenerate or
-check one manifest entry.
+committed fixtures without modifying files. For second-core regeneration where the evidence
+commit or capture-specific identity indices naturally differ, use `--check-layout` to
+compare only target identity, UFunction fields, and property-chain layout. Use
+`--target Outer.Function` to regenerate or check one manifest entry.
 
 Compare sanitized snapshot layouts between two evidence roots with:
 
@@ -35,6 +37,12 @@ second-source gap with:
 python3 scripts/compare_reflection_snapshots.py \
   --base-root tests/fixtures/ufunction_snapshots \
   --readiness-report
+```
+
+List the named target sets used by focused readiness checks with:
+
+```bash
+python3 scripts/compare_reflection_snapshots.py --list-target-sets
 ```
 
 Naming:

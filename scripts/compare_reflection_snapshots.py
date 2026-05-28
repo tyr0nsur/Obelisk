@@ -48,7 +48,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Compare two sanitized reflection snapshot roots without reading cores or touching servers."
     )
-    parser.add_argument("--base-root", required=True, type=Path, help="Baseline snapshot root or single snapshot file.")
+    parser.add_argument("--base-root", type=Path, help="Baseline snapshot root or single snapshot file.")
     parser.add_argument("--candidate-root", type=Path, help="Second-source snapshot root or file.")
     parser.add_argument(
         "--allow-ark-sha-mismatch",
@@ -81,6 +81,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Summarize current snapshot coverage and second-source readiness by module.",
     )
+    parser.add_argument(
+        "--list-target-sets",
+        action="store_true",
+        help="List named target sets and exit without reading snapshot roots.",
+    )
     parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     return parser.parse_args()
 
@@ -90,6 +95,16 @@ def expand_target_filters(targets: list[str], target_sets: list[str]) -> set[str
     for target_set in target_sets:
         filters.update(TARGET_SETS[target_set])
     return filters
+
+
+def target_set_report() -> dict[str, Any]:
+    return {
+        "schema": "obelisk.reflection-snapshot-target-sets.v1",
+        "target_sets": [
+            {"name": name, "targets": list(targets)}
+            for name, targets in sorted(TARGET_SETS.items())
+        ],
+    }
 
 
 def snapshot_paths(root: Path) -> list[Path]:
@@ -506,6 +521,13 @@ def readiness_report(
 
 
 def print_text(report: dict[str, Any]) -> None:
+    if report["schema"] == "obelisk.reflection-snapshot-target-sets.v1":
+        for item in report["target_sets"]:
+            print(f"{item['name']}:")
+            for target in item["targets"]:
+                print(f"  {target}")
+        return
+
     if report["schema"] == "obelisk.reflection-snapshot-readiness.v1":
         totals = report["totals"]
         print(
@@ -552,6 +574,16 @@ def print_text(report: dict[str, Any]) -> None:
 
 def main() -> int:
     args = parse_args()
+    if args.list_target_sets:
+        report = target_set_report()
+        if args.json:
+            print(json.dumps(report, indent=2, sort_keys=True))
+        else:
+            print_text(report)
+        return 0
+
+    if args.base_root is None:
+        raise SystemExit("--base-root is required unless --list-target-sets is used")
     base = load_snapshot_set(args.base_root)
     candidate = load_snapshot_set(args.candidate_root) if args.candidate_root else None
     target_filters = expand_target_filters(args.target, args.target_set)

@@ -146,7 +146,30 @@ def run_compare(base: Path, candidate: Path | None, *extra: str) -> subprocess.C
     return subprocess.run(command, text=True, capture_output=True)
 
 
+def run_compare_raw(*extra: str) -> subprocess.CompletedProcess[str]:
+    command = [sys.executable, str(SCRIPT_DIR / "compare_reflection_snapshots.py")]
+    command.extend(extra)
+    return subprocess.run(command, text=True, capture_output=True)
+
+
 class CompareReflectionSnapshotsTests(unittest.TestCase):
+    def test_lists_named_target_sets_without_snapshot_roots(self) -> None:
+        result = run_compare_raw("--list-target-sets", "--json")
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["schema"], "obelisk.reflection-snapshot-target-sets.v1")
+        sets = {item["name"]: item["targets"] for item in report["target_sets"]}
+        self.assertIn("minimal-second-source-intake", sets)
+        self.assertIn("PrimalItem.CanUse", sets["minimal-second-source-intake"])
+        self.assertIn("transfer-scriptstruct", sets)
+
+    def test_requires_base_root_unless_listing_target_sets(self) -> None:
+        result = run_compare_raw("--readiness-report")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--base-root is required unless --list-target-sets is used", result.stderr)
+
     def test_accepts_identical_layout_while_ignoring_indices_and_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

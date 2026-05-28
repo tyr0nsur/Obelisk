@@ -43,11 +43,28 @@ python3 scripts/compare_reflection_snapshots.py \
   --json
 ```
 
+For the focused transfer intake, prefer the named target set:
+
+```bash
+python3 scripts/compare_reflection_snapshots.py \
+  --base-root tests/fixtures/scriptstruct_snapshots \
+  --candidate-root /path/to/second-source/scriptstruct_snapshots \
+  --target-set transfer-scriptstruct \
+  --json
+```
+
 Before a second evidence root exists, use the same comparator as a readiness report so the
 ScriptStruct gap stays visible without touching a live server:
 
 ```bash
 python3 scripts/compare_reflection_snapshots.py \
   --base-root tests/fixtures/scriptstruct_snapshots \
-  --readiness-report
+  --readiness-report \
+  --target-set transfer-scriptstruct
+```
+
+List focused target groups, including `transfer-scriptstruct`, with:
+
+```bash
+python3 scripts/compare_reflection_snapshots.py --list-target-sets
 ```

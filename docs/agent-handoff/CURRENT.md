@@ -152,6 +152,7 @@ Updated: 2026-05-28
   `PrimalItem.CanUse`, `PrimalItem.AllowRemoteAddToInventory`,
   `PrimalStructure.AllowStructureAccess`, and `PrimalStructure.IsAllowedToDemolish`.
   `--target-set transfer-scriptstruct` expands the two transfer ScriptStruct fixtures.
+  Use `--list-target-sets` to print the available named groups without reading snapshots.
 - fact: `scripts/regenerate_ufunction_snapshots.py --check-layout` now supports
   UFunction layout-only verification for second-source intake. It ignores unstable
   identity/evidence indices while preserving target identity, UFunction fields, and

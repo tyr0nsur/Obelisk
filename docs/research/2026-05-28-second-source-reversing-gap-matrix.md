@@ -59,6 +59,7 @@ Before a second-source snapshot set exists, use the readiness report to keep mod
 coverage and missing second-source evidence explicit:
 
 ```bash
+python3 scripts/compare_reflection_snapshots.py --list-target-sets
 python3 scripts/compare_reflection_snapshots.py \
   --base-root tests/fixtures/ufunction_snapshots \
   --readiness-report
@@ -74,6 +75,11 @@ semantic/layout-only check that ignores evidence commit churn and unstable captu
 indices, then use `compare_reflection_snapshots.py` for cross-source semantic layout
 comparison. Use strict identity comparison only when intentionally checking same-binary
 identity evidence.
+
+For UFunction fixtures, `regenerate_ufunction_snapshots.py --check-layout` provides the
+same same-target semantic regeneration gate: it ignores evidence commit churn and unstable
+identity indices while still checking `NumParms`, `ParmsSize`, function flags, return
+offset, and property-chain layout.
 
 ## P1 Module Fixture Matrix
 
@@ -132,6 +138,36 @@ explicit statement that no live server was touched unless the artifact came from
 operator-approved debug capture. Even after layout acceptance, runtime observation remains
 separate and must use a named debug instance, marker/env/SHA/budget gates, no value
 logging, and no public SDK callbacks.
+
+## Transfer ScriptStruct Intake
+
+Use this focused intake for the first transfer struct second-source comparison. It stays
+offline and layout-only; it does not authorize upload/download runtime dispatch or nested
+payload decoding.
+
+```bash
+python3 scripts/compare_reflection_snapshots.py \
+  --base-root tests/fixtures/scriptstruct_snapshots \
+  --readiness-report \
+  --target-set transfer-scriptstruct
+```
+
+Expected current result:
+
+```text
+readiness targets=2 comparable=2 blocked=0 second_source_status=missing_candidate_root
+scriptstruct:sdk_transfers targets=2 comparable=2 blocked=0 second_source=accepted:0,rejected:0,inconclusive:0,missing:2
+```
+
+When a second sanitized ScriptStruct root exists:
+
+```bash
+python3 scripts/compare_reflection_snapshots.py \
+  --base-root tests/fixtures/scriptstruct_snapshots \
+  --candidate-root <second-source-scriptstruct-snapshots> \
+  --target-set transfer-scriptstruct \
+  --json
+```
 
 ## Evidence Pack Checklist
 
