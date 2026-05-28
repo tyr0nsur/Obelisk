@@ -43,6 +43,9 @@ Own these areas:
   `OBELISK_ALLOW_CALL_PROCESS_EVENT=1` plus the safe per-instance marker
   `allow-call-process-event`, and the runtime only advertises
   `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT` when that gate is active.
+- Stable posture must reject ReflectionScanner, broad ProcessEvent tracing
+  (`OBELISK_PE_TRACE_LIMIT` non-zero), global callbacks, and public `CallProcessEvent`
+  unless an explicit debug-window workflow says otherwise.
 - Treat callback ownership as runtime-critical: callbacks registered by a plugin must be
   unregistered if init fails, before unload, and before `dlclose`.
 - Reject plugin callback registrations that cannot be attributed to the currently

@@ -1,5 +1,11 @@
 # TheIsland Chat Reflection A/B Runbook
 
+> Historical/superseded as of 2026-05-28: do not execute these `arkserver2` /
+> TheIsland commands while RAM is constrained. Current operator direction is to keep
+> `arkserver2` stopped unless explicitly reopened and to use `arkserver` / Ragnarok only
+> inside an operator-approved Obelisk debug window with rollback. Chat remains a historical
+> observer family, not the center of the SDK roadmap.
+
 ## Objective
 
 Define a controlled `arkserver2` / TheIsland validation run for the experimental chat

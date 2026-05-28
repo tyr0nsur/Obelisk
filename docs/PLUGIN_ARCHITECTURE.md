@@ -41,6 +41,11 @@ Plugins must treat `include/obelisk/ObeliskApi.h` as a C ABI boundary:
 - Catch all plugin exceptions before returning to the runtime.
 - Check `abi_version`, `struct_size`, and capability flags before using appended
   API fields when the plugin depends on them.
+- Treat the `ObeliskApi*` and `ObeliskPluginInitContext*` passed to
+  `ObeliskPlugin_Init` as borrowed for init only. Copy `ObeliskApi` by value if shutdown,
+  worker threads, or later callbacks need runtime function pointers.
+- Metadata strings returned by `ObeliskPlugin_GetInfo` must point to static or
+  plugin-owned storage that remains valid until the shared object is closed.
 
 Runtime-owned callback cleanup is already part of the stable baseline. Plugin
 authors must still make callback registration explicit and avoid registering

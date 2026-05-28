@@ -27,6 +27,8 @@ typedef bool (*OnProcessEventCallback)(void* caller, void* function, void* parms
 typedef struct ObeliskPluginMetadata {
     uint32_t abi_version;
     uint32_t struct_size;
+    // Metadata strings must point to static or plugin-owned storage that remains valid
+    // until the plugin shared object is closed.
     const char* plugin_id;
     const char* name;
     const char* version;
@@ -61,6 +63,10 @@ typedef struct ObeliskApi {
     void (*RegisterPostProcessEventForNameIndex)(int32_t nameIndex, OnProcessEventCallback callback);
 
     // Call the original ProcessEvent trampoline for explicit UE function execution.
+    //
+    // Availability contract: this ABI slot is present for compatibility, but stable
+    // posture rejects calls unless OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT is advertised.
+    // Plugins must check struct_size, capabilities, and this function pointer before use.
     //
     // Reentrancy contract: do not call this from a ProcessEvent callback unless the
     // callback returns false to block the detour's automatic original call. Calling it
@@ -104,6 +110,9 @@ typedef struct ObeliskApi {
 // default_config_json must include enabled=false, allow_all_instances=false, and an
 // instance_allowlist array so clustered installs have an explicit activation envelope.
 // __attribute__((visibility("default"))) bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out);
+// The api and context pointers passed to ObeliskPlugin_Init are borrowed for init only.
+// Copy ObeliskApi by value if the plugin needs runtime callbacks during shutdown,
+// worker threads, or later event callbacks.
 // __attribute__((visibility("default"))) bool ObeliskPlugin_Init(ObeliskApi* api, const ObeliskPluginInitContext* context);
 //
 // Plugins may also export this optional lifecycle hook. When present, the runtime

@@ -1,5 +1,9 @@
 # Ops Restart Audit After OBELISK_INSTANCE_ID
 
+> Historical/superseded operational commands: do not execute these restart or marker
+> migration snippets directly. Current posture and server direction are tracked in
+> `docs/agent-handoff/CURRENT.md` and `docs/STATUS.md`.
+
 Date: 2026-05-27
 
 Scope: read-only audit of `/servidor/ark` before applying the instance-aware wrapper and

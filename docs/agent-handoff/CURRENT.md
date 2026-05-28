@@ -176,6 +176,26 @@ Updated: 2026-05-28
   default-deny. It requires `OBELISK_ALLOW_CALL_PROCESS_EVENT=1` plus the per-instance
   marker `allow-call-process-event`; only then does the runtime advertise
   `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT` and call the original trampoline.
+- fact: `ObeliskApi*` and `ObeliskPluginInitContext*` are borrowed for
+  `ObeliskPlugin_Init` only. Public examples, `oBaseEvents`, and SDK consumer fixtures must
+  copy `ObeliskApi` by value before using runtime functions during shutdown or callbacks.
+  The SDK consumer fixture clears its local init table before shutdown to catch dangling
+  pointer patterns.
+- fact: `ObeliskPluginMetadata` string fields must point to static or plugin-owned storage
+  that remains valid until the plugin shared object is closed.
+- fact: Contributor-facing status now defines the current game interaction boundary:
+  filtered, non-mutating `ProcessEvent` observation is the stable game-facing pattern for
+  first-stable work. Gameplay mutation, return overrides, arbitrary UE4 calls, public
+  `CallProcessEvent` behavior, borrowed UE4 object/string/param exposure, and higher-level
+  gameplay SDK modules remain blocked until promoted with reflection-backed decoding,
+  ownership policy, and isolated runtime evidence.
+- fact: Stable posture no longer has a scanner escape hatch: `--expect-stable` rejects
+  ReflectionScanner env, non-zero `OBELISK_PE_TRACE_LIMIT`, global ProcessEvent callbacks,
+  public `CallProcessEvent`, and module observer env. Use `--forbid-chat-reflection` for
+  quiet Ragnarok/post-release checks; release docs now require that command explicitly.
+- fact: Older TheIsland/`arkserver2` research runbooks are marked historical/superseded
+  while RAM is constrained. The operational doc guardrail now scans research docs with live
+  marker/restart snippets and requires an explicit historical or approved-runbook banner.
 - fact: Commit `c0d1e4c` pushed the hardened first-stable gates. On 2026-05-28,
   `scripts/check_release_readiness.sh` passed from a clean tracked/untracked worktree
   (ignored `build/` and `scripts/__pycache__/` only), and the read-only Ragnarok posture

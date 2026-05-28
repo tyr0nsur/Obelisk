@@ -29,7 +29,7 @@ runtime and a general ARK Linux API/SDK core.
 
 | Track | Next Step | Blocked Items |
 | --- | --- | --- |
-| `sdk.structures` | Add wrapper/posture tests and perform only approved observation on a named debug target; prefer a dedicated instance and keep `arkserver2` stopped unless explicitly reopened. | Placement/build/snapping mutation. |
+| `sdk.structures` | Add wrapper/posture tests and keep runtime observation blocked until an approved `arkserver` debug window or a dedicated isolated debug instance exists; keep `arkserver2` stopped unless explicitly reopened. | Placement/build/snapping mutation. |
 | `sdk.inventory` | Add disabled-by-default observation gate after audit, with cheap exact FName filter before budget reservation. | Item ids, arrays, item contents, NetExec. |
 | `sdk.buffs` | Maintain the offline internal recognizer and use it to harden exact reflected metadata validation. | Runtime hooks, callbacks, return override, object/class pointer exposure, gameplay mutation. |
 | `sdk.transfers` | Capture or obtain second source for tribute ScriptStruct layouts. | `ItemNetInfo`, upload/download dispatch. |
@@ -47,7 +47,9 @@ runtime and a general ARK Linux API/SDK core.
 
 ## Hard Blocks
 
-- Ragnarok is not a reversing target while players test performance.
+- Ragnarok runtime work requires an explicit operator-approved Obelisk debug window with
+  rollback; otherwise keep reversing offline.
+- Keep `arkserver2` stopped while RAM is constrained unless explicitly reopened.
 - No native exec probes.
 - No broad `ProcessEvent` tracing on live instances.
 - No public callbacks for raw `UObject*`, `FString`, `TArray`, `StructProperty`, or

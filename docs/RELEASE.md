@@ -14,12 +14,16 @@ Included:
 - Central install script and LinuxGSM wrappers.
 - `oBaseEvents`.
 - `OBELISK_INSTANCE_ID` logs and state markers.
+- Filtered, non-mutating `ProcessEvent` observation as the only stable game-facing
+  interaction pattern.
 
 Excluded:
 
 - Stable gameplay module interception APIs.
 - Full UE4 reflection.
 - Higher-level gameplay SDK APIs.
+- Gameplay mutation, return overrides, arbitrary UE4 function calls, and public
+  `CallProcessEvent`-based plugin behavior.
 - Production HTTP plugins.
 
 ## Checklist
@@ -47,7 +51,14 @@ git status --short --ignored
 
 5. Update `CHANGELOG.md`.
 6. Confirm docs and wrappers use `state/instances/<instance-id>/` markers only.
-7. Tag:
+7. For the protected Ragnarok harness, confirm quiet stable posture after any approved
+   runtime experiment:
+
+```bash
+scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map Ragnarok --instance arkserver
+```
+
+8. Tag:
 
 ```bash
 git tag -a v0.1.0 -m "Obelisk 0.1.0"

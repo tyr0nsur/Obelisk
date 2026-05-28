@@ -1,5 +1,10 @@
 # arkserver2 Debug Pivot
 
+> Historical/superseded as of 2026-05-28: do not execute these `arkserver2` /
+> TheIsland commands while RAM is constrained. Current operator direction is to keep
+> `arkserver2` stopped unless explicitly reopened and to use `arkserver` / Ragnarok only
+> inside an operator-approved Obelisk debug window with rollback.
+
 ## Objective
 
 Record the operational pivot requested on 2026-05-27: protect `arkserver` / Ragnarok for

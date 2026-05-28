@@ -16,6 +16,7 @@ CHECK_ROOTS = [
 SKIP_DIRS = {
     REPO_ROOT / "docs" / "research",
 }
+RESEARCH_ROOT = REPO_ROOT / "docs" / "research"
 FORBIDDEN_ACTIVE_LINES = [
     "touch /servidor/ark/obelisk/state/",
     "mkdir -p /servidor/ark/obelisk/state/",
@@ -27,6 +28,13 @@ FORBIDDEN_ACTIVE_LINES = [
 ]
 FORBIDDEN_STALE_PHRASES = [
     "current TheIsland debug baseline",
+]
+RESEARCH_RUNBOOK_MARKERS = [
+    "Historical/superseded",
+    "operator-approved",
+    "approved-window",
+    "approved debug",
+    "does not authorize",
 ]
 
 
@@ -70,6 +78,21 @@ class OperationalDocGuardrailTests(unittest.TestCase):
                 for forbidden in FORBIDDEN_STALE_PHRASES:
                     if forbidden in line:
                         offenders.append(f"{path.relative_to(REPO_ROOT)}:{number}: {forbidden}")
+
+        self.assertEqual(offenders, [])
+
+    def test_research_live_commands_are_marked_historical_or_approved_runbook(self) -> None:
+        offenders: list[str] = []
+        for path in sorted(RESEARCH_ROOT.rglob("*.md")):
+            text = path.read_text(encoding="utf-8")
+            header = "\n".join(text.splitlines()[:20])
+            header_lower = header.lower()
+            has_marker = any(marker.lower() in header_lower for marker in RESEARCH_RUNBOOK_MARKERS)
+            for number, line in enumerate(text.splitlines(), start=1):
+                if is_comment_or_example(line):
+                    continue
+                if any(forbidden in line for forbidden in FORBIDDEN_ACTIVE_LINES) and not has_marker:
+                    offenders.append(f"{path.relative_to(REPO_ROOT)}:{number}")
 
         self.assertEqual(offenders, [])
 

@@ -208,6 +208,7 @@ int main(int argc, char** argv)
         }
 
         Require(initSucceeded, "ObeliskPlugin_Init failed");
+        api = {};
         if (shutdown)
             shutdown();
         if (mode == "active-process-event")

@@ -5,7 +5,8 @@
 
 namespace
 {
-    ObeliskApi* g_Api = nullptr;
+    ObeliskApi g_Api{};
+    bool g_HasApi = false;
     uint64_t g_OwnerToken = 0;
     uint64_t g_ProcessEventHandle = 0;
 
@@ -61,15 +62,16 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
         return false;
     }
 
-    g_Api = api;
+    g_Api = *api;
+    g_HasApi = true;
     g_OwnerToken = context->plugin_owner_token;
 
-    if (g_Api->LogInfo)
-        g_Api->LogInfo("[sdk_consumer_minimal] Loaded.");
+    if (g_Api.LogInfo)
+        g_Api.LogInfo("[sdk_consumer_minimal] Loaded.");
 
-    if (HasProcessEventHandleApi(g_Api))
+    if (HasProcessEventHandleApi(&g_Api))
     {
-        g_ProcessEventHandle = g_Api->RegisterPreProcessEventForNameIndexWithOwnerTokenHandle(
+        g_ProcessEventHandle = g_Api.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle(
             g_OwnerToken,
             42,
             OnProcessEvent);
@@ -82,13 +84,14 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
 
 extern "C" __attribute__((visibility("default"))) void ObeliskPlugin_Shutdown()
 {
-    if (g_Api && g_ProcessEventHandle != 0)
-        g_Api->UnregisterProcessEventCallbackWithOwnerToken(g_OwnerToken, g_ProcessEventHandle);
+    if (g_HasApi && g_ProcessEventHandle != 0 && g_Api.UnregisterProcessEventCallbackWithOwnerToken)
+        g_Api.UnregisterProcessEventCallbackWithOwnerToken(g_OwnerToken, g_ProcessEventHandle);
 
-    if (g_Api && g_Api->LogInfo)
-        g_Api->LogInfo("[sdk_consumer_minimal] Shutdown.");
+    if (g_HasApi && g_Api.LogInfo)
+        g_Api.LogInfo("[sdk_consumer_minimal] Shutdown.");
 
-    g_Api = nullptr;
+    g_Api = {};
+    g_HasApi = false;
     g_OwnerToken = 0;
     g_ProcessEventHandle = 0;
 }

@@ -52,6 +52,11 @@ that a `.so` will consume.
 - `ObeliskPluginInitContext` string pointers are borrowed for `ObeliskPlugin_Init` only;
   plugin examples should copy `config_dir`, `config_path`, or `instance_id` before using
   them from shutdown, threads, or later callbacks.
+- The `ObeliskApi*` pointer passed to `ObeliskPlugin_Init` is also borrowed for init only.
+  Plugins that need runtime functions during shutdown, worker threads, or later callbacks
+  must copy the `ObeliskApi` table by value.
+- `ObeliskPluginMetadata` string fields must point to static or plugin-owned storage that
+  remains valid until the plugin shared object is closed.
 
 ## Required Boundary Rules
 
@@ -146,3 +151,5 @@ Validation rules:
 - [ ] ProcessEvent callbacks are filtered by `FName` index unless there is a measured reason.
 - [ ] ABI additions are appended and guarded by `struct_size` checks.
 - [ ] The runtime can reject incompatible plugin ABI versions with a clear log line.
+- [ ] Examples do not store borrowed init-only `ObeliskApi*` or context pointers past
+      `ObeliskPlugin_Init`.

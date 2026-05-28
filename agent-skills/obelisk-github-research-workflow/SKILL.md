@@ -46,9 +46,10 @@ to every sub-agent.
 
 ## Agent Coordination
 
-- At the start of every new supervised agent round, verify there are no stale stand-by
-  agents from the previous round. Close completed or obsolete agents before spawning new
-  ones, and record any still-active agent with a concrete polling/integration plan.
+- Mandatory round preflight: at the start of every new supervised agent round, verify there
+  are no stale stand-by agents from the previous round. Close completed or obsolete agents
+  before spawning new ones, and record any still-active agent with a concrete
+  polling/integration plan.
 - Pass sub-agents only the context they need: task objective, ownership scope, files they
   may edit, files they must not edit, relevant skills to read, current safety baseline, and
   expected deliverable.

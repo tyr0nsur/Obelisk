@@ -135,9 +135,6 @@ write_proc_fixture 102 "${stable_maps}" \
 expect_failure scanner-forbidden \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 102 --expect-stable
 
-expect_success scanner-explicitly-allowed \
-    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 102 --expect-stable --allow-scanner
-
 write_proc_fixture 107 "${stable_maps}" \
     "LD_PRELOAD=/servidor/ark/obelisk/lib/libobelisk.so" \
     "OBELISK_INSTANCE_ID=arkserver" \
@@ -146,6 +143,24 @@ write_proc_fixture 107 "${stable_maps}" \
     "OBELISK_ENABLE_REFLECTION_SCANNER="
 expect_failure scanner-empty-env-forbidden \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 107 --expect-stable
+
+write_proc_fixture 116 "${stable_maps}" \
+    "LD_PRELOAD=/servidor/ark/obelisk/lib/libobelisk.so" \
+    "OBELISK_INSTANCE_ID=arkserver" \
+    "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
+    "OBELISK_DISABLE_PLUGINS=1" \
+    "OBELISK_PE_TRACE_LIMIT=25"
+expect_failure pe-trace-limit-forbidden-for-stable \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 116 --expect-stable
+
+write_proc_fixture 117 "${stable_maps}" \
+    "LD_PRELOAD=/servidor/ark/obelisk/lib/libobelisk.so" \
+    "OBELISK_INSTANCE_ID=arkserver" \
+    "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
+    "OBELISK_DISABLE_PLUGINS=1" \
+    "OBELISK_PE_TRACE_LIMIT=0"
+expect_success pe-trace-limit-zero-allowed \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 117 --expect-stable
 
 write_proc_fixture 103 "7f000000-7f001000 r-xp 00000000 00:00 0 /usr/lib/libc.so" \
     "LD_PRELOAD=/servidor/ark/obelisk/lib/libobelisk.so" \

@@ -1,5 +1,9 @@
 # ReflectionScanner Isolated Capture Runbook
 
+> Operator-approved runbook only: commands in this note are not a standing authorization.
+> Do not start `arkserver2`, edit markers, restart servers, or run ReflectionScanner unless
+> the operator explicitly approves a current debug window and rollback plan.
+
 ## Objective
 
 Prepare the next isolated `ReflectionScanner` capture to validate two scanner-only signals:

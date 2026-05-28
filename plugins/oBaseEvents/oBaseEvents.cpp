@@ -13,7 +13,8 @@ using json = nlohmann::json;
 
 namespace
 {
-    ObeliskApi* g_Api = nullptr;
+    ObeliskApi g_Api{};
+    bool g_HasApi = false;
     std::mutex g_ConfigMutex;
     bool g_Enabled = false;
     bool g_ProcessEventEnabled = false;
@@ -76,8 +77,8 @@ namespace
         std::ifstream in(path);
         if (!in.is_open())
         {
-            if (g_Api)
-                g_Api->LogError("[oBaseEvents] Config not readable.");
+            if (g_HasApi && g_Api.LogError)
+                g_Api.LogError("[oBaseEvents] Config not readable.");
             return false;
         }
 
@@ -87,15 +88,15 @@ namespace
         }
         catch (const std::exception& e)
         {
-            if (g_Api)
-                g_Api->LogError((std::string("[oBaseEvents] Config parse failed: ") + e.what()).c_str());
+            if (g_HasApi && g_Api.LogError)
+                g_Api.LogError((std::string("[oBaseEvents] Config parse failed: ") + e.what()).c_str());
             return false;
         }
 
         if (!config.is_object())
         {
-            if (g_Api)
-                g_Api->LogError("[oBaseEvents] Config root must be an object.");
+            if (g_HasApi && g_Api.LogError)
+                g_Api.LogError("[oBaseEvents] Config root must be an object.");
             return false;
         }
 
@@ -108,8 +109,8 @@ namespace
             context->struct_size < sizeof(ObeliskPluginInitContext) ||
             !context->config_path || context->config_path[0] == '\0')
         {
-            if (g_Api)
-                g_Api->LogError("[oBaseEvents] Invalid plugin init context.");
+            if (g_HasApi && g_Api.LogError)
+                g_Api.LogError("[oBaseEvents] Invalid plugin init context.");
             return false;
         }
 
@@ -122,42 +123,42 @@ namespace
 
         if (!config.contains("enabled") || !config["enabled"].is_boolean())
         {
-            if (g_Api)
-                g_Api->LogError("[oBaseEvents] Config field enabled must be boolean.");
+            if (g_HasApi && g_Api.LogError)
+                g_Api.LogError("[oBaseEvents] Config field enabled must be boolean.");
             return false;
         }
 
         if (config.contains("log_level") && !config["log_level"].is_string())
         {
-            if (g_Api)
-                g_Api->LogError("[oBaseEvents] Config field log_level must be string.");
+            if (g_HasApi && g_Api.LogError)
+                g_Api.LogError("[oBaseEvents] Config field log_level must be string.");
             return false;
         }
 
         if (config.contains("instance_allowlist") && !IsStringArray(config["instance_allowlist"]))
         {
-            if (g_Api)
-                g_Api->LogError("[oBaseEvents] Config field instance_allowlist must be an array of strings.");
+            if (g_HasApi && g_Api.LogError)
+                g_Api.LogError("[oBaseEvents] Config field instance_allowlist must be an array of strings.");
             return false;
         }
 
         if (config.contains("allow_all_instances") && !config["allow_all_instances"].is_boolean())
         {
-            if (g_Api)
-                g_Api->LogError("[oBaseEvents] Config field allow_all_instances must be boolean.");
+            if (g_HasApi && g_Api.LogError)
+                g_Api.LogError("[oBaseEvents] Config field allow_all_instances must be boolean.");
             return false;
         }
 
         if (config.contains("map_allowlist") && !IsStringArray(config["map_allowlist"]))
         {
-            if (g_Api)
-                g_Api->LogError("[oBaseEvents] Config field map_allowlist must be an array of strings.");
+            if (g_HasApi && g_Api.LogError)
+                g_Api.LogError("[oBaseEvents] Config field map_allowlist must be an array of strings.");
             return false;
         }
         if (config.contains("map_allowlist") && !config["map_allowlist"].empty())
         {
-            if (g_Api)
-                g_Api->LogError("[oBaseEvents] Config field map_allowlist is not supported yet and must be empty.");
+            if (g_HasApi && g_Api.LogError)
+                g_Api.LogError("[oBaseEvents] Config field map_allowlist is not supported yet and must be empty.");
             return false;
         }
 
@@ -172,8 +173,8 @@ namespace
         const json processEvent = config.value("process_event", json::object());
         if (!processEvent.is_object())
         {
-            if (g_Api)
-                g_Api->LogError("[oBaseEvents] Config field process_event must be an object.");
+            if (g_HasApi && g_Api.LogError)
+                g_Api.LogError("[oBaseEvents] Config field process_event must be an object.");
             return false;
         }
 
@@ -181,8 +182,8 @@ namespace
             !processEvent.contains("filtered_function_index") || !processEvent["filtered_function_index"].is_number_integer() ||
             !processEvent.contains("log_limit") || !processEvent["log_limit"].is_number_integer())
         {
-            if (g_Api)
-                g_Api->LogError("[oBaseEvents] process_event fields have invalid types.");
+            if (g_HasApi && g_Api.LogError)
+                g_Api.LogError("[oBaseEvents] process_event fields have invalid types.");
             return false;
         }
 
@@ -203,15 +204,16 @@ namespace
         (void)params;
 
         const int current = g_LoggedEvents.fetch_add(1);
-        if (current < g_LogLimit && g_Api)
-            g_Api->LogInfo("[oBaseEvents] Filtered ProcessEvent callback fired.");
+        if (current < g_LogLimit && g_HasApi && g_Api.LogInfo)
+            g_Api.LogInfo("[oBaseEvents] Filtered ProcessEvent callback fired.");
 
         return true;
     }
 
     void ResetState()
     {
-        g_Api = nullptr;
+        g_Api = {};
+        g_HasApi = false;
         g_Enabled = false;
         g_ProcessEventEnabled = false;
         g_FilteredFunctionIndex = -1;
@@ -258,7 +260,8 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(Obelis
             return false;
         }
 
-        g_Api = api;
+        g_Api = *api;
+        g_HasApi = true;
         g_OwnerToken = context ? context->plugin_owner_token : 0;
         g_LoggedEvents.store(0);
 
@@ -330,14 +333,14 @@ extern "C" __attribute__((visibility("default"))) void ObeliskPlugin_Shutdown()
 {
     try
     {
-        if (g_Api && g_ProcessEventRegistrationId != 0 && g_Api->UnregisterProcessEventCallbackWithOwnerToken)
+        if (g_HasApi && g_ProcessEventRegistrationId != 0 && g_Api.UnregisterProcessEventCallbackWithOwnerToken)
         {
-            g_Api->UnregisterProcessEventCallbackWithOwnerToken(g_OwnerToken, g_ProcessEventRegistrationId);
+            g_Api.UnregisterProcessEventCallbackWithOwnerToken(g_OwnerToken, g_ProcessEventRegistrationId);
             g_ProcessEventRegistrationId = 0;
         }
 
-        if (g_Api)
-            g_Api->LogInfo("[oBaseEvents] Shutdown.");
+        if (g_HasApi && g_Api.LogInfo)
+            g_Api.LogInfo("[oBaseEvents] Shutdown.");
     }
     catch (...)
     {

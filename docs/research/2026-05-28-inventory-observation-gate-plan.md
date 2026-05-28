@@ -69,9 +69,11 @@ Before implementation can be used in an approved TheIsland/debug window, add tes
 
 ## Runtime Scope
 
-Use only `arkserver2` / TheIsland during an explicit operator-approved short window, or
-prefer `arkserver-obelisk-debug` for stronger isolation. Do not use Ragnarok while player
-performance testing is active.
+Historical TheIsland instructions are superseded while RAM is constrained. Keep
+`arkserver2` stopped unless the operator explicitly reopens it. Runtime inventory
+observation should remain offline-only until an explicit approved `arkserver` / Ragnarok
+debug window or a dedicated isolated debug instance exists, with rollback and stable
+posture verification.
 
 ## Current Status
 

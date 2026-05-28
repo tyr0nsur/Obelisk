@@ -14,11 +14,10 @@ Options:
   --pid <pid>               Check a specific process id instead of using pgrep.
   --proc-root <path>        Procfs root. Default: /proc. Intended for offline tests.
   --expect-stable           Require stable dev posture: ProcessEvent on, plugins off,
-                            ReflectionScanner/debug control/native exec probes and
-                            structure reflection off.
+                            ReflectionScanner/debug control/native exec probes,
+                            broad ProcessEvent tracing, and structure reflection off.
   --forbid-chat-reflection  Also require chat reflection and chat text logging to be off.
                             Use this for production/performance posture checks.
-  --allow-scanner           Allow OBELISK_ENABLE_REFLECTION_SCANNER=1.
   -h, --help                Show this help.
 EOF
 }
@@ -29,7 +28,6 @@ PID=""
 PROC_ROOT="/proc"
 EXPECT_STABLE=0
 FORBID_CHAT_REFLECTION=0
-ALLOW_SCANNER=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -55,10 +53,6 @@ while [[ $# -gt 0 ]]; do
             ;;
         --forbid-chat-reflection)
             FORBID_CHAT_REFLECTION=1
-            shift
-            ;;
-        --allow-scanner)
-            ALLOW_SCANNER=1
             shift
             ;;
         -h|--help)
@@ -152,6 +146,16 @@ forbid_env() {
     fi
 }
 
+forbid_nonzero_env() {
+    local name="$1"
+    local actual
+    actual="$(get_env "${name}")"
+    if has_env "${name}" && [[ -n "${actual}" && "${actual}" != "0" ]]; then
+        echo "Forbidden ${name} is set to non-zero value '${actual}'." >&2
+        return 1
+    fi
+}
+
 require_mapped_library() {
     local library="$1"
     if ! printf '%s\n' "${maps_dump}" | grep -F -- "${library}" >/dev/null; then
@@ -186,6 +190,7 @@ if [[ "${EXPECT_STABLE}" == "1" ]]; then
     forbid_env OBELISK_ENABLE_NATIVE_EXEC_PROBES
     forbid_env OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS
     forbid_env OBELISK_ALLOW_CALL_PROCESS_EVENT
+    forbid_nonzero_env OBELISK_PE_TRACE_LIMIT
     forbid_env OBELISK_ENABLE_INVENTORY_REFLECTION
     forbid_env OBELISK_INVENTORY_REFLECTION_BINARY_SHA256
     forbid_env OBELISK_INVENTORY_REFLECTION_LOG_LIMIT
@@ -193,12 +198,10 @@ if [[ "${EXPECT_STABLE}" == "1" ]]; then
     forbid_env OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256
     forbid_env OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT
 
-    if [[ "${ALLOW_SCANNER}" != "1" ]]; then
-        forbid_env OBELISK_ENABLE_REFLECTION_SCANNER
-        forbid_env OBELISK_REFLECTION_STATIC_FNAME_ROOTS
-        forbid_env OBELISK_REFLECTION_SAMPLE_STATIC_FNAME_ROOTS
-        forbid_env OBELISK_REFLECTION_LOG_FNAME_REJECTS
-    fi
+    forbid_env OBELISK_ENABLE_REFLECTION_SCANNER
+    forbid_env OBELISK_REFLECTION_STATIC_FNAME_ROOTS
+    forbid_env OBELISK_REFLECTION_SAMPLE_STATIC_FNAME_ROOTS
+    forbid_env OBELISK_REFLECTION_LOG_FNAME_REJECTS
 fi
 
 if [[ "${FORBID_CHAT_REFLECTION}" == "1" ]]; then

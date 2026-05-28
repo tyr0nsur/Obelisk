@@ -101,6 +101,17 @@ work from repository state instead of chat history.
   unregister through `UnregisterProcessEventCallbackWithOwnerToken(owner_token, handle)`.
   Handles are process-local and must not be stored in shared cluster config or reused
   across ARK instances.
+- Public plugin examples and first-party fixtures must copy the `ObeliskApi` table by value
+  if they need runtime functions after `ObeliskPlugin_Init`; the init `ObeliskApi*` and
+  `ObeliskPluginInitContext*` are borrowed only for init. Metadata strings returned by
+  `ObeliskPlugin_GetInfo` must be static or plugin-owned until the shared object closes.
+- Stable posture rejects scanner env, non-zero `OBELISK_PE_TRACE_LIMIT`, global callbacks,
+  public `CallProcessEvent`, and module observer env. Quiet Ragnarok/release checks should
+  use `scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection
+  --map Ragnarok --instance arkserver`.
+- `arkserver2` / TheIsland runbooks from 2026-05-27 are historical/superseded while RAM is
+  constrained unless the operator explicitly reopens that server. Research docs with live
+  marker/restart snippets must carry a historical or approved-runbook banner.
 - Reflection/reversing/type-reconstruction skills now use the shared module promotion
   ladder and require explicit debug-window approval before marker edits, restarts,
   scanners, ptrace/gcore, or broad tracing. Public SDK guardrails now block premature

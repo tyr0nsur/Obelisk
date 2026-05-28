@@ -154,7 +154,8 @@ Minimal shape:
 #include <obelisk/ObeliskApi.h>
 #include <cstddef>
 
-static ObeliskApi* g_api = nullptr;
+static ObeliskApi g_api{};
+static bool g_has_api = false;
 static uint64_t g_owner_token = 0;
 static uint64_t g_pre_handle = 0;
 
@@ -195,7 +196,8 @@ bool ObeliskPlugin_Init(ObeliskApi* api, const ObeliskPluginInitContext* context
         context->struct_size < sizeof(ObeliskPluginInitContext))
         return false;
 
-    g_api = api;
+    g_api = *api;
+    g_has_api = true;
     g_owner_token = context->plugin_owner_token;
     api->LogInfo("Plugin loaded");
 
@@ -217,9 +219,10 @@ bool ObeliskPlugin_Init(ObeliskApi* api, const ObeliskPluginInitContext* context
 extern "C" __attribute__((visibility("default")))
 void ObeliskPlugin_Shutdown()
 {
-    if (g_api && g_pre_handle != 0)
-        g_api->UnregisterProcessEventCallbackWithOwnerToken(g_owner_token, g_pre_handle);
-    g_api = nullptr;
+    if (g_has_api && g_pre_handle != 0 && g_api.UnregisterProcessEventCallbackWithOwnerToken)
+        g_api.UnregisterProcessEventCallbackWithOwnerToken(g_owner_token, g_pre_handle);
+    g_api = {};
+    g_has_api = false;
     g_owner_token = 0;
     g_pre_handle = 0;
 }
@@ -238,10 +241,16 @@ state: never write them into shared plugin config or assume they are valid in an
 server process. Legacy registration functions reject callbacks that cannot be attributed
 to the initializing plugin or an already-loaded plugin shared object.
 
-`CallProcessEvent` is a low-level trampoline escape hatch. If a pre-callback calls it,
-that callback should return `false`; if it returns `true`, the runtime skips the automatic
-original call and warns to avoid double execution. Stable plugin APIs should prefer
-higher-level Obelisk module surfaces as they are promoted.
+`ObeliskApi*` and `ObeliskPluginInitContext*` are borrowed for `ObeliskPlugin_Init` only.
+Copy the `ObeliskApi` table by value if shutdown, worker threads, or later callbacks need
+runtime functions.
+
+`CallProcessEvent` is a low-level trampoline escape hatch. The ABI slot exists for
+compatibility, but plugins must treat it as unavailable unless `struct_size` covers the
+field, `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT` is advertised, and the function pointer
+is non-null. If a pre-callback calls it, that callback should return `false`; if it returns
+`true`, the runtime skips the automatic original call and warns to avoid double execution.
+Stable plugin APIs should prefer higher-level Obelisk module surfaces as they are promoted.
 
 The first official example is [oBaseEvents](docs/oBaseEvents.md).
 
