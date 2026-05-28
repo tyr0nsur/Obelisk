@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -110,6 +111,69 @@ class RunSecondSourceCoreIntakeTests(unittest.TestCase):
         self.assertIn("--gobjects-sample-index 7", result.stdout)
         self.assertNotIn("--gobjects-sample-index 25447", result.stdout)
         self.assertIn("--target-set structure-observer-intake", result.stdout)
+
+    def test_execute_requires_existing_binary_and_core(self) -> None:
+        result = subprocess.run(
+            [
+                "python3",
+                "scripts/run_second_source_core_intake.py",
+                "--binary",
+                "/tmp/missing-ShooterGameServer",
+                "--core",
+                "/tmp/missing-second.core",
+                "--pack-dir",
+                "/tmp/pack",
+                "--snapshot-root",
+                "/tmp/snapshots",
+                "--verified-fname-root-slot",
+                "0x1234",
+                "--gobjects-candidate",
+                "0x595b7e0",
+                "--execute",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--binary must exist before --execute", result.stderr)
+        self.assertEqual(result.stdout, "")
+
+    def test_execute_rejects_unignored_in_repo_outputs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            binary = Path(temp_dir) / "ShooterGameServer"
+            core = Path(temp_dir) / "second.core"
+            binary.write_bytes(b"binary")
+            core.write_bytes(b"core")
+
+            result = subprocess.run(
+                [
+                    "python3",
+                    "scripts/run_second_source_core_intake.py",
+                    "--binary",
+                    str(binary),
+                    "--core",
+                    str(core),
+                    "--pack-dir",
+                    "docs/not-ignored-pack",
+                    "--snapshot-root",
+                    "/tmp/snapshots",
+                    "--verified-fname-root-slot",
+                    "0x1234",
+                    "--gobjects-candidate",
+                    "0x595b7e0",
+                    "--execute",
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--pack-dir is inside the repository but is not ignored by Git", result.stderr)
 
 
 if __name__ == "__main__":

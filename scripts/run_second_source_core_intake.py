@@ -85,6 +85,36 @@ def rel_or_abs(path: str) -> str:
     return str(Path(path).expanduser())
 
 
+def require_existing_file(path: str, label: str) -> None:
+    candidate = Path(path).expanduser()
+    if not candidate.is_file():
+        raise SystemExit(f"{label} must exist before --execute: {candidate}")
+
+
+def require_ignored_output_path(path: str, label: str) -> None:
+    candidate = Path(path).expanduser().resolve()
+    try:
+        relative = candidate.relative_to(REPO_ROOT)
+    except ValueError:
+        return
+    result = subprocess.run(
+        ["git", "check-ignore", "-q", "--", str(relative), f"{relative}/"],
+        cwd=REPO_ROOT,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise SystemExit(
+            f"{label} is inside the repository but is not ignored by Git: {candidate}"
+        )
+
+
+def preflight_execute(args: argparse.Namespace) -> None:
+    require_existing_file(args.binary, "--binary")
+    require_existing_file(args.core, "--core")
+    require_ignored_output_path(args.pack_dir, "--pack-dir")
+    require_ignored_output_path(args.snapshot_root, "--snapshot-root")
+
+
 def build_commands(args: argparse.Namespace) -> list[list[str]]:
     pack_dir = rel_or_abs(args.pack_dir)
     manifest = str(Path(pack_dir) / "manifest.json")
@@ -162,6 +192,7 @@ def main() -> int:
             print(shlex.join(command))
         return 0
 
+    preflight_execute(args)
     for command in commands:
         print(f"\n==> {shlex.join(command)}", flush=True)
         subprocess.run(command, cwd=REPO_ROOT, check=True)

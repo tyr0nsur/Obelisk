@@ -67,7 +67,9 @@ python3 scripts/run_second_source_core_intake.py \
 
 The command is dry-run by default and prints the reproducible command sequence. Add
 `--execute` only after the independent artifact, artifact-specific FName root, and
-GObjects candidate have been reviewed.
+GObjects candidate have been reviewed. Execution requires existing binary/core paths and
+rejects in-repository output paths unless Git already ignores them, so local evidence
+packs and regenerated candidate snapshots cannot be staged accidentally.
 
 1. Build a core evidence pack from the existing artifact. Derive or scan the per-artifact
    FName root first; do not reuse the primary-core-only FName slot by default.
