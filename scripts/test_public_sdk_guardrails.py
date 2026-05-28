@@ -8,6 +8,38 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+UNPROMOTED_GAMEPLAY_SURFACES = (
+    "Player",
+    "Chat",
+    "Tribe",
+    "Inventory",
+    "Item",
+    "Dino",
+    "Structure",
+    "Mission",
+    "Transfer",
+    "Permission",
+    "Timer",
+    "Admin",
+    "Command",
+)
+
+
+def unpromoted_gameplay_tokens() -> list[str]:
+    tokens: list[str] = []
+    for singular in UNPROMOTED_GAMEPLAY_SURFACES:
+        plural = f"{singular}s"
+        for term in (singular, plural):
+            tokens.extend(
+                [
+                    f"OBELISK_API_CAPABILITY_{term.upper()}_EVENTS",
+                    f"Obelisk{term}",
+                    f"RegisterOn{term}",
+                    f"Unregister{term}",
+                    f"On{term}",
+                ]
+            )
+    return tokens
 
 
 class PublicSdkGuardrailTests(unittest.TestCase):
@@ -56,30 +88,56 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         self.assertEqual(offenders, [])
 
-    def test_public_header_has_no_gameplay_module_api_until_promotion(self) -> None:
-        header = (REPO_ROOT / "include/obelisk/ObeliskApi.h").read_text(encoding="utf-8")
-        module_terms = [
-            "Inventory",
-            "Structure",
-            "Buff",
-            "Dino",
-            "Tribe",
-            "Mission",
-            "Transfer",
-            "Admin",
-            "Player",
-            "Item",
+    def test_public_examples_do_not_use_call_process_event_escape_hatch(self) -> None:
+        scanned_roots = [
+            REPO_ROOT / "plugins",
+            REPO_ROOT / "tests" / "sdk_consumer",
         ]
-        forbidden = [
-            f"OBELISK_API_CAPABILITY_{term.upper()}_EVENTS"
-            for term in module_terms
-        ] + [
-            f"Obelisk{term}" for term in module_terms
-        ] + [
-            f"RegisterOn{term}" for term in module_terms
-        ]
+        allowed_fixture_files = {
+            REPO_ROOT / "tests" / "sdk_consumer" / "SdkConsumerFixture.cpp",
+        }
+        forbidden = (
+            "OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT",
+            ".CallProcessEvent",
+            "->CallProcessEvent",
+        )
+        offenders: list[str] = []
+        for root in scanned_roots:
+            for path in root.rglob("*"):
+                if path in allowed_fixture_files:
+                    continue
+                if not path.is_file() or path.suffix not in {".cpp", ".h", ".hpp", ".c"}:
+                    continue
+                text = path.read_text(encoding="utf-8")
+                for token in forbidden:
+                    if token in text:
+                        offenders.append(f"{path.relative_to(REPO_ROOT)}: {token}")
 
-        offenders = [token for token in forbidden if token in header]
+        self.assertEqual(offenders, [])
+
+    def test_unpromoted_gameplay_token_list_covers_documented_examples(self) -> None:
+        tokens = set(unpromoted_gameplay_tokens())
+
+        for token in (
+            "ObeliskCommand",
+            "RegisterOnTimer",
+            "OBELISK_API_CAPABILITY_PERMISSION_EVENTS",
+            "ObeliskPlayers",
+            "UnregisterCommands",
+        ):
+            self.assertIn(token, tokens)
+
+    def test_public_sdk_headers_have_no_gameplay_module_api_until_promotion(self) -> None:
+        offenders: list[str] = []
+        forbidden = unpromoted_gameplay_tokens()
+        for path in (REPO_ROOT / "include" / "obelisk").rglob("*"):
+            if not path.is_file() or path.suffix not in {".h", ".hpp"}:
+                continue
+            text = path.read_text(encoding="utf-8")
+            for token in forbidden:
+                if token in text:
+                    offenders.append(f"{path.relative_to(REPO_ROOT)}: {token}")
+
         self.assertEqual(offenders, [])
 
     def test_chat_abi_preflight_documents_future_shapes(self) -> None:

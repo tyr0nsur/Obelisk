@@ -175,7 +175,10 @@ work from repository state instead of chat history.
   `scripts/test_operational_doc_guardrails.py`, which blocks active marker/restart
   command examples from returning to install, supervision, or skill docs.
 - `scripts/test_public_sdk_guardrails.py` is the canonical module-first public SDK
-  guardrail; `test_public_sdk_chat_guardrails.py` remains a legacy wrapper.
+  guardrail; it scans every shipped header under `include/obelisk/**` for unpromoted
+  gameplay/API surfaces and keeps public examples/first-party plugins from using the
+  `CallProcessEvent` escape hatch. `test_public_sdk_chat_guardrails.py` remains a legacy
+  wrapper.
 - Commit `cd57189`:
   - supervisor default was aligned to `arkserver-obelisk-debug`;
   - CI/release/README were updated to run `scripts/test_obelisk_supervisor_snapshot.sh`;

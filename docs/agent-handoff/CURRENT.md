@@ -206,6 +206,11 @@ Updated: 2026-05-28
   `CallProcessEvent` behavior, borrowed UE4 object/string/param exposure, and higher-level
   gameplay SDK modules remain blocked until promoted with reflection-backed decoding,
   ownership policy, and isolated runtime evidence.
+- fact: Public SDK guardrails scan every shipped header under `include/obelisk/**` for
+  unpromoted gameplay/API surfaces, including players, chat, tribes, inventory, items,
+  dinos, structures, missions, transfers, permissions, timers, admin, and commands. Public
+  examples and first-party plugins are also guarded against using the `CallProcessEvent`
+  escape hatch.
 - fact: Stable posture no longer has a scanner escape hatch: `--expect-stable` rejects
   ReflectionScanner env, non-zero `OBELISK_PE_TRACE_LIMIT`, global ProcessEvent callbacks,
   public `CallProcessEvent`, and module observer env. Use `--forbid-chat-reflection` for
