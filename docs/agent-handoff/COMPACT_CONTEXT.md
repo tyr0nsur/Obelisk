@@ -118,8 +118,8 @@ work from repository state instead of chat history.
     callbacks.
 - Current agent audit backlog:
   - runtime/API: owner-token callback handles, active-detour hook removal, owned
-    debug-control shutdown, and `CallProcessEvent` pre-callback double-execution guard are
-    implemented;
+    debug-control shutdown, init-window helper-thread owner-token registration, and
+    `CallProcessEvent` pre-callback double-execution guard are implemented;
   - cluster/plugin config: shared config default creation is now safe for concurrent
     multi-instance startup; `enabled=true` now requires a matching non-empty
     `instance_allowlist` or explicit `allow_all_instances=true`; mutable shared plugin

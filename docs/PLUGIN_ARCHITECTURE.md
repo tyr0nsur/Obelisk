@@ -54,7 +54,8 @@ prefer the handle-returning owner-token functions when
 `OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES` is advertised, store the returned
 non-zero handle in process-local state, and call
 `UnregisterProcessEventCallbackWithOwnerToken` during shutdown before callback code or
-state can disappear.
+state can disappear. Owner-token registration is valid during `ObeliskPlugin_Init`, even
+from helper/background threads, and remains valid after successful load until unload.
 
 ## Configuration Convention
 

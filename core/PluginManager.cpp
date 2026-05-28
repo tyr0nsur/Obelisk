@@ -26,6 +26,8 @@ namespace Obelisk::Core
         std::atomic<uint64_t> g_ApiCapabilities{OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS};
         std::mutex g_LoadedPluginOwnersMutex;
         std::unordered_set<void*> g_LoadedPluginOwners;
+        std::mutex g_InitializingPluginOwnersMutex;
+        std::unordered_set<void*> g_InitializingPluginOwners;
         std::atomic<uint64_t> g_NextPluginOwnerToken{1};
         std::mutex g_PluginOwnerTokensMutex;
         std::unordered_map<uint64_t, void*> g_PluginOwnerTokens;
@@ -103,6 +105,33 @@ namespace Obelisk::Core
             g_LoadedPluginOwners.erase(owner);
         }
 
+        bool IsInitializingPluginOwner(void* owner)
+        {
+            if (!owner)
+                return false;
+
+            std::lock_guard<std::mutex> lock(g_InitializingPluginOwnersMutex);
+            return g_InitializingPluginOwners.find(owner) != g_InitializingPluginOwners.end();
+        }
+
+        void AddInitializingPluginOwner(void* owner)
+        {
+            if (!owner)
+                return;
+
+            std::lock_guard<std::mutex> lock(g_InitializingPluginOwnersMutex);
+            g_InitializingPluginOwners.insert(owner);
+        }
+
+        void RemoveInitializingPluginOwner(void* owner)
+        {
+            if (!owner)
+                return;
+
+            std::lock_guard<std::mutex> lock(g_InitializingPluginOwnersMutex);
+            g_InitializingPluginOwners.erase(owner);
+        }
+
         uint64_t AddPluginOwnerToken(void* owner)
         {
             if (!owner)
@@ -144,7 +173,7 @@ namespace Obelisk::Core
                 return nullptr;
             }
 
-            if (owner == g_CurrentPluginOwner)
+            if (owner == g_CurrentPluginOwner || IsInitializingPluginOwner(owner))
                 return owner;
 
             if (!IsLoadedPluginOwner(owner))
@@ -642,6 +671,10 @@ namespace Obelisk::Core
                 auto ownerTokenCleanup = MakeScopeExit([&]() {
                     RemovePluginOwnerToken(pluginOwnerToken);
                 });
+                AddInitializingPluginOwner(pluginOwner);
+                auto initializingOwnerCleanup = MakeScopeExit([&]() {
+                    RemoveInitializingPluginOwner(pluginOwner);
+                });
                 ObeliskPluginInitContext initContext{
                     OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION,
                     sizeof(ObeliskPluginInitContext),
@@ -692,6 +725,8 @@ namespace Obelisk::Core
                     m_LoadedPlugins.push_back({pluginName, metadata.plugin_id, handle, pluginOwner, pluginOwnerToken, shutdownFunc});
                     loadedOwnerCleanup.Dismiss();
                     ownerTokenCleanup.Dismiss();
+                    initializingOwnerCleanup.Dismiss();
+                    RemoveInitializingPluginOwner(pluginOwner);
                     initCleanup.Dismiss();
                     handleCleanup.Dismiss();
                 }

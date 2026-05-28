@@ -127,6 +127,10 @@ Updated: 2026-05-28
   until a reliable map identity enters the ABI or plugin contract.
 - fact: The public README example uses owner-token handle registration plus explicit
   `ObeliskPlugin_Shutdown` unregister instead of teaching legacy callback registration.
+- fact: Owner-token ProcessEvent registrations now work during `ObeliskPlugin_Init` from
+  helper/background threads that do not inherit the loader thread-local current owner. The
+  runtime tracks an initializing-owner set for the init window and still removes token
+  state/callbacks on init failure and unload.
 - fact: SDK consumer fixture now treats `ObeliskPlugin_Shutdown` as optional, matching
   `PluginManager`; a no-shutdown minimal plugin fixture covers that contract.
 - fact: `PluginManager` rejects `.so` symlink candidates during plugin directory scanning

@@ -24,7 +24,9 @@ that a `.so` will consume.
   the plugin currently initializing or an already-loaded Obelisk plugin shared object.
 - Helper-module or background-thread callback registrations must use the append-only
   owner-token registration functions and the `plugin_owner_token` supplied in
-  `ObeliskPluginInitContext`.
+  `ObeliskPluginInitContext`. The runtime accepts those owner-token registrations during
+  `ObeliskPlugin_Init`, including from helper/background threads that do not inherit the
+  loader thread-local current owner.
 - Handle-returning owner-token ProcessEvent registrations are the preferred public path
   for long-lived callbacks. Public unregister must be owner-scoped with the same
   `plugin_owner_token`; never expose bare unregister-by-id across the plugin ABI.
@@ -98,6 +100,10 @@ Validation rules:
   If owner resolution fails outside `ObeliskPlugin_Init` and the plugin did not use a valid
   owner token, reject the registration with a warning instead of relying on `dladdr`
   fallback blindly.
+- Owner-token registration must stay valid during the plugin's init window for helper
+  threads, then continue to work after successful load through the loaded-owner set. On
+  init failure, plugin shutdown and owner cleanup must still remove callbacks registered
+  through that temporary initializing-owner window before `dlclose`.
 - Chat callback unregister must be idempotent and safe when called by the callback itself;
   cross-thread owner cleanup must still wait until in-flight dispatch finishes.
 - Keep tests for both self-unregister and cross-thread owner cleanup waiting before

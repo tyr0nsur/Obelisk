@@ -10,6 +10,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -34,6 +35,7 @@ namespace
         bool registerFilteredCallback = false;
         bool registerInvalidFilteredCallback = false;
         bool registerNullFilteredCallback = false;
+        bool registerOwnerTokenFromInitThread = false;
         bool registerChatCallback = false;
         bool throwOnGetInfoResolve = false;
         bool throwInInitAfterCallbacks = false;
@@ -47,6 +49,7 @@ namespace
         std::string initConfigPath;
         std::string initInstanceId;
         uint64_t initOwnerToken = 0;
+        uint64_t initThreadRegistrationId = 0;
         void* owner = this;
         std::vector<std::string>* orderLog = nullptr;
         Obelisk::Core::ChatEventDispatcher* chatDispatcher = nullptr;
@@ -133,6 +136,18 @@ namespace
 
         if (g_CurrentFakePlugin->registerNullFilteredCallback)
             api->RegisterPreProcessEventForNameIndex(42, nullptr);
+
+        if (g_CurrentFakePlugin->registerOwnerTokenFromInitThread)
+        {
+            std::thread worker([api, token = context->plugin_owner_token]() {
+                g_CurrentFakePlugin->initThreadRegistrationId =
+                    api->RegisterPreProcessEventForNameIndexWithOwnerTokenHandle(
+                        token,
+                        42,
+                        FakeCallback);
+            });
+            worker.join();
+        }
 
         if (g_CurrentFakePlugin->registerChatCallback)
         {
@@ -407,6 +422,38 @@ namespace
 
         Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
                 "owner-token callback survived unload");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestOwnerTokenCallbackRegistrationFromInitThread()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_owner_token_init_thread");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "owner_token_init_thread.so",
+            .registerOwnerTokenFromInitThread = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "owner-token init-thread plugin was not initialized");
+        Require(plugin.initThreadRegistrationId != 0,
+                "owner-token callback from an init-time helper thread was rejected");
+        Require(Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
+                "owner-token callback from init-time helper thread was not registered");
+
+        manager.UnloadAll();
+
+        Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
+                "owner-token init-thread callback survived unload");
 
         CleanupPlugin(plugin);
         fs::remove_all(root);
@@ -946,6 +993,7 @@ int main()
     TestFilteredProcessEventCallbackAllowedByDefault();
     TestPostInitUnownedCallbackRegistrationIsRejected();
     TestPostInitOwnerTokenCallbackRegistrationCleansOnUnload();
+    TestOwnerTokenCallbackRegistrationFromInitThread();
     TestOwnerTokenHandleRegistrationCanUnregister();
     TestOwnerTokenGlobalHandleRejectedByDefault();
     TestInvalidOwnerTokenCallbackRegistrationIsRejected();

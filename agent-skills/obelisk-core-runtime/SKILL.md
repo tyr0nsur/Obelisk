@@ -44,7 +44,9 @@ Own these areas:
   through the public plugin API.
 - Owner-token callback registration is the supported path for helper-module or
   background-thread callbacks whose function pointer does not live in the plugin `.so`.
-  Remove owner tokens on init failure and before/with plugin unload.
+  The runtime accepts owner-token registrations from helper/background threads during
+  `ObeliskPlugin_Init` while the plugin owner is in the initializing set, then removes
+  owner tokens on init failure and before/with plugin unload.
 - For new public ProcessEvent registrations, prefer owner-token handle functions that
   return a non-zero `uint64_t` handle and require
   `UnregisterProcessEventCallbackWithOwnerToken(owner_token, handle)` for granular
