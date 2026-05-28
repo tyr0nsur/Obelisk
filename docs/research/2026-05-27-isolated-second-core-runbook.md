@@ -151,21 +151,55 @@ After the capture exists, run only offline tooling:
 python3 scripts/build_core_dump_evidence_pack.py \
   --binary /servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer \
   --core "${core_file}" \
+  --output-dir "/servidor/ark/obelisk/dumps/core-pack-${stamp}-fname-scan" \
+  --scan-fname-tables \
+  --fname-index None=0 \
+  --fname-index ClientMessage=4884 \
+  --fname-index ServerChat=9619 \
+  --fname-index SetActiveMissionDebugFlags=9622
+
+# Inspect the generated pack and choose a verified per-artifact FName root slot.
+verified_fname_root_slot=<verified-slot-from-this-artifact>
+
+python3 scripts/build_core_dump_evidence_pack.py \
+  --binary /servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer \
+  --core "${core_file}" \
   --output-dir "/servidor/ark/obelisk/dumps/core-pack-${stamp}" \
   --gobjects-candidate gobjects=0x595b7e0 \
   --gobjects-sample-index 0 \
   --gobjects-sample-index 1 \
   --gobjects-sample-index 25447 \
-  --fname-root-slot static_fname_root_slot=0x5956f30
+  --fname-root-slot verified_fname_root_slot="${verified_fname_root_slot}"
 
 python3 scripts/verify_chat_reflection_constants.py \
   --core "${core_file}" \
+  --fname-root-slot "${verified_fname_root_slot}" \
   --max-object-scan 30000
 ```
+
+When regenerating UFunction or ScriptStruct snapshots from the second core, prefer passing
+the generated evidence-pack manifest instead of manually retyping artifact identity:
+
+```bash
+python3 scripts/regenerate_ufunction_snapshots.py \
+  --core "${core_file}" \
+  --output-root <second-source-ufunction-snapshots> \
+  --gobjects 0x595b7e0 \
+  --evidence-pack-manifest "/servidor/ark/obelisk/dumps/core-pack-${stamp}/manifest.json" \
+  --target PrimalItem.CanUse \
+  --check-layout
+```
+
+If the manifest contains multiple FName roots, add
+`--evidence-pack-fname-root-label verified_fname_root_slot`. The regenerators copy
+`core.sha256`, `core.path`, the evidence-pack directory name, and the selected FName root
+from the manifest, and reject CLI identity values that contradict it.
 
 Expected second-source result:
 
 - same ARK binary hash or a recorded new hash;
+- FName root/table is derived or scanned from this artifact and is not copied from the
+  primary-core-only `0x5956f30` slot;
 - `GObjects` object samples still round-trip through `InternalIndex`;
 - chat `UFunction` target/class/outer/property membership checks pass;
 - any mismatch is documented as binary/core-specific evidence, not patched live.

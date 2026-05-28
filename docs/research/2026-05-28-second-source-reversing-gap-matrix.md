@@ -97,7 +97,12 @@ an explicit per-artifact `--fname-root-slot`: it ignores evidence commit churn a
 unstable identity indices while still checking `NumParms`, `ParmsSize`, function flags,
 return offset, and property-chain layout. This prevents second-source evidence packs from
 silently reusing the primary-core FName root default; derive or scan the FName root for the
-artifact first.
+artifact first. To reduce manual transcription, both UFunction and ScriptStruct
+regenerators accept `--evidence-pack-manifest <pack>/manifest.json`; they read
+`core.sha256`, derive a sanitized capture id from `core.path`, use the pack directory name
+as `evidence_pack_id`, and import the selected `fname_root_slots` address. If a pack has
+multiple roots, pass `--evidence-pack-fname-root-label <label>`. Explicit CLI identity or
+FName-root values must match the manifest or regeneration aborts.
 Likewise, `build_core_dump_evidence_pack.py --gobjects-sample-index` now requires an
 explicit `--fname-root-slot` for the sampled artifact and resolves sampled names only
 through explicit roots in that mode. Use `--scan-fname-tables` or a static derivation

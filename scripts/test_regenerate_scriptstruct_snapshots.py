@@ -47,6 +47,22 @@ class RegenerateScriptStructSnapshotsTests(unittest.TestCase):
         }
         path.write_text(json.dumps(manifest), encoding="utf-8")
 
+    def write_evidence_pack_manifest(self, path: Path, *, core: Path, fname_root_slot: int) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        manifest = {
+            "core": {
+                "path": str(core),
+                "sha256": "4" * 64,
+            },
+            "fname_root_slots": [
+                {
+                    "label": "verified_fname_root_slot",
+                    "address": hex(fname_root_slot),
+                }
+            ],
+        }
+        path.write_text(json.dumps(manifest), encoding="utf-8")
+
     def test_write_generates_scriptstruct_snapshot_from_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -222,6 +238,85 @@ class RegenerateScriptStructSnapshotsTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("artifact identity must include", result.stderr)
+
+    def test_evidence_pack_manifest_supplies_identity_and_fname_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "second-core.1234"
+            manifest = root / "manifest.json"
+            evidence_pack = root / "second-pack" / "manifest.json"
+            output_root = root / "out"
+            output = output_root / "7e7ded49e0c6" / "sdk_test" / "Script.ShooterGame.ARKTributeDino.snapshot.json"
+            addrs = build_core_fixture(core)
+            self.write_manifest(manifest)
+            self.write_evidence_pack_manifest(evidence_pack, core=core, fname_root_slot=addrs["fname_root_slot"])
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "regenerate_scriptstruct_snapshots.py"),
+                    "--core",
+                    str(core),
+                    "--manifest",
+                    str(manifest),
+                    "--output-root",
+                    str(output_root),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--obelisk-commit",
+                    "abcdef1",
+                    "--evidence-pack-manifest",
+                    str(evidence_pack),
+                    "--write",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            payload = json.loads(output.read_text(encoding="utf-8"))
+
+        self.assertIn("wrote", result.stdout)
+        self.assertEqual(payload["evidence"]["artifact_kind"], "offline_core")
+        self.assertEqual(payload["evidence"]["artifact_sha256"], "4" * 64)
+        self.assertEqual(payload["evidence"]["capture_id"], "second-core")
+        self.assertEqual(payload["evidence"]["evidence_pack_id"], "second-pack")
+
+    def test_evidence_pack_manifest_rejects_conflicting_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "second-core"
+            manifest = root / "manifest.json"
+            evidence_pack = root / "second-pack" / "manifest.json"
+            output_root = root / "out"
+            addrs = build_core_fixture(core)
+            self.write_manifest(manifest)
+            self.write_evidence_pack_manifest(evidence_pack, core=core, fname_root_slot=addrs["fname_root_slot"])
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "regenerate_scriptstruct_snapshots.py"),
+                    "--core",
+                    str(core),
+                    "--manifest",
+                    str(manifest),
+                    "--output-root",
+                    str(output_root),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--evidence-pack-manifest",
+                    str(evidence_pack),
+                    "--capture-id",
+                    "other-core",
+                    "--write",
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--capture-id conflicts with --evidence-pack-manifest", result.stderr)
 
     def test_check_layout_ignores_evidence_commit_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

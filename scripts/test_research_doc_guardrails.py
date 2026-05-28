@@ -38,6 +38,17 @@ class ResearchDocGuardrailTests(unittest.TestCase):
         self.assertIn("Protected target:", text)
         self.assertIn("arkserver` / Ragnarok", text)
 
+    def test_second_core_runbook_does_not_reuse_primary_fname_root_slot(self) -> None:
+        runbook = REPO_ROOT / "docs/research/2026-05-27-isolated-second-core-runbook.md"
+        text = runbook.read_text(encoding="utf-8")
+        offline_follow_up = text.split("## Offline Follow-Up", 1)[1]
+
+        self.assertIn("--scan-fname-tables", offline_follow_up)
+        self.assertIn("verified_fname_root_slot=<verified-slot-from-this-artifact>", offline_follow_up)
+        self.assertIn("--fname-root-slot verified_fname_root_slot=\"${verified_fname_root_slot}\"", offline_follow_up)
+        self.assertIn("not copied from the\n  primary-core-only `0x5956f30` slot", offline_follow_up)
+        self.assertNotIn("static_fname_root_slot=0x5956f30", offline_follow_up)
+
     def test_historical_core_dump_runbook_is_not_ragnarok_executable(self) -> None:
         runbook = REPO_ROOT / "docs/research/2026-05-27-arkserver-core-dump-runbook.md"
         text = runbook.read_text(encoding="utf-8")
