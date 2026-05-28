@@ -130,10 +130,11 @@ In `--expect-stable` mode it must fail closed if `libobelisk.so` is not mapped, 
 deleted `libobelisk` mapping remains after redeploy, if `LD_PRELOAD` does not include the
 central `${OBELISK_ROOT}/lib/libobelisk.so`, if scanner/native-exec variables are still
 present, if stable markers `enable-process-event-hook` and `disable-plugins` are missing,
-or if per-instance marker entries would re-enable forbidden experimental features at the
-next restart. It rejects a forbidden marker name even when the entry is malformed or a
-symlink. Its parser is tested offline with procfs fixtures; do not weaken those tests to
-depend on a live ARK process.
+if the instance id or marker directory would be rejected by the wrapper/runtime, or if
+per-instance marker entries would re-enable forbidden experimental features at the next
+restart. It rejects a forbidden marker name even when the entry is malformed or a symlink.
+Its parser is tested offline with procfs fixtures; do not weaken those tests to depend on a
+live ARK process.
 
 ## Runtime Debug Control
 

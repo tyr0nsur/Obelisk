@@ -63,6 +63,16 @@ expect_failure missing-disable-plugins-marker-for-stable \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable
 : > "${TEST_OBELISK_ROOT}/state/instances/arkserver/disable-plugins"
 
+mv "${TEST_OBELISK_ROOT}/state/instances/arkserver" "${TEST_OBELISK_ROOT}/state/instances/real-arkserver"
+ln -s "${TEST_OBELISK_ROOT}/state/instances/real-arkserver" "${TEST_OBELISK_ROOT}/state/instances/arkserver"
+expect_failure symlink-instance-dir-for-stable \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable
+rm -f "${TEST_OBELISK_ROOT}/state/instances/arkserver"
+mv "${TEST_OBELISK_ROOT}/state/instances/real-arkserver" "${TEST_OBELISK_ROOT}/state/instances/arkserver"
+
+expect_failure unsafe-instance-id-for-stable \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable --instance '../arkserver'
+
 write_proc_fixture 114 "${stable_maps}" \
     "OBELISK_INSTANCE_ID=arkserver" \
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \

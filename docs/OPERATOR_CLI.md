@@ -14,6 +14,21 @@ The CLI reads the central install root, plugin publication state, plugin config 
 and per-instance marker directories. It does not edit config, markers, plugin binaries, or
 LinuxGSM state.
 
+`instances list` includes a `persistent_posture` column derived only from marker files:
+
+- `stable`: `enable-process-event-hook` and `disable-plugins` are regular files and no
+  forbidden experimental marker entry is present.
+- `incomplete`: one of the stable markers is missing or malformed.
+- `experimental`: a debug/reflection/callback marker entry is present and would affect a
+  future restart.
+- `experimental+incomplete`: both conditions are true.
+- `invalid`: the instance marker entry itself is unsafe, such as a symlinked instance
+  directory.
+
+This is a restart-posture summary, not proof that a currently running process has the same
+environment. Use `scripts/check_obelisk_server_posture.sh --expect-stable` for live
+process validation.
+
 ## Post-Stable Lifecycle TODO
 
 The first stable Obelisk line should not depend on mutable lifecycle commands. Keep the

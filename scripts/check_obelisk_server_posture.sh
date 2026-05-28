@@ -76,6 +76,11 @@ if [[ -z "${PID}" ]]; then
     exit 1
 fi
 
+if [[ ! "${INSTANCE}" =~ ^[A-Za-z0-9_-]+$ ]]; then
+    echo "Invalid instance id '${INSTANCE}'. Expected [A-Za-z0-9_-]+." >&2
+    exit 1
+fi
+
 proc_pid_dir="${PROC_ROOT%/}/${PID}"
 env_file="${proc_pid_dir}/environ"
 maps_file="${proc_pid_dir}/maps"
@@ -174,6 +179,13 @@ require_marker() {
     fi
 }
 
+require_marker_dir() {
+    if [[ ! -d "${marker_dir}" || -L "${marker_dir}" ]]; then
+        echo "Expected marker directory ${marker_dir} to exist as a non-symlink directory." >&2
+        return 1
+    fi
+}
+
 require_mapped_library() {
     local library="$1"
     if ! printf '%s\n' "${maps_dump}" | grep -F -- "${library}" >/dev/null; then
@@ -204,6 +216,7 @@ if [[ "${EXPECT_STABLE}" == "1" ]]; then
     require_env OBELISK_DISABLE_PLUGINS 1
     require_env_path_list_contains LD_PRELOAD "${expected_runtime}"
     require_mapped_library "${expected_runtime}"
+    require_marker_dir
     require_marker enable-process-event-hook
     require_marker disable-plugins
     forbid_deleted_obelisk_mapping

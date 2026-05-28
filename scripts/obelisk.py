@@ -13,6 +13,21 @@ from typing import Any
 
 DEFAULT_ROOT = Path("/servidor/ark/obelisk")
 REQUIRED_DIRS = ("lib", "plugins", "config", "logs", "state/instances")
+STABLE_INSTANCE_MARKERS = frozenset(("enable-process-event-hook", "disable-plugins"))
+FORBIDDEN_STABLE_MARKERS = frozenset(
+    (
+        "allow-ptrace",
+        "enable-debug-control",
+        "enable-native-exec-probes",
+        "allow-global-process-event-callbacks",
+        "allow-call-process-event",
+        "enable-chat-reflection",
+        "enable-inventory-reflection",
+        "enable-structure-reflection",
+        "enable-reflection-scanner",
+        "request-static-fname-probe",
+    )
+)
 
 
 def safe_json_load(path: Path) -> tuple[dict[str, Any] | None, str | None]:
@@ -62,6 +77,46 @@ def iter_instances(state_root: Path) -> list[Path]:
     return sorted(path for path in instances_root.iterdir() if path.is_dir() and not path.is_symlink())
 
 
+def iter_instance_entries(state_root: Path) -> list[Path]:
+    instances_root = state_root / "instances"
+    if not instances_root.is_dir():
+        return []
+    return sorted(path for path in instances_root.iterdir() if path.is_dir() or path.is_symlink())
+
+
+def marker_is_regular_file(instance_dir: Path, marker: str) -> bool:
+    path = instance_dir / marker
+    return path.is_file() and not path.is_symlink()
+
+
+def marker_entry_exists(instance_dir: Path, marker: str) -> bool:
+    path = instance_dir / marker
+    return path.exists() or path.is_symlink()
+
+
+def instance_posture_summary(instance_dir: Path) -> tuple[str, str]:
+    missing_stable = sorted(
+        marker for marker in STABLE_INSTANCE_MARKERS if not marker_is_regular_file(instance_dir, marker)
+    )
+    forbidden = sorted(marker for marker in FORBIDDEN_STABLE_MARKERS if marker_entry_exists(instance_dir, marker))
+
+    if forbidden and missing_stable:
+        posture = "experimental+incomplete"
+    elif forbidden:
+        posture = "experimental"
+    elif missing_stable:
+        posture = "incomplete"
+    else:
+        posture = "stable"
+
+    details: list[str] = []
+    if missing_stable:
+        details.append(f"missing={','.join(missing_stable)}")
+    if forbidden:
+        details.append(f"forbidden={','.join(forbidden)}")
+    return posture, ";".join(details) if details else "ok"
+
+
 def print_table(rows: list[list[str]], headers: list[str]) -> None:
     widths = [len(header) for header in headers]
     for row in rows:
@@ -98,19 +153,25 @@ def command_status(root: Path) -> int:
 
 def command_instances_list(root: Path) -> int:
     rows: list[list[str]] = []
-    for instance_dir in iter_instances(root / "state"):
-        markers = sorted(
-            marker.name
-            for marker in instance_dir.iterdir()
-            if marker.is_file() and not marker.is_symlink()
-        )
-        rows.append([instance_dir.name, ",".join(markers) if markers else "[]"])
+    for instance_dir in iter_instance_entries(root / "state"):
+        if instance_dir.is_symlink():
+            markers: list[str] = []
+            posture = "invalid"
+            details = "instance-dir-symlink"
+        else:
+            markers = sorted(
+                marker.name
+                for marker in instance_dir.iterdir()
+                if marker.is_file() and not marker.is_symlink()
+            )
+            posture, details = instance_posture_summary(instance_dir)
+        rows.append([instance_dir.name, posture, ",".join(markers) if markers else "[]", details])
 
     if not rows:
         print("No instances found.")
         return 0
 
-    print_table(rows, ["instance", "markers"])
+    print_table(rows, ["instance", "persistent_posture", "markers", "details"])
     return 0
 
 

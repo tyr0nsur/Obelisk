@@ -549,16 +549,20 @@ Updated: 2026-05-28
 - fact: `scripts/check_obelisk_server_posture.sh --expect-stable` now fails closed if
   central `${OBELISK_ROOT}/lib/libobelisk.so` is not present in `LD_PRELOAD` and mapped, if
   a deleted `libobelisk` mapping remains, if scanner/native-exec env vars are present, or
-  if stable markers `enable-process-event-hook` / `disable-plugins` are missing, or if
-  forbidden per-instance marker entries would re-enable debug/runtime observers at next
-  restart. Forbidden marker names fail even when malformed or symlinked. Offline procfs
-  fixture coverage is in
+  if stable markers `enable-process-event-hook` / `disable-plugins` are missing, if the
+  instance id or marker directory would be rejected by the wrapper/runtime, or if forbidden
+  per-instance marker entries would re-enable debug/runtime observers at next restart.
+  Forbidden marker names fail even when malformed or symlinked. Offline procfs fixture
+  coverage is in
   `scripts/test_check_obelisk_server_posture.sh`.
 - fact: `scripts/check_obelisk_server_posture.sh --forbid-chat-reflection` adds a
   production/performance posture guard that rejects experimental chat reflection and chat
   text logging env plus the `enable-chat-reflection` marker. Use it with
   `--expect-stable` for Ragnarok player-performance checks and for TheIsland Phase A /
   rollback checks.
+- fact: `scripts/obelisk.py instances list` now reports persistent restart posture per
+  instance: `stable`, `incomplete`, `experimental`, `experimental+incomplete`, or `invalid`
+  for unsafe instance marker entries such as symlinked instance directories.
 - fact: Historical read-only quiet-posture audit at commit `5da65d6` found Ragnarok PID
   `3940524` still had `OBELISK_ENABLE_CHAT_REFLECTION=1`, so it failed the stricter
   production/performance guard. This was superseded on 2026-05-28 when the

@@ -438,8 +438,9 @@ work from repository state instead of chat history.
   guardrail after server debug work. It checks expected env, requires central
   `${OBELISK_ROOT}/lib/libobelisk.so` in `LD_PRELOAD` and maps, rejects deleted Obelisk
   mappings, requires stable markers `enable-process-event-hook` / `disable-plugins`,
-  rejects forbidden per-instance marker entries that would re-enable experimental features
-  at next restart, and has offline procfs fixture coverage in
+  rejects unsafe instance ids/directories and forbidden per-instance marker entries that
+  would re-enable experimental features at next restart, and has offline procfs fixture
+  coverage in
   `scripts/test_check_obelisk_server_posture.sh`.
 - Add `--forbid-chat-reflection` to the posture check when validating
   production/performance or quiet-baseline posture. It rejects
