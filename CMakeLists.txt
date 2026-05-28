@@ -67,6 +67,7 @@ add_library(obelisk SHARED
     ue/ReflectionScanner.cpp
     hooks/HookManager.cpp
     hooks/ProcessEventCallGuard.cpp
+    hooks/ProcessEventDispatch.cpp
     hooks/ProcessEventChatReflection.cpp
     hooks/ProcessEventInventoryReflection.cpp
     hooks/ProcessEventStructureReflection.cpp
@@ -109,6 +110,18 @@ target_include_directories(event_manager_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DI
 target_link_libraries(event_manager_tests PRIVATE obelisk_sdk fmt::fmt spdlog::spdlog)
 
 add_test(NAME EventManagerTests COMMAND event_manager_tests)
+
+add_executable(process_event_dispatch_tests
+    tests/core/ProcessEventDispatchTests.cpp
+    hooks/ProcessEventCallGuard.cpp
+    hooks/ProcessEventDispatch.cpp
+    core/EventManager.cpp
+    runtime/Logger.cpp
+)
+target_include_directories(process_event_dispatch_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(process_event_dispatch_tests PRIVATE obelisk_sdk fmt::fmt spdlog::spdlog)
+
+add_test(NAME ProcessEventDispatchTests COMMAND process_event_dispatch_tests)
 
 add_executable(chat_event_dispatcher_tests
     tests/core/ChatEventDispatcherTests.cpp

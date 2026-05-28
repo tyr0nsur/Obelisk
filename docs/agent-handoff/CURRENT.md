@@ -393,7 +393,9 @@ Updated: 2026-05-28
 - fact: Runtime now tracks when `CallProcessEvent` is invoked from a pre-callback and
   skips the automatic original call if the callback returns `true`, logging a warning
   instead of executing the UE function twice. `ProcessEventCallGuardTests` cover nested
-  and sibling pre-callback scopes.
+  and sibling pre-callback scopes; `ProcessEventDispatchTests` cover the detour dispatch
+  branch that skips the automatic original call after a pre-callback records a manual
+  original call.
 - fact: Commit `5cf3de7` added internal `EventManager`
   registration IDs and `UnregisterCallback(id)` coverage. Later commit `7e405f8` promoted
   the safe public form as owner-token handle registration plus
