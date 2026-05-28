@@ -4,11 +4,16 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
 
 from snapshot_evidence_pack import evidence_pack_defaults, merge_manifest_default
+
+
+def sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
 
 
 def parse_int(value: str) -> int:
@@ -23,11 +28,16 @@ class SnapshotEvidencePackTests(unittest.TestCase):
         core_path: Path,
         fname_roots: list[dict[str, str]] | None = None,
         gobjects: list[dict[str, str]] | None = None,
-        sha: str = "4" * 64,
+        sha: str | None = None,
         binary_sha: str = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
         evidence_status: dict[str, object] | None = None,
+        write_core: bool = True,
     ) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
+        if write_core and not core_path.exists():
+            core_path.write_bytes(b"snapshot evidence pack core fixture")
+        if sha is None:
+            sha = sha256_bytes(core_path.read_bytes()) if core_path.exists() else "4" * 64
         payload = {
             "binary": {
                 "sha256": binary_sha,
@@ -74,7 +84,7 @@ class SnapshotEvidencePackTests(unittest.TestCase):
             )
 
         self.assertEqual(defaults.artifact_kind, "offline_core")
-        self.assertEqual(defaults.artifact_sha256, "4" * 64)
+        self.assertEqual(defaults.artifact_sha256, sha256_bytes(b"snapshot evidence pack core fixture"))
         self.assertEqual(defaults.capture_id, "core")
         self.assertEqual(defaults.evidence_pack_id, "pack-A")
         self.assertEqual(defaults.core_path, core.resolve())
@@ -160,6 +170,36 @@ class SnapshotEvidencePackTests(unittest.TestCase):
             )
 
             with self.assertRaisesRegex(SystemExit, "status is not complete"):
+                evidence_pack_defaults(
+                    manifest,
+                    None,
+                    None,
+                    "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                    parse_int,
+                )
+
+    def test_rejects_core_sha_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            manifest = root / "pack-A" / "manifest.json"
+            self.write_pack(manifest, core_path=root / "core", sha="5" * 64)
+
+            with self.assertRaisesRegex(SystemExit, "core.sha256 does not match"):
+                evidence_pack_defaults(
+                    manifest,
+                    None,
+                    None,
+                    "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                    parse_int,
+                )
+
+    def test_rejects_missing_core_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            manifest = root / "pack-A" / "manifest.json"
+            self.write_pack(manifest, core_path=root / "missing-core", write_core=False)
+
+            with self.assertRaisesRegex(SystemExit, "core.path does not exist"):
                 evidence_pack_defaults(
                     manifest,
                     None,

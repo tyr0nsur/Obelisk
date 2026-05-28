@@ -45,6 +45,8 @@ namespace
         bool registerOwnerTokenFromInitThread = false;
         bool registerChatCallback = false;
         bool callProcessEventInInit = false;
+        bool registerOwnerTokenCallbackInShutdown = false;
+        bool unregisterOwnerTokenCallbackInShutdown = false;
         bool throwOnGetInfoResolve = false;
         bool throwInInitAfterCallbacks = false;
         bool throwOnShutdown = false;
@@ -60,6 +62,8 @@ namespace
         std::string initInstanceId;
         uint64_t initOwnerToken = 0;
         uint64_t initThreadRegistrationId = 0;
+        uint64_t shutdownRegistrationId = 0;
+        bool shutdownUnregisterResult = false;
         void* owner = this;
         std::vector<std::string>* orderLog = nullptr;
         Obelisk::Core::ChatEventDispatcher* chatDispatcher = nullptr;
@@ -159,6 +163,12 @@ namespace
             worker.join();
         }
 
+        if (g_CurrentFakePlugin->registerOwnerTokenCallbackInShutdown ||
+            g_CurrentFakePlugin->unregisterOwnerTokenCallbackInShutdown)
+        {
+            g_CurrentFakePlugin->capturedApi = *api;
+        }
+
         if (g_CurrentFakePlugin->registerChatCallback)
         {
             Require(g_CurrentFakePlugin->chatDispatcher != nullptr,
@@ -197,6 +207,21 @@ namespace
             g_CurrentFakePlugin->chatSubscriptionsAtShutdown =
                 g_CurrentFakePlugin->chatDispatcher->SubscriptionCount();
         ++g_CurrentFakePlugin->shutdownCalls;
+        if (g_CurrentFakePlugin->registerOwnerTokenCallbackInShutdown)
+        {
+            g_CurrentFakePlugin->shutdownRegistrationId =
+                g_CurrentFakePlugin->capturedApi.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle(
+                    g_CurrentFakePlugin->initOwnerToken,
+                    42,
+                    FakeCallback);
+        }
+        if (g_CurrentFakePlugin->unregisterOwnerTokenCallbackInShutdown)
+        {
+            g_CurrentFakePlugin->shutdownUnregisterResult =
+                g_CurrentFakePlugin->capturedApi.UnregisterProcessEventCallbackWithOwnerToken(
+                    g_CurrentFakePlugin->initOwnerToken,
+                    g_CurrentFakePlugin->initThreadRegistrationId);
+        }
         if (g_CurrentFakePlugin->throwOnShutdown)
             throw std::runtime_error("fake shutdown failure");
     }
@@ -705,6 +730,98 @@ namespace
                 "owner-token handle callback survived explicit unregister");
 
         manager.UnloadAll();
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestOwnerTokenRegistrationRejectedDuringShutdown()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_owner_token_shutdown_register");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "owner_token_shutdown_register.so",
+            .registerOwnerTokenCallbackInShutdown = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1, "shutdown-register plugin shutdown was not called");
+        Require(plugin.shutdownRegistrationId == 0,
+                "owner-token callback registration succeeded while plugin was unloading");
+        Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
+                "shutdown-time owner-token callback survived unload");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestOwnerTokenRegistrationRejectedDuringInitFailureShutdown()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_owner_token_init_fail_shutdown_register");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "owner_token_init_fail_shutdown_register.so",
+            .initResult = false,
+            .registerOwnerTokenCallbackInShutdown = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "init-failure shutdown-register plugin Init was not called");
+        Require(plugin.shutdownCalls == 1, "init-failure shutdown-register plugin shutdown was not called");
+        Require(plugin.shutdownRegistrationId == 0,
+                "owner-token callback registration succeeded during init-failure shutdown");
+        Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
+                "init-failure shutdown-time owner-token callback survived load failure");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestOwnerTokenUnregisterAllowedDuringShutdown()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_owner_token_shutdown_unregister");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "owner_token_shutdown_unregister.so",
+            .registerOwnerTokenFromInitThread = true,
+            .unregisterOwnerTokenCallbackInShutdown = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initThreadRegistrationId != 0,
+                "shutdown-unregister plugin did not register a callback before unload");
+        Require(Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
+                "shutdown-unregister plugin callback was not registered before unload");
+
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1, "shutdown-unregister plugin shutdown was not called");
+        Require(plugin.shutdownUnregisterResult,
+                "owner-token callback unregister was rejected while plugin was unloading");
+        Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
+                "shutdown-unregistered owner-token callback survived unload");
+
         CleanupPlugin(plugin);
         fs::remove_all(root);
     }
@@ -1385,6 +1502,9 @@ int main()
     TestOwnerTokenGlobalHandleRejectedByDefault();
     TestInvalidOwnerTokenCallbackRegistrationIsRejected();
     TestInvalidProcessEventCallbacksAreRejected();
+    TestOwnerTokenRegistrationRejectedDuringShutdown();
+    TestOwnerTokenRegistrationRejectedDuringInitFailureShutdown();
+    TestOwnerTokenUnregisterAllowedDuringShutdown();
     TestUnsafeInstanceIdDisablesPluginLoading();
     TestGlobalProcessEventCallbackAllowedWithGate();
     TestCallProcessEventRejectedByDefault();

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -28,6 +29,19 @@ def safe_component(value: str, field: str) -> str:
     if SAFE_COMPONENT_RE.fullmatch(value) is None or ".." in value:
         raise SystemExit(f"unsafe {field} in manifest: {value}")
     return value
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except FileNotFoundError as exc:
+        raise SystemExit(f"{path}: evidence pack core.path does not exist") from exc
+    except OSError as exc:
+        raise SystemExit(f"{path}: evidence pack core.path is unreadable: {exc}") from exc
+    return digest.hexdigest()
 
 
 def select_labeled_address(
@@ -97,12 +111,16 @@ def evidence_pack_defaults(
     core_path = core.get("path")
     if not isinstance(core_path, str) or not core_path:
         raise SystemExit(f"{path}: evidence pack manifest missing core.path")
+    resolved_core_path = Path(core_path).resolve()
+    actual_core_sha = sha256_file(resolved_core_path)
+    if actual_core_sha != core_sha:
+        raise SystemExit(f"{path}: core.sha256 does not match core.path contents")
     return EvidencePackDefaults(
         artifact_kind="offline_core",
         artifact_sha256=core_sha,
         capture_id=safe_component(Path(core_path).stem, "capture-id"),
         evidence_pack_id=safe_component(path.parent.name, "evidence-pack-id"),
-        core_path=Path(core_path).resolve(),
+        core_path=resolved_core_path,
         fname_root_slot=select_labeled_address(
             path,
             payload.get("fname_root_slots"),

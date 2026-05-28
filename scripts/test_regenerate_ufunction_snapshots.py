@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import subprocess
 import sys
 import tempfile
@@ -13,6 +14,10 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 from test_inspect_core_ufunctions import build_core_fixture  # noqa: E402
+
+
+def sha256_file(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
@@ -71,7 +76,7 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
             },
             "core": {
                 "path": str(core),
-                "sha256": "4" * 64,
+                "sha256": sha256_file(core),
             },
             "evidence_status": evidence_status
             or {
@@ -317,6 +322,7 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
             output_root = root / "out"
             output = output_root / "7e7ded49e0c6" / "sdk_test" / "PrimalStructure.AllowStructureAccess.snapshot.json"
             addrs = build_core_fixture(core)
+            core_sha = sha256_file(core)
             self.write_manifest(manifest)
             self.write_evidence_pack_manifest(
                 evidence_pack,
@@ -350,7 +356,7 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
 
         self.assertIn("wrote", result.stdout)
         self.assertEqual(payload["evidence"]["artifact_kind"], "offline_core")
-        self.assertEqual(payload["evidence"]["artifact_sha256"], "4" * 64)
+        self.assertEqual(payload["evidence"]["artifact_sha256"], core_sha)
         self.assertEqual(payload["evidence"]["capture_id"], "second-core")
         self.assertEqual(payload["evidence"]["evidence_pack_id"], "second-pack")
 

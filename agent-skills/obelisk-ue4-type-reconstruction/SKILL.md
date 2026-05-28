@@ -108,3 +108,6 @@ For each reconstructed field:
 - When recording artifact identity, pass all four fields together: `artifact_kind`,
   `artifact_sha256`, `capture_id`, and `evidence_pack_id`. Partial artifact identity is not
   valid second-source evidence.
+- Evidence-pack manifests used by snapshot regenerators must verify that `core.path`
+  exists and that its actual SHA256 matches `core.sha256`; do not trust manifest identity
+  without checking the artifact bytes.

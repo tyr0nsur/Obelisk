@@ -124,6 +124,9 @@ work from repository state instead of chat history.
   unregister through `UnregisterProcessEventCallbackWithOwnerToken(owner_token, handle)`.
   Handles are process-local and must not be stored in shared cluster config or reused
   across ARK instances.
+- `PluginManager` marks plugin owners as unloading before shutdown on init failure or
+  unload. New callback registrations are rejected while unloading, while owner-token
+  unregister remains valid so shutdown can clean existing handles before `dlclose`.
 - Callback handles and plugin owner tokens skip `0` and currently live IDs after counter
   wrap. `0` remains the failure sentinel for plugin-facing registration APIs.
 - `oBaseEvents` requires owner-token callback handle support when its ProcessEvent example
@@ -155,7 +158,8 @@ work from repository state instead of chat history.
   rules centralized there for both UFunction and ScriptStruct paths. Evidence-pack
   manifests used for regeneration must match the snapshot manifest `ark_binary_sha256`,
   must have `evidence_status.status=complete`, and must not have `gdb_core_failed=true`;
-  wrong-binary or partial-GDB packs are rejected before snapshots are generated.
+  wrong-binary, missing-core, core-SHA-mismatch, or partial-GDB packs are rejected before
+  snapshots are generated.
 - Passive operator-supplied runtime evidence from 2026-05-28 is recorded in
   `docs/research/2026-05-28-passive-chat-reflection-live-observation.md`: it observed
   experimental `ServerSendChatMessage` metadata with `GlobalChat` and `GlobalTribeChat`,

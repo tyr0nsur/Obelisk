@@ -54,6 +54,9 @@ Own these areas:
 - Reject plugin callback registrations that cannot be attributed to the currently
   initializing plugin or an already-loaded plugin owner. Do not allow ownerless callbacks
   through the public plugin API.
+- Mark plugin owners as unloading before `ObeliskPlugin_Shutdown()` on init failure or
+  unload. New callback registrations must be rejected while unloading, but owner-token
+  unregister must remain valid so shutdown can clean existing handles.
 - Plugin config default creation must validate the config root and per-plugin directory
   before writing. Reject symlinked plugin config directories before first-run default
   config creation, not only before parsing an existing `config.json`.

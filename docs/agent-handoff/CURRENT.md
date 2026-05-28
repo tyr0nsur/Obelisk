@@ -300,6 +300,11 @@ Updated: 2026-05-28
   helper/background threads that do not inherit the loader thread-local current owner. The
   runtime tracks an initializing-owner set for the init window and still removes token
   state/callbacks on init failure and unload.
+- fact: `PluginManager` tracks plugin owners through initializing, loaded, and unloading
+  states under one lifecycle mutex. Shutdown and init-failure shutdown may unregister
+  existing owner-token callback handles, but new callback registrations are rejected while
+  the owner is unloading so no ProcessEvent callback can be inserted after cleanup and
+  before `dlclose`.
 - fact: SDK consumer fixture now treats `ObeliskPlugin_Shutdown` as optional, matching
   `PluginManager`; a no-shutdown minimal plugin fixture covers that contract.
 - fact: `PluginManager` rejects `.so` symlink candidates during plugin directory scanning
@@ -383,8 +388,9 @@ Updated: 2026-05-28
   capture id from `core.path`, the pack directory name as `evidence_pack_id`, and the
   selected `fname_root_slots` and `gobjects_candidates` addresses. They reject manifests
   whose `binary.sha256` conflicts with the snapshot manifest, whose
-  `evidence_status.status` is not `complete`, or whose `gdb_core_failed` is true. CLI core,
-  identity, FName-root, or GObjects values that contradict the pack manifest abort before
+  `evidence_status.status` is not `complete`, whose `gdb_core_failed` is true, whose
+  `core.path` is missing, or whose actual core file SHA256 does not match `core.sha256`.
+  CLI core, identity, FName-root, or GObjects values that contradict the pack manifest abort before
   snapshot generation. Use `--evidence-pack-fname-root-label` or
   `--evidence-pack-gobjects-label` when the pack has multiple candidates.
 - fact: GObjects sample evidence now has the same guardrail:
