@@ -39,6 +39,7 @@ namespace
         bool registerChatCallback = false;
         bool throwOnGetInfoResolve = false;
         bool throwInInitAfterCallbacks = false;
+        bool throwOnShutdown = false;
         bool throwOnClose = false;
         bool captureApi = false;
         int getInfoCalls = 0;
@@ -177,6 +178,8 @@ namespace
             g_CurrentFakePlugin->chatSubscriptionsAtShutdown =
                 g_CurrentFakePlugin->chatDispatcher->SubscriptionCount();
         ++g_CurrentFakePlugin->shutdownCalls;
+        if (g_CurrentFakePlugin->throwOnShutdown)
+            throw std::runtime_error("fake shutdown failure");
     }
 
     class FakeLoader final : public Obelisk::Core::PluginManager::LibraryLoader
@@ -485,6 +488,78 @@ namespace
 
         Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
                 "owner-token init-thread callback survived unload");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestInitFailureCleansInitThreadOwnerTokenCallbackAndToken()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_owner_token_init_fail");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "owner_token_init_fail.so",
+            .initResult = false,
+            .registerOwnerTokenFromInitThread = true,
+            .captureApi = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "owner-token init-fail plugin was not initialized");
+        Require(plugin.shutdownCalls == 1, "owner-token init-fail plugin shutdown was not called");
+        Require(plugin.closeCalls == 1, "owner-token init-fail plugin was not closed");
+        Require(plugin.initThreadRegistrationId != 0,
+                "owner-token init-fail callback from helper thread was not registered before failure");
+        Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
+                "owner-token callback from failed init survived load failure");
+        Require(plugin.capturedApi.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    42,
+                    FakeCallback) == 0,
+                "owner token from failed init remained valid after cleanup");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestInitExceptionCleansInitThreadOwnerTokenCallbackAndToken()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_owner_token_init_throw");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "owner_token_init_throw.so",
+            .registerOwnerTokenFromInitThread = true,
+            .throwInInitAfterCallbacks = true,
+            .captureApi = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "owner-token init-throw plugin was not initialized");
+        Require(plugin.shutdownCalls == 1, "owner-token init-throw plugin shutdown was not called");
+        Require(plugin.closeCalls == 1, "owner-token init-throw plugin was not closed");
+        Require(plugin.initThreadRegistrationId != 0,
+                "owner-token init-throw callback from helper thread was not registered before exception");
+        Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
+                "owner-token callback from throwing init survived load failure");
+        Require(plugin.capturedApi.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    42,
+                    FakeCallback) == 0,
+                "owner token from throwing init remained valid after cleanup");
 
         CleanupPlugin(plugin);
         fs::remove_all(root);
@@ -952,6 +1027,54 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestUnloadAllCleansAfterShutdownException()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_shutdown_throw");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "shutdown_throw.so",
+            .registerFilteredCallback = true,
+            .registerOwnerTokenFromInitThread = true,
+            .registerChatCallback = true,
+            .throwOnShutdown = true,
+        };
+        Obelisk::Core::ChatEventDispatcher chatDispatcher;
+        plugin.chatDispatcher = &chatDispatcher;
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader, chatDispatcher);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "shutdown-throw plugin was not initialized");
+        Require(Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
+                "shutdown-throw plugin ProcessEvent callbacks were not registered");
+        Require(chatDispatcher.SubscriptionCount() == 1,
+                "shutdown-throw plugin chat callback was not registered");
+
+        manager.UnloadAll();
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1, "shutdown-throw plugin shutdown was not called once");
+        Require(plugin.eventCallbacksAtShutdown,
+                "shutdown-throw plugin ProcessEvent callbacks were removed before shutdown");
+        Require(plugin.chatSubscriptionsAtShutdown == 1,
+                "shutdown-throw plugin chat callback was removed before shutdown");
+        Require(plugin.closeCalls == 1, "shutdown-throw plugin was not closed once");
+        Require(plugin.chatSubscriptionsAtClose == 0,
+                "shutdown-throw plugin chat callback was still registered at dlclose");
+        Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
+                "shutdown-throw plugin ProcessEvent callbacks survived unload");
+        Require(chatDispatcher.SubscriptionCount() == 0,
+                "shutdown-throw plugin chat callback survived unload");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestDuplicatePluginIdRejectsSecondPlugin()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_duplicate_id");
@@ -1025,6 +1148,8 @@ int main()
     TestPostInitUnownedCallbackRegistrationIsRejected();
     TestPostInitOwnerTokenCallbackRegistrationCleansOnUnload();
     TestOwnerTokenCallbackRegistrationFromInitThread();
+    TestInitFailureCleansInitThreadOwnerTokenCallbackAndToken();
+    TestInitExceptionCleansInitThreadOwnerTokenCallbackAndToken();
     TestOwnerTokenHandleRegistrationCanUnregister();
     TestOwnerTokenGlobalHandleRejectedByDefault();
     TestInvalidOwnerTokenCallbackRegistrationIsRejected();
@@ -1042,6 +1167,7 @@ int main()
     TestInitExceptionCleansCallbacksAndCloses();
     TestMultiplePluginsLoadSortedAndUnloadReverse();
     TestUnloadAllContinuesAfterCloseException();
+    TestUnloadAllCleansAfterShutdownException();
     TestDuplicatePluginIdRejectsSecondPlugin();
     TestLoadPluginsSkipsAlreadyLoadedPluginId();
 

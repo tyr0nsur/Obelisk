@@ -126,9 +126,18 @@ work from repository state instead of chat history.
     `default_config_json` must declare `enabled=false`, an `instance_allowlist` array,
     and `allow_all_instances=false`; plugin loading fails closed when
     `OBELISK_INSTANCE_ID` is missing/unsafe and allowlist entries use the same safe-token
-    rule; plugin config directories and `config.json` files must be regular non-symlink
+    rule; `oBaseEvents` does not publish `map_allowlist`, and SDK consumer CTest rejects
+    non-empty legacy `map_allowlist` until reliable map identity exists; plugin config
+    directories and `config.json` files must be regular non-symlink
     entries; mutable shared plugin state still requires plugin-level locking/atomic-write
     design;
+  - lifecycle hardening: PluginManager regression tests cover init-time helper-thread
+    owner-token callbacks when `Init` returns false or throws, invalidating tokens and
+    cleaning callbacks before close; `UnloadAll` also covers cleanup when plugin
+    `Shutdown` throws;
+  - event dispatch hardening: EventManager tests initialize logger and verify throwing
+    pre/post callbacks are logged without propagating and without stopping later
+    callbacks;
   - reflection/offline: second-source evidence is the bottleneck, and safe work should
     keep improving deterministic readiness/comparison tooling without touching live
     servers.

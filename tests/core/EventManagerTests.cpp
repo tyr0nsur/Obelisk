@@ -1,8 +1,13 @@
 #include "core/EventManager.h"
+#include "runtime/Logger.h"
 
+#include <cstdlib>
 #include <cstdint>
+#include <filesystem>
 #include <iostream>
 #include <stdexcept>
+
+namespace fs = std::filesystem;
 
 namespace
 {
@@ -30,6 +35,14 @@ namespace
             throw std::runtime_error(message);
     }
 
+    fs::path MakeTempRoot()
+    {
+        char templatePath[] = "/tmp/obelisk_event_manager_tests.XXXXXX";
+        char* directory = mkdtemp(templatePath);
+        Require(directory != nullptr, "mkdtemp failed");
+        return fs::path(directory);
+    }
+
     bool GlobalPre(void*, void*, void*)
     {
         ++g_Counters.global_pre;
@@ -52,6 +65,30 @@ namespace
     {
         ++g_Counters.filtered_post;
         return true;
+    }
+
+    bool ThrowingGlobalPre(void*, void*, void*)
+    {
+        ++g_Counters.global_pre;
+        throw std::runtime_error("global pre failed");
+    }
+
+    bool ThrowingFilteredPre(void*, void*, void*)
+    {
+        ++g_Counters.filtered_pre;
+        throw std::runtime_error("filtered pre failed");
+    }
+
+    bool ThrowingGlobalPost(void*, void*, void*)
+    {
+        ++g_Counters.global_post;
+        throw std::runtime_error("global post failed");
+    }
+
+    bool ThrowingFilteredPost(void*, void*, void*)
+    {
+        ++g_Counters.filtered_post;
+        throw std::runtime_error("filtered post failed");
     }
 
     bool NullSafeCallback(void*, void*, void*)
@@ -127,6 +164,39 @@ namespace
         events.TriggerPostProcessEvent(42, nullptr, nullptr, nullptr);
         Require(g_Counters.global_post == 2, "global post callback did not run for matched event");
         Require(g_Counters.filtered_post == 1, "filtered post callback did not run for matched name index");
+    }
+
+    void TestPreCallbackExceptionsDoNotBlockOrStopLaterCallbacks()
+    {
+        ResetCounters();
+        Obelisk::Core::EventManager events;
+        int owner = 0;
+
+        events.RegisterPreProcessEventOwned(&owner, ThrowingGlobalPre);
+        events.RegisterPreProcessEventOwned(&owner, GlobalPre);
+        events.RegisterPreProcessEventForNameIndexOwned(&owner, 42, ThrowingFilteredPre);
+        events.RegisterPreProcessEventForNameIndexOwned(&owner, 42, FilteredPre);
+
+        Require(events.TriggerPreProcessEvent(42, nullptr, nullptr, nullptr),
+                "throwing pre callback blocked event dispatch");
+        Require(g_Counters.global_pre == 2, "global pre dispatch stopped after exception");
+        Require(g_Counters.filtered_pre == 2, "filtered pre dispatch stopped after exception");
+    }
+
+    void TestPostCallbackExceptionsDoNotStopLaterCallbacks()
+    {
+        ResetCounters();
+        Obelisk::Core::EventManager events;
+        int owner = 0;
+
+        events.RegisterPostProcessEventOwned(&owner, ThrowingGlobalPost);
+        events.RegisterPostProcessEventOwned(&owner, GlobalPost);
+        events.RegisterPostProcessEventForNameIndexOwned(&owner, 42, ThrowingFilteredPost);
+        events.RegisterPostProcessEventForNameIndexOwned(&owner, 42, FilteredPost);
+
+        events.TriggerPostProcessEvent(42, nullptr, nullptr, nullptr);
+        Require(g_Counters.global_post == 2, "global post dispatch stopped after exception");
+        Require(g_Counters.filtered_post == 2, "filtered post dispatch stopped after exception");
     }
 
     void TestOwnerCleanup()
@@ -244,13 +314,22 @@ namespace
 
 int main()
 {
+    const fs::path logRoot = MakeTempRoot();
+    setenv("OBELISK_LOG_DIR", logRoot.string().c_str(), 1);
+    Obelisk::Logger::Init();
+
     TestFilteredPreCallbacks();
     TestPreCallbackBlocking();
     TestFilteredPostCallbacks();
+    TestPreCallbackExceptionsDoNotBlockOrStopLaterCallbacks();
+    TestPostCallbackExceptionsDoNotStopLaterCallbacks();
     TestOwnerCleanup();
     TestSingleRegistrationUnregister();
     TestNullCallbacksAreIgnored();
     TestCallbackCanUnregisterItself();
+
+    Obelisk::Logger::Shutdown();
+    fs::remove_all(logRoot);
 
     std::cout << "EventManagerTests passed\n";
     return 0;

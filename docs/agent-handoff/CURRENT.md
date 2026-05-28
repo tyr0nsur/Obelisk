@@ -138,7 +138,8 @@ Updated: 2026-05-28
   consumer CTest enables `oBaseEvents` with `process_event.enabled=true` and verifies one
   owner-token handle registration plus one owner-scoped unregister during shutdown.
   `oBaseEvents` no longer publishes `map_allowlist` in its default config; non-empty
-  legacy `map_allowlist` values are rejected until a reliable map identity contract exists.
+  legacy `map_allowlist` values are rejected until a reliable map identity contract exists,
+  and SDK consumer CTest now covers that fail-closed path directly.
   `scripts/install_obelisk_plugin.sh` uses the same non-root absolute path and symlink-root
   validation as the runtime installer.
 - fact: The CMake package version remains numeric `0.1.0` as the SDK compatibility floor
@@ -147,6 +148,14 @@ Updated: 2026-05-28
   `Obelisk_RELEASE_CHANNEL`, and public ABI version variables so consumers and tests can
   distinguish a dev package from a tagged release. Official examples use plugin metadata
   version `0.1.0-dev` until the stable tag exists.
+- fact: Plugin lifecycle hardening now has offline regression coverage for owner-token
+  ProcessEvent callbacks registered from init-time helper threads when `Init` returns
+  false or throws. Both paths must run shutdown, unregister callbacks, invalidate the
+  owner token, and close the library once. `UnloadAll` also has coverage for plugins whose
+  `Shutdown` throws while ProcessEvent and chat callbacks are still registered.
+- fact: `EventManagerTests` now initialize the runtime logger and cover throwing
+  pre/post callbacks. Exceptions are logged, do not propagate, and do not stop later
+  callbacks from running; only an explicit `false` pre-callback blocks dispatch.
 - fact: Commit `c0d1e4c` pushed the hardened first-stable gates. On 2026-05-28,
   `scripts/check_release_readiness.sh` passed from a clean tracked/untracked worktree
   (ignored `build/` and `scripts/__pycache__/` only), and the read-only Ragnarok posture

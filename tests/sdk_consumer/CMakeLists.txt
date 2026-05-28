@@ -42,3 +42,8 @@ add_test(
     NAME SdkConsumerFixtureOBaseEventsActive
     COMMAND sdk_consumer_fixture "$<TARGET_FILE:oBaseEvents>" oBaseEvents active-process-event
 )
+
+add_test(
+    NAME SdkConsumerFixtureOBaseEventsRejectsMapAllowlist
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oBaseEvents>" oBaseEvents unsupported-map-allowlist
+)

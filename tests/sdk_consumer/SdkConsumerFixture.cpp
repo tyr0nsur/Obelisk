@@ -73,6 +73,19 @@ namespace
     }
 })json";
 
+    constexpr const char* kUnsupportedMapAllowlistConfig = R"json({
+    "enabled": true,
+    "log_level": "info",
+    "allow_all_instances": false,
+    "instance_allowlist": ["sdk-consumer-test"],
+    "map_allowlist": ["Ragnarok"],
+    "process_event": {
+        "enabled": true,
+        "filtered_function_index": 42,
+        "log_limit": 1
+    }
+})json";
+
     std::filesystem::path CreateConfigDir(const char* defaultConfigJson)
     {
         char templatePath[] = "/tmp/obelisk-sdk-consumer.XXXXXX";
@@ -143,7 +156,11 @@ int main(int argc, char** argv)
         Require(std::strcmp(metadata.plugin_id, expectedPluginId) == 0, "plugin_id mismatch");
         Require(std::strcmp(metadata.config_file, "config.json") == 0, "config file mismatch");
         Require(metadata.default_config_json != nullptr, "missing default config");
-        const char* configJson = mode == "active-process-event" ? kActiveOBaseEventsConfig : metadata.default_config_json;
+        const char* configJson = metadata.default_config_json;
+        if (mode == "active-process-event")
+            configJson = kActiveOBaseEventsConfig;
+        else if (mode == "unsupported-map-allowlist")
+            configJson = kUnsupportedMapAllowlistConfig;
         std::filesystem::path configDir = CreateConfigDir(configJson);
         const auto cleanupConfigDir = [&configDir]() {
             if (!configDir.empty())
@@ -179,7 +196,18 @@ int main(int argc, char** argv)
         context.instance_id = "sdk-consumer-test";
         context.plugin_owner_token = 0xC0FFEE;
 
-        Require(init(&api, &context), "ObeliskPlugin_Init failed");
+        const bool initSucceeded = init(&api, &context);
+        if (mode == "unsupported-map-allowlist")
+        {
+            Require(!initSucceeded, "oBaseEvents accepted unsupported map_allowlist");
+            Require(g_RegisterCount == 0, "rejected oBaseEvents unexpectedly registered a callback");
+            Require(g_UnregisterCount == 0, "rejected oBaseEvents unexpectedly unregistered a callback");
+            cleanupConfigDir();
+            closeHandle();
+            return 0;
+        }
+
+        Require(initSucceeded, "ObeliskPlugin_Init failed");
         if (shutdown)
             shutdown();
         if (mode == "active-process-event")
