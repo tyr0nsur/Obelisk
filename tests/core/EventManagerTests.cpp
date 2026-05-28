@@ -1,5 +1,6 @@
 #include "core/EventManager.h"
 
+#include <cstdint>
 #include <iostream>
 #include <stdexcept>
 
@@ -146,6 +147,40 @@ namespace
         Require(g_Counters.filtered_post == 0, "owner B filtered post callback survived cleanup");
     }
 
+    void TestSingleRegistrationUnregister()
+    {
+        ResetCounters();
+        Obelisk::Core::EventManager events;
+        int owner = 0;
+
+        const uint64_t globalPreId = events.RegisterPreProcessEventOwned(&owner, GlobalPre);
+        const uint64_t filteredPreId = events.RegisterPreProcessEventForNameIndexOwned(&owner, 42, FilteredPre);
+        const uint64_t globalPostId = events.RegisterPostProcessEventOwned(&owner, GlobalPost);
+        const uint64_t filteredPostId = events.RegisterPostProcessEventForNameIndexOwned(&owner, 42, FilteredPost);
+
+        Require(globalPreId != 0, "global pre registration id was zero");
+        Require(filteredPreId != 0, "filtered pre registration id was zero");
+        Require(globalPostId != 0, "global post registration id was zero");
+        Require(filteredPostId != 0, "filtered post registration id was zero");
+        Require(globalPreId != filteredPreId, "registration ids were not unique");
+
+        Require(events.UnregisterCallback(filteredPreId), "filtered pre unregister by id failed");
+        Require(!events.UnregisterCallback(filteredPreId), "filtered pre unregister by id was not idempotent");
+        Require(!events.UnregisterCallback(0), "zero registration id unregistered a callback");
+
+        Require(events.TriggerPreProcessEvent(42, nullptr, nullptr, nullptr),
+                "pre event blocked after unregistering one callback");
+        Require(g_Counters.global_pre == 1, "global pre callback was removed by filtered id");
+        Require(g_Counters.filtered_pre == 0, "filtered pre callback survived id unregister");
+
+        Require(events.UnregisterCallback(globalPostId), "global post unregister by id failed");
+        events.TriggerPostProcessEvent(42, nullptr, nullptr, nullptr);
+        Require(g_Counters.global_post == 0, "global post callback survived id unregister");
+        Require(g_Counters.filtered_post == 1, "filtered post callback was removed by global id");
+
+        Require(events.UnregisterCallbacksForOwner(&owner) == 2, "owner cleanup did not remove remaining callbacks");
+    }
+
     void TestNullCallbacksAreIgnored()
     {
         ResetCounters();
@@ -171,6 +206,7 @@ int main()
     TestPreCallbackBlocking();
     TestFilteredPostCallbacks();
     TestOwnerCleanup();
+    TestSingleRegistrationUnregister();
     TestNullCallbacksAreIgnored();
 
     std::cout << "EventManagerTests passed\n";

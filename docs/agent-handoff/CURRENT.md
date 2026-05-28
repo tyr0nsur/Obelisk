@@ -126,6 +126,10 @@ Updated: 2026-05-28
   contract in the public SDK header, README, and plugin architecture docs without changing
   ABI layout. A pre-callback that calls `CallProcessEvent` must return `false`; returning
   `true` risks double execution by the detour. A runtime guard remains future work.
+- fact: Current uncommitted runtime/API round also adds internal `EventManager`
+  registration IDs and `UnregisterCallback(id)` coverage. Public `ObeliskApi` callback
+  registration remains unchanged for ABI v1; this prepares a future explicit unsubscribe
+  capability without promoting it yet.
 - finding: Reflection tooling audit found UFunction snapshot fixture coverage is broad
   across module areas, but ScriptStruct coverage is the current bottleneck with only two
   transfer structs. Prioritize an offline second-source readiness report before any

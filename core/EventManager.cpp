@@ -31,28 +31,60 @@ namespace Obelisk::Core
         RegisterPostProcessEventForNameIndexOwned(nullptr, nameIndex, callback);
     }
 
-    void EventManager::RegisterPreProcessEventOwned(void* owner, OnProcessEventCallback callback)
+    uint64_t EventManager::RegisterPreProcessEventOwned(void* owner, OnProcessEventCallback callback)
     {
         std::lock_guard<std::mutex> lock(m_Mutex);
-        m_PreProcessEventCallbacks.push_back({-1, callback, owner});
+        const uint64_t id = m_NextRegistrationId++;
+        m_PreProcessEventCallbacks.push_back({id, -1, callback, owner});
+        return id;
     }
 
-    void EventManager::RegisterPostProcessEventOwned(void* owner, OnProcessEventCallback callback)
+    uint64_t EventManager::RegisterPostProcessEventOwned(void* owner, OnProcessEventCallback callback)
     {
         std::lock_guard<std::mutex> lock(m_Mutex);
-        m_PostProcessEventCallbacks.push_back({-1, callback, owner});
+        const uint64_t id = m_NextRegistrationId++;
+        m_PostProcessEventCallbacks.push_back({id, -1, callback, owner});
+        return id;
     }
 
-    void EventManager::RegisterPreProcessEventForNameIndexOwned(void* owner, int32_t nameIndex, OnProcessEventCallback callback)
+    uint64_t EventManager::RegisterPreProcessEventForNameIndexOwned(void* owner, int32_t nameIndex, OnProcessEventCallback callback)
     {
         std::lock_guard<std::mutex> lock(m_Mutex);
-        m_FilteredPreProcessEventCallbacks.push_back({nameIndex, callback, owner});
+        const uint64_t id = m_NextRegistrationId++;
+        m_FilteredPreProcessEventCallbacks.push_back({id, nameIndex, callback, owner});
+        return id;
     }
 
-    void EventManager::RegisterPostProcessEventForNameIndexOwned(void* owner, int32_t nameIndex, OnProcessEventCallback callback)
+    uint64_t EventManager::RegisterPostProcessEventForNameIndexOwned(void* owner, int32_t nameIndex, OnProcessEventCallback callback)
     {
         std::lock_guard<std::mutex> lock(m_Mutex);
-        m_FilteredPostProcessEventCallbacks.push_back({nameIndex, callback, owner});
+        const uint64_t id = m_NextRegistrationId++;
+        m_FilteredPostProcessEventCallbacks.push_back({id, nameIndex, callback, owner});
+        return id;
+    }
+
+    bool EventManager::UnregisterCallback(uint64_t registrationId)
+    {
+        if (registrationId == 0)
+            return false;
+
+        std::lock_guard<std::mutex> dispatchLock(m_DispatchMutex);
+        std::lock_guard<std::mutex> lock(m_Mutex);
+
+        auto removeForId = [registrationId](auto& callbacks) -> bool {
+            const auto before = callbacks.size();
+            callbacks.erase(
+                std::remove_if(callbacks.begin(), callbacks.end(), [registrationId](const CallbackRegistration& item) {
+                    return item.id == registrationId;
+                }),
+                callbacks.end());
+            return callbacks.size() != before;
+        };
+
+        return removeForId(m_PreProcessEventCallbacks) ||
+               removeForId(m_PostProcessEventCallbacks) ||
+               removeForId(m_FilteredPreProcessEventCallbacks) ||
+               removeForId(m_FilteredPostProcessEventCallbacks);
     }
 
     size_t EventManager::UnregisterCallbacksForOwner(void* owner)

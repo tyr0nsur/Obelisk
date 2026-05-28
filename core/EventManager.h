@@ -4,6 +4,7 @@
 #include <vector>
 #include <mutex>
 #include <cstddef>
+#include <cstdint>
 
 namespace Obelisk::Core
 {
@@ -19,10 +20,11 @@ namespace Obelisk::Core
         void RegisterPostProcessEvent(OnProcessEventCallback callback);
         void RegisterPreProcessEventForNameIndex(int32_t nameIndex, OnProcessEventCallback callback);
         void RegisterPostProcessEventForNameIndex(int32_t nameIndex, OnProcessEventCallback callback);
-        void RegisterPreProcessEventOwned(void* owner, OnProcessEventCallback callback);
-        void RegisterPostProcessEventOwned(void* owner, OnProcessEventCallback callback);
-        void RegisterPreProcessEventForNameIndexOwned(void* owner, int32_t nameIndex, OnProcessEventCallback callback);
-        void RegisterPostProcessEventForNameIndexOwned(void* owner, int32_t nameIndex, OnProcessEventCallback callback);
+        uint64_t RegisterPreProcessEventOwned(void* owner, OnProcessEventCallback callback);
+        uint64_t RegisterPostProcessEventOwned(void* owner, OnProcessEventCallback callback);
+        uint64_t RegisterPreProcessEventForNameIndexOwned(void* owner, int32_t nameIndex, OnProcessEventCallback callback);
+        uint64_t RegisterPostProcessEventForNameIndexOwned(void* owner, int32_t nameIndex, OnProcessEventCallback callback);
+        bool UnregisterCallback(uint64_t registrationId);
         size_t UnregisterCallbacksForOwner(void* owner);
 
         bool HasPreProcessEventCallbacks();
@@ -37,6 +39,7 @@ namespace Obelisk::Core
 
     private:
         struct CallbackRegistration {
+            uint64_t id;
             int32_t nameIndex;
             OnProcessEventCallback callback;
             void* owner;
@@ -44,6 +47,7 @@ namespace Obelisk::Core
 
         std::mutex m_Mutex;
         std::mutex m_DispatchMutex;
+        uint64_t m_NextRegistrationId = 1;
         std::vector<CallbackRegistration> m_PreProcessEventCallbacks;
         std::vector<CallbackRegistration> m_PostProcessEventCallbacks;
         std::vector<CallbackRegistration> m_FilteredPreProcessEventCallbacks;

@@ -117,6 +117,9 @@ work from repository state instead of chat history.
 - Current uncommitted runtime/API round documents `CallProcessEvent` reentrancy in the SDK
   header and plugin docs without changing ABI layout: pre-callbacks that call it must
   return `false` to avoid double execution; a runtime guard remains future work.
+- Current uncommitted runtime/API round adds internal `EventManager` registration IDs and
+  `UnregisterCallback(id)` tests. Public `ObeliskApi` callback registration remains
+  unchanged for ABI v1.
 - Current uncommitted reflection-tooling round adds
   `scripts/compare_reflection_snapshots.py --readiness-report`. Use it to summarize
   comparable snapshot coverage and second-source status by schema/module. Current fixtures
