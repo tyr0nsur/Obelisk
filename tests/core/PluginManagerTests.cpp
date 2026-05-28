@@ -450,6 +450,33 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestPluginSymlinkCandidateIsRejected()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_symlink");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{.filename = "linked.so"};
+        FakeLoader loader;
+        loader.Add(plugin);
+
+        const fs::path externalTarget = root / "external-plugin.so";
+        {
+            std::ofstream out(externalTarget);
+            Require(out.is_open(), "failed to create external fake plugin target");
+        }
+        fs::create_symlink(externalTarget, root / "plugins" / plugin.filename);
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.getInfoCalls == 0, "symlink plugin candidate was opened");
+        Require(plugin.initCalls == 0, "symlink plugin candidate was initialized");
+        Require(plugin.closeCalls == 0, "symlink plugin candidate reached loader close path");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestMissingInitRejectsAndCloses()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_no_init");
@@ -633,6 +660,7 @@ int main()
     TestDisabledPluginPreparesConfigButDoesNotInit();
     TestInstanceDisallowedPluginDoesNotInit();
     TestMissingGetInfoRejectsAndCloses();
+    TestPluginSymlinkCandidateIsRejected();
     TestMissingInitRejectsAndCloses();
     TestInvalidMetadataRejectsAndCloses();
     TestInitFailureCleansCallbacksAndCloses();

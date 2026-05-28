@@ -102,6 +102,8 @@ Updated: 2026-05-28
   legacy MVP moved to `docs/archive/`.
 - fact: SDK consumer fixture now treats `ObeliskPlugin_Shutdown` as optional, matching
   `PluginManager`; a no-shutdown minimal plugin fixture covers that contract.
+- fact: `PluginManager` rejects `.so` symlink candidates during plugin directory scanning
+  before `dlopen`, so `${OBELISK_PLUGIN_DIR}` cannot load a plugin through a symlink escape.
 - fact: Runtime observer marker checks use `runtime/RuntimeMarkers.*`, which rejects empty
   components, path traversal, slashes, dots, spaces, directory markers, symlink markers, and
   symlink instance directories before checking `state/instances/<instance>/<marker>`.
@@ -216,9 +218,8 @@ Updated: 2026-05-28
   `PrimalStructure.IsAllowedToDemolish`; current readiness is `4/4` comparable and blocked
   only by missing second-source root.
 - next-step: Runtime/API debt from the latest read-only audit: harden `PluginManager`
-  ownership/cleanup around callback registrations outside init, add RAII cleanup for
-  exceptions between `dlopen` and `m_LoadedPlugins` insertion, and reject plugin `.so`
-  symlinks that point outside the plugin directory.
+  ownership/cleanup around callback registrations outside init, and add RAII cleanup for
+  exceptions between `dlopen` and `m_LoadedPlugins` insertion.
 - fact: Runtime/chat baseline is documented in
   `docs/research/2026-05-27-runtime-and-chat-baseline.md`.
 - fact: Reflection/chat metadata audit added shared UE probe layouts and gated

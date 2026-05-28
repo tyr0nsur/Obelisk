@@ -294,7 +294,16 @@ namespace Obelisk::Core
             std::vector<fs::path> plugins;
             for (const auto& entry : fs::directory_iterator(directory))
             {
-                if (entry.is_regular_file() && entry.path().extension() == ".so")
+                if (entry.path().extension() != ".so")
+                    continue;
+
+                if (entry.is_symlink())
+                {
+                    OBELISK_WARN("Skipping plugin candidate {} because plugin symlinks are not allowed.", entry.path().filename().string());
+                    continue;
+                }
+
+                if (entry.is_regular_file())
                     plugins.push_back(entry.path());
             }
 
