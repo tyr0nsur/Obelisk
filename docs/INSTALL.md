@@ -108,6 +108,14 @@ Place the production wrapper in:
 ShooterGame/Binaries/Linux/ObeliskRun.sh
 ```
 
+Before any maintenance restart, verify that the installed wrapper still matches the
+versioned template:
+
+```bash
+scripts/check_linuxgsm_wrapper_drift.sh \
+  --installed /servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ObeliskRun.sh
+```
+
 Then configure LinuxGSM:
 
 ```ini

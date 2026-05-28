@@ -41,6 +41,13 @@ If a reinstall rewrites the ARK binary directory, also verify the launcher/wrapp
 /servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ObeliskRun.sh
 ```
 
+Use the read-only drift check before restarting any restored instance:
+
+```bash
+scripts/check_linuxgsm_wrapper_drift.sh \
+  --installed /servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ObeliskRun.sh
+```
+
 ## Backup Already Created
 
 Latest backup symlink:

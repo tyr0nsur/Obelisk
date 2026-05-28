@@ -208,6 +208,8 @@ Before restart:
 
 ```bash
 git -C /home/flowcommunity-ark/Obelisk status --short
+scripts/check_linuxgsm_wrapper_drift.sh \
+  --installed /servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ObeliskRun.sh
 ls -la /servidor/ark/obelisk/lib /servidor/ark/obelisk/plugins
 ls -la /servidor/ark/obelisk/state
 ```

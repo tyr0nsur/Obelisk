@@ -113,7 +113,15 @@ git status --short --ignored
 
 5. Update `CHANGELOG.md`.
 6. Confirm docs and wrappers use `state/instances/<instance-id>/` markers only.
-7. If this release candidate followed an approved runtime experiment, confirm quiet stable
+7. Before a maintenance-window deploy or restart, confirm the installed LinuxGSM wrapper
+   matches the versioned template:
+
+```bash
+scripts/check_linuxgsm_wrapper_drift.sh \
+  --installed /servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ObeliskRun.sh
+```
+
+8. If this release candidate followed an approved runtime experiment, confirm quiet stable
    posture on the same approved validation adapter target. If no runtime experiment was
    part of the release validation, keep this release check offline and skip live harness
    inspection.
@@ -122,7 +130,7 @@ git status --short --ignored
 scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map <map> --instance <instance-id>
 ```
 
-8. Tag:
+9. Tag:
 
 ```bash
 git tag -a v0.1.0 -m "Obelisk 0.1.0"

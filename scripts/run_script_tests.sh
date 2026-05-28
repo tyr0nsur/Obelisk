@@ -18,7 +18,9 @@ shell_scripts=(
     scripts/install_obelisk.sh
     scripts/install_obelisk_plugin.sh
     scripts/check_release_readiness.sh
+    scripts/check_linuxgsm_wrapper_drift.sh
     scripts/test_check_release_readiness_options.sh
+    scripts/test_check_linuxgsm_wrapper_drift.sh
     scripts/test_install_obelisk_plugin.sh
     scripts/test_install_obelisk_layout.sh
     scripts/check_obelisk_server_posture.sh
@@ -36,6 +38,7 @@ for script_path in "${shell_scripts[@]}"; do
 done
 
 scripts/test_check_obelisk_server_posture.sh
+scripts/test_check_linuxgsm_wrapper_drift.sh
 scripts/test_check_release_readiness_options.sh
 scripts/test_install_obelisk_plugin.sh
 scripts/test_obelisk_supervisor_snapshot.sh

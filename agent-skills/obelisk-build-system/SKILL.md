@@ -60,6 +60,8 @@ target_link_libraries(my_plugin PRIVATE Obelisk::obelisk_sdk)
 ```
 
 Do not install runtime artifacts directly into `ShooterGame/Binaries/Linux` except the thin `ObeliskRun.sh` wrapper.
+Before restarting a LinuxGSM instance, compare the installed wrapper with the versioned
+template using `scripts/check_linuxgsm_wrapper_drift.sh --installed <path>/ObeliskRun.sh`.
 
 ## Dependency Rules
 
