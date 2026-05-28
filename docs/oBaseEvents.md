@@ -38,7 +38,8 @@ cp -a build/plugins/oBaseEvents/oBaseEvents.so /servidor/ark/obelisk/plugins/
 If the plugin should not load, do not place it in `/servidor/ark/obelisk/plugins/`.
 On a clustered install, that directory is shared discovery scope. Use
 `instance_allowlist` to restrict which ARK server instances may initialize the plugin after
-restart.
+restart. An enabled config with an empty allowlist stays skipped unless
+`allow_all_instances` is set to `true` explicitly.
 
 ## Config
 
@@ -54,6 +55,7 @@ Default generated config:
 {
     "enabled": false,
     "log_level": "info",
+    "allow_all_instances": false,
     "instance_allowlist": [],
     "map_allowlist": [],
     "process_event": {

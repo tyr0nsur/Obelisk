@@ -26,6 +26,7 @@ namespace
     constexpr const char* kDefaultConfig = R"json({
     "enabled": false,
     "log_level": "info",
+    "allow_all_instances": false,
     "instance_allowlist": [],
     "map_allowlist": [],
     "process_event": {
@@ -51,9 +52,12 @@ namespace
 
     bool InstanceAllowed(const json& config, const char* instanceId)
     {
+        if (config.value("allow_all_instances", false))
+            return true;
+
         const auto allowlist = config.find("instance_allowlist");
         if (allowlist == config.end() || allowlist->empty())
-            return true;
+            return false;
 
         if (!IsStringArray(*allowlist))
             return false;
@@ -135,6 +139,13 @@ namespace
         {
             if (g_Api)
                 g_Api->LogError("[oBaseEvents] Config field instance_allowlist must be an array of strings.");
+            return false;
+        }
+
+        if (config.contains("allow_all_instances") && !config["allow_all_instances"].is_boolean())
+        {
+            if (g_Api)
+                g_Api->LogError("[oBaseEvents] Config field allow_all_instances must be boolean.");
             return false;
         }
 

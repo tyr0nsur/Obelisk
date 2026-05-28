@@ -150,6 +150,11 @@ Minimal shape:
 
 ```cpp
 #include <obelisk/ObeliskApi.h>
+#include <cstddef>
+
+static ObeliskApi* g_api = nullptr;
+static uint64_t g_owner_token = 0;
+static uint64_t g_pre_handle = 0;
 
 static bool OnProcessEvent(void* caller, void* function, void* params)
 {
@@ -171,7 +176,8 @@ bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out)
     out->name = "Example Plugin";
     out->version = "0.1.0";
     out->config_file = "config.json";
-    out->default_config_json = "{\"enabled\":false}\n";
+    out->default_config_json =
+        "{\"enabled\":false,\"allow_all_instances\":false,\"instance_allowlist\":[]}\n";
     return true;
 }
 
@@ -187,13 +193,33 @@ bool ObeliskPlugin_Init(ObeliskApi* api, const ObeliskPluginInitContext* context
         context->struct_size < sizeof(ObeliskPluginInitContext))
         return false;
 
+    g_api = api;
+    g_owner_token = context->plugin_owner_token;
     api->LogInfo("Plugin loaded");
 
     const int32_t validated_function_index = -1;
-    if (validated_function_index >= 0)
-        api->RegisterPreProcessEventForNameIndex(validated_function_index, OnProcessEvent);
+    if (validated_function_index >= 0 &&
+        (api->capabilities & OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES) &&
+        api->struct_size >= offsetof(ObeliskApi, UnregisterProcessEventCallbackWithOwnerToken) +
+            sizeof(api->UnregisterProcessEventCallbackWithOwnerToken))
+    {
+        g_pre_handle = api->RegisterPreProcessEventForNameIndexWithOwnerTokenHandle(
+            g_owner_token, validated_function_index, OnProcessEvent);
+        if (g_pre_handle == 0)
+            api->LogWarn("Filtered ProcessEvent callback registration was rejected");
+    }
 
     return true;
+}
+
+extern "C" __attribute__((visibility("default")))
+void ObeliskPlugin_Shutdown()
+{
+    if (g_api && g_pre_handle != 0)
+        g_api->UnregisterProcessEventCallbackWithOwnerToken(g_owner_token, g_pre_handle);
+    g_api = nullptr;
+    g_owner_token = 0;
+    g_pre_handle = 0;
 }
 ```
 

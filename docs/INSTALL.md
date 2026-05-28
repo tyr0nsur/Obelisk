@@ -120,7 +120,9 @@ ${OBELISK_ROOT}/state/instances/<id>/        per-server markers and runtime stat
 Each ARK server process must have a unique `OBELISK_INSTANCE_ID`, even when several maps
 share the same ARK cluster id, save cluster directory, plugin binaries, and Obelisk config.
 Use `instance_allowlist` in plugin config to select which maps/servers may activate a
-plugin from the shared config.
+plugin from the shared config. An enabled plugin with a missing or empty
+`instance_allowlist` does not activate by default; set `allow_all_instances=true` only when
+the plugin is intentionally safe to run on every process sharing that config.
 
 Shared config is intentional; shared mutable plugin state is not the default. Plugins that
 write runtime state should write under an instance-scoped path, or document and implement

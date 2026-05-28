@@ -3,10 +3,13 @@
 
 This tool is offline-only: it reads an existing core file and never attaches to a
 running process. It currently targets the ARK research candidates observed by
-Obelisk:
+Obelisk primary-core fixtures:
 
 - direct GUObjectArray candidate: 0x595b7e0
 - static FName root slot: 0x5956f30
+
+For second-source artifacts, pass a FName root/table verified for that artifact instead of
+reusing the primary-core slot by default.
 """
 
 from __future__ import annotations
@@ -198,7 +201,13 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Offline UObject enumeration from an ELF core dump.")
     parser.add_argument("--core", required=True, type=Path, help="Path to an existing ELF core dump.")
     parser.add_argument("--gobjects", type=parse_int, default=DEFAULT_GOBJECTS)
-    parser.add_argument("--fname-root-slot", type=parse_int, default=DEFAULT_FNAME_ROOT_SLOT)
+    parser.add_argument(
+        "--fname-root-slot",
+        type=parse_int,
+        default=DEFAULT_FNAME_ROOT_SLOT,
+        help="FName root slot for this artifact. Default is the primary-core fixture candidate; "
+        "override for second-source artifacts.",
+    )
     parser.add_argument("--max-objects", type=int, default=DEFAULT_MAX_OBJECTS)
     parser.add_argument("--name-contains")
     parser.add_argument("--class-contains")

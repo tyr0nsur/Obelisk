@@ -25,6 +25,9 @@ FORBIDDEN_ACTIVE_LINES = [
     "./arkserver restart",
     "./arkserver start",
 ]
+FORBIDDEN_STALE_PHRASES = [
+    "current TheIsland debug baseline",
+]
 
 
 def candidate_paths() -> list[Path]:
@@ -55,6 +58,16 @@ class OperationalDocGuardrailTests(unittest.TestCase):
                 if is_comment_or_example(line):
                     continue
                 for forbidden in FORBIDDEN_ACTIVE_LINES:
+                    if forbidden in line:
+                        offenders.append(f"{path.relative_to(REPO_ROOT)}:{number}: {forbidden}")
+
+        self.assertEqual(offenders, [])
+
+    def test_no_stale_operational_baseline_phrases_outside_research_docs(self) -> None:
+        offenders: list[str] = []
+        for path in candidate_paths():
+            for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+                for forbidden in FORBIDDEN_STALE_PHRASES:
                     if forbidden in line:
                         offenders.append(f"{path.relative_to(REPO_ROOT)}:{number}: {forbidden}")
 

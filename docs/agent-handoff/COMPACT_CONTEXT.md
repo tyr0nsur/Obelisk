@@ -121,8 +121,9 @@ work from repository state instead of chat history.
     debug-control shutdown, and `CallProcessEvent` pre-callback double-execution guard are
     implemented;
   - cluster/plugin config: shared config default creation is now safe for concurrent
-    multi-instance startup; mutable shared plugin state still requires plugin-level
-    locking/atomic-write design;
+    multi-instance startup; `enabled=true` now requires a matching non-empty
+    `instance_allowlist` or explicit `allow_all_instances=true`; mutable shared plugin
+    state still requires plugin-level locking/atomic-write design;
   - reflection/offline: second-source evidence is the bottleneck, and safe work should
     keep improving deterministic readiness/comparison tooling without touching live
     servers.
@@ -162,6 +163,9 @@ work from repository state instead of chat history.
   `PrimalItem.CanUse`, `PrimalItem.AllowRemoteAddToInventory`,
   `PrimalStructure.AllowStructureAccess`, and `PrimalStructure.IsAllowedToDemolish`.
   Current readiness is `4/4` comparable and blocked only by missing second-source root.
+- For new second-source artifacts, do not reuse the primary-core FName root slot by
+  default. First derive or scan a verified per-artifact FName root/table, then pass it
+  explicitly to UObjects/UFunction/ScriptStruct tools.
 - Latest restart audit:
   `docs/research/2026-05-27-ops-restart-audit-instance-id.md`
   - live `ObeliskRun.sh` exports `OBELISK_INSTANCE_ID=arkserver`

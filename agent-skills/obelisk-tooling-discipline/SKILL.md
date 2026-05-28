@@ -34,9 +34,11 @@ Development-server gated:
 - Experimental module recognizers only when paired with explicit operator approval for
   the target, marker/env changes, restart window, and rollback. Historical chat reflection
   additionally requires the exact supported `OBELISK_CHAT_REFLECTION_BINARY_SHA256`, a
-  small log limit, plugins disabled, and a post-change
-  `scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance
-  arkserver2` or equivalent explicit approved debug target.
+  small log limit, plugins disabled, and a post-change stable posture check for the exact
+  approved target. Current default validation uses
+  `scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map
+  Ragnarok --instance arkserver`; use TheIsland only if the operator explicitly reopens
+  `arkserver2` for that named window.
 
 Forbidden on live/shared instances:
 
@@ -79,9 +81,11 @@ Before adopting a tool into the workflow:
 
 - Prefer analyzer JSON evidence packs over hand-written offset summaries.
 - Every runtime capture should have both a capture artifact and a post-capture posture
-  check. Use `scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland
-  --instance arkserver2` after returning TheIsland to normal mode, or pass the explicit
-  map/instance for the approved debug target.
+  check. Use an explicit map/instance for the approved debug target. Under the current RAM
+  constraint, the default read-only validation target is
+  `scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map
+  Ragnarok --instance arkserver`; do not substitute `arkserver2` unless that instance has
+  been explicitly reopened for the capture window.
 - A tool result is not accepted unless another engineer can reproduce it from the command,
   binary hash, Obelisk commit, and copied artifacts.
 - UI-only Ghidra conclusions must be translated into text: function/address, xref path,

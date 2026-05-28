@@ -120,6 +120,13 @@ Updated: 2026-05-28
 - fact: Shared plugin config default creation is hardened for concurrent multi-instance
   startup: each process uses a unique temporary file and atomically installs the default
   only if the config path is still absent, with coverage in `PluginConfigTests`.
+- fact: Enabled plugin configs fail closed for shared clusters: `enabled=true` now
+  requires either a matching non-empty `instance_allowlist` or explicit
+  `allow_all_instances=true`. Missing/empty allowlists are skipped instead of activating
+  on every ARK process sharing the config. `map_allowlist` remains plugin-owned/inert
+  until a reliable map identity enters the ABI or plugin contract.
+- fact: The public README example uses owner-token handle registration plus explicit
+  `ObeliskPlugin_Shutdown` unregister instead of teaching legacy callback registration.
 - fact: SDK consumer fixture now treats `ObeliskPlugin_Shutdown` as optional, matching
   `PluginManager`; a no-shutdown minimal plugin fixture covers that contract.
 - fact: `PluginManager` rejects `.so` symlink candidates during plugin directory scanning
@@ -162,6 +169,10 @@ Updated: 2026-05-28
   self-comparison of the primary fixture root cannot masquerade as independent evidence.
   Readiness JSON includes per-target details for missing, inconclusive, rejected, or
   accepted targets.
+- fact: Second-source workflow docs and offline tool help now warn that the primary-core
+  FName root slot default is not reusable evidence for new artifacts. For second-source
+  work, first derive or scan a per-artifact verified FName root/table and pass it
+  explicitly before regenerating UObjects/UFunction/ScriptStruct evidence.
 - fact: `scripts/regenerate_ufunction_snapshots.py --check-layout` now supports
   UFunction layout-only verification for second-source intake. It ignores unstable
   identity/evidence indices while preserving target identity, UFunction fields, and

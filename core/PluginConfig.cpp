@@ -78,6 +78,13 @@ namespace Obelisk::Core
                 }
             }
 
+            const auto allowAllInstances = config.find("allow_all_instances");
+            if (allowAllInstances != config.end() && !allowAllInstances->is_boolean())
+            {
+                error = "allow_all_instances must be a boolean";
+                return false;
+            }
+
             return true;
         }
 
@@ -103,11 +110,19 @@ namespace Obelisk::Core
             return true;
         }
 
-        bool InstanceAllowed(const json& config, const std::string& instanceId)
+        bool InstanceAllowed(const json& config, const std::string& instanceId, bool enabled)
         {
+            if (!enabled)
+                return true;
+
+            const auto allowAllInstances = config.find("allow_all_instances");
+            if (allowAllInstances != config.end() && allowAllInstances->is_boolean() &&
+                allowAllInstances->get<bool>())
+                return true;
+
             const auto allowlist = config.find("instance_allowlist");
             if (allowlist == config.end() || allowlist->empty())
-                return true;
+                return false;
 
             for (const auto& entry : *allowlist)
             {
@@ -275,8 +290,15 @@ namespace Obelisk::Core
             }
         }
 
+        const auto allowAllInstances = existingConfig.find("allow_all_instances");
+        if (allowAllInstances != existingConfig.end() && !allowAllInstances->is_boolean())
+        {
+            error = "allow_all_instances must be a boolean";
+            return false;
+        }
+
         prepared.enabled = enabled->get<bool>();
-        prepared.instance_allowed = InstanceAllowed(existingConfig, instanceId);
+        prepared.instance_allowed = InstanceAllowed(existingConfig, instanceId, prepared.enabled);
 
         return true;
     }

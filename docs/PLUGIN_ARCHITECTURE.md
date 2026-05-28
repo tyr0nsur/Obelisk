@@ -73,7 +73,10 @@ Config files should include:
 
 - `enabled`: boolean defaulting to `false` for experimental plugins.
 - `instance_allowlist`: list of `OBELISK_INSTANCE_ID` values where the plugin may run.
-- `map_allowlist`: optional plugin-owned map filter when behavior genuinely depends on map.
+- `allow_all_instances`: explicit boolean escape hatch for operators who intentionally
+  want `enabled=true` to run on every instance sharing the config.
+- `map_allowlist`: optional plugin-owned map filter only after the plugin has a reliable
+  map identity source; the runtime does not enforce this field today.
 - `log_level`: plugin-local verbosity.
 - Feature gates for every risky subsystem, such as `http.enabled`,
   `process_event.enabled`, and `discovery.enabled`.
@@ -86,10 +89,11 @@ with `enabled: false`. If metadata, default config, or an existing config is inv
 the runtime rejects the plugin before calling `ObeliskPlugin_Init`.
 
 The runtime interprets the common activation envelope before initialization:
-`enabled=false` or a non-matching `instance_allowlist` skips
-`ObeliskPlugin_Init` and closes the shared object. Plugin-specific feature gates remain
-owned by the plugin and must be checked before registering callbacks or starting
-background work.
+`enabled=false`, a missing/empty `instance_allowlist`, or a non-matching
+`instance_allowlist` skips `ObeliskPlugin_Init` and closes the shared object. An enabled
+plugin may run on every instance only when `allow_all_instances=true` is present. Plugin-
+specific feature gates remain owned by the plugin and must be checked before registering
+callbacks or starting background work.
 
 In clustered deployments, multiple ARK processes may share the same `${OBELISK_CONFIG_DIR}`
 and plugin binaries. Plugin config should therefore be treated as shared, mostly-static
@@ -126,8 +130,9 @@ The stable operational flow is:
 4. Restart only the target ARK instance.
 
 Dropping a plugin into `plugins/` is therefore the discovery and config-preparation step.
-Runtime activation still requires `enabled=true` and a matching `instance_allowlist`.
-Plugins that should not even be discovered must stay outside the plugin directory.
+Runtime activation still requires `enabled=true` and either a matching
+`instance_allowlist` or explicit `allow_all_instances=true`. Plugins that should not even
+be discovered must stay outside the plugin directory.
 
 ## Lifecycle
 

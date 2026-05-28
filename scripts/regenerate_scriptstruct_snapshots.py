@@ -48,7 +48,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--gobjects", type=inspector.parse_int, default=inspector.uobjects.DEFAULT_GOBJECTS)
-    parser.add_argument("--fname-root-slot", type=inspector.parse_int, default=inspector.uobjects.DEFAULT_FNAME_ROOT_SLOT)
+    parser.add_argument(
+        "--fname-root-slot",
+        type=inspector.parse_int,
+        default=inspector.uobjects.DEFAULT_FNAME_ROOT_SLOT,
+        help="FName root slot for this artifact. Default is the primary-core fixture candidate; "
+        "override for second-source artifacts.",
+    )
     parser.add_argument("--max-object-scan", type=int, help="Override manifest max_object_scan.")
     parser.add_argument("--obelisk-commit", help="Commit recorded in snapshot evidence. Defaults to current HEAD.")
     parser.add_argument("--artifact-kind", help="Sanitized source artifact kind, such as offline_core.")

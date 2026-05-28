@@ -84,11 +84,12 @@ git status --short --ignored
 For runtime/server work, also run the posture check after the server is restored:
 
 ```bash
-scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance arkserver2
+scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map Ragnarok --instance arkserver
 ```
 
 Use explicit `--map` and `--instance`; do not rely on script defaults during Obelisk debug
-rounds.
+rounds. Under current RAM constraints, keep `arkserver2` / TheIsland stopped unless the
+operator explicitly reopens it for a named window.
 
 Check that no files matching these patterns are staged:
 

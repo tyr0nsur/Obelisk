@@ -184,8 +184,10 @@ Interpret the snapshot counters this way:
 - `rejected_chat_lines=0`: no bounded rejection line was logged. This can also mean the
   diagnostic path or log limit suppressed rejection details.
 
-Rollback is marker-only plus a controlled restart during the approved debug window. Do not
-run this block from an ordinary documentation review or unattended round:
+Rollback is marker-only plus a controlled restart during the approved debug window. The
+commands below are an example for an explicitly approved TheIsland fallback window; do not
+run them from an ordinary documentation review, unattended round, or while `arkserver2`
+is intentionally stopped for RAM:
 
 ```bash
 # Approved debug-window rollback only:
@@ -199,5 +201,7 @@ cat /servidor/ark/obelisk/dumps/supervisor/latest/chat-reflection.txt
 ```
 
 After rollback, `chat_reflection_marker=disabled` is expected. Do not remove
-`enable-process-event-hook` or `disable-plugins` for this rollback; they are part of the
-current TheIsland debug baseline.
+`enable-process-event-hook` or `disable-plugins` for this rollback if that approved
+fallback profile uses them. The current default development/test harness is
+`arkserver` / Ragnarok; `arkserver2` / TheIsland should stay stopped unless the operator
+explicitly reopens it for a named window.

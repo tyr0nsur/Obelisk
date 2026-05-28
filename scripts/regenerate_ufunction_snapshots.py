@@ -52,6 +52,8 @@ def parse_args() -> argparse.Namespace:
         "--fname-root-slot",
         type=inspector.parse_int,
         default=inspector.uobjects.DEFAULT_FNAME_ROOT_SLOT,
+        help="FName root slot for this artifact. Default is the primary-core fixture candidate; "
+        "override for second-source artifacts.",
     )
     parser.add_argument("--max-object-scan", type=int, help="Override manifest max_object_scan.")
     parser.add_argument("--obelisk-commit", help="Commit recorded in snapshot evidence. Defaults to current HEAD.")

@@ -223,6 +223,45 @@ namespace
         Require(!prepared.instance_allowed, "non-matching instance_allowlist was allowed");
     }
 
+    void TestEnabledConfigRequiresExplicitInstanceScope(const fs::path& root)
+    {
+        Obelisk::Core::PreparedPluginConfig prepared;
+        std::string error;
+
+        WriteFile(root / "missing_allowlist" / "config.json", R"({"enabled":true})");
+        Require(Prepare(Metadata("missing_allowlist"), root, prepared, error),
+                "enabled config without instance scope was rejected instead of skipped");
+        Require(prepared.enabled, "enabled config without instance scope did not set prepared enabled");
+        Require(!prepared.instance_allowed, "enabled config without instance scope was allowed");
+
+        WriteFile(root / "empty_allowlist" / "config.json",
+                  R"({"enabled":true,"instance_allowlist":[]})");
+        Require(Prepare(Metadata("empty_allowlist"), root, prepared, error),
+                "enabled config with empty instance_allowlist was rejected instead of skipped");
+        Require(prepared.enabled, "enabled config with empty allowlist did not set prepared enabled");
+        Require(!prepared.instance_allowed, "enabled config with empty instance_allowlist was allowed");
+    }
+
+    void TestAllowAllInstancesIsExplicitOptIn(const fs::path& root)
+    {
+        Obelisk::Core::PreparedPluginConfig prepared;
+        std::string error;
+
+        WriteFile(root / "allow_all_instances" / "config.json",
+                  R"({"enabled":true,"allow_all_instances":true,"instance_allowlist":[]})");
+        Require(Prepare(Metadata("allow_all_instances"), root, prepared, error),
+                "allow_all_instances config was rejected");
+        Require(prepared.enabled, "allow_all_instances config did not set prepared enabled");
+        Require(prepared.instance_allowed, "allow_all_instances did not allow the instance");
+
+        WriteFile(root / "bad_allow_all_instances" / "config.json",
+                  R"({"enabled":true,"allow_all_instances":"yes","instance_allowlist":["arkserver"]})");
+        Require(!Prepare(Metadata("bad_allow_all_instances"), root, prepared, error),
+                "non-boolean allow_all_instances was accepted");
+        Require(error.find("allow_all_instances") != std::string::npos,
+                "allow_all_instances error was unclear");
+    }
+
     void TestRejectsCorruptExistingJson(const fs::path& root)
     {
         WriteFile(root / "corrupt_existing" / "config.json", "{ \"enabled\": false,");
@@ -268,6 +307,8 @@ int main()
         TestAcceptsExistingValidConfigWithoutOverwrite(root);
         TestConcurrentDefaultCreation(root);
         TestExistingConfigCanDisallowInstance(root);
+        TestEnabledConfigRequiresExplicitInstanceScope(root);
+        TestAllowAllInstancesIsExplicitOptIn(root);
         TestRejectsCorruptExistingJson(root);
         TestRejectsMistypedExistingAllowlist(root);
         fs::remove_all(root);
