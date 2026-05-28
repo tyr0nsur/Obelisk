@@ -86,6 +86,8 @@ class ObeliskCliTests(unittest.TestCase):
             experimental.mkdir(parents=True)
             (experimental / "enable-process-event-hook").write_text("", encoding="utf-8")
             (experimental / "disable-plugins").write_text("", encoding="utf-8")
+            (experimental / "allow-observer-debug-window").write_text("", encoding="utf-8")
+            (experimental / "allow-experimental-observers").write_text("", encoding="utf-8")
             (experimental / "enable-chat-reflection").write_text("", encoding="utf-8")
 
             result = run_cli(root, "instances", "list")
@@ -96,7 +98,10 @@ class ObeliskCliTests(unittest.TestCase):
             self.assertIn("missing=disable-plugins", result.stdout)
             self.assertIn("arkserver2", result.stdout)
             self.assertIn("experimental", result.stdout)
-            self.assertIn("forbidden=enable-chat-reflection", result.stdout)
+            self.assertIn(
+                "forbidden=allow-experimental-observers,allow-observer-debug-window,enable-chat-reflection",
+                result.stdout,
+            )
 
     def test_instances_list_treats_forbidden_symlink_as_experimental(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

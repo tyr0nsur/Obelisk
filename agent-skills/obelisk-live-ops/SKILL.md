@@ -87,7 +87,9 @@ scripts/check_obelisk_server_posture.sh --expect-stable \
 - Enable one marker/config gate at a time and record the exact change.
 - Use instance markers under `state/instances/<instance-id>/`; map markers are obsolete.
 - Experimental runtime observers must have their own instance markers in addition to env
-  gates and `allow-experimental-observers` on the same instance. Current observer markers:
+  gates, `OBELISK_WRAPPER_PROFILE=observer-debug`, `allow-observer-debug-window`, and
+  `allow-experimental-observers` on the same instance. Current observer markers:
+  - `allow-observer-debug-window`
   - `allow-experimental-observers`
   - `enable-chat-reflection`
   - `enable-structure-reflection`
@@ -103,6 +105,8 @@ scripts/check_obelisk_server_posture.sh --expect-stable \
 - Never enable `ReflectionScanner` on `arkserver` / Ragnarok while users are active. Use
   `arkserver2` / TheIsland only with a specific operator-approved debug window, plugins
   disabled, copied-log evidence, marker/env rollback, and shutdown at the end.
+- Never persist `OBELISK_WRAPPER_PROFILE=observer-debug` in a normal service environment.
+  It is a per-launch debug-window profile for the normal wrapper.
 - Keep `OBELISK_PE_TRACE_LIMIT=0` by default; use short trace windows only for approved
   evidence windows on `arkserver2`.
 - Do not start `arkserver2` unless it is the approved scoped test target, and stop it

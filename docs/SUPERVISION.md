@@ -149,7 +149,6 @@ is intentionally stopped for RAM:
 # /servidor/ark/arkserver2 restart
 cd /home/flowcommunity-ark/Obelisk
 scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance arkserver2
-scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map TheIsland --instance arkserver2
 OBELISK_SUPERVISOR_INSTANCE=arkserver2 OBELISK_SUPERVISOR_MAP=TheIsland scripts/obelisk_supervisor_snapshot.sh
 cat /servidor/ark/obelisk/dumps/supervisor/latest/chat-reflection.txt
 ```

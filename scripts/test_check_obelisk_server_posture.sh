@@ -236,6 +236,7 @@ expect_failure debug-control-forbidden \
 
 for marker in \
     allow-ptrace \
+    allow-observer-debug-window \
     allow-experimental-observers \
     enable-debug-control \
     enable-native-exec-probes \

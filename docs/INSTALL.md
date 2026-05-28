@@ -195,9 +195,13 @@ state/instances/<instance-id>/enable-inventory-reflection  # experimental, metad
 state/instances/<instance-id>/enable-structure-reflection  # experimental, metadata-only
 ```
 
-Experimental observer markers do nothing unless `allow-experimental-observers` is also
-present for the same instance. Use that marker only inside an approved debug window and
-remove it before returning the instance to stable posture.
+The normal LinuxGSM wrapper is protected by default. If any experimental observer marker is
+present for the selected instance, it refuses to launch unless the approved debug window
+uses `OBELISK_WRAPPER_PROFILE=observer-debug` and the same instance has
+`allow-observer-debug-window`. Experimental observer markers still do nothing unless
+`allow-experimental-observers` is also present for the same instance. Use those markers
+only inside an approved debug window and remove them before returning the instance to
+stable posture.
 
 `enable-chat-reflection` makes the wrapper set:
 
@@ -241,9 +245,9 @@ environment gate:
 OBELISK_CHAT_REFLECTION_LOG_TEXT=1
 ```
 
-Rollback is removing the marker and restarting the instance. The stable production posture
-is still process-event hook enabled, plugins disabled for debug, and chat reflection off
-unless a development validation run explicitly needs it.
+Rollback is removing the observer/debug-window markers and restarting the instance. The
+stable production posture is still process-event hook enabled, plugins disabled for debug,
+and all experimental observers off.
 
 Map markers such as `enable-process-event-hook-ragnarok` are obsolete and are not read by
 the release wrapper.
@@ -277,3 +281,11 @@ This validates the core ProcessEvent hook without loading experimental plugins.
 Use `arkserver2` / TheIsland for debug/development markers and validation windows only
 after explicit operator approval. It starts from powered off and must be stopped again
 after the scoped test. Keep `arkserver` / Ragnarok protected while users are active.
+
+Stable production posture also requires no forbidden experimental marker entries for the
+instance, including observer, scanner, debug-control, native-exec, ptrace, global callback,
+or public `CallProcessEvent` markers. Prove the running process with:
+
+```bash
+scripts/check_obelisk_server_posture.sh --expect-stable --map <map> --instance <instance-id>
+```

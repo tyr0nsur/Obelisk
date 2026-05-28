@@ -87,7 +87,53 @@ enable_marker() {
     return 1
 }
 
+marker_entry_exists() {
+    local feature="$1"
+    local instance="${OBELISK_INSTANCE_ID:-}"
+    local instance_dir="${OBELISK_ROOT}/state/instances/${instance}"
+    local marker="${instance_dir}/${feature}"
+
+    [[ "${instance}" =~ ^[A-Za-z0-9_-]+$ ]] || return 1
+    [[ "${feature}" =~ ^[A-Za-z0-9_-]+$ ]] || return 1
+    [[ -d "${instance_dir}" && ! -L "${instance_dir}" ]] || return 1
+    [[ -e "${marker}" || -L "${marker}" ]]
+}
+
+validate_observer_wrapper_profile() {
+    local profile="${OBELISK_WRAPPER_PROFILE:-stable}"
+
+    case "${profile}" in
+        stable)
+            local marker
+            for marker in \
+                allow-observer-debug-window \
+                allow-experimental-observers \
+                enable-chat-reflection \
+                enable-inventory-reflection \
+                enable-structure-reflection
+            do
+                if marker_entry_exists "${marker}"; then
+                    echo "Experimental observer marker ${marker} is present for ${OBELISK_INSTANCE_ID}; refusing stable wrapper launch." >&2
+                    exit 1
+                fi
+            done
+            ;;
+        observer-debug)
+            if ! enable_marker "allow-observer-debug-window"; then
+                echo "OBELISK_WRAPPER_PROFILE=observer-debug requires allow-observer-debug-window marker for ${OBELISK_INSTANCE_ID}." >&2
+                exit 1
+            fi
+            ;;
+        *)
+            echo "Unknown OBELISK_WRAPPER_PROFILE '${profile}'. Expected stable or observer-debug." >&2
+            exit 1
+            ;;
+    esac
+}
+
 configure_chat_reflection() {
+    [[ "${OBELISK_WRAPPER_PROFILE:-stable}" == "observer-debug" ]] || return 0
+    enable_marker "allow-observer-debug-window" || return 0
     enable_marker "allow-experimental-observers" || return 0
     enable_marker "enable-chat-reflection" || return 0
 
@@ -100,6 +146,8 @@ configure_chat_reflection() {
 }
 
 configure_structure_reflection() {
+    [[ "${OBELISK_WRAPPER_PROFILE:-stable}" == "observer-debug" ]] || return 0
+    enable_marker "allow-observer-debug-window" || return 0
     enable_marker "allow-experimental-observers" || return 0
     enable_marker "enable-structure-reflection" || return 0
 
@@ -109,6 +157,8 @@ configure_structure_reflection() {
 }
 
 configure_inventory_reflection() {
+    [[ "${OBELISK_WRAPPER_PROFILE:-stable}" == "observer-debug" ]] || return 0
+    enable_marker "allow-observer-debug-window" || return 0
     enable_marker "allow-experimental-observers" || return 0
     enable_marker "enable-inventory-reflection" || return 0
 
@@ -120,6 +170,7 @@ configure_inventory_reflection() {
 case "${1:-}" in
     Ragnarok*)
         export OBELISK_INSTANCE_ID="${OBELISK_INSTANCE_ID:-arkserver}"
+        validate_observer_wrapper_profile
         enable_marker "enable-process-event-hook" && export OBELISK_ENABLE_PROCESS_EVENT_HOOK=1
         enable_marker "disable-plugins" && export OBELISK_DISABLE_PLUGINS=1
         enable_marker "allow-ptrace" && export OBELISK_DEBUG_ALLOW_PTRACE=1
@@ -132,6 +183,7 @@ case "${1:-}" in
         ;;
     TheIsland*)
         export OBELISK_INSTANCE_ID="${OBELISK_INSTANCE_ID:-arkserver2}"
+        validate_observer_wrapper_profile
         enable_marker "enable-process-event-hook" && export OBELISK_ENABLE_PROCESS_EVENT_HOOK=1
         enable_marker "disable-plugins" && export OBELISK_DISABLE_PLUGINS=1
         enable_marker "allow-ptrace" && export OBELISK_DEBUG_ALLOW_PTRACE=1

@@ -255,6 +255,7 @@ if [[ "${EXPECT_STABLE}" == "1" ]]; then
     forbid_env OBELISK_REFLECTION_LOG_FNAME_REJECTS
 
     forbid_marker allow-ptrace
+    forbid_marker allow-observer-debug-window
     forbid_marker allow-experimental-observers
     forbid_marker enable-debug-control
     forbid_marker enable-native-exec-probes

@@ -50,9 +50,10 @@ Own these areas:
 - Stable posture must reject ReflectionScanner, broad ProcessEvent tracing
   (`OBELISK_PE_TRACE_LIMIT` non-zero), global callbacks, and public `CallProcessEvent`
   unless an explicit debug-window workflow says otherwise.
-- Experimental observer wrappers require both the observer-specific marker and
-  `allow-experimental-observers` on the same instance; stable posture must reject that
-  allow marker.
+- Experimental observer wrappers require `OBELISK_WRAPPER_PROFILE=observer-debug`, the
+  `allow-observer-debug-window` marker, the observer-specific marker, and
+  `allow-experimental-observers` on the same instance; stable posture must reject those
+  observer/debug-window markers and observer env.
 - Treat callback ownership as runtime-critical: callbacks registered by a plugin must be
   unregistered if init fails, before unload, and before `dlclose`.
 - Reject plugin callback registrations that cannot be attributed to the currently

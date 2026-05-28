@@ -96,7 +96,7 @@ For an approved validation target, confirm stable posture with explicit map and 
 values:
 
 ```bash
-scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection \
+scripts/check_obelisk_server_posture.sh --expect-stable \
   --map <map> --instance <instance-id>
 ```
 

@@ -123,15 +123,29 @@ prepare_root "${root_marker}"
 : > "${root_marker}/state/instances/arkserver2/enable-structure-reflection"
 : > "${root_marker}/state/instances/arkserver2/enable-inventory-reflection"
 : > "${root_marker}/state/instances/arkserver2/enable-chat-reflection"
-run_wrapper "${root_marker}" "${capture_marker}" TheIsland?listen
-
-assert_contains "${capture_marker}" '^OBELISK_INSTANCE_ID=arkserver2$'
-assert_not_contains "${capture_marker}" '^OBELISK_ENABLE_CHAT_REFLECTION='
-assert_not_contains "${capture_marker}" '^OBELISK_ENABLE_INVENTORY_REFLECTION='
-assert_not_contains "${capture_marker}" '^OBELISK_ENABLE_STRUCTURE_REFLECTION='
+expect_wrapper_failure observer-marker-without-wrapper-approval env \
+    OBELISK_ROOT="${root_marker}" \
+    OBELISK_WRAPPER_CAPTURE="${TMP_DIR}/observer-marker-without-wrapper-approval.env" \
+    "${WRAPPER}" TheIsland?listen
 
 : > "${root_marker}/state/instances/arkserver2/allow-experimental-observers"
-run_wrapper "${root_marker}" "${capture_marker}" TheIsland?listen
+expect_wrapper_failure observer-allow-marker-without-wrapper-approval env \
+    OBELISK_ROOT="${root_marker}" \
+    OBELISK_WRAPPER_CAPTURE="${TMP_DIR}/observer-allow-marker-without-wrapper-approval.env" \
+    "${WRAPPER}" TheIsland?listen
+expect_wrapper_failure observer-debug-profile-without-marker env \
+    OBELISK_ROOT="${root_marker}" \
+    OBELISK_WRAPPER_CAPTURE="${TMP_DIR}/observer-debug-profile-without-marker.env" \
+    OBELISK_WRAPPER_PROFILE=observer-debug \
+    "${WRAPPER}" TheIsland?listen
+: > "${root_marker}/state/instances/arkserver2/allow-observer-debug-window"
+(
+    cd "${RUN_CWD}"
+    OBELISK_ROOT="${root_marker}" \
+    OBELISK_WRAPPER_CAPTURE="${capture_marker}" \
+    OBELISK_WRAPPER_PROFILE=observer-debug \
+    "${WRAPPER}" TheIsland?listen
+)
 
 assert_contains "${capture_marker}" '^OBELISK_ENABLE_CHAT_REFLECTION=1$'
 assert_contains "${capture_marker}" '^OBELISK_CHAT_REFLECTION_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520$'
@@ -150,22 +164,21 @@ mkdir -p "${root_ragnarok_stale}/state/instances/arkserver"
 : > "${root_ragnarok_stale}/state/instances/arkserver/enable-chat-reflection"
 : > "${root_ragnarok_stale}/state/instances/arkserver/enable-inventory-reflection"
 : > "${root_ragnarok_stale}/state/instances/arkserver/enable-structure-reflection"
-run_wrapper "${root_ragnarok_stale}" "${capture_ragnarok_stale}" Ragnarok?listen
-
-assert_contains "${capture_ragnarok_stale}" '^OBELISK_INSTANCE_ID=arkserver$'
-assert_not_contains "${capture_ragnarok_stale}" '^OBELISK_ENABLE_CHAT_REFLECTION='
-assert_not_contains "${capture_ragnarok_stale}" '^OBELISK_CHAT_REFLECTION_BINARY_SHA256='
-assert_not_contains "${capture_ragnarok_stale}" '^OBELISK_CHAT_REFLECTION_LOG_LIMIT='
-assert_not_contains "${capture_ragnarok_stale}" '^OBELISK_ENABLE_INVENTORY_REFLECTION='
-assert_not_contains "${capture_ragnarok_stale}" '^OBELISK_INVENTORY_REFLECTION_BINARY_SHA256='
-assert_not_contains "${capture_ragnarok_stale}" '^OBELISK_INVENTORY_REFLECTION_LOG_LIMIT='
-assert_not_contains "${capture_ragnarok_stale}" '^OBELISK_ENABLE_STRUCTURE_REFLECTION='
-assert_not_contains "${capture_ragnarok_stale}" '^OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256='
-assert_not_contains "${capture_ragnarok_stale}" '^OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT='
+expect_wrapper_failure ragnarok-stale-observer-markers env \
+    OBELISK_ROOT="${root_ragnarok_stale}" \
+    OBELISK_WRAPPER_CAPTURE="${capture_ragnarok_stale}" \
+    "${WRAPPER}" Ragnarok?listen
+: > "${root_ragnarok_stale}/state/instances/arkserver/allow-experimental-observers"
+: > "${root_ragnarok_stale}/state/instances/arkserver/allow-observer-debug-window"
+expect_wrapper_failure ragnarok-observer-markers-stable-profile env \
+    OBELISK_ROOT="${root_ragnarok_stale}" \
+    OBELISK_WRAPPER_CAPTURE="${TMP_DIR}/ragnarok-observer-markers-stable-profile.env" \
+    "${WRAPPER}" Ragnarok?listen
 
 root_override="${TMP_DIR}/root-override"
 capture_override="${TMP_DIR}/override.env"
 prepare_root "${root_override}"
+: > "${root_override}/state/instances/arkserver2/allow-observer-debug-window"
 : > "${root_override}/state/instances/arkserver2/allow-experimental-observers"
 : > "${root_override}/state/instances/arkserver2/enable-structure-reflection"
 : > "${root_override}/state/instances/arkserver2/enable-inventory-reflection"
@@ -173,6 +186,7 @@ prepare_root "${root_override}"
     cd "${RUN_CWD}"
     OBELISK_ROOT="${root_override}" \
     OBELISK_WRAPPER_CAPTURE="${capture_override}" \
+    OBELISK_WRAPPER_PROFILE=observer-debug \
     OBELISK_INVENTORY_REFLECTION_LOG_LIMIT=5 \
     OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT=7 \
     "${WRAPPER}" TheIsland?listen
@@ -194,15 +208,19 @@ assert_not_contains "${capture_wrong_instance}" '^OBELISK_ENABLE_STRUCTURE_REFLE
 
 capture_directory_marker="${TMP_DIR}/directory-marker.env"
 mkdir -p "${root_invalid}/state/instances/arkserver2/enable-inventory-reflection"
-run_wrapper "${root_invalid}" "${capture_directory_marker}" TheIsland?listen
-assert_not_contains "${capture_directory_marker}" '^OBELISK_ENABLE_INVENTORY_REFLECTION='
+expect_wrapper_failure directory-observer-marker env \
+    OBELISK_ROOT="${root_invalid}" \
+    OBELISK_WRAPPER_CAPTURE="${capture_directory_marker}" \
+    "${WRAPPER}" TheIsland?listen
 
 capture_symlink_marker="${TMP_DIR}/symlink-marker.env"
 rm -rf "${root_invalid}/state/instances/arkserver2/enable-inventory-reflection"
 : > "${TMP_DIR}/external-inventory-marker"
 ln -s "${TMP_DIR}/external-inventory-marker" "${root_invalid}/state/instances/arkserver2/enable-inventory-reflection"
-run_wrapper "${root_invalid}" "${capture_symlink_marker}" TheIsland?listen
-assert_not_contains "${capture_symlink_marker}" '^OBELISK_ENABLE_INVENTORY_REFLECTION='
+expect_wrapper_failure symlink-observer-marker env \
+    OBELISK_ROOT="${root_invalid}" \
+    OBELISK_WRAPPER_CAPTURE="${capture_symlink_marker}" \
+    "${WRAPPER}" TheIsland?listen
 
 capture_traversal="${TMP_DIR}/traversal.env"
 run_wrapper_with_instance "${root_marker}" "${capture_traversal}" '../arkserver2' TheIsland?listen

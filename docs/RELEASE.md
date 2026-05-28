@@ -127,7 +127,7 @@ scripts/check_linuxgsm_wrapper_drift.sh \
    inspection.
 
 ```bash
-scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map <map> --instance <instance-id>
+scripts/check_obelisk_server_posture.sh --expect-stable --map <map> --instance <instance-id>
 ```
 
 9. Tag:

@@ -64,6 +64,14 @@ Updated: 2026-05-28
   `${OBELISK_ROOT}/plugins` so inherited parent environments cannot redirect plugin
   loading outside the central install root. The live wrapper was refreshed without
   restart; backup: `/home/flowcommunity-ark/backups/ObeliskRun.sh.20260528-031006.bak`.
+- fact: The versioned normal LinuxGSM wrapper now uses `OBELISK_WRAPPER_PROFILE=stable` by
+  default and refuses to launch when `allow-observer-debug-window`,
+  `allow-experimental-observers`, `enable-chat-reflection`,
+  `enable-inventory-reflection`, or `enable-structure-reflection` exists for the selected
+  instance. An approved observer window must use `OBELISK_WRAPPER_PROFILE=observer-debug`
+  plus a regular non-symlink `allow-observer-debug-window` marker before observer env can
+  be exported. This is repository state only until a future operator-approved wrapper
+  deploy; do not refresh the live wrapper while users are active.
 - fact: Runtime-side debug/scanner gates now require env+instance marker, so direct
   `LD_PRELOAD` launches cannot enable ProcessEvent hook, ptrace, debug-control,
   ReflectionScanner, or native exec probes by env alone. Marker names:
@@ -82,6 +90,7 @@ Updated: 2026-05-28
   powered off. Start it only with explicit operator approval for a scoped test, then shut
   it down afterward. Keep `arkserver` / Ragnarok untouched while users are active.
 - fact: `sdk.structures` runtime observation now requires
+  `OBELISK_WRAPPER_PROFILE=observer-debug`, `allow-observer-debug-window`,
   `allow-experimental-observers`, the observer marker, and env/SHA/budget gates for the
   same instance:
   `/servidor/ark/obelisk/state/instances/<instance>/enable-structure-reflection`.
@@ -96,11 +105,13 @@ Updated: 2026-05-28
   FName filter passes. Non-structure `ProcessEvent` calls no longer consume the bounded
   observation budget.
 - fact: `sdk.inventory` now has an internal hook-side observer behind
+  `OBELISK_WRAPPER_PROFILE=observer-debug`, `allow-observer-debug-window`,
   `allow-experimental-observers`, `enable-inventory-reflection`, env/SHA, and explicit
   non-zero budget gates. It logs metadata only, filters exact inventory FNames before
   reserving budget, and has no public SDK callback or gameplay mutation path.
 - fact: Chat, inventory, and structure ProcessEvent observers all require runtime-side
-  env+instance-marker gates plus `allow-experimental-observers` and binary SHA validation
+  env+instance-marker gates plus `OBELISK_WRAPPER_PROFILE=observer-debug`,
+  `allow-observer-debug-window`, `allow-experimental-observers`, and binary SHA validation
   before activation. Chat now matches the inventory/structure marker discipline with
   `enable-chat-reflection`.
 - fact: Plugin API ProcessEvent registration wrappers reject null callbacks and negative

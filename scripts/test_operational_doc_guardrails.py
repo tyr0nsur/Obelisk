@@ -139,6 +139,29 @@ class OperationalDocGuardrailTests(unittest.TestCase):
         self.assertNotIn("Default: arkserver", script)
         self.assertNotIn("Default: Ragnarok", script)
 
+    def test_active_docs_use_expect_stable_as_canonical_posture_check(self) -> None:
+        offenders: list[str] = []
+        for path in candidate_paths():
+            relative = path.relative_to(REPO_ROOT)
+            if relative.parts[0] == "scripts":
+                continue
+            for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+                if "--expect-stable --forbid-chat-reflection" in line:
+                    offenders.append(f"{relative}:{number}")
+
+        self.assertEqual(offenders, [])
+
+    def test_observer_debug_profile_is_documented_with_window_marker(self) -> None:
+        install_doc = (REPO_ROOT / "docs" / "INSTALL.md").read_text(encoding="utf-8")
+        status_doc = (REPO_ROOT / "docs" / "STATUS.md").read_text(encoding="utf-8")
+        live_ops_skill = (REPO_ROOT / "agent-skills" / "obelisk-live-ops" / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
+
+        for text in (install_doc, status_doc, live_ops_skill):
+            self.assertIn("OBELISK_WRAPPER_PROFILE=observer-debug", text)
+            self.assertIn("allow-observer-debug-window", text)
+
     def test_skills_reference_canonical_public_api_header(self) -> None:
         offenders: list[str] = []
         for path in sorted((REPO_ROOT / "agent-skills").rglob("SKILL.md")):
