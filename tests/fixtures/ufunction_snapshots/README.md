@@ -51,7 +51,9 @@ python3 scripts/compare_reflection_snapshots.py \
 
 Use `--json` with readiness reports when creating evidence packs. The JSON includes
 per-module `target_details` entries with each target key, fixture path, comparability,
-block reasons, and second-source status.
+block reasons, second-source status, and a top-level `promotion_gate` summary with a
+boolean `ready` value plus blocker counts. Target-set entries missing from the base root
+are `not_applicable` for second-source status and block the gate as missing base coverage.
 
 When this readiness report is acting as a promotion gate, add
 `--fail-on-readiness-gaps` or run

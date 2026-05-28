@@ -248,6 +248,25 @@ def property_layout(prop: dict[str, Any], *, strict_identity_indices: bool) -> d
     return result
 
 
+def property_block_reasons(prop: dict[str, Any], *, index: int) -> list[str]:
+    reasons: list[str] = []
+    prefix = f"property[{index}]"
+    if prop.get("status") != "candidate":
+        reasons.append(f"{prefix}_status_{prop.get('status')}")
+    if prop.get("reject_reasons", []):
+        reasons.append(f"{prefix}_has_reject_reasons")
+    for nested_key in ("array_inner_candidate", "struct_type_candidate"):
+        nested = prop.get(nested_key)
+        if not isinstance(nested, dict):
+            continue
+        nested_prefix = f"{prefix}_{nested_key}"
+        if nested.get("status") != "candidate":
+            reasons.append(f"{nested_prefix}_status_{nested.get('status')}")
+        if nested.get("reject_reasons", []):
+            reasons.append(f"{nested_prefix}_has_reject_reasons")
+    return reasons
+
+
 def evidence_reasons(payload: dict[str, Any]) -> list[str]:
     evidence = payload.get("evidence")
     if not isinstance(evidence, dict):
@@ -304,6 +323,14 @@ def comparable_layout(payload: dict[str, Any], *, strict_identity_indices: bool)
     properties = chain.get("properties")
     if not isinstance(properties, list):
         return None, ["missing_property_list"]
+    property_reasons: list[str] = []
+    for index, prop in enumerate(properties):
+        if not isinstance(prop, dict):
+            property_reasons.append(f"property[{index}]_not_object")
+            continue
+        property_reasons.extend(property_block_reasons(prop, index=index))
+    if property_reasons:
+        return None, property_reasons
 
     layout = {
         "schema": payload.get("schema"),
@@ -325,7 +352,6 @@ def comparable_layout(payload: dict[str, Any], *, strict_identity_indices: bool)
             "properties": [
                 property_layout(prop, strict_identity_indices=strict_identity_indices)
                 for prop in properties
-                if isinstance(prop, dict)
             ],
         },
     }
@@ -358,8 +384,6 @@ def comparable_layout(payload: dict[str, Any], *, strict_identity_indices: bool)
             }
         )
         layout["property_chain"]["properties_size"] = chain.get("properties_size")
-    if len(layout["property_chain"]["properties"]) != len(properties):
-        return None, ["non_object_property_entry"]
     return layout, []
 
 
@@ -560,6 +584,21 @@ def readiness_report(
         "second_source_missing": 0,
     }
 
+    def promotion_gate_summary() -> dict[str, Any]:
+        blockers = []
+        if totals["blocked"]:
+            blockers.append({"reason": "blocked_base_targets", "count": totals["blocked"]})
+        if totals["second_source_rejected"]:
+            blockers.append({"reason": "rejected_second_source", "count": totals["second_source_rejected"]})
+        if totals["second_source_inconclusive"]:
+            blockers.append({"reason": "inconclusive_second_source", "count": totals["second_source_inconclusive"]})
+        if totals["second_source_missing"]:
+            blockers.append({"reason": "missing_second_source", "count": totals["second_source_missing"]})
+        return {
+            "ready": not blockers,
+            "blockers": blockers,
+        }
+
     def module_bucket(module_key: str, *, schema: str, module: str) -> dict[str, Any]:
         return modules.setdefault(
             module_key,
@@ -586,7 +625,7 @@ def readiness_report(
                 "path": None,
                 "comparable": False,
                 "block_reasons": ["missing_base_snapshot"],
-                "second_source_status": "missing",
+                "second_source_status": "not_applicable",
             }
             bucket["targets"] += 1
             bucket["blocked"] += 1
@@ -597,7 +636,6 @@ def readiness_report(
             bucket["target_details"].append(target_detail)
             totals["targets"] += 1
             totals["blocked"] += 1
-            totals["second_source_missing"] += 1
             continue
         payload = entry["payload"]
         schema = schema_label(payload.get("schema", ""))
@@ -648,6 +686,7 @@ def readiness_report(
         "target_filters": sorted(target_filters),
         "second_source_status": "compared" if candidate is not None else "missing_candidate_root",
         "totals": totals,
+        "promotion_gate": promotion_gate_summary(),
         "modules": [modules[key] for key in sorted(modules)],
     }
 

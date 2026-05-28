@@ -90,7 +90,9 @@ work from repository state instead of chat history.
 - Second-source comparison now requires sanitized artifact identity in both roots:
   `artifact_kind`, `artifact_sha256`, `capture_id`, and `evidence_pack_id`. Missing or
   matching identity is `inconclusive`, so self-comparison cannot pass as independent
-  evidence. Readiness JSON includes per-target details for evidence packs.
+  evidence. Readiness JSON includes per-target details plus a top-level `promotion_gate`
+  summary. Missing base target-set entries are `not_applicable` for second-source status,
+  and rejected property/nested candidates make a target inconclusive before layout compare.
 - UFunction and ScriptStruct regenerators accept the artifact identity flags above; the
   committed primary fixtures carry the primary core artifact SHA without storing core
   paths.

@@ -62,8 +62,12 @@ Each side should record `artifact_kind`, `artifact_sha256`, `capture_id`, and
 match. This prevents self-comparison or partial reuse of the same capture/evidence pack
 from looking like independent acceptance. Readiness JSON includes per-module
 `target_details` entries with each target key, source path, comparability, block reasons,
-and second-source status. Use those details in evidence packs instead of manually
-reconstructing which target is still missing, inconclusive, or layout-rejected.
+and second-source status, plus a top-level `promotion_gate` summary with `ready` and
+blocker counts. Use those details in evidence packs instead of manually reconstructing
+which target is still missing, inconclusive, or layout-rejected.
+If a target-set entry is missing from the base fixture root, its second-source status is
+`not_applicable`; fix base coverage before interpreting second-source readiness for that
+target.
 
 Before a second-source snapshot set exists, use the readiness report to keep module
 coverage and missing second-source evidence explicit:

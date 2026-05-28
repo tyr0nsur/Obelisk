@@ -500,6 +500,63 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(report["counts"]["rejected"], 1)
         self.assertIn("array_inner_candidate.inner_property.name_index", report["results"][0]["diffs"][0]["path"])
 
+    def test_rejected_property_blocks_comparison_even_when_both_sides_match(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            left = base_snapshot()
+            right = deepcopy(left)
+            for payload in (left, right):
+                prop = payload["targets"][0]["property_chain"]["properties"][0]  # type: ignore[index]
+                prop["status"] = "rejected"
+                prop["reject_reasons"] = ["bad_property_candidate"]
+            write_snapshot(base, left)
+            write_snapshot(candidate, right)
+
+            result = run_compare(base, candidate, "--json")
+
+        self.assertEqual(result.returncode, 2)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["counts"]["inconclusive"], 1)
+        self.assertIn("base:property[0]_status_rejected", report["results"][0]["reasons"])
+        self.assertIn("candidate:property[0]_has_reject_reasons", report["results"][0]["reasons"])
+
+    def test_rejected_nested_property_candidate_blocks_comparison(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            left = base_snapshot()
+            left["targets"][0]["property_chain"]["properties"][0]["array_inner_candidate"] = {  # type: ignore[index]
+                "status": "rejected",
+                "reject_reasons": ["bad_inner_property"],
+                "membership_status": "candidate-uobject",
+                "inner_property": {
+                    "object_index": 2000,
+                    "name": "InventoryItems",
+                    "name_index": 3000,
+                    "class_name": "ObjectProperty",
+                    "class_name_index": 4000,
+                    "class_object_index": 5000,
+                },
+            }
+            right = deepcopy(left)
+            write_snapshot(base, left)
+            write_snapshot(candidate, right)
+
+            result = run_compare(base, candidate, "--json")
+
+        self.assertEqual(result.returncode, 2)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["counts"]["inconclusive"], 1)
+        self.assertIn("base:property[0]_array_inner_candidate_status_rejected", report["results"][0]["reasons"])
+        self.assertIn("candidate:property[0]_array_inner_candidate_has_reject_reasons", report["results"][0]["reasons"])
+
     def test_target_filter_limits_comparison_to_requested_target(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -776,6 +833,10 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(report["totals"]["targets"], 1)
         self.assertEqual(report["totals"]["comparable"], 1)
         self.assertEqual(report["totals"]["second_source_missing"], 1)
+        self.assertEqual(
+            report["promotion_gate"],
+            {"ready": False, "blockers": [{"reason": "missing_second_source", "count": 1}]},
+        )
         self.assertEqual(report["modules"][0]["module"], "sdk_inventory")
         self.assertEqual(report["modules"][0]["schema"], "ufunction")
         self.assertEqual(report["modules"][0]["target_details"][0]["target"],
@@ -804,9 +865,39 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(report["totals"]["targets"], 4)
         self.assertEqual(report["totals"]["comparable"], 1)
         self.assertEqual(report["totals"]["blocked"], 3)
+        self.assertIn({"reason": "blocked_base_targets", "count": 3}, report["promotion_gate"]["blockers"])
+        self.assertIn({"reason": "missing_second_source", "count": 1}, report["promotion_gate"]["blockers"])
         missing_module = next(module for module in report["modules"] if module["module"] == "<missing>")
         self.assertEqual(missing_module["targets"], 3)
         self.assertEqual(missing_module["block_reasons"], {"missing_base_snapshot": 3})
+        self.assertTrue(
+            all(detail["second_source_status"] == "not_applicable" for detail in missing_module["target_details"])
+        )
+
+    def test_readiness_report_marks_promotion_gate_ready_when_all_targets_are_accepted(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base" / "sha" / "sdk_inventory"
+            candidate = root / "candidate" / "sha" / "sdk_inventory"
+            base.mkdir(parents=True)
+            candidate.mkdir(parents=True)
+            payload = base_snapshot()
+            write_snapshot(base, payload)
+            write_snapshot(candidate, deepcopy(payload))
+
+            result = run_compare(
+                root / "base",
+                root / "candidate",
+                "--readiness-report",
+                "--target",
+                "PrimalItem.CanUse",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["totals"]["second_source_accepted"], 1)
+        self.assertEqual(report["promotion_gate"], {"ready": True, "blockers": []})
 
     def test_readiness_report_can_fail_on_missing_target_set_entries(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
