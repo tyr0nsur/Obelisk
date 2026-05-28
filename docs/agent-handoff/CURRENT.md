@@ -350,9 +350,10 @@ Updated: 2026-05-28
   the primary-core default. They also accept
   `--evidence-pack-manifest <pack>/manifest.json` to import `core.sha256`, a sanitized
   capture id from `core.path`, the pack directory name as `evidence_pack_id`, and the
-  selected `fname_root_slots` address; CLI identity/root values that contradict the pack
-  manifest abort before snapshot generation. Use `--evidence-pack-fname-root-label` when
-  the pack has multiple FName roots.
+  selected `fname_root_slots` and `gobjects_candidates` addresses; CLI core, identity,
+  FName-root, or GObjects values that contradict the pack manifest abort before snapshot
+  generation. Use `--evidence-pack-fname-root-label` or
+  `--evidence-pack-gobjects-label` when the pack has multiple candidates.
 - fact: GObjects sample evidence now has the same guardrail:
   `build_core_dump_evidence_pack.py --gobjects-sample-index` requires an explicit
   `--fname-root-slot` for the sampled artifact so UObject/Class names are not resolved

@@ -258,9 +258,10 @@ work from repository state instead of chat history.
   supplied, and GObjects sampling with `build_core_dump_evidence_pack.py
   --gobjects-sample-index` requires an explicit `--fname-root-slot`. Prefer
   `--evidence-pack-manifest <pack>/manifest.json` for UFunction/ScriptStruct regeneration
-  so `core.sha256`, `capture_id`, `evidence_pack_id`, and the selected FName root come
-  from the evidence pack instead of manual CLI transcription; use
-  `--evidence-pack-fname-root-label` when the pack has multiple roots.
+  so `core.sha256`, `capture_id`, `evidence_pack_id`, selected FName root, and selected
+  GObjects candidate come from the evidence pack instead of manual CLI transcription; use
+  `--evidence-pack-fname-root-label` or `--evidence-pack-gobjects-label` when the pack has
+  multiple candidates.
 - Latest restart audit:
   `docs/research/2026-05-27-ops-restart-audit-instance-id.md`
   - live `ObeliskRun.sh` exports `OBELISK_INSTANCE_ID=arkserver`

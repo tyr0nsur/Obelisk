@@ -47,7 +47,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--core", required=True, type=Path, help="Path to an existing offline ELF core dump.")
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
-    parser.add_argument("--gobjects", type=inspector.parse_int, default=inspector.uobjects.DEFAULT_GOBJECTS)
+    parser.add_argument("--gobjects", type=inspector.parse_int)
     parser.add_argument(
         "--fname-root-slot",
         type=inspector.parse_int,
@@ -69,6 +69,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--evidence-pack-fname-root-label",
         help="FName root slot label to read from --evidence-pack-manifest when the pack has multiple slots.",
+    )
+    parser.add_argument(
+        "--evidence-pack-gobjects-label",
+        help="GObjects candidate label to read from --evidence-pack-manifest when the pack has multiple candidates.",
     )
     parser.add_argument("--target", action="append", default=[], help="Only process exact Outer.Name target. Repeatable.")
     parser.add_argument("--write", action="store_true", help="Write fixtures. Default is dry-run.")
@@ -95,7 +99,40 @@ def optional_sha256(value: str | None, field: str) -> str | None:
     return value
 
 
-def evidence_pack_defaults(path: Path, root_label: str | None) -> dict[str, object]:
+def select_labeled_address(
+    path: Path,
+    entries: object,
+    *,
+    field: str,
+    label: str | None,
+    label_flag: str,
+) -> int:
+    if not isinstance(entries, list) or not entries:
+        raise SystemExit(f"{path}: evidence pack manifest missing {field}")
+    if label is None:
+        if len(entries) != 1:
+            raise SystemExit(f"{path}: multiple {field} found; pass {label_flag}")
+        selected = entries[0]
+    else:
+        selected = next(
+            (
+                item
+                for item in entries
+                if isinstance(item, dict) and item.get("label") == label
+            ),
+            None,
+        )
+        if selected is None:
+            raise SystemExit(f"{path}: {field} label not found: {label}")
+    if not isinstance(selected, dict):
+        raise SystemExit(f"{path}: invalid {field} entry")
+    address = selected.get("address")
+    if not isinstance(address, str):
+        raise SystemExit(f"{path}: selected {field} entry missing address")
+    return inspector.parse_int(address)
+
+
+def evidence_pack_defaults(path: Path, root_label: str | None, gobjects_label: str | None) -> dict[str, object]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     core = payload.get("core")
     if not isinstance(core, dict):
@@ -106,37 +143,26 @@ def evidence_pack_defaults(path: Path, root_label: str | None) -> dict[str, obje
     core_path = core.get("path")
     if not isinstance(core_path, str) or not core_path:
         raise SystemExit(f"{path}: evidence pack manifest missing core.path")
-    root_slots = payload.get("fname_root_slots")
-    if not isinstance(root_slots, list) or not root_slots:
-        raise SystemExit(f"{path}: evidence pack manifest missing fname_root_slots")
-    if root_label is None:
-        if len(root_slots) != 1:
-            raise SystemExit(
-                f"{path}: multiple FName root slots found; pass --evidence-pack-fname-root-label"
-            )
-        selected_root = root_slots[0]
-    else:
-        selected_root = next(
-            (
-                item
-                for item in root_slots
-                if isinstance(item, dict) and item.get("label") == root_label
-            ),
-            None,
-        )
-        if selected_root is None:
-            raise SystemExit(f"{path}: FName root label not found: {root_label}")
-    if not isinstance(selected_root, dict):
-        raise SystemExit(f"{path}: invalid fname_root_slots entry")
-    root_address = selected_root.get("address")
-    if not isinstance(root_address, str):
-        raise SystemExit(f"{path}: selected FName root slot missing address")
     return {
         "artifact_kind": "offline_core",
         "artifact_sha256": core_sha,
         "capture_id": safe_component(Path(core_path).stem, "capture-id"),
         "evidence_pack_id": safe_component(path.parent.name, "evidence-pack-id"),
-        "fname_root_slot": inspector.parse_int(root_address),
+        "core_path": Path(core_path).resolve(),
+        "fname_root_slot": select_labeled_address(
+            path,
+            payload.get("fname_root_slots"),
+            field="fname_root_slots",
+            label=root_label,
+            label_flag="--evidence-pack-fname-root-label",
+        ),
+        "gobjects": select_labeled_address(
+            path,
+            payload.get("gobjects_candidates"),
+            field="gobjects_candidates",
+            label=gobjects_label,
+            label_flag="--evidence-pack-gobjects-label",
+        ),
     }
 
 
@@ -358,15 +384,26 @@ def main() -> int:
     status = required_text(manifest, "status")
     obelisk_commit = args.obelisk_commit or repo_commit()
     pack_defaults = (
-        evidence_pack_defaults(args.evidence_pack_manifest, args.evidence_pack_fname_root_label)
+        evidence_pack_defaults(
+            args.evidence_pack_manifest,
+            args.evidence_pack_fname_root_label,
+            args.evidence_pack_gobjects_label,
+        )
         if args.evidence_pack_manifest is not None
         else {}
     )
     if pack_defaults:
+        if args.core.resolve() != pack_defaults["core_path"]:
+            raise SystemExit("--core conflicts with --evidence-pack-manifest core.path")
         args.fname_root_slot = merge_manifest_default(
             args.fname_root_slot,
             pack_defaults["fname_root_slot"],
             "--fname-root-slot",
+        )
+        args.gobjects = merge_manifest_default(
+            args.gobjects,
+            pack_defaults["gobjects"],
+            "--gobjects",
         )
         args.artifact_kind = merge_manifest_default(
             args.artifact_kind,
@@ -409,6 +446,11 @@ def main() -> int:
             "--fname-root-slot is required when recording artifact identity; "
             "derive or scan a FName root for this artifact instead of using the primary-core default"
         )
+    if artifact_identity_supplied and args.gobjects is None:
+        raise SystemExit(
+            "--gobjects is required when recording artifact identity; "
+            "derive or import a GObjects candidate for this artifact instead of using the primary-core default"
+        )
     if args.check_layout and not artifact_identity_supplied:
         raise SystemExit(
             "--check-layout is reserved for second-source layout validation and requires "
@@ -420,6 +462,7 @@ def main() -> int:
         if args.fname_root_slot is not None
         else inspector.uobjects.DEFAULT_FNAME_ROOT_SLOT
     )
+    gobjects = args.gobjects if args.gobjects is not None else inspector.uobjects.DEFAULT_GOBJECTS
     filters = set(args.target)
     processed = 0
     failures: list[str] = []
@@ -436,7 +479,7 @@ def main() -> int:
             snapshot = build_snapshot(
                 memory=memory,
                 entry=raw_entry,
-                gobjects=args.gobjects,
+                gobjects=gobjects,
                 fname_root_slot=fname_root_slot,
                 max_object_scan=max_object_scan,
                 ark_sha=ark_sha,

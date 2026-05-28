@@ -53,7 +53,15 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
         }
         path.write_text(json.dumps(manifest), encoding="utf-8")
 
-    def write_evidence_pack_manifest(self, path: Path, *, core: Path, fname_root_slot: int) -> None:
+    def write_evidence_pack_manifest(
+        self,
+        path: Path,
+        *,
+        core: Path,
+        fname_root_slot: int,
+        gobjects: int,
+        extra_gobjects: bool = False,
+    ) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         manifest = {
             "core": {
@@ -66,7 +74,20 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
                     "address": hex(fname_root_slot),
                 }
             ],
+            "gobjects_candidates": [
+                {
+                    "label": "verified_gobjects",
+                    "address": hex(gobjects),
+                }
+            ],
         }
+        if extra_gobjects:
+            manifest["gobjects_candidates"].append(  # type: ignore[index]
+                {
+                    "label": "alternate_gobjects",
+                    "address": hex(gobjects + 0x1000),
+                }
+            )
         path.write_text(json.dumps(manifest), encoding="utf-8")
 
     def test_dry_run_reports_manifest_outputs_without_writing(self) -> None:
@@ -287,7 +308,12 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
             output = output_root / "7e7ded49e0c6" / "sdk_test" / "PrimalStructure.AllowStructureAccess.snapshot.json"
             addrs = build_core_fixture(core)
             self.write_manifest(manifest)
-            self.write_evidence_pack_manifest(evidence_pack, core=core, fname_root_slot=addrs["fname_root_slot"])
+            self.write_evidence_pack_manifest(
+                evidence_pack,
+                core=core,
+                fname_root_slot=addrs["fname_root_slot"],
+                gobjects=addrs["gobjects"],
+            )
 
             result = subprocess.run(
                 [
@@ -299,8 +325,6 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
                     str(manifest),
                     "--output-root",
                     str(output_root),
-                    "--gobjects",
-                    hex(addrs["gobjects"]),
                     "--obelisk-commit",
                     "abcdef1",
                     "--evidence-pack-manifest",
@@ -329,7 +353,12 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
             output_root = root / "out"
             addrs = build_core_fixture(core)
             self.write_manifest(manifest)
-            self.write_evidence_pack_manifest(evidence_pack, core=core, fname_root_slot=addrs["fname_root_slot"])
+            self.write_evidence_pack_manifest(
+                evidence_pack,
+                core=core,
+                fname_root_slot=addrs["fname_root_slot"],
+                gobjects=addrs["gobjects"],
+            )
 
             result = subprocess.run(
                 [
@@ -341,8 +370,6 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
                     str(manifest),
                     "--output-root",
                     str(output_root),
-                    "--gobjects",
-                    hex(addrs["gobjects"]),
                     "--evidence-pack-manifest",
                     str(evidence_pack),
                     "--artifact-sha256",
@@ -355,6 +382,122 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("--artifact-sha256 conflicts with --evidence-pack-manifest", result.stderr)
+
+    def test_evidence_pack_manifest_rejects_conflicting_gobjects(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "second-core"
+            manifest = root / "manifest.json"
+            evidence_pack = root / "second-pack" / "manifest.json"
+            output_root = root / "out"
+            addrs = build_core_fixture(core)
+            self.write_manifest(manifest)
+            self.write_evidence_pack_manifest(
+                evidence_pack,
+                core=core,
+                fname_root_slot=addrs["fname_root_slot"],
+                gobjects=addrs["gobjects"],
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "regenerate_ufunction_snapshots.py"),
+                    "--core",
+                    str(core),
+                    "--manifest",
+                    str(manifest),
+                    "--output-root",
+                    str(output_root),
+                    "--gobjects",
+                    hex(addrs["gobjects"] + 0x1000),
+                    "--evidence-pack-manifest",
+                    str(evidence_pack),
+                    "--write",
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--gobjects conflicts with --evidence-pack-manifest", result.stderr)
+
+    def test_evidence_pack_manifest_requires_gobjects_label_when_ambiguous(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "second-core"
+            manifest = root / "manifest.json"
+            evidence_pack = root / "second-pack" / "manifest.json"
+            output_root = root / "out"
+            addrs = build_core_fixture(core)
+            self.write_manifest(manifest)
+            self.write_evidence_pack_manifest(
+                evidence_pack,
+                core=core,
+                fname_root_slot=addrs["fname_root_slot"],
+                gobjects=addrs["gobjects"],
+                extra_gobjects=True,
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "regenerate_ufunction_snapshots.py"),
+                    "--core",
+                    str(core),
+                    "--manifest",
+                    str(manifest),
+                    "--output-root",
+                    str(output_root),
+                    "--evidence-pack-manifest",
+                    str(evidence_pack),
+                    "--write",
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("multiple gobjects_candidates found; pass --evidence-pack-gobjects-label", result.stderr)
+
+    def test_evidence_pack_manifest_rejects_different_core_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            manifest_core = root / "manifest-core"
+            cli_core = root / "cli-core"
+            manifest = root / "manifest.json"
+            evidence_pack = root / "second-pack" / "manifest.json"
+            output_root = root / "out"
+            addrs = build_core_fixture(manifest_core)
+            cli_core.write_bytes(manifest_core.read_bytes())
+            self.write_manifest(manifest)
+            self.write_evidence_pack_manifest(
+                evidence_pack,
+                core=manifest_core,
+                fname_root_slot=addrs["fname_root_slot"],
+                gobjects=addrs["gobjects"],
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "regenerate_ufunction_snapshots.py"),
+                    "--core",
+                    str(cli_core),
+                    "--manifest",
+                    str(manifest),
+                    "--output-root",
+                    str(output_root),
+                    "--evidence-pack-manifest",
+                    str(evidence_pack),
+                    "--write",
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--core conflicts with --evidence-pack-manifest core.path", result.stderr)
 
     def test_check_layout_ignores_evidence_and_identity_index_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

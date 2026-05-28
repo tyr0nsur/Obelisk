@@ -192,8 +192,10 @@ python3 scripts/regenerate_ufunction_snapshots.py \
 
 If the manifest contains multiple FName roots, add
 `--evidence-pack-fname-root-label verified_fname_root_slot`. The regenerators copy
-`core.sha256`, `core.path`, the evidence-pack directory name, and the selected FName root
-from the manifest, and reject CLI identity values that contradict it.
+`core.sha256`, `core.path`, the evidence-pack directory name, the selected FName root, and
+the selected GObjects candidate from the manifest, and reject CLI values that contradict
+them. If the manifest contains multiple GObjects candidates, add
+`--evidence-pack-gobjects-label <label>`.
 
 Expected second-source result:
 
