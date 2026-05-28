@@ -359,6 +359,34 @@ namespace
         }
     }
 
+    void TestUnsafeConfigRootDisablesPluginLoading()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_unsafe_config_root");
+        ConfigureEnvironment(root);
+
+        const fs::path externalConfigRoot = root / "external-config-root";
+        fs::create_directories(externalConfigRoot);
+        const fs::path symlinkConfigRoot = root / "config-root-symlink";
+        fs::remove_all(root / "config");
+        fs::create_symlink(externalConfigRoot, symlinkConfigRoot);
+        setenv("OBELISK_CONFIG_DIR", symlinkConfigRoot.string().c_str(), 1);
+
+        FakePlugin plugin{.filename = "unsafe_config_root.so", .pluginId = "unsafe_config_root_plugin"};
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.getInfoCalls == 0, "plugin metadata was read with unsafe OBELISK_CONFIG_DIR");
+        Require(plugin.initCalls == 0, "plugin initialized with unsafe OBELISK_CONFIG_DIR");
+        Require(plugin.closeCalls == 0, "plugin handle was opened with unsafe OBELISK_CONFIG_DIR");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestEmptyPluginDirectoryIsRejected()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_empty_plugin_dir");
@@ -1634,6 +1662,7 @@ int main()
     TestOwnerTokenRegistrationRejectedDuringInitFailureShutdown();
     TestOwnerTokenUnregisterAllowedDuringShutdown();
     TestUnsafeInstanceIdDisablesPluginLoading();
+    TestUnsafeConfigRootDisablesPluginLoading();
     TestGlobalProcessEventCallbackAllowedWithGate();
     TestGlobalProcessEventCallbackRejectedAfterGateRevoked();
     TestCallProcessEventRejectedByDefault();

@@ -369,6 +369,9 @@ namespace Obelisk::Core
         if (!IsSafeDisabledConfig(defaultConfig, error))
             return false;
 
+        if (!ValidatePluginConfigRoot(configRoot, true, error))
+            return false;
+
         prepared.directory = configRoot / metadata.plugin_id;
         prepared.path = prepared.directory / metadata.config_file;
 
@@ -448,6 +451,50 @@ namespace Obelisk::Core
 
         prepared.enabled = enabled->get<bool>();
         prepared.instance_allowed = InstanceAllowed(existingConfig, instanceId, prepared.enabled);
+
+        return true;
+    }
+
+    bool ValidatePluginConfigRoot(const fs::path& configRoot, bool allowMissing, std::string& error)
+    {
+        if (configRoot.empty())
+        {
+            error = "plugin config root is empty";
+            return false;
+        }
+
+        if (!configRoot.is_absolute())
+        {
+            error = "plugin config root must be absolute";
+            return false;
+        }
+
+        std::error_code ec;
+        const fs::file_status rootSymlinkStatus = fs::symlink_status(configRoot, ec);
+        if (rootSymlinkStatus.type() == fs::file_type::not_found)
+        {
+            if (allowMissing)
+                return true;
+            error = "plugin config root must exist";
+            return false;
+        }
+        if (ec)
+        {
+            error = "plugin config root is not accessible: " + ec.message();
+            return false;
+        }
+
+        if (fs::is_symlink(rootSymlinkStatus))
+        {
+            error = "plugin config root must not be a symlink";
+            return false;
+        }
+
+        if (!fs::is_directory(rootSymlinkStatus))
+        {
+            error = "plugin config root must be a directory";
+            return false;
+        }
 
         return true;
     }

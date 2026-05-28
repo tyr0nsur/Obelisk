@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -30,6 +31,7 @@ FORBIDDEN_STABLE_MARKERS = frozenset(
         "request-static-fname-probe",
     )
 )
+SAFE_INSTANCE_ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
 def safe_json_load(path: Path) -> tuple[dict[str, Any] | None, str | None]:
@@ -60,6 +62,38 @@ def list_text(value: Any) -> str:
     if not value:
         return "[]"
     return ",".join(str(item) for item in value)
+
+
+def is_safe_instance_id(value: str) -> bool:
+    return bool(SAFE_INSTANCE_ID_RE.fullmatch(value))
+
+
+def validate_plugin_config_payload(payload: dict[str, Any]) -> str | None:
+    enabled = payload.get("enabled")
+    if not isinstance(enabled, bool):
+        return "enabled-not-boolean"
+
+    allow_all = payload.get("allow_all_instances")
+    if allow_all is not None and not isinstance(allow_all, bool):
+        return "allow_all_instances-not-boolean"
+
+    allowlist = payload.get("instance_allowlist")
+    if allowlist is not None:
+        if not isinstance(allowlist, list):
+            return "instance_allowlist-not-array"
+        for entry in allowlist:
+            if not isinstance(entry, str):
+                return "instance_allowlist-entry-not-string"
+            if not is_safe_instance_id(entry):
+                return "instance_allowlist-entry-unsafe"
+
+    if enabled:
+        if allow_all is True:
+            return None
+        if not isinstance(allowlist, list) or not allowlist:
+            return "enabled-without-instance-scope"
+
+    return None
 
 
 def iter_regular_so(plugin_dir: Path) -> list[Path]:
@@ -206,6 +240,9 @@ def plugin_config_summary(root: Path, plugin_id: str) -> tuple[str, str, str, st
     if error:
         return ("unknown", "unknown", "unknown", error)
     assert payload is not None
+    validation_error = validate_plugin_config_payload(payload)
+    if validation_error:
+        return ("unknown", "unknown", "unknown", validation_error)
     return (
         bool_text(payload.get("enabled")),
         bool_text(payload.get("allow_all_instances")),
@@ -267,6 +304,12 @@ def command_plugins_show(root: Path, plugin: str) -> int:
         return 1 if error != "missing" else 0
 
     assert payload is not None
+    validation_error = validate_plugin_config_payload(payload)
+    if validation_error:
+        print(f"config_state: {validation_error}")
+        return 1
+
+    print("config_state: ok")
     print(f"enabled: {bool_text(payload.get('enabled'))}")
     print(f"allow_all_instances: {bool_text(payload.get('allow_all_instances'))}")
     print(f"instance_allowlist: {list_text(payload.get('instance_allowlist'))}")

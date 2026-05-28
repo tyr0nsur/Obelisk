@@ -261,6 +261,71 @@ class ObeliskCliTests(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn("config_state: invalid JSON", result.stdout)
 
+    def test_plugins_list_reports_invalid_config_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "plugins").mkdir()
+            config_root = root / "config"
+            config_root.mkdir()
+
+            cases = {
+                "bad_enabled": {
+                    "enabled": "yes",
+                    "allow_all_instances": False,
+                    "instance_allowlist": ["arkserver"],
+                },
+                "bad_allow_all": {
+                    "enabled": True,
+                    "allow_all_instances": "yes",
+                    "instance_allowlist": ["arkserver"],
+                },
+                "bad_allowlist": {
+                    "enabled": True,
+                    "allow_all_instances": False,
+                    "instance_allowlist": ["../arkserver"],
+                },
+                "missing_scope": {
+                    "enabled": True,
+                    "allow_all_instances": False,
+                    "instance_allowlist": [],
+                },
+            }
+            for name, payload in cases.items():
+                plugin_dir = config_root / name
+                plugin_dir.mkdir()
+                (plugin_dir / "config.json").write_text(json.dumps(payload), encoding="utf-8")
+
+            result = run_cli(root, "plugins", "list")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("bad_enabled", result.stdout)
+            self.assertIn("enabled-not-boolean", result.stdout)
+            self.assertIn("allow_all_instances-not-boolean", result.stdout)
+            self.assertIn("instance_allowlist-entry-unsafe", result.stdout)
+            self.assertIn("enabled-without-instance-scope", result.stdout)
+
+    def test_plugins_show_rejects_enabled_config_without_instance_scope(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config_dir = root / "config" / "missing_scope"
+            config_dir.mkdir(parents=True)
+            (config_dir / "config.json").write_text(
+                json.dumps(
+                    {
+                        "enabled": True,
+                        "allow_all_instances": False,
+                        "instance_allowlist": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_cli(root, "plugins", "show", "missing_scope")
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("config_state: enabled-without-instance-scope", result.stdout)
+            self.assertNotIn("enabled: true", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

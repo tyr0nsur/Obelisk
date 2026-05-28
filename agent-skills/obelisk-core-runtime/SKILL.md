@@ -63,11 +63,13 @@ Own these areas:
   unload. New callback registrations must be rejected while unloading, but owner-token
   unregister must remain valid so shutdown can clean existing handles.
 - Plugin config default creation must validate the config root and per-plugin directory
-  before writing. Reject symlinked plugin config directories before first-run default
-  config creation, not only before parsing an existing `config.json`.
+  before writing. Reject relative or symlinked `OBELISK_CONFIG_DIR` roots and symlinked
+  plugin config directories before first-run default config creation, not only before
+  parsing an existing `config.json`.
 - Operator tooling should mirror runtime path safety: read-only CLI views must surface
   invalid plugin/config entries and avoid following symlinked plugin directories,
-  per-plugin config directories, or `config.json` entries.
+  per-plugin config directories, or `config.json` entries. CLI config summaries should
+  report malformed activation envelopes instead of showing unsafe configs as enabled.
 - Owner-token callback registration is the supported path for helper-module or
   background-thread callbacks whose function pointer does not live in the plugin `.so`.
   The runtime accepts owner-token registrations from helper/background threads during

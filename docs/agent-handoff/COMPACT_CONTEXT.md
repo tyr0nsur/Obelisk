@@ -228,8 +228,8 @@ work from repository state instead of chat history.
     rule; `oBaseEvents` does not publish `map_allowlist`, and SDK consumer CTest rejects
     non-empty legacy `map_allowlist` until reliable map identity exists; plugin config
     directories and `config.json` files must be regular non-symlink
-    entries; mutable shared plugin state still requires plugin-level locking/atomic-write
-    design;
+    entries, and `OBELISK_CONFIG_DIR` itself must be absolute and non-symlinked; mutable
+    shared plugin state still requires plugin-level locking/atomic-write design;
   - lifecycle hardening: PluginManager regression tests cover init-time helper-thread
     owner-token callbacks when `Init` returns false or throws, invalidating tokens and
     cleaning callbacks before close; `UnloadAll` also covers cleanup when plugin

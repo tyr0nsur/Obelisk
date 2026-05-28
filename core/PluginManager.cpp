@@ -672,6 +672,13 @@ namespace Obelisk::Core
             }
 
             const fs::path configRoot = configRootEnv;
+            std::string configRootError;
+            if (!ValidatePluginConfigRoot(configRoot, true, configRootError))
+            {
+                OBELISK_ERROR("Invalid OBELISK_CONFIG_DIR: {}. Plugins will not be loaded.", configRootError);
+                return;
+            }
+
             const char* instanceIdEnv = std::getenv("OBELISK_INSTANCE_ID");
             const std::string instanceId = instanceIdEnv ? instanceIdEnv : "";
             if (!IsSafeInstanceId(instanceId))

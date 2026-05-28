@@ -381,6 +381,58 @@ namespace
         Require(error.find("symlink") != std::string::npos, "symlink config directory error was unclear");
     }
 
+    void TestRejectsConfigRootSymlinkWithExistingConfig(const fs::path& root)
+    {
+        Obelisk::Core::PreparedPluginConfig prepared;
+        std::string error;
+
+        const fs::path externalRoot = root / "external-config-root";
+        WriteFile(externalRoot / "root_symlink_existing" / "config.json",
+                  R"({"enabled":true,"allow_all_instances":true,"instance_allowlist":[]})");
+        const fs::path symlinkRoot = root / "config-root-symlink-existing";
+        fs::create_symlink(externalRoot, symlinkRoot);
+
+        Require(!Prepare(Metadata("root_symlink_existing"), symlinkRoot, prepared, error),
+                "symlink config root with existing config was accepted");
+        Require(error.find("plugin config root") != std::string::npos,
+                "symlink config root error did not name the root");
+        Require(error.find("symlink") != std::string::npos,
+                "symlink config root error was unclear");
+    }
+
+    void TestRejectsConfigRootSymlinkBeforeDefaultWrite(const fs::path& root)
+    {
+        Obelisk::Core::PreparedPluginConfig prepared;
+        std::string error;
+
+        const fs::path externalRoot = root / "empty-external-config-root";
+        fs::create_directories(externalRoot);
+        const fs::path symlinkRoot = root / "config-root-symlink-default";
+        fs::create_symlink(externalRoot, symlinkRoot);
+
+        Require(!Prepare(Metadata("root_symlink_default"), symlinkRoot, prepared, error),
+                "symlink config root accepted default config creation");
+        Require(error.find("plugin config root") != std::string::npos,
+                "symlink config root default error did not name the root");
+        Require(error.find("symlink") != std::string::npos,
+                "symlink config root default error was unclear");
+        Require(!fs::exists(externalRoot / "root_symlink_default" / "config.json"),
+                "default config was written through a symlinked config root");
+    }
+
+    void TestRejectsRelativeConfigRoot(const fs::path& root)
+    {
+        Obelisk::Core::PreparedPluginConfig prepared;
+        std::string error;
+
+        Require(!Prepare(Metadata("relative_root"), fs::path("relative-config-root"), prepared, error),
+                "relative config root was accepted");
+        Require(error.find("absolute") != std::string::npos,
+                "relative config root error did not require absolute paths");
+        Require(!fs::exists(root / "relative-config-root" / "relative_root" / "config.json"),
+                "relative config root wrote under the test root");
+    }
+
     void TestRejectsEmptyConfigDirectorySymlinkBeforeDefaultWrite(const fs::path& root)
     {
         Obelisk::Core::PreparedPluginConfig prepared;
@@ -433,6 +485,9 @@ int main()
         TestRejectsMistypedExistingAllowlist(root);
         TestRejectsConfigSymlinkEscape(root);
         TestRejectsConfigDirectorySymlinkEscape(root);
+        TestRejectsConfigRootSymlinkWithExistingConfig(root);
+        TestRejectsConfigRootSymlinkBeforeDefaultWrite(root);
+        TestRejectsRelativeConfigRoot(root);
         TestRejectsEmptyConfigDirectorySymlinkBeforeDefaultWrite(root);
         TestRejectsNonRegularConfigFile(root);
         fs::remove_all(root);

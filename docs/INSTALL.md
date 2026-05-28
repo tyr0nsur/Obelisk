@@ -167,7 +167,10 @@ their own locking/atomic-write strategy before using a shared state file across 
 server processes.
 Plugin config directories and `config.json` files must be regular filesystem entries under
 `${OBELISK_ROOT}/config`; the runtime rejects symlinked plugin config directories and
-symlinked or non-regular config files.
+symlinked or non-regular config files. `OBELISK_CONFIG_DIR` itself must be an absolute,
+non-symlink directory when it exists; missing absolute roots may be created for safe
+default configs, but relative or symlinked config roots fail closed before plugin
+discovery.
 
 ## Feature Flags
 

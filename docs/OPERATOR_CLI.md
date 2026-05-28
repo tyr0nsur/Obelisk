@@ -21,6 +21,12 @@ directories or symlinked/non-regular `config.json` files; they report those entr
 invalid config state instead. This mirrors the runtime's fail-closed plugin/config loaders
 and helps operators find shared-root escapes before a restart.
 
+Plugin config summaries also validate the shared-cluster activation envelope before
+showing enabled/all-instance state. Malformed `enabled`, malformed
+`allow_all_instances`, unsafe or mistyped `instance_allowlist` entries, and
+`enabled=true` configs without either a non-empty allowlist or `allow_all_instances=true`
+are reported as invalid config state.
+
 `instances list` includes a `persistent_posture` column derived only from marker files:
 
 - `stable`: `enable-process-event-hook` and `disable-plugins` are regular files and no

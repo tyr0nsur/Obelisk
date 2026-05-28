@@ -20,5 +20,9 @@ namespace Obelisk::Core
                              PreparedPluginConfig& prepared,
                              std::string& error);
 
+    bool ValidatePluginConfigRoot(const std::filesystem::path& configRoot,
+                                  bool allowMissing,
+                                  std::string& error);
+
     bool IsSafeInstanceId(const std::string& value);
 }
