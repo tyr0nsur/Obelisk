@@ -28,6 +28,11 @@ class AgentHandoffGuardrailsTests(unittest.TestCase):
         self.assertIn("active routing table", text)
         self.assertIn("Priority Next Steps", text)
         self.assertIn("Agent Protocol", text)
+        self.assertNotIn(
+            "latest pushed checkpoint",
+            text,
+            "CURRENT.md should not duplicate the moving HEAD hash; use git log instead",
+        )
 
     def test_handoff_history_files_are_archives(self) -> None:
         history_files = sorted(HANDOFF_DIR.glob("HISTORY-*.md"))

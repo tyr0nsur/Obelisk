@@ -51,10 +51,11 @@ in `docs/research/` and stable resume facts belong in `docs/agent-handoff/COMPAC
 
 ## Stable Runtime Baseline
 
-- fact: latest pushed checkpoint is `c40a997 Harden hook removal and reflection intake`.
-- fact: core-first release readiness passed after `c40a997`: configure/build, 31 CTest
-  tests, script tests, install layout/SDK consumer validation, dry-run install checks,
-  `git diff --check`, and clean tracked worktree.
+- fact: use `git log --oneline -1` for the current pushed checkpoint; do not duplicate the
+  moving HEAD hash in this handoff file.
+- fact: the most recent full core-first release readiness run covered configure/build,
+  31 CTest tests, script tests, install layout/SDK consumer validation, dry-run install
+  checks, `git diff --check`, and a clean tracked worktree.
 - fact: stable installer deploys runtime libraries only. Plugins activate only when their
   `.so` is published into `/servidor/ark/obelisk/plugins/` with
   `scripts/install_obelisk_plugin.sh`.
@@ -64,9 +65,9 @@ in `docs/research/` and stable resume facts belong in `docs/agent-handoff/COMPAC
 - fact: global ProcessEvent callbacks, public `CallProcessEvent`, and pre-callback
   blocking are runtime default-deny behind env + safe per-instance markers + capability
   bits where applicable.
-- fact: `ProcessEventHook::Remove()` is fail-closed after `c40a997`: removal failures
-  preserve hook state/trampoline ownership and report failure instead of clearing state
-  while patched bytes may still execute.
+- fact: `ProcessEventHook::Remove()` is fail-closed: removal failures preserve hook
+  state/trampoline ownership and report failure instead of clearing state while patched
+  bytes may still execute.
 - fact: `oBaseEvents` requires owner-token callback handle support for its ProcessEvent
   example and defensively rejects unsafe `instance_allowlist` entries before callback
   registration.
