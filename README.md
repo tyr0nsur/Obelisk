@@ -208,9 +208,9 @@ server process. Legacy registration functions reject callbacks that cannot be at
 to the initializing plugin or an already-loaded plugin shared object.
 
 `CallProcessEvent` is a low-level trampoline escape hatch. If a pre-callback calls it,
-that callback must return `false`; returning `true` lets the detour call the original
-again. Stable plugin APIs should prefer higher-level Obelisk module surfaces as they are
-promoted.
+that callback should return `false`; if it returns `true`, the runtime skips the automatic
+original call and warns to avoid double execution. Stable plugin APIs should prefer
+higher-level Obelisk module surfaces as they are promoted.
 
 The first official example is [oBaseEvents](docs/oBaseEvents.md).
 

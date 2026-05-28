@@ -110,9 +110,9 @@ work from repository state instead of chat history.
     skipped on repeated load attempts and duplicate handles are closed without duplicating
     callbacks.
 - Current agent audit backlog:
-  - runtime/API: owner-token callback handles, active-detour hook removal, and owned
-    debug-control shutdown are implemented; remaining focused follow-up is a runtime guard
-    or harness coverage for `CallProcessEvent` double-execution misuse;
+  - runtime/API: owner-token callback handles, active-detour hook removal, owned
+    debug-control shutdown, and `CallProcessEvent` pre-callback double-execution guard are
+    implemented;
   - cluster/plugin config: shared config default creation is now safe for concurrent
     multi-instance startup; mutable shared plugin state still requires plugin-level
     locking/atomic-write design;
@@ -121,7 +121,9 @@ work from repository state instead of chat history.
     servers.
 - Commit `6b9fe8a` documents `CallProcessEvent` reentrancy in the SDK
   header and plugin docs without changing ABI layout: pre-callbacks that call it must
-  return `false` to avoid double execution; a runtime guard remains future work.
+  return `false` to avoid double execution; later runtime hardening added a guard that
+  skips automatic original execution and warns if a pre-callback calls it and returns
+  `true`.
 - Commit `5cf3de7` adds internal `EventManager` registration IDs and
   `UnregisterCallback(id)` tests. Public `ObeliskApi` callback registration remains
   unchanged for ABI v1.

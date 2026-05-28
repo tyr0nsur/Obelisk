@@ -209,9 +209,9 @@ Rules:
 - Parameter decoding must be reflection-backed before it is considered stable.
   Raw memory scans and string heuristics are research tools only.
 - `CallProcessEvent` is a low-level trampoline escape hatch, not a stable event
-  mutation API. A pre-callback that calls it must return `false`; otherwise the
-  detour will also call the original and the UE function can run twice. Post-callbacks
-  must not replay the same event through `CallProcessEvent`.
+  mutation API. A pre-callback that calls it should return `false`; if it returns
+  `true`, the runtime skips the automatic original call and warns to avoid double
+  execution. Post-callbacks must not replay the same event through `CallProcessEvent`.
 - A global callback may be acceptable for an isolated discovery run if the explicit gate
   is enabled only on the approved debug instance and the test has rollback instructions.
 

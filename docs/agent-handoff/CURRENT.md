@@ -191,13 +191,16 @@ Updated: 2026-05-28
   so repeated loads of an already-loaded `plugin_id` skip initialization and close the
   duplicate handle instead of duplicating callbacks.
 - finding: Runtime/API audit items have mostly been closed: public owner-token callback
-  handles are now exposed, `CallProcessEvent` reentrancy is documented, hook removal tracks
-  active frames, and debug-control shutdown is owned/joined. Remaining focused runtime
-  follow-up is a possible runtime guard for `CallProcessEvent` double-execution misuse.
+  handles are exposed, `CallProcessEvent` double-execution is guarded, hook removal tracks
+  active frames, and debug-control shutdown is owned/joined.
 - fact: Commit `6b9fe8a` documents the `CallProcessEvent` reentrancy
   contract in the public SDK header, README, and plugin architecture docs without changing
-  ABI layout. A pre-callback that calls `CallProcessEvent` must return `false`; returning
-  `true` risks double execution by the detour. A runtime guard remains future work.
+  ABI layout. A pre-callback that calls `CallProcessEvent` should return `false`; returning
+  `true` used to risk double execution by the detour.
+- fact: Runtime now tracks when `CallProcessEvent` is invoked from a pre-callback and
+  skips the automatic original call if the callback returns `true`, logging a warning
+  instead of executing the UE function twice. `ProcessEventCallGuardTests` cover nested
+  and sibling pre-callback scopes.
 - fact: Commit `5cf3de7` added internal `EventManager`
   registration IDs and `UnregisterCallback(id)` coverage. Later commit `7e405f8` promoted
   the safe public form as owner-token handle registration plus
@@ -248,9 +251,8 @@ Updated: 2026-05-28
   `PrimalItem.AllowRemoteAddToInventory`, `PrimalStructure.AllowStructureAccess`, and
   `PrimalStructure.IsAllowedToDemolish`; current readiness is `4/4` comparable and blocked
   only by missing second-source root.
-- next-step: Runtime/API follow-up: add a runtime guard or test harness around
-  `CallProcessEvent` double-execution misuse before promoting plugins that manually invoke
-  the original trampoline.
+- next-step: Runtime/API follow-up: keep expanding tests around plugin lifecycle and
+  callback behavior before promoting plugins that manually invoke the original trampoline.
 - fact: Runtime/chat baseline is documented in
   `docs/research/2026-05-27-runtime-and-chat-baseline.md`.
 - fact: Reflection/chat metadata audit added shared UE probe layouts and gated

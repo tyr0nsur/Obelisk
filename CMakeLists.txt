@@ -60,6 +60,7 @@ add_library(obelisk SHARED
     ue/RuntimeReflection.cpp
     ue/ReflectionScanner.cpp
     hooks/HookManager.cpp
+    hooks/ProcessEventCallGuard.cpp
     hooks/ProcessEventChatReflection.cpp
     hooks/ProcessEventInventoryReflection.cpp
     hooks/ProcessEventStructureReflection.cpp
@@ -160,6 +161,14 @@ add_executable(runtime_marker_tests
 target_include_directories(runtime_marker_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_test(NAME RuntimeMarkerTests COMMAND runtime_marker_tests)
+
+add_executable(process_event_call_guard_tests
+    tests/core/ProcessEventCallGuardTests.cpp
+    hooks/ProcessEventCallGuard.cpp
+)
+target_include_directories(process_event_call_guard_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_test(NAME ProcessEventCallGuardTests COMMAND process_event_call_guard_tests)
 
 add_executable(chat_reflection_tests
     tests/core/ChatReflectionTests.cpp

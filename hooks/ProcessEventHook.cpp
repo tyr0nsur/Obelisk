@@ -1,4 +1,5 @@
 #include "ProcessEventHook.h"
+#include "ProcessEventCallGuard.h"
 #include "ProcessEventChatReflection.h"
 #include "ProcessEventInventoryReflection.h"
 #include "ProcessEventStructureReflection.h"
@@ -838,16 +839,27 @@ namespace Obelisk::Hooks
         TraceReflectedInventoryInvocation(nameIndex, function, params);
         TraceReflectedStructureInvocation(nameIndex, function, params);
 
-        if (hasPreCallbacks &&
-            !eventManager.TriggerPreProcessEvent(nameIndex, object, function, params))
+        bool skipAutomaticOriginal = false;
+        if (hasPreCallbacks)
         {
-            return;
+            ProcessEventCallGuard::PreCallbackScope preCallbackScope;
+            if (!eventManager.TriggerPreProcessEvent(nameIndex, object, function, params))
+                return;
+
+            if (preCallbackScope.OriginalCalled())
+            {
+                skipAutomaticOriginal = true;
+                OBELISK_WARN("ProcessEvent original was called from a pre-callback; skipping the automatic original call to avoid double execution.");
+            }
         }
 
         // Call original function
-        ProcessEvent_t original = SnapshotOriginalProcessEvent();
-        if (original)
-            original(object, function, params);
+        if (!skipAutomaticOriginal)
+        {
+            ProcessEvent_t original = SnapshotOriginalProcessEvent();
+            if (original)
+                original(object, function, params);
+        }
 
         if (hasPostCallbacks)
             eventManager.TriggerPostProcessEvent(nameIndex, object, function, params);
@@ -926,6 +938,7 @@ namespace Obelisk::Hooks
 
     void ProcessEventHook::CallOriginalProcessEvent(void* object, void* function, void* params)
     {
+        ProcessEventCallGuard::MarkOriginalCalledFromPublicApi();
         ActiveProcessEventFrame activeFrame;
         ProcessEvent_t original = SnapshotOriginalProcessEvent();
         if (!original)
