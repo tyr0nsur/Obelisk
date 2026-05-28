@@ -526,6 +526,9 @@ Updated: 2026-05-28
 - fact: Plugin deployment has a staged installer: copy to a temporary non-`.so` filename
   in the destination plugin directory, then atomic rename to the final `.so`, so shared
   discovery cannot see partial plugin copies.
+- fact: Initial operator CLI exists at `scripts/obelisk.py` with read-only `status`,
+  `instances list`, `plugins list`, and `plugins show`. Lifecycle commands remain planned
+  LinuxGSM wrappers; plugin restart means instance restart until hot reload is proven.
 - fact: An authorized `arkserver` core dump confirmed static FName slot `0x5956f30` points
   to a plausible table for binary SHA256
   `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`: table

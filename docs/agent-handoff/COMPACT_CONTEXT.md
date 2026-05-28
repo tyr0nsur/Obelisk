@@ -202,6 +202,9 @@ work from repository state instead of chat history.
 - Stable install only deploys runtime libraries; plugins are activated by publishing `.so`
   files into `/servidor/ark/obelisk/plugins/` with `scripts/install_obelisk_plugin.sh`,
   which stages under a non-`.so` name and atomically renames to the final path.
+- Initial operator CLI is `scripts/obelisk.py`; it is read-only and supports `status`,
+  `instances list`, `plugins list`, and `plugins show`. Start/stop/restart commands are
+  not implemented yet and should wrap LinuxGSM with explicit safety gates.
 - Plugin-owned callback cleanup on init failure and unload.
 - Optional plugin export: `extern "C" void ObeliskPlugin_Shutdown()`.
 - `plugins/oBaseEvents` builds as the first official plugin example.

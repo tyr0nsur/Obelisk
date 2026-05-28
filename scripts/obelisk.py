@@ -1,0 +1,224 @@
+#!/usr/bin/env python3
+"""Read-only operator CLI for Obelisk installs."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+from pathlib import Path
+from typing import Any
+
+
+DEFAULT_ROOT = Path("/servidor/ark/obelisk")
+REQUIRED_DIRS = ("lib", "plugins", "config", "logs", "state/instances")
+
+
+def safe_json_load(path: Path) -> tuple[dict[str, Any] | None, str | None]:
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except FileNotFoundError:
+        return None, "missing"
+    except json.JSONDecodeError as exc:
+        return None, f"invalid JSON: {exc.msg}"
+    except OSError as exc:
+        return None, f"unreadable: {exc}"
+
+    if not isinstance(payload, dict):
+        return None, "config root is not an object"
+    return payload, None
+
+
+def bool_text(value: Any) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return "missing"
+
+
+def list_text(value: Any) -> str:
+    if not isinstance(value, list):
+        return "missing"
+    if not value:
+        return "[]"
+    return ",".join(str(item) for item in value)
+
+
+def iter_regular_so(plugin_dir: Path) -> list[Path]:
+    if not plugin_dir.is_dir():
+        return []
+    return sorted(
+        path
+        for path in plugin_dir.iterdir()
+        if path.suffix == ".so" and path.is_file() and not path.is_symlink()
+    )
+
+
+def iter_instances(state_root: Path) -> list[Path]:
+    instances_root = state_root / "instances"
+    if not instances_root.is_dir():
+        return []
+    return sorted(path for path in instances_root.iterdir() if path.is_dir() and not path.is_symlink())
+
+
+def print_table(rows: list[list[str]], headers: list[str]) -> None:
+    widths = [len(header) for header in headers]
+    for row in rows:
+        for index, value in enumerate(row):
+            widths[index] = max(widths[index], len(value))
+
+    def render(row: list[str]) -> str:
+        return "  ".join(value.ljust(widths[index]) for index, value in enumerate(row))
+
+    print(render(headers))
+    print(render(["-" * width for width in widths]))
+    for row in rows:
+        print(render(row))
+
+
+def command_status(root: Path) -> int:
+    print(f"root: {root}")
+    for relative in REQUIRED_DIRS:
+        path = root / relative
+        if path.is_symlink():
+            state = "symlink"
+        elif path.exists():
+            state = "ok" if path.is_dir() else "not-directory"
+        else:
+            state = "missing"
+        print(f"{relative}: {state}")
+
+    plugins = iter_regular_so(root / "plugins")
+    instances = iter_instances(root / "state")
+    print(f"plugins: {len(plugins)}")
+    print(f"instances: {len(instances)}")
+    return 0
+
+
+def command_instances_list(root: Path) -> int:
+    rows: list[list[str]] = []
+    for instance_dir in iter_instances(root / "state"):
+        markers = sorted(
+            marker.name
+            for marker in instance_dir.iterdir()
+            if marker.is_file() and not marker.is_symlink()
+        )
+        rows.append([instance_dir.name, ",".join(markers) if markers else "[]"])
+
+    if not rows:
+        print("No instances found.")
+        return 0
+
+    print_table(rows, ["instance", "markers"])
+    return 0
+
+
+def plugin_config_summary(root: Path, plugin_id: str) -> tuple[str, str, str, str]:
+    config_path = root / "config" / plugin_id / "config.json"
+    payload, error = safe_json_load(config_path)
+    if error:
+        return ("unknown", "unknown", "unknown", error)
+    assert payload is not None
+    return (
+        bool_text(payload.get("enabled")),
+        bool_text(payload.get("allow_all_instances")),
+        list_text(payload.get("instance_allowlist")),
+        "ok",
+    )
+
+
+def command_plugins_list(root: Path) -> int:
+    plugin_files = iter_regular_so(root / "plugins")
+    config_dirs = []
+    config_root = root / "config"
+    if config_root.is_dir():
+        config_dirs = sorted(path for path in config_root.iterdir() if path.is_dir() and not path.is_symlink())
+
+    names = sorted({path.stem for path in plugin_files} | {path.name for path in config_dirs})
+    rows: list[list[str]] = []
+    for name in names:
+        so_path = root / "plugins" / f"{name}.so"
+        enabled, allow_all, allowlist, config_state = plugin_config_summary(root, name)
+        rows.append([
+            name,
+            "yes" if so_path.is_file() and not so_path.is_symlink() else "no",
+            enabled,
+            allow_all,
+            allowlist,
+            config_state,
+        ])
+
+    if not rows:
+        print("No plugins or plugin configs found.")
+        return 0
+
+    print_table(rows, ["plugin", "published", "enabled", "all", "instances", "config"])
+    return 0
+
+
+def command_plugins_show(root: Path, plugin: str) -> int:
+    so_path = root / "plugins" / f"{plugin}.so"
+    config_path = root / "config" / plugin / "config.json"
+    print(f"plugin: {plugin}")
+    print(f"published_so: {so_path if so_path.is_file() and not so_path.is_symlink() else 'missing'}")
+    print(f"config: {config_path}")
+
+    payload, error = safe_json_load(config_path)
+    if error:
+        print(f"config_state: {error}")
+        return 1 if error != "missing" else 0
+
+    assert payload is not None
+    print(f"enabled: {bool_text(payload.get('enabled'))}")
+    print(f"allow_all_instances: {bool_text(payload.get('allow_all_instances'))}")
+    print(f"instance_allowlist: {list_text(payload.get('instance_allowlist'))}")
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Read-only Obelisk operator CLI.",
+    )
+    parser.add_argument(
+        "--root",
+        default=os.environ.get("OBELISK_ROOT", str(DEFAULT_ROOT)),
+        help="Obelisk install root. Defaults to OBELISK_ROOT or /servidor/ark/obelisk.",
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    subparsers.add_parser("status", help="Show install root, directory, plugin, and instance summary.")
+
+    instances = subparsers.add_parser("instances", help="Inspect instance marker state.")
+    instance_subcommands = instances.add_subparsers(dest="instances_command", required=True)
+    instance_subcommands.add_parser("list", help="List known instance marker directories.")
+
+    plugins = subparsers.add_parser("plugins", help="Inspect plugin publication/config state.")
+    plugin_subcommands = plugins.add_subparsers(dest="plugins_command", required=True)
+    plugin_subcommands.add_parser("list", help="List published plugins and plugin configs.")
+    plugin_show = plugin_subcommands.add_parser("show", help="Show one plugin config summary.")
+    plugin_show.add_argument("plugin", help="Plugin id / config directory name.")
+
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    root = Path(args.root)
+
+    if args.command == "status":
+        return command_status(root)
+    if args.command == "instances" and args.instances_command == "list":
+        return command_instances_list(root)
+    if args.command == "plugins" and args.plugins_command == "list":
+        return command_plugins_list(root)
+    if args.command == "plugins" and args.plugins_command == "show":
+        return command_plugins_show(root, args.plugin)
+
+    parser.error("unsupported command")
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

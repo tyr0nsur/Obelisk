@@ -74,7 +74,8 @@ packaging/            Harness adapters and wrapper templates
 ```
 
 Plugin policy is documented in
-[docs/PLUGIN_ARCHITECTURE.md](docs/PLUGIN_ARCHITECTURE.md).
+[docs/PLUGIN_ARCHITECTURE.md](docs/PLUGIN_ARCHITECTURE.md). The initial read-only
+operator CLI is documented in [docs/OPERATOR_CLI.md](docs/OPERATOR_CLI.md).
 
 ## Build And Test
 

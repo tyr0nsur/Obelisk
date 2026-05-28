@@ -33,6 +33,7 @@ cmake --build build -j"$(nproc)"
 ctest --test-dir build --output-on-failure
 scripts/run_script_tests.sh
 scripts/test_install_obelisk_layout.sh
+scripts/obelisk.py --root /tmp/obelisk-release-check status
 scripts/install_obelisk.sh --dry-run /tmp/obelisk-release-check
 scripts/install_obelisk_plugin.sh --dry-run build/plugins/oBaseEvents/oBaseEvents.so /tmp/obelisk-release-check
 ```
