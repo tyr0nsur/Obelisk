@@ -534,6 +534,30 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertIn("base:property[0]_status_rejected", report["results"][0]["reasons"])
         self.assertIn("candidate:property[0]_has_reject_reasons", report["results"][0]["reasons"])
 
+    def test_weak_property_membership_blocks_comparison_even_when_both_sides_match(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            left = base_snapshot()
+            right = deepcopy(left)
+            for payload in (left, right):
+                prop = payload["targets"][0]["property_chain"]["properties"][0]  # type: ignore[index]
+                prop["membership_status"] = "not-in-gobjects"
+                prop.pop("class_membership_status", None)
+            write_snapshot(base, left)
+            write_snapshot(candidate, right)
+
+            result = run_compare(base, candidate, "--json")
+
+        self.assertEqual(result.returncode, 2)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["counts"]["inconclusive"], 1)
+        self.assertIn("base:property[0]_membership_status_not-in-gobjects", report["results"][0]["reasons"])
+        self.assertIn("candidate:property[0]_class_membership_status_missing", report["results"][0]["reasons"])
+
     def test_rejected_nested_property_candidate_blocks_comparison(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -566,6 +590,83 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(report["counts"]["inconclusive"], 1)
         self.assertIn("base:property[0]_array_inner_candidate_status_rejected", report["results"][0]["reasons"])
         self.assertIn("candidate:property[0]_array_inner_candidate_has_reject_reasons", report["results"][0]["reasons"])
+
+    def test_weak_nested_property_membership_blocks_comparison(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            left = base_snapshot()
+            left["targets"][0]["property_chain"]["properties"][0]["array_inner_candidate"] = {  # type: ignore[index]
+                "status": "candidate",
+                "reject_reasons": [],
+                "membership_status": "not-in-gobjects",
+                "inner_property": {
+                    "object_index": 2000,
+                    "name": "InventoryItems",
+                    "name_index": 3000,
+                    "class_name": "ObjectProperty",
+                    "class_name_index": 4000,
+                    "class_object_index": 5000,
+                },
+            }
+            left["targets"][0]["property_chain"]["properties"][1]["struct_type_candidate"] = {  # type: ignore[index]
+                "status": "candidate",
+                "reject_reasons": [],
+                "struct_type": {
+                    "object_index": 2001,
+                    "name": "ARKTributeDino",
+                    "name_index": 3001,
+                    "class_name": "ScriptStruct",
+                    "class_name_index": 4001,
+                    "class_object_index": 5001,
+                },
+            }
+            right = deepcopy(left)
+            write_snapshot(base, left)
+            write_snapshot(candidate, right)
+
+            result = run_compare(base, candidate, "--json")
+
+        self.assertEqual(result.returncode, 2)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["counts"]["inconclusive"], 1)
+        reasons = report["results"][0]["reasons"]
+        self.assertIn("base:property[0]_array_inner_candidate_membership_status_not-in-gobjects", reasons)
+        self.assertIn("candidate:property[1]_struct_type_candidate_membership_status_missing", reasons)
+
+    def test_nested_property_candidate_requires_identity_object(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            left = base_snapshot()
+            left["targets"][0]["property_chain"]["properties"][0]["array_inner_candidate"] = {  # type: ignore[index]
+                "status": "candidate",
+                "reject_reasons": [],
+                "membership_status": "candidate-uobject",
+            }
+            left["targets"][0]["property_chain"]["properties"][1]["struct_type_candidate"] = {  # type: ignore[index]
+                "status": "candidate",
+                "reject_reasons": [],
+                "membership_status": "candidate-uobject",
+            }
+            right = deepcopy(left)
+            write_snapshot(base, left)
+            write_snapshot(candidate, right)
+
+            result = run_compare(base, candidate, "--json")
+
+        self.assertEqual(result.returncode, 2)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["counts"]["inconclusive"], 1)
+        reasons = report["results"][0]["reasons"]
+        self.assertIn("base:property[0]_array_inner_candidate_missing_inner_property", reasons)
+        self.assertIn("candidate:property[1]_struct_type_candidate_missing_struct_type", reasons)
 
     def test_target_filter_limits_comparison_to_requested_target(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -369,8 +369,9 @@ Updated: 2026-05-28
   `PrimalLocalProfile.ArkTributePlayerData`.
 - fact: Snapshot comparison now rejects internally bad layouts before comparing:
   individual property candidates and nested array/struct candidates with non-candidate
-  status or reject reasons make the target `inconclusive`, even when base and candidate
-  share the same rejected shape.
+  status, reject reasons, missing/non-candidate GObjects membership, or missing nested
+  identity objects make the target `inconclusive`, even when base and candidate share the
+  same rejected shape.
 - fact: Second-source workflow docs and offline tool help now warn that the primary-core
   FName root slot default is not reusable evidence for new artifacts. For second-source
   work, first derive or scan a per-artifact verified FName root/table and pass it

@@ -93,10 +93,10 @@ work from repository state instead of chat history.
   matching identity is `inconclusive`, so self-comparison cannot pass as independent
   evidence. Readiness JSON includes per-target details plus a top-level `promotion_gate`
   summary. Empty snapshot roots add a `no_targets` blocker. Missing base target-set entries
-  are `not_applicable` for second-source status, and rejected property/nested candidates
-  make a target inconclusive before layout compare. Text readiness reports now list each
-  non-accepted target with `comparable`, `second_source`, blocker reasons, and first diff
-  details.
+  are `not_applicable` for second-source status, and rejected or weak-membership
+  property/nested candidates make a target inconclusive before layout compare. Text
+  readiness reports now list each non-accepted target with `comparable`,
+  `second_source`, blocker reasons, and first diff details.
 - UFunction and ScriptStruct regenerators accept the artifact identity flags above; the
   committed primary fixtures carry the primary core artifact SHA without storing core
   paths.

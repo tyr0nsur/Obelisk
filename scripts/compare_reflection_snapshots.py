@@ -276,15 +276,25 @@ def property_block_reasons(prop: dict[str, Any], *, index: int) -> list[str]:
         reasons.append(f"{prefix}_status_{prop.get('status')}")
     if prop.get("reject_reasons", []):
         reasons.append(f"{prefix}_has_reject_reasons")
+    for membership_key in ("membership_status", "class_membership_status", "outer_membership_status"):
+        membership = prop.get(membership_key)
+        if membership != "candidate-uobject":
+            reasons.append(f"{prefix}_{membership_key}_{membership if membership is not None else 'missing'}")
     for nested_key in ("array_inner_candidate", "struct_type_candidate"):
         nested = prop.get(nested_key)
         if not isinstance(nested, dict):
             continue
         nested_prefix = f"{prefix}_{nested_key}"
+        nested_identity_key = "inner_property" if nested_key == "array_inner_candidate" else "struct_type"
         if nested.get("status") != "candidate":
             reasons.append(f"{nested_prefix}_status_{nested.get('status')}")
         if nested.get("reject_reasons", []):
             reasons.append(f"{nested_prefix}_has_reject_reasons")
+        membership = nested.get("membership_status")
+        if membership != "candidate-uobject":
+            reasons.append(f"{nested_prefix}_membership_status_{membership if membership is not None else 'missing'}")
+        if not isinstance(nested.get(nested_identity_key), dict):
+            reasons.append(f"{nested_prefix}_missing_{nested_identity_key}")
     return reasons
 
 

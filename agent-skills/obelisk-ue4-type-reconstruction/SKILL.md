@@ -101,6 +101,10 @@ For each reconstructed field:
 - Snapshot comparison target sets used for promotion must be schema-qualified and strict:
   requested targets absent from the base or candidate snapshot root are
   inconclusive/missing and must not be silently ignored.
+- Snapshot comparison must block a target before layout diff if any property lacks
+  `candidate-uobject` membership for the property, class, or outer back-reference, or if
+  nested array/struct candidates lack `candidate-uobject` membership and their identity
+  object.
 - When recording artifact identity, pass all four fields together: `artifact_kind`,
   `artifact_sha256`, `capture_id`, and `evidence_pack_id`. Partial artifact identity is not
   valid second-source evidence.

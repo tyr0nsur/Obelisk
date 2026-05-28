@@ -137,6 +137,8 @@ Do not skip steps because a single core, log line, or recognizer test looks conv
   identity indices only when intentionally checking same-binary identity evidence.
 - For snapshot comparisons, acceptance requires distinct sanitized artifact identity on
   both roots; missing or matching identity is `inconclusive`.
+- Snapshot comparison must also require each property and nested array/struct candidate
+  to be backed by `candidate-uobject` membership before accepting a layout as comparable.
 - Do not expand raw `0x00..0x80` param scanning as the long-term fix for any module.
 - Avoid manual construction of UE params until the real reflected property layout and
   caller semantics are decoded.
