@@ -89,6 +89,14 @@ write_proc_fixture 112 "${stable_maps}" \
 expect_failure inventory-reflection-forbidden-for-stable \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 112 --expect-stable
 
+write_proc_fixture 113 "${stable_maps}" \
+    "OBELISK_INSTANCE_ID=arkserver" \
+    "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
+    "OBELISK_DISABLE_PLUGINS=1" \
+    "OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS=1"
+expect_failure global-process-event-callbacks-forbidden-for-stable \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 113 --expect-stable
+
 write_proc_fixture 102 "${stable_maps}" \
     "OBELISK_INSTANCE_ID=arkserver" \
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \

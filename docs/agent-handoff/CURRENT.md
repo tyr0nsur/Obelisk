@@ -50,6 +50,12 @@ Updated: 2026-05-28
   Ragnarok PID after restart: `1820244`. Read-only posture passes with
   `scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map
   Ragnarok --instance arkserver`.
+- fact: The LinuxGSM wrapper now scrubs inherited marker-managed Obelisk env vars before
+  selecting an instance profile. ProcessEvent hook, plugin-disable, ptrace/debug-control,
+  native exec probes, global callbacks, and chat/inventory/structure reflection env must be
+  reintroduced by instance markers instead of leaking from the parent environment. The live
+  wrapper was updated without restart; backup:
+  `/home/flowcommunity-ark/backups/ObeliskRun.sh.20260528-024702.bak`.
 - fact: Operator explicitly approved a Ragnarok gameplay config change on 2026-05-27:
   `AllowCaveBuildingPvP=True` was applied to `GameUserSettings.ini`, pre-change backup is
   `/home/flowcommunity-ark/backups/ark-config-manual/GameUserSettings.ini.allow-cave-20260527-184547.bak`,
@@ -554,10 +560,12 @@ Updated: 2026-05-28
 - next-step: Keep reducing tooling debt that makes reversing faster and safer: snapshot
   comparators, manifest regeneration, sanitizer tests, evidence packs, and bounded
   property-chain validation.
-- rollback: on `arkserver2`, remove the experimental marker/env, keep
-  `disable-plugins`, restart only TheIsland, and run
-  `scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance
-  arkserver2`; no plugin ABI or config migration is involved.
+- rollback: while RAM is constrained, rollback targets `arkserver` / Ragnarok only within
+  an approved test/rollback window: remove the experimental marker/env, keep
+  `disable-plugins`, restart only Ragnarok if restart was approved, and run
+  `scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map
+  Ragnarok --instance arkserver`. Keep `arkserver2` stopped unless the operator explicitly
+  reopens it.
 - next-step: Generalize the binary-hash-scoped reflection pipeline only after another
   capture or ARK binary hash validates the same fields.
 - next-step: Add binary hash validation or an instruction decoder before accepting future

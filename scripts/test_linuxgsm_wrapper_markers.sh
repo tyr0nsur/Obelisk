@@ -148,6 +148,50 @@ run_wrapper_with_instance "${root_marker}" "${capture_traversal}" '../arkserver2
 assert_not_contains "${capture_traversal}" '^OBELISK_ENABLE_INVENTORY_REFLECTION='
 assert_not_contains "${capture_traversal}" '^OBELISK_ENABLE_STRUCTURE_REFLECTION='
 
+root_inherited="${TMP_DIR}/root-inherited"
+capture_inherited="${TMP_DIR}/inherited.env"
+prepare_root "${root_inherited}"
+(
+    cd "${TMP_DIR}"
+    OBELISK_ROOT="${root_inherited}" \
+    OBELISK_WRAPPER_CAPTURE="${capture_inherited}" \
+    OBELISK_ENABLE_PROCESS_EVENT_HOOK=1 \
+    OBELISK_DISABLE_PLUGINS=1 \
+    OBELISK_DEBUG_ALLOW_PTRACE=1 \
+    OBELISK_ENABLE_DEBUG_CONTROL=1 \
+    OBELISK_ENABLE_NATIVE_EXEC_PROBES=1 \
+    OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS=1 \
+    OBELISK_ENABLE_CHAT_REFLECTION=1 \
+    OBELISK_CHAT_REFLECTION_BINARY_SHA256=bad-chat-sha \
+    OBELISK_CHAT_REFLECTION_LOG_LIMIT=99 \
+    OBELISK_CHAT_REFLECTION_LOG_TEXT=1 \
+    OBELISK_ENABLE_INVENTORY_REFLECTION=1 \
+    OBELISK_INVENTORY_REFLECTION_BINARY_SHA256=bad-inventory-sha \
+    OBELISK_INVENTORY_REFLECTION_LOG_LIMIT=88 \
+    OBELISK_ENABLE_STRUCTURE_REFLECTION=1 \
+    OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256=bad-structure-sha \
+    OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT=77 \
+    "${WRAPPER}" Ragnarok?listen
+)
+
+assert_contains "${capture_inherited}" '^OBELISK_INSTANCE_ID=arkserver$'
+assert_not_contains "${capture_inherited}" '^OBELISK_ENABLE_PROCESS_EVENT_HOOK='
+assert_not_contains "${capture_inherited}" '^OBELISK_DISABLE_PLUGINS='
+assert_not_contains "${capture_inherited}" '^OBELISK_DEBUG_ALLOW_PTRACE='
+assert_not_contains "${capture_inherited}" '^OBELISK_ENABLE_DEBUG_CONTROL='
+assert_not_contains "${capture_inherited}" '^OBELISK_ENABLE_NATIVE_EXEC_PROBES='
+assert_not_contains "${capture_inherited}" '^OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS='
+assert_not_contains "${capture_inherited}" '^OBELISK_ENABLE_CHAT_REFLECTION='
+assert_not_contains "${capture_inherited}" '^OBELISK_CHAT_REFLECTION_BINARY_SHA256='
+assert_not_contains "${capture_inherited}" '^OBELISK_CHAT_REFLECTION_LOG_LIMIT='
+assert_not_contains "${capture_inherited}" '^OBELISK_CHAT_REFLECTION_LOG_TEXT='
+assert_not_contains "${capture_inherited}" '^OBELISK_ENABLE_INVENTORY_REFLECTION='
+assert_not_contains "${capture_inherited}" '^OBELISK_INVENTORY_REFLECTION_BINARY_SHA256='
+assert_not_contains "${capture_inherited}" '^OBELISK_INVENTORY_REFLECTION_LOG_LIMIT='
+assert_not_contains "${capture_inherited}" '^OBELISK_ENABLE_STRUCTURE_REFLECTION='
+assert_not_contains "${capture_inherited}" '^OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256='
+assert_not_contains "${capture_inherited}" '^OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT='
+
 capture_symlink_instance="${TMP_DIR}/symlink-instance.env"
 root_symlink_instance="${TMP_DIR}/root-symlink-instance"
 mkdir -p "${root_symlink_instance}/lib" "${root_symlink_instance}/real-instance" "${root_symlink_instance}/state/instances"
