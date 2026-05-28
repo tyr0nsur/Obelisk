@@ -417,6 +417,54 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertIn("candidate:evidence_source_runtime_probe", report["results"][0]["reasons"])
         self.assertIn("candidate:evidence_status_accepted", report["results"][0]["reasons"])
 
+    def test_marks_malformed_evidence_identity_inconclusive(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "second"
+            base.mkdir()
+            candidate.mkdir()
+            left = base_snapshot()
+            right = deepcopy(left)
+            right["evidence"]["artifact_kind"] = "runtime_probe"  # type: ignore[index]
+            right["evidence"]["artifact_sha256"] = "not-a-sha"  # type: ignore[index]
+            right["evidence"]["capture_id"] = "../capture"  # type: ignore[index]
+            right["evidence"]["evidence_pack_id"] = "pack/id"  # type: ignore[index]
+            write_snapshot(base, left)
+            write_snapshot(candidate, right)
+
+            result = run_compare(base, candidate, "--json")
+
+        self.assertEqual(result.returncode, 2)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["counts"]["inconclusive"], 1)
+        self.assertIn("candidate:invalid_artifact_kind_runtime_probe", report["results"][0]["reasons"])
+        self.assertIn("candidate:invalid_artifact_sha256", report["results"][0]["reasons"])
+        self.assertIn("candidate:invalid_capture_id", report["results"][0]["reasons"])
+        self.assertIn("candidate:invalid_evidence_pack_id", report["results"][0]["reasons"])
+
+    def test_marks_malformed_ark_sha_inconclusive(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            left = base_snapshot()
+            right = deepcopy(left)
+            left["evidence"]["ark_binary_sha256"] = "not-a-sha"  # type: ignore[index]
+            right["evidence"]["ark_binary_sha256"] = "not-a-sha"  # type: ignore[index]
+            write_snapshot(base, left)
+            write_snapshot(candidate, right)
+
+            result = run_compare(base, candidate, "--json")
+
+        self.assertEqual(result.returncode, 2)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["counts"]["inconclusive"], 1)
+        self.assertIn("base:invalid_ark_binary_sha256", report["results"][0]["reasons"])
+        self.assertIn("candidate:invalid_ark_binary_sha256", report["results"][0]["reasons"])
+
     def test_strict_identity_indices_rejects_nested_index_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

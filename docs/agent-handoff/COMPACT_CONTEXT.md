@@ -231,7 +231,8 @@ work from repository state instead of chat history.
 - Minimal second-source intake should run before expanding more gameplay surfaces:
   `PrimalItem.CanUse`, `PrimalItem.AllowRemoteAddToInventory`,
   `PrimalStructure.AllowStructureAccess`, and `PrimalStructure.IsAllowedToDemolish`.
-  Current readiness is `4/4` comparable and blocked only by missing second-source root.
+  Current primary-fixture comparability is `4/4`, and promotion remains blocked by missing
+  accepted second-source evidence.
 - For new second-source artifacts, do not reuse the primary-core FName root slot by
   default. First derive or scan a verified per-artifact FName root/table, then pass it
   explicitly to UObjects/UFunction/ScriptStruct tools. UFunction and ScriptStruct

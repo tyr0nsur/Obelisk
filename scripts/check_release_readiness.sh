@@ -21,9 +21,10 @@ while [[ $# -gt 0 ]]; do
             cat <<'EOF'
 Usage: scripts/check_release_readiness.sh [--allow-dirty] [--require-second-source-readiness]
 
-Runs the local first-stable release gate. By default the command fails if tracked or
+Runs the local first-stable core release gate. By default the command fails if tracked or
 untracked non-ignored files are present before or after validation. Ignored build/cache
-directories are allowed.
+directories are allowed. Gameplay/module second-source promotion gates run only when
+--require-second-source-readiness is supplied.
 
 Options:
   --allow-dirty                     Permit a dirty worktree while developing the release gate itself.
@@ -99,4 +100,8 @@ printf '\n==> git status --short --ignored\n'
 git status --short --ignored
 check_clean_tree
 
-printf '\nRelease readiness checks completed.\n'
+if [[ "${REQUIRE_SECOND_SOURCE_READINESS}" == "1" ]]; then
+    printf '\nCore-first release readiness and gameplay/module second-source promotion checks completed.\n'
+else
+    printf '\nCore-first release readiness checks completed; gameplay/module second-source promotion gate was not run.\n'
+fi

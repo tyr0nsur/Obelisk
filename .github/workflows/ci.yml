@@ -114,8 +114,8 @@ jobs:
               sys.exit(1)
           PY
 
-  release-readiness:
-    name: Release readiness
+  core-first-release-readiness:
+    name: Core-first release readiness
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -133,5 +133,6 @@ jobs:
             git \
             ninja-build
 
-      - name: Run first-stable release gate
+      - name: Run first-stable core release gate
+        # Gameplay/module promotion requires scripts/check_release_readiness.sh --require-second-source-readiness.
         run: scripts/check_release_readiness.sh

@@ -29,6 +29,8 @@ FORBIDDEN_KEYS = {
     "native_func_candidate",
 }
 ADDRESS_RE = re.compile(r"0x[0-9a-fA-F]{8,}")
+SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+SAFE_ARTIFACT_ID_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 HEX_METADATA_KEYS = {"property_flags", "return_value_offset", "function_flags"}
 EVIDENCE_ARTIFACT_IDENTITY_KEYS = (
     "artifact_sha256",
@@ -36,6 +38,7 @@ EVIDENCE_ARTIFACT_IDENTITY_KEYS = (
     "capture_id",
     "evidence_pack_id",
 )
+ALLOWED_ARTIFACT_KINDS = {"offline_core"}
 TARGET_SETS = {
     "minimal-second-source-intake": (
         "obelisk.ufunction-chain.snapshot.v1:PrimalItem.CanUse",
@@ -250,8 +253,23 @@ def evidence_reasons(payload: dict[str, Any]) -> list[str]:
     if not isinstance(evidence, dict):
         return ["missing_evidence"]
     reasons: list[str] = []
-    if not isinstance(evidence.get("ark_binary_sha256"), str):
+    ark_binary_sha256 = evidence.get("ark_binary_sha256")
+    if not isinstance(ark_binary_sha256, str):
         reasons.append("missing_ark_binary_sha256")
+    elif SHA256_RE.fullmatch(ark_binary_sha256) is None:
+        reasons.append("invalid_ark_binary_sha256")
+    artifact_kind = evidence.get("artifact_kind")
+    if artifact_kind is not None and artifact_kind not in ALLOWED_ARTIFACT_KINDS:
+        reasons.append(f"invalid_artifact_kind_{artifact_kind}")
+    artifact_sha256 = evidence.get("artifact_sha256")
+    if artifact_sha256 is not None:
+        if not isinstance(artifact_sha256, str) or SHA256_RE.fullmatch(artifact_sha256) is None:
+            reasons.append("invalid_artifact_sha256")
+    for field in ("capture_id", "evidence_pack_id"):
+        value = evidence.get(field)
+        if value is not None:
+            if not isinstance(value, str) or SAFE_ARTIFACT_ID_RE.fullmatch(value) is None:
+                reasons.append(f"invalid_{field}")
     if evidence.get("source") != "offline_core":
         reasons.append(f"evidence_source_{evidence.get('source')}")
     if evidence.get("status") != "candidate-only":

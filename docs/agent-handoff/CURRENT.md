@@ -404,9 +404,9 @@ Updated: 2026-05-28
 - fact: Commit `4e4f5cf` adds
   `scripts/compare_reflection_snapshots.py --readiness-report`. It summarizes comparable
   snapshot coverage and second-source status by schema/module without requiring a live
-  server. Current fixture readiness: UFunction `35/35` comparable and ScriptStruct `2/2`
-  comparable. Second-source acceptance now additionally requires independent sanitized
-  artifact identity; self-comparison is inconclusive.
+  server. Current primary-fixture comparability: UFunction `35/35` comparable and
+  ScriptStruct `2/2` comparable. Promotion still requires accepted distinct second-source
+  evidence; self-comparison is inconclusive.
 - fact: `sdk.transfers` ScriptStruct fixtures now preserve target/property object and
   FName identity fields like UFunction fixtures. `regenerate_scriptstruct_snapshots.py
   --check-layout` stays semantic/layout-only so second-source gates do not depend on
@@ -417,8 +417,8 @@ Updated: 2026-05-28
   `docs/research/2026-05-28-second-source-reversing-gap-matrix.md` before expanding more
   gameplay surfaces. First targets are `PrimalItem.CanUse`,
   `PrimalItem.AllowRemoteAddToInventory`, `PrimalStructure.AllowStructureAccess`, and
-  `PrimalStructure.IsAllowedToDemolish`; current readiness is `4/4` comparable and blocked
-  only by missing second-source root.
+  `PrimalStructure.IsAllowedToDemolish`; current primary-fixture comparability is `4/4`,
+  and promotion remains blocked by missing accepted second-source evidence.
 - next-step: Runtime/API follow-up: keep expanding tests around plugin lifecycle and
   callback behavior before promoting plugins that manually invoke the original trampoline.
 - fact: Runtime/chat baseline is documented in
