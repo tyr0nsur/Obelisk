@@ -324,11 +324,17 @@ namespace Obelisk::Hooks
             ProcessEventChatReflection::Gate value =
                 ProcessEventChatReflection::EvaluateGate(
                     std::getenv("OBELISK_ENABLE_CHAT_REFLECTION"),
+                    Runtime::IsInstanceMarkerEnabled(std::getenv("OBELISK_ROOT"),
+                                                     std::getenv("OBELISK_INSTANCE_ID"),
+                                                     "enable-chat-reflection"),
                     std::getenv("OBELISK_CHAT_REFLECTION_BINARY_SHA256"));
 
             switch (value.Status)
             {
             case ProcessEventChatReflection::GateStatus::Disabled:
+                break;
+            case ProcessEventChatReflection::GateStatus::MissingInstanceMarker:
+                OBELISK_WARN("Chat reflection disabled: instance marker enable-chat-reflection is required.");
                 break;
             case ProcessEventChatReflection::GateStatus::MissingBinarySha256:
                 OBELISK_WARN("Chat reflection disabled: OBELISK_CHAT_REFLECTION_BINARY_SHA256 is required.");

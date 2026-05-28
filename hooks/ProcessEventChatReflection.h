@@ -12,6 +12,7 @@ namespace Obelisk::Hooks::ProcessEventChatReflection
     enum class GateStatus
     {
         Disabled,
+        MissingInstanceMarker,
         MissingBinarySha256,
         UnsupportedBinarySha256,
         Enabled,
@@ -43,7 +44,7 @@ namespace Obelisk::Hooks::ProcessEventChatReflection
         Obelisk::UE::ChatReflection::ChatInvocation Invocation;
     };
 
-    Gate EvaluateGate(const char* enableChatReflection, const char* binarySha256);
+    Gate EvaluateGate(const char* enableChatReflection, bool instanceMarkerEnabled, const char* binarySha256);
     bool IsReflectedChatNameIndex(int32_t nameIndex);
     bool ShouldAttemptObservation(uint64_t limit);
     bool ShouldLogObservation(uint64_t observationNumber, uint64_t limit);

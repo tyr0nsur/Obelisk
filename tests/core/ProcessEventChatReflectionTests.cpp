@@ -228,18 +228,20 @@ namespace
     {
         const char* supportedSha = kSupportedShooterGameServerSha256.data();
 
-        Require(EvaluateGate(nullptr, supportedSha).Status == GateStatus::Disabled,
+        Require(EvaluateGate(nullptr, true, supportedSha).Status == GateStatus::Disabled,
                 "missing enable env should disable chat reflection");
-        Require(EvaluateGate("0", supportedSha).Status == GateStatus::Disabled,
+        Require(EvaluateGate("0", true, supportedSha).Status == GateStatus::Disabled,
                 "non-1 enable env should disable chat reflection");
-        Require(EvaluateGate("1", nullptr).Status == GateStatus::MissingBinarySha256,
+        Require(EvaluateGate("1", false, supportedSha).Status == GateStatus::MissingInstanceMarker,
+                "missing instance marker gate was not rejected");
+        Require(EvaluateGate("1", true, nullptr).Status == GateStatus::MissingBinarySha256,
                 "missing binary SHA gate was not rejected");
-        Require(EvaluateGate("1", "").Status == GateStatus::MissingBinarySha256,
+        Require(EvaluateGate("1", true, "").Status == GateStatus::MissingBinarySha256,
                 "empty binary SHA gate was not rejected");
-        Require(EvaluateGate("1", "not-this-binary").Status == GateStatus::UnsupportedBinarySha256,
+        Require(EvaluateGate("1", true, "not-this-binary").Status == GateStatus::UnsupportedBinarySha256,
                 "unsupported binary SHA gate was not rejected");
 
-        Gate gate = EvaluateGate("1", supportedSha);
+        Gate gate = EvaluateGate("1", true, supportedSha);
         Require(gate.Status == GateStatus::Enabled, "supported chat reflection gate did not enable");
         Require(gate.Enabled(), "enabled chat reflection gate did not report enabled");
         Require(gate.BinarySha256 == kSupportedShooterGameServerSha256, "enabled gate did not retain binary SHA");
