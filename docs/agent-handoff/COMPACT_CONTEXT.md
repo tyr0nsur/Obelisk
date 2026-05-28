@@ -102,10 +102,10 @@ work from repository state instead of chat history.
   command examples from returning to install, supervision, or skill docs.
 - `scripts/test_public_sdk_guardrails.py` is the canonical module-first public SDK
   guardrail; `test_public_sdk_chat_guardrails.py` remains a legacy wrapper.
-- Current uncommitted priority round:
-  - supervisor default is being aligned to `arkserver-obelisk-debug`;
-  - CI/release/README are being updated to run `scripts/test_obelisk_supervisor_snapshot.sh`;
-  - `PluginManager::LoadPlugins` is being hardened so already-loaded `plugin_id` values are
+- Commit `cd57189`:
+  - supervisor default was aligned to `arkserver-obelisk-debug`;
+  - CI/release/README were updated to run `scripts/test_obelisk_supervisor_snapshot.sh`;
+  - `PluginManager::LoadPlugins` was hardened so already-loaded `plugin_id` values are
     skipped on repeated load attempts and duplicate handles are closed without duplicating
     callbacks.
 - Current agent audit backlog:
@@ -114,10 +114,10 @@ work from repository state instead of chat history.
   - reflection/offline: ScriptStruct second-source coverage is the bottleneck, and the
     next safe step is a second-source readiness report over existing snapshots without
     touching live servers.
-- Current uncommitted runtime/API round documents `CallProcessEvent` reentrancy in the SDK
+- Commit `6b9fe8a` documents `CallProcessEvent` reentrancy in the SDK
   header and plugin docs without changing ABI layout: pre-callbacks that call it must
   return `false` to avoid double execution; a runtime guard remains future work.
-- Current uncommitted runtime/API round adds internal `EventManager` registration IDs and
+- Commit `5cf3de7` adds internal `EventManager` registration IDs and
   `UnregisterCallback(id)` tests. Public `ObeliskApi` callback registration remains
   unchanged for ABI v1.
 - Commit `f5d1b0e` tracks active ProcessEvent detour/trampoline frames and avoids
@@ -128,15 +128,19 @@ work from repository state instead of chat history.
 - Commit `2095b1a` aligns ProcessEvent callback dispatch with chat dispatcher
   self-unregister behavior by using a recursive dispatch mutex and testing a callback that
   unregisters its own registration during dispatch. Public ABI remains unchanged.
-- Current uncommitted hook lifecycle hardening snapshots the ProcessEvent original
+- Commit `228ef7e` snapshots the ProcessEvent original
   trampoline under a hook-state mutex, starts the active-frame guard before public
   `CallOriginalProcessEvent` observes hook state, and makes hook removal mark `removing`
   under the same mutex before restoring bytes or unmapping the trampoline.
-- Current uncommitted reflection-tooling round adds
+- Commit `4e4f5cf` adds
   `scripts/compare_reflection_snapshots.py --readiness-report`. Use it to summarize
   comparable snapshot coverage and second-source status by schema/module. Current fixtures
   are fully comparable against themselves: UFunction `35/35`, ScriptStruct `2/2`; both
   still need a real second sanitized snapshot root before promotion.
+- Minimal second-source intake should run before expanding more gameplay surfaces:
+  `PrimalItem.CanUse`, `PrimalItem.AllowRemoteAddToInventory`,
+  `PrimalStructure.AllowStructureAccess`, and `PrimalStructure.IsAllowedToDemolish`.
+  Current readiness is `4/4` comparable and blocked only by missing second-source root.
 - Latest restart audit:
   `docs/research/2026-05-27-ops-restart-audit-instance-id.md`
   - live `ObeliskRun.sh` exports `OBELISK_INSTANCE_ID=arkserver`

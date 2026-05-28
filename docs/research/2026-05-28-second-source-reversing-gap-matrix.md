@@ -87,6 +87,58 @@ identity evidence.
 | `sdk.missions` | Offline lifecycle fixtures. | Second-source compact lifecycle targets with arrays metadata-only. | Usable-item arrays, mission payload dispatch. |
 | `sdk.transfers` | UFunction fixtures plus two candidate ScriptStruct fixtures. | Second-source layout-only comparison for `ARKTributeDino` and `ArkTributePlayerData`. | `ItemNetInfo`, upload/download runtime dispatch, nested arrays/strings. |
 
+## Minimal Second-Source Intake
+
+Use this first intake before expanding more gameplay surfaces. It is deliberately small:
+two inventory functions and two structure functions that already have primary snapshots and
+internal observer plans, without arrays, strings, raw identity exposure, callbacks, return
+overrides, or gameplay mutation.
+
+| Module | First Targets | Why These First |
+| --- | --- | --- |
+| `sdk.inventory` | `PrimalItem.CanUse`, `PrimalItem.AllowRemoteAddToInventory` | Compact item-policy shapes with existing internal observer gates; useful for validating bool/scalar layout comparison before item contents or inventory arrays. |
+| `sdk.structures` | `PrimalStructure.AllowStructureAccess`, `PrimalStructure.IsAllowedToDemolish` | Compact structure access/demolish shapes with existing marker-gated observation policy; avoids pincode and placement/build mutation surfaces. |
+
+Current primary readiness, before any second artifact exists:
+
+```bash
+python3 scripts/compare_reflection_snapshots.py \
+  --base-root tests/fixtures/ufunction_snapshots \
+  --readiness-report \
+  --target PrimalItem.CanUse \
+  --target PrimalItem.AllowRemoteAddToInventory \
+  --target PrimalStructure.AllowStructureAccess \
+  --target PrimalStructure.IsAllowedToDemolish
+```
+
+Expected current result:
+
+```text
+readiness targets=4 comparable=4 blocked=0 second_source_status=missing_candidate_root
+ufunction:sdk_inventory targets=2 comparable=2 blocked=0 second_source=accepted:0,rejected:0,inconclusive:0,missing:2
+ufunction:sdk_structures targets=2 comparable=2 blocked=0 second_source=accepted:0,rejected:0,inconclusive:0,missing:2
+```
+
+When a second sanitized snapshot root exists, compare only this intake first:
+
+```bash
+python3 scripts/compare_reflection_snapshots.py \
+  --base-root tests/fixtures/ufunction_snapshots \
+  --candidate-root <second-source-ufunction-snapshots> \
+  --target PrimalItem.CanUse \
+  --target PrimalItem.AllowRemoteAddToInventory \
+  --target PrimalStructure.AllowStructureAccess \
+  --target PrimalStructure.IsAllowedToDemolish \
+  --json
+```
+
+Promotion requires all four targets to be `accepted` layout-only, with evidence recorded
+for binary SHA, Obelisk commit, artifact path, commands, reject conditions checked, and an
+explicit statement that no live server was touched unless the artifact came from an
+operator-approved debug capture. Even after layout acceptance, runtime observation remains
+separate and must use a named debug instance, marker/env/SHA/budget gates, no value
+logging, and no public SDK callbacks.
+
 ## Evidence Pack Checklist
 
 Every second-source note or evidence pack should record:

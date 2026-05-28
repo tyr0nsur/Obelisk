@@ -113,7 +113,7 @@ Updated: 2026-05-28
 - fact: Commit `ffa3269` makes `scripts/test_public_sdk_guardrails.py` the canonical
   module-first public SDK guardrail test and keeps `test_public_sdk_chat_guardrails.py` as
   a legacy wrapper.
-- fact: Current uncommitted priority round aligned debug policy toward
+- fact: Commit `cd57189` aligned debug policy toward
   `arkserver-obelisk-debug` by default, added CI coverage for
   `scripts/test_obelisk_supervisor_snapshot.sh`, and hardened `PluginManager::LoadPlugins`
   so repeated loads of an already-loaded `plugin_id` skip initialization and close the
@@ -122,11 +122,11 @@ Updated: 2026-05-28
   unsubscribe handles, `CallProcessEvent` reentrancy contract/guard, safe hook removal
   with active-detour tracking, and owned debug-control thread shutdown. Treat these as
   future focused runtime rounds.
-- fact: Current uncommitted runtime/API round documents the `CallProcessEvent` reentrancy
+- fact: Commit `6b9fe8a` documents the `CallProcessEvent` reentrancy
   contract in the public SDK header, README, and plugin architecture docs without changing
   ABI layout. A pre-callback that calls `CallProcessEvent` must return `false`; returning
   `true` risks double execution by the detour. A runtime guard remains future work.
-- fact: Current uncommitted runtime/API round also adds internal `EventManager`
+- fact: Commit `5cf3de7` adds internal `EventManager`
   registration IDs and `UnregisterCallback(id)` coverage. Public `ObeliskApi` callback
   registration remains unchanged for ABI v1; this prepares a future explicit unsubscribe
   capability without promoting it yet.
@@ -142,7 +142,7 @@ Updated: 2026-05-28
   mutex and adding coverage for a callback unregistering its own registration during
   dispatch. This is internal groundwork for future explicit public callback unsubscribe
   handles; public ABI remains unchanged.
-- fact: Current uncommitted hook lifecycle hardening snapshots the ProcessEvent original
+- fact: Commit `228ef7e` snapshots the ProcessEvent original
   trampoline under a hook-state mutex, starts the active-frame guard before public
   `CallOriginalProcessEvent` observes hook state, and makes hook removal mark `removing`
   under the same mutex before restoring bytes or unmapping the trampoline. This addresses
@@ -151,7 +151,7 @@ Updated: 2026-05-28
   across module areas, but ScriptStruct coverage is the current bottleneck with only two
   transfer structs. Prioritize an offline second-source readiness report before any
   runtime capture or public API promotion.
-- fact: Current uncommitted reflection-tooling round adds
+- fact: Commit `4e4f5cf` adds
   `scripts/compare_reflection_snapshots.py --readiness-report`. It summarizes comparable
   snapshot coverage and second-source status by schema/module without requiring a live
   server. Current fixture readiness: UFunction `35/35` comparable, ScriptStruct `2/2`
@@ -162,9 +162,12 @@ Updated: 2026-05-28
   --check-layout` stays semantic/layout-only so second-source gates do not depend on
   unstable FName/GObjects indices.
 - next-step: Continue priority rounds on general reflection/API substrate. Immediate safe
-  priorities are: validate and eventually commit the readiness-report tooling, then obtain
-  or generate an offline second sanitized snapshot root for ScriptStruct transfer layouts
-  and compact UFunction module snapshots.
+  priorities are: use the minimal second-source intake in
+  `docs/research/2026-05-28-second-source-reversing-gap-matrix.md` before expanding more
+  gameplay surfaces. First targets are `PrimalItem.CanUse`,
+  `PrimalItem.AllowRemoteAddToInventory`, `PrimalStructure.AllowStructureAccess`, and
+  `PrimalStructure.IsAllowedToDemolish`; current readiness is `4/4` comparable and blocked
+  only by missing second-source root.
 - fact: Runtime/chat baseline is documented in
   `docs/research/2026-05-27-runtime-and-chat-baseline.md`.
 - fact: Reflection/chat metadata audit added shared UE probe layouts and gated
