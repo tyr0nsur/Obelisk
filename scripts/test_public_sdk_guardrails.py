@@ -11,6 +11,23 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 class PublicSdkGuardrailTests(unittest.TestCase):
+    def test_handle_callback_guidance_requires_owner_token_capability(self) -> None:
+        files = [
+            REPO_ROOT / "README.md",
+            REPO_ROOT / "docs/PLUGIN_ARCHITECTURE.md",
+            REPO_ROOT / "docs/oBaseEvents.md",
+            REPO_ROOT / "tests/sdk_consumer/MinimalPlugin.cpp",
+            REPO_ROOT / "plugins/oBaseEvents/oBaseEvents.cpp",
+        ]
+        for path in files:
+            text = path.read_text(encoding="utf-8")
+            if "OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES" in text:
+                self.assertIn(
+                    "OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS",
+                    text,
+                    f"{path.relative_to(REPO_ROOT)} documents handle callbacks without owner-token capability",
+                )
+
     def test_public_header_has_no_chat_api_until_promotion(self) -> None:
         header = (REPO_ROOT / "include/obelisk/ObeliskApi.h").read_text(encoding="utf-8")
         forbidden = [

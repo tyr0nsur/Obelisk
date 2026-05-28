@@ -205,6 +205,7 @@ bool ObeliskPlugin_Init(ObeliskApi* api, const ObeliskPluginInitContext* context
 
     const int32_t validated_function_index = -1;
     if (validated_function_index >= 0 &&
+        (api->capabilities & OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS) &&
         (api->capabilities & OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES) &&
         api->struct_size >= offsetof(ObeliskApi, UnregisterProcessEventCallbackWithOwnerToken) +
             sizeof(api->UnregisterProcessEventCallbackWithOwnerToken) &&
@@ -238,8 +239,9 @@ tools unless explicitly measured and gated.
 
 Callbacks registered after `ObeliskPlugin_Init`, from helper libraries, or from background
 threads should use the owner-token registration fields appended to `ObeliskApi`. New
-plugins should prefer the handle-returning owner-token functions when
-`OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES` is advertised, store returned
+plugins should prefer the handle-returning owner-token functions when both
+`OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS` and
+`OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES` are advertised, store returned
 handles only in process-local state, and unregister them with
 `UnregisterProcessEventCallbackWithOwnerToken` during shutdown. Handles are not cluster
 state: never write them into shared plugin config or assume they are valid in another ARK

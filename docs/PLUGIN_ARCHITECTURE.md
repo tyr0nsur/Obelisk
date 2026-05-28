@@ -56,8 +56,9 @@ valid `plugin_owner_token` supplied in `ObeliskPluginInitContext`. Callback func
 helper `.so` files, external thunks, or background threads must use the owner-token
 registration functions and remain covered by plugin-local shutdown tests. New code should
 prefer the handle-returning owner-token functions when
-`OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES` is advertised, store the returned
-non-zero handle in process-local state, and call
+`OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS` and
+`OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES` are both advertised, store the
+returned non-zero handle in process-local state, and call
 `UnregisterProcessEventCallbackWithOwnerToken` during shutdown before callback code or
 state can disappear. Owner-token registration is valid during `ObeliskPlugin_Init`, even
 from helper/background threads, and remains valid after successful load until unload.
@@ -175,8 +176,9 @@ before using them from shutdown hooks, worker threads, or later callbacks.
 For callback code owned by helper modules, worker threads, or reloadable state, prefer the
 handle-returning owner-token API and explicit unregister:
 
-1. Check `OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES`, `struct_size`, and the
-   relevant function pointers.
+1. Check `OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS`,
+   `OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES`, `struct_size`, a non-zero
+   `plugin_owner_token`, and the relevant function pointers.
 2. Register with `RegisterPreProcessEventForNameIndexWithOwnerTokenHandle` or the matching
    post/global variant.
 3. Treat a `0` return value as rejected registration.
