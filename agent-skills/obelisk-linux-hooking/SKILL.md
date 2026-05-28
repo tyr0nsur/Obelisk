@@ -53,15 +53,15 @@ When patching `.text`:
 
 ## Validation
 
-Run live validation only during an approved TheIsland/debug window with explicit approval
-for target instance, marker changes, restart window, and rollback plan. For high-risk
-hook/scanner captures, prefer `arkserver-obelisk-debug`; do not validate hooks on Ragnarok
-while player performance testing is active.
+Run live validation on the currently approved target. As of 2026-05-28, RAM is
+constrained, `arkserver2` / TheIsland should stay stopped, and `arkserver` / Ragnarok is
+the active Obelisk development/test harness. High-risk hook/scanner captures still require
+explicit approval for the exact run window and rollback plan.
 
 ```bash
 cmake --build build -j"$(nproc)"
-tail -n 80 /servidor/ark/obelisk/logs/arkserver2/Obelisk.log
-scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance arkserver2
+tail -n 80 /servidor/ark/obelisk/logs/arkserver/Obelisk.log
+scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map Ragnarok --instance arkserver
 ```
 
 Expected:

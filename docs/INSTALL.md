@@ -77,11 +77,10 @@ Then configure LinuxGSM:
 executable="./ObeliskRun.sh"
 ```
 
-For current Obelisk debug/development work, prefer a dedicated instance such as
-`arkserver-obelisk-debug` instead of Ragnarok. Use `arkserver2` / TheIsland only as an
-explicit operator-approved fallback for a named run window and rollback plan. For scanner
-or reflection research that needs stronger isolation, use the debug wrapper from
-`ObeliskRunDebug.sh`; do not reuse live map markers for debug captures.
+Current operator direction as of 2026-05-28: RAM is tight, keep `arkserver2` / TheIsland
+stopped, and use `arkserver` / Ragnarok as the Obelisk debug/development harness. For
+scanner or reflection research, use a specifically approved `arkserver` window with
+rollback; do not start extra ARK instances while RAM is constrained.
 
 ## Instance Identity
 
@@ -192,6 +191,5 @@ state/instances/arkserver/disable-plugins
 
 This validates the core ProcessEvent hook without loading experimental plugins.
 
-While Ragnarok is under player performance testing, use `arkserver-obelisk-debug` for
-debug/development markers and validation windows whenever possible; use `arkserver2` /
-TheIsland only as an approved fallback.
+While RAM is constrained, use `arkserver` / Ragnarok for debug/development markers and
+validation windows, and keep `arkserver2` / TheIsland stopped unless explicitly reopened.

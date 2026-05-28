@@ -33,33 +33,29 @@ Convenience log links may live under:
 /home/flowcommunity-ark/logs/ark/
 ```
 
-Current operator direction as of 2026-05-27:
+Current operator direction as of 2026-05-28:
 
-- `arkserver` / Ragnarok is reserved for player performance testing. Do not restart it,
-  change markers, deploy new runtime, enable extra logging, run scanners, or attach
-  debuggers unless the operator explicitly opens a maintenance window.
-- `arkserver-obelisk-debug` is the preferred debug/development target for Obelisk rounds.
-  Use it for controlled runtime validation, plugin lifecycle checks, and research captures
-  that need an ARK server harness whenever possible.
-- Treat `arkserver2` / TheIsland as an explicit approved fallback, not automatically
-  scanner-safe. ReflectionScanner, native exec probes, ptrace/gcore, broad ProcessEvent
-  tracing, and text logging still need a specific operator-approved run window,
-  per-instance markers, copied-log evidence, and rollback to stable posture.
+- RAM is currently tight. Keep `arkserver2` / TheIsland stopped unless the operator
+  explicitly reopens it.
+- `arkserver` / Ragnarok is now operator-approved as the active Obelisk development/test
+  harness. Use it for controlled runtime validation and plugin lifecycle checks, with
+  one gate at a time, copied evidence, and rollback to stable posture.
+- ReflectionScanner, native exec probes, ptrace/gcore, broad ProcessEvent tracing, and
+  text/gameplay-payload logging still require a specific operator-approved run window and
+  rollback plan before activation on `arkserver`.
 
 ## Production Baseline
 
-Observed Ragnarok live-like stability markers are listed here for maintenance review only.
-Do not create, remove, refresh, or restart `arkserver` during normal agent rounds. Routine
-debug work belongs on `arkserver-obelisk-debug`; use `arkserver2` / TheIsland only as an
-explicit approved fallback. Ragnarok changes require an operator-stated maintenance window
-in the current turn.
+Ragnarok is the current development/test harness. Keep its stable baseline simple:
+ProcessEvent hook enabled, plugins disabled unless a plugin test is explicitly in scope,
+scanner/native-exec/broad tracing off, and posture checked after any marker or restart.
 
 ```bash
-# Observed baseline only. Maintenance-window-only if the operator explicitly approves:
+# Only run marker/restart commands when that change is part of the active approved test:
 # mkdir -p /servidor/ark/obelisk/state/instances/arkserver
 # touch /servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook
 # touch /servidor/ark/obelisk/state/instances/arkserver/disable-plugins
-# ./arkserver restart
+# env -u TMUX ./arkserver restart
 ```
 
 Expected logs:
@@ -86,16 +82,12 @@ scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection
   - `enable-chat-reflection`
   - `enable-structure-reflection`
   - `enable-inventory-reflection`
-- Never enable native exec probes on live servers.
-- Never enable `ReflectionScanner` on `arkserver`.
-- Enable `ReflectionScanner` on `arkserver2` only after a specific operator-approved debug
-  window confirms TheIsland is isolated enough for that run, with plugins disabled and a
-  marker/env rollback plan recorded.
-- Keep `OBELISK_PE_TRACE_LIMIT=0` by default; use short trace windows only for evidence on
-  `arkserver2` or a dedicated debug instance.
-- A future `arkserver-obelisk-debug` instance remains the cleaner scanner target if we need
-  stronger isolation than TheIsland can provide. Use distinct ports, save directory,
-  cluster id, and `OBELISK_LOG_DIR`; do not reuse live map markers.
+- Never enable native exec probes without explicit approval for the named `arkserver` run.
+- Never enable `ReflectionScanner` on `arkserver` without a specific operator-approved
+  debug window, plugins disabled, copied-log evidence, and a marker/env rollback plan.
+- Keep `OBELISK_PE_TRACE_LIMIT=0` by default; use short trace windows only for approved
+  evidence windows on `arkserver`.
+- Do not start `arkserver2` to get extra isolation while RAM is constrained.
 
 ## Debug Profiles
 
@@ -114,7 +106,8 @@ Use named profiles instead of ad hoc env mixes:
 After any scanner/plugin capture, run:
 
 ```bash
-scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance arkserver2
+scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection \
+  --map Ragnarok --instance arkserver
 ```
 
 Use the matching explicit `--map` and `--instance` for the approved debug target. That
@@ -200,14 +193,15 @@ scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection
   --map Ragnarok --instance arkserver
 ```
 
-Do not use the Ragnarok block for routine debug. For TheIsland debug posture, use
-`arkserver2` paths and map filters instead:
+Current routine debug uses Ragnarok/`arkserver` because the operator made it available and
+`arkserver2` is stopped for RAM pressure:
 
 ```bash
-tail -n 100 /servidor/ark/obelisk/logs/arkserver2/Obelisk.log
-pid=$(pgrep -f '^./ShooterGameServer TheIsland' | head -n1)
+tail -n 100 /servidor/ark/obelisk/logs/arkserver/Obelisk.log
+pid=$(pgrep -f '^./ShooterGameServer Ragnarok' | head -n1)
 rg 'libobelisk|libsubhook' /proc/$pid/maps
-scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance arkserver2
+scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection \
+  --map Ragnarok --instance arkserver
 ```
 
 ## Rollback

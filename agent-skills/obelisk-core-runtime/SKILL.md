@@ -59,21 +59,22 @@ This is required because `jmp rel32` can fail when `ShooterGameServer` is mapped
 
 ## Safe Runtime Validation
 
-Ragnarok is currently reserved for player performance testing. Do not restart it, change
-markers, deploy runtime, or increase logging unless the operator opens a maintenance
-window.
+Current operator direction as of 2026-05-28: RAM is tight, `arkserver2` / TheIsland should
+stay stopped, and `arkserver` / Ragnarok is available as the Obelisk development/test
+harness. Keep changes controlled, one gate at a time, and restore stable posture after
+runtime validation.
 
-For TheIsland debug/development validation, first obtain explicit operator approval for
-the target instance, marker changes, restart window, and rollback plan. TheIsland is the
-debug/development fallback; it is not automatic permission to edit markers or restart.
+For risky probes such as ReflectionScanner, native exec, ptrace/gcore, broad tracing, or
+text/gameplay-payload logging, first obtain explicit operator approval for the exact
+`arkserver` run, marker changes, restart window, and rollback plan.
 
 Validate:
 
 ```bash
 pgrep -af '^./ShooterGameServer'
-tail -n 80 /servidor/ark/obelisk/logs/arkserver2/Obelisk.log
-rg 'libobelisk|libsubhook' /proc/$(pgrep -f '^./ShooterGameServer TheIsland' | head -n1)/maps
-scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance arkserver2
+tail -n 80 /servidor/ark/obelisk/logs/arkserver/Obelisk.log
+rg 'libobelisk|libsubhook' /proc/$(pgrep -f '^./ShooterGameServer Ragnarok' | head -n1)/maps
+scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map Ragnarok --instance arkserver
 ```
 
 Expected:

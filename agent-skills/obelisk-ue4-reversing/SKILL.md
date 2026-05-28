@@ -76,8 +76,9 @@ cross-validated by object and property metadata.
 
 - Keep `OBELISK_ENABLE_PROCESS_EVENT_HOOK=1` plus plugins disabled as the baseline safe
   runtime test.
-- `arkserver` / Ragnarok is currently reserved for player performance testing; do not use
-  it for new reversing/debug captures without an explicit maintenance window.
+- Current operator direction as of 2026-05-28 makes `arkserver` / Ragnarok the active
+  Obelisk development/test harness because RAM is constrained and `arkserver2` should stay
+  stopped. Use controlled gates and rollback posture.
 - Experimental module recognizers belong only on an explicitly approved debug/development
   target. The historical chat gate (`OBELISK_ENABLE_CHAT_REFLECTION=1`) additionally
   requires the matching `OBELISK_CHAT_REFLECTION_BINARY_SHA256` gate and a small log limit.

@@ -126,9 +126,9 @@ Expected safe Obelisk posture for development baseline:
 
 - Ragnarok: ProcessEvent hook enabled, plugins disabled; currently reserved for player
   performance testing.
-- TheIsland: `arkserver2` is an explicit fallback for Obelisk debug/development windows;
-  prefer `arkserver-obelisk-debug` whenever possible and still require explicit
-  run-window approval for scanner/native-exec/ptrace or broad tracing.
+- TheIsland: `arkserver2` should stay stopped while RAM is constrained. Current Obelisk
+  debug/development work uses `arkserver` / Ragnarok; scanner/native-exec/ptrace or broad
+  tracing still require explicit run-window approval and rollback.
 - ReflectionScanner disabled unless an isolated/debug run is intentionally authorized.
 - Native exec probes disabled.
 

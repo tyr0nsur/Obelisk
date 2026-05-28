@@ -41,21 +41,25 @@ Updated: 2026-05-28
   Preferred markers are
   `/servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook` and
   `/servidor/ark/obelisk/state/instances/arkserver/disable-plugins`.
-- fact: Operator direction changed on 2026-05-27: `arkserver` / Ragnarok is reserved for
-  player performance testing. Do not restart, redeploy, change markers, enable extra
-  logging, scan, ptrace, or run debug experiments there without an explicit maintenance
-  window.
+- fact: Operator direction changed on 2026-05-28: RAM is tight, `arkserver2` / TheIsland
+  should stay stopped, and `arkserver` / Ragnarok is now available as the Obelisk
+  development/test harness. Use controlled gates, copied evidence, and rollback posture.
+- fact: Operational correction on 2026-05-28: `arkserver2` stop was requested and confirmed
+  already stopped; `arkserver` was restarted after removing
+  `/servidor/ark/obelisk/state/instances/arkserver/enable-chat-reflection`. Current
+  Ragnarok PID after restart: `1820244`. Read-only posture passes with
+  `scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map
+  Ragnarok --instance arkserver`.
 - fact: Operator explicitly approved a Ragnarok gameplay config change on 2026-05-27:
   `AllowCaveBuildingPvP=True` was applied to `GameUserSettings.ini`, pre-change backup is
   `/home/flowcommunity-ark/backups/ark-config-manual/GameUserSettings.ini.allow-cave-20260527-184547.bak`,
   `arkserver` was restarted successfully. A later read-only-agent protocol violation
   repeated the backup/restart; current `ark-config-latest` is
-  `/home/flowcommunity-ark/backups/ark-config-20260527-190558`, and Ragnarok is up as PID
-  `3940524`.
-- fact: `arkserver-obelisk-debug` is the preferred Obelisk debug/development target for
-  future harness work. Use `arkserver2` / TheIsland only as an explicit operator-approved
-  fallback for a named run window and rollback plan; never use Ragnarok for routine
-  development while player performance testing is active.
+  `/home/flowcommunity-ark/backups/ark-config-20260527-190558`. Historical PID `3940524`
+  was replaced by PID `1820244` after the 2026-05-28 RAM/posture restart.
+- fact: Active debug target is now `arkserver` / Ragnarok. Do not start `arkserver2` for
+  Obelisk work while RAM is constrained. Risky probes still need explicit approval for the
+  exact `arkserver` window and rollback plan.
 - fact: `sdk.structures` runtime observation now requires both env/SHA/budget gates and
   `/servidor/ark/obelisk/state/instances/<instance>/enable-structure-reflection`.
   The LinuxGSM wrapper exports structure reflection env only from that marker, and the
@@ -449,10 +453,11 @@ Updated: 2026-05-28
   candidate. The priority is repeating the classified context checks on a second isolated
   core or future binary before promoting any runtime-stable reflection contract.
 - next-step: No second isolated core is currently available; read-only dump inventory only
-  found the existing Ragnarok-derived core and derivative packs. When the operator opens a
-  core window, prefer dedicated `arkserver-obelisk-debug`; use `arkserver2` / TheIsland
-  only as explicit fallback. Follow
-  `docs/research/2026-05-27-isolated-second-core-runbook.md` and do not touch Ragnarok.
+  found the existing Ragnarok-derived core and derivative packs. Current operator
+  direction makes `arkserver` / Ragnarok available for Obelisk tests while RAM is tight
+  and keeps `arkserver2` stopped. Follow
+  `docs/research/2026-05-27-isolated-second-core-runbook.md` only after approval for the
+  exact `arkserver` run window.
 - fact: `scripts/inspect_core_ufunctions.py` can walk legacy `UStruct.Children +0x38` and
   `UField.Next +0x28` property chains from the core for UFunction and ScriptStruct
   evidence across module surfaces; see
@@ -508,13 +513,11 @@ Updated: 2026-05-28
 - rejected: ProcessEvent candidate `0x1d11cb0` did not receive gameplay events.
 - risk: Raw FString scanning/discovery must not be enabled on live Ragnarok as
   the normal test path.
-- risk: Runtime/reversing experiments on Ragnarok can invalidate player performance
-  testing; keep `arkserver` / Ragnarok protected unless the operator opens an explicit
-  maintenance window.
-- risk: `arkserver2` / TheIsland is the controlled debug/development fallback, not the
-  default target for high-risk tooling. For `gcore`, `ptrace`, `ReflectionScanner`, broad
-  tracing, and scanner-like captures, prefer a dedicated `arkserver-obelisk-debug`
-  instance with separate ports/save/cluster/logs.
+- risk: Runtime/reversing experiments on `arkserver` / Ragnarok can still affect the only
+  running ARK instance. Use one gate at a time, short windows, copied evidence, and
+  rollback posture.
+- risk: `arkserver2` / TheIsland should stay stopped while RAM is constrained. Do not
+  start it for Obelisk work unless the operator explicitly reopens it.
 - fact: Historical Ragnarok runbooks for core dumps and runtime debug-control were
   rewritten as non-default guidance: future captures must use
   `docs/research/2026-05-27-isolated-second-core-runbook.md`,

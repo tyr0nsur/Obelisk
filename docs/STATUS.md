@@ -58,16 +58,15 @@ Do not enable native exec probes on validation adapter servers. Keep experimenta
 plugins in the repository or another staging location until isolated validation
 passes.
 
-While Ragnarok is under player performance testing, use `arkserver-obelisk-debug` as the
-normal Obelisk debug/development harness instead of changing Ragnarok markers or
-restarting it. Use `arkserver2` / TheIsland only during an explicitly approved debug
-window for the named instance and rollback plan. For `gcore`, `ptrace`, ReflectionScanner,
-broad tracing, or scanner-like probes, keep preferring `arkserver-obelisk-debug`.
+Current operator direction as of 2026-05-28: RAM is tight, `arkserver2` / TheIsland should
+stay stopped, and `arkserver` / Ragnarok is available as the Obelisk debug/development
+harness. For `gcore`, `ptrace`, ReflectionScanner, broad tracing, or scanner-like probes,
+use a specifically approved `arkserver` run window with rollback.
 
 After any scanner/plugin capture or runtime redeploy on an approved debug target, run
 `scripts/check_obelisk_server_posture.sh --expect-stable --map <map> --instance
 <instance-id>` before treating the harness as stable. The check is read-only and should
 fail closed rather than depending on a live experiment to reveal stale runtime state.
 
-For Ragnarok player performance posture, add `--forbid-chat-reflection` so the same
-read-only check also rejects experimental chat reflection and chat text logging env.
+For Ragnarok stable posture, add `--forbid-chat-reflection` so the same read-only check
+also rejects experimental chat reflection and chat text logging env.

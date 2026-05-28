@@ -45,25 +45,27 @@ work from repository state instead of chat history.
 - Central Obelisk root: `/servidor/ark/obelisk`
 - Gameplay config backup was created at
   `/home/flowcommunity-ark/backups/ark-config-20260527-015805`.
-- Ragnarok stable live posture and player performance test target:
+- Ragnarok stable live posture and current Obelisk development/test target:
   - `/servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook`
   - `/servidor/ark/obelisk/state/instances/arkserver/disable-plugins`
 - Current operator direction as of 2026-05-28:
-  - protect `arkserver` / Ragnarok for player performance testing;
-  - prefer `arkserver-obelisk-debug` as the Obelisk debug/development target for future
-    controlled runtime validation and research windows;
-  - use `arkserver2` / TheIsland only as an explicit operator-approved fallback for a
-    named run window and rollback plan.
-- Do not restart `arkserver`, edit its marker files, deploy to it, attach debuggers, or
-  increase logging while player performance testing is active.
+  - RAM is tight;
+  - keep `arkserver2` / TheIsland stopped unless the operator explicitly reopens it;
+  - use `arkserver` / Ragnarok as the Obelisk development/test harness;
+  - risky probes on `arkserver` still need explicit approval for the exact run window and
+    rollback plan.
+- Operational correction on 2026-05-28: `arkserver2` stop was requested and confirmed
+  already stopped; `arkserver` was restarted after removing
+  `/servidor/ark/obelisk/state/instances/arkserver/enable-chat-reflection`. Current
+  Ragnarok PID after restart: `1820244`. Read-only posture passes with
+  `scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map
+  Ragnarok --instance arkserver`.
 - Exception already completed with explicit operator approval: `AllowCaveBuildingPvP=True`
   was applied to Ragnarok `GameUserSettings.ini` on 2026-05-27, `arkserver` was restarted,
   and a later read-only-agent protocol violation refreshed backup
   `/home/flowcommunity-ark/backups/ark-config-20260527-190558` as `ark-config-latest`.
 - Do not restart servers, edit marker files, change `/servidor/ark`, or activate
-  ReflectionScanner without explicit operator permission. For new debug work, target
-  `arkserver-obelisk-debug` first; use TheIsland only as an approved fallback, not
-  Ragnarok.
+  ReflectionScanner unless it is part of the current approved `arkserver` test window.
 - Structure reflection is marker-gated in code and wrapper:
   `/servidor/ark/obelisk/state/instances/<instance>/enable-structure-reflection`.
   Env-only structure reflection activation is rejected; budget defaults to `0`.
@@ -218,10 +220,10 @@ work from repository state instead of chat history.
 
 - Legacy chat/monitor prototype source has been removed from the release tree.
 - ReflectionScanner is experimental and must stay disabled on live servers.
-- `arkserver-obelisk-debug` is the preferred debug/development target. Use `arkserver2` /
-  TheIsland only as an explicit operator-approved fallback for a named run window and
-  rollback plan. High-risk scanners/native exec/ptrace require the dedicated debug
-  instance whenever possible; see `docs/research/2026-05-27-isolated-debug-instance-plan.md`.
+- `arkserver` / Ragnarok is the current debug/development harness because the operator made
+  it available and RAM is constrained. Keep `arkserver2` / TheIsland stopped unless the
+  operator explicitly reopens it. High-risk scanners/native exec/ptrace still require an
+  approved `arkserver` window and rollback plan.
 - General-purpose SDK reflection is not solved yet. However, the current ARK binary has
   binary-hash-scoped evidence for FName, `GUObjectArray`, chat `UFunction` property chains,
   bounded param ranges, and an internal UTF-32 `FString` decoder candidate.
@@ -293,9 +295,9 @@ work from repository state instead of chat history.
   second static path for `0x595b7e0`: classify `0x12d1400`, `0x79ce22`, `0x7a27a7`,
   `0x81f118`, and `0x81f206`, then strengthen class/outer back-reference validation.
 - No second isolated core is currently available; read-only dump inventory only found the
-  existing Ragnarok-derived core and derivative packs. Prefer dedicated
-  `arkserver-obelisk-debug`; use `arkserver2` / TheIsland only as explicit fallback. See
-  `docs/research/2026-05-27-isolated-second-core-runbook.md`.
+  existing Ragnarok-derived core and derivative packs. Current core/runtime captures should
+  use the operator-approved `arkserver` window only after explicit approval for that run.
+  Keep `arkserver2` stopped for RAM.
 - Offline `UFunction` and `ScriptStruct` property-chain inspection now works through
   `scripts/inspect_core_ufunctions.py`. Treat module-specific offsets as candidate-only
   fixture evidence until second-source comparison and SDK ownership gates pass.
@@ -407,9 +409,8 @@ python3 scripts/analyze_reflectionscanner_capture.py \
 
 - Never enable `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` on live servers.
 - Never enable raw chat discovery on live Ragnarok as a normal test.
-- Do not run Obelisk debug or reversing experiments on `arkserver` while players are
-  testing performance; prefer `arkserver-obelisk-debug` and use `arkserver2` / TheIsland
-  only as an explicit approved fallback.
+- Run Obelisk debug or reversing experiments on `arkserver` only within the current
+  approved scope; keep `arkserver2` stopped while RAM is constrained.
 - Do not reintroduce legacy map markers or binary-local `ObeliskPlugins` fallback.
 - Do not treat observed FName indices such as `9619` or `9622` as stable API contracts.
 - Do not promote plugins with HTTP, threads, or file readers until they implement and
@@ -432,16 +433,16 @@ python3 scripts/analyze_reflectionscanner_capture.py \
 
 ## Next Good Rounds
 
-- Ops: prefer `arkserver-obelisk-debug` as the debug/development target; use `arkserver2`
-  / TheIsland only as an explicit approved fallback, and keep scanner/native-exec/ptrace
-  behind run-window approval.
+- Ops: use `arkserver` / Ragnarok as the current development/test harness, keep
+  `arkserver2` stopped for RAM, and keep scanner/native-exec/ptrace behind run-window
+  approval.
 - Reflection core: strengthen `RuntimeReflection`, snapshot fixtures, comparators,
   sanitizer tests, and evidence packs before adding public SDK module surfaces.
 - Module breadth: use focused snapshot comparison for inventory, structures, buffs, dinos,
   tribes, missions, transfers, and admin candidates. Keep recognizers candidate-only until
   second-source evidence and ABI/lifetime policy are satisfied.
 - Runtime safety: keep ProcessEvent observers gated by binary hash, markers, budgets, and
-  explicit debug-instance approval. Do not use Ragnarok as a development target.
+  explicit approval for the current `arkserver` window.
 - SDK/API: promote public module APIs only after copied-data ownership, callback cleanup,
   installed SDK consumer coverage, and ABI layout tests are in place.
 - Historical chat work remains internal and blocked from public SDK promotion; do not let
