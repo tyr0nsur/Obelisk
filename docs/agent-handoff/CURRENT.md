@@ -134,6 +134,11 @@ Updated: 2026-05-28
   changes unless `--allow-dirty` is used while developing the gate. CTest also loads the
   real `oBaseEvents` plugin through the SDK consumer fixture, validating its exported
   `GetInfo`/`Init`/optional `Shutdown` path against the public ABI.
+- fact: Commit `c0d1e4c` pushed the hardened first-stable gates. On 2026-05-28,
+  `scripts/check_release_readiness.sh` passed from a clean tracked/untracked worktree
+  (ignored `build/` and `scripts/__pycache__/` only), and the read-only Ragnarok posture
+  check passed with `--expect-stable --forbid-chat-reflection --map Ragnarok --instance
+  arkserver`.
 - fact: Shared plugin config default creation is hardened for concurrent multi-instance
   startup: each process uses a unique temporary file and atomically installs the default
   only if the config path is still absent, with coverage in `PluginConfigTests`.
