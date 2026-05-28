@@ -268,7 +268,11 @@ Runtime logs are written to:
 ```
 
 The LinuxGSM wrapper sets `OBELISK_INSTANCE_ID`. Custom launchers should set it explicitly
-before loading Obelisk and keep it to the safe token form described above.
+before loading Obelisk and keep it to the safe token form described above. Explicit
+`OBELISK_LOG_DIR` values must be absolute, non-symlink directories; when logs are derived
+from `OBELISK_ROOT`, both `${OBELISK_ROOT}` and `${OBELISK_ROOT}/logs` must be
+non-symlink directories. Per-instance log directories are also rejected when symlinked, so
+log writes cannot escape the central root through an inherited environment.
 
 ## Current Safe Production Posture
 

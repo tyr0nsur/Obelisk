@@ -313,6 +313,10 @@ Updated: 2026-05-28
   directory or follows a symlinked plugin directory. The read-only operator CLI mirrors
   this by not listing `.so` files through a symlinked `plugins` path and by surfacing
   invalid plugin config entries, malformed activation envelopes, and unsafe allowlists.
+- fact: Runtime logging now rejects explicit relative or symlinked `OBELISK_LOG_DIR`
+  values, symlinked `${OBELISK_ROOT}/logs`, and symlinked per-instance log directories.
+  Missing absolute log roots may still be created, but inherited log env cannot redirect
+  writes through symlink escapes.
 - fact: `ObeliskPluginInitContext` string pointers are documented as borrowed only for
   `ObeliskPlugin_Init`; plugins must copy `config_dir`, `config_path`, or `instance_id`
   before using them from shutdown, worker threads, or later callbacks.

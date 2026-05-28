@@ -123,6 +123,15 @@ target_link_libraries(process_event_dispatch_tests PRIVATE obelisk_sdk fmt::fmt 
 
 add_test(NAME ProcessEventDispatchTests COMMAND process_event_dispatch_tests)
 
+add_executable(logger_tests
+    tests/runtime/LoggerTests.cpp
+    runtime/Logger.cpp
+)
+target_include_directories(logger_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(logger_tests PRIVATE fmt::fmt spdlog::spdlog stdc++fs)
+
+add_test(NAME LoggerTests COMMAND logger_tests)
+
 add_executable(chat_event_dispatcher_tests
     tests/core/ChatEventDispatcherTests.cpp
     core/ChatEventDispatcher.cpp

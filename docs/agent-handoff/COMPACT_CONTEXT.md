@@ -180,6 +180,8 @@ work from repository state instead of chat history.
 - Runtime/plugin installers reject symlinked managed subdirectories before writing
   artifacts. Keep `lib`, `plugins`, `include`, `config`, `logs`, `state`, and
   `state/instances` as real directories under the central Obelisk root.
+- Runtime logging rejects explicit relative or symlinked `OBELISK_LOG_DIR` values,
+  symlinked `${OBELISK_ROOT}/logs`, and symlinked per-instance log directories.
 - Plugin config preparation rejects a symlinked per-plugin config directory before
   first-run default config creation, so default publication cannot write through a config
   symlink escape.

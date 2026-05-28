@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <stdexcept>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -16,20 +17,67 @@ namespace Obelisk
 
     namespace
     {
+        void ValidateOrCreateLogDirectory(const std::filesystem::path& path, const char* label)
+        {
+            if (path.empty())
+                throw std::runtime_error(std::string(label) + " is empty");
+            if (!path.is_absolute())
+                throw std::runtime_error(std::string(label) + " must be absolute");
+
+            std::error_code ec;
+            const std::filesystem::file_status symlinkStatus = std::filesystem::symlink_status(path, ec);
+            if (symlinkStatus.type() == std::filesystem::file_type::not_found)
+            {
+                std::filesystem::create_directories(path, ec);
+                if (ec)
+                    throw std::runtime_error(std::string("failed to create ") + label + ": " + ec.message());
+            }
+            else
+            {
+                if (ec)
+                    throw std::runtime_error(std::string(label) + " is not accessible: " + ec.message());
+                if (std::filesystem::is_symlink(symlinkStatus))
+                    throw std::runtime_error(std::string(label) + " must not be a symlink");
+                if (!std::filesystem::is_directory(symlinkStatus))
+                    throw std::runtime_error(std::string(label) + " must be a directory");
+            }
+
+            const std::filesystem::file_status finalStatus = std::filesystem::symlink_status(path, ec);
+            if (ec)
+                throw std::runtime_error(std::string(label) + " status failed: " + ec.message());
+            if (std::filesystem::is_symlink(finalStatus))
+                throw std::runtime_error(std::string(label) + " must not be a symlink");
+            if (!std::filesystem::is_directory(finalStatus))
+                throw std::runtime_error(std::string(label) + " must be a directory");
+        }
+
         std::string GetLogDir()
         {
             const char* logDir = std::getenv("OBELISK_LOG_DIR");
             if (logDir && logDir[0] != '\0')
             {
-                std::filesystem::create_directories(logDir);
-                return logDir;
+                std::filesystem::path path(logDir);
+                ValidateOrCreateLogDirectory(path, "OBELISK_LOG_DIR");
+                return path.string();
             }
 
             const char* root = std::getenv("OBELISK_ROOT");
             if (root && root[0] != '\0')
             {
+                std::filesystem::path rootPath(root);
+                if (!rootPath.is_absolute())
+                    throw std::runtime_error("OBELISK_ROOT must be absolute before deriving log directory");
+                std::error_code ec;
+                const std::filesystem::file_status rootStatus = std::filesystem::symlink_status(rootPath, ec);
+                if (ec)
+                    throw std::runtime_error("OBELISK_ROOT is not accessible before deriving log directory: " + ec.message());
+                if (std::filesystem::is_symlink(rootStatus))
+                    throw std::runtime_error("OBELISK_ROOT must not be a symlink before deriving log directory");
+                if (std::filesystem::exists(rootStatus) && !std::filesystem::is_directory(rootStatus))
+                    throw std::runtime_error("OBELISK_ROOT must be a directory before deriving log directory");
+
                 std::filesystem::path path = std::filesystem::path(root) / "logs";
-                std::filesystem::create_directories(path);
+                ValidateOrCreateLogDirectory(path, "OBELISK_ROOT/logs");
                 return path.string();
             }
 
@@ -91,7 +139,7 @@ namespace Obelisk
                 return baseLogDir;
 
             std::filesystem::path path = baseLogDir / instanceId;
-            std::filesystem::create_directories(path);
+            ValidateOrCreateLogDirectory(path, "OBELISK instance log directory");
             return path;
         }
     }

@@ -66,6 +66,10 @@ Own these areas:
   before writing. Reject relative or symlinked `OBELISK_CONFIG_DIR` roots and symlinked
   plugin config directories before first-run default config creation, not only before
   parsing an existing `config.json`.
+- Runtime logging must reject explicit relative or symlinked `OBELISK_LOG_DIR` values,
+  symlinked `${OBELISK_ROOT}/logs`, and symlinked per-instance log directories. Missing
+  absolute log roots may be created; inherited env must not redirect logs through symlink
+  escapes.
 - Operator tooling should mirror runtime path safety: read-only CLI views must surface
   invalid plugin/config entries and avoid following symlinked plugin directories,
   per-plugin config directories, or `config.json` entries. CLI config summaries should
