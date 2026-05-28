@@ -250,6 +250,10 @@ work from repository state instead of chat history.
   - `CallProcessEvent` compatibility slot is default-deny; runtime advertises
     `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT` and calls the trampoline only when
     `OBELISK_ALLOW_CALL_PROCESS_EVENT=1` plus marker `allow-call-process-event` are active;
+  - plugin pre-callback blocking is default-deny; `false` returns continue the original
+    `ProcessEvent` unless `OBELISK_ALLOW_PROCESS_EVENT_BLOCKING=1`, marker
+    `allow-process-event-blocking`, and
+    `OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING` are active;
   - event dispatch hardening: EventManager tests initialize logger and verify throwing
     pre/post callbacks are logged without propagating and without stopping later
     callbacks;
@@ -342,6 +346,9 @@ work from repository state instead of chat history.
 - Initial operator CLI is `scripts/obelisk.py`; it is read-only and supports `status`,
   `instances list`, `plugins list`, and `plugins show`. Start/stop/restart commands are
   not implemented yet and should wrap LinuxGSM with explicit safety gates.
+- Operator CLI instance views apply the runtime/config safe instance-id contract
+  (`[A-Za-z0-9_-]+`); unsafe marker directory names are invalid and excluded from valid
+  instance counts.
 - Plugin-owned callback cleanup on init failure and unload.
 - Optional plugin export: `extern "C" void ObeliskPlugin_Shutdown()`.
 - `plugins/oBaseEvents` builds as the first official plugin example.

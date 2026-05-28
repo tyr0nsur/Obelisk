@@ -47,9 +47,13 @@ Own these areas:
   `OBELISK_ALLOW_CALL_PROCESS_EVENT=1` plus the safe per-instance marker
   `allow-call-process-event`, and the runtime only advertises
   `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT` when that gate is active.
+- Pre-callback blocking of the original `ProcessEvent` is runtime default-deny. A
+  callback return value of `false` is observational unless
+  `OBELISK_ALLOW_PROCESS_EVENT_BLOCKING=1`, `allow-process-event-blocking`, and
+  `OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING` are active for the instance.
 - Stable posture must reject ReflectionScanner, broad ProcessEvent tracing
-  (`OBELISK_PE_TRACE_LIMIT` non-zero), global callbacks, and public `CallProcessEvent`
-  unless an explicit debug-window workflow says otherwise.
+  (`OBELISK_PE_TRACE_LIMIT` non-zero), global callbacks, public `CallProcessEvent`, and
+  ProcessEvent blocking unless an explicit debug-window workflow says otherwise.
 - Experimental observer wrappers require `OBELISK_WRAPPER_PROFILE=observer-debug`, the
   `allow-observer-debug-window` marker, the observer-specific marker, and
   `allow-experimental-observers` on the same instance; stable posture must reject those

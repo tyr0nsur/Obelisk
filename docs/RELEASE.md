@@ -24,6 +24,8 @@ Excluded:
 - Higher-level gameplay SDK APIs.
 - Gameplay mutation, return overrides, arbitrary UE4 function calls, and public
   `CallProcessEvent`-based plugin behavior.
+- Plugin callback blocking of the original `ProcessEvent` outside an explicit
+  debug/experimental gate.
 - Production HTTP plugins.
 
 ## Checklist

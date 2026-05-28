@@ -15,6 +15,7 @@ namespace Obelisk::Core
         ~EventManager() = default;
 
         static EventManager& Get();
+        static void SetProcessEventBlockingCapabilityAdvertised(bool advertised);
 
         void RegisterPreProcessEvent(OnProcessEventCallback callback);
         void RegisterPostProcessEvent(OnProcessEventCallback callback);
@@ -31,8 +32,8 @@ namespace Obelisk::Core
         bool HasPreProcessEventCallbacks();
         bool HasPostProcessEventCallbacks();
 
-        // Called by hooks
-        // Returns false if any plugin blocked the event
+        // Called by hooks. Returns false only if an explicit ProcessEvent-blocking
+        // gate is active and a pre-callback requests blocking.
         bool TriggerPreProcessEvent(void* caller, void* function, void* parms);
         void TriggerPostProcessEvent(void* caller, void* function, void* parms);
         bool TriggerPreProcessEvent(int32_t nameIndex, void* caller, void* function, void* parms);

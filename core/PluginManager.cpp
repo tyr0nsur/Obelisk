@@ -371,6 +371,12 @@ namespace Obelisk::Core
                                                           "allow-call-process-event");
         }
 
+        bool IsProcessEventBlockingAllowed()
+        {
+            return Runtime::IsEnvAndInstanceMarkerEnabled("OBELISK_ALLOW_PROCESS_EVENT_BLOCKING",
+                                                          "allow-process-event-blocking");
+        }
+
         uint64_t BuildApiCapabilities()
         {
             uint64_t capabilities = OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS |
@@ -380,6 +386,8 @@ namespace Obelisk::Core
                 capabilities |= OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS;
             if (IsCallProcessEventAllowed())
                 capabilities |= OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT;
+            if (IsProcessEventBlockingAllowed())
+                capabilities |= OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING;
             return capabilities;
         }
 
@@ -624,6 +632,8 @@ namespace Obelisk::Core
         m_Api.RegisterPostProcessEventForNameIndexWithOwnerTokenHandle = PluginRegisterPostProcessEventForNameIndexWithOwnerTokenHandle;
         m_Api.UnregisterProcessEventCallbackWithOwnerToken = PluginUnregisterProcessEventCallbackWithOwnerToken;
         g_ApiCapabilities.store(m_Api.capabilities, std::memory_order_release);
+        EventManager::SetProcessEventBlockingCapabilityAdvertised(
+            (m_Api.capabilities & OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING) != 0);
     }
 
     uint64_t PluginManager::ApiCapabilitiesForTesting() const

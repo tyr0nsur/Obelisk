@@ -338,6 +338,8 @@ namespace
         setenv("OBELISK_INSTANCE_ID", "arkserver", 1);
         unsetenv("OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS");
         unsetenv("OBELISK_ALLOW_CALL_PROCESS_EVENT");
+        unsetenv("OBELISK_ALLOW_PROCESS_EVENT_BLOCKING");
+        Obelisk::Core::EventManager::SetProcessEventBlockingCapabilityAdvertised(false);
     }
 
     void CleanupPlugin(FakePlugin& plugin)
@@ -590,6 +592,38 @@ namespace
                     (capabilities & OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS) != 0,
                 "callback handle capability was advertised without owner-token capability");
 
+        fs::remove_all(root);
+    }
+
+    void TestProcessEventBlockingCapabilityRejectedByDefault()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_process_event_blocking_denied");
+        ConfigureEnvironment(root);
+
+        FakeLoader loader;
+        Obelisk::Core::PluginManager manager(loader);
+        Require((manager.ApiCapabilitiesForTesting() & OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING) == 0,
+                "ProcessEvent blocking capability was enabled by default");
+
+        fs::remove_all(root);
+    }
+
+    void TestProcessEventBlockingCapabilityAllowedWithGate()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_process_event_blocking_allowed");
+        ConfigureEnvironment(root);
+        setenv("OBELISK_ALLOW_PROCESS_EVENT_BLOCKING", "1", 1);
+        fs::create_directories(root / "state" / "instances" / "arkserver");
+        std::ofstream marker(root / "state" / "instances" / "arkserver" / "allow-process-event-blocking");
+        Require(marker.is_open(), "failed to create ProcessEvent blocking marker");
+        marker.close();
+
+        FakeLoader loader;
+        Obelisk::Core::PluginManager manager(loader);
+        Require((manager.ApiCapabilitiesForTesting() & OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING) != 0,
+                "ProcessEvent blocking capability was not enabled with env and marker gate");
+
+        unsetenv("OBELISK_ALLOW_PROCESS_EVENT_BLOCKING");
         fs::remove_all(root);
     }
 
@@ -1678,6 +1712,8 @@ int main()
     TestPluginOwnerTokensSkipZeroAndLiveTokensAfterWrap();
     TestGlobalProcessEventCallbackRejectedByDefault();
     TestCallbackHandleCapabilityImpliesOwnerTokenCapability();
+    TestProcessEventBlockingCapabilityRejectedByDefault();
+    TestProcessEventBlockingCapabilityAllowedWithGate();
     TestFilteredProcessEventCallbackAllowedByDefault();
     TestPostInitUnownedCallbackRegistrationIsRejected();
     TestPostInitOwnerTokenCallbackRegistrationCleansOnUnload();

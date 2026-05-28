@@ -156,6 +156,15 @@ write_proc_fixture 114 "${stable_maps}" \
 expect_failure call-process-event-forbidden-for-stable \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 114 --expect-stable --instance arkserver
 
+write_proc_fixture 115 "${stable_maps}" \
+    "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
+    "OBELISK_INSTANCE_ID=arkserver" \
+    "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
+    "OBELISK_DISABLE_PLUGINS=1" \
+    "OBELISK_ALLOW_PROCESS_EVENT_BLOCKING=1"
+expect_failure process-event-blocking-forbidden-for-stable \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 115 --expect-stable --instance arkserver
+
 write_proc_fixture 102 "${stable_maps}" \
     "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
     "OBELISK_INSTANCE_ID=arkserver" \
@@ -243,6 +252,7 @@ for marker in \
     enable-native-exec-probes \
     allow-global-process-event-callbacks \
     allow-call-process-event \
+    allow-process-event-blocking \
     enable-chat-reflection \
     enable-inventory-reflection \
     enable-structure-reflection \

@@ -7,6 +7,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <limits>
 #include <mutex>
@@ -135,6 +136,23 @@ namespace
         return true;
     }
 
+    void EnableProcessEventBlockingGate(const fs::path& root)
+    {
+        setenv("OBELISK_ROOT", root.string().c_str(), 1);
+        setenv("OBELISK_INSTANCE_ID", "arkserver", 1);
+        setenv("OBELISK_ALLOW_PROCESS_EVENT_BLOCKING", "1", 1);
+        fs::create_directories(root / "state" / "instances" / "arkserver");
+        std::ofstream marker(root / "state" / "instances" / "arkserver" / "allow-process-event-blocking");
+        Require(marker.is_open(), "failed to create ProcessEvent blocking marker");
+        Obelisk::Core::EventManager::SetProcessEventBlockingCapabilityAdvertised(true);
+    }
+
+    void DisableProcessEventBlockingGate()
+    {
+        Obelisk::Core::EventManager::SetProcessEventBlockingCapabilityAdvertised(false);
+        unsetenv("OBELISK_ALLOW_PROCESS_EVENT_BLOCKING");
+    }
+
     void TestFilteredPreCallbacks()
     {
         ResetCounters();
@@ -157,6 +175,33 @@ namespace
     void TestPreCallbackBlocking()
     {
         ResetCounters();
+        DisableProcessEventBlockingGate();
+        Obelisk::Core::EventManager events;
+        int owner = 0;
+
+        events.RegisterPreProcessEventOwned(&owner, GlobalPre);
+        events.RegisterPreProcessEventForNameIndexOwned(&owner, 42, FilteredPre);
+
+        g_Counters.block_global_pre = true;
+        Require(events.TriggerPreProcessEvent(42, nullptr, nullptr, nullptr),
+                "global pre callback blocked without explicit ProcessEvent blocking gate");
+        Require(g_Counters.global_pre == 1, "global pre blocker did not run");
+        Require(g_Counters.filtered_pre == 1, "filtered pre callback did not continue after ungated global block");
+
+        ResetCounters();
+        g_Counters.block_filtered_pre = true;
+        Require(events.TriggerPreProcessEvent(42, nullptr, nullptr, nullptr),
+                "filtered pre callback blocked without explicit ProcessEvent blocking gate");
+        Require(g_Counters.global_pre == 1, "global pre callback did not run before ungated filtered block");
+        Require(g_Counters.filtered_pre == 1, "filtered pre blocker did not run");
+    }
+
+    void TestPreCallbackBlockingWithGate()
+    {
+        const fs::path root = MakeTempRoot();
+        EnableProcessEventBlockingGate(root);
+
+        ResetCounters();
         Obelisk::Core::EventManager events;
         int owner = 0;
 
@@ -165,16 +210,19 @@ namespace
 
         g_Counters.block_global_pre = true;
         Require(!events.TriggerPreProcessEvent(42, nullptr, nullptr, nullptr),
-                "global pre callback block was ignored");
-        Require(g_Counters.global_pre == 1, "global pre blocker did not run");
-        Require(g_Counters.filtered_pre == 0, "filtered pre callback ran after global block");
+                "global pre callback block was ignored with explicit gate");
+        Require(g_Counters.global_pre == 1, "gated global pre blocker did not run");
+        Require(g_Counters.filtered_pre == 0, "filtered pre callback ran after gated global block");
 
         ResetCounters();
         g_Counters.block_filtered_pre = true;
         Require(!events.TriggerPreProcessEvent(42, nullptr, nullptr, nullptr),
-                "filtered pre callback block was ignored");
+                "filtered pre callback block was ignored with explicit gate");
         Require(g_Counters.global_pre == 1, "global pre callback did not run before filtered block");
         Require(g_Counters.filtered_pre == 1, "filtered pre blocker did not run");
+
+        DisableProcessEventBlockingGate();
+        fs::remove_all(root);
     }
 
     void TestFilteredPostCallbacks()
@@ -437,6 +485,7 @@ int main()
 
     TestFilteredPreCallbacks();
     TestPreCallbackBlocking();
+    TestPreCallbackBlockingWithGate();
     TestFilteredPostCallbacks();
     TestPostCallbackReturnValueDoesNotAffectDispatch();
     TestPreCallbackExceptionsDoNotBlockOrStopLaterCallbacks();

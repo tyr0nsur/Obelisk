@@ -24,6 +24,7 @@ FORBIDDEN_STABLE_MARKERS = frozenset(
         "enable-native-exec-probes",
         "allow-global-process-event-callbacks",
         "allow-call-process-event",
+        "allow-process-event-blocking",
         "enable-chat-reflection",
         "enable-inventory-reflection",
         "enable-structure-reflection",
@@ -110,7 +111,11 @@ def iter_instances(state_root: Path) -> list[Path]:
     instances_root = state_root / "instances"
     if not instances_root.is_dir():
         return []
-    return sorted(path for path in instances_root.iterdir() if path.is_dir() and not path.is_symlink())
+    return sorted(
+        path
+        for path in instances_root.iterdir()
+        if path.is_dir() and not path.is_symlink() and is_safe_instance_id(path.name)
+    )
 
 
 def iter_instance_entries(state_root: Path) -> list[Path]:
@@ -208,6 +213,10 @@ def command_instances_list(root: Path) -> int:
             markers: list[str] = []
             posture = "invalid"
             details = "instance-dir-symlink"
+        elif not is_safe_instance_id(instance_dir.name):
+            markers = []
+            posture = "invalid"
+            details = "instance-id-unsafe"
         else:
             markers = sorted(
                 marker.name

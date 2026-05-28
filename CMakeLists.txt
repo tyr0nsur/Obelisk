@@ -106,6 +106,7 @@ add_executable(event_manager_tests
     tests/core/EventManagerTests.cpp
     core/EventManager.cpp
     runtime/Logger.cpp
+    runtime/RuntimeMarkers.cpp
 )
 target_include_directories(event_manager_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(event_manager_tests PRIVATE obelisk_sdk fmt::fmt spdlog::spdlog)
@@ -118,6 +119,7 @@ add_executable(process_event_dispatch_tests
     hooks/ProcessEventDispatch.cpp
     core/EventManager.cpp
     runtime/Logger.cpp
+    runtime/RuntimeMarkers.cpp
 )
 target_include_directories(process_event_dispatch_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(process_event_dispatch_tests PRIVATE obelisk_sdk fmt::fmt spdlog::spdlog)

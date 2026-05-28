@@ -28,6 +28,7 @@ namespace
         volatile std::uint64_t ownerTokenCallbacksCapability = OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS;
         volatile std::uint64_t callbackHandlesCapability = OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES;
         volatile std::uint64_t callProcessEventCapability = OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT;
+        volatile std::uint64_t processEventBlockingCapability = OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING;
 
         (void)apiVersion;
         (void)metadataVersion;
@@ -37,6 +38,7 @@ namespace
         (void)ownerTokenCallbacksCapability;
         (void)callbackHandlesCapability;
         (void)callProcessEventCapability;
+        (void)processEventBlockingCapability;
     }
 }
 
@@ -48,6 +50,7 @@ int main()
     static_assert(OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS == (1ull << 2));
     static_assert(OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES == (1ull << 3));
     static_assert(OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT == (1ull << 4));
+    static_assert(OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING == (1ull << 5));
 
     AssertAbiType<ObeliskPluginMetadata>();
     static_assert(alignof(ObeliskPluginMetadata) == 8);

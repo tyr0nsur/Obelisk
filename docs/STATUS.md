@@ -64,6 +64,8 @@ Current safe interaction shape:
 Blocked from stable plugin APIs until promoted with evidence:
 
 - mutating UE4 parameter buffers or return values;
+- blocking the original `ProcessEvent` from plugin callbacks except in an explicit
+  debug/experimental gate;
 - calling arbitrary UE4 functions or replaying events through `CallProcessEvent`;
 - exposing borrowed `UObject`, `FString`, `UFunction`, or raw parameter memory to plugins;
 - publishing player, inventory, structure, dino, tribe, transfer, admin, or command APIs.

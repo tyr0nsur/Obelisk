@@ -249,6 +249,7 @@ prepare_root "${root_inherited}"
     OBELISK_ENABLE_NATIVE_EXEC_PROBES=1 \
     OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS=1 \
     OBELISK_ALLOW_CALL_PROCESS_EVENT=1 \
+    OBELISK_ALLOW_PROCESS_EVENT_BLOCKING=1 \
     OBELISK_PE_TRACE_LIMIT=100 \
     OBELISK_ENABLE_CHAT_REFLECTION=1 \
     OBELISK_CHAT_REFLECTION_BINARY_SHA256=bad-chat-sha \
@@ -279,6 +280,7 @@ assert_not_contains "${capture_inherited}" '^OBELISK_ENABLE_REFLECTION_SCANNER='
 assert_not_contains "${capture_inherited}" '^OBELISK_ENABLE_NATIVE_EXEC_PROBES='
 assert_not_contains "${capture_inherited}" '^OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS='
 assert_not_contains "${capture_inherited}" '^OBELISK_ALLOW_CALL_PROCESS_EVENT='
+assert_not_contains "${capture_inherited}" '^OBELISK_ALLOW_PROCESS_EVENT_BLOCKING='
 assert_not_contains "${capture_inherited}" '^OBELISK_PE_TRACE_LIMIT='
 assert_not_contains "${capture_inherited}" '^OBELISK_ENABLE_CHAT_REFLECTION='
 assert_not_contains "${capture_inherited}" '^OBELISK_CHAT_REFLECTION_BINARY_SHA256='

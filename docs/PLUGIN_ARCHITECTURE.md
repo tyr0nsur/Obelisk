@@ -239,6 +239,11 @@ Rules:
   callbacks are not explicitly enabled for the current instance.
 - Any global-callback debug window also requires a documented objective, bounded trace
   limits, named debug instance, and rollback plan.
+- Pre-callbacks are observational by default. A `false` return blocks the original
+  `ProcessEvent` only when `OBELISK_ALLOW_PROCESS_EVENT_BLOCKING=1`, the per-instance
+  `allow-process-event-blocking` marker exists, and
+  `OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING` is advertised. Stable plugins should
+  return `true`.
 - Global callbacks must not block, allocate heavily, perform file or network I/O,
   parse JSON, sleep, or take contended locks.
 - Parameter decoding must be reflection-backed before it is considered stable.

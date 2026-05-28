@@ -11,6 +11,7 @@
 #define OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS (1ull << 2)
 #define OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES (1ull << 3)
 #define OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT (1ull << 4)
+#define OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING (1ull << 5)
 
 #ifdef __cplusplus
 extern "C" {
@@ -21,7 +22,9 @@ extern "C" {
 // ============================================================================
 
 // Prototype for a function that will receive the ProcessEvent hook.
-// Pre-process callbacks return true to continue execution or false to block the event.
+// Pre-process callbacks return true to continue execution. Returning false blocks the
+// original event only when OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING is advertised;
+// stable/default posture treats false as observational and continues.
 // Post-process callbacks use the same ABI type, but their return value is ignored; return
 // true from post callbacks for forward compatibility.
 typedef bool (*OnProcessEventCallback)(void* caller, void* function, void* parms);

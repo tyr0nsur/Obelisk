@@ -1,14 +1,33 @@
 #include "EventManager.h"
 #include "runtime/Logger.h"
+#include "runtime/RuntimeMarkers.h"
 #include <algorithm>
+#include <atomic>
 #include <exception>
 
 namespace Obelisk::Core
 {
+    namespace
+    {
+        std::atomic<bool> g_ProcessEventBlockingCapabilityAdvertised{false};
+
+        bool IsProcessEventBlockingAllowed()
+        {
+            return g_ProcessEventBlockingCapabilityAdvertised.load(std::memory_order_acquire) &&
+                Runtime::IsEnvAndInstanceMarkerEnabled("OBELISK_ALLOW_PROCESS_EVENT_BLOCKING",
+                                                       "allow-process-event-blocking");
+        }
+    }
+
     EventManager& EventManager::Get()
     {
         static EventManager instance;
         return instance;
+    }
+
+    void EventManager::SetProcessEventBlockingCapabilityAdvertised(bool advertised)
+    {
+        g_ProcessEventBlockingCapabilityAdvertised.store(advertised, std::memory_order_release);
     }
 
     void EventManager::RegisterPreProcessEvent(OnProcessEventCallback callback)
@@ -198,7 +217,11 @@ namespace Obelisk::Core
             try
             {
                 if (!callback(caller, function, parms))
-                    return false;
+                {
+                    if (IsProcessEventBlockingAllowed())
+                        return false;
+                    OBELISK_WARN("PreProcessEvent callback returned false, but ProcessEvent blocking is disabled; continuing original event.");
+                }
             }
             catch (const std::exception& e)
             {
@@ -236,7 +259,11 @@ namespace Obelisk::Core
             try
             {
                 if (!callback(caller, function, parms))
-                    return false;
+                {
+                    if (IsProcessEventBlockingAllowed())
+                        return false;
+                    OBELISK_WARN("Filtered PreProcessEvent callback returned false, but ProcessEvent blocking is disabled; continuing original event.");
+                }
             }
             catch (const std::exception& e)
             {

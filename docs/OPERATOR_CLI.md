@@ -36,7 +36,7 @@ are reported as invalid config state.
   future restart.
 - `experimental+incomplete`: both conditions are true.
 - `invalid`: the instance marker entry itself is unsafe, such as a symlinked instance
-  directory.
+  directory or a directory name that is not a safe `OBELISK_INSTANCE_ID`.
 
 This is a restart-posture summary, not proof that a currently running process has the same
 environment. Use `scripts/check_obelisk_server_posture.sh --expect-stable --map <map>

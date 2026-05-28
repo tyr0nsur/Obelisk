@@ -157,6 +157,9 @@ Updated: 2026-05-28
   runtime libraries, plugin binaries, and shared plugin config, with unique
   `OBELISK_INSTANCE_ID` values, per-instance logs, and per-instance markers/runtime state.
   Mutable shared plugin state requires explicit plugin-level locking/atomic-write design.
+- fact: Read-only operator CLI instance views now apply the same safe instance-id contract
+  as runtime/config (`[A-Za-z0-9_-]+`). Unsafe marker directory names are reported as
+  `invalid` / `instance-id-unsafe` and are excluded from the valid instance count.
 - fact: Operator CLI lifecycle/mutation commands are intentionally post-first-stable TODOs,
   not current production requirements. The current CLI remains read-only; future
   `plugins enable/disable/start/stop/restart` commands must wrap instance-scoped
@@ -214,6 +217,11 @@ Updated: 2026-05-28
   default-deny. It requires `OBELISK_ALLOW_CALL_PROCESS_EVENT=1` plus the per-instance
   marker `allow-call-process-event`; only then does the runtime advertise
   `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT` and call the original trampoline.
+- fact: Plugin pre-callback blocking is also default-deny. A `false` return from
+  `RegisterPreProcessEvent*` callbacks is treated as observational and the original
+  `ProcessEvent` continues unless `OBELISK_ALLOW_PROCESS_EVENT_BLOCKING=1`,
+  `allow-process-event-blocking`, and
+  `OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING` are active.
 - fact: `ObeliskApi*` and `ObeliskPluginInitContext*` are borrowed for
   `ObeliskPlugin_Init` only. Public examples, `oBaseEvents`, and SDK consumer fixtures must
   copy `ObeliskApi` by value before using runtime functions during shutdown or callbacks.

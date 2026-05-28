@@ -49,12 +49,13 @@ class ObeliskCliTests(unittest.TestCase):
             real_instance = root / "state" / "instances" / "real-arkserver"
             real_instance.mkdir()
             (root / "state" / "instances" / "arkserver").symlink_to(real_instance)
+            (root / "state" / "instances" / "bad.instance").mkdir()
 
             result = run_cli(root, "status")
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("instances: 1", result.stdout)
-            self.assertIn("invalid_instance_entries: 1", result.stdout)
+            self.assertIn("invalid_instance_entries: 2", result.stdout)
 
     def test_instances_list_reports_safe_marker_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -137,6 +138,22 @@ class ObeliskCliTests(unittest.TestCase):
             self.assertIn("arkserver", result.stdout)
             self.assertIn("invalid", result.stdout)
             self.assertIn("instance-dir-symlink", result.stdout)
+
+    def test_instances_list_reports_unsafe_instance_id_as_invalid(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            unsafe = root / "state" / "instances" / "bad.instance"
+            unsafe.mkdir(parents=True)
+            (unsafe / "enable-process-event-hook").write_text("", encoding="utf-8")
+            (unsafe / "disable-plugins").write_text("", encoding="utf-8")
+
+            result = run_cli(root, "instances", "list")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("bad.instance", result.stdout)
+            self.assertIn("invalid", result.stdout)
+            self.assertIn("instance-id-unsafe", result.stdout)
+            self.assertNotIn("stable", result.stdout)
 
     def test_plugins_list_merges_published_so_and_config(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

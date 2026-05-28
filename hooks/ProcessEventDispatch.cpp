@@ -20,14 +20,16 @@ namespace Obelisk::Hooks
         if (hasPreCallbacks)
         {
             ProcessEventCallGuard::PreCallbackScope preCallbackScope;
-            if (!eventManager.TriggerPreProcessEvent(nameIndex, object, function, params))
-                return false;
+            const bool preCallbacksAllowedOriginal =
+                eventManager.TriggerPreProcessEvent(nameIndex, object, function, params);
 
             if (preCallbackScope.OriginalCalled())
             {
                 skipAutomaticOriginal = true;
                 OBELISK_WARN("ProcessEvent original was called from a pre-callback; skipping the automatic original call to avoid double execution.");
             }
+            if (!preCallbacksAllowedOriginal)
+                return skipAutomaticOriginal;
         }
 
         if (!skipAutomaticOriginal && original)
