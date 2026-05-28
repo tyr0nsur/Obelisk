@@ -51,7 +51,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--fname-root-slot",
         type=inspector.parse_int,
-        default=inspector.uobjects.DEFAULT_FNAME_ROOT_SLOT,
+        default=None,
         help="FName root slot for this artifact. Default is the primary-core fixture candidate; "
         "override for second-source artifacts.",
     )
@@ -292,6 +292,20 @@ def main() -> int:
     artifact_sha256 = optional_sha256(args.artifact_sha256, "artifact-sha256")
     capture_id = optional_safe_text(args.capture_id, "capture-id")
     evidence_pack_id = optional_safe_text(args.evidence_pack_id, "evidence-pack-id")
+    artifact_identity_supplied = any(
+        value is not None
+        for value in (artifact_kind, artifact_sha256, capture_id, evidence_pack_id)
+    )
+    if artifact_identity_supplied and args.fname_root_slot is None:
+        raise SystemExit(
+            "--fname-root-slot is required when recording artifact identity; "
+            "derive or scan a FName root for this artifact instead of using the primary-core default"
+        )
+    fname_root_slot = (
+        args.fname_root_slot
+        if args.fname_root_slot is not None
+        else inspector.uobjects.DEFAULT_FNAME_ROOT_SLOT
+    )
     filters = set(args.target)
     processed = 0
     failures: list[str] = []
@@ -309,7 +323,7 @@ def main() -> int:
                 memory=memory,
                 entry=raw_entry,
                 gobjects=args.gobjects,
-                fname_root_slot=args.fname_root_slot,
+                fname_root_slot=fname_root_slot,
                 max_object_scan=max_object_scan,
                 ark_sha=ark_sha,
                 obelisk_commit=obelisk_commit,

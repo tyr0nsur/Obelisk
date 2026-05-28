@@ -90,3 +90,7 @@ For each reconstructed field:
   candidate-only. Acceptance requires distinct sanitized artifact identity on both roots;
   missing or matching identity is `inconclusive`, so self-comparison cannot satisfy
   second-source evidence.
+- When regenerating UFunction or ScriptStruct snapshots with artifact identity fields,
+  pass a FName root/table verified for that artifact. The regenerators must reject artifact
+  identity runs that omit explicit `--fname-root-slot`; do not let the primary-core default
+  become second-source evidence.

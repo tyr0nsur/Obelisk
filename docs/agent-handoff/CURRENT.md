@@ -177,6 +177,9 @@ Updated: 2026-05-28
   FName root slot default is not reusable evidence for new artifacts. For second-source
   work, first derive or scan a per-artifact verified FName root/table and pass it
   explicitly before regenerating UObjects/UFunction/ScriptStruct evidence.
+- fact: UFunction and ScriptStruct regenerators now enforce that rule when artifact
+  identity flags are supplied: `--fname-root-slot` is required instead of silently using
+  the primary-core default.
 - fact: `scripts/regenerate_ufunction_snapshots.py --check-layout` now supports
   UFunction layout-only verification for second-source intake. It ignores unstable
   identity/evidence indices while preserving target identity, UFunction fields, and

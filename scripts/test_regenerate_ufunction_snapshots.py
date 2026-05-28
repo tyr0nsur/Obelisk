@@ -170,6 +170,46 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("snapshot drift detected", result.stderr)
 
+    def test_artifact_identity_requires_explicit_fname_root_slot(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            manifest = root / "manifest.json"
+            output_root = root / "out"
+            addrs = build_core_fixture(core)
+            self.write_manifest(manifest)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "regenerate_ufunction_snapshots.py"),
+                    "--core",
+                    str(core),
+                    "--manifest",
+                    str(manifest),
+                    "--output-root",
+                    str(output_root),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--obelisk-commit",
+                    "abcdef1",
+                    "--artifact-kind",
+                    "offline_core",
+                    "--artifact-sha256",
+                    "2" * 64,
+                    "--capture-id",
+                    "second-core",
+                    "--evidence-pack-id",
+                    "second-pack",
+                    "--write",
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--fname-root-slot is required when recording artifact identity", result.stderr)
+
     def test_check_layout_ignores_evidence_and_identity_index_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

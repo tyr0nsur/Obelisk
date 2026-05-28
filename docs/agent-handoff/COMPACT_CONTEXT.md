@@ -165,7 +165,9 @@ work from repository state instead of chat history.
   Current readiness is `4/4` comparable and blocked only by missing second-source root.
 - For new second-source artifacts, do not reuse the primary-core FName root slot by
   default. First derive or scan a verified per-artifact FName root/table, then pass it
-  explicitly to UObjects/UFunction/ScriptStruct tools.
+  explicitly to UObjects/UFunction/ScriptStruct tools. UFunction and ScriptStruct
+  regenerators now require explicit `--fname-root-slot` when artifact identity flags are
+  supplied.
 - Latest restart audit:
   `docs/research/2026-05-27-ops-restart-audit-instance-id.md`
   - live `ObeliskRun.sh` exports `OBELISK_INSTANCE_ID=arkserver`

@@ -89,6 +89,10 @@ For UFunction fixtures, `regenerate_ufunction_snapshots.py --check-layout` provi
 same same-target semantic regeneration gate: it ignores evidence commit churn and unstable
 identity indices while still checking `NumParms`, `ParmsSize`, function flags, return
 offset, and property-chain layout.
+When artifact identity flags are supplied to either UFunction or ScriptStruct
+regeneration, the scripts require an explicit `--fname-root-slot`. This prevents
+second-source evidence packs from silently reusing the primary-core FName root default;
+derive or scan the FName root for the artifact first.
 
 ## P1 Module Fixture Matrix
 
