@@ -10,6 +10,10 @@ Regenerate accepted entries with:
 python3 scripts/regenerate_scriptstruct_snapshots.py \
   --core /path/to/offline/core \
   --obelisk-commit <commit> \
+  --artifact-kind offline_core \
+  --artifact-sha256 <core-or-evidence-artifact-sha256> \
+  --capture-id <sanitized-capture-id> \
+  --evidence-pack-id <sanitized-evidence-pack-id> \
   --check
 ```
 
@@ -21,8 +25,15 @@ indices:
 python3 scripts/regenerate_scriptstruct_snapshots.py \
   --core /path/to/second/offline/core \
   --obelisk-commit <commit> \
+  --artifact-kind offline_core \
+  --artifact-sha256 <core-or-evidence-artifact-sha256> \
+  --capture-id <sanitized-capture-id> \
+  --evidence-pack-id <sanitized-evidence-pack-id> \
   --check-layout
 ```
+
+The artifact fields are sanitized identifiers used by the comparator to reject
+self-comparison or missing second-source identity; do not store absolute core paths here.
 
 Accepted fixtures use:
 
@@ -62,6 +73,10 @@ python3 scripts/compare_reflection_snapshots.py \
   --readiness-report \
   --target-set transfer-scriptstruct
 ```
+
+Use `--json` with readiness reports when creating evidence packs. The JSON includes
+per-module `target_details` entries with each target key, fixture path, comparability,
+block reasons, and second-source status.
 
 List focused target groups, including `transfer-scriptstruct`, with:
 

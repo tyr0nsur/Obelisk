@@ -26,6 +26,20 @@ MANIFEST_SCHEMA = "obelisk.scriptstruct-snapshot-manifest.v1"
 SNAPSHOT_SCHEMA = "obelisk.scriptstruct-chain.snapshot.v1"
 SAFE_COMPONENT_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+UNSTABLE_IDENTITY_KEYS = {
+    "gobjects_index",
+    "object_index",
+    "name_gobjects_index",
+    "name_index",
+    "class_index",
+    "class_gobjects_index",
+    "class_name_index",
+    "class_object_index",
+    "outer_index",
+    "outer_gobjects_index",
+    "outer_name_index",
+    "outer_object_index",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -37,6 +51,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--fname-root-slot", type=inspector.parse_int, default=inspector.uobjects.DEFAULT_FNAME_ROOT_SLOT)
     parser.add_argument("--max-object-scan", type=int, help="Override manifest max_object_scan.")
     parser.add_argument("--obelisk-commit", help="Commit recorded in snapshot evidence. Defaults to current HEAD.")
+    parser.add_argument("--artifact-kind", help="Sanitized source artifact kind, such as offline_core.")
+    parser.add_argument("--artifact-sha256", help="SHA256 of the source core/log/evidence artifact.")
+    parser.add_argument("--capture-id", help="Sanitized capture identifier for second-source comparison.")
+    parser.add_argument("--evidence-pack-id", help="Sanitized evidence pack identifier for second-source comparison.")
     parser.add_argument("--target", action="append", default=[], help="Only process exact Outer.Name target. Repeatable.")
     parser.add_argument("--write", action="store_true", help="Write fixtures. Default is dry-run.")
     parser.add_argument("--check", action="store_true", help="Generate to temp files and fail if committed fixtures differ.")
@@ -50,6 +68,20 @@ def parse_args() -> argparse.Namespace:
 
 def repo_commit() -> str:
     return subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], cwd=REPO_ROOT, text=True).strip()
+
+
+def optional_safe_text(value: str | None, field: str) -> str | None:
+    if value is None:
+        return None
+    return safe_component(value, field)
+
+
+def optional_sha256(value: str | None, field: str) -> str | None:
+    if value is None:
+        return None
+    if SHA256_RE.fullmatch(value) is None:
+        raise SystemExit(f"{field} must be lowercase SHA256")
+    return value
 
 
 def required_text(payload: dict[str, object], key: str) -> str:
@@ -115,6 +147,10 @@ def build_snapshot(
     obelisk_commit: str,
     source: str,
     status: str,
+    artifact_kind: str | None,
+    artifact_sha256: str | None,
+    capture_id: str | None,
+    evidence_pack_id: str | None,
 ) -> dict[str, object]:
     outer = required_text(entry, "outer")
     name = required_text(entry, "name")
@@ -144,6 +180,13 @@ def build_snapshot(
         "status": status,
         "generated_by": GENERATED_BY,
     }
+    optional_evidence = {
+        "artifact_kind": artifact_kind,
+        "artifact_sha256": artifact_sha256,
+        "capture_id": capture_id,
+        "evidence_pack_id": evidence_pack_id,
+    }
+    evidence.update({key: value for key, value in optional_evidence.items() if value is not None})
     snapshot = inspector.build_fixture_snapshot(payload, evidence=evidence)
     if snapshot.get("schema") != SNAPSHOT_SCHEMA:
         raise SystemExit(f"{outer}.{name}: generated non-ScriptStruct snapshot")
@@ -174,6 +217,14 @@ def check_matches(path: Path, payload: dict[str, object]) -> bool:
         temp_path.unlink(missing_ok=True)
 
 
+def stable_layout_value(value: object) -> object:
+    if isinstance(value, dict):
+        return {key: stable_layout_value(item) for key, item in value.items() if key not in UNSTABLE_IDENTITY_KEYS}
+    if isinstance(value, list):
+        return [stable_layout_value(item) for item in value]
+    return value
+
+
 def target_layout(payload: dict[str, object]) -> dict[str, object]:
     targets = payload.get("targets")
     if not isinstance(targets, list) or len(targets) != 1:
@@ -185,25 +236,27 @@ def target_layout(payload: dict[str, object]) -> dict[str, object]:
     chain = target.get("property_chain")
     if not isinstance(identity, dict) or not isinstance(chain, dict):
         raise SystemExit("snapshot missing target identity or property chain")
-    return {
-        "schema": payload.get("schema"),
-        "inspection_mode": target.get("inspection_mode"),
-        "target": {
-            "class_name": identity.get("class_name"),
-            "name": identity.get("name"),
-            "outer_name": identity.get("outer_name"),
-            "outer_class_name": identity.get("outer_class_name"),
-        },
-        "status": target.get("status"),
-        "properties_size": target.get("properties_size"),
-        "property_chain": {
-            "status": chain.get("status"),
-            "expected_count": chain.get("expected_count"),
-            "observed_count": chain.get("observed_count"),
-            "properties_size": chain.get("properties_size"),
-            "properties": chain.get("properties"),
-        },
-    }
+    return stable_layout_value(
+        {
+            "schema": payload.get("schema"),
+            "inspection_mode": target.get("inspection_mode"),
+            "target": {
+                "class_name": identity.get("class_name"),
+                "name": identity.get("name"),
+                "outer_name": identity.get("outer_name"),
+                "outer_class_name": identity.get("outer_class_name"),
+            },
+            "status": target.get("status"),
+            "properties_size": target.get("properties_size"),
+            "property_chain": {
+                "status": chain.get("status"),
+                "expected_count": chain.get("expected_count"),
+                "observed_count": chain.get("observed_count"),
+                "properties_size": chain.get("properties_size"),
+                "properties": chain.get("properties"),
+            },
+        }
+    )
 
 
 def check_layout_matches(path: Path, payload: dict[str, object]) -> bool:
@@ -229,6 +282,10 @@ def main() -> int:
     source = required_text(manifest, "source")
     status = required_text(manifest, "status")
     obelisk_commit = args.obelisk_commit or repo_commit()
+    artifact_kind = optional_safe_text(args.artifact_kind, "artifact-kind")
+    artifact_sha256 = optional_sha256(args.artifact_sha256, "artifact-sha256")
+    capture_id = optional_safe_text(args.capture_id, "capture-id")
+    evidence_pack_id = optional_safe_text(args.evidence_pack_id, "evidence-pack-id")
     filters = set(args.target)
     processed = 0
     failures: list[str] = []
@@ -252,6 +309,10 @@ def main() -> int:
                 obelisk_commit=obelisk_commit,
                 source=source,
                 status=status,
+                artifact_kind=artifact_kind,
+                artifact_sha256=artifact_sha256,
+                capture_id=capture_id,
+                evidence_pack_id=evidence_pack_id,
             )
             label = output_path.relative_to(REPO_ROOT) if output_path.is_relative_to(REPO_ROOT) else output_path
             if args.check:

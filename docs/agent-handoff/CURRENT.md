@@ -156,10 +156,20 @@ Updated: 2026-05-28
   `PrimalStructure.AllowStructureAccess`, and `PrimalStructure.IsAllowedToDemolish`.
   `--target-set transfer-scriptstruct` expands the two transfer ScriptStruct fixtures.
   Use `--list-target-sets` to print the available named groups without reading snapshots.
+- fact: `scripts/compare_reflection_snapshots.py` now requires sanitized artifact identity
+  (`artifact_kind`, `artifact_sha256`, `capture_id`, `evidence_pack_id`) before accepting
+  a second-source comparison. Missing or matching artifact identity is inconclusive, so
+  self-comparison of the primary fixture root cannot masquerade as independent evidence.
+  Readiness JSON includes per-target details for missing, inconclusive, rejected, or
+  accepted targets.
 - fact: `scripts/regenerate_ufunction_snapshots.py --check-layout` now supports
   UFunction layout-only verification for second-source intake. It ignores unstable
   identity/evidence indices while preserving target identity, UFunction fields, and
   property-chain layout drift.
+- fact: UFunction and ScriptStruct snapshot regenerators accept sanitized artifact
+  identity flags (`--artifact-kind`, `--artifact-sha256`, `--capture-id`,
+  `--evidence-pack-id`) for second-source evidence packs. The committed primary fixtures
+  carry the primary core artifact SHA without storing absolute core paths.
 - fact: Commit `f3a47d1` runs reflection snapshot comparison and ScriptStruct fixture
   tests in CI and release validation.
 - fact: Commit `3451a19` aligns README and `docs/STATUS.md` around module-first runtime

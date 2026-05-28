@@ -86,6 +86,13 @@ work from repository state instead of chat history.
   second-source checks for one UFunction or ScriptStruct without preparing a separate
   fixture root. Use `--list-target-sets` to print named intakes such as
   `minimal-second-source-intake` and `transfer-scriptstruct`.
+- Second-source comparison now requires sanitized artifact identity in both roots:
+  `artifact_kind`, `artifact_sha256`, `capture_id`, and `evidence_pack_id`. Missing or
+  matching identity is `inconclusive`, so self-comparison cannot pass as independent
+  evidence. Readiness JSON includes per-target details for evidence packs.
+- UFunction and ScriptStruct regenerators accept the artifact identity flags above; the
+  committed primary fixtures carry the primary core artifact SHA without storing core
+  paths.
 - CI and release validation now run reflection snapshot comparison and ScriptStruct
   fixture tests. README/STATUS present module-first observers and snapshot tooling instead
   of a chat-centered roadmap. Mixed-schema target-filter behavior is covered by tests.

@@ -54,6 +54,14 @@ Use `--json` for evidence packs. The comparator ignores commit, metadata, and un
 FName/GObjects indices by default; it returns `accepted`, `rejected`, or `inconclusive` per
 target. Use `--strict-identity-indices` only when intentionally comparing same-binary
 identity evidence, not for cross-source layout promotion.
+Second-source comparison now requires sanitized artifact identity in snapshot evidence.
+Each side should record `artifact_kind`, `artifact_sha256`, `capture_id`, and
+`evidence_pack_id`; matching or missing artifact identity is `inconclusive`, even when
+layouts match. This prevents self-comparison of the primary fixture root from looking like
+independent acceptance. Readiness JSON includes per-module `target_details` entries with
+each target key, source path, comparability, block reasons, and second-source status. Use
+those details in evidence packs instead of manually reconstructing which target is still
+missing, inconclusive, or layout-rejected.
 
 Before a second-source snapshot set exists, use the readiness report to keep module
 coverage and missing second-source evidence explicit:

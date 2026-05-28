@@ -104,6 +104,14 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
                     hex(addrs["fname_root_slot"]),
                     "--obelisk-commit",
                     "abcdef1",
+                    "--artifact-kind",
+                    "offline_core",
+                    "--artifact-sha256",
+                    "2" * 64,
+                    "--capture-id",
+                    "second-core",
+                    "--evidence-pack-id",
+                    "second-pack",
                     "--write",
                 ],
                 check=True,
@@ -118,6 +126,10 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
             "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
         )
         self.assertEqual(payload["evidence"]["obelisk_commit"], "abcdef1")
+        self.assertEqual(payload["evidence"]["artifact_kind"], "offline_core")
+        self.assertEqual(payload["evidence"]["artifact_sha256"], "2" * 64)
+        self.assertEqual(payload["evidence"]["capture_id"], "second-core")
+        self.assertEqual(payload["evidence"]["evidence_pack_id"], "second-pack")
         self.assertEqual(payload["targets"][0]["target"]["name"], "AllowStructureAccess")
         self.assertEqual(payload["targets"][0]["target"]["outer_name"], "PrimalStructure")
 

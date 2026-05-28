@@ -62,6 +62,14 @@ class RegenerateScriptStructSnapshotsTests(unittest.TestCase):
                     hex(addrs["fname_root_slot"]),
                     "--obelisk-commit",
                     "abcdef1",
+                    "--artifact-kind",
+                    "offline_core",
+                    "--artifact-sha256",
+                    "2" * 64,
+                    "--capture-id",
+                    "second-core",
+                    "--evidence-pack-id",
+                    "second-pack",
                     "--write",
                 ],
                 check=True,
@@ -76,6 +84,10 @@ class RegenerateScriptStructSnapshotsTests(unittest.TestCase):
         self.assertEqual(payload["targets"][0]["target"]["name"], "ARKTributeDino")
         self.assertEqual(payload["targets"][0]["target"]["class_name"], "ScriptStruct")
         self.assertEqual(payload["targets"][0]["properties_size"], 288)
+        self.assertEqual(payload["evidence"]["artifact_kind"], "offline_core")
+        self.assertEqual(payload["evidence"]["artifact_sha256"], "2" * 64)
+        self.assertEqual(payload["evidence"]["capture_id"], "second-core")
+        self.assertEqual(payload["evidence"]["evidence_pack_id"], "second-pack")
 
     def test_empty_manifest_is_allowed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -195,6 +207,46 @@ class RegenerateScriptStructSnapshotsTests(unittest.TestCase):
             subprocess.run([*common_args, "--write"], check=True, capture_output=True, text=True)
             payload = json.loads(output.read_text(encoding="utf-8"))
             payload["targets"][0]["target"]["object_index"] = 999999  # type: ignore[index]
+            output.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+            result = subprocess.run([*common_args, "--check-layout"], check=False, capture_output=True, text=True)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("layout ok", result.stdout)
+
+    def test_check_layout_ignores_property_identity_index_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            manifest = root / "manifest.json"
+            output_root = root / "out"
+            output = output_root / "7e7ded49e0c6" / "sdk_test" / "Script.ShooterGame.ARKTributeDino.snapshot.json"
+            addrs = build_core_fixture(core)
+            self.write_manifest(manifest)
+            common_args = [
+                sys.executable,
+                str(SCRIPT_DIR / "regenerate_scriptstruct_snapshots.py"),
+                "--core",
+                str(core),
+                "--manifest",
+                str(manifest),
+                "--output-root",
+                str(output_root),
+                "--gobjects",
+                hex(addrs["gobjects"]),
+                "--fname-root-slot",
+                hex(addrs["fname_root_slot"]),
+                "--obelisk-commit",
+                "abcdef1",
+            ]
+
+            subprocess.run([*common_args, "--write"], check=True, capture_output=True, text=True)
+            payload = json.loads(output.read_text(encoding="utf-8"))
+            prop = payload["targets"][0]["property_chain"]["properties"][0]  # type: ignore[index]
+            prop["object_index"] = 999991
+            prop["name_index"] = 999992
+            prop["class_name_index"] = 999993
+            prop["class_object_index"] = 999994
             output.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
             result = subprocess.run([*common_args, "--check-layout"], check=False, capture_output=True, text=True)

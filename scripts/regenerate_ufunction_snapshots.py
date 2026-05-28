@@ -55,6 +55,10 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--max-object-scan", type=int, help="Override manifest max_object_scan.")
     parser.add_argument("--obelisk-commit", help="Commit recorded in snapshot evidence. Defaults to current HEAD.")
+    parser.add_argument("--artifact-kind", help="Sanitized source artifact kind, such as offline_core.")
+    parser.add_argument("--artifact-sha256", help="SHA256 of the source core/log/evidence artifact.")
+    parser.add_argument("--capture-id", help="Sanitized capture identifier for second-source comparison.")
+    parser.add_argument("--evidence-pack-id", help="Sanitized evidence pack identifier for second-source comparison.")
     parser.add_argument("--target", action="append", default=[], help="Only process exact Outer.Name target. Repeatable.")
     parser.add_argument("--write", action="store_true", help="Write fixtures. Default is dry-run.")
     parser.add_argument("--check", action="store_true", help="Generate to temp files and fail if committed fixtures differ.")
@@ -64,6 +68,20 @@ def parse_args() -> argparse.Namespace:
         help="Fail only when target identity, UFunction fields, or property-chain layout differs.",
     )
     return parser.parse_args()
+
+
+def optional_safe_text(value: str | None, field: str) -> str | None:
+    if value is None:
+        return None
+    return safe_component(value, field)
+
+
+def optional_sha256(value: str | None, field: str) -> str | None:
+    if value is None:
+        return None
+    if SHA256_RE.fullmatch(value) is None:
+        raise SystemExit(f"{field} must be lowercase SHA256")
+    return value
 
 
 def repo_commit() -> str:
@@ -138,6 +156,10 @@ def build_snapshot(
     obelisk_commit: str,
     source: str,
     status: str,
+    artifact_kind: str | None,
+    artifact_sha256: str | None,
+    capture_id: str | None,
+    evidence_pack_id: str | None,
 ) -> dict[str, object]:
     outer = safe_component(required_text(entry, "outer"), "outer")
     name = safe_component(required_text(entry, "name"), "name")
@@ -166,6 +188,13 @@ def build_snapshot(
         "status": status,
         "generated_by": GENERATED_BY,
     }
+    optional_evidence = {
+        "artifact_kind": artifact_kind,
+        "artifact_sha256": artifact_sha256,
+        "capture_id": capture_id,
+        "evidence_pack_id": evidence_pack_id,
+    }
+    evidence.update({key: value for key, value in optional_evidence.items() if value is not None})
     snapshot = inspector.build_fixture_snapshot(payload, evidence=evidence)
     if snapshot.get("schema") != SNAPSHOT_SCHEMA:
         raise SystemExit(f"{outer}.{name}: generated non-UFunction snapshot")
@@ -264,6 +293,10 @@ def main() -> int:
     source = required_text(manifest, "source")
     status = required_text(manifest, "status")
     obelisk_commit = args.obelisk_commit or repo_commit()
+    artifact_kind = optional_safe_text(args.artifact_kind, "artifact-kind")
+    artifact_sha256 = optional_sha256(args.artifact_sha256, "artifact-sha256")
+    capture_id = optional_safe_text(args.capture_id, "capture-id")
+    evidence_pack_id = optional_safe_text(args.evidence_pack_id, "evidence-pack-id")
     filters = set(args.target)
     processed = 0
     failures: list[str] = []
@@ -287,6 +320,10 @@ def main() -> int:
                 obelisk_commit=obelisk_commit,
                 source=source,
                 status=status,
+                artifact_kind=artifact_kind,
+                artifact_sha256=artifact_sha256,
+                capture_id=capture_id,
+                evidence_pack_id=evidence_pack_id,
             )
             label = output_path.relative_to(REPO_ROOT) if output_path.is_relative_to(REPO_ROOT) else output_path
             if args.check:

@@ -30,6 +30,12 @@ FORBIDDEN_KEYS = {
 }
 ADDRESS_RE = re.compile(r"0x[0-9a-fA-F]{8,}")
 HEX_METADATA_KEYS = {"property_flags", "return_value_offset", "function_flags"}
+EVIDENCE_ARTIFACT_IDENTITY_KEYS = (
+    "artifact_sha256",
+    "artifact_kind",
+    "capture_id",
+    "evidence_pack_id",
+)
 TARGET_SETS = {
     "minimal-second-source-intake": (
         "PrimalItem.CanUse",
@@ -356,6 +362,16 @@ def evidence_sha(payload: dict[str, Any]) -> Any:
     return evidence.get("ark_binary_sha256") if isinstance(evidence, dict) else None
 
 
+def evidence_artifact_identity(payload: dict[str, Any]) -> tuple[Any, ...] | None:
+    evidence = payload.get("evidence")
+    if not isinstance(evidence, dict):
+        return None
+    values = tuple(evidence.get(key) for key in EVIDENCE_ARTIFACT_IDENTITY_KEYS)
+    if not all(isinstance(value, str) and value for value in values):
+        return None
+    return values
+
+
 def matches_target_filter(key: str, filters: set[str]) -> bool:
     if not filters:
         return True
@@ -399,6 +415,18 @@ def compare_sets(
                     "reasons": ["ark_binary_sha256_mismatch"],
                 }
             )
+            continue
+        base_artifact = evidence_artifact_identity(base[key]["payload"])
+        candidate_artifact = evidence_artifact_identity(candidate[key]["payload"])
+        artifact_reasons = []
+        if base_artifact is None:
+            artifact_reasons.append("missing_base_evidence_artifact_identity")
+        if candidate_artifact is None:
+            artifact_reasons.append("missing_candidate_evidence_artifact_identity")
+        if base_artifact is not None and candidate_artifact is not None and base_artifact == candidate_artifact:
+            artifact_reasons.append("same_evidence_artifact_identity")
+        if artifact_reasons:
+            results.append({"target": key, "status": "inconclusive", "reasons": artifact_reasons})
             continue
         base_layout, base_reasons = comparable_layout(base[key]["payload"], strict_identity_indices=strict_identity_indices)
         candidate_layout, candidate_reasons = comparable_layout(
@@ -486,12 +514,20 @@ def readiness_report(
                 "blocked": 0,
                 "block_reasons": {},
                 "second_source": {"accepted": 0, "rejected": 0, "inconclusive": 0, "missing": 0},
+                "target_details": [],
             },
         )
 
         bucket["targets"] += 1
         totals["targets"] += 1
         _, reasons = comparable_layout(payload, strict_identity_indices=strict_identity_indices)
+        target_detail = {
+            "target": key,
+            "path": entry["path"],
+            "comparable": not bool(reasons),
+            "block_reasons": reasons,
+            "second_source_status": "missing",
+        }
         if reasons:
             bucket["blocked"] += 1
             totals["blocked"] += 1
@@ -505,10 +541,19 @@ def readiness_report(
         if comparison_result is None:
             bucket["second_source"]["missing"] += 1
             totals["second_source_missing"] += 1
+            bucket["target_details"].append(target_detail)
             continue
         status = comparison_result["status"]
+        target_detail["second_source_status"] = status
+        if status == "inconclusive":
+            target_detail["second_source_reasons"] = comparison_result.get("reasons", [])
+        elif status == "rejected":
+            target_detail["diff_count"] = len(comparison_result.get("diffs", []))
+            first_diff = comparison_result.get("diffs", [{}])[0]
+            target_detail["first_diff"] = first_diff.get("path")
         bucket["second_source"][status] += 1
         totals[f"second_source_{status}"] += 1
+        bucket["target_details"].append(target_detail)
 
     return {
         "schema": "obelisk.reflection-snapshot-readiness.v1",

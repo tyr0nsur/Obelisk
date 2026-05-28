@@ -8,6 +8,10 @@ regenerated from an existing offline core with:
 python3 scripts/regenerate_ufunction_snapshots.py \
   --core <offline-core-path> \
   --obelisk-commit <obelisk-commit> \
+  --artifact-kind offline_core \
+  --artifact-sha256 <core-or-evidence-artifact-sha256> \
+  --capture-id <sanitized-capture-id> \
+  --evidence-pack-id <sanitized-evidence-pack-id> \
   --write
 ```
 
@@ -16,6 +20,8 @@ committed fixtures without modifying files. For second-core regeneration where t
 commit or capture-specific identity indices naturally differ, use `--check-layout` to
 compare only target identity, UFunction fields, and property-chain layout. Use
 `--target Outer.Function` to regenerate or check one manifest entry.
+The artifact fields are sanitized identifiers used by the comparator to reject
+self-comparison or missing second-source identity; do not store absolute core paths here.
 
 Compare sanitized snapshot layouts between two evidence roots with:
 
@@ -38,6 +44,10 @@ python3 scripts/compare_reflection_snapshots.py \
   --base-root tests/fixtures/ufunction_snapshots \
   --readiness-report
 ```
+
+Use `--json` with readiness reports when creating evidence packs. The JSON includes
+per-module `target_details` entries with each target key, fixture path, comparability,
+block reasons, and second-source status.
 
 List the named target sets used by focused readiness checks with:
 

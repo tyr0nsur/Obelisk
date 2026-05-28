@@ -20,6 +20,10 @@ def base_snapshot() -> dict[str, object]:
         "schema": "obelisk.ufunction-chain.snapshot.v1",
         "evidence": {
             "ark_binary_sha256": "a" * 64,
+            "artifact_kind": "offline_core",
+            "artifact_sha256": "1" * 64,
+            "capture_id": "primary-core",
+            "evidence_pack_id": "primary-pack",
             "obelisk_commit": "1111111",
             "source": "offline_core",
             "status": "candidate-only",
@@ -121,6 +125,13 @@ def scriptstruct_snapshot() -> dict[str, object]:
 
 
 def write_snapshot(root: Path, payload: dict[str, object], name: str = "PrimalItem.CanUse.snapshot.json") -> Path:
+    if "candidate" in root.parts:
+        evidence = payload.get("evidence")
+        if isinstance(evidence, dict):
+            evidence["artifact_kind"] = "offline_core"
+            evidence["artifact_sha256"] = "2" * 64
+            evidence["capture_id"] = "candidate-core"
+            evidence["evidence_pack_id"] = "candidate-pack"
     path = root / name
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
     return path
@@ -270,6 +281,53 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         report = json.loads(result.stdout)
         self.assertEqual(report["results"][0]["reasons"], ["ark_binary_sha256_mismatch"])
+
+    def test_marks_missing_artifact_identity_inconclusive(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            left = base_snapshot()
+            right = deepcopy(left)
+            for payload in (left, right):
+                evidence = payload["evidence"]  # type: ignore[index]
+                evidence.pop("artifact_kind", None)
+                evidence.pop("artifact_sha256", None)
+                evidence.pop("capture_id", None)
+                evidence.pop("evidence_pack_id", None)
+            write_snapshot(base, left)
+            path = candidate / "PrimalItem.CanUse.snapshot.json"
+            path.write_text(json.dumps(right, indent=2, sort_keys=True), encoding="utf-8")
+
+            result = run_compare(base, candidate, "--json")
+
+        self.assertEqual(result.returncode, 2)
+        report = json.loads(result.stdout)
+        self.assertEqual(
+            report["results"][0]["reasons"],
+            ["missing_base_evidence_artifact_identity", "missing_candidate_evidence_artifact_identity"],
+        )
+
+    def test_marks_same_artifact_identity_inconclusive(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            left = base_snapshot()
+            right = deepcopy(left)
+            write_snapshot(base, left)
+            path = candidate / "PrimalItem.CanUse.snapshot.json"
+            path.write_text(json.dumps(right, indent=2, sort_keys=True), encoding="utf-8")
+
+            result = run_compare(base, candidate, "--json")
+
+        self.assertEqual(result.returncode, 2)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["results"][0]["reasons"], ["same_evidence_artifact_identity"])
 
     def test_marks_non_offline_candidate_evidence_inconclusive(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -584,6 +642,10 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(report["totals"]["second_source_missing"], 1)
         self.assertEqual(report["modules"][0]["module"], "sdk_inventory")
         self.assertEqual(report["modules"][0]["schema"], "ufunction")
+        self.assertEqual(report["modules"][0]["target_details"][0]["target"],
+                         "obelisk.ufunction-chain.snapshot.v1:PrimalItem.CanUse")
+        self.assertTrue(report["modules"][0]["target_details"][0]["comparable"])
+        self.assertEqual(report["modules"][0]["target_details"][0]["second_source_status"], "missing")
 
     def test_readiness_report_supports_scriptstruct_target_filter(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -606,6 +668,42 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(report["totals"]["targets"], 1)
         self.assertEqual(report["modules"][0]["schema"], "scriptstruct")
         self.assertEqual(report["modules"][0]["module"], "sdk_transfers")
+
+    def test_readiness_report_includes_second_source_target_details(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base" / "sha" / "sdk_buffs"
+            candidate = root / "candidate" / "sha" / "sdk_buffs"
+            base.mkdir(parents=True)
+            candidate.mkdir(parents=True)
+            accepted_left = rename_target(deepcopy(base_snapshot()), outer="PrimalBuff", name="AllowPostProcessEffect")
+            accepted_right = deepcopy(accepted_left)
+            rejected_left = rename_target(deepcopy(base_snapshot()), outer="PrimalBuff", name="BPBuffPreventUploading")
+            rejected_right = deepcopy(rejected_left)
+            rejected_right["targets"][0]["property_chain"]["properties"][0]["offset_internal"] = 99  # type: ignore[index]
+            missing_left = rename_target(deepcopy(base_snapshot()), outer="PrimalBuff", name="BP_OnBuffLifetimeUpdated")
+            write_snapshot(base, accepted_left, "PrimalBuff.AllowPostProcessEffect.snapshot.json")
+            write_snapshot(candidate, accepted_right, "PrimalBuff.AllowPostProcessEffect.snapshot.json")
+            write_snapshot(base, rejected_left, "PrimalBuff.BPBuffPreventUploading.snapshot.json")
+            write_snapshot(candidate, rejected_right, "PrimalBuff.BPBuffPreventUploading.snapshot.json")
+            write_snapshot(base, missing_left, "PrimalBuff.BP_OnBuffLifetimeUpdated.snapshot.json")
+
+            result = run_compare(root / "base", root / "candidate", "--readiness-report", "--json")
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        details = {item["target"]: item for item in report["modules"][0]["target_details"]}
+        self.assertEqual(
+            details["obelisk.ufunction-chain.snapshot.v1:PrimalBuff.AllowPostProcessEffect"]["second_source_status"],
+            "accepted",
+        )
+        rejected_detail = details["obelisk.ufunction-chain.snapshot.v1:PrimalBuff.BPBuffPreventUploading"]
+        self.assertEqual(rejected_detail["second_source_status"], "rejected")
+        self.assertEqual(rejected_detail["diff_count"], 1)
+        self.assertIn("offset_internal", rejected_detail["first_diff"])
+        missing_detail = details["obelisk.ufunction-chain.snapshot.v1:PrimalBuff.BP_OnBuffLifetimeUpdated"]
+        self.assertEqual(missing_detail["second_source_status"], "inconclusive")
+        self.assertEqual(missing_detail["second_source_reasons"], ["missing_candidate_snapshot"])
 
     def test_compare_mode_requires_candidate_root(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
