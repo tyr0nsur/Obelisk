@@ -35,6 +35,9 @@ namespace
         bool registerInvalidFilteredCallback = false;
         bool registerNullFilteredCallback = false;
         bool registerChatCallback = false;
+        bool throwOnGetInfoResolve = false;
+        bool throwInInitAfterCallbacks = false;
+        bool throwOnClose = false;
         int getInfoCalls = 0;
         int initCalls = 0;
         int shutdownCalls = 0;
@@ -45,6 +48,8 @@ namespace
         void* owner = this;
         std::vector<std::string>* orderLog = nullptr;
         Obelisk::Core::ChatEventDispatcher* chatDispatcher = nullptr;
+        bool eventCallbacksAtShutdown = false;
+        size_t chatSubscriptionsAtShutdown = 0;
         size_t chatSubscriptionsAtClose = 0;
     };
 
@@ -130,12 +135,20 @@ namespace
         if (g_CurrentFakePlugin->orderLog)
             g_CurrentFakePlugin->orderLog->push_back("init:" + g_CurrentFakePlugin->filename);
 
+        if (g_CurrentFakePlugin->throwInInitAfterCallbacks)
+            throw std::runtime_error("fake init failure after callback registration");
+
         return g_CurrentFakePlugin->initResult;
     }
 
     void FakeShutdown()
     {
         Require(g_CurrentFakePlugin != nullptr, "fake Shutdown called without current plugin");
+        g_CurrentFakePlugin->eventCallbacksAtShutdown =
+            Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks();
+        if (g_CurrentFakePlugin->chatDispatcher)
+            g_CurrentFakePlugin->chatSubscriptionsAtShutdown =
+                g_CurrentFakePlugin->chatDispatcher->SubscriptionCount();
         ++g_CurrentFakePlugin->shutdownCalls;
     }
 
@@ -164,6 +177,8 @@ namespace
             g_CurrentFakePlugin = plugin;
 
             const std::string symbol = symbolName ? symbolName : "";
+            if (symbol == "ObeliskPlugin_GetInfo" && plugin->throwOnGetInfoResolve)
+                throw std::runtime_error("fake resolve failure");
             if (symbol == "ObeliskPlugin_GetInfo" && plugin->hasGetInfo)
                 return reinterpret_cast<void*>(&FakeGetInfo);
             if (symbol == "ObeliskPlugin_Init" && plugin->hasInit)
@@ -188,6 +203,8 @@ namespace
             ++plugin->closeCalls;
             if (plugin->orderLog)
                 plugin->orderLog->push_back("close:" + plugin->filename);
+            if (plugin->throwOnClose)
+                throw std::runtime_error("fake close failure");
         }
 
     private:
@@ -266,6 +283,10 @@ namespace
         manager.UnloadAll();
 
         Require(plugin.shutdownCalls == 1, "valid plugin shutdown was not called during unload");
+        Require(plugin.eventCallbacksAtShutdown,
+                "ProcessEvent callbacks were removed before plugin shutdown");
+        Require(plugin.chatSubscriptionsAtShutdown == 1,
+                "chat callback was removed before plugin shutdown");
         Require(plugin.closeCalls == 1, "valid plugin was not closed during unload");
         Require(plugin.chatSubscriptionsAtClose == 0, "chat callback was still registered at dlclose");
         Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
@@ -450,6 +471,28 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestResolveExceptionAfterOpenClosesHandle()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_resolve_throw");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{.filename = "resolve_throw.so", .throwOnGetInfoResolve = true};
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.getInfoCalls == 0, "resolve-throw plugin reported metadata");
+        Require(plugin.initCalls == 0, "resolve-throw plugin was initialized");
+        Require(plugin.closeCalls == 1, "resolve-throw plugin handle was not closed");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestPluginSymlinkCandidateIsRejected()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_symlink");
@@ -524,7 +567,7 @@ namespace
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_init_fail");
         ConfigureEnvironment(root);
 
-        FakePlugin plugin{.filename = "init_fail.so", .initResult = false, .registerCallback = true};
+        FakePlugin plugin{.filename = "init_fail.so", .initResult = false, .registerFilteredCallback = true};
         Obelisk::Core::ChatEventDispatcher chatDispatcher;
         plugin.registerChatCallback = true;
         plugin.chatDispatcher = &chatDispatcher;
@@ -539,12 +582,55 @@ namespace
         Require(plugin.getInfoCalls == 1, "init-failing plugin did not report metadata");
         Require(plugin.initCalls == 1, "init-failing plugin Init was not called");
         Require(plugin.shutdownCalls == 1, "init-failing plugin shutdown was not called");
+        Require(plugin.eventCallbacksAtShutdown,
+                "init-failing plugin ProcessEvent callback was removed before shutdown");
+        Require(plugin.chatSubscriptionsAtShutdown == 1,
+                "init-failing plugin chat callback was removed before shutdown");
         Require(plugin.closeCalls == 1, "init-failing plugin was not closed");
         Require(plugin.chatSubscriptionsAtClose == 0, "failed plugin chat callback was still registered at dlclose");
         Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
                 "callback registered by failed plugin survived load failure");
         Require(chatDispatcher.SubscriptionCount() == 0,
                 "chat callback registered by failed plugin survived load failure");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestInitExceptionCleansCallbacksAndCloses()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_init_throw");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "init_throw.so",
+            .registerFilteredCallback = true,
+            .throwInInitAfterCallbacks = true,
+        };
+        Obelisk::Core::ChatEventDispatcher chatDispatcher;
+        plugin.registerChatCallback = true;
+        plugin.chatDispatcher = &chatDispatcher;
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader, chatDispatcher);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.getInfoCalls == 1, "init-throw plugin did not report metadata");
+        Require(plugin.initCalls == 1, "init-throw plugin Init was not called");
+        Require(plugin.shutdownCalls == 1, "init-throw plugin shutdown was not called");
+        Require(plugin.eventCallbacksAtShutdown,
+                "init-throw plugin ProcessEvent callback was removed before shutdown");
+        Require(plugin.chatSubscriptionsAtShutdown == 1,
+                "init-throw plugin chat callback was removed before shutdown");
+        Require(plugin.closeCalls == 1, "init-throw plugin was not closed");
+        Require(plugin.chatSubscriptionsAtClose == 0, "init-throw plugin chat callback was still registered at dlclose");
+        Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
+                "ProcessEvent callback registered by throwing plugin survived load failure");
+        Require(chatDispatcher.SubscriptionCount() == 0,
+                "chat callback registered by throwing plugin survived load failure");
 
         CleanupPlugin(plugin);
         fs::remove_all(root);
@@ -579,6 +665,34 @@ namespace
         Require(orderLog == expected, "plugins were not loaded sorted and unloaded in reverse load order");
         Require(pluginA.closeCalls == 1, "first plugin was not closed once");
         Require(pluginB.closeCalls == 1, "second plugin was not closed once");
+
+        CleanupPlugin(pluginA);
+        CleanupPlugin(pluginB);
+        fs::remove_all(root);
+    }
+
+    void TestUnloadAllContinuesAfterCloseException()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_close_throw");
+        ConfigureEnvironment(root);
+
+        FakePlugin pluginA{.filename = "a_first.so", .pluginId = "plugin_a", .hasShutdown = false};
+        FakePlugin pluginB{.filename = "b_second.so", .pluginId = "plugin_b", .hasShutdown = false, .throwOnClose = true};
+        FakeLoader loader;
+        loader.Add(pluginA);
+        loader.Add(pluginB);
+        TouchPlugin(root, pluginA.filename);
+        TouchPlugin(root, pluginB.filename);
+        WritePluginConfig(root, pluginA.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+        WritePluginConfig(root, pluginB.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+        manager.UnloadAll();
+        manager.UnloadAll();
+
+        Require(pluginA.closeCalls == 1, "unload did not continue after later plugin close threw");
+        Require(pluginB.closeCalls == 1, "throwing plugin close was repeated after unload");
 
         CleanupPlugin(pluginA);
         CleanupPlugin(pluginB);
@@ -660,11 +774,14 @@ int main()
     TestDisabledPluginPreparesConfigButDoesNotInit();
     TestInstanceDisallowedPluginDoesNotInit();
     TestMissingGetInfoRejectsAndCloses();
+    TestResolveExceptionAfterOpenClosesHandle();
     TestPluginSymlinkCandidateIsRejected();
     TestMissingInitRejectsAndCloses();
     TestInvalidMetadataRejectsAndCloses();
     TestInitFailureCleansCallbacksAndCloses();
+    TestInitExceptionCleansCallbacksAndCloses();
     TestMultiplePluginsLoadSortedAndUnloadReverse();
+    TestUnloadAllContinuesAfterCloseException();
     TestDuplicatePluginIdRejectsSecondPlugin();
     TestLoadPluginsSkipsAlreadyLoadedPluginId();
 

@@ -117,6 +117,25 @@ namespace Obelisk::Core
             }
         }
 
+        void SafeCloseLibrary(PluginManager::LibraryLoader& loader, void* handle, const std::string& pluginName)
+        {
+            if (!handle)
+                return;
+
+            try
+            {
+                loader.Close(handle);
+            }
+            catch (const std::exception& e)
+            {
+                OBELISK_ERROR("Plugin {} threw while closing library handle: {}", pluginName, e.what());
+            }
+            catch (...)
+            {
+                OBELISK_ERROR("Plugin {} threw an unknown exception while closing library handle.", pluginName);
+            }
+        }
+
         bool AreGlobalProcessEventCallbacksAllowed()
         {
             const char* env = std::getenv("OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS");
@@ -162,6 +181,40 @@ namespace Obelisk::Core
 
             OBELISK_WARN("{} rejected invalid negative FName index {}.", apiName, nameIndex);
             return false;
+        }
+
+        template <typename Fn>
+        class ScopeExit
+        {
+        public:
+            explicit ScopeExit(Fn fn)
+                : m_Fn(fn)
+            {
+            }
+
+            ~ScopeExit()
+            {
+                if (m_Active)
+                    m_Fn();
+            }
+
+            ScopeExit(const ScopeExit&) = delete;
+            ScopeExit& operator=(const ScopeExit&) = delete;
+
+            void Dismiss()
+            {
+                m_Active = false;
+            }
+
+        private:
+            Fn m_Fn;
+            bool m_Active = true;
+        };
+
+        template <typename Fn>
+        ScopeExit<Fn> MakeScopeExit(Fn fn)
+        {
+            return ScopeExit<Fn>(fn);
         }
     }
 
@@ -325,12 +378,15 @@ namespace Obelisk::Core
                     continue;
                 }
 
+                auto handleCleanup = MakeScopeExit([&]() {
+                    SafeCloseLibrary(*m_Loader, handle, pluginName);
+                });
+
                 std::string symbolError;
                 GetInfoFunc getInfoFunc = reinterpret_cast<GetInfoFunc>(m_Loader->Resolve(handle, "ObeliskPlugin_GetInfo", symbolError));
                 if (!getInfoFunc)
                 {
                     OBELISK_ERROR("Plugin {} is missing ObeliskPlugin_GetInfo: {}. Unloading.", pluginName, symbolError);
-                    m_Loader->Close(handle);
                     continue;
                 }
 
@@ -352,7 +408,6 @@ namespace Obelisk::Core
                 if (!metadataLoaded)
                 {
                     OBELISK_ERROR("Plugin {} failed to report metadata. Unloading.", pluginName);
-                    m_Loader->Close(handle);
                     continue;
                 }
 
@@ -361,35 +416,30 @@ namespace Obelisk::Core
                 if (!PreparePluginConfig(metadata, configRoot, instanceId, preparedConfig, configError))
                 {
                     OBELISK_ERROR("Plugin {} metadata/config rejected: {}. Unloading.", pluginName, configError);
-                    m_Loader->Close(handle);
                     continue;
                 }
 
                 if (!pluginIds.insert(metadata.plugin_id).second)
                 {
                     OBELISK_ERROR("Plugin {} rejected: duplicate plugin_id '{}'. Unloading.", pluginName, metadata.plugin_id);
-                    m_Loader->Close(handle);
                     continue;
                 }
 
                 if (IsPluginIdLoaded(metadata.plugin_id))
                 {
                     OBELISK_WARN("Plugin {} skipped because plugin_id '{}' is already loaded.", pluginName, metadata.plugin_id);
-                    m_Loader->Close(handle);
                     continue;
                 }
 
                 if (!preparedConfig.enabled)
                 {
                     OBELISK_INFO("Plugin {} skipped because config enabled=false.", pluginName);
-                    m_Loader->Close(handle);
                     continue;
                 }
 
                 if (!preparedConfig.instance_allowed)
                 {
                     OBELISK_INFO("Plugin {} skipped because instance '{}' is not in instance_allowlist.", pluginName, instanceId);
-                    m_Loader->Close(handle);
                     continue;
                 }
 
@@ -398,7 +448,6 @@ namespace Obelisk::Core
                 if (!initFunc)
                 {
                     OBELISK_ERROR("Plugin {} is missing ObeliskPlugin_Init: {}. Unloading.", pluginName, symbolError);
-                    m_Loader->Close(handle);
                     continue;
                 }
 
@@ -419,8 +468,21 @@ namespace Obelisk::Core
                     pluginOwner = handle;
 
                 bool initialized = false;
+                bool initAttempted = false;
+                auto initCleanup = MakeScopeExit([&]() {
+                    if (!initAttempted)
+                        return;
+                    CallPluginShutdown(pluginName, shutdownFunc);
+                    UnregisterPluginCallbacks(pluginName, pluginOwner, "after init failure and before dlclose");
+                });
+
                 void* previousOwner = g_CurrentPluginOwner;
                 g_CurrentPluginOwner = pluginOwner;
+                auto ownerRestore = MakeScopeExit([&]() {
+                    g_CurrentPluginOwner = previousOwner;
+                });
+
+                initAttempted = true;
                 try
                 {
                     initialized = initFunc(&m_Api, &initContext);
@@ -433,19 +495,19 @@ namespace Obelisk::Core
                 {
                     OBELISK_ERROR("Plugin {} threw an unknown exception during initialization.", pluginName);
                 }
+                ownerRestore.Dismiss();
                 g_CurrentPluginOwner = previousOwner;
 
                 if (initialized)
                 {
                     OBELISK_INFO("Plugin {} initialized successfully.", pluginName);
                     m_LoadedPlugins.push_back({pluginName, metadata.plugin_id, handle, pluginOwner, shutdownFunc});
+                    initCleanup.Dismiss();
+                    handleCleanup.Dismiss();
                 }
                 else
                 {
                     OBELISK_ERROR("Plugin {} failed to initialize.", pluginName);
-                    CallPluginShutdown(pluginName, shutdownFunc);
-                    UnregisterPluginCallbacks(pluginName, pluginOwner, "after init failure and before dlclose");
-                    m_Loader->Close(handle);
                 }
             }
         }
@@ -467,7 +529,7 @@ namespace Obelisk::Core
             OBELISK_INFO("Unloading plugin: {}", plugin.name);
             CallPluginShutdown(plugin.name, plugin.shutdown);
             UnregisterPluginCallbacks(plugin.name, plugin.owner, "before dlclose");
-            m_Loader->Close(plugin.handle);
+            SafeCloseLibrary(*m_Loader, plugin.handle, plugin.name);
         }
         m_LoadedPlugins.clear();
     }

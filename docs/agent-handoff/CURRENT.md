@@ -104,6 +104,16 @@ Updated: 2026-05-28
   `PluginManager`; a no-shutdown minimal plugin fixture covers that contract.
 - fact: `PluginManager` rejects `.so` symlink candidates during plugin directory scanning
   before `dlopen`, so `${OBELISK_PLUGIN_DIR}` cannot load a plugin through a symlink escape.
+- fact: `PluginManager::LoadPlugins` now uses scope-exit cleanup after `dlopen`: exceptions
+  during symbol resolution, init, logging, or insertion into `m_LoadedPlugins` close the
+  handle, call optional plugin shutdown after an init attempt, and remove plugin-owned
+  EventManager/ChatEventDispatcher callbacks before `dlclose`.
+- fact: `PluginManager::UnloadAll` continues unloading remaining plugins if a loader close
+  operation throws, logs the failure, and clears loaded plugin state so a later unload does
+  not repeat shutdown/close on partially unloaded entries.
+- fact: Plugin lifecycle tests now pin shutdown ordering: optional
+  `ObeliskPlugin_Shutdown` runs while plugin-owned callbacks are still registered, and
+  callbacks are removed before the library close step.
 - fact: Runtime observer marker checks use `runtime/RuntimeMarkers.*`, which rejects empty
   components, path traversal, slashes, dots, spaces, directory markers, symlink markers, and
   symlink instance directories before checking `state/instances/<instance>/<marker>`.
@@ -218,8 +228,7 @@ Updated: 2026-05-28
   `PrimalStructure.IsAllowedToDemolish`; current readiness is `4/4` comparable and blocked
   only by missing second-source root.
 - next-step: Runtime/API debt from the latest read-only audit: harden `PluginManager`
-  ownership/cleanup around callback registrations outside init, and add RAII cleanup for
-  exceptions between `dlopen` and `m_LoadedPlugins` insertion.
+  ownership/cleanup around callback registrations outside init.
 - fact: Runtime/chat baseline is documented in
   `docs/research/2026-05-27-runtime-and-chat-baseline.md`.
 - fact: Reflection/chat metadata audit added shared UE probe layouts and gated
