@@ -91,6 +91,8 @@ work from repository state instead of chat history.
 - Operational docs/skills outside `docs/research/` are guarded by
   `scripts/test_operational_doc_guardrails.py`, which blocks active marker/restart
   command examples from returning to install, supervision, or skill docs.
+- `scripts/test_public_sdk_guardrails.py` is the canonical module-first public SDK
+  guardrail; `test_public_sdk_chat_guardrails.py` remains a legacy wrapper.
 - Latest restart audit:
   `docs/research/2026-05-27-ops-restart-audit-instance-id.md`
   - live `ObeliskRun.sh` exports `OBELISK_INSTANCE_ID=arkserver`

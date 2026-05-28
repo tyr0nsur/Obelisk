@@ -104,6 +104,9 @@ Updated: 2026-05-28
 - fact: Commit `a884b3f` adds `scripts/test_operational_doc_guardrails.py` to CI/release
   so docs and skills outside `docs/research/` cannot reintroduce active marker/restart
   commands.
+- fact: Commit `ffa3269` makes `scripts/test_public_sdk_guardrails.py` the canonical
+  module-first public SDK guardrail test and keeps `test_public_sdk_chat_guardrails.py` as
+  a legacy wrapper.
 - fact: `sdk.transfers` ScriptStruct fixtures now preserve target/property object and
   FName identity fields like UFunction fixtures. `regenerate_scriptstruct_snapshots.py
   --check-layout` stays semantic/layout-only so second-source gates do not depend on
