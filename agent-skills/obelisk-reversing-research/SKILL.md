@@ -54,10 +54,9 @@ Own these areas:
   sleep/retry windows.
 - Every new offset or signature must include how it was derived and what binary/version it was tested against.
 - Run scanner captures only on a confirmed isolated/debug instance. Current operator
-  direction designates `arkserver2` / TheIsland as the Obelisk debug/development target for
-  controlled runtime validation, but scanner/native-exec/ptrace/gcore and broad tracing
-  should prefer a dedicated `arkserver-obelisk-debug` instance. Use TheIsland for those
-  high-risk captures only as an explicit approved fallback with a rollback plan.
+  direction prefers `arkserver-obelisk-debug` for Obelisk debug/development validation.
+  Use `arkserver2` / TheIsland only as an explicit approved fallback with a rollback plan,
+  especially for scanner/native-exec/ptrace/gcore and broad tracing.
 
 ## Safe Experiment Pattern
 

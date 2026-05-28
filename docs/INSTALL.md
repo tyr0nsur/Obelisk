@@ -77,12 +77,11 @@ Then configure LinuxGSM:
 executable="./ObeliskRun.sh"
 ```
 
-For current Obelisk debug/development work, use `arkserver2` / TheIsland instead of
-Ragnarok. For scanner or reflection research that needs stronger isolation, use the debug
-wrapper from `ObeliskRunDebug.sh` on a separate instance such as
-`arkserver-obelisk-debug`; do not reuse live map markers for debug captures.
-For `gcore`, `ptrace`, ReflectionScanner, broad tracing, or scanner-like probes,
-`arkserver2` is an explicit fallback, not the default target.
+For current Obelisk debug/development work, prefer a dedicated instance such as
+`arkserver-obelisk-debug` instead of Ragnarok. Use `arkserver2` / TheIsland only as an
+explicit operator-approved fallback for a named run window and rollback plan. For scanner
+or reflection research that needs stronger isolation, use the debug wrapper from
+`ObeliskRunDebug.sh`; do not reuse live map markers for debug captures.
 
 ## Instance Identity
 
@@ -193,5 +192,6 @@ state/instances/arkserver/disable-plugins
 
 This validates the core ProcessEvent hook without loading experimental plugins.
 
-While Ragnarok is under player performance testing, use `arkserver2` / TheIsland for
-debug/development markers and validation windows.
+While Ragnarok is under player performance testing, use `arkserver-obelisk-debug` for
+debug/development markers and validation windows whenever possible; use `arkserver2` /
+TheIsland only as an approved fallback.

@@ -218,11 +218,10 @@ work from repository state instead of chat history.
 
 - Legacy chat/monitor prototype source has been removed from the release tree.
 - ReflectionScanner is experimental and must stay disabled on live servers.
-- `arkserver2` / TheIsland is now operator-designated as the debug/development target.
-  High-risk scanners/native exec/ptrace still need specific run-window approval and
-  rollback. The cleaner future option remains `arkserver-obelisk-debug` with isolated
-  ports/saves, no live cluster, debug-only `OBELISK_LOG_DIR`, and wrapper-level Obelisk env;
-  see `docs/research/2026-05-27-isolated-debug-instance-plan.md`.
+- `arkserver-obelisk-debug` is the preferred debug/development target. Use `arkserver2` /
+  TheIsland only as an explicit operator-approved fallback for a named run window and
+  rollback plan. High-risk scanners/native exec/ptrace require the dedicated debug
+  instance whenever possible; see `docs/research/2026-05-27-isolated-debug-instance-plan.md`.
 - General-purpose SDK reflection is not solved yet. However, the current ARK binary has
   binary-hash-scoped evidence for FName, `GUObjectArray`, chat `UFunction` property chains,
   bounded param ranges, and an internal UTF-32 `FString` decoder candidate.
@@ -409,7 +408,8 @@ python3 scripts/analyze_reflectionscanner_capture.py \
 - Never enable `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` on live servers.
 - Never enable raw chat discovery on live Ragnarok as a normal test.
 - Do not run Obelisk debug or reversing experiments on `arkserver` while players are
-  testing performance; use `arkserver2` / TheIsland.
+  testing performance; prefer `arkserver-obelisk-debug` and use `arkserver2` / TheIsland
+  only as an explicit approved fallback.
 - Do not reintroduce legacy map markers or binary-local `ObeliskPlugins` fallback.
 - Do not treat observed FName indices such as `9619` or `9622` as stable API contracts.
 - Do not promote plugins with HTTP, threads, or file readers until they implement and
@@ -432,8 +432,9 @@ python3 scripts/analyze_reflectionscanner_capture.py \
 
 ## Next Good Rounds
 
-- Ops: use `arkserver2` / TheIsland as the designated debug/development target, but keep
-  scanner/native-exec/ptrace behind explicit run-window approval.
+- Ops: prefer `arkserver-obelisk-debug` as the debug/development target; use `arkserver2`
+  / TheIsland only as an explicit approved fallback, and keep scanner/native-exec/ptrace
+  behind run-window approval.
 - Reflection core: strengthen `RuntimeReflection`, snapshot fixtures, comparators,
   sanitizer tests, and evidence packs before adding public SDK module surfaces.
 - Module breadth: use focused snapshot comparison for inventory, structures, buffs, dinos,

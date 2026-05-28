@@ -38,23 +38,21 @@ Current operator direction as of 2026-05-27:
 - `arkserver` / Ragnarok is reserved for player performance testing. Do not restart it,
   change markers, deploy new runtime, enable extra logging, run scanners, or attach
   debuggers unless the operator explicitly opens a maintenance window.
-- `arkserver2` / TheIsland is the designated debug/development target for Obelisk rounds.
-  Prefer it for controlled runtime validation, plugin lifecycle checks, and research
-  captures that need an ARK server harness.
-- Treat `arkserver2` as debug-designated, not automatically scanner-safe. ReflectionScanner,
-  native exec probes, ptrace/gcore, broad ProcessEvent tracing, and text logging still need
-  a specific operator-approved run window, per-instance markers, copied-log evidence, and
-  rollback to stable posture.
-- Prefer `arkserver-obelisk-debug` for high-risk captures such as `gcore`, `ptrace`,
-  ReflectionScanner, and broad tracing.
+- `arkserver-obelisk-debug` is the preferred debug/development target for Obelisk rounds.
+  Use it for controlled runtime validation, plugin lifecycle checks, and research captures
+  that need an ARK server harness whenever possible.
+- Treat `arkserver2` / TheIsland as an explicit approved fallback, not automatically
+  scanner-safe. ReflectionScanner, native exec probes, ptrace/gcore, broad ProcessEvent
+  tracing, and text logging still need a specific operator-approved run window,
+  per-instance markers, copied-log evidence, and rollback to stable posture.
 
 ## Production Baseline
 
 Observed Ragnarok live-like stability markers are listed here for maintenance review only.
 Do not create, remove, refresh, or restart `arkserver` during normal agent rounds. Routine
-debug work belongs on `arkserver2`; scanner, ptrace, gcore, and broad tracing should
-prefer `arkserver-obelisk-debug`. Ragnarok changes require an operator-stated maintenance
-window in the current turn.
+debug work belongs on `arkserver-obelisk-debug`; use `arkserver2` / TheIsland only as an
+explicit approved fallback. Ragnarok changes require an operator-stated maintenance window
+in the current turn.
 
 ```bash
 # Observed baseline only. Maintenance-window-only if the operator explicitly approves:
