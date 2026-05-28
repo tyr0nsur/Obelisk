@@ -112,6 +112,9 @@ fi
 if [[ -n "${OBELISK_SUPERVISOR_PID:-}" ]]; then
     POSTURE_CMD+=(--pid "${OBELISK_SUPERVISOR_PID}")
 fi
+if [[ "${OBELISK_SUPERVISOR_ALLOW_CHAT_REFLECTION:-0}" != "1" ]]; then
+    POSTURE_CMD+=(--forbid-chat-reflection)
+fi
 
 posture_status=ok
 if ! capture_command posture "${POSTURE_CMD[@]}"; then
@@ -123,7 +126,13 @@ if ! capture_command posture "${POSTURE_CMD[@]}"; then
     exit 1
 fi
 
-QUIET_POSTURE_CMD=("${POSTURE_CMD[@]}" --forbid-chat-reflection)
+QUIET_POSTURE_CMD=("${REPO_ROOT}/scripts/check_obelisk_server_posture.sh" --expect-stable --forbid-chat-reflection --map "${MAP}" --instance "${INSTANCE}")
+if [[ -n "${OBELISK_SUPERVISOR_PROC_ROOT:-}" ]]; then
+    QUIET_POSTURE_CMD+=(--proc-root "${OBELISK_SUPERVISOR_PROC_ROOT}")
+fi
+if [[ -n "${OBELISK_SUPERVISOR_PID:-}" ]]; then
+    QUIET_POSTURE_CMD+=(--pid "${OBELISK_SUPERVISOR_PID}")
+fi
 quiet_posture_status=ok
 if ! capture_command quiet-posture "${QUIET_POSTURE_CMD[@]}"; then
     quiet_posture_status=failed

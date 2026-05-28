@@ -49,6 +49,7 @@ run_snapshot() {
     local root="$1"
     local out="$2"
     local pid="$3"
+    local allow_chat_reflection="${4:-0}"
 
     OBELISK_ROOT="${root}" \
     OBELISK_SUPERVISOR_OUT="${out}" \
@@ -56,6 +57,7 @@ run_snapshot() {
     OBELISK_SUPERVISOR_INSTANCE=arkserver2 \
     OBELISK_SUPERVISOR_MAP=TheIsland \
     OBELISK_SUPERVISOR_PID="${pid}" \
+    OBELISK_SUPERVISOR_ALLOW_CHAT_REFLECTION="${allow_chat_reflection}" \
     "${SNAPSHOT}"
 }
 
@@ -125,7 +127,16 @@ write_proc_fixture 4242 "${stable_maps}" \
     "OBELISK_ENABLE_CHAT_REFLECTION=1" \
     "OBELISK_CHAT_REFLECTION_BINARY_SHA256=abc123"
 
-snapshot_dir="$(run_snapshot "${stable_root}" "${stable_out}" 4242)"
+chat_forbidden_out="${TMP_DIR}/chat-forbidden-out"
+if run_snapshot "${stable_root}" "${chat_forbidden_out}" 4242 >/dev/null 2>"${TMP_DIR}/chat-forbidden.err"; then
+    echo "Expected chat reflection to fail default supervisor posture" >&2
+    exit 1
+fi
+assert_file_contains "${TMP_DIR}/chat-forbidden.err" 'unstable Obelisk posture'
+assert_file_contains "${chat_forbidden_out}/latest/posture.txt" 'Forbidden OBELISK_ENABLE_CHAT_REFLECTION'
+assert_file_contains "${chat_forbidden_out}/latest/summary.txt" '^posture_status=failed$'
+
+snapshot_dir="$(run_snapshot "${stable_root}" "${stable_out}" 4242 1)"
 assert_file_contains "${snapshot_dir}/summary.txt" '^pid=4242$'
 assert_file_contains "${snapshot_dir}/summary.txt" '^posture_status=ok$'
 assert_file_contains "${snapshot_dir}/summary.txt" '^quiet_posture_status=failed$'
@@ -168,7 +179,7 @@ assert_file_contains "${snapshot_dir}/summary.txt" '^structure_reflection_binary
 assert_file_not_contains "${snapshot_dir}/disk.txt" '/servidor/ark '
 
 loop_out="${TMP_DIR}/loop-out"
-run_loop_once "${stable_root}" "${loop_out}" 4242 >/dev/null
+OBELISK_SUPERVISOR_ALLOW_CHAT_REFLECTION=1 run_loop_once "${stable_root}" "${loop_out}" 4242 >/dev/null
 assert_file_contains "${loop_out}/latest/summary.txt" '^posture_status=ok$'
 assert_file_contains "${loop_out}/latest/summary.txt" '^quiet_posture_status=failed$'
 
