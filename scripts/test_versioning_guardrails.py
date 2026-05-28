@@ -34,7 +34,7 @@ class VersioningGuardrailTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-        self.assertRegex(cmake, re.compile(r"project\(Obelisk VERSION 0\.1\.0 LANGUAGES CXX\)"))
+        self.assertRegex(cmake, re.compile(r"project\(Obelisk VERSION 0\.1\.0 LANGUAGES C CXX\)"))
         self.assertIn("project(Obelisk VERSION 0.1.0)", versioning)
         self.assertIn("find_package(Obelisk 0.1.0 CONFIG REQUIRED)", versioning)
         self.assertIn("find_package(Obelisk 0.1.0 CONFIG REQUIRED)", install_layout_test)

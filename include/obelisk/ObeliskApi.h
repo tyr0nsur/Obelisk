@@ -23,7 +23,7 @@ extern "C" {
 // Returns true if the event should continue execution, false to block it.
 typedef bool (*OnProcessEventCallback)(void* caller, void* function, void* parms);
 
-struct ObeliskPluginMetadata {
+typedef struct ObeliskPluginMetadata {
     uint32_t abi_version;
     uint32_t struct_size;
     const char* plugin_id;
@@ -31,9 +31,9 @@ struct ObeliskPluginMetadata {
     const char* version;
     const char* config_file;
     const char* default_config_json;
-};
+} ObeliskPluginMetadata;
 
-struct ObeliskPluginInitContext {
+typedef struct ObeliskPluginInitContext {
     uint32_t abi_version;
     uint32_t struct_size;
     // Borrowed strings are valid only for the duration of ObeliskPlugin_Init.
@@ -42,12 +42,12 @@ struct ObeliskPluginInitContext {
     const char* config_path;
     const char* instance_id;
     uint64_t plugin_owner_token;
-};
+} ObeliskPluginInitContext;
 
 // ============================================================================
 // Public API Interface provided by Obelisk to Plugins
 // ============================================================================
-struct ObeliskApi {
+typedef struct ObeliskApi {
     // Logging functions for plugins
     void (*LogInfo)(const char* message);
     void (*LogWarn)(const char* message);
@@ -94,7 +94,7 @@ struct ObeliskApi {
     uint64_t (*RegisterPreProcessEventForNameIndexWithOwnerTokenHandle)(uint64_t ownerToken, int32_t nameIndex, OnProcessEventCallback callback);
     uint64_t (*RegisterPostProcessEventForNameIndexWithOwnerTokenHandle)(uint64_t ownerToken, int32_t nameIndex, OnProcessEventCallback callback);
     bool (*UnregisterProcessEventCallbackWithOwnerToken)(uint64_t ownerToken, uint64_t registrationId);
-};
+} ObeliskApi;
 
 // Plugins must export these functions to be loaded by Obelisk.
 // Metadata is validated before initialization. The runtime creates a missing

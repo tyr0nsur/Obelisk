@@ -140,6 +140,9 @@ work from repository state instead of chat history.
     before publishing and rolls back any already-published runtime file if the paired
     publish fails; layout tests force failure on the second rename and verify the original
     pair remains intact;
+  - C ABI coverage: public SDK structs have C typedef names, and the SDK consumer suite
+    builds and loads a C-language plugin through the documented `ObeliskPlugin_GetInfo`,
+    `ObeliskPlugin_Init`, and optional `ObeliskPlugin_Shutdown` exports;
   - event dispatch hardening: EventManager tests initialize logger and verify throwing
     pre/post callbacks are logged without propagating and without stopping later
     callbacks;

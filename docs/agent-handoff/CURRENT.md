@@ -164,6 +164,10 @@ Updated: 2026-05-28
   and rolls back any already-published runtime file if the paired publish fails. Layout
   tests force failure on the second runtime rename and verify the original
   `libsubhook.so`/`libobelisk.so` pair remains intact with no temporary files left behind.
+- fact: The public SDK header now exposes C typedef names for `ObeliskPluginMetadata`,
+  `ObeliskPluginInitContext`, and `ObeliskApi`, and the build includes a C-language SDK
+  consumer plugin loaded through the same fixture path. This covers the documented C entry
+  points with a real C compiler instead of only C++ consumers.
 - fact: Commit `c0d1e4c` pushed the hardened first-stable gates. On 2026-05-28,
   `scripts/check_release_readiness.sh` passed from a clean tracked/untracked worktree
   (ignored `build/` and `scripts/__pycache__/` only), and the read-only Ragnarok posture

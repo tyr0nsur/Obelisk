@@ -18,6 +18,17 @@ set_target_properties(sdk_consumer_minimal_no_shutdown_plugin PROPERTIES
     VISIBILITY_INLINES_HIDDEN 1
 )
 
+add_library(sdk_consumer_c_abi_plugin SHARED
+    CAbiPlugin.c
+)
+target_link_libraries(sdk_consumer_c_abi_plugin PRIVATE obelisk_sdk)
+set_target_properties(sdk_consumer_c_abi_plugin PROPERTIES
+    PREFIX ""
+    C_STANDARD 11
+    C_STANDARD_REQUIRED ON
+    C_VISIBILITY_PRESET hidden
+)
+
 add_executable(sdk_consumer_fixture
     SdkConsumerFixture.cpp
 )
@@ -31,6 +42,11 @@ add_test(
 add_test(
     NAME SdkConsumerFixtureNoShutdown
     COMMAND sdk_consumer_fixture "$<TARGET_FILE:sdk_consumer_minimal_no_shutdown_plugin>"
+)
+
+add_test(
+    NAME SdkConsumerFixtureCAbiPlugin
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:sdk_consumer_c_abi_plugin>" c_abi_minimal
 )
 
 add_test(
