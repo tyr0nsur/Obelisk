@@ -8,11 +8,13 @@
 #include "core/EventManager.h"
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <string>
 #include <string_view>
 #include <sys/mman.h>
+#include <thread>
 #include <unistd.h>
 
 namespace Obelisk::Hooks
@@ -52,8 +54,19 @@ namespace Obelisk::Hooks
         };
 
         AbsoluteHook s_ProcessEventHook;
+
+        class ActiveProcessEventFrame
+        {
+        public:
+            ActiveProcessEventFrame();
+            ~ActiveProcessEventFrame();
+            ActiveProcessEventFrame(const ActiveProcessEventFrame&) = delete;
+            ActiveProcessEventFrame& operator=(const ActiveProcessEventFrame&) = delete;
+        };
     }
 
+    static std::atomic<uint32_t> s_ActiveProcessEventFrames{0};
+    static std::atomic<bool> s_RemovingProcessEventHook{false};
     static std::atomic<uint64_t> s_ProcessEventCalls{0};
     static std::atomic<uint64_t> s_ReflectedChatCalls{0};
     static std::atomic<uint64_t> s_ReflectedChatRejects{0};
@@ -194,10 +207,33 @@ namespace Obelisk::Hooks
         return true;
     }
 
+    ActiveProcessEventFrame::ActiveProcessEventFrame()
+    {
+        s_ActiveProcessEventFrames.fetch_add(1, std::memory_order_acq_rel);
+    }
+
+    ActiveProcessEventFrame::~ActiveProcessEventFrame()
+    {
+        s_ActiveProcessEventFrames.fetch_sub(1, std::memory_order_acq_rel);
+    }
+
+    static bool WaitForActiveProcessEventFramesToDrain()
+    {
+        for (int attempt = 0; attempt < 100; ++attempt)
+        {
+            if (s_ActiveProcessEventFrames.load(std::memory_order_acquire) == 0)
+                return true;
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        return s_ActiveProcessEventFrames.load(std::memory_order_acquire) == 0;
+    }
+
     static void RemoveAbsoluteHook(AbsoluteHook& hook)
     {
         if (!hook.Installed || !hook.Target)
             return;
+
+        s_RemovingProcessEventHook.store(true, std::memory_order_release);
 
         if (MakeWritableExecutable(hook.Target, kPatchSize))
         {
@@ -207,10 +243,15 @@ namespace Obelisk::Hooks
             MakeReadableExecutable(hook.Target, kPatchSize);
         }
 
-        if (hook.Trampoline)
+        const bool drained = WaitForActiveProcessEventFramesToDrain();
+        if (hook.Trampoline && drained)
             munmap(hook.Trampoline, kTrampolineSize);
+        else if (hook.Trampoline)
+            OBELISK_WARN("ProcessEvent trampoline left mapped because {} frame(s) were still active during hook removal.",
+                         s_ActiveProcessEventFrames.load(std::memory_order_acquire));
 
         hook = {};
+        s_RemovingProcessEventHook.store(false, std::memory_order_release);
     }
 
     static uint64_t GetTraceLimit()
@@ -753,6 +794,7 @@ namespace Obelisk::Hooks
 
     void ProcessEvent_Detour(void* object, void* function, void* params)
     {
+        ActiveProcessEventFrame activeFrame;
         uint64_t callNumber = ++s_ProcessEventCalls;
         TraceProcessEventCall(callNumber, object, function, params);
 
@@ -848,8 +890,15 @@ namespace Obelisk::Hooks
 
     void ProcessEventHook::CallOriginalProcessEvent(void* object, void* function, void* params)
     {
+        if (s_RemovingProcessEventHook.load(std::memory_order_acquire))
+        {
+            OBELISK_WARN("CallOriginalProcessEvent skipped while ProcessEvent hook removal is in progress.");
+            return;
+        }
+
         if (s_ProcessEventHook.Trampoline)
         {
+            ActiveProcessEventFrame activeFrame;
             ProcessEvent_t original = reinterpret_cast<ProcessEvent_t>(s_ProcessEventHook.Trampoline);
             if (original)
                 original(object, function, params);

@@ -130,6 +130,10 @@ Updated: 2026-05-28
   registration IDs and `UnregisterCallback(id)` coverage. Public `ObeliskApi` callback
   registration remains unchanged for ABI v1; this prepares a future explicit unsubscribe
   capability without promoting it yet.
+- fact: Current uncommitted hook hardening adds active ProcessEvent frame tracking around
+  the detour and manual trampoline calls. Hook removal restores target bytes first, waits
+  briefly for active frames to drain, and leaves the trampoline mapped with a warning
+  instead of risking `munmap` while a frame may still be executing.
 - finding: Reflection tooling audit found UFunction snapshot fixture coverage is broad
   across module areas, but ScriptStruct coverage is the current bottleneck with only two
   transfer structs. Prioritize an offline second-source readiness report before any

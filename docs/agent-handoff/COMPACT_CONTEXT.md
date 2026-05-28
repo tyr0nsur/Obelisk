@@ -120,6 +120,9 @@ work from repository state instead of chat history.
 - Current uncommitted runtime/API round adds internal `EventManager` registration IDs and
   `UnregisterCallback(id)` tests. Public `ObeliskApi` callback registration remains
   unchanged for ABI v1.
+- Current uncommitted hook hardening tracks active ProcessEvent detour/trampoline frames
+  and avoids unmapping the trampoline during hook removal until frames drain; on timeout it
+  warns and intentionally leaves the trampoline mapped to avoid use-after-free.
 - Current uncommitted reflection-tooling round adds
   `scripts/compare_reflection_snapshots.py --readiness-report`. Use it to summarize
   comparable snapshot coverage and second-source status by schema/module. Current fixtures
