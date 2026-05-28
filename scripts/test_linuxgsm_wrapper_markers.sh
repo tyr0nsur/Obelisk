@@ -122,9 +122,20 @@ capture_marker="${TMP_DIR}/marker.env"
 prepare_root "${root_marker}"
 : > "${root_marker}/state/instances/arkserver2/enable-structure-reflection"
 : > "${root_marker}/state/instances/arkserver2/enable-inventory-reflection"
+: > "${root_marker}/state/instances/arkserver2/enable-chat-reflection"
 run_wrapper "${root_marker}" "${capture_marker}" TheIsland?listen
 
 assert_contains "${capture_marker}" '^OBELISK_INSTANCE_ID=arkserver2$'
+assert_not_contains "${capture_marker}" '^OBELISK_ENABLE_CHAT_REFLECTION='
+assert_not_contains "${capture_marker}" '^OBELISK_ENABLE_INVENTORY_REFLECTION='
+assert_not_contains "${capture_marker}" '^OBELISK_ENABLE_STRUCTURE_REFLECTION='
+
+: > "${root_marker}/state/instances/arkserver2/allow-experimental-observers"
+run_wrapper "${root_marker}" "${capture_marker}" TheIsland?listen
+
+assert_contains "${capture_marker}" '^OBELISK_ENABLE_CHAT_REFLECTION=1$'
+assert_contains "${capture_marker}" '^OBELISK_CHAT_REFLECTION_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520$'
+assert_contains "${capture_marker}" '^OBELISK_CHAT_REFLECTION_LOG_LIMIT=25$'
 assert_contains "${capture_marker}" '^OBELISK_ENABLE_INVENTORY_REFLECTION=1$'
 assert_contains "${capture_marker}" '^OBELISK_INVENTORY_REFLECTION_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520$'
 assert_contains "${capture_marker}" '^OBELISK_INVENTORY_REFLECTION_LOG_LIMIT=0$'
@@ -132,9 +143,30 @@ assert_contains "${capture_marker}" '^OBELISK_ENABLE_STRUCTURE_REFLECTION=1$'
 assert_contains "${capture_marker}" '^OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520$'
 assert_contains "${capture_marker}" '^OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT=0$'
 
+root_ragnarok_stale="${TMP_DIR}/root-ragnarok-stale"
+capture_ragnarok_stale="${TMP_DIR}/ragnarok-stale.env"
+prepare_root "${root_ragnarok_stale}"
+mkdir -p "${root_ragnarok_stale}/state/instances/arkserver"
+: > "${root_ragnarok_stale}/state/instances/arkserver/enable-chat-reflection"
+: > "${root_ragnarok_stale}/state/instances/arkserver/enable-inventory-reflection"
+: > "${root_ragnarok_stale}/state/instances/arkserver/enable-structure-reflection"
+run_wrapper "${root_ragnarok_stale}" "${capture_ragnarok_stale}" Ragnarok?listen
+
+assert_contains "${capture_ragnarok_stale}" '^OBELISK_INSTANCE_ID=arkserver$'
+assert_not_contains "${capture_ragnarok_stale}" '^OBELISK_ENABLE_CHAT_REFLECTION='
+assert_not_contains "${capture_ragnarok_stale}" '^OBELISK_CHAT_REFLECTION_BINARY_SHA256='
+assert_not_contains "${capture_ragnarok_stale}" '^OBELISK_CHAT_REFLECTION_LOG_LIMIT='
+assert_not_contains "${capture_ragnarok_stale}" '^OBELISK_ENABLE_INVENTORY_REFLECTION='
+assert_not_contains "${capture_ragnarok_stale}" '^OBELISK_INVENTORY_REFLECTION_BINARY_SHA256='
+assert_not_contains "${capture_ragnarok_stale}" '^OBELISK_INVENTORY_REFLECTION_LOG_LIMIT='
+assert_not_contains "${capture_ragnarok_stale}" '^OBELISK_ENABLE_STRUCTURE_REFLECTION='
+assert_not_contains "${capture_ragnarok_stale}" '^OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256='
+assert_not_contains "${capture_ragnarok_stale}" '^OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT='
+
 root_override="${TMP_DIR}/root-override"
 capture_override="${TMP_DIR}/override.env"
 prepare_root "${root_override}"
+: > "${root_override}/state/instances/arkserver2/allow-experimental-observers"
 : > "${root_override}/state/instances/arkserver2/enable-structure-reflection"
 : > "${root_override}/state/instances/arkserver2/enable-inventory-reflection"
 (

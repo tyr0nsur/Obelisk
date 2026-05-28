@@ -320,15 +320,21 @@ namespace Obelisk::Hooks
         return Memory::IsReadable(const_cast<void*>(address), size);
     }
 
+    static bool AreExperimentalObserverMarkersEnabled(const char* observerMarkerName)
+    {
+        return Runtime::AreInstanceMarkersEnabled(std::getenv("OBELISK_ROOT"),
+                                                  std::getenv("OBELISK_INSTANCE_ID"),
+                                                  "allow-experimental-observers",
+                                                  observerMarkerName);
+    }
+
     static const ProcessEventChatReflection::Gate& GetChatReflectionGate()
     {
         static ProcessEventChatReflection::Gate gate = [] {
             ProcessEventChatReflection::Gate value =
                 ProcessEventChatReflection::EvaluateGate(
                     std::getenv("OBELISK_ENABLE_CHAT_REFLECTION"),
-                    Runtime::IsInstanceMarkerEnabled(std::getenv("OBELISK_ROOT"),
-                                                     std::getenv("OBELISK_INSTANCE_ID"),
-                                                     "enable-chat-reflection"),
+                    AreExperimentalObserverMarkersEnabled("enable-chat-reflection"),
                     std::getenv("OBELISK_CHAT_REFLECTION_BINARY_SHA256"));
 
             switch (value.Status)
@@ -336,7 +342,8 @@ namespace Obelisk::Hooks
             case ProcessEventChatReflection::GateStatus::Disabled:
                 break;
             case ProcessEventChatReflection::GateStatus::MissingInstanceMarker:
-                OBELISK_WARN("Chat reflection disabled: instance marker enable-chat-reflection is required.");
+                OBELISK_WARN("Chat reflection disabled: instance markers allow-experimental-observers and "
+                             "enable-chat-reflection are required.");
                 break;
             case ProcessEventChatReflection::GateStatus::MissingBinarySha256:
                 OBELISK_WARN("Chat reflection disabled: OBELISK_CHAT_REFLECTION_BINARY_SHA256 is required.");
@@ -367,9 +374,7 @@ namespace Obelisk::Hooks
             ProcessEventStructureReflection::Gate value =
                 ProcessEventStructureReflection::EvaluateGate(
                     std::getenv("OBELISK_ENABLE_STRUCTURE_REFLECTION"),
-                    Runtime::IsInstanceMarkerEnabled(std::getenv("OBELISK_ROOT"),
-                                                     std::getenv("OBELISK_INSTANCE_ID"),
-                                                     "enable-structure-reflection"),
+                    AreExperimentalObserverMarkersEnabled("enable-structure-reflection"),
                     std::getenv("OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256"));
 
             switch (value.Status)
@@ -377,7 +382,8 @@ namespace Obelisk::Hooks
             case ProcessEventStructureReflection::GateStatus::Disabled:
                 break;
             case ProcessEventStructureReflection::GateStatus::MissingInstanceMarker:
-                OBELISK_WARN("Structure reflection disabled: instance marker enable-structure-reflection is required.");
+                OBELISK_WARN("Structure reflection disabled: instance markers allow-experimental-observers and "
+                             "enable-structure-reflection are required.");
                 break;
             case ProcessEventStructureReflection::GateStatus::MissingBinarySha256:
                 OBELISK_WARN("Structure reflection disabled: OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256 is required.");
@@ -408,9 +414,7 @@ namespace Obelisk::Hooks
             ProcessEventInventoryReflection::Gate value =
                 ProcessEventInventoryReflection::EvaluateGate(
                     std::getenv("OBELISK_ENABLE_INVENTORY_REFLECTION"),
-                    Runtime::IsInstanceMarkerEnabled(std::getenv("OBELISK_ROOT"),
-                                                     std::getenv("OBELISK_INSTANCE_ID"),
-                                                     "enable-inventory-reflection"),
+                    AreExperimentalObserverMarkersEnabled("enable-inventory-reflection"),
                     std::getenv("OBELISK_INVENTORY_REFLECTION_BINARY_SHA256"));
 
             switch (value.Status)
@@ -418,7 +422,8 @@ namespace Obelisk::Hooks
             case ProcessEventInventoryReflection::GateStatus::Disabled:
                 break;
             case ProcessEventInventoryReflection::GateStatus::MissingInstanceMarker:
-                OBELISK_WARN("Inventory reflection disabled: instance marker enable-inventory-reflection is required.");
+                OBELISK_WARN("Inventory reflection disabled: instance markers allow-experimental-observers and "
+                             "enable-inventory-reflection are required.");
                 break;
             case ProcessEventInventoryReflection::GateStatus::MissingBinarySha256:
                 OBELISK_WARN("Inventory reflection disabled: OBELISK_INVENTORY_REFLECTION_BINARY_SHA256 is required.");

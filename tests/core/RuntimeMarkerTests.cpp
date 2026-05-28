@@ -127,6 +127,43 @@ namespace
         std::filesystem::remove_all(root);
     }
 
+    void TestInstanceMarkerPairEnabled()
+    {
+        const std::filesystem::path root = MakeTempRoot();
+        const std::filesystem::path instanceDir = root / "state" / "instances" / "arkserver2";
+        const std::filesystem::path allowMarker = instanceDir / "allow-experimental-observers";
+        const std::filesystem::path observerMarker = instanceDir / "enable-inventory-reflection";
+
+        Require(!Obelisk::Runtime::AreInstanceMarkersEnabled(root.c_str(),
+                                                             "arkserver2",
+                                                             "allow-experimental-observers",
+                                                             "enable-inventory-reflection"),
+                "missing marker pair was accepted");
+
+        Touch(observerMarker);
+        Require(!Obelisk::Runtime::AreInstanceMarkersEnabled(root.c_str(),
+                                                             "arkserver2",
+                                                             "allow-experimental-observers",
+                                                             "enable-inventory-reflection"),
+                "observer marker was accepted without allow marker");
+
+        Touch(allowMarker);
+        Require(Obelisk::Runtime::AreInstanceMarkersEnabled(root.c_str(),
+                                                            "arkserver2",
+                                                            "allow-experimental-observers",
+                                                            "enable-inventory-reflection"),
+                "complete marker pair was rejected");
+
+        std::filesystem::remove(observerMarker);
+        Require(!Obelisk::Runtime::AreInstanceMarkersEnabled(root.c_str(),
+                                                             "arkserver2",
+                                                             "allow-experimental-observers",
+                                                             "enable-inventory-reflection"),
+                "allow marker was accepted without observer marker");
+
+        std::filesystem::remove_all(root);
+    }
+
     void TestEnvAndInstanceMarkerGate()
     {
         const std::filesystem::path root = MakeTempRoot();
@@ -178,6 +215,7 @@ int main()
 {
     TestSafeMarkerComponents();
     TestInstanceMarkerEnabled();
+    TestInstanceMarkerPairEnabled();
     TestEnvAndInstanceMarkerGate();
 
     std::cout << "RuntimeMarkerTests passed\n";

@@ -93,7 +93,8 @@ scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection
 - Enable one marker/config gate at a time and record the exact change.
 - Use instance markers under `state/instances/<instance-id>/`; map markers are obsolete.
 - Experimental runtime observers must have their own instance markers in addition to env
-  gates. Current observer markers:
+  gates and `allow-experimental-observers` on the same instance. Current observer markers:
+  - `allow-experimental-observers`
   - `enable-chat-reflection`
   - `enable-structure-reflection`
   - `enable-inventory-reflection`

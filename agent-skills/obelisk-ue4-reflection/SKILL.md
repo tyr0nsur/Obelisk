@@ -60,11 +60,12 @@ metadata.
   second isolated core or future binary before promoting runtime-stable contracts.
 - Module recognizers are active research tracks, not public SDK:
   - `ue/StructureReflection` has a hook-side observer, but it requires env, supported SHA,
-    non-zero budget, and `state/instances/<id>/enable-structure-reflection`.
+    non-zero budget, `state/instances/<id>/allow-experimental-observers`, and
+    `state/instances/<id>/enable-structure-reflection`.
   - `ue/InventoryReflection` is internal recognizer only. A future runtime observer must
-    require `enable-inventory-reflection`, exact `CanUse` / `AllowRemoteAddToInventory`
-    FName prefiltering before budget reservation, and no return override or gameplay
-    mutation.
+    require `allow-experimental-observers`, `enable-inventory-reflection`, exact `CanUse`
+    / `AllowRemoteAddToInventory` FName prefiltering before budget reservation, and no
+    return override or gameplay mutation.
   - `ue/BuffReflection` is an offline internal recognizer only. Keep buff hooks,
     callbacks, return overrides, raw object/class exposure, and gameplay mutation blocked
     until second-source evidence and SDK policy exist.

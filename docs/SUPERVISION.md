@@ -191,6 +191,7 @@ is intentionally stopped for RAM:
 
 ```bash
 # Approved debug-window rollback only:
+# rm -f /servidor/ark/obelisk/state/instances/arkserver2/allow-experimental-observers
 # rm -f /servidor/ark/obelisk/state/instances/arkserver2/enable-chat-reflection
 # /servidor/ark/arkserver2 restart
 cd /home/flowcommunity-ark/Obelisk

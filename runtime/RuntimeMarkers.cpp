@@ -53,6 +53,15 @@ namespace Obelisk::Runtime
         return !ec && std::filesystem::is_regular_file(markerStatus) && !std::filesystem::is_symlink(markerStatus);
     }
 
+    bool AreInstanceMarkersEnabled(const char* root,
+                                   const char* instanceId,
+                                   const char* firstMarkerName,
+                                   const char* secondMarkerName)
+    {
+        return IsInstanceMarkerEnabled(root, instanceId, firstMarkerName) &&
+               IsInstanceMarkerEnabled(root, instanceId, secondMarkerName);
+    }
+
     bool IsEnvAndInstanceMarkerEnabled(const char* envVarName, const char* markerName)
     {
         if (!envVarName || envVarName[0] == '\0' || !markerName || markerName[0] == '\0')

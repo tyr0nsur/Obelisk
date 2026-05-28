@@ -182,10 +182,15 @@ Useful flags:
 ```text
 state/instances/<instance-id>/enable-process-event-hook
 state/instances/<instance-id>/disable-plugins
+state/instances/<instance-id>/allow-experimental-observers  # required with observer markers below
 state/instances/<instance-id>/enable-chat-reflection  # experimental
 state/instances/<instance-id>/enable-inventory-reflection  # experimental, metadata-only
 state/instances/<instance-id>/enable-structure-reflection  # experimental, metadata-only
 ```
+
+Experimental observer markers do nothing unless `allow-experimental-observers` is also
+present for the same instance. Use that marker only inside an approved debug window and
+remove it before returning the instance to stable posture.
 
 `enable-chat-reflection` makes the wrapper set:
 

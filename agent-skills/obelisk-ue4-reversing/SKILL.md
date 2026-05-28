@@ -83,7 +83,8 @@ cross-validated by object and property metadata.
   when the test window ends.
 - Experimental module recognizers belong only on an explicitly approved debug/development
   target. The historical chat gate (`OBELISK_ENABLE_CHAT_REFLECTION=1`) additionally
-  requires the matching `OBELISK_CHAT_REFLECTION_BINARY_SHA256` gate and a small log limit.
+  requires `allow-experimental-observers`, the matching
+  `OBELISK_CHAT_REFLECTION_BINARY_SHA256` gate, and a small log limit.
 - Do not enable `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` plus
   `enable-native-exec-probes` on live servers.
 - Do not enable broad event discovery on a production map until it has survived an

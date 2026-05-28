@@ -88,6 +88,7 @@ enable_marker() {
 }
 
 configure_chat_reflection() {
+    enable_marker "allow-experimental-observers" || return 0
     enable_marker "enable-chat-reflection" || return 0
 
     export OBELISK_ENABLE_CHAT_REFLECTION=1
@@ -99,6 +100,7 @@ configure_chat_reflection() {
 }
 
 configure_structure_reflection() {
+    enable_marker "allow-experimental-observers" || return 0
     enable_marker "enable-structure-reflection" || return 0
 
     export OBELISK_ENABLE_STRUCTURE_REFLECTION=1
@@ -107,6 +109,7 @@ configure_structure_reflection() {
 }
 
 configure_inventory_reflection() {
+    enable_marker "allow-experimental-observers" || return 0
     enable_marker "enable-inventory-reflection" || return 0
 
     export OBELISK_ENABLE_INVENTORY_REFLECTION=1

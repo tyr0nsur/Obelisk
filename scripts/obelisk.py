@@ -17,6 +17,7 @@ STABLE_INSTANCE_MARKERS = frozenset(("enable-process-event-hook", "disable-plugi
 FORBIDDEN_STABLE_MARKERS = frozenset(
     (
         "allow-ptrace",
+        "allow-experimental-observers",
         "enable-debug-control",
         "enable-native-exec-probes",
         "allow-global-process-event-callbacks",
