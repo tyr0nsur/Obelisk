@@ -53,7 +53,11 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="${REPO_DIR}/build"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 STAGE_ROOT="${ROOT}/.install-runtime.${STAMP}.$$"
+ROLLBACK_ROOT="${ROOT}/.install-rollback.${STAMP}.$$"
 TEMP_PATHS=()
+PUBLISHED_RUNTIME_PATHS=()
+declare -A RUNTIME_ROLLBACK_SNAPSHOTS=()
+declare -A RUNTIME_ROLLBACK_EXISTED=()
 
 run() {
     if [[ "${DRY_RUN}" == "1" ]]; then
@@ -99,22 +103,66 @@ cleanup_temp_paths() {
             rm -f "${temp_path}"
         done
         rm -rf "${STAGE_ROOT}"
+        rm -rf "${ROLLBACK_ROOT}"
     fi
 }
 trap cleanup_temp_paths EXIT
 
-install_staged_file() {
+prepare_staged_file() {
     local mode="$1"
     local src="$2"
     local dst="$3"
+    local -n out_tmp="$4"
     local tmp="${dst}.incoming.$$"
     if [[ "${DRY_RUN}" != "1" || -f "${src}" ]]; then
         require_file "${src}"
     fi
-    backup_existing "${dst}"
     TEMP_PATHS+=("${tmp}")
     run install -m "${mode}" "${src}" "${tmp}"
-    run mv -f "${tmp}" "${dst}"
+    out_tmp="${tmp}"
+}
+
+snapshot_runtime_destination() {
+    local dst="$1"
+    local snapshot="${ROLLBACK_ROOT}/$(basename "${dst}")"
+    mkdir -p "${ROLLBACK_ROOT}"
+    if [[ -e "${dst}" ]]; then
+        cp -a "${dst}" "${snapshot}"
+        RUNTIME_ROLLBACK_EXISTED["${dst}"]=1
+        RUNTIME_ROLLBACK_SNAPSHOTS["${dst}"]="${snapshot}"
+    else
+        RUNTIME_ROLLBACK_EXISTED["${dst}"]=0
+        RUNTIME_ROLLBACK_SNAPSHOTS["${dst}"]=""
+    fi
+}
+
+rollback_runtime_publish() {
+    local dst
+    for ((idx=${#PUBLISHED_RUNTIME_PATHS[@]} - 1; idx >= 0; --idx)); do
+        dst="${PUBLISHED_RUNTIME_PATHS[$idx]}"
+        if [[ "${RUNTIME_ROLLBACK_EXISTED["${dst}"]}" == "1" ]]; then
+            cp -a "${RUNTIME_ROLLBACK_SNAPSHOTS["${dst}"]}" "${dst}"
+        else
+            rm -f "${dst}"
+        fi
+    done
+}
+
+publish_runtime_file() {
+    local tmp="$1"
+    local dst="$2"
+    mv -f "${tmp}" "${dst}" || return
+    PUBLISHED_RUNTIME_PATHS+=("${dst}")
+}
+
+publish_runtime_pair() {
+    local subhook_tmp="$1"
+    local subhook_dst="$2"
+    local obelisk_tmp="$3"
+    local obelisk_dst="$4"
+
+    publish_runtime_file "${subhook_tmp}" "${subhook_dst}" &&
+        publish_runtime_file "${obelisk_tmp}" "${obelisk_dst}"
 }
 
 install_runtime_package() {
@@ -122,8 +170,25 @@ install_runtime_package() {
     require_file "${BUILD_DIR}/_deps/subhook-build/libsubhook.so"
     run rm -rf "${STAGE_ROOT}"
     run cmake --install "${BUILD_DIR}" --prefix "${STAGE_ROOT}" --component Runtime
-    install_staged_file 755 "${BUILD_DIR}/_deps/subhook-build/libsubhook.so" "${ROOT}/lib/libsubhook.so"
-    install_staged_file 755 "${STAGE_ROOT}/lib/libobelisk.so" "${ROOT}/lib/libobelisk.so"
+    local subhook_dst="${ROOT}/lib/libsubhook.so"
+    local obelisk_dst="${ROOT}/lib/libobelisk.so"
+    local subhook_tmp
+    local obelisk_tmp
+    prepare_staged_file 755 "${BUILD_DIR}/_deps/subhook-build/libsubhook.so" "${subhook_dst}" subhook_tmp
+    prepare_staged_file 755 "${STAGE_ROOT}/lib/libobelisk.so" "${obelisk_dst}" obelisk_tmp
+    backup_existing "${subhook_dst}"
+    backup_existing "${obelisk_dst}"
+    if [[ "${DRY_RUN}" == "1" ]]; then
+        run mv -f "${subhook_tmp}" "${subhook_dst}"
+        run mv -f "${obelisk_tmp}" "${obelisk_dst}"
+    else
+        snapshot_runtime_destination "${subhook_dst}"
+        snapshot_runtime_destination "${obelisk_dst}"
+        if ! publish_runtime_pair "${subhook_tmp}" "${subhook_dst}" "${obelisk_tmp}" "${obelisk_dst}"; then
+            rollback_runtime_publish
+            return 1
+        fi
+    fi
     run rm -rf "${STAGE_ROOT}"
 }
 

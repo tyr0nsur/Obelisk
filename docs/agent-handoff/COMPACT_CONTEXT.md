@@ -136,6 +136,10 @@ work from repository state instead of chat history.
     cleaning callbacks before close; `UnloadAll` also covers cleanup when plugin
     `Shutdown` throws; each plugin init receives a per-plugin `ObeliskApi` copy so a
     plugin cannot mutate the manager template or poison later plugin loads;
+  - install hardening: runtime installer stages both `libsubhook.so` and `libobelisk.so`
+    before publishing and rolls back any already-published runtime file if the paired
+    publish fails; layout tests force failure on the second rename and verify the original
+    pair remains intact;
   - event dispatch hardening: EventManager tests initialize logger and verify throwing
     pre/post callbacks are logged without propagating and without stopping later
     callbacks;

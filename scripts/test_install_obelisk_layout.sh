@@ -82,9 +82,11 @@ failure_root="${WORK_DIR}/failure-root"
 mkdir -p "${fake_bin}"
 cat > "${fake_bin}/mv" <<'SH'
 #!/usr/bin/env bash
-if [[ "$*" == *'.incoming.'* ]]; then
-    exit 77
-fi
+for arg in "$@"; do
+    if [[ "${arg}" == *.incoming.* ]]; then
+        exit 77
+    fi
+done
 exec /usr/bin/mv "$@"
 SH
 chmod +x "${fake_bin}/mv"
@@ -101,6 +103,54 @@ fi
 if find "${failure_root}" -maxdepth 1 -name '.install-runtime.*' | grep -q .; then
     echo "failed runtime install left staging directories" >&2
     find "${failure_root}" -maxdepth 1 -print >&2
+    exit 1
+fi
+
+pair_failure_root="${WORK_DIR}/pair-failure-root"
+mkdir -p "${pair_failure_root}/lib"
+printf 'old-subhook\n' > "${pair_failure_root}/lib/libsubhook.so"
+printf 'old-obelisk\n' > "${pair_failure_root}/lib/libobelisk.so"
+cat > "${fake_bin}/mv" <<'SH'
+#!/usr/bin/env bash
+for arg in "$@"; do
+    if [[ "${arg}" == *.incoming.* ]]; then
+        count=0
+        if [[ -n "${OBELISK_FAKE_MV_COUNT:-}" && -f "${OBELISK_FAKE_MV_COUNT}" ]]; then
+            count="$(cat "${OBELISK_FAKE_MV_COUNT}")"
+        fi
+        count=$((count + 1))
+        if [[ -n "${OBELISK_FAKE_MV_COUNT:-}" ]]; then
+            printf '%s\n' "${count}" > "${OBELISK_FAKE_MV_COUNT}"
+        fi
+        if [[ "${count}" == "2" ]]; then
+            exit 77
+        fi
+        break
+    fi
+done
+exec /usr/bin/mv "$@"
+SH
+chmod +x "${fake_bin}/mv"
+fake_mv_count="${WORK_DIR}/fake-mv-count"
+if OBELISK_FAKE_MV_COUNT="${fake_mv_count}" PATH="${fake_bin}:${PATH}" \
+    "${REPO_DIR}/scripts/install_obelisk.sh" "${pair_failure_root}" \
+    >"${WORK_DIR}/pair-fail-mv.out" 2>"${WORK_DIR}/pair-fail-mv.err"; then
+    echo "install_obelisk.sh succeeded despite failing second runtime rename" >&2
+    exit 1
+fi
+if [[ "$(cat "${pair_failure_root}/lib/libsubhook.so")" != "old-subhook" ]]; then
+    echo "failed runtime pair install did not restore original libsubhook.so" >&2
+    ls -la "${pair_failure_root}/lib" >&2
+    exit 1
+fi
+if [[ "$(cat "${pair_failure_root}/lib/libobelisk.so")" != "old-obelisk" ]]; then
+    echo "failed runtime pair install changed original libobelisk.so" >&2
+    ls -la "${pair_failure_root}/lib" >&2
+    exit 1
+fi
+if find "${pair_failure_root}" \( -name '*.incoming.*' -o -name '.install-runtime.*' -o -name '.install-rollback.*' \) | grep -q .; then
+    echo "failed runtime pair install left temporary files" >&2
+    find "${pair_failure_root}" -print >&2
     exit 1
 fi
 

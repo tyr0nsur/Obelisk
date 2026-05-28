@@ -160,6 +160,10 @@ Updated: 2026-05-28
   that mutates its received function table cannot corrupt the manager template or poison
   later plugin loads; `PluginManagerTests` covers this with a mutating plugin followed by
   a clean plugin.
+- fact: Runtime installer publication now stages both runtime libraries before publishing
+  and rolls back any already-published runtime file if the paired publish fails. Layout
+  tests force failure on the second runtime rename and verify the original
+  `libsubhook.so`/`libobelisk.so` pair remains intact with no temporary files left behind.
 - fact: Commit `c0d1e4c` pushed the hardened first-stable gates. On 2026-05-28,
   `scripts/check_release_readiness.sh` passed from a clean tracked/untracked worktree
   (ignored `build/` and `scripts/__pycache__/` only), and the read-only Ragnarok posture
