@@ -175,6 +175,7 @@ Unattended cron-style work may collect read-only snapshots only:
 
 - git status/log head,
 - server posture,
+- LinuxGSM wrapper drift status,
 - recent Obelisk logs,
 - marker list,
 - disk/memory/process summary.

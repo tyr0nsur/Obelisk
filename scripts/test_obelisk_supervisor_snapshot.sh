@@ -6,6 +6,11 @@ SNAPSHOT="${REPO_ROOT}/scripts/obelisk_supervisor_snapshot.sh"
 LOOP="${REPO_ROOT}/scripts/obelisk_supervisor_loop.sh"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "${TMP_DIR}"' EXIT
+WRAPPER_EXPECTED_FIXTURE="${TMP_DIR}/expected-wrapper/ObeliskRun.sh"
+WRAPPER_FIXTURE="${TMP_DIR}/installed-wrapper/ObeliskRun.sh"
+mkdir -p "$(dirname "${WRAPPER_EXPECTED_FIXTURE}")" "$(dirname "${WRAPPER_FIXTURE}")"
+cp "${REPO_ROOT}/packaging/linuxgsm/ObeliskRun.sh" "${WRAPPER_EXPECTED_FIXTURE}"
+cp "${WRAPPER_EXPECTED_FIXTURE}" "${WRAPPER_FIXTURE}"
 
 write_proc_fixture() {
     local pid="$1"
@@ -74,6 +79,8 @@ run_snapshot() {
     OBELISK_SUPERVISOR_MAP=TheIsland \
     OBELISK_SUPERVISOR_PID="${pid}" \
     OBELISK_SUPERVISOR_ALLOW_CHAT_REFLECTION="${allow_chat_reflection}" \
+    OBELISK_SUPERVISOR_WRAPPER_EXPECTED="${WRAPPER_EXPECTED_FIXTURE}" \
+    OBELISK_SUPERVISOR_WRAPPER_INSTALLED="${WRAPPER_FIXTURE}" \
     "${SNAPSHOT}"
 }
 
@@ -88,6 +95,8 @@ run_loop_once() {
     OBELISK_SUPERVISOR_INSTANCE=arkserver2 \
     OBELISK_SUPERVISOR_MAP=TheIsland \
     OBELISK_SUPERVISOR_PID="${pid}" \
+    OBELISK_SUPERVISOR_WRAPPER_EXPECTED="${WRAPPER_EXPECTED_FIXTURE}" \
+    OBELISK_SUPERVISOR_WRAPPER_INSTALLED="${WRAPPER_FIXTURE}" \
     "${LOOP}" --interval 1 --count 1
 }
 
@@ -126,10 +135,15 @@ default_snapshot_dir="$(
     OBELISK_SUPERVISOR_OUT="${default_out}" \
     OBELISK_SUPERVISOR_PROC_ROOT="${TMP_DIR}/proc" \
     OBELISK_SUPERVISOR_PID=4141 \
+    OBELISK_SUPERVISOR_WRAPPER_EXPECTED="${WRAPPER_EXPECTED_FIXTURE}" \
+    OBELISK_SUPERVISOR_WRAPPER_INSTALLED="${WRAPPER_FIXTURE}" \
     "${SNAPSHOT}"
 )"
 assert_file_contains "${default_snapshot_dir}/summary.txt" '^instance=arkserver-obelisk-debug$'
 assert_file_contains "${default_snapshot_dir}/summary.txt" '^posture_status=ok$'
+assert_file_contains "${default_snapshot_dir}/summary.txt" '^linuxgsm_wrapper_drift_status=ok$'
+assert_file_contains "${default_snapshot_dir}/wrapper-drift.txt" '^LinuxGSM wrapper matches versioned template: '
+assert_file_contains "${default_snapshot_dir}/wrapper-drift.txt" '^sha256='
 
 stable_root="${TMP_DIR}/stable-root"
 stable_out="${TMP_DIR}/stable-out"
@@ -154,6 +168,7 @@ assert_file_contains "${chat_forbidden_out}/latest/summary.txt" '^posture_status
 
 snapshot_dir="$(run_snapshot "${stable_root}" "${stable_out}" 4242 1)"
 assert_file_contains "${snapshot_dir}/summary.txt" '^pid=4242$'
+assert_file_contains "${snapshot_dir}/summary.txt" '^linuxgsm_wrapper_drift_status=ok$'
 assert_file_contains "${snapshot_dir}/summary.txt" '^posture_status=ok$'
 assert_file_contains "${snapshot_dir}/summary.txt" '^quiet_posture_status=failed$'
 assert_file_contains "${snapshot_dir}/summary.txt" '^stable_posture_summary=stable;'
@@ -194,6 +209,25 @@ assert_file_contains "${snapshot_dir}/summary.txt" '^structure_reflection_gate_e
 assert_file_contains "${snapshot_dir}/summary.txt" '^structure_reflection_binary_sha256=missing$'
 assert_file_not_contains "${snapshot_dir}/disk.txt" '/servidor/ark '
 
+drift_wrapper="${TMP_DIR}/drift-wrapper/ObeliskRun.sh"
+mkdir -p "$(dirname "${drift_wrapper}")"
+printf '#!/usr/bin/env bash\nexit 0\n' > "${drift_wrapper}"
+drift_snapshot_dir="$(
+    OBELISK_ROOT="${stable_root}" \
+    OBELISK_SUPERVISOR_OUT="${TMP_DIR}/drift-out" \
+    OBELISK_SUPERVISOR_PROC_ROOT="${TMP_DIR}/proc" \
+    OBELISK_SUPERVISOR_INSTANCE=arkserver2 \
+    OBELISK_SUPERVISOR_MAP=TheIsland \
+    OBELISK_SUPERVISOR_PID=4242 \
+    OBELISK_SUPERVISOR_ALLOW_CHAT_REFLECTION=1 \
+    OBELISK_SUPERVISOR_WRAPPER_EXPECTED="${WRAPPER_EXPECTED_FIXTURE}" \
+    OBELISK_SUPERVISOR_WRAPPER_INSTALLED="${drift_wrapper}" \
+    "${SNAPSHOT}"
+)"
+assert_file_contains "${drift_snapshot_dir}/summary.txt" '^posture_status=ok$'
+assert_file_contains "${drift_snapshot_dir}/summary.txt" '^linuxgsm_wrapper_drift_status=failed$'
+assert_file_contains "${drift_snapshot_dir}/wrapper-drift.txt" '^LinuxGSM wrapper drift detected\.'
+
 loop_out="${TMP_DIR}/loop-out"
 OBELISK_SUPERVISOR_ALLOW_CHAT_REFLECTION=1 run_loop_once "${stable_root}" "${loop_out}" 4242 >/dev/null
 assert_file_contains "${loop_out}/latest/summary.txt" '^posture_status=ok$'
@@ -216,6 +250,7 @@ if run_snapshot "${unstable_root}" "${unstable_out}" 4343 >/dev/null 2>"${TMP_DI
 fi
 assert_file_contains "${TMP_DIR}/unstable.err" 'unstable Obelisk posture'
 assert_file_contains "${unstable_out}/latest/summary.txt" '^posture_status=failed$'
+assert_file_contains "${unstable_out}/latest/summary.txt" '^linuxgsm_wrapper_drift_status=ok$'
 assert_file_contains "${unstable_out}/latest/summary.txt" '^stable_posture_summary=unstable;'
 assert_file_contains "${unstable_out}/latest/chat-reflection.txt" '^skipped_unstable_posture=true$'
 assert_file_contains "${unstable_out}/latest/inventory-reflection.txt" '^skipped_unstable_posture=true$'
@@ -248,6 +283,8 @@ if OBELISK_ROOT="${unstable_root}" \
     OBELISK_SUPERVISOR_INSTANCE=arkserver2 \
     OBELISK_SUPERVISOR_MAP=TheIsland \
     OBELISK_SUPERVISOR_PID=4343 \
+    OBELISK_SUPERVISOR_WRAPPER_EXPECTED="${WRAPPER_EXPECTED_FIXTURE}" \
+    OBELISK_SUPERVISOR_WRAPPER_INSTALLED="${WRAPPER_FIXTURE}" \
     "${LOOP}" --interval 1 --count 2 >/dev/null 2>"${TMP_DIR}/loop-fail.err"; then
     echo "Expected supervisor loop to stop on snapshot failure" >&2
     exit 1

@@ -6,6 +6,8 @@ OBELISK_ROOT="${OBELISK_ROOT:-/servidor/ark/obelisk}"
 OUT_ROOT="${OBELISK_SUPERVISOR_OUT:-${OBELISK_ROOT}/dumps/supervisor}"
 INSTANCE="${OBELISK_SUPERVISOR_INSTANCE:-arkserver-obelisk-debug}"
 MAP="${OBELISK_SUPERVISOR_MAP:-TheIsland}"
+WRAPPER_EXPECTED="${OBELISK_SUPERVISOR_WRAPPER_EXPECTED:-${REPO_ROOT}/packaging/linuxgsm/ObeliskRun.sh}"
+WRAPPER_INSTALLED="${OBELISK_SUPERVISOR_WRAPPER_INSTALLED:-/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ObeliskRun.sh}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 OUT_DIR="${OUT_ROOT}/${STAMP}"
 
@@ -79,6 +81,7 @@ write_unstable_summary() {
         printf 'map=%s\n' "${MAP}"
         printf 'snapshot_dir=%s\n' "${OUT_DIR}"
         printf 'pid=%s\n' "${pid:-unknown}"
+        printf 'linuxgsm_wrapper_drift_status=%s\n' "${WRAPPER_DRIFT_STATUS}"
         printf 'posture_status=%s\n' "${posture_status}"
         printf 'stable_posture_summary=unstable; see posture.txt before trusting chat/reflection evidence\n'
         printf '\n'
@@ -104,6 +107,12 @@ run_capture git-log git -C "${REPO_ROOT}" log --oneline -10
 run_capture disk df -h / "${OBELISK_ROOT}"
 run_capture processes pgrep -af 'ShooterGameServer|arkserver'
 run_capture markers find "${OBELISK_ROOT}/state/instances" -maxdepth 3 -type f -printf '%TY-%Tm-%Td %TH:%TM:%TS %p\n'
+
+WRAPPER_DRIFT_CMD=("${REPO_ROOT}/scripts/check_linuxgsm_wrapper_drift.sh" --expected "${WRAPPER_EXPECTED}" --installed "${WRAPPER_INSTALLED}")
+WRAPPER_DRIFT_STATUS=ok
+if ! capture_command wrapper-drift "${WRAPPER_DRIFT_CMD[@]}"; then
+    WRAPPER_DRIFT_STATUS=failed
+fi
 
 POSTURE_CMD=("${REPO_ROOT}/scripts/check_obelisk_server_posture.sh" --expect-stable --map "${MAP}" --instance "${INSTANCE}")
 if [[ -n "${OBELISK_SUPERVISOR_PROC_ROOT:-}" ]]; then
@@ -280,6 +289,7 @@ instance=${INSTANCE}
 map=${MAP}
 snapshot_dir=${OUT_DIR}
 pid=${PID:-unknown}
+linuxgsm_wrapper_drift_status=${WRAPPER_DRIFT_STATUS}
 posture_status=${posture_status}
 quiet_posture_status=${quiet_posture_status}
 stable_posture_summary=stable; instance=${INSTANCE}; process_event_hook=1; plugins_disabled=1; libobelisk_mapped=1; scanner_debug_native_exec_absent=1
