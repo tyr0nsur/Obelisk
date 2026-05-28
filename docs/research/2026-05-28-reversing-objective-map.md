@@ -11,7 +11,7 @@ runtime and a general ARK Linux API/SDK core.
 - ARK binary SHA256:
   `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`
 - Current repository baseline:
-  `4a80d17 Add internal inventory reflection recognizer`
+  `a526450 Summarize runtime observer evidence offline`
 - Primary evidence source:
   existing offline core and committed sanitized fixtures.
 - Live-server impact: none.
@@ -20,9 +20,9 @@ runtime and a general ARK Linux API/SDK core.
 
 | Area | Needed Evidence | Current Gate |
 | --- | --- | --- |
-| Instance safety | Instance-scoped marker gates for runtime observers. | `sdk.structures` now requires env plus `enable-structure-reflection`; inventory must follow before runtime. |
+| Instance safety | Instance-scoped marker gates for runtime observers. | Chat, inventory, and structures now require env, binary SHA, explicit budget, and per-instance markers before runtime observation. |
 | Second source | Independent debug core or static path for `FName`/`GObjects`/`UObject`/`UFunction` layout comparison. | Existing packs derive from one core only; operational checklist is in `docs/research/2026-05-28-second-source-reversing-gap-matrix.md`. |
-| Runtime budget | Every observer gate must have explicit budget defaulting to zero. | Structures has this; inventory must copy it. |
+| Runtime budget | Every observer gate must have explicit budget defaulting to zero. | Chat, inventory, and structures all follow bounded observer discipline; copied/sanitized logs can be summarized offline without touching live instances. |
 | Public SDK readiness | Copied-data ownership and callback lifecycle for each event family. | No new public ABI until proven. |
 
 ## P1 Research Tracks
@@ -30,7 +30,7 @@ runtime and a general ARK Linux API/SDK core.
 | Track | Next Step | Blocked Items |
 | --- | --- | --- |
 | `sdk.structures` | Add wrapper/posture tests and keep runtime observation blocked until an approved `arkserver2` / TheIsland window or a dedicated isolated debug instance exists; keep `arkserver` / Ragnarok untouched while users are active. | Placement/build/snapping mutation. |
-| `sdk.inventory` | Add disabled-by-default observation gate after audit, with cheap exact FName filter before budget reservation. | Item ids, arrays, item contents, NetExec. |
+| `sdk.inventory` | Keep the internal marker-gated observer metadata-only and use copied-log summaries plus second-source layouts before any public SDK surface. | Item ids, arrays, item contents, NetExec. |
 | `sdk.buffs` | Maintain the offline internal recognizer and use it to harden exact reflected metadata validation. | Runtime hooks, callbacks, return override, object/class pointer exposure, gameplay mutation. |
 | `sdk.transfers` | Capture or obtain second source for tribute ScriptStruct layouts. | `ItemNetInfo`, upload/download dispatch. |
 | `ue.reflection` | Keep strengthening exact identity and property-chain validation through the second-source matrix. | Treating FName/object indices as cross-build contracts. |
@@ -65,3 +65,8 @@ allowed only after the corresponding offline recognizer, budget, marker, rollbac
 privacy gates exist. For gameplay-authoritative functions, observers must not override
 returns, mutate params, call original manually, or dispatch public plugin callbacks until
 copied-data ownership and authority policy are proven.
+
+`scripts/analyze_runtime_observer_log.py` is a summary tool for copied or sanitized
+observer logs. Its JSON is useful for comparing chat, inventory, structure, and future
+observer families, but it is not a promotion evidence pack by itself and must not be used
+as a reason to read or tail live Ragnarok logs.

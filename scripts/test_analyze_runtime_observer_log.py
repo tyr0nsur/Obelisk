@@ -16,12 +16,12 @@ ANALYZER = REPO_ROOT / "scripts" / "analyze_runtime_observer_log.py"
 
 
 class RuntimeObserverLogAnalyzerTests(unittest.TestCase):
-    def run_analyzer(self, lines: list[str]) -> dict[str, object]:
+    def run_analyzer(self, lines: list[str], *extra_args: str) -> dict[str, object]:
         with tempfile.TemporaryDirectory() as temp_dir:
             log_path = Path(temp_dir) / "Obelisk.log"
             log_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
             result = subprocess.run(
-                [sys.executable, str(ANALYZER), str(log_path)],
+                [sys.executable, str(ANALYZER), *extra_args, str(log_path)],
                 check=False,
                 text=True,
                 stdout=subprocess.PIPE,
@@ -56,6 +56,8 @@ class RuntimeObserverLogAnalyzerTests(unittest.TestCase):
         self.assertEqual(chat["accepted_count"], 2)
         self.assertEqual(chat["rejected_count"], 1)
         self.assertEqual(chat["metadata_only_count"], 0)
+        self.assertEqual(chat["evidence_status"], "observational")
+        self.assertEqual(chat["blockers"], ["runtime_observer_evidence_only"])
         self.assertEqual(
             chat["gate_sha256"],
             ["7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"],
@@ -77,12 +79,18 @@ class RuntimeObserverLogAnalyzerTests(unittest.TestCase):
             chat["reject_reasons"],
             {"chat UFunction outer FName index mismatch": 1},
         )
+        self.assertEqual(result["evidence"]["kind"], "runtime-observer-log")
+        self.assertFalse(result["evidence"]["server_paths_allowed"])
+        self.assertEqual(len(result["evidence"]["sources"]), 1)
+        self.assertEqual(result["evidence"]["sources"][0]["line_count"], 8)
+        self.assertRegex(result["evidence"]["sources"][0]["sha256"], r"^[a-f0-9]{64}$")
         self.assertFalse(result["promotion_gate"]["ready"])
 
     def test_summarizes_non_chat_module_shapes(self) -> None:
         result = self.run_analyzer(
             [
-                "[warning] Experimental structure reflection enabled for ShooterGameServer SHA256 abc123abc123abc1.",
+                "[warning] Experimental structure reflection enabled for ShooterGameServer SHA256 "
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.",
                 "[info] Reflected structure ProcessEvent #1 function=VerifyPinCode "
                 "fname_index=7636 outer_fname_index=7617 fields=2",
                 "[info] Reflected structure field pinCode offset=0x0 size=4 sensitive=true has_range=false",
@@ -93,10 +101,84 @@ class RuntimeObserverLogAnalyzerTests(unittest.TestCase):
 
         structure = result["modules"]["structure"]
         self.assertEqual(structure["accepted_count"], 1)
+        self.assertEqual(structure["blockers"], ["runtime_observer_evidence_only"])
         self.assertEqual(structure["functions"]["VerifyPinCode"]["outer_fname_indices"], [7617])
         self.assertEqual(structure["fields"]["pinCode"]["sensitive"], {"true": 1})
         self.assertEqual(structure["fields"]["pinCode"]["has_range"], {"false": 1})
         self.assertEqual(structure["reject_reasons"], {"bad_parms_size": 1})
+
+    def test_records_commit_override(self) -> None:
+        result = self.run_analyzer(
+            [
+                "[info] Reflected inventory ProcessEvent #1 function=CanUse "
+                "fname_index=6252 outer_fname_index=6231 fields=2",
+            ],
+            "--obelisk-commit",
+            "test-commit",
+        )
+
+        self.assertEqual(result["evidence"]["obelisk_commit"], "test-commit")
+
+    def test_blocks_missing_gate_mixed_sha_and_malformed_lines(self) -> None:
+        result = self.run_analyzer(
+            [
+                "[warning] Experimental inventory reflection enabled for ShooterGameServer SHA256 "
+                "1111111111111111111111111111111111111111111111111111111111111111.",
+                "[warning] Experimental inventory reflection enabled for ShooterGameServer SHA256 "
+                "2222222222222222222222222222222222222222222222222222222222222222.",
+                "prefix garbage Reflected inventory ProcessEvent #1 function=CanUse "
+                "fname_index=6252 outer_fname_index=6231 fields=2",
+                "[info] Reflected structure ProcessEvent #1 function=VerifyPinCode "
+                "fname_index=7636 outer_fname_index=7617 fields=2",
+            ]
+        )
+
+        inventory = result["modules"]["inventory"]
+        self.assertEqual(inventory["accepted_count"], 0)
+        self.assertEqual(inventory["malformed_observer_lines"], 1)
+        self.assertIn("mixed_binary_sha256", inventory["blockers"])
+        self.assertIn("malformed_observer_lines", inventory["blockers"])
+
+        structure = result["modules"]["structure"]
+        self.assertEqual(structure["accepted_count"], 1)
+        self.assertIn("missing_experimental_gate", structure["blockers"])
+
+    def test_redacts_unapproved_detail_keys(self) -> None:
+        result = self.run_analyzer(
+            [
+                "[warning] Experimental chat reflection enabled for ShooterGameServer SHA256 "
+                "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520.",
+                "[info] Reflected chat ServerSendChatMessage send_mode=0 send_mode_name=GlobalChat "
+                "send_mode_known=true text=\"player message\" player_id=123",
+            ]
+        )
+
+        function = result["modules"]["chat"]["functions"]["ServerSendChatMessage"]
+        self.assertEqual(function["details"]["send_mode"], [0])
+        self.assertEqual(function["details"]["send_mode_name"], ["GlobalChat"])
+        self.assertNotIn("text", function["details"])
+        self.assertNotIn("player_id", function["details"])
+        self.assertEqual(
+            result["modules"]["chat"]["redacted_detail_keys"],
+            {"player_id": 1, "text": 1},
+        )
+        self.assertIn(
+            "redacted_sensitive_or_unapproved_details",
+            result["modules"]["chat"]["blockers"],
+        )
+
+    def test_refuses_live_server_paths_by_default(self) -> None:
+        live_path = Path("/servidor/ark/obelisk/logs/test-live-observer.log")
+        result = subprocess.run(
+            [sys.executable, str(ANALYZER), str(live_path)],
+            check=False,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("refusing to read live server path", result.stderr)
 
 
 if __name__ == "__main__":

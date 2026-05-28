@@ -790,8 +790,11 @@ Updated: 2026-05-28
   `docs/research/2026-05-27-server-send-chat-runtime-hit.md`.
 - fact: `scripts/analyze_runtime_observer_log.py` turns copied/sanitized observer logs
   into module-level JSON summaries for chat, inventory, structures, and future reflected
-  observers. Use it on copied artifacts or fixtures, not as a reason to tail/probe live
-  Ragnarok.
+  observers. It records source path, SHA256, line count, Obelisk commit, and a
+  `promotion_gate.ready=false` blocker summary. It uses strict line matching, per-module
+  blockers for missing gates, mixed SHA values, malformed observer lines, and redacted
+  unapproved details. By default it refuses paths under `/servidor/ark`; use copied
+  artifacts or fixtures, not live Ragnarok logs.
 - fact: `FString` for this ARK Linux build is a strong candidate for
   `{TCHAR* Data, int32 ArrayNum, int32 ArrayMax}` with `TCHAR=UTF-32LE`; see
   `docs/research/2026-05-27-fstring-layout.md`.

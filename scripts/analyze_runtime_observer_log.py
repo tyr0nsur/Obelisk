@@ -9,20 +9,34 @@ inventory, structures, or future reflected modules.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
+import subprocess
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+SERVER_ROOT = Path("/servidor/ark")
+LOG_PREFIX = r"(?:\[[^\]]+\]\s+)*"
+SAFE_DETAIL_KEYS = {
+    "chat": {
+        "ServerSendChatMessage": {"send_mode", "send_mode_name", "send_mode_known"},
+    },
+}
+
+
 GATE_RE = re.compile(
-    r"Experimental (?P<module>[A-Za-z0-9_]+) reflection enabled for ShooterGameServer "
-    r"SHA256 (?P<sha256>[a-fA-F0-9]{16,64})"
+    LOG_PREFIX
+    + r"Experimental (?P<module>[A-Za-z0-9_]+) reflection enabled for ShooterGameServer "
+    r"SHA256 (?P<sha256>[a-fA-F0-9]{64})\.?"
 )
 PROCESS_EVENT_RE = re.compile(
-    r"Reflected (?P<module>[A-Za-z0-9_]+) ProcessEvent #(?P<sequence>\d+) "
+    LOG_PREFIX
+    + r"Reflected (?P<module>[A-Za-z0-9_]+) ProcessEvent #(?P<sequence>\d+) "
     r"function=(?P<function>\S+) fname_index=(?P<fname_index>-?\d+)"
     r"(?: outer_fname_index=(?P<outer_fname_index>-?\d+))?"
     r"(?: params=(?P<params>0x[0-9a-fA-F]+))? "
@@ -30,18 +44,50 @@ PROCESS_EVENT_RE = re.compile(
     r"(?: metadata_only=(?P<metadata_only>true|false))?"
 )
 FIELD_RE = re.compile(
-    r"Reflected (?P<module>[A-Za-z0-9_]+) field (?P<field>\S+) "
+    LOG_PREFIX
+    + r"Reflected (?P<module>[A-Za-z0-9_]+) field (?P<field>\S+) "
     r"offset=(?P<offset>0x[0-9a-fA-F]+) size=(?P<size>\d+) (?P<rest>.*)"
 )
 REJECT_RE = re.compile(
-    r"Reflected (?P<module>[A-Za-z0-9_]+) rejected #(?P<sequence>\d+) "
+    LOG_PREFIX
+    + r"Reflected (?P<module>[A-Za-z0-9_]+) rejected #(?P<sequence>\d+) "
     r"fname_index=(?P<fname_index>-?\d+)"
     r"(?: function=(?P<function>\S+))? reason=(?P<reason>.+)"
 )
 DETAIL_RE = re.compile(
-    r"Reflected (?P<module>[A-Za-z0-9_]+) (?P<function>\S+) (?P<rest>.+)"
+    LOG_PREFIX + r"Reflected (?P<module>[A-Za-z0-9_]+) (?P<function>\S+) (?P<rest>.+)"
 )
 KEY_VALUE_RE = re.compile(r"(?P<key>[A-Za-z0-9_]+)=(?P<value>\S+)")
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def git_commit() -> str | None:
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=REPO_ROOT,
+        check=False,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+    )
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip() or None
+
+
+def is_relative_to(path: Path, parent: Path) -> bool:
+    try:
+        path.relative_to(parent)
+    except ValueError:
+        return False
+    return True
 
 
 def bool_from_text(value: str | None) -> bool | None:
@@ -77,6 +123,8 @@ def module_record() -> dict[str, Any]:
         "functions": {},
         "fields": {},
         "reject_reasons": {},
+        "redacted_detail_keys": Counter(),
+        "malformed_observer_lines": 0,
     }
 
 
@@ -126,16 +174,37 @@ def normalize_field(record: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def module_blockers(record: dict[str, Any]) -> list[str]:
+    blockers = ["runtime_observer_evidence_only"]
+    if len(record["gate_sha256"]) == 0:
+        blockers.append("missing_experimental_gate")
+    if len(record["gate_sha256"]) > 1:
+        blockers.append("mixed_binary_sha256")
+    if record["malformed_observer_lines"] > 0:
+        blockers.append("malformed_observer_lines")
+    if record["redacted_detail_keys"]:
+        blockers.append("redacted_sensitive_or_unapproved_details")
+    return blockers
+
+
+def safe_detail_keys(module: str, function: str) -> set[str]:
+    return SAFE_DETAIL_KEYS.get(module, {}).get(function, set())
+
+
 def analyze_lines(lines: list[str]) -> dict[str, Any]:
     modules: dict[str, dict[str, Any]] = defaultdict(module_record)
 
     for line in lines:
-        if match := GATE_RE.search(line):
+        stripped = line.strip()
+        if not stripped:
+            continue
+
+        if match := GATE_RE.fullmatch(stripped):
             module = match.group("module")
             add_unique(modules[module]["gate_sha256"], match.group("sha256").lower())
             continue
 
-        if match := PROCESS_EVENT_RE.search(line):
+        if match := PROCESS_EVENT_RE.fullmatch(stripped):
             module = match.group("module")
             function = match.group("function")
             record = modules[module]
@@ -157,7 +226,7 @@ def analyze_lines(lines: list[str]) -> dict[str, Any]:
             add_unique(function_data["field_counts"], int(match.group("field_count")))
             continue
 
-        if match := FIELD_RE.search(line):
+        if match := FIELD_RE.fullmatch(stripped):
             module = match.group("module")
             field = match.group("field")
             fields = modules[module]["fields"]
@@ -174,7 +243,7 @@ def analyze_lines(lines: list[str]) -> dict[str, Any]:
                 field_data["sensitive"][extra["sensitive"]] += 1
             continue
 
-        if match := REJECT_RE.search(line):
+        if match := REJECT_RE.fullmatch(stripped):
             module = match.group("module")
             record = modules[module]
             record["rejected_count"] += 1
@@ -183,7 +252,7 @@ def analyze_lines(lines: list[str]) -> dict[str, Any]:
             record["reject_reasons"][reason] += 1
             continue
 
-        if match := DETAIL_RE.search(line):
+        if match := DETAIL_RE.fullmatch(stripped):
             module = match.group("module")
             function = match.group("function")
             if function in {"ProcessEvent", "field", "rejected"}:
@@ -193,8 +262,18 @@ def analyze_lines(lines: list[str]) -> dict[str, Any]:
                 continue
             functions = modules[module]["functions"]
             functions.setdefault(function, function_record())
+            allowed_keys = safe_detail_keys(module, function)
             for key, raw_value in details.items():
+                if key not in allowed_keys:
+                    modules[module]["redacted_detail_keys"][key] += 1
+                    continue
                 add_unique(functions[function]["details"][key], int_or_text(raw_value))
+            continue
+
+        if "Reflected " in stripped or "Experimental " in stripped:
+            match = re.search(r"(?:Reflected|Experimental) (?P<module>[A-Za-z0-9_]+)", stripped)
+            module = match.group("module") if match else "unknown"
+            modules[module]["malformed_observer_lines"] += 1
 
     normalized_modules: dict[str, Any] = {}
     for module, record in sorted(modules.items()):
@@ -203,6 +282,8 @@ def analyze_lines(lines: list[str]) -> dict[str, Any]:
             "accepted_count": record["accepted_count"],
             "metadata_only_count": record["metadata_only_count"],
             "rejected_count": record["rejected_count"],
+            "evidence_status": "observational",
+            "blockers": module_blockers(record),
             "functions": {
                 name: normalize_function(function)
                 for name, function in sorted(record["functions"].items())
@@ -212,6 +293,8 @@ def analyze_lines(lines: list[str]) -> dict[str, Any]:
                 for name, field in sorted(record["fields"].items())
             },
             "reject_reasons": dict(sorted(record["reject_reasons"].items())),
+            "redacted_detail_keys": dict(sorted(record["redacted_detail_keys"].items())),
+            "malformed_observer_lines": record["malformed_observer_lines"],
         }
 
     return {
@@ -230,6 +313,18 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Analyze copied Obelisk runtime observer log lines into JSON evidence."
     )
+    parser.add_argument(
+        "--allow-server-path",
+        action="store_true",
+        help=(
+            "Allow direct reads below /servidor/ark. Default refuses those paths so runtime "
+            "observer analysis stays on copied or sanitized artifacts."
+        ),
+    )
+    parser.add_argument(
+        "--obelisk-commit",
+        help="Optional Obelisk commit override recorded in the evidence metadata.",
+    )
     parser.add_argument("logs", nargs="+", type=Path, help="Copied/sanitized Obelisk log files.")
     return parser.parse_args()
 
@@ -237,17 +332,36 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     lines: list[str] = []
-    sources: list[str] = []
+    sources: list[dict[str, Any]] = []
 
     for path in args.logs:
-        if not path.is_file():
-            print(f"log does not exist: {path}", file=sys.stderr)
+        resolved = path.resolve()
+        if is_relative_to(resolved, SERVER_ROOT) and not args.allow_server_path:
+            print(
+                f"refusing to read live server path without --allow-server-path: {resolved}",
+                file=sys.stderr,
+            )
             return 2
-        sources.append(str(path))
-        lines.extend(path.read_text(encoding="utf-8").splitlines())
+        if not resolved.is_file():
+            print(f"log does not exist: {resolved}", file=sys.stderr)
+            return 2
+        text = resolved.read_text(encoding="utf-8")
+        sources.append(
+            {
+                "path": str(resolved),
+                "sha256": sha256_file(resolved),
+                "line_count": len(text.splitlines()),
+            }
+        )
+        lines.extend(text.splitlines())
 
     result = analyze_lines(lines)
-    result["sources"] = sources
+    result["evidence"] = {
+        "kind": "runtime-observer-log",
+        "obelisk_commit": args.obelisk_commit or git_commit(),
+        "sources": sources,
+        "server_paths_allowed": bool(args.allow_server_path),
+    }
     json.dump(result, sys.stdout, indent=2, sort_keys=True)
     sys.stdout.write("\n")
     return 0
