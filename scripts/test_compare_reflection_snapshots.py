@@ -329,6 +329,72 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         report = json.loads(result.stdout)
         self.assertEqual(report["results"][0]["reasons"], ["same_evidence_artifact_identity"])
 
+    def test_marks_shared_capture_id_inconclusive(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            left = base_snapshot()
+            right = deepcopy(left)
+            evidence = right["evidence"]  # type: ignore[index]
+            evidence["artifact_sha256"] = "2" * 64
+            evidence["evidence_pack_id"] = "candidate-pack"
+            write_snapshot(base, left)
+            path = candidate / "PrimalItem.CanUse.snapshot.json"
+            path.write_text(json.dumps(right, indent=2, sort_keys=True), encoding="utf-8")
+
+            result = run_compare(base, candidate, "--json")
+
+        self.assertEqual(result.returncode, 2)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["results"][0]["reasons"], ["same_evidence_capture_id"])
+
+    def test_marks_shared_evidence_pack_id_inconclusive(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            left = base_snapshot()
+            right = deepcopy(left)
+            evidence = right["evidence"]  # type: ignore[index]
+            evidence["artifact_sha256"] = "2" * 64
+            evidence["capture_id"] = "candidate-core"
+            write_snapshot(base, left)
+            path = candidate / "PrimalItem.CanUse.snapshot.json"
+            path.write_text(json.dumps(right, indent=2, sort_keys=True), encoding="utf-8")
+
+            result = run_compare(base, candidate, "--json")
+
+        self.assertEqual(result.returncode, 2)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["results"][0]["reasons"], ["same_evidence_evidence_pack_id"])
+
+    def test_marks_shared_artifact_sha_inconclusive(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            left = base_snapshot()
+            right = deepcopy(left)
+            evidence = right["evidence"]  # type: ignore[index]
+            evidence["capture_id"] = "candidate-core"
+            evidence["evidence_pack_id"] = "candidate-pack"
+            write_snapshot(base, left)
+            path = candidate / "PrimalItem.CanUse.snapshot.json"
+            path.write_text(json.dumps(right, indent=2, sort_keys=True), encoding="utf-8")
+
+            result = run_compare(base, candidate, "--json")
+
+        self.assertEqual(result.returncode, 2)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["results"][0]["reasons"], ["same_evidence_artifact_sha256"])
+
     def test_marks_non_offline_candidate_evidence_inconclusive(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

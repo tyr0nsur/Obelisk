@@ -196,6 +196,21 @@ Updated: 2026-05-28
 - fact: Older TheIsland/`arkserver2` research runbooks are marked historical/superseded
   while RAM is constrained. The operational doc guardrail now scans research docs with live
   marker/restart snippets and requires an explicit historical or approved-runbook banner.
+- fact: Second-source snapshot comparison now rejects partial identity reuse. Missing
+  identity, fully matching identity, or shared `artifact_sha256`, `capture_id`, or
+  `evidence_pack_id` is `inconclusive`, even if the sanitized layout matches. A promoted
+  module shape needs distinct capture and evidence-pack identity, not just a changed commit
+  or path.
+- fact: Snapshot regenerators now require the full artifact identity quartet together:
+  `artifact_kind`, `artifact_sha256`, `capture_id`, and `evidence_pack_id`. Partial identity
+  is rejected before writing snapshots, and artifact identity still requires an explicit
+  `--fname-root-slot`.
+- fact: `build_core_dump_evidence_pack.py --gobjects-sample-index` uses only explicit
+  `--fname-root-slot` values for sampled UObject/class name resolution. Default primary
+  FName roots are not mixed into second-source GObjects sampling.
+- fact: The LinuxGSM production wrapper scrubs inherited `OBELISK_ALLOW_CALL_PROCESS_EVENT`
+  and `OBELISK_PE_TRACE_LIMIT` alongside the other marker-managed debug env vars before
+  deriving runtime env from per-instance markers.
 - fact: Commit `c0d1e4c` pushed the hardened first-stable gates. On 2026-05-28,
   `scripts/check_release_readiness.sh` passed from a clean tracked/untracked worktree
   (ignored `build/` and `scripts/__pycache__/` only), and the read-only Ragnarok posture

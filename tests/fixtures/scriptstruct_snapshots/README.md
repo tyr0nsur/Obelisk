@@ -33,8 +33,9 @@ python3 scripts/regenerate_scriptstruct_snapshots.py \
 ```
 
 The artifact fields are sanitized identifiers used by the comparator to mark
-self-comparison or missing second-source identity as `inconclusive`; do not store absolute
-core paths here.
+self-comparison, shared artifact identity, or missing second-source identity as
+`inconclusive`; do not store absolute core paths here. A valid second source must use a
+distinct `artifact_sha256`, `capture_id`, and `evidence_pack_id`.
 
 Accepted fixtures use:
 

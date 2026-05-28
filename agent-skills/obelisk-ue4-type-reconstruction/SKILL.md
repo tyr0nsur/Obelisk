@@ -88,8 +88,9 @@ For each reconstructed field:
 - Use sanitized snapshots and `compare_reflection_snapshots.py --target <Outer.Name>` to
   compare semantic layouts before accepting any UFunction or ScriptStruct shape beyond
   candidate-only. Acceptance requires distinct sanitized artifact identity on both roots;
-  missing or matching identity is `inconclusive`, so self-comparison cannot satisfy
-  second-source evidence.
+  missing identity, fully matching identity, or shared `artifact_sha256`, `capture_id`, or
+  `evidence_pack_id` is `inconclusive`, so self-comparison or partial capture reuse cannot
+  satisfy second-source evidence.
 - When regenerating UFunction or ScriptStruct snapshots with artifact identity fields,
   pass a FName root/table verified for that artifact. The regenerators must reject artifact
   identity runs that omit explicit `--fname-root-slot`; do not let the primary-core default
@@ -97,3 +98,6 @@ For each reconstructed field:
 - GObjects/UObject second-source sampling also needs an explicit per-artifact FName root.
   `build_core_dump_evidence_pack.py --gobjects-sample-index` must not resolve names through
   the primary-core default slot.
+- When recording artifact identity, pass all four fields together: `artifact_kind`,
+  `artifact_sha256`, `capture_id`, and `evidence_pack_id`. Partial artifact identity is not
+  valid second-source evidence.

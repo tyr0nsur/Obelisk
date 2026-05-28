@@ -372,6 +372,32 @@ def evidence_artifact_identity(payload: dict[str, Any]) -> tuple[Any, ...] | Non
     return values
 
 
+def evidence_artifact_identity_dict(payload: dict[str, Any]) -> dict[str, str] | None:
+    evidence = payload.get("evidence")
+    if not isinstance(evidence, dict):
+        return None
+    values = {key: evidence.get(key) for key in EVIDENCE_ARTIFACT_IDENTITY_KEYS}
+    if not all(isinstance(value, str) and value for value in values.values()):
+        return None
+    return values  # type: ignore[return-value]
+
+
+def shared_artifact_identity_reasons(base_payload: dict[str, Any], candidate_payload: dict[str, Any]) -> list[str]:
+    base_identity = evidence_artifact_identity_dict(base_payload)
+    candidate_identity = evidence_artifact_identity_dict(candidate_payload)
+    if base_identity is None or candidate_identity is None:
+        return []
+    if tuple(base_identity[key] for key in EVIDENCE_ARTIFACT_IDENTITY_KEYS) == tuple(
+        candidate_identity[key] for key in EVIDENCE_ARTIFACT_IDENTITY_KEYS
+    ):
+        return ["same_evidence_artifact_identity"]
+    reasons: list[str] = []
+    for key in ("artifact_sha256", "capture_id", "evidence_pack_id"):
+        if base_identity[key] == candidate_identity[key]:
+            reasons.append(f"same_evidence_{key}")
+    return reasons
+
+
 def matches_target_filter(key: str, filters: set[str]) -> bool:
     if not filters:
         return True
@@ -423,8 +449,7 @@ def compare_sets(
             artifact_reasons.append("missing_base_evidence_artifact_identity")
         if candidate_artifact is None:
             artifact_reasons.append("missing_candidate_evidence_artifact_identity")
-        if base_artifact is not None and candidate_artifact is not None and base_artifact == candidate_artifact:
-            artifact_reasons.append("same_evidence_artifact_identity")
+        artifact_reasons.extend(shared_artifact_identity_reasons(base[key]["payload"], candidate[key]["payload"]))
         if artifact_reasons:
             results.append({"target": key, "status": "inconclusive", "reasons": artifact_reasons})
             continue

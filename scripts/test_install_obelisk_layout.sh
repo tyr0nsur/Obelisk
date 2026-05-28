@@ -259,7 +259,8 @@ static_assert(OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION == 1u, "unexpected plugin 
 
 namespace
 {
-    ObeliskApi* g_Api = nullptr;
+    ObeliskApi g_Api{};
+    bool g_HasApi = false;
     uint64_t g_OwnerToken = 0;
     uint64_t g_ProcessEventHandle = 0;
 
@@ -321,7 +322,8 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
         return false;
     }
 
-    g_Api = api;
+    g_Api = *api;
+    g_HasApi = true;
     g_OwnerToken = context->plugin_owner_token;
 
     const bool contextOk = context->config_dir &&
@@ -349,9 +351,10 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
 
 extern "C" __attribute__((visibility("default"))) void ObeliskPlugin_Shutdown()
 {
-    if (g_Api && g_ProcessEventHandle != 0)
-        g_Api->UnregisterProcessEventCallbackWithOwnerToken(g_OwnerToken, g_ProcessEventHandle);
-    g_Api = nullptr;
+    if (g_HasApi && g_ProcessEventHandle != 0 && g_Api.UnregisterProcessEventCallbackWithOwnerToken)
+        g_Api.UnregisterProcessEventCallbackWithOwnerToken(g_OwnerToken, g_ProcessEventHandle);
+    g_Api = {};
+    g_HasApi = false;
     g_OwnerToken = 0;
     g_ProcessEventHandle = 0;
 }
@@ -474,6 +477,7 @@ int main(int argc, char** argv)
         context.plugin_owner_token = 0xC0FFEE;
 
         Require(init(&api, &context), "ObeliskPlugin_Init failed");
+        api = {};
         shutdown();
         dlclose(handle);
     }

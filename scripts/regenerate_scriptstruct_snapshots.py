@@ -296,6 +296,14 @@ def main() -> int:
         value is not None
         for value in (artifact_kind, artifact_sha256, capture_id, evidence_pack_id)
     )
+    if artifact_identity_supplied and not all(
+        value is not None
+        for value in (artifact_kind, artifact_sha256, capture_id, evidence_pack_id)
+    ):
+        raise SystemExit(
+            "artifact identity must include --artifact-kind, --artifact-sha256, "
+            "--capture-id, and --evidence-pack-id together"
+        )
     if artifact_identity_supplied and args.fname_root_slot is None:
         raise SystemExit(
             "--fname-root-slot is required when recording artifact identity; "

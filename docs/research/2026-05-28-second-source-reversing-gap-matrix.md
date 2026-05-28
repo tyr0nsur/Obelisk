@@ -36,7 +36,7 @@ ReflectionScanner, native exec probes, or runtime observation.
 | Area | Current State | Second-Source Acceptance | Commands When Artifact Exists | Reject/Block |
 | --- | --- | --- | --- | --- |
 | `FName` / `GNames` | Primary core has useful FName clues; current live logs without scanner are inconclusive. | `None`, `ClientMessage`, and `ServerChat` resolve through the same bounded table/pool; analyzer has no reject markers; evidence includes binary SHA, Obelisk commit, copied log/core path, and either a second isolated capture or static xref path. | `python3 scripts/analyze_reflectionscanner_capture.py --json --binary <ShooterGameServer> --objdump-xrefs <objdump> <copied-log>`; for core packs, first scan or derive a per-artifact FName table/root, then pass it explicitly, for example `python3 scripts/build_core_dump_evidence_pack.py --binary <bin> --core <core> --output-dir <pack> --scan-fname-tables --fname-root-slot verified_fname_root_slot=<verified-slot> --fname-index None=0 --fname-index ClientMessage=4884 --fname-index ServerChat=9619 --fname-index SetActiveMissionDebugFlags=9622`. | Single-source table, clue swap, implausible counts, readable-printable-memory heuristic, runtime probe rejection ignored, reused primary-core-only FName root slot. |
-| `GUObjectArray` / `GObjects` | `0x595b7e0` is a binary-hash-scoped research-candidate. | Second core or static path shows chunk/root/count/serial behavior; at least two sampled objects round-trip through `InternalIndex`; class and outer checks are plausible through object-array membership. | `python3 scripts/build_core_dump_evidence_pack.py --binary <bin> --core <core> --output-dir <pack> --gobjects-candidate gobjects=0x595b7e0 --gobjects-sample-index 0 --gobjects-sample-index 1 --gobjects-sample-index 25447`. | High object-shape score alone, no `InternalIndex` backref, class/outer merely readable, broad memory scans. |
+| `GUObjectArray` / `GObjects` | `0x595b7e0` is a binary-hash-scoped research-candidate. | Second core or static path shows chunk/root/count/serial behavior; at least two sampled objects round-trip through `InternalIndex`; class and outer checks are plausible through object-array membership. | `python3 scripts/build_core_dump_evidence_pack.py --binary <bin> --core <core> --output-dir <pack> --gobjects-candidate gobjects=0x595b7e0 --fname-root-slot verified_fname_root_slot=<verified-slot> --gobjects-sample-index 0 --gobjects-sample-index 1 --gobjects-sample-index 25447`. | High object-shape score alone, no `InternalIndex` backref, class/outer merely readable, broad memory scans, default primary FName root mixed into second-source sampling. |
 | `UObject` base | RuntimeReflection has a candidate layout; fixtures validate synthetic and primary-core shapes. | Second source confirms vtable, flags, internal index, class, name, outer; object pointer is reachable from `GObjects[InternalIndex]`. | `python3 scripts/enumerate_core_uobjects.py --core <core> --gobjects <verified-gobjects> --fname-root-slot <verified-fname-root-slot> --max-objects 30000 --class-contains Function --json`. | Class pointer not in `GObjects`, outer chain loops, FName only numeric, bad vtable/range, reused primary-core-only FName root slot. |
 | `UFunction` / `UProperty` | Primary core supports property-chain snapshots and internal recognizers. | Second core or static path repeats target identity, outer/class membership, `NumParms`, `ParmsSize`, `ReturnValueOffset`, property names/classes/offsets/sizes. | `python3 scripts/inspect_core_ufunctions.py --core <core> --gobjects <verified-gobjects> --fname-root-slot <verified-fname-root-slot> --name-exact <target> --outer-exact <outer> --max-object-scan 30000 --snapshot-json`. | String proximity only, executable-tail heuristic only, chain loops, property count mismatch, offsets outside `ParmsSize`, reused primary-core-only FName root slot. |
 
@@ -57,12 +57,13 @@ target. Use `--strict-identity-indices` only when intentionally comparing same-b
 identity evidence, not for cross-source layout promotion.
 Second-source comparison now requires sanitized artifact identity in snapshot evidence.
 Each side should record `artifact_kind`, `artifact_sha256`, `capture_id`, and
-`evidence_pack_id`; matching or missing artifact identity is `inconclusive`, even when
-layouts match. This prevents self-comparison of the primary fixture root from looking like
-independent acceptance. Readiness JSON includes per-module `target_details` entries with
-each target key, source path, comparability, block reasons, and second-source status. Use
-those details in evidence packs instead of manually reconstructing which target is still
-missing, inconclusive, or layout-rejected.
+`evidence_pack_id`; missing identity, fully matching identity, or shared
+`artifact_sha256`/`capture_id`/`evidence_pack_id` is `inconclusive`, even when layouts
+match. This prevents self-comparison or partial reuse of the same capture/evidence pack
+from looking like independent acceptance. Readiness JSON includes per-module
+`target_details` entries with each target key, source path, comparability, block reasons,
+and second-source status. Use those details in evidence packs instead of manually
+reconstructing which target is still missing, inconclusive, or layout-rejected.
 
 Before a second-source snapshot set exists, use the readiness report to keep module
 coverage and missing second-source evidence explicit:
@@ -94,8 +95,9 @@ regeneration, the scripts require an explicit `--fname-root-slot`. This prevents
 second-source evidence packs from silently reusing the primary-core FName root default;
 derive or scan the FName root for the artifact first.
 Likewise, `build_core_dump_evidence_pack.py --gobjects-sample-index` now requires an
-explicit `--fname-root-slot` for the sampled artifact. Use `--scan-fname-tables` or a
-static derivation first, then pass the verified root to GObjects/UObject sampling.
+explicit `--fname-root-slot` for the sampled artifact and resolves sampled names only
+through explicit roots in that mode. Use `--scan-fname-tables` or a static derivation
+first, then pass the verified root to GObjects/UObject sampling.
 
 ## P1 Module Fixture Matrix
 
@@ -149,14 +151,15 @@ python3 scripts/compare_reflection_snapshots.py \
 ```
 
 Promotion requires all four targets to be `accepted` by
-`compare_reflection_snapshots.py`, with non-empty and distinct sanitized artifact identity
-on both roots: `artifact_kind`, `artifact_sha256`, `capture_id`, and
-`evidence_pack_id`. Missing or matching artifact identity remains `inconclusive`, even
-when layouts match. Evidence must also record binary SHA, Obelisk commit, artifact path,
-commands, reject conditions checked, and an explicit statement that no live server was
-touched unless the artifact came from an operator-approved debug capture. Even after
-layout acceptance, runtime observation remains separate and must use a named debug
-instance, marker/env/SHA/budget gates, no value logging, and no public SDK callbacks.
+`compare_reflection_snapshots.py`, with non-empty sanitized artifact identity on both
+roots: `artifact_kind`, `artifact_sha256`, `capture_id`, and `evidence_pack_id`. The
+second source must use distinct `artifact_sha256`, `capture_id`, and `evidence_pack_id`;
+missing or shared identity remains `inconclusive`, even when layouts match. Evidence must
+also record binary SHA, Obelisk commit, artifact path, commands, reject conditions checked,
+and an explicit statement that no live server was touched unless the artifact came from an
+operator-approved debug capture. Even after layout acceptance, runtime observation remains
+separate and must use a named debug instance, marker/env/SHA/budget gates, no value logging,
+and no public SDK callbacks.
 
 ## Transfer ScriptStruct Intake
 

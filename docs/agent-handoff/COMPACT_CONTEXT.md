@@ -109,6 +109,16 @@ work from repository state instead of chat history.
   public `CallProcessEvent`, and module observer env. Quiet Ragnarok/release checks should
   use `scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection
   --map Ragnarok --instance arkserver`.
+- Second-source snapshot comparison requires distinct sanitized evidence identity. Missing
+  identity, fully matching identity, or shared `artifact_sha256`, `capture_id`, or
+  `evidence_pack_id` is `inconclusive`, even when layouts match.
+- Snapshot regenerators reject partial artifact identity and require all four identity
+  fields together. GObjects sampling in core evidence packs resolves sampled names only
+  through explicit `--fname-root-slot` values, so primary defaults cannot contaminate a
+  second-source sample.
+- The production LinuxGSM wrapper scrubs inherited `OBELISK_ALLOW_CALL_PROCESS_EVENT` and
+  nonzero tracing controls such as `OBELISK_PE_TRACE_LIMIT`; stable posture still derives
+  debug env only from explicit markers.
 - `arkserver2` / TheIsland runbooks from 2026-05-27 are historical/superseded while RAM is
   constrained unless the operator explicitly reopens that server. Research docs with live
   marker/restart snippets must carry a historical or approved-runbook banner.

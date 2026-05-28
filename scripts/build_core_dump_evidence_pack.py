@@ -430,6 +430,16 @@ def validate_gobjects_sample_options(
     return None
 
 
+def fname_roots_for_gobjects_sampling(
+    all_fname_root_slots: list[tuple[str, int]],
+    explicit_fname_root_slots: list[tuple[str, int]],
+    gobjects_sample_indices: list[int],
+) -> list[tuple[str, int]]:
+    if gobjects_sample_indices:
+        return list(explicit_fname_root_slots)
+    return all_fname_root_slots
+
+
 def extend_candidate_dump_commands(
     lines: list[str],
     candidates: list[tuple[str, int]],
@@ -909,6 +919,11 @@ def main() -> int:
     if gobjects_sample_error:
         print(gobjects_sample_error, file=sys.stderr)
         return 2
+    fname_root_slots = fname_roots_for_gobjects_sampling(
+        fname_root_slots,
+        args.fname_root_slot,
+        gobjects_sample_indices,
+    )
     if args.pointer_scan_max_mapping_bytes <= 0:
         print("--pointer-scan-max-mapping-bytes must be positive", file=sys.stderr)
         return 2

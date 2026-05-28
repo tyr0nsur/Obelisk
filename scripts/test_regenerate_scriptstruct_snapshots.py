@@ -172,6 +172,46 @@ class RegenerateScriptStructSnapshotsTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("--fname-root-slot is required when recording artifact identity", result.stderr)
 
+    def test_artifact_identity_requires_all_fields_together(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            manifest = root / "manifest.json"
+            output_root = root / "out"
+            addrs = build_core_fixture(core)
+            self.write_manifest(manifest)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "regenerate_scriptstruct_snapshots.py"),
+                    "--core",
+                    str(core),
+                    "--manifest",
+                    str(manifest),
+                    "--output-root",
+                    str(output_root),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--obelisk-commit",
+                    "abcdef1",
+                    "--artifact-kind",
+                    "offline_core",
+                    "--artifact-sha256",
+                    "2" * 64,
+                    "--capture-id",
+                    "second-core",
+                    "--write",
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("artifact identity must include", result.stderr)
+
     def test_check_layout_ignores_evidence_commit_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

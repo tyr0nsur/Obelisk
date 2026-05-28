@@ -261,6 +261,36 @@ class CoreDumpEvidencePackCommandTests(unittest.TestCase):
             )
         )
 
+    def test_gobjects_sampling_uses_only_explicit_fname_roots(self) -> None:
+        selected = core_pack.fname_roots_for_gobjects_sampling(
+            [
+                ("primary_default", 0x5956F30),
+                ("second_source_verified", 0x1234000),
+            ],
+            [("second_source_verified", 0x1234000)],
+            [0],
+        )
+
+        self.assertEqual(selected, [("second_source_verified", 0x1234000)])
+
+    def test_default_fname_roots_remain_for_non_gobjects_sampling(self) -> None:
+        selected = core_pack.fname_roots_for_gobjects_sampling(
+            [
+                ("primary_default", 0x5956F30),
+                ("second_source_verified", 0x1234000),
+            ],
+            [("second_source_verified", 0x1234000)],
+            [],
+        )
+
+        self.assertEqual(
+            selected,
+            [
+                ("primary_default", 0x5956F30),
+                ("second_source_verified", 0x1234000),
+            ],
+        )
+
     def test_gobjects_sample_options_are_bounded(self) -> None:
         self.assertEqual(
             core_pack.validate_gobjects_sample_options(
