@@ -27,6 +27,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "Central install script and LinuxGSM wrappers",
             "`oBaseEvents`",
             "`OBELISK_INSTANCE_ID` logs and state markers",
+            "Filtered, non-mutating `ProcessEvent` observation as the only stable game-facing",
         ]
         required_status_items = [
             "`LD_PRELOAD` bootstrap | Stable baseline",
@@ -66,6 +67,8 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "Stable gameplay module interception APIs",
             "Full UE4 reflection",
             "Higher-level gameplay SDK APIs",
+            "Gameplay mutation, return overrides, arbitrary UE4 function calls, and public",
+            "`CallProcessEvent`-based plugin behavior",
             "Production HTTP plugins",
         ]:
             with self.subTest(file="docs/RELEASE.md", item=item):
@@ -90,6 +93,39 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         ]:
             with self.subTest(file="CHANGELOG.md", item=item):
                 self.assertIn(item, changelog)
+
+    def test_game_interaction_boundary_stays_non_mutating(self) -> None:
+        readme = read("README.md")
+        release = read("docs/RELEASE.md")
+        status = read("docs/STATUS.md")
+
+        for item in [
+            "Filtered, non-mutating `ProcessEvent` observation as the only stable game-facing",
+            "Gameplay mutation, return overrides, arbitrary UE4 function calls, and public",
+            "`CallProcessEvent`-based plugin behavior",
+        ]:
+            with self.subTest(file="docs/RELEASE.md", item=item):
+                self.assertIn(item, release)
+
+        for item in [
+            "Current safe interaction shape",
+            "observe a narrow `ProcessEvent` target by exact `FName` index",
+            "keep callbacks filtered, non-blocking, and instance-gated",
+            "record metadata or plugin-local state only",
+            "Blocked from stable plugin APIs until promoted with evidence",
+            "mutating UE4 parameter buffers or return values",
+            "calling arbitrary UE4 functions or replaying events through `CallProcessEvent`",
+            "exposing borrowed `UObject`, `FString`, `UFunction`, or raw parameter memory",
+        ]:
+            with self.subTest(file="docs/STATUS.md", item=item):
+                self.assertIn(item, status)
+
+        for item in [
+            "`CallProcessEvent` is a low-level trampoline escape hatch",
+            "Stable plugin APIs should prefer higher-level Obelisk module surfaces as they are promoted",
+        ]:
+            with self.subTest(file="README.md", item=item):
+                self.assertIn(item, readme)
 
     def test_release_readiness_is_the_documented_release_gate(self) -> None:
         release = read("docs/RELEASE.md")

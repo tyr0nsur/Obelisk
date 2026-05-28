@@ -164,7 +164,8 @@ Updated: 2026-05-28
   `ObeliskConfig.cmake` exports `Obelisk_DEVELOPMENT_LINE`,
   `Obelisk_RELEASE_CHANNEL`, and public ABI version variables so consumers and tests can
   distinguish a dev package from a tagged release. Official examples use plugin metadata
-  version `0.1.0-dev` until the stable tag exists.
+  version `0.1.0-dev` until the stable tag exists; SDK consumer fixture plugins use the
+  same pre-release metadata so installed-consumer validation cannot imply a stable tag.
 - fact: Plugin lifecycle hardening now has offline regression coverage for owner-token
   ProcessEvent callbacks registered from init-time helper threads when `Init` returns
   false or throws. Both paths must run shutdown, unregister callbacks, invalidate the
@@ -205,7 +206,8 @@ Updated: 2026-05-28
   first-stable work. Gameplay mutation, return overrides, arbitrary UE4 calls, public
   `CallProcessEvent` behavior, borrowed UE4 object/string/param exposure, and higher-level
   gameplay SDK modules remain blocked until promoted with reflection-backed decoding,
-  ownership policy, and isolated runtime evidence.
+  ownership policy, and isolated runtime evidence. `scripts/test_release_scope_guardrails.py`
+  pins this boundary across release docs/status/README.
 - fact: Public SDK guardrails scan every shipped header under `include/obelisk/**` for
   unpromoted gameplay/API surfaces, including players, chat, tribes, inventory, items,
   dinos, structures, missions, transfers, permissions, timers, admin, and commands. Public

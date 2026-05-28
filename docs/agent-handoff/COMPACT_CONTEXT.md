@@ -133,6 +133,12 @@ work from repository state instead of chat history.
   if they need runtime functions after `ObeliskPlugin_Init`; the init `ObeliskApi*` and
   `ObeliskPluginInitContext*` are borrowed only for init. Metadata strings returned by
   `ObeliskPlugin_GetInfo` must be static or plugin-owned until the shared object closes.
+- Public examples and SDK consumer fixture plugins use metadata version `0.1.0-dev` until
+  the stable tag exists; do not reintroduce `0.1.0` plugin metadata during the dev line.
+- Release-scope guardrails pin the first-stable game interaction boundary: filtered,
+  non-mutating ProcessEvent observation only; gameplay mutation, arbitrary UE4 calls,
+  public `CallProcessEvent` plugin behavior, borrowed UE memory, and higher-level gameplay
+  SDK modules stay blocked.
 - Stable posture rejects scanner env, non-zero `OBELISK_PE_TRACE_LIMIT`, global callbacks,
   public `CallProcessEvent`, and module observer env. Quiet Ragnarok/release checks should
   use `scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection

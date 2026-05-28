@@ -65,12 +65,20 @@ class VersioningGuardrailTests(unittest.TestCase):
                 self.assertIn(token, versioning)
 
     def test_official_examples_use_development_version_until_stable_tag(self) -> None:
-        obase = (REPO_ROOT / "plugins/oBaseEvents/oBaseEvents.cpp").read_text(encoding="utf-8")
         readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+        plugin_sources = [
+            REPO_ROOT / "plugins/oBaseEvents/oBaseEvents.cpp",
+            REPO_ROOT / "tests/sdk_consumer/MinimalPlugin.cpp",
+            REPO_ROOT / "tests/sdk_consumer/MinimalNoShutdownPlugin.cpp",
+            REPO_ROOT / "tests/sdk_consumer/CAbiPlugin.c",
+        ]
 
-        self.assertIn('out->version = "0.1.0-dev";', obase)
-        self.assertNotIn('out->version = "0.1.0";', obase)
         self.assertIn('out->version = "0.1.0-dev";', readme)
+        for path in plugin_sources:
+            with self.subTest(path=path.relative_to(REPO_ROOT)):
+                text = path.read_text(encoding="utf-8")
+                self.assertIn('out->version = "0.1.0-dev";', text)
+                self.assertNotIn('out->version = "0.1.0";', text)
 
     def test_cmake_exported_abi_versions_match_public_sdk_header(self) -> None:
         cmake = (REPO_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
