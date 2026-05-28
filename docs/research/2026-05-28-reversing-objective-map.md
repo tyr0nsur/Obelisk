@@ -11,7 +11,7 @@ runtime and a general ARK Linux API/SDK core.
 - ARK binary SHA256:
   `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`
 - Current repository baseline:
-  `a526450 Summarize runtime observer evidence offline`
+  `1b33a2e Harden runtime observer log analysis`
 - Primary evidence source:
   existing offline core and committed sanitized fixtures.
 - Live-server impact: none.
@@ -67,6 +67,10 @@ returns, mutate params, call original manually, or dispatch public plugin callba
 copied-data ownership and authority policy are proven.
 
 `scripts/analyze_runtime_observer_log.py` is a summary tool for copied or sanitized
-observer logs. Its JSON is useful for comparing chat, inventory, structure, and future
-observer families, but it is not a promotion evidence pack by itself and must not be used
-as a reason to read or tail live Ragnarok logs.
+observer logs. Its `obelisk.runtime-observer-log-summary.v1` JSON has
+`review_scope=runtime_observer_evidence_summary`, `readiness_gate=none`, and
+`promotion_gate.gate_type=runtime_observer_observational_only`. It is useful for comparing
+chat, inventory, structure, and future observer families, and `--fail-on-quality-blockers`
+can reject copied captures that are empty, missing gates, mix binary SHA values, contain
+malformed observer lines, or require redaction. It is still not a promotion evidence pack
+by itself and must not be used as a reason to read or tail live Ragnarok logs.

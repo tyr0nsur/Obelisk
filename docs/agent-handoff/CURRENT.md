@@ -793,8 +793,13 @@ Updated: 2026-05-28
   observers. It records source path, SHA256, line count, Obelisk commit, and a
   `promotion_gate.ready=false` blocker summary. It uses strict line matching, per-module
   blockers for missing gates, mixed SHA values, malformed observer lines, and redacted
-  unapproved details. By default it refuses paths under `/servidor/ark`; use copied
-  artifacts or fixtures, not live Ragnarok logs.
+  unapproved details. The schema is `obelisk.runtime-observer-log-summary.v1`,
+  `review_scope=runtime_observer_evidence_summary`, `readiness_gate=none`, and
+  `promotion_gate.gate_type=runtime_observer_observational_only`; this is intentionally
+  separate from release readiness and second-source promotion gates.
+  `--fail-on-quality-blockers` can fail copied-log review when a summary is empty or any
+  blocker beyond `runtime_observer_evidence_only` appears. By default it refuses paths
+  under `/servidor/ark`; use copied artifacts or fixtures, not live Ragnarok logs.
 - fact: `FString` for this ARK Linux build is a strong candidate for
   `{TCHAR* Data, int32 ArrayNum, int32 ArrayMax}` with `TCHAR=UTF-32LE`; see
   `docs/research/2026-05-27-fstring-layout.md`.

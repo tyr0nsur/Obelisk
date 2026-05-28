@@ -27,6 +27,7 @@ SAFE_DETAIL_KEYS = {
         "ServerSendChatMessage": {"send_mode", "send_mode_name", "send_mode_known"},
     },
 }
+PROMOTION_ONLY_BLOCKERS = {"runtime_observer_evidence_only"}
 
 
 GATE_RE = re.compile(
@@ -298,8 +299,12 @@ def analyze_lines(lines: list[str]) -> dict[str, Any]:
         }
 
     return {
+        "schema": "obelisk.runtime-observer-log-summary.v1",
+        "review_scope": "runtime_observer_evidence_summary",
+        "readiness_gate": "none",
         "modules": normalized_modules,
         "promotion_gate": {
+            "gate_type": "runtime_observer_observational_only",
             "ready": False,
             "blockers": [
                 "runtime_observer_evidence_only",
@@ -324,6 +329,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--obelisk-commit",
         help="Optional Obelisk commit override recorded in the evidence metadata.",
+    )
+    parser.add_argument(
+        "--fail-on-quality-blockers",
+        action="store_true",
+        help=(
+            "Return non-zero when a module has blockers beyond runtime_observer_evidence_only, "
+            "such as missing gates, mixed SHA values, malformed observer lines, or redacted details."
+        ),
     )
     parser.add_argument("logs", nargs="+", type=Path, help="Copied/sanitized Obelisk log files.")
     return parser.parse_args()
@@ -364,6 +377,23 @@ def main() -> int:
     }
     json.dump(result, sys.stdout, indent=2, sort_keys=True)
     sys.stdout.write("\n")
+
+    if args.fail_on_quality_blockers:
+        quality_blockers = []
+        if not result["modules"]:
+            quality_blockers.append("no_runtime_observer_evidence")
+        for module, payload in result["modules"].items():
+            blockers = set(payload["blockers"]) - PROMOTION_ONLY_BLOCKERS
+            if blockers:
+                quality_blockers.append(f"{module}: {', '.join(sorted(blockers))}")
+        if quality_blockers:
+            print(
+                "runtime observer summary has quality blockers: "
+                + "; ".join(quality_blockers),
+                file=sys.stderr,
+            )
+            return 1
+
     return 0
 
 

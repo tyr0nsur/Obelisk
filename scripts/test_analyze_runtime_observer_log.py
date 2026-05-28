@@ -51,6 +51,13 @@ class RuntimeObserverLogAnalyzerTests(unittest.TestCase):
         )
 
         modules = result["modules"]
+        self.assertEqual(result["schema"], "obelisk.runtime-observer-log-summary.v1")
+        self.assertEqual(result["review_scope"], "runtime_observer_evidence_summary")
+        self.assertEqual(result["readiness_gate"], "none")
+        self.assertEqual(
+            result["promotion_gate"]["gate_type"],
+            "runtime_observer_observational_only",
+        )
         self.assertIn("chat", modules)
         chat = modules["chat"]
         self.assertEqual(chat["accepted_count"], 2)
@@ -179,6 +186,68 @@ class RuntimeObserverLogAnalyzerTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 2)
         self.assertIn("refusing to read live server path", result.stderr)
+
+    def test_fail_on_quality_blockers_allows_clean_observational_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            log_path = Path(temp_dir) / "Obelisk.log"
+            log_path.write_text(
+                "\n".join(
+                    [
+                        "[warning] Experimental structure reflection enabled for ShooterGameServer SHA256 "
+                        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.",
+                        "[info] Reflected structure ProcessEvent #1 function=VerifyPinCode "
+                        "fname_index=7636 outer_fname_index=7617 fields=2",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [sys.executable, str(ANALYZER), "--fail-on-quality-blockers", str(log_path)],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_fail_on_quality_blockers_rejects_malformed_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            log_path = Path(temp_dir) / "Obelisk.log"
+            log_path.write_text(
+                "garbage Reflected inventory ProcessEvent #1 function=CanUse "
+                "fname_index=6252 outer_fname_index=6231 fields=2\n",
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [sys.executable, str(ANALYZER), "--fail-on-quality-blockers", str(log_path)],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("quality blockers", result.stderr)
+        self.assertIn("inventory", result.stderr)
+
+    def test_fail_on_quality_blockers_rejects_empty_observer_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            log_path = Path(temp_dir) / "Obelisk.log"
+            log_path.write_text("[info] unrelated line\n", encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, str(ANALYZER), "--fail-on-quality-blockers", str(log_path)],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("no_runtime_observer_evidence", result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["modules"], {})
 
 
 if __name__ == "__main__":

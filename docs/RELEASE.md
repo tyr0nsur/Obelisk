@@ -49,6 +49,21 @@ scripts/check_release_readiness.sh --require-second-source-readiness
 This intentionally fails until the focused UFunction and ScriptStruct target sets have
 complete, distinct second-source evidence.
 
+Runtime-observer log summaries are a separate review artifact, not a release gate and not
+second-source promotion evidence. Use them only on copied or sanitized logs when reviewing
+an approved observer capture:
+
+```bash
+python3 scripts/analyze_runtime_observer_log.py --fail-on-quality-blockers <copied-log>
+```
+
+The analyzer emits `obelisk.runtime-observer-log-summary.v1` JSON with
+`review_scope=runtime_observer_evidence_summary`, `readiness_gate=none`, and
+`promotion_gate.gate_type=runtime_observer_observational_only`. It fails quality checks
+when a copied log has no observer evidence, is missing observer gates, mixes binary SHA
+values, contains malformed observer lines, or requires redaction. Even a clean summary
+remains observational until the second-source and SDK ownership gates are satisfied.
+
 3. Confirm `scripts/test_install_obelisk_layout.sh` covered runtime backup reinstall:
    one backup each for `libobelisk.so` and `libsubhook.so`, no `.incoming.*` files, no
    `.install-runtime.*` staging directory, invalid install roots rejected, failed runtime

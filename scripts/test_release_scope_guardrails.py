@@ -110,6 +110,11 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("--require-second-source-readiness", release)
         self.assertIn("--require-second-source-readiness", script)
         self.assertIn("--fail-on-readiness-gaps", script)
+        self.assertIn("analyze_runtime_observer_log.py --fail-on-quality-blockers", release)
+        self.assertIn("not a release gate", release)
+        self.assertIn("not\nsecond-source promotion evidence", release)
+        self.assertIn("readiness_gate=none", release)
+        self.assertIn("runtime_observer_observational_only", release)
 
     def test_release_example_does_not_publish_map_scoped_config(self) -> None:
         obase_docs = read("docs/oBaseEvents.md")
