@@ -295,6 +295,11 @@ work from repository state instead of chat history.
   accepted second-source evidence. The current ScriptStruct promotion gate also names
   `PrimalLocalProfile.ARKTributeDino` and
   `PrimalLocalProfile.ArkTributePlayerData` as missing accepted second-source targets.
+- `structure-observer-intake` covers all six currently recognized structure observer
+  UFunctions: `AllowStructureAccess`, `IsAllowedToDemolish`, `SetVariant`,
+  `AllowToggleActivation`, `VerifyPinCode`, and `CanSeat`. Current committed base
+  fixtures cover all six with zero blocked base targets; second-source evidence is still
+  missing for each.
 - For new second-source artifacts, do not reuse the primary-core FName root slot by
   default. First derive or scan a verified per-artifact FName root/table, then pass it
   explicitly to UObjects/UFunction/ScriptStruct tools. UFunction and ScriptStruct

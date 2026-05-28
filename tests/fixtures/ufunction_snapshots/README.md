@@ -68,8 +68,13 @@ python3 scripts/compare_reflection_snapshots.py --list-target-sets
 Current UFunction target sets:
 
 - `minimal-second-source-intake`: first inventory/structure promotion gate.
+- `structure-observer-intake`: all six structure observer UFunctions currently recognized
+  internally.
 - `buff-compact-intake`: compact `PrimalBuff` bool/scalar shapes for P1 research.
 - `dino-compact-intake`: compact dino passenger/carry shapes for P1 research.
+- `mission-compact-intake`: compact mission lifecycle and usable-item targets.
+- `tribe-compact-intake`: compact tribe/admin-adjacent identity and log targets.
+- `transfer-ufunction-intake`: transfer upload/download and validation functions.
 
 Naming:
 

@@ -168,6 +168,11 @@ python3 scripts/compare_reflection_snapshots.py \
 python3 scripts/compare_reflection_snapshots.py \
   --base-root tests/fixtures/ufunction_snapshots \
   --readiness-report \
+  --target-set structure-observer-intake
+
+python3 scripts/compare_reflection_snapshots.py \
+  --base-root tests/fixtures/ufunction_snapshots \
+  --readiness-report \
   --target-set transfer-ufunction-intake
 ```
 
@@ -233,6 +238,33 @@ and an explicit statement that no live server was touched unless the artifact ca
 operator-approved debug capture. Even after layout acceptance, runtime observation remains
 separate and must use a named debug instance, marker/env/SHA/budget gates, no value logging,
 and no public SDK callbacks.
+
+## Structure Observer Intake
+
+Use this focused intake when evaluating all currently recognized structure observer
+UFunctions after the minimal inventory/structure gate is understood. It names the six
+structure functions already covered by primary fixtures and internal recognizer tests:
+
+- `PrimalStructure.AllowStructureAccess`
+- `PrimalStructure.IsAllowedToDemolish`
+- `PrimalStructure.SetVariant`
+- `PrimalStructureItemContainer.AllowToggleActivation`
+- `PrimalStructureItemContainer.VerifyPinCode`
+- `PrimalStructureSeating.CanSeat`
+
+Current base-readiness command:
+
+```bash
+python3 scripts/compare_reflection_snapshots.py \
+  --base-root tests/fixtures/ufunction_snapshots \
+  --readiness-report \
+  --target-set structure-observer-intake \
+  --fail-on-base-readiness-gaps
+```
+
+Expected current result: six comparable `sdk_structures` targets, zero blocked base
+targets, and six missing second-source targets. This confirms committed fixture coverage;
+it does not promote the structure observer to public SDK readiness.
 
 ## Transfer ScriptStruct Intake
 

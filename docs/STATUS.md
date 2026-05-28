@@ -42,7 +42,7 @@ define or protect runtime behavior.
 | ReflectionScanner | Experimental | Use for isolated captures with explicit gates; keep disabled by default. |
 | Runtime debug control | Experimental | Marker-triggered post-start probes for short debug windows; stable posture rejects `OBELISK_ENABLE_DEBUG_CONTROL`. |
 | Binary-hash-gated module observers | Experimental | Internal observation paths for exact candidate functions; metadata logging is gated by env, supported binary SHA, `OBELISK_WRAPPER_PROFILE=observer-debug`, `allow-observer-debug-window`, `allow-experimental-observers`, and the observer marker on the same instance. There is no plugin dispatch or public ABI yet. Chat is one historical observer in this family, not the center of the SDK. |
-| Reflection snapshot tooling | Experimental | Sanitized UFunction and ScriptStruct fixtures, manifest regeneration, and offline comparison support second-source research. Fixtures are candidate-only evidence, not SDK contracts. |
+| Reflection snapshot tooling | Experimental | Sanitized UFunction and ScriptStruct fixtures, manifest regeneration, and offline comparison support second-source research. Named target sets include the full six-function structure observer intake for base-readiness checks. Fixtures are candidate-only evidence, not SDK contracts. |
 | Raw FString/FName inference | Experimental | Evidence gathering only until reflection-backed decoding replaces it. |
 | GNames/FNamePool resolution | Not ready | Priority research item. |
 | GObjects/GUObjectArray enumeration | Not ready | Validate object shapes in isolation before accepting offsets. |

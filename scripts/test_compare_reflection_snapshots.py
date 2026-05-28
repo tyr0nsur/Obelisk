@@ -186,6 +186,11 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertIn("transfer-scriptstruct", sets)
         self.assertIn("mission-compact-intake", sets)
         self.assertIn("tribe-compact-intake", sets)
+        self.assertIn("structure-observer-intake", sets)
+        self.assertIn(
+            "obelisk.ufunction-chain.snapshot.v1:PrimalStructureItemContainer.VerifyPinCode",
+            sets["structure-observer-intake"],
+        )
         self.assertIn("transfer-ufunction-intake", sets)
         self.assertIn("obelisk.ufunction-chain.snapshot.v1:MissionType.AddPlayerToMission", sets["mission-compact-intake"])
         self.assertIn(
@@ -1170,6 +1175,24 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         report = json.loads(result.stdout)
         self.assertEqual(report["totals"]["blocked"], 3)
+
+    def test_structure_observer_target_set_matches_committed_base_fixtures(self) -> None:
+        result = run_compare_raw(
+            "--base-root",
+            str(SCRIPT_DIR.parent / "tests" / "fixtures" / "ufunction_snapshots"),
+            "--readiness-report",
+            "--target-set",
+            "structure-observer-intake",
+            "--fail-on-base-readiness-gaps",
+            "--json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["totals"]["targets"], 6)
+        self.assertEqual(report["totals"]["comparable"], 6)
+        self.assertEqual(report["totals"]["blocked"], 0)
+        self.assertEqual(report["totals"]["second_source_missing"], 6)
 
     def test_readiness_report_can_fail_on_missing_second_source_only(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

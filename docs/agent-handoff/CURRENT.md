@@ -409,6 +409,13 @@ Updated: 2026-05-28
   `PrimalStructure.AllowStructureAccess`, and `PrimalStructure.IsAllowedToDemolish`.
   `--target-set transfer-scriptstruct` expands the two transfer ScriptStruct fixtures.
   Use `--list-target-sets` to print the available named groups without reading snapshots.
+- fact: `scripts/compare_reflection_snapshots.py --target-set structure-observer-intake`
+  expands all six currently recognized structure observer UFunctions:
+  `PrimalStructure.AllowStructureAccess`, `PrimalStructure.IsAllowedToDemolish`,
+  `PrimalStructure.SetVariant`, `PrimalStructureItemContainer.AllowToggleActivation`,
+  `PrimalStructureItemContainer.VerifyPinCode`, and `PrimalStructureSeating.CanSeat`.
+  Current committed base fixtures cover all six with zero blocked base targets; promotion
+  remains blocked by six missing second-source targets.
 - fact: `scripts/compare_reflection_snapshots.py` now requires sanitized artifact identity
   (`artifact_kind`, `artifact_sha256`, `capture_id`, `evidence_pack_id`) before accepting
   a second-source comparison. Missing or matching artifact identity is inconclusive, so
