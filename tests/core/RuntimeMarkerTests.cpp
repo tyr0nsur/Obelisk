@@ -9,6 +9,37 @@
 
 namespace
 {
+    class ScopedEnv
+    {
+    public:
+        ScopedEnv(const char* name, const char* value) : name_(name)
+        {
+            const char* old = std::getenv(name);
+            if (old)
+            {
+                hadOld_ = true;
+                oldValue_ = old;
+            }
+            if (value)
+                setenv(name, value, 1);
+            else
+                unsetenv(name);
+        }
+
+        ~ScopedEnv()
+        {
+            if (hadOld_)
+                setenv(name_.c_str(), oldValue_.c_str(), 1);
+            else
+                unsetenv(name_.c_str());
+        }
+
+    private:
+        std::string name_;
+        bool hadOld_ = false;
+        std::string oldValue_;
+    };
+
     void Require(bool condition, const char* message)
     {
         if (!condition)
@@ -95,12 +126,59 @@ namespace
 
         std::filesystem::remove_all(root);
     }
+
+    void TestEnvAndInstanceMarkerGate()
+    {
+        const std::filesystem::path root = MakeTempRoot();
+        const std::filesystem::path marker =
+            root / "state" / "instances" / "arkserver2" / "enable-reflection-scanner";
+
+        {
+            ScopedEnv rootEnv("OBELISK_ROOT", root.c_str());
+            ScopedEnv instanceEnv("OBELISK_INSTANCE_ID", "arkserver2");
+            ScopedEnv gateEnv("OBELISK_ENABLE_REFLECTION_SCANNER", "1");
+            Require(!Obelisk::Runtime::IsEnvAndInstanceMarkerEnabled("OBELISK_ENABLE_REFLECTION_SCANNER",
+                                                                      "enable-reflection-scanner"),
+                    "env-only gate was accepted without marker");
+        }
+
+        Touch(marker);
+        {
+            ScopedEnv rootEnv("OBELISK_ROOT", root.c_str());
+            ScopedEnv instanceEnv("OBELISK_INSTANCE_ID", "arkserver2");
+            ScopedEnv gateEnv("OBELISK_ENABLE_REFLECTION_SCANNER", "1");
+            Require(Obelisk::Runtime::IsEnvAndInstanceMarkerEnabled("OBELISK_ENABLE_REFLECTION_SCANNER",
+                                                                    "enable-reflection-scanner"),
+                    "env+marker gate was rejected");
+        }
+
+        {
+            ScopedEnv rootEnv("OBELISK_ROOT", root.c_str());
+            ScopedEnv instanceEnv("OBELISK_INSTANCE_ID", "arkserver2");
+            ScopedEnv gateEnv("OBELISK_ENABLE_REFLECTION_SCANNER", "0");
+            Require(!Obelisk::Runtime::IsEnvAndInstanceMarkerEnabled("OBELISK_ENABLE_REFLECTION_SCANNER",
+                                                                      "enable-reflection-scanner"),
+                    "marker-only gate was accepted without env=1");
+        }
+
+        {
+            ScopedEnv rootEnv("OBELISK_ROOT", root.c_str());
+            ScopedEnv instanceEnv("OBELISK_INSTANCE_ID", "ark/server2");
+            ScopedEnv gateEnv("OBELISK_ENABLE_REFLECTION_SCANNER", "1");
+            Require(!Obelisk::Runtime::IsEnvAndInstanceMarkerEnabled("OBELISK_ENABLE_REFLECTION_SCANNER",
+                                                                      "enable-reflection-scanner"),
+                    "unsafe instance gate was accepted");
+        }
+
+        std::filesystem::remove_all(root);
+    }
 }
 
 int main()
 {
     TestSafeMarkerComponents();
     TestInstanceMarkerEnabled();
+    TestEnvAndInstanceMarkerGate();
 
     std::cout << "RuntimeMarkerTests passed\n";
     return 0;

@@ -56,6 +56,12 @@ Updated: 2026-05-28
   reintroduced by instance markers instead of leaking from the parent environment. The live
   wrapper was updated without restart; backup:
   `/home/flowcommunity-ark/backups/ObeliskRun.sh.20260528-024702.bak`.
+- fact: Runtime-side debug/scanner gates now require env+instance marker, so direct
+  `LD_PRELOAD` launches cannot enable ptrace, debug-control, ReflectionScanner, or native
+  exec probes by env alone. Marker names: `allow-ptrace`, `enable-debug-control`,
+  `enable-reflection-scanner`, and `enable-native-exec-probes`. The live wrapper was
+  refreshed without restart; backup:
+  `/home/flowcommunity-ark/backups/ObeliskRun.sh.20260528-025602.bak`.
 - fact: Operator explicitly approved a Ragnarok gameplay config change on 2026-05-27:
   `AllowCaveBuildingPvP=True` was applied to `GameUserSettings.ini`, pre-change backup is
   `/home/flowcommunity-ark/backups/ark-config-manual/GameUserSettings.ini.allow-cave-20260527-184547.bak`,

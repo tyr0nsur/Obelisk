@@ -26,7 +26,8 @@ Own these areas:
 - Gate risky behavior behind explicit env vars or marker files.
 - Prefer per-instance enablement under `/servidor/ark/obelisk/state/instances/<id>`.
 - Keep plugin loading optional via `OBELISK_DISABLE_PLUGINS=1`.
-- Never use `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` as part of normal runtime validation.
+- Never use `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` plus
+  `enable-native-exec-probes` as part of normal runtime validation.
 - Do not let plugin exceptions or STL types cross the C ABI boundary.
 - Do not subscribe plugins to all `ProcessEvent` calls except during a specifically
   operator-approved debug window on the named debug instance, with bounded limits and a

@@ -12,10 +12,13 @@ export LD_PRELOAD="${OBELISK_ROOT}/lib/libobelisk.so${LD_PRELOAD:+:${LD_PRELOAD}
 export OBELISK_ENABLE_PROCESS_EVENT_HOOK=1
 export OBELISK_DISABLE_PLUGINS=1
 export OBELISK_PE_TRACE_LIMIT="${OBELISK_PE_TRACE_LIMIT:-0}"
+# Ptrace/debug-control/scanner gates are runtime-side env+marker checks.
+# Keep the env available for approved isolated runs, but create/remove the
+# matching instance marker in the runbook instead of relying on env-only state.
 export OBELISK_DEBUG_ALLOW_PTRACE="${OBELISK_DEBUG_ALLOW_PTRACE:-1}"
 
 unset OBELISK_ENABLE_NATIVE_EXEC_PROBES
 
-# Set OBELISK_ENABLE_REFLECTION_SCANNER=1 only for a controlled isolated capture.
+# Set OBELISK_ENABLE_REFLECTION_SCANNER=1 only with enable-reflection-scanner marker.
 
 exec ./ShooterGameServer "$@"

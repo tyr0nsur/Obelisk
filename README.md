@@ -247,6 +247,17 @@ OBELISK_CHAT_REFLECTION_LOG_TEXT=1  # extra opt-in for decoded experimental chat
 OBELISK_PE_TRACE_LIMIT=0
 ```
 
+Experimental runtime controls that can affect server safety require both their environment
+variable and the matching instance marker under
+`OBELISK_ROOT/state/instances/<OBELISK_INSTANCE_ID>/`:
+
+```text
+OBELISK_DEBUG_ALLOW_PTRACE=1             + allow-ptrace
+OBELISK_ENABLE_DEBUG_CONTROL=1           + enable-debug-control
+OBELISK_ENABLE_REFLECTION_SCANNER=1      + enable-reflection-scanner
+OBELISK_ENABLE_NATIVE_EXEC_PROBES=1      + enable-native-exec-probes
+```
+
 Experimental scanners, candidate module observers, text logging, and native exec probes
 stay opt-in. Reflection captures belong on isolated/debug instances only. Do not use these
 controls on Ragnarok performance posture, and use TheIsland only during an explicitly

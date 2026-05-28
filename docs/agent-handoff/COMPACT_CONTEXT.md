@@ -407,7 +407,8 @@ python3 scripts/analyze_reflectionscanner_capture.py \
 
 ## Hard Rules
 
-- Never enable `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` on live servers.
+- Never enable `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` plus the
+  `enable-native-exec-probes` instance marker on live servers.
 - Never enable raw chat discovery on live Ragnarok as a normal test.
 - Run Obelisk debug or reversing experiments on `arkserver` only within the current
   approved scope; keep `arkserver2` stopped while RAM is constrained.

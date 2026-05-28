@@ -1,6 +1,8 @@
 #include "RuntimeMarkers.h"
 
 #include <cctype>
+#include <cstdlib>
+#include <cstring>
 #include <system_error>
 
 namespace Obelisk::Runtime
@@ -49,5 +51,19 @@ namespace Obelisk::Runtime
         const std::filesystem::file_status markerStatus =
             std::filesystem::symlink_status(InstanceMarkerPath(root, instance, marker), ec);
         return !ec && std::filesystem::is_regular_file(markerStatus) && !std::filesystem::is_symlink(markerStatus);
+    }
+
+    bool IsEnvAndInstanceMarkerEnabled(const char* envVarName, const char* markerName)
+    {
+        if (!envVarName || envVarName[0] == '\0' || !markerName || markerName[0] == '\0')
+            return false;
+
+        const char* value = std::getenv(envVarName);
+        if (!value || std::strcmp(value, "1") != 0)
+            return false;
+
+        return IsInstanceMarkerEnabled(std::getenv("OBELISK_ROOT"),
+                                       std::getenv("OBELISK_INSTANCE_ID"),
+                                       markerName);
     }
 }

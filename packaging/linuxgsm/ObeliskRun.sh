@@ -20,6 +20,7 @@ unset OBELISK_ENABLE_PROCESS_EVENT_HOOK
 unset OBELISK_DISABLE_PLUGINS
 unset OBELISK_DEBUG_ALLOW_PTRACE
 unset OBELISK_ENABLE_DEBUG_CONTROL
+unset OBELISK_ENABLE_REFLECTION_SCANNER
 unset OBELISK_ENABLE_NATIVE_EXEC_PROBES
 unset OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS
 unset OBELISK_ENABLE_CHAT_REFLECTION
@@ -80,6 +81,8 @@ case "${1:-}" in
         enable_marker "disable-plugins" && export OBELISK_DISABLE_PLUGINS=1
         enable_marker "allow-ptrace" && export OBELISK_DEBUG_ALLOW_PTRACE=1
         enable_marker "enable-debug-control" && export OBELISK_ENABLE_DEBUG_CONTROL=1
+        enable_marker "enable-reflection-scanner" && export OBELISK_ENABLE_REFLECTION_SCANNER=1
+        enable_marker "enable-native-exec-probes" && export OBELISK_ENABLE_NATIVE_EXEC_PROBES=1
         configure_chat_reflection
         configure_inventory_reflection
         configure_structure_reflection
@@ -90,6 +93,8 @@ case "${1:-}" in
         enable_marker "disable-plugins" && export OBELISK_DISABLE_PLUGINS=1
         enable_marker "allow-ptrace" && export OBELISK_DEBUG_ALLOW_PTRACE=1
         enable_marker "enable-debug-control" && export OBELISK_ENABLE_DEBUG_CONTROL=1
+        enable_marker "enable-reflection-scanner" && export OBELISK_ENABLE_REFLECTION_SCANNER=1
+        enable_marker "enable-native-exec-probes" && export OBELISK_ENABLE_NATIVE_EXEC_PROBES=1
         configure_chat_reflection
         configure_inventory_reflection
         configure_structure_reflection

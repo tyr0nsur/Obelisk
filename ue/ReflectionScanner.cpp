@@ -1,6 +1,7 @@
 #include "ReflectionScanner.h"
 
 #include "runtime/Logger.h"
+#include "runtime/RuntimeMarkers.h"
 #include "ue/Memory.h"
 #include "ue/Reflection.h"
 
@@ -69,8 +70,8 @@ namespace Obelisk::UE
         bool NativeExecProbesEnabled()
         {
             static bool enabled = [] {
-                const char* value = std::getenv("OBELISK_ENABLE_NATIVE_EXEC_PROBES");
-                return value && std::string(value) == "1";
+                return Obelisk::Runtime::IsEnvAndInstanceMarkerEnabled("OBELISK_ENABLE_NATIVE_EXEC_PROBES",
+                                                                        "enable-native-exec-probes");
             }();
             return enabled;
         }

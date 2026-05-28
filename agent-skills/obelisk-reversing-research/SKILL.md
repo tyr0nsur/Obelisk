@@ -82,8 +82,10 @@ export OBELISK_PE_TRACE_LIMIT=0
 unset OBELISK_ENABLE_NATIVE_EXEC_PROBES
 ```
 
-Set `OBELISK_ENABLE_REFLECTION_SCANNER=1` only for the specific scanner capture start, then
-copy the log and analyze it offline:
+Set `OBELISK_ENABLE_REFLECTION_SCANNER=1` only for the specific scanner capture start and
+only with the matching `enable-reflection-scanner` instance marker. Native exec probes also
+require both `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` and the
+`enable-native-exec-probes` marker. Then copy the log and analyze it offline:
 
 ```bash
 python3 scripts/analyze_reflectionscanner_capture.py /path/to/isolated/Obelisk.log

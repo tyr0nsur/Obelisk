@@ -82,6 +82,11 @@ scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection
   - `enable-chat-reflection`
   - `enable-structure-reflection`
   - `enable-inventory-reflection`
+- Runtime debug/scanner gates also require both env and instance markers:
+  - `allow-ptrace`
+  - `enable-debug-control`
+  - `enable-reflection-scanner`
+  - `enable-native-exec-probes`
 - Never enable native exec probes without explicit approval for the named `arkserver` run.
 - Never enable `ReflectionScanner` on `arkserver` without a specific operator-approved
   debug window, plugins disabled, copied-log evidence, and a marker/env rollback plan.

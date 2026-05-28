@@ -42,19 +42,19 @@ unset OBELISK_ENABLE_NATIVE_EXEC_PROBES
 export OBELISK_PE_TRACE_LIMIT=0
 ```
 
-There is currently no marker-file gate for `OBELISK_ENABLE_REFLECTION_SCANNER`; it must be
-set in the isolated instance environment. Marker files may still be used for the existing
-hook/plugin gates, but only through instance markers:
+`OBELISK_ENABLE_REFLECTION_SCANNER=1` is not sufficient by itself anymore; runtime startup
+also requires the `enable-reflection-scanner` instance marker. Native exec probes require
+both `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` and `enable-native-exec-probes`. Marker files
+must be instance markers:
 
 ```bash
 mkdir -p /servidor/ark/obelisk/state/instances/arkserver-obelisk-debug
 touch /servidor/ark/obelisk/state/instances/arkserver-obelisk-debug/enable-process-event-hook
 touch /servidor/ark/obelisk/state/instances/arkserver-obelisk-debug/disable-plugins
+touch /servidor/ark/obelisk/state/instances/arkserver-obelisk-debug/enable-reflection-scanner
 ```
 
-Do not remove the plugin-disable marker for this capture. Do not assume that creating an
-`enable-reflection-scanner-*` marker will run the scanner unless the launcher has been
-explicitly changed to translate that marker into `OBELISK_ENABLE_REFLECTION_SCANNER=1`.
+Do not remove the plugin-disable marker for this capture.
 
 ## Capture Commands
 

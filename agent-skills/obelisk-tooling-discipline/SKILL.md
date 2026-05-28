@@ -26,7 +26,7 @@ Isolated-debug only:
 - Frida,
 - dynamic binary instrumentation,
 - `ReflectionScanner`,
-- `OBELISK_ENABLE_DEBUG_CONTROL=1` marker-triggered runtime probes,
+- `OBELISK_ENABLE_DEBUG_CONTROL=1` plus `enable-debug-control` marker-triggered runtime probes,
 - broad `ProcessEvent` tracing.
 
 Development-server gated:
@@ -40,7 +40,7 @@ Development-server gated:
 
 Forbidden on live/shared instances:
 
-- `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1`,
+- `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` plus `enable-native-exec-probes`,
 - raw FString/text or arbitrary gameplay-param discovery loops,
 - broad unbounded ProcessEvent logging,
 - decoded player text or gameplay payload logging without reflected `UFunction`/
@@ -58,7 +58,8 @@ Forbidden on live/shared instances:
   Obelisk development/test harness and keeps `arkserver2` / TheIsland stopped for RAM.
 - For `gcore`, `ptrace`, `ReflectionScanner`, Frida/rr, broad event tracing, or
   scanner-like probes, require explicit approval for the exact `arkserver` run window and
-  rollback plan.
+  rollback plan. ReflectionScanner/native-exec activations require both env vars and their
+  per-instance markers.
 - Use Frida/rr only after there is a specifically approved debug window and a rollback
   plan.
 - Do not introduce `/dev/null` write probes as memory-readability checks on Linux; current

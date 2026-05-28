@@ -159,6 +159,7 @@ prepare_root "${root_inherited}"
     OBELISK_DISABLE_PLUGINS=1 \
     OBELISK_DEBUG_ALLOW_PTRACE=1 \
     OBELISK_ENABLE_DEBUG_CONTROL=1 \
+    OBELISK_ENABLE_REFLECTION_SCANNER=1 \
     OBELISK_ENABLE_NATIVE_EXEC_PROBES=1 \
     OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS=1 \
     OBELISK_ENABLE_CHAT_REFLECTION=1 \
@@ -179,6 +180,7 @@ assert_not_contains "${capture_inherited}" '^OBELISK_ENABLE_PROCESS_EVENT_HOOK='
 assert_not_contains "${capture_inherited}" '^OBELISK_DISABLE_PLUGINS='
 assert_not_contains "${capture_inherited}" '^OBELISK_DEBUG_ALLOW_PTRACE='
 assert_not_contains "${capture_inherited}" '^OBELISK_ENABLE_DEBUG_CONTROL='
+assert_not_contains "${capture_inherited}" '^OBELISK_ENABLE_REFLECTION_SCANNER='
 assert_not_contains "${capture_inherited}" '^OBELISK_ENABLE_NATIVE_EXEC_PROBES='
 assert_not_contains "${capture_inherited}" '^OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS='
 assert_not_contains "${capture_inherited}" '^OBELISK_ENABLE_CHAT_REFLECTION='
