@@ -194,6 +194,10 @@ Keep skills short and operational. Put detailed experiment records in `docs/rese
 - Promotion PRs for reflected gameplay/module surfaces must name every promoted
   second-source target set explicitly. Do not treat the default minimal intake as a broad
   module promotion gate.
+- Runtime-observer summaries are review artifacts only. Module-level field aggregates are
+  not promotable layouts; new observer families need per-function analyzer fixture coverage
+  and/or supervisor snapshot coverage before captures are accepted for review, then
+  second-source/static evidence before promotion.
 
 ## Pre-Push Checklist
 

@@ -139,6 +139,8 @@ def add_unique(values: list[Any], value: Any) -> None:
 def module_record() -> dict[str, Any]:
     return {
         "gate_sha256": [],
+        "source_indices": [],
+        "source_merge_explicit": False,
         "accepted_count": 0,
         "metadata_only_count": 0,
         "rejected_count": 0,
@@ -147,6 +149,9 @@ def module_record() -> dict[str, Any]:
         "reject_reasons": {},
         "redacted_detail_keys": Counter(),
         "malformed_observer_lines": 0,
+        "orphan_field_lines": 0,
+        "out_of_order_field_lines": 0,
+        "field_count_mismatches": 0,
     }
 
 
@@ -220,8 +225,22 @@ def module_blockers(record: dict[str, Any]) -> list[str]:
         blockers.append("missing_experimental_gate")
     if len(record["gate_sha256"]) > 1:
         blockers.append("mixed_binary_sha256")
+    if len(record["source_indices"]) > 1 and not record["source_merge_explicit"]:
+        blockers.append("multiple_sources_same_module")
+    if (
+        record["accepted_count"] == 0
+        and record["metadata_only_count"] == 0
+        and record["rejected_count"] == 0
+    ):
+        blockers.append("no_accepted_or_rejected_observer_lines")
     if record["malformed_observer_lines"] > 0:
         blockers.append("malformed_observer_lines")
+    if record["orphan_field_lines"] > 0:
+        blockers.append("orphan_field_lines")
+    if record["out_of_order_field_lines"] > 0:
+        blockers.append("out_of_order_field_lines")
+    if record["field_count_mismatches"] > 0:
+        blockers.append("field_count_mismatch")
     if record["redacted_detail_keys"]:
         blockers.append("redacted_sensitive_or_unapproved_details")
     return blockers
@@ -231,12 +250,34 @@ def safe_detail_keys(module: str, function: str) -> set[str]:
     return SAFE_DETAIL_KEYS.get(module, {}).get(function, set())
 
 
+def add_source_index(record: dict[str, Any], source_index: int) -> None:
+    add_unique(record["source_indices"], source_index)
+
+
+def observer_lines_from_sources(sources: list[list[str]]) -> list[tuple[int, str]]:
+    return [
+        (source_index, line)
+        for source_index, lines in enumerate(sources)
+        for line in lines
+    ]
+
+
 def analyze_lines(lines: list[str]) -> dict[str, Any]:
+    return analyze_source_lines([lines])
+
+
+def analyze_source_lines(sources: list[list[str]], *, source_merge_explicit: bool = False) -> dict[str, Any]:
     modules: dict[str, dict[str, Any]] = defaultdict(module_record)
     runtime = runtime_record()
-    active_function_by_module: dict[str, str] = {}
+    active_fields_by_module: dict[tuple[int, str], dict[str, Any]] = {}
 
-    for line in lines:
+    def close_active_context(source_index: int, module: str) -> None:
+        key = (source_index, module)
+        active = active_fields_by_module.pop(key, None)
+        if active and active["remaining"] != 0:
+            modules[module]["field_count_mismatches"] += 1
+
+    for source_index, line in observer_lines_from_sources(sources):
         stripped = line.strip()
         if not stripped:
             continue
@@ -278,13 +319,19 @@ def analyze_lines(lines: list[str]) -> dict[str, Any]:
 
         if match := GATE_RE.fullmatch(stripped):
             module = match.group("module")
+            close_active_context(source_index, module)
+            add_source_index(modules[module], source_index)
+            modules[module]["source_merge_explicit"] = source_merge_explicit
             add_unique(modules[module]["gate_sha256"], match.group("sha256").lower())
             continue
 
         if match := PROCESS_EVENT_RE.fullmatch(stripped):
             module = match.group("module")
             function = match.group("function")
+            close_active_context(source_index, module)
             record = modules[module]
+            record["source_merge_explicit"] = source_merge_explicit
+            add_source_index(record, source_index)
             functions = record["functions"]
             functions.setdefault(function, function_record())
             function_data = functions[function]
@@ -300,14 +347,22 @@ def analyze_lines(lines: list[str]) -> dict[str, Any]:
             add_unique(function_data["fname_indices"], int(match.group("fname_index")))
             if match.group("outer_fname_index") is not None:
                 add_unique(function_data["outer_fname_indices"], int(match.group("outer_fname_index")))
-            add_unique(function_data["field_counts"], int(match.group("field_count")))
-            active_function_by_module[module] = function
+            field_count = int(match.group("field_count"))
+            add_unique(function_data["field_counts"], field_count)
+            if field_count > 0:
+                active_fields_by_module[(source_index, module)] = {
+                    "function": function,
+                    "remaining": field_count,
+                }
             continue
 
         if match := FIELD_RE.fullmatch(stripped):
             module = match.group("module")
+            record = modules[module]
+            record["source_merge_explicit"] = source_merge_explicit
+            add_source_index(record, source_index)
             field = match.group("field")
-            fields = modules[module]["fields"]
+            fields = record["fields"]
             fields.setdefault(field, field_record())
             field_data = fields[field]
             field_data["count"] += 1
@@ -320,27 +375,41 @@ def analyze_lines(lines: list[str]) -> dict[str, Any]:
             if "sensitive" in extra:
                 field_data["sensitive"][extra["sensitive"]] += 1
 
-            active_function = active_function_by_module.get(module)
-            if active_function:
-                functions = modules[module]["functions"]
-                functions.setdefault(active_function, function_record())
-                function_fields = functions[active_function]["fields"]
-                function_fields.setdefault(field, field_record())
-                function_field_data = function_fields[field]
-                function_field_data["count"] += 1
-                add_unique(function_field_data["offsets"], match.group("offset").lower())
-                add_unique(function_field_data["sizes"], int(match.group("size")))
-                if "has_range" in extra:
-                    function_field_data["has_range"][extra["has_range"]] += 1
-                if "sensitive" in extra:
-                    function_field_data["sensitive"][extra["sensitive"]] += 1
+            active_key = (source_index, module)
+            active_context = active_fields_by_module.get(active_key)
+            if not active_context:
+                record["orphan_field_lines"] += 1
+                continue
+
+            if active_context["remaining"] <= 0:
+                record["out_of_order_field_lines"] += 1
+                active_fields_by_module.pop(active_key, None)
+                continue
+
+            active_function = active_context["function"]
+            functions = record["functions"]
+            functions.setdefault(active_function, function_record())
+            function_fields = functions[active_function]["fields"]
+            function_fields.setdefault(field, field_record())
+            function_field_data = function_fields[field]
+            function_field_data["count"] += 1
+            add_unique(function_field_data["offsets"], match.group("offset").lower())
+            add_unique(function_field_data["sizes"], int(match.group("size")))
+            if "has_range" in extra:
+                function_field_data["has_range"][extra["has_range"]] += 1
+            if "sensitive" in extra:
+                function_field_data["sensitive"][extra["sensitive"]] += 1
+
+            active_context["remaining"] -= 1
             continue
 
         if match := REJECT_RE.fullmatch(stripped):
             module = match.group("module")
             record = modules[module]
+            record["source_merge_explicit"] = source_merge_explicit
+            add_source_index(record, source_index)
             record["rejected_count"] += 1
-            active_function_by_module.pop(module, None)
+            close_active_context(source_index, module)
             reason = match.group("reason")
             record["reject_reasons"].setdefault(reason, 0)
             record["reject_reasons"][reason] += 1
@@ -354,12 +423,15 @@ def analyze_lines(lines: list[str]) -> dict[str, Any]:
             details = parse_key_values(match.group("rest"))
             if not details:
                 continue
-            functions = modules[module]["functions"]
+            record = modules[module]
+            record["source_merge_explicit"] = source_merge_explicit
+            add_source_index(record, source_index)
+            functions = record["functions"]
             functions.setdefault(function, function_record())
             allowed_keys = safe_detail_keys(module, function)
             for key, raw_value in details.items():
                 if key not in allowed_keys:
-                    modules[module]["redacted_detail_keys"][key] += 1
+                    record["redacted_detail_keys"][key] += 1
                     continue
                 add_unique(functions[function]["details"][key], int_or_text(raw_value))
             continue
@@ -367,12 +439,19 @@ def analyze_lines(lines: list[str]) -> dict[str, Any]:
         if "Reflected " in stripped or "Experimental " in stripped:
             match = re.search(r"(?:Reflected|Experimental) (?P<module>[A-Za-z0-9_]+)", stripped)
             module = match.group("module") if match else "unknown"
+            modules[module]["source_merge_explicit"] = source_merge_explicit
+            add_source_index(modules[module], source_index)
             modules[module]["malformed_observer_lines"] += 1
+
+    for source_index, module in list(active_fields_by_module):
+        close_active_context(source_index, module)
 
     normalized_modules: dict[str, Any] = {}
     for module, record in sorted(modules.items()):
         normalized_modules[module] = {
             "gate_sha256": sorted(record["gate_sha256"]),
+            "source_indices": sorted(record["source_indices"]),
+            "source_merge_explicit": record["source_merge_explicit"],
             "accepted_count": record["accepted_count"],
             "metadata_only_count": record["metadata_only_count"],
             "rejected_count": record["rejected_count"],
@@ -389,6 +468,9 @@ def analyze_lines(lines: list[str]) -> dict[str, Any]:
             "reject_reasons": dict(sorted(record["reject_reasons"].items())),
             "redacted_detail_keys": dict(sorted(record["redacted_detail_keys"].items())),
             "malformed_observer_lines": record["malformed_observer_lines"],
+            "orphan_field_lines": record["orphan_field_lines"],
+            "out_of_order_field_lines": record["out_of_order_field_lines"],
+            "field_count_mismatches": record["field_count_mismatches"],
         }
 
     return {
@@ -429,7 +511,16 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help=(
             "Return non-zero when a module has blockers beyond runtime_observer_evidence_only, "
-            "such as missing gates, mixed SHA values, malformed observer lines, or redacted details."
+            "such as missing gates, mixed SHA values, multiple unmerged sources, field-count "
+            "problems, malformed observer lines, or redacted details."
+        ),
+    )
+    parser.add_argument(
+        "--merge-module-sources",
+        action="store_true",
+        help=(
+            "Allow the same observer module to be summarized across multiple copied logs. "
+            "Without this flag, multi-source module summaries are quality blockers."
         ),
     )
     parser.add_argument("logs", nargs="+", type=Path, help="Copied/sanitized Obelisk log files.")
@@ -438,7 +529,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    lines: list[str] = []
+    source_lines: list[list[str]] = []
     sources: list[dict[str, Any]] = []
 
     for path in args.logs:
@@ -453,16 +544,17 @@ def main() -> int:
             print(f"log does not exist: {resolved}", file=sys.stderr)
             return 2
         text = resolved.read_text(encoding="utf-8")
+        lines = text.splitlines()
         sources.append(
             {
                 "path": str(resolved),
                 "sha256": sha256_file(resolved),
-                "line_count": len(text.splitlines()),
+                "line_count": len(lines),
             }
         )
-        lines.extend(text.splitlines())
+        source_lines.append(lines)
 
-    result = analyze_lines(lines)
+    result = analyze_source_lines(source_lines, source_merge_explicit=bool(args.merge_module_sources))
     result["evidence"] = {
         "kind": "runtime-observer-log",
         "obelisk_commit": args.obelisk_commit or git_commit(),

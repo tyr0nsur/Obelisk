@@ -30,6 +30,28 @@ class RuntimeObserverLogAnalyzerTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             return json.loads(result.stdout)
 
+    def run_analyzer_files(
+        self,
+        sources: list[list[str]],
+        *extra_args: str,
+        expect_returncode: int = 0,
+    ) -> subprocess.CompletedProcess[str]:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            paths = []
+            for index, lines in enumerate(sources):
+                path = Path(temp_dir) / f"Obelisk-{index}.log"
+                path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+                paths.append(str(path))
+            result = subprocess.run(
+                [sys.executable, str(ANALYZER), *extra_args, *paths],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            self.assertEqual(result.returncode, expect_returncode, result.stderr)
+            return result
+
     def test_summarizes_chat_runtime_observer_evidence(self) -> None:
         result = self.run_analyzer(
             [
@@ -56,6 +78,8 @@ class RuntimeObserverLogAnalyzerTests(unittest.TestCase):
                 "fname_index=2697 params=0x208069410 fields=2 metadata_only=false",
                 "[07:20:03] [info] Reflected chat ServerSendChatMessage send_mode=1 "
                 "send_mode_name=GlobalTribeChat send_mode_known=true",
+                "[07:20:03] [info] Reflected chat field ChatMessage offset=0x0 size=16 has_range=true",
+                "[07:20:03] [info] Reflected chat field SendMode offset=0x10 size=1 has_range=true",
             ]
         )
 
@@ -101,12 +125,12 @@ class RuntimeObserverLogAnalyzerTests(unittest.TestCase):
         self.assertEqual(function["fields"]["ChatMessage"]["offsets"], ["0x0"])
         self.assertEqual(function["fields"]["ChatMessage"]["sizes"], [16])
         self.assertEqual(function["fields"]["SendMode"]["offsets"], ["0x10"])
-        self.assertEqual(function["fields"]["SendMode"]["has_range"], {"true": 1})
+        self.assertEqual(function["fields"]["SendMode"]["has_range"], {"true": 2})
 
         self.assertEqual(chat["fields"]["ChatMessage"]["offsets"], ["0x0"])
         self.assertEqual(chat["fields"]["ChatMessage"]["sizes"], [16])
         self.assertEqual(chat["fields"]["SendMode"]["offsets"], ["0x10"])
-        self.assertEqual(chat["fields"]["SendMode"]["has_range"], {"true": 1})
+        self.assertEqual(chat["fields"]["SendMode"]["has_range"], {"true": 2})
         self.assertEqual(
             chat["reject_reasons"],
             {"chat UFunction outer FName index mismatch": 1},
@@ -114,7 +138,7 @@ class RuntimeObserverLogAnalyzerTests(unittest.TestCase):
         self.assertEqual(result["evidence"]["kind"], "runtime-observer-log")
         self.assertFalse(result["evidence"]["server_paths_allowed"])
         self.assertEqual(len(result["evidence"]["sources"]), 1)
-        self.assertEqual(result["evidence"]["sources"][0]["line_count"], 15)
+        self.assertEqual(result["evidence"]["sources"][0]["line_count"], 17)
         self.assertRegex(result["evidence"]["sources"][0]["sha256"], r"^[a-f0-9]{64}$")
         self.assertFalse(result["promotion_gate"]["ready"])
 
@@ -263,6 +287,8 @@ class RuntimeObserverLogAnalyzerTests(unittest.TestCase):
                         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.",
                         "[info] Reflected structure ProcessEvent #1 function=VerifyPinCode "
                         "fname_index=7636 outer_fname_index=7617 fields=2",
+                        "[info] Reflected structure field pinCode offset=0x0 size=4 has_range=true",
+                        "[info] Reflected structure field ReturnValue offset=0x4 size=1 has_range=true",
                     ]
                 )
                 + "\n",
@@ -277,6 +303,114 @@ class RuntimeObserverLogAnalyzerTests(unittest.TestCase):
             )
 
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_gate_only_module_is_quality_blocker(self) -> None:
+        result = self.run_analyzer(
+            [
+                "[warning] Experimental inventory reflection enabled for ShooterGameServer SHA256 "
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.",
+            ]
+        )
+
+        inventory = result["modules"]["inventory"]
+        self.assertIn("no_accepted_or_rejected_observer_lines", inventory["blockers"])
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            log_path = Path(temp_dir) / "Obelisk.log"
+            log_path.write_text(
+                "[warning] Experimental inventory reflection enabled for ShooterGameServer SHA256 "
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.\n",
+                encoding="utf-8",
+            )
+            failed = subprocess.run(
+                [sys.executable, str(ANALYZER), "--fail-on-quality-blockers", str(log_path)],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+        self.assertEqual(failed.returncode, 1)
+        self.assertIn("no_accepted_or_rejected_observer_lines", failed.stderr)
+
+    def test_orphan_field_line_is_quality_blocker(self) -> None:
+        result = self.run_analyzer(
+            [
+                "[warning] Experimental inventory reflection enabled for ShooterGameServer SHA256 "
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.",
+                "[info] Reflected inventory field ReturnValue offset=0x0 size=1 has_range=true",
+            ]
+        )
+
+        inventory = result["modules"]["inventory"]
+        self.assertEqual(inventory["orphan_field_lines"], 1)
+        self.assertIn("orphan_field_lines", inventory["blockers"])
+
+    def test_field_count_mismatch_blocks_quality_gate(self) -> None:
+        result = self.run_analyzer(
+            [
+                "[warning] Experimental structure reflection enabled for ShooterGameServer SHA256 "
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.",
+                "[info] Reflected structure ProcessEvent #1 function=VerifyPinCode "
+                "fname_index=7636 outer_fname_index=7617 fields=2",
+                "[info] Reflected structure field pinCode offset=0x0 size=4 has_range=true",
+            ]
+        )
+
+        structure = result["modules"]["structure"]
+        self.assertEqual(structure["field_count_mismatches"], 1)
+        self.assertIn("field_count_mismatch", structure["blockers"])
+
+    def test_extra_field_after_expected_count_is_not_attached_to_previous_function(self) -> None:
+        result = self.run_analyzer(
+            [
+                "[warning] Experimental inventory reflection enabled for ShooterGameServer SHA256 "
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.",
+                "[info] Reflected inventory ProcessEvent #1 function=CanUse "
+                "fname_index=6252 outer_fname_index=6231 fields=1",
+                "[info] Reflected inventory field ReturnValue offset=0x4 size=1 has_range=true",
+                "[info] Reflected inventory field ExtraValue offset=0x8 size=4 has_range=true",
+            ]
+        )
+
+        inventory = result["modules"]["inventory"]
+        self.assertEqual(inventory["out_of_order_field_lines"], 1)
+        self.assertIn("out_of_order_field_lines", inventory["blockers"])
+        self.assertNotIn("ExtraValue", inventory["functions"]["CanUse"]["fields"])
+
+    def test_rejects_same_module_across_multiple_sources_without_explicit_merge(self) -> None:
+        first = [
+            "[warning] Experimental inventory reflection enabled for ShooterGameServer SHA256 "
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.",
+            "[info] Reflected inventory ProcessEvent #1 function=CanUse "
+            "fname_index=6252 outer_fname_index=6231 fields=1",
+            "[info] Reflected inventory field ReturnValue offset=0x4 size=1 has_range=true",
+        ]
+        second = [
+            "[warning] Experimental inventory reflection enabled for ShooterGameServer SHA256 "
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.",
+            "[info] Reflected inventory ProcessEvent #1 function=CanUse "
+            "fname_index=6252 outer_fname_index=6231 fields=1",
+            "[info] Reflected inventory field ReturnValue offset=0x8 size=4 has_range=true",
+        ]
+
+        failed = self.run_analyzer_files(
+            [first, second],
+            "--fail-on-quality-blockers",
+            expect_returncode=1,
+        )
+        self.assertIn("multiple_sources_same_module", failed.stderr)
+
+        merged = self.run_analyzer_files(
+            [first, second],
+            "--merge-module-sources",
+            "--fail-on-quality-blockers",
+        )
+        payload = json.loads(merged.stdout)
+        inventory = payload["modules"]["inventory"]
+        self.assertTrue(inventory["source_merge_explicit"])
+        self.assertEqual(inventory["source_indices"], [0, 1])
+        self.assertNotIn("multiple_sources_same_module", inventory["blockers"])
 
     def test_fail_on_quality_blockers_rejects_malformed_summary(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

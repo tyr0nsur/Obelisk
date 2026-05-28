@@ -74,3 +74,7 @@ chat, inventory, structure, and future observer families, and `--fail-on-quality
 can reject copied captures that are empty, missing gates, mix binary SHA values, contain
 malformed observer lines, or require redaction. It is still not a promotion evidence pack
 by itself and must not be used as a reason to read or tail live Ragnarok logs.
+Module-level field aggregates are lossy review summaries only, not promotable layouts.
+Future observer families need per-function analyzer fixture coverage and/or supervisor
+snapshot coverage before their captures are accepted for review, and still require
+second-source promotion evidence before any public module surface is promoted.

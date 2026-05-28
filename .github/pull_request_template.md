@@ -25,6 +25,7 @@
 - [ ] `scripts/check_release_readiness.sh` for release-candidate, installer, SDK package, or first-stable scope changes.
 - [ ] `scripts/check_release_readiness.sh --require-second-source-readiness` for PRs that promote reflected gameplay/module surfaces; name every promoted target set with `--ufunction-second-source-target-set` or `--scriptstruct-second-source-target-set`, and pass `--ufunction-second-source-root`, `--scriptstruct-second-source-root`, and `--second-source-report-dir` when sanitized snapshots exist.
 - [ ] `python3 scripts/analyze_runtime_observer_log.py --fail-on-quality-blockers <copied-log>` for approved runtime-observer capture reviews; this is observational only, not release readiness or second-source promotion evidence.
+- [ ] New runtime-observer modules include per-function analyzer fixture coverage and/or supervisor snapshot coverage; module-level field aggregates are not used as promotion evidence.
 - [ ] Docs-only changes explain why the build was skipped.
 
 ## Handoff

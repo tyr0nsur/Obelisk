@@ -92,8 +92,12 @@ ReflectionScanner disabled state, and plugin-disabled state. Observer fields are
 both as module-level aggregates and, when the log order provides enough context, as
 per-function field layouts for chat, inventory, structure, or future module families. It
 fails quality checks when a copied log has no observer evidence, is missing observer gates,
-mixes binary SHA values, contains malformed observer lines, or requires redaction. Even a
-clean summary remains observational until the second-source and SDK ownership gates are
+mixes binary SHA values, spans the same module across multiple source logs without
+`--merge-module-sources`, has field-count/order problems, contains malformed observer
+lines, or requires redaction. Module-level field aggregates are not promotable layouts and
+are not used as promotion evidence; promotion evidence must be per target set/function and
+come from second-source snapshot or static evidence, not runtime summaries. Even a clean
+summary remains observational until the second-source and SDK ownership gates are
 satisfied.
 
 3. Confirm `scripts/test_install_obelisk_layout.sh` covered runtime backup reinstall:
