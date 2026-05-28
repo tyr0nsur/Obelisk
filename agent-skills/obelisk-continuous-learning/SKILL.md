@@ -129,4 +129,5 @@ starting a new round.
       explicit next actions?
 - [ ] Did the relevant skill get updated?
 - [ ] Did `docs/research/` get updated when the evidence is too detailed for a skill?
-- [ ] Are changes committed and pushed if stable?
+- [ ] Are changes either intentionally batched for a later useful checkpoint or committed
+      and pushed because they are checkpoint-worthy now?

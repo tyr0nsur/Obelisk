@@ -33,7 +33,12 @@ to every sub-agent.
   reviews, stages, commits, pushes, closes agents, and updates shared handoff state.
 - Keep each commit focused: runtime code, docs, skills, or deployment scripts should not be
   mixed unless the change requires it.
-- Push stable checkpoints to `origin/main` after validation.
+- Batch small internal documentation, skill, handoff, and guardrail cleanups. Do not commit
+  and push after every routine round; create a checkpoint when the accumulated work is
+  useful to contributors, changes runtime/release behavior, or needs to be shared as a
+  stable integration point.
+- Push stable checkpoints to `origin/main` after validation when they meet that usefulness
+  threshold.
 - Do not commit server artifacts: `.so`, logs, core files, local configs, state markers, or
   build directories.
 - Server restore documentation is allowed, but never stage copied `/servidor/ark` config
@@ -116,6 +121,20 @@ git push origin main
 ```
 
 Skip the build only for docs-only or skills-only commits, and say so in the final report.
+
+## Release Alignment
+
+- Treat `scripts/check_release_readiness.sh` as the single core-first release gate. CI may
+  keep fast build/test jobs, but install/package validation should not drift into separate
+  ad hoc CI commands with different defaults.
+- When release-scope behavior changes, keep `docs/RELEASE.md`, `docs/STATUS.md`,
+  `CHANGELOG.md`, `.github/pull_request_template.md`, and release-scope guardrail tests in
+  agreement.
+- Do not duplicate moving commit hashes as "latest checkpoint" facts in
+  `docs/agent-handoff/CURRENT.md`; use `git log --oneline -1` for the current head and
+  reserve handoff entries for stable facts, risks, and next steps.
+- Prefer adding guardrail tests when fixing coordination drift so the same stale state does
+  not return in later rounds.
 
 ## Community Discord Updates
 

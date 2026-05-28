@@ -102,15 +102,18 @@ scripts/check_obelisk_server_posture.sh --expect-stable \
 - Never enable native exec probes without explicit approval for the named debug run.
 - Do not set `OBELISK_DEBUG_ALLOW_PTRACE=1` by default in debug wrappers. Ptrace requires
   an approved isolated run plus the `allow-ptrace` marker.
-- Never enable `ReflectionScanner` on `arkserver` / Ragnarok while users are active. Use
-  `arkserver2` / TheIsland only with a specific operator-approved debug window, plugins
-  disabled, copied-log evidence, marker/env rollback, and shutdown at the end.
+- Never enable `ReflectionScanner` on `arkserver` / Ragnarok while users are active.
+  Current operator direction allows `arkserver2` / TheIsland as the debug target when
+  runtime validation is needed; keep plugins disabled unless the test explicitly requires
+  them, preserve copied-log evidence, make marker/env rollback explicit, and shut down
+  TheIsland at the end.
 - Never persist `OBELISK_WRAPPER_PROFILE=observer-debug` in a normal service environment.
   It is a per-launch debug-window profile for the normal wrapper.
 - Keep `OBELISK_PE_TRACE_LIMIT=0` by default; use short trace windows only for approved
   evidence windows on `arkserver2`.
-- Do not start `arkserver2` unless it is the approved scoped test target, and stop it
-  again after the test.
+- Do not move debug instrumentation to player-facing `arkserver` / Ragnarok until the same
+  posture is proven on `arkserver2` and the operator approves a privacy-bounded player
+  signal window.
 
 ## Debug Profiles
 
@@ -226,8 +229,8 @@ scripts/check_obelisk_server_posture.sh --expect-stable \
   --map <map> --instance <instance-id>
 ```
 
-Current server-backed debug, when approved, uses `arkserver2` / TheIsland. It starts from
-powered off, runs the scoped test, then shuts down:
+Current server-backed debug uses `arkserver2` / TheIsland. It normally starts from powered
+off, runs the scoped test, then shuts down:
 
 ```bash
 tail -n 100 /servidor/ark/obelisk/logs/arkserver2/Obelisk.log

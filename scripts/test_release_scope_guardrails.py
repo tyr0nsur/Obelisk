@@ -137,15 +137,23 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         pr_template = read(".github/pull_request_template.md")
         ci = read(".github/workflows/ci.yml")
         script = read("scripts/check_release_readiness.sh")
+        build_skill = read("agent-skills/obelisk-build-system/SKILL.md")
+        workflow_skill = read("agent-skills/obelisk-github-research-workflow/SKILL.md")
 
         self.assertIn("scripts/check_release_readiness.sh", release)
         self.assertIn("scripts/check_release_readiness.sh", pr_template)
         self.assertIn("scripts/check_release_readiness.sh", ci)
+        self.assertIn("scripts/check_release_readiness.sh", build_skill)
+        self.assertIn("scripts/check_release_readiness.sh", workflow_skill)
+        self.assertIn("canonical local and CI gate", build_skill)
+        self.assertIn("single core-first release gate", workflow_skill)
         self.assertIn("analyze_runtime_observer_log.py --fail-on-quality-blockers", pr_template)
         self.assertIn("observational only", pr_template)
         self.assertIn("not release readiness or second-source promotion evidence", pr_template)
         self.assertIn("Core-first release readiness", ci)
         self.assertIn("first-stable core release gate", ci)
+        self.assertNotIn("scripts/install_obelisk.sh --dry-run /tmp/obelisk-ci-install", ci)
+        self.assertNotIn("scripts/test_install_obelisk_layout.sh /tmp/obelisk-ci-layout", ci)
         self.assertIn("Reflection base readiness", ci)
         self.assertIn("--fail-on-base-readiness-gaps", ci)
         self.assertRegex(
@@ -195,6 +203,20 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("runtime_observer_observational_only", release)
         self.assertNotIn("--map Ragnarok --instance arkserver", release)
         self.assertIn("--map <map> --instance <instance-id>", release)
+
+    def test_lead_commit_policy_prefers_useful_checkpoints(self) -> None:
+        workflow_skill = read("agent-skills/obelisk-github-research-workflow/SKILL.md")
+        handoff_skill = read("agent-skills/obelisk-agent-handoff/SKILL.md")
+        learning_skill = read("agent-skills/obelisk-continuous-learning/SKILL.md")
+
+        self.assertIn("Batch small internal documentation, skill, handoff, and guardrail cleanups", workflow_skill)
+        self.assertIn("Do not commit\n  and push after every routine round", workflow_skill)
+        self.assertIn("useful to contributors", workflow_skill)
+        self.assertIn("stable integration point", workflow_skill)
+        self.assertIn("Do not send Discord updates for routine commits", workflow_skill)
+        self.assertIn("useful stable\n   checkpoint", handoff_skill)
+        self.assertIn("intentionally batched for a later useful checkpoint", learning_skill)
+        self.assertNotIn("Are changes committed and pushed if stable?", learning_skill)
 
     def test_release_example_does_not_publish_map_scoped_config(self) -> None:
         obase_docs = read("docs/oBaseEvents.md")

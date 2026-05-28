@@ -53,6 +53,22 @@ binary. The artifact must record:
 
 ## Procedure
 
+The full offline sequence can be planned without touching any live server:
+
+```bash
+python3 scripts/run_second_source_core_intake.py \
+  --binary <ShooterGameServer> \
+  --core <second-source-core> \
+  --pack-dir <pack-dir> \
+  --snapshot-root <second-source-ufunction-snapshots> \
+  --verified-fname-root-slot <verified-slot> \
+  --gobjects-candidate 0x595b7e0
+```
+
+The command is dry-run by default and prints the reproducible command sequence. Add
+`--execute` only after the independent artifact, artifact-specific FName root, and
+GObjects candidate have been reviewed.
+
 1. Build a core evidence pack from the existing artifact. Derive or scan the per-artifact
    FName root first; do not reuse the primary-core-only FName slot by default.
 

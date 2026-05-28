@@ -41,9 +41,13 @@ in `docs/research/` and stable resume facts belong in `docs/agent-handoff/COMPAC
 - fact: user-provided live log evidence confirmed reflected `ServerSendChatMessage` events
   on Ragnarok. Treat this as operational evidence only; do not publish player payloads or
   enable payload logging.
-- fact: `arkserver2` / TheIsland is the fallback debug target but is powered off. Start it
-  only with explicit operator approval for a scoped test, then restore posture and shut it
-  down afterward.
+- fact: operator has approved using `arkserver2` / TheIsland as the active debug target
+  when runtime validation is needed. Start it only for a concrete test window, keep
+  rollback/posture checks explicit, and shut it down when the test no longer needs it.
+- priority: do not move new debug instrumentation to `arkserver` / Ragnarok just because
+  players are active. First prove a solid low-risk debug base on `arkserver2`; only then
+  propose a player-facing Ragnarok window with privacy, budgets, rollback, and operator
+  approval.
 - fact: stable posture rejects ReflectionScanner, native exec probes, ptrace/debug-control,
   broad ProcessEvent tracing, global callbacks, public `CallProcessEvent`, ProcessEvent
   blocking, and observer/debug-window markers unless a specific approved debug workflow

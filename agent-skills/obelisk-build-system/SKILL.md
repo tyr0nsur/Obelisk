@@ -80,6 +80,14 @@ template using `scripts/check_linuxgsm_wrapper_drift.sh --installed <path>/Obeli
   back both the runtime pair and already-published SDK files if SDK install or SDK publish
   fails.
 
+## Release Gate Discipline
+
+- `scripts/check_release_readiness.sh` is the canonical local and CI gate for first-stable
+  runtime/SDK/install readiness. It owns build, CTest, script tests, install layout, SDK
+  consumer validation, read-only CLI status, installer dry-runs, and clean-tree checks.
+- Do not add parallel installer or SDK layout checks to CI with different defaults. Extend
+  the release gate or its tests instead so release readiness remains one reproducible path.
+
 ## Before Commit
 
 ```bash
@@ -102,8 +110,10 @@ scripts/check_obelisk_server_posture.sh --expect-stable --map <map> --instance <
 
 Use explicit `--map` and `--instance`; do not rely on script defaults during Obelisk debug
 rounds. Current operator direction protects `arkserver` / Ragnarok while users are active.
-If server validation is needed, use `arkserver2` / TheIsland only after explicit approval,
-then shut it down when the test window ends.
+If server validation is needed, use `arkserver2` / TheIsland as the debug target and shut
+it down when the test window ends. Do not move debug instrumentation to player-facing
+Ragnarok until the same posture is proven on `arkserver2` and the operator approves that
+specific player-signal window.
 
 Check that no files matching these patterns are staged:
 
