@@ -20,8 +20,10 @@ extern "C" {
 // Types
 // ============================================================================
 
-// Prototype for a function that will receive the ProcessEvent hook
-// Returns true if the event should continue execution, false to block it.
+// Prototype for a function that will receive the ProcessEvent hook.
+// Pre-process callbacks return true to continue execution or false to block the event.
+// Post-process callbacks use the same ABI type, but their return value is ignored; return
+// true from post callbacks for forward compatibility.
 typedef bool (*OnProcessEventCallback)(void* caller, void* function, void* parms);
 
 typedef struct ObeliskPluginMetadata {

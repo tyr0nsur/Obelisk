@@ -3,10 +3,15 @@
 
 #include <cstdlib>
 #include <cstdint>
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <filesystem>
 #include <iostream>
 #include <limits>
+#include <mutex>
 #include <stdexcept>
+#include <thread>
 
 namespace fs = std::filesystem;
 
@@ -24,6 +29,16 @@ namespace
     Counters g_Counters;
     Obelisk::Core::EventManager* g_SelfUnregisterEvents = nullptr;
     uint64_t g_SelfUnregisterId = 0;
+
+    struct BlockingCallbackState {
+        std::mutex mutex;
+        std::condition_variable cv;
+        bool entered = false;
+        bool release = false;
+        bool exiting = false;
+    };
+
+    BlockingCallbackState* g_BlockingPostState = nullptr;
 
     void ResetCounters()
     {
@@ -66,6 +81,20 @@ namespace
     {
         ++g_Counters.filtered_post;
         return true;
+    }
+
+    bool BlockingPost(void*, void*, void*)
+    {
+        Require(g_BlockingPostState != nullptr, "blocking post callback has no state");
+        std::unique_lock<std::mutex> lock(g_BlockingPostState->mutex);
+        g_BlockingPostState->entered = true;
+        g_BlockingPostState->cv.notify_all();
+        g_BlockingPostState->cv.wait(lock, [] {
+            return g_BlockingPostState->release;
+        });
+        g_BlockingPostState->exiting = true;
+        g_BlockingPostState->cv.notify_all();
+        return false;
     }
 
     bool ThrowingGlobalPre(void*, void*, void*)
@@ -165,6 +194,22 @@ namespace
         events.TriggerPostProcessEvent(42, nullptr, nullptr, nullptr);
         Require(g_Counters.global_post == 2, "global post callback did not run for matched event");
         Require(g_Counters.filtered_post == 1, "filtered post callback did not run for matched name index");
+    }
+
+    void TestPostCallbackReturnValueDoesNotAffectDispatch()
+    {
+        ResetCounters();
+        Obelisk::Core::EventManager events;
+        int owner = 0;
+
+        events.RegisterPostProcessEventOwned(&owner, [](void*, void*, void*) -> bool {
+            ++g_Counters.global_post;
+            return false;
+        });
+        events.RegisterPostProcessEventOwned(&owner, GlobalPost);
+
+        events.TriggerPostProcessEvent(nullptr, nullptr, nullptr);
+        Require(g_Counters.global_post == 2, "post callback false return stopped later callbacks");
     }
 
     void TestPreCallbackExceptionsDoNotBlockOrStopLaterCallbacks()
@@ -312,6 +357,54 @@ namespace
         g_SelfUnregisterId = 0;
     }
 
+    void TestOwnerCleanupWaitsForInFlightPostCallback()
+    {
+        ResetCounters();
+        Obelisk::Core::EventManager events;
+        int owner = 0;
+        BlockingCallbackState state;
+        g_BlockingPostState = &state;
+
+        const uint64_t id = events.RegisterPostProcessEventOwned(&owner, BlockingPost);
+        Require(id != 0, "blocking post registration id was zero");
+
+        std::thread dispatchThread([&events] {
+            events.TriggerPostProcessEvent(nullptr, nullptr, nullptr);
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.mutex);
+            Require(state.cv.wait_for(lock, std::chrono::seconds(2), [&state] {
+                        return state.entered;
+                    }),
+                    "blocking post callback did not enter");
+        }
+
+        std::atomic_bool cleanupReturned = false;
+        size_t removed = 0;
+        std::thread cleanupThread([&] {
+            removed = events.UnregisterCallbacksForOwner(&owner);
+            cleanupReturned.store(true);
+        });
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        Require(!cleanupReturned.load(), "owner cleanup returned while post callback was in flight");
+
+        {
+            std::lock_guard<std::mutex> lock(state.mutex);
+            state.release = true;
+        }
+        state.cv.notify_all();
+
+        cleanupThread.join();
+        dispatchThread.join();
+
+        Require(cleanupReturned.load(), "owner cleanup did not return after callback exit");
+        Require(removed == 1, "owner cleanup removed wrong count after post dispatch");
+        Require(!events.HasPostProcessEventCallbacks(), "post callback survived owner cleanup");
+        g_BlockingPostState = nullptr;
+    }
+
     void TestRegistrationIdsSkipZeroAfterWrap()
     {
         ResetCounters();
@@ -345,12 +438,14 @@ int main()
     TestFilteredPreCallbacks();
     TestPreCallbackBlocking();
     TestFilteredPostCallbacks();
+    TestPostCallbackReturnValueDoesNotAffectDispatch();
     TestPreCallbackExceptionsDoNotBlockOrStopLaterCallbacks();
     TestPostCallbackExceptionsDoNotStopLaterCallbacks();
     TestOwnerCleanup();
     TestSingleRegistrationUnregister();
     TestNullCallbacksAreIgnored();
     TestCallbackCanUnregisterItself();
+    TestOwnerCleanupWaitsForInFlightPostCallback();
     TestRegistrationIdsSkipZeroAfterWrap();
 
     Obelisk::Logger::Shutdown();
