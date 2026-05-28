@@ -202,6 +202,7 @@ cat /servidor/ark/obelisk/dumps/supervisor/latest/chat-reflection.txt
 
 After rollback, `chat_reflection_marker=disabled` is expected. Do not remove
 `enable-process-event-hook` or `disable-plugins` for this rollback if that approved
-fallback profile uses them. The current default development/test harness is
-`arkserver` / Ragnarok; `arkserver2` / TheIsland should stay stopped unless the operator
-explicitly reopens it for a named window.
+fallback profile uses them. The current server-backed development/test target is
+`arkserver2` / TheIsland only after explicit operator approval; it starts from powered off
+and must be shut down when the window ends. Keep `arkserver` / Ragnarok untouched while
+users are active.

@@ -94,8 +94,9 @@ scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection
 ```
 
 Use explicit `--map` and `--instance`; do not rely on script defaults during Obelisk debug
-rounds. Under current RAM constraints, keep `arkserver2` / TheIsland stopped unless the
-operator explicitly reopens it for a named window.
+rounds. Current operator direction protects `arkserver` / Ragnarok while users are active.
+If server validation is needed, use `arkserver2` / TheIsland only after explicit approval,
+then shut it down when the test window ends.
 
 Check that no files matching these patterns are staged:
 

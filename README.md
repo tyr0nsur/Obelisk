@@ -305,8 +305,9 @@ OBELISK_ENABLE_NATIVE_EXEC_PROBES=1      + enable-native-exec-probes
 Experimental scanners, candidate module observers, text logging, broad tracing, and native
 exec probes stay opt-in. Reflection captures belong on isolated/debug instances or the
 currently approved named harness only. Do not use these controls on normal player
-performance posture; `arkserver2` / TheIsland is only an explicitly approved fallback
-while RAM is constrained.
+performance posture. Current operator direction protects `arkserver` / Ragnarok while
+users are active; `arkserver2` / TheIsland starts powered off and may be used only for an
+explicitly approved scoped test, then shut down afterward.
 
 ## Roadmap
 

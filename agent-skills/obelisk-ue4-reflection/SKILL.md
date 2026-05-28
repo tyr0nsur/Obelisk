@@ -146,14 +146,14 @@ Do not skip steps because a single core, log line, or recognizer test looks conv
   dispatch public plugin callbacks from candidate evidence.
 - Reserve runtime observation budgets only after cheap exact prefilters pass.
 - On live servers, keep plugin discovery off unless testing a known safe build.
-- Current operator direction as of 2026-05-28 keeps `arkserver2` / TheIsland stopped for
-  RAM and makes `arkserver` / Ragnarok the active Obelisk development/test harness.
-  Treat it as an approved window for controlled runtime validation only, not a reason to
-  run high-risk probes by default.
+- Current operator direction as of 2026-05-28 protects `arkserver` / Ragnarok because
+  users are active there. Do not restart it, change markers, or run runtime tests there.
+  `arkserver2` / TheIsland is powered off; if a server is needed, start it only with
+  explicit operator approval and shut it down when the test window ends.
 - Do not enable raw discovery, broad tracing, native exec probes, ptrace/gcore, or
   `ReflectionScanner` without exact operator approval for that run, copied-log evidence,
-  and rollback. Prefer `arkserver-obelisk-debug` for scanner-like captures; use
-  `arkserver2` only if the operator explicitly reopens it as a fallback.
+  and rollback. Prefer `arkserver2` / TheIsland or `arkserver-obelisk-debug` for
+  scanner-like captures only when the operator explicitly approves that target.
 
 ## Review Checklist
 

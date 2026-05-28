@@ -70,11 +70,10 @@ proving:
 
 ## Runtime Scope
 
-Historical TheIsland instructions are superseded while RAM is constrained. Keep
-`arkserver2` stopped unless the operator explicitly reopens it. Runtime inventory
-observation should remain offline-only until an explicit approved `arkserver` / Ragnarok
-debug window or a dedicated isolated debug instance exists, with rollback and stable
-posture verification.
+Runtime inventory observation should remain offline-only until an explicit approved
+`arkserver2` / TheIsland window or a dedicated isolated debug instance exists, with
+rollback, stable posture verification, and shutdown afterward. Keep `arkserver` / Ragnarok
+untouched while users are active.
 
 ## Current Status
 

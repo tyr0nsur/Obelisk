@@ -35,27 +35,29 @@ Convenience log links may live under:
 
 Current operator direction as of 2026-05-28:
 
-- RAM is currently tight. Keep `arkserver2` / TheIsland stopped unless the operator
-  explicitly reopens it.
-- `arkserver` / Ragnarok is now operator-approved as the active Obelisk development/test
-  harness. Use it for controlled runtime validation and plugin lifecycle checks, with
-  one gate at a time, copied evidence, and rollback to stable posture.
+- `arkserver` / Ragnarok has active users and is protected. Do not restart it, change
+  markers, or run Obelisk tests there.
+- `arkserver2` / TheIsland is powered off. If server validation is needed, start it only
+  with explicit operator approval, use one scoped gate at a time with copied evidence and
+  rollback posture, then shut it down when the test window ends.
 - ReflectionScanner, native exec probes, ptrace/gcore, broad ProcessEvent tracing, and
   text/gameplay-payload logging still require a specific operator-approved run window and
-  rollback plan before activation on `arkserver`.
+  rollback plan before activation on `arkserver2`.
 
 ## Production Baseline
 
-Ragnarok is the current development/test harness. Keep its stable baseline simple:
-ProcessEvent hook enabled, plugins disabled unless a plugin test is explicitly in scope,
-scanner/native-exec/broad tracing off, and posture checked after any marker or restart.
+Ragnarok is currently protected because users are active. Keep its stable baseline simple:
+ProcessEvent hook enabled, plugins disabled unless a future maintenance window explicitly
+scopes a plugin test, scanner/native-exec/broad tracing off, and no restarts or marker
+edits.
 
 ```bash
-# Only run marker/restart commands when that change is part of the active approved test:
-# mkdir -p /servidor/ark/obelisk/state/instances/arkserver
-# touch /servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook
-# touch /servidor/ark/obelisk/state/instances/arkserver/disable-plugins
-# env -u TMUX ./arkserver restart
+# Only run marker/start/stop commands when that change is part of an approved
+# arkserver2 / TheIsland test window:
+# mkdir -p /servidor/ark/obelisk/state/instances/arkserver2
+# touch /servidor/ark/obelisk/state/instances/arkserver2/enable-process-event-hook
+# touch /servidor/ark/obelisk/state/instances/arkserver2/disable-plugins
+# env -u TMUX ./arkserver2 start
 ```
 
 Expected logs:
@@ -93,11 +95,13 @@ scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection
 - Never enable native exec probes without explicit approval for the named `arkserver` run.
 - Do not set `OBELISK_DEBUG_ALLOW_PTRACE=1` by default in debug wrappers. Ptrace requires
   an approved isolated run plus the `allow-ptrace` marker.
-- Never enable `ReflectionScanner` on `arkserver` without a specific operator-approved
-  debug window, plugins disabled, copied-log evidence, and a marker/env rollback plan.
+- Never enable `ReflectionScanner` on `arkserver` / Ragnarok while users are active. Use
+  `arkserver2` / TheIsland only with a specific operator-approved debug window, plugins
+  disabled, copied-log evidence, marker/env rollback, and shutdown at the end.
 - Keep `OBELISK_PE_TRACE_LIMIT=0` by default; use short trace windows only for approved
-  evidence windows on `arkserver`.
-- Do not start `arkserver2` to get extra isolation while RAM is constrained.
+  evidence windows on `arkserver2`.
+- Do not start `arkserver2` unless it is the approved scoped test target, and stop it
+  again after the test.
 
 ## Debug Profiles
 
@@ -204,27 +208,27 @@ scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection
   --map Ragnarok --instance arkserver
 ```
 
-Current routine debug uses Ragnarok/`arkserver` because the operator made it available and
-`arkserver2` is stopped for RAM pressure:
+Current server-backed debug, when approved, uses `arkserver2` / TheIsland. It starts from
+powered off, runs the scoped test, then shuts down:
 
 ```bash
-tail -n 100 /servidor/ark/obelisk/logs/arkserver/Obelisk.log
-pid=$(pgrep -f '^./ShooterGameServer Ragnarok' | head -n1)
+tail -n 100 /servidor/ark/obelisk/logs/arkserver2/Obelisk.log
+pid=$(pgrep -f '^./ShooterGameServer TheIsland' | head -n1)
 rg 'libobelisk|libsubhook' /proc/$pid/maps
 scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection \
-  --map Ragnarok --instance arkserver
+  --map TheIsland --instance arkserver2
 ```
 
 ## Rollback
 
-If `arkserver` crashes after an Obelisk change, preserve logs/core files first. Restarting
-Ragnarok is allowed only when it is part of the current approved test or rollback window:
+If `arkserver2` crashes after an Obelisk change, preserve logs/core files first. Stop
+TheIsland at the end of the approved test or rollback window:
 
 ```bash
 # Approved test/rollback window only; preserve evidence first.
-# mkdir -p /servidor/ark/obelisk/state/instances/arkserver
-# touch /servidor/ark/obelisk/state/instances/arkserver/disable-plugins
-# env -u TMUX ./arkserver start
+# mkdir -p /servidor/ark/obelisk/state/instances/arkserver2
+# touch /servidor/ark/obelisk/state/instances/arkserver2/disable-plugins
+# env -u TMUX ./arkserver2 stop
 ```
 
 Preserve logs and core files before rebuilding or changing markers again.

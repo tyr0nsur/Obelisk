@@ -225,9 +225,10 @@ Every second-source note or evidence pack should record:
 3. Compare existing module snapshots layout-only against the second source with
    `scripts/compare_reflection_snapshots.py` when available.
 4. Only then schedule short, marker-gated observation for inventory or structures on a
-   named approved debug target. Prefer a dedicated `arkserver-obelisk-debug` instance;
-   use `arkserver` / Ragnarok only inside an explicit operator-approved window, and keep
-   `arkserver2` / TheIsland stopped unless the operator explicitly reopens it.
+   named approved debug target. Prefer a dedicated `arkserver-obelisk-debug` instance; if
+   using the current cluster, use `arkserver2` / TheIsland only inside an explicit
+   operator-approved window and shut it down afterward. Keep `arkserver` / Ragnarok
+   untouched while users are active.
 5. Define SDK promotion policy after copied-data ownership and ABI lifecycle are proven.
 
 ## Current Result

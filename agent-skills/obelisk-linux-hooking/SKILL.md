@@ -53,10 +53,11 @@ When patching `.text`:
 
 ## Validation
 
-Run live validation on the currently approved target. As of 2026-05-28, RAM is
-constrained, `arkserver2` / TheIsland should stay stopped, and `arkserver` / Ragnarok is
-the active Obelisk development/test harness. High-risk hook/scanner captures still require
-explicit approval for the exact run window and rollback plan.
+Run live validation on the currently approved target. As of 2026-05-28, `arkserver` /
+Ragnarok has active users and is protected from Obelisk tests. If a server is needed, use
+`arkserver2` / TheIsland only after explicit approval for start/restart, the exact run
+window, rollback, and shutdown at the end. High-risk hook/scanner captures still require
+separate explicit approval.
 
 ```bash
 cmake --build build -j"$(nproc)"
@@ -70,5 +71,6 @@ Expected:
 - server process remains alive
 - player can join
 
-Do not use `arkserver` / Ragnarok for hook validation while player performance testing is
-active unless the operator opens a maintenance window.
+Do not use `arkserver` / Ragnarok for hook validation while users are active. Use
+`arkserver2` / TheIsland only after explicit operator approval for the scoped test, then
+shut it down afterward.

@@ -2,7 +2,8 @@
 
 > Historical/superseded chat observer plan: do not execute marker commands from this note
 > directly. Current runtime-observation work is module-first, requires explicit
-> operator-approved debug windows, and keeps `arkserver2` stopped unless reopened.
+> operator-approved `arkserver2` / TheIsland windows, and requires shutting it down after
+> the scoped test. Keep `arkserver` / Ragnarok untouched while users are active.
 
 ## Objective
 

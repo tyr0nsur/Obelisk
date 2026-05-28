@@ -34,15 +34,21 @@ Updated: 2026-05-28
   Preferred markers are
   `/servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook` and
   `/servidor/ark/obelisk/state/instances/arkserver/disable-plugins`.
-- fact: Operator direction changed on 2026-05-28: RAM is tight, `arkserver2` / TheIsland
-  should stay stopped, and `arkserver` / Ragnarok is now available as the Obelisk
-  development/test harness. Use controlled gates, copied evidence, and rollback posture.
-- fact: Operational correction on 2026-05-28: `arkserver2` stop was requested and confirmed
-  already stopped; `arkserver` was restarted after removing
-  `/servidor/ark/obelisk/state/instances/arkserver/enable-chat-reflection`. Current
-  Ragnarok PID after restart: `1820244`. Read-only posture passes with
+- fact: Operator direction changed on 2026-05-28: users are active on `arkserver` /
+  Ragnarok, so do not restart it, change markers, or run Obelisk tests there.
+  `arkserver2` / TheIsland is powered off; if server validation is needed, start it only
+  with explicit operator approval, run the scoped test, restore posture, and shut it down
+  again.
+- fact: Historical operational correction on 2026-05-28 removed a chat-reflection marker
+  and restarted `arkserver`; this is superseded by the later read-only audit below.
+- fact: Read-only audit after user report found active Ragnarok PID `3412724` still has
+  `OBELISK_ENABLE_CHAT_REFLECTION=1`, `OBELISK_ENABLE_INVENTORY_REFLECTION=1`, and
+  `OBELISK_ENABLE_STRUCTURE_REFLECTION=1` in its environment. Instance markers
+  `enable-chat-reflection`, `enable-inventory-reflection`, and `enable-structure-reflection`
+  were present under `/servidor/ark/obelisk/state/instances/arkserver`. The check
   `scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map
-  Ragnarok --instance arkserver`.
+  Ragnarok --instance arkserver` fails. Do not fix by restarting while users are active;
+  cleanup requires explicit maintenance approval.
 - fact: The LinuxGSM wrapper now scrubs inherited marker-managed Obelisk env vars before
   selecting an instance profile. ProcessEvent hook, plugin-disable, ptrace/debug-control,
   native exec probes, global callbacks, and chat/inventory/structure reflection env must be
@@ -67,9 +73,9 @@ Updated: 2026-05-28
   repeated the backup/restart; current `ark-config-latest` is
   `/home/flowcommunity-ark/backups/ark-config-20260527-190558`. Historical PID `3940524`
   was replaced by PID `1820244` after the 2026-05-28 RAM/posture restart.
-- fact: Active debug target is now `arkserver` / Ragnarok. Do not start `arkserver2` for
-  Obelisk work while RAM is constrained. Risky probes still need explicit approval for the
-  exact `arkserver` window and rollback plan.
+- fact: Active server-backed debug target is now `arkserver2` / TheIsland, but it is
+  powered off. Start it only with explicit operator approval for a scoped test, then shut
+  it down afterward. Keep `arkserver` / Ragnarok untouched while users are active.
 - fact: `sdk.structures` runtime observation now requires both env/SHA/budget gates and
   `/servidor/ark/obelisk/state/instances/<instance>/enable-structure-reflection`.
   The LinuxGSM wrapper exports structure reflection env only from that marker, and the
@@ -197,8 +203,9 @@ Updated: 2026-05-28
   public `CallProcessEvent`, and module observer env. Use `--forbid-chat-reflection` for
   quiet Ragnarok/post-release checks; release docs now require that command explicitly.
 - fact: Older TheIsland/`arkserver2` research runbooks are marked historical/superseded
-  while RAM is constrained. The operational doc guardrail now scans research docs with live
-  marker/restart snippets and requires an explicit historical or approved-runbook banner.
+  unless the operator approves a new scoped `arkserver2` window. The operational doc
+  guardrail now scans research docs with live marker/restart snippets and requires an
+  explicit historical or approved-runbook banner.
 - fact: Second-source snapshot comparison now rejects partial identity reuse. Missing
   identity, fully matching identity, or shared `artifact_sha256`, `capture_id`, or
   `evidence_pack_id` is `inconclusive`, even if the sanitized layout matches. A promoted
@@ -446,9 +453,9 @@ Updated: 2026-05-28
   `docs/research/2026-05-27-isolated-debug-instance-plan.md`.
 - fact: Runtime and wrapper were redeployed from the central install root after removing
   legacy marker fallbacks. Historical audit recorded `arkserver` active and `arkserver2`
-  stopped. Current operator direction on 2026-05-28 makes `arkserver` / Ragnarok the
-  temporary Obelisk development/test harness while RAM is constrained and keeps
-  `arkserver2` stopped; the preferred future target remains a dedicated
+  stopped. Current operator direction protects `arkserver` / Ragnarok while users are
+  active; use `arkserver2` / TheIsland only for an explicitly approved server test window
+  and shut it down afterward. The preferred future target remains a dedicated
   `arkserver-obelisk-debug` instance when available. See
   `docs/research/2026-05-27-ops-restart-audit-instance-id.md`.
 - fact: `scripts/analyze_reflectionscanner_capture.py` passively summarizes copied
@@ -720,10 +727,9 @@ Updated: 2026-05-28
   core or future binary before promoting any runtime-stable reflection contract.
 - next-step: No second isolated core is currently available; read-only dump inventory only
   found the existing Ragnarok-derived core and derivative packs. Current operator
-  direction makes `arkserver` / Ragnarok available for Obelisk tests while RAM is tight
-  and keeps `arkserver2` stopped. Follow
-  `docs/research/2026-05-27-isolated-second-core-runbook.md` only after approval for the
-  exact `arkserver` run window.
+  direction protects `arkserver` / Ragnarok while users are active. Follow
+  `docs/research/2026-05-27-isolated-second-core-runbook.md` only after approval for an
+  exact `arkserver2` / TheIsland run window, and shut it down afterward.
 - fact: `scripts/inspect_core_ufunctions.py` can walk legacy `UStruct.Children +0x38` and
   `UField.Next +0x28` property chains from the core for UFunction and ScriptStruct
   evidence across module surfaces; see
@@ -779,11 +785,10 @@ Updated: 2026-05-28
 - rejected: ProcessEvent candidate `0x1d11cb0` did not receive gameplay events.
 - risk: Raw FString scanning/discovery must not be enabled on live Ragnarok as
   the normal test path.
-- risk: Runtime/reversing experiments on `arkserver` / Ragnarok can still affect the only
-  running ARK instance. Use one gate at a time, short windows, copied evidence, and
-  rollback posture.
-- risk: `arkserver2` / TheIsland should stay stopped while RAM is constrained. Do not
-  start it for Obelisk work unless the operator explicitly reopens it.
+- risk: Runtime/reversing experiments on `arkserver` / Ragnarok would affect active
+  users. Do not use it for Obelisk tests.
+- risk: `arkserver2` / TheIsland is powered off. Do not start it for Obelisk work unless
+  the operator explicitly approves the scoped test, rollback, and shutdown afterward.
 - fact: Historical Ragnarok runbooks for core dumps and runtime debug-control were
   rewritten as non-default guidance: future captures must use
   `docs/research/2026-05-27-isolated-second-core-runbook.md`,
@@ -821,12 +826,10 @@ Updated: 2026-05-28
 - next-step: Keep reducing tooling debt that makes reversing faster and safer: snapshot
   comparators, manifest regeneration, sanitizer tests, evidence packs, and bounded
   property-chain validation.
-- rollback: while RAM is constrained, rollback targets `arkserver` / Ragnarok only within
-  an approved test/rollback window: remove the experimental marker/env, keep
-  `disable-plugins`, restart only Ragnarok if restart was approved, and run
-  `scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map
-  Ragnarok --instance arkserver`. Keep `arkserver2` stopped unless the operator explicitly
-  reopens it.
+- rollback: server-backed Obelisk tests target `arkserver2` / TheIsland only within an
+  approved test/rollback window: remove the experimental marker/env, keep
+  `disable-plugins`, stop TheIsland when done, and run posture checks before shutdown if
+  the server was started. Keep `arkserver` / Ragnarok untouched while users are active.
 - next-step: Generalize the binary-hash-scoped reflection pipeline only after another
   capture or ARK binary hash validates the same fields.
 - next-step: Add binary hash validation or an instruction decoder before accepting future

@@ -80,10 +80,12 @@ Do not enable native exec probes on validation adapter servers. Keep experimenta
 plugins in the repository or another staging location until isolated validation
 passes.
 
-Current operator direction as of 2026-05-28: RAM is tight, `arkserver2` / TheIsland should
-stay stopped, and `arkserver` / Ragnarok is available as the Obelisk debug/development
-harness. For `gcore`, `ptrace`, ReflectionScanner, broad tracing, or scanner-like probes,
-use a specifically approved `arkserver` run window with rollback.
+Current operator direction as of 2026-05-28: users are active on `arkserver` / Ragnarok,
+so do not restart it, change markers, or run Obelisk tests there. `arkserver2` /
+TheIsland is powered off; if server validation is needed, start it only with explicit
+operator approval, run the scoped test, restore posture, and shut it down again. For
+`gcore`, `ptrace`, ReflectionScanner, broad tracing, or scanner-like probes, use a
+specifically approved `arkserver2` run window with rollback.
 
 After any scanner/plugin capture or runtime redeploy on an approved debug target, run
 `scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map <map> --instance

@@ -85,14 +85,15 @@ This is required because `jmp rel32` can fail when `ShooterGameServer` is mapped
 
 ## Safe Runtime Validation
 
-Current operator direction as of 2026-05-28: RAM is tight, `arkserver2` / TheIsland should
-stay stopped, and `arkserver` / Ragnarok is available as the Obelisk development/test
-harness. Keep changes controlled, one gate at a time, and restore stable posture after
-runtime validation.
+Current operator direction as of 2026-05-28: users are active on `arkserver` / Ragnarok,
+so it is protected from Obelisk restarts, marker changes, and runtime tests. `arkserver2`
+/ TheIsland is powered off; if server validation is needed, start it only with explicit
+operator approval, keep changes controlled one gate at a time, restore stable posture, and
+shut it down when the test window ends.
 
 For risky probes such as ReflectionScanner, native exec, ptrace/gcore, broad tracing, or
 text/gameplay-payload logging, first obtain explicit operator approval for the exact
-`arkserver` run, marker changes, restart window, and rollback plan.
+`arkserver2` run, marker changes, restart window, rollback plan, and shutdown at the end.
 
 Validate:
 

@@ -28,6 +28,18 @@ FORBIDDEN_ACTIVE_LINES = [
 ]
 FORBIDDEN_STALE_PHRASES = [
     "current TheIsland debug baseline",
+    "Ragnarok is the current development/test harness",
+    "Ragnarok is the current debug/development harness",
+    "use `arkserver` / Ragnarok as the Obelisk development/test harness",
+    "use `arkserver` / Ragnarok as the Obelisk debug/development harness",
+    "Active debug target is now `arkserver` / Ragnarok",
+    "Current routine debug uses Ragnarok",
+    "Current core/runtime captures should\n  use the operator-approved `arkserver` window",
+    "`arkserver` / Ragnarok available for Obelisk tests",
+    "`arkserver` / Ragnarok is available as the Obelisk debug/development",
+    "`arkserver` / Ragnarok is now available as the Obelisk",
+    "keep `arkserver2` stopped for RAM",
+    "while RAM is constrained",
 ]
 RESEARCH_RUNBOOK_MARKERS = [
     "Historical/superseded",

@@ -124,11 +124,12 @@ tr '\0' '\n' < /proc/$(pgrep -f '^./ShooterGameServer TheIsland' | head -n1)/env
 
 Expected safe Obelisk posture for development baseline:
 
-- Ragnarok: ProcessEvent hook enabled, plugins disabled; currently reserved for player
-  performance testing.
-- TheIsland: `arkserver2` should stay stopped while RAM is constrained. Current Obelisk
-  debug/development work uses `arkserver` / Ragnarok; scanner/native-exec/ptrace or broad
-  tracing still require explicit run-window approval and rollback.
+- Ragnarok: ProcessEvent hook enabled, plugins disabled; currently protected while users
+  are active.
+- TheIsland: `arkserver2` is powered off. Current Obelisk debug/development server work
+  uses `arkserver2` only after explicit approval for a scoped test, rollback, and shutdown
+  afterward; scanner/native-exec/ptrace or broad tracing still require explicit
+  run-window approval and rollback.
 - ReflectionScanner disabled unless an isolated/debug run is intentionally authorized.
 - Native exec probes disabled.
 

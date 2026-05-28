@@ -76,9 +76,11 @@ cross-validated by object and property metadata.
 
 - Keep `OBELISK_ENABLE_PROCESS_EVENT_HOOK=1` plus the `enable-process-event-hook` marker
   and plugins disabled as the baseline safe runtime test.
-- Current operator direction as of 2026-05-28 makes `arkserver` / Ragnarok the active
-  Obelisk development/test harness because RAM is constrained and `arkserver2` should stay
-  stopped. Use controlled gates and rollback posture.
+- Current operator direction as of 2026-05-28 protects `arkserver` / Ragnarok because
+  users are active there. Do not restart it, change markers, or run runtime tests there.
+  `arkserver2` / TheIsland is powered off; if a server is needed, start it only with
+  explicit operator approval, use controlled gates plus rollback posture, and shut it down
+  when the test window ends.
 - Experimental module recognizers belong only on an explicitly approved debug/development
   target. The historical chat gate (`OBELISK_ENABLE_CHAT_REFLECTION=1`) additionally
   requires the matching `OBELISK_CHAT_REFLECTION_BINARY_SHA256` gate and a small log limit.
@@ -87,10 +89,9 @@ cross-validated by object and property metadata.
 - Do not enable broad event discovery on a production map until it has survived an
   isolated server test.
 - Do not run `ReflectionScanner`, `gcore`/`ptrace`, broad tracing, native exec probes, or
-  scanner-like captures on `arkserver` unless the operator approves that exact run window.
-  Prefer `arkserver-obelisk-debug` for these high-risk captures; run them on `arkserver2`
-  only for a specifically approved fallback debug window with plugins disabled,
-  copied-log evidence, and rollback.
+  scanner-like captures on `arkserver` / Ragnarok. Run them on `arkserver2` only for a
+  specifically approved debug window with plugins disabled, copied-log evidence, rollback,
+  and shutdown at the end.
 - Use small `OBELISK_PE_TRACE_LIMIT` windows only when capturing evidence; default should
   remain quiet.
 - Prefer per-instance markers over ad hoc environment edits for approved debug captures.

@@ -108,10 +108,10 @@ Then configure LinuxGSM:
 executable="./ObeliskRun.sh"
 ```
 
-Current operator direction as of 2026-05-28: RAM is tight, keep `arkserver2` / TheIsland
-stopped, and use `arkserver` / Ragnarok as the Obelisk debug/development harness. For
-scanner or reflection research, use a specifically approved `arkserver` window with
-rollback; do not start extra ARK instances while RAM is constrained.
+Current operator direction as of 2026-05-28: users are active on `arkserver` / Ragnarok,
+so do not restart it, change markers, or run Obelisk tests there. `arkserver2` /
+TheIsland is powered off; if server validation is needed, start it only with explicit
+operator approval, run the scoped test, restore posture, and shut it down again.
 
 ## Instance Identity
 
@@ -252,5 +252,6 @@ state/instances/arkserver/disable-plugins
 
 This validates the core ProcessEvent hook without loading experimental plugins.
 
-While RAM is constrained, use `arkserver` / Ragnarok for debug/development markers and
-validation windows, and keep `arkserver2` / TheIsland stopped unless explicitly reopened.
+Use `arkserver2` / TheIsland for debug/development markers and validation windows only
+after explicit operator approval. It starts from powered off and must be stopped again
+after the scoped test. Keep `arkserver` / Ragnarok protected while users are active.
