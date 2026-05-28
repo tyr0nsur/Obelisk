@@ -25,6 +25,9 @@ that a `.so` will consume.
 - Helper-module or background-thread callback registrations must use the append-only
   owner-token registration functions and the `plugin_owner_token` supplied in
   `ObeliskPluginInitContext`.
+- Handle-returning owner-token ProcessEvent registrations are the preferred public path
+  for long-lived callbacks. Public unregister must be owner-scoped with the same
+  `plugin_owner_token`; never expose bare unregister-by-id across the plugin ABI.
 - Plugins may optionally export `extern "C" void ObeliskPlugin_Shutdown()`. The runtime
   resolves it with `dlsym` outside the `ObeliskApi` table and calls it before callback
   owner cleanup and before `dlclose`.
@@ -102,6 +105,8 @@ Validation rules:
 - Prefer opaque `uint64_t` registration ids plus explicit unregister for new event APIs.
   Keep owner-token cleanup on init failure/unload as the backstop, and include `user_data`
   in callback subscriptions instead of asking plugins to capture global state.
+- Registration ids returned across the ABI are process-local handles, not shared cluster
+  state. They must not be written to shared config or reused across ARK server processes.
 - Owner-token API additions must stay append-only: `plugin_owner_token` remains at the end
   of `ObeliskPluginInitContext`, and owner-token registration function pointers remain
   after existing `ObeliskApi` fields.

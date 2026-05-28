@@ -101,6 +101,11 @@ Updated: 2026-05-28
   appends owner-token ProcessEvent registration functions guarded by
   `OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS`. Tokens are removed on init failure and
   unload.
+- fact: `ObeliskApi` now also appends owner-token ProcessEvent registration functions that
+  return process-local `uint64_t` handles, guarded by
+  `OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES`. Public granular unregister is
+  owner-scoped through `UnregisterProcessEventCallbackWithOwnerToken(owner_token, handle)`;
+  do not expose or document bare unregister-by-id across the plugin ABI.
 - fact: `oBaseEvents` C exports catch plugin-side exceptions before returning across the
   runtime/plugin ABI. `ObeliskPlugin_Init` resets plugin state on config failure or thrown
   exception, and `ObeliskPlugin_Shutdown` is idempotent.
@@ -267,8 +272,10 @@ Updated: 2026-05-28
   `docs/research/2026-05-27-isolated-debug-instance-plan.md`.
 - fact: Runtime and wrapper were redeployed from the central install root after removing
   legacy marker fallbacks. Historical audit recorded `arkserver` active and `arkserver2`
-  stopped; current operational policy is to avoid Ragnarok for development, prefer
-  `arkserver-obelisk-debug`, and use `arkserver2` only for approved fallback windows. See
+  stopped. Current operator direction on 2026-05-28 makes `arkserver` / Ragnarok the
+  temporary Obelisk development/test harness while RAM is constrained and keeps
+  `arkserver2` stopped; the preferred future target remains a dedicated
+  `arkserver-obelisk-debug` instance when available. See
   `docs/research/2026-05-27-ops-restart-audit-instance-id.md`.
 - fact: `scripts/analyze_reflectionscanner_capture.py` passively summarizes copied
   ReflectionScanner logs for UObject scores, FName `matched_clues`, delayed globals, and

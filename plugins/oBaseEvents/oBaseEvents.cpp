@@ -19,6 +19,8 @@ namespace
     bool g_ProcessEventEnabled = false;
     int32_t g_FilteredFunctionIndex = -1;
     int g_LogLimit = 5;
+    uint64_t g_OwnerToken = 0;
+    uint64_t g_ProcessEventRegistrationId = 0;
     std::atomic<int> g_LoggedEvents{0};
 
     constexpr const char* kDefaultConfig = R"json({
@@ -198,6 +200,8 @@ namespace
         g_ProcessEventEnabled = false;
         g_FilteredFunctionIndex = -1;
         g_LogLimit = 5;
+        g_OwnerToken = 0;
+        g_ProcessEventRegistrationId = 0;
         g_LoggedEvents.store(0);
     }
 }
@@ -239,6 +243,7 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(Obelis
         }
 
         g_Api = api;
+        g_OwnerToken = context ? context->plugin_owner_token : 0;
         g_LoggedEvents.store(0);
 
         if (!LoadConfig(context))
@@ -257,8 +262,30 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(Obelis
 
         if (g_ProcessEventEnabled && g_FilteredFunctionIndex >= 0)
         {
-            api->RegisterPreProcessEventForNameIndex(g_FilteredFunctionIndex, OnFilteredProcessEvent);
-            api->LogInfo("[oBaseEvents] Registered filtered ProcessEvent callback.");
+            if ((api->capabilities & OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES) != 0 &&
+                context->plugin_owner_token != 0 &&
+                api->RegisterPreProcessEventForNameIndexWithOwnerTokenHandle)
+            {
+                g_ProcessEventRegistrationId =
+                    api->RegisterPreProcessEventForNameIndexWithOwnerTokenHandle(
+                        context->plugin_owner_token,
+                        g_FilteredFunctionIndex,
+                        OnFilteredProcessEvent);
+                if (g_ProcessEventRegistrationId == 0)
+                {
+                    api->LogError("[oBaseEvents] Failed to register filtered ProcessEvent callback.");
+                    ResetState();
+                    return false;
+                }
+            }
+            else
+            {
+                api->RegisterPreProcessEventForNameIndex(g_FilteredFunctionIndex, OnFilteredProcessEvent);
+            }
+
+            api->LogInfo(g_ProcessEventRegistrationId != 0
+                ? "[oBaseEvents] Registered filtered ProcessEvent callback with explicit handle."
+                : "[oBaseEvents] Registered filtered ProcessEvent callback.");
         }
         else
         {
@@ -287,6 +314,12 @@ extern "C" __attribute__((visibility("default"))) void ObeliskPlugin_Shutdown()
 {
     try
     {
+        if (g_Api && g_ProcessEventRegistrationId != 0 && g_Api->UnregisterProcessEventCallbackWithOwnerToken)
+        {
+            g_Api->UnregisterProcessEventCallbackWithOwnerToken(g_OwnerToken, g_ProcessEventRegistrationId);
+            g_ProcessEventRegistrationId = 0;
+        }
+
         if (g_Api)
             g_Api->LogInfo("[oBaseEvents] Shutdown.");
     }

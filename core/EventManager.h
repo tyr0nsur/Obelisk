@@ -25,6 +25,7 @@ namespace Obelisk::Core
         uint64_t RegisterPreProcessEventForNameIndexOwned(void* owner, int32_t nameIndex, OnProcessEventCallback callback);
         uint64_t RegisterPostProcessEventForNameIndexOwned(void* owner, int32_t nameIndex, OnProcessEventCallback callback);
         bool UnregisterCallback(uint64_t registrationId);
+        bool UnregisterCallbackForOwner(void* owner, uint64_t registrationId);
         size_t UnregisterCallbacksForOwner(void* owner);
 
         bool HasPreProcessEventCallbacks();

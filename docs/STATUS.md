@@ -33,9 +33,9 @@ define or protect runtime behavior.
 | Server posture check | Stable baseline | `scripts/check_obelisk_server_posture.sh --expect-stable --map <map> --instance <instance-id>` validates stable debug env flags, requires a mapped `libobelisk.so`, rejects deleted runtime mappings, and is covered by offline procfs-fixture tests. Use explicit `--map`/`--instance`; add `--forbid-chat-reflection` for production/performance posture where chat reflection and text logging must be off. |
 | Plugin C ABI loading | Stable baseline | ABI is C-compatible and currently append-only for new metadata fields. |
 | Filtered ProcessEvent callbacks | Stable baseline | Prefer callbacks scoped by `FName` index over global callbacks. |
-| Plugin callback ownership | Stable baseline | Callback owner tokens are unregistered on init failure and before plugin unload; owner-token registration supports helper/background-thread callbacks without creating ownerless registrations. |
+| Plugin callback ownership | Stable baseline | Callback owner tokens are unregistered on init failure and before plugin unload; owner-token handle registration supports helper/background-thread callbacks and explicit owner-scoped unregister without creating ownerless registrations. |
 | Plugin architecture policy | Stable baseline | See `docs/PLUGIN_ARCHITECTURE.md`; examples must stay small and experimental plugins stay out of top-level build. |
-| `oBaseEvents` | Release example | First official example plugin; demonstrates ABI validation, config creation, filtered callbacks, and shutdown. |
+| `oBaseEvents` | Release example | First official example plugin; demonstrates ABI validation, config creation, filtered callback handles, and shutdown unregister. |
 | ReflectionScanner | Experimental | Use for isolated captures with explicit gates; keep disabled by default. |
 | Runtime debug control | Experimental | Marker-triggered post-start probes for short debug windows; stable posture rejects `OBELISK_ENABLE_DEBUG_CONTROL`. |
 | Binary-hash-gated module observers | Experimental | Internal observation paths for exact candidate functions; metadata logging is gated and there is no plugin dispatch or public ABI yet. Chat is one historical observer in this family, not the center of the SDK. |

@@ -88,6 +88,11 @@ work from repository state instead of chat history.
 - CI and release validation now run reflection snapshot comparison and ScriptStruct
   fixture tests. README/STATUS present module-first observers and snapshot tooling instead
   of a chat-centered roadmap. Mixed-schema target-filter behavior is covered by tests.
+- Public ProcessEvent callback lifecycle now includes owner-token handle registration:
+  plugins can register with handle-returning owner-token functions and explicitly
+  unregister through `UnregisterProcessEventCallbackWithOwnerToken(owner_token, handle)`.
+  Handles are process-local and must not be stored in shared cluster config or reused
+  across ARK instances.
 - Reflection/reversing/type-reconstruction skills now use the shared module promotion
   ladder and require explicit debug-window approval before marker edits, restarts,
   scanners, ptrace/gcore, or broad tracing. Public SDK guardrails now block premature

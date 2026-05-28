@@ -247,7 +247,8 @@ namespace Obelisk::Core
         uint64_t BuildApiCapabilities()
         {
             uint64_t capabilities = OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS |
-                OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS;
+                OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS |
+                OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES;
             if (AreGlobalProcessEventCallbacksAllowed())
                 capabilities |= OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS;
             return capabilities;
@@ -364,47 +365,65 @@ namespace Obelisk::Core
                 return;
             EventManager::Get().RegisterPostProcessEventForNameIndexOwned(owner, nameIndex, callback);
         }
-        void PluginRegisterPreProcessEventWithOwnerToken(uint64_t ownerToken, OnProcessEventCallback callback) {
+        uint64_t PluginRegisterPreProcessEventWithOwnerTokenHandle(uint64_t ownerToken, OnProcessEventCallback callback) {
             if (!ValidateProcessEventCallback("RegisterPreProcessEventWithOwnerToken", callback))
-                return;
+                return 0;
             if (!IsGlobalProcessEventCallbackCapabilityEnabled())
             {
                 OBELISK_WARN("Global PreProcessEvent callback rejected. Use RegisterPreProcessEventForNameIndexWithOwnerToken or enable allow-global-process-event-callbacks for a controlled debug window.");
-                return;
+                return 0;
             }
             void* owner = ResolveOwnerTokenForRegistration("RegisterPreProcessEventWithOwnerToken", ownerToken);
             if (!owner)
-                return;
-            EventManager::Get().RegisterPreProcessEventOwned(owner, callback);
+                return 0;
+            return EventManager::Get().RegisterPreProcessEventOwned(owner, callback);
         }
-        void PluginRegisterPostProcessEventWithOwnerToken(uint64_t ownerToken, OnProcessEventCallback callback) {
+        uint64_t PluginRegisterPostProcessEventWithOwnerTokenHandle(uint64_t ownerToken, OnProcessEventCallback callback) {
             if (!ValidateProcessEventCallback("RegisterPostProcessEventWithOwnerToken", callback))
-                return;
+                return 0;
             if (!IsGlobalProcessEventCallbackCapabilityEnabled())
             {
                 OBELISK_WARN("Global PostProcessEvent callback rejected. Use RegisterPreProcessEventForNameIndexWithOwnerToken or enable allow-global-process-event-callbacks for a controlled debug window.");
-                return;
+                return 0;
             }
             void* owner = ResolveOwnerTokenForRegistration("RegisterPostProcessEventWithOwnerToken", ownerToken);
             if (!owner)
-                return;
-            EventManager::Get().RegisterPostProcessEventOwned(owner, callback);
+                return 0;
+            return EventManager::Get().RegisterPostProcessEventOwned(owner, callback);
         }
-        void PluginRegisterPreProcessEventForNameIndexWithOwnerToken(uint64_t ownerToken, int32_t nameIndex, OnProcessEventCallback callback) {
+        uint64_t PluginRegisterPreProcessEventForNameIndexWithOwnerTokenHandle(uint64_t ownerToken, int32_t nameIndex, OnProcessEventCallback callback) {
             if (!ValidateFilteredProcessEventCallback("RegisterPreProcessEventForNameIndexWithOwnerToken", nameIndex, callback))
-                return;
+                return 0;
             void* owner = ResolveOwnerTokenForRegistration("RegisterPreProcessEventForNameIndexWithOwnerToken", ownerToken);
             if (!owner)
-                return;
-            EventManager::Get().RegisterPreProcessEventForNameIndexOwned(owner, nameIndex, callback);
+                return 0;
+            return EventManager::Get().RegisterPreProcessEventForNameIndexOwned(owner, nameIndex, callback);
         }
-        void PluginRegisterPostProcessEventForNameIndexWithOwnerToken(uint64_t ownerToken, int32_t nameIndex, OnProcessEventCallback callback) {
+        uint64_t PluginRegisterPostProcessEventForNameIndexWithOwnerTokenHandle(uint64_t ownerToken, int32_t nameIndex, OnProcessEventCallback callback) {
             if (!ValidateFilteredProcessEventCallback("RegisterPostProcessEventForNameIndexWithOwnerToken", nameIndex, callback))
-                return;
+                return 0;
             void* owner = ResolveOwnerTokenForRegistration("RegisterPostProcessEventForNameIndexWithOwnerToken", ownerToken);
             if (!owner)
-                return;
-            EventManager::Get().RegisterPostProcessEventForNameIndexOwned(owner, nameIndex, callback);
+                return 0;
+            return EventManager::Get().RegisterPostProcessEventForNameIndexOwned(owner, nameIndex, callback);
+        }
+        void PluginRegisterPreProcessEventWithOwnerToken(uint64_t ownerToken, OnProcessEventCallback callback) {
+            (void)PluginRegisterPreProcessEventWithOwnerTokenHandle(ownerToken, callback);
+        }
+        void PluginRegisterPostProcessEventWithOwnerToken(uint64_t ownerToken, OnProcessEventCallback callback) {
+            (void)PluginRegisterPostProcessEventWithOwnerTokenHandle(ownerToken, callback);
+        }
+        void PluginRegisterPreProcessEventForNameIndexWithOwnerToken(uint64_t ownerToken, int32_t nameIndex, OnProcessEventCallback callback) {
+            (void)PluginRegisterPreProcessEventForNameIndexWithOwnerTokenHandle(ownerToken, nameIndex, callback);
+        }
+        void PluginRegisterPostProcessEventForNameIndexWithOwnerToken(uint64_t ownerToken, int32_t nameIndex, OnProcessEventCallback callback) {
+            (void)PluginRegisterPostProcessEventForNameIndexWithOwnerTokenHandle(ownerToken, nameIndex, callback);
+        }
+        bool PluginUnregisterProcessEventCallbackWithOwnerToken(uint64_t ownerToken, uint64_t registrationId) {
+            void* owner = ResolveOwnerTokenForRegistration("UnregisterProcessEventCallbackWithOwnerToken", ownerToken);
+            if (!owner)
+                return false;
+            return EventManager::Get().UnregisterCallbackForOwner(owner, registrationId);
         }
         void PluginCallProcessEvent(void* caller, void* function, void* parms) {
             Hooks::ProcessEventHook::CallOriginalProcessEvent(caller, function, parms);
@@ -446,6 +465,11 @@ namespace Obelisk::Core
         m_Api.RegisterPostProcessEventWithOwnerToken = PluginRegisterPostProcessEventWithOwnerToken;
         m_Api.RegisterPreProcessEventForNameIndexWithOwnerToken = PluginRegisterPreProcessEventForNameIndexWithOwnerToken;
         m_Api.RegisterPostProcessEventForNameIndexWithOwnerToken = PluginRegisterPostProcessEventForNameIndexWithOwnerToken;
+        m_Api.RegisterPreProcessEventWithOwnerTokenHandle = PluginRegisterPreProcessEventWithOwnerTokenHandle;
+        m_Api.RegisterPostProcessEventWithOwnerTokenHandle = PluginRegisterPostProcessEventWithOwnerTokenHandle;
+        m_Api.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle = PluginRegisterPreProcessEventForNameIndexWithOwnerTokenHandle;
+        m_Api.RegisterPostProcessEventForNameIndexWithOwnerTokenHandle = PluginRegisterPostProcessEventForNameIndexWithOwnerTokenHandle;
+        m_Api.UnregisterProcessEventCallbackWithOwnerToken = PluginUnregisterProcessEventCallbackWithOwnerToken;
         g_ApiCapabilities.store(m_Api.capabilities, std::memory_order_release);
     }
 

@@ -163,6 +163,7 @@ namespace
         ResetCounters();
         Obelisk::Core::EventManager events;
         int owner = 0;
+        int otherOwner = 0;
 
         const uint64_t globalPreId = events.RegisterPreProcessEventOwned(&owner, GlobalPre);
         const uint64_t filteredPreId = events.RegisterPreProcessEventForNameIndexOwned(&owner, 42, FilteredPre);
@@ -175,8 +176,14 @@ namespace
         Require(filteredPostId != 0, "filtered post registration id was zero");
         Require(globalPreId != filteredPreId, "registration ids were not unique");
 
-        Require(events.UnregisterCallback(filteredPreId), "filtered pre unregister by id failed");
-        Require(!events.UnregisterCallback(filteredPreId), "filtered pre unregister by id was not idempotent");
+        Require(!events.UnregisterCallbackForOwner(&otherOwner, filteredPreId),
+                "wrong owner unregistered filtered pre callback");
+        Require(events.UnregisterCallbackForOwner(&owner, filteredPreId),
+                "filtered pre unregister by owner and id failed");
+        Require(!events.UnregisterCallbackForOwner(&owner, filteredPreId),
+                "filtered pre unregister by owner and id succeeded twice");
+        Require(!events.UnregisterCallbackForOwner(nullptr, globalPreId),
+                "null owner unregistered a callback");
         Require(!events.UnregisterCallback(0), "zero registration id unregistered a callback");
 
         Require(events.TriggerPreProcessEvent(42, nullptr, nullptr, nullptr),
@@ -184,7 +191,8 @@ namespace
         Require(g_Counters.global_pre == 1, "global pre callback was removed by filtered id");
         Require(g_Counters.filtered_pre == 0, "filtered pre callback survived id unregister");
 
-        Require(events.UnregisterCallback(globalPostId), "global post unregister by id failed");
+        Require(events.UnregisterCallbackForOwner(&owner, globalPostId),
+                "global post unregister by owner and id failed");
         events.TriggerPostProcessEvent(42, nullptr, nullptr, nullptr);
         Require(g_Counters.global_post == 0, "global post callback survived id unregister");
         Require(g_Counters.filtered_post == 1, "filtered post callback was removed by global id");

@@ -9,6 +9,7 @@
 #define OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS (1ull << 0)
 #define OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS (1ull << 1)
 #define OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS (1ull << 2)
+#define OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES (1ull << 3)
 
 #ifdef __cplusplus
 extern "C" {
@@ -79,6 +80,18 @@ struct ObeliskApi {
     void (*RegisterPostProcessEventWithOwnerToken)(uint64_t ownerToken, OnProcessEventCallback callback);
     void (*RegisterPreProcessEventForNameIndexWithOwnerToken)(uint64_t ownerToken, int32_t nameIndex, OnProcessEventCallback callback);
     void (*RegisterPostProcessEventForNameIndexWithOwnerToken)(uint64_t ownerToken, int32_t nameIndex, OnProcessEventCallback callback);
+
+    // Handle-returning ProcessEvent callback registration. Plugins must check
+    // struct_size and OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES before using
+    // these fields. A return value of 0 means the registration was rejected. Non-zero
+    // handles can be passed with the same owner token to
+    // UnregisterProcessEventCallbackWithOwnerToken for granular cleanup; plugin-owner
+    // cleanup on unload remains the runtime backstop.
+    uint64_t (*RegisterPreProcessEventWithOwnerTokenHandle)(uint64_t ownerToken, OnProcessEventCallback callback);
+    uint64_t (*RegisterPostProcessEventWithOwnerTokenHandle)(uint64_t ownerToken, OnProcessEventCallback callback);
+    uint64_t (*RegisterPreProcessEventForNameIndexWithOwnerTokenHandle)(uint64_t ownerToken, int32_t nameIndex, OnProcessEventCallback callback);
+    uint64_t (*RegisterPostProcessEventForNameIndexWithOwnerTokenHandle)(uint64_t ownerToken, int32_t nameIndex, OnProcessEventCallback callback);
+    bool (*UnregisterProcessEventCallbackWithOwnerToken)(uint64_t ownerToken, uint64_t registrationId);
 };
 
 // Plugins must export these functions to be loaded by Obelisk.

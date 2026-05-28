@@ -45,6 +45,10 @@ Own these areas:
 - Owner-token callback registration is the supported path for helper-module or
   background-thread callbacks whose function pointer does not live in the plugin `.so`.
   Remove owner tokens on init failure and before/with plugin unload.
+- For new public ProcessEvent registrations, prefer owner-token handle functions that
+  return a non-zero `uint64_t` handle and require
+  `UnregisterProcessEventCallbackWithOwnerToken(owner_token, handle)` for granular
+  unregister. Do not expose bare unregister-by-id across the plugin ABI.
 - Keep plugin-owned lifecycle cleanup shared across `EventManager` and the internal
   `ChatEventDispatcher`; future event families must join the same owner cleanup path before
   any public SDK exposure.

@@ -49,7 +49,12 @@ Callbacks registered through the current ABI are accepted only when the runtime 
 them to the plugin being initialized, to an already-loaded plugin shared object, or to a
 valid `plugin_owner_token` supplied in `ObeliskPluginInitContext`. Callback functions in
 helper `.so` files, external thunks, or background threads must use the owner-token
-registration functions and remain covered by plugin-local shutdown tests.
+registration functions and remain covered by plugin-local shutdown tests. New code should
+prefer the handle-returning owner-token functions when
+`OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES` is advertised, store the returned
+non-zero handle in process-local state, and call
+`UnregisterProcessEventCallbackWithOwnerToken` during shutdown before callback code or
+state can disappear.
 
 ## Configuration Convention
 
@@ -92,6 +97,10 @@ input. Plugin-owned mutable state should be instance-scoped by default, using th
 `instance_id` or an operator-configured per-instance path. A plugin may use shared mutable
 state only when it documents the file/process ownership model and uses atomic writes or
 locking that is safe across multiple server processes.
+
+Callback registration handles are process-local runtime values. Do not write them into
+shared config, cluster state, or cross-instance files; a handle from one ARK process is not
+valid in another server process that happens to load the same plugin binary.
 
 ## Build And Drop-In Model
 
@@ -138,6 +147,22 @@ when the plugin passes its `plugin_owner_token` to the append-only owner-token r
 functions. Plugins must check `struct_size`, `OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS`,
 and non-null function pointers before using those fields.
 
+For callback code owned by helper modules, worker threads, or reloadable state, prefer the
+handle-returning owner-token API and explicit unregister:
+
+1. Check `OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES`, `struct_size`, and the
+   relevant function pointers.
+2. Register with `RegisterPreProcessEventForNameIndexWithOwnerTokenHandle` or the matching
+   post/global variant.
+3. Treat a `0` return value as rejected registration.
+4. On shutdown, stop external ingress first, call
+   `UnregisterProcessEventCallbackWithOwnerToken(owner_token, handle)` while callback code
+   and state are still valid, drain in-flight work, then join threads and release state.
+
+Owner-token attribution is not a lifetime system by itself. Runtime owner cleanup on
+plugin unload remains the backstop, but stable plugins should unregister their own
+long-lived callbacks explicitly.
+
 The ABI exposes metadata/config through `ObeliskPlugin_GetInfo`, initialization
 through `ObeliskPlugin_Init`, and supports an
 optional shutdown export resolved directly from the plugin shared object:
@@ -175,6 +200,8 @@ Rules:
   `OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS`.
 - A plugin that does not see `OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS`
   must treat `RegisterPreProcessEvent` and `RegisterPostProcessEvent` as unavailable.
+- Handle-returning global registration follows the same gate and returns `0` when global
+  callbacks are not explicitly enabled for the current instance.
 - Any global-callback debug window also requires a documented objective, bounded trace
   limits, named debug instance, and rollback plan.
 - Global callbacks must not block, allocate heavily, perform file or network I/O,
@@ -222,6 +249,8 @@ Before a plugin is promoted to stable or added to the top-level build:
 - [ ] No global `ProcessEvent` callback outside a documented debug gate.
 - [ ] Callback lifetime is covered by runtime owner cleanup and plugin-local
       shutdown design.
+- [ ] Helper-module or background-thread callbacks use handle-returning owner-token
+      registration and explicit unregister before their code/state is released.
 - [ ] Background threads, sockets, and file readers have a stop and join path.
 - [ ] HTTP endpoints are local-only by default, authenticated when mutating, and
       bounded by request limits.

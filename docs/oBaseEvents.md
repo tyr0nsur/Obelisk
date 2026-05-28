@@ -9,6 +9,8 @@ It demonstrates:
 - Runtime-owned first-run config creation under the central Obelisk config directory.
 - `ObeliskPlugin_GetInfo` metadata and `ObeliskPluginInitContext` config paths.
 - A filtered `ProcessEvent` callback.
+- Handle-returning callback registration plus explicit unregister during shutdown when the
+  runtime advertises `OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES`.
 - Optional `ObeliskPlugin_Shutdown()`.
 
 ## Build
@@ -34,6 +36,9 @@ cp -a build/plugins/oBaseEvents/oBaseEvents.so /servidor/ark/obelisk/plugins/
 ```
 
 If the plugin should not load, do not place it in `/servidor/ark/obelisk/plugins/`.
+On a clustered install, that directory is shared discovery scope. Use
+`instance_allowlist` to restrict which ARK server instances may initialize the plugin after
+restart.
 
 ## Config
 
@@ -61,6 +66,8 @@ Default generated config:
 
 The callback stays disabled unless both `enabled` and `process_event.enabled` are `true`
 and `process_event.filtered_function_index` is a validated non-negative `FName` index.
+When enabled on more than one server instance, each ARK process receives its own callback
+registration handle and unregisters that process-local handle during plugin shutdown.
 
 Do not treat observed ARK indices as stable API contracts. They must come from a validated
 reflection capture or future reflected function lookup.

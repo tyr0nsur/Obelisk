@@ -87,6 +87,30 @@ namespace Obelisk::Core
                removeForId(m_FilteredPostProcessEventCallbacks);
     }
 
+    bool EventManager::UnregisterCallbackForOwner(void* owner, uint64_t registrationId)
+    {
+        if (!owner || registrationId == 0)
+            return false;
+
+        std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
+        std::lock_guard<std::mutex> lock(m_Mutex);
+
+        auto removeForOwnerAndId = [owner, registrationId](auto& callbacks) -> bool {
+            const auto before = callbacks.size();
+            callbacks.erase(
+                std::remove_if(callbacks.begin(), callbacks.end(), [owner, registrationId](const CallbackRegistration& item) {
+                    return item.owner == owner && item.id == registrationId;
+                }),
+                callbacks.end());
+            return callbacks.size() != before;
+        };
+
+        return removeForOwnerAndId(m_PreProcessEventCallbacks) ||
+               removeForOwnerAndId(m_PostProcessEventCallbacks) ||
+               removeForOwnerAndId(m_FilteredPreProcessEventCallbacks) ||
+               removeForOwnerAndId(m_FilteredPostProcessEventCallbacks);
+    }
+
     size_t EventManager::UnregisterCallbacksForOwner(void* owner)
     {
         if (!owner)

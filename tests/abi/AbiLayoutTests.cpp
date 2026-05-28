@@ -26,6 +26,7 @@ namespace
         volatile std::uint64_t ownedCallbacksCapability = OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS;
         volatile std::uint64_t globalCallbacksCapability = OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS;
         volatile std::uint64_t ownerTokenCallbacksCapability = OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS;
+        volatile std::uint64_t callbackHandlesCapability = OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES;
 
         (void)apiVersion;
         (void)metadataVersion;
@@ -33,6 +34,7 @@ namespace
         (void)ownedCallbacksCapability;
         (void)globalCallbacksCapability;
         (void)ownerTokenCallbacksCapability;
+        (void)callbackHandlesCapability;
     }
 }
 
@@ -63,7 +65,7 @@ int main()
 
     AssertAbiType<ObeliskApi>();
     static_assert(alignof(ObeliskApi) == 8);
-    static_assert(sizeof(ObeliskApi) == 112);
+    static_assert(sizeof(ObeliskApi) == 152);
     static_assert(offsetof(ObeliskApi, LogInfo) == 0);
     static_assert(offsetof(ObeliskApi, LogWarn) == 8);
     static_assert(offsetof(ObeliskApi, LogError) == 16);
@@ -79,6 +81,11 @@ int main()
     static_assert(offsetof(ObeliskApi, RegisterPostProcessEventWithOwnerToken) == 88);
     static_assert(offsetof(ObeliskApi, RegisterPreProcessEventForNameIndexWithOwnerToken) == 96);
     static_assert(offsetof(ObeliskApi, RegisterPostProcessEventForNameIndexWithOwnerToken) == 104);
+    static_assert(offsetof(ObeliskApi, RegisterPreProcessEventWithOwnerTokenHandle) == 112);
+    static_assert(offsetof(ObeliskApi, RegisterPostProcessEventWithOwnerTokenHandle) == 120);
+    static_assert(offsetof(ObeliskApi, RegisterPreProcessEventForNameIndexWithOwnerTokenHandle) == 128);
+    static_assert(offsetof(ObeliskApi, RegisterPostProcessEventForNameIndexWithOwnerTokenHandle) == 136);
+    static_assert(offsetof(ObeliskApi, UnregisterProcessEventCallbackWithOwnerToken) == 144);
 
     static_assert(offsetof(ObeliskApi, abi_version) > offsetof(ObeliskApi, CallProcessEvent));
     static_assert(offsetof(ObeliskApi, struct_size) > offsetof(ObeliskApi, abi_version));
@@ -86,8 +93,14 @@ int main()
     static_assert(offsetof(ObeliskApi, RegisterPreProcessEventWithOwnerToken) > offsetof(ObeliskApi, capabilities));
     static_assert(offsetof(ObeliskApi, RegisterPostProcessEventWithOwnerToken) > offsetof(ObeliskApi, RegisterPreProcessEventWithOwnerToken));
     static_assert(offsetof(ObeliskApi, RegisterPreProcessEventForNameIndexWithOwnerToken) > offsetof(ObeliskApi, RegisterPostProcessEventWithOwnerToken));
-    static_assert(offsetof(ObeliskApi, RegisterPostProcessEventForNameIndexWithOwnerToken) +
-        sizeof(ObeliskApi::RegisterPostProcessEventForNameIndexWithOwnerToken) == sizeof(ObeliskApi));
+    static_assert(offsetof(ObeliskApi, RegisterPostProcessEventForNameIndexWithOwnerToken) > offsetof(ObeliskApi, RegisterPreProcessEventForNameIndexWithOwnerToken));
+    static_assert(offsetof(ObeliskApi, RegisterPreProcessEventWithOwnerTokenHandle) > offsetof(ObeliskApi, RegisterPostProcessEventForNameIndexWithOwnerToken));
+    static_assert(offsetof(ObeliskApi, RegisterPostProcessEventWithOwnerTokenHandle) > offsetof(ObeliskApi, RegisterPreProcessEventWithOwnerTokenHandle));
+    static_assert(offsetof(ObeliskApi, RegisterPreProcessEventForNameIndexWithOwnerTokenHandle) > offsetof(ObeliskApi, RegisterPostProcessEventWithOwnerTokenHandle));
+    static_assert(offsetof(ObeliskApi, RegisterPostProcessEventForNameIndexWithOwnerTokenHandle) > offsetof(ObeliskApi, RegisterPreProcessEventForNameIndexWithOwnerTokenHandle));
+    static_assert(offsetof(ObeliskApi, UnregisterProcessEventCallbackWithOwnerToken) > offsetof(ObeliskApi, RegisterPostProcessEventForNameIndexWithOwnerTokenHandle));
+    static_assert(offsetof(ObeliskApi, UnregisterProcessEventCallbackWithOwnerToken) +
+        sizeof(ObeliskApi::UnregisterProcessEventCallbackWithOwnerToken) == sizeof(ObeliskApi));
 
     RuntimeNoOp();
     return 0;
