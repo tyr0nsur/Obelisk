@@ -49,6 +49,12 @@ The log now contains accepted reflected chat hits:
 - `14:17:13`: same accepted `ServerSendChatMessage` shape and `GlobalChat`
 - `16:12:02`: same accepted `ServerSendChatMessage` shape and `GlobalChat`
 - `16:12:45`: same accepted `ServerSendChatMessage` shape and `GlobalChat`
+- Operator-provided 2026-05-28 live log excerpt:
+  - `07:19:58`: `function=ServerSendChatMessage`, `fname_index=2697`,
+    `metadata_only=false`, `send_mode=0`, `send_mode_name=GlobalChat`,
+    `send_mode_known=true`
+  - `07:20:03`: same accepted `ServerSendChatMessage` shape with `send_mode=1`,
+    `send_mode_name=GlobalTribeChat`, `send_mode_known=true`
 
 Each accepted hit logs bounded field ranges for:
 
@@ -60,6 +66,12 @@ The same log also contains rejected `ClientChatMessage` observations with
 evidence: the outer validation is rejecting at least one tempting metadata-only fallback
 instead of broadening the recognizer unsafely.
 
+The 2026-05-28 operator-provided excerpt also includes two rejected observations with
+`fname_index=1865` and the same `chat UFunction outer FName index mismatch` reason. That
+keeps supporting the exact-owner guardrail: the recognizer is not accepting a same-family
+or tempting chat-shaped function when the owner does not match the expected reflected
+shape.
+
 Offline verification against the existing core returned `status=ok` for all current chat
 recognizers, including `ServerSendChatMessage`, the `ShooterPlayerController`
 metadata-only fallbacks, and the new `ShooterGameMode` metadata-only candidates.
@@ -70,6 +82,11 @@ metadata-only fallbacks, and the new `ShooterGameMode` metadata-only candidates.
 `ProcessEvent` path for this binary and deployment posture. This promotes the previous
 best candidate from "needs one real runtime hit" to "observed runtime path" for
 experimental logging.
+
+The 2026-05-28 operator-provided excerpt expands observed send-mode coverage from global
+chat to both global and tribe chat without changing the promotion boundary. It is still
+module evidence for the broader reflection pipeline: exact `UFunction` selection, bounded
+parameter fields, enum decoding, and false-positive rejection.
 
 This does not promote a public SDK chat event yet.
 
@@ -88,6 +105,9 @@ runtime evidence.
 - Chat reflection remains experimental and should not be treated as stable baseline for
   high-population/live operation without overhead measurement.
 - Metadata-only `ShooterGameMode` candidates remain fallback observations only.
+- The 2026-05-28 lines were copied from a live Ragnarok instance with at least one user
+  connected. Use them as read-only observational evidence only; do not perform follow-up
+  experiments, restarts, marker changes, or extra logging on that instance.
 
 ## Next Steps
 

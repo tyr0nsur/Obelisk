@@ -782,6 +782,16 @@ Updated: 2026-05-28
   chat structs/capabilities/functions, runtime plugin dispatch is blocked, and tests guard
   accidental promotion. Treat chat as one module proving promotion gates, not the active
   project center.
+- fact: A 2026-05-28 operator-provided read-only Ragnarok log excerpt observed
+  `ServerSendChatMessage` through the reflected path with `GlobalChat` and
+  `GlobalTribeChat`, plus same-family rejects with `chat UFunction outer FName index
+  mismatch`. This strengthens the exact `UFunction`/outer/field-range guardrail evidence
+  but does not authorize experiments on live Ragnarok or promote a public chat API. See
+  `docs/research/2026-05-27-server-send-chat-runtime-hit.md`.
+- fact: `scripts/analyze_runtime_observer_log.py` turns copied/sanitized observer logs
+  into module-level JSON summaries for chat, inventory, structures, and future reflected
+  observers. Use it on copied artifacts or fixtures, not as a reason to tail/probe live
+  Ragnarok.
 - fact: `FString` for this ARK Linux build is a strong candidate for
   `{TCHAR* Data, int32 ArrayNum, int32 ArrayMax}` with `TCHAR=UTF-32LE`; see
   `docs/research/2026-05-27-fstring-layout.md`.
