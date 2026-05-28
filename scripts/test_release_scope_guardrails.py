@@ -102,6 +102,9 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("scripts/check_release_readiness.sh", ci)
         self.assertIn("Release readiness requires a clean worktree", script)
         self.assertIn("scripts/install_obelisk_plugin.sh --dry-run", script)
+        self.assertIn("--require-second-source-readiness", release)
+        self.assertIn("--require-second-source-readiness", script)
+        self.assertIn("--fail-on-readiness-gaps", script)
 
     def test_release_example_does_not_publish_map_scoped_config(self) -> None:
         obase_docs = read("docs/oBaseEvents.md")
