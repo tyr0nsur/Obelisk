@@ -8,8 +8,8 @@ Usage: scripts/check_obelisk_server_posture.sh [options]
 Checks a running ARK/Obelisk process posture without changing server state.
 
 Options:
-  --map <name>              Map argument prefix to find. Default: Ragnarok.
-  --instance <id>           Expected OBELISK_INSTANCE_ID. Default: arkserver.
+  --map <name>              Map argument prefix to find. Required unless --pid is used.
+  --instance <id>           Expected OBELISK_INSTANCE_ID. Required.
   --instance-id <id>        Alias for --instance.
   --pid <pid>               Check a specific process id instead of using pgrep.
   --proc-root <path>        Procfs root. Default: /proc. Intended for offline tests.
@@ -22,8 +22,8 @@ Options:
 EOF
 }
 
-MAP="Ragnarok"
-INSTANCE="arkserver"
+MAP=""
+INSTANCE=""
 PID=""
 PROC_ROOT="/proc"
 EXPECT_STABLE=0
@@ -66,6 +66,18 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+if [[ -z "${INSTANCE}" ]]; then
+    echo "--instance is required. Pass the explicit Obelisk instance id to avoid checking the wrong server." >&2
+    usage >&2
+    exit 2
+fi
+
+if [[ -z "${PID}" && -z "${MAP}" ]]; then
+    echo "--map is required when --pid is not provided." >&2
+    usage >&2
+    exit 2
+fi
 
 if [[ -z "${PID}" ]]; then
     PID="$(pgrep -f "^./ShooterGameServer ${MAP}" | head -n1 || true)"

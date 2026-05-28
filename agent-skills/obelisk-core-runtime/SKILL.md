@@ -15,7 +15,7 @@ Own these areas:
 - `hooks/ProcessEventHook.*`
 - `core/EventManager.*`
 - `core/PluginManager.*`
-- `api/ObeliskApi.h`
+- `include/obelisk/ObeliskApi.h`
 - `runtime/Logger.*`
 - `scripts/install_obelisk.sh`
 - `docs/INSTALL.md`

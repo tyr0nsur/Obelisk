@@ -66,7 +66,8 @@ to every sub-agent.
   - Live-ops engineer owns `/servidor/ark`, wrappers, markers, backups, and rollback notes.
 - Do not assign two editing agents to the same focus area in the same round. If two tasks
   need the same shared file such as `CMakeLists.txt`, `.github/workflows/ci.yml`, or
-  `api/ObeliskApi.h`, make one agent read-only or sequence the work in separate rounds.
+  `include/obelisk/ObeliskApi.h`, make one agent read-only or sequence the work in
+  separate rounds.
 - If shared-file edits are unavoidable, name a single integration owner. Other agents should
   return plans or patches scoped to their own files instead of editing the shared file.
 - Tell agents whether they may edit files. Read-only reviewers should not change the tree.

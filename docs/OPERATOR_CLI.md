@@ -26,8 +26,8 @@ LinuxGSM state.
   directory.
 
 This is a restart-posture summary, not proof that a currently running process has the same
-environment. Use `scripts/check_obelisk_server_posture.sh --expect-stable` for live
-process validation.
+environment. Use `scripts/check_obelisk_server_posture.sh --expect-stable --map <map>
+--instance <instance-id>` for live process validation.
 
 `status` reports valid instance directories separately from `invalid_instance_entries` so
 unsafe marker entries are visible even before listing per-instance details.

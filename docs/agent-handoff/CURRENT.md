@@ -574,8 +574,9 @@ Updated: 2026-05-28
   instance id or marker directory would be rejected by the wrapper/runtime, or if forbidden
   per-instance marker entries would re-enable debug/runtime observers at next restart.
   Forbidden marker names fail even when malformed or symlinked. Offline procfs fixture
-  coverage is in
-  `scripts/test_check_obelisk_server_posture.sh`.
+  coverage is in `scripts/test_check_obelisk_server_posture.sh`. The checker now requires
+  explicit `--instance` and requires `--map` unless `--pid` is provided, so it cannot
+  silently fall back to Ragnarok/`arkserver`.
 - fact: `scripts/check_obelisk_server_posture.sh --forbid-chat-reflection` adds a
   production/performance posture guard that rejects experimental chat reflection and chat
   text logging env plus the `enable-chat-reflection` marker. Use it with

@@ -5,9 +5,9 @@ description: "Validates Obelisk runtime/plugin API changes so shared libraries k
 
 # Obelisk C ABI Validation Skill
 
-Use this skill whenever code crosses the runtime/plugin boundary: `api/ObeliskApi.h`,
-`loader/PluginManager.*`, plugin entry points, callback registration, and any SDK surface
-that a `.so` will consume.
+Use this skill whenever code crosses the runtime/plugin boundary:
+`include/obelisk/ObeliskApi.h`, `core/PluginManager.*`, plugin entry points, callback
+registration, and any SDK surface that a `.so` will consume.
 
 ## Current ABI State
 

@@ -27,6 +27,7 @@ namespace
         volatile std::uint64_t globalCallbacksCapability = OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS;
         volatile std::uint64_t ownerTokenCallbacksCapability = OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS;
         volatile std::uint64_t callbackHandlesCapability = OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES;
+        volatile std::uint64_t callProcessEventCapability = OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT;
 
         (void)apiVersion;
         (void)metadataVersion;
@@ -35,12 +36,18 @@ namespace
         (void)globalCallbacksCapability;
         (void)ownerTokenCallbacksCapability;
         (void)callbackHandlesCapability;
+        (void)callProcessEventCapability;
     }
 }
 
 int main()
 {
     static_assert(sizeof(void*) == 8, "Obelisk ABI layout tests target Linux x86_64");
+    static_assert(OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS == (1ull << 0));
+    static_assert(OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS == (1ull << 1));
+    static_assert(OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS == (1ull << 2));
+    static_assert(OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES == (1ull << 3));
+    static_assert(OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT == (1ull << 4));
 
     AssertAbiType<ObeliskPluginMetadata>();
     static_assert(alignof(ObeliskPluginMetadata) == 8);

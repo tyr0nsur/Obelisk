@@ -127,6 +127,27 @@ class OperationalDocGuardrailTests(unittest.TestCase):
         for mutable_command in ("start", "stop", "restart", "enable", "disable", "install", "rollback"):
             self.assertNotIn(f'add_parser("{mutable_command}"', cli_script)
 
+    def test_posture_checker_requires_explicit_target(self) -> None:
+        script = (REPO_ROOT / "scripts" / "check_obelisk_server_posture.sh").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("--instance is required", script)
+        self.assertIn("--map is required when --pid is not provided", script)
+        self.assertNotIn('INSTANCE="arkserver"', script)
+        self.assertNotIn('MAP="Ragnarok"', script)
+        self.assertNotIn("Default: arkserver", script)
+        self.assertNotIn("Default: Ragnarok", script)
+
+    def test_skills_reference_canonical_public_api_header(self) -> None:
+        offenders: list[str] = []
+        for path in sorted((REPO_ROOT / "agent-skills").rglob("SKILL.md")):
+            text = path.read_text(encoding="utf-8")
+            if "api/ObeliskApi.h" in text:
+                offenders.append(str(path.relative_to(REPO_ROOT)))
+
+        self.assertEqual(offenders, [])
+
 
 if __name__ == "__main__":
     unittest.main()

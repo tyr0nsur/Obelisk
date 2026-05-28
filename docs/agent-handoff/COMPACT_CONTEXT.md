@@ -439,12 +439,14 @@ work from repository state instead of chat history.
   current GNames evidence audit is inconclusive because scanner logs only show
   `ReflectionScanner disabled`; see
   `docs/research/2026-05-27-current-gname-evidence-pack-audit.md`.
-- `scripts/check_obelisk_server_posture.sh --expect-stable` is the required read-only
-  guardrail after server debug work. It checks expected env, requires central
+- `scripts/check_obelisk_server_posture.sh --expect-stable --map <map> --instance
+  <instance-id>` is the required read-only guardrail after server debug work. It checks
+  expected env, requires central
   `${OBELISK_ROOT}/lib/libobelisk.so` in `LD_PRELOAD` and maps, rejects deleted Obelisk
   mappings, requires stable markers `enable-process-event-hook` / `disable-plugins`,
   rejects unsafe instance ids/directories and forbidden per-instance marker entries that
-  would re-enable experimental features at next restart, and has offline procfs fixture
+  would re-enable experimental features at next restart, requires explicit `--instance`,
+  and requires explicit `--map` unless `--pid` is provided. It has offline procfs fixture
   coverage in
   `scripts/test_check_obelisk_server_posture.sh`.
 - Add `--forbid-chat-reflection` to the posture check when validating
