@@ -68,7 +68,7 @@ namespace Obelisk::Core
         if (registrationId == 0)
             return false;
 
-        std::lock_guard<std::mutex> dispatchLock(m_DispatchMutex);
+        std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
         std::lock_guard<std::mutex> lock(m_Mutex);
 
         auto removeForId = [registrationId](auto& callbacks) -> bool {
@@ -92,7 +92,7 @@ namespace Obelisk::Core
         if (!owner)
             return 0;
 
-        std::lock_guard<std::mutex> dispatchLock(m_DispatchMutex);
+        std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
         std::lock_guard<std::mutex> lock(m_Mutex);
 
         auto removeForOwner = [owner](auto& callbacks) -> size_t {
@@ -126,7 +126,7 @@ namespace Obelisk::Core
     bool EventManager::TriggerPreProcessEvent(void* caller, void* function, void* parms)
     {
         std::vector<OnProcessEventCallback> callbacks;
-        std::lock_guard<std::mutex> dispatchLock(m_DispatchMutex);
+        std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
             for (const auto& item : m_PreProcessEventCallbacks)
@@ -161,7 +161,7 @@ namespace Obelisk::Core
             return false;
 
         std::vector<OnProcessEventCallback> callbacks;
-        std::lock_guard<std::mutex> dispatchLock(m_DispatchMutex);
+        std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
             for (const auto& item : m_FilteredPreProcessEventCallbacks)
@@ -196,7 +196,7 @@ namespace Obelisk::Core
     void EventManager::TriggerPostProcessEvent(void* caller, void* function, void* parms)
     {
         std::vector<OnProcessEventCallback> callbacks;
-        std::lock_guard<std::mutex> dispatchLock(m_DispatchMutex);
+        std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
             for (const auto& item : m_PostProcessEventCallbacks)
@@ -228,7 +228,7 @@ namespace Obelisk::Core
         TriggerPostProcessEvent(caller, function, parms);
 
         std::vector<OnProcessEventCallback> callbacks;
-        std::lock_guard<std::mutex> dispatchLock(m_DispatchMutex);
+        std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
             for (const auto& item : m_FilteredPostProcessEventCallbacks)

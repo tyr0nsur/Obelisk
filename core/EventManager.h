@@ -46,7 +46,7 @@ namespace Obelisk::Core
         };
 
         std::mutex m_Mutex;
-        std::mutex m_DispatchMutex;
+        std::recursive_mutex m_DispatchMutex;
         uint64_t m_NextRegistrationId = 1;
         std::vector<CallbackRegistration> m_PreProcessEventCallbacks;
         std::vector<CallbackRegistration> m_PostProcessEventCallbacks;

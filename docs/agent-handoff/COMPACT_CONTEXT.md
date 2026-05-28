@@ -123,8 +123,12 @@ work from repository state instead of chat history.
 - Current uncommitted hook hardening tracks active ProcessEvent detour/trampoline frames
   and avoids unmapping the trampoline during hook removal until frames drain; on timeout it
   warns and intentionally leaves the trampoline mapped to avoid use-after-free.
-- Current uncommitted runtime lifecycle round owns the debug-control thread and joins it
-  before logger shutdown instead of detaching it.
+- Commit `8519b2b` owns the debug-control thread and joins it before logger shutdown
+  instead of detaching it.
+- Current uncommitted EventManager hardening aligns ProcessEvent callback dispatch with
+  chat dispatcher self-unregister behavior by using a recursive dispatch mutex and testing
+  a callback that unregisters its own registration during dispatch. Public ABI remains
+  unchanged.
 - Current uncommitted reflection-tooling round adds
   `scripts/compare_reflection_snapshots.py --readiness-report`. Use it to summarize
   comparable snapshot coverage and second-source status by schema/module. Current fixtures

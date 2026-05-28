@@ -134,9 +134,14 @@ Updated: 2026-05-28
   the detour and manual trampoline calls. Hook removal restores target bytes first, waits
   briefly for active frames to drain, and leaves the trampoline mapped with a warning
   instead of risking `munmap` while a frame may still be executing.
-- fact: Current uncommitted runtime lifecycle round replaces the detached debug-control
-  thread with owned thread state, stop flag, condition-variable wakeup, and join before
-  logger shutdown on bootstrap failure or normal unload.
+- fact: Commit `8519b2b` replaces the detached debug-control thread with owned thread
+  state, stop flag, condition-variable wakeup, and join before logger shutdown on
+  bootstrap failure or normal unload.
+- fact: Current uncommitted EventManager hardening aligns ProcessEvent callback dispatch
+  with the existing chat dispatcher self-unregister behavior by using a recursive dispatch
+  mutex and adding coverage for a callback unregistering its own registration during
+  dispatch. This is internal groundwork for future explicit public callback unsubscribe
+  handles; public ABI remains unchanged.
 - finding: Reflection tooling audit found UFunction snapshot fixture coverage is broad
   across module areas, but ScriptStruct coverage is the current bottleneck with only two
   transfer structs. Prioritize an offline second-source readiness report before any

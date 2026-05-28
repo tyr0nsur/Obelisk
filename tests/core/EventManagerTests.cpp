@@ -16,6 +16,8 @@ namespace
     };
 
     Counters g_Counters;
+    Obelisk::Core::EventManager* g_SelfUnregisterEvents = nullptr;
+    uint64_t g_SelfUnregisterId = 0;
 
     void ResetCounters()
     {
@@ -54,6 +56,15 @@ namespace
 
     bool NullSafeCallback(void*, void*, void*)
     {
+        return true;
+    }
+
+    bool SelfUnregisteringPre(void*, void*, void*)
+    {
+        ++g_Counters.global_pre;
+        Require(g_SelfUnregisterEvents != nullptr, "self-unregister callback has no event manager");
+        Require(g_SelfUnregisterEvents->UnregisterCallback(g_SelfUnregisterId),
+                "self-unregister callback could not unregister itself");
         return true;
     }
 
@@ -198,6 +209,29 @@ namespace
         events.TriggerPostProcessEvent(42, nullptr, nullptr, nullptr);
         Require(events.UnregisterCallbacksForOwner(&owner) == 5, "null callbacks were not tracked for cleanup");
     }
+
+    void TestCallbackCanUnregisterItself()
+    {
+        ResetCounters();
+        Obelisk::Core::EventManager events;
+        int owner = 0;
+
+        g_SelfUnregisterEvents = &events;
+        g_SelfUnregisterId = events.RegisterPreProcessEventOwned(&owner, SelfUnregisteringPre);
+        Require(g_SelfUnregisterId != 0, "self-unregister registration id was zero");
+
+        Require(events.TriggerPreProcessEvent(nullptr, nullptr, nullptr),
+                "self-unregistering callback blocked the event");
+        Require(g_Counters.global_pre == 1, "self-unregistering callback did not run once");
+        Require(!events.HasPreProcessEventCallbacks(), "self-unregistering callback survived dispatch");
+
+        Require(events.TriggerPreProcessEvent(nullptr, nullptr, nullptr),
+                "empty callback list blocked an event");
+        Require(g_Counters.global_pre == 1, "self-unregistered callback ran again");
+
+        g_SelfUnregisterEvents = nullptr;
+        g_SelfUnregisterId = 0;
+    }
 }
 
 int main()
@@ -208,6 +242,7 @@ int main()
     TestOwnerCleanup();
     TestSingleRegistrationUnregister();
     TestNullCallbacksAreIgnored();
+    TestCallbackCanUnregisterItself();
 
     std::cout << "EventManagerTests passed\n";
     return 0;
