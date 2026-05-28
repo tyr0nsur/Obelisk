@@ -360,8 +360,9 @@ Updated: 2026-05-28
   `--objdump-xrefs`, writes `manifest.json`, and refuses to write artifacts under
   `/servidor/ark`.
 - fact: `scripts/check_obelisk_server_posture.sh --expect-stable` now fails closed if
-  `libobelisk.so` is not mapped, if a deleted `libobelisk` mapping remains, or if scanner
-  / native-exec env vars are present. Offline procfs fixture coverage is in
+  central `${OBELISK_ROOT}/lib/libobelisk.so` is not present in `LD_PRELOAD` and mapped, if
+  a deleted `libobelisk` mapping remains, or if scanner/native-exec env vars are present.
+  Offline procfs fixture coverage is in
   `scripts/test_check_obelisk_server_posture.sh`.
 - fact: `scripts/check_obelisk_server_posture.sh --forbid-chat-reflection` adds a
   production/performance posture guard that rejects experimental chat reflection and chat

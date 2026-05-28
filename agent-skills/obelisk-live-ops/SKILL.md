@@ -118,9 +118,10 @@ scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection
 Use the matching explicit `--map` and `--instance` for the approved debug target. That
 check must pass before launching another agent round that assumes a stable server.
 In `--expect-stable` mode it must fail closed if `libobelisk.so` is not mapped, if a
-deleted `libobelisk` mapping remains after redeploy, or if scanner/native-exec variables
-are still present. Its parser is tested offline with procfs fixtures; do not weaken those
-tests to depend on a live ARK process.
+deleted `libobelisk` mapping remains after redeploy, if `LD_PRELOAD` does not include the
+central `${OBELISK_ROOT}/lib/libobelisk.so`, or if scanner/native-exec variables are still
+present. Its parser is tested offline with procfs fixtures; do not weaken those tests to
+depend on a live ARK process.
 
 ## Runtime Debug Control
 

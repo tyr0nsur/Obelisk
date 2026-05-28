@@ -120,6 +120,28 @@ require_env() {
     fi
 }
 
+require_env_path_list_contains() {
+    local name="$1"
+    local expected="$2"
+    local actual
+    actual="$(get_env "${name}")"
+    if [[ -z "${actual}" ]]; then
+        echo "Expected ${name} to contain '${expected}', got '<unset>'." >&2
+        return 1
+    fi
+
+    local entry
+    IFS=':' read -r -a entries <<< "${actual}"
+    for entry in "${entries[@]}"; do
+        if [[ "${entry}" == "${expected}" ]]; then
+            return 0
+        fi
+    done
+
+    echo "Expected ${name} to contain '${expected}', got '${actual}'." >&2
+    return 1
+}
+
 forbid_env() {
     local name="$1"
     local actual
@@ -149,10 +171,15 @@ echo "pid=${PID}"
 printf '%s\n' "${env_dump}" | grep -E '^(OBELISK_|LD_PRELOAD=|LD_LIBRARY_PATH=)' || true
 
 if [[ "${EXPECT_STABLE}" == "1" ]]; then
+    obelisk_root="$(get_env OBELISK_ROOT)"
+    obelisk_root="${obelisk_root:-/servidor/ark/obelisk}"
+    expected_runtime="${obelisk_root%/}/lib/libobelisk.so"
+
     require_env OBELISK_INSTANCE_ID "${INSTANCE}"
     require_env OBELISK_ENABLE_PROCESS_EVENT_HOOK 1
     require_env OBELISK_DISABLE_PLUGINS 1
-    require_mapped_library "libobelisk.so"
+    require_env_path_list_contains LD_PRELOAD "${expected_runtime}"
+    require_mapped_library "${expected_runtime}"
     forbid_deleted_obelisk_mapping
     forbid_env OBELISK_DEBUG_ALLOW_PTRACE
     forbid_env OBELISK_ENABLE_DEBUG_CONTROL

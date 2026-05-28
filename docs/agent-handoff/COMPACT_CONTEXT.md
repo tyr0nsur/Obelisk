@@ -331,8 +331,9 @@ work from repository state instead of chat history.
   `ReflectionScanner disabled`; see
   `docs/research/2026-05-27-current-gname-evidence-pack-audit.md`.
 - `scripts/check_obelisk_server_posture.sh --expect-stable` is the required read-only
-  guardrail after server debug work. It checks expected env, requires `libobelisk.so` to be
-  mapped, rejects deleted Obelisk mappings, and has offline procfs fixture coverage in
+  guardrail after server debug work. It checks expected env, requires central
+  `${OBELISK_ROOT}/lib/libobelisk.so` in `LD_PRELOAD` and maps, rejects deleted Obelisk
+  mappings, and has offline procfs fixture coverage in
   `scripts/test_check_obelisk_server_posture.sh`.
 - Add `--forbid-chat-reflection` to the posture check when validating
   production/performance or quiet-baseline posture. It rejects
