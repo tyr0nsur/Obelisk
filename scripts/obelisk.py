@@ -146,8 +146,10 @@ def command_status(root: Path) -> int:
 
     plugins = iter_regular_so(root / "plugins")
     instances = iter_instances(root / "state")
+    instance_entries = iter_instance_entries(root / "state")
     print(f"plugins: {len(plugins)}")
     print(f"instances: {len(instances)}")
+    print(f"invalid_instance_entries: {len(instance_entries) - len(instances)}")
     return 0
 
 

@@ -29,6 +29,9 @@ This is a restart-posture summary, not proof that a currently running process ha
 environment. Use `scripts/check_obelisk_server_posture.sh --expect-stable` for live
 process validation.
 
+`status` reports valid instance directories separately from `invalid_instance_entries` so
+unsafe marker entries are visible even before listing per-instance details.
+
 ## Post-Stable Lifecycle TODO
 
 The first stable Obelisk line should not depend on mutable lifecycle commands. Keep the

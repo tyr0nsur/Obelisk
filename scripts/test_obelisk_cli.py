@@ -37,6 +37,22 @@ class ObeliskCliTests(unittest.TestCase):
             self.assertIn(f"root: {root}", result.stdout)
             self.assertIn("plugins: 0", result.stdout)
             self.assertIn("instances: 0", result.stdout)
+            self.assertIn("invalid_instance_entries: 0", result.stdout)
+
+    def test_status_reports_invalid_instance_entries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for relative in ("lib", "plugins", "config", "logs", "state/instances"):
+                (root / relative).mkdir(parents=True)
+            real_instance = root / "state" / "instances" / "real-arkserver"
+            real_instance.mkdir()
+            (root / "state" / "instances" / "arkserver").symlink_to(real_instance)
+
+            result = run_cli(root, "status")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("instances: 1", result.stdout)
+            self.assertIn("invalid_instance_entries: 1", result.stdout)
 
     def test_instances_list_reports_safe_marker_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
