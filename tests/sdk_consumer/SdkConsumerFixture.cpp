@@ -196,6 +196,19 @@ int main(int argc, char** argv)
         context.instance_id = "sdk-consumer-test";
         context.plugin_owner_token = 0xC0FFEE;
 
+        if (mode == "invalid-context")
+        {
+            Require(!init(&api, nullptr), "plugin accepted null init context");
+            ObeliskPluginInitContext shortContext = context;
+            shortContext.struct_size = offsetof(ObeliskPluginInitContext, plugin_owner_token);
+            Require(!init(&api, &shortContext), "plugin accepted too-small init context");
+            Require(g_RegisterCount == 0, "invalid context unexpectedly registered a callback");
+            Require(g_UnregisterCount == 0, "invalid context unexpectedly unregistered a callback");
+            cleanupConfigDir();
+            closeHandle();
+            return 0;
+        }
+
         const bool initSucceeded = init(&api, &context);
         if (mode == "unsupported-map-allowlist")
         {

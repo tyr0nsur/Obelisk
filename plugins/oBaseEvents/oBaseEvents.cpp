@@ -250,11 +250,13 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(Obelis
 {
     try
     {
-        if (!api)
+        if (!api || !context)
             return false;
 
         if (api->abi_version != OBELISK_API_ABI_VERSION ||
-            api->struct_size < sizeof(ObeliskApi))
+            api->struct_size < sizeof(ObeliskApi) ||
+            context->abi_version != OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION ||
+            context->struct_size < sizeof(ObeliskPluginInitContext))
         {
             api->LogError("[oBaseEvents] Incompatible Obelisk API.");
             return false;
@@ -262,7 +264,7 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(Obelis
 
         g_Api = *api;
         g_HasApi = true;
-        g_OwnerToken = context ? context->plugin_owner_token : 0;
+        g_OwnerToken = context->plugin_owner_token;
         g_LoggedEvents.store(0);
 
         if (!LoadConfig(context))
@@ -281,30 +283,31 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(Obelis
 
         if (g_ProcessEventEnabled && g_FilteredFunctionIndex >= 0)
         {
-            if ((api->capabilities & OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES) != 0 &&
-                context->plugin_owner_token != 0 &&
-                api->RegisterPreProcessEventForNameIndexWithOwnerTokenHandle)
+            if ((api->capabilities & OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES) == 0 ||
+                api->struct_size < offsetof(ObeliskApi, UnregisterProcessEventCallbackWithOwnerToken) +
+                    sizeof(api->UnregisterProcessEventCallbackWithOwnerToken) ||
+                context->plugin_owner_token == 0 ||
+                !api->RegisterPreProcessEventForNameIndexWithOwnerTokenHandle ||
+                !api->UnregisterProcessEventCallbackWithOwnerToken)
             {
-                g_ProcessEventRegistrationId =
-                    api->RegisterPreProcessEventForNameIndexWithOwnerTokenHandle(
-                        context->plugin_owner_token,
-                        g_FilteredFunctionIndex,
-                        OnFilteredProcessEvent);
-                if (g_ProcessEventRegistrationId == 0)
-                {
-                    api->LogError("[oBaseEvents] Failed to register filtered ProcessEvent callback.");
-                    ResetState();
-                    return false;
-                }
-            }
-            else
-            {
-                api->RegisterPreProcessEventForNameIndex(g_FilteredFunctionIndex, OnFilteredProcessEvent);
+                api->LogError("[oBaseEvents] ProcessEvent example requires owner-token callback handle API.");
+                ResetState();
+                return false;
             }
 
-            api->LogInfo(g_ProcessEventRegistrationId != 0
-                ? "[oBaseEvents] Registered filtered ProcessEvent callback with explicit handle."
-                : "[oBaseEvents] Registered filtered ProcessEvent callback.");
+            g_ProcessEventRegistrationId =
+                api->RegisterPreProcessEventForNameIndexWithOwnerTokenHandle(
+                    context->plugin_owner_token,
+                    g_FilteredFunctionIndex,
+                    OnFilteredProcessEvent);
+            if (g_ProcessEventRegistrationId == 0)
+            {
+                api->LogError("[oBaseEvents] Failed to register filtered ProcessEvent callback.");
+                ResetState();
+                return false;
+            }
+
+            api->LogInfo("[oBaseEvents] Registered filtered ProcessEvent callback with explicit handle.");
         }
         else
         {

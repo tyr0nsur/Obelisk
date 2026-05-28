@@ -205,7 +205,10 @@ bool ObeliskPlugin_Init(ObeliskApi* api, const ObeliskPluginInitContext* context
     if (validated_function_index >= 0 &&
         (api->capabilities & OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES) &&
         api->struct_size >= offsetof(ObeliskApi, UnregisterProcessEventCallbackWithOwnerToken) +
-            sizeof(api->UnregisterProcessEventCallbackWithOwnerToken))
+            sizeof(api->UnregisterProcessEventCallbackWithOwnerToken) &&
+        g_owner_token != 0 &&
+        api->RegisterPreProcessEventForNameIndexWithOwnerTokenHandle &&
+        api->UnregisterProcessEventCallbackWithOwnerToken)
     {
         g_pre_handle = api->RegisterPreProcessEventForNameIndexWithOwnerTokenHandle(
             g_owner_token, validated_function_index, OnProcessEvent);

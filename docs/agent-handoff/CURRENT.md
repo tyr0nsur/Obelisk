@@ -115,6 +115,9 @@ Updated: 2026-05-28
 - fact: `oBaseEvents` C exports catch plugin-side exceptions before returning across the
   runtime/plugin ABI. `ObeliskPlugin_Init` resets plugin state on config failure or thrown
   exception, and `ObeliskPlugin_Shutdown` is idempotent.
+- fact: `oBaseEvents` now treats the owner-token callback handle API as required when its
+  ProcessEvent example is enabled. It rejects null or too-small init contexts and no
+  longer falls back to legacy filtered registration without an explicit unregister handle.
 - fact: Contributor-facing organization is intentionally lightweight: `main` plus
   short-lived topic branches, current source directories kept stable, agent-only process
   moved out of contributor workflow, SDK install/package validation documented, and the

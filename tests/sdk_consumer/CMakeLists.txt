@@ -63,3 +63,8 @@ add_test(
     NAME SdkConsumerFixtureOBaseEventsRejectsMapAllowlist
     COMMAND sdk_consumer_fixture "$<TARGET_FILE:oBaseEvents>" oBaseEvents unsupported-map-allowlist
 )
+
+add_test(
+    NAME SdkConsumerFixtureOBaseEventsRejectsInvalidContext
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oBaseEvents>" oBaseEvents invalid-context
+)

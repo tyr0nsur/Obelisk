@@ -108,6 +108,9 @@ work from repository state instead of chat history.
   across ARK instances.
 - Callback handles and plugin owner tokens skip `0` and currently live IDs after counter
   wrap. `0` remains the failure sentinel for plugin-facing registration APIs.
+- `oBaseEvents` requires owner-token callback handle support when its ProcessEvent example
+  is enabled. Do not reintroduce legacy filtered registration fallback without an explicit
+  unregister handle.
 - Public plugin examples and first-party fixtures must copy the `ObeliskApi` table by value
   if they need runtime functions after `ObeliskPlugin_Init`; the init `ObeliskApi*` and
   `ObeliskPluginInitContext*` are borrowed only for init. Metadata strings returned by

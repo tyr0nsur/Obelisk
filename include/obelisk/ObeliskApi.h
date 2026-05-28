@@ -68,12 +68,11 @@ typedef struct ObeliskApi {
     // posture rejects calls unless OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT is advertised.
     // Plugins must check struct_size, capabilities, and this function pointer before use.
     //
-    // Reentrancy contract: do not call this from a ProcessEvent callback unless the
-    // callback returns false to block the detour's automatic original call. Calling it
-    // from a pre-callback and then returning true can execute the same UE function twice.
-    // Post-callback use is observationally after the original call and must not attempt
-    // to replay the same event. Stable plugins should prefer future higher-level APIs
-    // over direct ProcessEvent replay.
+    // Reentrancy contract: a pre-callback that calls this should return false. If it
+    // returns true, the runtime skips the automatic original call and warns to avoid
+    // double execution. Post-callback use is observationally after the original call and
+    // must not attempt to replay the same event. Stable plugins should prefer future
+    // higher-level APIs over direct ProcessEvent replay.
     void (*CallProcessEvent)(void* caller, void* function, void* parms);
 
     // ABI metadata appended for compatibility with the original function table layout.
