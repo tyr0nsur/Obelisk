@@ -195,6 +195,10 @@ def gobjects_static_xref_targets(gobjects_candidates: list[tuple[str, int]]) -> 
     return targets
 
 
+def fname_static_xref_targets(fname_root_slots: list[tuple[str, int]]) -> dict[str, str]:
+    return {normalize_hex(address): f"{label}.root_slot" for label, address in fname_root_slots}
+
+
 def xref_record(
     *,
     line_number: int,
@@ -401,6 +405,23 @@ def collect_static_xrefs(objdump_path: Path, targets: dict[str, str]) -> dict[st
     }
 
 
+def has_actionable_static_xrefs(payload: dict[str, object] | None) -> bool:
+    if not payload:
+        return False
+    anchor_groups = payload.get("anchor_groups")
+    if not isinstance(anchor_groups, list):
+        return False
+    for group in anchor_groups:
+        if not isinstance(group, dict):
+            continue
+        if bool(group.get("oversized")):
+            continue
+        if int(group.get("xref_count", 0)) <= 0:
+            continue
+        return True
+    return False
+
+
 def validate_gobjects_sample_options(
     gobjects_candidates: list[tuple[str, int]],
     gobjects_sample_indices: list[int],
@@ -438,6 +459,41 @@ def fname_roots_for_gobjects_sampling(
     if gobjects_sample_indices:
         return list(explicit_fname_root_slots)
     return all_fname_root_slots
+
+
+def core_promotion_gate(*, gdb_failed: bool, static_xrefs_actionable: bool) -> dict[str, object]:
+    blockers = [
+        {
+            "reason": "single_core_artifact",
+            "detail": "A core dump is one process image and is not independent second-source evidence.",
+        },
+        {
+            "reason": "needs_second_isolated_capture_or_static_path",
+            "detail": "Promotion requires a second isolated capture or an independent static path.",
+        },
+    ]
+    if not static_xrefs_actionable:
+        blockers.append(
+            {
+                "reason": "non_actionable_static_xrefs",
+                "detail": "No non-oversized static xref window was generated for this evidence pack.",
+            }
+        )
+    if gdb_failed:
+        blockers.append(
+            {
+                "reason": "partial_gdb_failed",
+                "detail": "GDB core inspection failed; this pack is triage-only.",
+            }
+        )
+    return {
+        "ready": False,
+        "blockers": blockers,
+        "summary": (
+            "Core dump evidence can confirm in-memory values for this one process image, "
+            "but it does not by itself promote stable offsets or prove initialization flow."
+        ),
+    }
 
 
 def extend_candidate_dump_commands(
@@ -1063,17 +1119,34 @@ def main() -> int:
             encoding="utf-8",
         )
 
+    fname_static_xrefs_path = None
+    fname_static_xrefs = None
+    if fname_root_slots:
+        fname_static_xrefs = collect_static_xrefs(
+            output_dir / "ShooterGameServer.objdump",
+            fname_static_xref_targets(fname_root_slots),
+        )
+        fname_static_xrefs_path = output_dir / "fname-static-xrefs.json"
+        fname_static_xrefs_path.write_text(
+            json.dumps(fname_static_xrefs, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+
     gobjects_static_xrefs_path = None
+    gobjects_static_xrefs = None
     if gobjects_candidates:
-        static_xrefs = collect_static_xrefs(
+        gobjects_static_xrefs = collect_static_xrefs(
             output_dir / "ShooterGameServer.objdump",
             gobjects_static_xref_targets(gobjects_candidates),
         )
         gobjects_static_xrefs_path = output_dir / "gobjects-static-xrefs.json"
         gobjects_static_xrefs_path.write_text(
-            json.dumps(static_xrefs, indent=2, sort_keys=True),
+            json.dumps(gobjects_static_xrefs, indent=2, sort_keys=True),
             encoding="utf-8",
         )
+    static_xrefs_actionable = has_actionable_static_xrefs(fname_static_xrefs) or has_actionable_static_xrefs(
+        gobjects_static_xrefs
+    )
 
     manifest = {
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -1129,6 +1202,7 @@ def main() -> int:
             "core_readelf_programs": str(output_dir / "core.readelf-programs.txt"),
             "strings": str(output_dir / "ShooterGameServer.strings.txt"),
             "objdump": str(output_dir / "ShooterGameServer.objdump"),
+            "fname_static_xrefs": str(fname_static_xrefs_path) if fname_static_xrefs_path else None,
             "gobjects_static_xrefs": str(gobjects_static_xrefs_path) if gobjects_static_xrefs_path else None,
             "gdb_commands": str(output_dir / "gdb-core-commands.txt"),
             "gdb_core": str(output_dir / "gdb-core.txt"),
@@ -1144,10 +1218,9 @@ def main() -> int:
             "gdb_core_failed": gdb_failed,
             "allow_partial_gdb": args.allow_partial_gdb,
         },
-        "promotion_gate": (
-            "Core dump evidence can confirm in-memory values for this one process image, "
-            "but it does not by itself promote stable offsets or prove initialization flow. "
-            "Require static xrefs and a second isolated capture before runtime code."
+        "promotion_gate": core_promotion_gate(
+            gdb_failed=gdb_failed,
+            static_xrefs_actionable=static_xrefs_actionable,
         ),
     }
     manifest_path = output_dir / "manifest.json"

@@ -332,6 +332,10 @@ Updated: 2026-05-28
   `build_core_dump_evidence_pack.py --gobjects-sample-index` requires an explicit
   `--fname-root-slot` for the sampled artifact so UObject/Class names are not resolved
   through a primary-core-only default.
+- fact: Core evidence pack manifests now have a structured `promotion_gate` with
+  `ready=false` and blocker reasons. They emit `fname-static-xrefs.json` for FName root
+  slots and only treat static xrefs as actionable when at least one non-oversized anchor
+  window exists; empty or contaminated xref artifacts keep the static-xref blocker.
 - fact: `scripts/regenerate_ufunction_snapshots.py --check-layout` now supports
   UFunction layout-only verification for second-source intake, and both UFunction and
   ScriptStruct `--check-layout` runs require full artifact identity plus explicit

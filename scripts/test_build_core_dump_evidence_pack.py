@@ -76,6 +76,11 @@ class CoreDumpEvidencePackCommandTests(unittest.TestCase):
         self.assertEqual(manifest["evidence_status"]["status"], "partial-gdb-failed")
         self.assertTrue(manifest["evidence_status"]["gdb_core_failed"])
         self.assertTrue(manifest["evidence_status"]["allow_partial_gdb"])
+        self.assertFalse(manifest["promotion_gate"]["ready"])
+        blocker_reasons = {blocker["reason"] for blocker in manifest["promotion_gate"]["blockers"]}
+        self.assertIn("single_core_artifact", blocker_reasons)
+        self.assertIn("non_actionable_static_xrefs", blocker_reasons)
+        self.assertIn("partial_gdb_failed", blocker_reasons)
 
     def test_main_marks_successful_gdb_as_complete(self) -> None:
         result, output_dir = self.run_main_with_gdb_status(0)
@@ -85,6 +90,31 @@ class CoreDumpEvidencePackCommandTests(unittest.TestCase):
         self.assertEqual(manifest["evidence_status"]["status"], "complete")
         self.assertFalse(manifest["evidence_status"]["gdb_core_failed"])
         self.assertFalse(manifest["evidence_status"]["allow_partial_gdb"])
+        self.assertEqual(manifest["artifacts"]["fname_static_xrefs"], str(output_dir / "fname-static-xrefs.json"))
+        self.assertTrue((output_dir / "fname-static-xrefs.json").exists())
+        self.assertFalse(manifest["promotion_gate"]["ready"])
+        blocker_reasons = {blocker["reason"] for blocker in manifest["promotion_gate"]["blockers"]}
+        self.assertEqual(
+            blocker_reasons,
+            {
+                "single_core_artifact",
+                "needs_second_isolated_capture_or_static_path",
+                "non_actionable_static_xrefs",
+            },
+        )
+
+    def test_core_promotion_gate_omits_static_xref_blocker_when_actionable(self) -> None:
+        gate = core_pack.core_promotion_gate(gdb_failed=False, static_xrefs_actionable=True)
+
+        self.assertFalse(gate["ready"])
+        blocker_reasons = {blocker["reason"] for blocker in gate["blockers"]}
+        self.assertEqual(
+            blocker_reasons,
+            {
+                "single_core_artifact",
+                "needs_second_isolated_capture_or_static_path",
+            },
+        )
 
     def test_gdb_commands_include_direct_fname_entry_reads(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -245,6 +275,31 @@ class CoreDumpEvidencePackCommandTests(unittest.TestCase):
         self.assertFalse(payload["anchor_groups"][0]["oversized"])
         self.assertEqual(payload["anchor_groups"][0]["interpretation"], "concrete-instruction-window")
         self.assertEqual(payload["anchor_groups"][0]["xref_count"], 6)
+        self.assertTrue(core_pack.has_actionable_static_xrefs(payload))
+
+    def test_collects_fname_root_static_xrefs_from_objdump(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            objdump = Path(temp_dir) / "ShooterGameServer.objdump"
+            objdump.write_text(
+                """
+0000000000002000 <InitNames>:
+  2000: 48 8d 3d 00 00 00 00  lea    rdi,[rip+0x4]                  # 0x1234000
+  2007: 48 89 05 00 00 00 00  mov    QWORD PTR [rip+0x5],rax        # 0x1234000
+  200e: 48 8b 05 00 00 00 00  mov    rax,QWORD PTR [rip+0x6]        # 0x1234000
+""",
+                encoding="utf-8",
+            )
+
+            payload = core_pack.collect_static_xrefs(
+                objdump,
+                core_pack.fname_static_xref_targets([("verified_fname_root", 0x1234000)]),
+            )
+
+        refs = payload["xrefs"]["0x1234000"]
+        self.assertEqual([ref["target_label"] for ref in refs], ["verified_fname_root.root_slot"] * 3)
+        self.assertEqual(payload["access_counts"], {"address": 1, "load": 1, "store": 1})
+        self.assertEqual(payload["anchor_groups"][0]["xref_count"], 3)
+        self.assertTrue(core_pack.has_actionable_static_xrefs(payload))
 
     def test_static_xref_groups_mark_oversized_symbol_buckets(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -294,6 +349,19 @@ class CoreDumpEvidencePackCommandTests(unittest.TestCase):
         self.assertEqual(anchor_group["xref_count"], core_pack.ANCHOR_GROUP_OVERSIZED_XREFS)
         self.assertTrue(anchor_group["oversized"])
         self.assertEqual(anchor_group["interpretation"], "contaminated-anchor-window")
+        self.assertFalse(core_pack.has_actionable_static_xrefs(payload))
+
+    def test_static_xref_gate_rejects_empty_xrefs(self) -> None:
+        payload = {
+            "anchor_groups": [],
+            "function_groups": [],
+            "xrefs": {"0x1234000": []},
+        }
+
+        self.assertFalse(core_pack.has_actionable_static_xrefs(payload))
+        gate = core_pack.core_promotion_gate(gdb_failed=False, static_xrefs_actionable=False)
+        blocker_reasons = {blocker["reason"] for blocker in gate["blockers"]}
+        self.assertIn("non_actionable_static_xrefs", blocker_reasons)
 
     def test_gobjects_sample_options_require_candidate_and_fname_root(self) -> None:
         self.assertEqual(

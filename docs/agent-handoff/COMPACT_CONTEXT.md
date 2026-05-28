@@ -96,6 +96,9 @@ work from repository state instead of chat history.
 - UFunction and ScriptStruct regenerators accept the artifact identity flags above; the
   committed primary fixtures carry the primary core artifact SHA without storing core
   paths.
+- Core evidence pack manifests include a structured `promotion_gate` with `ready=false`,
+  emit `fname-static-xrefs.json` for FName root slots, and treat static xrefs as actionable
+  only when a non-oversized anchor window exists.
 - CI and release validation now run reflection snapshot comparison and ScriptStruct
   fixture tests. README/STATUS present module-first observers and snapshot tooling instead
   of a chat-centered roadmap. Mixed-schema target-filter behavior is covered by tests.
