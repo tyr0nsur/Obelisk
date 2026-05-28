@@ -46,6 +46,7 @@ namespace
         std::string initConfigDir;
         std::string initConfigPath;
         std::string initInstanceId;
+        uint64_t initOwnerToken = 0;
         void* owner = this;
         std::vector<std::string>* orderLog = nullptr;
         Obelisk::Core::ChatEventDispatcher* chatDispatcher = nullptr;
@@ -102,12 +103,16 @@ namespace
         g_CurrentFakePlugin->initConfigDir = context->config_dir ? context->config_dir : "";
         g_CurrentFakePlugin->initConfigPath = context->config_path ? context->config_path : "";
         g_CurrentFakePlugin->initInstanceId = context->instance_id ? context->instance_id : "";
+        g_CurrentFakePlugin->initOwnerToken = context->plugin_owner_token;
 
         Require(api != nullptr, "plugin init received null API");
         Require(api->abi_version == OBELISK_API_ABI_VERSION, "plugin init received wrong API ABI version");
         Require(api->struct_size == sizeof(ObeliskApi), "plugin init received wrong API struct size");
         Require((api->capabilities & OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS) != 0,
                 "plugin init received API without owned callback capability");
+        Require((api->capabilities & OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS) != 0,
+                "plugin init received API without owner-token callback capability");
+        Require(context->plugin_owner_token != 0, "plugin init received empty owner token");
 
         if (g_CurrentFakePlugin->captureApi)
             g_CurrentFakePlugin->capturedApi = *api;
@@ -368,6 +373,61 @@ namespace
         plugin.capturedApi.RegisterPreProcessEventForNameIndex(42, FakeCallback);
         Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
                 "post-init unowned callback was registered");
+
+        manager.UnloadAll();
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestPostInitOwnerTokenCallbackRegistrationCleansOnUnload()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_owner_token");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{.filename = "owner_token.so", .captureApi = true};
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "owner-token plugin was not initialized");
+        Require(plugin.initOwnerToken != 0, "owner-token plugin did not receive a token");
+        Require(plugin.capturedApi.RegisterPreProcessEventForNameIndexWithOwnerToken != nullptr,
+                "owner-token registration function was not exposed");
+        plugin.capturedApi.RegisterPreProcessEventForNameIndexWithOwnerToken(plugin.initOwnerToken, 42, FakeCallback);
+        Require(Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
+                "owner-token callback was not registered");
+
+        manager.UnloadAll();
+
+        Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
+                "owner-token callback survived unload");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestInvalidOwnerTokenCallbackRegistrationIsRejected()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_invalid_owner_token");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{.filename = "invalid_owner_token.so", .captureApi = true};
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "invalid-owner-token plugin was not initialized");
+        plugin.capturedApi.RegisterPreProcessEventForNameIndexWithOwnerToken(plugin.initOwnerToken + 1000, 42, FakeCallback);
+        Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
+                "invalid owner-token callback was registered");
 
         manager.UnloadAll();
         CleanupPlugin(plugin);
@@ -799,6 +859,8 @@ int main()
     TestGlobalProcessEventCallbackRejectedByDefault();
     TestFilteredProcessEventCallbackAllowedByDefault();
     TestPostInitUnownedCallbackRegistrationIsRejected();
+    TestPostInitOwnerTokenCallbackRegistrationCleansOnUnload();
+    TestInvalidOwnerTokenCallbackRegistrationIsRejected();
     TestInvalidProcessEventCallbacksAreRejected();
     TestGlobalProcessEventCallbackAllowedWithGate();
     TestDisabledPluginPreparesConfigButDoesNotInit();

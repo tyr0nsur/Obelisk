@@ -8,6 +8,7 @@
 #define OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION 1u
 #define OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS (1ull << 0)
 #define OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS (1ull << 1)
+#define OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS (1ull << 2)
 
 #ifdef __cplusplus
 extern "C" {
@@ -37,6 +38,7 @@ struct ObeliskPluginInitContext {
     const char* config_dir;
     const char* config_path;
     const char* instance_id;
+    uint64_t plugin_owner_token;
 };
 
 // ============================================================================
@@ -69,6 +71,14 @@ struct ObeliskApi {
     uint32_t abi_version;
     uint32_t struct_size;
     uint64_t capabilities;
+
+    // Owner-token callback registration for callbacks whose function pointer does not
+    // live in the plugin shared object. Plugins must check struct_size and
+    // OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS before using these fields.
+    void (*RegisterPreProcessEventWithOwnerToken)(uint64_t ownerToken, OnProcessEventCallback callback);
+    void (*RegisterPostProcessEventWithOwnerToken)(uint64_t ownerToken, OnProcessEventCallback callback);
+    void (*RegisterPreProcessEventForNameIndexWithOwnerToken)(uint64_t ownerToken, int32_t nameIndex, OnProcessEventCallback callback);
+    void (*RegisterPostProcessEventForNameIndexWithOwnerToken)(uint64_t ownerToken, int32_t nameIndex, OnProcessEventCallback callback);
 };
 
 // Plugins must export these functions to be loaded by Obelisk.

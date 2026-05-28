@@ -96,7 +96,11 @@ Updated: 2026-05-28
 - fact: Plugin API ProcessEvent registration wrappers also reject callbacks whose owner
   cannot be attributed to the currently initializing plugin or an already-loaded Obelisk
   plugin shared object. This prevents ownerless callbacks from surviving plugin unload;
-  helper-module callbacks remain future work for an explicit owner-token API.
+  helper-module/background-thread callbacks must use the append-only owner-token API.
+- fact: `ObeliskPluginInitContext` now appends `plugin_owner_token`, and `ObeliskApi`
+  appends owner-token ProcessEvent registration functions guarded by
+  `OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS`. Tokens are removed on init failure and
+  unload.
 - fact: `oBaseEvents` C exports catch plugin-side exceptions before returning across the
   runtime/plugin ABI. `ObeliskPlugin_Init` resets plugin state on config failure or thrown
   exception, and `ObeliskPlugin_Shutdown` is idempotent.
@@ -235,9 +239,9 @@ Updated: 2026-05-28
   `PrimalItem.AllowRemoteAddToInventory`, `PrimalStructure.AllowStructureAccess`, and
   `PrimalStructure.IsAllowedToDemolish`; current readiness is `4/4` comparable and blocked
   only by missing second-source root.
-- next-step: Runtime/API debt from the latest read-only audit: design an append-only
-  explicit owner-token callback API for helpers/background threads before declaring
-  post-init helper-module registrations stable.
+- next-step: Runtime/API debt from the latest read-only audit: add explicit public
+  unregister handles for token-owned callback registrations before promoting complex
+  background-thread plugins as stable.
 - fact: Runtime/chat baseline is documented in
   `docs/research/2026-05-27-runtime-and-chat-baseline.md`.
 - fact: Reflection/chat metadata audit added shared UE probe layouts and gated

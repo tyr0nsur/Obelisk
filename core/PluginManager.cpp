@@ -12,6 +12,7 @@
 #include <exception>
 #include <mutex>
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -25,6 +26,9 @@ namespace Obelisk::Core
         std::atomic<uint64_t> g_ApiCapabilities{OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS};
         std::mutex g_LoadedPluginOwnersMutex;
         std::unordered_set<void*> g_LoadedPluginOwners;
+        std::atomic<uint64_t> g_NextPluginOwnerToken{1};
+        std::mutex g_PluginOwnerTokensMutex;
+        std::unordered_map<uint64_t, void*> g_PluginOwnerTokens;
 
         using GetInfoFunc = bool(*)(ObeliskPluginMetadata*);
         using InitFunc = bool(*)(ObeliskApi*, const ObeliskPluginInitContext*);
@@ -97,6 +101,59 @@ namespace Obelisk::Core
 
             std::lock_guard<std::mutex> lock(g_LoadedPluginOwnersMutex);
             g_LoadedPluginOwners.erase(owner);
+        }
+
+        uint64_t AddPluginOwnerToken(void* owner)
+        {
+            if (!owner)
+                return 0;
+
+            const uint64_t token = g_NextPluginOwnerToken.fetch_add(1, std::memory_order_relaxed);
+            std::lock_guard<std::mutex> lock(g_PluginOwnerTokensMutex);
+            g_PluginOwnerTokens[token] = owner;
+            return token;
+        }
+
+        void RemovePluginOwnerToken(uint64_t token)
+        {
+            if (token == 0)
+                return;
+
+            std::lock_guard<std::mutex> lock(g_PluginOwnerTokensMutex);
+            g_PluginOwnerTokens.erase(token);
+        }
+
+        void* ResolvePluginOwnerToken(uint64_t token)
+        {
+            if (token == 0)
+                return nullptr;
+
+            std::lock_guard<std::mutex> lock(g_PluginOwnerTokensMutex);
+            const auto it = g_PluginOwnerTokens.find(token);
+            if (it == g_PluginOwnerTokens.end())
+                return nullptr;
+            return it->second;
+        }
+
+        void* ResolveOwnerTokenForRegistration(const char* apiName, uint64_t token)
+        {
+            void* owner = ResolvePluginOwnerToken(token);
+            if (!owner)
+            {
+                OBELISK_WARN("{} rejected callback because the owner token is invalid.", apiName);
+                return nullptr;
+            }
+
+            if (owner == g_CurrentPluginOwner)
+                return owner;
+
+            if (!IsLoadedPluginOwner(owner))
+            {
+                OBELISK_WARN("{} rejected callback because the owner token does not map to a loaded Obelisk plugin.", apiName);
+                return nullptr;
+            }
+
+            return owner;
         }
 
         void* ResolveCallbackOwnerForRegistration(const char* apiName, OnProcessEventCallback callback)
@@ -189,7 +246,8 @@ namespace Obelisk::Core
 
         uint64_t BuildApiCapabilities()
         {
-            uint64_t capabilities = OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS;
+            uint64_t capabilities = OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS |
+                OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS;
             if (AreGlobalProcessEventCallbacksAllowed())
                 capabilities |= OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS;
             return capabilities;
@@ -306,6 +364,48 @@ namespace Obelisk::Core
                 return;
             EventManager::Get().RegisterPostProcessEventForNameIndexOwned(owner, nameIndex, callback);
         }
+        void PluginRegisterPreProcessEventWithOwnerToken(uint64_t ownerToken, OnProcessEventCallback callback) {
+            if (!ValidateProcessEventCallback("RegisterPreProcessEventWithOwnerToken", callback))
+                return;
+            if (!IsGlobalProcessEventCallbackCapabilityEnabled())
+            {
+                OBELISK_WARN("Global PreProcessEvent callback rejected. Use RegisterPreProcessEventForNameIndexWithOwnerToken or enable allow-global-process-event-callbacks for a controlled debug window.");
+                return;
+            }
+            void* owner = ResolveOwnerTokenForRegistration("RegisterPreProcessEventWithOwnerToken", ownerToken);
+            if (!owner)
+                return;
+            EventManager::Get().RegisterPreProcessEventOwned(owner, callback);
+        }
+        void PluginRegisterPostProcessEventWithOwnerToken(uint64_t ownerToken, OnProcessEventCallback callback) {
+            if (!ValidateProcessEventCallback("RegisterPostProcessEventWithOwnerToken", callback))
+                return;
+            if (!IsGlobalProcessEventCallbackCapabilityEnabled())
+            {
+                OBELISK_WARN("Global PostProcessEvent callback rejected. Use RegisterPreProcessEventForNameIndexWithOwnerToken or enable allow-global-process-event-callbacks for a controlled debug window.");
+                return;
+            }
+            void* owner = ResolveOwnerTokenForRegistration("RegisterPostProcessEventWithOwnerToken", ownerToken);
+            if (!owner)
+                return;
+            EventManager::Get().RegisterPostProcessEventOwned(owner, callback);
+        }
+        void PluginRegisterPreProcessEventForNameIndexWithOwnerToken(uint64_t ownerToken, int32_t nameIndex, OnProcessEventCallback callback) {
+            if (!ValidateFilteredProcessEventCallback("RegisterPreProcessEventForNameIndexWithOwnerToken", nameIndex, callback))
+                return;
+            void* owner = ResolveOwnerTokenForRegistration("RegisterPreProcessEventForNameIndexWithOwnerToken", ownerToken);
+            if (!owner)
+                return;
+            EventManager::Get().RegisterPreProcessEventForNameIndexOwned(owner, nameIndex, callback);
+        }
+        void PluginRegisterPostProcessEventForNameIndexWithOwnerToken(uint64_t ownerToken, int32_t nameIndex, OnProcessEventCallback callback) {
+            if (!ValidateFilteredProcessEventCallback("RegisterPostProcessEventForNameIndexWithOwnerToken", nameIndex, callback))
+                return;
+            void* owner = ResolveOwnerTokenForRegistration("RegisterPostProcessEventForNameIndexWithOwnerToken", ownerToken);
+            if (!owner)
+                return;
+            EventManager::Get().RegisterPostProcessEventForNameIndexOwned(owner, nameIndex, callback);
+        }
         void PluginCallProcessEvent(void* caller, void* function, void* parms) {
             Hooks::ProcessEventHook::CallOriginalProcessEvent(caller, function, parms);
         }
@@ -342,6 +442,10 @@ namespace Obelisk::Core
         m_Api.abi_version = OBELISK_API_ABI_VERSION;
         m_Api.struct_size = sizeof(ObeliskApi);
         m_Api.capabilities = BuildApiCapabilities();
+        m_Api.RegisterPreProcessEventWithOwnerToken = PluginRegisterPreProcessEventWithOwnerToken;
+        m_Api.RegisterPostProcessEventWithOwnerToken = PluginRegisterPostProcessEventWithOwnerToken;
+        m_Api.RegisterPreProcessEventForNameIndexWithOwnerToken = PluginRegisterPreProcessEventForNameIndexWithOwnerToken;
+        m_Api.RegisterPostProcessEventForNameIndexWithOwnerToken = PluginRegisterPostProcessEventForNameIndexWithOwnerToken;
         g_ApiCapabilities.store(m_Api.capabilities, std::memory_order_release);
     }
 
@@ -507,17 +611,21 @@ namespace Obelisk::Core
 
                 const std::string configDir = preparedConfig.directory.string();
                 const std::string configPath = preparedConfig.path.string();
+                void* pluginOwner = m_Loader->GetSymbolOwner(handle, reinterpret_cast<void*>(initFunc));
+                if (!pluginOwner)
+                    pluginOwner = handle;
+                const uint64_t pluginOwnerToken = AddPluginOwnerToken(pluginOwner);
+                auto ownerTokenCleanup = MakeScopeExit([&]() {
+                    RemovePluginOwnerToken(pluginOwnerToken);
+                });
                 ObeliskPluginInitContext initContext{
                     OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION,
                     sizeof(ObeliskPluginInitContext),
                     configDir.c_str(),
                     configPath.c_str(),
-                    instanceId.c_str()
+                    instanceId.c_str(),
+                    pluginOwnerToken
                 };
-
-                void* pluginOwner = m_Loader->GetSymbolOwner(handle, reinterpret_cast<void*>(initFunc));
-                if (!pluginOwner)
-                    pluginOwner = handle;
 
                 bool initialized = false;
                 bool initAttempted = false;
@@ -557,8 +665,9 @@ namespace Obelisk::Core
                     auto loadedOwnerCleanup = MakeScopeExit([&]() {
                         RemoveLoadedPluginOwner(pluginOwner);
                     });
-                    m_LoadedPlugins.push_back({pluginName, metadata.plugin_id, handle, pluginOwner, shutdownFunc});
+                    m_LoadedPlugins.push_back({pluginName, metadata.plugin_id, handle, pluginOwner, pluginOwnerToken, shutdownFunc});
                     loadedOwnerCleanup.Dismiss();
+                    ownerTokenCleanup.Dismiss();
                     initCleanup.Dismiss();
                     handleCleanup.Dismiss();
                 }
@@ -587,6 +696,7 @@ namespace Obelisk::Core
             CallPluginShutdown(plugin.name, plugin.shutdown);
             UnregisterPluginCallbacks(plugin.name, plugin.owner, "before dlclose");
             RemoveLoadedPluginOwner(plugin.owner);
+            RemovePluginOwnerToken(plugin.ownerToken);
             SafeCloseLibrary(*m_Loader, plugin.handle, plugin.name);
         }
         m_LoadedPlugins.clear();

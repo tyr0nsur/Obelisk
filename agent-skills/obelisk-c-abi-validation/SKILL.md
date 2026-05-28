@@ -22,7 +22,9 @@ that a `.so` will consume.
   plugin unload, or `dlclose`.
 - Plugin callback registration wrappers reject callbacks whose owner cannot be resolved to
   the plugin currently initializing or an already-loaded Obelisk plugin shared object.
-  Helper-module callbacks need a future explicit owner-token API before they are stable.
+- Helper-module or background-thread callback registrations must use the append-only
+  owner-token registration functions and the `plugin_owner_token` supplied in
+  `ObeliskPluginInitContext`.
 - Plugins may optionally export `extern "C" void ObeliskPlugin_Shutdown()`. The runtime
   resolves it with `dlsym` outside the `ObeliskApi` table and calls it before callback
   owner cleanup and before `dlclose`.
@@ -90,8 +92,9 @@ Validation rules:
 - `PluginManager` must unregister both `EventManager` and `ChatEventDispatcher` callbacks
   for a plugin owner on init failure and before `dlclose` during unload.
 - Current public callback registration functions must not create ownerless registrations.
-  If owner resolution fails outside `ObeliskPlugin_Init`, reject the registration with a
-  warning instead of relying on `dladdr` fallback blindly.
+  If owner resolution fails outside `ObeliskPlugin_Init` and the plugin did not use a valid
+  owner token, reject the registration with a warning instead of relying on `dladdr`
+  fallback blindly.
 - Chat callback unregister must be idempotent and safe when called by the callback itself;
   cross-thread owner cleanup must still wait until in-flight dispatch finishes.
 - Keep tests for both self-unregister and cross-thread owner cleanup waiting before
@@ -99,6 +102,9 @@ Validation rules:
 - Prefer opaque `uint64_t` registration ids plus explicit unregister for new event APIs.
   Keep owner-token cleanup on init failure/unload as the backstop, and include `user_data`
   in callback subscriptions instead of asking plugins to capture global state.
+- Owner-token API additions must stay append-only: `plugin_owner_token` remains at the end
+  of `ObeliskPluginInitContext`, and owner-token registration function pointers remain
+  after existing `ObeliskApi` fields.
 
 ## Review Checklist
 

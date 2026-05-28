@@ -42,6 +42,9 @@ Own these areas:
 - Reject plugin callback registrations that cannot be attributed to the currently
   initializing plugin or an already-loaded plugin owner. Do not allow ownerless callbacks
   through the public plugin API.
+- Owner-token callback registration is the supported path for helper-module or
+  background-thread callbacks whose function pointer does not live in the plugin `.so`.
+  Remove owner tokens on init failure and before/with plugin unload.
 - Keep plugin-owned lifecycle cleanup shared across `EventManager` and the internal
   `ChatEventDispatcher`; future event families must join the same owner cleanup path before
   any public SDK exposure.

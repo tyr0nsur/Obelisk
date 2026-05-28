@@ -36,6 +36,7 @@ namespace Obelisk::Core
             std::string pluginId;
             void* handle;
             void* owner;
+            uint64_t ownerToken;
             void (*shutdown)();
         };
 

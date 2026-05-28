@@ -25,12 +25,14 @@ namespace
         volatile std::uint32_t initContextVersion = OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION;
         volatile std::uint64_t ownedCallbacksCapability = OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS;
         volatile std::uint64_t globalCallbacksCapability = OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS;
+        volatile std::uint64_t ownerTokenCallbacksCapability = OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS;
 
         (void)apiVersion;
         (void)metadataVersion;
         (void)initContextVersion;
         (void)ownedCallbacksCapability;
         (void)globalCallbacksCapability;
+        (void)ownerTokenCallbacksCapability;
     }
 }
 
@@ -51,16 +53,17 @@ int main()
 
     AssertAbiType<ObeliskPluginInitContext>();
     static_assert(alignof(ObeliskPluginInitContext) == 8);
-    static_assert(sizeof(ObeliskPluginInitContext) == 32);
+    static_assert(sizeof(ObeliskPluginInitContext) == 40);
     static_assert(offsetof(ObeliskPluginInitContext, abi_version) == 0);
     static_assert(offsetof(ObeliskPluginInitContext, struct_size) == 4);
     static_assert(offsetof(ObeliskPluginInitContext, config_dir) == 8);
     static_assert(offsetof(ObeliskPluginInitContext, config_path) == 16);
     static_assert(offsetof(ObeliskPluginInitContext, instance_id) == 24);
+    static_assert(offsetof(ObeliskPluginInitContext, plugin_owner_token) == 32);
 
     AssertAbiType<ObeliskApi>();
     static_assert(alignof(ObeliskApi) == 8);
-    static_assert(sizeof(ObeliskApi) == 80);
+    static_assert(sizeof(ObeliskApi) == 112);
     static_assert(offsetof(ObeliskApi, LogInfo) == 0);
     static_assert(offsetof(ObeliskApi, LogWarn) == 8);
     static_assert(offsetof(ObeliskApi, LogError) == 16);
@@ -72,11 +75,19 @@ int main()
     static_assert(offsetof(ObeliskApi, abi_version) == 64);
     static_assert(offsetof(ObeliskApi, struct_size) == 68);
     static_assert(offsetof(ObeliskApi, capabilities) == 72);
+    static_assert(offsetof(ObeliskApi, RegisterPreProcessEventWithOwnerToken) == 80);
+    static_assert(offsetof(ObeliskApi, RegisterPostProcessEventWithOwnerToken) == 88);
+    static_assert(offsetof(ObeliskApi, RegisterPreProcessEventForNameIndexWithOwnerToken) == 96);
+    static_assert(offsetof(ObeliskApi, RegisterPostProcessEventForNameIndexWithOwnerToken) == 104);
 
     static_assert(offsetof(ObeliskApi, abi_version) > offsetof(ObeliskApi, CallProcessEvent));
     static_assert(offsetof(ObeliskApi, struct_size) > offsetof(ObeliskApi, abi_version));
     static_assert(offsetof(ObeliskApi, capabilities) > offsetof(ObeliskApi, struct_size));
-    static_assert(offsetof(ObeliskApi, capabilities) + sizeof(ObeliskApi::capabilities) == sizeof(ObeliskApi));
+    static_assert(offsetof(ObeliskApi, RegisterPreProcessEventWithOwnerToken) > offsetof(ObeliskApi, capabilities));
+    static_assert(offsetof(ObeliskApi, RegisterPostProcessEventWithOwnerToken) > offsetof(ObeliskApi, RegisterPreProcessEventWithOwnerToken));
+    static_assert(offsetof(ObeliskApi, RegisterPreProcessEventForNameIndexWithOwnerToken) > offsetof(ObeliskApi, RegisterPostProcessEventWithOwnerToken));
+    static_assert(offsetof(ObeliskApi, RegisterPostProcessEventForNameIndexWithOwnerToken) +
+        sizeof(ObeliskApi::RegisterPostProcessEventForNameIndexWithOwnerToken) == sizeof(ObeliskApi));
 
     RuntimeNoOp();
     return 0;
