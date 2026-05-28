@@ -30,6 +30,10 @@ that a `.so` will consume.
 - Handle-returning owner-token ProcessEvent registrations are the preferred public path
   for long-lived callbacks. Public unregister must be owner-scoped with the same
   `plugin_owner_token`; never expose bare unregister-by-id across the plugin ABI.
+- `CallProcessEvent` remains in the ABI v1 function table for compatibility, but the
+  runtime must reject it unless `OBELISK_ALLOW_CALL_PROCESS_EVENT=1` and the per-instance
+  marker `allow-call-process-event` are active. Plugins must check
+  `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT` before treating it as available.
 - Plugins may optionally export `extern "C" void ObeliskPlugin_Shutdown()`. The runtime
   resolves it with `dlsym` outside the `ObeliskApi` table and calls it before callback
   owner cleanup and before `dlclose`.

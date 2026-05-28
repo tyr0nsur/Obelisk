@@ -273,6 +273,12 @@ namespace Obelisk::Core
             return Runtime::IsInstanceMarkerEnabled(markerRoot, instanceId, "allow-global-process-event-callbacks");
         }
 
+        bool IsCallProcessEventAllowed()
+        {
+            return Runtime::IsEnvAndInstanceMarkerEnabled("OBELISK_ALLOW_CALL_PROCESS_EVENT",
+                                                          "allow-call-process-event");
+        }
+
         uint64_t BuildApiCapabilities()
         {
             uint64_t capabilities = OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS |
@@ -280,6 +286,8 @@ namespace Obelisk::Core
                 OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES;
             if (AreGlobalProcessEventCallbacksAllowed())
                 capabilities |= OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS;
+            if (IsCallProcessEventAllowed())
+                capabilities |= OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT;
             return capabilities;
         }
 
@@ -455,6 +463,12 @@ namespace Obelisk::Core
             return EventManager::Get().UnregisterCallbackForOwner(owner, registrationId);
         }
         void PluginCallProcessEvent(void* caller, void* function, void* parms) {
+            if ((g_ApiCapabilities.load(std::memory_order_acquire) &
+                 OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT) == 0)
+            {
+                OBELISK_WARN("CallProcessEvent rejected. Enable allow-call-process-event only for a controlled debug window.");
+                return;
+            }
             Hooks::ProcessEventHook::CallOriginalProcessEvent(caller, function, parms);
         }
     }

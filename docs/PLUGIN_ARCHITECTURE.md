@@ -229,9 +229,13 @@ Rules:
 - Parameter decoding must be reflection-backed before it is considered stable.
   Raw memory scans and string heuristics are research tools only.
 - `CallProcessEvent` is a low-level trampoline escape hatch, not a stable event
-  mutation API. A pre-callback that calls it should return `false`; if it returns
-  `true`, the runtime skips the automatic original call and warns to avoid double
-  execution. Post-callbacks must not replay the same event through `CallProcessEvent`.
+  mutation API. It is rejected by default and requires both
+  `OBELISK_ALLOW_CALL_PROCESS_EVENT=1` and the per-instance marker
+  `allow-call-process-event`; only then does the runtime advertise
+  `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT`. A pre-callback that calls it should return
+  `false`; if it returns `true`, the runtime skips the automatic original call and warns
+  to avoid double execution. Post-callbacks must not replay the same event through
+  `CallProcessEvent`.
 - A global callback may be acceptable for an isolated discovery run if the explicit gate
   is enabled only on the approved debug instance and the test has rollback instructions.
 

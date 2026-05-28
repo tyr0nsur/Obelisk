@@ -16,6 +16,12 @@
 
 namespace fs = std::filesystem;
 
+namespace Obelisk::Hooks
+{
+    int ProcessEventCallOriginalCountForTesting();
+    void ResetProcessEventCallOriginalCountForTesting();
+}
+
 namespace
 {
     constexpr const char* kDefaultConfig =
@@ -37,6 +43,7 @@ namespace
         bool registerNullFilteredCallback = false;
         bool registerOwnerTokenFromInitThread = false;
         bool registerChatCallback = false;
+        bool callProcessEventInInit = false;
         bool throwOnGetInfoResolve = false;
         bool throwInInitAfterCallbacks = false;
         bool throwOnShutdown = false;
@@ -161,6 +168,9 @@ namespace
             Require(registrationId != 0, "fake chat callback registration failed");
         }
 
+        if (g_CurrentFakePlugin->callProcessEventInInit)
+            api->CallProcessEvent(reinterpret_cast<void*>(0x1), reinterpret_cast<void*>(0x2), reinterpret_cast<void*>(0x3));
+
         if (g_CurrentFakePlugin->orderLog)
             g_CurrentFakePlugin->orderLog->push_back("init:" + g_CurrentFakePlugin->filename);
 
@@ -281,6 +291,7 @@ namespace
         setenv("OBELISK_ROOT", root.string().c_str(), 1);
         setenv("OBELISK_INSTANCE_ID", "arkserver", 1);
         unsetenv("OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS");
+        unsetenv("OBELISK_ALLOW_CALL_PROCESS_EVENT");
     }
 
     void CleanupPlugin(FakePlugin& plugin)
@@ -737,6 +748,66 @@ namespace
         manager.UnloadAll();
         CleanupPlugin(plugin);
         unsetenv("OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS");
+        fs::remove_all(root);
+    }
+
+    void TestCallProcessEventRejectedByDefault()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_call_process_event_denied");
+        ConfigureEnvironment(root);
+        Obelisk::Hooks::ResetProcessEventCallOriginalCountForTesting();
+
+        FakePlugin plugin{.filename = "call_process_event_denied.so", .callProcessEventInInit = true};
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        Require((manager.ApiCapabilitiesForTesting() & OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT) == 0,
+                "CallProcessEvent capability was enabled by default");
+
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "CallProcessEvent-denied plugin was not initialized");
+        Require(Obelisk::Hooks::ProcessEventCallOriginalCountForTesting() == 0,
+                "CallProcessEvent reached original trampoline without explicit gate");
+
+        manager.UnloadAll();
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestCallProcessEventAllowedWithGate()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_call_process_event_allowed");
+        ConfigureEnvironment(root);
+        setenv("OBELISK_ALLOW_CALL_PROCESS_EVENT", "1", 1);
+        fs::create_directories(root / "state" / "instances" / "arkserver");
+        std::ofstream marker(root / "state" / "instances" / "arkserver" / "allow-call-process-event");
+        Require(marker.is_open(), "failed to create CallProcessEvent marker");
+        marker.close();
+        Obelisk::Hooks::ResetProcessEventCallOriginalCountForTesting();
+
+        FakePlugin plugin{.filename = "call_process_event_allowed.so", .callProcessEventInInit = true};
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        Require((manager.ApiCapabilitiesForTesting() & OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT) != 0,
+                "CallProcessEvent capability was not enabled with env and marker gate");
+
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "CallProcessEvent-allowed plugin was not initialized");
+        Require(Obelisk::Hooks::ProcessEventCallOriginalCountForTesting() == 1,
+                "CallProcessEvent did not reach original trampoline with explicit gate");
+
+        manager.UnloadAll();
+        CleanupPlugin(plugin);
+        unsetenv("OBELISK_ALLOW_CALL_PROCESS_EVENT");
         fs::remove_all(root);
     }
 
@@ -1207,6 +1278,8 @@ int main()
     TestInvalidProcessEventCallbacksAreRejected();
     TestUnsafeInstanceIdDisablesPluginLoading();
     TestGlobalProcessEventCallbackAllowedWithGate();
+    TestCallProcessEventRejectedByDefault();
+    TestCallProcessEventAllowedWithGate();
     TestDisabledPluginPreparesConfigButDoesNotInit();
     TestInstanceDisallowedPluginDoesNotInit();
     TestMissingGetInfoRejectsAndCloses();

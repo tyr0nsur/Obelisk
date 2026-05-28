@@ -172,6 +172,10 @@ Updated: 2026-05-28
   `OBELISK_BUILD_DIR`; release readiness passes the same build directory into layout and
   dry-run install validation. Runtime and plugin installers reject unexpected extra
   positional arguments instead of silently redirecting the target root.
+- fact: Public `CallProcessEvent` remains in the ABI table for compatibility but is now
+  default-deny. It requires `OBELISK_ALLOW_CALL_PROCESS_EVENT=1` plus the per-instance
+  marker `allow-call-process-event`; only then does the runtime advertise
+  `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT` and call the original trampoline.
 - fact: Commit `c0d1e4c` pushed the hardened first-stable gates. On 2026-05-28,
   `scripts/check_release_readiness.sh` passed from a clean tracked/untracked worktree
   (ignored `build/` and `scripts/__pycache__/` only), and the read-only Ragnarok posture

@@ -146,6 +146,9 @@ work from repository state instead of chat history.
   - build/install consistency: runtime installer accepts `--build-dir` and honors
     `OBELISK_BUILD_DIR`; release readiness passes the same build dir into layout and
     dry-run installer validation; runtime/plugin installers reject extra positional args;
+  - `CallProcessEvent` compatibility slot is default-deny; runtime advertises
+    `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT` and calls the trampoline only when
+    `OBELISK_ALLOW_CALL_PROCESS_EVENT=1` plus marker `allow-call-process-event` are active;
   - event dispatch hardening: EventManager tests initialize logger and verify throwing
     pre/post callbacks are logged without propagating and without stopping later
     callbacks;

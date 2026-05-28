@@ -39,6 +39,10 @@ Own these areas:
   default-deny. They require `OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS=1` plus the
   safe per-instance marker `allow-global-process-event-callbacks`; filtered callbacks stay
   the stable plugin path.
+- Public `CallProcessEvent` is also runtime default-deny. It requires
+  `OBELISK_ALLOW_CALL_PROCESS_EVENT=1` plus the safe per-instance marker
+  `allow-call-process-event`, and the runtime only advertises
+  `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT` when that gate is active.
 - Treat callback ownership as runtime-critical: callbacks registered by a plugin must be
   unregistered if init fails, before unload, and before `dlclose`.
 - Reject plugin callback registrations that cannot be attributed to the currently
