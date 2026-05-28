@@ -122,6 +122,10 @@ Updated: 2026-05-28
   unsubscribe handles, `CallProcessEvent` reentrancy contract/guard, safe hook removal
   with active-detour tracking, and owned debug-control thread shutdown. Treat these as
   future focused runtime rounds.
+- fact: Current uncommitted runtime/API round documents the `CallProcessEvent` reentrancy
+  contract in the public SDK header, README, and plugin architecture docs without changing
+  ABI layout. A pre-callback that calls `CallProcessEvent` must return `false`; returning
+  `true` risks double execution by the detour. A runtime guard remains future work.
 - finding: Reflection tooling audit found UFunction snapshot fixture coverage is broad
   across module areas, but ScriptStruct coverage is the current bottleneck with only two
   transfer structs. Prioritize an offline second-source readiness report before any

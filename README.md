@@ -211,6 +211,11 @@ bool ObeliskPlugin_Init(ObeliskApi* api, const ObeliskPluginInitContext* context
 Prefer filtered callbacks. Global `ProcessEvent` callbacks are hot-path debug
 tools unless explicitly measured and gated.
 
+`CallProcessEvent` is a low-level trampoline escape hatch. If a pre-callback calls it,
+that callback must return `false`; returning `true` lets the detour call the original
+again. Stable plugin APIs should prefer higher-level Obelisk module surfaces as they are
+promoted.
+
 The first official example is [oBaseEvents](docs/oBaseEvents.md).
 
 ## ARK Debug Harness

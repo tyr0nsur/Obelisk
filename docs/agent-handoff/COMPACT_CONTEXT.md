@@ -114,6 +114,9 @@ work from repository state instead of chat history.
   - reflection/offline: ScriptStruct second-source coverage is the bottleneck, and the
     next safe step is a second-source readiness report over existing snapshots without
     touching live servers.
+- Current uncommitted runtime/API round documents `CallProcessEvent` reentrancy in the SDK
+  header and plugin docs without changing ABI layout: pre-callbacks that call it must
+  return `false` to avoid double execution; a runtime guard remains future work.
 - Current uncommitted reflection-tooling round adds
   `scripts/compare_reflection_snapshots.py --readiness-report`. Use it to summarize
   comparable snapshot coverage and second-source status by schema/module. Current fixtures

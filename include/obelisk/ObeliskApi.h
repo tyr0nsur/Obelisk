@@ -53,7 +53,14 @@ struct ObeliskApi {
     void (*RegisterPreProcessEventForNameIndex)(int32_t nameIndex, OnProcessEventCallback callback);
     void (*RegisterPostProcessEventForNameIndex)(int32_t nameIndex, OnProcessEventCallback callback);
 
-    // Call Original ProcessEvent (for executing UE functions)
+    // Call the original ProcessEvent trampoline for explicit UE function execution.
+    //
+    // Reentrancy contract: do not call this from a ProcessEvent callback unless the
+    // callback returns false to block the detour's automatic original call. Calling it
+    // from a pre-callback and then returning true can execute the same UE function twice.
+    // Post-callback use is observationally after the original call and must not attempt
+    // to replay the same event. Stable plugins should prefer future higher-level APIs
+    // over direct ProcessEvent replay.
     void (*CallProcessEvent)(void* caller, void* function, void* parms);
 
     // ABI metadata appended for compatibility with the original function table layout.

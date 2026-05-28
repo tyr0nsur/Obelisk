@@ -156,6 +156,10 @@ Rules:
   parse JSON, sleep, or take contended locks.
 - Parameter decoding must be reflection-backed before it is considered stable.
   Raw memory scans and string heuristics are research tools only.
+- `CallProcessEvent` is a low-level trampoline escape hatch, not a stable event
+  mutation API. A pre-callback that calls it must return `false`; otherwise the
+  detour will also call the original and the UE function can run twice. Post-callbacks
+  must not replay the same event through `CallProcessEvent`.
 - A global callback may be acceptable for an isolated discovery run if plugins
   are otherwise disabled on live maps and the test has rollback instructions.
 
