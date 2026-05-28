@@ -459,6 +459,22 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestCallbackHandleCapabilityImpliesOwnerTokenCapability()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_capability_invariant");
+        ConfigureEnvironment(root);
+
+        FakeLoader loader;
+        Obelisk::Core::PluginManager manager(loader);
+        const uint64_t capabilities = manager.ApiCapabilitiesForTesting();
+
+        Require((capabilities & OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES) == 0 ||
+                    (capabilities & OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS) != 0,
+                "callback handle capability was advertised without owner-token capability");
+
+        fs::remove_all(root);
+    }
+
     void TestFilteredProcessEventCallbackAllowedByDefault()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_filtered_allowed");
@@ -531,6 +547,11 @@ namespace
 
         Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
                 "owner-token callback survived unload");
+        Require(plugin.capturedApi.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    42,
+                    FakeCallback) == 0,
+                "owner token remained valid after plugin unload");
 
         CleanupPlugin(plugin);
         fs::remove_all(root);
@@ -1323,6 +1344,7 @@ int main()
     TestValidPluginLoadsAndUnloadCleansCallbacks();
     TestPluginOwnerTokensSkipZeroAndLiveTokensAfterWrap();
     TestGlobalProcessEventCallbackRejectedByDefault();
+    TestCallbackHandleCapabilityImpliesOwnerTokenCapability();
     TestFilteredProcessEventCallbackAllowedByDefault();
     TestPostInitUnownedCallbackRegistrationIsRejected();
     TestPostInitOwnerTokenCallbackRegistrationCleansOnUnload();

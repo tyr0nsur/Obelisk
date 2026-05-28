@@ -724,6 +724,8 @@ namespace Obelisk::Core
                     if (!initAttempted)
                         return;
                     CallPluginShutdown(pluginName, shutdownFunc);
+                    RemoveInitializingPluginOwner(pluginOwner);
+                    RemovePluginOwnerToken(pluginOwnerToken);
                     UnregisterPluginCallbacks(pluginName, pluginOwner, "after init failure and before dlclose");
                 });
 
@@ -788,9 +790,9 @@ namespace Obelisk::Core
             auto& plugin = *it;
             OBELISK_INFO("Unloading plugin: {}", plugin.name);
             CallPluginShutdown(plugin.name, plugin.shutdown);
-            UnregisterPluginCallbacks(plugin.name, plugin.owner, "before dlclose");
             RemoveLoadedPluginOwner(plugin.owner);
             RemovePluginOwnerToken(plugin.ownerToken);
+            UnregisterPluginCallbacks(plugin.name, plugin.owner, "before dlclose");
             SafeCloseLibrary(*m_Loader, plugin.handle, plugin.name);
         }
         m_LoadedPlugins.clear();

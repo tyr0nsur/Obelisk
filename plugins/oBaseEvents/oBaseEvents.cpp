@@ -283,7 +283,8 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(Obelis
 
         if (g_ProcessEventEnabled && g_FilteredFunctionIndex >= 0)
         {
-            if ((api->capabilities & OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES) == 0 ||
+            if ((api->capabilities & OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS) == 0 ||
+                (api->capabilities & OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES) == 0 ||
                 api->struct_size < offsetof(ObeliskApi, UnregisterProcessEventCallbackWithOwnerToken) +
                     sizeof(api->UnregisterProcessEventCallbackWithOwnerToken) ||
                 context->plugin_owner_token == 0 ||

@@ -91,10 +91,11 @@ typedef struct ObeliskApi {
     void (*RegisterPreProcessEventForNameIndexWithOwnerToken)(uint64_t ownerToken, int32_t nameIndex, OnProcessEventCallback callback);
     void (*RegisterPostProcessEventForNameIndexWithOwnerToken)(uint64_t ownerToken, int32_t nameIndex, OnProcessEventCallback callback);
 
-    // Handle-returning ProcessEvent callback registration. Plugins must check
-    // struct_size and OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES before using
-    // these fields. A return value of 0 means the registration was rejected. Non-zero
-    // handles can be passed with the same owner token to
+    // Handle-returning ProcessEvent callback registration. Plugins must check struct_size,
+    // OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS, and
+    // OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES before using these fields.
+    // A return value of 0 means the registration was rejected. Non-zero handles can be
+    // passed with the same owner token to
     // UnregisterProcessEventCallbackWithOwnerToken for granular cleanup; plugin-owner
     // cleanup on unload remains the runtime backstop.
     uint64_t (*RegisterPreProcessEventWithOwnerTokenHandle)(uint64_t ownerToken, OnProcessEventCallback callback);

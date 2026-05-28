@@ -24,6 +24,7 @@ namespace
     bool HasProcessEventHandleApi(const ObeliskApi* api)
     {
         return api &&
+            (api->capabilities & OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS) != 0 &&
             (api->capabilities & OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES) != 0 &&
             api->struct_size >= offsetof(ObeliskApi, UnregisterProcessEventCallbackWithOwnerToken) +
                 sizeof(api->UnregisterProcessEventCallbackWithOwnerToken) &&
