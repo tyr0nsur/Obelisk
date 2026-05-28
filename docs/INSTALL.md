@@ -162,8 +162,8 @@ Instance marker files are preferred for production operations:
 
 ```bash
 # Approved debug window only. Do not run from an ordinary install or agent round.
-# mkdir -p /servidor/ark/obelisk/state/instances/arkserver2
-# touch /servidor/ark/obelisk/state/instances/arkserver2/<approved-marker>
+# mkdir -p /servidor/ark/obelisk/state/instances/<approved-instance-id>
+# touch /servidor/ark/obelisk/state/instances/<approved-instance-id>/<approved-marker>
 ```
 
 Do not create, remove, or refresh `arkserver` / Ragnarok markers from install or debug
