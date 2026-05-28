@@ -123,6 +123,13 @@ and blocker reasons. A generated static xref artifact removes the static-xref bl
 when at least one non-oversized anchor window exists; empty or contaminated xref groups
 remain non-actionable.
 
+ReflectionScanner analyzer JSON and `build_reflection_evidence_pack.py` manifests also
+expose a structured fail-closed `promotion_gate`. Even when analyzer status is
+`research-candidate`, the gate keeps `ready=false`, `promotable.gnames=false`, and
+`promotable.gobjects=false` until a second isolated capture or independent static path is
+recorded. ReflectionScanner packs explicitly block GObjects promotion because they do not
+prove object-array layout, membership, or object/name resolution.
+
 ## P1 Module Fixture Matrix
 
 | Module | Current Best Use | Second-Source Promotion Gate | Still Blocked |

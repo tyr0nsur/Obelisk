@@ -404,6 +404,10 @@ work from repository state instead of chat history.
 - `scripts/build_reflection_evidence_pack.py` wraps that manual flow into a reproducible
   offline pack: copied logs, SHA256/file/readelf/objdump artifacts, analyzer JSON, and a
   manifest. It refuses to write artifacts under `/servidor/ark`.
+- ReflectionScanner analyzer JSON and offline pack manifests expose a structured
+  `promotion_gate` with `ready=false`, `promotable.gnames=false`, and
+  `promotable.gobjects=false`. Treat `evidence_pack.status=research-candidate` as
+  candidate ranking only, never as a runtime offset/API promotion.
 - Analyzer static xref entries now include access classification (`load`, `store`,
   `address`, `call`, `jump`, or `other`) and evidence-pack access counts.
 - ReflectionScanner can probe explicit static FName root slots supplied through

@@ -443,6 +443,100 @@ def summarize_fname_rejects(rejects: list[FNameReject]) -> list[dict[str, object
     return summaries
 
 
+def reflectionscanner_promotion_gate(
+    *,
+    repeat_confirmed_gname_table_count: int,
+    reject_marker_count: int,
+    static_xrefs_actionable: bool,
+    binary_metadata_present: bool,
+    objdump_xrefs_present: bool,
+) -> dict[str, object]:
+    blockers: list[dict[str, object]] = [
+        {
+            "reason": "reflectionscanner_research_candidate_only",
+            "detail": (
+                "ReflectionScanner analyzer output may identify research candidates "
+                "but is never direct promotion evidence."
+            ),
+        },
+        {
+            "reason": "needs_second_isolated_capture_or_static_path",
+            "detail": (
+                "Promotion requires a second isolated capture or an independent "
+                "static validation path."
+            ),
+        },
+        {
+            "reason": "gobjects_not_validated_by_reflectionscanner_pack",
+            "detail": (
+                "This pack does not prove GUObjectArray/GObjects layout, object count, "
+                "sample membership, or object/name resolution."
+            ),
+        },
+    ]
+
+    conditional_blockers = {
+        "reject_markers_present": reject_marker_count,
+        "no_repeat_confirmed_gnames_candidate": repeat_confirmed_gname_table_count == 0,
+        "non_actionable_static_xrefs": not static_xrefs_actionable,
+        "missing_binary_metadata": not binary_metadata_present,
+        "missing_objdump_xrefs": not objdump_xrefs_present,
+    }
+
+    if reject_marker_count:
+        blockers.append(
+            {
+                "reason": "reject_markers_present",
+                "count": reject_marker_count,
+                "detail": "Copied logs contain unsafe marker lines such as legacy plugins or native exec probes.",
+            }
+        )
+    if conditional_blockers["no_repeat_confirmed_gnames_candidate"]:
+        blockers.append(
+            {
+                "reason": "no_repeat_confirmed_gnames_candidate",
+                "detail": "No repeat-confirmed GNames table candidate is present in this analyzer output.",
+            }
+        )
+    if conditional_blockers["non_actionable_static_xrefs"]:
+        blockers.append(
+            {
+                "reason": "non_actionable_static_xrefs",
+                "detail": "No actionable objdump xref evidence was attached for the candidate roots.",
+            }
+        )
+    if conditional_blockers["missing_binary_metadata"]:
+        blockers.append(
+            {
+                "reason": "missing_binary_metadata",
+                "detail": "The analyzer output does not include hashed binary metadata.",
+            }
+        )
+    if conditional_blockers["missing_objdump_xrefs"]:
+        blockers.append(
+            {
+                "reason": "missing_objdump_xrefs",
+                "detail": "The analyzer output does not include an objdump xref artifact path.",
+            }
+        )
+
+    return {
+        "gate_type": "reflectionscanner_evidence_pack_v1",
+        "ready": False,
+        "scope": "research_candidate_only",
+        "promotable": {
+            "gnames": False,
+            "gobjects": False,
+        },
+        "blockers": blockers,
+        "conditional_blockers": conditional_blockers,
+        "summary": (
+            "ReflectionScanner evidence packs are candidate-ranking artifacts only; "
+            "do not promote GNames, GObjects, or runtime offsets directly from them."
+        ),
+    }
+
+
 def count_by(items: list[StaticFNameRootSample], field: str) -> dict[str, int]:
     counts: dict[str, int] = {}
     for item in items:
@@ -818,6 +912,13 @@ def parse_logs(
         static_fname_root_reject_reason_counts[reject.reason] = (
             static_fname_root_reject_reason_counts.get(reject.reason, 0) + 1
         )
+    promotion_gate = reflectionscanner_promotion_gate(
+        repeat_confirmed_gname_table_count=len(repeat_confirmed_tables),
+        reject_marker_count=len(reject_markers),
+        static_xrefs_actionable=bool(static_xref_access_counts),
+        binary_metadata_present=binary_metadata is not None,
+        objdump_xrefs_present=objdump_xrefs_path is not None,
+    )
 
     return {
         "evidence_pack": {
@@ -854,10 +955,7 @@ def parse_logs(
                 if repeat_confirmed_tables and not reject_markers
                 else "inconclusive"
             ),
-            "promotion_gate": (
-                "Never promote directly from this analyzer output. Require a second "
-                "isolated capture or independent static validation before runtime code."
-            ),
+            "promotion_gate": promotion_gate,
         },
         "files": sorted(files),
         "reject_markers": [asdict(item) for item in reject_markers],

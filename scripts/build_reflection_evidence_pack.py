@@ -83,6 +83,61 @@ def require_success(record: dict[str, object]) -> None:
         raise RuntimeError(f"command failed with exit {record['returncode']}: {command}")
 
 
+def fallback_promotion_gate(reason: str) -> dict[str, object]:
+    return {
+        "gate_type": "reflectionscanner_evidence_pack_v1",
+        "ready": False,
+        "scope": "research_candidate_only",
+        "promotable": {
+            "gnames": False,
+            "gobjects": False,
+        },
+        "blockers": [
+            {
+                "reason": "reflectionscanner_research_candidate_only",
+                "detail": (
+                    "ReflectionScanner analyzer output may identify research candidates "
+                    "but is never direct promotion evidence."
+                ),
+            },
+            {
+                "reason": "needs_second_isolated_capture_or_static_path",
+                "detail": (
+                    "Promotion requires a second isolated capture or an independent "
+                    "static validation path."
+                ),
+            },
+            {
+                "reason": "invalid_or_missing_analyzer_promotion_gate",
+                "detail": reason,
+            },
+        ],
+        "conditional_blockers": {
+            "reject_markers_present": 0,
+            "no_repeat_confirmed_gnames_candidate": True,
+            "non_actionable_static_xrefs": True,
+            "missing_binary_metadata": True,
+            "missing_objdump_xrefs": True,
+        },
+        "summary": (
+            "ReflectionScanner evidence packs are candidate-ranking artifacts only; "
+            "do not promote GNames, GObjects, or runtime offsets directly from them."
+        ),
+    }
+
+
+def load_analyzer_promotion_gate(analyzer_json_path: Path) -> dict[str, object]:
+    try:
+        payload = json.loads(analyzer_json_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return fallback_promotion_gate(f"could not parse analyzer JSON: {exc}")
+
+    gate = payload.get("evidence_pack", {}).get("promotion_gate")
+    if isinstance(gate, dict) and gate.get("ready") is False:
+        return gate
+    return fallback_promotion_gate("analyzer JSON did not contain a structured fail-closed gate")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -207,6 +262,7 @@ def main() -> int:
         print(str(exc), file=sys.stderr)
         return 1
 
+    analyzer_json_path = output_dir / "analyzer-evidence.json"
     manifest = {
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "repo_root": str(REPO_ROOT),
@@ -226,10 +282,7 @@ def main() -> int:
             "analyzer_json": str(output_dir / "analyzer-evidence.json"),
         },
         "commands": commands,
-        "promotion_gate": (
-            "Offline pack only. Do not promote offsets without isolated runtime evidence "
-            "or independent static validation."
-        ),
+        "promotion_gate": load_analyzer_promotion_gate(analyzer_json_path),
     }
     manifest_path = output_dir / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")

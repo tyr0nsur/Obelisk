@@ -279,6 +279,16 @@ class ReflectionScannerAnalyzerStrictTests(unittest.TestCase):
         self.assertEqual(tables["0x7f0000001000"]["research_candidate_count"], 2)
         self.assertEqual(tables["0x7f0000002000"]["status"], "rejected")
         self.assertIn("preview mismatch observed", tables["0x7f0000002000"]["reason"])
+        gate = summary["evidence_pack"]["promotion_gate"]
+        self.assertEqual(gate["gate_type"], "reflectionscanner_evidence_pack_v1")
+        self.assertFalse(gate["ready"])
+        self.assertEqual(gate["promotable"], {"gnames": False, "gobjects": False})
+        blocker_reasons = {blocker["reason"] for blocker in gate["blockers"]}
+        self.assertIn("reflectionscanner_research_candidate_only", blocker_reasons)
+        self.assertIn("needs_second_isolated_capture_or_static_path", blocker_reasons)
+        self.assertIn("gobjects_not_validated_by_reflectionscanner_pack", blocker_reasons)
+        self.assertIn("non_actionable_static_xrefs", blocker_reasons)
+        self.assertNotIn("no_repeat_confirmed_gnames_candidate", blocker_reasons)
 
     def test_json_summarizes_fname_rejects(self) -> None:
         result = self.run_analyzer(
@@ -578,6 +588,43 @@ class ReflectionScannerAnalyzerStrictTests(unittest.TestCase):
             {"load": 1, "store": 1},
         )
         self.assertNotIn("0x600010", summary["static_xrefs"])
+        gate = summary["evidence_pack"]["promotion_gate"]
+        self.assertFalse(gate["ready"])
+        blocker_reasons = {blocker["reason"] for blocker in gate["blockers"]}
+        self.assertIn("needs_second_isolated_capture_or_static_path", blocker_reasons)
+        self.assertIn("gobjects_not_validated_by_reflectionscanner_pack", blocker_reasons)
+        self.assertNotIn("non_actionable_static_xrefs", blocker_reasons)
+
+    def test_json_promotion_gate_reports_no_repeat_confirmed_gnames_candidate(self) -> None:
+        result = self.run_analyzer([fname_probe()], "--json")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        summary = json.loads(result.stdout)
+        gate = summary["evidence_pack"]["promotion_gate"]
+        self.assertFalse(gate["ready"])
+        blocker_reasons = {blocker["reason"] for blocker in gate["blockers"]}
+        self.assertIn("no_repeat_confirmed_gnames_candidate", blocker_reasons)
+        self.assertTrue(
+            gate["conditional_blockers"]["no_repeat_confirmed_gnames_candidate"]
+        )
+
+    def test_json_promotion_gate_reports_reject_markers_present(self) -> None:
+        result = self.run_analyzer(
+            [
+                fname_probe(source_global="0x600000"),
+                fname_probe(source_global="0x600008"),
+                "[NativeExecProbe] installed in copied log",
+            ],
+            "--json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        summary = json.loads(result.stdout)
+        gate = summary["evidence_pack"]["promotion_gate"]
+        self.assertFalse(gate["ready"])
+        blocker_reasons = {blocker["reason"] for blocker in gate["blockers"]}
+        self.assertIn("reject_markers_present", blocker_reasons)
+        self.assertEqual(gate["conditional_blockers"]["reject_markers_present"], 1)
 
     def test_json_classifies_intel_static_xref_access(self) -> None:
         result = self.run_analyzer(
@@ -640,7 +687,13 @@ class ReflectionScannerAnalyzerStrictTests(unittest.TestCase):
             evidence_pack["binary"]["sha256"],
             "d936ee81753955ccd696878ea4beb9cf69db467d7c6e5fdc2ffd001c81b641e6",
         )
-        self.assertIn("Never promote directly", evidence_pack["promotion_gate"])
+        gate = evidence_pack["promotion_gate"]
+        self.assertFalse(gate["ready"])
+        self.assertEqual(gate["scope"], "research_candidate_only")
+        self.assertEqual(gate["promotable"], {"gnames": False, "gobjects": False})
+        blocker_reasons = {blocker["reason"] for blocker in gate["blockers"]}
+        self.assertIn("missing_objdump_xrefs", blocker_reasons)
+        self.assertNotIn("missing_binary_metadata", blocker_reasons)
 
 
 class ReflectionEvidencePackBuilderTests(unittest.TestCase):
@@ -689,6 +742,20 @@ class ReflectionEvidencePackBuilderTests(unittest.TestCase):
                 analyzer["evidence_pack"]["logs"],
                 [str(output_dir / "logs" / "Obelisk.log")],
             )
+            self.assertEqual(
+                manifest["promotion_gate"],
+                analyzer["evidence_pack"]["promotion_gate"],
+            )
+            self.assertFalse(manifest["promotion_gate"]["ready"])
+            self.assertEqual(
+                manifest["promotion_gate"]["promotable"],
+                {"gnames": False, "gobjects": False},
+            )
+            blocker_reasons = {
+                blocker["reason"] for blocker in manifest["promotion_gate"]["blockers"]
+            }
+            self.assertIn("no_repeat_confirmed_gnames_candidate", blocker_reasons)
+            self.assertIn("gobjects_not_validated_by_reflectionscanner_pack", blocker_reasons)
 
     def test_refuses_to_write_under_server_root(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

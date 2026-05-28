@@ -91,6 +91,10 @@ python3 scripts/analyze_reflectionscanner_capture.py \
 
 The JSON output contains an `evidence_pack` block. Preserve that block in the research
 note summary when a candidate is promoted to `research-candidate` or explicitly rejected.
+Its `promotion_gate` is the machine-readable promotion contract: for ReflectionScanner
+packs it must remain `ready=false`, and `promotable.gnames` / `promotable.gobjects` must
+remain false until a separate second-source/static promotion artifact exists. Do not use
+`evidence_pack.status=research-candidate` alone as a runtime offset or API promotion.
 
 ## Acceptance Bar
 

@@ -49,6 +49,9 @@ Own these areas:
 - Do not scan arbitrary params on every `ProcessEvent` in live servers.
 - Use filtered callbacks by `fname_index` whenever possible.
 - Treat `ReflectionScanner` as an offline/debug tool, not a production startup feature.
+- Treat ReflectionScanner `evidence_pack.status=research-candidate` as candidate ranking
+  only. The structured `promotion_gate` must remain `ready=false` and non-promotable for
+  GNames/GObjects until second-source or independent static evidence exists.
 - Prefer post-start or offline evidence over blind startup waits. If a server is joinable
   and the scanner still reads zero/invalid tables, change the method instead of extending
   sleep/retry windows.

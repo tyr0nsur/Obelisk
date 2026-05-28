@@ -650,6 +650,11 @@ Updated: 2026-05-28
   SHA256/file/readelf/objdump artifacts, runs analyzer JSON with `--binary` and
   `--objdump-xrefs`, writes `manifest.json`, and refuses to write artifacts under
   `/servidor/ark`.
+- fact: ReflectionScanner analyzer JSON and offline pack manifests now expose a structured
+  `promotion_gate` with `ready=false`, `promotable.gnames=false`, and
+  `promotable.gobjects=false`. A `research-candidate` evidence status remains candidate
+  ranking only; promotion still requires a second isolated capture or independent static
+  path, and GObjects are explicitly blocked by ReflectionScanner packs.
 - fact: `scripts/check_obelisk_server_posture.sh --expect-stable` now fails closed if
   central `${OBELISK_ROOT}/lib/libobelisk.so` is not present in `LD_PRELOAD` and mapped, if
   a deleted `libobelisk` mapping remains, if scanner/native-exec env vars are present, or
