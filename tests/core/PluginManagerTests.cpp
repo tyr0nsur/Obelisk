@@ -945,6 +945,47 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestGlobalProcessEventCallbackRejectedAfterGateRevoked()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_global_revoked");
+        ConfigureEnvironment(root);
+        setenv("OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS", "1", 1);
+        fs::create_directories(root / "state" / "instances" / "arkserver");
+        const fs::path markerPath =
+            root / "state" / "instances" / "arkserver" / "allow-global-process-event-callbacks";
+        std::ofstream marker(markerPath);
+        Require(marker.is_open(), "failed to create global callback marker");
+        marker.close();
+
+        FakePlugin plugin{.filename = "global_revoked.so", .captureApi = true};
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        Require((manager.ApiCapabilitiesForTesting() & OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS) != 0,
+                "global callback capability was not enabled with env and marker gate");
+
+        manager.LoadPlugins((root / "plugins").string());
+        Require(plugin.initCalls == 1, "global-revoked plugin was not initialized");
+        fs::remove(markerPath);
+
+        const uint64_t registrationId =
+            plugin.capturedApi.RegisterPreProcessEventWithOwnerTokenHandle(
+                plugin.initOwnerToken,
+                FakeCallback);
+
+        Require(registrationId == 0, "global callback registration succeeded after marker revocation");
+        Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
+                "global callback was registered after marker revocation");
+
+        manager.UnloadAll();
+        CleanupPlugin(plugin);
+        unsetenv("OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS");
+        fs::remove_all(root);
+    }
+
     void TestCallProcessEventRejectedByDefault()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_call_process_event_denied");
@@ -998,6 +1039,47 @@ namespace
         Require(plugin.initCalls == 1, "CallProcessEvent-allowed plugin was not initialized");
         Require(Obelisk::Hooks::ProcessEventCallOriginalCountForTesting() == 1,
                 "CallProcessEvent did not reach original trampoline with explicit gate");
+
+        manager.UnloadAll();
+        CleanupPlugin(plugin);
+        unsetenv("OBELISK_ALLOW_CALL_PROCESS_EVENT");
+        fs::remove_all(root);
+    }
+
+    void TestCallProcessEventRejectedAfterGateRevoked()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_call_process_event_revoked");
+        ConfigureEnvironment(root);
+        setenv("OBELISK_ALLOW_CALL_PROCESS_EVENT", "1", 1);
+        fs::create_directories(root / "state" / "instances" / "arkserver");
+        const fs::path markerPath =
+            root / "state" / "instances" / "arkserver" / "allow-call-process-event";
+        std::ofstream marker(markerPath);
+        Require(marker.is_open(), "failed to create CallProcessEvent marker");
+        marker.close();
+        Obelisk::Hooks::ResetProcessEventCallOriginalCountForTesting();
+
+        FakePlugin plugin{.filename = "call_process_event_revoked.so", .captureApi = true};
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        Require((manager.ApiCapabilitiesForTesting() & OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT) != 0,
+                "CallProcessEvent capability was not enabled with env and marker gate");
+
+        manager.LoadPlugins((root / "plugins").string());
+        Require(plugin.initCalls == 1, "CallProcessEvent-revoked plugin was not initialized");
+        fs::remove(markerPath);
+
+        plugin.capturedApi.CallProcessEvent(
+            reinterpret_cast<void*>(0x1),
+            reinterpret_cast<void*>(0x2),
+            reinterpret_cast<void*>(0x3));
+
+        Require(Obelisk::Hooks::ProcessEventCallOriginalCountForTesting() == 0,
+                "CallProcessEvent reached original trampoline after marker revocation");
 
         manager.UnloadAll();
         CleanupPlugin(plugin);
@@ -1507,8 +1589,10 @@ int main()
     TestOwnerTokenUnregisterAllowedDuringShutdown();
     TestUnsafeInstanceIdDisablesPluginLoading();
     TestGlobalProcessEventCallbackAllowedWithGate();
+    TestGlobalProcessEventCallbackRejectedAfterGateRevoked();
     TestCallProcessEventRejectedByDefault();
     TestCallProcessEventAllowedWithGate();
+    TestCallProcessEventRejectedAfterGateRevoked();
     TestDisabledPluginPreparesConfigButDoesNotInit();
     TestInstanceDisallowedPluginDoesNotInit();
     TestMissingGetInfoRejectsAndCloses();

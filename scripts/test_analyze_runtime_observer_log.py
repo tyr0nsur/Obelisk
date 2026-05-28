@@ -98,6 +98,10 @@ class RuntimeObserverLogAnalyzerTests(unittest.TestCase):
         self.assertEqual(function["details"]["send_mode"], [0, 1])
         self.assertEqual(function["details"]["send_mode_name"], ["GlobalChat", "GlobalTribeChat"])
         self.assertEqual(function["details"]["send_mode_known"], ["true"])
+        self.assertEqual(function["fields"]["ChatMessage"]["offsets"], ["0x0"])
+        self.assertEqual(function["fields"]["ChatMessage"]["sizes"], [16])
+        self.assertEqual(function["fields"]["SendMode"]["offsets"], ["0x10"])
+        self.assertEqual(function["fields"]["SendMode"]["has_range"], {"true": 1})
 
         self.assertEqual(chat["fields"]["ChatMessage"]["offsets"], ["0x0"])
         self.assertEqual(chat["fields"]["ChatMessage"]["sizes"], [16])
@@ -131,9 +135,50 @@ class RuntimeObserverLogAnalyzerTests(unittest.TestCase):
         self.assertEqual(structure["accepted_count"], 1)
         self.assertEqual(structure["blockers"], ["runtime_observer_evidence_only"])
         self.assertEqual(structure["functions"]["VerifyPinCode"]["outer_fname_indices"], [7617])
+        self.assertEqual(
+            structure["functions"]["VerifyPinCode"]["fields"]["pinCode"]["offsets"],
+            ["0x0"],
+        )
+        self.assertEqual(
+            structure["functions"]["VerifyPinCode"]["fields"]["ReturnValue"]["sizes"],
+            [1],
+        )
         self.assertEqual(structure["fields"]["pinCode"]["sensitive"], {"true": 1})
         self.assertEqual(structure["fields"]["pinCode"]["has_range"], {"false": 1})
         self.assertEqual(structure["reject_reasons"], {"bad_parms_size": 1})
+
+    def test_keeps_same_field_name_layouts_separate_by_function(self) -> None:
+        result = self.run_analyzer(
+            [
+                "[warning] Experimental inventory reflection enabled for ShooterGameServer SHA256 "
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.",
+                "[info] Reflected inventory ProcessEvent #1 function=CanUse "
+                "fname_index=6252 outer_fname_index=6231 fields=1",
+                "[info] Reflected inventory field ReturnValue offset=0x4 size=1 has_range=true",
+                "[info] Reflected inventory ProcessEvent #2 function=CanEquip "
+                "fname_index=7001 outer_fname_index=6231 fields=1",
+                "[info] Reflected inventory field ReturnValue offset=0x8 size=4 has_range=true",
+            ]
+        )
+
+        inventory = result["modules"]["inventory"]
+        self.assertEqual(inventory["fields"]["ReturnValue"]["offsets"], ["0x4", "0x8"])
+        self.assertEqual(
+            inventory["functions"]["CanUse"]["fields"]["ReturnValue"]["offsets"],
+            ["0x4"],
+        )
+        self.assertEqual(
+            inventory["functions"]["CanUse"]["fields"]["ReturnValue"]["sizes"],
+            [1],
+        )
+        self.assertEqual(
+            inventory["functions"]["CanEquip"]["fields"]["ReturnValue"]["offsets"],
+            ["0x8"],
+        )
+        self.assertEqual(
+            inventory["functions"]["CanEquip"]["fields"]["ReturnValue"]["sizes"],
+            [4],
+        )
 
     def test_records_commit_override(self) -> None:
         result = self.run_analyzer(

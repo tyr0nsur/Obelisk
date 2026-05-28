@@ -88,10 +88,13 @@ The analyzer emits `obelisk.runtime-observer-log-summary.v1` JSON with
 `review_scope=runtime_observer_evidence_summary`, `readiness_gate=none`, and
 `promotion_gate.gate_type=runtime_observer_observational_only`. It also summarizes copied
 runtime posture lines such as native LD_PRELOAD load, ProcessEvent hook install,
-ReflectionScanner disabled state, and plugin-disabled state. It fails quality checks when
-a copied log has no observer evidence, is missing observer gates, mixes binary SHA values,
-contains malformed observer lines, or requires redaction. Even a clean summary remains
-observational until the second-source and SDK ownership gates are satisfied.
+ReflectionScanner disabled state, and plugin-disabled state. Observer fields are reported
+both as module-level aggregates and, when the log order provides enough context, as
+per-function field layouts for chat, inventory, structure, or future module families. It
+fails quality checks when a copied log has no observer evidence, is missing observer gates,
+mixes binary SHA values, contains malformed observer lines, or requires redaction. Even a
+clean summary remains observational until the second-source and SDK ownership gates are
+satisfied.
 
 3. Confirm `scripts/test_install_obelisk_layout.sh` covered runtime backup reinstall:
    one backup each for `libobelisk.so` and `libsubhook.so`, no `.incoming.*` files, no

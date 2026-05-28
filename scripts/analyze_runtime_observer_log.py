@@ -171,6 +171,7 @@ def function_record() -> dict[str, Any]:
         "outer_fname_indices": [],
         "field_counts": [],
         "details": defaultdict(list),
+        "fields": {},
     }
 
 
@@ -196,6 +197,10 @@ def normalize_function(record: dict[str, Any]) -> dict[str, Any]:
         "outer_fname_indices": sorted(record["outer_fname_indices"]),
         "field_counts": sorted(record["field_counts"]),
         "details": details,
+        "fields": {
+            name: normalize_field(field)
+            for name, field in sorted(record["fields"].items())
+        },
     }
 
 
@@ -229,6 +234,7 @@ def safe_detail_keys(module: str, function: str) -> set[str]:
 def analyze_lines(lines: list[str]) -> dict[str, Any]:
     modules: dict[str, dict[str, Any]] = defaultdict(module_record)
     runtime = runtime_record()
+    active_function_by_module: dict[str, str] = {}
 
     for line in lines:
         stripped = line.strip()
@@ -295,6 +301,7 @@ def analyze_lines(lines: list[str]) -> dict[str, Any]:
             if match.group("outer_fname_index") is not None:
                 add_unique(function_data["outer_fname_indices"], int(match.group("outer_fname_index")))
             add_unique(function_data["field_counts"], int(match.group("field_count")))
+            active_function_by_module[module] = function
             continue
 
         if match := FIELD_RE.fullmatch(stripped):
@@ -312,12 +319,28 @@ def analyze_lines(lines: list[str]) -> dict[str, Any]:
                 field_data["has_range"][extra["has_range"]] += 1
             if "sensitive" in extra:
                 field_data["sensitive"][extra["sensitive"]] += 1
+
+            active_function = active_function_by_module.get(module)
+            if active_function:
+                functions = modules[module]["functions"]
+                functions.setdefault(active_function, function_record())
+                function_fields = functions[active_function]["fields"]
+                function_fields.setdefault(field, field_record())
+                function_field_data = function_fields[field]
+                function_field_data["count"] += 1
+                add_unique(function_field_data["offsets"], match.group("offset").lower())
+                add_unique(function_field_data["sizes"], int(match.group("size")))
+                if "has_range" in extra:
+                    function_field_data["has_range"][extra["has_range"]] += 1
+                if "sensitive" in extra:
+                    function_field_data["sensitive"][extra["sensitive"]] += 1
             continue
 
         if match := REJECT_RE.fullmatch(stripped):
             module = match.group("module")
             record = modules[module]
             record["rejected_count"] += 1
+            active_function_by_module.pop(module, None)
             reason = match.group("reason")
             record["reject_reasons"].setdefault(reason, 0)
             record["reject_reasons"][reason] += 1

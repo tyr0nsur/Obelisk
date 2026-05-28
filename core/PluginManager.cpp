@@ -385,7 +385,8 @@ namespace Obelisk::Core
         bool IsGlobalProcessEventCallbackCapabilityEnabled()
         {
             return (g_ApiCapabilities.load(std::memory_order_acquire) &
-                    OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS) != 0;
+                    OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS) != 0 &&
+                AreGlobalProcessEventCallbacksAllowed();
         }
 
         bool ValidateProcessEventCallback(const char* apiName, OnProcessEventCallback callback)
@@ -571,7 +572,8 @@ namespace Obelisk::Core
         }
         void PluginCallProcessEvent(void* caller, void* function, void* parms) {
             if ((g_ApiCapabilities.load(std::memory_order_acquire) &
-                 OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT) == 0)
+                 OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT) == 0 ||
+                !IsCallProcessEventAllowed())
             {
                 OBELISK_WARN("CallProcessEvent rejected. Enable allow-call-process-event only for a controlled debug window.");
                 return;
