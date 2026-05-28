@@ -42,3 +42,12 @@ python3 scripts/compare_reflection_snapshots.py \
   --target Outer.Struct \
   --json
 ```
+
+Before a second evidence root exists, use the same comparator as a readiness report so the
+ScriptStruct gap stays visible without touching a live server:
+
+```bash
+python3 scripts/compare_reflection_snapshots.py \
+  --base-root tests/fixtures/scriptstruct_snapshots \
+  --readiness-report
+```

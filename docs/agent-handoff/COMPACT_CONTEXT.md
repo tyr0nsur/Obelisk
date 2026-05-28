@@ -7,6 +7,10 @@ work from repository state instead of chat history.
 
 ## Active Operating Objective
 
+- Objetivo literal del leader: Llevar Obelisk hacia una versión estable de producción
+  mediante rondas continuas de auditoría, desarrollo, investigación, conocimiento y
+  aprendizaje sobre ARK: Survival Evolved mediante ingenieria inversa del dump, análisis
+  del proyecto y coordinación de agentes bajo supervisión central.
 - Move Obelisk toward a production-stable version through continuous supervised rounds of
   audit, development, investigation, knowledge capture, and learning about ARK: Survival
   Evolved from dump reverse engineering, project analysis, and centrally coordinated
@@ -110,6 +114,11 @@ work from repository state instead of chat history.
   - reflection/offline: ScriptStruct second-source coverage is the bottleneck, and the
     next safe step is a second-source readiness report over existing snapshots without
     touching live servers.
+- Current uncommitted reflection-tooling round adds
+  `scripts/compare_reflection_snapshots.py --readiness-report`. Use it to summarize
+  comparable snapshot coverage and second-source status by schema/module. Current fixtures
+  are fully comparable against themselves: UFunction `35/35`, ScriptStruct `2/2`; both
+  still need a real second sanitized snapshot root before promotion.
 - Latest restart audit:
   `docs/research/2026-05-27-ops-restart-audit-instance-id.md`
   - live `ObeliskRun.sh` exports `OBELISK_INSTANCE_ID=arkserver`

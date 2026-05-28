@@ -10,6 +10,12 @@ skill updates, or making work reproducible for contributors.
 
 ## Project Vision
 
+Objetivo persistente del leader:
+
+```text
+Llevar Obelisk hacia una versión estable de producción mediante rondas continuas de auditoría, desarrollo, investigación, conocimiento y aprendizaje sobre ARK: Survival Evolved mediante ingenieria inversa del dump, análisis del proyecto y coordinación de agentes bajo supervisión central.
+```
+
 Obelisk is a Linux runtime/API/SDK core for ARK modding. The standing leader objective is
 to move Obelisk toward a production-stable version through continuous supervised rounds of
 audit, development, investigation, knowledge capture, and learning about ARK: Survival

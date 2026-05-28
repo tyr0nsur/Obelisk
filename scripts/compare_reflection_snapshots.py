@@ -37,7 +37,7 @@ def parse_args() -> argparse.Namespace:
         description="Compare two sanitized reflection snapshot roots without reading cores or touching servers."
     )
     parser.add_argument("--base-root", required=True, type=Path, help="Baseline snapshot root or single snapshot file.")
-    parser.add_argument("--candidate-root", required=True, type=Path, help="Second-source snapshot root or file.")
+    parser.add_argument("--candidate-root", type=Path, help="Second-source snapshot root or file.")
     parser.add_argument(
         "--allow-ark-sha-mismatch",
         action="store_true",
@@ -56,6 +56,11 @@ def parse_args() -> argparse.Namespace:
             "Only compare an exact target. Accepts Outer.Name or schema:Outer.Name. "
             "Repeatable."
         ),
+    )
+    parser.add_argument(
+        "--readiness-report",
+        action="store_true",
+        help="Summarize current snapshot coverage and second-source readiness by module.",
     )
     parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     return parser.parse_args()
@@ -104,6 +109,21 @@ def load_snapshot_set(root: Path) -> dict[str, dict[str, Any]]:
             raise SystemExit(f"duplicate snapshot target {key}: {snapshots[key]['path']} and {path}")
         snapshots[key] = {"path": str(path), "payload": payload}
     return snapshots
+
+
+def schema_label(schema: str) -> str:
+    if schema == "obelisk.ufunction-chain.snapshot.v1":
+        return "ufunction"
+    if schema == "obelisk.scriptstruct-chain.snapshot.v1":
+        return "scriptstruct"
+    return schema
+
+
+def module_from_path(path: str) -> str:
+    parts = Path(path).parts
+    if len(parts) >= 2:
+        return parts[-2]
+    return "<unknown>"
 
 
 def raw_sanitization_reasons(value: Any, *, key: str | None = None, path: str = "") -> list[str]:
@@ -372,7 +392,122 @@ def compare_sets(
     }
 
 
+def readiness_report(
+    snapshots: dict[str, dict[str, Any]],
+    *,
+    strict_identity_indices: bool,
+    allow_ark_sha_mismatch: bool,
+    target_filters: set[str],
+    candidate: dict[str, dict[str, Any]] | None,
+) -> dict[str, Any]:
+    if candidate is None:
+        keys = sorted(key for key in snapshots if matches_target_filter(key, target_filters))
+        if target_filters and not keys:
+            raise SystemExit(f"target filter did not match snapshots: {', '.join(sorted(target_filters))}")
+        comparison_by_target: dict[str, dict[str, Any]] = {}
+    else:
+        keys = filtered_keys(snapshots, candidate, target_filters=target_filters)
+        comparison = compare_sets(
+            snapshots,
+            candidate,
+            strict_identity_indices=strict_identity_indices,
+            allow_ark_sha_mismatch=allow_ark_sha_mismatch,
+            target_filters=target_filters,
+        )
+        comparison_by_target = {result["target"]: result for result in comparison["results"]}
+
+    modules: dict[str, dict[str, Any]] = {}
+    totals = {
+        "targets": 0,
+        "comparable": 0,
+        "blocked": 0,
+        "second_source_accepted": 0,
+        "second_source_rejected": 0,
+        "second_source_inconclusive": 0,
+        "second_source_missing": 0,
+    }
+
+    for key in keys:
+        entry = snapshots.get(key)
+        if entry is None:
+            continue
+        payload = entry["payload"]
+        schema = schema_label(payload.get("schema", ""))
+        module = module_from_path(entry["path"])
+        module_key = f"{schema}:{module}"
+        bucket = modules.setdefault(
+            module_key,
+            {
+                "schema": schema,
+                "module": module,
+                "targets": 0,
+                "comparable": 0,
+                "blocked": 0,
+                "block_reasons": {},
+                "second_source": {"accepted": 0, "rejected": 0, "inconclusive": 0, "missing": 0},
+            },
+        )
+
+        bucket["targets"] += 1
+        totals["targets"] += 1
+        _, reasons = comparable_layout(payload, strict_identity_indices=strict_identity_indices)
+        if reasons:
+            bucket["blocked"] += 1
+            totals["blocked"] += 1
+            for reason in reasons:
+                bucket["block_reasons"][reason] = bucket["block_reasons"].get(reason, 0) + 1
+        else:
+            bucket["comparable"] += 1
+            totals["comparable"] += 1
+
+        comparison_result = comparison_by_target.get(key)
+        if comparison_result is None:
+            bucket["second_source"]["missing"] += 1
+            totals["second_source_missing"] += 1
+            continue
+        status = comparison_result["status"]
+        bucket["second_source"][status] += 1
+        totals[f"second_source_{status}"] += 1
+
+    return {
+        "schema": "obelisk.reflection-snapshot-readiness.v1",
+        "strict_identity_indices": strict_identity_indices,
+        "target_filters": sorted(target_filters),
+        "second_source_status": "compared" if candidate is not None else "missing_candidate_root",
+        "totals": totals,
+        "modules": [modules[key] for key in sorted(modules)],
+    }
+
+
 def print_text(report: dict[str, Any]) -> None:
+    if report["schema"] == "obelisk.reflection-snapshot-readiness.v1":
+        totals = report["totals"]
+        print(
+            "readiness targets={targets} comparable={comparable} blocked={blocked} "
+            "second_source_status={second_source_status}".format(
+                second_source_status=report["second_source_status"],
+                **totals,
+            )
+        )
+        for module in report["modules"]:
+            second_source = module["second_source"]
+            print(
+                "{schema}:{module_name} targets={targets} comparable={comparable} "
+                "blocked={blocked} second_source=accepted:{accepted},rejected:{rejected},"
+                "inconclusive:{inconclusive},missing:{missing}".format(
+                    schema=module["schema"],
+                    module_name=module["module"],
+                    targets=module["targets"],
+                    comparable=module["comparable"],
+                    blocked=module["blocked"],
+                    accepted=second_source["accepted"],
+                    rejected=second_source["rejected"],
+                    inconclusive=second_source["inconclusive"],
+                    missing=second_source["missing"],
+                )
+            )
+        return
+
     counts = report["counts"]
     print(
         "summary accepted={accepted} rejected={rejected} inconclusive={inconclusive}".format(
@@ -392,18 +527,31 @@ def print_text(report: dict[str, Any]) -> None:
 def main() -> int:
     args = parse_args()
     base = load_snapshot_set(args.base_root)
-    candidate = load_snapshot_set(args.candidate_root)
-    report = compare_sets(
-        base,
-        candidate,
-        strict_identity_indices=args.strict_identity_indices,
-        allow_ark_sha_mismatch=args.allow_ark_sha_mismatch,
-        target_filters=set(args.target),
-    )
+    candidate = load_snapshot_set(args.candidate_root) if args.candidate_root else None
+    if args.readiness_report:
+        report = readiness_report(
+            base,
+            strict_identity_indices=args.strict_identity_indices,
+            allow_ark_sha_mismatch=args.allow_ark_sha_mismatch,
+            target_filters=set(args.target),
+            candidate=candidate,
+        )
+    else:
+        if candidate is None:
+            raise SystemExit("--candidate-root is required unless --readiness-report is used")
+        report = compare_sets(
+            base,
+            candidate,
+            strict_identity_indices=args.strict_identity_indices,
+            allow_ark_sha_mismatch=args.allow_ark_sha_mismatch,
+            target_filters=set(args.target),
+        )
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:
         print_text(report)
+    if report["schema"] == "obelisk.reflection-snapshot-readiness.v1":
+        return 0
     if report["counts"]["rejected"]:
         return 1
     if report["counts"]["inconclusive"]:

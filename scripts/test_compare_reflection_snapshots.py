@@ -133,20 +133,17 @@ def rename_target(payload: dict[str, object], *, outer: str, name: str) -> dict[
     return payload
 
 
-def run_compare(base: Path, candidate: Path, *extra: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [
-            sys.executable,
-            str(SCRIPT_DIR / "compare_reflection_snapshots.py"),
-            "--base-root",
-            str(base),
-            "--candidate-root",
-            str(candidate),
-            *extra,
-        ],
-        text=True,
-        capture_output=True,
-    )
+def run_compare(base: Path, candidate: Path | None, *extra: str) -> subprocess.CompletedProcess[str]:
+    command = [
+        sys.executable,
+        str(SCRIPT_DIR / "compare_reflection_snapshots.py"),
+        "--base-root",
+        str(base),
+    ]
+    if candidate is not None:
+        command.extend(["--candidate-root", str(candidate)])
+    command.extend(extra)
+    return subprocess.run(command, text=True, capture_output=True)
 
 
 class CompareReflectionSnapshotsTests(unittest.TestCase):
@@ -478,6 +475,59 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             report["results"][0]["target"],
             "obelisk.scriptstruct-chain.snapshot.v1:SharedOuter.SharedName",
         )
+
+    def test_readiness_report_summarizes_modules_without_second_source(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base" / "sha" / "sdk_inventory"
+            base.mkdir(parents=True)
+            write_snapshot(base, base_snapshot())
+
+            result = run_compare(root / "base", None, "--readiness-report", "--json")
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["schema"], "obelisk.reflection-snapshot-readiness.v1")
+        self.assertEqual(report["second_source_status"], "missing_candidate_root")
+        self.assertEqual(report["totals"]["targets"], 1)
+        self.assertEqual(report["totals"]["comparable"], 1)
+        self.assertEqual(report["totals"]["second_source_missing"], 1)
+        self.assertEqual(report["modules"][0]["module"], "sdk_inventory")
+        self.assertEqual(report["modules"][0]["schema"], "ufunction")
+
+    def test_readiness_report_supports_scriptstruct_target_filter(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base" / "sha" / "sdk_transfers"
+            base.mkdir(parents=True)
+            write_snapshot(base, scriptstruct_snapshot(), "PrimalLocalProfile.ARKTributeDino.snapshot.json")
+
+            result = run_compare(
+                root / "base",
+                None,
+                "--readiness-report",
+                "--target",
+                "PrimalLocalProfile.ARKTributeDino",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["totals"]["targets"], 1)
+        self.assertEqual(report["modules"][0]["schema"], "scriptstruct")
+        self.assertEqual(report["modules"][0]["module"], "sdk_transfers")
+
+    def test_compare_mode_requires_candidate_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            base.mkdir()
+            write_snapshot(base, base_snapshot())
+
+            result = run_compare(base, None, "--json")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--candidate-root is required", result.stderr)
 
 
 if __name__ == "__main__":

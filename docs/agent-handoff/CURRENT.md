@@ -4,6 +4,10 @@ Updated: 2026-05-28
 
 ## Active Operating Objective
 
+- objetivo literal del leader: Llevar Obelisk hacia una versión estable de producción
+  mediante rondas continuas de auditoría, desarrollo, investigación, conocimiento y
+  aprendizaje sobre ARK: Survival Evolved mediante ingenieria inversa del dump, análisis
+  del proyecto y coordinación de agentes bajo supervisión central.
 - objective: Move Obelisk toward a production-stable version through continuous supervised
   rounds of audit, development, investigation, knowledge capture, and learning about ARK:
   Survival Evolved from dump reverse engineering, project analysis, and centrally
@@ -122,14 +126,20 @@ Updated: 2026-05-28
   across module areas, but ScriptStruct coverage is the current bottleneck with only two
   transfer structs. Prioritize an offline second-source readiness report before any
   runtime capture or public API promotion.
+- fact: Current uncommitted reflection-tooling round adds
+  `scripts/compare_reflection_snapshots.py --readiness-report`. It summarizes comparable
+  snapshot coverage and second-source status by schema/module without requiring a live
+  server. Current fixture readiness: UFunction `35/35` comparable, ScriptStruct `2/2`
+  comparable, both blocked only by missing second-source roots; self-comparison accepts all
+  fixtures.
 - fact: `sdk.transfers` ScriptStruct fixtures now preserve target/property object and
   FName identity fields like UFunction fixtures. `regenerate_scriptstruct_snapshots.py
   --check-layout` stays semantic/layout-only so second-source gates do not depend on
   unstable FName/GObjects indices.
 - next-step: Continue priority rounds on general reflection/API substrate. Immediate safe
-  priorities are: finish validating/committing the grouped debug-policy and PluginManager
-  idempotency changes, then build an offline second-source readiness report for
-  ScriptStruct and compact UFunction module snapshots.
+  priorities are: validate and eventually commit the readiness-report tooling, then obtain
+  or generate an offline second sanitized snapshot root for ScriptStruct transfer layouts
+  and compact UFunction module snapshots.
 - fact: Runtime/chat baseline is documented in
   `docs/research/2026-05-27-runtime-and-chat-baseline.md`.
 - fact: Reflection/chat metadata audit added shared UE probe layouts and gated

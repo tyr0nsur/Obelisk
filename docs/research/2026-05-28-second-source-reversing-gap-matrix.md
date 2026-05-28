@@ -55,6 +55,18 @@ FName/GObjects indices by default; it returns `accepted`, `rejected`, or `inconc
 target. Use `--strict-identity-indices` only when intentionally comparing same-binary
 identity evidence, not for cross-source layout promotion.
 
+Before a second-source snapshot set exists, use the readiness report to keep module
+coverage and missing second-source evidence explicit:
+
+```bash
+python3 scripts/compare_reflection_snapshots.py \
+  --base-root tests/fixtures/ufunction_snapshots \
+  --readiness-report
+python3 scripts/compare_reflection_snapshots.py \
+  --base-root tests/fixtures/scriptstruct_snapshots \
+  --readiness-report
+```
+
 For `sdk.transfers` ScriptStruct fixtures, the committed snapshots now preserve
 target/property object indices and FName identity fields. Regeneration remains an offline
 core workflow; use `regenerate_scriptstruct_snapshots.py --check-layout` as a

@@ -28,6 +28,15 @@ python3 scripts/compare_reflection_snapshots.py \
 The comparator ignores unstable FName/GObjects indices by default. Use
 `--strict-identity-indices` only for intentional same-binary identity checks.
 
+Before a second evidence root exists, summarize current fixture coverage and the remaining
+second-source gap with:
+
+```bash
+python3 scripts/compare_reflection_snapshots.py \
+  --base-root tests/fixtures/ufunction_snapshots \
+  --readiness-report
+```
+
 Naming:
 
 ```text
