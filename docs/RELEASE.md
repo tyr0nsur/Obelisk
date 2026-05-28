@@ -62,6 +62,20 @@ scripts/check_release_readiness.sh \
   --second-source-report-dir <artifact-dir>
 ```
 
+The default second-source gate is intentionally scoped to the core-first intake:
+`minimal-second-source-intake` for UFunctions and `transfer-scriptstruct` for
+ScriptStructs. A release or PR that promotes another reflected module family must name
+each promoted target set explicitly, for example:
+
+```bash
+scripts/check_release_readiness.sh \
+  --require-second-source-readiness \
+  --ufunction-second-source-target-set buff-compact-intake \
+  --ufunction-second-source-target-set dino-compact-intake \
+  --scriptstruct-second-source-target-set transfer-scriptstruct \
+  --ufunction-second-source-root <second-source-ufunction-snapshots>
+```
+
 Runtime-observer log summaries are a separate review artifact, not a release gate and not
 second-source promotion evidence. Use them only on copied or sanitized logs when reviewing
 an approved observer capture:

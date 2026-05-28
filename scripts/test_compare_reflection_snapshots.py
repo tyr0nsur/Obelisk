@@ -184,6 +184,18 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             sets["dino-compact-intake"],
         )
         self.assertIn("transfer-scriptstruct", sets)
+        self.assertIn("mission-compact-intake", sets)
+        self.assertIn("tribe-compact-intake", sets)
+        self.assertIn("transfer-ufunction-intake", sets)
+        self.assertIn("obelisk.ufunction-chain.snapshot.v1:MissionType.AddPlayerToMission", sets["mission-compact-intake"])
+        self.assertIn(
+            "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerRequestTribeLog",
+            sets["tribe-compact-intake"],
+        )
+        self.assertIn(
+            "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerUploadDino",
+            sets["transfer-ufunction-intake"],
+        )
 
     def test_requires_base_root_unless_listing_target_sets(self) -> None:
         result = run_compare_raw("--readiness-report")

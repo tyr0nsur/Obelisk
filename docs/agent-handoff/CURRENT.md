@@ -344,6 +344,11 @@ Updated: 2026-05-28
   `2`.
   Put `--second-source-report-dir` outside the repository or under an ignored artifact
   path; unignored in-repo report paths are rejected before the release build starts.
+- fact: Second-source release readiness target-set scope is explicit. The default
+  `--require-second-source-readiness` gate still covers `minimal-second-source-intake` and
+  `transfer-scriptstruct`; promotion PRs for buffs, dinos, missions, tribes, transfer
+  UFunctions, or future module families must add each promoted set with
+  `--ufunction-second-source-target-set` or `--scriptstruct-second-source-target-set`.
 - fact: `ue/BuffReflection.*` adds an offline internal `sdk.buffs` recognizer for exact
   compact `PrimalBuff` fixtures. It has no runtime hook, no public callback, no return
   override, and exposes only bounded bool ranges; object/class pointer ranges stay

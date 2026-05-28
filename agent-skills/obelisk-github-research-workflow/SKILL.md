@@ -189,6 +189,12 @@ Update skills when:
 
 Keep skills short and operational. Put detailed experiment records in `docs/research/`.
 
+## Release Promotion Gates
+
+- Promotion PRs for reflected gameplay/module surfaces must name every promoted
+  second-source target set explicitly. Do not treat the default minimal intake as a broad
+  module promotion gate.
+
 ## Pre-Push Checklist
 
 - [ ] `git diff --check` is clean.

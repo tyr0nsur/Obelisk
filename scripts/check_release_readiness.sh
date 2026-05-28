@@ -13,6 +13,8 @@ REQUIRE_SECOND_SOURCE_READINESS=0
 UFUNCTION_SECOND_SOURCE_ROOT="${OBELISK_UFUNCTION_SECOND_SOURCE_ROOT:-}"
 SCRIPTSTRUCT_SECOND_SOURCE_ROOT="${OBELISK_SCRIPTSTRUCT_SECOND_SOURCE_ROOT:-}"
 SECOND_SOURCE_REPORT_DIR="${OBELISK_SECOND_SOURCE_REPORT_DIR:-}"
+UFUNCTION_SECOND_SOURCE_TARGET_SETS=()
+SCRIPTSTRUCT_SECOND_SOURCE_TARGET_SETS=()
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -25,6 +27,8 @@ while [[ $# -gt 0 ]]; do
 Usage: scripts/check_release_readiness.sh [--allow-dirty] [--require-second-source-readiness]
                                           [--ufunction-second-source-root <path>]
                                           [--scriptstruct-second-source-root <path>]
+                                          [--ufunction-second-source-target-set <name>]
+                                          [--scriptstruct-second-source-target-set <name>]
                                           [--second-source-report-dir <path>]
 
 Runs the local first-stable core release gate. By default the command fails if tracked or
@@ -38,6 +42,12 @@ Options:
                                     second-source evidence.
   --ufunction-second-source-root    Candidate UFunction snapshot root for second-source promotion.
   --scriptstruct-second-source-root Candidate ScriptStruct snapshot root for second-source promotion.
+  --ufunction-second-source-target-set
+                                    UFunction target set to gate. Repeat for each promoted module.
+                                    Defaults to minimal-second-source-intake.
+  --scriptstruct-second-source-target-set
+                                    ScriptStruct target set to gate. Repeat for each promoted module.
+                                    Defaults to transfer-scriptstruct.
   --second-source-report-dir        Directory where JSON second-source readiness reports are written.
   -h, --help                        Show this help.
 
@@ -64,6 +74,14 @@ EOF
             SECOND_SOURCE_REPORT_DIR="${2:?--second-source-report-dir requires a path}"
             shift 2
             ;;
+        --ufunction-second-source-target-set)
+            UFUNCTION_SECOND_SOURCE_TARGET_SETS+=("${2:?--ufunction-second-source-target-set requires a name}")
+            shift 2
+            ;;
+        --scriptstruct-second-source-target-set)
+            SCRIPTSTRUCT_SECOND_SOURCE_TARGET_SETS+=("${2:?--scriptstruct-second-source-target-set requires a name}")
+            shift 2
+            ;;
         *)
             echo "Unknown option: $1" >&2
             exit 2
@@ -72,9 +90,26 @@ EOF
 done
 
 if [[ -n "${UFUNCTION_SECOND_SOURCE_ROOT}${SCRIPTSTRUCT_SECOND_SOURCE_ROOT}${SECOND_SOURCE_REPORT_DIR}" \
+    || "${#UFUNCTION_SECOND_SOURCE_TARGET_SETS[@]}" -gt 0 \
+    || "${#SCRIPTSTRUCT_SECOND_SOURCE_TARGET_SETS[@]}" -gt 0 ]]; then
+    second_source_options_present=1
+else
+    second_source_options_present=0
+fi
+
+if [[ "${second_source_options_present}" == "1" \
     && "${REQUIRE_SECOND_SOURCE_READINESS}" != "1" ]]; then
-    echo "Second-source roots or report dirs require --require-second-source-readiness." >&2
+    echo "Second-source roots, target sets, or report dirs require --require-second-source-readiness." >&2
     exit 2
+fi
+
+if [[ "${REQUIRE_SECOND_SOURCE_READINESS}" == "1" ]]; then
+    if [[ "${#UFUNCTION_SECOND_SOURCE_TARGET_SETS[@]}" -eq 0 ]]; then
+        UFUNCTION_SECOND_SOURCE_TARGET_SETS=("minimal-second-source-intake")
+    fi
+    if [[ "${#SCRIPTSTRUCT_SECOND_SOURCE_TARGET_SETS[@]}" -eq 0 ]]; then
+        SCRIPTSTRUCT_SECOND_SOURCE_TARGET_SETS=("transfer-scriptstruct")
+    fi
 fi
 
 if [[ -n "${SECOND_SOURCE_REPORT_DIR}" ]]; then
@@ -187,24 +222,28 @@ run_step ctest --test-dir "${BUILD_DIR}" --output-on-failure
 run_step scripts/run_script_tests.sh
 if [[ "${REQUIRE_SECOND_SOURCE_READINESS}" == "1" ]]; then
     second_source_status=0
-    set +e
-    run_second_source_readiness \
-        ufunction \
-        tests/fixtures/ufunction_snapshots \
-        minimal-second-source-intake \
-        "${UFUNCTION_SECOND_SOURCE_ROOT}"
-    status=$?
-    set -e
-    second_source_status="$(merge_second_source_status "${second_source_status}" "${status}")"
-    set +e
-    run_second_source_readiness \
-        scriptstruct \
-        tests/fixtures/scriptstruct_snapshots \
-        transfer-scriptstruct \
-        "${SCRIPTSTRUCT_SECOND_SOURCE_ROOT}"
-    status=$?
-    set -e
-    second_source_status="$(merge_second_source_status "${second_source_status}" "${status}")"
+    for target_set in "${UFUNCTION_SECOND_SOURCE_TARGET_SETS[@]}"; do
+        set +e
+        run_second_source_readiness \
+            "ufunction-${target_set}" \
+            tests/fixtures/ufunction_snapshots \
+            "${target_set}" \
+            "${UFUNCTION_SECOND_SOURCE_ROOT}"
+        status=$?
+        set -e
+        second_source_status="$(merge_second_source_status "${second_source_status}" "${status}")"
+    done
+    for target_set in "${SCRIPTSTRUCT_SECOND_SOURCE_TARGET_SETS[@]}"; do
+        set +e
+        run_second_source_readiness \
+            "scriptstruct-${target_set}" \
+            tests/fixtures/scriptstruct_snapshots \
+            "${target_set}" \
+            "${SCRIPTSTRUCT_SECOND_SOURCE_ROOT}"
+        status=$?
+        set -e
+        second_source_status="$(merge_second_source_status "${second_source_status}" "${status}")"
+    done
     if [[ "${second_source_status}" -ne 0 ]]; then
         exit "${second_source_status}"
     fi
