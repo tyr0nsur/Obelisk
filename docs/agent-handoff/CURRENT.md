@@ -8,6 +8,9 @@ Updated: 2026-05-28
   or default sub-agent prompts.
 - agent context rule: pass sub-agents only the scoped objective, ownership, relevant skills,
   safety baseline, and deliverable for their assigned task.
+- agent lifecycle rule: every new supervised agent round starts by checking for stale
+  stand-by agents; close completed/obsolete agents before spawning replacements and keep a
+  polling/integration plan for any intentionally active agent.
 - priorities: preserve live server safety first; strengthen UE4 reflection and
   second-source evidence; keep module recognizers candidate-only until promotion gates are
   met; optimize tooling/tests that make future reverse engineering faster and more
