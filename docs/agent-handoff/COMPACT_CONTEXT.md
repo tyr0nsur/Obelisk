@@ -199,8 +199,9 @@ work from repository state instead of chat history.
     current `OBELISK_INSTANCE_ID` is not in `instance_allowlist`
   - duplicate `plugin_id` values are rejected during one load pass
   - `ObeliskPlugin_Init` receives `ObeliskPluginInitContext`
-- Stable install only deploys runtime libraries; plugins are activated by placing `.so`
-  files directly in `/servidor/ark/obelisk/plugins/`.
+- Stable install only deploys runtime libraries; plugins are activated by publishing `.so`
+  files into `/servidor/ark/obelisk/plugins/` with `scripts/install_obelisk_plugin.sh`,
+  which stages under a non-`.so` name and atomically renames to the final path.
 - Plugin-owned callback cleanup on init failure and unload.
 - Optional plugin export: `extern "C" void ObeliskPlugin_Shutdown()`.
 - `plugins/oBaseEvents` builds as the first official plugin example.

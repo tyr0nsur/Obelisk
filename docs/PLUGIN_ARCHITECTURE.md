@@ -126,15 +126,23 @@ values, applies runtime activation gates, resolves `ObeliskPlugin_Init`, optiona
 resolves `ObeliskPlugin_Shutdown`, and passes enabled plugins their resolved config
 paths.
 
+Treat `${OBELISK_PLUGIN_DIR}` as shared discovery scope in clustered installs. Copying a
+plugin there publishes it for discovery by every ARK process that shares the directory;
+activation is still limited by config. `ObeliskPlugin_GetInfo` must therefore be
+side-effect-free and safe to call on instances where the plugin will not initialize.
+
 The stable operational flow is:
 
 1. Build or obtain `PluginName.so`.
 2. Ensure `${OBELISK_CONFIG_DIR}/<plugin-id>/config.json` exists or let the runtime
    create the safe-disabled default on first load.
-3. Copy the `.so` into `${OBELISK_ROOT}/plugins/`.
+3. Install the `.so` with `scripts/install_obelisk_plugin.sh PluginName.so ${OBELISK_ROOT}`.
 4. Restart only the target ARK instance.
 
-Dropping a plugin into `plugins/` is therefore the discovery and config-preparation step.
+The plugin installer copies to a temporary non-`.so` name in the destination directory and
+then publishes with an atomic rename, so runtime discovery cannot see a partial copy. Direct
+`cp` into the active plugin directory is not the stable deployment path. Dropping a plugin
+into `plugins/` is therefore the discovery and config-preparation step.
 Runtime activation still requires `enabled=true` and either a matching
 `instance_allowlist` or explicit `allow_all_instances=true`. Plugins that should not even
 be discovered must stay outside the plugin directory.

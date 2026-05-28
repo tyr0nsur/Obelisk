@@ -28,8 +28,8 @@ Updated: 2026-05-28
   symlink is `/home/flowcommunity-ark/backups/ark-config-latest`.
 - fact: Obelisk central install root is `/servidor/ark/obelisk`.
 - fact: Stable installer deploys runtime libraries only. Plugins activate only when their
-  `.so` is copied into `/servidor/ark/obelisk/plugins/`; inactive plugins stay outside the
-  install root.
+  `.so` is published into `/servidor/ark/obelisk/plugins/` with
+  `scripts/install_obelisk_plugin.sh`; inactive plugins stay outside the install root.
 - fact: Contributor-facing stability matrix is documented in `docs/STATUS.md`.
 - fact: Ragnarok stable baseline is ProcessEvent hook enabled with plugins disabled.
   Preferred markers are
@@ -516,6 +516,9 @@ Updated: 2026-05-28
 - fact: LinuxGSM wrappers must not inherit unsafe production config/log/plugin env from a
   shell session. The production wrapper pins plugin/config/log dirs under `OBELISK_ROOT`;
   the debug wrapper no longer enables `OBELISK_DEBUG_ALLOW_PTRACE=1` by default.
+- fact: Plugin deployment has a staged installer: copy to a temporary non-`.so` filename
+  in the destination plugin directory, then atomic rename to the final `.so`, so shared
+  discovery cannot see partial plugin copies.
 - fact: An authorized `arkserver` core dump confirmed static FName slot `0x5956f30` points
   to a plausible table for binary SHA256
   `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`: table

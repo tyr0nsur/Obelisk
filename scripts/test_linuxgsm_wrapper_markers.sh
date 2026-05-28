@@ -220,10 +220,19 @@ prepare_root "${root_debug_default}"
     cd "${TMP_DIR}"
     OBELISK_ROOT="${root_debug_default}" \
     OBELISK_WRAPPER_CAPTURE="${capture_debug_default}" \
+    OBELISK_PLUGIN_DIR=/tmp/unsafe-debug-plugins \
+    OBELISK_CONFIG_DIR=/tmp/unsafe-debug-config \
+    OBELISK_LOG_DIR=/tmp/unsafe-debug-logs \
     "${DEBUG_WRAPPER}" TheIsland?listen
 )
 
 assert_contains "${capture_debug_default}" '^OBELISK_INSTANCE_ID=arkserver-obelisk-debug$'
+assert_contains "${capture_debug_default}" "^OBELISK_PLUGIN_DIR=${root_debug_default}/plugins$"
+assert_contains "${capture_debug_default}" "^OBELISK_CONFIG_DIR=${root_debug_default}/config$"
+assert_contains "${capture_debug_default}" "^OBELISK_LOG_DIR=${root_debug_default}/logs/isolated-debug$"
+assert_not_contains "${capture_debug_default}" '^OBELISK_PLUGIN_DIR=/tmp/unsafe-debug-plugins$'
+assert_not_contains "${capture_debug_default}" '^OBELISK_CONFIG_DIR=/tmp/unsafe-debug-config$'
+assert_not_contains "${capture_debug_default}" '^OBELISK_LOG_DIR=/tmp/unsafe-debug-logs$'
 assert_contains "${capture_debug_default}" '^OBELISK_ENABLE_PROCESS_EVENT_HOOK=1$'
 assert_contains "${capture_debug_default}" '^OBELISK_DISABLE_PLUGINS=1$'
 assert_contains "${capture_debug_default}" '^OBELISK_PE_TRACE_LIMIT=0$'

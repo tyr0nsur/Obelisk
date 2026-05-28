@@ -28,15 +28,17 @@ build/plugins/oBaseEvents/oBaseEvents.so
 
 ## Install
 
-Copy the plugin into the active plugin directory only when you want it to load on the next
-server restart:
+Publish the plugin into the active plugin directory only when you want it to be discovered
+on the next server restart. Use the staged installer so the shared `plugins/` directory
+never exposes a partially copied `.so`:
 
 ```bash
-cp -a build/plugins/oBaseEvents/oBaseEvents.so /servidor/ark/obelisk/plugins/
+scripts/install_obelisk_plugin.sh build/plugins/oBaseEvents/oBaseEvents.so /servidor/ark/obelisk
 ```
 
 If the plugin should not load, do not place it in `/servidor/ark/obelisk/plugins/`.
-On a clustered install, that directory is shared discovery scope. Use
+On a clustered install, that directory is shared discovery scope: every instance that
+restarts can discover the `.so`, read metadata, and prepare config. Use
 `instance_allowlist` to restrict which ARK server instances may initialize the plugin after
 restart. An enabled config with an empty allowlist stays skipped unless
 `allow_all_instances` is set to `true` explicitly.

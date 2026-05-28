@@ -18,10 +18,12 @@ plugin, not to become a feature-heavy server plugin.
 
 ## Policy
 
-- Plugins activate only when their `.so` is copied into the runtime `plugins/` directory.
-  In a clustered install that directory can be shared by every ARK instance, so use
-  `instance_allowlist` for targeted rollout. `enabled=true` with an empty allowlist stays
-  skipped unless `allow_all_instances=true` is set explicitly.
+- Plugins activate only when their `.so` is published into the runtime `plugins/`
+  directory. Use `scripts/install_obelisk_plugin.sh` instead of copying directly into the
+  active directory, so shared clusters never discover a partial `.so`. In a clustered
+  install that directory can be shared by every ARK instance, so use `instance_allowlist`
+  for targeted rollout. `enabled=true` with an empty allowlist stays skipped unless
+  `allow_all_instances=true` is set explicitly.
 - Stable plugins must use runtime-owned central config paths:
   `${OBELISK_CONFIG_DIR}/<plugin-id>/config.json`.
 - Treat multi-instance loading as the default cluster shape. A plugin may read shared

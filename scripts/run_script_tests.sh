@@ -16,6 +16,8 @@ done
 
 shell_scripts=(
     scripts/install_obelisk.sh
+    scripts/install_obelisk_plugin.sh
+    scripts/test_install_obelisk_plugin.sh
     scripts/test_install_obelisk_layout.sh
     scripts/check_obelisk_server_posture.sh
     scripts/test_check_obelisk_server_posture.sh
@@ -32,5 +34,6 @@ for script_path in "${shell_scripts[@]}"; do
 done
 
 scripts/test_check_obelisk_server_posture.sh
+scripts/test_install_obelisk_plugin.sh
 scripts/test_obelisk_supervisor_snapshot.sh
 scripts/test_linuxgsm_wrapper_markers.sh

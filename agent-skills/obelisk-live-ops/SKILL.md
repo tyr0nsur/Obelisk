@@ -75,6 +75,9 @@ scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection
 ## Experiment Gates
 
 - Keep experimental plugins outside `plugins/` until an isolated server test passes.
+- Publish plugin `.so` files with `scripts/install_obelisk_plugin.sh` or an equivalent
+  staged non-`.so` copy plus atomic rename. Do not copy directly into the active shared
+  plugin directory while ARK instances may restart.
 - Enable one marker/config gate at a time and record the exact change.
 - Use instance markers under `state/instances/<instance-id>/`; map markers are obsolete.
 - Experimental runtime observers must have their own instance markers in addition to env

@@ -56,6 +56,10 @@ directory for plugin config is:
 
 The runtime loads every `.so` directly inside `/servidor/ark/obelisk/plugins/` on restart.
 If a plugin should not load, do not place it in `plugins/`.
+Install plugin `.so` files with `scripts/install_obelisk_plugin.sh <PluginName.so>
+/servidor/ark/obelisk`; it stages the copy under a non-`.so` name and publishes it with an
+atomic rename inside the shared plugin directory. Do not copy plugins directly into the
+active directory while ARK instances may restart.
 
 Useful installer flags:
 
