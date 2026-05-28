@@ -3,6 +3,48 @@
 Obelisk is looking for contributors interested in Linux-native ARK server
 modding, UE4 reflection, and safe runtime hooking.
 
+## Branch Model
+
+The canonical development branch is `main`.
+
+Use short-lived topic branches for work:
+
+```text
+feature/<area>-<summary>
+fix/<area>-<summary>
+docs/<area>-<summary>
+research/<topic>
+```
+
+Open pull requests back to `main`. Keep PRs focused on one subsystem or one
+documentation/research topic. Do not keep long-running integration branches
+unless the team lead explicitly creates one for a release or migration.
+
+The lead owns GitHub checkpoints for coordinated agent rounds. Sub-agents and
+contributors should leave changes unstaged/uncommitted unless their task
+explicitly includes Git operations.
+
+## Repository Map
+
+```text
+include/obelisk/      Public SDK headers and ABI surface
+api/                  Transitional include wrappers
+core/                 Plugin manager, event manager, config, lifecycle
+hooks/                Runtime hook implementations and ProcessEvent observers
+loader/               LD_PRELOAD bootstrap
+runtime/              Logging, marker helpers, runtime services
+ue/                   UE4 memory/reflection helpers and recognizers
+plugins/oBaseEvents/  First official example plugin
+tests/                C++ ABI/runtime/SDK tests and fixtures
+scripts/              Install, validation, and offline reversing tooling
+packaging/            LinuxGSM and harness wrapper templates
+docs/                 Architecture, status, install, release, research notes
+agent-skills/         Operational instructions for coordinated Obelisk agents
+```
+
+Public plugin contracts live under `include/obelisk/`. ARK/LinuxGSM files are
+validation adapters, not the product API.
+
 ## Useful Areas
 
 - Linux ELF and x86_64 detours.
@@ -18,7 +60,7 @@ modding, UE4 reflection, and safe runtime hooking.
 - Prefer filtered callbacks over global `ProcessEvent` callbacks.
 - Do not let C++ exceptions cross plugin boundaries.
 - Do not expose STL types in the public plugin ABI.
-- Keep experimental scanners behind explicit flags.
+- Keep experimental scanners and observers behind env plus per-instance markers.
 - Document every new signature or offset with how it was found.
 - Avoid hardcoded offsets when reflection can be used.
 - Follow [docs/PLUGIN_ARCHITECTURE.md](docs/PLUGIN_ARCHITECTURE.md) before
@@ -38,18 +80,20 @@ Docs-only changes may skip the CMake build, but the PR should say why.
 
 ## Runtime Testing
 
-Use one test map before enabling cluster-wide.
+Runtime validation requires an operator-approved window for the named instance.
+Do not restart servers, edit `/servidor/ark`, or change markers from a PR unless
+the work explicitly owns live-ops for that window.
 
-Recommended test posture:
+Current stable posture for the active Ragnarok harness is:
 
 ```bash
-touch /servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook
-touch /servidor/ark/obelisk/state/instances/arkserver/disable-plugins
-./arkserver restart
+scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection \
+  --map Ragnarok --instance arkserver
 ```
 
-Then remove the instance `disable-plugins` marker only when intentionally testing
-drop-in plugin loading.
+Experimental debug/scanner work must use explicit env plus instance markers and
+rollback to stable posture. Keep `arkserver2` stopped while RAM is constrained
+unless the operator explicitly reopens it.
 
 ## Commit Style
 
@@ -63,11 +107,13 @@ Harden reflected event parameter decoding
 
 ## Current Priorities
 
-1. Resolve `FName` indices to names.
-2. Stabilize filtered chat interception.
-3. Add safe plugin examples following the documented plugin architecture.
-4. Add CI build checks.
-5. Convert the experimental scanner into a documented offline/debug tool.
+1. Build the general UE4 reflection pipeline: `FName`, `GNames`, `GObjects`,
+   `UObject`, `UFunction`, and property-chain validation.
+2. Keep runtime hooks, marker gates, plugin lifecycle, and C ABI behavior stable.
+3. Expand offline snapshot tooling and second-source comparison before promoting
+   public SDK module APIs.
+4. Add safe plugin examples only after the relevant promotion gates are met.
+5. Reduce operational and documentation debt that can mislead new contributors.
 
 Use [docs/STATUS.md](docs/STATUS.md) before changing runtime behavior. It
 defines which pieces are stable baseline, experimental, or not ready.

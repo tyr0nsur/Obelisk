@@ -143,6 +143,12 @@ uses `/servidor/ark/obelisk`:
         enable-process-event-hook
         disable-plugins
         enable-chat-reflection  # experimental
+        enable-inventory-reflection  # experimental
+        enable-structure-reflection  # experimental
+        allow-ptrace  # approved debug window only
+        enable-debug-control  # approved debug window only
+        enable-reflection-scanner  # approved debug window only
+        enable-native-exec-probes  # never on live/shared instances
 ```
 
 The target binary directory should only need a thin launcher/wrapper. Runtime

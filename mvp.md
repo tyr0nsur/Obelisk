@@ -1,5 +1,10 @@
 # Obelisk
 
+> Historical vision note. The current contributor-facing status, branch model,
+> repository layout, and promotion rules live in `README.md`, `CONTRIBUTING.md`,
+> `docs/STATUS.md`, and `docs/PLUGIN_ARCHITECTURE.md`. Use this file as early
+> project intent, not as the canonical implementation map.
+
 ## Runtime/API/SDK Linux-first para modding de servidores UE4
 
 ---
