@@ -43,71 +43,103 @@ namespace
             api->RegisterPreProcessEventForNameIndexWithOwnerTokenHandle &&
             api->UnregisterProcessEventCallbackWithOwnerToken;
     }
+
+    void ResetState()
+    {
+        g_Api = {};
+        g_HasApi = false;
+        g_OwnerToken = 0;
+        g_ProcessEventHandle = 0;
+    }
 }
 
 extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out)
 {
-    if (!out)
-        return false;
+    try
+    {
+        if (!out)
+            return false;
 
-    out->abi_version = OBELISK_PLUGIN_METADATA_ABI_VERSION;
-    out->struct_size = sizeof(ObeliskPluginMetadata);
-    out->plugin_id = "install_layout_consumer";
-    out->name = "Install Layout Consumer";
-    out->version = "0.1.0-dev";
-    out->config_file = "config.json";
-    out->default_config_json = kDefaultConfig;
-    return true;
+        out->abi_version = OBELISK_PLUGIN_METADATA_ABI_VERSION;
+        out->struct_size = sizeof(ObeliskPluginMetadata);
+        out->plugin_id = "install_layout_consumer";
+        out->name = "Install Layout Consumer";
+        out->version = "0.1.0-dev";
+        out->config_file = "config.json";
+        out->default_config_json = kDefaultConfig;
+        return true;
+    }
+    catch (...)
+    {
+        return false;
+    }
 }
 
 extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
     ObeliskApi* api,
     const ObeliskPluginInitContext* context)
 {
-    if (!api || !context)
-        return false;
-
-    if (api->abi_version != OBELISK_API_ABI_VERSION ||
-        api->struct_size < sizeof(ObeliskApi) ||
-        context->abi_version != OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION ||
-        context->struct_size < sizeof(ObeliskPluginInitContext))
+    try
     {
-        return false;
-    }
-
-    g_Api = *api;
-    g_HasApi = true;
-    g_OwnerToken = context->plugin_owner_token;
-
-    const bool contextOk = context->config_dir &&
-        context->config_path &&
-        context->instance_id &&
-        context->plugin_owner_token != 0 &&
-        std::strcmp(context->instance_id, "install-layout-test") == 0 &&
-        PathExists(context->config_dir) &&
-        PathExists(context->config_path);
-    if (!contextOk)
-        return false;
-
-    if (HasProcessEventHandleApi(api))
-    {
-        g_ProcessEventHandle = api->RegisterPreProcessEventForNameIndexWithOwnerTokenHandle(
-            g_OwnerToken,
-            42,
-            OnProcessEvent);
-        if (g_ProcessEventHandle == 0)
+        if (!api || !context)
             return false;
-    }
 
-    return true;
+        if (api->abi_version != OBELISK_API_ABI_VERSION ||
+            api->struct_size < sizeof(ObeliskApi) ||
+            context->abi_version != OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION ||
+            context->struct_size < sizeof(ObeliskPluginInitContext))
+        {
+            return false;
+        }
+
+        g_Api = *api;
+        g_HasApi = true;
+        g_OwnerToken = context->plugin_owner_token;
+
+        const bool contextOk = context->config_dir &&
+            context->config_path &&
+            context->instance_id &&
+            context->plugin_owner_token != 0 &&
+            std::strcmp(context->instance_id, "install-layout-test") == 0 &&
+            PathExists(context->config_dir) &&
+            PathExists(context->config_path);
+        if (!contextOk)
+        {
+            ResetState();
+            return false;
+        }
+
+        if (HasProcessEventHandleApi(api))
+        {
+            g_ProcessEventHandle = api->RegisterPreProcessEventForNameIndexWithOwnerTokenHandle(
+                g_OwnerToken,
+                42,
+                OnProcessEvent);
+            if (g_ProcessEventHandle == 0)
+            {
+                ResetState();
+                return false;
+            }
+        }
+
+        return true;
+    }
+    catch (...)
+    {
+        ResetState();
+        return false;
+    }
 }
 
 extern "C" __attribute__((visibility("default"))) void ObeliskPlugin_Shutdown()
 {
-    if (g_HasApi && g_ProcessEventHandle != 0 && g_Api.UnregisterProcessEventCallbackWithOwnerToken)
-        g_Api.UnregisterProcessEventCallbackWithOwnerToken(g_OwnerToken, g_ProcessEventHandle);
-    g_Api = {};
-    g_HasApi = false;
-    g_OwnerToken = 0;
-    g_ProcessEventHandle = 0;
+    try
+    {
+        if (g_HasApi && g_ProcessEventHandle != 0 && g_Api.UnregisterProcessEventCallbackWithOwnerToken)
+            g_Api.UnregisterProcessEventCallbackWithOwnerToken(g_OwnerToken, g_ProcessEventHandle);
+    }
+    catch (...)
+    {
+    }
+    ResetState();
 }

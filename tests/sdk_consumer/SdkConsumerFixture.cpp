@@ -19,6 +19,7 @@ namespace
 
     int g_RegisterCount = 0;
     int g_UnregisterCount = 0;
+    bool g_ThrowLog = false;
 
     void Require(bool condition, const char* message)
     {
@@ -28,6 +29,8 @@ namespace
 
     void NoOpLog(const char*)
     {
+        if (g_ThrowLog)
+            throw std::runtime_error("injected log callback failure");
     }
 
     void RegisterProcessEvent(OnProcessEventCallback)
@@ -196,6 +199,9 @@ int main(int argc, char** argv)
         context.instance_id = "sdk-consumer-test";
         context.plugin_owner_token = 0xC0FFEE;
 
+        if (mode == "throw-log-init")
+            g_ThrowLog = true;
+
         if (mode == "invalid-context")
         {
             Require(!init(&api, nullptr), "plugin accepted null init context");
@@ -210,6 +216,15 @@ int main(int argc, char** argv)
         }
 
         const bool initSucceeded = init(&api, &context);
+        if (mode == "throw-log-init")
+        {
+            Require(!initSucceeded, "plugin allowed log exception to cross or reported init success");
+            Require(g_RegisterCount == 0, "failed init unexpectedly registered a callback");
+            Require(g_UnregisterCount == 0, "failed init unexpectedly unregistered a callback");
+            cleanupConfigDir();
+            closeHandle();
+            return 0;
+        }
         if (mode == "unsupported-map-allowlist")
         {
             Require(!initSucceeded, "oBaseEvents accepted unsupported map_allowlist");

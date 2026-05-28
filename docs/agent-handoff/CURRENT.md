@@ -966,6 +966,10 @@ Updated: 2026-05-28
   membership, target reject reasons, and property-chain reject reasons. Layout checks must
   not report success when a second-source artifact only matches offsets/names but loses
   plausible `GObjects` membership evidence.
+- fact: Public C++ SDK examples and installed SDK C++ consumers wrap exported
+  `ObeliskPlugin_*` entry points in `try/catch (...)`. The SDK consumer fixture includes
+  an injected logging exception mode so example plugins prove they return failure instead
+  of unwinding across the C ABI boundary.
 
 ## Agent Protocol
 

@@ -40,6 +40,11 @@ add_test(
 )
 
 add_test(
+    NAME SdkConsumerFixtureNoThrowBoundary
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:sdk_consumer_minimal_plugin>" sdk_consumer_minimal throw-log-init
+)
+
+add_test(
     NAME SdkConsumerFixtureNoShutdown
     COMMAND sdk_consumer_fixture "$<TARGET_FILE:sdk_consumer_minimal_no_shutdown_plugin>"
 )

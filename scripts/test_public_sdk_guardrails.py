@@ -43,6 +43,19 @@ def unpromoted_gameplay_tokens() -> list[str]:
 
 
 class PublicSdkGuardrailTests(unittest.TestCase):
+    def test_cpp_public_sdk_examples_catch_exceptions_at_entry_points(self) -> None:
+        files = [
+            REPO_ROOT / "README.md",
+            REPO_ROOT / "tests/sdk_consumer/MinimalPlugin.cpp",
+            REPO_ROOT / "tests/sdk_consumer/MinimalNoShutdownPlugin.cpp",
+            REPO_ROOT / "tests/sdk_installed_consumer/consumer_plugin.cpp",
+            REPO_ROOT / "tests/sdk_installed_consumer/no_shutdown_plugin.cpp",
+        ]
+        for path in files:
+            with self.subTest(path=path.relative_to(REPO_ROOT)):
+                text = path.read_text(encoding="utf-8")
+                self.assertIn("catch (...)", text)
+
     def test_handle_callback_guidance_requires_owner_token_capability(self) -> None:
         files = [
             REPO_ROOT / "README.md",

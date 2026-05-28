@@ -166,6 +166,14 @@ static bool g_has_api = false;
 static uint64_t g_owner_token = 0;
 static uint64_t g_pre_handle = 0;
 
+static void ResetState()
+{
+    g_api = {};
+    g_has_api = false;
+    g_owner_token = 0;
+    g_pre_handle = 0;
+}
+
 static bool OnProcessEvent(void* caller, void* function, void* params)
 {
     (void)caller;
@@ -177,65 +185,74 @@ static bool OnProcessEvent(void* caller, void* function, void* params)
 extern "C" __attribute__((visibility("default")))
 bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out)
 {
-    if (!out)
-        return false;
+    try {
+        if (!out)
+            return false;
 
-    out->abi_version = OBELISK_PLUGIN_METADATA_ABI_VERSION;
-    out->struct_size = sizeof(ObeliskPluginMetadata);
-    out->plugin_id = "example";
-    out->name = "Example Plugin";
-    out->version = "0.1.0-dev";
-    out->config_file = "config.json";
-    out->default_config_json =
-        "{\"enabled\":false,\"allow_all_instances\":false,\"instance_allowlist\":[]}\n";
-    return true;
+        out->abi_version = OBELISK_PLUGIN_METADATA_ABI_VERSION;
+        out->struct_size = sizeof(ObeliskPluginMetadata);
+        out->plugin_id = "example";
+        out->name = "Example Plugin";
+        out->version = "0.1.0-dev";
+        out->config_file = "config.json";
+        out->default_config_json =
+            "{\"enabled\":false,\"allow_all_instances\":false,\"instance_allowlist\":[]}\n";
+        return true;
+    } catch (...) {
+        return false;
+    }
 }
 
 extern "C" __attribute__((visibility("default")))
 bool ObeliskPlugin_Init(ObeliskApi* api, const ObeliskPluginInitContext* context)
 {
-    if (!api || !context)
-        return false;
-    if (api->abi_version != OBELISK_API_ABI_VERSION ||
-        api->struct_size < sizeof(ObeliskApi))
-        return false;
-    if (context->abi_version != OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION ||
-        context->struct_size < sizeof(ObeliskPluginInitContext))
-        return false;
+    try {
+        if (!api || !context)
+            return false;
+        if (api->abi_version != OBELISK_API_ABI_VERSION ||
+            api->struct_size < sizeof(ObeliskApi))
+            return false;
+        if (context->abi_version != OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION ||
+            context->struct_size < sizeof(ObeliskPluginInitContext))
+            return false;
 
-    g_api = *api;
-    g_has_api = true;
-    g_owner_token = context->plugin_owner_token;
-    api->LogInfo("Plugin loaded");
+        g_api = *api;
+        g_has_api = true;
+        g_owner_token = context->plugin_owner_token;
+        api->LogInfo("Plugin loaded");
 
-    const int32_t validated_function_index = -1;
-    if (validated_function_index >= 0 &&
-        (api->capabilities & OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS) &&
-        (api->capabilities & OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES) &&
-        api->struct_size >= offsetof(ObeliskApi, UnregisterProcessEventCallbackWithOwnerToken) +
-            sizeof(api->UnregisterProcessEventCallbackWithOwnerToken) &&
-        g_owner_token != 0 &&
-        api->RegisterPreProcessEventForNameIndexWithOwnerTokenHandle &&
-        api->UnregisterProcessEventCallbackWithOwnerToken)
-    {
-        g_pre_handle = api->RegisterPreProcessEventForNameIndexWithOwnerTokenHandle(
-            g_owner_token, validated_function_index, OnProcessEvent);
-        if (g_pre_handle == 0)
-            api->LogWarn("Filtered ProcessEvent callback registration was rejected");
+        const int32_t validated_function_index = -1;
+        if (validated_function_index >= 0 &&
+            (api->capabilities & OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS) &&
+            (api->capabilities & OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES) &&
+            api->struct_size >= offsetof(ObeliskApi, UnregisterProcessEventCallbackWithOwnerToken) +
+                sizeof(api->UnregisterProcessEventCallbackWithOwnerToken) &&
+            g_owner_token != 0 &&
+            api->RegisterPreProcessEventForNameIndexWithOwnerTokenHandle &&
+            api->UnregisterProcessEventCallbackWithOwnerToken)
+        {
+            g_pre_handle = api->RegisterPreProcessEventForNameIndexWithOwnerTokenHandle(
+                g_owner_token, validated_function_index, OnProcessEvent);
+            if (g_pre_handle == 0)
+                api->LogWarn("Filtered ProcessEvent callback registration was rejected");
+        }
+
+        return true;
+    } catch (...) {
+        ResetState();
+        return false;
     }
-
-    return true;
 }
 
 extern "C" __attribute__((visibility("default")))
 void ObeliskPlugin_Shutdown()
 {
-    if (g_has_api && g_pre_handle != 0 && g_api.UnregisterProcessEventCallbackWithOwnerToken)
-        g_api.UnregisterProcessEventCallbackWithOwnerToken(g_owner_token, g_pre_handle);
-    g_api = {};
-    g_has_api = false;
-    g_owner_token = 0;
-    g_pre_handle = 0;
+    try {
+        if (g_has_api && g_pre_handle != 0 && g_api.UnregisterProcessEventCallbackWithOwnerToken)
+            g_api.UnregisterProcessEventCallbackWithOwnerToken(g_owner_token, g_pre_handle);
+    } catch (...) {
+    }
+    ResetState();
 }
 ```
 
