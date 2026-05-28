@@ -210,12 +210,13 @@ work from repository state instead of chat history.
   - `AbiLayoutTests` currently fail if public chat capability is added before intentional
     ABI promotion
   - `tests/sdk_consumer` builds and loads a minimal external plugin against the public SDK
-    through CTest
+    through CTest, including owner-token handle registration and unregister
 - `EventManagerTests` cover global/filtered pre callbacks, blocking behavior, post
   callbacks, owner cleanup, and null callback handling.
 - Installed SDK layout validation exists through `scripts/test_install_obelisk_layout.sh`
   and is run by CI. The layout test now validates installed-header consumption, plugin
-  placement, config dir/path, and instance id passed to a consumer plugin.
+  placement, config dir/path, instance id, `plugin_owner_token`, and owner-token handle
+  registration/unregister passed to a consumer plugin.
 - `PluginManagerTests` cover plugin lifecycle and rejection paths with a fake loader:
   valid load/unload, missing entry points, invalid metadata, init failure, callback cleanup,
   shutdown, disabled/default config skip, instance allowlist skip, duplicate `plugin_id`,

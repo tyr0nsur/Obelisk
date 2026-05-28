@@ -386,6 +386,12 @@ Updated: 2026-05-28
 - fact: The installed layout test now consumes the installed SDK through
   `find_package(Obelisk CONFIG REQUIRED)` and `Obelisk::obelisk_sdk`, so package export
   regressions are covered by `scripts/test_install_obelisk_layout.sh`.
+- fact: SDK consumer fixtures now validate the modern public owner-token handle path:
+  external plugins compile against `Obelisk::obelisk_sdk`, receive a non-zero
+  `plugin_owner_token`, register a filtered ProcessEvent callback through
+  `RegisterPreProcessEventForNameIndexWithOwnerTokenHandle`, and unregister it through
+  `UnregisterProcessEventCallbackWithOwnerToken` during shutdown. The installed layout
+  test exercises the same contract from the installed CMake package.
 - fact: Commit `f24152f` adds analyzer evidence pack metadata. Use
   `scripts/analyze_reflectionscanner_capture.py --json --binary <ShooterGameServer>
   --objdump-xrefs <objdump.txt> <Obelisk.log>` to record Obelisk commit, binary SHA256,

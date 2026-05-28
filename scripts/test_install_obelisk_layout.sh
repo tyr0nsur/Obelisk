@@ -87,6 +87,7 @@ mkdir -p "${CONFIG_DIR}"
 cat > "${CONFIG_PATH}" <<'JSON'
 {
   "enabled": false,
+  "allow_all_instances": false,
   "instance_allowlist": []
 }
 JSON
@@ -94,13 +95,20 @@ JSON
 cat > "${WORK_DIR}/consumer_plugin.cpp" <<'CPP'
 #include <obelisk/ObeliskApi.h>
 
+#include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <sys/stat.h>
 
 namespace
 {
+    ObeliskApi* g_Api = nullptr;
+    uint64_t g_OwnerToken = 0;
+    uint64_t g_ProcessEventHandle = 0;
+
     constexpr const char* kDefaultConfig = R"json({
     "enabled": false,
+    "allow_all_instances": false,
     "instance_allowlist": []
 })json";
 
@@ -108,6 +116,21 @@ namespace
     {
         struct stat st {};
         return path && stat(path, &st) == 0;
+    }
+
+    bool OnProcessEvent(void*, void*, void*)
+    {
+        return true;
+    }
+
+    bool HasProcessEventHandleApi(const ObeliskApi* api)
+    {
+        return api &&
+            (api->capabilities & OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES) != 0 &&
+            api->struct_size >= offsetof(ObeliskApi, UnregisterProcessEventCallbackWithOwnerToken) +
+                sizeof(api->UnregisterProcessEventCallbackWithOwnerToken) &&
+            api->RegisterPreProcessEventForNameIndexWithOwnerTokenHandle &&
+            api->UnregisterProcessEventCallbackWithOwnerToken;
     }
 }
 
@@ -141,16 +164,39 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
         return false;
     }
 
-    return context->config_dir &&
+    g_Api = api;
+    g_OwnerToken = context->plugin_owner_token;
+
+    const bool contextOk = context->config_dir &&
         context->config_path &&
         context->instance_id &&
+        context->plugin_owner_token != 0 &&
         std::strcmp(context->instance_id, "install-layout-test") == 0 &&
         PathExists(context->config_dir) &&
         PathExists(context->config_path);
+    if (!contextOk)
+        return false;
+
+    if (HasProcessEventHandleApi(api))
+    {
+        g_ProcessEventHandle = api->RegisterPreProcessEventForNameIndexWithOwnerTokenHandle(
+            g_OwnerToken,
+            42,
+            OnProcessEvent);
+        if (g_ProcessEventHandle == 0)
+            return false;
+    }
+
+    return true;
 }
 
 extern "C" __attribute__((visibility("default"))) void ObeliskPlugin_Shutdown()
 {
+    if (g_Api && g_ProcessEventHandle != 0)
+        g_Api->UnregisterProcessEventCallbackWithOwnerToken(g_OwnerToken, g_ProcessEventHandle);
+    g_Api = nullptr;
+    g_OwnerToken = 0;
+    g_ProcessEventHandle = 0;
 }
 CPP
 
@@ -159,6 +205,7 @@ cat > "${WORK_DIR}/consumer_fixture.cpp" <<'CPP'
 
 #include <dlfcn.h>
 
+#include <cstdint>
 #include <cstring>
 #include <iostream>
 #include <stdexcept>
@@ -190,6 +237,23 @@ namespace
 
     void CallProcessEvent(void*, void*, void*)
     {
+    }
+
+    uint64_t RegisterNamedProcessEventWithOwnerTokenHandle(uint64_t ownerToken,
+                                                           int32_t nameIndex,
+                                                           OnProcessEventCallback callback)
+    {
+        Require(ownerToken == 0xC0FFEE, "unexpected owner token in callback registration");
+        Require(nameIndex == 42, "unexpected callback FName index");
+        Require(callback != nullptr, "callback registration received null callback");
+        return 1001;
+    }
+
+    bool UnregisterProcessEventCallbackWithOwnerToken(uint64_t ownerToken, uint64_t registrationId)
+    {
+        Require(ownerToken == 0xC0FFEE, "unexpected owner token in callback unregister");
+        Require(registrationId == 1001, "unexpected callback registration id");
+        return true;
     }
 
     template <typename T>
@@ -236,7 +300,13 @@ int main(int argc, char** argv)
         api.CallProcessEvent = CallProcessEvent;
         api.abi_version = OBELISK_API_ABI_VERSION;
         api.struct_size = sizeof(ObeliskApi);
-        api.capabilities = OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS;
+        api.capabilities = OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS |
+            OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS |
+            OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES;
+        api.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle =
+            RegisterNamedProcessEventWithOwnerTokenHandle;
+        api.UnregisterProcessEventCallbackWithOwnerToken =
+            UnregisterProcessEventCallbackWithOwnerToken;
 
         ObeliskPluginInitContext context{};
         context.abi_version = OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION;
@@ -244,6 +314,7 @@ int main(int argc, char** argv)
         context.config_dir = argv[2];
         context.config_path = argv[3];
         context.instance_id = argv[4];
+        context.plugin_owner_token = 0xC0FFEE;
 
         Require(init(&api, &context), "ObeliskPlugin_Init failed");
         shutdown();

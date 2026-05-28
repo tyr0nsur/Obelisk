@@ -2,6 +2,7 @@
 
 #include <dlfcn.h>
 
+#include <cstdint>
 #include <cstring>
 #include <iostream>
 #include <stdexcept>
@@ -33,6 +34,23 @@ namespace
 
     void CallProcessEvent(void*, void*, void*)
     {
+    }
+
+    uint64_t RegisterNamedProcessEventWithOwnerTokenHandle(uint64_t ownerToken,
+                                                           int32_t nameIndex,
+                                                           OnProcessEventCallback callback)
+    {
+        Require(ownerToken == 0xC0FFEE, "unexpected owner token in callback registration");
+        Require(nameIndex == 42, "unexpected callback FName index");
+        Require(callback != nullptr, "callback registration received null callback");
+        return 1001;
+    }
+
+    bool UnregisterProcessEventCallbackWithOwnerToken(uint64_t ownerToken, uint64_t registrationId)
+    {
+        Require(ownerToken == 0xC0FFEE, "unexpected owner token in callback unregister");
+        Require(registrationId == 1001, "unexpected callback registration id");
+        return true;
     }
 
     template <typename T>
@@ -99,7 +117,13 @@ int main(int argc, char** argv)
         api.CallProcessEvent = CallProcessEvent;
         api.abi_version = OBELISK_API_ABI_VERSION;
         api.struct_size = sizeof(ObeliskApi);
-        api.capabilities = OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS;
+        api.capabilities = OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS |
+            OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS |
+            OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES;
+        api.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle =
+            RegisterNamedProcessEventWithOwnerTokenHandle;
+        api.UnregisterProcessEventCallbackWithOwnerToken =
+            UnregisterProcessEventCallbackWithOwnerToken;
 
         ObeliskPluginInitContext context{};
         context.abi_version = OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION;
@@ -107,6 +131,7 @@ int main(int argc, char** argv)
         context.config_dir = "/tmp/obelisk-sdk-consumer";
         context.config_path = "/tmp/obelisk-sdk-consumer/config.json";
         context.instance_id = "sdk-consumer-test";
+        context.plugin_owner_token = 0xC0FFEE;
 
         Require(init(&api, &context), "ObeliskPlugin_Init failed");
         if (shutdown)

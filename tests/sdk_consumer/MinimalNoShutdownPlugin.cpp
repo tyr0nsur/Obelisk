@@ -4,6 +4,7 @@ namespace
 {
     constexpr const char* kDefaultConfig = R"json({
     "enabled": false,
+    "allow_all_instances": false,
     "instance_allowlist": []
 })json";
 }
