@@ -59,6 +59,27 @@ DETAIL_RE = re.compile(
     LOG_PREFIX + r"Reflected (?P<module>[A-Za-z0-9_]+) (?P<function>\S+) (?P<rest>.+)"
 )
 KEY_VALUE_RE = re.compile(r"(?P<key>[A-Za-z0-9_]+)=(?P<value>\S+)")
+RUNTIME_LOADED_RE = re.compile(LOG_PREFIX + r"Obelisk Runtime Loaded Native \(LD_PRELOAD\)")
+PROCESS_EVENT_CANDIDATES_RE = re.compile(
+    LOG_PREFIX + r"ProcessEvent vtable-derived pattern candidates found: (?P<count>\d+)"
+)
+PROCESS_EVENT_CANDIDATE_RE = re.compile(
+    LOG_PREFIX + r"ProcessEvent candidate\[(?P<index>\d+)\] = (?P<address>0x[0-9a-fA-F]+)"
+)
+PROCESS_EVENT_FOUND_RE = re.compile(
+    LOG_PREFIX + r"Found ProcessEvent at address: (?P<address>0x[0-9a-fA-F]+)"
+)
+PROCESS_EVENT_HOOK_INSTALLED_RE = re.compile(
+    LOG_PREFIX
+    + r"ProcessEvent absolute x64 hook installed successfully\. "
+    r"patch_size=(?P<patch_size>\d+) trampoline=(?P<trampoline>0x[0-9a-fA-F]+)"
+)
+REFLECTION_SCANNER_DISABLED_RE = re.compile(
+    LOG_PREFIX + r"ReflectionScanner disabled\. Set OBELISK_ENABLE_REFLECTION_SCANNER=1 .*"
+)
+PLUGINS_DISABLED_RE = re.compile(
+    LOG_PREFIX + r"Plugin loading disabled by OBELISK_DISABLE_PLUGINS=1\."
+)
 
 
 def sha256_file(path: Path) -> str:
@@ -129,6 +150,19 @@ def module_record() -> dict[str, Any]:
     }
 
 
+def runtime_record() -> dict[str, Any]:
+    return {
+        "loaded_native_ld_preload": False,
+        "process_event_candidate_count": None,
+        "process_event_candidates": [],
+        "process_event_address": None,
+        "process_event_hook_installed": False,
+        "process_event_hook_patch_size": None,
+        "reflection_scanner_disabled": False,
+        "plugins_disabled": False,
+    }
+
+
 def function_record() -> dict[str, Any]:
     return {
         "accepted": 0,
@@ -194,10 +228,46 @@ def safe_detail_keys(module: str, function: str) -> set[str]:
 
 def analyze_lines(lines: list[str]) -> dict[str, Any]:
     modules: dict[str, dict[str, Any]] = defaultdict(module_record)
+    runtime = runtime_record()
 
     for line in lines:
         stripped = line.strip()
         if not stripped:
+            continue
+
+        if RUNTIME_LOADED_RE.fullmatch(stripped):
+            runtime["loaded_native_ld_preload"] = True
+            continue
+
+        if match := PROCESS_EVENT_CANDIDATES_RE.fullmatch(stripped):
+            runtime["process_event_candidate_count"] = int(match.group("count"))
+            continue
+
+        if match := PROCESS_EVENT_CANDIDATE_RE.fullmatch(stripped):
+            add_unique(
+                runtime["process_event_candidates"],
+                {
+                    "index": int(match.group("index")),
+                    "address": match.group("address").lower(),
+                },
+            )
+            continue
+
+        if match := PROCESS_EVENT_FOUND_RE.fullmatch(stripped):
+            runtime["process_event_address"] = match.group("address").lower()
+            continue
+
+        if match := PROCESS_EVENT_HOOK_INSTALLED_RE.fullmatch(stripped):
+            runtime["process_event_hook_installed"] = True
+            runtime["process_event_hook_patch_size"] = int(match.group("patch_size"))
+            continue
+
+        if REFLECTION_SCANNER_DISABLED_RE.fullmatch(stripped):
+            runtime["reflection_scanner_disabled"] = True
+            continue
+
+        if PLUGINS_DISABLED_RE.fullmatch(stripped):
+            runtime["plugins_disabled"] = True
             continue
 
         if match := GATE_RE.fullmatch(stripped):
@@ -302,6 +372,7 @@ def analyze_lines(lines: list[str]) -> dict[str, Any]:
         "schema": "obelisk.runtime-observer-log-summary.v1",
         "review_scope": "runtime_observer_evidence_summary",
         "readiness_gate": "none",
+        "runtime": runtime,
         "modules": normalized_modules,
         "promotion_gate": {
             "gate_type": "runtime_observer_observational_only",

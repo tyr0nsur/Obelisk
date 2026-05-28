@@ -155,9 +155,10 @@ work from repository state instead of chat history.
   rules centralized there for both UFunction and ScriptStruct paths.
 - Passive operator-supplied runtime evidence from 2026-05-28 is recorded in
   `docs/research/2026-05-28-passive-chat-reflection-live-observation.md`: it observed
-  experimental `ServerSendChatMessage` metadata and outer-FName candidate rejection, with
-  plugins disabled and no server action performed for the note. Treat it as supporting
-  runtime evidence only, not SDK readiness.
+  experimental `ServerSendChatMessage` metadata with `GlobalChat` and `GlobalTribeChat`,
+  plus `fname_index=1865` outer-FName candidate rejection, with plugins disabled and no
+  server action performed for the note. Treat it as supporting runtime evidence only, not
+  SDK readiness.
 - The production LinuxGSM wrapper scrubs inherited `OBELISK_ALLOW_CALL_PROCESS_EVENT` and
   nonzero tracing controls such as `OBELISK_PE_TRACE_LIMIT`; stable posture still derives
   debug env only from explicit markers.
@@ -491,9 +492,9 @@ work from repository state instead of chat history.
   `OBELISK_CHAT_REFLECTION_LOG_TEXT`, plus the `enable-chat-reflection` marker.
 - Historical read-only quiet-posture audit at commit `5da65d6` found Ragnarok PID
   `3940524` still had `OBELISK_ENABLE_CHAT_REFLECTION=1`, so it failed the stricter
-  production/performance guard. This was superseded on 2026-05-28 when the
-  operator-approved restart removed `enable-chat-reflection` and
-  `--forbid-chat-reflection` passed; see
+  production/performance guard. Later handoff entries may record separate quiet-posture
+  passes, but the current operator direction still protects `arkserver` / Ragnarok from
+  Obelisk restarts, marker edits, and runtime tests while users are active; see
   `docs/research/2026-05-27-quiet-posture-readonly-audit.md`.
 - `scripts/obelisk_supervisor_snapshot.sh` writes `quiet-posture.txt` and
   `quiet_posture_status` so debug-stable snapshots do not hide active chat reflection from

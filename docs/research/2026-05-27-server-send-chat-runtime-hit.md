@@ -123,5 +123,6 @@ runtime evidence.
 
 ## Skill Updates Needed
 
-- Update `obelisk-ue4-reflection` with the `ServerSendChatMessage` runtime-hit fact and
-  the copied-ownership boundary for future SDK work.
+- Done. `agent-skills/obelisk-ue4-reflection/SKILL.md` now treats chat as historical
+  module evidence, keeps copied-data ownership and public SDK dispatch blocked, and points
+  future work at the shared module promotion ladder.

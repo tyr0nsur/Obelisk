@@ -33,6 +33,15 @@ class RuntimeObserverLogAnalyzerTests(unittest.TestCase):
     def test_summarizes_chat_runtime_observer_evidence(self) -> None:
         result = self.run_analyzer(
             [
+                "[06:41:13] [info]  Obelisk Runtime Loaded Native (LD_PRELOAD)",
+                "[06:41:13] [info] ProcessEvent vtable-derived pattern candidates found: 1",
+                "[06:41:13] [info] ProcessEvent candidate[0] = 0x1d34e20",
+                "[06:41:13] [info] Found ProcessEvent at address: 0x1d34e20",
+                "[06:41:13] [info] ProcessEvent absolute x64 hook installed successfully. "
+                "patch_size=18 trampoline=0x767c6aaa4000",
+                "[06:41:13] [info] ReflectionScanner disabled. "
+                "Set OBELISK_ENABLE_REFLECTION_SCANNER=1 to run the experimental scanner.",
+                "[06:41:13] [warning] Plugin loading disabled by OBELISK_DISABLE_PLUGINS=1.",
                 "[06:41:37] [warning] Experimental chat reflection enabled for ShooterGameServer SHA256 "
                 "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520.",
                 "[07:19:58] [info] Reflected chat ProcessEvent #1 function=ServerSendChatMessage "
@@ -58,6 +67,18 @@ class RuntimeObserverLogAnalyzerTests(unittest.TestCase):
             result["promotion_gate"]["gate_type"],
             "runtime_observer_observational_only",
         )
+        runtime = result["runtime"]
+        self.assertTrue(runtime["loaded_native_ld_preload"])
+        self.assertEqual(runtime["process_event_candidate_count"], 1)
+        self.assertEqual(
+            runtime["process_event_candidates"],
+            [{"index": 0, "address": "0x1d34e20"}],
+        )
+        self.assertEqual(runtime["process_event_address"], "0x1d34e20")
+        self.assertTrue(runtime["process_event_hook_installed"])
+        self.assertEqual(runtime["process_event_hook_patch_size"], 18)
+        self.assertTrue(runtime["reflection_scanner_disabled"])
+        self.assertTrue(runtime["plugins_disabled"])
         self.assertIn("chat", modules)
         chat = modules["chat"]
         self.assertEqual(chat["accepted_count"], 2)
@@ -89,7 +110,7 @@ class RuntimeObserverLogAnalyzerTests(unittest.TestCase):
         self.assertEqual(result["evidence"]["kind"], "runtime-observer-log")
         self.assertFalse(result["evidence"]["server_paths_allowed"])
         self.assertEqual(len(result["evidence"]["sources"]), 1)
-        self.assertEqual(result["evidence"]["sources"][0]["line_count"], 8)
+        self.assertEqual(result["evidence"]["sources"][0]["line_count"], 15)
         self.assertRegex(result["evidence"]["sources"][0]["sha256"], r"^[a-f0-9]{64}$")
         self.assertFalse(result["promotion_gate"]["ready"])
 

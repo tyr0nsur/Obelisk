@@ -44,14 +44,17 @@ class VersioningGuardrailTests(unittest.TestCase):
         cmake = (REPO_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
         versioning = (REPO_ROOT / "docs/VERSIONING.md").read_text(encoding="utf-8")
         config_template = (REPO_ROOT / "cmake/ObeliskConfig.cmake.in").read_text(encoding="utf-8")
-        install_layout_test = (REPO_ROOT / "scripts/test_install_obelisk_layout.sh").read_text(
-            encoding="utf-8"
-        )
+        installed_consumer_cmake = (
+            REPO_ROOT / "tests/sdk_installed_consumer/CMakeLists.txt"
+        ).read_text(encoding="utf-8")
 
         self.assertRegex(cmake, re.compile(r"project\(Obelisk VERSION 0\.1\.0 LANGUAGES C CXX\)"))
         self.assertIn("project(Obelisk VERSION 0.1.0)", versioning)
         self.assertIn("find_package(Obelisk 0.1.0 CONFIG REQUIRED)", versioning)
-        self.assertIn("find_package(Obelisk 0.1.0 CONFIG REQUIRED)", install_layout_test)
+        self.assertIn(
+            "find_package(Obelisk 0.1.0 CONFIG REQUIRED)",
+            installed_consumer_cmake,
+        )
         for token in (
             "Obelisk_DEVELOPMENT_LINE",
             "Obelisk_RELEASE_CHANNEL",
@@ -61,7 +64,7 @@ class VersioningGuardrailTests(unittest.TestCase):
         ):
             with self.subTest(token=token):
                 self.assertIn(token, config_template)
-                self.assertIn(token, install_layout_test)
+                self.assertIn(token, installed_consumer_cmake)
                 self.assertIn(token, versioning)
 
     def test_official_examples_use_development_version_until_stable_tag(self) -> None:
@@ -71,6 +74,8 @@ class VersioningGuardrailTests(unittest.TestCase):
             REPO_ROOT / "tests/sdk_consumer/MinimalPlugin.cpp",
             REPO_ROOT / "tests/sdk_consumer/MinimalNoShutdownPlugin.cpp",
             REPO_ROOT / "tests/sdk_consumer/CAbiPlugin.c",
+            REPO_ROOT / "tests/sdk_installed_consumer/consumer_plugin.cpp",
+            REPO_ROOT / "tests/sdk_installed_consumer/c_abi_plugin.c",
         ]
 
         self.assertIn('out->version = "0.1.0-dev";', readme)

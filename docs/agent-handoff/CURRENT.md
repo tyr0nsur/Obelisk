@@ -272,9 +272,9 @@ Updated: 2026-05-28
   configs still fail closed unless scoped to the current instance or explicitly all-instance.
 - fact: Operator-supplied passive live log evidence from 2026-05-28 is recorded in
   `docs/research/2026-05-28-passive-chat-reflection-live-observation.md`. It confirms
-  experimental `ServerSendChatMessage` metadata observations and outer-FName rejection
-  behavior only; it is not public SDK readiness and no server action was performed for the
-  note.
+  experimental `ServerSendChatMessage` metadata observations with `GlobalChat` and
+  `GlobalTribeChat`, plus `fname_index=1865` outer-FName rejection behavior only; it is
+  not public SDK readiness and no server action was performed for the note.
 - fact: Plugin loading now fails closed before discovery when `OBELISK_INSTANCE_ID` is
   missing, empty, or contains anything outside letters, digits, `_`, or `-`. Config
   `instance_allowlist` entries use the same safe-token rule.
@@ -889,9 +889,11 @@ Updated: 2026-05-28
 - fact: Historical read-only supervisor snapshot `20260527T185153Z` found one Ragnarok
   process with stable posture passing, plugins disabled, ProcessEvent hook loaded, and
   scanner/debug env absent, while quiet posture failed because chat reflection was active.
-  This was superseded on 2026-05-28 when the operator-approved restart removed
-  `enable-chat-reflection` and `--forbid-chat-reflection` passed. See
-  `docs/research/2026-05-27-ragnarok-readonly-posture-snapshot.md`.
+  Later handoff entries may record separate quiet-posture passes, but the current operator
+  direction still protects `arkserver` / Ragnarok from Obelisk restarts, marker edits, and
+  runtime tests while users are active. See
+  `docs/research/2026-05-27-ragnarok-readonly-posture-snapshot.md` and keep new runtime
+  validation off Ragnarok unless an explicit maintenance window is opened.
 - risk: Native exec probes must remain disabled on live servers.
 - risk: FetchContent pins were selected from existing local checkouts without internet
   verification; full offline resilience still needs a mirror or vendored archive.

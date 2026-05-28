@@ -9,6 +9,7 @@ readiness claim.
 ## Environment
 
 - Runtime load path: Obelisk loaded through `LD_PRELOAD`
+- ARK instance: `arkserver` / Ragnarok
 - ProcessEvent candidate: `0x1d34e20`
 - Hook state: absolute x64 hook installed with `patch_size=18`
 - ReflectionScanner: disabled
@@ -43,6 +44,7 @@ Observed send modes:
 
 The same signal includes two rejected candidates with:
 
+- `fname_index=1865`
 - reason: `chat UFunction outer FName index mismatch`
 
 No private player chat content is recorded in this note.
@@ -60,8 +62,8 @@ callbacks, plugin loading, chat dispatch, or any gameplay mutation.
 
 ## Rejected Paths
 
-- Two chat-shaped candidates were rejected because the chat `UFunction` outer FName index
-  did not match the expected metadata owner.
+- Two chat-shaped candidates with `fname_index=1865` were rejected because the chat
+  `UFunction` outer FName index did not match the expected metadata owner.
 
 ## Risks
 
