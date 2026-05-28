@@ -68,6 +68,17 @@ namespace
             throw std::runtime_error(std::string("missing symbol ") + symbol + ": " + error);
         return reinterpret_cast<T>(pointer);
     }
+
+    template <typename T>
+    T ResolveOptional(void* handle, const char* symbol)
+    {
+        dlerror();
+        void* pointer = dlsym(handle, symbol);
+        const char* error = dlerror();
+        if (error)
+            return nullptr;
+        return reinterpret_cast<T>(pointer);
+    }
 }
 
 int main(int argc, char** argv)
@@ -82,7 +93,7 @@ int main(int argc, char** argv)
 
         GetInfoFn getInfo = Resolve<GetInfoFn>(handle, "ObeliskPlugin_GetInfo");
         InitFn init = Resolve<InitFn>(handle, "ObeliskPlugin_Init");
-        ShutdownFn shutdown = Resolve<ShutdownFn>(handle, "ObeliskPlugin_Shutdown");
+        ShutdownFn shutdown = ResolveOptional<ShutdownFn>(handle, "ObeliskPlugin_Shutdown");
 
         ObeliskPluginMetadata metadata{};
         Require(getInfo(&metadata), "ObeliskPlugin_GetInfo failed");
@@ -122,10 +133,18 @@ int main(int argc, char** argv)
         g_RegisterCount = 0;
         g_UnregisterCount = 0;
         Require(init(&api, &context), "ObeliskPlugin_Init failed");
-        Require(g_RegisterCount == 1, "expected one owner-token callback registration");
-        api = {};
-        shutdown();
-        Require(g_UnregisterCount == 1, "expected one owner-token callback unregister");
+        if (shutdown)
+        {
+            Require(g_RegisterCount == 1, "expected one owner-token callback registration");
+            api = {};
+            shutdown();
+            Require(g_UnregisterCount == 1, "expected one owner-token callback unregister");
+        }
+        else
+        {
+            Require(g_RegisterCount == 0, "no-shutdown fixture should not register callbacks");
+            Require(g_UnregisterCount == 0, "no-shutdown fixture should not unregister callbacks");
+        }
         dlclose(handle);
     }
     catch (const std::exception& e)

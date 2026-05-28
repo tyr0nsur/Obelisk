@@ -1,0 +1,42 @@
+#include <obelisk/ObeliskApi.h>
+
+namespace
+{
+    constexpr const char* kDefaultConfig = R"json({
+    "enabled": false,
+    "allow_all_instances": false,
+    "instance_allowlist": []
+})json";
+}
+
+extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out)
+{
+    if (!out)
+        return false;
+
+    out->abi_version = OBELISK_PLUGIN_METADATA_ABI_VERSION;
+    out->struct_size = sizeof(ObeliskPluginMetadata);
+    out->plugin_id = "install_layout_no_shutdown_consumer";
+    out->name = "Install Layout No-Shutdown Consumer";
+    out->version = "0.1.0-dev";
+    out->config_file = "config.json";
+    out->default_config_json = kDefaultConfig;
+    return true;
+}
+
+extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
+    ObeliskApi* api,
+    const ObeliskPluginInitContext* context)
+{
+    if (!api || !context)
+        return false;
+
+    return api->abi_version == OBELISK_API_ABI_VERSION &&
+        api->struct_size >= sizeof(ObeliskApi) &&
+        context->abi_version == OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION &&
+        context->struct_size >= sizeof(ObeliskPluginInitContext) &&
+        context->config_dir != nullptr &&
+        context->config_path != nullptr &&
+        context->instance_id != nullptr &&
+        context->plugin_owner_token != 0;
+}

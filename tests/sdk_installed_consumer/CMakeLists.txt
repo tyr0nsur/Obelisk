@@ -45,5 +45,15 @@ set_target_properties(install_layout_c_abi_consumer PROPERTIES
     C_VISIBILITY_PRESET hidden
 )
 
+add_library(install_layout_no_shutdown_consumer SHARED no_shutdown_plugin.cpp)
+target_link_libraries(install_layout_no_shutdown_consumer PRIVATE Obelisk::obelisk_sdk)
+set_target_properties(install_layout_no_shutdown_consumer PROPERTIES
+    PREFIX ""
+    OUTPUT_NAME "install_layout_no_shutdown_consumer"
+    LIBRARY_OUTPUT_DIRECTORY "${OBELISK_INSTALL_ROOT}/plugins"
+    CXX_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN 1
+)
+
 add_executable(consumer_fixture consumer_fixture.cpp)
 target_link_libraries(consumer_fixture PRIVATE Obelisk::obelisk_sdk dl)

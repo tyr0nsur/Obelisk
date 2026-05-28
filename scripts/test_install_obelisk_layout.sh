@@ -370,6 +370,7 @@ CONFIG_DIR="${INSTALL_ROOT}/config/install_layout_consumer"
 CONFIG_PATH="${CONFIG_DIR}/config.json"
 PLUGIN_PATH="${INSTALL_ROOT}/plugins/install_layout_consumer.so"
 C_ABI_PLUGIN_PATH="${INSTALL_ROOT}/plugins/install_layout_c_abi_consumer.so"
+NO_SHUTDOWN_PLUGIN_PATH="${INSTALL_ROOT}/plugins/install_layout_no_shutdown_consumer.so"
 
 mkdir -p "${CONFIG_DIR}"
 cat > "${CONFIG_PATH}" <<'JSON'
@@ -391,6 +392,7 @@ cmake --build "${WORK_DIR}/build" --parallel
 
 require_path "${PLUGIN_PATH}"
 require_path "${C_ABI_PLUGIN_PATH}"
+require_path "${NO_SHUTDOWN_PLUGIN_PATH}"
 
 if ! grep -F "${INSTALL_ROOT}/include" "${WORK_DIR}/build/compile_commands.json" >/dev/null; then
     echo "SDK consumer did not include headers from the installed SDK layout" >&2
@@ -413,6 +415,12 @@ fi
 "${WORK_DIR}/build/consumer_fixture" \
     "${C_ABI_PLUGIN_PATH}" \
     "install_layout_c_abi_consumer" \
+    "${CONFIG_DIR}" \
+    "${CONFIG_PATH}" \
+    "install-layout-test"
+"${WORK_DIR}/build/consumer_fixture" \
+    "${NO_SHUTDOWN_PLUGIN_PATH}" \
+    "install_layout_no_shutdown_consumer" \
     "${CONFIG_DIR}" \
     "${CONFIG_PATH}" \
     "install-layout-test"

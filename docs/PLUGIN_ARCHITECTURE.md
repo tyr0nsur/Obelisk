@@ -20,7 +20,7 @@ on teaching the plugin model.
 
 | Category | Purpose | Build policy | Runtime policy |
 | --- | --- | --- | --- |
-| `oBaseEvents` | Official reference plugin for event/config/lifecycle patterns. | Built by default. | Installed only when the operator copies the `.so` into the runtime plugin directory. |
+| `oBaseEvents` | Official reference plugin for event/config/lifecycle patterns. | Built by default. | Published with `scripts/install_obelisk_plugin.sh`; activation remains config and instance gated. |
 | research branches | Probes and prototype integrations. | Excluded from top-level build by default. | Do not install into `plugins/` except isolated tests. |
 | stable plugin directories | Operational plugins with documented config, tests, and rollback. | Eligible for top-level build after review. | Instance-gated rollout only. |
 

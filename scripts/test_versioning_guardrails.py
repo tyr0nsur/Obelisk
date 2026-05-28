@@ -75,6 +75,7 @@ class VersioningGuardrailTests(unittest.TestCase):
             REPO_ROOT / "tests/sdk_consumer/MinimalNoShutdownPlugin.cpp",
             REPO_ROOT / "tests/sdk_consumer/CAbiPlugin.c",
             REPO_ROOT / "tests/sdk_installed_consumer/consumer_plugin.cpp",
+            REPO_ROOT / "tests/sdk_installed_consumer/no_shutdown_plugin.cpp",
             REPO_ROOT / "tests/sdk_installed_consumer/c_abi_plugin.c",
         ]
 

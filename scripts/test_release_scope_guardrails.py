@@ -193,6 +193,8 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertNotIn("map_allowlist", default_config)
         self.assertNotIn('"map_allowlist"', obase_docs)
         self.assertIn("Do not publish map-scoped config fields", architecture)
+        self.assertIn("scripts/install_obelisk_plugin.sh", architecture)
+        self.assertNotIn("operator copies the `.so`", architecture)
 
 
 if __name__ == "__main__":

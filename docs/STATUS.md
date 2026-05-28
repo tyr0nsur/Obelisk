@@ -26,7 +26,7 @@ define or protect runtime behavior.
 | `LD_PRELOAD` bootstrap | Stable baseline | Runtime loads through the central install layout. |
 | Central install root | Stable baseline | Operator-chosen Obelisk root with `lib/`, `plugins/`, `config/`, `logs/`, and `state/instances/`; current harness uses `/servidor/ark/obelisk`. |
 | Multi-server shared root | Stable baseline | Multiple ARK processes may share Obelisk `lib/`, `plugins/`, and `config/` when each process has a unique `OBELISK_INSTANCE_ID`; logs, markers, and mutable runtime state stay per instance. |
-| ARK/LinuxGSM validation adapter | Stable baseline | Versioned wrappers live under `packaging/linuxgsm/`; copy to the ARK binary directory only for adapter validation. |
+| ARK/LinuxGSM validation adapter | Stable baseline | Versioned wrappers live under `packaging/linuxgsm/`; copy to the ARK binary directory only for adapter validation. Use `scripts/check_linuxgsm_wrapper_drift.sh` before maintenance restarts and review `linuxgsm_wrapper_drift_status` in supervisor snapshots. |
 | Installer plugin posture | Stable baseline | `scripts/install_obelisk.sh` installs runtime/SDK artifacts; plugins are published with `scripts/install_obelisk_plugin.sh`, which stages under a non-`.so` name before atomic rename into `plugins/`. |
 | Operator CLI | Experimental | `scripts/obelisk.py` exposes read-only `status`, `instances list`, `plugins list`, and `plugins show`; lifecycle commands are planned after LinuxGSM integration and explicit restart safety gates. |
 | Per-instance runtime flags | Stable baseline | `OBELISK_INSTANCE_ID` selects logs and markers under `state/instances/<id>/`; map markers are obsolete. |
@@ -40,7 +40,7 @@ define or protect runtime behavior.
 | Game interaction surface | Experimental | Obelisk can already observe selected UE4 `ProcessEvent` calls through filtered callbacks when the target `FName` index is known. Gameplay mutation, return overrides, arbitrary UE4 calls, and public module SDK dispatch remain blocked until reflection-backed parameter decoding, ownership policy, and isolated runtime evidence exist. |
 | ReflectionScanner | Experimental | Use for isolated captures with explicit gates; keep disabled by default. |
 | Runtime debug control | Experimental | Marker-triggered post-start probes for short debug windows; stable posture rejects `OBELISK_ENABLE_DEBUG_CONTROL`. |
-| Binary-hash-gated module observers | Experimental | Internal observation paths for exact candidate functions; metadata logging is gated and there is no plugin dispatch or public ABI yet. Chat is one historical observer in this family, not the center of the SDK. |
+| Binary-hash-gated module observers | Experimental | Internal observation paths for exact candidate functions; metadata logging is gated by env, supported binary SHA, `allow-experimental-observers`, and the observer marker on the same instance. There is no plugin dispatch or public ABI yet. Chat is one historical observer in this family, not the center of the SDK. |
 | Reflection snapshot tooling | Experimental | Sanitized UFunction and ScriptStruct fixtures, manifest regeneration, and offline comparison support second-source research. Fixtures are candidate-only evidence, not SDK contracts. |
 | Raw FString/FName inference | Experimental | Evidence gathering only until reflection-backed decoding replaces it. |
 | GNames/FNamePool resolution | Not ready | Priority research item. |

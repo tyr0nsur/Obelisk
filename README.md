@@ -23,6 +23,8 @@ Stable baseline:
 - Multi-instance plugin rollout through `OBELISK_INSTANCE_ID` and
   `instance_allowlist`; shared config is supported, while runtime handles and mutable
   state stay process-local unless a plugin implements explicit cross-process locking.
+- Central install and LinuxGSM wrapper guardrails, including read-only wrapper drift
+  checks before maintenance restarts.
 - Plugin-owned callback cleanup and optional `ObeliskPlugin_Shutdown`.
 - Public SDK header at `include/obelisk/ObeliskApi.h`.
 - CTest coverage for plugin config and ABI layout.
@@ -127,6 +129,7 @@ uses `/servidor/ark/obelisk`:
       <instance-id>/
         enable-process-event-hook
         disable-plugins
+        allow-experimental-observers  # required with experimental observer markers
         enable-chat-reflection  # experimental
         enable-inventory-reflection  # experimental
         enable-structure-reflection  # experimental
@@ -140,7 +143,9 @@ uses `/servidor/ark/obelisk`:
 
 The target binary directory should only need a thin launcher/wrapper. Runtime
 libraries, plugins, config, logs, and state markers belong under the Obelisk
-root. See [docs/INSTALL.md](docs/INSTALL.md).
+root. Use `scripts/check_linuxgsm_wrapper_drift.sh` before maintenance restarts to
+confirm the installed LinuxGSM wrapper still matches the versioned template. See
+[docs/INSTALL.md](docs/INSTALL.md).
 
 ## Public Plugin ABI
 
@@ -312,6 +317,10 @@ currently approved named harness only. Do not use these controls on normal playe
 performance posture. Current operator direction protects `arkserver` / Ragnarok while
 users are active; `arkserver2` / TheIsland starts powered off and may be used only for an
 explicitly approved scoped test, then shut down afterward.
+
+Candidate module observers require the environment gate, supported binary SHA, the
+observer-specific instance marker, and `allow-experimental-observers` on the same
+instance. Stable posture rejects that allow marker.
 
 ## Roadmap
 
