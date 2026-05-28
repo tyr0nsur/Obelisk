@@ -209,4 +209,13 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
             out.ScalarStorage.data(), out.ScalarCount);
         return true;
     }
+
+    size_t DispatchCopiedStructureEvent(const Obelisk::UE::StructureReflection::StructureInvocation& invocation)
+    {
+        CopiedStructureEvent event;
+        if (!TryBuildCopiedStructureEvent(invocation, event))
+            return 0;
+
+        return Obelisk::Core::StructureEventDispatcher::Get().Dispatch(event.View);
+    }
 }

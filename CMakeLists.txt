@@ -269,10 +269,13 @@ add_test(NAME ProcessEventInventoryReflectionTests COMMAND process_event_invento
 add_executable(process_event_structure_reflection_tests
     tests/core/ProcessEventStructureReflectionTests.cpp
     hooks/ProcessEventStructureReflection.cpp
+    core/StructureEventDispatcher.cpp
     ue/StructureReflection.cpp
     ue/RuntimeReflection.cpp
+    runtime/Logger.cpp
 )
 target_include_directories(process_event_structure_reflection_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(process_event_structure_reflection_tests PRIVATE fmt::fmt spdlog::spdlog)
 
 add_test(NAME ProcessEventStructureReflectionTests COMMAND process_event_structure_reflection_tests)
 

@@ -6,7 +6,7 @@
 
 namespace Obelisk::Hooks
 {
-    void DispatchProcessEventCallbacks(
+    bool DispatchProcessEventCallbacks(
         int32_t nameIndex,
         void* object,
         void* function,
@@ -21,7 +21,7 @@ namespace Obelisk::Hooks
         {
             ProcessEventCallGuard::PreCallbackScope preCallbackScope;
             if (!eventManager.TriggerPreProcessEvent(nameIndex, object, function, params))
-                return;
+                return false;
 
             if (preCallbackScope.OriginalCalled())
             {
@@ -31,9 +31,14 @@ namespace Obelisk::Hooks
         }
 
         if (!skipAutomaticOriginal && original)
+        {
             original(object, function, params);
+            skipAutomaticOriginal = true;
+        }
 
         if (hasPostCallbacks)
             eventManager.TriggerPostProcessEvent(nameIndex, object, function, params);
+
+        return skipAutomaticOriginal;
     }
 }

@@ -6,7 +6,7 @@ namespace Obelisk::Hooks
 {
     using ProcessEventOriginalInvoker = void (*)(void* object, void* function, void* params);
 
-    void DispatchProcessEventCallbacks(
+    bool DispatchProcessEventCallbacks(
         int32_t nameIndex,
         void* object,
         void* function,

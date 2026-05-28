@@ -750,6 +750,8 @@ namespace Obelisk::Hooks
         }
 
         const Obelisk::UE::StructureReflection::StructureInvocation& invocation = attempt.Invocation;
+        const size_t dispatched =
+            ProcessEventStructureReflection::DispatchCopiedStructureEvent(invocation);
         if (!ProcessEventStructureReflection::ShouldLogObservation(observationNumber, limit))
             return;
 
@@ -759,6 +761,11 @@ namespace Obelisk::Hooks
                      invocation.FunctionNameIndex,
                      invocation.OuterNameIndex,
                      invocation.Fields.size());
+        if (dispatched > 0)
+        {
+            OBELISK_INFO("Reflected structure dispatched {} copied internal event callback(s).",
+                         dispatched);
+        }
         for (const auto& field : invocation.Fields)
         {
             OBELISK_INFO("Reflected structure field {} offset=0x{:X} size={} sensitive={} has_range={}",
@@ -843,9 +850,7 @@ namespace Obelisk::Hooks
 
         TraceReflectedChatInvocation(nameIndex, function, params);
         TraceReflectedInventoryInvocation(nameIndex, function, params);
-        TraceReflectedStructureInvocation(nameIndex, function, params);
-
-        DispatchProcessEventCallbacks(
+        const bool originalWasCalled = DispatchProcessEventCallbacks(
             nameIndex,
             object,
             function,
@@ -853,6 +858,9 @@ namespace Obelisk::Hooks
             hasPreCallbacks,
             hasPostCallbacks,
             SnapshotOriginalProcessEvent());
+
+        if (originalWasCalled)
+            TraceReflectedStructureInvocation(nameIndex, function, params);
     }
 
     void ProcessEventHook::Install()

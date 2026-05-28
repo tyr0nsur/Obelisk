@@ -57,6 +57,14 @@ namespace
         const void* Class = nullptr;
     };
 
+    struct CapturedStructureEvent
+    {
+        Obelisk::Core::StructureEventKind Kind = Obelisk::Core::StructureEventKind::VerifyPinCode;
+        int32_t FunctionNameIndex = -1;
+        int32_t OuterNameIndex = -1;
+        std::vector<Obelisk::Core::StructureScalarValue> Scalars;
+    };
+
     bool RegionReader(const void* address, size_t size, void* context)
     {
         auto* reader = static_cast<ReaderContext*>(context);
@@ -77,6 +85,17 @@ namespace
     {
         if (!condition)
             throw std::runtime_error(message);
+    }
+
+    void CaptureStructureEvent(const Obelisk::Core::StructureEventView& event, void* userData)
+    {
+        auto* captured = static_cast<std::vector<CapturedStructureEvent>*>(userData);
+        captured->push_back({
+            event.Kind,
+            event.FunctionNameIndex,
+            event.OuterNameIndex,
+            std::vector<Obelisk::Core::StructureScalarValue>(event.Scalars.begin(), event.Scalars.end()),
+        });
     }
 
     template <typename T, size_t N>
@@ -615,6 +634,52 @@ namespace
             Require(event.View.Scalars[1].BoolValue, "CanSeat return value mismatch");
         }
     }
+
+    void TestDispatchesCopiedStructureEventThroughInternalDispatcher()
+    {
+        StructureFixture fixture;
+        BuildVerifyPinCode(fixture);
+        fixture.Params[0] = 1;
+        fixture.Params[1] = 2;
+        fixture.Params[2] = 3;
+        fixture.Params[3] = 4;
+        fixture.Params[4] = 1;
+
+        Attempt attempt = TryIdentifyInvocation(
+            EnabledGate(),
+            kVerifyPinCodeNameIndex,
+            fixture.Reader(),
+            fixture.Function.data(),
+            fixture.Params.data());
+        Require(attempt.Status == AttemptStatus::Matched, attempt.Result.Reason.c_str());
+
+        int owner = 0;
+        std::vector<CapturedStructureEvent> captured;
+        const uint64_t registrationId = Obelisk::Core::StructureEventDispatcher::Get().Register(
+            &owner,
+            Obelisk::Core::StructureEventSubscription{CaptureStructureEvent, &captured});
+        Require(registrationId != 0, "failed to register structure event callback");
+
+        const size_t dispatched = DispatchCopiedStructureEvent(attempt.Invocation);
+        Obelisk::Core::StructureEventDispatcher::Get().UnregisterCallbacksForOwner(&owner);
+
+        Require(dispatched == 1, "copied structure event was not dispatched");
+        Require(captured.size() == 1, "captured structure event count mismatch");
+        Require(captured[0].Kind == Obelisk::Core::StructureEventKind::VerifyPinCode,
+                "dispatched VerifyPinCode kind mismatch");
+        Require(captured[0].FunctionNameIndex == kVerifyPinCodeNameIndex,
+                "dispatched VerifyPinCode function index mismatch");
+        Require(captured[0].OuterNameIndex == kPrimalStructureItemContainerNameIndex,
+                "dispatched VerifyPinCode outer index mismatch");
+        Require(captured[0].Scalars.size() == 1,
+                "dispatched VerifyPinCode exposed pin code or object fields");
+        Require(captured[0].Scalars[0].Field == Obelisk::Core::StructureScalarField::ReturnValue,
+                "dispatched VerifyPinCode return field mismatch");
+        Require(captured[0].Scalars[0].Type == Obelisk::Core::StructureScalarType::Bool,
+                "dispatched VerifyPinCode return type mismatch");
+        Require(captured[0].Scalars[0].BoolValue,
+                "dispatched VerifyPinCode return value mismatch");
+    }
 }
 
 int main()
@@ -629,6 +694,7 @@ int main()
     TestRejectsStructureHookWrongOuter();
     TestBuildsCopiedStructureEventWithoutBorrowedObjectOrSensitiveFields();
     TestBuildsCopiedStructureEventForScalarStructureTargets();
+    TestDispatchesCopiedStructureEventThroughInternalDispatcher();
 
     std::cout << "ProcessEventStructureReflectionTests passed\n";
     return 0;

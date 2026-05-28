@@ -68,4 +68,5 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
                                   void* params);
     bool TryBuildCopiedStructureEvent(const Obelisk::UE::StructureReflection::StructureInvocation& invocation,
                                       CopiedStructureEvent& out);
+    size_t DispatchCopiedStructureEvent(const Obelisk::UE::StructureReflection::StructureInvocation& invocation);
 }

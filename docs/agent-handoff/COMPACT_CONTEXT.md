@@ -376,6 +376,9 @@ work from repository state instead of chat history.
   shape rejection, and copied-storage tests; it is not public ABI/plugin SDK. `PluginManager`
   sweeps it on init failure and unload alongside `EventManager` and `ChatEventDispatcher`,
   with regression coverage that callbacks are gone before `dlclose`.
+- Hook-side structure observation dispatches matched copied scalar-only events through the
+  internal dispatcher only after the original `ProcessEvent` path reports that the original
+  call ran. It remains observer-gated, budget-limited, and not public ABI/plugin SDK.
 - `ProcessEventStructureReflection::TryBuildCopiedStructureEvent` turns matched structure
   recognizer output into copied scalar-only event storage. Sensitive pin values and object
   params are omitted; `SetVariant`/`CanSeat` scalars are copied in hook-side tests.

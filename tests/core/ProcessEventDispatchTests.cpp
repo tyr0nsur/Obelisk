@@ -44,6 +44,12 @@ namespace
         return true;
     }
 
+    bool PreCallbackBlocksOriginal(void*, void*, void*)
+    {
+        ++g_PreCallbackCount;
+        return false;
+    }
+
     bool PostCallback(void*, void*, void*)
     {
         ++g_PostCallbackCount;
@@ -57,7 +63,7 @@ namespace
         auto& eventManager = Obelisk::Core::EventManager::Get();
         eventManager.RegisterPreProcessEventForNameIndexOwned(&owner, 42, PreCallbackCallsOriginal);
 
-        Obelisk::Hooks::DispatchProcessEventCallbacks(
+        const bool originalWasCalled = Obelisk::Hooks::DispatchProcessEventCallbacks(
             42,
             reinterpret_cast<void*>(0x1),
             reinterpret_cast<void*>(0x2),
@@ -68,6 +74,7 @@ namespace
 
         Require(g_PreCallbackCount == 1, "manual-original pre-callback was not called");
         Require(g_OriginalCallCount == 1, "manual original call was followed by automatic original");
+        Require(originalWasCalled, "manual original call was not reported");
 
         eventManager.UnregisterCallbacksForOwner(&owner);
     }
@@ -79,7 +86,7 @@ namespace
         auto& eventManager = Obelisk::Core::EventManager::Get();
         eventManager.RegisterPreProcessEventForNameIndexOwned(&owner, 42, PreCallbackAllowsAutomaticOriginal);
 
-        Obelisk::Hooks::DispatchProcessEventCallbacks(
+        const bool originalWasCalled = Obelisk::Hooks::DispatchProcessEventCallbacks(
             42,
             reinterpret_cast<void*>(0x1),
             reinterpret_cast<void*>(0x2),
@@ -90,6 +97,31 @@ namespace
 
         Require(g_PreCallbackCount == 1, "normal pre-callback was not called");
         Require(g_OriginalCallCount == 1, "automatic original was not called exactly once");
+        Require(originalWasCalled, "automatic original call was not reported");
+
+        eventManager.UnregisterCallbacksForOwner(&owner);
+    }
+
+    void TestPreCallbackCanBlockOriginal()
+    {
+        ResetCounters();
+        int owner = 0;
+        auto& eventManager = Obelisk::Core::EventManager::Get();
+        eventManager.RegisterPreProcessEventForNameIndexOwned(&owner, 42, PreCallbackBlocksOriginal);
+
+        const bool originalWasCalled = Obelisk::Hooks::DispatchProcessEventCallbacks(
+            42,
+            reinterpret_cast<void*>(0x1),
+            reinterpret_cast<void*>(0x2),
+            reinterpret_cast<void*>(0x3),
+            true,
+            true,
+            FakeOriginal);
+
+        Require(g_PreCallbackCount == 1, "blocking pre-callback was not called");
+        Require(g_OriginalCallCount == 0, "blocked original was called");
+        Require(g_PostCallbackCount == 0, "post-callback ran after blocked original");
+        Require(!originalWasCalled, "blocked original was reported as called");
 
         eventManager.UnregisterCallbacksForOwner(&owner);
     }
@@ -101,7 +133,7 @@ namespace
         auto& eventManager = Obelisk::Core::EventManager::Get();
         eventManager.RegisterPostProcessEventForNameIndexOwned(&owner, 42, PostCallback);
 
-        Obelisk::Hooks::DispatchProcessEventCallbacks(
+        const bool originalWasCalled = Obelisk::Hooks::DispatchProcessEventCallbacks(
             42,
             reinterpret_cast<void*>(0x1),
             reinterpret_cast<void*>(0x2),
@@ -112,6 +144,7 @@ namespace
 
         Require(g_OriginalCallCount == 1, "original was not called before post dispatch");
         Require(g_PostCallbackCount == 1, "post-callback was not called");
+        Require(originalWasCalled, "post path did not report original call");
 
         eventManager.UnregisterCallbacksForOwner(&owner);
     }
@@ -123,6 +156,7 @@ int main()
 
     TestPreCallbackManualOriginalSkipsAutomaticOriginal();
     TestPreCallbackWithoutManualOriginalCallsAutomaticOriginal();
+    TestPreCallbackCanBlockOriginal();
     TestPostCallbackRunsAfterOriginal();
 
     Obelisk::Logger::Shutdown();

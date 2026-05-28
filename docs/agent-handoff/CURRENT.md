@@ -336,7 +336,11 @@ Updated: 2026-05-28
 - fact: `ProcessEventStructureReflection::TryBuildCopiedStructureEvent` converts a matched
   `StructureInvocation` into copied scalar-only `StructureEventView` storage. Tests verify
   that `VerifyPinCode` omits sensitive pin values, object params are not copied, and
-  `SetVariant`/`CanSeat` scalar values are copied before any future internal dispatch.
+  `SetVariant`/`CanSeat` scalar values are copied.
+- fact: Hook-side structure observation now dispatches matched copied scalar-only
+  structure events through the internal `StructureEventDispatcher` after the original
+  `ProcessEvent` path reports that the original call ran. This remains internal-only,
+  observer-gated, budget-limited, and not public ABI/plugin SDK.
 - fact: `ObeliskPluginInitContext` string pointers are documented as borrowed only for
   `ObeliskPlugin_Init`; plugins must copy `config_dir`, `config_path`, or `instance_id`
   before using them from shutdown, worker threads, or later callbacks.
