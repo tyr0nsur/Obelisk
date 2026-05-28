@@ -104,6 +104,29 @@ Debug     -> arkserver-obelisk-debug
 
 Operators can override it before launching the wrapper.
 
+## Multi-Server And Cluster Layout
+
+Obelisk is designed to support multiple ARK server processes sharing one central Obelisk
+root, including clustered map setups. The stable layout is:
+
+```text
+${OBELISK_ROOT}/lib/                         shared runtime libraries
+${OBELISK_ROOT}/plugins/                     shared plugin binaries
+${OBELISK_ROOT}/config/<plugin-id>/          shared plugin configuration
+${OBELISK_ROOT}/logs/<instance-id>/          per-server logs
+${OBELISK_ROOT}/state/instances/<id>/        per-server markers and runtime state
+```
+
+Each ARK server process must have a unique `OBELISK_INSTANCE_ID`, even when several maps
+share the same ARK cluster id, save cluster directory, plugin binaries, and Obelisk config.
+Use `instance_allowlist` in plugin config to select which maps/servers may activate a
+plugin from the shared config.
+
+Shared config is intentional; shared mutable plugin state is not the default. Plugins that
+write runtime state should write under an instance-scoped path, or document and implement
+their own locking/atomic-write strategy before using a shared state file across multiple
+server processes.
+
 ## Feature Flags
 
 Instance marker files are preferred for production operations:

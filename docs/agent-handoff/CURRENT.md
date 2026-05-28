@@ -100,6 +100,10 @@ Updated: 2026-05-28
   short-lived topic branches, current source directories kept stable, agent-only process
   moved out of contributor workflow, SDK install/package validation documented, and the
   legacy MVP moved to `docs/archive/`.
+- fact: Obelisk's intended production cluster posture is one shared Obelisk root for
+  runtime libraries, plugin binaries, and shared plugin config, with unique
+  `OBELISK_INSTANCE_ID` values, per-instance logs, and per-instance markers/runtime state.
+  Mutable shared plugin state requires explicit plugin-level locking/atomic-write design.
 - fact: SDK consumer fixture now treats `ObeliskPlugin_Shutdown` as optional, matching
   `PluginManager`; a no-shutdown minimal plugin fixture covers that contract.
 - fact: `PluginManager` rejects `.so` symlink candidates during plugin directory scanning

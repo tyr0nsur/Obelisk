@@ -81,6 +81,13 @@ The runtime interprets the common activation envelope before initialization:
 owned by the plugin and must be checked before registering callbacks or starting
 background work.
 
+In clustered deployments, multiple ARK processes may share the same `${OBELISK_CONFIG_DIR}`
+and plugin binaries. Plugin config should therefore be treated as shared, mostly-static
+input. Plugin-owned mutable state should be instance-scoped by default, using the supplied
+`instance_id` or an operator-configured per-instance path. A plugin may use shared mutable
+state only when it documents the file/process ownership model and uses atomic writes or
+locking that is safe across multiple server processes.
+
 ## Build And Drop-In Model
 
 Obelisk should support two plugin build paths:

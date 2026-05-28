@@ -25,6 +25,7 @@ define or protect runtime behavior.
 | --- | --- | --- |
 | `LD_PRELOAD` bootstrap | Stable baseline | Runtime loads through the central install layout. |
 | Central install root | Stable baseline | Operator-chosen Obelisk root with `lib/`, `plugins/`, `config/`, `logs/`, and `state/instances/`; current harness uses `/servidor/ark/obelisk`. |
+| Multi-server shared root | Stable baseline | Multiple ARK processes may share Obelisk `lib/`, `plugins/`, and `config/` when each process has a unique `OBELISK_INSTANCE_ID`; logs, markers, and mutable runtime state stay per instance. |
 | ARK/LinuxGSM validation adapter | Stable baseline | Versioned wrappers live under `packaging/linuxgsm/`; copy to the ARK binary directory only for adapter validation. |
 | Installer plugin posture | Stable baseline | `scripts/install_obelisk.sh` installs only runtime libraries; plugins are activated only by copying `.so` files into `plugins/`. |
 | Per-instance runtime flags | Stable baseline | `OBELISK_INSTANCE_ID` selects logs and markers under `state/instances/<id>/`; map markers are obsolete. |
