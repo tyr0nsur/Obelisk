@@ -132,6 +132,11 @@ work from repository state instead of chat history.
   trampoline under a hook-state mutex, starts the active-frame guard before public
   `CallOriginalProcessEvent` observes hook state, and makes hook removal mark `removing`
   under the same mutex before restoring bytes or unmapping the trampoline.
+- Current uncommitted runtime/API hardening makes global ProcessEvent callbacks runtime
+  default-deny. `RegisterPreProcessEvent` and `RegisterPostProcessEvent` no-op with a
+  warning unless `OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS=1` and the per-instance
+  marker `allow-global-process-event-callbacks` are both active. Filtered callbacks remain
+  available by default and ABI v1 layout is unchanged.
 - Commit `4e4f5cf` adds
   `scripts/compare_reflection_snapshots.py --readiness-report`. Use it to summarize
   comparable snapshot coverage and second-source status by schema/module. Current fixtures

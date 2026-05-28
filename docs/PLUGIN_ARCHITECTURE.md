@@ -150,8 +150,14 @@ integration point.
 Rules:
 
 - Prefer `RegisterPreProcessEventForNameIndex` or another filtered API.
-- Global callbacks require a documented debug objective, a bounded trace limit,
-  and an explicit config or env gate.
+- Global callbacks are rejected by default. They require both
+  `OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS=1` and the per-instance marker
+  `allow-global-process-event-callbacks`; only then does the runtime advertise
+  `OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS`.
+- A plugin that does not see `OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS`
+  must treat `RegisterPreProcessEvent` and `RegisterPostProcessEvent` as unavailable.
+- Any global-callback debug window also requires a documented objective, bounded trace
+  limits, named debug instance, and rollback plan.
 - Global callbacks must not block, allocate heavily, perform file or network I/O,
   parse JSON, sleep, or take contended locks.
 - Parameter decoding must be reflection-backed before it is considered stable.
@@ -160,8 +166,8 @@ Rules:
   mutation API. A pre-callback that calls it must return `false`; otherwise the
   detour will also call the original and the UE function can run twice. Post-callbacks
   must not replay the same event through `CallProcessEvent`.
-- A global callback may be acceptable for an isolated discovery run if plugins
-  are otherwise disabled on live maps and the test has rollback instructions.
+- A global callback may be acceptable for an isolated discovery run if the explicit gate
+  is enabled only on the approved debug instance and the test has rollback instructions.
 
 Promotion from experimental to stable requires proving that a plugin can run
 with filtered callbacks only, or documenting why a global callback is necessary

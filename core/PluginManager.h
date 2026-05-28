@@ -28,6 +28,7 @@ namespace Obelisk::Core
 
         void LoadPlugins(const std::string& directory);
         void UnloadAll();
+        uint64_t ApiCapabilitiesForTesting() const;
 
     private:
         struct PluginInfo {

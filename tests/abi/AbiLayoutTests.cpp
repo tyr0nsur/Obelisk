@@ -24,11 +24,13 @@ namespace
         volatile std::uint32_t metadataVersion = OBELISK_PLUGIN_METADATA_ABI_VERSION;
         volatile std::uint32_t initContextVersion = OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION;
         volatile std::uint64_t ownedCallbacksCapability = OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS;
+        volatile std::uint64_t globalCallbacksCapability = OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS;
 
         (void)apiVersion;
         (void)metadataVersion;
         (void)initContextVersion;
         (void)ownedCallbacksCapability;
+        (void)globalCallbacksCapability;
     }
 }
 

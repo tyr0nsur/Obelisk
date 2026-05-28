@@ -30,6 +30,7 @@ namespace
         bool initResult = true;
         bool validMetadata = true;
         bool registerCallback = false;
+        bool registerFilteredCallback = false;
         bool registerChatCallback = false;
         int getInfoCalls = 0;
         int initCalls = 0;
@@ -100,6 +101,9 @@ namespace
 
         if (g_CurrentFakePlugin->registerCallback)
             api->RegisterPreProcessEvent(FakeCallback);
+
+        if (g_CurrentFakePlugin->registerFilteredCallback)
+            api->RegisterPreProcessEventForNameIndex(42, FakeCallback);
 
         if (g_CurrentFakePlugin->registerChatCallback)
         {
@@ -207,7 +211,9 @@ namespace
     {
         setenv("OBELISK_CONFIG_DIR", (root / "config").string().c_str(), 1);
         setenv("OBELISK_LOG_DIR", (root / "logs").string().c_str(), 1);
+        setenv("OBELISK_MARKER_ROOT", root.string().c_str(), 1);
         setenv("OBELISK_INSTANCE_ID", "arkserver", 1);
+        unsetenv("OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS");
     }
 
     void CleanupPlugin(FakePlugin& plugin)
@@ -223,7 +229,7 @@ namespace
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_valid");
         ConfigureEnvironment(root);
 
-        FakePlugin plugin{.filename = "valid.so", .registerCallback = true};
+        FakePlugin plugin{.filename = "valid.so", .registerFilteredCallback = true};
         Obelisk::Core::ChatEventDispatcher chatDispatcher;
         plugin.registerChatCallback = true;
         plugin.chatDispatcher = &chatDispatcher;
@@ -255,6 +261,85 @@ namespace
         Require(chatDispatcher.SubscriptionCount() == 0, "owned chat callback survived plugin unload");
 
         CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestGlobalProcessEventCallbackRejectedByDefault()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_global_denied");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{.filename = "global_denied.so", .registerCallback = true};
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        Require((manager.ApiCapabilitiesForTesting() & OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS) == 0,
+                "global callback capability was enabled by default");
+
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "global-denied plugin was not initialized");
+        Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
+                "global callback was registered without explicit gate");
+
+        manager.UnloadAll();
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestFilteredProcessEventCallbackAllowedByDefault()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_filtered_allowed");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{.filename = "filtered_allowed.so", .registerFilteredCallback = true};
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
+                "filtered callback was rejected by default");
+
+        manager.UnloadAll();
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestGlobalProcessEventCallbackAllowedWithGate()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_global_allowed");
+        ConfigureEnvironment(root);
+        setenv("OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS", "1", 1);
+        fs::create_directories(root / "state" / "instances" / "arkserver");
+        std::ofstream marker(root / "state" / "instances" / "arkserver" / "allow-global-process-event-callbacks");
+        Require(marker.is_open(), "failed to create global callback marker");
+        marker.close();
+
+        FakePlugin plugin{.filename = "global_allowed.so", .registerCallback = true};
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        Require((manager.ApiCapabilitiesForTesting() & OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS) != 0,
+                "global callback capability was not enabled with env and marker gate");
+
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
+                "global callback was not registered with explicit gate");
+
+        manager.UnloadAll();
+        CleanupPlugin(plugin);
+        unsetenv("OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS");
         fs::remove_all(root);
     }
 
@@ -466,7 +551,7 @@ namespace
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_idempotent");
         ConfigureEnvironment(root);
 
-        FakePlugin plugin{.filename = "idempotent.so", .pluginId = "idempotent_plugin", .registerCallback = true};
+        FakePlugin plugin{.filename = "idempotent.so", .pluginId = "idempotent_plugin", .registerFilteredCallback = true};
         FakeLoader loader;
         loader.Add(plugin);
         TouchPlugin(root, plugin.filename);
@@ -501,6 +586,9 @@ int main()
     Obelisk::Logger::Init();
 
     TestValidPluginLoadsAndUnloadCleansCallbacks();
+    TestGlobalProcessEventCallbackRejectedByDefault();
+    TestFilteredProcessEventCallbackAllowedByDefault();
+    TestGlobalProcessEventCallbackAllowedWithGate();
     TestDisabledPluginPreparesConfigButDoesNotInit();
     TestInstanceDisallowedPluginDoesNotInit();
     TestMissingGetInfoRejectsAndCloses();

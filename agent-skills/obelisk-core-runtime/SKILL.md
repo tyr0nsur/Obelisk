@@ -31,6 +31,10 @@ Own these areas:
 - Do not subscribe plugins to all `ProcessEvent` calls except during a specifically
   operator-approved debug window on the named debug instance, with bounded limits and a
   rollback plan.
+- Global `RegisterPreProcessEvent` and `RegisterPostProcessEvent` callbacks are runtime
+  default-deny. They require `OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS=1` plus the
+  safe per-instance marker `allow-global-process-event-callbacks`; filtered callbacks stay
+  the stable plugin path.
 - Treat callback ownership as runtime-critical: callbacks registered by a plugin must be
   unregistered if init fails, before unload, and before `dlclose`.
 - Keep plugin-owned lifecycle cleanup shared across `EventManager` and the internal
@@ -85,8 +89,8 @@ Expected:
   `PluginManager`.
 - Preserve optional `ObeliskPlugin_Shutdown()` resolution outside the public API table.
 - Add tests or harness coverage for shutdown order and callback cleanup.
-- Keep global ProcessEvent callbacks off production paths unless a measured debug session
-  needs them.
+- Keep global ProcessEvent callbacks off production paths; the runtime should reject them
+  unless the explicit env+marker debug gate is active.
 - Keep hook-side experimental module recognizers cheap while they remain internal. The
   historical chat recognizer is the current benchmark fixture: disabled, unmatched, and
   `OBELISK_CHAT_REFLECTION_LOG_LIMIT=0` paths must stay allocation-free in

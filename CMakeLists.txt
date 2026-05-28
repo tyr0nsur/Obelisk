@@ -120,6 +120,7 @@ add_executable(plugin_manager_tests
     core/PluginConfig.cpp
     core/PluginManager.cpp
     runtime/Logger.cpp
+    runtime/RuntimeMarkers.cpp
     tests/core/ProcessEventHookStub.cpp
 )
 target_include_directories(plugin_manager_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

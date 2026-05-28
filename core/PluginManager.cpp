@@ -3,11 +3,14 @@
 #include "PluginConfig.h"
 #include "hooks/ProcessEventHook.h"
 #include "runtime/Logger.h"
+#include "runtime/RuntimeMarkers.h"
 #include <dlfcn.h>
 #include <filesystem>
 #include <algorithm>
+#include <atomic>
 #include <cstdlib>
 #include <exception>
+#include <string_view>
 #include <unordered_set>
 #include <vector>
 
@@ -18,6 +21,7 @@ namespace Obelisk::Core
     namespace
     {
         thread_local void* g_CurrentPluginOwner = nullptr;
+        std::atomic<uint64_t> g_ApiCapabilities{OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS};
 
         using GetInfoFunc = bool(*)(ObeliskPluginMetadata*);
         using InitFunc = bool(*)(ObeliskApi*, const ObeliskPluginInitContext*);
@@ -112,6 +116,31 @@ namespace Obelisk::Core
                 OBELISK_ERROR("Plugin {} threw an unknown exception during shutdown.", pluginName);
             }
         }
+
+        bool AreGlobalProcessEventCallbacksAllowed()
+        {
+            const char* env = std::getenv("OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS");
+            if (!env || std::string_view(env) != "1")
+                return false;
+
+            const char* markerRoot = std::getenv("OBELISK_MARKER_ROOT");
+            const char* instanceId = std::getenv("OBELISK_INSTANCE_ID");
+            return Runtime::IsInstanceMarkerEnabled(markerRoot, instanceId, "allow-global-process-event-callbacks");
+        }
+
+        uint64_t BuildApiCapabilities()
+        {
+            uint64_t capabilities = OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS;
+            if (AreGlobalProcessEventCallbacksAllowed())
+                capabilities |= OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS;
+            return capabilities;
+        }
+
+        bool IsGlobalProcessEventCallbackCapabilityEnabled()
+        {
+            return (g_ApiCapabilities.load(std::memory_order_acquire) &
+                    OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS) != 0;
+        }
     }
 
     // C-API Wrappers for Plugins
@@ -121,9 +150,19 @@ namespace Obelisk::Core
         void PluginLogError(const char* message) { OBELISK_ERROR("[Plugin] {}", message ? message : ""); }
 
         void PluginRegisterPreProcessEvent(OnProcessEventCallback callback) {
+            if (!IsGlobalProcessEventCallbackCapabilityEnabled())
+            {
+                OBELISK_WARN("Global PreProcessEvent callback rejected. Use RegisterPreProcessEventForNameIndex or enable allow-global-process-event-callbacks for a controlled debug window.");
+                return;
+            }
             EventManager::Get().RegisterPreProcessEventOwned(ResolveCallbackOwner(callback), callback);
         }
         void PluginRegisterPostProcessEvent(OnProcessEventCallback callback) {
+            if (!IsGlobalProcessEventCallbackCapabilityEnabled())
+            {
+                OBELISK_WARN("Global PostProcessEvent callback rejected. Use RegisterPostProcessEventForNameIndex or enable allow-global-process-event-callbacks for a controlled debug window.");
+                return;
+            }
             EventManager::Get().RegisterPostProcessEventOwned(ResolveCallbackOwner(callback), callback);
         }
         void PluginRegisterPreProcessEventForNameIndex(int32_t nameIndex, OnProcessEventCallback callback) {
@@ -167,7 +206,13 @@ namespace Obelisk::Core
         m_Api.CallProcessEvent = PluginCallProcessEvent;
         m_Api.abi_version = OBELISK_API_ABI_VERSION;
         m_Api.struct_size = sizeof(ObeliskApi);
-        m_Api.capabilities = OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS;
+        m_Api.capabilities = BuildApiCapabilities();
+        g_ApiCapabilities.store(m_Api.capabilities, std::memory_order_release);
+    }
+
+    uint64_t PluginManager::ApiCapabilitiesForTesting() const
+    {
+        return m_Api.capabilities;
     }
 
     PluginManager::~PluginManager()

@@ -147,6 +147,12 @@ Updated: 2026-05-28
   `CallOriginalProcessEvent` observes hook state, and makes hook removal mark `removing`
   under the same mutex before restoring bytes or unmapping the trampoline. This addresses
   the audited race between `CallProcessEvent` and hook removal.
+- fact: Current uncommitted runtime/API hardening makes global ProcessEvent callbacks
+  runtime default-deny. `RegisterPreProcessEvent` and `RegisterPostProcessEvent` no-op
+  with a warning unless `OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS=1` and the
+  per-instance marker `allow-global-process-event-callbacks` are both active. Filtered
+  name-index callbacks remain available by default, public ABI layout remains v1, and the
+  new capability bit only advertises global callbacks when the gate is active.
 - finding: Reflection tooling audit found UFunction snapshot fixture coverage is broad
   across module areas, but ScriptStruct coverage is the current bottleneck with only two
   transfer structs. Prioritize an offline second-source readiness report before any
