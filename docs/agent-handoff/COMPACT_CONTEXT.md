@@ -110,11 +110,15 @@ work from repository state instead of chat history.
     skipped on repeated load attempts and duplicate handles are closed without duplicating
     callbacks.
 - Current agent audit backlog:
-  - runtime/API: callback unsubscribe handles, `CallProcessEvent` reentrancy contract,
-    safe hook removal with active-detour tracking, and owned debug-control thread shutdown;
-  - reflection/offline: ScriptStruct second-source coverage is the bottleneck, and the
-    next safe step is a second-source readiness report over existing snapshots without
-    touching live servers.
+  - runtime/API: owner-token callback handles, active-detour hook removal, and owned
+    debug-control shutdown are implemented; remaining focused follow-up is a runtime guard
+    or harness coverage for `CallProcessEvent` double-execution misuse;
+  - cluster/plugin config: shared config default creation is now safe for concurrent
+    multi-instance startup; mutable shared plugin state still requires plugin-level
+    locking/atomic-write design;
+  - reflection/offline: second-source evidence is the bottleneck, and safe work should
+    keep improving deterministic readiness/comparison tooling without touching live
+    servers.
 - Commit `6b9fe8a` documents `CallProcessEvent` reentrancy in the SDK
   header and plugin docs without changing ABI layout: pre-callbacks that call it must
   return `false` to avoid double execution; a runtime guard remains future work.

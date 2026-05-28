@@ -2,11 +2,13 @@
 
 #include "extern/nlohmann/json.hpp"
 
+#include <atomic>
 #include <cctype>
 #include <cstring>
 #include <fstream>
 #include <string>
 #include <system_error>
+#include <unistd.h>
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
@@ -116,10 +118,17 @@ namespace Obelisk::Core
             return false;
         }
 
+        fs::path MakeUniqueTempConfigPath(const fs::path& path)
+        {
+            static std::atomic<uint64_t> counter{0};
+            const uint64_t id = counter.fetch_add(1, std::memory_order_relaxed);
+            return path.string() + ".tmp." + std::to_string(static_cast<long long>(getpid())) +
+                "." + std::to_string(id);
+        }
+
         bool WriteDefaultConfigAtomically(const fs::path& path, const json& config, std::string& error)
         {
-            const fs::path tempPath = path.string() + ".tmp";
-
+            const fs::path tempPath = MakeUniqueTempConfigPath(path);
             std::ofstream out(tempPath, std::ios::trunc);
             if (!out.is_open())
             {
@@ -138,15 +147,20 @@ namespace Obelisk::Core
             }
 
             std::error_code ec;
-            fs::rename(tempPath, path, ec);
+            fs::create_hard_link(tempPath, path, ec);
             if (ec)
             {
-                error = "failed to install default plugin config: " + ec.message();
                 std::error_code removeEc;
                 fs::remove(tempPath, removeEc);
+                if (fs::exists(path))
+                    return true;
+
+                error = "failed to install default plugin config: " + ec.message();
                 return false;
             }
 
+            std::error_code removeEc;
+            fs::remove(tempPath, removeEc);
             return true;
         }
     }

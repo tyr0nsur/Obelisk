@@ -117,6 +117,9 @@ Updated: 2026-05-28
   runtime libraries, plugin binaries, and shared plugin config, with unique
   `OBELISK_INSTANCE_ID` values, per-instance logs, and per-instance markers/runtime state.
   Mutable shared plugin state requires explicit plugin-level locking/atomic-write design.
+- fact: Shared plugin config default creation is hardened for concurrent multi-instance
+  startup: each process uses a unique temporary file and atomically installs the default
+  only if the config path is still absent, with coverage in `PluginConfigTests`.
 - fact: SDK consumer fixture now treats `ObeliskPlugin_Shutdown` as optional, matching
   `PluginManager`; a no-shutdown minimal plugin fixture covers that contract.
 - fact: `PluginManager` rejects `.so` symlink candidates during plugin directory scanning
@@ -187,18 +190,18 @@ Updated: 2026-05-28
   `scripts/test_obelisk_supervisor_snapshot.sh`, and hardened `PluginManager::LoadPlugins`
   so repeated loads of an already-loaded `plugin_id` skip initialization and close the
   duplicate handle instead of duplicating callbacks.
-- finding: Runtime/API audit identified the next SDK-core hardening items: public callback
-  unsubscribe handles, `CallProcessEvent` reentrancy contract/guard, safe hook removal
-  with active-detour tracking, and owned debug-control thread shutdown. Treat these as
-  future focused runtime rounds.
+- finding: Runtime/API audit items have mostly been closed: public owner-token callback
+  handles are now exposed, `CallProcessEvent` reentrancy is documented, hook removal tracks
+  active frames, and debug-control shutdown is owned/joined. Remaining focused runtime
+  follow-up is a possible runtime guard for `CallProcessEvent` double-execution misuse.
 - fact: Commit `6b9fe8a` documents the `CallProcessEvent` reentrancy
   contract in the public SDK header, README, and plugin architecture docs without changing
   ABI layout. A pre-callback that calls `CallProcessEvent` must return `false`; returning
   `true` risks double execution by the detour. A runtime guard remains future work.
-- fact: Commit `5cf3de7` adds internal `EventManager`
-  registration IDs and `UnregisterCallback(id)` coverage. Public `ObeliskApi` callback
-  registration remains unchanged for ABI v1; this prepares a future explicit unsubscribe
-  capability without promoting it yet.
+- fact: Commit `5cf3de7` added internal `EventManager`
+  registration IDs and `UnregisterCallback(id)` coverage. Later commit `7e405f8` promoted
+  the safe public form as owner-token handle registration plus
+  `UnregisterProcessEventCallbackWithOwnerToken(owner_token, handle)`.
 - fact: Commit `f5d1b0e` adds active ProcessEvent frame tracking around the detour and
   manual trampoline calls. Hook removal restores target bytes first, waits briefly for
   active frames to drain, and leaves the trampoline mapped with a warning instead of
@@ -209,8 +212,8 @@ Updated: 2026-05-28
 - fact: Commit `2095b1a` aligns ProcessEvent callback dispatch
   with the existing chat dispatcher self-unregister behavior by using a recursive dispatch
   mutex and adding coverage for a callback unregistering its own registration during
-  dispatch. This is internal groundwork for future explicit public callback unsubscribe
-  handles; public ABI remains unchanged.
+  dispatch. This now supports the owner-token handle unregister API added later in
+  `7e405f8`.
 - fact: Commit `228ef7e` snapshots the ProcessEvent original
   trampoline under a hook-state mutex, starts the active-frame guard before public
   `CallOriginalProcessEvent` observes hook state, and makes hook removal mark `removing`
@@ -245,9 +248,9 @@ Updated: 2026-05-28
   `PrimalItem.AllowRemoteAddToInventory`, `PrimalStructure.AllowStructureAccess`, and
   `PrimalStructure.IsAllowedToDemolish`; current readiness is `4/4` comparable and blocked
   only by missing second-source root.
-- next-step: Runtime/API debt from the latest read-only audit: add explicit public
-  unregister handles for token-owned callback registrations before promoting complex
-  background-thread plugins as stable.
+- next-step: Runtime/API follow-up: add a runtime guard or test harness around
+  `CallProcessEvent` double-execution misuse before promoting plugins that manually invoke
+  the original trampoline.
 - fact: Runtime/chat baseline is documented in
   `docs/research/2026-05-27-runtime-and-chat-baseline.md`.
 - fact: Reflection/chat metadata audit added shared UE probe layouts and gated

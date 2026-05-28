@@ -1,5 +1,6 @@
 #include "core/PluginConfig.h"
 
+#include <atomic>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -7,6 +8,8 @@
 #include <stdexcept>
 #include <sstream>
 #include <string>
+#include <thread>
+#include <vector>
 
 namespace fs = std::filesystem;
 
@@ -172,6 +175,40 @@ namespace
         Require(ReadFile(configPath) == original, "existing valid config was overwritten");
     }
 
+    void TestConcurrentDefaultCreation(const fs::path& root)
+    {
+        constexpr int kThreadCount = 8;
+        std::atomic<int> successes{0};
+        std::vector<std::thread> workers;
+        workers.reserve(kThreadCount);
+
+        for (int i = 0; i < kThreadCount; ++i)
+        {
+            workers.emplace_back([&]() {
+                Obelisk::Core::PreparedPluginConfig prepared;
+                std::string error;
+                if (Prepare(Metadata("concurrent_default"), root, prepared, error))
+                    successes.fetch_add(1, std::memory_order_relaxed);
+            });
+        }
+
+        for (auto& worker : workers)
+            worker.join();
+
+        const fs::path configPath = root / "concurrent_default" / "config.json";
+        Require(successes.load(std::memory_order_relaxed) == kThreadCount,
+                "concurrent default config creation rejected a caller");
+        Require(fs::exists(configPath), "concurrent default config was not created");
+        Require(ReadFile(configPath).find("\"enabled\": false") != std::string::npos,
+                "concurrent default config was not safe-disabled");
+
+        for (const auto& entry : fs::directory_iterator(configPath.parent_path()))
+        {
+            Require(entry.path().filename().string().find("config.json.tmp.") != 0,
+                    "temporary config file survived concurrent creation");
+        }
+    }
+
     void TestExistingConfigCanDisallowInstance(const fs::path& root)
     {
         WriteFile(root / "other_instance" / "config.json",
@@ -229,6 +266,7 @@ int main()
         TestRejectsCorruptDefaultJson(root);
         TestRejectsMistypedDefaultAllowlist(root);
         TestAcceptsExistingValidConfigWithoutOverwrite(root);
+        TestConcurrentDefaultCreation(root);
         TestExistingConfigCanDisallowInstance(root);
         TestRejectsCorruptExistingJson(root);
         TestRejectsMistypedExistingAllowlist(root);
