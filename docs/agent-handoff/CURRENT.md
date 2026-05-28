@@ -57,8 +57,9 @@ Updated: 2026-05-28
   wrapper was updated without restart; backup:
   `/home/flowcommunity-ark/backups/ObeliskRun.sh.20260528-024702.bak`.
 - fact: Runtime-side debug/scanner gates now require env+instance marker, so direct
-  `LD_PRELOAD` launches cannot enable ptrace, debug-control, ReflectionScanner, or native
-  exec probes by env alone. Marker names: `allow-ptrace`, `enable-debug-control`,
+  `LD_PRELOAD` launches cannot enable ProcessEvent hook, ptrace, debug-control,
+  ReflectionScanner, or native exec probes by env alone. Marker names:
+  `enable-process-event-hook`, `allow-ptrace`, `enable-debug-control`,
   `enable-reflection-scanner`, and `enable-native-exec-probes`. The live wrapper was
   refreshed without restart; backup:
   `/home/flowcommunity-ark/backups/ObeliskRun.sh.20260528-025602.bak`.

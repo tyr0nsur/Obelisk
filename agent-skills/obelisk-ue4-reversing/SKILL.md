@@ -74,8 +74,8 @@ cross-validated by object and property metadata.
 
 ## Live Server Safety
 
-- Keep `OBELISK_ENABLE_PROCESS_EVENT_HOOK=1` plus plugins disabled as the baseline safe
-  runtime test.
+- Keep `OBELISK_ENABLE_PROCESS_EVENT_HOOK=1` plus the `enable-process-event-hook` marker
+  and plugins disabled as the baseline safe runtime test.
 - Current operator direction as of 2026-05-28 makes `arkserver` / Ragnarok the active
   Obelisk development/test harness because RAM is constrained and `arkserver2` should stay
   stopped. Use controlled gates and rollback posture.

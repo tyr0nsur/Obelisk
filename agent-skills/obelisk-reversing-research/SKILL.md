@@ -72,7 +72,8 @@ experiment path.
 
 For scanner, `gcore`/`ptrace`, native exec experiments, or broad event discovery, enable
 one experiment at a time only in an approved `arkserver` window. The wrapper should set
-explicit environment variables such as:
+explicit environment variables from safe per-instance markers such as
+`enable-process-event-hook` and `disable-plugins`:
 
 ```bash
 export OBELISK_ENABLE_PROCESS_EVENT_HOOK=1

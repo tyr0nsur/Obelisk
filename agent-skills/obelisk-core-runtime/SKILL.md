@@ -23,7 +23,8 @@ Own these areas:
 ## Operating Rules
 
 - Keep live servers stable before adding features.
-- Gate risky behavior behind explicit env vars or marker files.
+- Gate runtime hooks and risky behavior behind explicit env vars plus safe per-instance
+  marker files.
 - Prefer per-instance enablement under `/servidor/ark/obelisk/state/instances/<id>`.
 - Keep plugin loading optional via `OBELISK_DISABLE_PLUGINS=1`.
 - Never use `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` plus
