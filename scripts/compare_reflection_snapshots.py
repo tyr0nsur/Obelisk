@@ -111,7 +111,19 @@ def expand_target_filters(targets: list[str], target_sets: list[str]) -> set[str
     filters = set(targets)
     for target_set in target_sets:
         filters.update(TARGET_SETS[target_set])
+    validate_target_filters(filters)
     return filters
+
+
+def validate_target_filters(filters: set[str]) -> None:
+    for target in sorted(filters):
+        if ":" not in target:
+            continue
+        schema, _, short_key = target.partition(":")
+        if schema not in SUPPORTED_SCHEMAS:
+            raise SystemExit(f"unsupported target filter schema: {schema}")
+        if not short_key:
+            raise SystemExit(f"schema-qualified target filter missing target: {target}")
 
 
 def target_set_report() -> dict[str, Any]:

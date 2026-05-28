@@ -33,6 +33,33 @@ for expected in \
     fi
 done
 
+merge_function="$(sed -n '/^merge_second_source_status()/,/^}/p' scripts/check_release_readiness.sh)"
+if [[ -z "${merge_function}" ]]; then
+    printf 'missing merge_second_source_status function\n' >&2
+    exit 1
+fi
+eval "${merge_function}"
+
+assert_merged_status() {
+    local current="$1"
+    local next="$2"
+    local expected="$3"
+    local actual
+    actual="$(merge_second_source_status "${current}" "${next}")"
+    if [[ "${actual}" != "${expected}" ]]; then
+        printf 'merge_second_source_status %s %s: expected %s got %s\n' \
+            "${current}" "${next}" "${expected}" "${actual}" >&2
+        exit 1
+    fi
+}
+
+assert_merged_status 0 0 0
+assert_merged_status 0 2 2
+assert_merged_status 2 0 2
+assert_merged_status 2 1 1
+assert_merged_status 1 2 1
+assert_merged_status 2 2 2
+
 before_error_roots="$(count_temp_roots)"
 set +e
 error_output="$(scripts/check_release_readiness.sh --ufunction-second-source-root /tmp/obelisk-candidate 2>&1)"

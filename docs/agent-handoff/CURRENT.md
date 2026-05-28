@@ -314,7 +314,9 @@ Updated: 2026-05-28
   gameplay module second-source evidence. When sanitized second-source roots exist, pass
   `--ufunction-second-source-root`, `--scriptstruct-second-source-root`, and
   `--second-source-report-dir`; the release gate writes JSON readiness artifacts for both
-  target sets and still runs both checks before returning the first non-zero gate status.
+  target sets and still runs both checks before returning the combined gate status. Hard
+  blockers/rejections exit `1` and take priority over inconclusive/missing-evidence exits
+  `2`.
   Put `--second-source-report-dir` outside the repository or under an ignored artifact
   path; unignored in-repo report paths are rejected before the release build starts.
 - fact: `ue/BuffReflection.*` adds an offline internal `sdk.buffs` recognizer for exact

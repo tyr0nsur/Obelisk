@@ -148,6 +148,25 @@ run_second_source_readiness() {
     return "${text_status}"
 }
 
+merge_second_source_status() {
+    local current_status="$1"
+    local next_status="$2"
+
+    if [[ "${next_status}" -eq 0 ]]; then
+        printf '%s\n' "${current_status}"
+        return
+    fi
+    if [[ "${current_status}" -eq 0 ]]; then
+        printf '%s\n' "${next_status}"
+        return
+    fi
+    if [[ "${current_status}" -eq 1 || "${next_status}" -eq 1 ]]; then
+        printf '1\n'
+        return
+    fi
+    printf '%s\n' "${current_status}"
+}
+
 check_clean_tree() {
     if [[ "${ALLOW_DIRTY}" == "1" ]]; then
         return
@@ -176,9 +195,7 @@ if [[ "${REQUIRE_SECOND_SOURCE_READINESS}" == "1" ]]; then
         "${UFUNCTION_SECOND_SOURCE_ROOT}"
     status=$?
     set -e
-    if [[ "${status}" -ne 0 ]]; then
-        second_source_status="${status}"
-    fi
+    second_source_status="$(merge_second_source_status "${second_source_status}" "${status}")"
     set +e
     run_second_source_readiness \
         scriptstruct \
@@ -187,9 +204,7 @@ if [[ "${REQUIRE_SECOND_SOURCE_READINESS}" == "1" ]]; then
         "${SCRIPTSTRUCT_SECOND_SOURCE_ROOT}"
     status=$?
     set -e
-    if [[ "${status}" -ne 0 && "${second_source_status}" -eq 0 ]]; then
-        second_source_status="${status}"
-    fi
+    second_source_status="$(merge_second_source_status "${second_source_status}" "${status}")"
     if [[ "${second_source_status}" -ne 0 ]]; then
         exit "${second_source_status}"
     fi

@@ -115,9 +115,10 @@ work from repository state instead of chat history.
   When sanitized second-source roots exist, pass `--ufunction-second-source-root`,
   `--scriptstruct-second-source-root`, and `--second-source-report-dir`; the release gate
   writes JSON readiness reports for both target sets and runs both before returning the
-  first non-zero gate status. Put the report directory outside the repository or under an
-  ignored artifact path; unignored in-repo report paths are rejected before the release
-  build starts.
+  combined gate status. Hard blockers/rejections exit `1` and take priority over
+  inconclusive/missing-evidence exits `2`. Put the report directory outside the repository
+  or under an ignored artifact path; unignored in-repo report paths are rejected before
+  the release build starts.
 - Public ProcessEvent callback lifecycle now includes owner-token handle registration:
   plugins can register with handle-returning owner-token functions and explicitly
   unregister through `UnregisterProcessEventCallbackWithOwnerToken(owner_token, handle)`.

@@ -604,6 +604,48 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         report = json.loads(result.stdout)
         self.assertEqual(report["counts"]["accepted"], 1)
 
+    def test_target_filter_rejects_unsupported_schema_qualifier(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            write_snapshot(base, base_snapshot())
+            write_snapshot(candidate, base_snapshot())
+
+            result = run_compare(
+                base,
+                candidate,
+                "--target",
+                "obelisk.unknown.snapshot.v1:PrimalItem.CanUse",
+                "--json",
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unsupported target filter schema: obelisk.unknown.snapshot.v1", result.stderr)
+
+    def test_target_filter_rejects_empty_schema_qualified_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            write_snapshot(base, base_snapshot())
+            write_snapshot(candidate, base_snapshot())
+
+            result = run_compare(
+                base,
+                candidate,
+                "--target",
+                "obelisk.ufunction-chain.snapshot.v1:",
+                "--json",
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("schema-qualified target filter missing target", result.stderr)
+
     def test_target_filter_fails_when_no_snapshot_matches(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
