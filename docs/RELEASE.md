@@ -28,15 +28,11 @@ Excluded:
 2. Build locally:
 
 ```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
-cmake --build build -j"$(nproc)"
-ctest --test-dir build --output-on-failure
-scripts/run_script_tests.sh
-scripts/test_install_obelisk_layout.sh
-scripts/obelisk.py --root /tmp/obelisk-release-check status
-scripts/install_obelisk.sh --dry-run /tmp/obelisk-release-check
-scripts/install_obelisk_plugin.sh --dry-run build/plugins/oBaseEvents/oBaseEvents.so /tmp/obelisk-release-check
+scripts/check_release_readiness.sh
 ```
+
+Set `OBELISK_KEEP_RELEASE_CHECK_ROOTS=1` to keep the temporary install roots for manual
+inspection after the script completes.
 
 3. Confirm `scripts/test_install_obelisk_layout.sh` covered runtime backup reinstall:
    one backup each for `libobelisk.so` and `libsubhook.so`, no `.incoming.*` files, no

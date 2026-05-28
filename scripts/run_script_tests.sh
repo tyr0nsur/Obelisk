@@ -17,6 +17,7 @@ done
 shell_scripts=(
     scripts/install_obelisk.sh
     scripts/install_obelisk_plugin.sh
+    scripts/check_release_readiness.sh
     scripts/test_install_obelisk_plugin.sh
     scripts/test_install_obelisk_layout.sh
     scripts/check_obelisk_server_posture.sh

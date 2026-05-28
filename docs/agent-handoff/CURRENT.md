@@ -122,6 +122,11 @@ Updated: 2026-05-28
   `plugins enable/disable/start/stop/restart` commands must wrap instance-scoped
   LinuxGSM/staged-installer operations, reject unsafe per-instance mutations from
   `allow_all_instances=true`, and use dry-run/backups/symlink rejection/atomic writes.
+- fact: First-stable release readiness is now consolidated in
+  `scripts/check_release_readiness.sh`. It builds RelWithDebInfo, runs CTest and script
+  tests, validates installed runtime/SDK layout, exercises read-only operator CLI status,
+  dry-runs runtime/plugin installers, and runs `git diff --check` without touching live
+  ARK server roots.
 - fact: Shared plugin config default creation is hardened for concurrent multi-instance
   startup: each process uses a unique temporary file and atomically installs the default
   only if the config path is still absent, with coverage in `PluginConfigTests`.
