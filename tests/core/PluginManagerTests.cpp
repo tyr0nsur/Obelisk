@@ -211,7 +211,7 @@ namespace
     {
         setenv("OBELISK_CONFIG_DIR", (root / "config").string().c_str(), 1);
         setenv("OBELISK_LOG_DIR", (root / "logs").string().c_str(), 1);
-        setenv("OBELISK_MARKER_ROOT", root.string().c_str(), 1);
+        setenv("OBELISK_ROOT", root.string().c_str(), 1);
         setenv("OBELISK_INSTANCE_ID", "arkserver", 1);
         unsetenv("OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS");
     }

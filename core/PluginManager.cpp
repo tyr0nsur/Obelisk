@@ -123,7 +123,7 @@ namespace Obelisk::Core
             if (!env || std::string_view(env) != "1")
                 return false;
 
-            const char* markerRoot = std::getenv("OBELISK_MARKER_ROOT");
+            const char* markerRoot = std::getenv("OBELISK_ROOT");
             const char* instanceId = std::getenv("OBELISK_INSTANCE_ID");
             return Runtime::IsInstanceMarkerEnabled(markerRoot, instanceId, "allow-global-process-event-callbacks");
         }
