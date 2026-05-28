@@ -7,17 +7,10 @@ work from repository state instead of chat history.
 
 ## Active Operating Objective
 
-- Objetivo literal del leader: Llevar Obelisk hacia una versión estable de producción
-  mediante rondas continuas de auditoría, desarrollo, investigación, conocimiento y
-  aprendizaje sobre ARK: Survival Evolved mediante ingenieria inversa del dump, análisis
-  del proyecto y coordinación de agentes bajo supervisión central.
-- Move Obelisk toward a production-stable version through continuous supervised rounds of
-  audit, development, investigation, knowledge capture, and learning about ARK: Survival
-  Evolved from dump reverse engineering, project analysis, and centrally coordinated
-  agents.
-- Each round should produce audited evidence, offline reversing/tooling improvement,
-  runtime/API hardening, recognizer/test coverage, documentation/skill updates, or a
-  validated checkpoint.
+- The persistent leader objective is tracked in the goal tool. Do not copy the full goal
+  text into default sub-agent prompts.
+- When delegating work, pass only the scoped objective, ownership, relevant skills, safety
+  baseline, and expected deliverable for that agent's task.
 - Safety remains first: no server restarts, `/servidor/ark` changes, marker edits,
   ReflectionScanner, ptrace/gcore, broad `ProcessEvent` tracing, or runtime observations
   without explicit operator approval for that run.

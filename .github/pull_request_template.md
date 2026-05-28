@@ -21,6 +21,7 @@
 - [ ] `cmake --build build -j"$(nproc)"`
 - [ ] `ctest --test-dir build --output-on-failure`
 - [ ] `scripts/run_script_tests.sh`
+- [ ] `scripts/test_install_obelisk_layout.sh` for install, SDK, packaging, or CMake export changes.
 - [ ] Docs-only changes explain why the build was skipped.
 
 ## Handoff

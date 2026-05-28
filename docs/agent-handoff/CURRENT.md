@@ -4,16 +4,10 @@ Updated: 2026-05-28
 
 ## Active Operating Objective
 
-- objetivo literal del leader: Llevar Obelisk hacia una versión estable de producción
-  mediante rondas continuas de auditoría, desarrollo, investigación, conocimiento y
-  aprendizaje sobre ARK: Survival Evolved mediante ingenieria inversa del dump, análisis
-  del proyecto y coordinación de agentes bajo supervisión central.
-- objective: Move Obelisk toward a production-stable version through continuous supervised
-  rounds of audit, development, investigation, knowledge capture, and learning about ARK:
-  Survival Evolved from dump reverse engineering, project analysis, and centrally
-  coordinated agents. Each round should produce one concrete outcome: audited evidence,
-  offline reversing/tooling improvement, runtime/API hardening, recognizer/test coverage,
-  documentation/skill updates, or a validated checkpoint.
+- fact: The persistent leader objective is tracked in the goal tool, not repeated in skills
+  or default sub-agent prompts.
+- agent context rule: pass sub-agents only the scoped objective, ownership, relevant skills,
+  safety baseline, and deliverable for their assigned task.
 - priorities: preserve live server safety first; strengthen UE4 reflection and
   second-source evidence; keep module recognizers candidate-only until promotion gates are
   met; optimize tooling/tests that make future reverse engineering faster and more
@@ -99,6 +93,15 @@ Updated: 2026-05-28
 - fact: Plugin API ProcessEvent registration wrappers reject null callbacks and negative
   filtered FName indices before registering callbacks. `-1` remains a runtime sentinel for
   unknown function names, not a valid plugin subscription target.
+- fact: `oBaseEvents` C exports catch plugin-side exceptions before returning across the
+  runtime/plugin ABI. `ObeliskPlugin_Init` resets plugin state on config failure or thrown
+  exception, and `ObeliskPlugin_Shutdown` is idempotent.
+- fact: Contributor-facing organization is intentionally lightweight: `main` plus
+  short-lived topic branches, current source directories kept stable, agent-only process
+  moved out of contributor workflow, SDK install/package validation documented, and the
+  legacy MVP moved to `docs/archive/`.
+- fact: SDK consumer fixture now treats `ObeliskPlugin_Shutdown` as optional, matching
+  `PluginManager`; a no-shutdown minimal plugin fixture covers that contract.
 - fact: Runtime observer marker checks use `runtime/RuntimeMarkers.*`, which rejects empty
   components, path traversal, slashes, dots, spaces, directory markers, symlink markers, and
   symlink instance directories before checking `state/instances/<instance>/<marker>`.
@@ -212,6 +215,10 @@ Updated: 2026-05-28
   `PrimalItem.AllowRemoteAddToInventory`, `PrimalStructure.AllowStructureAccess`, and
   `PrimalStructure.IsAllowedToDemolish`; current readiness is `4/4` comparable and blocked
   only by missing second-source root.
+- next-step: Runtime/API debt from the latest read-only audit: harden `PluginManager`
+  ownership/cleanup around callback registrations outside init, add RAII cleanup for
+  exceptions between `dlopen` and `m_LoadedPlugins` insertion, and reject plugin `.so`
+  symlinks that point outside the plugin directory.
 - fact: Runtime/chat baseline is documented in
   `docs/research/2026-05-27-runtime-and-chat-baseline.md`.
 - fact: Reflection/chat metadata audit added shared UE probe layouts and gated

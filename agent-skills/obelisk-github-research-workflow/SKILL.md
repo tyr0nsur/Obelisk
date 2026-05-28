@@ -10,22 +10,16 @@ skill updates, or making work reproducible for contributors.
 
 ## Project Vision
 
-Objetivo persistente del leader:
+Obelisk is a Linux runtime/API/SDK core for ARK modding. Coordinate work toward a robust
+general modding substrate: UE4 reflection, safe runtime hooks, stable C ABI, plugin
+lifecycle, install layout, live-ops safety, reproducible reversing evidence, and public SDK
+promotion gates. Treat chat, inventory, structures, buffs, dinos, tribes, missions,
+transfers, and admin surfaces as module areas on top of the same core, not as the center of
+the project.
 
-```text
-Llevar Obelisk hacia una versión estable de producción mediante rondas continuas de auditoría, desarrollo, investigación, conocimiento y aprendizaje sobre ARK: Survival Evolved mediante ingenieria inversa del dump, análisis del proyecto y coordinación de agentes bajo supervisión central.
-```
-
-Obelisk is a Linux runtime/API/SDK core for ARK modding. The standing leader objective is
-to move Obelisk toward a production-stable version through continuous supervised rounds of
-audit, development, investigation, knowledge capture, and learning about ARK: Survival
-Evolved from dump reverse engineering, project analysis, and centrally coordinated agents.
-
-Coordinate work toward a robust general modding substrate: UE4 reflection, safe runtime
-hooks, stable C ABI, plugin lifecycle, install layout, live-ops safety, reproducible
-reversing evidence, and public SDK promotion gates. Treat chat, inventory, structures,
-buffs, dinos, tribes, missions, transfers, and admin surfaces as module areas on top of
-the same core, not as the center of the project.
+Keep leader-only strategy, cadence, and active goal text outside this skill. The active
+leader objective belongs in the goal tool and short-lived handoff state, not in prompts sent
+to every sub-agent.
 
 ## Working Contract
 
@@ -52,6 +46,11 @@ the same core, not as the center of the project.
 
 ## Agent Coordination
 
+- Pass sub-agents only the context they need: task objective, ownership scope, files they
+  may edit, files they must not edit, relevant skills to read, current safety baseline, and
+  expected deliverable.
+- Do not pass broad leader cadence, long-term goal wording, Discord policy, commit flow, or
+  unrelated module history unless that information changes the agent's concrete task.
 - Before spawning agents, define disjoint ownership:
   - runtime/core: hooks, loader, EventManager, PluginManager, ABI
   - reversing/research: FName, GNames, GObjects, UFunction, event decoding experiments

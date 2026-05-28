@@ -20,9 +20,9 @@ Open pull requests back to `main`. Keep PRs focused on one subsystem or one
 documentation/research topic. Do not keep long-running integration branches
 unless the team lead explicitly creates one for a release or migration.
 
-The lead owns GitHub checkpoints for coordinated agent rounds. Sub-agents and
-contributors should leave changes unstaged/uncommitted unless their task
-explicitly includes Git operations.
+Coordinated agent handoff rules live in `docs/agent-handoff/`. Public
+contributor workflow should stay focused on branch scope, validation, and PR
+review.
 
 ## Repository Map
 
@@ -79,6 +79,12 @@ scripts/run_script_tests.sh
 ```
 
 Docs-only changes may skip the CMake build, but the PR should say why.
+Changes to install layout, CMake package exports, public headers, or SDK
+packaging should also run:
+
+```bash
+scripts/test_install_obelisk_layout.sh
+```
 
 ## Runtime Testing
 

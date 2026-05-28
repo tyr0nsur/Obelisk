@@ -8,6 +8,11 @@ longer investigation notes.
 ## Files
 
 - `CURRENT.md`: current state, risks, blockers, and next steps.
+- `COMPACT_CONTEXT.md`: compact resume baseline for context compaction or a fresh lead
+  session.
+
+These files are internal coordination notes for agents and the project lead. Public
+contributor workflow belongs in `CONTRIBUTING.md`.
 
 ## Rules
 

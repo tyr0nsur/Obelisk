@@ -36,13 +36,24 @@ namespace
     }
 
     template <typename T>
-    T Resolve(void* handle, const char* symbol)
+    T ResolveRequired(void* handle, const char* symbol)
     {
         dlerror();
         void* pointer = dlsym(handle, symbol);
         const char* error = dlerror();
         if (error)
             throw std::runtime_error(std::string("missing symbol ") + symbol + ": " + error);
+        return reinterpret_cast<T>(pointer);
+    }
+
+    template <typename T>
+    T ResolveOptional(void* handle, const char* symbol)
+    {
+        dlerror();
+        void* pointer = dlsym(handle, symbol);
+        const char* error = dlerror();
+        if (error)
+            return nullptr;
         return reinterpret_cast<T>(pointer);
     }
 }
@@ -65,9 +76,9 @@ int main(int argc, char** argv)
             }
         };
 
-        GetInfoFn getInfo = Resolve<GetInfoFn>(handle, "ObeliskPlugin_GetInfo");
-        InitFn init = Resolve<InitFn>(handle, "ObeliskPlugin_Init");
-        ShutdownFn shutdown = Resolve<ShutdownFn>(handle, "ObeliskPlugin_Shutdown");
+        GetInfoFn getInfo = ResolveRequired<GetInfoFn>(handle, "ObeliskPlugin_GetInfo");
+        InitFn init = ResolveRequired<InitFn>(handle, "ObeliskPlugin_Init");
+        ShutdownFn shutdown = ResolveOptional<ShutdownFn>(handle, "ObeliskPlugin_Shutdown");
 
         ObeliskPluginMetadata metadata{};
         Require(getInfo(&metadata), "ObeliskPlugin_GetInfo failed");
@@ -98,7 +109,8 @@ int main(int argc, char** argv)
         context.instance_id = "sdk-consumer-test";
 
         Require(init(&api, &context), "ObeliskPlugin_Init failed");
-        shutdown();
+        if (shutdown)
+            shutdown();
         closeHandle();
     }
     catch (const std::exception& e)

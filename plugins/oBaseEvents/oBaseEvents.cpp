@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <mutex>
@@ -189,71 +190,108 @@ namespace
 
         return true;
     }
+
+    void ResetState()
+    {
+        g_Api = nullptr;
+        g_Enabled = false;
+        g_ProcessEventEnabled = false;
+        g_FilteredFunctionIndex = -1;
+        g_LogLimit = 5;
+        g_LoggedEvents.store(0);
+    }
 }
 
 extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out)
 {
-    if (!out)
-        return false;
+    try
+    {
+        if (!out)
+            return false;
 
-    out->abi_version = OBELISK_PLUGIN_METADATA_ABI_VERSION;
-    out->struct_size = sizeof(ObeliskPluginMetadata);
-    out->plugin_id = "oBaseEvents";
-    out->name = "oBaseEvents";
-    out->version = "0.1.0";
-    out->config_file = "config.json";
-    out->default_config_json = kDefaultConfig;
-    return true;
+        out->abi_version = OBELISK_PLUGIN_METADATA_ABI_VERSION;
+        out->struct_size = sizeof(ObeliskPluginMetadata);
+        out->plugin_id = "oBaseEvents";
+        out->name = "oBaseEvents";
+        out->version = "0.1.0";
+        out->config_file = "config.json";
+        out->default_config_json = kDefaultConfig;
+        return true;
+    }
+    catch (...)
+    {
+        return false;
+    }
 }
 
 extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(ObeliskApi* api, const ObeliskPluginInitContext* context)
 {
-    if (!api)
-        return false;
-
-    if (api->abi_version != OBELISK_API_ABI_VERSION ||
-        api->struct_size < sizeof(ObeliskApi))
+    try
     {
-        api->LogError("[oBaseEvents] Incompatible Obelisk API.");
-        return false;
-    }
+        if (!api)
+            return false;
 
-    g_Api = api;
-    g_LoggedEvents.store(0);
+        if (api->abi_version != OBELISK_API_ABI_VERSION ||
+            api->struct_size < sizeof(ObeliskApi))
+        {
+            api->LogError("[oBaseEvents] Incompatible Obelisk API.");
+            return false;
+        }
 
-    if (!LoadConfig(context))
-        return false;
+        g_Api = api;
+        g_LoggedEvents.store(0);
 
-    api->LogInfo("[oBaseEvents] Loaded.");
+        if (!LoadConfig(context))
+        {
+            ResetState();
+            return false;
+        }
 
-    if (!g_Enabled)
-    {
-        api->LogInfo("[oBaseEvents] Disabled by config.");
+        api->LogInfo("[oBaseEvents] Loaded.");
+
+        if (!g_Enabled)
+        {
+            api->LogInfo("[oBaseEvents] Disabled by config.");
+            return true;
+        }
+
+        if (g_ProcessEventEnabled && g_FilteredFunctionIndex >= 0)
+        {
+            api->RegisterPreProcessEventForNameIndex(g_FilteredFunctionIndex, OnFilteredProcessEvent);
+            api->LogInfo("[oBaseEvents] Registered filtered ProcessEvent callback.");
+        }
+        else
+        {
+            api->LogInfo("[oBaseEvents] ProcessEvent example disabled by config.");
+        }
+
         return true;
     }
-
-    if (g_ProcessEventEnabled && g_FilteredFunctionIndex >= 0)
+    catch (const std::exception& e)
     {
-        api->RegisterPreProcessEventForNameIndex(g_FilteredFunctionIndex, OnFilteredProcessEvent);
-        api->LogInfo("[oBaseEvents] Registered filtered ProcessEvent callback.");
+        if (api)
+            api->LogError((std::string("[oBaseEvents] Init failed: ") + e.what()).c_str());
+        ResetState();
+        return false;
     }
-    else
+    catch (...)
     {
-        api->LogInfo("[oBaseEvents] ProcessEvent example disabled by config.");
+        if (api)
+            api->LogError("[oBaseEvents] Init failed with unknown exception.");
+        ResetState();
+        return false;
     }
-
-    return true;
 }
 
 extern "C" __attribute__((visibility("default"))) void ObeliskPlugin_Shutdown()
 {
-    if (g_Api)
-        g_Api->LogInfo("[oBaseEvents] Shutdown.");
-
-    g_Api = nullptr;
-    g_Enabled = false;
-    g_ProcessEventEnabled = false;
-    g_FilteredFunctionIndex = -1;
-    g_LogLimit = 5;
-    g_LoggedEvents.store(0);
+    try
+    {
+        if (g_Api)
+            g_Api->LogInfo("[oBaseEvents] Shutdown.");
+    }
+    catch (...)
+    {
+    }
+    ResetState();
 }

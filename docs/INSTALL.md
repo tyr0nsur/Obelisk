@@ -34,9 +34,18 @@ The script copies:
 ```text
 build/libobelisk.so                         -> lib/libobelisk.so
 build/_deps/subhook-build/libsubhook.so     -> lib/libsubhook.so
+include/obelisk/*.h                         -> include/obelisk/
+build/ObeliskConfig*.cmake                  -> lib/cmake/Obelisk/
 ```
 
 It also creates `plugins`, `config`, `logs`, and `state/instances`.
+
+External plugins can consume the installed SDK through the exported CMake package:
+
+```cmake
+find_package(Obelisk CONFIG REQUIRED)
+target_link_libraries(MyPlugin PRIVATE Obelisk::obelisk_sdk)
+```
 
 Plugins loaded from `plugins/` are expected to own their config defaults. The preferred
 directory for plugin config is:

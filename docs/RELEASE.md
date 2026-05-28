@@ -32,6 +32,7 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake --build build -j"$(nproc)"
 ctest --test-dir build --output-on-failure
 scripts/run_script_tests.sh
+scripts/test_install_obelisk_layout.sh
 scripts/install_obelisk.sh --dry-run /tmp/obelisk-release-check
 ```
 
