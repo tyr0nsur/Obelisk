@@ -43,6 +43,8 @@ that a `.so` will consume.
 - `OBELISK_INSTANCE_ID` and `instance_allowlist` entries must be non-empty safe tokens
   containing only letters, digits, `_`, or `-`. Plugin loading must fail closed before
   discovery when the runtime instance id is missing or unsafe.
+- Plugin config directories and `config.json` files must be regular non-symlink entries
+  under the central config root. Do not weaken this for shared-cluster installs.
 - `ObeliskPluginInitContext` string pointers are borrowed for `ObeliskPlugin_Init` only;
   plugin examples should copy `config_dir`, `config_path`, or `instance_id` before using
   them from shutdown, threads, or later callbacks.

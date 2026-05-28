@@ -351,6 +351,47 @@ namespace
         Require(error.find("safe instance ids") != std::string::npos,
                 "unsafe instance_allowlist error was unclear");
     }
+
+    void TestRejectsConfigSymlinkEscape(const fs::path& root)
+    {
+        Obelisk::Core::PreparedPluginConfig prepared;
+        std::string error;
+
+        const fs::path external = root / "external-config.json";
+        WriteFile(external, R"({"enabled":true,"allow_all_instances":true})");
+        fs::create_directories(root / "config_symlink");
+        fs::create_symlink(external, root / "config_symlink" / "config.json");
+
+        Require(!Prepare(Metadata("config_symlink"), root, prepared, error),
+                "symlink config file was accepted");
+        Require(error.find("symlink") != std::string::npos, "symlink config file error was unclear");
+    }
+
+    void TestRejectsConfigDirectorySymlinkEscape(const fs::path& root)
+    {
+        Obelisk::Core::PreparedPluginConfig prepared;
+        std::string error;
+
+        const fs::path externalDir = root / "external-config-dir";
+        WriteFile(externalDir / "config.json", R"({"enabled":true,"allow_all_instances":true})");
+        fs::create_symlink(externalDir, root / "directory_symlink");
+
+        Require(!Prepare(Metadata("directory_symlink"), root, prepared, error),
+                "symlink config directory was accepted");
+        Require(error.find("symlink") != std::string::npos, "symlink config directory error was unclear");
+    }
+
+    void TestRejectsNonRegularConfigFile(const fs::path& root)
+    {
+        Obelisk::Core::PreparedPluginConfig prepared;
+        std::string error;
+
+        fs::create_directories(root / "directory_config" / "config.json");
+
+        Require(!Prepare(Metadata("directory_config"), root, prepared, error),
+                "directory config file was accepted");
+        Require(error.find("regular file") != std::string::npos, "non-regular config error was unclear");
+    }
 }
 
 int main()
@@ -373,6 +414,9 @@ int main()
         TestAllowAllInstancesIsExplicitOptIn(root);
         TestRejectsCorruptExistingJson(root);
         TestRejectsMistypedExistingAllowlist(root);
+        TestRejectsConfigSymlinkEscape(root);
+        TestRejectsConfigDirectorySymlinkEscape(root);
+        TestRejectsNonRegularConfigFile(root);
         fs::remove_all(root);
     }
     catch (...)

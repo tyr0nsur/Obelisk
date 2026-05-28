@@ -132,6 +132,8 @@ Updated: 2026-05-28
 - fact: Plugin loading now fails closed before discovery when `OBELISK_INSTANCE_ID` is
   missing, empty, or contains anything outside letters, digits, `_`, or `-`. Config
   `instance_allowlist` entries use the same safe-token rule.
+- fact: Plugin config preparation rejects symlinked plugin config directories, symlinked
+  `config.json`, and non-regular `config.json` files before parsing shared config.
 - fact: `ObeliskPluginInitContext` string pointers are documented as borrowed only for
   `ObeliskPlugin_Init`; plugins must copy `config_dir`, `config_path`, or `instance_id`
   before using them from shutdown, worker threads, or later callbacks.

@@ -146,6 +146,57 @@ namespace Obelisk::Core
             return true;
         }
 
+        bool ValidateExistingConfigPath(const fs::path& directory, const fs::path& path, std::string& error)
+        {
+            std::error_code ec;
+            const fs::file_status directorySymlinkStatus = fs::symlink_status(directory, ec);
+            if (ec)
+            {
+                error = "plugin config directory is not accessible: " + ec.message();
+                return false;
+            }
+
+            if (fs::is_symlink(directorySymlinkStatus))
+            {
+                error = "plugin config directory must not be a symlink";
+                return false;
+            }
+
+            if (!fs::is_directory(directorySymlinkStatus))
+            {
+                error = "plugin config directory must be a directory";
+                return false;
+            }
+
+            const fs::file_status configSymlinkStatus = fs::symlink_status(path, ec);
+            if (ec)
+            {
+                error = "plugin config file is not accessible: " + ec.message();
+                return false;
+            }
+
+            if (fs::is_symlink(configSymlinkStatus))
+            {
+                error = "plugin config file must not be a symlink";
+                return false;
+            }
+
+            const fs::file_status configStatus = fs::status(path, ec);
+            if (ec)
+            {
+                error = "plugin config file status failed: " + ec.message();
+                return false;
+            }
+
+            if (!fs::is_regular_file(configStatus))
+            {
+                error = "plugin config file must be a regular file";
+                return false;
+            }
+
+            return true;
+        }
+
         bool InstanceAllowed(const json& config, const std::string& instanceId, bool enabled)
         {
             if (!enabled)
@@ -289,6 +340,9 @@ namespace Obelisk::Core
             if (!WriteDefaultConfigAtomically(prepared.path, defaultConfig, error))
                 return false;
         }
+
+        if (!ValidateExistingConfigPath(prepared.directory, prepared.path, error))
+            return false;
 
         json existingConfig;
         if (!LoadJsonFile(prepared.path, existingConfig, error))

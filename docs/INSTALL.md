@@ -130,6 +130,9 @@ Shared config is intentional; shared mutable plugin state is not the default. Pl
 write runtime state should write under an instance-scoped path, or document and implement
 their own locking/atomic-write strategy before using a shared state file across multiple
 server processes.
+Plugin config directories and `config.json` files must be regular filesystem entries under
+`${OBELISK_ROOT}/config`; the runtime rejects symlinked plugin config directories and
+symlinked or non-regular config files.
 
 ## Feature Flags
 

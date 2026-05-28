@@ -126,7 +126,8 @@ work from repository state instead of chat history.
     `default_config_json` must declare `enabled=false`, an `instance_allowlist` array,
     and `allow_all_instances=false`; plugin loading fails closed when
     `OBELISK_INSTANCE_ID` is missing/unsafe and allowlist entries use the same safe-token
-    rule; mutable shared plugin state still requires plugin-level locking/atomic-write
+    rule; plugin config directories and `config.json` files must be regular non-symlink
+    entries; mutable shared plugin state still requires plugin-level locking/atomic-write
     design;
   - reflection/offline: second-source evidence is the bottleneck, and safe work should
     keep improving deterministic readiness/comparison tooling without touching live

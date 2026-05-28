@@ -90,6 +90,8 @@ The runtime creates a plugin's missing default config before initialization usin
 with `enabled: false`, must include an `instance_allowlist` array, and must set
 `allow_all_instances: false` explicitly. If metadata, default config, or an existing config
 is invalid, the runtime rejects the plugin before calling `ObeliskPlugin_Init`.
+Existing config paths must stay inside the central config tree as regular files and
+directories; symlinked plugin config directories or `config.json` files are rejected.
 
 The runtime interprets the common activation envelope before initialization:
 `enabled=false`, a missing/empty `instance_allowlist`, or a non-matching
