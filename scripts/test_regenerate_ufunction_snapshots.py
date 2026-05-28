@@ -158,6 +158,140 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("snapshot drift detected", result.stderr)
 
+    def test_check_layout_ignores_evidence_and_identity_index_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            manifest = root / "manifest.json"
+            output_root = root / "out"
+            output = output_root / "7e7ded49e0c6" / "sdk_test" / "PrimalStructure.AllowStructureAccess.snapshot.json"
+            addrs = build_core_fixture(core)
+            self.write_manifest(manifest)
+            common_args = [
+                sys.executable,
+                str(SCRIPT_DIR / "regenerate_ufunction_snapshots.py"),
+                "--core",
+                str(core),
+                "--manifest",
+                str(manifest),
+                "--output-root",
+                str(output_root),
+                "--gobjects",
+                hex(addrs["gobjects"]),
+                "--fname-root-slot",
+                hex(addrs["fname_root_slot"]),
+            ]
+
+            subprocess.run(
+                [*common_args, "--obelisk-commit", "abcdef1", "--write"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            payload = json.loads(output.read_text(encoding="utf-8"))
+            payload["evidence"]["obelisk_commit"] = "different"  # type: ignore[index]
+            payload["targets"][0]["target"]["object_index"] = 9001  # type: ignore[index]
+            payload["targets"][0]["target"]["name_index"] = 9002  # type: ignore[index]
+            payload["targets"][0]["target"]["class_name_index"] = 9003  # type: ignore[index]
+            payload["targets"][0]["target"]["class_object_index"] = 9004  # type: ignore[index]
+            payload["targets"][0]["target"]["outer_name_index"] = 9005  # type: ignore[index]
+            payload["targets"][0]["target"]["outer_object_index"] = 9006  # type: ignore[index]
+            prop = payload["targets"][0]["property_chain"]["properties"][0]  # type: ignore[index]
+            prop["object_index"] = 9010
+            prop["name_index"] = 9011
+            prop["class_name_index"] = 9012
+            prop["class_object_index"] = 9013
+            output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+            layout = subprocess.run(
+                [*common_args, "--obelisk-commit", "1234567", "--check-layout"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            full = subprocess.run(
+                [*common_args, "--obelisk-commit", "1234567", "--check"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(layout.returncode, 0, layout.stderr)
+        self.assertIn("layout ok", layout.stdout)
+        self.assertNotEqual(full.returncode, 0)
+        self.assertIn("snapshot drift detected", full.stderr)
+
+    def test_check_layout_detects_property_layout_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            manifest = root / "manifest.json"
+            output_root = root / "out"
+            output = output_root / "7e7ded49e0c6" / "sdk_test" / "PrimalStructure.AllowStructureAccess.snapshot.json"
+            addrs = build_core_fixture(core)
+            self.write_manifest(manifest)
+            common_args = [
+                sys.executable,
+                str(SCRIPT_DIR / "regenerate_ufunction_snapshots.py"),
+                "--core",
+                str(core),
+                "--manifest",
+                str(manifest),
+                "--output-root",
+                str(output_root),
+                "--gobjects",
+                hex(addrs["gobjects"]),
+                "--fname-root-slot",
+                hex(addrs["fname_root_slot"]),
+                "--obelisk-commit",
+                "abcdef1",
+            ]
+
+            subprocess.run([*common_args, "--write"], check=True, capture_output=True, text=True)
+            payload = json.loads(output.read_text(encoding="utf-8"))
+            payload["targets"][0]["property_chain"]["properties"][0]["offset_internal"] = 4  # type: ignore[index]
+            output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+            result = subprocess.run([*common_args, "--check-layout"], check=False, capture_output=True, text=True)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("layout diff", result.stdout)
+        self.assertIn("layout drift detected", result.stderr)
+
+    def test_check_layout_is_mutually_exclusive_with_full_check(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            manifest = root / "manifest.json"
+            addrs = build_core_fixture(core)
+            self.write_manifest(manifest)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "regenerate_ufunction_snapshots.py"),
+                    "--core",
+                    str(core),
+                    "--manifest",
+                    str(manifest),
+                    "--output-root",
+                    str(root / "out"),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--obelisk-commit",
+                    "abcdef1",
+                    "--check",
+                    "--check-layout",
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("choose only one of --check, --check-layout, or --write", result.stderr)
+
     def test_rejects_manifest_output_that_escapes_root(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

@@ -98,6 +98,10 @@ Updated: 2026-05-28
   ScriptStruct snapshot sets offline and reports `accepted`, `rejected`, or `inconclusive`
   per target. Use `--target Outer.Name` for focused module checks. It does not read cores
   or touch servers.
+- fact: `scripts/regenerate_ufunction_snapshots.py --check-layout` now supports
+  UFunction layout-only verification for second-source intake. It ignores unstable
+  identity/evidence indices while preserving target identity, UFunction fields, and
+  property-chain layout drift.
 - fact: Commit `f3a47d1` runs reflection snapshot comparison and ScriptStruct fixture
   tests in CI and release validation.
 - fact: Commit `3451a19` aligns README and `docs/STATUS.md` around module-first runtime
