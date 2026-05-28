@@ -580,15 +580,26 @@ namespace Obelisk::Core
                 return;
             }
 
-            if (!fs::exists(directory))
+            const fs::path pluginDirectory = directory;
+            const fs::file_status pluginDirectoryStatus = fs::symlink_status(pluginDirectory);
+            if (!fs::exists(pluginDirectoryStatus))
             {
-                OBELISK_WARN("Plugin directory {} does not exist. Creating it...", directory);
-                fs::create_directories(directory);
+                OBELISK_WARN("Plugin directory {} does not exist. Plugins will not be loaded.", directory);
+                return;
+            }
+            if (fs::is_symlink(pluginDirectoryStatus))
+            {
+                OBELISK_ERROR("Plugin directory {} is a symlink. Plugins will not be loaded.", directory);
+                return;
+            }
+            if (!fs::is_directory(pluginDirectoryStatus))
+            {
+                OBELISK_ERROR("Plugin path {} is not a directory. Plugins will not be loaded.", directory);
                 return;
             }
 
             std::vector<fs::path> plugins;
-            for (const auto& entry : fs::directory_iterator(directory))
+            for (const auto& entry : fs::directory_iterator(pluginDirectory))
             {
                 if (entry.path().extension() != ".so")
                     continue;

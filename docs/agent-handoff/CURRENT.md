@@ -286,6 +286,11 @@ Updated: 2026-05-28
   `config.json`, and non-regular `config.json` files before parsing shared config. It now
   also rejects a symlinked per-plugin config directory before first-run default config
   creation, so default publication cannot write through a symlink escape.
+- fact: Runtime plugin discovery requires the plugin directory to already be a real
+  non-symlink directory; `PluginManager::LoadPlugins` no longer creates a missing plugin
+  directory or follows a symlinked plugin directory. The read-only operator CLI mirrors
+  this by not listing `.so` files through a symlinked `plugins` path and by surfacing
+  invalid plugin config entries.
 - fact: `ObeliskPluginInitContext` string pointers are documented as borrowed only for
   `ObeliskPlugin_Init`; plugins must copy `config_dir`, `config_path`, or `instance_id`
   before using them from shutdown, worker threads, or later callbacks.

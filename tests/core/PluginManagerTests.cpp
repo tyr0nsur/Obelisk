@@ -1004,6 +1004,36 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestPluginSymlinkDirectoryIsRejected()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_plugin_dir_symlink");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{.filename = "escaped.so"};
+        FakeLoader loader;
+        loader.Add(plugin);
+
+        const fs::path externalPlugins = root / "external-plugins";
+        fs::create_directories(externalPlugins);
+        fs::remove_all(root / "plugins");
+        fs::create_directory_symlink(externalPlugins, root / "plugins");
+        {
+            std::ofstream out(root / "plugins" / plugin.filename);
+            Require(out.is_open(), "failed to create fake plugin in symlinked plugin directory");
+        }
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.getInfoCalls == 0, "plugin in symlinked plugin directory was opened");
+        Require(plugin.initCalls == 0, "plugin in symlinked plugin directory was initialized");
+        Require(plugin.closeCalls == 0, "plugin in symlinked plugin directory reached loader close path");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestMissingInitRejectsAndCloses()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_no_init");
@@ -1364,6 +1394,7 @@ int main()
     TestMissingGetInfoRejectsAndCloses();
     TestResolveExceptionAfterOpenClosesHandle();
     TestPluginSymlinkCandidateIsRejected();
+    TestPluginSymlinkDirectoryIsRejected();
     TestMissingInitRejectsAndCloses();
     TestInvalidMetadataRejectsAndCloses();
     TestInitFailureCleansCallbacksAndCloses();

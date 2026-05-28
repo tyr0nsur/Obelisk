@@ -14,6 +14,13 @@ The CLI reads the central install root, plugin publication state, plugin config 
 and per-instance marker directories. It does not edit config, markers, plugin binaries, or
 LinuxGSM state.
 
+`status` reports valid plugin config directories separately from
+`invalid_plugin_config_entries`. `plugins list` does not follow a symlinked `plugins`
+directory, and `plugins list` / `plugins show` do not follow symlinked plugin config
+directories or symlinked/non-regular `config.json` files; they report those entries as
+invalid config state instead. This mirrors the runtime's fail-closed plugin/config loaders
+and helps operators find shared-root escapes before a restart.
+
 `instances list` includes a `persistent_posture` column derived only from marker files:
 
 - `stable`: `enable-process-event-hook` and `disable-plugins` are regular files and no

@@ -171,6 +171,10 @@ work from repository state instead of chat history.
 - Plugin config preparation rejects a symlinked per-plugin config directory before
   first-run default config creation, so default publication cannot write through a config
   symlink escape.
+- Runtime plugin discovery requires the plugin directory to already be a real non-symlink
+  directory. `PluginManager::LoadPlugins` does not create a missing plugin directory or
+  follow a symlinked plugin directory, and the read-only operator CLI mirrors that posture
+  when listing plugins/config.
 - Runtime and SDK install are treated as one compatibility unit: required artifacts are
   preflighted before runtime publication, the SDK component is staged into a temporary
   root, only expected public header/CMake package files are published, and SDK install or

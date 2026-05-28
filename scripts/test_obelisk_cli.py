@@ -36,6 +36,8 @@ class ObeliskCliTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn(f"root: {root}", result.stdout)
             self.assertIn("plugins: 0", result.stdout)
+            self.assertIn("plugin_configs: 0", result.stdout)
+            self.assertIn("invalid_plugin_config_entries: 0", result.stdout)
             self.assertIn("instances: 0", result.stdout)
             self.assertIn("invalid_instance_entries: 0", result.stdout)
 
@@ -157,6 +159,90 @@ class ObeliskCliTests(unittest.TestCase):
             self.assertIn("arkserver", result.stdout)
             self.assertIn("config_only", result.stdout)
             self.assertIn("missing", result.stdout)
+
+    def test_plugins_list_ignores_symlink_plugin_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            external_plugins = root / "external-plugins"
+            external_plugins.mkdir()
+            (external_plugins / "escaped.so").write_text("fixture", encoding="utf-8")
+            (root / "plugins").symlink_to(external_plugins)
+            (root / "config").mkdir()
+
+            result = run_cli(root, "plugins", "list")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("No plugins or plugin configs found.", result.stdout)
+            self.assertNotIn("escaped", result.stdout)
+
+    def test_plugins_list_reports_symlink_config_entry(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "plugins").mkdir()
+            config_root = root / "config"
+            config_root.mkdir()
+            external = root / "external-config"
+            external.mkdir()
+            (external / "config.json").write_text(
+                json.dumps(
+                    {
+                        "enabled": True,
+                        "allow_all_instances": True,
+                        "instance_allowlist": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (config_root / "escaped").symlink_to(external)
+
+            result = run_cli(root, "plugins", "list")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("escaped", result.stdout)
+            self.assertIn("config-dir-symlink", result.stdout)
+            self.assertNotIn("true", result.stdout.lower())
+
+    def test_plugins_show_rejects_symlink_config_entry(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config_root = root / "config"
+            config_root.mkdir()
+            external = root / "external-config"
+            external.mkdir()
+            (external / "config.json").write_text(
+                json.dumps(
+                    {
+                        "enabled": True,
+                        "allow_all_instances": True,
+                        "instance_allowlist": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (config_root / "escaped").symlink_to(external)
+
+            result = run_cli(root, "plugins", "show", "escaped")
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("config_state: config-dir-symlink", result.stdout)
+            self.assertNotIn("enabled: true", result.stdout)
+
+    def test_status_reports_invalid_plugin_config_entries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for relative in ("lib", "plugins", "config", "logs", "state/instances"):
+                (root / relative).mkdir(parents=True)
+            valid = root / "config" / "valid"
+            valid.mkdir()
+            external = root / "external-config"
+            external.mkdir()
+            (root / "config" / "escaped").symlink_to(external)
+
+            result = run_cli(root, "status")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("plugin_configs: 1", result.stdout)
+            self.assertIn("invalid_plugin_config_entries: 1", result.stdout)
 
     def test_plugins_show_reports_invalid_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

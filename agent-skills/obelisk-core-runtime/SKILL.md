@@ -29,6 +29,9 @@ Own these areas:
 - Plugin loading requires a non-empty safe `OBELISK_INSTANCE_ID` containing only letters,
   digits, `_`, or `-`; do not weaken this fail-closed guard for shared-cluster installs.
 - Keep plugin loading optional via `OBELISK_DISABLE_PLUGINS=1`.
+- Runtime plugin discovery must require `${OBELISK_ROOT}/plugins` or `OBELISK_PLUGIN_DIR`
+  to already be a real non-symlink directory. Do not create or follow the plugin directory
+  inside `PluginManager::LoadPlugins`; installers own layout creation.
 - Never use `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` plus
   `enable-native-exec-probes` as part of normal runtime validation.
 - Do not let plugin exceptions or STL types cross the C ABI boundary.
@@ -54,6 +57,9 @@ Own these areas:
 - Plugin config default creation must validate the config root and per-plugin directory
   before writing. Reject symlinked plugin config directories before first-run default
   config creation, not only before parsing an existing `config.json`.
+- Operator tooling should mirror runtime path safety: read-only CLI views must surface
+  invalid plugin/config entries and avoid following symlinked plugin directories,
+  per-plugin config directories, or `config.json` entries.
 - Owner-token callback registration is the supported path for helper-module or
   background-thread callbacks whose function pointer does not live in the plugin `.so`.
   The runtime accepts owner-token registrations from helper/background threads during

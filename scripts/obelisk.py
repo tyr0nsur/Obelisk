@@ -61,7 +61,7 @@ def list_text(value: Any) -> str:
 
 
 def iter_regular_so(plugin_dir: Path) -> list[Path]:
-    if not plugin_dir.is_dir():
+    if plugin_dir.is_symlink() or not plugin_dir.is_dir():
         return []
     return sorted(
         path
@@ -82,6 +82,12 @@ def iter_instance_entries(state_root: Path) -> list[Path]:
     if not instances_root.is_dir():
         return []
     return sorted(path for path in instances_root.iterdir() if path.is_dir() or path.is_symlink())
+
+
+def iter_plugin_config_entries(config_root: Path) -> list[Path]:
+    if not config_root.is_dir():
+        return []
+    return sorted(path for path in config_root.iterdir() if path.is_dir() or path.is_symlink())
 
 
 def marker_is_regular_file(instance_dir: Path, marker: str) -> bool:
@@ -145,9 +151,15 @@ def command_status(root: Path) -> int:
         print(f"{relative}: {state}")
 
     plugins = iter_regular_so(root / "plugins")
+    plugin_config_entries = iter_plugin_config_entries(root / "config")
+    valid_plugin_config_entries = [
+        path for path in plugin_config_entries if path.is_dir() and not path.is_symlink()
+    ]
     instances = iter_instances(root / "state")
     instance_entries = iter_instance_entries(root / "state")
     print(f"plugins: {len(plugins)}")
+    print(f"plugin_configs: {len(valid_plugin_config_entries)}")
+    print(f"invalid_plugin_config_entries: {len(plugin_config_entries) - len(valid_plugin_config_entries)}")
     print(f"instances: {len(instances)}")
     print(f"invalid_instance_entries: {len(instance_entries) - len(instances)}")
     return 0
@@ -178,7 +190,16 @@ def command_instances_list(root: Path) -> int:
 
 
 def plugin_config_summary(root: Path, plugin_id: str) -> tuple[str, str, str, str]:
-    config_path = root / "config" / plugin_id / "config.json"
+    config_dir = root / "config" / plugin_id
+    if config_dir.is_symlink():
+        return ("unknown", "unknown", "unknown", "config-dir-symlink")
+    if config_dir.exists() and not config_dir.is_dir():
+        return ("unknown", "unknown", "unknown", "config-dir-not-directory")
+    config_path = config_dir / "config.json"
+    if config_path.is_symlink():
+        return ("unknown", "unknown", "unknown", "config-file-symlink")
+    if config_path.exists() and not config_path.is_file():
+        return ("unknown", "unknown", "unknown", "config-file-not-regular")
     payload, error = safe_json_load(config_path)
     if error:
         return ("unknown", "unknown", "unknown", error)
@@ -193,12 +214,9 @@ def plugin_config_summary(root: Path, plugin_id: str) -> tuple[str, str, str, st
 
 def command_plugins_list(root: Path) -> int:
     plugin_files = iter_regular_so(root / "plugins")
-    config_dirs = []
-    config_root = root / "config"
-    if config_root.is_dir():
-        config_dirs = sorted(path for path in config_root.iterdir() if path.is_dir() and not path.is_symlink())
+    config_entries = iter_plugin_config_entries(root / "config")
 
-    names = sorted({path.stem for path in plugin_files} | {path.name for path in config_dirs})
+    names = sorted({path.stem for path in plugin_files} | {path.name for path in config_entries})
     rows: list[list[str]] = []
     for name in names:
         so_path = root / "plugins" / f"{name}.so"
@@ -222,10 +240,24 @@ def command_plugins_list(root: Path) -> int:
 
 def command_plugins_show(root: Path, plugin: str) -> int:
     so_path = root / "plugins" / f"{plugin}.so"
-    config_path = root / "config" / plugin / "config.json"
+    config_dir = root / "config" / plugin
+    config_path = config_dir / "config.json"
     print(f"plugin: {plugin}")
     print(f"published_so: {so_path if so_path.is_file() and not so_path.is_symlink() else 'missing'}")
     print(f"config: {config_path}")
+
+    if config_dir.is_symlink():
+        print("config_state: config-dir-symlink")
+        return 1
+    if config_dir.exists() and not config_dir.is_dir():
+        print("config_state: config-dir-not-directory")
+        return 1
+    if config_path.is_symlink():
+        print("config_state: config-file-symlink")
+        return 1
+    if config_path.exists() and not config_path.is_file():
+        print("config_state: config-file-not-regular")
+        return 1
 
     payload, error = safe_json_load(config_path)
     if error:

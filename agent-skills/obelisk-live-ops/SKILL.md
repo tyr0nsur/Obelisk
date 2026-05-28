@@ -23,6 +23,10 @@ Central root:
   state/instances/
 ```
 
+Managed subdirectories under the central root must be real directories, not symlinks.
+Runtime/plugin installers own layout creation, and `PluginManager` should fail closed if
+the plugin directory is missing, a symlink, or not a directory.
+
 Only the thin launcher/wrapper should live inside the ARK binary directory. Runtime
 libraries, plugin `.so` files, plugin config, logs, and state markers belong under the
 central Obelisk root.
