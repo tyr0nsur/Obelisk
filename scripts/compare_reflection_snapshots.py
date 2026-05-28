@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Any
 import re
 
+from reflection_target_sets import TARGET_SETS
+
 
 SUPPORTED_SCHEMAS = {
     "obelisk.ufunction-chain.snapshot.v1",
@@ -39,57 +41,6 @@ EVIDENCE_ARTIFACT_IDENTITY_KEYS = (
     "evidence_pack_id",
 )
 ALLOWED_ARTIFACT_KINDS = {"offline_core"}
-TARGET_SETS = {
-    "buff-compact-intake": (
-        "obelisk.ufunction-chain.snapshot.v1:PrimalBuff.AllowPostProcessEffect",
-        "obelisk.ufunction-chain.snapshot.v1:PrimalBuff.BPBuffPreventUploading",
-        "obelisk.ufunction-chain.snapshot.v1:PrimalBuff.BP_OnBuffLifetimeUpdated",
-    ),
-    "dino-compact-intake": (
-        "obelisk.ufunction-chain.snapshot.v1:PrimalDinoCharacter.AddPassenger",
-        "obelisk.ufunction-chain.snapshot.v1:PrimalDinoCharacter.AllowCarryCharacter",
-    ),
-    "mission-compact-intake": (
-        "obelisk.ufunction-chain.snapshot.v1:MissionType.AddPlayerToMission",
-        "obelisk.ufunction-chain.snapshot.v1:MissionType.BPAllowPlayerToLeaveMission",
-        "obelisk.ufunction-chain.snapshot.v1:MissionType.BPOnPlayerRemovedFromMission",
-        "obelisk.ufunction-chain.snapshot.v1:MissionType.GetPlayerUsableItems",
-    ),
-    "minimal-second-source-intake": (
-        "obelisk.ufunction-chain.snapshot.v1:PrimalItem.CanUse",
-        "obelisk.ufunction-chain.snapshot.v1:PrimalItem.AllowRemoteAddToInventory",
-        "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.AllowStructureAccess",
-        "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToDemolish",
-    ),
-    "structure-observer-intake": (
-        "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.AllowStructureAccess",
-        "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToDemolish",
-        "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.SetVariant",
-        "obelisk.ufunction-chain.snapshot.v1:PrimalStructureItemContainer.AllowToggleActivation",
-        "obelisk.ufunction-chain.snapshot.v1:PrimalStructureItemContainer.VerifyPinCode",
-        "obelisk.ufunction-chain.snapshot.v1:PrimalStructureSeating.CanSeat",
-    ),
-    "transfer-ufunction-intake": (
-        "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerDownloadTransferredPlayer",
-        "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerTransferredPlayerConfirmationResult",
-        "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerUploadCurrentCharacterAndItems",
-        "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerUploadDino",
-        "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerState.ServerRequestSpawnPointsForDownloadedCharacters",
-        "obelisk.ufunction-chain.snapshot.v1:ShooterGameState.AllowDownloadDino",
-        "obelisk.ufunction-chain.snapshot.v1:PrimalDinoCharacter.IsAllowedToTransfer",
-    ),
-    "tribe-compact-intake": (
-        "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerRequestTribeLog",
-        "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.AllowTribeGroupPermission",
-        "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.IsInTribe",
-        "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ClientReceiveMyTribeOnlineList",
-        "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ClientReceiveActiveMissionTags",
-    ),
-    "transfer-scriptstruct": (
-        "obelisk.scriptstruct-chain.snapshot.v1:PrimalLocalProfile.ARKTributeDino",
-        "obelisk.scriptstruct-chain.snapshot.v1:PrimalLocalProfile.ArkTributePlayerData",
-    ),
-}
 
 
 def parse_args() -> argparse.Namespace:

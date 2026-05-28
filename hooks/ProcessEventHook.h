@@ -8,6 +8,6 @@ namespace Obelisk::Hooks
         static void Install();
         static void CallOriginalProcessEvent(void* object, void* function, void* params);
         static bool IsInstalled();
-        static void Remove();
+        static bool Remove();
     };
 }

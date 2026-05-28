@@ -152,6 +152,40 @@ class RegenerateScriptStructSnapshotsTests(unittest.TestCase):
         self.assertEqual(payload["evidence"]["capture_id"], "second-core")
         self.assertEqual(payload["evidence"]["evidence_pack_id"], "second-pack")
 
+    def test_target_set_expands_named_scriptstruct_targets(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            manifest = root / "manifest.json"
+            output_root = root / "out"
+            addrs = build_core_fixture(core)
+            self.write_manifest(manifest)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "regenerate_scriptstruct_snapshots.py"),
+                    "--core",
+                    str(core),
+                    "--manifest",
+                    str(manifest),
+                    "--output-root",
+                    str(output_root),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--target-set",
+                    "transfer-scriptstruct",
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("PrimalLocalProfile.ARKTributeDino", result.stderr)
+        self.assertIn("PrimalLocalProfile.ArkTributePlayerData", result.stderr)
+
     def test_empty_manifest_is_allowed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

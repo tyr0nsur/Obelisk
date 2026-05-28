@@ -41,7 +41,8 @@ If the plugin should not load, do not place it in `/servidor/ark/obelisk/plugins
 On a clustered install, that directory is shared discovery scope: every instance that
 restarts can discover the `.so`, read metadata, and prepare config. Use
 `instance_allowlist` to restrict which ARK server instances may initialize the plugin after
-restart. An enabled config with an empty allowlist stays skipped unless
+restart. Allowlist entries must be safe `OBELISK_INSTANCE_ID` values using only letters,
+digits, `_`, or `-`. An enabled config with an empty allowlist stays skipped unless
 `allow_all_instances` is set to `true` explicitly.
 
 ## Config

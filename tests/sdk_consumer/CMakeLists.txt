@@ -88,3 +88,8 @@ add_test(
     NAME SdkConsumerFixtureOBaseEventsRejectsInvalidProcessEventConfig
     COMMAND sdk_consumer_fixture "$<TARGET_FILE:oBaseEvents>" oBaseEvents invalid-process-event-config
 )
+
+add_test(
+    NAME SdkConsumerFixtureOBaseEventsRejectsUnsafeInstanceAllowlist
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oBaseEvents>" oBaseEvents unsafe-instance-allowlist
+)

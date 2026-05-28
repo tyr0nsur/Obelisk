@@ -92,6 +92,8 @@ work from repository state instead of chat history.
   second-source checks for one UFunction or ScriptStruct without preparing a separate
   fixture root. Use `--list-target-sets` to print named intakes such as
   `minimal-second-source-intake` and `transfer-scriptstruct`.
+- UFunction and ScriptStruct snapshot regenerators also accept the shared `--target-set`
+  names from `scripts/reflection_target_sets.py`, matching comparison/readiness tooling.
 - Second-source comparison now requires sanitized artifact identity in both roots:
   `artifact_kind`, `artifact_sha256`, `capture_id`, and `evidence_pack_id`. Missing or
   matching identity is `inconclusive`, so self-comparison cannot pass as independent
@@ -140,6 +142,11 @@ work from repository state instead of chat history.
 - `oBaseEvents` requires owner-token callback handle support when its ProcessEvent example
   is enabled. Do not reintroduce legacy filtered registration fallback without an explicit
   unregister handle.
+- `oBaseEvents` also defensively rejects unsafe `instance_allowlist` entries in direct SDK
+  consumer validation, matching the runtime/config safe instance-id contract.
+- `ProcessEventHook::Remove()` must stay fail-closed: removal failures preserve hook
+  state/trampoline ownership and report failure instead of clearing state while patched
+  bytes may still execute.
 - Public plugin examples and first-party fixtures must copy the `ObeliskApi` table by value
   if they need runtime functions after `ObeliskPlugin_Init`; the init `ObeliskApi*` and
   `ObeliskPluginInitContext*` are borrowed only for init. Metadata strings returned by
@@ -304,6 +311,10 @@ work from repository state instead of chat history.
   `AllowToggleActivation`, `VerifyPinCode`, and `CanSeat`. Current committed base
   fixtures cover all six with zero blocked base targets; second-source evidence is still
   missing for each.
+- `docs/research/2026-05-28-second-source-core-intake-runbook.md` is the minimal
+  approved-artifact path for second-source UE4 reflection evidence: build the core pack,
+  verify per-artifact FName/GObjects data, regenerate `minimal-second-source-intake`, and
+  require four accepted targets with distinct artifact identity before promotion.
 - For new second-source artifacts, do not reuse the primary-core FName root slot by
   default. First derive or scan a verified per-artifact FName root/table, then pass it
   explicitly to UObjects/UFunction/ScriptStruct tools. UFunction and ScriptStruct

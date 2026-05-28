@@ -205,7 +205,15 @@ namespace Obelisk::Hooks
 
         __builtin___clear_cache(reinterpret_cast<char*>(targetBytes),
                                 reinterpret_cast<char*>(targetBytes + kPatchSize));
-        MakeReadableExecutable(target, kPatchSize);
+        if (!MakeReadableExecutable(target, kPatchSize))
+        {
+            std::memcpy(targetBytes, hook.OriginalBytes.data(), hook.OriginalBytes.size());
+            __builtin___clear_cache(reinterpret_cast<char*>(targetBytes),
+                                    reinterpret_cast<char*>(targetBytes + kPatchSize));
+            munmap(trampoline, kTrampolineSize);
+            hook = {};
+            return false;
+        }
 
         hook.Trampoline = trampoline;
         hook.Installed = true;
@@ -243,21 +251,30 @@ namespace Obelisk::Hooks
         return reinterpret_cast<ProcessEvent_t>(s_ProcessEventHook.Trampoline);
     }
 
-    static void RemoveAbsoluteHook(AbsoluteHook& hook)
+    static bool RemoveAbsoluteHook(AbsoluteHook& hook)
     {
         {
             std::lock_guard<std::mutex> lock(s_ProcessEventHookMutex);
             if (!hook.Installed || !hook.Target)
-                return;
+                return true;
 
             s_RemovingProcessEventHook.store(true, std::memory_order_release);
 
-            if (MakeWritableExecutable(hook.Target, kPatchSize))
+            if (!MakeWritableExecutable(hook.Target, kPatchSize))
             {
-                std::memcpy(hook.Target, hook.OriginalBytes.data(), hook.OriginalBytes.size());
-                __builtin___clear_cache(reinterpret_cast<char*>(hook.Target),
-                                        reinterpret_cast<char*>(static_cast<uint8_t*>(hook.Target) + kPatchSize));
-                MakeReadableExecutable(hook.Target, kPatchSize);
+                s_RemovingProcessEventHook.store(false, std::memory_order_release);
+                OBELISK_CRITICAL("ProcessEvent hook removal failed: target page could not be made writable; hook state preserved.");
+                return false;
+            }
+
+            std::memcpy(hook.Target, hook.OriginalBytes.data(), hook.OriginalBytes.size());
+            __builtin___clear_cache(reinterpret_cast<char*>(hook.Target),
+                                    reinterpret_cast<char*>(static_cast<uint8_t*>(hook.Target) + kPatchSize));
+            if (!MakeReadableExecutable(hook.Target, kPatchSize))
+            {
+                s_RemovingProcessEventHook.store(false, std::memory_order_release);
+                OBELISK_CRITICAL("ProcessEvent hook removal failed: restored target page could not be made RX; hook state and trampoline preserved.");
+                return false;
             }
         }
 
@@ -274,6 +291,7 @@ namespace Obelisk::Hooks
             hook = {};
             s_RemovingProcessEventHook.store(false, std::memory_order_release);
         }
+        return true;
     }
 
     static uint64_t GetTraceLimit()
@@ -972,9 +990,13 @@ namespace Obelisk::Hooks
         return s_ProcessEventHook.Installed;
     }
 
-    void ProcessEventHook::Remove()
+    bool ProcessEventHook::Remove()
     {
-        RemoveAbsoluteHook(s_ProcessEventHook);
-        OBELISK_INFO("ProcessEvent hook removed.");
+        const bool removed = RemoveAbsoluteHook(s_ProcessEventHook);
+        if (removed)
+            OBELISK_INFO("ProcessEvent hook removed.");
+        else
+            OBELISK_CRITICAL("ProcessEvent hook removal did not complete; leaving hook state installed for safety.");
+        return removed;
     }
 }

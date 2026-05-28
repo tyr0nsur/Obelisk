@@ -104,6 +104,18 @@ namespace
     }
 })json";
 
+    constexpr const char* kUnsafeInstanceAllowlistConfig = R"json({
+    "enabled": true,
+    "log_level": "info",
+    "allow_all_instances": false,
+    "instance_allowlist": ["../sdk-consumer-test"],
+    "process_event": {
+        "enabled": true,
+        "filtered_function_index": 42,
+        "log_limit": 1
+    }
+})json";
+
     std::filesystem::path CreateConfigDir(const char* defaultConfigJson)
     {
         char templatePath[] = "/tmp/obelisk-sdk-consumer.XXXXXX";
@@ -181,6 +193,8 @@ int main(int argc, char** argv)
             configJson = kUnsupportedMapAllowlistConfig;
         else if (mode == "invalid-process-event-config")
             configJson = kInvalidProcessEventConfig;
+        else if (mode == "unsafe-instance-allowlist")
+            configJson = kUnsafeInstanceAllowlistConfig;
         std::filesystem::path configDir = CreateConfigDir(configJson);
         const auto cleanupConfigDir = [&configDir]() {
             if (!configDir.empty())
@@ -254,6 +268,15 @@ int main(int argc, char** argv)
         if (mode == "invalid-process-event-config")
         {
             Require(!initSucceeded, "oBaseEvents accepted enabled ProcessEvent config without a valid filtered index");
+            Require(g_RegisterCount == 0, "rejected oBaseEvents unexpectedly registered a callback");
+            Require(g_UnregisterCount == 0, "rejected oBaseEvents unexpectedly unregistered a callback");
+            cleanupConfigDir();
+            closeHandle();
+            return 0;
+        }
+        if (mode == "unsafe-instance-allowlist")
+        {
+            Require(!initSucceeded, "oBaseEvents accepted unsafe instance_allowlist entry");
             Require(g_RegisterCount == 0, "rejected oBaseEvents unexpectedly registered a callback");
             Require(g_UnregisterCount == 0, "rejected oBaseEvents unexpectedly unregistered a callback");
             cleanupConfigDir();

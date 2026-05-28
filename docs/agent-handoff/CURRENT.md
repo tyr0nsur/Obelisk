@@ -110,6 +110,11 @@ Updated: 2026-05-28
   `allow-experimental-observers`, `enable-inventory-reflection`, env/SHA, and explicit
   non-zero budget gates. It logs metadata only, filters exact inventory FNames before
   reserving budget, and has no public SDK callback or gameplay mutation path.
+- fact: `docs/research/2026-05-28-second-source-core-intake-runbook.md` defines the
+  minimal approved-artifact path for second-source UE4 reflection evidence:
+  build an evidence pack, verify per-artifact FName/GObjects data, regenerate only
+  `minimal-second-source-intake`, then compare against committed fixtures. Promotion stays
+  blocked without distinct artifact identity and four accepted targets.
 - fact: Chat, inventory, and structure ProcessEvent observers all require runtime-side
   env+instance-marker gates plus `OBELISK_WRAPPER_PROFILE=observer-debug`,
   `allow-observer-debug-window`, `allow-experimental-observers`, and binary SHA validation
@@ -149,6 +154,12 @@ Updated: 2026-05-28
 - fact: `oBaseEvents` now treats the owner-token callback handle API as required when its
   ProcessEvent example is enabled. It rejects null or too-small init contexts and no
   longer falls back to legacy filtered registration without an explicit unregister handle.
+- fact: `oBaseEvents` mirrors the runtime/config safe instance-id contract in its own
+  defensive config parser; direct SDK consumer validation rejects unsafe
+  `instance_allowlist` entries before callback registration.
+- fact: `ProcessEventHook::Remove()` returns/reports failure when
+  restore or RX reprotection fails, preserving hook state/trampoline ownership instead of
+  clearing state and claiming removal. Future hook changes must keep removal fail-closed.
 - fact: Contributor-facing organization is intentionally lightweight: `main` plus
   short-lived topic branches, current source directories kept stable, agent-only process
   moved out of contributor workflow, SDK install/package validation documented, and the
@@ -478,6 +489,10 @@ Updated: 2026-05-28
   ScriptStruct `--check-layout` runs require full artifact identity plus explicit
   `--fname-root-slot`. They ignore unstable identity/evidence indices while preserving
   target identity, reflected fields, and property-chain layout drift.
+- fact: UFunction and ScriptStruct snapshot regenerators accept shared `--target-set`
+  names from `scripts/reflection_target_sets.py`, matching
+  `compare_reflection_snapshots.py`. Use this for minimal second-source intake instead of
+  manually repeating target lists.
 - fact: UFunction and ScriptStruct snapshot regenerators accept sanitized artifact
   identity flags (`--artifact-kind`, `--artifact-sha256`, `--capture-id`,
   `--evidence-pack-id`) for second-source evidence packs. The committed primary fixtures

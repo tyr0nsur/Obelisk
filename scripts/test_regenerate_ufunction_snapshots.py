@@ -141,6 +141,42 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
         self.assertIn("would write", result.stdout)
         self.assertFalse(output.exists())
 
+    def test_target_set_expands_named_ufunction_targets(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            manifest = root / "manifest.json"
+            output_root = root / "out"
+            addrs = build_core_fixture(core)
+            self.write_manifest(manifest)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "regenerate_ufunction_snapshots.py"),
+                    "--core",
+                    str(core),
+                    "--manifest",
+                    str(manifest),
+                    "--output-root",
+                    str(output_root),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--target-set",
+                    "minimal-second-source-intake",
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("would write", result.stdout)
+        self.assertIn("PrimalItem.CanUse", result.stderr)
+        self.assertIn("PrimalItem.AllowRemoteAddToInventory", result.stderr)
+        self.assertIn("PrimalStructure.IsAllowedToDemolish", result.stderr)
+
     def test_write_generates_sanitized_snapshot_from_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

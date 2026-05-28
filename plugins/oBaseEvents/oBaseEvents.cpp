@@ -2,6 +2,7 @@
 #include <obelisk/ObeliskApi.h>
 
 #include <atomic>
+#include <cctype>
 #include <cstdint>
 #include <exception>
 #include <filesystem>
@@ -44,6 +45,35 @@ namespace
         for (const auto& entry : value)
         {
             if (!entry.is_string())
+                return false;
+        }
+
+        return true;
+    }
+
+    bool IsSafeInstanceId(const std::string& value)
+    {
+        if (value.empty())
+            return false;
+
+        for (const unsigned char ch : value)
+        {
+            if (std::isalnum(ch) || ch == '_' || ch == '-')
+                continue;
+            return false;
+        }
+
+        return true;
+    }
+
+    bool IsSafeInstanceAllowlist(const json& value)
+    {
+        if (!IsStringArray(value))
+            return false;
+
+        for (const auto& entry : value)
+        {
+            if (!IsSafeInstanceId(entry.get<std::string>()))
                 return false;
         }
 
@@ -95,7 +125,7 @@ namespace
         if (allowlist == config.end() || allowlist->empty())
             return false;
 
-        if (!IsStringArray(*allowlist))
+        if (!IsSafeInstanceAllowlist(*allowlist))
             return false;
 
         const std::string current = instanceId ? instanceId : "";
@@ -165,9 +195,9 @@ namespace
             return false;
         }
 
-        if (config.contains("instance_allowlist") && !IsStringArray(config["instance_allowlist"]))
+        if (config.contains("instance_allowlist") && !IsSafeInstanceAllowlist(config["instance_allowlist"]))
         {
-            SafeLogError("[oBaseEvents] Config field instance_allowlist must be an array of strings.");
+            SafeLogError("[oBaseEvents] Config field instance_allowlist must be an array of safe instance ids.");
             return false;
         }
 

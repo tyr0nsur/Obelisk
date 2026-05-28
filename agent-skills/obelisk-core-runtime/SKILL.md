@@ -110,6 +110,11 @@ mov rax, imm64; jmp rax
 
 This is required because `jmp rel32` can fail when `ShooterGameServer` is mapped low and `libobelisk.so` is mapped high.
 
+Hook removal is fail-closed. If target restore or RX reprotection fails, keep hook state
+and trampoline ownership intact, return/report failure, and do not claim the hook was
+removed. Bootstrap or shutdown recovery must preserve enough state for retry or diagnosis
+instead of clearing the hook while patched bytes may still execute.
+
 ## Safe Runtime Validation
 
 Do not treat any shared or player-facing ARK instance as a validation target by default.

@@ -17,6 +17,7 @@ REPO_ROOT = SCRIPT_DIR.parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
 import inspect_core_ufunctions as inspector  # noqa: E402
+from reflection_target_sets import TARGET_SETS, expand_schema_target_sets  # noqa: E402
 from snapshot_evidence_pack import evidence_pack_defaults, merge_manifest_default  # noqa: E402
 
 
@@ -76,6 +77,13 @@ def parse_args() -> argparse.Namespace:
         help="GObjects candidate label to read from --evidence-pack-manifest when the pack has multiple candidates.",
     )
     parser.add_argument("--target", action="append", default=[], help="Only process exact Outer.Name target. Repeatable.")
+    parser.add_argument(
+        "--target-set",
+        action="append",
+        default=[],
+        choices=sorted(TARGET_SETS),
+        help="Process every ScriptStruct target in a named reflection snapshot target set. Repeatable.",
+    )
     parser.add_argument("--write", action="store_true", help="Write fixtures. Default is dry-run.")
     parser.add_argument("--check", action="store_true", help="Generate to temp files and fail if committed fixtures differ.")
     parser.add_argument(
@@ -388,6 +396,7 @@ def main() -> int:
     )
     gobjects = args.gobjects if args.gobjects is not None else inspector.uobjects.DEFAULT_GOBJECTS
     filters = set(args.target)
+    filters.update(expand_schema_target_sets(args.target_set, SNAPSHOT_SCHEMA))
     processed = 0
     failures: list[str] = []
 
