@@ -329,6 +329,10 @@ Updated: 2026-05-28
   bridge. It dispatches copied scalar-only structure event views, rejects unknown event or
   scalar shapes, supports owner cleanup/self-unregister, waits for in-flight callbacks, and
   exposes no public ABI or plugin SDK surface yet.
+- fact: `PluginManager` now sweeps `StructureEventDispatcher` owner callbacks on init
+  failure and unload alongside `EventManager` and `ChatEventDispatcher`; regression
+  coverage verifies structure callbacks remain visible to plugin shutdown but are gone
+  before `dlclose`.
 - fact: `ProcessEventStructureReflection::TryBuildCopiedStructureEvent` converts a matched
   `StructureInvocation` into copied scalar-only `StructureEventView` storage. Tests verify
   that `VerifyPinCode` omits sensitive pin values, object params are not copied, and

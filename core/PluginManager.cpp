@@ -1,6 +1,7 @@
 #include "PluginManager.h"
 #include "EventManager.h"
 #include "PluginConfig.h"
+#include "StructureEventDispatcher.h"
 #include "hooks/ProcessEventHook.h"
 #include "runtime/Logger.h"
 #include "runtime/RuntimeMarkers.h"
@@ -645,11 +646,14 @@ namespace Obelisk::Core
     {
         const size_t eventRemoved = EventManager::Get().UnregisterCallbacksForOwner(owner);
         const size_t chatRemoved = m_ChatDispatcher->UnregisterCallbacksForOwner(owner);
+        const size_t structureRemoved = StructureEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
 
         if (eventRemoved > 0)
             OBELISK_INFO("Removed {} ProcessEvent callback(s) registered by plugin {} {}.", eventRemoved, pluginName, reason);
         if (chatRemoved > 0)
             OBELISK_INFO("Removed {} chat callback(s) registered by plugin {} {}.", chatRemoved, pluginName, reason);
+        if (structureRemoved > 0)
+            OBELISK_INFO("Removed {} structure callback(s) registered by plugin {} {}.", structureRemoved, pluginName, reason);
     }
 
     bool PluginManager::IsPluginIdLoaded(const std::string& pluginId) const

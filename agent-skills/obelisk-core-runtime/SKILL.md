@@ -86,9 +86,9 @@ Own these areas:
 - Public and internal callback handles or owner tokens must never use `0` as a successful
   value and must not reuse currently-live IDs after counter wrap. `0` remains the failure
   sentinel across plugin-facing registration APIs.
-- Keep plugin-owned lifecycle cleanup shared across `EventManager` and the internal
-  `ChatEventDispatcher`; future event families must join the same owner cleanup path before
-  any public SDK exposure.
+- Keep plugin-owned lifecycle cleanup shared across `EventManager`, the internal
+  `ChatEventDispatcher`, and `StructureEventDispatcher`; future event families must join
+  the same owner cleanup path before any public SDK exposure.
 - Preserve optional plugin shutdown ordering: call `ObeliskPlugin_Shutdown()` before
   plugin-owned callback cleanup and before `dlclose`.
 - Follow `docs/PLUGIN_ARCHITECTURE.md` before adding plugin examples or promoting

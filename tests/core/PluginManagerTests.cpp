@@ -1,6 +1,7 @@
 #include "core/ChatEventDispatcher.h"
 #include "core/EventManager.h"
 #include "core/PluginManager.h"
+#include "core/StructureEventDispatcher.h"
 #include "runtime/Logger.h"
 
 #include <chrono>
@@ -44,6 +45,7 @@ namespace
         bool registerNullFilteredCallback = false;
         bool registerOwnerTokenFromInitThread = false;
         bool registerChatCallback = false;
+        bool registerStructureCallback = false;
         bool callProcessEventInInit = false;
         bool registerOwnerTokenCallbackInShutdown = false;
         bool unregisterOwnerTokenCallbackInShutdown = false;
@@ -71,6 +73,8 @@ namespace
         bool eventCallbacksAtShutdown = false;
         size_t chatSubscriptionsAtShutdown = 0;
         size_t chatSubscriptionsAtClose = 0;
+        size_t structureSubscriptionsAtShutdown = 0;
+        size_t structureSubscriptionsAtClose = 0;
     };
 
     FakePlugin* g_CurrentFakePlugin = nullptr;
@@ -87,6 +91,10 @@ namespace
     }
 
     void FakeChatCallback(const Obelisk::Core::ChatMessageView&, void*)
+    {
+    }
+
+    void FakeStructureCallback(const Obelisk::Core::StructureEventView&, void*)
     {
     }
 
@@ -179,6 +187,14 @@ namespace
             Require(registrationId != 0, "fake chat callback registration failed");
         }
 
+        if (g_CurrentFakePlugin->registerStructureCallback)
+        {
+            const uint64_t registrationId = Obelisk::Core::StructureEventDispatcher::Get().Register(
+                g_CurrentFakePlugin->owner,
+                Obelisk::Core::StructureEventSubscription{FakeStructureCallback, g_CurrentFakePlugin});
+            Require(registrationId != 0, "fake structure callback registration failed");
+        }
+
         if (g_CurrentFakePlugin->callProcessEventInInit)
             api->CallProcessEvent(reinterpret_cast<void*>(0x1), reinterpret_cast<void*>(0x2), reinterpret_cast<void*>(0x3));
 
@@ -206,6 +222,8 @@ namespace
         if (g_CurrentFakePlugin->chatDispatcher)
             g_CurrentFakePlugin->chatSubscriptionsAtShutdown =
                 g_CurrentFakePlugin->chatDispatcher->SubscriptionCount();
+        g_CurrentFakePlugin->structureSubscriptionsAtShutdown =
+            Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount();
         ++g_CurrentFakePlugin->shutdownCalls;
         if (g_CurrentFakePlugin->registerOwnerTokenCallbackInShutdown)
         {
@@ -274,6 +292,8 @@ namespace
             auto* plugin = static_cast<FakePlugin*>(handle);
             if (plugin->chatDispatcher)
                 plugin->chatSubscriptionsAtClose = plugin->chatDispatcher->SubscriptionCount();
+            plugin->structureSubscriptionsAtClose =
+                Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount();
             ++plugin->closeCalls;
             if (plugin->orderLog)
                 plugin->orderLog->push_back("close:" + plugin->filename);
@@ -325,6 +345,7 @@ namespace
         Obelisk::Core::EventManager::Get().UnregisterCallbacksForOwner(plugin.owner);
         if (plugin.chatDispatcher)
             plugin.chatDispatcher->UnregisterCallbacksForOwner(plugin.owner);
+        Obelisk::Core::StructureEventDispatcher::Get().UnregisterCallbacksForOwner(plugin.owner);
         g_CurrentFakePlugin = nullptr;
     }
 
@@ -1537,6 +1558,7 @@ namespace
             .registerFilteredCallback = true,
             .registerOwnerTokenFromInitThread = true,
             .registerChatCallback = true,
+            .registerStructureCallback = true,
             .throwOnShutdown = true,
         };
         Obelisk::Core::ChatEventDispatcher chatDispatcher;
@@ -1554,6 +1576,8 @@ namespace
                 "shutdown-throw plugin ProcessEvent callbacks were not registered");
         Require(chatDispatcher.SubscriptionCount() == 1,
                 "shutdown-throw plugin chat callback was not registered");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 1,
+                "shutdown-throw plugin structure callback was not registered");
 
         manager.UnloadAll();
         manager.UnloadAll();
@@ -1563,13 +1587,19 @@ namespace
                 "shutdown-throw plugin ProcessEvent callbacks were removed before shutdown");
         Require(plugin.chatSubscriptionsAtShutdown == 1,
                 "shutdown-throw plugin chat callback was removed before shutdown");
+        Require(plugin.structureSubscriptionsAtShutdown == 1,
+                "shutdown-throw plugin structure callback was removed before shutdown");
         Require(plugin.closeCalls == 1, "shutdown-throw plugin was not closed once");
         Require(plugin.chatSubscriptionsAtClose == 0,
                 "shutdown-throw plugin chat callback was still registered at dlclose");
+        Require(plugin.structureSubscriptionsAtClose == 0,
+                "shutdown-throw plugin structure callback was still registered at dlclose");
         Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
                 "shutdown-throw plugin ProcessEvent callbacks survived unload");
         Require(chatDispatcher.SubscriptionCount() == 0,
                 "shutdown-throw plugin chat callback survived unload");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
+                "shutdown-throw plugin structure callback survived unload");
 
         CleanupPlugin(plugin);
         fs::remove_all(root);

@@ -156,6 +156,7 @@ add_test(NAME StructureEventDispatcherTests COMMAND structure_event_dispatcher_t
 add_executable(plugin_manager_tests
     tests/core/PluginManagerTests.cpp
     core/ChatEventDispatcher.cpp
+    core/StructureEventDispatcher.cpp
     core/EventManager.cpp
     core/PluginConfig.cpp
     core/PluginManager.cpp

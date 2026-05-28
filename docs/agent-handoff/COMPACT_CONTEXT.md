@@ -368,7 +368,9 @@ work from repository state instead of chat history.
   rejected before any runtime promotion claim.
 - `core/StructureEventDispatcher` is an internal copied scalar-only bridge for future
   structure events. It has owner cleanup, self-unregister, in-flight cleanup wait, unknown
-  shape rejection, and copied-storage tests; it is not public ABI/plugin SDK.
+  shape rejection, and copied-storage tests; it is not public ABI/plugin SDK. `PluginManager`
+  sweeps it on init failure and unload alongside `EventManager` and `ChatEventDispatcher`,
+  with regression coverage that callbacks are gone before `dlclose`.
 - `ProcessEventStructureReflection::TryBuildCopiedStructureEvent` turns matched structure
   recognizer output into copied scalar-only event storage. Sensitive pin values and object
   params are omitted; `SetVariant`/`CanSeat` scalars are copied in hook-side tests.
