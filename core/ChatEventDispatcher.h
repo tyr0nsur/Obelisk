@@ -41,6 +41,7 @@ namespace Obelisk::Core
         uint64_t Register(void* owner, const ChatMessageSubscription& subscription);
         bool Unregister(uint64_t registrationId);
         size_t UnregisterCallbacksForOwner(void* owner);
+        void SetNextRegistrationIdForTesting(uint64_t nextRegistrationId);
 
         size_t Dispatch(const ChatMessageView& message);
         size_t SubscriptionCount() const;
@@ -52,6 +53,9 @@ namespace Obelisk::Core
             void* Owner = nullptr;
             ChatMessageSubscription Subscription;
         };
+
+        uint64_t AllocateRegistrationId();
+        bool HasRegistrationId(uint64_t registrationId) const;
 
         mutable std::mutex m_Mutex;
         std::recursive_mutex m_DispatchMutex;

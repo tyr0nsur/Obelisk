@@ -29,6 +29,7 @@ namespace Obelisk::Core
         void LoadPlugins(const std::string& directory);
         void UnloadAll();
         uint64_t ApiCapabilitiesForTesting() const;
+        static void SetNextPluginOwnerTokenForTesting(uint64_t nextOwnerToken);
 
     private:
         struct PluginInfo {

@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -374,6 +375,61 @@ namespace
         Require(chatDispatcher.SubscriptionCount() == 0, "owned chat callback survived plugin unload");
 
         CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestPluginOwnerTokensSkipZeroAndLiveTokensAfterWrap()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_owner_token_wrap");
+        ConfigureEnvironment(root);
+
+        FakePlugin first{
+            .filename = "owner_token_a.so",
+            .pluginId = "owner_token_a",
+        };
+        FakePlugin second{
+            .filename = "owner_token_b.so",
+            .pluginId = "owner_token_b",
+        };
+        FakePlugin third{
+            .filename = "owner_token_c.so",
+            .pluginId = "owner_token_c",
+        };
+        FakeLoader loader;
+        loader.Add(first);
+        loader.Add(second);
+        loader.Add(third);
+        TouchPlugin(root, first.filename);
+        WritePluginConfig(root, first.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        Obelisk::Core::PluginManager::SetNextPluginOwnerTokenForTesting(1);
+        manager.LoadPlugins((root / "plugins").string());
+        Require(first.initOwnerToken == 1, "first plugin owner token was not one");
+
+        TouchPlugin(root, second.filename);
+        TouchPlugin(root, third.filename);
+        WritePluginConfig(root, second.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+        WritePluginConfig(root, third.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager::SetNextPluginOwnerTokenForTesting(std::numeric_limits<uint64_t>::max());
+        manager.LoadPlugins((root / "plugins").string());
+
+        const std::vector<uint64_t> wrappedTokens{second.initOwnerToken, third.initOwnerToken};
+        Require(second.initOwnerToken != 0, "second plugin owner token was zero after wrap");
+        Require(third.initOwnerToken != 0, "third plugin owner token was zero after wrap");
+        Require(second.initOwnerToken != third.initOwnerToken, "wrapped owner tokens were duplicated");
+        Require(second.initOwnerToken != first.initOwnerToken, "second plugin reused a live owner token");
+        Require(third.initOwnerToken != first.initOwnerToken, "third plugin reused a live owner token");
+        Require(
+            (wrappedTokens[0] == std::numeric_limits<uint64_t>::max() && wrappedTokens[1] == 2) ||
+                (wrappedTokens[1] == std::numeric_limits<uint64_t>::max() && wrappedTokens[0] == 2),
+            "wrapped owner tokens did not preserve max token and skip live token one");
+
+        manager.UnloadAll();
+        CleanupPlugin(first);
+        CleanupPlugin(second);
+        CleanupPlugin(third);
         fs::remove_all(root);
     }
 
@@ -1265,6 +1321,7 @@ int main()
     Obelisk::Logger::Init();
 
     TestValidPluginLoadsAndUnloadCleansCallbacks();
+    TestPluginOwnerTokensSkipZeroAndLiveTokensAfterWrap();
     TestGlobalProcessEventCallbackRejectedByDefault();
     TestFilteredProcessEventCallbackAllowedByDefault();
     TestPostInitUnownedCallbackRegistrationIsRejected();

@@ -27,11 +27,29 @@ namespace Obelisk::Core
             return 0;
 
         std::lock_guard<std::mutex> lock(m_Mutex);
-        const uint64_t id = m_NextRegistrationId++;
-        if (m_NextRegistrationId == 0)
-            m_NextRegistrationId = 1;
+        const uint64_t id = AllocateRegistrationId();
         m_Registrations.push_back({id, owner, subscription});
         return id;
+    }
+
+    uint64_t ChatEventDispatcher::AllocateRegistrationId()
+    {
+        uint64_t id = 0;
+        do
+        {
+            id = m_NextRegistrationId++;
+            if (m_NextRegistrationId == 0)
+                m_NextRegistrationId = 1;
+        } while (id == 0 || HasRegistrationId(id));
+
+        return id;
+    }
+
+    bool ChatEventDispatcher::HasRegistrationId(uint64_t registrationId) const
+    {
+        return std::any_of(m_Registrations.begin(), m_Registrations.end(), [registrationId](const Registration& item) {
+            return item.Id == registrationId;
+        });
     }
 
     bool ChatEventDispatcher::Unregister(uint64_t registrationId)
@@ -68,6 +86,12 @@ namespace Obelisk::Core
                            }),
             m_Registrations.end());
         return before - m_Registrations.size();
+    }
+
+    void ChatEventDispatcher::SetNextRegistrationIdForTesting(uint64_t nextRegistrationId)
+    {
+        std::lock_guard<std::mutex> lock(m_Mutex);
+        m_NextRegistrationId = nextRegistrationId == 0 ? 1 : nextRegistrationId;
     }
 
     size_t ChatEventDispatcher::Dispatch(const ChatMessageView& message)

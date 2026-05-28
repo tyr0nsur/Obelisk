@@ -4,6 +4,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <iostream>
+#include <limits>
 #include <mutex>
 #include <stdexcept>
 #include <string>
@@ -102,6 +103,29 @@ namespace
         Require(dispatcher.Unregister(id), "first unregister failed");
         Require(!dispatcher.Unregister(id), "second unregister was not idempotent");
         Require(dispatcher.Dispatch(MakeMessage()) == 0, "unregistered callback ran");
+    }
+
+    void TestRegistrationIdsSkipZeroAndLiveIdsAfterWrap()
+    {
+        Obelisk::Core::ChatEventDispatcher dispatcher;
+        int owner = 0;
+        Capture capture;
+
+        const uint64_t firstId = dispatcher.Register(&owner, {CaptureCallback, &capture});
+        Require(firstId == 1, "first registration id was not one");
+
+        dispatcher.SetNextRegistrationIdForTesting(std::numeric_limits<uint64_t>::max());
+        const uint64_t lastId = dispatcher.Register(&owner, {CaptureCallback, &capture});
+        const uint64_t wrappedId = dispatcher.Register(&owner, {CaptureCallback, &capture});
+
+        Require(lastId == std::numeric_limits<uint64_t>::max(), "last registration id was not preserved");
+        Require(wrappedId == 2, "wrapped registration id did not skip zero or live ids");
+        Require(wrappedId != firstId, "wrapped registration reused a live registration id");
+        Require(!dispatcher.Unregister(0), "zero registration id unregistered a callback after wrap");
+        Require(dispatcher.Unregister(firstId), "first registration id could not unregister");
+        Require(dispatcher.Unregister(lastId), "last registration id could not unregister");
+        Require(dispatcher.Unregister(wrappedId), "wrapped registration id could not unregister");
+        Require(dispatcher.SubscriptionCount() == 0, "wrapped registrations survived unregister");
     }
 
     struct SelfUnregisterCapture
@@ -244,6 +268,7 @@ int main()
     TestDispatchCopiesInputForCallbackDuration();
     TestRegisterRejectsInvalidInput();
     TestUnregisterIsIdempotent();
+    TestRegistrationIdsSkipZeroAndLiveIdsAfterWrap();
     TestCallbackCanUnregisterItself();
     TestOwnerCleanupWaitsForInFlightDispatch();
     TestOwnerCleanup();

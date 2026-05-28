@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 
 namespace fs = std::filesystem;
@@ -310,6 +311,29 @@ namespace
         g_SelfUnregisterEvents = nullptr;
         g_SelfUnregisterId = 0;
     }
+
+    void TestRegistrationIdsSkipZeroAfterWrap()
+    {
+        ResetCounters();
+        Obelisk::Core::EventManager events;
+        int owner = 0;
+
+        const uint64_t firstId = events.RegisterPreProcessEventOwned(&owner, GlobalPre);
+        Require(firstId == 1, "first registration id was not one");
+
+        events.SetNextRegistrationIdForTesting(std::numeric_limits<uint64_t>::max());
+        const uint64_t lastId = events.RegisterPreProcessEventOwned(&owner, GlobalPre);
+        const uint64_t wrappedId = events.RegisterPreProcessEventForNameIndexOwned(&owner, 42, FilteredPre);
+
+        Require(lastId == std::numeric_limits<uint64_t>::max(), "last registration id was not preserved");
+        Require(wrappedId == 2, "wrapped registration id did not skip zero or live ids");
+        Require(wrappedId != firstId, "wrapped registration reused a live registration id");
+        Require(!events.UnregisterCallback(0), "zero registration id unregistered a callback after wrap");
+        Require(events.UnregisterCallbackForOwner(&owner, firstId), "first registration id could not unregister");
+        Require(events.UnregisterCallbackForOwner(&owner, lastId), "last registration id could not unregister");
+        Require(events.UnregisterCallbackForOwner(&owner, wrappedId), "wrapped registration id could not unregister");
+        Require(!events.HasPreProcessEventCallbacks(), "wrapped registration callbacks survived unregister");
+    }
 }
 
 int main()
@@ -327,6 +351,7 @@ int main()
     TestSingleRegistrationUnregister();
     TestNullCallbacksAreIgnored();
     TestCallbackCanUnregisterItself();
+    TestRegistrationIdsSkipZeroAfterWrap();
 
     Obelisk::Logger::Shutdown();
     fs::remove_all(logRoot);

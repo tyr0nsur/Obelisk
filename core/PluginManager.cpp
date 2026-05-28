@@ -137,8 +137,17 @@ namespace Obelisk::Core
             if (!owner)
                 return 0;
 
-            const uint64_t token = g_NextPluginOwnerToken.fetch_add(1, std::memory_order_relaxed);
             std::lock_guard<std::mutex> lock(g_PluginOwnerTokensMutex);
+            uint64_t token = 0;
+            do
+            {
+                token = g_NextPluginOwnerToken.load(std::memory_order_relaxed);
+                uint64_t nextToken = token + 1;
+                if (nextToken == 0)
+                    nextToken = 1;
+                g_NextPluginOwnerToken.store(nextToken, std::memory_order_relaxed);
+            } while (token == 0 || g_PluginOwnerTokens.find(token) != g_PluginOwnerTokens.end());
+
             g_PluginOwnerTokens[token] = owner;
             return token;
         }
@@ -519,6 +528,12 @@ namespace Obelisk::Core
     uint64_t PluginManager::ApiCapabilitiesForTesting() const
     {
         return m_Api.capabilities;
+    }
+
+    void PluginManager::SetNextPluginOwnerTokenForTesting(uint64_t nextOwnerToken)
+    {
+        std::lock_guard<std::mutex> lock(g_PluginOwnerTokensMutex);
+        g_NextPluginOwnerToken.store(nextOwnerToken == 0 ? 1 : nextOwnerToken, std::memory_order_relaxed);
     }
 
     PluginManager::~PluginManager()

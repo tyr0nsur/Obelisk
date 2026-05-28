@@ -101,6 +101,8 @@ work from repository state instead of chat history.
   unregister through `UnregisterProcessEventCallbackWithOwnerToken(owner_token, handle)`.
   Handles are process-local and must not be stored in shared cluster config or reused
   across ARK instances.
+- Callback handles and plugin owner tokens skip `0` and currently live IDs after counter
+  wrap. `0` remains the failure sentinel for plugin-facing registration APIs.
 - Public plugin examples and first-party fixtures must copy the `ObeliskApi` table by value
   if they need runtime functions after `ObeliskPlugin_Init`; the init `ObeliskApi*` and
   `ObeliskPluginInitContext*` are borrowed only for init. Metadata strings returned by

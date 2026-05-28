@@ -38,6 +38,8 @@ namespace Obelisk::Core
         bool TriggerPreProcessEvent(int32_t nameIndex, void* caller, void* function, void* parms);
         void TriggerPostProcessEvent(int32_t nameIndex, void* caller, void* function, void* parms);
 
+        void SetNextRegistrationIdForTesting(uint64_t nextRegistrationId);
+
     private:
         struct CallbackRegistration {
             uint64_t id;
@@ -45,6 +47,9 @@ namespace Obelisk::Core
             OnProcessEventCallback callback;
             void* owner;
         };
+
+        uint64_t AllocateRegistrationId();
+        bool HasRegistrationId(uint64_t registrationId) const;
 
         std::mutex m_Mutex;
         std::recursive_mutex m_DispatchMutex;

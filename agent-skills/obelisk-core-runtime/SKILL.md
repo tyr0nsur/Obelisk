@@ -60,6 +60,9 @@ Own these areas:
   return a non-zero `uint64_t` handle and require
   `UnregisterProcessEventCallbackWithOwnerToken(owner_token, handle)` for granular
   unregister. Do not expose bare unregister-by-id across the plugin ABI.
+- Public and internal callback handles or owner tokens must never use `0` as a successful
+  value and must not reuse currently-live IDs after counter wrap. `0` remains the failure
+  sentinel across plugin-facing registration APIs.
 - Keep plugin-owned lifecycle cleanup shared across `EventManager` and the internal
   `ChatEventDispatcher`; future event families must join the same owner cleanup path before
   any public SDK exposure.

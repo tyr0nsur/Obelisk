@@ -109,6 +109,10 @@ Updated: 2026-05-28
   `OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES`. Public granular unregister is
   owner-scoped through `UnregisterProcessEventCallbackWithOwnerToken(owner_token, handle)`;
   do not expose or document bare unregister-by-id across the plugin ABI.
+- fact: Callback registration handles and plugin owner tokens now skip `0` and currently
+  live IDs after counter wrap. `EventManager`, `ChatEventDispatcher`, and `PluginManager`
+  tests force wraparound to keep `0` as a strict failure sentinel and avoid duplicate live
+  handles/tokens.
 - fact: `oBaseEvents` C exports catch plugin-side exceptions before returning across the
   runtime/plugin ABI. `ObeliskPlugin_Init` resets plugin state on config failure or thrown
   exception, and `ObeliskPlugin_Shutdown` is idempotent.
