@@ -49,6 +49,9 @@ registration, and any SDK surface that a `.so` will consume.
   discovery when the runtime instance id is missing or unsafe.
 - Plugin config directories and `config.json` files must be regular non-symlink entries
   under the central config root. Do not weaken this for shared-cluster installs.
+- Plugin-owned feature gates must fail closed when explicitly enabled with invalid routing
+  inputs. For example, a filtered `ProcessEvent` feature with a negative FName index should
+  reject initialization instead of silently behaving like a disabled feature.
 - `ObeliskPluginInitContext` string pointers are borrowed for `ObeliskPlugin_Init` only;
   plugin examples should copy `config_dir`, `config_path`, or `instance_id` before using
   them from shutdown, threads, or later callbacks.

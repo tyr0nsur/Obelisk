@@ -83,3 +83,8 @@ add_test(
     NAME SdkConsumerFixtureOBaseEventsRejectsInvalidContext
     COMMAND sdk_consumer_fixture "$<TARGET_FILE:oBaseEvents>" oBaseEvents invalid-context
 )
+
+add_test(
+    NAME SdkConsumerFixtureOBaseEventsRejectsInvalidProcessEventConfig
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oBaseEvents>" oBaseEvents invalid-process-event-config
+)

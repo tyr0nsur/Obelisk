@@ -215,6 +215,12 @@ namespace
         g_FilteredFunctionIndex = processEvent.value("filtered_function_index", -1);
         g_LogLimit = processEvent.value("log_limit", 5);
 
+        if (g_ProcessEventEnabled && g_FilteredFunctionIndex < 0)
+        {
+            SafeLogError("[oBaseEvents] process_event.filtered_function_index must be non-negative when enabled.");
+            return false;
+        }
+
         if (g_LogLimit < 0)
             g_LogLimit = 0;
 

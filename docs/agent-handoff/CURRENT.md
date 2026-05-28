@@ -317,6 +317,14 @@ Updated: 2026-05-28
   values, symlinked `${OBELISK_ROOT}/logs`, and symlinked per-instance log directories.
   Missing absolute log roots may still be created, but inherited log env cannot redirect
   writes through symlink escapes.
+- fact: `oBaseEvents` fails closed when its `process_event` feature is explicitly enabled
+  with a negative `filtered_function_index`. The SDK consumer fixture covers this so the
+  official example cannot silently appear active while registering no filtered callback.
+- fact: Hook-side structure observer tests now cover all six accepted structure targets
+  (`AllowStructureAccess`, `IsAllowedToDemolish`, `SetVariant`, `AllowToggleActivation`,
+  `VerifyPinCode`, and `CanSeat`) through `TryIdentifyInvocation`. Object parameters stay
+  range-hidden, scalar ranges are bounded by `ParmsSize`, and wrong outer identity is
+  rejected at the hook wrapper layer.
 - fact: `ObeliskPluginInitContext` string pointers are documented as borrowed only for
   `ObeliskPlugin_Init`; plugins must copy `config_dir`, `config_path`, or `instance_id`
   before using them from shutdown, worker threads, or later callbacks.

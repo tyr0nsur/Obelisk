@@ -16,12 +16,26 @@ namespace
     using namespace Obelisk::UE::RuntimeReflection;
 
     constexpr int32_t kVerifyPinCodeNameIndex = 7636;
+    constexpr int32_t kAllowStructureAccessNameIndex = 7541;
+    constexpr int32_t kIsAllowedToDemolishNameIndex = 7574;
+    constexpr int32_t kSetVariantNameIndex = 7605;
+    constexpr int32_t kAllowToggleActivationNameIndex = 7620;
+    constexpr int32_t kCanSeatNameIndex = 8481;
+    constexpr int32_t kPrimalStructureNameIndex = 7539;
     constexpr int32_t kPrimalStructureItemContainerNameIndex = 7617;
+    constexpr int32_t kPrimalStructureSeatingNameIndex = 8480;
     constexpr int32_t kIntPropertyClassNameIndex = 2;
     constexpr int32_t kIntPropertyClassObjectIndex = 539;
     constexpr int32_t kBoolPropertyClassNameIndex = 3;
+    constexpr int32_t kObjectPropertyClassNameIndex = 5;
+    constexpr int32_t kObjectPropertyClassObjectIndex = 534;
+    constexpr int32_t kForPCNameIndex = 18805;
+    constexpr int32_t kForCharacterNameIndex = 17726;
+    constexpr int32_t kBForceNameIndex = 18793;
     constexpr int32_t kPinCodeNameIndex = 22699;
     constexpr int32_t kReturnValueNameIndex = 17716;
+    constexpr int32_t kVariantIndexNameIndex = 22292;
+    constexpr int32_t kBForceSetNameIndex = 22388;
 
     struct Region
     {
@@ -33,6 +47,14 @@ namespace
     {
         std::vector<Region> Regions;
         int Calls = 0;
+    };
+
+    struct FieldDef
+    {
+        int32_t NameIndex = -1;
+        int32_t Offset = -1;
+        int32_t ElementSize = 0;
+        const void* Class = nullptr;
     };
 
     bool RegionReader(const void* address, size_t size, void* context)
@@ -108,10 +130,13 @@ namespace
         std::array<uint8_t, 0xb0> Function{};
         std::array<uint8_t, 0x80> PropertyA{};
         std::array<uint8_t, 0x80> PropertyB{};
+        std::array<uint8_t, 0x80> PropertyC{};
+        std::array<uint8_t, 0x80> PropertyD{};
+        std::array<uint8_t, 0x40> ObjectPropertyClass{};
         std::array<uint8_t, 0x40> BoolPropertyClass{};
         std::array<uint8_t, 0x40> IntPropertyClass{};
         std::array<uint8_t, 0x40> Outer{};
-        std::array<uint8_t, 0x08> Params{};
+        std::array<uint8_t, 0x20> Params{};
         ReaderContext Context;
 
         MemoryReader Reader()
@@ -120,6 +145,9 @@ namespace
             Context.Regions.push_back({Function.data(), Function.size()});
             Context.Regions.push_back({PropertyA.data(), PropertyA.size()});
             Context.Regions.push_back({PropertyB.data(), PropertyB.size()});
+            Context.Regions.push_back({PropertyC.data(), PropertyC.size()});
+            Context.Regions.push_back({PropertyD.data(), PropertyD.size()});
+            Context.Regions.push_back({ObjectPropertyClass.data(), ObjectPropertyClass.size()});
             Context.Regions.push_back({BoolPropertyClass.data(), BoolPropertyClass.size()});
             Context.Regions.push_back({IntPropertyClass.data(), IntPropertyClass.size()});
             Context.Regions.push_back({Outer.data(), Outer.size()});
@@ -133,8 +161,13 @@ namespace
         return {GateStatus::Enabled, std::string(kSupportedShooterGameServerSha256)};
     }
 
-    void BuildVerifyPinCode(StructureFixture& fixture)
+    void InitClasses(StructureFixture& fixture)
     {
+        WriteObject(fixture.ObjectPropertyClass,
+                    kObjectPropertyClassNameIndex,
+                    kObjectPropertyClassObjectIndex,
+                    nullptr,
+                    nullptr);
         WriteObject(fixture.BoolPropertyClass,
                     kBoolPropertyClassNameIndex,
                     kBoolPropertyClassNameIndex,
@@ -145,42 +178,111 @@ namespace
                     kIntPropertyClassObjectIndex,
                     nullptr,
                     nullptr);
+    }
+
+    void BuildFunction(StructureFixture& fixture,
+                       int32_t functionNameIndex,
+                       int32_t outerNameIndex,
+                       uint16_t numParms,
+                       uint16_t parmsSize,
+                       uint16_t returnValueOffset,
+                       const std::array<FieldDef, 4>& fields)
+    {
+        InitClasses(fixture);
         WriteObject(fixture.Outer,
-                    kPrimalStructureItemContainerNameIndex,
-                    kPrimalStructureItemContainerNameIndex,
+                    outerNameIndex,
+                    outerNameIndex,
                     nullptr,
                     nullptr);
         WriteObject(fixture.Function,
-                    kVerifyPinCodeNameIndex,
-                    kVerifyPinCodeNameIndex,
+                    functionNameIndex,
+                    functionNameIndex,
                     reinterpret_cast<const void*>(0x20000),
                     fixture.Outer.data());
 
-        WriteProperty(fixture.PropertyA,
-                      fixture.PropertyB.data(),
-                      fixture.Function.data(),
-                      fixture.IntPropertyClass.data(),
-                      kPinCodeNameIndex,
-                      0x00,
-                      0x04);
-        WriteProperty(fixture.PropertyB,
-                      nullptr,
-                      fixture.Function.data(),
-                      fixture.BoolPropertyClass.data(),
-                      kReturnValueNameIndex,
-                      0x04,
-                      0x01);
+        std::array<std::array<uint8_t, 0x80>*, 4> properties{
+            &fixture.PropertyA,
+            &fixture.PropertyB,
+            &fixture.PropertyC,
+            &fixture.PropertyD,
+        };
+        for (uint16_t i = 0; i < numParms; ++i)
+        {
+            const void* next = i + 1 < numParms ? properties[i + 1]->data() : nullptr;
+            WriteProperty(*properties[i],
+                          next,
+                          fixture.Function.data(),
+                          fields[i].Class,
+                          fields[i].NameIndex,
+                          fields[i].Offset,
+                          fields[i].ElementSize);
+        }
 
         const void* children = fixture.PropertyA.data();
         const uint32_t functionFlags = 0x204000;
-        const uint16_t numParms = 2;
-        const uint16_t parmsSize = 0x05;
-        const uint16_t returnValueOffset = 0x04;
         WriteAt(fixture.Function, 0x38, children);
         WriteAt(fixture.Function, 0x90, functionFlags);
         WriteAt(fixture.Function, 0x96, numParms);
         WriteAt(fixture.Function, 0x98, parmsSize);
         WriteAt(fixture.Function, 0x9a, returnValueOffset);
+    }
+
+    std::array<FieldDef, 4> ForPCReturnFields(StructureFixture& fixture)
+    {
+        return {{
+            {kForPCNameIndex, 0x00, 0x08, fixture.ObjectPropertyClass.data()},
+            {kReturnValueNameIndex, 0x08, 0x01, fixture.BoolPropertyClass.data()},
+            {},
+            {},
+        }};
+    }
+
+    void BuildVerifyPinCode(StructureFixture& fixture)
+    {
+        BuildFunction(fixture,
+                      kVerifyPinCodeNameIndex,
+                      kPrimalStructureItemContainerNameIndex,
+                      2,
+                      0x05,
+                      0x04,
+                      {{
+                          {kPinCodeNameIndex, 0x00, 0x04, fixture.IntPropertyClass.data()},
+                          {kReturnValueNameIndex, 0x04, 0x01, fixture.BoolPropertyClass.data()},
+                          {},
+                          {},
+                      }});
+    }
+
+    void BuildSetVariant(StructureFixture& fixture)
+    {
+        BuildFunction(fixture,
+                      kSetVariantNameIndex,
+                      kPrimalStructureNameIndex,
+                      3,
+                      0x06,
+                      0x05,
+                      {{
+                          {kVariantIndexNameIndex, 0x00, 0x04, fixture.IntPropertyClass.data()},
+                          {kBForceSetNameIndex, 0x04, 0x01, fixture.BoolPropertyClass.data()},
+                          {kReturnValueNameIndex, 0x05, 0x01, fixture.BoolPropertyClass.data()},
+                          {},
+                      }});
+    }
+
+    void BuildCanSeat(StructureFixture& fixture)
+    {
+        BuildFunction(fixture,
+                      kCanSeatNameIndex,
+                      kPrimalStructureSeatingNameIndex,
+                      4,
+                      0x12,
+                      0x11,
+                      {{
+                          {kForPCNameIndex, 0x00, 0x08, fixture.ObjectPropertyClass.data()},
+                          {kForCharacterNameIndex, 0x08, 0x08, fixture.ObjectPropertyClass.data()},
+                          {kBForceNameIndex, 0x10, 0x01, fixture.BoolPropertyClass.data()},
+                          {kReturnValueNameIndex, 0x11, 0x01, fixture.BoolPropertyClass.data()},
+                      }});
     }
 
     void TestGateEvaluation()
@@ -300,6 +402,119 @@ namespace
         Require(attempt.Invocation.Fields[1].Range.Data == fixture.Params.data() + 4,
                 "ReturnValue range mismatch");
     }
+
+    void RequireScalarRange(const StructureReflection::StructureFieldRange& field,
+                            const uint8_t* expectedData,
+                            size_t expectedSize,
+                            const char* message)
+    {
+        Require(field.ExposesRange, message);
+        Require(field.Range.Data == expectedData, message);
+        Require(field.Range.Size == expectedSize, message);
+    }
+
+    void RequireObjectRangeHidden(const StructureReflection::StructureFieldRange& field, const char* message)
+    {
+        Require(!field.ExposesRange, message);
+        Require(field.Range.Data == nullptr, message);
+    }
+
+    void TestIdentifiesAllStructureHookTargets()
+    {
+        for (const auto [nameIndex, expected] : {
+                 std::pair{kAllowStructureAccessNameIndex, StructureReflection::StructureFunction::AllowStructureAccess},
+                 std::pair{kIsAllowedToDemolishNameIndex, StructureReflection::StructureFunction::IsAllowedToDemolish},
+                 std::pair{kAllowToggleActivationNameIndex, StructureReflection::StructureFunction::AllowToggleActivation},
+             })
+        {
+            StructureFixture fixture;
+            BuildFunction(fixture, nameIndex, nameIndex == kAllowToggleActivationNameIndex
+                              ? kPrimalStructureItemContainerNameIndex
+                              : kPrimalStructureNameIndex,
+                          2, 0x09, 0x08, ForPCReturnFields(fixture));
+
+            Attempt attempt = TryIdentifyInvocation(
+                EnabledGate(),
+                nameIndex,
+                fixture.Reader(),
+                fixture.Function.data(),
+                fixture.Params.data());
+
+            Require(attempt.Status == AttemptStatus::Matched, attempt.Result.Reason.c_str());
+            Require(attempt.Invocation.Function == expected, "structure access target mismatch");
+            Require(attempt.Invocation.Fields.size() == 2, "structure access field count mismatch");
+            RequireObjectRangeHidden(attempt.Invocation.Fields[0], "ForPC object range was exposed");
+            RequireScalarRange(attempt.Invocation.Fields[1], fixture.Params.data() + 0x08, 1,
+                               "return value range mismatch");
+        }
+
+        {
+            StructureFixture fixture;
+            BuildSetVariant(fixture);
+
+            Attempt attempt = TryIdentifyInvocation(
+                EnabledGate(),
+                kSetVariantNameIndex,
+                fixture.Reader(),
+                fixture.Function.data(),
+                fixture.Params.data());
+
+            Require(attempt.Status == AttemptStatus::Matched, attempt.Result.Reason.c_str());
+            Require(attempt.Invocation.Function == StructureReflection::StructureFunction::SetVariant,
+                    "SetVariant target mismatch");
+            Require(attempt.Invocation.Fields.size() == 3, "SetVariant field count mismatch");
+            RequireScalarRange(attempt.Invocation.Fields[0], fixture.Params.data(), 4,
+                               "VariantIndex range mismatch");
+            RequireScalarRange(attempt.Invocation.Fields[1], fixture.Params.data() + 0x04, 1,
+                               "bForceSet range mismatch");
+            RequireScalarRange(attempt.Invocation.Fields[2], fixture.Params.data() + 0x05, 1,
+                               "SetVariant return range mismatch");
+        }
+
+        {
+            StructureFixture fixture;
+            BuildCanSeat(fixture);
+
+            Attempt attempt = TryIdentifyInvocation(
+                EnabledGate(),
+                kCanSeatNameIndex,
+                fixture.Reader(),
+                fixture.Function.data(),
+                fixture.Params.data());
+
+            Require(attempt.Status == AttemptStatus::Matched, attempt.Result.Reason.c_str());
+            Require(attempt.Invocation.Function == StructureReflection::StructureFunction::CanSeat,
+                    "CanSeat target mismatch");
+            Require(attempt.Invocation.Fields.size() == 4, "CanSeat field count mismatch");
+            RequireObjectRangeHidden(attempt.Invocation.Fields[0], "CanSeat ForPC range was exposed");
+            RequireObjectRangeHidden(attempt.Invocation.Fields[1], "CanSeat ForCharacter range was exposed");
+            RequireScalarRange(attempt.Invocation.Fields[2], fixture.Params.data() + 0x10, 1,
+                               "CanSeat bForce range mismatch");
+            RequireScalarRange(attempt.Invocation.Fields[3], fixture.Params.data() + 0x11, 1,
+                               "CanSeat return range mismatch");
+        }
+    }
+
+    void TestRejectsStructureHookWrongOuter()
+    {
+        StructureFixture fixture;
+        BuildFunction(fixture,
+                      kAllowStructureAccessNameIndex,
+                      kPrimalStructureItemContainerNameIndex,
+                      2,
+                      0x09,
+                      0x08,
+                      ForPCReturnFields(fixture));
+
+        Attempt attempt = TryIdentifyInvocation(
+            EnabledGate(),
+            kAllowStructureAccessNameIndex,
+            fixture.Reader(),
+            fixture.Function.data(),
+            fixture.Params.data());
+
+        Require(attempt.Status == AttemptStatus::Rejected, "wrong structure outer was accepted");
+    }
 }
 
 int main()
@@ -310,6 +525,8 @@ int main()
     TestDisabledGateDoesNotRead();
     TestNonStructureNameDoesNotRead();
     TestIdentifiesVerifyPinCodeWithoutPinRange();
+    TestIdentifiesAllStructureHookTargets();
+    TestRejectsStructureHookWrongOuter();
 
     std::cout << "ProcessEventStructureReflectionTests passed\n";
     return 0;

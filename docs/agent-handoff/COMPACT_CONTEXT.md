@@ -361,6 +361,11 @@ work from repository state instead of chat history.
   and is run by CI. The layout test now validates installed-header consumption, plugin
   placement, config dir/path, instance id, `plugin_owner_token`, and owner-token handle
   registration/unregister passed to a consumer plugin.
+- `oBaseEvents` fails closed when its explicit `process_event` feature is enabled with an
+  invalid negative `filtered_function_index`; SDK consumer CTest covers the rejection.
+- Hook-side structure observer tests cover all six accepted structure targets through
+  `TryIdentifyInvocation`; object parameters stay range-hidden and wrong outer identity is
+  rejected before any runtime promotion claim.
 - `PluginManagerTests` cover plugin lifecycle and rejection paths with a fake loader:
   valid load/unload, missing entry points, invalid metadata, init failure, callback cleanup,
   shutdown, disabled/default config skip, instance allowlist skip, duplicate `plugin_id`,

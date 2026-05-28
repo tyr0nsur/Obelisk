@@ -102,8 +102,11 @@ The runtime interprets the common activation envelope before initialization:
 `instance_allowlist` skips `ObeliskPlugin_Init` and closes the shared object. An enabled
 plugin may run on every instance only when `allow_all_instances=true` is present. Plugin-
 specific feature gates remain owned by the plugin and must be checked before registering
-callbacks or starting background work. Do not publish map-scoped config fields until the
-plugin has a reliable map identity source; the runtime does not enforce map identity today.
+callbacks or starting background work. If a feature is explicitly enabled but its routing
+inputs are invalid, such as a filtered `ProcessEvent` feature with a negative FName index,
+the plugin should fail closed instead of silently behaving as disabled. Do not publish map-scoped config fields
+until the plugin has a reliable map identity source; the runtime does not enforce map
+identity today.
 
 In clustered deployments, multiple ARK processes may share the same `${OBELISK_CONFIG_DIR}`
 and plugin binaries. Plugin config should therefore be treated as shared, mostly-static
