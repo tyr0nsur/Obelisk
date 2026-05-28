@@ -74,6 +74,8 @@ Before opening a pull request:
 git diff --check
 cmake -S . -B build
 cmake --build build -j"$(nproc)"
+ctest --test-dir build --output-on-failure
+scripts/run_script_tests.sh
 ```
 
 Docs-only changes may skip the CMake build, but the PR should say why.

@@ -176,9 +176,8 @@ Updated: 2026-05-28
   per-instance marker `allow-global-process-event-callbacks` are both active. Filtered
   name-index callbacks remain available by default, public ABI layout remains v1, and the
   new capability bit only advertises global callbacks when the gate is active.
-- fact: Current uncommitted ops follow-up makes that gate use the existing `OBELISK_ROOT`
-  marker root and teaches stable posture checks to reject
-  `OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS`.
+- fact: Global ProcessEvent callback gate hardening is committed; stable posture checks
+  reject `OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS`.
 - finding: Reflection tooling audit found UFunction snapshot fixture coverage is broad
   across module areas, but ScriptStruct coverage is the current bottleneck with only two
   transfer structs. Prioritize an offline second-source readiness report before any
@@ -585,8 +584,8 @@ Updated: 2026-05-28
   ProcessEvent prologue changes.
 - next-step: Keep expanding package/export validation only when external plugin
   consumption exposes a concrete missing contract.
-- next-step: Later integrate `docs/VERSIONING.md` into README/STATUS/RELEASE once the
-  versioning policy has settled; avoid claiming `0.1.0` is imminent.
+- fact: README, STATUS, and RELEASE link the pre-release versioning policy; avoid claiming
+  `0.1.0` is imminent until the release checklist is satisfied.
 
 ## Agent Protocol
 

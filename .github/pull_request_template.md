@@ -19,6 +19,8 @@
 - [ ] `git diff --check`
 - [ ] `cmake -S . -B build`
 - [ ] `cmake --build build -j"$(nproc)"`
+- [ ] `ctest --test-dir build --output-on-failure`
+- [ ] `scripts/run_script_tests.sh`
 - [ ] Docs-only changes explain why the build was skipped.
 
 ## Handoff
