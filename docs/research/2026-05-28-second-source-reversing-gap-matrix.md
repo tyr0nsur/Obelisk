@@ -105,10 +105,7 @@ Current primary readiness, before any second artifact exists:
 python3 scripts/compare_reflection_snapshots.py \
   --base-root tests/fixtures/ufunction_snapshots \
   --readiness-report \
-  --target PrimalItem.CanUse \
-  --target PrimalItem.AllowRemoteAddToInventory \
-  --target PrimalStructure.AllowStructureAccess \
-  --target PrimalStructure.IsAllowedToDemolish
+  --target-set minimal-second-source-intake
 ```
 
 Expected current result:
@@ -125,10 +122,7 @@ When a second sanitized snapshot root exists, compare only this intake first:
 python3 scripts/compare_reflection_snapshots.py \
   --base-root tests/fixtures/ufunction_snapshots \
   --candidate-root <second-source-ufunction-snapshots> \
-  --target PrimalItem.CanUse \
-  --target PrimalItem.AllowRemoteAddToInventory \
-  --target PrimalStructure.AllowStructureAccess \
-  --target PrimalStructure.IsAllowedToDemolish \
+  --target-set minimal-second-source-intake \
   --json
 ```
 

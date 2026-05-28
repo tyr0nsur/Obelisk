@@ -30,6 +30,18 @@ FORBIDDEN_KEYS = {
 }
 ADDRESS_RE = re.compile(r"0x[0-9a-fA-F]{8,}")
 HEX_METADATA_KEYS = {"property_flags", "return_value_offset", "function_flags"}
+TARGET_SETS = {
+    "minimal-second-source-intake": (
+        "PrimalItem.CanUse",
+        "PrimalItem.AllowRemoteAddToInventory",
+        "PrimalStructure.AllowStructureAccess",
+        "PrimalStructure.IsAllowedToDemolish",
+    ),
+    "transfer-scriptstruct": (
+        "obelisk.scriptstruct-chain.snapshot.v1:PrimalLocalProfile.ARKTributeDino",
+        "obelisk.scriptstruct-chain.snapshot.v1:PrimalLocalProfile.ArkTributePlayerData",
+    ),
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -58,12 +70,26 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--target-set",
+        action="append",
+        default=[],
+        choices=sorted(TARGET_SETS),
+        help="Add a named target group. Repeatable.",
+    )
+    parser.add_argument(
         "--readiness-report",
         action="store_true",
         help="Summarize current snapshot coverage and second-source readiness by module.",
     )
     parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     return parser.parse_args()
+
+
+def expand_target_filters(targets: list[str], target_sets: list[str]) -> set[str]:
+    filters = set(targets)
+    for target_set in target_sets:
+        filters.update(TARGET_SETS[target_set])
+    return filters
 
 
 def snapshot_paths(root: Path) -> list[Path]:
@@ -528,12 +554,13 @@ def main() -> int:
     args = parse_args()
     base = load_snapshot_set(args.base_root)
     candidate = load_snapshot_set(args.candidate_root) if args.candidate_root else None
+    target_filters = expand_target_filters(args.target, args.target_set)
     if args.readiness_report:
         report = readiness_report(
             base,
             strict_identity_indices=args.strict_identity_indices,
             allow_ark_sha_mismatch=args.allow_ark_sha_mismatch,
-            target_filters=set(args.target),
+            target_filters=target_filters,
             candidate=candidate,
         )
     else:
@@ -544,8 +571,9 @@ def main() -> int:
             candidate,
             strict_identity_indices=args.strict_identity_indices,
             allow_ark_sha_mismatch=args.allow_ark_sha_mismatch,
-            target_filters=set(args.target),
+            target_filters=target_filters,
         )
+    report["target_sets"] = sorted(args.target_set)
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:

@@ -367,6 +367,73 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("target filter did not match snapshots", result.stderr)
 
+    def test_named_target_set_expands_minimal_second_source_intake(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            targets = [
+                ("PrimalItem", "CanUse"),
+                ("PrimalItem", "AllowRemoteAddToInventory"),
+                ("PrimalStructure", "AllowStructureAccess"),
+                ("PrimalStructure", "IsAllowedToDemolish"),
+            ]
+            ignored_left = rename_target(deepcopy(base_snapshot()), outer="PrimalBuff", name="AllowPostProcessEffect")
+            ignored_right = deepcopy(ignored_left)
+            ignored_right["targets"][0]["property_chain"]["properties"][0]["offset_internal"] = 99  # type: ignore[index]
+            for outer, name in targets:
+                payload = rename_target(deepcopy(base_snapshot()), outer=outer, name=name)
+                filename = f"{outer}.{name}.snapshot.json"
+                write_snapshot(base, payload, filename)
+                write_snapshot(candidate, deepcopy(payload), filename)
+            write_snapshot(base, ignored_left, "PrimalBuff.AllowPostProcessEffect.snapshot.json")
+            write_snapshot(candidate, ignored_right, "PrimalBuff.AllowPostProcessEffect.snapshot.json")
+
+            result = run_compare(base, candidate, "--target-set", "minimal-second-source-intake", "--json")
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["counts"], {"accepted": 4, "inconclusive": 0, "rejected": 0})
+        self.assertEqual(report["target_sets"], ["minimal-second-source-intake"])
+        self.assertEqual(len(report["target_filters"]), 4)
+
+    def test_named_target_set_selects_transfer_scriptstructs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            dino = scriptstruct_snapshot()
+            player = rename_target(scriptstruct_snapshot(), outer="PrimalLocalProfile", name="ArkTributePlayerData")
+            ufunction_same_short_name = rename_target(
+                deepcopy(base_snapshot()),
+                outer="PrimalLocalProfile",
+                name="ARKTributeDino",
+            )
+            write_snapshot(base, dino, "PrimalLocalProfile.ARKTributeDino.scriptstruct.snapshot.json")
+            write_snapshot(candidate, deepcopy(dino), "PrimalLocalProfile.ARKTributeDino.scriptstruct.snapshot.json")
+            write_snapshot(base, player, "PrimalLocalProfile.ArkTributePlayerData.scriptstruct.snapshot.json")
+            write_snapshot(candidate, deepcopy(player), "PrimalLocalProfile.ArkTributePlayerData.scriptstruct.snapshot.json")
+            write_snapshot(base, ufunction_same_short_name, "PrimalLocalProfile.ARKTributeDino.ufunction.snapshot.json")
+            write_snapshot(candidate, ufunction_same_short_name, "PrimalLocalProfile.ARKTributeDino.ufunction.snapshot.json")
+
+            result = run_compare(base, candidate, "--target-set", "transfer-scriptstruct", "--json")
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["counts"], {"accepted": 2, "inconclusive": 0, "rejected": 0})
+        self.assertEqual(report["target_sets"], ["transfer-scriptstruct"])
+        self.assertEqual(
+            sorted(result["target"] for result in report["results"]),
+            [
+                "obelisk.scriptstruct-chain.snapshot.v1:PrimalLocalProfile.ARKTributeDino",
+                "obelisk.scriptstruct-chain.snapshot.v1:PrimalLocalProfile.ArkTributePlayerData",
+            ],
+        )
+
     def test_target_filter_reports_missing_candidate_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

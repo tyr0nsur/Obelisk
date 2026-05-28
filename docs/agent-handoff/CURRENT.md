@@ -107,6 +107,11 @@ Updated: 2026-05-28
   ScriptStruct snapshot sets offline and reports `accepted`, `rejected`, or `inconclusive`
   per target. Use `--target Outer.Name` for focused module checks. It does not read cores
   or touch servers.
+- fact: `scripts/compare_reflection_snapshots.py --target-set minimal-second-source-intake`
+  expands the canonical first second-source UFunction intake:
+  `PrimalItem.CanUse`, `PrimalItem.AllowRemoteAddToInventory`,
+  `PrimalStructure.AllowStructureAccess`, and `PrimalStructure.IsAllowedToDemolish`.
+  `--target-set transfer-scriptstruct` expands the two transfer ScriptStruct fixtures.
 - fact: `scripts/regenerate_ufunction_snapshots.py --check-layout` now supports
   UFunction layout-only verification for second-source intake. It ignores unstable
   identity/evidence indices while preserving target identity, UFunction fields, and
