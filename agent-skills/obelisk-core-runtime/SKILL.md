@@ -95,13 +95,14 @@ For risky probes such as ReflectionScanner, native exec, ptrace/gcore, broad tra
 text/gameplay-payload logging, first obtain explicit operator approval for the exact
 `arkserver2` run, marker changes, restart window, rollback plan, and shutdown at the end.
 
-Validate:
+For an approved validation target, use the target's explicit map, instance id, copied logs,
+and posture command. Do not run these checks on protected Ragnarok unless the operator has
+approved that exact maintenance window:
 
 ```bash
 pgrep -af '^./ShooterGameServer'
-tail -n 80 /servidor/ark/obelisk/logs/arkserver/Obelisk.log
-rg 'libobelisk|libsubhook' /proc/$(pgrep -f '^./ShooterGameServer Ragnarok' | head -n1)/maps
-scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map Ragnarok --instance arkserver
+tail -n 80 /path/to/copied/Obelisk.log
+scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map <map> --instance <instance-id>
 ```
 
 Expected:

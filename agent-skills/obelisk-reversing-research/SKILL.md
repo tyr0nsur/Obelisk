@@ -79,7 +79,7 @@ explicit environment variables from safe per-instance markers such as
 ```bash
 export OBELISK_ENABLE_PROCESS_EVENT_HOOK=1
 export OBELISK_DISABLE_PLUGINS=1
-export OBELISK_INSTANCE_ID=arkserver
+export OBELISK_INSTANCE_ID=arkserver2
 export OBELISK_PE_TRACE_LIMIT=0
 unset OBELISK_ENABLE_NATIVE_EXEC_PROBES
 ```
@@ -101,7 +101,7 @@ For live-like development captures authorized by the operator, keep the run shor
 restore stable posture immediately:
 
 ```bash
-scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map Ragnarok --instance arkserver
+scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map <map> --instance <instance-id>
 ```
 
 Use explicit target flags for the approved debug instance. If this fails, fix the server

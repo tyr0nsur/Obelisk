@@ -67,11 +67,13 @@ Expected logs:
 - plugin loading disabled
 - server remains joinable
 
-Post-check for the current protected Ragnarok baseline should also reject experimental chat
-reflection unless the maintenance plan explicitly says otherwise:
+Post-checks after an approved runtime experiment should use the same approved target and
+should reject experimental chat reflection unless the maintenance plan explicitly says
+otherwise:
 
 ```bash
-scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection
+scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection \
+  --map <map> --instance <instance-id>
 ```
 
 ## Experiment Gates
@@ -92,7 +94,7 @@ scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection
   - `enable-debug-control`
   - `enable-reflection-scanner`
   - `enable-native-exec-probes`
-- Never enable native exec probes without explicit approval for the named `arkserver` run.
+- Never enable native exec probes without explicit approval for the named debug run.
 - Do not set `OBELISK_DEBUG_ALLOW_PTRACE=1` by default in debug wrappers. Ptrace requires
   an approved isolated run plus the `allow-ptrace` marker.
 - Never enable `ReflectionScanner` on `arkserver` / Ragnarok while users are active. Use
@@ -117,11 +119,11 @@ Use named profiles instead of ad hoc env mixes:
 - Plugin capture: scanner off, only the target plugin installed, plugin config backed up,
   short run, then return to stable dev.
 
-After any scanner/plugin capture, run:
+After any scanner/plugin capture, run the posture check for the same approved debug target:
 
 ```bash
 scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection \
-  --map Ragnarok --instance arkserver
+  --map <map> --instance <instance-id>
 ```
 
 Use the matching explicit `--map` and `--instance` for the approved debug target. That
@@ -201,15 +203,16 @@ ls -la /servidor/ark/obelisk/lib /servidor/ark/obelisk/plugins
 ls -la /servidor/ark/obelisk/state
 ```
 
-After a maintenance-window Ragnarok restart, use the protected live-like profile:
+After a maintenance-window restart on a protected live-like instance, use that instance's
+approved profile and explicit map/instance values:
 
 ```bash
 pgrep -af '^./ShooterGameServer'
-tail -n 100 /servidor/ark/obelisk/logs/arkserver/Obelisk.log
-pid=$(pgrep -f '^./ShooterGameServer Ragnarok' | head -n1)
+tail -n 100 /path/to/copied/Obelisk.log
+pid=$(pgrep -f '^./ShooterGameServer <map>' | head -n1)
 rg 'libobelisk|libsubhook' /proc/$pid/maps
 scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection \
-  --map Ragnarok --instance arkserver
+  --map <map> --instance <instance-id>
 ```
 
 Current server-backed debug, when approved, uses `arkserver2` / TheIsland. It starts from

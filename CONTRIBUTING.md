@@ -92,11 +92,12 @@ Runtime validation requires an operator-approved window for the named instance.
 Do not restart servers, edit `/servidor/ark`, or change markers from a PR unless
 the work explicitly owns live-ops for that window.
 
-Current stable posture for the active Ragnarok harness is:
+For an approved validation target, confirm stable posture with explicit map and instance
+values:
 
 ```bash
 scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection \
-  --map Ragnarok --instance arkserver
+  --map <map> --instance <instance-id>
 ```
 
 Experimental debug/scanner work must use explicit env plus instance markers and

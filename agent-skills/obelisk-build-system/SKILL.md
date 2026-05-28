@@ -90,7 +90,7 @@ git status --short --ignored
 For runtime/server work, also run the posture check after the server is restored:
 
 ```bash
-scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map Ragnarok --instance arkserver
+scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map <map> --instance <instance-id>
 ```
 
 Use explicit `--map` and `--instance`; do not rely on script defaults during Obelisk debug

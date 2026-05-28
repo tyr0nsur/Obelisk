@@ -35,10 +35,8 @@ Development-server gated:
   the target, marker/env changes, restart window, and rollback. Historical chat reflection
   additionally requires the exact supported `OBELISK_CHAT_REFLECTION_BINARY_SHA256`, a
   small log limit, plugins disabled, and a post-change stable posture check for the exact
-  approved target. Current default validation uses
-  `scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map
-  Ragnarok --instance arkserver`; use TheIsland only if the operator explicitly reopens
-  `arkserver2` for that named window.
+  approved target. Do not rely on posture-check defaults in agent rounds; pass explicit
+  `--map <map> --instance <instance-id>` for the operator-approved target.
 
 Forbidden on live/shared instances:
 
@@ -55,6 +53,9 @@ Forbidden on live/shared instances:
 - Prefer offline static analysis before runtime probes.
 - Prefer copied logs over live attach.
 - Prefer deterministic scripts over manual UI-only conclusions.
+- Do not rely on `check_obelisk_server_posture.sh` defaults in agent rounds. Use explicit
+  `--map <map> --instance <instance-id>` for the approved target, and do not use protected
+  Ragnarok as a validation target without a specific operator-approved maintenance window.
 - Use Ghidra for decompilation and manual xref reasoning, but summarize evidence in text.
 - Current operator direction as of 2026-05-28 protects `arkserver` / Ragnarok because
   users are active there. Do not restart it, change markers, or run runtime tests there.
@@ -83,11 +84,8 @@ Before adopting a tool into the workflow:
 
 - Prefer analyzer JSON evidence packs over hand-written offset summaries.
 - Every runtime capture should have both a capture artifact and a post-capture posture
-  check. Use an explicit map/instance for the approved debug target. Under the current RAM
-  constraint, the default read-only validation target is
-  `scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map
-  Ragnarok --instance arkserver`; do not substitute `arkserver2` unless that instance has
-  been explicitly reopened for the capture window.
+  check. Use an explicit map/instance for the approved debug target; do not use defaults
+  or protected live instances as a convenience validation target.
 - A tool result is not accepted unless another engineer can reproduce it from the command,
   binary hash, Obelisk commit, and copied artifacts.
 - UI-only Ghidra conclusions must be translated into text: function/address, xref path,

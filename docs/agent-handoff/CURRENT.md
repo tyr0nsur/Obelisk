@@ -800,6 +800,10 @@ Updated: 2026-05-28
   `--fail-on-quality-blockers` can fail copied-log review when a summary is empty or any
   blocker beyond `runtime_observer_evidence_only` appears. By default it refuses paths
   under `/servidor/ark`; use copied artifacts or fixtures, not live Ragnarok logs.
+- fact: Operational skills and contributor docs now avoid using Ragnarok/`arkserver` as a
+  default validation target. Future agent rounds must pass explicit
+  `--map <map> --instance <instance-id>` for an operator-approved target and must not rely
+  on posture-check defaults.
 - fact: `FString` for this ARK Linux build is a strong candidate for
   `{TCHAR* Data, int32 ArrayNum, int32 ArrayMax}` with `TCHAR=UTF-32LE`; see
   `docs/research/2026-05-27-fstring-layout.md`.
