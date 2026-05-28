@@ -17,6 +17,7 @@ REPO_ROOT = SCRIPT_DIR.parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
 import inspect_core_ufunctions as inspector  # noqa: E402
+from snapshot_evidence_pack import evidence_pack_defaults, merge_manifest_default  # noqa: E402
 
 
 DEFAULT_MANIFEST = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots" / "manifest.json"
@@ -97,81 +98,6 @@ def optional_sha256(value: str | None, field: str) -> str | None:
     if SHA256_RE.fullmatch(value) is None:
         raise SystemExit(f"{field} must be lowercase SHA256")
     return value
-
-
-def select_labeled_address(
-    path: Path,
-    entries: object,
-    *,
-    field: str,
-    label: str | None,
-    label_flag: str,
-) -> int:
-    if not isinstance(entries, list) or not entries:
-        raise SystemExit(f"{path}: evidence pack manifest missing {field}")
-    if label is None:
-        if len(entries) != 1:
-            raise SystemExit(f"{path}: multiple {field} found; pass {label_flag}")
-        selected = entries[0]
-    else:
-        selected = next(
-            (
-                item
-                for item in entries
-                if isinstance(item, dict) and item.get("label") == label
-            ),
-            None,
-        )
-        if selected is None:
-            raise SystemExit(f"{path}: {field} label not found: {label}")
-    if not isinstance(selected, dict):
-        raise SystemExit(f"{path}: invalid {field} entry")
-    address = selected.get("address")
-    if not isinstance(address, str):
-        raise SystemExit(f"{path}: selected {field} entry missing address")
-    return inspector.parse_int(address)
-
-
-def evidence_pack_defaults(path: Path, root_label: str | None, gobjects_label: str | None) -> dict[str, object]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    core = payload.get("core")
-    if not isinstance(core, dict):
-        raise SystemExit(f"{path}: evidence pack manifest missing core object")
-    core_sha = core.get("sha256")
-    if not isinstance(core_sha, str) or SHA256_RE.fullmatch(core_sha) is None:
-        raise SystemExit(f"{path}: evidence pack manifest must include core.sha256")
-    core_path = core.get("path")
-    if not isinstance(core_path, str) or not core_path:
-        raise SystemExit(f"{path}: evidence pack manifest missing core.path")
-    return {
-        "artifact_kind": "offline_core",
-        "artifact_sha256": core_sha,
-        "capture_id": safe_component(Path(core_path).stem, "capture-id"),
-        "evidence_pack_id": safe_component(path.parent.name, "evidence-pack-id"),
-        "core_path": Path(core_path).resolve(),
-        "fname_root_slot": select_labeled_address(
-            path,
-            payload.get("fname_root_slots"),
-            field="fname_root_slots",
-            label=root_label,
-            label_flag="--evidence-pack-fname-root-label",
-        ),
-        "gobjects": select_labeled_address(
-            path,
-            payload.get("gobjects_candidates"),
-            field="gobjects_candidates",
-            label=gobjects_label,
-            label_flag="--evidence-pack-gobjects-label",
-        ),
-    }
-
-
-def merge_manifest_default(current: object | None, default: object, field: str) -> object:
-    if current is None:
-        return default
-    if current != default:
-        raise SystemExit(f"{field} conflicts with --evidence-pack-manifest")
-    return current
 
 
 def repo_commit() -> str:
@@ -388,41 +314,42 @@ def main() -> int:
             args.evidence_pack_manifest,
             args.evidence_pack_fname_root_label,
             args.evidence_pack_gobjects_label,
+            inspector.parse_int,
         )
         if args.evidence_pack_manifest is not None
-        else {}
+        else None
     )
     if pack_defaults:
-        if args.core.resolve() != pack_defaults["core_path"]:
+        if args.core.resolve() != pack_defaults.core_path:
             raise SystemExit("--core conflicts with --evidence-pack-manifest core.path")
         args.fname_root_slot = merge_manifest_default(
             args.fname_root_slot,
-            pack_defaults["fname_root_slot"],
+            pack_defaults.fname_root_slot,
             "--fname-root-slot",
         )
         args.gobjects = merge_manifest_default(
             args.gobjects,
-            pack_defaults["gobjects"],
+            pack_defaults.gobjects,
             "--gobjects",
         )
         args.artifact_kind = merge_manifest_default(
             args.artifact_kind,
-            pack_defaults["artifact_kind"],
+            pack_defaults.artifact_kind,
             "--artifact-kind",
         )
         args.artifact_sha256 = merge_manifest_default(
             args.artifact_sha256,
-            pack_defaults["artifact_sha256"],
+            pack_defaults.artifact_sha256,
             "--artifact-sha256",
         )
         args.capture_id = merge_manifest_default(
             args.capture_id,
-            pack_defaults["capture_id"],
+            pack_defaults.capture_id,
             "--capture-id",
         )
         args.evidence_pack_id = merge_manifest_default(
             args.evidence_pack_id,
-            pack_defaults["evidence_pack_id"],
+            pack_defaults.evidence_pack_id,
             "--evidence-pack-id",
         )
     artifact_kind = optional_safe_text(args.artifact_kind, "artifact-kind")

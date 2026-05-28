@@ -223,6 +223,9 @@ Updated: 2026-05-28
   `artifact_kind`, `artifact_sha256`, `capture_id`, and `evidence_pack_id`. Partial identity
   is rejected before writing snapshots, and artifact identity still requires an explicit
   `--fname-root-slot`.
+- fact: UFunction and ScriptStruct snapshot regenerators share evidence-pack manifest
+  parsing through `scripts/snapshot_evidence_pack.py`. Keep future core/FName/GObjects
+  manifest-default rules centralized there so the two promotion paths cannot diverge.
 - fact: `build_core_dump_evidence_pack.py --gobjects-sample-index` uses only explicit
   `--fname-root-slot` values for sampled UObject/class name resolution. Default primary
   FName roots are not mixed into second-source GObjects sampling.
@@ -258,6 +261,11 @@ Updated: 2026-05-28
   envelope explicitly: `enabled=false`, an `instance_allowlist` array, and
   `allow_all_instances=false`. Existing configs may omit `allow_all_instances`; enabled
   configs still fail closed unless scoped to the current instance or explicitly all-instance.
+- fact: Operator-supplied passive live log evidence from 2026-05-28 is recorded in
+  `docs/research/2026-05-28-passive-chat-reflection-live-observation.md`. It confirms
+  experimental `ServerSendChatMessage` metadata observations and outer-FName rejection
+  behavior only; it is not public SDK readiness and no server action was performed for the
+  note.
 - fact: Plugin loading now fails closed before discovery when `OBELISK_INSTANCE_ID` is
   missing, empty, or contains anything outside letters, digits, `_`, or `-`. Config
   `instance_allowlist` entries use the same safe-token rule.
