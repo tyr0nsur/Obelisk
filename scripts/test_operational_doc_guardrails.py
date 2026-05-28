@@ -10,6 +10,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CHECK_ROOTS = [
     REPO_ROOT / "README.md",
+    REPO_ROOT / "CONTRIBUTING.md",
+    REPO_ROOT / ".github",
     REPO_ROOT / "docs",
     REPO_ROOT / "agent-skills",
 ]

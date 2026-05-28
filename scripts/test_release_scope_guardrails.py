@@ -100,6 +100,9 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("scripts/check_release_readiness.sh", release)
         self.assertIn("scripts/check_release_readiness.sh", pr_template)
         self.assertIn("scripts/check_release_readiness.sh", ci)
+        self.assertIn("analyze_runtime_observer_log.py --fail-on-quality-blockers", pr_template)
+        self.assertIn("observational only", pr_template)
+        self.assertIn("not release readiness or second-source promotion evidence", pr_template)
         self.assertIn("Core-first release readiness", ci)
         self.assertIn("first-stable core release gate", ci)
         self.assertIn("--require-second-source-readiness", ci)
@@ -108,6 +111,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("gameplay/module second-source promotion gate was not run", script)
         self.assertIn("scripts/install_obelisk_plugin.sh --dry-run", script)
         self.assertIn("--require-second-source-readiness", release)
+        self.assertIn("--require-second-source-readiness", pr_template)
         self.assertIn("--require-second-source-readiness", script)
         self.assertIn("--fail-on-readiness-gaps", script)
         self.assertIn("analyze_runtime_observer_log.py --fail-on-quality-blockers", release)
@@ -115,6 +119,8 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("not\nsecond-source promotion evidence", release)
         self.assertIn("readiness_gate=none", release)
         self.assertIn("runtime_observer_observational_only", release)
+        self.assertNotIn("--map Ragnarok --instance arkserver", release)
+        self.assertIn("--map <map> --instance <instance-id>", release)
 
     def test_release_example_does_not_publish_map_scoped_config(self) -> None:
         obase_docs = read("docs/oBaseEvents.md")

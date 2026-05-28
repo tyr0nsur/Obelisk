@@ -76,11 +76,13 @@ git status --short --ignored
 
 5. Update `CHANGELOG.md`.
 6. Confirm docs and wrappers use `state/instances/<instance-id>/` markers only.
-7. For the protected Ragnarok harness, confirm quiet stable posture after any approved
-   runtime experiment:
+7. If this release candidate followed an approved runtime experiment, confirm quiet stable
+   posture on the same approved validation adapter target. If no runtime experiment was
+   part of the release validation, keep this release check offline and skip live harness
+   inspection.
 
 ```bash
-scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map Ragnarok --instance arkserver
+scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map <map> --instance <instance-id>
 ```
 
 8. Tag:

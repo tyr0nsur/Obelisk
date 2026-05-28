@@ -100,8 +100,8 @@ scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection
 ```
 
 Experimental debug/scanner work must use explicit env plus instance markers and
-rollback to stable posture. Keep `arkserver2` stopped while RAM is constrained
-unless the operator explicitly reopens it.
+rollback to stable posture. `arkserver2` / TheIsland is powered off by default; use it
+only with explicit operator approval for a scoped test, then shut it down afterward.
 
 ## Commit Style
 
