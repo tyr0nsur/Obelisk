@@ -130,18 +130,23 @@ Updated: 2026-05-28
   registration IDs and `UnregisterCallback(id)` coverage. Public `ObeliskApi` callback
   registration remains unchanged for ABI v1; this prepares a future explicit unsubscribe
   capability without promoting it yet.
-- fact: Current uncommitted hook hardening adds active ProcessEvent frame tracking around
-  the detour and manual trampoline calls. Hook removal restores target bytes first, waits
-  briefly for active frames to drain, and leaves the trampoline mapped with a warning
-  instead of risking `munmap` while a frame may still be executing.
+- fact: Commit `f5d1b0e` adds active ProcessEvent frame tracking around the detour and
+  manual trampoline calls. Hook removal restores target bytes first, waits briefly for
+  active frames to drain, and leaves the trampoline mapped with a warning instead of
+  risking `munmap` while a frame may still be executing.
 - fact: Commit `8519b2b` replaces the detached debug-control thread with owned thread
   state, stop flag, condition-variable wakeup, and join before logger shutdown on
   bootstrap failure or normal unload.
-- fact: Current uncommitted EventManager hardening aligns ProcessEvent callback dispatch
+- fact: Commit `2095b1a` aligns ProcessEvent callback dispatch
   with the existing chat dispatcher self-unregister behavior by using a recursive dispatch
   mutex and adding coverage for a callback unregistering its own registration during
   dispatch. This is internal groundwork for future explicit public callback unsubscribe
   handles; public ABI remains unchanged.
+- fact: Current uncommitted hook lifecycle hardening snapshots the ProcessEvent original
+  trampoline under a hook-state mutex, starts the active-frame guard before public
+  `CallOriginalProcessEvent` observes hook state, and makes hook removal mark `removing`
+  under the same mutex before restoring bytes or unmapping the trampoline. This addresses
+  the audited race between `CallProcessEvent` and hook removal.
 - finding: Reflection tooling audit found UFunction snapshot fixture coverage is broad
   across module areas, but ScriptStruct coverage is the current bottleneck with only two
   transfer structs. Prioritize an offline second-source readiness report before any

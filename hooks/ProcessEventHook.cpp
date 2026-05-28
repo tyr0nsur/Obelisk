@@ -11,6 +11,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
 #include <string>
 #include <string_view>
 #include <sys/mman.h>
@@ -54,6 +55,7 @@ namespace Obelisk::Hooks
         };
 
         AbsoluteHook s_ProcessEventHook;
+        std::mutex s_ProcessEventHookMutex;
 
         class ActiveProcessEventFrame
         {
@@ -228,30 +230,47 @@ namespace Obelisk::Hooks
         return s_ActiveProcessEventFrames.load(std::memory_order_acquire) == 0;
     }
 
+    static ProcessEvent_t SnapshotOriginalProcessEvent()
+    {
+        std::lock_guard<std::mutex> lock(s_ProcessEventHookMutex);
+        if (s_RemovingProcessEventHook.load(std::memory_order_acquire))
+            return nullptr;
+        if (!s_ProcessEventHook.Installed || !s_ProcessEventHook.Trampoline)
+            return nullptr;
+        return reinterpret_cast<ProcessEvent_t>(s_ProcessEventHook.Trampoline);
+    }
+
     static void RemoveAbsoluteHook(AbsoluteHook& hook)
     {
-        if (!hook.Installed || !hook.Target)
-            return;
-
-        s_RemovingProcessEventHook.store(true, std::memory_order_release);
-
-        if (MakeWritableExecutable(hook.Target, kPatchSize))
         {
-            std::memcpy(hook.Target, hook.OriginalBytes.data(), hook.OriginalBytes.size());
-            __builtin___clear_cache(reinterpret_cast<char*>(hook.Target),
-                                    reinterpret_cast<char*>(static_cast<uint8_t*>(hook.Target) + kPatchSize));
-            MakeReadableExecutable(hook.Target, kPatchSize);
+            std::lock_guard<std::mutex> lock(s_ProcessEventHookMutex);
+            if (!hook.Installed || !hook.Target)
+                return;
+
+            s_RemovingProcessEventHook.store(true, std::memory_order_release);
+
+            if (MakeWritableExecutable(hook.Target, kPatchSize))
+            {
+                std::memcpy(hook.Target, hook.OriginalBytes.data(), hook.OriginalBytes.size());
+                __builtin___clear_cache(reinterpret_cast<char*>(hook.Target),
+                                        reinterpret_cast<char*>(static_cast<uint8_t*>(hook.Target) + kPatchSize));
+                MakeReadableExecutable(hook.Target, kPatchSize);
+            }
         }
 
         const bool drained = WaitForActiveProcessEventFramesToDrain();
-        if (hook.Trampoline && drained)
-            munmap(hook.Trampoline, kTrampolineSize);
-        else if (hook.Trampoline)
-            OBELISK_WARN("ProcessEvent trampoline left mapped because {} frame(s) were still active during hook removal.",
-                         s_ActiveProcessEventFrames.load(std::memory_order_acquire));
 
-        hook = {};
-        s_RemovingProcessEventHook.store(false, std::memory_order_release);
+        {
+            std::lock_guard<std::mutex> lock(s_ProcessEventHookMutex);
+            if (hook.Trampoline && drained)
+                munmap(hook.Trampoline, kTrampolineSize);
+            else if (hook.Trampoline)
+                OBELISK_WARN("ProcessEvent trampoline left mapped because {} frame(s) were still active during hook removal.",
+                             s_ActiveProcessEventFrames.load(std::memory_order_acquire));
+
+            hook = {};
+            s_RemovingProcessEventHook.store(false, std::memory_order_release);
+        }
     }
 
     static uint64_t GetTraceLimit()
@@ -820,7 +839,7 @@ namespace Obelisk::Hooks
         }
 
         // Call original function
-        ProcessEvent_t original = reinterpret_cast<ProcessEvent_t>(s_ProcessEventHook.Trampoline);
+        ProcessEvent_t original = SnapshotOriginalProcessEvent();
         if (original)
             original(object, function, params);
 
@@ -830,10 +849,13 @@ namespace Obelisk::Hooks
 
     void ProcessEventHook::Install()
     {
-        if (s_ProcessEventHook.Installed)
         {
-            OBELISK_WARN("ProcessEvent hook already installed.");
-            return;
+            std::lock_guard<std::mutex> lock(s_ProcessEventHookMutex);
+            if (s_ProcessEventHook.Installed)
+            {
+                OBELISK_WARN("ProcessEvent hook already installed.");
+                return;
+            }
         }
 
         // UObject::ProcessEvent(UFunction*, void*) as seen from UE UObject-derived vtables.
@@ -877,10 +899,18 @@ namespace Obelisk::Hooks
 
         OBELISK_INFO("Found ProcessEvent at address: {}", processEventAddr);
 
-        if (InstallAbsoluteHook(s_ProcessEventHook, processEventAddr, reinterpret_cast<void*>(&ProcessEvent_Detour)))
+        bool installed = false;
+        void* trampoline = nullptr;
+        {
+            std::lock_guard<std::mutex> lock(s_ProcessEventHookMutex);
+            installed = InstallAbsoluteHook(s_ProcessEventHook, processEventAddr, reinterpret_cast<void*>(&ProcessEvent_Detour));
+            trampoline = s_ProcessEventHook.Trampoline;
+        }
+
+        if (installed)
         {
             OBELISK_INFO("ProcessEvent absolute x64 hook installed successfully. patch_size={} trampoline={}",
-                         kPatchSize, s_ProcessEventHook.Trampoline);
+                         kPatchSize, trampoline);
         }
         else
         {
@@ -890,23 +920,21 @@ namespace Obelisk::Hooks
 
     void ProcessEventHook::CallOriginalProcessEvent(void* object, void* function, void* params)
     {
-        if (s_RemovingProcessEventHook.load(std::memory_order_acquire))
+        ActiveProcessEventFrame activeFrame;
+        ProcessEvent_t original = SnapshotOriginalProcessEvent();
+        if (!original)
         {
-            OBELISK_WARN("CallOriginalProcessEvent skipped while ProcessEvent hook removal is in progress.");
+            if (s_RemovingProcessEventHook.load(std::memory_order_acquire))
+                OBELISK_WARN("CallOriginalProcessEvent skipped while ProcessEvent hook removal is in progress.");
             return;
         }
 
-        if (s_ProcessEventHook.Trampoline)
-        {
-            ActiveProcessEventFrame activeFrame;
-            ProcessEvent_t original = reinterpret_cast<ProcessEvent_t>(s_ProcessEventHook.Trampoline);
-            if (original)
-                original(object, function, params);
-        }
+        original(object, function, params);
     }
 
     bool ProcessEventHook::IsInstalled()
     {
+        std::lock_guard<std::mutex> lock(s_ProcessEventHookMutex);
         return s_ProcessEventHook.Installed;
     }
 

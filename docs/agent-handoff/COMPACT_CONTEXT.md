@@ -120,15 +120,18 @@ work from repository state instead of chat history.
 - Current uncommitted runtime/API round adds internal `EventManager` registration IDs and
   `UnregisterCallback(id)` tests. Public `ObeliskApi` callback registration remains
   unchanged for ABI v1.
-- Current uncommitted hook hardening tracks active ProcessEvent detour/trampoline frames
-  and avoids unmapping the trampoline during hook removal until frames drain; on timeout it
-  warns and intentionally leaves the trampoline mapped to avoid use-after-free.
+- Commit `f5d1b0e` tracks active ProcessEvent detour/trampoline frames and avoids
+  unmapping the trampoline during hook removal until frames drain; on timeout it warns and
+  intentionally leaves the trampoline mapped to avoid use-after-free.
 - Commit `8519b2b` owns the debug-control thread and joins it before logger shutdown
   instead of detaching it.
-- Current uncommitted EventManager hardening aligns ProcessEvent callback dispatch with
-  chat dispatcher self-unregister behavior by using a recursive dispatch mutex and testing
-  a callback that unregisters its own registration during dispatch. Public ABI remains
-  unchanged.
+- Commit `2095b1a` aligns ProcessEvent callback dispatch with chat dispatcher
+  self-unregister behavior by using a recursive dispatch mutex and testing a callback that
+  unregisters its own registration during dispatch. Public ABI remains unchanged.
+- Current uncommitted hook lifecycle hardening snapshots the ProcessEvent original
+  trampoline under a hook-state mutex, starts the active-frame guard before public
+  `CallOriginalProcessEvent` observes hook state, and makes hook removal mark `removing`
+  under the same mutex before restoring bytes or unmapping the trampoline.
 - Current uncommitted reflection-tooling round adds
   `scripts/compare_reflection_snapshots.py --readiness-report`. Use it to summarize
   comparable snapshot coverage and second-source status by schema/module. Current fixtures
