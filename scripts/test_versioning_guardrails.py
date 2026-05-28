@@ -11,6 +11,20 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
+def cmake_set_value(cmake_text: str, variable: str) -> str:
+    match = re.search(rf"set\({re.escape(variable)}\s+\"?(?P<value>[^\")]+)\"?\)", cmake_text)
+    if not match:
+        raise AssertionError(f"missing CMake variable {variable}")
+    return match.group("value")
+
+
+def header_define_value(header_text: str, macro: str) -> str:
+    match = re.search(rf"^#define\s+{re.escape(macro)}\s+(?P<value>\d+)u?$", header_text, re.M)
+    if not match:
+        raise AssertionError(f"missing public SDK macro {macro}")
+    return match.group("value")
+
+
 class VersioningGuardrailTests(unittest.TestCase):
     def test_public_docs_link_versioning_policy(self) -> None:
         for relative in ("README.md", "docs/STATUS.md", "docs/RELEASE.md"):
@@ -57,6 +71,28 @@ class VersioningGuardrailTests(unittest.TestCase):
         self.assertIn('out->version = "0.1.0-dev";', obase)
         self.assertNotIn('out->version = "0.1.0";', obase)
         self.assertIn('out->version = "0.1.0-dev";', readme)
+
+    def test_cmake_exported_abi_versions_match_public_sdk_header(self) -> None:
+        cmake = (REPO_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+        header = (REPO_ROOT / "include/obelisk/ObeliskApi.h").read_text(encoding="utf-8")
+        config_template = (REPO_ROOT / "cmake/ObeliskConfig.cmake.in").read_text(encoding="utf-8")
+
+        for variable, macro, exported in (
+            ("OBELISK_API_ABI_VERSION", "OBELISK_API_ABI_VERSION", "Obelisk_API_ABI_VERSION"),
+            (
+                "OBELISK_PLUGIN_METADATA_ABI_VERSION",
+                "OBELISK_PLUGIN_METADATA_ABI_VERSION",
+                "Obelisk_PLUGIN_METADATA_ABI_VERSION",
+            ),
+            (
+                "OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION",
+                "OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION",
+                "Obelisk_PLUGIN_INIT_CONTEXT_ABI_VERSION",
+            ),
+        ):
+            with self.subTest(variable=variable):
+                self.assertEqual(cmake_set_value(cmake, variable), header_define_value(header, macro))
+                self.assertIn(f"set({exported} @{variable}@)", config_template)
 
     def test_release_doc_does_not_claim_current_stable_release(self) -> None:
         text = (REPO_ROOT / "docs/RELEASE.md").read_text(encoding="utf-8")
