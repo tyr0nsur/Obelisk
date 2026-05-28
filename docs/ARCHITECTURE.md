@@ -84,6 +84,9 @@ OBELISK_INSTANCE_ID
 This keeps Obelisk artifacts outside the target binary directory and allows multiple ARK
 server processes to share one runtime root. `OBELISK_INSTANCE_ID` separates logs,
 operational markers, plugin activation gates, and process-local runtime state by instance.
+Plugin discovery is fail-closed: plugin loading requires an explicit absolute
+`OBELISK_PLUGIN_DIR` or `OBELISK_ROOT`-derived `plugins` path, and the runtime does not scan
+a working-directory-relative `plugins/` fallback.
 Plugin binaries and config may be shared across a cluster; mutable plugin state should be
 instance-scoped unless the plugin documents and implements safe cross-process ownership.
 

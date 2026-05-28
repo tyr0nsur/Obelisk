@@ -1,7 +1,45 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+wrapper_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
 export OBELISK_ROOT="${OBELISK_ROOT:-/servidor/ark/obelisk}"
+
+validate_runtime_layout() {
+    case "${OBELISK_ROOT}" in
+        /*) ;;
+        *)
+            echo "OBELISK_ROOT must be an absolute path: ${OBELISK_ROOT}" >&2
+            exit 1
+            ;;
+    esac
+
+    if [[ "${OBELISK_ROOT}" == "/" || -L "${OBELISK_ROOT}" || ! -d "${OBELISK_ROOT}" ]]; then
+        echo "OBELISK_ROOT must be a real non-symlink directory and must not be /: ${OBELISK_ROOT}" >&2
+        exit 1
+    fi
+
+    local required_dir
+    for required_dir in lib plugins config logs state state/instances; do
+        if [[ -L "${OBELISK_ROOT}/${required_dir}" || ! -d "${OBELISK_ROOT}/${required_dir}" ]]; then
+            echo "Obelisk runtime directory must be real and non-symlink: ${OBELISK_ROOT}/${required_dir}" >&2
+            exit 1
+        fi
+    done
+
+    if [[ -L "${OBELISK_ROOT}/lib/libobelisk.so" || ! -f "${OBELISK_ROOT}/lib/libobelisk.so" ]]; then
+        echo "Obelisk runtime library must be a regular non-symlink file: ${OBELISK_ROOT}/lib/libobelisk.so" >&2
+        exit 1
+    fi
+
+    if [[ -L "${wrapper_dir}/ShooterGameServer" || ! -f "${wrapper_dir}/ShooterGameServer" ]]; then
+        echo "ShooterGameServer must be a regular non-symlink file beside the Obelisk wrapper: ${wrapper_dir}/ShooterGameServer" >&2
+        exit 1
+    fi
+}
+
+validate_runtime_layout
+
 export OBELISK_PLUGIN_DIR="${OBELISK_ROOT}/plugins"
 export OBELISK_CONFIG_DIR="${OBELISK_ROOT}/config"
 export OBELISK_LOG_DIR="${OBELISK_ROOT}/logs"
@@ -103,4 +141,4 @@ case "${1:-}" in
         ;;
 esac
 
-exec ./ShooterGameServer "$@"
+exec "${wrapper_dir}/ShooterGameServer" "$@"

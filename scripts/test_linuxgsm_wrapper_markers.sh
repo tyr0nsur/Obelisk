@@ -2,10 +2,12 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WRAPPER="${REPO_ROOT}/packaging/linuxgsm/ObeliskRun.sh"
-DEBUG_WRAPPER="${REPO_ROOT}/packaging/linuxgsm/ObeliskRunDebug.sh"
 TMP_DIR="$(mktemp -d /tmp/obelisk-wrapper-markers.XXXXXX)"
 trap 'rm -rf "${TMP_DIR}"' EXIT
+WRAPPER_DIR="${TMP_DIR}/wrapper"
+WRAPPER="${WRAPPER_DIR}/ObeliskRun.sh"
+DEBUG_WRAPPER="${WRAPPER_DIR}/ObeliskRunDebug.sh"
+RUN_CWD="${TMP_DIR}/cwd"
 LIBC_SO="$(ldconfig -p | awk '/libc\.so\.6/{print $NF; exit}')"
 if [[ -z "${LIBC_SO}" ]]; then
     echo "Could not locate libc.so.6 for harmless LD_PRELOAD fixture" >&2
@@ -32,15 +34,22 @@ assert_not_contains() {
     fi
 }
 
-cat > "${TMP_DIR}/ShooterGameServer" <<'SH'
+mkdir -p "${WRAPPER_DIR}" "${RUN_CWD}"
+cp "${REPO_ROOT}/packaging/linuxgsm/ObeliskRun.sh" "${WRAPPER}"
+cp "${REPO_ROOT}/packaging/linuxgsm/ObeliskRunDebug.sh" "${DEBUG_WRAPPER}"
+chmod +x "${WRAPPER}" "${DEBUG_WRAPPER}"
+
+cat > "${WRAPPER_DIR}/ShooterGameServer" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
 {
     printf 'args=%s\n' "$*"
+    printf 'server_path=%s\n' "$0"
+    printf 'cwd=%s\n' "$(pwd)"
     env | sort
 } > "${OBELISK_WRAPPER_CAPTURE}"
 SH
-chmod +x "${TMP_DIR}/ShooterGameServer"
+chmod +x "${WRAPPER_DIR}/ShooterGameServer"
 
 run_wrapper() {
     local root="$1"
@@ -48,7 +57,7 @@ run_wrapper() {
     shift 2
 
     (
-        cd "${TMP_DIR}"
+        cd "${RUN_CWD}"
         OBELISK_ROOT="${root}" \
         OBELISK_WRAPPER_CAPTURE="${capture}" \
         "${WRAPPER}" "$@"
@@ -62,7 +71,7 @@ run_wrapper_with_instance() {
     shift 3
 
     (
-        cd "${TMP_DIR}"
+        cd "${RUN_CWD}"
         OBELISK_ROOT="${root}" \
         OBELISK_INSTANCE_ID="${instance}" \
         OBELISK_WRAPPER_CAPTURE="${capture}" \
@@ -70,10 +79,27 @@ run_wrapper_with_instance() {
     )
 }
 
+expect_wrapper_failure() {
+    local label="$1"
+    shift
+
+    if "$@" > "${TMP_DIR}/${label}.stdout" 2> "${TMP_DIR}/${label}.stderr"; then
+        echo "Expected wrapper failure for ${label}" >&2
+        cat "${TMP_DIR}/${label}.stdout" >&2
+        cat "${TMP_DIR}/${label}.stderr" >&2
+        exit 1
+    fi
+}
+
 prepare_root() {
     local root="$1"
-    mkdir -p "${root}/lib" "${root}/state/instances/arkserver2"
-    ln -sf "${LIBC_SO}" "${root}/lib/libobelisk.so"
+    mkdir -p \
+        "${root}/lib" \
+        "${root}/plugins" \
+        "${root}/config" \
+        "${root}/logs" \
+        "${root}/state/instances/arkserver2"
+    cp "${LIBC_SO}" "${root}/lib/libobelisk.so"
 }
 
 root_no_marker="${TMP_DIR}/root-no-marker"
@@ -81,6 +107,8 @@ capture_no_marker="${TMP_DIR}/no-marker.env"
 prepare_root "${root_no_marker}"
 run_wrapper "${root_no_marker}" "${capture_no_marker}" TheIsland?listen
 
+assert_contains "${capture_no_marker}" "^server_path=${WRAPPER_DIR}/ShooterGameServer$"
+assert_contains "${capture_no_marker}" "^cwd=${RUN_CWD}$"
 assert_contains "${capture_no_marker}" '^OBELISK_INSTANCE_ID=arkserver2$'
 assert_not_contains "${capture_no_marker}" '^OBELISK_ENABLE_STRUCTURE_REFLECTION='
 assert_not_contains "${capture_no_marker}" '^OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256='
@@ -110,7 +138,7 @@ prepare_root "${root_override}"
 : > "${root_override}/state/instances/arkserver2/enable-structure-reflection"
 : > "${root_override}/state/instances/arkserver2/enable-inventory-reflection"
 (
-    cd "${TMP_DIR}"
+    cd "${RUN_CWD}"
     OBELISK_ROOT="${root_override}" \
     OBELISK_WRAPPER_CAPTURE="${capture_override}" \
     OBELISK_INVENTORY_REFLECTION_LOG_LIMIT=5 \
@@ -153,7 +181,7 @@ root_inherited="${TMP_DIR}/root-inherited"
 capture_inherited="${TMP_DIR}/inherited.env"
 prepare_root "${root_inherited}"
 (
-    cd "${TMP_DIR}"
+    cd "${RUN_CWD}"
     OBELISK_ROOT="${root_inherited}" \
     OBELISK_WRAPPER_CAPTURE="${capture_inherited}" \
     OBELISK_PLUGIN_DIR=/tmp/unsafe-obelisk-plugins \
@@ -210,18 +238,52 @@ assert_not_contains "${capture_inherited}" '^OBELISK_STRUCTURE_REFLECTION_LOG_LI
 
 capture_symlink_instance="${TMP_DIR}/symlink-instance.env"
 root_symlink_instance="${TMP_DIR}/root-symlink-instance"
-mkdir -p "${root_symlink_instance}/lib" "${root_symlink_instance}/real-instance" "${root_symlink_instance}/state/instances"
-ln -sf "${LIBC_SO}" "${root_symlink_instance}/lib/libobelisk.so"
+prepare_root "${root_symlink_instance}"
+mkdir -p "${root_symlink_instance}/real-instance"
+rm -rf "${root_symlink_instance}/state/instances/arkserver2"
 : > "${root_symlink_instance}/real-instance/enable-inventory-reflection"
 ln -s "${root_symlink_instance}/real-instance" "${root_symlink_instance}/state/instances/arkserver2"
 run_wrapper "${root_symlink_instance}" "${capture_symlink_instance}" TheIsland?listen
 assert_not_contains "${capture_symlink_instance}" '^OBELISK_ENABLE_INVENTORY_REFLECTION='
 
+expect_wrapper_failure relative-root env \
+    OBELISK_ROOT=relative/root \
+    OBELISK_WRAPPER_CAPTURE="${TMP_DIR}/relative-root.env" \
+    "${WRAPPER}" TheIsland?listen
+
+root_symlink_real="${TMP_DIR}/root-symlink-real"
+root_symlink_link="${TMP_DIR}/root-symlink-link"
+prepare_root "${root_symlink_real}"
+ln -s "${root_symlink_real}" "${root_symlink_link}"
+expect_wrapper_failure symlink-root env \
+    OBELISK_ROOT="${root_symlink_link}" \
+    OBELISK_WRAPPER_CAPTURE="${TMP_DIR}/symlink-root.env" \
+    "${WRAPPER}" TheIsland?listen
+
+root_plugins_symlink="${TMP_DIR}/root-plugins-symlink"
+prepare_root "${root_plugins_symlink}"
+rm -rf "${root_plugins_symlink}/plugins"
+mkdir -p "${TMP_DIR}/external-plugins"
+ln -s "${TMP_DIR}/external-plugins" "${root_plugins_symlink}/plugins"
+expect_wrapper_failure symlink-plugins env \
+    OBELISK_ROOT="${root_plugins_symlink}" \
+    OBELISK_WRAPPER_CAPTURE="${TMP_DIR}/symlink-plugins.env" \
+    "${WRAPPER}" TheIsland?listen
+
+root_lib_symlink="${TMP_DIR}/root-lib-symlink"
+prepare_root "${root_lib_symlink}"
+rm -f "${root_lib_symlink}/lib/libobelisk.so"
+ln -s "${LIBC_SO}" "${root_lib_symlink}/lib/libobelisk.so"
+expect_wrapper_failure symlink-runtime-lib env \
+    OBELISK_ROOT="${root_lib_symlink}" \
+    OBELISK_WRAPPER_CAPTURE="${TMP_DIR}/symlink-runtime-lib.env" \
+    "${WRAPPER}" TheIsland?listen
+
 capture_debug_default="${TMP_DIR}/debug-default.env"
 root_debug_default="${TMP_DIR}/root-debug-default"
 prepare_root "${root_debug_default}"
 (
-    cd "${TMP_DIR}"
+    cd "${RUN_CWD}"
     OBELISK_ROOT="${root_debug_default}" \
     OBELISK_WRAPPER_CAPTURE="${capture_debug_default}" \
     OBELISK_PLUGIN_DIR=/tmp/unsafe-debug-plugins \
@@ -245,7 +307,7 @@ assert_not_contains "${capture_debug_default}" '^OBELISK_ENABLE_NATIVE_EXEC_PROB
 
 capture_debug_ptrace="${TMP_DIR}/debug-ptrace.env"
 (
-    cd "${TMP_DIR}"
+    cd "${RUN_CWD}"
     OBELISK_ROOT="${root_debug_default}" \
     OBELISK_WRAPPER_CAPTURE="${capture_debug_ptrace}" \
     OBELISK_DEBUG_ALLOW_PTRACE=1 \

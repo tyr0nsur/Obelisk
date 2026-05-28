@@ -359,6 +359,50 @@ namespace
         }
     }
 
+    void TestEmptyPluginDirectoryIsRejected()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_empty_plugin_dir");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{.filename = "empty_plugin_dir.so"};
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins("");
+
+        Require(plugin.getInfoCalls == 0, "empty plugin directory still scanned plugin metadata");
+        Require(plugin.initCalls == 0, "empty plugin directory initialized plugin");
+        Require(plugin.closeCalls == 0, "empty plugin directory opened plugin handle");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestRelativePluginDirectoryIsRejected()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_relative_plugin_dir");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{.filename = "relative_plugin_dir.so"};
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins("plugins");
+
+        Require(plugin.getInfoCalls == 0, "relative plugin directory still scanned plugin metadata");
+        Require(plugin.initCalls == 0, "relative plugin directory initialized plugin");
+        Require(plugin.closeCalls == 0, "relative plugin directory opened plugin handle");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestValidPluginLoadsAndUnloadCleansCallbacks()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_valid");
@@ -1570,6 +1614,8 @@ int main()
     setenv("OBELISK_LOG_DIR", logRoot.string().c_str(), 1);
     Obelisk::Logger::Init();
 
+    TestEmptyPluginDirectoryIsRejected();
+    TestRelativePluginDirectoryIsRejected();
     TestValidPluginLoadsAndUnloadCleansCallbacks();
     TestPluginOwnerTokensSkipZeroAndLiveTokensAfterWrap();
     TestGlobalProcessEventCallbackRejectedByDefault();

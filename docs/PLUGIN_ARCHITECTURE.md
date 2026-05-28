@@ -124,12 +124,13 @@ Obelisk should support two plugin build paths:
 - External plugins compiled against `include/obelisk/ObeliskApi.h` and copied into
   `${OBELISK_PLUGIN_DIR}` as `.so` files.
 
-The runtime does not need to know how a plugin was compiled. On restart it scans
-`${OBELISK_PLUGIN_DIR}` for `.so` files directly inside that directory, resolves
-`ObeliskPlugin_GetInfo`, validates metadata/config, rejects duplicate `plugin_id`
-values, applies runtime activation gates, resolves `ObeliskPlugin_Init`, optionally
-resolves `ObeliskPlugin_Shutdown`, and passes enabled plugins their resolved config
-paths.
+The runtime does not need to know how a plugin was compiled. On restart it requires an
+explicit absolute plugin directory from `${OBELISK_PLUGIN_DIR}` or `${OBELISK_ROOT}/plugins`;
+it does not fall back to a `plugins/` directory relative to the ARK process working
+directory. It scans `.so` files directly inside that directory, resolves
+`ObeliskPlugin_GetInfo`, validates metadata/config, rejects duplicate `plugin_id` values,
+applies runtime activation gates, resolves `ObeliskPlugin_Init`, optionally resolves
+`ObeliskPlugin_Shutdown`, and passes enabled plugins their resolved config paths.
 
 Treat `${OBELISK_PLUGIN_DIR}` as shared discovery scope in clustered installs. Copying a
 plugin there publishes it for discovery by every ARK process that shares the directory;

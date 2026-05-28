@@ -38,7 +38,7 @@ static std::string GetPluginDirectory()
     if (root && root[0] != '\0')
         return (std::filesystem::path(root) / "plugins").string();
 
-    return "plugins";
+    return {};
 }
 
 static void ConfigureDebugPtrace()

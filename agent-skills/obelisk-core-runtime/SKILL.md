@@ -31,7 +31,8 @@ Own these areas:
 - Keep plugin loading optional via `OBELISK_DISABLE_PLUGINS=1`.
 - Runtime plugin discovery must require `${OBELISK_ROOT}/plugins` or `OBELISK_PLUGIN_DIR`
   to already be a real non-symlink directory. Do not create or follow the plugin directory
-  inside `PluginManager::LoadPlugins`; installers own layout creation.
+  inside `PluginManager::LoadPlugins`; installers own layout creation. Never fall back to a
+  working-directory-relative `plugins/` path.
 - Never use `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` plus
   `enable-native-exec-probes` as part of normal runtime validation.
 - Do not let plugin exceptions or STL types cross the C ABI boundary.

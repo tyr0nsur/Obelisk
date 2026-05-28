@@ -30,6 +30,9 @@ the plugin directory is missing, a symlink, or not a directory.
 Only the thin launcher/wrapper should live inside the ARK binary directory. Runtime
 libraries, plugin `.so` files, plugin config, logs, and state markers belong under the
 central Obelisk root.
+Wrappers must fail before exporting `LD_PRELOAD` when `OBELISK_ROOT` is relative, `/`, a
+symlink, missing managed directories, or has a symlinked `lib/libobelisk.so`. They must
+execute the `ShooterGameServer` located beside the wrapper, not a CWD-relative binary.
 
 Convenience log links may live under:
 

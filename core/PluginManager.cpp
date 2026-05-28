@@ -680,7 +680,19 @@ namespace Obelisk::Core
                 return;
             }
 
+            if (directory.empty())
+            {
+                OBELISK_ERROR("OBELISK_PLUGIN_DIR or OBELISK_ROOT is required for plugin loading. Plugins will not be loaded.");
+                return;
+            }
+
             const fs::path pluginDirectory = directory;
+            if (!pluginDirectory.is_absolute())
+            {
+                OBELISK_ERROR("Plugin directory {} is not absolute. Plugins will not be loaded.", directory);
+                return;
+            }
+
             const fs::file_status pluginDirectoryStatus = fs::symlink_status(pluginDirectory);
             if (!fs::exists(pluginDirectoryStatus))
             {
