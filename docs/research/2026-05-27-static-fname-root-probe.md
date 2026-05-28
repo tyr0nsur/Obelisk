@@ -57,8 +57,9 @@ It records counts in the evidence pack and treats a static-root probe as a
 - element/chunk counts are plausible,
 - no global reject markers are present.
 
-`--strict` can pass from either repeat-confirmed indirect-table evidence or one valid
-static-root probe. This is still a research gate, not offset promotion.
+`--strict` can pass only from repeat-confirmed indirect-table evidence. Static-root probes
+are reported as candidate clues, but a single static-root probe stays inconclusive without
+independent static validation or a second isolated capture.
 
 ## Result
 

@@ -398,7 +398,7 @@ class ReflectionScannerAnalyzerStrictTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         summary = json.loads(result.stdout)
         evidence_pack = summary["evidence_pack"]
-        self.assertEqual(evidence_pack["status"], "research-candidate")
+        self.assertEqual(evidence_pack["status"], "inconclusive")
         self.assertEqual(evidence_pack["static_fname_root_probe_count"], 1)
         self.assertEqual(evidence_pack["static_fname_root_reject_count"], 1)
         self.assertEqual(evidence_pack["static_fname_root_candidate_count"], 1)
@@ -413,15 +413,15 @@ class ReflectionScannerAnalyzerStrictTests(unittest.TestCase):
         self.assertEqual(probe["header_index_ok"], 3)
         self.assertEqual(summary["static_fname_root_rejects"][0]["slot"], "0x5956f38")
 
-    def test_static_fname_root_candidate_passes_strict(self) -> None:
+    def test_static_fname_root_candidate_fails_strict_but_reports_candidate(self) -> None:
         result = self.run_analyzer([static_fname_root_probe()], "--strict")
 
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(result.returncode, 1)
         self.assertIn("Static FName root probes: 1", result.stdout)
         self.assertIn("Static FName root candidates: 1", result.stdout)
         self.assertIn("slot=0x5956f30", result.stdout)
 
-    def test_current_static_fname_root_core_shape_passes_strict(self) -> None:
+    def test_current_static_fname_root_core_shape_fails_strict_but_reports_candidate(self) -> None:
         result = self.run_analyzer(
             [
                 static_fname_root_probe(
@@ -433,7 +433,7 @@ class ReflectionScannerAnalyzerStrictTests(unittest.TestCase):
             "--strict",
         )
 
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(result.returncode, 1)
         self.assertIn("Static FName root candidates: 1", result.stdout)
         self.assertIn("slot=0x5956f30", result.stdout)
         self.assertIn("elements=282990", result.stdout)

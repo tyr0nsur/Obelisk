@@ -91,8 +91,9 @@ work from repository state instead of chat history.
   `artifact_kind`, `artifact_sha256`, `capture_id`, and `evidence_pack_id`. Missing or
   matching identity is `inconclusive`, so self-comparison cannot pass as independent
   evidence. Readiness JSON includes per-target details plus a top-level `promotion_gate`
-  summary. Missing base target-set entries are `not_applicable` for second-source status,
-  and rejected property/nested candidates make a target inconclusive before layout compare.
+  summary. Empty snapshot roots add a `no_targets` blocker. Missing base target-set entries
+  are `not_applicable` for second-source status, and rejected property/nested candidates
+  make a target inconclusive before layout compare.
 - UFunction and ScriptStruct regenerators accept the artifact identity flags above; the
   committed primary fixtures carry the primary core artifact SHA without storing core
   paths.
@@ -349,9 +350,9 @@ work from repository state instead of chat history.
   `address`, `call`, `jump`, or `other`) and evidence-pack access counts.
 - ReflectionScanner can probe explicit static FName root slots supplied through
   `OBELISK_REFLECTION_STATIC_FNAME_ROOTS` at startup and through a one-minute delayed
-  retry. Analyzer strict mode accepts a static-root research candidate only with exact
-  `None`/`ClientMessage`/`ServerChat`, `header_index_ok=3/3`, plausible counts, and no
-  reject markers; see
+  retry. Analyzer strict mode does not accept static-root probes by themselves; exact
+  static-root matches are reported as inconclusive clues until backed by repeat-confirmed
+  indirect-table evidence, a second isolated capture, or independent static validation; see
   `docs/research/2026-05-27-static-fname-root-probe.md`.
 - ReflectionScanner can also sample observed `UObject.NamePrivate.ComparisonIndex` values
   against env-supplied static FName roots with

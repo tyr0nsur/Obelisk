@@ -322,9 +322,10 @@ Updated: 2026-05-28
   self-comparison of the primary fixture root cannot masquerade as independent evidence.
   Readiness JSON includes per-target details for missing, inconclusive, rejected, or
   accepted targets plus a top-level `promotion_gate` summary with `ready` and blocker
-  counts. Target-set entries missing from the base root are `not_applicable` for
-  second-source status and block base coverage instead of inflating second-source-missing
-  counts.
+  counts. Empty snapshot roots add a `no_targets` blocker, so absence of evidence cannot
+  report `ready=true`. Target-set entries missing from the base root are `not_applicable`
+  for second-source status and block base coverage instead of inflating
+  second-source-missing counts.
 - fact: Snapshot comparison now rejects internally bad layouts before comparing:
   individual property candidates and nested array/struct candidates with non-candidate
   status or reject reasons make the target `inconclusive`, even when base and candidate
@@ -665,9 +666,10 @@ Updated: 2026-05-28
   `docs/research/2026-05-27-static-fname-root-candidate.md`.
 - fact: ReflectionScanner now has an explicit env-supplied static FName root probe via
   `OBELISK_REFLECTION_STATIC_FNAME_ROOTS`, including startup and one-minute delayed retry
-  checks. The analyzer parses static-root probes and rejects. A static-root research
-  candidate requires exact `None`/`ClientMessage`/`ServerChat`, `header_index_ok=3/3`,
-  plausible counts, and no reject markers; see
+  checks. The analyzer parses static-root probes and rejects, but static-root probes do not
+  satisfy analyzer `--strict` or upgrade the evidence pack to `research-candidate` by
+  themselves. They stay inconclusive until backed by repeat-confirmed indirect-table
+  evidence, a second isolated capture, or independent static validation; see
   `docs/research/2026-05-27-static-fname-root-probe.md`.
 - fact: ReflectionScanner also has opt-in observed-index static-root sampling via
   `OBELISK_REFLECTION_SAMPLE_STATIC_FNAME_ROOTS=1`. It samples only already discovered

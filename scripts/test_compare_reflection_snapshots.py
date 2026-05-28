@@ -844,6 +844,27 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertTrue(report["modules"][0]["target_details"][0]["comparable"])
         self.assertEqual(report["modules"][0]["target_details"][0]["second_source_status"], "missing")
 
+    def test_readiness_report_blocks_empty_snapshot_roots(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            base.mkdir()
+
+            result = run_compare(base, None, "--readiness-report", "--json")
+            failing = run_compare(
+                base,
+                None,
+                "--readiness-report",
+                "--fail-on-readiness-gaps",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["totals"]["targets"], 0)
+        self.assertEqual(report["promotion_gate"], {"ready": False, "blockers": [{"reason": "no_targets", "count": 1}]})
+        self.assertEqual(failing.returncode, 1)
+
     def test_readiness_report_counts_missing_schema_qualified_target_set_entries(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

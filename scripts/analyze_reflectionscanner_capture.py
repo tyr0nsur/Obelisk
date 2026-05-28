@@ -851,8 +851,7 @@ def parse_logs(
             "gname_table_candidate_count": len(repeat_confirmed_tables),
             "status": (
                 "research-candidate"
-                if (repeat_confirmed_tables or static_fname_root_candidates)
-                and not reject_markers
+                if repeat_confirmed_tables and not reject_markers
                 else "inconclusive"
             ),
             "promotion_gate": (
@@ -1125,13 +1124,7 @@ def main() -> int:
             item["status"] == "research-candidate"
             for item in summary["gname_table_candidates"]
         )
-        has_static_root_candidate = any(
-            item["research_candidate"]
-            for item in summary["static_fname_root_probes"]
-        )
-        if has_reject_markers or not (
-            has_repeat_confirmed_candidate or has_static_root_candidate
-        ):
+        if has_reject_markers or not has_repeat_confirmed_candidate:
             return 1
     return 0
 

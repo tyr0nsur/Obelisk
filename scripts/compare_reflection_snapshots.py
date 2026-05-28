@@ -586,6 +586,8 @@ def readiness_report(
 
     def promotion_gate_summary() -> dict[str, Any]:
         blockers = []
+        if totals["targets"] == 0:
+            blockers.append({"reason": "no_targets", "count": 1})
         if totals["blocked"]:
             blockers.append({"reason": "blocked_base_targets", "count": totals["blocked"]})
         if totals["second_source_rejected"]:
@@ -784,6 +786,8 @@ def main() -> int:
     if report["schema"] == "obelisk.reflection-snapshot-readiness.v1":
         if args.fail_on_readiness_gaps:
             totals = report["totals"]
+            if totals["targets"] == 0:
+                return 1
             if totals["blocked"] or totals["second_source_rejected"]:
                 return 1
             if totals["second_source_inconclusive"] or totals["second_source_missing"]:
