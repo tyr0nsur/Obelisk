@@ -23,7 +23,7 @@
 - [ ] `scripts/run_script_tests.sh`
 - [ ] `scripts/test_install_obelisk_layout.sh` for install, SDK, packaging, or CMake export changes.
 - [ ] `scripts/check_release_readiness.sh` for release-candidate, installer, SDK package, or first-stable scope changes.
-- [ ] `scripts/check_release_readiness.sh --require-second-source-readiness` for PRs that promote reflected gameplay/module surfaces.
+- [ ] `scripts/check_release_readiness.sh --require-second-source-readiness` for PRs that promote reflected gameplay/module surfaces; pass `--ufunction-second-source-root`, `--scriptstruct-second-source-root`, and `--second-source-report-dir` when sanitized second-source snapshots exist.
 - [ ] `python3 scripts/analyze_runtime_observer_log.py --fail-on-quality-blockers <copied-log>` for approved runtime-observer capture reviews; this is observational only, not release readiness or second-source promotion evidence.
 - [ ] Docs-only changes explain why the build was skipped.
 

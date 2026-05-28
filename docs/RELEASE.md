@@ -49,6 +49,17 @@ scripts/check_release_readiness.sh --require-second-source-readiness
 This intentionally fails until the focused UFunction and ScriptStruct target sets have
 complete, distinct second-source evidence.
 
+When sanitized second-source snapshot roots exist, pass them into the same gate and keep
+JSON reports as promotion artifacts:
+
+```bash
+scripts/check_release_readiness.sh \
+  --require-second-source-readiness \
+  --ufunction-second-source-root <second-source-ufunction-snapshots> \
+  --scriptstruct-second-source-root <second-source-scriptstruct-snapshots> \
+  --second-source-report-dir <artifact-dir>
+```
+
 Runtime-observer log summaries are a separate review artifact, not a release gate and not
 second-source promotion evidence. Use them only on copied or sanitized logs when reviewing
 an approved observer capture:
