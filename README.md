@@ -20,6 +20,9 @@ Stable baseline:
 - C ABI plugin loading through `ObeliskPlugin_GetInfo` and
   `ObeliskPlugin_Init(api, context)`.
 - Runtime-owned plugin config under `${OBELISK_CONFIG_DIR}/<plugin-id>/config.json`.
+- Multi-instance plugin rollout through `OBELISK_INSTANCE_ID` and
+  `instance_allowlist`; shared config is supported, while runtime handles and mutable
+  state stay process-local unless a plugin implements explicit cross-process locking.
 - Plugin-owned callback cleanup and optional `ObeliskPlugin_Shutdown`.
 - Public SDK header at `include/obelisk/ObeliskApi.h`.
 - CTest coverage for plugin config and ABI layout.
@@ -309,4 +312,6 @@ For debug harness validation:
 - Keep native exec probes off unless explicitly isolated.
 - Prefer filtered callbacks.
 - Keep logs per instance.
+- Treat multi-instance plugins as the normal clustered case: shared config is fine,
+  shared mutable state requires an explicit ownership and locking design.
 - Do not promote observed offsets or `FName` indices without repeatable evidence.

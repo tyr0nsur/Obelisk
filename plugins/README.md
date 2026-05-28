@@ -23,6 +23,9 @@ plugin, not to become a feature-heavy server plugin.
   `instance_allowlist` for targeted rollout.
 - Stable plugins must use runtime-owned central config paths:
   `${OBELISK_CONFIG_DIR}/<plugin-id>/config.json`.
+- Treat multi-instance loading as the default cluster shape. A plugin may read shared
+  config from every ARK process, but mutable plugin state should be stored per
+  `OBELISK_INSTANCE_ID` unless the plugin has a documented cross-process locking model.
 - Prefer filtered `ProcessEvent` callbacks. Global callbacks require an explicit research
   gate and isolated validation.
 - Long-lived callbacks should use owner-token handle registration and explicit unregister

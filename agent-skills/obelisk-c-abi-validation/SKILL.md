@@ -107,6 +107,10 @@ Validation rules:
   in callback subscriptions instead of asking plugins to capture global state.
 - Registration ids returned across the ABI are process-local handles, not shared cluster
   state. They must not be written to shared config or reused across ARK server processes.
+- Assume most real plugins may load in more than one ARK server process that shares the
+  same plugin binary and config directory. Public API guidance must keep runtime handles,
+  callbacks, threads, sockets, caches, and mutable state process-local unless a plugin
+  explicitly documents cross-process ownership and locking.
 - Owner-token API additions must stay append-only: `plugin_owner_token` remains at the end
   of `ObeliskPluginInitContext`, and owner-token registration function pointers remain
   after existing `ObeliskApi` fields.

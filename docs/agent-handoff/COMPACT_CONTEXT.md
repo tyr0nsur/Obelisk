@@ -151,9 +151,8 @@ work from repository state instead of chat history.
   warning unless `OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS=1` and the per-instance
   marker `allow-global-process-event-callbacks` are both active. Filtered callbacks remain
   available by default and ABI v1 layout is unchanged.
-- Current uncommitted ops follow-up makes that gate use the existing `OBELISK_ROOT` marker
-  root and teaches stable posture checks to reject
-  `OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS`.
+- Global ProcessEvent callback gating uses the existing `OBELISK_ROOT` marker root, and
+  stable posture checks reject `OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS`.
 - Commit `4e4f5cf` adds
   `scripts/compare_reflection_snapshots.py --readiness-report`. Use it to summarize
   comparable snapshot coverage and second-source status by schema/module. Current fixtures

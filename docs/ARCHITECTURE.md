@@ -81,9 +81,11 @@ OBELISK_LOG_DIR
 OBELISK_INSTANCE_ID
 ```
 
-This keeps Obelisk artifacts outside the target binary directory and allows
-multiple validation adapter instances to share one runtime root. `OBELISK_INSTANCE_ID`
-separates logs and operational markers by instance.
+This keeps Obelisk artifacts outside the target binary directory and allows multiple ARK
+server processes to share one runtime root. `OBELISK_INSTANCE_ID` separates logs,
+operational markers, plugin activation gates, and process-local runtime state by instance.
+Plugin binaries and config may be shared across a cluster; mutable plugin state should be
+instance-scoped unless the plugin documents and implements safe cross-process ownership.
 
 ## ARK Validation Adapter
 
