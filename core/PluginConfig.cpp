@@ -33,6 +33,21 @@ namespace Obelisk::Core
             return true;
         }
 
+        bool IsSafeToken(const std::string& token)
+        {
+            if (token.empty())
+                return false;
+
+            for (const unsigned char ch : token)
+            {
+                if (std::isalnum(ch) || ch == '_' || ch == '-')
+                    continue;
+                return false;
+            }
+
+            return true;
+        }
+
         bool IsSafeConfigFile(const char* value)
         {
             return value && std::strcmp(value, "config.json") == 0;
@@ -60,28 +75,49 @@ namespace Obelisk::Core
             }
 
             const auto allowlist = config.find("instance_allowlist");
-            if (allowlist != config.end())
+            if (allowlist == config.end())
             {
-                if (!allowlist->is_array())
+                error = "default config must include array field 'instance_allowlist'";
+                return false;
+            }
+
+            if (!allowlist->is_array())
+            {
+                error = "instance_allowlist must be an array";
+                return false;
+            }
+
+            for (const auto& entry : *allowlist)
+            {
+                if (!entry.is_string())
                 {
-                    error = "instance_allowlist must be an array";
+                    error = "instance_allowlist entries must be strings";
                     return false;
                 }
 
-                for (const auto& entry : *allowlist)
+                if (!IsSafeToken(entry.get<std::string>()))
                 {
-                    if (!entry.is_string())
-                    {
-                        error = "instance_allowlist entries must be strings";
-                        return false;
-                    }
+                    error = "instance_allowlist entries must be non-empty safe instance ids";
+                    return false;
                 }
             }
 
             const auto allowAllInstances = config.find("allow_all_instances");
-            if (allowAllInstances != config.end() && !allowAllInstances->is_boolean())
+            if (allowAllInstances == config.end())
+            {
+                error = "default config must include boolean field 'allow_all_instances'";
+                return false;
+            }
+
+            if (!allowAllInstances->is_boolean())
             {
                 error = "allow_all_instances must be a boolean";
+                return false;
+            }
+
+            if (allowAllInstances->get<bool>())
+            {
+                error = "default config must set allow_all_instances=false";
                 return false;
             }
 
@@ -287,6 +323,12 @@ namespace Obelisk::Core
                     error = "instance_allowlist entries must be strings";
                     return false;
                 }
+
+                if (!IsSafeInstanceId(entry.get<std::string>()))
+                {
+                    error = "instance_allowlist entries must be non-empty safe instance ids";
+                    return false;
+                }
             }
         }
 
@@ -301,5 +343,10 @@ namespace Obelisk::Core
         prepared.instance_allowed = InstanceAllowed(existingConfig, instanceId, prepared.enabled);
 
         return true;
+    }
+
+    bool IsSafeInstanceId(const std::string& value)
+    {
+        return IsSafeToken(value);
     }
 }

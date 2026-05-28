@@ -119,6 +119,8 @@ ${OBELISK_ROOT}/state/instances/<id>/        per-server markers and runtime stat
 
 Each ARK server process must have a unique `OBELISK_INSTANCE_ID`, even when several maps
 share the same ARK cluster id, save cluster directory, plugin binaries, and Obelisk config.
+The id must be non-empty and use only letters, digits, `_`, or `-`; plugin loading fails
+closed when the id is missing or unsafe.
 Use `instance_allowlist` in plugin config to select which maps/servers may activate a
 plugin from the shared config. An enabled plugin with a missing or empty
 `instance_allowlist` does not activate by default; set `allow_all_instances=true` only when
@@ -212,7 +214,7 @@ Runtime logs are written to:
 ```
 
 The LinuxGSM wrapper sets `OBELISK_INSTANCE_ID`. Custom launchers should set it explicitly
-before loading Obelisk.
+before loading Obelisk and keep it to the safe token form described above.
 
 ## Current Safe Production Posture
 

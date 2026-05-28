@@ -122,8 +122,12 @@ work from repository state instead of chat history.
     `CallProcessEvent` pre-callback double-execution guard are implemented;
   - cluster/plugin config: shared config default creation is now safe for concurrent
     multi-instance startup; `enabled=true` now requires a matching non-empty
-    `instance_allowlist` or explicit `allow_all_instances=true`; mutable shared plugin
-    state still requires plugin-level locking/atomic-write design;
+    `instance_allowlist` or explicit `allow_all_instances=true`; plugin
+    `default_config_json` must declare `enabled=false`, an `instance_allowlist` array,
+    and `allow_all_instances=false`; plugin loading fails closed when
+    `OBELISK_INSTANCE_ID` is missing/unsafe and allowlist entries use the same safe-token
+    rule; mutable shared plugin state still requires plugin-level locking/atomic-write
+    design;
   - reflection/offline: second-source evidence is the bottleneck, and safe work should
     keep improving deterministic readiness/comparison tooling without touching live
     servers.

@@ -26,6 +26,8 @@ Own these areas:
 - Gate runtime hooks and risky behavior behind explicit env vars plus safe per-instance
   marker files.
 - Prefer per-instance enablement under `/servidor/ark/obelisk/state/instances/<id>`.
+- Plugin loading requires a non-empty safe `OBELISK_INSTANCE_ID` containing only letters,
+  digits, `_`, or `-`; do not weaken this fail-closed guard for shared-cluster installs.
 - Keep plugin loading optional via `OBELISK_DISABLE_PLUGINS=1`.
 - Never use `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` plus
   `enable-native-exec-probes` as part of normal runtime validation.

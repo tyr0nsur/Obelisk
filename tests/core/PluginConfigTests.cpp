@@ -16,7 +16,7 @@ namespace fs = std::filesystem;
 namespace
 {
     constexpr const char* kSafeDefaultConfig =
-        R"({"enabled":false,"instance_allowlist":["arkserver"]})";
+        R"({"enabled":false,"allow_all_instances":false,"instance_allowlist":["arkserver"]})";
 
     void Require(bool condition, const char* message)
     {
@@ -123,7 +123,12 @@ namespace
         Obelisk::Core::PreparedPluginConfig prepared;
         std::string error;
 
-        Require(!Prepare(Metadata("enabled_default", "config.json", R"({"enabled":true})"), root, prepared, error),
+        Require(!Prepare(Metadata("enabled_default",
+                                  "config.json",
+                                  R"({"enabled":true,"allow_all_instances":false,"instance_allowlist":[]})"),
+                         root,
+                         prepared,
+                         error),
                 "enabled default config was accepted");
         Require(error.find("enabled=false") != std::string::npos, "enabled default error was unclear");
         Require(!fs::exists(root / "enabled_default"), "enabled default case created a directory");
@@ -156,6 +161,48 @@ namespace
                 "mistyped default instance_allowlist error was unclear");
         Require(!fs::exists(root / "bad_default_allowlist"),
                 "mistyped default instance_allowlist case created a directory");
+    }
+
+    void TestRejectsDefaultWithoutExplicitInstanceEnvelope(const fs::path& root)
+    {
+        Obelisk::Core::PreparedPluginConfig prepared;
+        std::string error;
+
+        Require(!Prepare(Metadata("missing_default_allowlist",
+                                  "config.json",
+                                  R"({"enabled":false,"allow_all_instances":false})"),
+                         root,
+                         prepared,
+                         error),
+                "default config without instance_allowlist was accepted");
+        Require(error.find("instance_allowlist") != std::string::npos,
+                "missing default instance_allowlist error was unclear");
+        Require(!fs::exists(root / "missing_default_allowlist"),
+                "missing default instance_allowlist case created a directory");
+
+        Require(!Prepare(Metadata("missing_default_allow_all",
+                                  "config.json",
+                                  R"({"enabled":false,"instance_allowlist":[]})"),
+                         root,
+                         prepared,
+                         error),
+                "default config without allow_all_instances was accepted");
+        Require(error.find("allow_all_instances") != std::string::npos,
+                "missing default allow_all_instances error was unclear");
+        Require(!fs::exists(root / "missing_default_allow_all"),
+                "missing default allow_all_instances case created a directory");
+
+        Require(!Prepare(Metadata("unsafe_default_allow_all",
+                                  "config.json",
+                                  R"({"enabled":false,"allow_all_instances":true,"instance_allowlist":[]})"),
+                         root,
+                         prepared,
+                         error),
+                "default config with allow_all_instances=true was accepted");
+        Require(error.find("allow_all_instances=false") != std::string::npos,
+                "unsafe default allow_all_instances error was unclear");
+        Require(!fs::exists(root / "unsafe_default_allow_all"),
+                "unsafe default allow_all_instances case created a directory");
     }
 
     void TestAcceptsExistingValidConfigWithoutOverwrite(const fs::path& root)
@@ -289,6 +336,20 @@ namespace
         Require(!Prepare(Metadata("allowlist_entry_not_string"), root, prepared, error),
                 "non-string instance_allowlist entry was accepted");
         Require(error.find("instance_allowlist") != std::string::npos, "non-string allowlist error was unclear");
+
+        WriteFile(root / "allowlist_entry_empty" / "config.json",
+                  R"({"enabled":false,"instance_allowlist":[""]})");
+        Require(!Prepare(Metadata("allowlist_entry_empty"), root, prepared, error),
+                "empty instance_allowlist entry was accepted");
+        Require(error.find("safe instance ids") != std::string::npos,
+                "empty instance_allowlist error was unclear");
+
+        WriteFile(root / "allowlist_entry_path" / "config.json",
+                  R"({"enabled":false,"instance_allowlist":["../arkserver"]})");
+        Require(!Prepare(Metadata("allowlist_entry_path"), root, prepared, error),
+                "unsafe instance_allowlist entry was accepted");
+        Require(error.find("safe instance ids") != std::string::npos,
+                "unsafe instance_allowlist error was unclear");
     }
 }
 
@@ -304,6 +365,7 @@ int main()
         TestRejectsEnabledDefaultConfig(root);
         TestRejectsCorruptDefaultJson(root);
         TestRejectsMistypedDefaultAllowlist(root);
+        TestRejectsDefaultWithoutExplicitInstanceEnvelope(root);
         TestAcceptsExistingValidConfigWithoutOverwrite(root);
         TestConcurrentDefaultCreation(root);
         TestExistingConfigCanDisallowInstance(root);

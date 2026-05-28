@@ -36,6 +36,16 @@ that a `.so` will consume.
 - The runtime should resolve `ObeliskPlugin_GetInfo` and prepare/apply config gates before
   resolving mandatory `ObeliskPlugin_Init`. A disabled plugin may be discovered and get a
   default safe-disabled config without requiring its init symbol to be usable.
+- Plugin metadata `default_config_json` must be an explicit cluster-safe envelope:
+  `enabled=false`, an `instance_allowlist` array, and `allow_all_instances=false`.
+  Existing operator configs may omit `allow_all_instances`; enabled configs still fail
+  closed unless scoped to the current `OBELISK_INSTANCE_ID` or explicitly all-instance.
+- `OBELISK_INSTANCE_ID` and `instance_allowlist` entries must be non-empty safe tokens
+  containing only letters, digits, `_`, or `-`. Plugin loading must fail closed before
+  discovery when the runtime instance id is missing or unsafe.
+- `ObeliskPluginInitContext` string pointers are borrowed for `ObeliskPlugin_Init` only;
+  plugin examples should copy `config_dir`, `config_path`, or `instance_id` before using
+  them from shutdown, threads, or later callbacks.
 
 ## Required Boundary Rules
 

@@ -125,6 +125,16 @@ Updated: 2026-05-28
   `allow_all_instances=true`. Missing/empty allowlists are skipped instead of activating
   on every ARK process sharing the config. `map_allowlist` remains plugin-owned/inert
   until a reliable map identity enters the ABI or plugin contract.
+- fact: Plugin metadata `default_config_json` must declare the shared-cluster activation
+  envelope explicitly: `enabled=false`, an `instance_allowlist` array, and
+  `allow_all_instances=false`. Existing configs may omit `allow_all_instances`; enabled
+  configs still fail closed unless scoped to the current instance or explicitly all-instance.
+- fact: Plugin loading now fails closed before discovery when `OBELISK_INSTANCE_ID` is
+  missing, empty, or contains anything outside letters, digits, `_`, or `-`. Config
+  `instance_allowlist` entries use the same safe-token rule.
+- fact: `ObeliskPluginInitContext` string pointers are documented as borrowed only for
+  `ObeliskPlugin_Init`; plugins must copy `config_dir`, `config_path`, or `instance_id`
+  before using them from shutdown, worker threads, or later callbacks.
 - fact: The public README example uses owner-token handle registration plus explicit
   `ObeliskPlugin_Shutdown` unregister instead of teaching legacy callback registration.
 - fact: Owner-token ProcessEvent registrations now work during `ObeliskPlugin_Init` from

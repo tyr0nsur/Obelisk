@@ -19,7 +19,7 @@ namespace fs = std::filesystem;
 namespace
 {
     constexpr const char* kDefaultConfig =
-        R"({"enabled":false,"instance_allowlist":["arkserver"]})";
+        R"({"enabled":false,"allow_all_instances":false,"instance_allowlist":["arkserver"]})";
 
     struct FakePlugin {
         std::string filename;
@@ -278,6 +278,37 @@ namespace
         if (plugin.chatDispatcher)
             plugin.chatDispatcher->UnregisterCallbacksForOwner(plugin.owner);
         g_CurrentFakePlugin = nullptr;
+    }
+
+    void TestUnsafeInstanceIdDisablesPluginLoading()
+    {
+        const char* unsafeInstanceIds[] = {nullptr, "", "../arkserver", "ark/server", "ark server"};
+
+        for (const char* unsafeInstanceId : unsafeInstanceIds)
+        {
+            const fs::path root = MakeTempRoot("obelisk_plugin_manager_unsafe_instance_id");
+            ConfigureEnvironment(root);
+            if (unsafeInstanceId)
+                setenv("OBELISK_INSTANCE_ID", unsafeInstanceId, 1);
+            else
+                unsetenv("OBELISK_INSTANCE_ID");
+
+            FakePlugin plugin{.filename = "unsafe_instance.so", .pluginId = "unsafe_instance_plugin"};
+            FakeLoader loader;
+            loader.Add(plugin);
+            TouchPlugin(root, plugin.filename);
+            WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"allow_all_instances":true})");
+
+            Obelisk::Core::PluginManager manager(loader);
+            manager.LoadPlugins((root / "plugins").string());
+
+            Require(plugin.getInfoCalls == 0, "plugin metadata was read with unsafe OBELISK_INSTANCE_ID");
+            Require(plugin.initCalls == 0, "plugin initialized with unsafe OBELISK_INSTANCE_ID");
+            Require(plugin.closeCalls == 0, "plugin handle was opened with unsafe OBELISK_INSTANCE_ID");
+
+            CleanupPlugin(plugin);
+            fs::remove_all(root);
+        }
     }
 
     void TestValidPluginLoadsAndUnloadCleansCallbacks()
@@ -998,6 +1029,7 @@ int main()
     TestOwnerTokenGlobalHandleRejectedByDefault();
     TestInvalidOwnerTokenCallbackRegistrationIsRejected();
     TestInvalidProcessEventCallbacksAreRejected();
+    TestUnsafeInstanceIdDisablesPluginLoading();
     TestGlobalProcessEventCallbackAllowedWithGate();
     TestDisabledPluginPreparesConfigButDoesNotInit();
     TestInstanceDisallowedPluginDoesNotInit();

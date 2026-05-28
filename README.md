@@ -91,6 +91,7 @@ cmake --build build -j"$(nproc)"
 ctest --test-dir build --output-on-failure
 scripts/run_script_tests.sh
 scripts/install_obelisk.sh --dry-run /tmp/obelisk-install-check
+scripts/test_install_obelisk_layout.sh /tmp/obelisk-layout-check
 ```
 
 Main build outputs:
@@ -271,6 +272,10 @@ OBELISK_CHAT_REFLECTION_LOG_LIMIT=25
 OBELISK_CHAT_REFLECTION_LOG_TEXT=1  # extra opt-in for decoded experimental chat text
 OBELISK_PE_TRACE_LIMIT=0
 ```
+
+`OBELISK_INSTANCE_ID` must be a non-empty safe token using only letters, digits, `_`, or
+`-`. Plugin loading fails closed when the id is missing or unsafe, because shared-cluster
+plugin config uses this value for activation scope.
 
 Experimental runtime controls that can affect server safety require both their environment
 variable and the matching instance marker under

@@ -74,6 +74,7 @@ Config files should include:
 
 - `enabled`: boolean defaulting to `false` for experimental plugins.
 - `instance_allowlist`: list of `OBELISK_INSTANCE_ID` values where the plugin may run.
+  Entries must be non-empty safe tokens using only letters, digits, `_`, or `-`.
 - `allow_all_instances`: explicit boolean escape hatch for operators who intentionally
   want `enabled=true` to run on every instance sharing the config.
 - `map_allowlist`: optional plugin-owned map filter only after the plugin has a reliable
@@ -86,8 +87,9 @@ Config files should include:
 
 The runtime creates a plugin's missing default config before initialization using
 `default_config_json` from `ObeliskPlugin_GetInfo`. Defaults must be safe-disabled
-with `enabled: false`. If metadata, default config, or an existing config is invalid,
-the runtime rejects the plugin before calling `ObeliskPlugin_Init`.
+with `enabled: false`, must include an `instance_allowlist` array, and must set
+`allow_all_instances: false` explicitly. If metadata, default config, or an existing config
+is invalid, the runtime rejects the plugin before calling `ObeliskPlugin_Init`.
 
 The runtime interprets the common activation envelope before initialization:
 `enabled=false`, a missing/empty `instance_allowlist`, or a non-matching
@@ -152,6 +154,9 @@ whose function pointer resolves back to an already-loaded Obelisk plugin shared 
 when the plugin passes its `plugin_owner_token` to the append-only owner-token registration
 functions. Plugins must check `struct_size`, `OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS`,
 and non-null function pointers before using those fields.
+Strings in `ObeliskPluginInitContext`, including `config_dir`, `config_path`, and
+`instance_id`, are borrowed for `ObeliskPlugin_Init`; copy them into plugin-owned storage
+before using them from shutdown hooks, worker threads, or later callbacks.
 
 For callback code owned by helper modules, worker threads, or reloadable state, prefer the
 handle-returning owner-token API and explicit unregister:
@@ -251,7 +256,9 @@ installed only on isolated test instances or behind a trusted local proxy.
 Before a plugin is promoted to stable or added to the top-level build:
 
 - [ ] Config path follows `${OBELISK_CONFIG_DIR}/<plugin-id>/config.json`.
-- [ ] Risky features are safe-disabled and map-gated.
+- [ ] Risky features are safe-disabled and scoped with `instance_allowlist` or explicit
+      `allow_all_instances`; map filters are plugin-owned until a reliable map identity is
+      available.
 - [ ] No global `ProcessEvent` callback outside a documented debug gate.
 - [ ] Callback lifetime is covered by runtime owner cleanup and plugin-local
       shutdown design.

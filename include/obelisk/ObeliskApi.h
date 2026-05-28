@@ -36,6 +36,8 @@ struct ObeliskPluginMetadata {
 struct ObeliskPluginInitContext {
     uint32_t abi_version;
     uint32_t struct_size;
+    // Borrowed strings are valid only for the duration of ObeliskPlugin_Init.
+    // Copy values that are needed by shutdown hooks, worker threads, or later callbacks.
     const char* config_dir;
     const char* config_path;
     const char* instance_id;
@@ -98,6 +100,8 @@ struct ObeliskApi {
 // Metadata is validated before initialization. The runtime creates a missing
 // safe-disabled default config at:
 //   ${OBELISK_CONFIG_DIR}/<plugin_id>/config.json
+// default_config_json must include enabled=false, allow_all_instances=false, and an
+// instance_allowlist array so clustered installs have an explicit activation envelope.
 // __attribute__((visibility("default"))) bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out);
 // __attribute__((visibility("default"))) bool ObeliskPlugin_Init(ObeliskApi* api, const ObeliskPluginInitContext* context);
 //

@@ -545,6 +545,11 @@ namespace Obelisk::Core
             const fs::path configRoot = configRootEnv;
             const char* instanceIdEnv = std::getenv("OBELISK_INSTANCE_ID");
             const std::string instanceId = instanceIdEnv ? instanceIdEnv : "";
+            if (!IsSafeInstanceId(instanceId))
+            {
+                OBELISK_ERROR("OBELISK_INSTANCE_ID must be a non-empty safe instance id before plugin loading. Plugins will not be loaded.");
+                return;
+            }
 
             if (!fs::exists(directory))
             {

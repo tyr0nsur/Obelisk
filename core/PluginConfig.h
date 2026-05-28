@@ -19,4 +19,6 @@ namespace Obelisk::Core
                              const std::string& instanceId,
                              PreparedPluginConfig& prepared,
                              std::string& error);
+
+    bool IsSafeInstanceId(const std::string& value);
 }
