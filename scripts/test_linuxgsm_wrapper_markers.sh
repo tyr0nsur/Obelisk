@@ -135,7 +135,7 @@ run_wrapper "${root_marker}" "${capture_marker}" TheIsland?listen
 
 assert_contains "${capture_marker}" '^OBELISK_ENABLE_CHAT_REFLECTION=1$'
 assert_contains "${capture_marker}" '^OBELISK_CHAT_REFLECTION_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520$'
-assert_contains "${capture_marker}" '^OBELISK_CHAT_REFLECTION_LOG_LIMIT=25$'
+assert_contains "${capture_marker}" '^OBELISK_CHAT_REFLECTION_LOG_LIMIT=0$'
 assert_contains "${capture_marker}" '^OBELISK_ENABLE_INVENTORY_REFLECTION=1$'
 assert_contains "${capture_marker}" '^OBELISK_INVENTORY_REFLECTION_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520$'
 assert_contains "${capture_marker}" '^OBELISK_INVENTORY_REFLECTION_LOG_LIMIT=0$'

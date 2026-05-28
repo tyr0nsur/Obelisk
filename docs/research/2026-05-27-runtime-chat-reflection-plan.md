@@ -65,12 +65,13 @@ touch /servidor/ark/obelisk/state/instances/arkserver2/enable-chat-reflection
 ```
 
 The marker sets `OBELISK_ENABLE_CHAT_REFLECTION=1`, the current supported binary SHA, and
-a default `OBELISK_CHAT_REFLECTION_LOG_LIMIT=25`.
-`OBELISK_CHAT_REFLECTION_LOG_LIMIT=0` suppresses chat reflection observation logs instead
-of allowing unlimited output.
+`OBELISK_CHAT_REFLECTION_LOG_LIMIT=0`. Chat now matches the general candidate-observer
+policy: the marker opens the gate, but a debug window must set an explicit positive budget
+before the runtime reads or logs reflected fields.
 
-Use this marker on `arkserver2` / TheIsland for future debug validation while Ragnarok is
-reserved for player performance testing.
+Use this marker only on the current approved debug/development target from
+`docs/agent-handoff/CURRENT.md`; keep shared/player-facing instances out of runtime
+validation unless the operator opens a specific maintenance window.
 
 The final chat helper should build on that module and:
 

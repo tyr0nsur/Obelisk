@@ -101,19 +101,18 @@ This is required because `jmp rel32` can fail when `ShooterGameServer` is mapped
 
 ## Safe Runtime Validation
 
-Current operator direction as of 2026-05-28: users are active on `arkserver` / Ragnarok,
-so it is protected from Obelisk restarts, marker changes, and runtime tests. `arkserver2`
-/ TheIsland is powered off; if server validation is needed, start it only with explicit
-operator approval, keep changes controlled one gate at a time, restore stable posture, and
-shut it down when the test window ends.
+Do not treat any shared or player-facing ARK instance as a validation target by default.
+Read `docs/agent-handoff/CURRENT.md` for the current live target posture before any
+server-backed work, and require explicit operator approval for the exact instance, marker
+changes, restart window, rollback plan, and shutdown expectations.
 
 For risky probes such as ReflectionScanner, native exec, ptrace/gcore, broad tracing, or
-text/gameplay-payload logging, first obtain explicit operator approval for the exact
-`arkserver2` run, marker changes, restart window, rollback plan, and shutdown at the end.
+text/gameplay-payload logging, first obtain explicit operator approval for the exact debug
+instance run, marker changes, restart window, rollback plan, and shutdown at the end.
 
 For an approved validation target, use the target's explicit map, instance id, copied logs,
-and posture command. Do not run these checks on protected Ragnarok unless the operator has
-approved that exact maintenance window:
+and posture command. Do not run these checks on a protected production instance unless the
+operator has approved that exact maintenance window:
 
 ```bash
 pgrep -af '^./ShooterGameServer'

@@ -122,10 +122,9 @@ Then configure LinuxGSM:
 executable="./ObeliskRun.sh"
 ```
 
-Current operator direction as of 2026-05-28: users are active on `arkserver` / Ragnarok,
-so do not restart it, change markers, or run Obelisk tests there. `arkserver2` /
-TheIsland is powered off; if server validation is needed, start it only with explicit
-operator approval, run the scoped test, restore posture, and shut it down again.
+Current instance posture is tracked in `docs/agent-handoff/CURRENT.md`. Do not restart,
+change markers, or run Obelisk tests on shared or player-facing instances without explicit
+operator approval for the target, rollback plan, and shutdown expectations.
 
 ## Instance Identity
 
@@ -205,8 +204,12 @@ remove it before returning the instance to stable posture.
 ```text
 OBELISK_ENABLE_CHAT_REFLECTION=1
 OBELISK_CHAT_REFLECTION_BINARY_SHA256=<supported ARK SHA256>
-OBELISK_CHAT_REFLECTION_LOG_LIMIT=25
+OBELISK_CHAT_REFLECTION_LOG_LIMIT=0
 ```
+
+The chat log limit is also the observation budget and defaults to `0`, matching the other
+experimental observers. A short debug window must set an explicit non-zero budget before
+chat reflection reads or logs fields.
 
 `enable-structure-reflection` makes the wrapper set:
 

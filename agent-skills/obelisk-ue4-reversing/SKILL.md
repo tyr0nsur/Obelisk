@@ -76,11 +76,9 @@ cross-validated by object and property metadata.
 
 - Keep `OBELISK_ENABLE_PROCESS_EVENT_HOOK=1` plus the `enable-process-event-hook` marker
   and plugins disabled as the baseline safe runtime test.
-- Current operator direction as of 2026-05-28 protects `arkserver` / Ragnarok because
-  users are active there. Do not restart it, change markers, or run runtime tests there.
-  `arkserver2` / TheIsland is powered off; if a server is needed, start it only with
-  explicit operator approval, use controlled gates plus rollback posture, and shut it down
-  when the test window ends.
+- Current instance posture belongs in `docs/agent-handoff/CURRENT.md`. Read it before
+  server-backed reversing, then require explicit approval for the exact target, marker
+  changes, restart window, rollback plan, and shutdown expectations.
 - Experimental module recognizers belong only on an explicitly approved debug/development
   target. The historical chat gate (`OBELISK_ENABLE_CHAT_REFLECTION=1`) additionally
   requires `allow-experimental-observers`, the matching
@@ -90,9 +88,9 @@ cross-validated by object and property metadata.
 - Do not enable broad event discovery on a production map until it has survived an
   isolated server test.
 - Do not run `ReflectionScanner`, `gcore`/`ptrace`, broad tracing, native exec probes, or
-  scanner-like captures on `arkserver` / Ragnarok. Run them on `arkserver2` only for a
+  scanner-like captures on protected production/shared instances. Run them only for a
   specifically approved debug window with plugins disabled, copied-log evidence, rollback,
-  and shutdown at the end.
+  and shutdown at the end when required.
 - Use small `OBELISK_PE_TRACE_LIMIT` windows only when capturing evidence; default should
   remain quiet.
 - Prefer per-instance markers over ad hoc environment edits for approved debug captures.

@@ -100,10 +100,10 @@ ARK-specific paths, instance names, and observed `FName` indices are validation
 inputs only. Stable plugin contracts should be expressed through public SDK
 headers and documented runtime behavior.
 
-Current runtime debug work must keep `arkserver` / Ragnarok untouched while users are
-active. Server-backed validation targets `arkserver2` / TheIsland only after explicit
-operator approval; it starts from powered off, uses gates plus rollback checks, and is shut
-down when the window ends.
+Current runtime debug work must keep shared/player-facing instances untouched unless the
+operator approves a specific maintenance window. Server-backed validation uses the current
+approved debug/development target from `docs/agent-handoff/CURRENT.md`, with explicit
+gates, rollback checks, and shutdown expectations.
 
 ## SDK Direction
 

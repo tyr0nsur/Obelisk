@@ -93,7 +93,7 @@ configure_chat_reflection() {
 
     export OBELISK_ENABLE_CHAT_REFLECTION=1
     export OBELISK_CHAT_REFLECTION_BINARY_SHA256="${inherited_chat_reflection_binary_sha256:-7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520}"
-    export OBELISK_CHAT_REFLECTION_LOG_LIMIT="${inherited_chat_reflection_log_limit:-25}"
+    export OBELISK_CHAT_REFLECTION_LOG_LIMIT="${inherited_chat_reflection_log_limit:-0}"
     if [[ -n "${inherited_chat_reflection_log_text}" ]]; then
         export OBELISK_CHAT_REFLECTION_LOG_TEXT="${inherited_chat_reflection_log_text}"
     fi

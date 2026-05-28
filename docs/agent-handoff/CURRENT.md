@@ -955,6 +955,13 @@ Updated: 2026-05-28
   consumption exposes a concrete missing contract.
 - fact: README, STATUS, and RELEASE link the pre-release versioning policy; avoid claiming
   `0.1.0` is imminent until the release checklist is satisfied.
+- fact: Commit `890e4ae` validates the public SDK contract that
+  `ObeliskPlugin_Shutdown` is optional in the installed SDK layout. The install-layout
+  consumer now builds and loads a no-shutdown plugin, while callback-owning fixtures still
+  prove shutdown unregisters owner-token handles.
+- fact: Chat reflection is being aligned with the general observer policy: the wrapper and
+  runtime should default `OBELISK_CHAT_REFLECTION_LOG_LIMIT` to `0`; any field-reading
+  observer capture requires an explicit positive budget in an approved debug window.
 
 ## Agent Protocol
 

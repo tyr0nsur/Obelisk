@@ -55,16 +55,16 @@ Forbidden on live/shared instances:
 - Prefer deterministic scripts over manual UI-only conclusions.
 - Do not rely on `check_obelisk_server_posture.sh` defaults in agent rounds. Use explicit
   `--map <map> --instance <instance-id>` for the approved target, and do not use protected
-  Ragnarok as a validation target without a specific operator-approved maintenance window.
+  production instances as validation targets without a specific operator-approved
+  maintenance window.
 - Use Ghidra for decompilation and manual xref reasoning, but summarize evidence in text.
-- Current operator direction as of 2026-05-28 protects `arkserver` / Ragnarok because
-  users are active there. Do not restart it, change markers, or run runtime tests there.
-  `arkserver2` / TheIsland is powered off; if server validation is needed, start it only
-  with explicit operator approval and shut it down when the test window ends.
+- Current instance posture belongs in `docs/agent-handoff/CURRENT.md`. Read it before
+  any server-backed work, then require explicit approval for the exact target, restart or
+  marker changes, rollback plan, and shutdown expectations.
 - For `gcore`, `ptrace`, `ReflectionScanner`, Frida/rr, broad event tracing, or
-  scanner-like probes, require explicit approval for the exact `arkserver2` / TheIsland
-  run window and rollback plan. ReflectionScanner/native-exec activations require both env
-  vars and their per-instance markers.
+  scanner-like probes, require explicit approval for the exact debug instance run window
+  and rollback plan. ReflectionScanner/native-exec activations require both env vars and
+  their per-instance markers.
 - Use Frida/rr only after there is a specifically approved debug window and a rollback
   plan.
 - Do not introduce `/dev/null` write probes as memory-readability checks on Linux; current

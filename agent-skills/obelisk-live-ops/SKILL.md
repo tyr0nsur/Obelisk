@@ -40,27 +40,22 @@ Convenience log links may live under:
 /home/flowcommunity-ark/logs/ark/
 ```
 
-Current operator direction as of 2026-05-28:
-
-- `arkserver` / Ragnarok has active users and is protected. Do not restart it, change
-  markers, or run Obelisk tests there.
-- `arkserver2` / TheIsland is powered off. If server validation is needed, start it only
-  with explicit operator approval, use one scoped gate at a time with copied evidence and
-  rollback posture, then shut it down when the test window ends.
-- ReflectionScanner, native exec probes, ptrace/gcore, broad ProcessEvent tracing, and
-  text/gameplay-payload logging still require a specific operator-approved run window and
-  rollback plan before activation on `arkserver2`.
+Current instance posture belongs in `docs/agent-handoff/CURRENT.md`, not in this durable
+skill. Before server-backed validation, read that file and require explicit operator
+approval for the target instance, marker changes, restart window, rollback plan, and
+whether the server must be shut down afterward. ReflectionScanner, native exec probes,
+ptrace/gcore, broad ProcessEvent tracing, and text/gameplay-payload logging always require
+a specific approved run window before activation.
 
 ## Production Baseline
 
-Ragnarok is currently protected because users are active. Keep its stable baseline simple:
-ProcessEvent hook enabled, plugins disabled unless a future maintenance window explicitly
-scopes a plugin test, scanner/native-exec/broad tracing off, and no restarts or marker
-edits.
+Keep production/shared baselines simple: ProcessEvent hook enabled only when intended,
+plugins disabled unless a maintenance window explicitly scopes a plugin test,
+scanner/native-exec/broad tracing off, and no restarts or marker edits without approval.
 
 ```bash
 # Only run marker/start/stop commands when that change is part of an approved
-# arkserver2 / TheIsland test window:
+# debug/development instance test window:
 # mkdir -p /servidor/ark/obelisk/state/instances/arkserver2
 # touch /servidor/ark/obelisk/state/instances/arkserver2/enable-process-event-hook
 # touch /servidor/ark/obelisk/state/instances/arkserver2/disable-plugins

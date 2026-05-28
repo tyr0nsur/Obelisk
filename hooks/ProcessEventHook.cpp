@@ -452,7 +452,7 @@ namespace Obelisk::Hooks
     {
         static uint64_t limit = [] {
             const char* env = std::getenv("OBELISK_CHAT_REFLECTION_LOG_LIMIT");
-            if (!env || env[0] == '\0') return uint64_t{25};
+            if (!env || env[0] == '\0') return uint64_t{0};
             return static_cast<uint64_t>(std::strtoull(env, nullptr, 10));
         }();
         return limit;

@@ -53,27 +53,25 @@ Own these areas:
   and the scanner still reads zero/invalid tables, change the method instead of extending
   sleep/retry windows.
 - Every new offset or signature must include how it was derived and what binary/version it was tested against.
-- Current operator direction as of 2026-05-28 protects `arkserver` / Ragnarok because
-  users are active there. Do not restart it, change markers, or run runtime tests there.
-  `arkserver2` / TheIsland is powered off; if server validation is needed, start it only
-  with explicit operator approval and shut it down again when the test window ends.
+- Current instance posture belongs in `docs/agent-handoff/CURRENT.md`. Read it before
+  server-backed reversing, then require explicit approval for the exact target, marker
+  changes, restart window, rollback plan, and shutdown expectations.
 - Run scanner/native-exec/ptrace/gcore/broad tracing only after explicit operator approval
-  for the exact `arkserver2` / TheIsland window, with plugins disabled, copied-log
+  for the exact debug instance window, with plugins disabled, copied-log
   evidence, rollback, and shutdown at the end of the test.
 
 ## Safe Experiment Pattern
 
-Use `arkserver2` / TheIsland for current reversing/runtime validation only when the
-operator approves starting it. For marker changes, restarts, or runtime observation
-windows, keep the run scoped, record rollback posture, and shut `arkserver2` down when
-the test window ends.
+Use the operator-approved debug/development target for reversing/runtime validation. For
+marker changes, restarts, or runtime observation windows, keep the run scoped, record
+rollback posture, and shut the server down afterward when the approved plan requires it.
 
-On `arkserver` / Ragnarok, stop: users are active there, so no Obelisk restarts,
-marker changes, scanners, or runtime tests are allowed.
+On protected production/shared instances, stop: no Obelisk restarts, marker changes,
+scanners, or runtime tests are allowed without an explicit maintenance window.
 
 For scanner, `gcore`/`ptrace`, native exec experiments, or broad event discovery, enable
-one experiment at a time only in an approved `arkserver2` window. The wrapper should set
-explicit environment variables from safe per-instance markers such as
+one experiment at a time only in an approved debug window. The wrapper should set explicit
+environment variables from safe per-instance markers such as
 `enable-process-event-hook` and `disable-plugins`:
 
 ```bash

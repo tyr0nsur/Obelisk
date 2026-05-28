@@ -119,76 +119,23 @@ counts either reflected rejection lines or `send_mode_known=false`; non-zero mea
 snapshot found evidence that needs active review before promotion. `last_relevant_line`
 shows the last chat/reflection line matched by the snapshot.
 
-## Candidate Module Observer Example
+## Candidate Module Observer Pattern
 
-This historical chat observer flow is an example for candidate module validation, not the
-center of the SDK roadmap. Use it only after deploying a build that recognizes
-`ShooterPlayerController.ServerSendChatMessage`. The expected safe posture is ProcessEvent
-hook enabled, plugins disabled, and chat reflection enabled only for the supported binary
-SHA gate.
+Candidate observers are internal evidence tools, not public SDK surfaces. Use the same
+pattern for chat, inventory, structures, buffs, dinos, tribes, missions, transfers, and
+admin flows:
 
-For the full approved-window A/B flow, including reflection-off baseline, metadata-only
-validation, text-log gate, evidence fields, and rollback, use
+- use only an approved debug/development target from `docs/agent-handoff/CURRENT.md`;
+- require the global experimental observer marker plus the module marker;
+- require the supported binary SHA gate;
+- set an explicit non-zero observation budget for the module;
+- keep plugins disabled unless the approved test specifically needs them;
+- capture copied logs and a supervisor snapshot;
+- treat accepted/rejected observer lines as evidence only, not ABI readiness.
+
+Module-specific runbooks can add exact tail filters, player actions, evidence fields, and
+rollback details. The historical chat A/B procedure lives in
 `docs/research/2026-05-27-theisland-chat-reflection-ab-runbook.md`.
-
-Run this on `arkserver-obelisk-debug`. Use `arkserver2` / TheIsland only during an
-explicitly approved debug window for that named instance, not on Ragnarok while players
-are testing performance. Before sending chat, start a live tail in one shell:
-
-```bash
-tail -Fn 0 /servidor/ark/obelisk/logs/arkserver2/Obelisk.log \
-  | rg --line-buffered 'Experimental chat reflection|Reflected chat|Chat reflection rejected|Reflected chat rejected|metadata_only=true|ClientChatMessage|ClientServerChatMessage|ClientServerChatDirectMessage'
-```
-
-In another shell, keep a read-only snapshot command ready:
-
-```bash
-cd /home/flowcommunity-ark/Obelisk
-OBELISK_SUPERVISOR_INSTANCE=arkserver2 OBELISK_SUPERVISOR_MAP=TheIsland scripts/obelisk_supervisor_snapshot.sh
-latest=/servidor/ark/obelisk/dumps/supervisor/latest
-cat "${latest}/chat-reflection.txt"
-tail -n 80 "${latest}/obelisk-log-tail.txt"
-```
-
-Then send exactly one normal in-game chat message from a client on the approved debug
-target. For TheIsland, do this only after explicit approval for that run window. Expected
-successful evidence is a bounded `Reflected chat ProcessEvent` line for
-`ServerSendChatMessage`, with reflected metadata showing the
-`ShooterPlayerController.ServerSendChatMessage` path and parameter ranges for
-`ChatMessage` at offset `0x0` and `SendMode` at offset `0x10`. A supporting
-`Reflected chat ServerSendChatMessage send_mode=<n> send_mode_name=<name>` line should
-also appear when the parameter range is readable. This proves the reflected `ProcessEvent`
-path was hit; it does not by itself promote public plugin ABI or justify broader
-chat-name scans.
-
-If `ServerSendChatMessage` does not appear but a `ClientChatMessage`,
-`ClientServerChatMessage`, or `ClientServerChatDirectMessage` line appears with
-`metadata_only=true`, record it as fallback evidence only. It can guide the next runtime
-investigation, but it must not dispatch plugin chat events or decode text.
-
-Interpret the snapshot counters this way:
-
-- `reflected_chat_process_event_lines=0`: no accepted reflected chat hit is present in the reviewed log.
-  If the player definitely sent chat after deployment, treat this as inconclusive or a
-  runtime-path miss, not as proof that chat is absent from `ProcessEvent`.
-- `reflected_chat_process_event_lines>0`: review the actual `Reflected chat ProcessEvent` lines. Accept
-  only lines that name `ServerSendChatMessage` or its reflected fields; older `ServerChat*`
-  lines are cheat-manager coverage, not proof of normal player chat.
-- `server_send_chat_message_lines>0`: review the matching lines; this counter can include
-  field or send-mode diagnostics for the same ProcessEvent hit.
-- `metadata_only_lines>0`: review exact fallback lines. These are useful path evidence,
-  not accepted inbound chat.
-- `client_chat_message_lines>0`, `client_server_chat_message_lines>0`, or
-  `client_server_chat_direct_message_lines>0`: review the matching fallback candidate
-  lines and keep them separate from `ServerSendChatMessage`.
-- `rejected_chat_lines>0`: the cheap chat filter saw a candidate FName, but reflected
-  `UFunction`/property/`ParmsSize` validation rejected it. Rejections are useful evidence
-  for debugging constants, but they are not successful chat capture.
-- `rejected_or_unknown_send_mode_lines>0`: at least one rejection or
-  `send_mode_known=false` line is present. Treat it as a prompt for active review rather
-  than success evidence.
-- `rejected_chat_lines=0`: no bounded rejection line was logged. This can also mean the
-  diagnostic path or log limit suppressed rejection details.
 
 Rollback is marker-only plus a controlled restart during the approved debug window. The
 commands below are an example for an explicitly approved TheIsland fallback window; do not
