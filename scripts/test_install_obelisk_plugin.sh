@@ -110,4 +110,24 @@ if "${INSTALLER}" --dry-run "${plugin_src}" "${symlink_plugins_root}" \
 fi
 assert_contains "${TMP_DIR}/symlink-plugins.err" 'Managed install path must not be a symlink'
 
+directory_destination_root="${TMP_DIR}/root-directory-destination"
+mkdir -p "${directory_destination_root}/plugins/ExamplePlugin.so"
+if "${INSTALLER}" "${plugin_src}" "${directory_destination_root}" \
+    >"${TMP_DIR}/directory-destination.out" 2>"${TMP_DIR}/directory-destination.err"; then
+    echo "Installer accepted a plugin destination directory" >&2
+    exit 1
+fi
+assert_contains "${TMP_DIR}/directory-destination.err" 'Plugin destination must be a regular non-symlink file'
+assert_not_exists "${directory_destination_root}/plugins/.ExamplePlugin.so.incoming.$$"
+
+symlink_destination_root="${TMP_DIR}/root-symlink-destination"
+mkdir -p "${symlink_destination_root}/plugins"
+ln -s "${TMP_DIR}/external-plugin-target.so" "${symlink_destination_root}/plugins/ExamplePlugin.so"
+if "${INSTALLER}" "${plugin_src}" "${symlink_destination_root}" \
+    >"${TMP_DIR}/symlink-destination.out" 2>"${TMP_DIR}/symlink-destination.err"; then
+    echo "Installer accepted a plugin destination symlink" >&2
+    exit 1
+fi
+assert_contains "${TMP_DIR}/symlink-destination.err" 'Plugin destination must be a regular non-symlink file'
+
 echo "test_install_obelisk_plugin passed"

@@ -75,11 +75,15 @@ else
 fi
 STAMP="$(date +%Y%m%d-%H%M%S)"
 STAGE_ROOT="${ROOT}/.install-runtime.${STAMP}.$$"
+SDK_STAGE_ROOT="${ROOT}/.install-sdk.${STAMP}.$$"
 ROLLBACK_ROOT="${ROOT}/.install-rollback.${STAMP}.$$"
 TEMP_PATHS=()
 PUBLISHED_RUNTIME_PATHS=()
+PUBLISHED_SDK_PATHS=()
 declare -A RUNTIME_ROLLBACK_SNAPSHOTS=()
 declare -A RUNTIME_ROLLBACK_EXISTED=()
+declare -A SDK_ROLLBACK_SNAPSHOTS=()
+declare -A SDK_ROLLBACK_EXISTED=()
 
 run() {
     if [[ "${DRY_RUN}" == "1" ]]; then
@@ -135,6 +139,7 @@ cleanup_temp_paths() {
             rm -f "${temp_path}"
         done
         rm -rf "${STAGE_ROOT}"
+        rm -rf "${SDK_STAGE_ROOT}"
         rm -rf "${ROLLBACK_ROOT}"
     fi
 }
@@ -180,11 +185,52 @@ rollback_runtime_publish() {
     done
 }
 
+snapshot_sdk_destination() {
+    local dst="$1"
+    local snapshot="${ROLLBACK_ROOT}/sdk/$(printf '%s' "${dst#${ROOT}/}" | tr '/' '_')"
+    mkdir -p "$(dirname "${snapshot}")"
+    if [[ -e "${dst}" || -L "${dst}" ]]; then
+        cp -a "${dst}" "${snapshot}"
+        SDK_ROLLBACK_EXISTED["${dst}"]=1
+        SDK_ROLLBACK_SNAPSHOTS["${dst}"]="${snapshot}"
+    else
+        SDK_ROLLBACK_EXISTED["${dst}"]=0
+        SDK_ROLLBACK_SNAPSHOTS["${dst}"]=""
+    fi
+}
+
+rollback_sdk_publish() {
+    local dst
+    for ((idx=${#PUBLISHED_SDK_PATHS[@]} - 1; idx >= 0; --idx)); do
+        dst="${PUBLISHED_SDK_PATHS[$idx]}"
+        if [[ "${SDK_ROLLBACK_EXISTED["${dst}"]}" == "1" ]]; then
+            cp -a "${SDK_ROLLBACK_SNAPSHOTS["${dst}"]}" "${dst}"
+        else
+            rm -f "${dst}"
+        fi
+    done
+}
+
 publish_runtime_file() {
     local tmp="$1"
     local dst="$2"
     mv -f "${tmp}" "${dst}" || return
     PUBLISHED_RUNTIME_PATHS+=("${dst}")
+}
+
+publish_sdk_file() {
+    local src="$1"
+    local dst="$2"
+    local tmp="${dst}.incoming.$$"
+
+    if [[ ! -f "${src}" ]]; then
+        echo "Required staged SDK artifact not found: ${src}" >&2
+        return 1
+    fi
+    TEMP_PATHS+=("${tmp}")
+    install -m 644 "${src}" "${tmp}"
+    mv -f "${tmp}" "${dst}" || return
+    PUBLISHED_SDK_PATHS+=("${dst}")
 }
 
 publish_runtime_pair() {
@@ -230,7 +276,47 @@ install_runtime_package() {
 }
 
 install_sdk_package() {
-    run cmake --install "${BUILD_DIR}" --prefix "${ROOT}" --component SDK
+    local sdk_files=(
+        "include/obelisk/ObeliskApi.h"
+        "lib/cmake/Obelisk/ObeliskConfig.cmake"
+        "lib/cmake/Obelisk/ObeliskConfigVersion.cmake"
+        "lib/cmake/Obelisk/ObeliskTargets.cmake"
+    )
+    run rm -rf "${SDK_STAGE_ROOT}"
+    if ! run cmake --install "${BUILD_DIR}" --prefix "${SDK_STAGE_ROOT}" --component SDK; then
+        return 1
+    fi
+
+    local relative
+    if [[ "${DRY_RUN}" != "1" ]]; then
+        for relative in "${sdk_files[@]}"; do
+            if [[ ! -f "${SDK_STAGE_ROOT}/${relative}" ]]; then
+                echo "Required staged SDK artifact not found: ${SDK_STAGE_ROOT}/${relative}" >&2
+                return 1
+            fi
+        done
+    fi
+
+    run mkdir -p "${ROOT}/include/obelisk" "${ROOT}/lib/cmake/Obelisk"
+
+    if [[ "${DRY_RUN}" == "1" ]]; then
+        for relative in "${sdk_files[@]}"; do
+            run install -m 644 "${SDK_STAGE_ROOT}/${relative}" "${ROOT}/${relative}.incoming.$$"
+            run mv -f "${ROOT}/${relative}.incoming.$$" "${ROOT}/${relative}"
+        done
+    else
+        for relative in "${sdk_files[@]}"; do
+            snapshot_sdk_destination "${ROOT}/${relative}"
+        done
+        for relative in "${sdk_files[@]}"; do
+            if ! publish_sdk_file "${SDK_STAGE_ROOT}/${relative}" "${ROOT}/${relative}"; then
+                rollback_sdk_publish
+                return 1
+            fi
+        done
+    fi
+
+    run rm -rf "${SDK_STAGE_ROOT}"
 }
 
 validate_root
@@ -239,6 +325,8 @@ validate_managed_subpaths \
     "plugins" \
     "include" \
     "include/obelisk" \
+    "lib/cmake" \
+    "lib/cmake/Obelisk" \
     "config" \
     "logs" \
     "state" \
@@ -248,6 +336,7 @@ run mkdir -p \
     "${ROOT}/lib" \
     "${ROOT}/plugins" \
     "${ROOT}/include/obelisk" \
+    "${ROOT}/lib/cmake/Obelisk" \
     "${ROOT}/config" \
     "${ROOT}/logs" \
     "${ROOT}/state/instances"

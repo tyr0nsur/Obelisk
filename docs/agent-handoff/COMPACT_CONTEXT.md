@@ -165,8 +165,9 @@ work from repository state instead of chat history.
   artifacts. Keep `lib`, `plugins`, `include`, `config`, `logs`, `state`, and
   `state/instances` as real directories under the central Obelisk root.
 - Runtime and SDK install are treated as one compatibility unit: required artifacts are
-  preflighted before runtime publication, and a later SDK install failure rolls back the
-  published `libsubhook.so`/`libobelisk.so` runtime pair.
+  preflighted before runtime publication, the SDK component is staged into a temporary
+  root, only expected public header/CMake package files are published, and SDK install or
+  publish failures roll back both the runtime pair and any already-published SDK files.
 - Core dump evidence packs fail by default when GDB core inspection returns nonzero.
   `--allow-partial-gdb` is triage-only and marks the manifest
   `evidence_status.status=partial-gdb-failed`; do not promote partial GDB evidence.

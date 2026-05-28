@@ -224,6 +224,63 @@ if find "${sdk_failure_root}" \( -name '*.incoming.*' -o -name '.install-runtime
     exit 1
 fi
 
+sdk_publish_failure_root="${WORK_DIR}/sdk-publish-failure-root"
+sdk_publish_fake_bin="${WORK_DIR}/sdk-publish-fake-bin"
+mkdir -p "${sdk_publish_failure_root}/lib" \
+    "${sdk_publish_failure_root}/include/obelisk" \
+    "${sdk_publish_failure_root}/lib/cmake/Obelisk" \
+    "${sdk_publish_fake_bin}"
+printf 'old-subhook\n' > "${sdk_publish_failure_root}/lib/libsubhook.so"
+printf 'old-obelisk\n' > "${sdk_publish_failure_root}/lib/libobelisk.so"
+printf 'old-header\n' > "${sdk_publish_failure_root}/include/obelisk/ObeliskApi.h"
+printf 'old-config\n' > "${sdk_publish_failure_root}/lib/cmake/Obelisk/ObeliskConfig.cmake"
+printf 'old-version\n' > "${sdk_publish_failure_root}/lib/cmake/Obelisk/ObeliskConfigVersion.cmake"
+printf 'old-targets\n' > "${sdk_publish_failure_root}/lib/cmake/Obelisk/ObeliskTargets.cmake"
+cat > "${sdk_publish_fake_bin}/mv" <<'SH'
+#!/usr/bin/env bash
+for arg in "$@"; do
+    if [[ "${arg}" == *ObeliskConfig.cmake.incoming.* ]]; then
+        exit 79
+    fi
+done
+exec /usr/bin/mv "$@"
+SH
+chmod +x "${sdk_publish_fake_bin}/mv"
+if PATH="${sdk_publish_fake_bin}:${PATH}" \
+    "${REPO_DIR}/scripts/install_obelisk.sh" --build-dir "${BUILD_DIR}" "${sdk_publish_failure_root}" \
+    >"${WORK_DIR}/sdk-publish-fail.out" 2>"${WORK_DIR}/sdk-publish-fail.err"; then
+    echo "install_obelisk.sh succeeded despite failing SDK publish" >&2
+    exit 1
+fi
+if [[ "$(cat "${sdk_publish_failure_root}/lib/libsubhook.so")" != "old-subhook" ]]; then
+    echo "failed SDK publish did not restore original libsubhook.so" >&2
+    find "${sdk_publish_failure_root}" -print >&2
+    exit 1
+fi
+if [[ "$(cat "${sdk_publish_failure_root}/lib/libobelisk.so")" != "old-obelisk" ]]; then
+    echo "failed SDK publish did not restore original libobelisk.so" >&2
+    find "${sdk_publish_failure_root}" -print >&2
+    exit 1
+fi
+for sdk_file in \
+    "include/obelisk/ObeliskApi.h:old-header" \
+    "lib/cmake/Obelisk/ObeliskConfig.cmake:old-config" \
+    "lib/cmake/Obelisk/ObeliskConfigVersion.cmake:old-version" \
+    "lib/cmake/Obelisk/ObeliskTargets.cmake:old-targets"; do
+    sdk_path="${sdk_file%%:*}"
+    expected="${sdk_file#*:}"
+    if [[ "$(cat "${sdk_publish_failure_root}/${sdk_path}")" != "${expected}" ]]; then
+        echo "failed SDK publish did not restore ${sdk_path}" >&2
+        find "${sdk_publish_failure_root}" -print >&2
+        exit 1
+    fi
+done
+if find "${sdk_publish_failure_root}" \( -name '*.incoming.*' -o -name '.install-runtime.*' -o -name '.install-sdk.*' -o -name '.install-rollback.*' \) | grep -q .; then
+    echo "failed SDK publish left temporary files" >&2
+    find "${sdk_publish_failure_root}" -print >&2
+    exit 1
+fi
+
 "${REPO_DIR}/scripts/install_obelisk.sh" --build-dir "${BUILD_DIR}" "${INSTALL_ROOT}"
 
 require_path "${INSTALL_ROOT}/lib/libobelisk.so"

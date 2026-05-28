@@ -127,6 +127,11 @@ trap cleanup EXIT
 validate_managed_subpaths "plugins"
 run mkdir -p "${PLUGIN_DIR}"
 
+if [[ -L "${PLUGIN_DST}" || ( -e "${PLUGIN_DST}" && ! -f "${PLUGIN_DST}" ) ]]; then
+    echo "Plugin destination must be a regular non-symlink file when it already exists: ${PLUGIN_DST}" >&2
+    exit 2
+fi
+
 if [[ "${BACKUP_EXISTING}" == "1" && -e "${PLUGIN_DST}" ]]; then
     run cp -a "${PLUGIN_DST}" "${PLUGIN_DST}.${STAMP}.bak"
 fi

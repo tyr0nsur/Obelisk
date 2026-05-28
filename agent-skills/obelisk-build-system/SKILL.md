@@ -70,8 +70,10 @@ Do not install runtime artifacts directly into `ShooterGame/Binaries/Linux` exce
   for `lib`, `plugins`, `include`, `config`, `logs`, and `state/instances` before writing
   runtime, SDK, or plugin artifacts.
 - Runtime and SDK publication are one compatibility unit. Preflight all required runtime
-  and SDK build artifacts before publishing runtime libraries, and roll back the published
-  runtime pair if SDK install fails after runtime publication.
+  and SDK build artifacts before publishing runtime libraries. Stage the SDK component into
+  a temporary root, publish only the expected public header/CMake package files, and roll
+  back both the runtime pair and already-published SDK files if SDK install or SDK publish
+  fails.
 
 ## Before Commit
 
