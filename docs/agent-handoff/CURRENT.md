@@ -297,11 +297,18 @@ Updated: 2026-05-28
 - fact: Snapshot comparison target sets used for promotion are schema-qualified and
   strict. Requested targets absent from base or candidate roots are reported as
   inconclusive/missing instead of being silently skipped, and readiness reports support
-  `--fail-on-readiness-gaps` for promotion gates.
+  `--fail-on-readiness-gaps` for promotion gates. Text readiness reports now list each
+  non-accepted target with `comparable`, `second_source`, blocker reasons, and first diff
+  details so failed promotion gates are directly actionable without opening JSON first.
 - fact: `scripts/check_release_readiness.sh --require-second-source-readiness` adds the
   focused UFunction and ScriptStruct second-source promotion gates. The default
   `check_release_readiness.sh` remains the core-first release gate and does not require
-  gameplay module second-source evidence.
+  gameplay module second-source evidence. When sanitized second-source roots exist, pass
+  `--ufunction-second-source-root`, `--scriptstruct-second-source-root`, and
+  `--second-source-report-dir`; the release gate writes JSON readiness artifacts for both
+  target sets and still runs both checks before returning the first non-zero gate status.
+  Put `--second-source-report-dir` outside the repository or under an ignored artifact
+  path, because release readiness ends with a clean-worktree check.
 - fact: `ue/BuffReflection.*` adds an offline internal `sdk.buffs` recognizer for exact
   compact `PrimalBuff` fixtures. It has no runtime hook, no public callback, no return
   override, and exposes only bounded bool ranges; object/class pointer ranges stay
@@ -325,7 +332,11 @@ Updated: 2026-05-28
   counts. Empty snapshot roots add a `no_targets` blocker, so absence of evidence cannot
   report `ready=true`. Target-set entries missing from the base root are `not_applicable`
   for second-source status and block base coverage instead of inflating
-  second-source-missing counts.
+  second-source-missing counts. Current missing-target text output names:
+  `PrimalItem.AllowRemoteAddToInventory`, `PrimalItem.CanUse`,
+  `PrimalStructure.AllowStructureAccess`, `PrimalStructure.IsAllowedToDemolish`,
+  `PrimalLocalProfile.ARKTributeDino`, and
+  `PrimalLocalProfile.ArkTributePlayerData`.
 - fact: Snapshot comparison now rejects internally bad layouts before comparing:
   individual property candidates and nested array/struct candidates with non-candidate
   status or reject reasons make the target `inconclusive`, even when base and candidate

@@ -6,8 +6,8 @@ cd "${REPO_ROOT}"
 
 BUILD_DIR="${OBELISK_BUILD_DIR:-build}"
 JOBS="${OBELISK_BUILD_JOBS:-$(nproc)}"
-RELEASE_CHECK_ROOT="$(mktemp -d /tmp/obelisk-release-check.XXXXXX)"
-LAYOUT_CHECK_ROOT="$(mktemp -d /tmp/obelisk-layout-check.XXXXXX)"
+RELEASE_CHECK_ROOT=""
+LAYOUT_CHECK_ROOT=""
 ALLOW_DIRTY=0
 REQUIRE_SECOND_SOURCE_READINESS=0
 UFUNCTION_SECOND_SOURCE_ROOT="${OBELISK_UFUNCTION_SECOND_SOURCE_ROOT:-}"
@@ -79,12 +79,20 @@ fi
 
 cleanup() {
     if [[ "${OBELISK_KEEP_RELEASE_CHECK_ROOTS:-0}" != "1" ]]; then
-        rm -rf "${RELEASE_CHECK_ROOT}" "${LAYOUT_CHECK_ROOT}"
+        if [[ -n "${RELEASE_CHECK_ROOT}" ]]; then
+            rm -rf "${RELEASE_CHECK_ROOT}"
+        fi
+        if [[ -n "${LAYOUT_CHECK_ROOT}" ]]; then
+            rm -rf "${LAYOUT_CHECK_ROOT}"
+        fi
     else
         printf 'keeping release check roots:\n  %s\n  %s\n' "${RELEASE_CHECK_ROOT}" "${LAYOUT_CHECK_ROOT}"
     fi
 }
 trap cleanup EXIT
+
+RELEASE_CHECK_ROOT="$(mktemp -d /tmp/obelisk-release-check.XXXXXX)"
+LAYOUT_CHECK_ROOT="$(mktemp -d /tmp/obelisk-layout-check.XXXXXX)"
 
 run_step() {
     printf '\n==> %s\n' "$*"

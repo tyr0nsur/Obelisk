@@ -50,7 +50,8 @@ This intentionally fails until the focused UFunction and ScriptStruct target set
 complete, distinct second-source evidence.
 
 When sanitized second-source snapshot roots exist, pass them into the same gate and keep
-JSON reports as promotion artifacts:
+JSON reports as promotion artifacts. Write the report directory outside the repository
+or under an ignored artifact path so the final clean-worktree check stays meaningful:
 
 ```bash
 scripts/check_release_readiness.sh \

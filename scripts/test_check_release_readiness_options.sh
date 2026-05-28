@@ -4,7 +4,21 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${REPO_ROOT}"
 
+count_temp_roots() {
+    find /tmp -maxdepth 1 -type d \
+        \( -name 'obelisk-release-check.*' -o -name 'obelisk-layout-check.*' \) \
+        2>/dev/null | wc -l
+}
+
+before_help_roots="$(count_temp_roots)"
 help_output="$(scripts/check_release_readiness.sh --help)"
+after_help_roots="$(count_temp_roots)"
+if [[ "${before_help_roots}" != "${after_help_roots}" ]]; then
+    printf 'help path leaked release temp roots: before=%s after=%s\n' \
+        "${before_help_roots}" "${after_help_roots}" >&2
+    exit 1
+fi
+
 for expected in \
     "--require-second-source-readiness" \
     "--ufunction-second-source-root" \
@@ -19,10 +33,18 @@ for expected in \
     fi
 done
 
+before_error_roots="$(count_temp_roots)"
 set +e
 error_output="$(scripts/check_release_readiness.sh --ufunction-second-source-root /tmp/obelisk-candidate 2>&1)"
 status=$?
 set -e
+after_error_roots="$(count_temp_roots)"
+
+if [[ "${before_error_roots}" != "${after_error_roots}" ]]; then
+    printf 'option error path leaked release temp roots: before=%s after=%s\n' \
+        "${before_error_roots}" "${after_error_roots}" >&2
+    exit 1
+fi
 
 if [[ "${status}" -ne 2 ]]; then
     printf 'expected option validation to exit 2, got %s\n%s\n' "${status}" "${error_output}" >&2

@@ -23,7 +23,8 @@ work from repository state instead of chat history.
 - Repo: `/home/flowcommunity-ark/Obelisk`
 - Remote: `git@github.com:tyr0nsur/Obelisk.git`
 - Current known good baseline: latest pushed and validated `main`. Check
-  `git log --oneline -5` for the exact head if resuming after a compaction.
+  `git log --oneline -5` for the exact head if resuming after a compaction, then inspect
+  local validation and CI state before claiming the current head is release-ready.
 - Current development version line: `0.1.0-dev`. This is a coordination label, not a
   release tag. See `docs/VERSIONING.md`.
 - Local ignored artifacts normally present: `build/`, `Obelisk.log`
@@ -93,7 +94,9 @@ work from repository state instead of chat history.
   evidence. Readiness JSON includes per-target details plus a top-level `promotion_gate`
   summary. Empty snapshot roots add a `no_targets` blocker. Missing base target-set entries
   are `not_applicable` for second-source status, and rejected property/nested candidates
-  make a target inconclusive before layout compare.
+  make a target inconclusive before layout compare. Text readiness reports now list each
+  non-accepted target with `comparable`, `second_source`, blocker reasons, and first diff
+  details.
 - UFunction and ScriptStruct regenerators accept the artifact identity flags above; the
   committed primary fixtures carry the primary core artifact SHA without storing core
   paths.
@@ -109,6 +112,11 @@ work from repository state instead of chat history.
 - `scripts/check_release_readiness.sh --require-second-source-readiness` adds the focused
   UFunction and ScriptStruct second-source promotion gates. The default release check
   remains the core-first gate and does not require gameplay module second-source evidence.
+  When sanitized second-source roots exist, pass `--ufunction-second-source-root`,
+  `--scriptstruct-second-source-root`, and `--second-source-report-dir`; the release gate
+  writes JSON readiness reports for both target sets and runs both before returning the
+  first non-zero gate status. Put the report directory outside the repository or under an
+  ignored artifact path so the final clean-worktree check remains meaningful.
 - Public ProcessEvent callback lifecycle now includes owner-token handle registration:
   plugins can register with handle-returning owner-token functions and explicitly
   unregister through `UnregisterProcessEventCallbackWithOwnerToken(owner_token, handle)`.
@@ -239,7 +247,9 @@ work from repository state instead of chat history.
   `PrimalItem.CanUse`, `PrimalItem.AllowRemoteAddToInventory`,
   `PrimalStructure.AllowStructureAccess`, and `PrimalStructure.IsAllowedToDemolish`.
   Current primary-fixture comparability is `4/4`, and promotion remains blocked by missing
-  accepted second-source evidence.
+  accepted second-source evidence. The current ScriptStruct promotion gate also names
+  `PrimalLocalProfile.ARKTributeDino` and
+  `PrimalLocalProfile.ArkTributePlayerData` as missing accepted second-source targets.
 - For new second-source artifacts, do not reuse the primary-core FName root slot by
   default. First derive or scan a verified per-artifact FName root/table, then pass it
   explicitly to UObjects/UFunction/ScriptStruct tools. UFunction and ScriptStruct
