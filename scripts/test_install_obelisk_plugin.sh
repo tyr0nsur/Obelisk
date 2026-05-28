@@ -99,4 +99,15 @@ if "${INSTALLER}" --dry-run "${plugin_src}" "${symlink_root}" \
 fi
 assert_contains "${TMP_DIR}/symlink-root.err" 'Install root must not be a symlink'
 
+symlink_plugins_root="${TMP_DIR}/root-symlink-plugins"
+symlink_plugins_target="${TMP_DIR}/external-plugins"
+mkdir -p "${symlink_plugins_root}" "${symlink_plugins_target}"
+ln -s "${symlink_plugins_target}" "${symlink_plugins_root}/plugins"
+if "${INSTALLER}" --dry-run "${plugin_src}" "${symlink_plugins_root}" \
+    >"${TMP_DIR}/symlink-plugins.out" 2>"${TMP_DIR}/symlink-plugins.err"; then
+    echo "Installer accepted symlink plugins directory" >&2
+    exit 1
+fi
+assert_contains "${TMP_DIR}/symlink-plugins.err" 'Managed install path must not be a symlink'
+
 echo "test_install_obelisk_plugin passed"

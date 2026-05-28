@@ -92,6 +92,21 @@ if ! grep -F 'Install root must not be a symlink' "${WORK_DIR}/symlink-root.err"
     exit 1
 fi
 
+symlink_subpath_root="${WORK_DIR}/symlink-subpath-root"
+symlink_subpath_target="${WORK_DIR}/symlink-subpath-target"
+mkdir -p "${symlink_subpath_root}" "${symlink_subpath_target}"
+ln -s "${symlink_subpath_target}" "${symlink_subpath_root}/lib"
+if "${REPO_DIR}/scripts/install_obelisk.sh" --dry-run "${symlink_subpath_root}" \
+    >"${WORK_DIR}/symlink-subpath.out" 2>"${WORK_DIR}/symlink-subpath.err"; then
+    echo "install_obelisk.sh accepted symlink managed subpath" >&2
+    exit 1
+fi
+if ! grep -F 'Managed install path must not be a symlink' "${WORK_DIR}/symlink-subpath.err" >/dev/null; then
+    echo "symlink subpath error was unclear" >&2
+    cat "${WORK_DIR}/symlink-subpath.err" >&2
+    exit 1
+fi
+
 fake_bin="${WORK_DIR}/fake-bin"
 failure_root="${WORK_DIR}/failure-root"
 mkdir -p "${fake_bin}"

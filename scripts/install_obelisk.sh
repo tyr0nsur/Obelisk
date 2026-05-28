@@ -119,6 +119,16 @@ validate_root() {
     fi
 }
 
+validate_managed_subpaths() {
+    local subpath
+    for subpath in "$@"; do
+        if [[ -L "${ROOT}/${subpath}" ]]; then
+            echo "Managed install path must not be a symlink: ${ROOT}/${subpath}" >&2
+            exit 2
+        fi
+    done
+}
+
 cleanup_temp_paths() {
     if [[ "${DRY_RUN}" != "1" ]]; then
         for temp_path in "${TEMP_PATHS[@]}"; do
@@ -221,6 +231,15 @@ install_sdk_package() {
 }
 
 validate_root
+validate_managed_subpaths \
+    "lib" \
+    "plugins" \
+    "include" \
+    "include/obelisk" \
+    "config" \
+    "logs" \
+    "state" \
+    "state/instances"
 
 run mkdir -p \
     "${ROOT}/lib" \

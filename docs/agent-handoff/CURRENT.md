@@ -211,6 +211,10 @@ Updated: 2026-05-28
 - fact: The LinuxGSM production wrapper scrubs inherited `OBELISK_ALLOW_CALL_PROCESS_EVENT`
   and `OBELISK_PE_TRACE_LIMIT` alongside the other marker-managed debug env vars before
   deriving runtime env from per-instance markers.
+- fact: Runtime and plugin installers reject symlinked managed install paths before
+  writing. Runtime install checks `lib`, `plugins`, `include`, `include/obelisk`, `config`,
+  `logs`, `state`, and `state/instances`; plugin install checks `plugins`. This prevents
+  atomic publication from escaping the central Obelisk root through pre-existing symlinks.
 - fact: Commit `c0d1e4c` pushed the hardened first-stable gates. On 2026-05-28,
   `scripts/check_release_readiness.sh` passed from a clean tracked/untracked worktree
   (ignored `build/` and `scripts/__pycache__/` only), and the read-only Ragnarok posture

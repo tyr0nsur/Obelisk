@@ -119,6 +119,9 @@ work from repository state instead of chat history.
 - The production LinuxGSM wrapper scrubs inherited `OBELISK_ALLOW_CALL_PROCESS_EVENT` and
   nonzero tracing controls such as `OBELISK_PE_TRACE_LIMIT`; stable posture still derives
   debug env only from explicit markers.
+- Runtime/plugin installers reject symlinked managed subdirectories before writing
+  artifacts. Keep `lib`, `plugins`, `include`, `config`, `logs`, `state`, and
+  `state/instances` as real directories under the central Obelisk root.
 - `arkserver2` / TheIsland runbooks from 2026-05-27 are historical/superseded while RAM is
   constrained unless the operator explicitly reopens that server. Research docs with live
   marker/restart snippets must carry a historical or approved-runbook banner.

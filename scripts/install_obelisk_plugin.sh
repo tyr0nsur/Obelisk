@@ -91,6 +91,16 @@ validate_root() {
     fi
 }
 
+validate_managed_subpaths() {
+    local subpath
+    for subpath in "$@"; do
+        if [[ -L "${ROOT}/${subpath}" ]]; then
+            echo "Managed install path must not be a symlink: ${ROOT}/${subpath}" >&2
+            exit 2
+        fi
+    done
+}
+
 validate_root
 
 PLUGIN_DIR="${ROOT}/plugins"
@@ -114,6 +124,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
+validate_managed_subpaths "plugins"
 run mkdir -p "${PLUGIN_DIR}"
 
 if [[ "${BACKUP_EXISTING}" == "1" && -e "${PLUGIN_DST}" ]]; then

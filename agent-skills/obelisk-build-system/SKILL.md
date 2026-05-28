@@ -66,6 +66,9 @@ Do not install runtime artifacts directly into `ShooterGame/Binaries/Linux` exce
 - `oBaseEvents` is the first official plugin target and should remain small,
   instructional, and safe by default.
 - Experimental/research plugins should not be installed into `plugins/` by default.
+- Install roots and managed subdirectories must not be symlinks. Reject existing symlinks
+  for `lib`, `plugins`, `include`, `config`, `logs`, and `state/instances` before writing
+  runtime, SDK, or plugin artifacts.
 
 ## Before Commit
 
