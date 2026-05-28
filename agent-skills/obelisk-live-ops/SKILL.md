@@ -206,14 +206,14 @@ scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection
 
 ## Rollback
 
-If a live map crashes after an Obelisk change, preserve logs/core files first. Restarting
-Ragnarok is maintenance-window work and should be lead/operator approved:
+If `arkserver` crashes after an Obelisk change, preserve logs/core files first. Restarting
+Ragnarok is allowed only when it is part of the current approved test or rollback window:
 
 ```bash
-# Maintenance-window-only for Ragnarok; do not run during normal agent rounds.
+# Approved test/rollback window only; preserve evidence first.
 # mkdir -p /servidor/ark/obelisk/state/instances/arkserver
 # touch /servidor/ark/obelisk/state/instances/arkserver/disable-plugins
-# ./arkserver start  # Maintenance-window-only for Ragnarok.
+# env -u TMUX ./arkserver start
 ```
 
 Preserve logs and core files before rebuilding or changing markers again.
