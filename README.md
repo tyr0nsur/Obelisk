@@ -106,6 +106,7 @@ python3 scripts/test_dependency_pins.py
 python3 scripts/test_versioning_guardrails.py
 python3 scripts/test_secret_guardrails.py
 python3 scripts/test_repo_hygiene.py
+scripts/test_obelisk_supervisor_snapshot.sh
 scripts/install_obelisk.sh --dry-run /tmp/obelisk-install-check
 ```
 
@@ -241,8 +242,10 @@ OBELISK_CHAT_REFLECTION_LOG_TEXT=1  # extra opt-in for decoded experimental chat
 OBELISK_PE_TRACE_LIMIT=0
 ```
 
-Experimental scanners and native exec probes stay opt-in. Reflection captures
-belong on isolated/debug instances only.
+Experimental scanners, candidate module observers, text logging, and native exec probes
+stay opt-in. Reflection captures belong on isolated/debug instances only. Do not use these
+controls on Ragnarok performance posture, and use TheIsland only during an explicitly
+approved debug window for the named instance and rollback plan.
 
 ## Roadmap
 

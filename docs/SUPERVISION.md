@@ -10,10 +10,11 @@ Allowed unattended job:
 */30 * * * * /home/flowcommunity-ark/Obelisk/scripts/obelisk_supervisor_snapshot.sh >/dev/null 2>&1
 ```
 
-The default snapshot target is now `arkserver2` / TheIsland so Ragnarok player
-performance tests are not used as the normal debug evidence stream. To intentionally
-snapshot another instance, set `OBELISK_SUPERVISOR_INSTANCE` and `OBELISK_SUPERVISOR_MAP`
-explicitly.
+The default snapshot target is `arkserver-obelisk-debug` so Ragnarok player performance
+tests and TheIsland fallback windows are not used as the normal evidence stream. To
+intentionally snapshot another instance, set `OBELISK_SUPERVISOR_INSTANCE` and
+`OBELISK_SUPERVISOR_MAP` explicitly. Use TheIsland only during an explicitly approved
+debug window for that named instance.
 
 For an already supervised open shell, use a finite timer loop instead of installing cron:
 
@@ -112,9 +113,10 @@ counts either reflected rejection lines or `send_mode_known=false`; non-zero mea
 snapshot found evidence that needs active review before promotion. `last_relevant_line`
 shows the last chat/reflection line matched by the snapshot.
 
-## Manual ServerSendChatMessage Check
+## Candidate Module Observer Example
 
-Use this after deploying a build that recognizes
+This historical chat observer flow is an example for candidate module validation, not the
+center of the SDK roadmap. Use it only after deploying a build that recognizes
 `ShooterPlayerController.ServerSendChatMessage`. The expected safe posture is ProcessEvent
 hook enabled, plugins disabled, and chat reflection enabled only for the supported binary
 SHA gate.
@@ -123,8 +125,9 @@ For the full approved-window A/B flow, including reflection-off baseline, metada
 validation, text-log gate, evidence fields, and rollback, use
 `docs/research/2026-05-27-theisland-chat-reflection-ab-runbook.md`.
 
-Run this on `arkserver2` / TheIsland, not on Ragnarok while players are testing
-performance. Before sending chat, start a live tail in one shell:
+Run this on `arkserver-obelisk-debug`. Use `arkserver2` / TheIsland only during an
+explicitly approved debug window for that named instance, not on Ragnarok while players
+are testing performance. Before sending chat, start a live tail in one shell:
 
 ```bash
 tail -Fn 0 /servidor/ark/obelisk/logs/arkserver2/Obelisk.log \
@@ -141,7 +144,8 @@ cat "${latest}/chat-reflection.txt"
 tail -n 80 "${latest}/obelisk-log-tail.txt"
 ```
 
-Then send exactly one normal in-game chat message from a client on TheIsland. Expected
+Then send exactly one normal in-game chat message from a client on the approved debug
+target. For TheIsland, do this only after explicit approval for that run window. Expected
 successful evidence is a bounded `Reflected chat ProcessEvent` line for
 `ServerSendChatMessage`, with reflected metadata showing the
 `ShooterPlayerController.ServerSendChatMessage` path and parameter ranges for

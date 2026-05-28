@@ -19,6 +19,7 @@ SKIP_DIRS = {
 FORBIDDEN_ACTIVE_LINES = [
     "touch /servidor/ark/obelisk/state/",
     "mkdir -p /servidor/ark/obelisk/state/",
+    "rm -f /servidor/ark/obelisk/state/",
     "/servidor/ark/arkserver2 restart",
     "./arkserver2 restart",
     "./arkserver restart",

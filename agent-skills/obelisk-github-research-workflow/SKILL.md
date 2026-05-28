@@ -1,6 +1,6 @@
 ---
 name: obelisk-github-research-workflow
-description: "Use when coordinating Obelisk agents that should commit to GitHub, improve their own skills, and document reverse-engineering or runtime findings under docs/research."
+description: "Use when leading Obelisk toward production stability through supervised agent coordination, GitHub checkpoints, skill updates, ARK reverse-engineering research, and durable docs/research handoff."
 ---
 
 # Obelisk GitHub Research Workflow
@@ -10,11 +10,16 @@ skill updates, or making work reproducible for contributors.
 
 ## Project Vision
 
-Obelisk is a Linux runtime/API/SDK core for ARK modding. Coordinate work toward a robust
-general modding substrate: UE4 reflection, safe runtime hooks, stable C ABI, plugin
-lifecycle, install layout, live-ops safety, and reproducible reversing evidence. Treat chat,
-inventory, structures, buffs, dinos, tribes, missions, transfers, and admin surfaces as
-module areas on top of the same core, not as the center of the project.
+Obelisk is a Linux runtime/API/SDK core for ARK modding. The standing leader objective is
+to move Obelisk toward a production-stable version through continuous supervised rounds of
+audit, development, investigation, knowledge capture, and learning about ARK: Survival
+Evolved from dump reverse engineering, project analysis, and centrally coordinated agents.
+
+Coordinate work toward a robust general modding substrate: UE4 reflection, safe runtime
+hooks, stable C ABI, plugin lifecycle, install layout, live-ops safety, reproducible
+reversing evidence, and public SDK promotion gates. Treat chat, inventory, structures,
+buffs, dinos, tribes, missions, transfers, and admin surfaces as module areas on top of
+the same core, not as the center of the project.
 
 ## Working Contract
 

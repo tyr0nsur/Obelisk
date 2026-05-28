@@ -460,6 +460,38 @@ namespace
         CleanupPlugin(pluginB);
         fs::remove_all(root);
     }
+
+    void TestLoadPluginsSkipsAlreadyLoadedPluginId()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_idempotent");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{.filename = "idempotent.so", .pluginId = "idempotent_plugin", .registerCallback = true};
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.getInfoCalls == 2, "already-loaded plugin metadata was not checked on reload");
+        Require(plugin.initCalls == 1, "already-loaded plugin was initialized more than once");
+        Require(plugin.closeCalls == 1, "already-loaded duplicate handle was not closed during reload");
+        Require(Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
+                "callback from first loaded plugin was removed during reload");
+
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1, "idempotent plugin shutdown was not called once");
+        Require(plugin.closeCalls == 2, "loaded plugin handle was not closed during unload");
+        Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
+                "callback from idempotent plugin survived unload");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
 }
 
 int main()
@@ -477,6 +509,7 @@ int main()
     TestInitFailureCleansCallbacksAndCloses();
     TestMultiplePluginsLoadSortedAndUnloadReverse();
     TestDuplicatePluginIdRejectsSecondPlugin();
+    TestLoadPluginsSkipsAlreadyLoadedPluginId();
 
     Obelisk::Logger::Shutdown();
     fs::remove_all(logRoot);

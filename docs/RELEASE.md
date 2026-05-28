@@ -50,6 +50,7 @@ python3 scripts/test_dependency_pins.py
 python3 scripts/test_versioning_guardrails.py
 python3 scripts/test_secret_guardrails.py
 python3 scripts/test_repo_hygiene.py
+scripts/test_obelisk_supervisor_snapshot.sh
 scripts/install_obelisk.sh --dry-run /tmp/obelisk-release-check
 ```
 

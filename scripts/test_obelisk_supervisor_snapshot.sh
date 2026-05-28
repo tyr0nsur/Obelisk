@@ -19,12 +19,13 @@ write_proc_fixture() {
 
 write_obelisk_fixture() {
     local root="$1"
+    local instance="${2:-arkserver2}"
 
-    mkdir -p "${root}/logs/arkserver2" "${root}/state/instances/arkserver2"
-    : > "${root}/state/instances/arkserver2/enable-chat-reflection"
-    : > "${root}/state/instances/arkserver2/enable-inventory-reflection"
-    : > "${root}/state/instances/arkserver2/enable-structure-reflection"
-    cat > "${root}/logs/arkserver2/Obelisk.log" <<'EOF'
+    mkdir -p "${root}/logs/${instance}" "${root}/state/instances/${instance}"
+    : > "${root}/state/instances/${instance}/enable-chat-reflection"
+    : > "${root}/state/instances/${instance}/enable-inventory-reflection"
+    : > "${root}/state/instances/${instance}/enable-structure-reflection"
+    cat > "${root}/logs/${instance}/Obelisk.log" <<'EOF'
 [2026-05-27 01:00:00.000] [warning] Experimental chat reflection enabled for ShooterGameServer SHA256 abc123.
 [2026-05-27 01:00:01.000] [info] Reflected chat ProcessEvent #1 function=ServerSendChatMessage fname_index=2697 params=0x123 fields=2
 [2026-05-27 01:00:01.001] [info] Reflected chat ServerSendChatMessage send_mode=4 send_mode_name=Unknown send_mode_known=false
@@ -52,6 +53,8 @@ run_snapshot() {
     OBELISK_ROOT="${root}" \
     OBELISK_SUPERVISOR_OUT="${out}" \
     OBELISK_SUPERVISOR_PROC_ROOT="${TMP_DIR}/proc" \
+    OBELISK_SUPERVISOR_INSTANCE=arkserver2 \
+    OBELISK_SUPERVISOR_MAP=TheIsland \
     OBELISK_SUPERVISOR_PID="${pid}" \
     "${SNAPSHOT}"
 }
@@ -64,6 +67,8 @@ run_loop_once() {
     OBELISK_ROOT="${root}" \
     OBELISK_SUPERVISOR_OUT="${out}" \
     OBELISK_SUPERVISOR_PROC_ROOT="${TMP_DIR}/proc" \
+    OBELISK_SUPERVISOR_INSTANCE=arkserver2 \
+    OBELISK_SUPERVISOR_MAP=TheIsland \
     OBELISK_SUPERVISOR_PID="${pid}" \
     "${LOOP}" --interval 1 --count 1
 }
@@ -89,6 +94,25 @@ assert_file_not_contains() {
 }
 
 stable_maps="7f000000-7f001000 r-xp 00000000 00:00 0 /servidor/ark/obelisk/lib/libobelisk.so"
+
+default_root="${TMP_DIR}/default-root"
+default_out="${TMP_DIR}/default-out"
+write_obelisk_fixture "${default_root}" "arkserver-obelisk-debug"
+write_proc_fixture 4141 "${stable_maps}" \
+    "LD_PRELOAD=/servidor/ark/obelisk/lib/libobelisk.so" \
+    "OBELISK_INSTANCE_ID=arkserver-obelisk-debug" \
+    "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
+    "OBELISK_DISABLE_PLUGINS=1"
+
+default_snapshot_dir="$(
+    OBELISK_ROOT="${default_root}" \
+    OBELISK_SUPERVISOR_OUT="${default_out}" \
+    OBELISK_SUPERVISOR_PROC_ROOT="${TMP_DIR}/proc" \
+    OBELISK_SUPERVISOR_PID=4141 \
+    "${SNAPSHOT}"
+)"
+assert_file_contains "${default_snapshot_dir}/summary.txt" '^instance=arkserver-obelisk-debug$'
+assert_file_contains "${default_snapshot_dir}/summary.txt" '^posture_status=ok$'
 
 stable_root="${TMP_DIR}/stable-root"
 stable_out="${TMP_DIR}/stable-out"
@@ -189,6 +213,8 @@ assert_file_contains "${invalid_snapshot_dir}/structure-reflection.txt" '^struct
 if OBELISK_ROOT="${unstable_root}" \
     OBELISK_SUPERVISOR_OUT="${TMP_DIR}/loop-fail-out" \
     OBELISK_SUPERVISOR_PROC_ROOT="${TMP_DIR}/proc" \
+    OBELISK_SUPERVISOR_INSTANCE=arkserver2 \
+    OBELISK_SUPERVISOR_MAP=TheIsland \
     OBELISK_SUPERVISOR_PID=4343 \
     "${LOOP}" --interval 1 --count 2 >/dev/null 2>"${TMP_DIR}/loop-fail.err"; then
     echo "Expected supervisor loop to stop on snapshot failure" >&2

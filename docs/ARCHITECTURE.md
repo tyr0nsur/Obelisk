@@ -95,9 +95,10 @@ ARK-specific paths, instance names, and observed `FName` indices are validation
 inputs only. Stable plugin contracts should be expressed through public SDK
 headers and documented runtime behavior.
 
-Current runtime debug work targets `arkserver2` / TheIsland or a dedicated
-`arkserver-obelisk-debug` instance. Ragnarok is protected for player performance
-testing and should not be treated as the routine debug target.
+Current runtime debug work should target a dedicated `arkserver-obelisk-debug` instance.
+Use `arkserver2` / TheIsland only as an explicitly approved fallback for the named run
+window. Ragnarok is protected for player performance testing and should not be treated as
+the routine debug target.
 
 ## SDK Direction
 

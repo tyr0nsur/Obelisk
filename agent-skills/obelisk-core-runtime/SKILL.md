@@ -28,7 +28,9 @@ Own these areas:
 - Keep plugin loading optional via `OBELISK_DISABLE_PLUGINS=1`.
 - Never use `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` as part of normal runtime validation.
 - Do not let plugin exceptions or STL types cross the C ABI boundary.
-- Do not subscribe plugins to all `ProcessEvent` calls unless explicitly debugging.
+- Do not subscribe plugins to all `ProcessEvent` calls except during a specifically
+  operator-approved debug window on the named debug instance, with bounded limits and a
+  rollback plan.
 - Treat callback ownership as runtime-critical: callbacks registered by a plugin must be
   unregistered if init fails, before unload, and before `dlclose`.
 - Keep plugin-owned lifecycle cleanup shared across `EventManager` and the internal
@@ -85,14 +87,15 @@ Expected:
 - Add tests or harness coverage for shutdown order and callback cleanup.
 - Keep global ProcessEvent callbacks off production paths unless a measured debug session
   needs them.
-- Keep hook-side experimental chat reflection cheap while it remains internal:
-  disabled, chat-unmatched, and `OBELISK_CHAT_REFLECTION_LOG_LIMIT=0` paths must stay
-  allocation-free in `chat_reflection_benchmark`; matched metadata-only
-  `ServerSendChatMessage` should also remain allocation-free unless a research note
-  justifies the regression. Hook-like text logging should stay at one allocation or lower.
-- Any text logging work must keep `OBELISK_CHAT_REFLECTION_LOG_TEXT=1` as a separate gate,
-  sanitize output through the tested `ProcessEventChatReflection` helper, and avoid
-  publishing player chat contents in docs or Discord updates.
+- Keep hook-side experimental module recognizers cheap while they remain internal. The
+  historical chat recognizer is the current benchmark fixture: disabled, unmatched, and
+  `OBELISK_CHAT_REFLECTION_LOG_LIMIT=0` paths must stay allocation-free in
+  `chat_reflection_benchmark`; matched metadata-only `ServerSendChatMessage` should also
+  remain allocation-free unless a research note justifies the regression. Hook-like text
+  logging should stay at one allocation or lower.
+- Any player-text or gameplay-payload logging work must keep a separate explicit gate
+  (`OBELISK_CHAT_REFLECTION_LOG_TEXT=1` for the historical chat path), sanitize output
+  through tested helpers, and avoid publishing player contents in docs or Discord updates.
 - Require a validated, idempotent plugin shutdown export before treating thread-owning or
   HTTP-owning plugins as stable.
 
@@ -105,7 +108,7 @@ cmake --build build -j"$(nproc)"
 git diff --check
 ```
 
-For chat reflection hot-path work also run:
+For recognizer hot-path work that touches the historical chat benchmark fixture also run:
 
 ```bash
 cmake --build build --target chat_reflection_benchmark

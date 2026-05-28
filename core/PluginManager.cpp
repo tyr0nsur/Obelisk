@@ -186,6 +186,14 @@ namespace Obelisk::Core
             OBELISK_INFO("Removed {} chat callback(s) registered by plugin {} {}.", chatRemoved, pluginName, reason);
     }
 
+    bool PluginManager::IsPluginIdLoaded(const std::string& pluginId) const
+    {
+        return std::any_of(m_LoadedPlugins.begin(), m_LoadedPlugins.end(),
+            [&pluginId](const PluginInfo& plugin) {
+                return plugin.pluginId == pluginId;
+            });
+    }
+
     void PluginManager::LoadPlugins(const std::string& directory)
     {
         try
@@ -280,6 +288,13 @@ namespace Obelisk::Core
                     continue;
                 }
 
+                if (IsPluginIdLoaded(metadata.plugin_id))
+                {
+                    OBELISK_WARN("Plugin {} skipped because plugin_id '{}' is already loaded.", pluginName, metadata.plugin_id);
+                    m_Loader->Close(handle);
+                    continue;
+                }
+
                 if (!preparedConfig.enabled)
                 {
                     OBELISK_INFO("Plugin {} skipped because config enabled=false.", pluginName);
@@ -339,7 +354,7 @@ namespace Obelisk::Core
                 if (initialized)
                 {
                     OBELISK_INFO("Plugin {} initialized successfully.", pluginName);
-                    m_LoadedPlugins.push_back({pluginName, handle, pluginOwner, shutdownFunc});
+                    m_LoadedPlugins.push_back({pluginName, metadata.plugin_id, handle, pluginOwner, shutdownFunc});
                 }
                 else
                 {

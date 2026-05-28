@@ -5,9 +5,9 @@ description: "Operational reversing workflow for maintaining Obelisk against ARK
 
 # Obelisk UE4 Reversing Skill
 
-Use this skill when an ARK update changes signatures, ProcessEvent discovery fails, chat
-events are not detected, reflection globals need validation, or a server crash may be tied
-to native hooks.
+Use this skill when an ARK update changes signatures, ProcessEvent discovery fails,
+gameplay module recognizers need validation, reflection globals need validation, or a
+server crash may be tied to native hooks.
 
 ## Ground Truth First
 
@@ -56,20 +56,21 @@ Known research targets:
 - Maintain the current FName/GObjects/UFunction evidence against future binary updates.
 - Re-run `scripts/enumerate_core_uobjects.py` and `scripts/inspect_core_ufunctions.py`
   when the ARK binary hash changes.
-- Confirm deployed chat reflection with a real in-game chat message before promoting text
-  decoding or plugin-facing events.
-- For normal incoming player chat, prioritize
+- Treat historical chat work as one module-recognizer example, not the roadmap center.
+  For normal incoming player chat, prior evidence favors
   `ShooterPlayerController.ServerSendChatMessage` over `ServerChat*`; the latter currently
-  looks like `ShooterCheatManager` command coverage.
-- Recover additional event families only after repeating the reflection path: object,
-  function, property chain, bounded params, then decoder.
+  looks like `ShooterCheatManager` command coverage. Keep this evidence internal until the
+  common module promotion gates pass.
+- Recover event families by repeating the same reflection path for each module: object,
+  function, property chain, bounded params, copied-data ownership, callback lifecycle, then
+  decoder/API surface.
 - Use copied logs with `scripts/analyze_reflectionscanner_capture.py`; `--strict` requires
   repeat-confirmed exact FName table clues and should fail on single-hit candidates.
 
-`ReflectionScanner` may scan UTF-32 names such as `ServerSendChatMessage`, `ServerChat`,
-`ClientServerChatMessage`, `ClientChatMessage`, and `ClientMessage`, plus mov-immediate and
-RIP-relative references. Treat results as candidates until cross-validated by object and
-property metadata.
+`ReflectionScanner` may scan UTF-32 names for approved module-recognizer targets such as
+chat, inventory, structures, buffs, dinos, tribes, transfers, missions, and admin flows,
+plus mov-immediate and RIP-relative references. Treat results as candidates until
+cross-validated by object and property metadata.
 
 ## Live Server Safety
 
@@ -77,9 +78,9 @@ property metadata.
   runtime test.
 - `arkserver` / Ragnarok is currently reserved for player performance testing; do not use
   it for new reversing/debug captures without an explicit maintenance window.
-- `OBELISK_ENABLE_CHAT_REFLECTION=1` belongs on `arkserver2` / TheIsland for future
-  development captures, only with the matching `OBELISK_CHAT_REFLECTION_BINARY_SHA256`
-  gate and small log limit.
+- Experimental module recognizers belong only on an explicitly approved debug/development
+  target. The historical chat gate (`OBELISK_ENABLE_CHAT_REFLECTION=1`) additionally
+  requires the matching `OBELISK_CHAT_REFLECTION_BINARY_SHA256` gate and a small log limit.
 - Do not enable `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` on live servers.
 - Do not enable broad event discovery on a production map until it has survived an
   isolated server test.
@@ -89,8 +90,9 @@ property metadata.
   disabled, copied-log evidence, and rollback.
 - Use small `OBELISK_PE_TRACE_LIMIT` windows only when capturing evidence; default should
   remain quiet.
-- Prefer the `enable-chat-reflection` marker over ad hoc environment edits; rollback is
-  removing the marker and restarting `arkserver2` or the debug/development server.
+- Prefer per-instance markers over ad hoc environment edits for approved debug captures.
+  Rollback is removing the approved marker and restarting the approved debug/development
+  server during the same run window.
 - If a plugin crashes during load/init, disable plugins first and preserve logs/core files
   for analysis.
 

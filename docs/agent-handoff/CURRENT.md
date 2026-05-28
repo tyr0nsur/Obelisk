@@ -4,10 +4,12 @@ Updated: 2026-05-28
 
 ## Active Operating Objective
 
-- objective: Run up to 10 hours of supervised priority rounds for Obelisk as a robust
-  Linux runtime/API/SDK core for ARK modding. Each round should produce one concrete
-  outcome: audited evidence, offline reversing/tooling improvement, runtime/API hardening,
-  recognizer/test coverage, documentation/skill updates, or a validated checkpoint.
+- objective: Move Obelisk toward a production-stable version through continuous supervised
+  rounds of audit, development, investigation, knowledge capture, and learning about ARK:
+  Survival Evolved from dump reverse engineering, project analysis, and centrally
+  coordinated agents. Each round should produce one concrete outcome: audited evidence,
+  offline reversing/tooling improvement, runtime/API hardening, recognizer/test coverage,
+  documentation/skill updates, or a validated checkpoint.
 - priorities: preserve live server safety first; strengthen UE4 reflection and
   second-source evidence; keep module recognizers candidate-only until promotion gates are
   met; optimize tooling/tests that make future reverse engineering faster and more
@@ -46,10 +48,10 @@ Updated: 2026-05-28
   repeated the backup/restart; current `ark-config-latest` is
   `/home/flowcommunity-ark/backups/ark-config-20260527-190558`, and Ragnarok is up as PID
   `3940524`.
-- fact: `arkserver2` / TheIsland is now the designated Obelisk debug/development target.
-  Use it for controlled runtime validation and research harness work instead of Ragnarok,
-  while still requiring explicit per-run approval for ReflectionScanner, native exec,
-  ptrace/gcore, broad ProcessEvent traces, or chat text logging.
+- fact: `arkserver-obelisk-debug` is the preferred Obelisk debug/development target for
+  future harness work. Use `arkserver2` / TheIsland only as an explicit operator-approved
+  fallback for a named run window and rollback plan; never use Ragnarok for routine
+  development while player performance testing is active.
 - fact: `sdk.structures` runtime observation now requires both env/SHA/budget gates and
   `/servidor/ark/obelisk/state/instances/<instance>/enable-structure-reflection`.
   The LinuxGSM wrapper exports structure reflection env only from that marker, and the
@@ -107,13 +109,27 @@ Updated: 2026-05-28
 - fact: Commit `ffa3269` makes `scripts/test_public_sdk_guardrails.py` the canonical
   module-first public SDK guardrail test and keeps `test_public_sdk_chat_guardrails.py` as
   a legacy wrapper.
+- fact: Current uncommitted priority round aligned debug policy toward
+  `arkserver-obelisk-debug` by default, added CI coverage for
+  `scripts/test_obelisk_supervisor_snapshot.sh`, and hardened `PluginManager::LoadPlugins`
+  so repeated loads of an already-loaded `plugin_id` skip initialization and close the
+  duplicate handle instead of duplicating callbacks.
+- finding: Runtime/API audit identified the next SDK-core hardening items: public callback
+  unsubscribe handles, `CallProcessEvent` reentrancy contract/guard, safe hook removal
+  with active-detour tracking, and owned debug-control thread shutdown. Treat these as
+  future focused runtime rounds.
+- finding: Reflection tooling audit found UFunction snapshot fixture coverage is broad
+  across module areas, but ScriptStruct coverage is the current bottleneck with only two
+  transfer structs. Prioritize an offline second-source readiness report before any
+  runtime capture or public API promotion.
 - fact: `sdk.transfers` ScriptStruct fixtures now preserve target/property object and
   FName identity fields like UFunction fixtures. `regenerate_scriptstruct_snapshots.py
   --check-layout` stays semantic/layout-only so second-source gates do not depend on
   unstable FName/GObjects indices.
-- next-step: Continue priority rounds on general reflection/API substrate: second-source
-  evidence, snapshot tooling, module recognizer coverage, runtime safety gates, and
-  public SDK promotion policy.
+- next-step: Continue priority rounds on general reflection/API substrate. Immediate safe
+  priorities are: finish validating/committing the grouped debug-policy and PluginManager
+  idempotency changes, then build an offline second-source readiness report for
+  ScriptStruct and compact UFunction module snapshots.
 - fact: Runtime/chat baseline is documented in
   `docs/research/2026-05-27-runtime-and-chat-baseline.md`.
 - fact: Reflection/chat metadata audit added shared UE probe layouts and gated
@@ -129,9 +145,9 @@ Updated: 2026-05-28
   flags, expected logs, GNames accept/reject criteria, and rollback; see
   `docs/research/2026-05-27-reflectionscanner-isolated-capture-runbook.md`.
 - fact: Earlier read-only ops audit found no confirmed isolated/debug ARK instance on
-  `/servidor/ark`; the operator has now designated `arkserver2` / TheIsland for debug and
-  development, but historical caveats still apply for high-risk scanners unless a specific
-  run window is approved. See
+  `/servidor/ark`; the preferred future target is now `arkserver-obelisk-debug`, with
+  `arkserver2` / TheIsland only as an approved fallback. High-risk scanners still require
+  a specific run window. See
   `docs/research/2026-05-27-reflectionscanner-isolated-instance-audit.md`.
 - fact: Ops planning recommends a new `arkserver-obelisk-debug` LinuxGSM instance with
   isolated ports, saves, cluster posture, `OBELISK_LOG_DIR`, and wrapper-level Obelisk
@@ -139,8 +155,8 @@ Updated: 2026-05-28
   `docs/research/2026-05-27-isolated-debug-instance-plan.md`.
 - fact: Runtime and wrapper were redeployed from the central install root after removing
   legacy marker fallbacks. Historical audit recorded `arkserver` active and `arkserver2`
-  stopped; current operational policy is to avoid Ragnarok for development and use
-  `arkserver2` for future debug windows. See
+  stopped; current operational policy is to avoid Ragnarok for development, prefer
+  `arkserver-obelisk-debug`, and use `arkserver2` only for approved fallback windows. See
   `docs/research/2026-05-27-ops-restart-audit-instance-id.md`.
 - fact: `scripts/analyze_reflectionscanner_capture.py` passively summarizes copied
   ReflectionScanner logs for UObject scores, FName `matched_clues`, delayed globals, and

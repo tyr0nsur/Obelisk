@@ -31,18 +31,20 @@ Isolated-debug only:
 
 Development-server gated:
 
-- `OBELISK_ENABLE_CHAT_REFLECTION=1` only when paired with the exact supported
-  `OBELISK_CHAT_REFLECTION_BINARY_SHA256`, a small log limit, plugins disabled, and a
-  post-change `scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland
-  --instance arkserver2` or equivalent explicit approved debug target.
+- Experimental module recognizers only when paired with explicit operator approval for
+  the target, marker/env changes, restart window, and rollback. Historical chat reflection
+  additionally requires the exact supported `OBELISK_CHAT_REFLECTION_BINARY_SHA256`, a
+  small log limit, plugins disabled, and a post-change
+  `scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance
+  arkserver2` or equivalent explicit approved debug target.
 
 Forbidden on live/shared instances:
 
 - `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1`,
-- raw chat/FString discovery loops,
+- raw FString/text or arbitrary gameplay-param discovery loops,
 - broad unbounded ProcessEvent logging,
-- decoded chat text logging without reflected `UFunction`/`UProperty` validation and a
-  confirmed `FString` layout,
+- decoded player text or gameplay payload logging without reflected `UFunction`/
+  `UProperty` validation, copied-data ownership, and a confirmed layout,
 - patching unknown UE function pointers,
 - external instrumentation that changes thread/process behavior.
 

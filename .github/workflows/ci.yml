@@ -56,6 +56,9 @@ jobs:
           bash -n scripts/test_install_obelisk_layout.sh
           bash -n scripts/check_obelisk_server_posture.sh
           bash -n scripts/test_check_obelisk_server_posture.sh
+          bash -n scripts/obelisk_supervisor_snapshot.sh
+          bash -n scripts/obelisk_supervisor_loop.sh
+          bash -n scripts/test_obelisk_supervisor_snapshot.sh
           bash -n scripts/test_linuxgsm_wrapper_markers.sh
           bash -n packaging/linuxgsm/ObeliskRun.sh
           bash -n packaging/linuxgsm/ObeliskRunDebug.sh
@@ -100,6 +103,7 @@ jobs:
       - name: Run server posture tests
         run: |
           scripts/test_check_obelisk_server_posture.sh
+          scripts/test_obelisk_supervisor_snapshot.sh
           scripts/test_linuxgsm_wrapper_markers.sh
 
   build:

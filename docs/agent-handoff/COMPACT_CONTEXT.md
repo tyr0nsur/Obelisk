@@ -7,8 +7,10 @@ work from repository state instead of chat history.
 
 ## Active Operating Objective
 
-- Run up to 10 hours of supervised priority rounds for Obelisk as a robust Linux
-  runtime/API/SDK core for ARK modding.
+- Move Obelisk toward a production-stable version through continuous supervised rounds of
+  audit, development, investigation, knowledge capture, and learning about ARK: Survival
+  Evolved from dump reverse engineering, project analysis, and centrally coordinated
+  agents.
 - Each round should produce audited evidence, offline reversing/tooling improvement,
   runtime/API hardening, recognizer/test coverage, documentation/skill updates, or a
   validated checkpoint.
@@ -42,10 +44,12 @@ work from repository state instead of chat history.
 - Ragnarok stable live posture and player performance test target:
   - `/servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook`
   - `/servidor/ark/obelisk/state/instances/arkserver/disable-plugins`
-- Current operator direction as of 2026-05-27:
+- Current operator direction as of 2026-05-28:
   - protect `arkserver` / Ragnarok for player performance testing;
-  - use `arkserver2` / TheIsland as the Obelisk debug/development target for future
-    controlled runtime validation and research windows.
+  - prefer `arkserver-obelisk-debug` as the Obelisk debug/development target for future
+    controlled runtime validation and research windows;
+  - use `arkserver2` / TheIsland only as an explicit operator-approved fallback for a
+    named run window and rollback plan.
 - Do not restart `arkserver`, edit its marker files, deploy to it, attach debuggers, or
   increase logging while player performance testing is active.
 - Exception already completed with explicit operator approval: `AllowCaveBuildingPvP=True`
@@ -54,7 +58,8 @@ work from repository state instead of chat history.
   `/home/flowcommunity-ark/backups/ark-config-20260527-190558` as `ark-config-latest`.
 - Do not restart servers, edit marker files, change `/servidor/ark`, or activate
   ReflectionScanner without explicit operator permission. For new debug work, target
-  `arkserver2` / TheIsland, not Ragnarok.
+  `arkserver-obelisk-debug` first; use TheIsland only as an approved fallback, not
+  Ragnarok.
 - Structure reflection is marker-gated in code and wrapper:
   `/servidor/ark/obelisk/state/instances/<instance>/enable-structure-reflection`.
   Env-only structure reflection activation is rejected; budget defaults to `0`.
@@ -93,6 +98,18 @@ work from repository state instead of chat history.
   command examples from returning to install, supervision, or skill docs.
 - `scripts/test_public_sdk_guardrails.py` is the canonical module-first public SDK
   guardrail; `test_public_sdk_chat_guardrails.py` remains a legacy wrapper.
+- Current uncommitted priority round:
+  - supervisor default is being aligned to `arkserver-obelisk-debug`;
+  - CI/release/README are being updated to run `scripts/test_obelisk_supervisor_snapshot.sh`;
+  - `PluginManager::LoadPlugins` is being hardened so already-loaded `plugin_id` values are
+    skipped on repeated load attempts and duplicate handles are closed without duplicating
+    callbacks.
+- Current agent audit backlog:
+  - runtime/API: callback unsubscribe handles, `CallProcessEvent` reentrancy contract,
+    safe hook removal with active-detour tracking, and owned debug-control thread shutdown;
+  - reflection/offline: ScriptStruct second-source coverage is the bottleneck, and the
+    next safe step is a second-source readiness report over existing snapshots without
+    touching live servers.
 - Latest restart audit:
   `docs/research/2026-05-27-ops-restart-audit-instance-id.md`
   - live `ObeliskRun.sh` exports `OBELISK_INSTANCE_ID=arkserver`

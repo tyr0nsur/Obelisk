@@ -29,7 +29,7 @@ define or protect runtime behavior.
 | Installer plugin posture | Stable baseline | `scripts/install_obelisk.sh` installs only runtime libraries; plugins are activated only by copying `.so` files into `plugins/`. |
 | Per-instance runtime flags | Stable baseline | `OBELISK_INSTANCE_ID` selects logs and markers under `state/instances/<id>/`; map markers are obsolete. |
 | ProcessEvent hook | Stable baseline | Current Ragnarok posture enables the hook while disabling plugins. |
-| Server posture check | Stable baseline | `scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance arkserver2` validates stable debug env flags, requires a mapped `libobelisk.so`, rejects deleted runtime mappings, and is covered by offline procfs-fixture tests. Use explicit `--map`/`--instance`; add `--forbid-chat-reflection` for production/performance posture where chat reflection and text logging must be off. |
+| Server posture check | Stable baseline | `scripts/check_obelisk_server_posture.sh --expect-stable --map <map> --instance <instance-id>` validates stable debug env flags, requires a mapped `libobelisk.so`, rejects deleted runtime mappings, and is covered by offline procfs-fixture tests. Use explicit `--map`/`--instance`; add `--forbid-chat-reflection` for production/performance posture where chat reflection and text logging must be off. |
 | Plugin C ABI loading | Stable baseline | ABI is C-compatible and currently append-only for new metadata fields. |
 | Filtered ProcessEvent callbacks | Stable baseline | Prefer callbacks scoped by `FName` index over global callbacks. |
 | Plugin callback ownership | Stable baseline | Callback owner tokens are unregistered on init failure and before plugin unload. |
@@ -58,16 +58,16 @@ Do not enable native exec probes on validation adapter servers. Keep experimenta
 plugins in the repository or another staging location until isolated validation
 passes.
 
-While Ragnarok is under player performance testing, use `arkserver2` / TheIsland as the
-Obelisk debug/development harness instead of changing Ragnarok markers or restarting it.
-For `gcore`, `ptrace`, ReflectionScanner, broad tracing, or scanner-like probes, prefer
-`arkserver-obelisk-debug`; use `arkserver2` only as an explicit approved fallback.
+While Ragnarok is under player performance testing, use `arkserver-obelisk-debug` as the
+normal Obelisk debug/development harness instead of changing Ragnarok markers or
+restarting it. Use `arkserver2` / TheIsland only during an explicitly approved debug
+window for the named instance and rollback plan. For `gcore`, `ptrace`, ReflectionScanner,
+broad tracing, or scanner-like probes, keep preferring `arkserver-obelisk-debug`.
 
-After any scanner/plugin capture or runtime redeploy on TheIsland, run
-`scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance
-arkserver2` before treating the
-harness as stable. The check is read-only and should fail closed rather than
-depending on a live experiment to reveal stale runtime state.
+After any scanner/plugin capture or runtime redeploy on an approved debug target, run
+`scripts/check_obelisk_server_posture.sh --expect-stable --map <map> --instance
+<instance-id>` before treating the harness as stable. The check is read-only and should
+fail closed rather than depending on a live experiment to reveal stale runtime state.
 
 For Ragnarok player performance posture, add `--forbid-chat-reflection` so the same
 read-only check also rejects experimental chat reflection and chat text logging env.

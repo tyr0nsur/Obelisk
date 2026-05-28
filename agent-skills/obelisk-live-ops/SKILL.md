@@ -107,8 +107,9 @@ Use named profiles instead of ad hoc env mixes:
 - Runtime debug control: plugins disabled, scanner/native exec off,
   `enable-debug-control` marker enabled only for a short window, request marker consumed,
   then immediate restart back to stable dev.
-- Scanner capture: plugins disabled, native exec off, one scanner env family enabled, copied
-  logs analyzed offline, then immediate restart back to stable dev.
+- Scanner capture: operator-approved debug window only, named instance, plugins disabled,
+  native exec off, one scanner env family enabled, copied logs analyzed offline, then
+  immediate restart back to stable dev inside the same approved window.
 - Plugin capture: scanner off, only the target plugin installed, plugin config backed up,
   short run, then return to stable dev.
 
