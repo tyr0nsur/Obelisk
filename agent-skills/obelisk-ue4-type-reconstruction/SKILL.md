@@ -98,6 +98,9 @@ For each reconstructed field:
 - GObjects/UObject second-source sampling also needs an explicit per-artifact FName root.
   `build_core_dump_evidence_pack.py --gobjects-sample-index` must not resolve names through
   the primary-core default slot.
+- Snapshot comparison target sets used for promotion must be schema-qualified and strict:
+  requested targets absent from the base or candidate snapshot root are
+  inconclusive/missing and must not be silently ignored.
 - When recording artifact identity, pass all four fields together: `artifact_kind`,
   `artifact_sha256`, `capture_id`, and `evidence_pack_id`. Partial artifact identity is not
   valid second-source evidence.

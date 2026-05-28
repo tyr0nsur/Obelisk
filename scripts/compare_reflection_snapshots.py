@@ -38,10 +38,10 @@ EVIDENCE_ARTIFACT_IDENTITY_KEYS = (
 )
 TARGET_SETS = {
     "minimal-second-source-intake": (
-        "PrimalItem.CanUse",
-        "PrimalItem.AllowRemoteAddToInventory",
-        "PrimalStructure.AllowStructureAccess",
-        "PrimalStructure.IsAllowedToDemolish",
+        "obelisk.ufunction-chain.snapshot.v1:PrimalItem.CanUse",
+        "obelisk.ufunction-chain.snapshot.v1:PrimalItem.AllowRemoteAddToInventory",
+        "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.AllowStructureAccess",
+        "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToDemolish",
     ),
     "transfer-scriptstruct": (
         "obelisk.scriptstruct-chain.snapshot.v1:PrimalLocalProfile.ARKTributeDino",
@@ -86,6 +86,14 @@ def parse_args() -> argparse.Namespace:
         "--readiness-report",
         action="store_true",
         help="Summarize current snapshot coverage and second-source readiness by module.",
+    )
+    parser.add_argument(
+        "--fail-on-readiness-gaps",
+        action="store_true",
+        help=(
+            "With --readiness-report, return non-zero when requested targets are blocked, "
+            "missing, inconclusive, or rejected. Use this for promotion gates."
+        ),
     )
     parser.add_argument(
         "--list-target-sets",
@@ -411,10 +419,21 @@ def filtered_keys(
     *,
     target_filters: set[str],
 ) -> list[str]:
-    keys = sorted(key for key in set(base) | set(candidate) if matches_target_filter(key, target_filters))
+    available_keys = set(base) | set(candidate)
+    keys = {key for key in available_keys if matches_target_filter(key, target_filters)}
+    schema_qualified_filters = {target for target in target_filters if ":" in target}
+    keys.update(schema_qualified_filters)
     if target_filters and not keys:
         raise SystemExit(f"target filter did not match snapshots: {', '.join(sorted(target_filters))}")
-    return keys
+    unmatched_short_filters = []
+    for target in target_filters:
+        if ":" in target:
+            continue
+        if not any(key.partition(":")[2] == target for key in available_keys):
+            unmatched_short_filters.append(target)
+    if unmatched_short_filters:
+        raise SystemExit(f"target filter did not match snapshots: {', '.join(sorted(unmatched_short_filters))}")
+    return sorted(keys)
 
 
 def compare_sets(
@@ -427,11 +446,13 @@ def compare_sets(
 ) -> dict[str, Any]:
     results: list[dict[str, Any]] = []
     for key in filtered_keys(base, candidate, target_filters=target_filters):
-        if key not in candidate:
-            results.append({"target": key, "status": "inconclusive", "reasons": ["missing_candidate_snapshot"]})
-            continue
+        missing_reasons = []
         if key not in base:
-            results.append({"target": key, "status": "inconclusive", "reasons": ["missing_base_snapshot"]})
+            missing_reasons.append("missing_base_snapshot")
+        if key not in candidate:
+            missing_reasons.append("missing_candidate_snapshot")
+        if missing_reasons:
+            results.append({"target": key, "status": "inconclusive", "reasons": missing_reasons})
             continue
         if not allow_ark_sha_mismatch and evidence_sha(base[key]["payload"]) != evidence_sha(candidate[key]["payload"]):
             results.append(
@@ -495,7 +516,7 @@ def readiness_report(
     candidate: dict[str, dict[str, Any]] | None,
 ) -> dict[str, Any]:
     if candidate is None:
-        keys = sorted(key for key in snapshots if matches_target_filter(key, target_filters))
+        keys = filtered_keys(snapshots, {}, target_filters=target_filters)
         if target_filters and not keys:
             raise SystemExit(f"target filter did not match snapshots: {', '.join(sorted(target_filters))}")
         comparison_by_target: dict[str, dict[str, Any]] = {}
@@ -521,15 +542,8 @@ def readiness_report(
         "second_source_missing": 0,
     }
 
-    for key in keys:
-        entry = snapshots.get(key)
-        if entry is None:
-            continue
-        payload = entry["payload"]
-        schema = schema_label(payload.get("schema", ""))
-        module = module_from_path(entry["path"])
-        module_key = f"{schema}:{module}"
-        bucket = modules.setdefault(
+    def module_bucket(module_key: str, *, schema: str, module: str) -> dict[str, Any]:
+        return modules.setdefault(
             module_key,
             {
                 "schema": schema,
@@ -542,6 +556,36 @@ def readiness_report(
                 "target_details": [],
             },
         )
+
+    for key in keys:
+        entry = snapshots.get(key)
+        if entry is None:
+            schema_name, _, _ = key.partition(":")
+            schema = schema_label(schema_name)
+            bucket = module_bucket(f"{schema}:<missing>", schema=schema, module="<missing>")
+            target_detail = {
+                "target": key,
+                "path": None,
+                "comparable": False,
+                "block_reasons": ["missing_base_snapshot"],
+                "second_source_status": "missing",
+            }
+            bucket["targets"] += 1
+            bucket["blocked"] += 1
+            bucket["block_reasons"]["missing_base_snapshot"] = (
+                bucket["block_reasons"].get("missing_base_snapshot", 0) + 1
+            )
+            bucket["second_source"]["missing"] += 1
+            bucket["target_details"].append(target_detail)
+            totals["targets"] += 1
+            totals["blocked"] += 1
+            totals["second_source_missing"] += 1
+            continue
+        payload = entry["payload"]
+        schema = schema_label(payload.get("schema", ""))
+        module = module_from_path(entry["path"])
+        module_key = f"{schema}:{module}"
+        bucket = module_bucket(module_key, schema=schema, module=module)
 
         bucket["targets"] += 1
         totals["targets"] += 1
@@ -681,6 +725,12 @@ def main() -> int:
     else:
         print_text(report)
     if report["schema"] == "obelisk.reflection-snapshot-readiness.v1":
+        if args.fail_on_readiness_gaps:
+            totals = report["totals"]
+            if totals["blocked"] or totals["second_source_rejected"]:
+                return 1
+            if totals["second_source_inconclusive"] or totals["second_source_missing"]:
+                return 2
         return 0
     if report["counts"]["rejected"]:
         return 1

@@ -96,6 +96,9 @@ work from repository state instead of chat history.
 - CI and release validation now run reflection snapshot comparison and ScriptStruct
   fixture tests. README/STATUS present module-first observers and snapshot tooling instead
   of a chat-centered roadmap. Mixed-schema target-filter behavior is covered by tests.
+- Snapshot comparison promotion target sets are schema-qualified and strict. Missing
+  requested base/candidate targets are inconclusive instead of silently skipped; use
+  `--fail-on-readiness-gaps` when a readiness report is acting as a promotion gate.
 - Public ProcessEvent callback lifecycle now includes owner-token handle registration:
   plugins can register with handle-returning owner-token functions and explicitly
   unregister through `UnregisterProcessEventCallbackWithOwnerToken(owner_token, handle)`.

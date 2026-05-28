@@ -172,7 +172,7 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(report["schema"], "obelisk.reflection-snapshot-target-sets.v1")
         sets = {item["name"]: item["targets"] for item in report["target_sets"]}
         self.assertIn("minimal-second-source-intake", sets)
-        self.assertIn("PrimalItem.CanUse", sets["minimal-second-source-intake"])
+        self.assertIn("obelisk.ufunction-chain.snapshot.v1:PrimalItem.CanUse", sets["minimal-second-source-intake"])
         self.assertIn("transfer-scriptstruct", sets)
 
     def test_requires_base_root_unless_listing_target_sets(self) -> None:
@@ -546,6 +546,28 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(report["target_sets"], ["minimal-second-source-intake"])
         self.assertEqual(len(report["target_filters"]), 4)
 
+    def test_named_target_set_reports_missing_schema_qualified_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            payload = rename_target(deepcopy(base_snapshot()), outer="PrimalItem", name="CanUse")
+            write_snapshot(base, payload, "PrimalItem.CanUse.snapshot.json")
+            write_snapshot(candidate, deepcopy(payload), "PrimalItem.CanUse.snapshot.json")
+
+            result = run_compare(base, candidate, "--target-set", "minimal-second-source-intake", "--json")
+
+        self.assertEqual(result.returncode, 2)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["counts"], {"accepted": 1, "inconclusive": 3, "rejected": 0})
+        missing = [item for item in report["results"] if item["status"] == "inconclusive"]
+        self.assertEqual(len(missing), 3)
+        self.assertTrue(
+            all(item["reasons"] == ["missing_base_snapshot", "missing_candidate_snapshot"] for item in missing)
+        )
+
     def test_named_target_set_selects_transfer_scriptstructs(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -712,6 +734,74 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
                          "obelisk.ufunction-chain.snapshot.v1:PrimalItem.CanUse")
         self.assertTrue(report["modules"][0]["target_details"][0]["comparable"])
         self.assertEqual(report["modules"][0]["target_details"][0]["second_source_status"], "missing")
+
+    def test_readiness_report_counts_missing_schema_qualified_target_set_entries(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base" / "sha" / "sdk_inventory"
+            base.mkdir(parents=True)
+            write_snapshot(base, base_snapshot())
+
+            result = run_compare(
+                root / "base",
+                None,
+                "--readiness-report",
+                "--target-set",
+                "minimal-second-source-intake",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["totals"]["targets"], 4)
+        self.assertEqual(report["totals"]["comparable"], 1)
+        self.assertEqual(report["totals"]["blocked"], 3)
+        missing_module = next(module for module in report["modules"] if module["module"] == "<missing>")
+        self.assertEqual(missing_module["targets"], 3)
+        self.assertEqual(missing_module["block_reasons"], {"missing_base_snapshot": 3})
+
+    def test_readiness_report_can_fail_on_missing_target_set_entries(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base" / "sha" / "sdk_inventory"
+            base.mkdir(parents=True)
+            write_snapshot(base, base_snapshot())
+
+            result = run_compare(
+                root / "base",
+                None,
+                "--readiness-report",
+                "--target-set",
+                "minimal-second-source-intake",
+                "--fail-on-readiness-gaps",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 1)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["totals"]["blocked"], 3)
+
+    def test_readiness_report_can_fail_on_missing_second_source_only(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base" / "sha" / "sdk_inventory"
+            base.mkdir(parents=True)
+            write_snapshot(base, base_snapshot())
+
+            result = run_compare(
+                root / "base",
+                None,
+                "--readiness-report",
+                "--target",
+                "PrimalItem.CanUse",
+                "--fail-on-readiness-gaps",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 2)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["totals"]["blocked"], 0)
+        self.assertEqual(report["totals"]["second_source_missing"], 1)
 
     def test_readiness_report_supports_scriptstruct_target_filter(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

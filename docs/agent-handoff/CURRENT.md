@@ -280,6 +280,10 @@ Updated: 2026-05-28
   `FName`/`GObjects`/`UObject`/`UFunction` evidence remains single-core or otherwise
   candidate-only until a second isolated core or independent static path satisfies that
   matrix.
+- fact: Snapshot comparison target sets used for promotion are schema-qualified and
+  strict. Requested targets absent from base or candidate roots are reported as
+  inconclusive/missing instead of being silently skipped, and readiness reports support
+  `--fail-on-readiness-gaps` for promotion gates.
 - fact: `ue/BuffReflection.*` adds an offline internal `sdk.buffs` recognizer for exact
   compact `PrimalBuff` fixtures. It has no runtime hook, no public callback, no return
   override, and exposes only bounded bool ranges; object/class pointer ranges stay
