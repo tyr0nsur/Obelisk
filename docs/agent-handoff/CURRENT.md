@@ -325,6 +325,10 @@ Updated: 2026-05-28
   `VerifyPinCode`, and `CanSeat`) through `TryIdentifyInvocation`. Object parameters stay
   range-hidden, scalar ranges are bounded by `ParmsSize`, and wrong outer identity is
   rejected at the hook wrapper layer.
+- fact: `core/StructureEventDispatcher` is the first non-chat internal copied-data event
+  bridge. It dispatches copied scalar-only structure event views, rejects unknown event or
+  scalar shapes, supports owner cleanup/self-unregister, waits for in-flight callbacks, and
+  exposes no public ABI or plugin SDK surface yet.
 - fact: `ObeliskPluginInitContext` string pointers are documented as borrowed only for
   `ObeliskPlugin_Init`; plugins must copy `config_dir`, `config_path`, or `instance_id`
   before using them from shutdown, worker threads, or later callbacks.

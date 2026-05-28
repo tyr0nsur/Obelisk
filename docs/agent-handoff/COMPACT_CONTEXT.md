@@ -366,6 +366,9 @@ work from repository state instead of chat history.
 - Hook-side structure observer tests cover all six accepted structure targets through
   `TryIdentifyInvocation`; object parameters stay range-hidden and wrong outer identity is
   rejected before any runtime promotion claim.
+- `core/StructureEventDispatcher` is an internal copied scalar-only bridge for future
+  structure events. It has owner cleanup, self-unregister, in-flight cleanup wait, unknown
+  shape rejection, and copied-storage tests; it is not public ABI/plugin SDK.
 - `PluginManagerTests` cover plugin lifecycle and rejection paths with a fake loader:
   valid load/unload, missing entry points, invalid metadata, init failure, callback cleanup,
   shutdown, disabled/default config skip, instance allowlist skip, duplicate `plugin_id`,
