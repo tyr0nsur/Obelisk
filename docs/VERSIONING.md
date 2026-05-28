@@ -16,6 +16,28 @@ This means the repository is moving toward a future `v0.1.0`, but no `v0.1.0` re
 promised yet. The current tree may break plugin ABI, install layout, scanner output, or
 debug-harness assumptions when that is the correct engineering tradeoff.
 
+The CMake package version is intentionally numeric during this line:
+
+```text
+project(Obelisk VERSION 0.1.0)
+```
+
+`ObeliskConfigVersion.cmake` and installed SDK consumers use the numeric compatibility
+floor, for example `find_package(Obelisk 0.1.0 CONFIG REQUIRED)`. That numeric package
+version is not a release claim by itself; the release claim exists only when a matching
+Git tag is cut after the release checklist passes.
+
+The installed package also exports:
+
+- `Obelisk_DEVELOPMENT_LINE`
+- `Obelisk_RELEASE_CHANNEL`
+- `Obelisk_API_ABI_VERSION`
+- `Obelisk_PLUGIN_METADATA_ABI_VERSION`
+- `Obelisk_PLUGIN_INIT_CONTEXT_ABI_VERSION`
+
+Consumers can inspect those CMake variables when they need to distinguish a dev package
+from a tagged release or pin against a specific public C ABI.
+
 ## Allowed Version Labels
 
 Use these labels consistently:
@@ -88,6 +110,8 @@ contains enough tests, docs, gates, and rollback posture to reproduce the claim.
   and example plugin layout without relying on the source tree.
 - `oBaseEvents` remains small and demonstrates only validated API surfaces.
 - `docs/STATUS.md`, `docs/RELEASE.md`, and `CHANGELOG.md` agree on scope.
+- The numeric CMake package version remains documented as a compatibility floor, not as
+  proof that a stable tag exists.
 
 `0.1.0-alpha.1` is reasonable when:
 

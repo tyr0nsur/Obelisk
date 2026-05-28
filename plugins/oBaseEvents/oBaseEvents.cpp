@@ -233,7 +233,7 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_GetInfo(Obe
         out->struct_size = sizeof(ObeliskPluginMetadata);
         out->plugin_id = "oBaseEvents";
         out->name = "oBaseEvents";
-        out->version = "0.1.0";
+        out->version = "0.1.0-dev";
         out->config_file = "config.json";
         out->default_config_json = kDefaultConfig;
         return true;

@@ -188,6 +188,10 @@ cat > "${WORK_DIR}/consumer_plugin.cpp" <<'CPP'
 #include <cstring>
 #include <sys/stat.h>
 
+static_assert(OBELISK_API_ABI_VERSION == 1u, "unexpected Obelisk API ABI version");
+static_assert(OBELISK_PLUGIN_METADATA_ABI_VERSION == 1u, "unexpected plugin metadata ABI version");
+static_assert(OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION == 1u, "unexpected plugin init context ABI version");
+
 namespace
 {
     ObeliskApi* g_Api = nullptr;
@@ -427,6 +431,22 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(Obelisk 0.1.0 CONFIG REQUIRED)
+
+if(NOT Obelisk_DEVELOPMENT_LINE STREQUAL "0.1.0-dev")
+    message(FATAL_ERROR "Unexpected Obelisk development line: ${Obelisk_DEVELOPMENT_LINE}")
+endif()
+if(NOT Obelisk_RELEASE_CHANNEL STREQUAL "dev")
+    message(FATAL_ERROR "Unexpected Obelisk release channel: ${Obelisk_RELEASE_CHANNEL}")
+endif()
+if(NOT Obelisk_API_ABI_VERSION EQUAL 1)
+    message(FATAL_ERROR "Unexpected Obelisk API ABI version: ${Obelisk_API_ABI_VERSION}")
+endif()
+if(NOT Obelisk_PLUGIN_METADATA_ABI_VERSION EQUAL 1)
+    message(FATAL_ERROR "Unexpected Obelisk plugin metadata ABI version: ${Obelisk_PLUGIN_METADATA_ABI_VERSION}")
+endif()
+if(NOT Obelisk_PLUGIN_INIT_CONTEXT_ABI_VERSION EQUAL 1)
+    message(FATAL_ERROR "Unexpected Obelisk plugin init context ABI version: ${Obelisk_PLUGIN_INIT_CONTEXT_ABI_VERSION}")
+endif()
 
 add_library(install_layout_consumer SHARED consumer_plugin.cpp)
 target_link_libraries(install_layout_consumer PRIVATE Obelisk::obelisk_sdk)

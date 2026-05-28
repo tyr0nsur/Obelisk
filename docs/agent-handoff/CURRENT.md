@@ -141,6 +141,12 @@ Updated: 2026-05-28
   legacy `map_allowlist` values are rejected until a reliable map identity contract exists.
   `scripts/install_obelisk_plugin.sh` uses the same non-root absolute path and symlink-root
   validation as the runtime installer.
+- fact: The CMake package version remains numeric `0.1.0` as the SDK compatibility floor
+  while the public development line stays `0.1.0-dev`. Installed
+  `ObeliskConfig.cmake` exports `Obelisk_DEVELOPMENT_LINE`,
+  `Obelisk_RELEASE_CHANNEL`, and public ABI version variables so consumers and tests can
+  distinguish a dev package from a tagged release. Official examples use plugin metadata
+  version `0.1.0-dev` until the stable tag exists.
 - fact: Commit `c0d1e4c` pushed the hardened first-stable gates. On 2026-05-28,
   `scripts/check_release_readiness.sh` passed from a clean tracked/untracked worktree
   (ignored `build/` and `scripts/__pycache__/` only), and the read-only Ragnarok posture
