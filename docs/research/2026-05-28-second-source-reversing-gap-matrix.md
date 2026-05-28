@@ -146,7 +146,11 @@ Expected current result:
 ```text
 readiness targets=4 comparable=4 blocked=0 second_source_status=missing_candidate_root
 ufunction:sdk_inventory targets=2 comparable=2 blocked=0 second_source=accepted:0,rejected:0,inconclusive:0,missing:2
+  target=obelisk.ufunction-chain.snapshot.v1:PrimalItem.AllowRemoteAddToInventory comparable=true second_source=missing
+  target=obelisk.ufunction-chain.snapshot.v1:PrimalItem.CanUse comparable=true second_source=missing
 ufunction:sdk_structures targets=2 comparable=2 blocked=0 second_source=accepted:0,rejected:0,inconclusive:0,missing:2
+  target=obelisk.ufunction-chain.snapshot.v1:PrimalStructure.AllowStructureAccess comparable=true second_source=missing
+  target=obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToDemolish comparable=true second_source=missing
 ```
 
 This is the promotion-gate form and should exit non-zero until the second source exists.
@@ -193,6 +197,8 @@ Expected current result:
 ```text
 readiness targets=2 comparable=2 blocked=0 second_source_status=missing_candidate_root
 scriptstruct:sdk_transfers targets=2 comparable=2 blocked=0 second_source=accepted:0,rejected:0,inconclusive:0,missing:2
+  target=obelisk.scriptstruct-chain.snapshot.v1:PrimalLocalProfile.ARKTributeDino comparable=true second_source=missing
+  target=obelisk.scriptstruct-chain.snapshot.v1:PrimalLocalProfile.ArkTributePlayerData comparable=true second_source=missing
 ```
 
 The command above is the promotion-gate form and should exit non-zero until the second

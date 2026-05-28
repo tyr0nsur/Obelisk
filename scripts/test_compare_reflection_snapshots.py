@@ -844,6 +844,71 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertTrue(report["modules"][0]["target_details"][0]["comparable"])
         self.assertEqual(report["modules"][0]["target_details"][0]["second_source_status"], "missing")
 
+    def test_readiness_text_lists_actionable_missing_second_source_targets(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base" / "sha" / "sdk_inventory"
+            base.mkdir(parents=True)
+            write_snapshot(base, base_snapshot())
+
+            result = run_compare(
+                root / "base",
+                None,
+                "--readiness-report",
+                "--target",
+                "PrimalItem.CanUse",
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertIn("ufunction:sdk_inventory targets=1 comparable=1", result.stdout)
+        self.assertIn(
+            "target=obelisk.ufunction-chain.snapshot.v1:PrimalItem.CanUse "
+            "comparable=true second_source=missing",
+            result.stdout,
+        )
+
+    def test_readiness_text_lists_blocked_and_rejected_target_details(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base" / "sha" / "sdk_buffs"
+            candidate = root / "candidate" / "sha" / "sdk_buffs"
+            base.mkdir(parents=True)
+            candidate.mkdir(parents=True)
+            rejected_left = rename_target(deepcopy(base_snapshot()), outer="PrimalBuff", name="BPBuffPreventUploading")
+            rejected_right = deepcopy(rejected_left)
+            rejected_right["targets"][0]["property_chain"]["properties"][0]["offset_internal"] = 99  # type: ignore[index]
+            write_snapshot(base, rejected_left, "PrimalBuff.BPBuffPreventUploading.snapshot.json")
+            write_snapshot(candidate, rejected_right, "PrimalBuff.BPBuffPreventUploading.snapshot.json")
+
+            result = run_compare(root / "base", root / "candidate", "--readiness-report")
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertIn("second_source=rejected", result.stdout)
+        self.assertIn("first_diff=property_chain.properties[0].offset_internal", result.stdout)
+
+    def test_readiness_text_omits_accepted_target_details(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base" / "sha" / "sdk_inventory"
+            candidate = root / "candidate" / "sha" / "sdk_inventory"
+            base.mkdir(parents=True)
+            candidate.mkdir(parents=True)
+            payload = base_snapshot()
+            write_snapshot(base, payload)
+            write_snapshot(candidate, deepcopy(payload))
+
+            result = run_compare(
+                root / "base",
+                root / "candidate",
+                "--readiness-report",
+                "--target",
+                "PrimalItem.CanUse",
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertIn("second_source=accepted:1", result.stdout)
+        self.assertNotIn("target=obelisk.ufunction-chain.snapshot.v1:PrimalItem.CanUse", result.stdout)
+
     def test_readiness_report_blocks_empty_snapshot_roots(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

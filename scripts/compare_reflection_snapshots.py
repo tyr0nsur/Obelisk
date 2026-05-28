@@ -727,6 +727,25 @@ def print_text(report: dict[str, Any]) -> None:
                     missing=second_source["missing"],
                 )
             )
+            for detail in module["target_details"]:
+                second_source_status = detail["second_source_status"]
+                if detail["comparable"] and second_source_status == "accepted":
+                    continue
+
+                parts = [
+                    f"target={detail['target']}",
+                    f"comparable={str(detail['comparable']).lower()}",
+                    f"second_source={second_source_status}",
+                ]
+                block_reasons = detail.get("block_reasons", [])
+                if block_reasons:
+                    parts.append(f"block_reasons={','.join(block_reasons)}")
+                second_source_reasons = detail.get("second_source_reasons", [])
+                if second_source_reasons:
+                    parts.append(f"second_source_reasons={','.join(second_source_reasons)}")
+                if "first_diff" in detail:
+                    parts.append(f"first_diff={detail['first_diff']}")
+                print(f"  {' '.join(parts)}")
         return
 
     counts = report["counts"]
