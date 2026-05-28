@@ -2,11 +2,14 @@
 #include <cstring>
 #include <errno.h>
 #include <exception>
+#include <atomic>
 #include <cstdlib>
 #include <chrono>
 #include <cctype>
+#include <condition_variable>
 #include <filesystem>
 #include <fstream>
+#include <mutex>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -19,6 +22,10 @@
 #include "ue/ReflectionScanner.h"
 
 static bool g_ObeliskStarted = false;
+static std::atomic<bool> g_DebugControlStopRequested{false};
+static std::thread g_DebugControlThread;
+static std::mutex g_DebugControlMutex;
+static std::condition_variable g_DebugControlWake;
 
 static std::string GetPluginDirectory()
 {
@@ -140,6 +147,12 @@ static void StartDebugControlThread()
     if (!enabled || std::strcmp(enabled, "1") != 0)
         return;
 
+    if (g_DebugControlThread.joinable())
+    {
+        OBELISK_WARN("Debug control thread already running.");
+        return;
+    }
+
     const std::filesystem::path controlDir = GetDebugControlDirectory();
     std::error_code ec;
     std::filesystem::create_directories(controlDir, ec);
@@ -150,10 +163,12 @@ static void StartDebugControlThread()
     }
 
     OBELISK_WARN("Debug control enabled. Watching {} for marker requests.", controlDir.string());
-    std::thread([controlDir]() {
+    g_DebugControlStopRequested.store(false, std::memory_order_release);
+    g_DebugControlThread = std::thread([controlDir]() {
         const std::filesystem::path staticFNameProbePath = controlDir / "request-static-fname-probe";
 
-        while (Obelisk::Logger::IsInitialized())
+        while (!g_DebugControlStopRequested.load(std::memory_order_acquire) &&
+               Obelisk::Logger::IsInitialized())
         {
             std::error_code existsEc;
             if (std::filesystem::exists(staticFNameProbePath, existsEc))
@@ -173,9 +188,20 @@ static void StartDebugControlThread()
                 MarkDebugControlRequestDone(staticFNameProbePath);
             }
 
-            std::this_thread::sleep_for(std::chrono::seconds(2));
+            std::unique_lock<std::mutex> lock(g_DebugControlMutex);
+            g_DebugControlWake.wait_for(lock, std::chrono::seconds(2), [] {
+                return g_DebugControlStopRequested.load(std::memory_order_acquire);
+            });
         }
-    }).detach();
+    });
+}
+
+static void StopDebugControlThread()
+{
+    g_DebugControlStopRequested.store(true, std::memory_order_release);
+    g_DebugControlWake.notify_all();
+    if (g_DebugControlThread.joinable())
+        g_DebugControlThread.join();
 }
 
 // The constructor attribute ensures this function runs as soon as the shared library 
@@ -230,6 +256,7 @@ void Obelisk_Init()
         if (Obelisk::Logger::IsInitialized())
         {
             OBELISK_CRITICAL("Obelisk bootstrap failed: {}", e.what());
+            StopDebugControlThread();
             Obelisk::Hooks::ProcessEventHook::Remove();
             Obelisk::Core::PluginManager::Get().UnloadAll();
             Obelisk::Logger::Shutdown();
@@ -241,6 +268,7 @@ void Obelisk_Init()
         if (Obelisk::Logger::IsInitialized())
         {
             OBELISK_CRITICAL("Obelisk bootstrap failed with unknown exception.");
+            StopDebugControlThread();
             Obelisk::Hooks::ProcessEventHook::Remove();
             Obelisk::Core::PluginManager::Get().UnloadAll();
             Obelisk::Logger::Shutdown();
@@ -256,6 +284,7 @@ void Obelisk_Shutdown()
         return;
 
     OBELISK_INFO("Obelisk Runtime Shutting Down...");
+    StopDebugControlThread();
     Obelisk::Hooks::ProcessEventHook::Remove();
     Obelisk::Core::PluginManager::Get().UnloadAll();
     Obelisk::Logger::Shutdown();

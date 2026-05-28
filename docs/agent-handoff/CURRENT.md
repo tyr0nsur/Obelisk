@@ -134,6 +134,9 @@ Updated: 2026-05-28
   the detour and manual trampoline calls. Hook removal restores target bytes first, waits
   briefly for active frames to drain, and leaves the trampoline mapped with a warning
   instead of risking `munmap` while a frame may still be executing.
+- fact: Current uncommitted runtime lifecycle round replaces the detached debug-control
+  thread with owned thread state, stop flag, condition-variable wakeup, and join before
+  logger shutdown on bootstrap failure or normal unload.
 - finding: Reflection tooling audit found UFunction snapshot fixture coverage is broad
   across module areas, but ScriptStruct coverage is the current bottleneck with only two
   transfer structs. Prioritize an offline second-source readiness report before any
