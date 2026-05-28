@@ -19,9 +19,8 @@ Updated: 2026-05-28
   ReflectionScanner, attach ptrace/gcore, enable broad `ProcessEvent` tracing, or publish
   runtime observations without explicit operator approval for that run.
 - cadence: use focused agent rounds, integrate findings into repo files, validate with
-  safe offline tests, and commit/push stable checkpoints. Send Discord community updates
-  only for major Obelisk milestones relevant to future mod/plugin creators, not routine
-  development checkpoints.
+  safe offline tests, and commit/push stable checkpoints. Community announcement policy
+  is lead-owned in `agent-skills/obelisk-github-research-workflow/SKILL.md`.
 
 ## Stable Baseline
 
@@ -284,6 +283,10 @@ Updated: 2026-05-28
   strict. Requested targets absent from base or candidate roots are reported as
   inconclusive/missing instead of being silently skipped, and readiness reports support
   `--fail-on-readiness-gaps` for promotion gates.
+- fact: `scripts/check_release_readiness.sh --require-second-source-readiness` adds the
+  focused UFunction and ScriptStruct second-source promotion gates. The default
+  `check_release_readiness.sh` remains the core-first release gate and does not require
+  gameplay module second-source evidence.
 - fact: `ue/BuffReflection.*` adds an offline internal `sdk.buffs` recognizer for exact
   compact `PrimalBuff` fixtures. It has no runtime hook, no public callback, no return
   override, and exposes only bounded bool ranges; object/class pointer ranges stay
@@ -543,10 +546,11 @@ Updated: 2026-05-28
   production/performance posture guard that rejects experimental chat reflection and chat
   text logging env. Use it with `--expect-stable` for Ragnarok player-performance checks
   and for TheIsland Phase A / rollback checks.
-- fact: Read-only quiet-posture audit at commit `5da65d6` found Ragnarok PID `3940524`
-  still has `OBELISK_ENABLE_CHAT_REFLECTION=1`, so it fails the stricter
-  production/performance guard. TheIsland was not running. Do not auto-fix this without an
-  operator-approved restart window; see
+- fact: Historical read-only quiet-posture audit at commit `5da65d6` found Ragnarok PID
+  `3940524` still had `OBELISK_ENABLE_CHAT_REFLECTION=1`, so it failed the stricter
+  production/performance guard. This was superseded on 2026-05-28 when the
+  operator-approved restart removed `enable-chat-reflection` and
+  `--forbid-chat-reflection` passed; see
   `docs/research/2026-05-27-quiet-posture-readonly-audit.md`.
 - fact: `scripts/obelisk_supervisor_snapshot.sh` now writes `quiet-posture.txt` and
   `quiet_posture_status` so debug-stable snapshots do not hide active chat reflection from
@@ -785,10 +789,11 @@ Updated: 2026-05-28
 - fact: Historical FName/ReflectionScanner capture notes that previously showed direct
   Ragnarok start commands now say not to repeat that workflow on `arkserver`; future
   retries target `arkserver-obelisk-debug` first.
-- fact: Read-only supervisor snapshot `20260527T185153Z` found one Ragnarok process with
-  stable posture passing, plugins disabled, ProcessEvent hook loaded, and scanner/debug
-  env absent. Quiet posture still fails because chat reflection is active; do not change it
-  without an operator maintenance window. See
+- fact: Historical read-only supervisor snapshot `20260527T185153Z` found one Ragnarok
+  process with stable posture passing, plugins disabled, ProcessEvent hook loaded, and
+  scanner/debug env absent, while quiet posture failed because chat reflection was active.
+  This was superseded on 2026-05-28 when the operator-approved restart removed
+  `enable-chat-reflection` and `--forbid-chat-reflection` passed. See
   `docs/research/2026-05-27-ragnarok-readonly-posture-snapshot.md`.
 - risk: Native exec probes must remain disabled on live servers.
 - risk: FetchContent pins were selected from existing local checkouts without internet

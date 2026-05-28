@@ -39,6 +39,16 @@ The script requires a clean worktree by default. Use `--allow-dirty` only while 
 the release gate itself. Set `OBELISK_KEEP_RELEASE_CHECK_ROOTS=1` to keep the temporary
 install roots for manual inspection after the script completes.
 
+When a release or preview promotes reflected gameplay module surfaces beyond the
+core-first API, run the stricter promotion gate:
+
+```bash
+scripts/check_release_readiness.sh --require-second-source-readiness
+```
+
+This intentionally fails until the focused UFunction and ScriptStruct target sets have
+complete, distinct second-source evidence.
+
 3. Confirm `scripts/test_install_obelisk_layout.sh` covered runtime backup reinstall:
    one backup each for `libobelisk.so` and `libsubhook.so`, no `.incoming.*` files, no
    `.install-runtime.*` staging directory, invalid install roots rejected, failed runtime

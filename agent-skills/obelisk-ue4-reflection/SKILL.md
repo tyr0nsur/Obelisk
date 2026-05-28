@@ -46,8 +46,10 @@ metadata.
   ownership, ABI guardrails, and benchmark gates. Keep details in `docs/research/`; do
   not let chat dominate new reflection/API rounds unless explicitly requested.
 - `arkserver` / Ragnarok has carried experimental chat reflection in historical runs. Do
-  not add, remove, or rely on that marker for new validation. Future runtime observer work
-  belongs on approved `arkserver2` / TheIsland windows or a dedicated debug instance.
+  not add, remove, or rely on that marker for new validation. Current runtime observer
+  work belongs only on the currently approved target or a dedicated debug instance;
+  `arkserver2` / TheIsland is an explicit operator-approved fallback while RAM is
+  constrained.
 - `ReflectionScanner` FName table output must be treated as candidate ranking. Analyzer
   `--strict` requires repeat-confirmed exact `matched_clues=3/3` evidence, and even that
   needs a second isolated capture or static xref before becoming an accepted offset.

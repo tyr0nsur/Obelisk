@@ -14,17 +14,16 @@ work from repository state instead of chat history.
 - Safety remains first: no server restarts, `/servidor/ark` changes, marker edits,
   ReflectionScanner, ptrace/gcore, broad `ProcessEvent` tracing, or runtime observations
   without explicit operator approval for that run.
-- Discord updates are reserved for major Obelisk milestones relevant to future
-  mod/plugin creators; do not post routine development, validation, fixture, or research
-  checkpoint updates.
+- Community announcement policy is lead-owned in
+  `agent-skills/obelisk-github-research-workflow/SKILL.md`; do not copy it into scoped
+  sub-agent prompts unless the task specifically concerns announcements.
 
 ## Current Repo State
 
 - Repo: `/home/flowcommunity-ark/Obelisk`
 - Remote: `git@github.com:tyr0nsur/Obelisk.git`
-- Current known good baseline: latest pushed and validated `main` after the 2026-05-27
-  priority round. Check `git log --oneline -5` for the exact head if resuming after a
-  compaction.
+- Current known good baseline: latest pushed and validated `main`. Check
+  `git log --oneline -5` for the exact head if resuming after a compaction.
 - Current development version line: `0.1.0-dev`. This is a coordination label, not a
   release tag. See `docs/VERSIONING.md`.
 - Local ignored artifacts normally present: `build/`, `Obelisk.log`
@@ -99,6 +98,9 @@ work from repository state instead of chat history.
 - Snapshot comparison promotion target sets are schema-qualified and strict. Missing
   requested base/candidate targets are inconclusive instead of silently skipped; use
   `--fail-on-readiness-gaps` when a readiness report is acting as a promotion gate.
+- `scripts/check_release_readiness.sh --require-second-source-readiness` adds the focused
+  UFunction and ScriptStruct second-source promotion gates. The default release check
+  remains the core-first gate and does not require gameplay module second-source evidence.
 - Public ProcessEvent callback lifecycle now includes owner-token handle registration:
   plugins can register with handle-returning owner-token functions and explicitly
   unregister through `UnregisterProcessEventCallbackWithOwnerToken(owner_token, handle)`.
@@ -434,10 +436,11 @@ work from repository state instead of chat history.
   production/performance or quiet-baseline posture. It rejects
   `OBELISK_ENABLE_CHAT_REFLECTION`, the chat SHA/log-limit env, and
   `OBELISK_CHAT_REFLECTION_LOG_TEXT`.
-- Read-only quiet-posture audit at commit `5da65d6` found Ragnarok PID `3940524` still
-  has `OBELISK_ENABLE_CHAT_REFLECTION=1`, so it fails the stricter
-  production/performance guard. TheIsland was not running. Do not auto-fix this without an
-  operator-approved restart window; see
+- Historical read-only quiet-posture audit at commit `5da65d6` found Ragnarok PID
+  `3940524` still had `OBELISK_ENABLE_CHAT_REFLECTION=1`, so it failed the stricter
+  production/performance guard. This was superseded on 2026-05-28 when the
+  operator-approved restart removed `enable-chat-reflection` and
+  `--forbid-chat-reflection` passed; see
   `docs/research/2026-05-27-quiet-posture-readonly-audit.md`.
 - `scripts/obelisk_supervisor_snapshot.sh` writes `quiet-posture.txt` and
   `quiet_posture_status` so debug-stable snapshots do not hide active chat reflection from

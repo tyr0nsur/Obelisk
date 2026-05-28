@@ -9,6 +9,7 @@ JOBS="${OBELISK_BUILD_JOBS:-$(nproc)}"
 RELEASE_CHECK_ROOT="$(mktemp -d /tmp/obelisk-release-check.XXXXXX)"
 LAYOUT_CHECK_ROOT="$(mktemp -d /tmp/obelisk-layout-check.XXXXXX)"
 ALLOW_DIRTY=0
+REQUIRE_SECOND_SOURCE_READINESS=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -18,17 +19,23 @@ while [[ $# -gt 0 ]]; do
             ;;
         -h|--help)
             cat <<'EOF'
-Usage: scripts/check_release_readiness.sh [--allow-dirty]
+Usage: scripts/check_release_readiness.sh [--allow-dirty] [--require-second-source-readiness]
 
 Runs the local first-stable release gate. By default the command fails if tracked or
 untracked non-ignored files are present before or after validation. Ignored build/cache
 directories are allowed.
 
 Options:
-  --allow-dirty    Permit a dirty worktree while developing the release gate itself.
-  -h, --help       Show this help.
+  --allow-dirty                     Permit a dirty worktree while developing the release gate itself.
+  --require-second-source-readiness Fail if focused reflection promotion target sets lack complete
+                                    second-source evidence.
+  -h, --help                        Show this help.
 EOF
             exit 0
+            ;;
+        --require-second-source-readiness)
+            REQUIRE_SECOND_SOURCE_READINESS=1
+            shift
             ;;
         *)
             echo "Unknown option: $1" >&2
@@ -69,6 +76,18 @@ run_step cmake -S . -B "${BUILD_DIR}" -DCMAKE_BUILD_TYPE=RelWithDebInfo
 run_step cmake --build "${BUILD_DIR}" -j"${JOBS}"
 run_step ctest --test-dir "${BUILD_DIR}" --output-on-failure
 run_step scripts/run_script_tests.sh
+if [[ "${REQUIRE_SECOND_SOURCE_READINESS}" == "1" ]]; then
+    run_step python3 scripts/compare_reflection_snapshots.py \
+        --base-root tests/fixtures/ufunction_snapshots \
+        --readiness-report \
+        --target-set minimal-second-source-intake \
+        --fail-on-readiness-gaps
+    run_step python3 scripts/compare_reflection_snapshots.py \
+        --base-root tests/fixtures/scriptstruct_snapshots \
+        --readiness-report \
+        --target-set transfer-scriptstruct \
+        --fail-on-readiness-gaps
+fi
 run_step env OBELISK_BUILD_DIR="${BUILD_DIR}" scripts/test_install_obelisk_layout.sh "${LAYOUT_CHECK_ROOT}"
 run_step scripts/obelisk.py --root "${LAYOUT_CHECK_ROOT}" status
 run_step scripts/install_obelisk.sh --build-dir "${BUILD_DIR}" --dry-run "${RELEASE_CHECK_ROOT}"

@@ -129,7 +129,8 @@ Current primary readiness, before any second artifact exists:
 python3 scripts/compare_reflection_snapshots.py \
   --base-root tests/fixtures/ufunction_snapshots \
   --readiness-report \
-  --target-set minimal-second-source-intake
+  --target-set minimal-second-source-intake \
+  --fail-on-readiness-gaps
 ```
 
 Expected current result:
@@ -139,6 +140,10 @@ readiness targets=4 comparable=4 blocked=0 second_source_status=missing_candidat
 ufunction:sdk_inventory targets=2 comparable=2 blocked=0 second_source=accepted:0,rejected:0,inconclusive:0,missing:2
 ufunction:sdk_structures targets=2 comparable=2 blocked=0 second_source=accepted:0,rejected:0,inconclusive:0,missing:2
 ```
+
+This is the promotion-gate form and should exit non-zero until the second source exists.
+Omit `--fail-on-readiness-gaps` only when generating an informational gap report that must
+not block the current core-first release gate.
 
 When a second sanitized snapshot root exists, compare only this intake first:
 
@@ -171,7 +176,8 @@ payload decoding.
 python3 scripts/compare_reflection_snapshots.py \
   --base-root tests/fixtures/scriptstruct_snapshots \
   --readiness-report \
-  --target-set transfer-scriptstruct
+  --target-set transfer-scriptstruct \
+  --fail-on-readiness-gaps
 ```
 
 Expected current result:
@@ -180,6 +186,10 @@ Expected current result:
 readiness targets=2 comparable=2 blocked=0 second_source_status=missing_candidate_root
 scriptstruct:sdk_transfers targets=2 comparable=2 blocked=0 second_source=accepted:0,rejected:0,inconclusive:0,missing:2
 ```
+
+The command above is the promotion-gate form and should exit non-zero until the second
+source exists. Omit `--fail-on-readiness-gaps` only when generating an informational gap
+report that must not block the current core-first release gate.
 
 When a second sanitized ScriptStruct root exists:
 

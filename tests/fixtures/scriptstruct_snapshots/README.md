@@ -80,6 +80,10 @@ Use `--json` with readiness reports when creating evidence packs. The JSON inclu
 per-module `target_details` entries with each target key, fixture path, comparability,
 block reasons, and second-source status.
 
+When this readiness report is acting as a promotion gate, add
+`--fail-on-readiness-gaps` or run
+`scripts/check_release_readiness.sh --require-second-source-readiness`.
+
 List focused target groups, including `transfer-scriptstruct`, with:
 
 ```bash
