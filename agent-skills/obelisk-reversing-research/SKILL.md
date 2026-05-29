@@ -119,6 +119,11 @@ Own these areas:
   Mission is the cleaner next module candidate; tribe should be split into a scalar subset
   before any public work. Do not promote player/tribe identity, arrays, strings, object
   pointers, mutation, return overrides, or public Mission/Tribe SDK surfaces.
+- `ue/MissionReflection.*` implements the first internal mission recognizer for those
+  four mission targets. It is SHA-gated and fixture-backed, exposes copied bool ranges
+  only, and keeps player/controller/character object refs plus `OutItemIDs` arrays
+  recognition-only. Do not add hooks, dispatchers, public Mission SDK, identity, mutation,
+  or return override from this recognizer without a separate promotion gate.
 - Native exec field patching was unsafe and must remain disabled. Do not use
   `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` unless a future written plan proves a separate
   throwaway process can tolerate crashes.
@@ -146,6 +151,10 @@ Own these areas:
   and the scanner still reads zero/invalid tables, change the method instead of extending
   sleep/retry windows.
 - Every new offset or signature must include how it was derived and what binary/version it was tested against.
+- Use `scripts/build_weak_helper_provenance_bundle.py` to archive weak-helper static or
+  decompiler artifacts with hashes and source-provenance sidecars. Missing or invalid
+  sidecars are blockers, not hard failures, and keep `promotion_ready=false`; such bundles
+  remain archival evidence only.
 - FName index manifest resolution must use offline inputs or an explicit SHA256. Do not
   point `--manifest`, `--ark-binary`, or accepted entry evidence-pack manifest paths at
   `/servidor/ark`; direct and symlinked live-server paths are rejected by the validator.

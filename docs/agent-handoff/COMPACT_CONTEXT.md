@@ -82,6 +82,9 @@ priorities, and do not use history files as the active source of truth.
   `docs/research/2026-05-29-buff-compact-second-source-result.md`, and
   `docs/research/2026-05-29-next-targetset-discovery.md` for exact target counts and
   blockers.
+- `ue/MissionReflection.*` is an internal fixture-backed recognizer for
+  `mission-compact-intake`: copied bool ranges only, object refs and `OutItemIDs` arrays
+  recognition-only, no hook/runtime dispatcher/public Mission SDK.
 - `scripts/evaluate_resource_handle_revalidation.py` is the current offline redacted
   ResourceHandle readiness gate. Current evidence keeps public/post-callback handles
   blocked; see `docs/research/2026-05-29-resource-handle-revalidation-evaluator.md` and
@@ -111,6 +114,9 @@ priorities, and do not use history files as the active source of truth.
   ScriptStruct target set.
 - Static-only global evidence uses `scripts/build_static_global_promotion_evidence.py`;
   `promotion_gate.ready` remains false for static global candidates.
+- Weak-helper evidence archives use `scripts/build_weak_helper_provenance_bundle.py`.
+  Missing or invalid source sidecars are preserved as blockers and keep
+  `promotion_ready=false`.
 
 ## Checkpoint Baseline
 

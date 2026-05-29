@@ -74,6 +74,15 @@ detail in `HISTORY-*.md`.
   `docs/research/2026-05-29-dino-compact-second-source-readiness.md`,
   `docs/research/2026-05-29-buff-compact-second-source-result.md`, and
   `docs/research/2026-05-29-next-targetset-discovery.md`.
+- Internal recognizers now include `ue/MissionReflection.*` for the
+  `mission-compact-intake` targets. It is fixture-backed, SHA-gated, recognizes exact
+  UFunction metadata and copied bool ranges only, and keeps object references plus
+  `OutItemIDs` arrays recognition-only. It does not add a runtime hook, dispatcher, public
+  Mission SDK, identity, mutation, or return override.
+- Weak-helper static/decompiler evidence can now be archived with
+  `scripts/build_weak_helper_provenance_bundle.py`. Bundles are archival and fail closed:
+  missing or invalid source provenance keeps `promotion_ready=false`; do not treat them as
+  public `ResourceHandle` promotion evidence.
 - Follow `docs/research/2026-05-29-rc-checkpoint-slicing-plan.md` for checkpoint slicing;
   do not stage by path proximity. Ignored local build/pycache artifacts may exist and
   should remain unstaged.
@@ -123,9 +132,9 @@ detail in `HISTORY-*.md`.
   process lifetime to avoid fallback teardown ordering hazards. Prefer explicit shutdown,
   and do not reintroduce destructible function-local STL registries on plugin cleanup
   paths.
-- After inventory hardening, mission is the next clean internal module candidate as a
-  reduced copied-scalar observer. Tribe and transfer wait behind higher identity/payload
-  risk.
+- After MissionReflection, DinoReflection is the next clean internal module candidate.
+  Buff remains useful for offline expansion; tribe should be split to a scalar subset
+  before use; transfer remains high-risk/offline-only. Keep all out of public RC APIs.
 - Keep ignored local artifacts, logs, build output, pycache, raw cores, dumps, generated
   reports, and server config unstaged.
 
