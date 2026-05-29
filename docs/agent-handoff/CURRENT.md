@@ -60,18 +60,17 @@ detail in `HISTORY-*.md`.
 - `plugins/oPolicyAudit` is an experimental first-party example for
   `GameplayPolicyEvent` descriptors and callbacks. It is outside the first release scope
   and builds only with `-DOBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`.
-- Release readiness is core-first through `scripts/check_release_readiness.sh`. The
-  documented local gate evidence is the dirty/offline run with the accepted minimal
-  second-source root; the current integration round is open and must rerun that gate
-  without `--allow-dirty` before any publication decision.
+- Release readiness is core-first through `scripts/check_release_readiness.sh`. Local head
+  has passed focused gates in prior slices, but a real publication decision must rerun the
+  release gate without `--allow-dirty` at the selected checkpoint.
 - Evidence details for accepted layout-only target sets live in:
   `docs/research/2026-05-29-minimal-second-source-readiness.md`,
   `docs/research/2026-05-29-dino-compact-second-source-readiness.md`,
   `docs/research/2026-05-29-buff-compact-second-source-result.md`, and
   `docs/research/2026-05-29-next-targetset-discovery.md`.
-- Current working tree may be dirty while the active integration round is being reviewed.
-  Follow `docs/research/2026-05-29-rc-checkpoint-slicing-plan.md` for checkpoint slicing;
-  do not stage by path proximity.
+- Follow `docs/research/2026-05-29-rc-checkpoint-slicing-plan.md` for checkpoint slicing;
+  do not stage by path proximity. Ignored local build/pycache artifacts may exist and
+  should remain unstaged.
 
 ## Checkpoint Groups If Commits Reopen
 
@@ -106,8 +105,6 @@ detail in `HISTORY-*.md`.
   the cleanest next candidate. Tribe and transfer wait behind higher identity/payload risk.
 - Keep ignored local artifacts, logs, build output, pycache, raw cores, dumps, generated
   reports, and server config unstaged.
-- Preserve the current supervised-agent balance requested by the operator: two on Obelisk engineering/audit/development
-  and four on research/knowledge/reversing/dump work.
 
 ## Agent Protocol
 
@@ -117,3 +114,8 @@ detail in `HISTORY-*.md`.
 - Pass only the skills required by scope; sub-agents follow the same minimal-skill rule.
 - Before each supervised round, check for stale stand-by agents and close completed or
   obsolete agents before launching replacements.
+
+Operator routing for active supervised rounds: when the operator requests the standing
+six-agent split, keep two on Obelisk engineering/audit/development and four
+on research/knowledge/reversing/dump work. Keep this out of default contributor docs and
+sub-agent prompts unless it changes the concrete task.

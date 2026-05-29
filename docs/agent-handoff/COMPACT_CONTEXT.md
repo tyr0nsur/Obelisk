@@ -137,12 +137,13 @@ priorities, and do not use history files as the active source of truth.
   set by default.
 - The lead integrates sub-agent findings, owns commits/pushes, and closes stale or
   completed work before launching replacements.
+- Operator routing for active supervised rounds may request two on Obelisk
+  engineering/audit/development and four on research/knowledge/reversing/dump work; keep
+  that routing out of default contributor docs and sub-agent prompts unless needed.
 
 ## Canonical References
 
 - `docs/agent-handoff/CURRENT.md`: active routing and immediate next steps.
-- `docs/agent-handoff/HISTORY-2026-05-28-pre-current-compaction.md`: historical handoff
-  detail before the active routing file was compacted.
 - `docs/STATUS.md`: contributor-facing stability matrix.
 - `docs/RELEASE.md`: release and second-source gates.
 - `docs/VERSIONING.md`: version and ABI line rules.
@@ -157,3 +158,8 @@ priorities, and do not use history files as the active source of truth.
 - `docs/research/2026-05-28-second-source-core-intake-runbook.md`: shortest offline
   second-source intake.
 - `docs/research/2026-05-28-second-source-reversing-gap-matrix.md`: evidence gap matrix.
+
+Archive reference, not active source of truth:
+
+- `docs/agent-handoff/HISTORY-2026-05-28-pre-current-compaction.md`: historical handoff
+  detail before the active routing file was compacted; use only to resolve old context.

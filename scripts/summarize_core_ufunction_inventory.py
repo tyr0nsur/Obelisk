@@ -297,6 +297,15 @@ def target_set_coverage(
         for key, items in sorted(by_key.items())
     }
     missing = [target for target in requested_targets if target not in matched]
+    ambiguous = [
+        {
+            "target": key,
+            "count": len(items),
+            "samples": items[:max_samples],
+        }
+        for key, items in sorted(by_key.items())
+        if len(items) > 1
+    ]
 
     return {
         "schema": "obelisk.ufunction-inventory-target-set-coverage.v1",
@@ -306,6 +315,8 @@ def target_set_coverage(
         "matched_count": len(matched),
         "missing_count": len(missing),
         "missing_targets": missing,
+        "ambiguous_count": len(ambiguous),
+        "ambiguous_targets": ambiguous,
         "matched_targets": matched,
         "unassigned_function_count": unassigned_count,
         "unassigned_samples": unassigned_samples,
@@ -389,6 +400,80 @@ def collect_function_inventory(
             }
         )
     return metadata, functions
+
+
+def redact_function_inventory(functions: list[dict[str, object]]) -> list[dict[str, object]]:
+    redacted: list[dict[str, object]] = []
+    for item in functions:
+        redacted.append(
+            {
+                "name": item.get("name"),
+                "family": item.get("family"),
+                "outer_name": item.get("outer_name"),
+                "outer_class_name": item.get("outer_class_name"),
+                "function_flags": item.get("function_flags"),
+                "num_parms": item.get("num_parms"),
+                "parms_size": item.get("parms_size"),
+            }
+        )
+    return redacted
+
+
+def build_ufunction_inventory_payload(
+    memory: uobjects.CoreMemory,
+    *,
+    core: Path,
+    gobjects: int,
+    fname_root_slot: int,
+    max_objects: int,
+    max_groups: int,
+    filters: dict[str, object],
+    target_sets: list[str],
+    include_functions: bool = False,
+    redact_pointers: bool = False,
+    snapshot_manifest: dict[str, object] | None = None,
+    snapshot_manifest_path: Path | None = None,
+    plan_regeneration: bool = False,
+    evidence_pack_manifest: Path | None = None,
+    evidence_pack_payload: dict[str, object] | None = None,
+) -> dict[str, object]:
+    metadata, functions = collect_function_inventory(
+        memory,
+        gobjects=gobjects,
+        fname_root_slot=fname_root_slot,
+        max_objects=max_objects,
+    )
+    inventory_functions = redact_function_inventory(functions) if redact_pointers else functions
+    filtered_functions = filter_functions(inventory_functions, **filters)
+    payload: dict[str, object] = {
+        "status": "offline-inventory",
+        "core": str(core),
+        "metadata": metadata,
+        "filters": filters,
+        "unfiltered_function_count": len(functions),
+        "summary": summarize_functions(filtered_functions, max_groups=max_groups),
+    }
+    coverage = target_set_coverage(inventory_functions, target_sets=target_sets)
+    if coverage:
+        payload["target_set_coverage"] = coverage
+    if plan_regeneration:
+        if snapshot_manifest is None or snapshot_manifest_path is None:
+            raise SystemExit("--plan-regeneration requires a snapshot manifest")
+        payload["target_set_regeneration_plan"] = target_set_regeneration_plan(
+            inventory_functions,
+            target_sets=target_sets,
+            snapshot_manifest=snapshot_manifest,
+            snapshot_manifest_path=snapshot_manifest_path,
+            core=core,
+            gobjects=gobjects,
+            fname_root_slot=fname_root_slot,
+            evidence_pack_manifest=evidence_pack_manifest,
+        )
+    if evidence_pack_payload:
+        payload["evidence_pack"] = evidence_pack_payload
+    if include_functions:
+        payload["functions"] = filtered_functions
+    return payload
 
 
 def format_text(payload: dict[str, object]) -> str:
@@ -531,50 +616,32 @@ def main() -> int:
 
     memory = uobjects.CoreMemory(core)
     try:
-        metadata, functions = collect_function_inventory(
+        filters = {
+            "outer_contains": args.outer_contains,
+            "name_contains": args.name_contains,
+            "family": args.family,
+            "min_params": args.min_params,
+            "max_params": args.max_params,
+        }
+        snapshot_manifest = load_snapshot_manifest(args.snapshot_manifest) if args.plan_regeneration else None
+        payload = build_ufunction_inventory_payload(
             memory,
-            gobjects=gobjects,
-            fname_root_slot=fname_root_slot,
-            max_objects=args.max_objects,
-        )
-    finally:
-        memory.close()
-
-    filters = {
-        "outer_contains": args.outer_contains,
-        "name_contains": args.name_contains,
-        "family": args.family,
-        "min_params": args.min_params,
-        "max_params": args.max_params,
-    }
-    filtered_functions = filter_functions(functions, **filters)
-    payload: dict[str, object] = {
-        "status": "offline-inventory",
-        "core": str(core),
-        "metadata": metadata,
-        "filters": filters,
-        "unfiltered_function_count": len(functions),
-        "summary": summarize_functions(filtered_functions, max_groups=args.max_groups),
-    }
-    coverage = target_set_coverage(functions, target_sets=args.target_set)
-    if coverage:
-        payload["target_set_coverage"] = coverage
-    if args.plan_regeneration:
-        snapshot_manifest = load_snapshot_manifest(args.snapshot_manifest)
-        payload["target_set_regeneration_plan"] = target_set_regeneration_plan(
-            functions,
-            target_sets=args.target_set,
-            snapshot_manifest=snapshot_manifest,
-            snapshot_manifest_path=args.snapshot_manifest,
             core=core,
             gobjects=gobjects,
             fname_root_slot=fname_root_slot,
+            max_objects=args.max_objects,
+            max_groups=args.max_groups,
+            filters=filters,
+            target_sets=args.target_set,
+            include_functions=args.include_functions,
+            snapshot_manifest=snapshot_manifest,
+            snapshot_manifest_path=args.snapshot_manifest if args.plan_regeneration else None,
+            plan_regeneration=args.plan_regeneration,
             evidence_pack_manifest=evidence_pack_manifest_path,
+            evidence_pack_payload=evidence_pack_payload,
         )
-    if evidence_pack_payload:
-        payload["evidence_pack"] = evidence_pack_payload
-    if args.include_functions:
-        payload["functions"] = filtered_functions
+    finally:
+        memory.close()
     if args.json:
         print(json.dumps(payload, indent=2, sort_keys=True))
     else:

@@ -194,7 +194,9 @@ scripts/check_linuxgsm_wrapper_drift.sh \
 scripts/check_obelisk_server_posture.sh --expect-stable --map <map> --instance <instance-id>
 ```
 
-11. For a release candidate, tag the validated candidate first:
+11. For a release candidate, tag the validated candidate first. Release tags and release
+    ref pushes are release-manager/lead-only; contributors should not tag or push release
+    refs from ordinary development branches.
 
 ```bash
 git tag -a v0.1.0-rc.1 -m "Obelisk 0.1.0-rc.1"

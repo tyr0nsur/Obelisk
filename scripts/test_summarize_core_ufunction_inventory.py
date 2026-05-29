@@ -136,8 +136,26 @@ class UFunctionInventorySummaryTests(unittest.TestCase):
         self.assertIn("PrimalItem.AllowRemoteAddToInventory", coverage["missing_targets"])
         self.assertIn("PrimalStructure.IsAllowedToDemolish", coverage["missing_targets"])
         self.assertEqual(coverage["matched_targets"]["PrimalItem.CanUse"]["count"], 1)
+        self.assertEqual(coverage["ambiguous_count"], 0)
+        self.assertEqual(coverage["ambiguous_targets"], [])
         self.assertEqual(coverage["unassigned_function_count"], 1)
         self.assertEqual(coverage["unassigned_samples"][0]["name"], "ServerUnrelated")
+
+    def test_target_set_coverage_reports_ambiguous_matches(self) -> None:
+        functions = [
+            {"name": "CanUse", "outer_name": "PrimalItem", "family": "Can", "index": 1},
+            {"name": "CanUse", "outer_name": "PrimalItem", "family": "Can", "index": 2},
+        ]
+
+        coverage = inventory.target_set_coverage(
+            functions,
+            target_sets=["minimal-second-source-intake"],
+        )
+
+        self.assertEqual(coverage["matched_count"], 1)
+        self.assertEqual(coverage["ambiguous_count"], 1)
+        self.assertEqual(coverage["ambiguous_targets"][0]["target"], "PrimalItem.CanUse")
+        self.assertEqual(coverage["ambiguous_targets"][0]["count"], 2)
 
     def test_target_set_coverage_uses_unfiltered_inventory(self) -> None:
         functions = [
