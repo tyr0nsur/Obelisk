@@ -304,4 +304,40 @@ namespace Obelisk::Hooks::ProcessEventChatReflection
 
         return {AttemptStatus::Matched, std::move(result), std::move(invocation)};
     }
+
+    bool TryBuildCopiedChatMessageEvent(
+        const Obelisk::UE::RuntimeReflection::MemoryReader& reader,
+        const Obelisk::UE::ChatReflection::ChatInvocation& invocation,
+        CopiedChatMessageEvent& out,
+        int32_t maxChars)
+    {
+        out = {};
+        if (invocation.Function != Obelisk::UE::ChatReflection::ChatFunction::ServerSendChatMessage)
+            return false;
+
+        uint8_t sendMode = 0xff;
+        if (!Obelisk::UE::ChatReflection::TryGetSendMode(invocation, sendMode) ||
+            !Obelisk::UE::ChatReflection::IsKnownSendMode(sendMode))
+        {
+            return false;
+        }
+
+        Obelisk::UE::RuntimeReflection::ReadResult textResult =
+            TryDecodeUtf32Field(reader,
+                                invocation,
+                                Obelisk::UE::ChatReflection::ChatField::ChatMessage,
+                                maxChars,
+                                out.Message);
+        if (!textResult)
+            return false;
+
+        out.View = {
+            .Message = out.Message,
+            .SenderName = {},
+            .SenderPlatformId = {},
+            .SendMode = static_cast<Obelisk::Core::ChatSendMode>(sendMode),
+            .SenderNameIndex = -1,
+        };
+        return true;
+    }
 }

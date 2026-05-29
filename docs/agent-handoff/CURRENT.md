@@ -88,10 +88,11 @@ detail in `HISTORY-*.md`.
 
 ## Priority Next Steps
 
-- Freeze the RC public API around `GameplayPolicyEvent`, `DescribeResourceKind`, and
-  `DescribeGameplayPolicyEventKind`; keep
-  public Inventory, StructureEvents, dino, buff, mission, tribe, transfer, chat, player,
-  admin, mutation, return override, and public `CallProcessEvent` surfaces out of RC.
+- Freeze the RC public API around `GameplayPolicyEvent`, the minimal copied
+  `ChatMessageEvent`, `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`; keep
+  public Inventory, StructureEvents, dino, buff, mission, tribe, transfer, richer chat,
+  command, player, admin, mutation, return override, and public `CallProcessEvent`
+  surfaces out of RC.
 - Revalidate each checkpoint slice independently before any GitHub publication decision.
 - Keep second-source intake fail-closed: derive artifact-specific FName root, validate
   GObjects, regenerate snapshots, compare with readiness gaps enabled, and review the JSON

@@ -116,13 +116,26 @@ write_proc_fixture 109 "${stable_maps}" \
     "OBELISK_INSTANCE_ID=arkserver" \
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
     "OBELISK_DISABLE_PLUGINS=1" \
+    "OBELISK_ENABLE_CHAT_EVENTS=1" \
+    "OBELISK_CHAT_EVENTS_BINARY_SHA256=abc123" \
+    "OBELISK_CHAT_EVENTS_DISPATCH_LIMIT=25"
+expect_failure chat-events-forbidden-for-stable \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 109 --expect-stable --instance arkserver
+expect_failure chat-events-forbidden-for-stable-legacy-flag \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 109 --expect-stable --forbid-chat-reflection --instance arkserver
+
+write_proc_fixture 121 "${stable_maps}" \
+    "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
+    "OBELISK_INSTANCE_ID=arkserver" \
+    "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
+    "OBELISK_DISABLE_PLUGINS=1" \
     "OBELISK_ENABLE_CHAT_REFLECTION=1" \
     "OBELISK_CHAT_REFLECTION_BINARY_SHA256=abc123" \
     "OBELISK_CHAT_REFLECTION_LOG_LIMIT=25"
 expect_failure chat-reflection-forbidden-for-stable \
-    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 109 --expect-stable --instance arkserver
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 121 --expect-stable --instance arkserver
 expect_failure chat-reflection-forbidden-for-stable-legacy-flag \
-    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 109 --expect-stable --forbid-chat-reflection --instance arkserver
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 121 --expect-stable --forbid-chat-reflection --instance arkserver
 
 write_proc_fixture 110 "${stable_maps}" \
     "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
@@ -281,6 +294,7 @@ for marker in \
     allow-global-process-event-callbacks \
     allow-call-process-event \
     allow-process-event-blocking \
+    enable-chat-events \
     enable-chat-reflection \
     enable-inventory-reflection \
     enable-structure-reflection \
@@ -307,5 +321,12 @@ expect_failure chat-marker-forbidden-for-stable \
 expect_failure chat-marker-forbidden-for-stable-legacy-flag \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable --forbid-chat-reflection --instance arkserver
 rm -f "${TEST_OBELISK_ROOT}/state/instances/arkserver/enable-chat-reflection"
+
+: > "${TEST_OBELISK_ROOT}/state/instances/arkserver/enable-chat-events"
+expect_failure chat-events-marker-forbidden-for-stable \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable --instance arkserver
+expect_failure chat-events-marker-forbidden-for-stable-legacy-flag \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable --forbid-chat-reflection --instance arkserver
+rm -f "${TEST_OBELISK_ROOT}/state/instances/arkserver/enable-chat-events"
 
 echo "check_obelisk_server_posture offline tests passed"

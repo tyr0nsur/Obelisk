@@ -150,8 +150,9 @@ Harden reflected event parameter decoding
 ## Current Priorities
 
 1. Close the core-first `v0.1.0-rc` surface around stable runtime hooks, marker
-   gates, plugin lifecycle, C ABI behavior, `GameplayPolicyEvent`, and
-   metadata helpers `DescribeResourceKind` and `DescribeGameplayPolicyEventKind`.
+   gates, plugin lifecycle, C ABI behavior, `GameplayPolicyEvent`, minimal
+   `ChatMessageEvent`, and metadata helpers `DescribeResourceKind` and
+   `DescribeGameplayPolicyEventKind`.
 2. Keep additional gameplay/module APIs out of public scope until their copied
    payloads, callback lifetime, SDK consumer coverage, and explicitly named
    second-source gates are complete.

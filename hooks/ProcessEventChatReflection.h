@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/ChatEventDispatcher.h"
 #include "ue/ChatReflection.h"
 #include "ue/RuntimeReflection.h"
 
@@ -44,6 +45,12 @@ namespace Obelisk::Hooks::ProcessEventChatReflection
         Obelisk::UE::ChatReflection::ChatInvocation Invocation;
     };
 
+    struct CopiedChatMessageEvent
+    {
+        Obelisk::Core::ChatMessageView View;
+        std::string Message;
+    };
+
     Gate EvaluateGate(const char* enableChatReflection, bool instanceMarkerEnabled, const char* binarySha256);
     bool IsReflectedChatNameIndex(int32_t nameIndex);
     bool ShouldAttemptObservation(uint64_t limit);
@@ -72,4 +79,10 @@ namespace Obelisk::Hooks::ProcessEventChatReflection
                                   const Obelisk::UE::RuntimeReflection::MemoryReader& reader,
                                   void* function,
                                   void* params);
+
+    bool TryBuildCopiedChatMessageEvent(
+        const Obelisk::UE::RuntimeReflection::MemoryReader& reader,
+        const Obelisk::UE::ChatReflection::ChatInvocation& invocation,
+        CopiedChatMessageEvent& out,
+        int32_t maxChars = 512);
 }

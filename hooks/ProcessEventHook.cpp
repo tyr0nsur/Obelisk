@@ -74,6 +74,7 @@ namespace Obelisk::Hooks
     static std::atomic<uint64_t> s_ProcessEventCalls{0};
     static std::atomic<uint64_t> s_ReflectedChatCalls{0};
     static std::atomic<uint64_t> s_ReflectedChatRejects{0};
+    static std::atomic<uint64_t> s_ReflectedChatEventDispatches{0};
     static std::atomic<uint64_t> s_ReflectedInventoryCalls{0};
     static std::atomic<uint64_t> s_ReflectedInventoryRejects{0};
     static std::atomic<uint64_t> s_ReflectedInventoryDispatches{0};
@@ -368,6 +369,13 @@ namespace Obelisk::Hooks
                AreExperimentalObserverMarkersEnabled("enable-chat-reflection");
     }
 
+    static bool IsChatEventsObserverDebugGateEnabled()
+    {
+        return IsObserverDebugProfileEnabled() &&
+               IsObserverDebugWindowMarkerEnabled() &&
+               AreExperimentalObserverMarkersEnabled("enable-chat-events");
+    }
+
     static const ProcessEventChatReflection::Gate& GetChatReflectionGate()
     {
         static ProcessEventChatReflection::Gate gate = [] {
@@ -417,6 +425,57 @@ namespace Obelisk::Hooks
     static bool IsChatReflectionEnabled()
     {
         return GetChatReflectionGate().Enabled();
+    }
+
+    static const ProcessEventChatReflection::Gate& GetChatEventProducerGate()
+    {
+        static ProcessEventChatReflection::Gate gate = [] {
+            ProcessEventChatReflection::Gate value =
+                ProcessEventChatReflection::EvaluateGate(
+                    std::getenv("OBELISK_ENABLE_CHAT_EVENTS"),
+                    IsChatEventsObserverDebugGateEnabled(),
+                    std::getenv("OBELISK_CHAT_EVENTS_BINARY_SHA256"));
+
+            switch (value.Status)
+            {
+            case ProcessEventChatReflection::GateStatus::Disabled:
+                break;
+            case ProcessEventChatReflection::GateStatus::MissingInstanceMarker:
+                if (!IsObserverDebugProfileEnabled())
+                {
+                    OBELISK_WARN("Chat message event producer disabled: OBELISK_WRAPPER_PROFILE=observer-debug is required.");
+                }
+                else if (!IsObserverDebugWindowMarkerEnabled())
+                {
+                    OBELISK_WARN("Chat message event producer disabled: allow-observer-debug-window instance marker is required.");
+                }
+                else
+                {
+                    OBELISK_WARN("Chat message event producer disabled: instance markers allow-experimental-observers and "
+                                 "enable-chat-events are required.");
+                }
+                break;
+            case ProcessEventChatReflection::GateStatus::MissingBinarySha256:
+                OBELISK_WARN("Chat message event producer disabled: OBELISK_CHAT_EVENTS_BINARY_SHA256 is required.");
+                break;
+            case ProcessEventChatReflection::GateStatus::UnsupportedBinarySha256:
+                OBELISK_WARN("Chat message event producer disabled: unsupported ShooterGameServer SHA256 '{}'.",
+                             value.BinarySha256);
+                break;
+            case ProcessEventChatReflection::GateStatus::Enabled:
+                OBELISK_WARN("Chat message event producer enabled for ShooterGameServer SHA256 {}.",
+                             value.BinarySha256);
+                break;
+            }
+
+            return value;
+        }();
+        return gate;
+    }
+
+    static bool IsChatEventProducerEnabled()
+    {
+        return GetChatEventProducerGate().Enabled();
     }
 
     static const ProcessEventStructureReflection::Gate& GetStructureReflectionGate()
@@ -532,6 +591,25 @@ namespace Obelisk::Hooks
             return env && std::strcmp(env, "1") == 0;
         }();
         return enabled;
+    }
+
+    static uint64_t GetChatEventDispatchLimit()
+    {
+        static uint64_t limit = [] {
+            const char* env = std::getenv("OBELISK_CHAT_EVENTS_DISPATCH_LIMIT");
+            if (!env || env[0] == '\0') return uint64_t{0};
+            return static_cast<uint64_t>(std::strtoull(env, nullptr, 10));
+        }();
+        return limit;
+    }
+
+    static bool IsChatEventProducerActive()
+    {
+        const uint64_t dispatchLimit = GetChatEventDispatchLimit();
+        return IsChatEventProducerEnabled() &&
+               ProcessEventChatReflection::ShouldAttemptObservation(dispatchLimit) &&
+               s_ReflectedChatEventDispatches.load(std::memory_order_relaxed) < dispatchLimit &&
+               Core::ChatEventDispatcher::Get().SubscriptionCount() > 0;
     }
 
     static uint64_t GetStructureReflectionLogLimit()
@@ -810,6 +888,46 @@ namespace Obelisk::Hooks
         }
     }
 
+    static size_t DispatchReflectedChatMessageEventAfterOriginal(
+        bool originalWasCalled,
+        int32_t nameIndex,
+        void* function,
+        void* params)
+    {
+        if (!originalWasCalled)
+            return 0;
+
+        const ProcessEventChatReflection::Gate& gate = GetChatEventProducerGate();
+        if (!gate.Enabled())
+            return 0;
+        if (!ProcessEventChatReflection::IsReflectedChatNameIndex(nameIndex))
+            return 0;
+        const uint64_t dispatchLimit = GetChatEventDispatchLimit();
+        if (!ProcessEventChatReflection::ShouldAttemptObservation(dispatchLimit))
+            return 0;
+        if (s_ReflectedChatEventDispatches.load(std::memory_order_relaxed) >= dispatchLimit)
+            return 0;
+        if (Core::ChatEventDispatcher::Get().SubscriptionCount() == 0)
+            return 0;
+
+        Obelisk::UE::RuntimeReflection::MemoryReader reader{RuntimeReflectionReader, nullptr};
+        ProcessEventChatReflection::Attempt attempt =
+            ProcessEventChatReflection::TryIdentifyInvocation(gate, nameIndex, reader, function, params);
+        if (attempt.Status != ProcessEventChatReflection::AttemptStatus::Matched)
+            return 0;
+
+        ProcessEventChatReflection::CopiedChatMessageEvent event;
+        if (!ProcessEventChatReflection::TryBuildCopiedChatMessageEvent(reader, attempt.Invocation, event))
+            return 0;
+
+        const uint64_t dispatchNumber =
+            s_ReflectedChatEventDispatches.fetch_add(1, std::memory_order_relaxed) + 1;
+        if (dispatchNumber > dispatchLimit)
+            return 0;
+
+        return Core::ChatEventDispatcher::Get().Dispatch(event.View);
+    }
+
     static void TraceReflectedStructureInvocation(bool originalWasCalled, int32_t nameIndex, void* function, void* params)
     {
         if (!originalWasCalled)
@@ -979,10 +1097,11 @@ namespace Obelisk::Hooks
         const bool hasPreCallbacks = eventManager.HasPreProcessEventCallbacks();
         const bool hasPostCallbacks = eventManager.HasPostProcessEventCallbacks();
         const bool chatReflectionEnabled = IsChatReflectionEnabled();
+        const bool chatEventProducerActive = IsChatEventProducerActive();
         const bool inventoryObservationActive = IsInventoryObservationActive();
         const bool structureObservationActive = IsStructureObservationActive();
         const bool needsNameIndex =
-            hasPreCallbacks || hasPostCallbacks || chatReflectionEnabled ||
+            hasPreCallbacks || hasPostCallbacks || chatReflectionEnabled || chatEventProducerActive ||
             inventoryObservationActive || structureObservationActive;
         const int32_t nameIndex = needsNameIndex ? GetFunctionNameIndex(function) : -1;
 
@@ -996,6 +1115,7 @@ namespace Obelisk::Hooks
             hasPostCallbacks,
             SnapshotOriginalProcessEvent());
 
+        DispatchReflectedChatMessageEventAfterOriginal(originalWasCalled, nameIndex, function, params);
         TraceReflectedInventoryInvocation(originalWasCalled, nameIndex, function, params);
         TraceReflectedStructureInvocation(originalWasCalled, nameIndex, function, params);
     }

@@ -120,10 +120,11 @@ priorities, and do not use history files as the active source of truth.
   should be refreshed separately from runtime, release/public docs, offline tooling, and
   research-evidence slices.
 - Do not promote post-RC work into the RC: ResourceHandle, GNames/GObjects promotion, full
-  UE4 reflection, public Inventory SDK, public StructureEvents, chat/player/tribe/dino/
-  buff/transfer APIs, mutation, return overrides, public `CallProcessEvent`, background
-  worker plugins, operator lifecycle commands, and ScriptStruct/transfer promotion remain
-  blocked unless a later focused gate changes scope.
+  UE4 reflection, public Inventory SDK, public StructureEvents, chat APIs beyond minimal
+  `ChatMessageEvent`, player/tribe/dino/buff/transfer APIs, mutation, return overrides,
+  public `CallProcessEvent`, background worker plugins, operator lifecycle commands, and
+  ScriptStruct/transfer promotion remain blocked unless a later focused gate changes
+  scope.
 
 ## Agent Coordination
 

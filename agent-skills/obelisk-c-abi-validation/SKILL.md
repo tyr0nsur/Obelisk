@@ -133,13 +133,14 @@ Validation rules:
   path and should be rare, measured, and disabled by default for experimental plugins.
 - Callback implementations must be non-blocking and must not call back into unsafe UE4
   functions unless reentrancy is explicitly handled.
-- Future gameplay events beyond `GameplayPolicyEvent`, such as chat or inventory, must
-  copy data into Obelisk-owned memory before calling plugins. Do not expose borrowed UE4
-  params, `FString`, `UObject`, `UFunction`, or raw `ProcessEvent` buffers as a stable SDK
+- Future gameplay events beyond `GameplayPolicyEvent` and the minimal
+  `ChatMessageEvent`, such as richer chat or inventory APIs, must copy data into
+  Obelisk-owned memory before calling plugins. Do not expose borrowed UE4 params,
+  `FString`, `UObject`, `UFunction`, or raw `ProcessEvent` buffers as a stable SDK
   contract.
-- Future chat events should pass through the internal `core/ChatEventDispatcher` ownership
-  layer before any SDK exposure. Do not dispatch plugin-facing chat callbacks directly from
-  the `ProcessEvent` hook.
+- `ChatMessageEvent` is an RC ABI surface but must pass through the internal
+  `core/ChatEventDispatcher` ownership layer. Do not dispatch plugin-facing chat callbacks
+  directly from the `ProcessEvent` hook.
 - `PluginManager` must unregister both `EventManager` and `ChatEventDispatcher` callbacks
   for a plugin owner on init failure and before `dlclose` during unload.
 - Current public callback registration functions must not create ownerless registrations.

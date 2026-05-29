@@ -490,6 +490,78 @@ namespace
         Require(result.Status == RuntimeReflection::ReadStatus::Ok, result.Reason.c_str());
         Require(text == "Q\\\"...", "sanitized decoded chat truncation mismatch");
     }
+
+    void TestBuildsCopiedChatMessageEventWithoutSenderIdentity()
+    {
+        ChatFixture fixture;
+        BuildServerSendChatMessage(fixture);
+        fixture.FStringData[0] = 'O';
+        fixture.FStringData[1] = 'K';
+        fixture.FStringData[2] = 0;
+
+        RuntimeReflection::FStringHeaderCandidate header{
+            fixture.FStringData.data(),
+            3,
+            3,
+        };
+        WriteAt(fixture.Params, 0x00, header);
+        fixture.Params[0x10] = 0x03;
+
+        MemoryReader reader = fixture.Reader();
+        Attempt attempt = TryIdentifyInvocation(
+            EnabledGate(),
+            kServerSendChatMessageNameIndex,
+            reader,
+            fixture.Function.data(),
+            fixture.Params.data());
+
+        Require(attempt.Status == AttemptStatus::Matched, attempt.Result.Reason.c_str());
+
+        CopiedChatMessageEvent event;
+        Require(TryBuildCopiedChatMessageEvent(reader, attempt.Invocation, event),
+                "copied chat message event was not built");
+        Require(event.Message == "OK", "copied chat event message mismatch");
+        Require(event.View.Message == event.Message, "chat event view does not point at copied message");
+        Require(event.View.SenderName.empty(), "chat event exposed sender name");
+        Require(event.View.SenderPlatformId.empty(), "chat event exposed sender platform id");
+        Require(event.View.SenderNameIndex == -1, "chat event exposed sender name index");
+        Require(event.View.SendMode == Obelisk::Core::ChatSendMode::Alliance, "chat send mode mismatch");
+
+        fixture.FStringData[0] = 'X';
+        Require(event.Message == "OK", "chat event message borrowed UE parameter storage");
+    }
+
+    void TestRejectsUnknownSendModeForCopiedChatMessageEvent()
+    {
+        ChatFixture fixture;
+        BuildServerSendChatMessage(fixture);
+        fixture.FStringData[0] = 'H';
+        fixture.FStringData[1] = 'i';
+        fixture.FStringData[2] = 0;
+
+        RuntimeReflection::FStringHeaderCandidate header{
+            fixture.FStringData.data(),
+            3,
+            3,
+        };
+        WriteAt(fixture.Params, 0x00, header);
+        fixture.Params[0x10] = 0x04;
+
+        MemoryReader reader = fixture.Reader();
+        Attempt attempt = TryIdentifyInvocation(
+            EnabledGate(),
+            kServerSendChatMessageNameIndex,
+            reader,
+            fixture.Function.data(),
+            fixture.Params.data());
+
+        Require(attempt.Status == AttemptStatus::Matched, attempt.Result.Reason.c_str());
+
+        CopiedChatMessageEvent event;
+        Require(!TryBuildCopiedChatMessageEvent(reader, attempt.Invocation, event),
+                "unknown send mode produced a chat message event");
+    }
+
 }
 
 int main()
@@ -505,6 +577,8 @@ int main()
     TestMatchedServerSendChatMessageReturnsByteRange();
     TestDecodesServerSendChatMessageText();
     TestDecodesServerSendChatMessageTextForLog();
+    TestBuildsCopiedChatMessageEventWithoutSenderIdentity();
+    TestRejectsUnknownSendModeForCopiedChatMessageEvent();
 
     std::cout << "ProcessEventChatReflectionTests passed\n";
     return 0;

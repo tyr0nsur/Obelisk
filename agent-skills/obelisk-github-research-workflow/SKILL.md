@@ -159,7 +159,8 @@ Skip the build only for docs-only or skills-only commits, and say so in the fina
 
 ## Community Updates
 
-Community/Discord updates are lead-only. Do not send or draft them unless the task
+Community/Discord updates are lead-only and reserved for major public modder-facing
+milestones, previews, migrations, or releases. Do not send or draft them unless the task
 explicitly delegates that scope. Keep detailed announcement policy outside default
 sub-agent prompts.
 

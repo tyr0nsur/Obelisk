@@ -25,6 +25,7 @@ FORBIDDEN_STABLE_MARKERS = frozenset(
         "allow-global-process-event-callbacks",
         "allow-call-process-event",
         "allow-process-event-blocking",
+        "enable-chat-events",
         "enable-chat-reflection",
         "enable-inventory-reflection",
         "enable-structure-reflection",

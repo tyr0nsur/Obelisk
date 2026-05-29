@@ -5,6 +5,9 @@ from __future__ import annotations
 
 
 TARGET_SETS = {
+    "chat-message-intake": (
+        "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerSendChatMessage",
+    ),
     "buff-compact-intake": (
         "obelisk.ufunction-chain.snapshot.v1:PrimalBuff.AllowPostProcessEffect",
         "obelisk.ufunction-chain.snapshot.v1:PrimalBuff.BPBuffPreventUploading",

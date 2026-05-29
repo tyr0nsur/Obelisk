@@ -6,7 +6,7 @@
 - [ ] I did not touch live server roots or commit server-local artifacts.
 - [ ] I did not commit build outputs, `.so` files, logs, cores, local config, or state markers.
 - [ ] Runtime/reversing changes include a matching research note or public documentation update.
-- [ ] This PR does not promote chat or any gameplay module to public SDK/release scope unless `docs/STATUS.md`, `docs/RELEASE.md`, and explicitly named second-source gates are updated.
+- [ ] This PR does not promote chat beyond minimal `ChatMessageEvent` or any gameplay module to public SDK/release scope unless `docs/STATUS.md`, `docs/RELEASE.md`, and explicitly named second-source gates are updated.
 
 ## Safety
 

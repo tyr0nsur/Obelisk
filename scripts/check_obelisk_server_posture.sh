@@ -250,6 +250,9 @@ if [[ "${EXPECT_STABLE}" == "1" ]]; then
     forbid_env OBELISK_ALLOW_CALL_PROCESS_EVENT
     forbid_env OBELISK_ALLOW_PROCESS_EVENT_BLOCKING
     forbid_env_value OBELISK_WRAPPER_PROFILE observer-debug
+    forbid_env OBELISK_ENABLE_CHAT_EVENTS
+    forbid_env OBELISK_CHAT_EVENTS_BINARY_SHA256
+    forbid_env OBELISK_CHAT_EVENTS_DISPATCH_LIMIT
     forbid_nonzero_env OBELISK_PE_TRACE_LIMIT
     forbid_env OBELISK_ENABLE_CHAT_REFLECTION
     forbid_env OBELISK_CHAT_REFLECTION_BINARY_SHA256
@@ -277,6 +280,7 @@ if [[ "${EXPECT_STABLE}" == "1" ]]; then
     forbid_marker allow-global-process-event-callbacks
     forbid_marker allow-call-process-event
     forbid_marker allow-process-event-blocking
+    forbid_marker enable-chat-events
     forbid_marker enable-chat-reflection
     forbid_marker enable-inventory-reflection
     forbid_marker enable-structure-reflection
@@ -285,9 +289,13 @@ if [[ "${EXPECT_STABLE}" == "1" ]]; then
 fi
 
 if [[ "${FORBID_CHAT_REFLECTION}" == "1" ]]; then
+    forbid_env OBELISK_ENABLE_CHAT_EVENTS
+    forbid_env OBELISK_CHAT_EVENTS_BINARY_SHA256
+    forbid_env OBELISK_CHAT_EVENTS_DISPATCH_LIMIT
     forbid_env OBELISK_ENABLE_CHAT_REFLECTION
     forbid_env OBELISK_CHAT_REFLECTION_BINARY_SHA256
     forbid_env OBELISK_CHAT_REFLECTION_LOG_LIMIT
     forbid_env OBELISK_CHAT_REFLECTION_LOG_TEXT
+    forbid_marker enable-chat-events
     forbid_marker enable-chat-reflection
 fi
