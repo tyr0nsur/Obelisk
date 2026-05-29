@@ -690,7 +690,12 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertIs(chat.get("owner_token_handle_registration"), True)
         self.assertIs(chat.get("owner_scoped_unregister"), True)
         self.assertIs(chat.get("plugin_owner_cleanup"), True)
-        self.assertIs(chat.get("runtime_producer_gate_pending"), True)
+        self.assertIs(chat.get("second_source_ready"), True)
+        self.assertIs(chat.get("runtime_producer_gate_pending"), False)
+        self.assertIs(chat.get("live_debug_delivery_pending"), True)
+        reports = chat.get("second_source_reports")
+        self.assertIsInstance(reports, list)
+        self.assertGreater(len(reports), 0)
         for field in ("abi_tests", "sdk_consumer_tests", "lifecycle_tests", "docs"):
             entries = chat.get(field)
             self.assertIsInstance(entries, list)

@@ -97,6 +97,12 @@
       "outer": "PrimalInventoryComponent"
     },
     {
+      "file": "ShooterPlayerController.ServerSendChatMessage.snapshot.json",
+      "module": "sdk_chat",
+      "name": "ServerSendChatMessage",
+      "outer": "ShooterPlayerController"
+    },
+    {
       "file": "PrimalBuff.AllowPostProcessEffect.snapshot.json",
       "module": "sdk_buffs",
       "name": "AllowPostProcessEffect",

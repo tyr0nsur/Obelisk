@@ -65,6 +65,11 @@ add_test(
 )
 
 add_test(
+    NAME SdkConsumerFixtureCAbiPluginSkipsChatMessageWithoutCapability
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:sdk_consumer_c_abi_plugin>" c_abi_minimal no-chat-message-capability
+)
+
+add_test(
     NAME SdkConsumerFixtureOBaseEvents
     COMMAND sdk_consumer_fixture "$<TARGET_FILE:oBaseEvents>" oBaseEvents
 )

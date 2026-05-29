@@ -3,6 +3,14 @@
 #include <stddef.h>
 #include <stdint.h>
 
+static ObeliskApi g_Api;
+static bool g_HasApi = false;
+static uint64_t g_OwnerToken = 0;
+static uint64_t g_ChatMessageEventHandle = 0;
+static uint64_t g_ChatMessageEventUserData = 0xC0FFEE03;
+static bool g_ChatMessageEventSeen = false;
+static bool g_ChatMessageEventAccepted = false;
+
 static void OnGameplayPolicyEvent(const ObeliskGameplayPolicyEvent* event, void* user_data)
 {
     (void)user_data;
@@ -26,12 +34,59 @@ static void OnGameplayPolicyEvent(const ObeliskGameplayPolicyEvent* event, void*
     }
 }
 
+static void OnChatMessageEvent(const ObeliskChatMessageEvent* event, void* user_data)
+{
+    g_ChatMessageEventSeen = true;
+    g_ChatMessageEventAccepted = false;
+
+    if (!event ||
+        event->abi_version != OBELISK_CHAT_MESSAGE_EVENT_ABI_VERSION ||
+        event->struct_size < sizeof(ObeliskChatMessageEvent) ||
+        event->send_mode > OBELISK_CHAT_SEND_MODE_MAX ||
+        (event->flags & OBELISK_CHAT_MESSAGE_EVENT_FLAG_COPIED_PAYLOAD) == 0 ||
+        event->sequence == 0 ||
+        !event->message.data ||
+        event->message.size != 5 ||
+        user_data != &g_ChatMessageEventUserData)
+    {
+        return;
+    }
+
+    g_ChatMessageEventAccepted =
+        event->message.data[0] == 'h' &&
+        event->message.data[1] == 'e' &&
+        event->message.data[2] == 'l' &&
+        event->message.data[3] == 'l' &&
+        event->message.data[4] == 'o';
+}
+
+static void OnCompileChatMessageEvent(const ObeliskChatMessageEvent* event, void* user_data)
+{
+    (void)user_data;
+    if (event && event->struct_size >= sizeof(ObeliskChatMessageEvent))
+    {
+        volatile uint32_t send_mode = event->send_mode;
+        volatile uint64_t flags = event->flags;
+        volatile uint64_t sequence = event->sequence;
+        volatile size_t message_size = event->message.size;
+        volatile bool copied_payload =
+            event->abi_version == OBELISK_CHAT_MESSAGE_EVENT_ABI_VERSION &&
+            (event->flags & OBELISK_CHAT_MESSAGE_EVENT_FLAG_COPIED_PAYLOAD) != 0;
+        (void)send_mode;
+        (void)flags;
+        (void)sequence;
+        (void)message_size;
+        (void)copied_payload;
+    }
+}
+
 static void CompileGameplayPolicyAbi(void)
 {
     volatile uint64_t capability = OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS;
     volatile uint64_t resource_descriptor_capability = OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS;
     volatile uint64_t event_descriptor_capability =
         OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS;
+    volatile uint64_t chat_capability = OBELISK_API_CAPABILITY_CHAT_EVENTS;
     volatile uint64_t all_events = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL;
     volatile uint64_t all_structures = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES;
     volatile uint64_t all_inventory = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY;
@@ -42,6 +97,17 @@ static void CompileGameplayPolicyAbi(void)
     volatile uint64_t ignore_cooldown = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN;
     volatile uint64_t category_only = OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_CATEGORY_ONLY;
     volatile uint32_t event_descriptor_abi = OBELISK_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION;
+    volatile uint64_t chat_copied_payload = OBELISK_CHAT_MESSAGE_EVENT_FLAG_COPIED_PAYLOAD;
+    ObeliskStringView chat_message_view = {"hello", 5};
+    ObeliskChatMessageEvent chat_event = {
+        OBELISK_CHAT_MESSAGE_EVENT_ABI_VERSION,
+        sizeof(ObeliskChatMessageEvent),
+        OBELISK_CHAT_SEND_MODE_GLOBAL,
+        0,
+        OBELISK_CHAT_MESSAGE_EVENT_FLAG_COPIED_PAYLOAD,
+        1,
+        {"hello", 5},
+    };
     ObeliskGameplayPolicyEvent event = {
         OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION,
         sizeof(ObeliskGameplayPolicyEvent),
@@ -105,12 +171,15 @@ static void CompileGameplayPolicyAbi(void)
         "Structure Variant Change",
     };
     ObeliskGameplayPolicyEventCallback callback = OnGameplayPolicyEvent;
+    ObeliskChatMessageEventCallback chat_callback = OnCompileChatMessageEvent;
     callback(&event, NULL);
     callback(&inventory_remote_add_event, NULL);
     callback(&inventory_use_event, NULL);
+    chat_callback(&chat_event, NULL);
     (void)capability;
     (void)resource_descriptor_capability;
     (void)event_descriptor_capability;
+    (void)chat_capability;
     (void)all_events;
     (void)all_structures;
     (void)all_inventory;
@@ -121,8 +190,39 @@ static void CompileGameplayPolicyAbi(void)
     (void)ignore_cooldown;
     (void)category_only;
     (void)event_descriptor_abi;
+    (void)chat_copied_payload;
+    (void)chat_message_view;
     (void)descriptor;
     (void)event_descriptor;
+}
+
+static bool HasChatMessageEventApi(const ObeliskApi* api)
+{
+    return api &&
+        (api->capabilities & OBELISK_API_CAPABILITY_CHAT_EVENTS) != 0 &&
+        api->struct_size >= offsetof(ObeliskApi, UnregisterChatMessageEventWithOwnerToken) +
+            sizeof(api->UnregisterChatMessageEventWithOwnerToken) &&
+        api->RegisterChatMessageEventWithOwnerTokenHandle &&
+        api->UnregisterChatMessageEventWithOwnerToken;
+}
+
+static void UnregisterCallbacks(void)
+{
+    if (g_HasApi && g_ChatMessageEventHandle != 0 && g_Api.UnregisterChatMessageEventWithOwnerToken)
+    {
+        g_Api.UnregisterChatMessageEventWithOwnerToken(g_OwnerToken, g_ChatMessageEventHandle);
+        g_ChatMessageEventHandle = 0;
+    }
+}
+
+static void ResetState(void)
+{
+    g_Api = (ObeliskApi){0};
+    g_HasApi = false;
+    g_OwnerToken = 0;
+    g_ChatMessageEventHandle = 0;
+    g_ChatMessageEventSeen = false;
+    g_ChatMessageEventAccepted = false;
 }
 
 static const char* kDefaultConfig = "{\n"
@@ -167,6 +267,25 @@ __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
     if (context->plugin_owner_token == 0)
         return false;
 
+    g_Api = *api;
+    g_HasApi = true;
+    g_OwnerToken = context->plugin_owner_token;
+    g_ChatMessageEventSeen = false;
+    g_ChatMessageEventAccepted = false;
+
+    if (HasChatMessageEventApi(api))
+    {
+        g_ChatMessageEventHandle = api->RegisterChatMessageEventWithOwnerTokenHandle(
+            g_OwnerToken,
+            OnChatMessageEvent,
+            &g_ChatMessageEventUserData);
+        if (g_ChatMessageEventHandle == 0)
+        {
+            ResetState();
+            return false;
+        }
+    }
+
     CompileGameplayPolicyAbi();
     api->LogInfo("[c_abi_minimal] Loaded.");
     return true;
@@ -174,4 +293,16 @@ __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
 
 __attribute__((visibility("default"))) void ObeliskPlugin_Shutdown(void)
 {
+    UnregisterCallbacks();
+    ResetState();
+}
+
+__attribute__((visibility("default"))) bool CAbiMinimal_ChatMessageEventSeen(void)
+{
+    return g_ChatMessageEventSeen;
+}
+
+__attribute__((visibility("default"))) bool CAbiMinimal_ChatMessageEventAccepted(void)
+{
+    return g_ChatMessageEventAccepted;
 }

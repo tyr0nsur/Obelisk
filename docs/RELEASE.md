@@ -28,8 +28,8 @@ Included:
   text, send mode, copied-payload flag, and process-local sequence only. It is a
   notification contract for plugins that parse their own text locally, not a command SDK,
   chat send/moderation API, sender identity API, UE lookup path, mutation surface, or
-  return-override authority. Runtime producer hookup remains a separate gate and must not
-  be implied by the SDK ABI alone.
+  return-override authority. Runtime producer delivery must still be validated on an
+  isolated debug server before a public milestone claim.
 
 Excluded:
 
@@ -178,10 +178,12 @@ chat-text plugins. It is declared in `docs/public_gameplay_events.json` so publi
 capabilities stay audited, but it does not promote a command SDK, sender/player identity,
 chat sending, moderation/blocking, raw `FString`, `UObject`, `UFunction`, FName/GObjects
 indices, raw params, mutation, or return overrides. SDK acceptance for this event is ABI
-layout coverage, `ChatEventDispatcher` copy/lifetime tests, plugin-manager owner-token
-registration/unregister tests, and installed SDK consumer coverage. Runtime producer
-hookup remains a separate gate; runtime-observer summaries and chat reflection logs do not
-promote additional chat fields or prove end-to-end delivery.
+layout coverage, accepted `chat-message-intake` second-source comparison,
+`ChatEventDispatcher` copy/lifetime tests, plugin-manager owner-token
+registration/unregister tests, and installed SDK consumer coverage. The runtime producer
+exists behind observer-debug gates, SHA, marker, and positive dispatch budget; isolated
+`arkserver2` delivery validation is still required before treating it as an end-to-end
+public milestone.
 
 5. Confirm `scripts/test_install_obelisk_layout.sh` covered runtime backup reinstall:
    one backup each for `libobelisk.so` and `libsubhook.so`, no `.incoming.*` files, no

@@ -131,7 +131,7 @@ namespace
         Require(g_RegisteredChatMessageCallback != nullptr, "missing chat message callback");
         Require(g_RegisteredChatMessageUserData != nullptr, "missing chat message user data");
 
-        const char message[] = "!ping";
+        const char message[] = "hello";
         ObeliskChatMessageEvent event{};
         event.abi_version = OBELISK_CHAT_MESSAGE_EVENT_ABI_VERSION;
         event.struct_size = sizeof(ObeliskChatMessageEvent);
@@ -322,6 +322,10 @@ int main(int argc, char** argv)
             ResolveOptional<BoolProbeFn>(handle, "SdkConsumerMinimal_ChatMessageEventSeen");
         BoolProbeFn chatMessageEventAccepted =
             ResolveOptional<BoolProbeFn>(handle, "SdkConsumerMinimal_ChatMessageEventAccepted");
+        if (!chatMessageEventSeen)
+            chatMessageEventSeen = ResolveOptional<BoolProbeFn>(handle, "CAbiMinimal_ChatMessageEventSeen");
+        if (!chatMessageEventAccepted)
+            chatMessageEventAccepted = ResolveOptional<BoolProbeFn>(handle, "CAbiMinimal_ChatMessageEventAccepted");
 
         ObeliskPluginMetadata metadata{};
         Require(getInfo(&metadata), "ObeliskPlugin_GetInfo failed");

@@ -216,7 +216,7 @@
         "mutation or return override authority"
       ],
       "command_sdk": "not promoted; plugins may parse copied text locally",
-      "second_source_ready": false,
+      "second_source_ready": true,
       "copied_obelisk_owned_payload": true,
       "no_ue_internals_in_public_abi": true,
       "append_only_abi": true,
@@ -224,7 +224,11 @@
       "owner_token_handle_registration": true,
       "owner_scoped_unregister": true,
       "plugin_owner_cleanup": true,
-      "runtime_producer_gate_pending": true,
+      "runtime_producer_gate_pending": false,
+      "live_debug_delivery_pending": true,
+      "second_source_reports": [
+        "/servidor/ark/workspace-offline/chat-message-intake-20260529T000000Z/readiness-report.json"
+      ],
       "abi_tests": [
         "tests/abi/AbiLayoutTests.cpp"
       ],

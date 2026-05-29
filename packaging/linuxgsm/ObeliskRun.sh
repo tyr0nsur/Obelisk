@@ -109,6 +109,26 @@ marker_entry_exists() {
     [[ -e "${marker}" || -L "${marker}" ]]
 }
 
+require_sha256_hex() {
+    local name="$1"
+    local value="$2"
+
+    if [[ ! "${value}" =~ ^[0-9a-f]{64}$ ]]; then
+        echo "${name} must be an explicit lowercase SHA256 hex value for observer-debug chat events." >&2
+        exit 1
+    fi
+}
+
+require_positive_integer() {
+    local name="$1"
+    local value="$2"
+
+    if [[ ! "${value}" =~ ^0*[1-9][0-9]*$ ]]; then
+        echo "${name} must be an explicit positive integer for observer-debug chat events." >&2
+        exit 1
+    fi
+}
+
 validate_observer_wrapper_profile() {
     local profile="${OBELISK_WRAPPER_PROFILE:-stable}"
 
@@ -148,9 +168,12 @@ configure_chat_events() {
     enable_marker "allow-experimental-observers" || return 0
     enable_marker "enable-chat-events" || return 0
 
+    require_sha256_hex "OBELISK_CHAT_EVENTS_BINARY_SHA256" "${inherited_chat_events_binary_sha256}"
+    require_positive_integer "OBELISK_CHAT_EVENTS_DISPATCH_LIMIT" "${inherited_chat_events_dispatch_limit}"
+
     export OBELISK_ENABLE_CHAT_EVENTS=1
-    export OBELISK_CHAT_EVENTS_BINARY_SHA256="${inherited_chat_events_binary_sha256:-7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520}"
-    export OBELISK_CHAT_EVENTS_DISPATCH_LIMIT="${inherited_chat_events_dispatch_limit:-0}"
+    export OBELISK_CHAT_EVENTS_BINARY_SHA256="${inherited_chat_events_binary_sha256}"
+    export OBELISK_CHAT_EVENTS_DISPATCH_LIMIT="${inherited_chat_events_dispatch_limit}"
 }
 
 configure_chat_reflection() {

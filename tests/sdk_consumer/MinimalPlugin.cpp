@@ -130,11 +130,11 @@ namespace
 
         g_ChatMessageEventCopy = *event;
         g_ChatMessageEventAccepted =
-            event->message.data[0] == '!' &&
-            event->message.data[1] == 'p' &&
-            event->message.data[2] == 'i' &&
-            event->message.data[3] == 'n' &&
-            event->message.data[4] == 'g';
+            event->message.data[0] == 'h' &&
+            event->message.data[1] == 'e' &&
+            event->message.data[2] == 'l' &&
+            event->message.data[3] == 'l' &&
+            event->message.data[4] == 'o';
     }
 
     bool HasProcessEventHandleApi(const ObeliskApi* api)

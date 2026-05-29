@@ -70,6 +70,12 @@ priorities, and do not use history files as the active source of truth.
   core-first release gate but does not promote GObjects, ResourceHandle, identity,
   mutation, return overrides, raw params, player/item/inventory identity, or public
   Inventory/StructureEvents SDK surfaces.
+- The minimal copied `ChatMessageEvent` RC surface is backed by
+  `chat-message-intake`; second-source comparison accepted
+  `ShooterPlayerController.ServerSendChatMessage` in
+  `/servidor/ark/workspace-offline/chat-message-intake-20260529T000000Z/readiness-report.json`.
+  It still needs isolated `arkserver2` delivery validation before publication as a public
+  milestone.
 - Dino, buff, mission, and tribe compact intakes are layout evidence only. Use
   `docs/research/2026-05-29-dino-compact-second-source-readiness.md`,
   `docs/research/2026-05-29-buff-compact-second-source-result.md`, and
@@ -121,7 +127,7 @@ priorities, and do not use history files as the active source of truth.
   research-evidence slices.
 - Do not promote post-RC work into the RC: ResourceHandle, GNames/GObjects promotion, full
   UE4 reflection, public Inventory SDK, public StructureEvents, chat APIs beyond minimal
-  `ChatMessageEvent`, player/tribe/dino/buff/transfer APIs, mutation, return overrides,
+  copied `ChatMessageEvent`, player/tribe/dino/buff/transfer APIs, mutation, return overrides,
   public `CallProcessEvent`, background worker plugins, operator lifecycle commands, and
   ScriptStruct/transfer promotion remain blocked unless a later focused gate changes
   scope.

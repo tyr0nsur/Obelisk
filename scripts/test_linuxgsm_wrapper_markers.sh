@@ -173,17 +173,45 @@ expect_wrapper_failure chat-events-marker-stable-profile env \
     OBELISK_ROOT="${root_chat_events}" \
     OBELISK_WRAPPER_CAPTURE="${TMP_DIR}/chat-events-marker-stable-profile.env" \
     "${WRAPPER}" TheIsland?listen
+expect_wrapper_failure chat-events-marker-without-explicit-budget env \
+    OBELISK_ROOT="${root_chat_events}" \
+    OBELISK_WRAPPER_CAPTURE="${TMP_DIR}/chat-events-marker-without-explicit-budget.env" \
+    OBELISK_WRAPPER_PROFILE=observer-debug \
+    "${WRAPPER}" TheIsland?listen
+expect_wrapper_failure chat-events-marker-with-zero-budget env \
+    OBELISK_ROOT="${root_chat_events}" \
+    OBELISK_WRAPPER_CAPTURE="${TMP_DIR}/chat-events-marker-with-zero-budget.env" \
+    OBELISK_WRAPPER_PROFILE=observer-debug \
+    OBELISK_CHAT_EVENTS_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
+    OBELISK_CHAT_EVENTS_DISPATCH_LIMIT=0 \
+    "${WRAPPER}" TheIsland?listen
+expect_wrapper_failure chat-events-marker-with-padded-zero-budget env \
+    OBELISK_ROOT="${root_chat_events}" \
+    OBELISK_WRAPPER_CAPTURE="${TMP_DIR}/chat-events-marker-with-padded-zero-budget.env" \
+    OBELISK_WRAPPER_PROFILE=observer-debug \
+    OBELISK_CHAT_EVENTS_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
+    OBELISK_CHAT_EVENTS_DISPATCH_LIMIT=00 \
+    "${WRAPPER}" TheIsland?listen
+expect_wrapper_failure chat-events-marker-with-invalid-sha env \
+    OBELISK_ROOT="${root_chat_events}" \
+    OBELISK_WRAPPER_CAPTURE="${TMP_DIR}/chat-events-marker-with-invalid-sha.env" \
+    OBELISK_WRAPPER_PROFILE=observer-debug \
+    OBELISK_CHAT_EVENTS_BINARY_SHA256=bad-chat-events-sha \
+    OBELISK_CHAT_EVENTS_DISPATCH_LIMIT=1 \
+    "${WRAPPER}" TheIsland?listen
 (
     cd "${RUN_CWD}"
     OBELISK_ROOT="${root_chat_events}" \
     OBELISK_WRAPPER_CAPTURE="${capture_chat_events}" \
     OBELISK_WRAPPER_PROFILE=observer-debug \
+    OBELISK_CHAT_EVENTS_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
+    OBELISK_CHAT_EVENTS_DISPATCH_LIMIT=1 \
     "${WRAPPER}" TheIsland?listen
 )
 
 assert_contains "${capture_chat_events}" '^OBELISK_ENABLE_CHAT_EVENTS=1$'
 assert_contains "${capture_chat_events}" '^OBELISK_CHAT_EVENTS_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520$'
-assert_contains "${capture_chat_events}" '^OBELISK_CHAT_EVENTS_DISPATCH_LIMIT=0$'
+assert_contains "${capture_chat_events}" '^OBELISK_CHAT_EVENTS_DISPATCH_LIMIT=1$'
 assert_not_contains "${capture_chat_events}" '^OBELISK_ENABLE_CHAT_REFLECTION='
 assert_not_contains "${capture_chat_events}" '^OBELISK_CHAT_REFLECTION_BINARY_SHA256='
 assert_not_contains "${capture_chat_events}" '^OBELISK_CHAT_REFLECTION_LOG_LIMIT='
