@@ -110,12 +110,18 @@ detail in `HISTORY-*.md`.
 - Reconcile the GObjects coherent field window before promoting beyond
   binary-hash-scoped research candidate status.
 - Keep ResourceHandle blocked on current evaluator output and
-  `uobject_flags_validity_semantics_unproven`; do not spend more broad core-scan rounds
-  there unless a new artifact likely contains negative flag samples. The next useful
-  ResourceHandle task is static/decompiler evidence for weak-helper flag polarity.
+  `uobject_flags_validity_semantics_unproven`. Broad core-scan rounds are low value unless
+  a new artifact likely contains negative flag samples. Static weak-helper evidence now
+  refines `0x100` as invalid and `0x4000` as strict-mode invalid, but public handles still
+  need named lifetime semantics, more Ghidra helper/caller windows, and a fail-closed
+  runtime policy.
 - Inventory hardening now requires exact per-target `FunctionFlags` for
   `PrimalItem.CanUse` and `PrimalItem.AllowRemoteAddToInventory`, plus copied bool ranges
   only. Do not promote public Inventory SDK, identity, mutation, or return override.
+- Runtime hardening should resolve fallback teardown ordering for `EventManager`,
+  `StructureEventDispatcher`, `InventoryPolicyEventDispatcher`, and chat cleanup before
+  relying on plugin cleanup from C++ static destruction. Prefer explicit shutdown, but do
+  not leave destructible function-local STL registries on fallback cleanup paths.
 - After inventory hardening, mission is the next clean internal module candidate as a
   reduced copied-scalar observer. Tribe and transfer wait behind higher identity/payload
   risk.

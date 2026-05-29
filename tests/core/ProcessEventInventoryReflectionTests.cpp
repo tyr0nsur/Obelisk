@@ -476,20 +476,31 @@ namespace
         Require(event.View.Scalars[1].BoolValue, "return value mismatch");
     }
 
-    void TestDispatchesCopiedInventoryPolicyEventThroughInternalDispatcher()
+    Attempt BuildMatchedAttempt(InventoryFixture& fixture, int32_t nameIndex)
     {
-        InventoryFixture fixture;
-        BuildCanUse(fixture);
-        fixture.Params[0x00] = 0;
-        fixture.Params[0x01] = 1;
-
         Attempt attempt = TryIdentifyInvocation(
             EnabledGate(),
-            kCanUseNameIndex,
+            nameIndex,
             fixture.Reader(),
             fixture.Function.data(),
             fixture.Params.data());
         Require(attempt.Status == AttemptStatus::Matched, attempt.Result.Reason.c_str());
+        return attempt;
+    }
+
+    void TestDispatchesCopiedInventoryPolicyEventsThroughInternalDispatcher()
+    {
+        InventoryFixture canUseFixture;
+        BuildCanUse(canUseFixture);
+        canUseFixture.Params[0x00] = 0;
+        canUseFixture.Params[0x01] = 1;
+        Attempt canUseAttempt = BuildMatchedAttempt(canUseFixture, kCanUseNameIndex);
+
+        InventoryFixture remoteAddFixture;
+        BuildAllowRemoteAdd(remoteAddFixture);
+        remoteAddFixture.Params[0x10] = 1;
+        remoteAddFixture.Params[0x11] = 0;
+        Attempt remoteAddAttempt = BuildMatchedAttempt(remoteAddFixture, kAllowRemoteAddToInventoryNameIndex);
 
         int owner = 0;
         std::vector<CapturedInventoryPolicyEvent> captured;
@@ -498,14 +509,22 @@ namespace
             Obelisk::Core::InventoryPolicyEventSubscription{CaptureInventoryPolicyEvent, &captured});
         Require(registrationId != 0, "failed to register inventory policy event callback");
 
-        Require(MaybeDispatchCopiedInventoryPolicyEventAfterOriginal(false, attempt.Invocation) == 0,
+        Require(MaybeDispatchCopiedInventoryPolicyEventAfterOriginal(false, canUseAttempt.Invocation) == 0,
                 "blocked original ProcessEvent still dispatched inventory policy event");
         Require(captured.empty(), "blocked original ProcessEvent reached inventory policy callback");
-        Require(MaybeDispatchCopiedInventoryPolicyEventAfterOriginal(true, attempt.Invocation) == 1,
+        Require(MaybeDispatchCopiedInventoryPolicyEventAfterOriginal(true, canUseAttempt.Invocation) == 1,
                 "post-original inventory policy event did not dispatch");
+        canUseFixture.Params[0x00] = 1;
+        canUseFixture.Params[0x01] = 0;
+
+        Require(MaybeDispatchCopiedInventoryPolicyEventAfterOriginal(true, remoteAddAttempt.Invocation) == 1,
+                "post-original remote-add inventory policy event did not dispatch");
+        remoteAddFixture.Params[0x10] = 0;
+        remoteAddFixture.Params[0x11] = 1;
+
         Obelisk::Core::InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(&owner);
 
-        Require(captured.size() == 1, "captured inventory policy event count mismatch");
+        Require(captured.size() == 2, "captured inventory policy event count mismatch");
         Require(captured[0].Kind == Obelisk::Core::InventoryPolicyEventKind::CanUse,
                 "dispatched CanUse kind mismatch");
         Require(captured[0].Scalars.size() == 2, "dispatched CanUse scalar count mismatch");
@@ -515,6 +534,16 @@ namespace
         Require(captured[0].Scalars[1].Field == Obelisk::Core::InventoryPolicyScalarField::ReturnValue,
                 "dispatched return field mismatch");
         Require(captured[0].Scalars[1].BoolValue, "dispatched return value mismatch");
+
+        Require(captured[1].Kind == Obelisk::Core::InventoryPolicyEventKind::AllowRemoteAddToInventory,
+                "dispatched AllowRemoteAddToInventory kind mismatch");
+        Require(captured[1].Scalars.size() == 2, "dispatched remote-add scalar count mismatch");
+        Require(captured[1].Scalars[0].Field == Obelisk::Core::InventoryPolicyScalarField::BRequestedByPlayer,
+                "dispatched bRequestedByPlayer field mismatch");
+        Require(captured[1].Scalars[0].BoolValue, "dispatched bRequestedByPlayer value was not copied");
+        Require(captured[1].Scalars[1].Field == Obelisk::Core::InventoryPolicyScalarField::ReturnValue,
+                "dispatched remote-add return field mismatch");
+        Require(!captured[1].Scalars[1].BoolValue, "dispatched remote-add return value was not copied");
     }
 }
 
@@ -528,7 +557,7 @@ int main()
     TestIdentifiesAllowRemoteAddWithoutObjectRanges();
     TestBuildsCopiedInventoryPolicyEventWithoutObjectFields();
     TestBuildsCopiedInventoryPolicyEventForCanUse();
-    TestDispatchesCopiedInventoryPolicyEventThroughInternalDispatcher();
+    TestDispatchesCopiedInventoryPolicyEventsThroughInternalDispatcher();
 
     std::cout << "ProcessEventInventoryReflectionTests passed\n";
     return 0;

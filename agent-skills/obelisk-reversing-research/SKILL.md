@@ -78,6 +78,11 @@ Own these areas:
   further broad scans are low value unless a new artifact likely contains destroyed or
   pending objects; resolve the blocker through static/decompiler semantics or targeted
   negative samples instead.
+- Bounded static helper/caller evidence now refines `UObject+0x8` flag polarity for the
+  current hash: reviewed weak-handle helpers treat `0x100` as invalid and treat `0x4000`
+  as invalid in strict variants, with at least one helper mode that may tolerate `0x4000`.
+  This is internal revalidation evidence only; public `ResourceHandle` remains blocked on
+  named lifetime semantics and a fail-closed runtime policy.
 - `minimal-second-source-intake` has accepted offline second-source UFunction layout
   evidence from
   `/servidor/ark/workspace-offline/minimal-second-source-intake-direct-20260529T033919Z`:

@@ -34,6 +34,7 @@ Post-RC/research candidates:
 - [2026-05-29-resource-handle-revalidation-evaluator.md](2026-05-29-resource-handle-revalidation-evaluator.md)
 - [2026-05-29-resource-handle-nonzero-revalidation.md](2026-05-29-resource-handle-nonzero-revalidation.md)
 - [2026-05-29-uobject-flags-fullscan.md](2026-05-29-uobject-flags-fullscan.md)
+- [2026-05-29-weak-helper-flag-polarity.md](2026-05-29-weak-helper-flag-polarity.md)
 - [2026-05-29-offline-evidence-canonicality.md](2026-05-29-offline-evidence-canonicality.md)
 - [2026-05-29-plugin-loader-bootstrap-state.md](2026-05-29-plugin-loader-bootstrap-state.md)
 - [2026-05-29-resource-identity-feasibility.md](2026-05-29-resource-identity-feasibility.md)
@@ -105,6 +106,7 @@ when a task explicitly targets that module.
 | [2026-05-29-ghidra-fuobjectarray-field-window-probe.md](2026-05-29-ghidra-fuobjectarray-field-window-probe.md) | Bounded Ghidra/r2 FUObjectArray probe | Records redacted internal evidence that the static GObjects candidate and serial accessors share one coherent field-window hypothesis for the current ARK binary hash. |
 | [2026-05-29-resource-handle-nonzero-revalidation.md](2026-05-29-resource-handle-nonzero-revalidation.md) | ResourceHandle nonzero serial revalidation | Records `32/32` accepted offline samples with `32` nonzero serial candidates and proven GObjects field coherence, while keeping public ResourceHandle blocked on `uobject_flags_validity_semantics_unproven`. |
 | [2026-05-29-uobject-flags-fullscan.md](2026-05-29-uobject-flags-fullscan.md) | UObject flags fullscan | Records full copied-core scans with thousands of nonzero serial candidates, zero `InternalIndex` mismatches, and no `0x100`/`0x4000` mask-positive samples, refining the ResourceHandle blocker. |
+| [2026-05-29-weak-helper-flag-polarity.md](2026-05-29-weak-helper-flag-polarity.md) | Weak helper flag polarity | Refines `UObject+0x8` validity semantics from bounded static helper/caller evidence while keeping public ResourceHandle blocked. |
 | [2026-05-29-offline-evidence-canonicality.md](2026-05-29-offline-evidence-canonicality.md) | Offline evidence canonicality | Marks stale ResourceHandle evaluator output, dry-run plans, and duplicate GObjects reports so future rounds do not use them as independent promotion evidence. |
 | [2026-05-29-plugin-loader-bootstrap-state.md](2026-05-29-plugin-loader-bootstrap-state.md) | Plugin loader bootstrap state | Records the `LD_PRELOAD` static-state crash found during `oChatLogger` validation and the process-lifetime registry rule for plugin lifecycle state. |
 | [2026-05-29-buff-compact-second-source-result.md](2026-05-29-buff-compact-second-source-result.md) | Buff compact second-source result | Records accepted second-source layout evidence for the three-target buff compact intake without promoting a public Buff SDK. |

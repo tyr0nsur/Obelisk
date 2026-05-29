@@ -9,6 +9,8 @@ Record the runtime crash found while validating the experimental `oChatLogger` p
 
 - Instance id: `arkserver2`
 - Map: `TheIsland`
+- Obelisk commit: `fa3cef7`
+- ARK binary: `/home/flowcommunity-ark/obelisk-artifacts/offline-binaries/7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520/ShooterGameServer`
 - ARK binary hash: `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`
 - Runtime mode: `OBELISK_WRAPPER_PROFILE=observer-debug`
 - Plugin state: `oChatLogger` enabled only for `arkserver2`
