@@ -24,6 +24,8 @@ namespace
     constexpr int32_t kBRequestedByPlayerNameIndex = 18796;
     constexpr int32_t kReturnValueNameIndex = 17716;
     constexpr int32_t kBIgnoreCooldownNameIndex = 18814;
+    constexpr uint32_t kAllowRemoteAddToInventoryFunctionFlags = 0x04020400;
+    constexpr uint32_t kCanUseFunctionFlags = 0x54020400;
 
     struct Region
     {
@@ -162,6 +164,7 @@ namespace
 
     void BuildFunction(InventoryFixture& fixture,
                        int32_t functionNameIndex,
+                       uint32_t functionFlags,
                        uint16_t numParms,
                        uint16_t parmsSize,
                        uint16_t returnValueOffset,
@@ -193,7 +196,6 @@ namespace
                           fields[i].ElementSize);
         }
 
-        const uint32_t functionFlags = 0x204000;
         WriteAt(fixture.Function, 0x38, fixture.PropertyA.data());
         WriteAt(fixture.Function, 0x90, functionFlags);
         WriteAt(fixture.Function, 0x96, numParms);
@@ -205,6 +207,7 @@ namespace
     {
         BuildFunction(fixture,
                       kCanUseNameIndex,
+                      kCanUseFunctionFlags,
                       2,
                       0x02,
                       0x01,
@@ -220,6 +223,7 @@ namespace
     {
         BuildFunction(fixture,
                       kAllowRemoteAddToInventoryNameIndex,
+                      kAllowRemoteAddToInventoryFunctionFlags,
                       4,
                       0x12,
                       0x11,
@@ -229,6 +233,20 @@ namespace
                           {kBRequestedByPlayerNameIndex, 0x10, 0x01, fixture.BoolPropertyClass.data()},
                           {kReturnValueNameIndex, 0x11, 0x01, fixture.BoolPropertyClass.data()},
                       }});
+    }
+
+    void RequireFieldMetadata(const InventoryReflection::InventoryFieldRange& field,
+                              InventoryReflection::InventoryField expectedField,
+                              int32_t expectedNameIndex,
+                              int32_t expectedOffset,
+                              size_t expectedSize,
+                              bool expectedExposesRange)
+    {
+        Require(field.Field == expectedField, "inventory field kind mismatch");
+        Require(field.PropertyNameIndex == expectedNameIndex, "inventory field FName mismatch");
+        Require(field.Offset == expectedOffset, "inventory field offset mismatch");
+        Require(field.Size == expectedSize, "inventory field size mismatch");
+        Require(field.ExposesRange == expectedExposesRange, "inventory field exposure mismatch");
     }
 
     void TestRecognizesCanUseScalarShape()
@@ -249,12 +267,22 @@ namespace
         Require(static_cast<bool>(result), result.Reason.c_str());
         Require(invocation.Function == InventoryReflection::InventoryFunction::CanUse, "CanUse kind mismatch");
         Require(invocation.Fields.size() == 2, "CanUse field count mismatch");
-        Require(invocation.Fields[0].Field == InventoryReflection::InventoryField::BIgnoreCooldown,
-                "bIgnoreCooldown field mismatch");
+        RequireFieldMetadata(invocation.Fields[0],
+                             InventoryReflection::InventoryField::BIgnoreCooldown,
+                             kBIgnoreCooldownNameIndex,
+                             0x00,
+                             0x01,
+                             true);
         Require(invocation.Fields[0].Range.Data == fixture.Params.data(), "bIgnoreCooldown range mismatch");
-        Require(invocation.Fields[1].Field == InventoryReflection::InventoryField::ReturnValue,
-                "ReturnValue field mismatch");
+        Require(invocation.Fields[0].Range.Size == 0x01, "bIgnoreCooldown range size mismatch");
+        RequireFieldMetadata(invocation.Fields[1],
+                             InventoryReflection::InventoryField::ReturnValue,
+                             kReturnValueNameIndex,
+                             0x01,
+                             0x01,
+                             true);
         Require(invocation.Fields[1].Range.Data == fixture.Params.data() + 1, "ReturnValue range mismatch");
+        Require(invocation.Fields[1].Range.Size == 0x01, "ReturnValue range size mismatch");
     }
 
     void TestRecognizesAllowRemoteAddWithoutObjectRanges()
@@ -276,12 +304,38 @@ namespace
         Require(invocation.Function == InventoryReflection::InventoryFunction::AllowRemoteAddToInventory,
                 "AllowRemoteAddToInventory kind mismatch");
         Require(invocation.Fields.size() == 4, "AllowRemoteAddToInventory field count mismatch");
+        RequireFieldMetadata(invocation.Fields[0],
+                             InventoryReflection::InventoryField::InventoryComponent,
+                             kInvCompNameIndex,
+                             0x00,
+                             0x08,
+                             false);
         Require(invocation.Fields[0].Range.Data == nullptr, "invComp range should not be exposed");
+        RequireFieldMetadata(invocation.Fields[1],
+                             InventoryReflection::InventoryField::ByPC,
+                             kByPCNameIndex,
+                             0x08,
+                             0x08,
+                             false);
         Require(invocation.Fields[1].Range.Data == nullptr, "ByPC range should not be exposed");
+        RequireFieldMetadata(invocation.Fields[2],
+                             InventoryReflection::InventoryField::BRequestedByPlayer,
+                             kBRequestedByPlayerNameIndex,
+                             0x10,
+                             0x01,
+                             true);
         Require(invocation.Fields[2].Range.Data == fixture.Params.data() + 0x10,
                 "bRequestedByPlayer range mismatch");
+        Require(invocation.Fields[2].Range.Size == 0x01, "bRequestedByPlayer range size mismatch");
+        RequireFieldMetadata(invocation.Fields[3],
+                             InventoryReflection::InventoryField::ReturnValue,
+                             kReturnValueNameIndex,
+                             0x11,
+                             0x01,
+                             true);
         Require(invocation.Fields[3].Range.Data == fixture.Params.data() + 0x11,
                 "ReturnValue range mismatch");
+        Require(invocation.Fields[3].Range.Size == 0x01, "ReturnValue range size mismatch");
     }
 
     void TestRejectsWrongOuterAndNameNumber()
@@ -299,6 +353,20 @@ namespace
                 fixture.Params.data(),
                 invocation);
             Require(result.Status == ReadStatus::Implausible, "wrong outer was accepted");
+        }
+        {
+            InventoryFixture fixture;
+            BuildCanUse(fixture);
+            WriteObject(fixture.Outer, kPrimalItemNameIndex, kPrimalItemNameIndex, nullptr, nullptr, 1);
+
+            InventoryReflection::InventoryInvocation invocation;
+            ReadResult result = InventoryReflection::TryIdentifyInventoryInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "numbered outer FName was accepted");
         }
         {
             InventoryFixture fixture;
@@ -326,6 +394,34 @@ namespace
         {
             InventoryFixture fixture;
             BuildCanUse(fixture);
+            WriteAt(fixture.Function, 0x90, uint32_t{kCanUseFunctionFlags ^ 0x400});
+
+            InventoryReflection::InventoryInvocation invocation;
+            ReadResult result = InventoryReflection::TryIdentifyInventoryInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "wrong FunctionFlags were accepted");
+        }
+        {
+            InventoryFixture fixture;
+            BuildCanUse(fixture);
+            WriteAt(fixture.Function, 0x96, uint16_t{3});
+
+            InventoryReflection::InventoryInvocation invocation;
+            ReadResult result = InventoryReflection::TryIdentifyInventoryInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "wrong NumParms was accepted");
+        }
+        {
+            InventoryFixture fixture;
+            BuildCanUse(fixture);
             WriteAt(fixture.Function, 0x98, uint16_t{0x03});
 
             InventoryReflection::InventoryInvocation invocation;
@@ -336,6 +432,26 @@ namespace
                 fixture.Params.data(),
                 invocation);
             Require(result.Status == ReadStatus::Implausible, "wrong ParmsSize was accepted");
+        }
+        {
+            InventoryFixture fixture;
+            BuildCanUse(fixture);
+            WriteProperty(fixture.PropertyA,
+                          fixture.PropertyB.data(),
+                          fixture.Function.data(),
+                          fixture.BoolPropertyClass.data(),
+                          kReturnValueNameIndex,
+                          0x00,
+                          0x01);
+
+            InventoryReflection::InventoryInvocation invocation;
+            ReadResult result = InventoryReflection::TryIdentifyInventoryInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "wrong first property FName was accepted");
         }
         {
             InventoryFixture fixture;

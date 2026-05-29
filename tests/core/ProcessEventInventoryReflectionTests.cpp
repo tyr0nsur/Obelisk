@@ -26,6 +26,8 @@ namespace
     constexpr int32_t kBRequestedByPlayerNameIndex = 18796;
     constexpr int32_t kReturnValueNameIndex = 17716;
     constexpr int32_t kBIgnoreCooldownNameIndex = 18814;
+    constexpr uint32_t kAllowRemoteAddToInventoryFunctionFlags = 0x04020400;
+    constexpr uint32_t kCanUseFunctionFlags = 0x54020400;
 
     struct Region
     {
@@ -180,6 +182,7 @@ namespace
 
     void BuildFunction(InventoryFixture& fixture,
                        int32_t functionNameIndex,
+                       uint32_t functionFlags,
                        uint16_t numParms,
                        uint16_t parmsSize,
                        uint16_t returnValueOffset,
@@ -211,7 +214,6 @@ namespace
                           fields[i].ElementSize);
         }
 
-        const uint32_t functionFlags = 0x204000;
         WriteAt(fixture.Function, 0x38, fixture.PropertyA.data());
         WriteAt(fixture.Function, 0x90, functionFlags);
         WriteAt(fixture.Function, 0x96, numParms);
@@ -223,6 +225,7 @@ namespace
     {
         BuildFunction(fixture,
                       kCanUseNameIndex,
+                      kCanUseFunctionFlags,
                       2,
                       0x02,
                       0x01,
@@ -238,6 +241,7 @@ namespace
     {
         BuildFunction(fixture,
                       kAllowRemoteAddToInventoryNameIndex,
+                      kAllowRemoteAddToInventoryFunctionFlags,
                       4,
                       0x12,
                       0x11,

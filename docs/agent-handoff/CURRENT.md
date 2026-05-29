@@ -99,10 +99,15 @@ detail in `HISTORY-*.md`.
 - Reconcile the GObjects coherent field window before promoting beyond
   binary-hash-scoped research candidate status.
 - Keep ResourceHandle blocked on current evaluator output and
-  `uobject_flags_validity_semantics_unproven`.
-- For utility after the core RC, the fastest safe path is internal copied-scalar inventory
-  observation from the accepted minimal target set; if choosing a new module, mission is
-  the cleanest next candidate. Tribe and transfer wait behind higher identity/payload risk.
+  `uobject_flags_validity_semantics_unproven`; do not spend more broad core-scan rounds
+  there unless a new artifact likely contains negative flag samples. The next useful
+  ResourceHandle task is static/decompiler evidence for weak-helper flag polarity.
+- Inventory hardening now requires exact per-target `FunctionFlags` for
+  `PrimalItem.CanUse` and `PrimalItem.AllowRemoteAddToInventory`, plus copied bool ranges
+  only. Do not promote public Inventory SDK, identity, mutation, or return override.
+- After inventory hardening, mission is the next clean internal module candidate as a
+  reduced copied-scalar observer. Tribe and transfer wait behind higher identity/payload
+  risk.
 - Keep ignored local artifacts, logs, build output, pycache, raw cores, dumps, generated
   reports, and server config unstaged.
 

@@ -95,8 +95,11 @@ metadata.
     `GameplayPolicyEvent` ABI, but only through copied/redacted POD scalars.
   - `ue/InventoryReflection` is internal recognizer only. A future runtime observer must
     require `allow-experimental-observers`, `enable-inventory-reflection`, exact `CanUse`
-    / `AllowRemoteAddToInventory` FName prefiltering before budget reservation, and no
-    return override or gameplay mutation.
+    / `AllowRemoteAddToInventory` FName prefiltering before budget reservation, exact
+    per-target `FunctionFlags` for the supported binary, and no return override or
+    gameplay mutation. Current copied-scalar fields are `CanUse.bIgnoreCooldown`,
+    `CanUse.ReturnValue`, `AllowRemoteAddToInventory.bRequestedByPlayer`, and
+    `AllowRemoteAddToInventory.ReturnValue`; object fields stay redacted.
   - `ue/BuffReflection` has accepted `buff-compact-intake` layout evidence for three
     compact targets, but remains an offline/internal recognizer track only. Keep buff
     hooks, callbacks, return overrides, raw object/class exposure, and gameplay mutation
@@ -108,10 +111,11 @@ metadata.
     This is internal layout evidence only; no public Dino SDK/API, runtime observer,
     object identity, mutation, return override, or resource-handle behavior is promoted.
   - `mission-compact-intake` and `tribe-compact-intake` now have accepted offline
-    second-source layout evidence. Mission is the next cleaner module candidate after
-    current gameplay policy work; tribe requires a reduced scalar subset before public
-    consideration. Keep player/tribe identity, arrays, strings, object pointers, mutation,
-    return override, and public Mission/Tribe SDK surfaces blocked.
+    second-source layout evidence. Mission is the next cleaner internal module candidate
+    after inventory hardening, but only as a reduced copied-scalar observer; tribe requires
+    a reduced scalar subset before public consideration. Keep player/tribe/mission
+    identity, arrays, strings, object pointers, mutation, return override, and public
+    Mission/Tribe SDK surfaces blocked.
   - Use the same gates for future dinos, tribes, missions, transfers, admin, and item
     recognizers: exact metadata shape, candidate-only fixtures, no mutation, no raw UE
     pointer exposure, and no public callbacks before ABI/lifetime policy.

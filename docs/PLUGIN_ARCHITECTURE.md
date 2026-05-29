@@ -301,7 +301,7 @@ event-kind mask, and a process-local owner-token handle; shutdown must call
 `bool_values`, and `int32_values`: return values, variant index, force-set, force,
 requested-by-player, and ignore-cooldown where the backing target contains them. Pincode
 values, player identity, character identity, structure identity, inventory identity, item
-identity, raw params, FName/GObjects indices, and all UE pointers remain redacted.
+identity, raw params, FName/GNames/GObjects indices, and all UE pointers remain redacted.
 `STRUCTURE_PIN_CODE_CHECK` is ReturnValue-only; plugins that do not want that timing
 signal should omit its event-kind mask. Inventory-backed policy events are still generic
 policy events under the same callback family. They use
@@ -324,9 +324,9 @@ descriptor for known categories with supported event/field masks and explicit
 category-only/no-identity/no-lookup flags. Plugins must check the resource descriptor
 capability bit, that `struct_size` covers the appended `DescribeResourceKind` slot, and
 that the function pointer is non-null before calling it. Do not add `GetResource`,
-`ResolveResource`, `ResourceHandle`, pointer-derived IDs, GObjects-derived IDs, or object
-mutation APIs until a later promotion gate defines identity stability, privacy, lifecycle,
-and cross-instance semantics.
+`ResolveResource`, `ResourceHandle`, pointer-derived IDs, GNames/GObjects-derived IDs, or
+object mutation APIs until a later promotion gate defines identity stability, privacy,
+lifecycle, and cross-instance semantics.
 
 `DescribeGameplayPolicyEventKind` is the matching event-kind metadata helper. It returns
 copied POD descriptors for promoted `GameplayPolicyEvent` kinds: stable event name,

@@ -26,6 +26,11 @@ PUBLIC_DOC_FILES = [
     REPO_ROOT / "docs" / "oBaseEvents.md",
     REPO_ROOT / ".github" / "pull_request_template.md",
 ]
+PUBLIC_RELEASE_SCOPE_DOC_FILES = [
+    REPO_ROOT / "docs" / "PLUGIN_ARCHITECTURE.md",
+    REPO_ROOT / "docs" / "RELEASE.md",
+    REPO_ROOT / "docs" / "STATUS.md",
+]
 V010_CORE_API_CAPABILITY_ALLOWLIST = [
     "OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS",
     "OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS",
@@ -84,8 +89,10 @@ UNPROMOTED_IDENTITY_SURFACE_TOKENS = (
     "ResourceHandle",
     "GetResource",
     "ResolveResource",
+    "GObject",
     "GObjects",
     "GUObjectArray",
+    "GName",
     "GNames",
 )
 
@@ -254,6 +261,60 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         for term in required_terms:
             self.assertIn(term, text)
+
+    def test_release_scope_docs_keep_inventory_reflection_boundary_explicit(self) -> None:
+        required_terms = (
+            "GameplayPolicyEvent",
+            "Inventory SDK",
+            "ResourceHandle",
+            "GNames",
+            "GObjects",
+            "identity",
+            "mutation",
+            "return override",
+        )
+
+        for path in PUBLIC_RELEASE_SCOPE_DOC_FILES:
+            text = path.read_text(encoding="utf-8")
+            with self.subTest(path=path.relative_to(REPO_ROOT)):
+                for term in required_terms:
+                    self.assertIn(term, text)
+
+    def test_public_sdk_headers_have_no_inventory_identity_mutation_or_override_api(self) -> None:
+        forbidden = (
+            "OBELISK_API_CAPABILITY_INVENTORY_EVENTS",
+            "OBELISK_API_CAPABILITY_INVENTORY_POLICY_EVENTS",
+            "OBELISK_API_CAPABILITY_RESOURCE_HANDLES",
+            "ObeliskInventory",
+            "ObeliskInventoryItem",
+            "ObeliskResourceHandle",
+            "ResourceHandle",
+            "GetResource",
+            "ResolveResource",
+            "GetInventory",
+            "ResolveInventory",
+            "MutateInventory",
+            "SetInventory",
+            "OverrideInventory",
+            "OverrideReturn",
+            "ReturnOverride",
+            "GObject",
+            "GObjects",
+            "GUObjectArray",
+            "GName",
+            "GNames",
+        )
+        offenders: list[str] = []
+
+        for path in (REPO_ROOT / "include" / "obelisk").rglob("*"):
+            if not path.is_file() or path.suffix not in {".h", ".hpp"}:
+                continue
+            text = strip_c_comments(path.read_text(encoding="utf-8"))
+            for token in forbidden:
+                if token in text:
+                    offenders.append(f"{path.relative_to(REPO_ROOT)}: {token}")
+
+        self.assertEqual(offenders, [])
 
     def test_public_gameplay_event_manifest_has_no_undeclared_public_event_capabilities(self) -> None:
         manifest = json.loads(PUBLIC_GAMEPLAY_EVENTS_MANIFEST.read_text(encoding="utf-8"))

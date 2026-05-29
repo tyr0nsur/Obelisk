@@ -21,6 +21,8 @@ namespace Obelisk::UE::InventoryReflection
         constexpr int32_t kReturnValueNameIndex = 17716;
         constexpr int32_t kBIgnoreCooldownNameIndex = 18814;
 
+        constexpr uint32_t kAllowRemoteAddToInventoryFunctionFlags = 0x04020400;
+        constexpr uint32_t kCanUseFunctionFlags = 0x54020400;
         constexpr size_t kObjectPropertySize = 0x8;
         constexpr size_t kBoolPropertySize = 0x1;
         constexpr int32_t kAnyObjectIndex = -1;
@@ -41,6 +43,7 @@ namespace Obelisk::UE::InventoryReflection
             InventoryFunction Function;
             int32_t NameIndex;
             int32_t OuterNameIndex;
+            uint32_t FunctionFlags;
             uint16_t NumParms;
             uint16_t ParmsSize;
             uint16_t ReturnValueOffset;
@@ -100,6 +103,7 @@ namespace Obelisk::UE::InventoryReflection
             InventoryFunction::AllowRemoteAddToInventory,
             kAllowRemoteAddToInventoryNameIndex,
             kPrimalItemNameIndex,
+            kAllowRemoteAddToInventoryFunctionFlags,
             4,
             0x12,
             0x11,
@@ -111,6 +115,7 @@ namespace Obelisk::UE::InventoryReflection
             InventoryFunction::CanUse,
             kCanUseNameIndex,
             kPrimalItemNameIndex,
+            kCanUseFunctionFlags,
             2,
             0x02,
             0x01,
@@ -152,6 +157,9 @@ namespace Obelisk::UE::InventoryReflection
                 function.Object.NamePrivate.Number != 0)
                 return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
                                                            "UFunction FName does not match inventory spec");
+            if (function.FunctionFlags != spec.FunctionFlags)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                           "inventory UFunction FunctionFlags mismatch");
             if (function.NumParms != spec.NumParms)
                 return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
                                                            "inventory UFunction NumParms mismatch");
