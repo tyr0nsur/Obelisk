@@ -16,8 +16,12 @@ identity or exposing runtime handles.
 
 ## Evidence
 
-The Ghidra run used `-noanalysis` and a temporary script that created functions only at
-the bounded target windows. Raw output stayed under `/tmp`.
+The Ghidra run used `-noanalysis` and
+`scripts/ghidra/DumpFuObjectArrayWindows.java`, which creates functions only at the
+bounded target windows. The script emits `script_version`, `program`, `language`,
+`image_base`, `window_count`, and one `window_spec` line per bounded range before any
+decompiler/disassembly output, so archived stdout records the exact replay window set.
+Raw output stayed under `/tmp`.
 
 Observed shape:
 
@@ -63,6 +67,18 @@ SHA. The static global promotion gate still remains `ready=false` with
 Validation:
 
 ```bash
+OUT=/tmp/obelisk-guobjectarray-field-window-ghidra-20260529
+BIN=/servidor/ark/workspace-offline/vanilla-gdb-arkserver2-TheIsland-20260529T012853Z/raw/ShooterGameServer
+mkdir -p "$OUT/raw" "$OUT/ghidra-project"
+analyzeHeadless "$OUT/ghidra-project" ObeliskGObjectsFieldWindow \
+  -import "$BIN" \
+  -scriptPath scripts/ghidra \
+  -postScript DumpFuObjectArrayWindows.java \
+  -noanalysis \
+  -deleteProject \
+  > "$OUT/raw/ghidra-headless.stdout" \
+  2> "$OUT/raw/ghidra-headless.stderr"
+
 python3 scripts/test_convert_fuobjectarray_field_window_probe.py
 python3 scripts/test_build_static_global_promotion_evidence.py
 ```

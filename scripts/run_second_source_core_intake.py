@@ -22,6 +22,7 @@ DEFAULT_FNAME_INDICES = (
     "ServerChat=9619",
     "SetActiveMissionDebugFlags=9622",
 )
+DEFAULT_FNAME_INDEX_LABELS = frozenset(item.split("=", 1)[0] for item in DEFAULT_FNAME_INDICES)
 DEFAULT_GOBJECTS_SAMPLE_INDICES = ("0", "1", "25447")
 DEFAULT_TARGET_SET = "minimal-second-source-intake"
 DEFAULT_BASE_ROOT = "tests/fixtures/ufunction_snapshots"
@@ -143,8 +144,14 @@ def is_relative_to(path: Path, root: Path) -> bool:
 
 
 def is_approved_offline_workspace_path(path: Path) -> bool:
+    expanded = path.expanduser()
     resolved = path.resolve()
-    return any(is_relative_to(resolved, root.resolve()) for root in APPROVED_OFFLINE_WORKSPACE_ROOTS)
+    return any(
+        expanded.is_absolute()
+        and is_relative_to(expanded, root)
+        and is_relative_to(resolved, root.resolve())
+        for root in APPROVED_OFFLINE_WORKSPACE_ROOTS
+    )
 
 
 def reject_protected_output_path(path: str, label: str) -> None:
@@ -154,7 +161,7 @@ def reject_protected_output_path(path: str, label: str) -> None:
             raise SystemExit(f"{label} must not write under protected server root {root}: {expanded}")
     candidate = expanded.resolve()
     for root in PROTECTED_OUTPUT_ROOTS:
-        if is_relative_to(candidate, root.resolve()) and not is_approved_offline_workspace_path(candidate):
+        if is_relative_to(candidate, root.resolve()) and not is_approved_offline_workspace_path(expanded):
             raise SystemExit(f"{label} must not write under protected server root {root}: {candidate}")
 
 
@@ -165,7 +172,7 @@ def reject_protected_input_path(path: str, label: str) -> None:
             raise SystemExit(f"{label} must not read from protected server root {root}: {expanded}")
     candidate = expanded.resolve()
     for root in PROTECTED_OUTPUT_ROOTS:
-        if is_relative_to(candidate, root.resolve()) and not is_approved_offline_workspace_path(candidate):
+        if is_relative_to(candidate, root.resolve()) and not is_approved_offline_workspace_path(expanded):
             raise SystemExit(f"{label} must not read from protected server root {root}: {candidate}")
 
 
@@ -177,6 +184,18 @@ def parse_nonnegative_int(value: str, label: str) -> int:
     if parsed < 0:
         raise SystemExit(f"{label} must be non-negative: {value}")
     return parsed
+
+
+def merged_fname_indices(extra_indices: list[str]) -> list[str]:
+    merged = list(DEFAULT_FNAME_INDICES)
+    seen_labels = set(DEFAULT_FNAME_INDEX_LABELS)
+    for item in extra_indices:
+        label, _index = parse_labeled_index(item, "--fname-index")
+        if label in seen_labels:
+            raise SystemExit(f"--fname-index duplicates required FName clue: {label}")
+        seen_labels.add(label)
+        merged.append(item)
+    return merged
 
 
 def validate_unlabeled_address(value: str | None, label: str) -> None:
@@ -195,6 +214,17 @@ def validate_fname_index(value: str) -> None:
         parse_nonnegative_int(raw_index, "--fname-index")
         return
     parse_nonnegative_int(value, "--fname-index")
+
+
+def parse_labeled_index(value: str, label: str) -> tuple[str, int]:
+    if "=" in value:
+        name, raw_index = value.split("=", 1)
+        name = name.strip()
+        if not name:
+            raise SystemExit(f"{label} label must not be empty")
+        return name, parse_nonnegative_int(raw_index, label)
+    index = parse_nonnegative_int(value, label)
+    return f"fname_{index}", index
 
 
 def preflight_execute(args: argparse.Namespace) -> None:
@@ -265,7 +295,7 @@ def build_commands(args: argparse.Namespace) -> list[list[str]]:
     root_validation_pack_dir = str(Path(pack_dir) / "fname-root-validation")
     sample_pack_dir = str(Path(pack_dir) / "gobjects-sampling")
     manifest = str(Path(sample_pack_dir) / "manifest.json")
-    fname_indices = args.fname_index or list(DEFAULT_FNAME_INDICES)
+    fname_indices = merged_fname_indices(args.fname_index)
     sample_indices = args.gobjects_sample_index or list(DEFAULT_GOBJECTS_SAMPLE_INDICES)
 
     scan_command = [
@@ -410,7 +440,7 @@ def build_plan(args: argparse.Namespace, commands: list[list[str]]) -> dict[str,
             "base_root": None if scan_only else rel_or_abs(args.base_root),
             "verified_fname_root_slot": args.verified_fname_root_slot,
             "gobjects_candidate": args.gobjects_candidate,
-            "fname_indices": args.fname_index or list(DEFAULT_FNAME_INDICES),
+            "fname_indices": merged_fname_indices(args.fname_index),
             "gobjects_sample_indices": []
             if scan_only
             else args.gobjects_sample_index or list(DEFAULT_GOBJECTS_SAMPLE_INDICES),
@@ -418,9 +448,11 @@ def build_plan(args: argparse.Namespace, commands: list[list[str]]) -> dict[str,
         "phase_order": phases,
         "review_gates": [
             "no live server operations",
+            "protected server input/output paths are rejected by both textual and resolved path",
             "execute requires existing binary/core paths",
             "in-repository output paths must be ignored by Git",
             "direct FName root validation must pass exact requested indices before GObjects sampling",
+            "GObjects sampling manifest must be complete and match the reviewed root, candidate, and sample indices before snapshot regeneration",
             "full intake requires reviewed artifact-specific FName root and GObjects candidate",
         ],
         "promotion_blockers": [
@@ -432,6 +464,7 @@ def build_plan(args: argparse.Namespace, commands: list[list[str]]) -> dict[str,
             "direct FName root validation missing, failed, or only partially matched",
             "missing or reused primary-core FName root assumptions",
             "GDB/core inspection failure in the evidence pack",
+            "GObjects sampling manifest missing, partial, or mismatched against the executed command inputs",
             "missing candidate snapshot root",
             "snapshot comparison missing, inconclusive, rejected, or base-blocked targets",
             "snapshot comparison readiness JSON missing from the executed intake pack",
@@ -518,6 +551,58 @@ def require_persisted_readiness_report(
         raise ReadinessReportError("readiness report totals.targets must be greater than zero")
 
 
+def require_persisted_gobjects_manifest(
+    manifest_path: Path,
+    *,
+    expected_gobjects_candidate: str,
+    expected_sample_indices: list[str],
+    expected_fname_root_slot: str,
+) -> None:
+    expected_gobjects_candidate = f"0x{parse_nonnegative_int(expected_gobjects_candidate, '--gobjects-candidate'):x}"
+    expected_fname_root_slot = f"0x{parse_nonnegative_int(expected_fname_root_slot, '--verified-fname-root-slot'):x}"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise ReadinessReportError(f"gobjects sampling manifest was not written: {manifest_path}") from exc
+    except json.JSONDecodeError as exc:
+        raise ReadinessReportError(f"gobjects sampling manifest is not valid JSON: {exc}") from exc
+
+    if not isinstance(manifest, dict):
+        raise ReadinessReportError("gobjects sampling manifest root must be a JSON object")
+    evidence_status = manifest.get("evidence_status")
+    if not isinstance(evidence_status, dict):
+        raise ReadinessReportError("gobjects sampling manifest evidence_status must be an object")
+    if evidence_status.get("status") != "complete" or evidence_status.get("gdb_core_failed") is not False:
+        raise ReadinessReportError("gobjects sampling manifest evidence_status must be complete")
+
+    candidates = manifest.get("gobjects_candidates")
+    if not isinstance(candidates, list):
+        raise ReadinessReportError("gobjects sampling manifest gobjects_candidates must be a list")
+    if not any(
+        isinstance(item, dict)
+        and item.get("label") == "gobjects"
+        and item.get("address") == expected_gobjects_candidate
+        for item in candidates
+    ):
+        raise ReadinessReportError("gobjects sampling manifest missing expected gobjects candidate")
+
+    roots = manifest.get("fname_root_slots")
+    if not isinstance(roots, list):
+        raise ReadinessReportError("gobjects sampling manifest fname_root_slots must be a list")
+    if not any(
+        isinstance(item, dict)
+        and item.get("label") == "verified_fname_root_slot"
+        and item.get("address") == expected_fname_root_slot
+        for item in roots
+    ):
+        raise ReadinessReportError("gobjects sampling manifest missing expected verified FName root")
+
+    sample_indices = manifest.get("gobjects_sample_indices")
+    expected_indices = [parse_nonnegative_int(item, "--gobjects-sample-index") for item in expected_sample_indices]
+    if sample_indices != expected_indices:
+        raise ReadinessReportError("gobjects sampling manifest sample indices do not match command inputs")
+
+
 def append_wrapper_stderr(stderr_path: Path, message: str) -> None:
     prefix = ""
     if stderr_path.exists() and stderr_path.stat().st_size > 0:
@@ -533,6 +618,14 @@ def run_commands(args: argparse.Namespace, commands: list[list[str]]) -> int:
         print(f"\n==> {shlex.join(command)}", flush=True)
         if phase != "snapshot_comparison":
             subprocess.run(command, cwd=REPO_ROOT, check=True)
+            if phase == "gobjects_sampling":
+                require_persisted_gobjects_manifest(
+                    Path(rel_or_abs(args.pack_dir)) / "gobjects-sampling" / "manifest.json",
+                    expected_gobjects_candidate=args.gobjects_candidate,
+                    expected_sample_indices=args.gobjects_sample_index
+                    or list(DEFAULT_GOBJECTS_SAMPLE_INDICES),
+                    expected_fname_root_slot=args.verified_fname_root_slot,
+                )
             continue
 
         output_dir = Path(rel_or_abs(args.pack_dir)) / "snapshot-comparison"

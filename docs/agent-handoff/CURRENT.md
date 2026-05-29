@@ -49,17 +49,18 @@ detail in `HISTORY-*.md`.
 - Internal bridges only: `core/StructureEventDispatcher` and
   `core/InventoryPolicyEventDispatcher` feed copied-scalar policy events. They do not
   promote public StructureEvents or Inventory SDKs.
-- Release readiness is core-first through `scripts/check_release_readiness.sh`. The dirty
-  offline run passed with the accepted minimal second-source root, but a real RC still
-  requires focused checkpoints and the same gate without `--allow-dirty`.
+- Release readiness is core-first through `scripts/check_release_readiness.sh`. The
+  documented local gate evidence is the dirty/offline run with the accepted minimal
+  second-source root; the current integration round is open and must rerun that gate
+  without `--allow-dirty` before any publication decision.
 - Evidence details for accepted layout-only target sets live in:
   `docs/research/2026-05-29-minimal-second-source-readiness.md`,
   `docs/research/2026-05-29-dino-compact-second-source-readiness.md`,
   `docs/research/2026-05-29-buff-compact-second-source-result.md`, and
   `docs/research/2026-05-29-next-targetset-discovery.md`.
-- Current dirty tree is intentionally broad. Follow
-  `docs/research/2026-05-29-rc-checkpoint-slicing-plan.md`; do not stage by path
-  proximity.
+- Current working tree may be dirty while the active integration round is being reviewed.
+  Follow `docs/research/2026-05-29-rc-checkpoint-slicing-plan.md` for checkpoint slicing;
+  do not stage by path proximity.
 
 ## Checkpoint Groups If Commits Reopen
 

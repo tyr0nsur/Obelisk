@@ -36,6 +36,51 @@ def readiness_report_json(
     ) + "\n"
 
 
+def gobjects_manifest_json(
+    *,
+    status: str = "complete",
+    gdb_core_failed: bool = False,
+    gobjects_address: str = "0x595b7e0",
+    fname_root_address: str = "0x1234",
+    sample_indices: list[int] | None = None,
+) -> str:
+    return json.dumps(
+        {
+            "evidence_status": {
+                "status": status,
+                "gdb_core_failed": gdb_core_failed,
+            },
+            "gobjects_candidates": [
+                {
+                    "label": "gobjects",
+                    "address": gobjects_address,
+                }
+            ],
+            "fname_root_slots": [
+                {
+                    "label": "verified_fname_root_slot",
+                    "address": fname_root_address,
+                }
+            ],
+            "gobjects_sample_indices": [0, 1, 25447] if sample_indices is None else sample_indices,
+        }
+    ) + "\n"
+
+
+def full_intake_args(pack_dir: Path) -> object:
+    return type(
+        "Args",
+        (),
+        {
+            "scan_only": False,
+            "pack_dir": str(pack_dir),
+            "gobjects_candidate": "0x595b7e0",
+            "gobjects_sample_index": [],
+            "verified_fname_root_slot": "0x1234",
+        },
+    )()
+
+
 class RunSecondSourceCoreIntakeTests(unittest.TestCase):
     def test_default_mode_prints_offline_plan(self) -> None:
         result = subprocess.run(
@@ -236,6 +281,18 @@ class RunSecondSourceCoreIntakeTests(unittest.TestCase):
                 for gate in plan["review_gates"]
             )
         )
+        self.assertTrue(
+            any(
+                "GObjects sampling manifest must be complete" in gate
+                for gate in plan["review_gates"]
+            )
+        )
+        self.assertTrue(
+            any(
+                "protected server input/output paths are rejected" in gate
+                for gate in plan["review_gates"]
+            )
+        )
         self.assertIn(
             "offline independent core artifact from the same ARK binary",
             plan["required_artifact_inputs"],
@@ -274,6 +331,10 @@ class RunSecondSourceCoreIntakeTests(unittest.TestCase):
         )
         self.assertIn(
             "direct FName root validation missing, failed, or only partially matched",
+            plan["promotion_blockers"],
+        )
+        self.assertIn(
+            "GObjects sampling manifest missing, partial, or mismatched against the executed command inputs",
             plan["promotion_blockers"],
         )
         self.assertIn(
@@ -380,7 +441,88 @@ class RunSecondSourceCoreIntakeTests(unittest.TestCase):
         self.assertNotIn("--fname-root-slot", command)
         self.assertNotIn("--gobjects-candidate", command)
 
-    def test_custom_target_and_clues_are_preserved(self) -> None:
+    def test_custom_target_and_extra_clues_preserve_required_fname_clues(self) -> None:
+        result = subprocess.run(
+            [
+                "python3",
+                "scripts/run_second_source_core_intake.py",
+                "--binary",
+                "/tmp/ShooterGameServer",
+                "--core",
+                "/tmp/second.core",
+                "--pack-dir",
+                "/tmp/pack",
+                "--snapshot-root",
+                "/tmp/snapshots",
+                "--verified-fname-root-slot",
+                "0x1234",
+                "--gobjects-candidate",
+                "0x595b7e0",
+                "--fname-index",
+                "ExtraClue=7777",
+                "--gobjects-sample-index",
+                "7",
+                "--target-set",
+                "structure-observer-intake",
+            ],
+            cwd=REPO_ROOT,
+            check=True,
+            text=True,
+            stdout=subprocess.PIPE,
+        )
+
+        self.assertIn("--index None=0", result.stdout)
+        self.assertIn("ClientMessage=4884", result.stdout)
+        self.assertIn("ServerChat=9619", result.stdout)
+        self.assertIn("SetActiveMissionDebugFlags=9622", result.stdout)
+        self.assertIn("ExtraClue=7777", result.stdout)
+        self.assertIn("--gobjects-sample-index 7", result.stdout)
+        self.assertNotIn("--gobjects-sample-index 25447", result.stdout)
+        self.assertIn("--target-set structure-observer-intake", result.stdout)
+
+        plan = json.loads(
+            subprocess.run(
+                [
+                    "python3",
+                    "scripts/run_second_source_core_intake.py",
+                    "--binary",
+                    "/tmp/ShooterGameServer",
+                    "--core",
+                    "/tmp/second.core",
+                    "--pack-dir",
+                    "/tmp/pack",
+                    "--snapshot-root",
+                    "/tmp/snapshots",
+                    "--verified-fname-root-slot",
+                    "0x1234",
+                    "--gobjects-candidate",
+                    "0x595b7e0",
+                    "--fname-index",
+                    "ExtraClue=7777",
+                    "--gobjects-sample-index",
+                    "7",
+                    "--target-set",
+                    "structure-observer-intake",
+                    "--json-plan",
+                ],
+                cwd=REPO_ROOT,
+                check=True,
+                text=True,
+                stdout=subprocess.PIPE,
+            ).stdout
+        )
+        self.assertEqual(
+            plan["inputs"]["fname_indices"],
+            [
+                "None=0",
+                "ClientMessage=4884",
+                "ServerChat=9619",
+                "SetActiveMissionDebugFlags=9622",
+                "ExtraClue=7777",
+            ],
+        )
+
+    def test_rejects_custom_fname_clue_that_duplicates_required_label(self) -> None:
         result = subprocess.run(
             [
                 "python3",
@@ -399,22 +541,15 @@ class RunSecondSourceCoreIntakeTests(unittest.TestCase):
                 "0x595b7e0",
                 "--fname-index",
                 "None=0",
-                "--gobjects-sample-index",
-                "7",
-                "--target-set",
-                "structure-observer-intake",
             ],
             cwd=REPO_ROOT,
-            check=True,
             text=True,
             stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
 
-        self.assertIn("--index None=0", result.stdout)
-        self.assertNotIn("ClientMessage=4884", result.stdout)
-        self.assertIn("--gobjects-sample-index 7", result.stdout)
-        self.assertNotIn("--gobjects-sample-index 25447", result.stdout)
-        self.assertIn("--target-set structure-observer-intake", result.stdout)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--fname-index duplicates required FName clue: None", result.stderr)
 
     def test_execute_requires_existing_binary_and_core(self) -> None:
         result = subprocess.run(
@@ -633,6 +768,28 @@ class RunSecondSourceCoreIntakeTests(unittest.TestCase):
                 intake.reject_protected_input_path(str(workspace / "core"), "--core")
                 intake.reject_protected_output_path(str(workspace / "pack"), "--pack-dir")
 
+    def test_rejects_textually_protected_non_workspace_symlink_to_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            protected = temp_root / "protected"
+            workspace = protected / "workspace-offline"
+            blocked = protected / "obelisk"
+            workspace.mkdir(parents=True)
+            blocked.mkdir()
+            binary = workspace / "ShooterGameServer"
+            binary.write_bytes(b"binary")
+            link = blocked / "ShooterGameServer"
+            link.symlink_to(binary)
+
+            with (
+                mock.patch.object(intake, "PROTECTED_OUTPUT_ROOTS", (protected,)),
+                mock.patch.object(intake, "APPROVED_OFFLINE_WORKSPACE_ROOTS", (workspace,)),
+                self.assertRaises(SystemExit) as raised,
+            ):
+                intake.reject_protected_input_path(str(link), "--binary")
+
+        self.assertIn("--binary must not read from protected server root", str(raised.exception))
+
     def test_rejects_protected_snapshot_root_even_for_dry_run(self) -> None:
         result = subprocess.run(
             [
@@ -817,16 +974,81 @@ class RunSecondSourceCoreIntakeTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn(expected, result.stderr)
 
+    def test_validates_persisted_gobjects_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest = Path(temp_dir) / "manifest.json"
+            manifest.write_text(gobjects_manifest_json(), encoding="utf-8")
+
+            intake.require_persisted_gobjects_manifest(
+                manifest,
+                expected_gobjects_candidate="0x595b7e0",
+                expected_sample_indices=["0", "1", "25447"],
+                expected_fname_root_slot="0x1234",
+            )
+
+    def test_rejects_failed_gobjects_manifest_before_snapshot_regeneration(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest = Path(temp_dir) / "manifest.json"
+            manifest.write_text(
+                gobjects_manifest_json(status="partial", gdb_core_failed=True),
+                encoding="utf-8",
+            )
+
+            with self.assertRaises(intake.ReadinessReportError) as raised:
+                intake.require_persisted_gobjects_manifest(
+                    manifest,
+                    expected_gobjects_candidate="0x595b7e0",
+                    expected_sample_indices=["0", "1", "25447"],
+                    expected_fname_root_slot="0x1234",
+                )
+
+        self.assertIn("evidence_status must be complete", str(raised.exception))
+
+    def test_rejects_gobjects_manifest_that_does_not_match_command_inputs(self) -> None:
+        cases = (
+            (
+                gobjects_manifest_json(gobjects_address="0x595b7e1"),
+                "missing expected gobjects candidate",
+            ),
+            (
+                gobjects_manifest_json(fname_root_address="0x1235"),
+                "missing expected verified FName root",
+            ),
+            (
+                gobjects_manifest_json(sample_indices=[0, 1]),
+                "sample indices do not match command inputs",
+            ),
+        )
+        for manifest_json, expected in cases:
+            with self.subTest(expected=expected), tempfile.TemporaryDirectory() as temp_dir:
+                manifest = Path(temp_dir) / "manifest.json"
+                manifest.write_text(manifest_json, encoding="utf-8")
+
+                with self.assertRaises(intake.ReadinessReportError) as raised:
+                    intake.require_persisted_gobjects_manifest(
+                        manifest,
+                        expected_gobjects_candidate="0x595b7e0",
+                        expected_sample_indices=["0", "1", "25447"],
+                        expected_fname_root_slot="0x1234",
+                    )
+
+                self.assertIn(expected, str(raised.exception))
+
     def test_execute_persists_snapshot_comparison_stdout_even_when_gate_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            args = type("Args", (), {"scan_only": False, "pack_dir": str(root / "pack")})()
+            args = full_intake_args(root / "pack")
             commands = [
                 ["python3", "scan.py"],
                 ["python3", "sample.py"],
                 ["python3", "regen.py"],
                 ["python3", "compare.py", "--target-set", "minimal-second-source-intake"],
             ]
+            (root / "pack" / "gobjects-sampling").mkdir(parents=True)
+            (root / "pack" / "gobjects-sampling" / "manifest.json").write_text(
+                gobjects_manifest_json(),
+                encoding="utf-8",
+            )
             results = [
                 subprocess.CompletedProcess(commands[0], 0),
                 subprocess.CompletedProcess(commands[1], 0),
@@ -856,13 +1078,18 @@ class RunSecondSourceCoreIntakeTests(unittest.TestCase):
     def test_execute_rejects_minimal_false_success_json(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            args = type("Args", (), {"scan_only": False, "pack_dir": str(root / "pack")})()
+            args = full_intake_args(root / "pack")
             commands = [
                 ["python3", "scan.py"],
                 ["python3", "sample.py"],
                 ["python3", "regen.py"],
                 ["python3", "compare.py", "--target-set", "minimal-second-source-intake"],
             ]
+            (root / "pack" / "gobjects-sampling").mkdir(parents=True)
+            (root / "pack" / "gobjects-sampling" / "manifest.json").write_text(
+                gobjects_manifest_json(),
+                encoding="utf-8",
+            )
             results = [
                 subprocess.CompletedProcess(commands[0], 0),
                 subprocess.CompletedProcess(commands[1], 0),
@@ -891,7 +1118,7 @@ class RunSecondSourceCoreIntakeTests(unittest.TestCase):
     def test_execute_persists_snapshot_comparison_stdout_on_valid_success(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            args = type("Args", (), {"scan_only": False, "pack_dir": str(root / "pack")})()
+            args = full_intake_args(root / "pack")
             commands = [
                 ["python3", "scan.py"],
                 ["python3", "sample.py"],
@@ -899,6 +1126,11 @@ class RunSecondSourceCoreIntakeTests(unittest.TestCase):
                 ["python3", "compare.py", "--target-set", "minimal-second-source-intake"],
             ]
             report_json = readiness_report_json()
+            (root / "pack" / "gobjects-sampling").mkdir(parents=True)
+            (root / "pack" / "gobjects-sampling" / "manifest.json").write_text(
+                gobjects_manifest_json(),
+                encoding="utf-8",
+            )
             results = [
                 subprocess.CompletedProcess(commands[0], 0),
                 subprocess.CompletedProcess(commands[1], 0),
@@ -924,13 +1156,18 @@ class RunSecondSourceCoreIntakeTests(unittest.TestCase):
     def test_execute_rejects_success_json_missing_command_target_set(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            args = type("Args", (), {"scan_only": False, "pack_dir": str(root / "pack")})()
+            args = full_intake_args(root / "pack")
             commands = [
                 ["python3", "scan.py"],
                 ["python3", "sample.py"],
                 ["python3", "regen.py"],
                 ["python3", "compare.py", "--target-set", "minimal-second-source-intake"],
             ]
+            (root / "pack" / "gobjects-sampling").mkdir(parents=True)
+            (root / "pack" / "gobjects-sampling" / "manifest.json").write_text(
+                gobjects_manifest_json(),
+                encoding="utf-8",
+            )
             results = [
                 subprocess.CompletedProcess(commands[0], 0),
                 subprocess.CompletedProcess(commands[1], 0),
