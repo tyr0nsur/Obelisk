@@ -59,6 +59,18 @@ When this readiness report is acting as a promotion gate, add
 `--fail-on-readiness-gaps` or run
 `scripts/check_release_readiness.sh --require-second-source-readiness`.
 
+To inspect copied-scalar candidates from committed snapshots without reading cores or
+touching servers, use:
+
+```bash
+python3 scripts/summarize_reflection_scalar_candidates.py \
+  --target-set mission-compact-intake
+```
+
+This helper is a review aid only. It classifies one-byte `BoolProperty` candidates as
+copyable and keeps object, array, string, and struct fields redacted; it does not replace
+second-source readiness reports or promote public SDK callbacks.
+
 List the named target sets used by focused readiness checks with:
 
 ```bash
