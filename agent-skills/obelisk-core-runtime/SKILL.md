@@ -25,6 +25,11 @@ Own these areas:
 - Keep live servers stable before adding features.
 - Gate runtime hooks and risky behavior behind explicit env vars plus safe per-instance
   marker files.
+- Avoid namespace-scope or destructible function-local STL state for plugin lifecycle,
+  registration, or owner-token maps in the LD_PRELOAD path. Bootstrap can run before C++
+  static initialization is fully safe, and process teardown order can call plugin cleanup
+  after function-local statics are destroyed. Use first-use state with process-lifetime
+  storage for those runtime registries.
 - Prefer per-instance enablement under `/servidor/ark/obelisk/state/instances/<id>`.
 - Plugin loading requires a non-empty safe `OBELISK_INSTANCE_ID` containing only letters,
   digits, `_`, or `-`; do not weaken this fail-closed guard for shared-cluster installs.

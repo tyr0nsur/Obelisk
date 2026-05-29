@@ -50,12 +50,12 @@ cmake --build build --target oPolicyAudit oChatLogger -j"$(nproc)"
 {
   "enabled": false,
   "allow_all_instances": false,
-  "instance_allowlist": [],
-  "chat_logger": {
-    "log_limit": 5
-  }
+  "instance_allowlist": []
 }
 ```
+
+`oChatLogger` logs at most the first five received chat events per process during the
+current validation window; that limit is fixed in the experimental example.
 
 ## Policy
 

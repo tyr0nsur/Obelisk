@@ -29,17 +29,6 @@ namespace Obelisk::Core
     {
         thread_local void* g_CurrentPluginOwner = nullptr;
         std::atomic<uint64_t> g_ApiCapabilities{OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS};
-        std::mutex g_PluginOwnerLifecycleMutex;
-        std::unordered_set<void*> g_LoadedPluginOwners;
-        std::unordered_set<void*> g_InitializingPluginOwners;
-        std::unordered_set<void*> g_UnloadingPluginOwners;
-        std::atomic<uint64_t> g_NextPluginOwnerToken{1};
-        std::unordered_map<uint64_t, void*> g_PluginOwnerTokens;
-        std::mutex g_GameplayPolicyRegistrationMutex;
-        uint64_t g_NextGameplayPolicyRegistrationId = 1;
-        std::mutex g_ChatMessageRegistrationMutex;
-        uint64_t g_NextChatMessageRegistrationId = 1;
-        std::atomic<uint64_t> g_NextChatMessageSequence{1};
         std::atomic<ChatEventDispatcher*> g_PublicChatDispatcher{nullptr};
 
         struct GameplayPolicyRegistration
@@ -56,8 +45,83 @@ namespace Obelisk::Core
             uint64_t InternalRegistrationId = 0;
         };
 
-        std::unordered_map<uint64_t, GameplayPolicyRegistration> g_GameplayPolicyRegistrations;
-        std::unordered_map<uint64_t, ChatMessageRegistration> g_ChatMessageRegistrations;
+        std::mutex& PluginOwnerLifecycleMutex()
+        {
+            static auto* mutex = new std::mutex();
+            return *mutex;
+        }
+
+        std::unordered_set<void*>& LoadedPluginOwners()
+        {
+            static auto* owners = new std::unordered_set<void*>();
+            return *owners;
+        }
+
+        std::unordered_set<void*>& InitializingPluginOwners()
+        {
+            static auto* owners = new std::unordered_set<void*>();
+            return *owners;
+        }
+
+        std::unordered_set<void*>& UnloadingPluginOwners()
+        {
+            static auto* owners = new std::unordered_set<void*>();
+            return *owners;
+        }
+
+        std::atomic<uint64_t>& NextPluginOwnerToken()
+        {
+            static auto* token = new std::atomic<uint64_t>(1);
+            return *token;
+        }
+
+        std::unordered_map<uint64_t, void*>& PluginOwnerTokens()
+        {
+            static auto* tokens = new std::unordered_map<uint64_t, void*>();
+            return *tokens;
+        }
+
+        std::mutex& GameplayPolicyRegistrationMutex()
+        {
+            static auto* mutex = new std::mutex();
+            return *mutex;
+        }
+
+        uint64_t& NextGameplayPolicyRegistrationId()
+        {
+            static auto* id = new uint64_t(1);
+            return *id;
+        }
+
+        std::unordered_map<uint64_t, GameplayPolicyRegistration>& GameplayPolicyRegistrations()
+        {
+            static auto* registrations = new std::unordered_map<uint64_t, GameplayPolicyRegistration>();
+            return *registrations;
+        }
+
+        std::mutex& ChatMessageRegistrationMutex()
+        {
+            static auto* mutex = new std::mutex();
+            return *mutex;
+        }
+
+        uint64_t& NextChatMessageRegistrationId()
+        {
+            static auto* id = new uint64_t(1);
+            return *id;
+        }
+
+        std::atomic<uint64_t>& NextChatMessageSequence()
+        {
+            static auto* sequence = new std::atomic<uint64_t>(1);
+            return *sequence;
+        }
+
+        std::unordered_map<uint64_t, ChatMessageRegistration>& ChatMessageRegistrations()
+        {
+            static auto* registrations = new std::unordered_map<uint64_t, ChatMessageRegistration>();
+            return *registrations;
+        }
 
         using GetInfoFunc = bool(*)(ObeliskPluginMetadata*);
         using InitFunc = bool(*)(ObeliskApi*, const ObeliskPluginInitContext*);
@@ -110,7 +174,7 @@ namespace Obelisk::Core
             if (!owner)
                 return false;
 
-            return g_LoadedPluginOwners.find(owner) != g_LoadedPluginOwners.end();
+            return LoadedPluginOwners().find(owner) != LoadedPluginOwners().end();
         }
 
         void AddLoadedPluginOwner(void* owner)
@@ -118,8 +182,8 @@ namespace Obelisk::Core
             if (!owner)
                 return;
 
-            std::lock_guard<std::mutex> lock(g_PluginOwnerLifecycleMutex);
-            g_LoadedPluginOwners.insert(owner);
+            std::lock_guard<std::mutex> lock(PluginOwnerLifecycleMutex());
+            LoadedPluginOwners().insert(owner);
         }
 
         void RemoveLoadedPluginOwner(void* owner)
@@ -127,8 +191,8 @@ namespace Obelisk::Core
             if (!owner)
                 return;
 
-            std::lock_guard<std::mutex> lock(g_PluginOwnerLifecycleMutex);
-            g_LoadedPluginOwners.erase(owner);
+            std::lock_guard<std::mutex> lock(PluginOwnerLifecycleMutex());
+            LoadedPluginOwners().erase(owner);
         }
 
         bool IsInitializingPluginOwnerLocked(void* owner)
@@ -136,7 +200,7 @@ namespace Obelisk::Core
             if (!owner)
                 return false;
 
-            return g_InitializingPluginOwners.find(owner) != g_InitializingPluginOwners.end();
+            return InitializingPluginOwners().find(owner) != InitializingPluginOwners().end();
         }
 
         void AddInitializingPluginOwner(void* owner)
@@ -144,8 +208,8 @@ namespace Obelisk::Core
             if (!owner)
                 return;
 
-            std::lock_guard<std::mutex> lock(g_PluginOwnerLifecycleMutex);
-            g_InitializingPluginOwners.insert(owner);
+            std::lock_guard<std::mutex> lock(PluginOwnerLifecycleMutex());
+            InitializingPluginOwners().insert(owner);
         }
 
         void RemoveInitializingPluginOwner(void* owner)
@@ -153,8 +217,8 @@ namespace Obelisk::Core
             if (!owner)
                 return;
 
-            std::lock_guard<std::mutex> lock(g_PluginOwnerLifecycleMutex);
-            g_InitializingPluginOwners.erase(owner);
+            std::lock_guard<std::mutex> lock(PluginOwnerLifecycleMutex());
+            InitializingPluginOwners().erase(owner);
         }
 
         void MarkPluginOwnerUnloading(void* owner)
@@ -162,8 +226,8 @@ namespace Obelisk::Core
             if (!owner)
                 return;
 
-            std::lock_guard<std::mutex> lock(g_PluginOwnerLifecycleMutex);
-            g_UnloadingPluginOwners.insert(owner);
+            std::lock_guard<std::mutex> lock(PluginOwnerLifecycleMutex());
+            UnloadingPluginOwners().insert(owner);
         }
 
         void ClearPluginOwnerUnloading(void* owner)
@@ -171,13 +235,13 @@ namespace Obelisk::Core
             if (!owner)
                 return;
 
-            std::lock_guard<std::mutex> lock(g_PluginOwnerLifecycleMutex);
-            g_UnloadingPluginOwners.erase(owner);
+            std::lock_guard<std::mutex> lock(PluginOwnerLifecycleMutex());
+            UnloadingPluginOwners().erase(owner);
         }
 
         bool IsUnloadingPluginOwnerLocked(void* owner)
         {
-            return owner && g_UnloadingPluginOwners.find(owner) != g_UnloadingPluginOwners.end();
+            return owner && UnloadingPluginOwners().find(owner) != UnloadingPluginOwners().end();
         }
 
         uint64_t AddPluginOwnerToken(void* owner)
@@ -185,18 +249,18 @@ namespace Obelisk::Core
             if (!owner)
                 return 0;
 
-            std::lock_guard<std::mutex> lock(g_PluginOwnerLifecycleMutex);
+            std::lock_guard<std::mutex> lock(PluginOwnerLifecycleMutex());
             uint64_t token = 0;
             do
             {
-                token = g_NextPluginOwnerToken.load(std::memory_order_relaxed);
+                token = NextPluginOwnerToken().load(std::memory_order_relaxed);
                 uint64_t nextToken = token + 1;
                 if (nextToken == 0)
                     nextToken = 1;
-                g_NextPluginOwnerToken.store(nextToken, std::memory_order_relaxed);
-            } while (token == 0 || g_PluginOwnerTokens.find(token) != g_PluginOwnerTokens.end());
+                NextPluginOwnerToken().store(nextToken, std::memory_order_relaxed);
+            } while (token == 0 || PluginOwnerTokens().find(token) != PluginOwnerTokens().end());
 
-            g_PluginOwnerTokens[token] = owner;
+            PluginOwnerTokens()[token] = owner;
             return token;
         }
 
@@ -205,8 +269,8 @@ namespace Obelisk::Core
             if (token == 0)
                 return;
 
-            std::lock_guard<std::mutex> lock(g_PluginOwnerLifecycleMutex);
-            g_PluginOwnerTokens.erase(token);
+            std::lock_guard<std::mutex> lock(PluginOwnerLifecycleMutex());
+            PluginOwnerTokens().erase(token);
         }
 
         void* ResolvePluginOwnerTokenLocked(uint64_t token)
@@ -214,8 +278,8 @@ namespace Obelisk::Core
             if (token == 0)
                 return nullptr;
 
-            const auto it = g_PluginOwnerTokens.find(token);
-            if (it == g_PluginOwnerTokens.end())
+            const auto it = PluginOwnerTokens().find(token);
+            if (it == PluginOwnerTokens().end())
                 return nullptr;
             return it->second;
         }
@@ -249,7 +313,7 @@ namespace Obelisk::Core
 
         void* ResolveOwnerTokenForUnregister(const char* apiName, uint64_t token)
         {
-            std::lock_guard<std::mutex> lock(g_PluginOwnerLifecycleMutex);
+            std::lock_guard<std::mutex> lock(PluginOwnerLifecycleMutex());
             void* owner = ResolvePluginOwnerTokenLocked(token);
             if (!owner)
             {
@@ -310,7 +374,7 @@ namespace Obelisk::Core
         template <typename RegisterFn>
         uint64_t RegisterProcessEventCallbackForOwnerToken(const char* apiName, uint64_t ownerToken, RegisterFn registerFn)
         {
-            std::lock_guard<std::mutex> lock(g_PluginOwnerLifecycleMutex);
+            std::lock_guard<std::mutex> lock(PluginOwnerLifecycleMutex());
             void* owner = ResolveOwnerTokenForRegistrationLocked(apiName, ownerToken);
             if (!owner)
                 return 0;
@@ -322,7 +386,7 @@ namespace Obelisk::Core
                                                               OnProcessEventCallback callback,
                                                               RegisterFn registerFn)
         {
-            std::lock_guard<std::mutex> lock(g_PluginOwnerLifecycleMutex);
+            std::lock_guard<std::mutex> lock(PluginOwnerLifecycleMutex());
             void* owner = ResolveCallbackOwnerForRegistrationLocked(apiName, callback);
             if (!owner)
                 return 0;
@@ -869,7 +933,7 @@ namespace Obelisk::Core
                 .send_mode = sendMode,
                 .reserved0 = 0,
                 .flags = OBELISK_CHAT_MESSAGE_EVENT_FLAG_COPIED_PAYLOAD,
-                .sequence = g_NextChatMessageSequence.fetch_add(1, std::memory_order_relaxed),
+                .sequence = NextChatMessageSequence().fetch_add(1, std::memory_order_relaxed),
                 .message = {
                     .data = message.Message.data(),
                     .size = message.Message.size(),
@@ -883,10 +947,10 @@ namespace Obelisk::Core
             uint64_t id = 0;
             do
             {
-                id = g_NextChatMessageRegistrationId++;
-                if (g_NextChatMessageRegistrationId == 0)
-                    g_NextChatMessageRegistrationId = 1;
-            } while (id == 0 || g_ChatMessageRegistrations.find(id) != g_ChatMessageRegistrations.end());
+                id = NextChatMessageRegistrationId()++;
+                if (NextChatMessageRegistrationId() == 0)
+                    NextChatMessageRegistrationId() = 1;
+            } while (id == 0 || ChatMessageRegistrations().find(id) != ChatMessageRegistrations().end());
             return id;
         }
 
@@ -905,7 +969,7 @@ namespace Obelisk::Core
 
             uint64_t publicRegistrationId = 0;
             {
-                std::lock_guard<std::mutex> lock(g_ChatMessageRegistrationMutex);
+                std::lock_guard<std::mutex> lock(ChatMessageRegistrationMutex());
                 publicRegistrationId = AllocateChatMessageRegistrationIdLocked();
             }
 
@@ -924,8 +988,8 @@ namespace Obelisk::Core
 
             try
             {
-                std::lock_guard<std::mutex> lock(g_ChatMessageRegistrationMutex);
-                g_ChatMessageRegistrations[publicRegistrationId] = ChatMessageRegistration{
+                std::lock_guard<std::mutex> lock(ChatMessageRegistrationMutex());
+                ChatMessageRegistrations()[publicRegistrationId] = ChatMessageRegistration{
                     .Owner = owner,
                     .Dispatcher = dispatcher,
                     .InternalRegistrationId = internalRegistrationId,
@@ -946,12 +1010,12 @@ namespace Obelisk::Core
 
             ChatMessageRegistration registration;
             {
-                std::lock_guard<std::mutex> lock(g_ChatMessageRegistrationMutex);
-                const auto it = g_ChatMessageRegistrations.find(registrationId);
-                if (it == g_ChatMessageRegistrations.end() || it->second.Owner != owner)
+                std::lock_guard<std::mutex> lock(ChatMessageRegistrationMutex());
+                const auto it = ChatMessageRegistrations().find(registrationId);
+                if (it == ChatMessageRegistrations().end() || it->second.Owner != owner)
                     return false;
                 registration = it->second;
-                g_ChatMessageRegistrations.erase(it);
+                ChatMessageRegistrations().erase(it);
             }
 
             return registration.Dispatcher &&
@@ -965,9 +1029,9 @@ namespace Obelisk::Core
 
             std::vector<std::pair<uint64_t, ChatMessageRegistration>> registrations;
             {
-                std::lock_guard<std::mutex> lock(g_ChatMessageRegistrationMutex);
-                for (auto it = g_ChatMessageRegistrations.begin();
-                     it != g_ChatMessageRegistrations.end();)
+                std::lock_guard<std::mutex> lock(ChatMessageRegistrationMutex());
+                for (auto it = ChatMessageRegistrations().begin();
+                     it != ChatMessageRegistrations().end();)
                 {
                     if (it->second.Owner != owner)
                     {
@@ -975,7 +1039,7 @@ namespace Obelisk::Core
                         continue;
                     }
                     registrations.push_back(*it);
-                    it = g_ChatMessageRegistrations.erase(it);
+                    it = ChatMessageRegistrations().erase(it);
                 }
             }
 
@@ -997,10 +1061,10 @@ namespace Obelisk::Core
             uint64_t id = 0;
             do
             {
-                id = g_NextGameplayPolicyRegistrationId++;
-                if (g_NextGameplayPolicyRegistrationId == 0)
-                    g_NextGameplayPolicyRegistrationId = 1;
-            } while (id == 0 || g_GameplayPolicyRegistrations.find(id) != g_GameplayPolicyRegistrations.end());
+                id = NextGameplayPolicyRegistrationId()++;
+                if (NextGameplayPolicyRegistrationId() == 0)
+                    NextGameplayPolicyRegistrationId() = 1;
+            } while (id == 0 || GameplayPolicyRegistrations().find(id) != GameplayPolicyRegistrations().end());
             return id;
         }
 
@@ -1014,7 +1078,7 @@ namespace Obelisk::Core
 
             uint64_t publicRegistrationId = 0;
             {
-                std::lock_guard<std::mutex> lock(g_GameplayPolicyRegistrationMutex);
+                std::lock_guard<std::mutex> lock(GameplayPolicyRegistrationMutex());
                 publicRegistrationId = AllocateGameplayPolicyRegistrationIdLocked();
             }
 
@@ -1079,8 +1143,8 @@ namespace Obelisk::Core
 
             try
             {
-                std::lock_guard<std::mutex> lock(g_GameplayPolicyRegistrationMutex);
-                g_GameplayPolicyRegistrations[publicRegistrationId] = registration;
+                std::lock_guard<std::mutex> lock(GameplayPolicyRegistrationMutex());
+                GameplayPolicyRegistrations()[publicRegistrationId] = registration;
             }
             catch (...)
             {
@@ -1108,12 +1172,12 @@ namespace Obelisk::Core
 
             GameplayPolicyRegistration registration;
             {
-                std::lock_guard<std::mutex> lock(g_GameplayPolicyRegistrationMutex);
-                const auto it = g_GameplayPolicyRegistrations.find(registrationId);
-                if (it == g_GameplayPolicyRegistrations.end() || it->second.Owner != owner)
+                std::lock_guard<std::mutex> lock(GameplayPolicyRegistrationMutex());
+                const auto it = GameplayPolicyRegistrations().find(registrationId);
+                if (it == GameplayPolicyRegistrations().end() || it->second.Owner != owner)
                     return false;
                 registration = it->second;
-                g_GameplayPolicyRegistrations.erase(it);
+                GameplayPolicyRegistrations().erase(it);
             }
 
             bool removed = false;
@@ -1139,9 +1203,9 @@ namespace Obelisk::Core
 
             std::vector<std::pair<uint64_t, GameplayPolicyRegistration>> registrations;
             {
-                std::lock_guard<std::mutex> lock(g_GameplayPolicyRegistrationMutex);
-                for (auto it = g_GameplayPolicyRegistrations.begin();
-                     it != g_GameplayPolicyRegistrations.end();)
+                std::lock_guard<std::mutex> lock(GameplayPolicyRegistrationMutex());
+                for (auto it = GameplayPolicyRegistrations().begin();
+                     it != GameplayPolicyRegistrations().end();)
                 {
                     if (it->second.Owner != owner)
                     {
@@ -1149,7 +1213,7 @@ namespace Obelisk::Core
                         continue;
                     }
                     registrations.push_back(*it);
-                    it = g_GameplayPolicyRegistrations.erase(it);
+                    it = GameplayPolicyRegistrations().erase(it);
                 }
             }
 
@@ -1489,8 +1553,8 @@ namespace Obelisk::Core
 
     void PluginManager::SetNextPluginOwnerTokenForTesting(uint64_t nextOwnerToken)
     {
-        std::lock_guard<std::mutex> lock(g_PluginOwnerLifecycleMutex);
-        g_NextPluginOwnerToken.store(nextOwnerToken == 0 ? 1 : nextOwnerToken, std::memory_order_relaxed);
+        std::lock_guard<std::mutex> lock(PluginOwnerLifecycleMutex());
+        NextPluginOwnerToken().store(nextOwnerToken == 0 ? 1 : nextOwnerToken, std::memory_order_relaxed);
     }
 
     PluginManager::~PluginManager()

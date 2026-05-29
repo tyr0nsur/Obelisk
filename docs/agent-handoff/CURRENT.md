@@ -47,8 +47,9 @@ detail in `HISTORY-*.md`.
 - RC chat surface: minimal copied `ChatMessageEvent` is now backed by the
   `chat-message-intake` target set with accepted second-source snapshot comparison.
   It remains limited to copied UTF-8 message bytes, send mode, copied-payload flag, and
-  process-local sequence; live debug delivery validation is still pending before public
-  milestone publication.
+  process-local sequence. An isolated `arkserver2` run proved runtime/plugin bootstrap,
+  hook install, `oChatLogger` load, and callback registration; actual plugin-facing
+  delivery from a real chat message is still pending before public milestone publication.
 - ResourceHandle remains blocked. Use
   `docs/research/2026-05-29-resource-handle-revalidation-evaluator.md`,
   `docs/research/2026-05-29-resource-handle-nonzero-revalidation.md`,
@@ -99,8 +100,10 @@ detail in `HISTORY-*.md`.
   command, player, admin, mutation, return override, and public `CallProcessEvent`
   surfaces out of RC.
 - Revalidate each checkpoint slice independently before any GitHub publication decision.
-- Validate `ChatMessageEvent` delivery on `arkserver2` / TheIsland with explicit
-  observer-debug markers, SHA, and positive dispatch budget, then restore stable posture.
+- Validate actual `ChatMessageEvent` delivery on `arkserver2` / TheIsland with explicit
+  observer-debug markers, SHA, positive dispatch budget, `oChatLogger` allowlisted only for
+  `arkserver2`, no raw chat text logging, copied log evidence, and immediate rollback to
+  stable markers plus safe-disabled plugin config.
 - Keep second-source intake fail-closed: derive artifact-specific FName root, validate
   GObjects, regenerate snapshots, compare with readiness gaps enabled, and review the JSON
   plan before execution.

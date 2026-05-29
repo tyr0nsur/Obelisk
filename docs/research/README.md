@@ -35,6 +35,7 @@ Post-RC/research candidates:
 - [2026-05-29-resource-handle-nonzero-revalidation.md](2026-05-29-resource-handle-nonzero-revalidation.md)
 - [2026-05-29-uobject-flags-fullscan.md](2026-05-29-uobject-flags-fullscan.md)
 - [2026-05-29-offline-evidence-canonicality.md](2026-05-29-offline-evidence-canonicality.md)
+- [2026-05-29-plugin-loader-bootstrap-state.md](2026-05-29-plugin-loader-bootstrap-state.md)
 - [2026-05-29-resource-identity-feasibility.md](2026-05-29-resource-identity-feasibility.md)
 - [2026-05-29-uobject-flags-validity-blocker.md](2026-05-29-uobject-flags-validity-blocker.md)
 - [2026-05-29-fuobjectitem-serial-lifetime-audit.md](2026-05-29-fuobjectitem-serial-lifetime-audit.md)
@@ -105,6 +106,7 @@ when a task explicitly targets that module.
 | [2026-05-29-resource-handle-nonzero-revalidation.md](2026-05-29-resource-handle-nonzero-revalidation.md) | ResourceHandle nonzero serial revalidation | Records `32/32` accepted offline samples with `32` nonzero serial candidates and proven GObjects field coherence, while keeping public ResourceHandle blocked on `uobject_flags_validity_semantics_unproven`. |
 | [2026-05-29-uobject-flags-fullscan.md](2026-05-29-uobject-flags-fullscan.md) | UObject flags fullscan | Records full copied-core scans with thousands of nonzero serial candidates, zero `InternalIndex` mismatches, and no `0x100`/`0x4000` mask-positive samples, refining the ResourceHandle blocker. |
 | [2026-05-29-offline-evidence-canonicality.md](2026-05-29-offline-evidence-canonicality.md) | Offline evidence canonicality | Marks stale ResourceHandle evaluator output, dry-run plans, and duplicate GObjects reports so future rounds do not use them as independent promotion evidence. |
+| [2026-05-29-plugin-loader-bootstrap-state.md](2026-05-29-plugin-loader-bootstrap-state.md) | Plugin loader bootstrap state | Records the `LD_PRELOAD` static-state crash found during `oChatLogger` validation and the process-lifetime registry rule for plugin lifecycle state. |
 | [2026-05-29-buff-compact-second-source-result.md](2026-05-29-buff-compact-second-source-result.md) | Buff compact second-source result | Records accepted second-source layout evidence for the three-target buff compact intake without promoting a public Buff SDK. |
 | [2026-05-29-dino-compact-second-source-readiness.md](2026-05-29-dino-compact-second-source-readiness.md) | Dino compact second-source readiness | Records accepted second-source layout evidence for passenger/carry dino targets without promoting public Dino callbacks or identity. |
 | [2026-05-27-sdk-chat-event-ownership-plan.md](2026-05-27-sdk-chat-event-ownership-plan.md) | Historical SDK event ownership plan | Defines ownership, ABI, callback cleanup, and validation gates required before a public module callback API. |
