@@ -53,6 +53,24 @@ expect_success stable-posture-instance-id-alias \
 expect_success stable-posture-legacy-chat-forbidden-flag-clean \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable --forbid-chat-reflection --instance arkserver
 
+write_proc_fixture 118 "${stable_maps}" \
+    "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
+    "OBELISK_INSTANCE_ID=arkserver" \
+    "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
+    "OBELISK_DISABLE_PLUGINS=1" \
+    "OBELISK_WRAPPER_PROFILE=stable"
+expect_success stable-wrapper-profile-allowed \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 118 --expect-stable --instance arkserver
+
+write_proc_fixture 119 "${stable_maps}" \
+    "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
+    "OBELISK_INSTANCE_ID=arkserver" \
+    "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
+    "OBELISK_DISABLE_PLUGINS=1" \
+    "OBELISK_WRAPPER_PROFILE=observer-debug"
+expect_failure observer-debug-profile-forbidden-for-stable \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 119 --expect-stable --instance arkserver
+
 expect_failure missing-explicit-instance \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable
 expect_failure missing-map-without-pid \
@@ -134,9 +152,19 @@ write_proc_fixture 112 "${stable_maps}" \
     "OBELISK_DISABLE_PLUGINS=1" \
     "OBELISK_ENABLE_INVENTORY_REFLECTION=1" \
     "OBELISK_INVENTORY_REFLECTION_BINARY_SHA256=abc123" \
-    "OBELISK_INVENTORY_REFLECTION_LOG_LIMIT=25"
+    "OBELISK_INVENTORY_REFLECTION_LOG_LIMIT=25" \
+    "OBELISK_INVENTORY_REFLECTION_DISPATCH_LIMIT=25"
 expect_failure inventory-reflection-forbidden-for-stable \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 112 --expect-stable --instance arkserver
+
+write_proc_fixture 120 "${stable_maps}" \
+    "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
+    "OBELISK_INSTANCE_ID=arkserver" \
+    "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
+    "OBELISK_DISABLE_PLUGINS=1" \
+    "OBELISK_INVENTORY_REFLECTION_DISPATCH_LIMIT=25"
+expect_failure inventory-dispatch-limit-forbidden-for-stable \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 120 --expect-stable --instance arkserver
 
 write_proc_fixture 113 "${stable_maps}" \
     "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \

@@ -163,6 +163,17 @@ forbid_env() {
     fi
 }
 
+forbid_env_value() {
+    local name="$1"
+    local forbidden="$2"
+    local actual
+    actual="$(get_env "${name}")"
+    if has_env "${name}" && [[ "${actual}" == "${forbidden}" ]]; then
+        echo "Forbidden ${name} is set to '${actual}'." >&2
+        return 1
+    fi
+}
+
 forbid_nonzero_env() {
     local name="$1"
     local actual
@@ -238,6 +249,7 @@ if [[ "${EXPECT_STABLE}" == "1" ]]; then
     forbid_env OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS
     forbid_env OBELISK_ALLOW_CALL_PROCESS_EVENT
     forbid_env OBELISK_ALLOW_PROCESS_EVENT_BLOCKING
+    forbid_env_value OBELISK_WRAPPER_PROFILE observer-debug
     forbid_nonzero_env OBELISK_PE_TRACE_LIMIT
     forbid_env OBELISK_ENABLE_CHAT_REFLECTION
     forbid_env OBELISK_CHAT_REFLECTION_BINARY_SHA256
@@ -246,6 +258,7 @@ if [[ "${EXPECT_STABLE}" == "1" ]]; then
     forbid_env OBELISK_ENABLE_INVENTORY_REFLECTION
     forbid_env OBELISK_INVENTORY_REFLECTION_BINARY_SHA256
     forbid_env OBELISK_INVENTORY_REFLECTION_LOG_LIMIT
+    forbid_env OBELISK_INVENTORY_REFLECTION_DISPATCH_LIMIT
     forbid_env OBELISK_ENABLE_STRUCTURE_REFLECTION
     forbid_env OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256
     forbid_env OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT

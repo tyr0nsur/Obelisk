@@ -69,7 +69,10 @@ python3 scripts/summarize_reflection_scalar_candidates.py \
 
 This helper is a review aid only. It classifies one-byte `BoolProperty` candidates as
 copyable and keeps object, array, string, and struct fields redacted; it does not replace
-second-source readiness reports or promote public SDK callbacks.
+second-source readiness reports or promote public SDK callbacks. It is not a release
+readiness gate, not RC scope, and the `mission-compact-intake` example remains
+candidate-only until an explicit promotion PR names that target set with accepted
+second-source evidence and SDK guardrails.
 
 List the named target sets used by focused readiness checks with:
 

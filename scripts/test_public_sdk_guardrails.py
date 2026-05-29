@@ -729,6 +729,24 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         self.assertEqual(offenders, [])
 
+    def test_scalar_candidate_tooling_is_not_public_sdk_promotion(self) -> None:
+        fixture_readme = (REPO_ROOT / "tests/fixtures/ufunction_snapshots/README.md").read_text(
+            encoding="utf-8"
+        )
+        status = (REPO_ROOT / "docs/STATUS.md").read_text(encoding="utf-8")
+
+        self.assertIn("scripts/summarize_reflection_scalar_candidates.py", fixture_readme)
+        self.assertIn("--target-set mission-compact-intake", fixture_readme)
+        self.assertIn("This helper is a review aid only", fixture_readme)
+        self.assertIn(
+            "does not replace\nsecond-source readiness reports or promote public SDK callbacks",
+            fixture_readme,
+        )
+        self.assertIn("not a release\nreadiness gate, not RC scope", fixture_readme)
+        self.assertIn("`mission-compact-intake` example remains\ncandidate-only", fixture_readme)
+        self.assertIn("missions", status)
+        self.assertIn("remain roadmap items", status)
+
     def test_chat_abi_preflight_documents_future_shapes(self) -> None:
         note = (REPO_ROOT / "docs/research/2026-05-27-chat-sdk-abi-preflight.md").read_text(
             encoding="utf-8"

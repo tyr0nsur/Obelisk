@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -70,6 +71,31 @@ class SummarizeReflectionScalarCandidatesTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("MissionType.GetPlayerUsableItems", result.stdout)
         self.assertIn("redacted OutItemIDs class=ArrayProperty", result.stdout)
+
+    def test_rejects_protected_live_server_snapshot_root(self) -> None:
+        result = run_summary(
+            "--snapshot-root",
+            "/servidor/ark/not-approved/ufunction_snapshots",
+            "--target-set",
+            "mission-compact-intake",
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("snapshot root must not read from protected live-server path", result.stderr)
+
+    def test_rejects_symlink_to_protected_live_server_snapshot_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            link = Path(tmp) / "snapshots"
+            link.symlink_to("/servidor/ark/not-approved/ufunction_snapshots")
+
+            result = run_summary(
+                "--snapshot-root",
+                str(link),
+                "--target-set",
+                "mission-compact-intake",
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("snapshot root must not read from protected live-server path", result.stderr)
 
 
 if __name__ == "__main__":

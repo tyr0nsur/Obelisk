@@ -424,6 +424,12 @@ namespace
         Require(observationNumber == 0, "exhausted budget did not clear observation number");
 
         std::atomic<uint64_t> dispatchCounter{0};
+        std::atomic<uint64_t> logCounter{0};
+        Require(!ShouldAttemptRuntimeObservation(logCounter, 0, dispatchCounter, 0),
+                "zero atomic log and dispatch budgets reported active structure observation");
+        Require(ShouldAttemptRuntimeObservation(logCounter, 0, dispatchCounter, 1),
+                "atomic dispatch budget did not activate structure observation");
+
         Attempt rejectedAttempt;
         rejectedAttempt.Status = AttemptStatus::Rejected;
         observationNumber = 99;
@@ -441,6 +447,8 @@ namespace
         Require(!TryReserveDispatchBudgetForMatchedAttempt(matchedAttempt, dispatchCounter, 1, observationNumber),
                 "exhausted matched dispatch budget reserved again");
         Require(observationNumber == 0, "exhausted matched dispatch budget did not clear observation number");
+        Require(!ShouldAttemptRuntimeObservation(logCounter, 0, dispatchCounter, 1),
+                "exhausted atomic dispatch budget still activated structure observation");
     }
 
     void TestReflectedStructureNameFilter()

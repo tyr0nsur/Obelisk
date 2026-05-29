@@ -308,6 +308,8 @@ namespace
                 "zero log and dispatch budgets reported active runtime observation");
         Require(ShouldAttemptRuntimeObservation(logCounter, 0, dispatchCounter, 1),
                 "dispatch budget did not activate runtime observation");
+        Require(HasObservationBudgetRemaining(dispatchCounter, 1),
+                "fresh inventory dispatch counter did not report remaining budget");
 
         Attempt rejectedAttempt;
         rejectedAttempt.Status = AttemptStatus::Rejected;
@@ -325,6 +327,10 @@ namespace
         Require(!TryReserveDispatchBudgetForMatchedAttempt(matchedAttempt, dispatchCounter, 1, observationNumber),
                 "exhausted matched dispatch budget reserved again");
         Require(observationNumber == 0, "exhausted matched dispatch budget did not clear observation number");
+        Require(!HasObservationBudgetRemaining(dispatchCounter, 1),
+                "exhausted inventory dispatch counter reported remaining budget");
+        Require(!ShouldAttemptRuntimeObservation(logCounter, 0, dispatchCounter, 1),
+                "exhausted inventory dispatch budget still activated runtime observation");
     }
 
     void TestDisabledGateDoesNotRead()

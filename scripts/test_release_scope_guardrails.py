@@ -207,9 +207,12 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("--scriptstruct-second-source-target-set", script)
         self.assertIn("default second-source gate is intentionally scoped to the core-first UFunction intake", release)
         self.assertIn("`minimal-second-source-intake`", release)
+        self.assertIn("Mission target sets such as `mission-compact-intake` are", release)
+        self.assertIn("not part of the default gate", release)
+        self.assertIn("scalar-candidate summaries are review aids only, not RC\nscope", release)
         self.assertIn("Explicit\n`--ufunction-second-source-target-set` values replace that default", release)
         self.assertIn("--ufunction-second-source-target-set minimal-second-source-intake", release)
-        self.assertIn("ScriptStruct promotion, including transfer structs, is not\npart of the default gate", release)
+        self.assertIn("ScriptStruct promotion, including transfer structs, is not part of the default gate", release)
         self.assertIn("ScriptStruct promotion requires explicit opt-in", script)
         self.assertIn("--scriptstruct-second-source-root requires at least one --scriptstruct-second-source-target-set", script)
         self.assertNotIn('SCRIPTSTRUCT_SECOND_SOURCE_TARGET_SETS=("transfer-scriptstruct")', script)
@@ -321,6 +324,28 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("long-lived file readers", obase_docs)
         self.assertIn("Plugins with background workers", status)
         self.assertIn("are experimental until they pass a promotion gate", status)
+
+    def test_scalar_candidate_tooling_and_mission_route_stay_out_of_rc_scope(self) -> None:
+        release = read("docs/RELEASE.md")
+        status = read("docs/STATUS.md")
+        fixture_readme = read("tests/fixtures/ufunction_snapshots/README.md")
+
+        self.assertIn("mission/transfer APIs", release)
+        self.assertIn("Mission target sets such as `mission-compact-intake` are", release)
+        self.assertIn("not part of the default gate", release)
+        self.assertIn("scalar-candidate summaries are review aids only, not RC\nscope", release)
+        self.assertIn("missions", status)
+        self.assertIn("remain roadmap items", status)
+
+        self.assertIn("scripts/summarize_reflection_scalar_candidates.py", fixture_readme)
+        self.assertIn("--target-set mission-compact-intake", fixture_readme)
+        self.assertIn("This helper is a review aid only", fixture_readme)
+        self.assertIn(
+            "does not replace\nsecond-source readiness reports or promote public SDK callbacks",
+            fixture_readme,
+        )
+        self.assertIn("not a release\nreadiness gate, not RC scope", fixture_readme)
+        self.assertIn("`mission-compact-intake` example remains\ncandidate-only", fixture_readme)
 
 
 if __name__ == "__main__":

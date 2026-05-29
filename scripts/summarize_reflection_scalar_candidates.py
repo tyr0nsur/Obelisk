@@ -14,6 +14,8 @@ from reflection_target_sets import TARGET_SETS
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SNAPSHOT_ROOT = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
 SUPPORTED_SCHEMA = "obelisk.ufunction-chain.snapshot.v1"
+PROTECTED_SERVER_ROOT = Path("/servidor/ark")
+APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
 COPIED_BOOL_CLASS = "BoolProperty"
 REDACTED_CLASSES = {
     "ArrayProperty",
@@ -48,10 +50,37 @@ def parse_args() -> argparse.Namespace:
 
 
 def load_manifest(snapshot_root: Path) -> dict[str, Any]:
+    reject_protected_input_path("snapshot root", snapshot_root)
     manifest_path = snapshot_root / "manifest.json"
+    reject_protected_input_path("snapshot manifest", manifest_path)
     if not manifest_path.is_file():
         raise SystemExit(f"missing snapshot manifest: {manifest_path}")
     return json.loads(manifest_path.read_text(encoding="utf-8"))
+
+
+def is_under_path(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+        return True
+    except ValueError:
+        return False
+
+
+def is_approved_offline_workspace_path(path: Path) -> bool:
+    resolved = path.resolve()
+    return any(is_under_path(resolved, root.resolve()) for root in APPROVED_OFFLINE_WORKSPACE_ROOTS)
+
+
+def reject_protected_input_path(label: str, path: Path) -> None:
+    expanded = path.expanduser()
+    direct = expanded.absolute()
+    resolved = expanded.resolve()
+    direct_protected = PROTECTED_SERVER_ROOT.absolute()
+    protected = PROTECTED_SERVER_ROOT.resolve()
+    if is_under_path(direct, direct_protected) and not is_approved_offline_workspace_path(expanded):
+        raise SystemExit(f"{label} must not read from protected live-server path: {path}")
+    if is_under_path(resolved, protected) and not is_approved_offline_workspace_path(resolved):
+        raise SystemExit(f"{label} must not read from protected live-server path: {path}")
 
 
 def manifest_index(manifest: dict[str, Any], snapshot_root: Path) -> dict[str, Path]:
@@ -76,6 +105,7 @@ def manifest_index(manifest: dict[str, Any], snapshot_root: Path) -> dict[str, P
 
         target = f"{outer}.{name}"
         path = snapshot_root / sha_prefix / module / file_name
+        reject_protected_input_path("snapshot", path)
         if target in indexed:
             raise SystemExit(f"duplicate snapshot manifest target: {target}")
         indexed[target] = path
@@ -145,6 +175,7 @@ def classify_property(prop: dict[str, Any]) -> dict[str, Any]:
 
 
 def summarize_target(path: Path) -> dict[str, Any]:
+    reject_protected_input_path("snapshot", path)
     payload = json.loads(path.read_text(encoding="utf-8"))
     target_payload = require_single_target(payload, path)
     target_identity = target_payload.get("target")

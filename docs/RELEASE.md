@@ -31,7 +31,7 @@ Excluded:
 - Full UE4 reflection.
 - Higher-level gameplay SDK APIs outside `GameplayPolicyEvent`.
 - `ResourceHandle`, GNames/GObjects promotion, public Inventory SDK, public
-  `StructureEvents`, and chat/player/tribe/dino/buff/transfer APIs.
+  `StructureEvents`, and chat/player/tribe/dino/buff/mission/transfer APIs.
 - Experimental first-party plugins such as `oPolicyAudit`, which require
   `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON` and are not published by the release gate.
 - Gameplay mutation, return overrides, arbitrary UE4 function calls, and public
@@ -122,9 +122,11 @@ the public SDK. Inventory-backed signals are published only as
 Inventory SDK.
 
 The default second-source gate is intentionally scoped to the core-first UFunction intake:
-`minimal-second-source-intake`. ScriptStruct promotion, including transfer structs, is not
-part of the default gate and must be opted in explicitly. A release or PR that promotes
-another reflected module family must name each promoted target set explicitly, for example:
+`minimal-second-source-intake`. Mission target sets such as `mission-compact-intake` are
+not part of the default gate, and scalar-candidate summaries are review aids only, not RC
+scope. ScriptStruct promotion, including transfer structs, is not part of the default gate
+and must be opted in explicitly. A release or PR that promotes another reflected module
+family must name each promoted target set explicitly, for example:
 
 ```bash
 scripts/check_release_readiness.sh \
