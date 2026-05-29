@@ -67,10 +67,14 @@ namespace Obelisk::Core
         uint64_t AllocateRegistrationId();
         bool HasRegistrationId(uint64_t registrationId) const;
         bool IsRegistrationActive(uint64_t registrationId) const;
+        void QueueOrDestroyRemovedSubscriptions(std::vector<InventoryPolicyEventSubscription>& removed);
+        void FinishDispatch();
 
         mutable std::mutex m_Mutex;
         std::recursive_mutex m_DispatchMutex;
+        size_t m_DispatchDepth = 0;
         uint64_t m_NextRegistrationId = 1;
         std::vector<Registration> m_Registrations;
+        std::vector<InventoryPolicyEventSubscription> m_PendingDestroy;
     };
 }

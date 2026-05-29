@@ -161,8 +161,7 @@ namespace Obelisk::Core
             m_Registrations.erase(keepEnd, m_Registrations.end());
             after = m_Registrations.size();
         }
-        for (const InventoryPolicyEventSubscription& subscription : removed)
-            DestroySubscriptionUserData(subscription);
+        QueueOrDestroyRemovedSubscriptions(removed);
         return after != before;
     }
 
@@ -189,8 +188,7 @@ namespace Obelisk::Core
             m_Registrations.erase(keepEnd, m_Registrations.end());
             after = m_Registrations.size();
         }
-        for (const InventoryPolicyEventSubscription& subscription : removed)
-            DestroySubscriptionUserData(subscription);
+        QueueOrDestroyRemovedSubscriptions(removed);
         return after != before;
     }
 
@@ -217,9 +215,40 @@ namespace Obelisk::Core
             m_Registrations.erase(keepEnd, m_Registrations.end());
             after = m_Registrations.size();
         }
+        QueueOrDestroyRemovedSubscriptions(removed);
+        return before - after;
+    }
+
+    void InventoryPolicyEventDispatcher::QueueOrDestroyRemovedSubscriptions(
+        std::vector<InventoryPolicyEventSubscription>& removed)
+    {
+        if (removed.empty())
+            return;
+
+        if (m_DispatchDepth > 0)
+        {
+            m_PendingDestroy.insert(m_PendingDestroy.end(), removed.begin(), removed.end());
+            removed.clear();
+            return;
+        }
+
         for (const InventoryPolicyEventSubscription& subscription : removed)
             DestroySubscriptionUserData(subscription);
-        return before - after;
+    }
+
+    void InventoryPolicyEventDispatcher::FinishDispatch()
+    {
+        if (m_DispatchDepth == 0)
+            return;
+
+        --m_DispatchDepth;
+        if (m_DispatchDepth != 0)
+            return;
+
+        std::vector<InventoryPolicyEventSubscription> pending;
+        pending.swap(m_PendingDestroy);
+        for (const InventoryPolicyEventSubscription& subscription : pending)
+            DestroySubscriptionUserData(subscription);
     }
 
     void InventoryPolicyEventDispatcher::SetNextRegistrationIdForTesting(uint64_t nextRegistrationId)
@@ -241,38 +270,48 @@ namespace Obelisk::Core
 
         std::vector<DispatchRegistration> callbacks;
         std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
-        {
-            std::lock_guard<std::mutex> lock(m_Mutex);
-            callbacks.reserve(m_Registrations.size());
-            for (const Registration& item : m_Registrations)
-                callbacks.push_back({item.Id, item.Subscription});
-        }
-
+        ++m_DispatchDepth;
         size_t dispatched = 0;
-        for (const DispatchRegistration& item : callbacks)
+        try
         {
-            if (!IsRegistrationActive(item.Id))
-                continue;
-            if (!item.Subscription.Callback)
-                continue;
+            {
+                std::lock_guard<std::mutex> lock(m_Mutex);
+                callbacks.reserve(m_Registrations.size());
+                for (const Registration& item : m_Registrations)
+                    callbacks.push_back({item.Id, item.Subscription});
+            }
 
-            try
+            for (const DispatchRegistration& item : callbacks)
             {
-                item.Subscription.Callback(copiedEvent, item.Subscription.UserData);
-                ++dispatched;
-            }
-            catch (const std::exception& e)
-            {
-                if (Obelisk::Logger::IsInitialized())
-                    OBELISK_ERROR("Inventory policy event callback threw: {}", e.what());
-            }
-            catch (...)
-            {
-                if (Obelisk::Logger::IsInitialized())
-                    OBELISK_ERROR("Inventory policy event callback threw an unknown exception.");
+                if (!IsRegistrationActive(item.Id))
+                    continue;
+                if (!item.Subscription.Callback)
+                    continue;
+
+                try
+                {
+                    item.Subscription.Callback(copiedEvent, item.Subscription.UserData);
+                    ++dispatched;
+                }
+                catch (const std::exception& e)
+                {
+                    if (Obelisk::Logger::IsInitialized())
+                        OBELISK_ERROR("Inventory policy event callback threw: {}", e.what());
+                }
+                catch (...)
+                {
+                    if (Obelisk::Logger::IsInitialized())
+                        OBELISK_ERROR("Inventory policy event callback threw an unknown exception.");
+                }
             }
         }
+        catch (...)
+        {
+            FinishDispatch();
+            throw;
+        }
 
+        FinishDispatch();
         return dispatched;
     }
 

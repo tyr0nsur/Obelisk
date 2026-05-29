@@ -69,6 +69,7 @@ namespace
         uint64_t initOwnerToken = 0;
         uint64_t initThreadRegistrationId = 0;
         uint64_t gameplayPolicyRegistrationId = 0;
+        bool gameplayPolicySelfUnregisterResult = false;
         uint64_t shutdownRegistrationId = 0;
         bool shutdownUnregisterResult = false;
         void* owner = this;
@@ -132,6 +133,16 @@ namespace
             plugin->gameplayPolicyInt32Values[i] = event->int32_values[i];
         plugin->gameplayPolicyEventAbiVersion = event->abi_version;
         plugin->gameplayPolicyEventStructSize = event->struct_size;
+    }
+
+    void FakeGameplayPolicySelfUnregisterCallback(const ObeliskGameplayPolicyEvent* event, void* userData)
+    {
+        FakeGameplayPolicyEventCallback(event, userData);
+        auto* plugin = static_cast<FakePlugin*>(userData);
+        plugin->gameplayPolicySelfUnregisterResult =
+            plugin->capturedApi.UnregisterGameplayPolicyEventWithOwnerToken(
+                plugin->initOwnerToken,
+                plugin->gameplayPolicyRegistrationId);
     }
 
     std::vector<Obelisk::Core::StructureScalarValue> MakeStructureScalars()
@@ -1278,6 +1289,100 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestGameplayPolicyCallbackCanSelfUnregisterDuringDispatch()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_gameplay_policy_self_unregister");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "gameplay_policy_self_unregister.so",
+            .pluginId = "gameplay_policy_self_unregister",
+            .captureApi = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "self-unregister plugin was not initialized");
+        Require(plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle != nullptr,
+                "gameplay policy registration function was not exposed");
+        Require(plugin.capturedApi.UnregisterGameplayPolicyEventWithOwnerToken != nullptr,
+                "gameplay policy unregister function was not exposed");
+
+        plugin.gameplayPolicyRegistrationId =
+            plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                plugin.initOwnerToken,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACCESS_CHECK,
+                FakeGameplayPolicySelfUnregisterCallback,
+                &plugin);
+        Require(plugin.gameplayPolicyRegistrationId != 0,
+                "structure self-unregister gameplay policy registration returned zero");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 1,
+                "structure self-unregister callback was not bridged into structure dispatcher");
+
+        const std::vector<Obelisk::Core::StructureScalarValue> scalars = MakeStructureScalars();
+        Require(Obelisk::Core::StructureEventDispatcher::Get().Dispatch(MakeStructureEvent(scalars)) == 1,
+                "structure self-unregister callback did not dispatch");
+        Require(plugin.gameplayPolicyEventCalls == 1,
+                "structure self-unregister callback call count mismatch");
+        Require(plugin.gameplayPolicySelfUnregisterResult,
+                "structure self-unregister callback could not unregister itself");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
+                "structure self-unregister callback remained registered after dispatch");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().Dispatch(MakeStructureEvent(scalars)) == 0,
+                "structure self-unregister callback dispatched after removal");
+
+        plugin.gameplayPolicyEventCalls = 0;
+        plugin.gameplayPolicySelfUnregisterResult = false;
+        plugin.gameplayPolicyRegistrationId =
+            plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                plugin.initOwnerToken,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK,
+                FakeGameplayPolicySelfUnregisterCallback,
+                &plugin);
+        Require(plugin.gameplayPolicyRegistrationId != 0,
+                "inventory self-unregister gameplay policy registration returned zero");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 1,
+                "inventory self-unregister callback was not bridged into inventory dispatcher");
+
+        const std::vector<Obelisk::Core::InventoryPolicyScalarValue> inventoryScalars =
+            MakeInventoryCanUseScalars();
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().Dispatch(
+                    MakeInventoryCanUseEvent(inventoryScalars)) == 1,
+                "inventory self-unregister callback did not dispatch");
+        Require(plugin.gameplayPolicyEventCalls == 1,
+                "inventory self-unregister callback call count mismatch");
+        Require(plugin.gameplayPolicySelfUnregisterResult,
+                "inventory self-unregister callback could not unregister itself");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
+                "inventory self-unregister callback remained registered after dispatch");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().Dispatch(
+                    MakeInventoryCanUseEvent(inventoryScalars)) == 0,
+                "inventory self-unregister callback dispatched after removal");
+
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1, "self-unregister plugin shutdown was not called");
+        Require(plugin.closeCalls == 1, "self-unregister plugin was not closed");
+        Require(plugin.structureSubscriptionsAtClose == 0,
+                "structure self-unregister callback was still registered at dlclose");
+        Require(plugin.inventoryPolicySubscriptionsAtClose == 0,
+                "inventory self-unregister callback was still registered at dlclose");
+        Require(plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL,
+                    FakeGameplayPolicyEventCallback,
+                    &plugin) == 0,
+                "owner token remained valid after self-unregister plugin unload");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestDescribeResourceKind()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_describe_resource_kind");
@@ -2370,6 +2475,7 @@ int main()
     TestInitExceptionCleansInitThreadOwnerTokenCallbackAndToken();
     TestOwnerTokenHandleRegistrationCanUnregister();
     TestOwnerTokenGameplayPolicyEventRegistrationCanUnregister();
+    TestGameplayPolicyCallbackCanSelfUnregisterDuringDispatch();
     TestDescribeResourceKind();
     TestGameplayPolicyCallbackCleansOnInitFailure();
     TestGameplayPolicyCallbackCleansOnInitException();

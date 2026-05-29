@@ -235,6 +235,50 @@ namespace
         Require(dispatcher.Dispatch(MakeEvent(scalars)) == 0, "self-unregistered callback ran twice");
     }
 
+    struct SelfUnregisterDestroyCapture
+    {
+        Obelisk::Core::StructureEventDispatcher* Dispatcher = nullptr;
+        uint64_t RegistrationId = 0;
+        int Calls = 0;
+        int Destroyed = 0;
+    };
+
+    void SelfUnregisterWithDestroyCallback(const Obelisk::Core::StructureEventView&, void* userData)
+    {
+        auto* capture = static_cast<SelfUnregisterDestroyCapture*>(userData);
+        ++capture->Calls;
+        Require(capture->Destroyed == 0, "structure user data was destroyed before callback body");
+        Require(capture->Dispatcher != nullptr, "self-unregister destroy callback had no dispatcher");
+        Require(capture->Dispatcher->Unregister(capture->RegistrationId),
+                "self-unregister with destroy from structure callback failed");
+        Require(capture->Destroyed == 0, "structure user data was destroyed before callback returned");
+    }
+
+    void CountSelfUnregisterDestroyed(void* userData)
+    {
+        auto* capture = static_cast<SelfUnregisterDestroyCapture*>(userData);
+        ++capture->Destroyed;
+    }
+
+    void TestSelfUnregisterDefersUserDataDestroyUntilCallbackReturns()
+    {
+        Obelisk::Core::StructureEventDispatcher dispatcher;
+        int owner = 0;
+        SelfUnregisterDestroyCapture capture{&dispatcher, 0, 0, 0};
+        const std::vector<Obelisk::Core::StructureScalarValue> scalars = MakeScalars();
+
+        capture.RegistrationId = dispatcher.Register(
+            &owner,
+            {SelfUnregisterWithDestroyCallback, &capture, CountSelfUnregisterDestroyed});
+        Require(capture.RegistrationId != 0, "self-unregister destroy registration id was not assigned");
+        Require(dispatcher.Dispatch(MakeEvent(scalars)) == 1,
+                "self-unregister destroy structure callback did not run");
+        Require(capture.Calls == 1, "self-unregister destroy structure callback ran wrong number of times");
+        Require(capture.Destroyed == 1, "structure user data was not destroyed after callback returned");
+        Require(dispatcher.SubscriptionCount() == 0,
+                "self-unregister destroy structure callback remained registered");
+    }
+
     struct ReentrantUnregisterOtherState
     {
         Obelisk::Core::StructureEventDispatcher* Dispatcher = nullptr;
@@ -389,6 +433,7 @@ int main()
     TestUnregisterForOwnerRequiresMatchingOwner();
     TestRegistrationIdsSkipZeroAndLiveIdsAfterWrap();
     TestCallbackCanUnregisterItself();
+    TestSelfUnregisterDefersUserDataDestroyUntilCallbackReturns();
     TestReentrantUnregisterSkipsRemovedSnapshotCallback();
     TestOwnerCleanupWaitsForInFlightDispatch();
     TestOwnerCleanup();
