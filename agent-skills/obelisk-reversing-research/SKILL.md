@@ -55,6 +55,12 @@ Own these areas:
   object handles. Treat `FUObjectItem+0xc` as unknown, not accepted serial evidence.
   Offline tooling should record both fields neutrally until independent core reconciliation
   proves exact semantics and reuse/invalidation rules.
+- Broad copied-core scans now found nonzero `FUObjectItem+0x8` serial candidates in both
+  available cores: first 200,000 readable object slots showed `817` nonzero serials,
+  `197330` zero serials, and `0` internal-index mismatches per core. This weakens the old
+  tiny-sample `zero_or_missing_fuobjectitem_serial_candidates` blocker for broad evidence,
+  but public `ResourceHandle` remains blocked by lifetime/reuse and `UObject+0x8` flag
+  semantics. Use `scripts/scan_resource_handle_serials.py` for repeatable offline scans.
 - Targeted Ghidra/radare2 evidence for this binary hash confirms a weak-object helper at
   `0x1d56a30` that validates `{index, serial}` against `0x595b804`, `0x595b7f0`,
   `FUObjectItem+0x8`, and `UObject+0x8` masks `0x100`/`0x4000`. Serial-publication

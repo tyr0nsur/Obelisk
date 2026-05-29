@@ -67,6 +67,11 @@ metadata.
   flags field; helper paths consult `0x100` and `0x4000` after `{index, serial}` validation;
   accepted samples show `0x81`/`0xc7`/`0xc5`; no rejected sample or exact lifetime semantic
   is proven.
+- Do not claim all copied-core `FUObjectItem+0x8` serial samples are zero. Wider offline
+  scans with `scripts/scan_resource_handle_serials.py` found repeatable nonzero serial
+  candidates in both copied cores. This supports internal handle-revalidation tooling only;
+  `ResourceHandle`, object identity, lookup, and post-callback validity remain unpromoted
+  until lifetime/reuse behavior and `UObject+0x8` flag semantics are proven.
 - Do not restart `GObjects` work from broad candidate search. Repeat classified checks on a
   second isolated core or future binary before promoting runtime-stable contracts.
 - General/core offline layout promotion has accepted `minimal-second-source-intake`:
