@@ -32,6 +32,8 @@ Excluded:
 - Higher-level gameplay SDK APIs outside `GameplayPolicyEvent`.
 - `ResourceHandle`, GNames/GObjects promotion, public Inventory SDK, public
   `StructureEvents`, and chat/player/tribe/dino/buff/transfer APIs.
+- Experimental first-party plugins such as `oPolicyAudit`, which require
+  `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON` and are not published by the release gate.
 - Gameplay mutation, return overrides, arbitrary UE4 function calls, and public
   `CallProcessEvent`-based plugin behavior.
 - Plugin callback blocking of the original `ProcessEvent` outside an explicit

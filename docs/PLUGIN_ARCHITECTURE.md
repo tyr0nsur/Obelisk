@@ -11,16 +11,22 @@ Keep plugin source code split by maturity:
 plugins/
   README.md
   oBaseEvents/
+  oPolicyAudit/
 ```
 
 `oBaseEvents` is the first official plugin planned for release. Keep it small and focused
 on teaching the plugin model.
+
+`oPolicyAudit` is an experimental first-party example for `GameplayPolicyEvent`
+descriptors and callbacks. It is excluded from the default build and release scope unless
+`OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`.
 
 ## Plugin Categories
 
 | Category | Purpose | Build policy | Runtime policy |
 | --- | --- | --- | --- |
 | `oBaseEvents` | Official reference plugin for event/config/lifecycle patterns. | Built by default. | Published with `scripts/install_obelisk_plugin.sh`; activation remains config and instance gated. |
+| `oPolicyAudit` | Experimental example for copied `GameplayPolicyEvent` auditing. | Excluded unless `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`. | Do not publish as part of the first release; install only for isolated tests. |
 | research branches | Probes and prototype integrations. | Excluded from top-level build by default. | Do not install into `plugins/` except isolated tests. |
 | stable plugin directories | Operational plugins with documented config, tests, and rollback. | Eligible for top-level build after review. | Instance-gated rollout only. |
 

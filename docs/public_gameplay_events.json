@@ -76,10 +76,7 @@
           "stable_name": "structure.activation_toggle",
           "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE",
           "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACTIVATION_TOGGLE",
-          "field_mask": [
-            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
-            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE"
-          ]
+          "field_mask": ["OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"]
         },
         {
           "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_PIN_CODE_CHECK",
@@ -93,7 +90,10 @@
           "stable_name": "structure.seat_check",
           "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE",
           "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_SEAT_CHECK",
-          "field_mask": ["OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"]
+          "field_mask": [
+            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
+            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE"
+          ]
         },
         {
           "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK",

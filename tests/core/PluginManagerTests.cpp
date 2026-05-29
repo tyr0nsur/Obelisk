@@ -203,6 +203,58 @@ namespace
         };
     }
 
+    std::vector<Obelisk::Core::StructureScalarValue> MakeActivationToggleScalars()
+    {
+        return {
+            {
+                .Field = Obelisk::Core::StructureScalarField::ReturnValue,
+                .Type = Obelisk::Core::StructureScalarType::Bool,
+                .BoolValue = true,
+                .Int32Value = 0,
+            },
+        };
+    }
+
+    Obelisk::Core::StructureEventView MakeActivationToggleEvent(
+        const std::vector<Obelisk::Core::StructureScalarValue>& scalars)
+    {
+        return {
+            .Kind = Obelisk::Core::StructureEventKind::AllowToggleActivation,
+            .FunctionNameIndex = 12039,
+            .OuterNameIndex = 18998,
+            .Scalars = scalars,
+        };
+    }
+
+    std::vector<Obelisk::Core::StructureScalarValue> MakeCanSeatScalars()
+    {
+        return {
+            {
+                .Field = Obelisk::Core::StructureScalarField::BForce,
+                .Type = Obelisk::Core::StructureScalarType::Bool,
+                .BoolValue = true,
+                .Int32Value = 0,
+            },
+            {
+                .Field = Obelisk::Core::StructureScalarField::ReturnValue,
+                .Type = Obelisk::Core::StructureScalarType::Bool,
+                .BoolValue = false,
+                .Int32Value = 0,
+            },
+        };
+    }
+
+    Obelisk::Core::StructureEventView MakeCanSeatEvent(
+        const std::vector<Obelisk::Core::StructureScalarValue>& scalars)
+    {
+        return {
+            .Kind = Obelisk::Core::StructureEventKind::CanSeat,
+            .FunctionNameIndex = 18999,
+            .OuterNameIndex = 7539,
+            .Scalars = scalars,
+        };
+    }
+
     std::vector<Obelisk::Core::InventoryPolicyScalarValue> MakeInventoryRemoteAddScalars()
     {
         return {
@@ -1225,12 +1277,46 @@ namespace
                     (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_RETURN_VALUE)) == 0,
                 "set variant event copied wrong false return value");
 
+        const std::vector<Obelisk::Core::StructureScalarValue> activationToggleScalars =
+            MakeActivationToggleScalars();
+        Require(Obelisk::Core::StructureEventDispatcher::Get().Dispatch(
+                    MakeActivationToggleEvent(activationToggleScalars)) == 1,
+                "all gameplay policy callback did not receive activation toggle dispatch");
+        Require(plugin.gameplayPolicyEventCalls == 3,
+                "activation toggle gameplay policy callback did not dispatch");
+        Require(plugin.gameplayPolicyEventKind ==
+                    OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_ACTIVATION_TOGGLE,
+                "activation toggle event kind was not mapped");
+        Require((plugin.gameplayPolicyFieldMask & OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE) != 0,
+                "activation toggle did not expose copied return value");
+        Require((plugin.gameplayPolicyFieldMask & OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE) == 0,
+                "activation toggle exposed force field that current producer does not copy");
+
+        const std::vector<Obelisk::Core::StructureScalarValue> canSeatScalars = MakeCanSeatScalars();
+        Require(Obelisk::Core::StructureEventDispatcher::Get().Dispatch(MakeCanSeatEvent(canSeatScalars)) == 1,
+                "all gameplay policy callback did not receive can-seat dispatch");
+        Require(plugin.gameplayPolicyEventCalls == 4,
+                "can-seat gameplay policy callback did not dispatch");
+        Require(plugin.gameplayPolicyEventKind ==
+                    OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_SEAT_CHECK,
+                "can-seat event kind was not mapped");
+        Require((plugin.gameplayPolicyFieldMask & OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE) != 0,
+                "can-seat did not expose copied force flag");
+        Require((plugin.gameplayPolicyBoolValues &
+                    (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_FORCE)) != 0,
+                "can-seat copied wrong force flag");
+        Require((plugin.gameplayPolicyFieldMask & OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE) != 0,
+                "can-seat did not expose copied return value");
+        Require((plugin.gameplayPolicyBoolValues &
+                    (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_RETURN_VALUE)) == 0,
+                "can-seat copied wrong false return value");
+
         const std::vector<Obelisk::Core::InventoryPolicyScalarValue> inventoryRemoteAddScalars =
             MakeInventoryRemoteAddScalars();
         Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().Dispatch(
                     MakeInventoryRemoteAddEvent(inventoryRemoteAddScalars)) == 1,
                 "all gameplay policy callback did not receive inventory remote-add dispatch");
-        Require(plugin.gameplayPolicyEventCalls == 3,
+        Require(plugin.gameplayPolicyEventCalls == 5,
                 "inventory gameplay policy callback did not dispatch");
         Require(plugin.gameplayPolicyEventKind ==
                     OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK,
@@ -1260,7 +1346,7 @@ namespace
         Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().Dispatch(
                     MakeInventoryCanUseEvent(inventoryCanUseScalars)) == 1,
                 "all gameplay policy callback did not receive inventory can-use dispatch");
-        Require(plugin.gameplayPolicyEventCalls == 4,
+        Require(plugin.gameplayPolicyEventCalls == 6,
                 "inventory can-use gameplay policy callback did not dispatch");
         Require(plugin.gameplayPolicyEventKind ==
                     OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK,
@@ -1562,8 +1648,7 @@ namespace
                 OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD |
                     OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED,
                 OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACTIVATION_TOGGLE,
-                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
-                    OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE,
                 "structure.activation_toggle",
                 "Structure Activation Toggle",
             },
@@ -1583,7 +1668,8 @@ namespace
                 OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD |
                     OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED,
                 OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_SEAT_CHECK,
-                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+                    OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE,
                 "structure.seat_check",
                 "Structure Seat Check",
             },

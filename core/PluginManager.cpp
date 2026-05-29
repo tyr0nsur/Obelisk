@@ -519,8 +519,7 @@ namespace Obelisk::Core
                     descriptor.resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE;
                     descriptor.flags |= OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED;
                     descriptor.event_kind_mask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACTIVATION_TOGGLE;
-                    descriptor.field_mask = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
-                        OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE;
+                    descriptor.field_mask = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE;
                     CopyDescriptorText(descriptor.stable_name, "structure.activation_toggle");
                     CopyDescriptorText(descriptor.display_name, "Structure Activation Toggle");
                     *out = descriptor;
@@ -538,7 +537,8 @@ namespace Obelisk::Core
                     descriptor.resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE;
                     descriptor.flags |= OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED;
                     descriptor.event_kind_mask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_SEAT_CHECK;
-                    descriptor.field_mask = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE;
+                    descriptor.field_mask = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+                        OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE;
                     CopyDescriptorText(descriptor.stable_name, "structure.seat_check");
                     CopyDescriptorText(descriptor.display_name, "Structure Seat Check");
                     *out = descriptor;

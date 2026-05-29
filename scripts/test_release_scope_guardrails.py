@@ -38,6 +38,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "Central install root | Stable baseline",
             "ARK/LinuxGSM validation adapter | Stable baseline",
             "`oBaseEvents` | Release example",
+            "`oPolicyAudit` | Experimental",
             "Per-instance runtime flags | Stable baseline",
         ]
         required_changelog_items = [
@@ -76,6 +77,8 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "Higher-level gameplay SDK APIs outside `GameplayPolicyEvent`",
             "Gameplay mutation, return overrides, arbitrary UE4 function calls, and public",
             "`CallProcessEvent`-based plugin behavior",
+            "Experimental first-party plugins such as `oPolicyAudit`",
+            "`OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`",
             "Plugins with background workers, sockets, HTTP listeners/clients, long-lived file\n  readers",
             "background-work\n  promotion gate",
             "Production HTTP plugins",
@@ -89,6 +92,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "General reflected UFunction parameter decoding | Not ready",
             "Higher-level SDK APIs | Not ready",
             "Internal copied inventory policy events | Internal bridge",
+            "`oPolicyAudit` | Experimental",
             "Operator CLI | Experimental",
             "ReflectionScanner | Experimental",
         ]:
@@ -147,6 +151,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         workflow_skill = read("agent-skills/obelisk-github-research-workflow/SKILL.md")
 
         self.assertIn("scripts/check_release_readiness.sh", release)
+        self.assertIn("`oPolicyAudit`", release)
         self.assertIn("Verify the ABI v1 freeze artifacts before tagging", release)
         self.assertIn("Obelisk freezes the\n   current append-only `ObeliskApi` ABI v1", release)
         self.assertIn("Any ABI v2 must use an explicit migration plan", release)
@@ -183,6 +188,8 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("first-stable core release gate", script)
         self.assertIn("gameplay/module second-source promotion gate was not run", script)
         self.assertIn("scripts/install_obelisk_plugin.sh --dry-run", script)
+        self.assertIn("${BUILD_DIR}/plugins/oBaseEvents/oBaseEvents.so", script)
+        self.assertNotIn("oPolicyAudit.so", script)
         self.assertIn("--require-second-source-readiness", release)
         self.assertIn("--require-second-source-readiness", pr_template)
         self.assertIn("--require-second-source-readiness", script)
@@ -234,6 +241,36 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("runtime_observer_observational_only", release)
         self.assertNotIn("--map Ragnarok --instance arkserver", release)
         self.assertIn("--map <map> --instance <instance-id>", release)
+
+    def test_experimental_policy_audit_plugin_stays_out_of_release_scope(self) -> None:
+        cmake = read("CMakeLists.txt")
+        architecture = read("docs/PLUGIN_ARCHITECTURE.md")
+        status = read("docs/STATUS.md")
+        release = read("docs/RELEASE.md")
+        plugins_readme = read("plugins/README.md")
+        script = read("scripts/check_release_readiness.sh")
+
+        self.assertIn(
+            'option(OBELISK_BUILD_EXPERIMENTAL_PLUGINS "Build experimental first-party plugins outside the release scope" OFF)',
+            cmake,
+        )
+        self.assertRegex(
+            cmake,
+            re.compile(
+                r"if\(OBELISK_BUILD_EXPERIMENTAL_PLUGINS\)\s+"
+                r"add_subdirectory\(plugins/oPolicyAudit\)\s+"
+                r"endif\(\)",
+                re.M,
+            ),
+        )
+        for text in (architecture, status, release, plugins_readme):
+            self.assertIn("oPolicyAudit", text)
+            self.assertIn("OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON", text)
+        self.assertIn("Experimental Examples", plugins_readme)
+        self.assertIn("Excluded unless `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`", architecture)
+        self.assertIn("not published by `scripts/check_release_readiness.sh`", status)
+        self.assertNotIn("OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON", script)
+        self.assertNotIn("oPolicyAudit.so", script)
 
     def test_lead_commit_policy_prefers_useful_checkpoints(self) -> None:
         workflow_skill = read("agent-skills/obelisk-github-research-workflow/SKILL.md")
