@@ -27,6 +27,10 @@ Stable baseline:
   checks before maintenance restarts.
 - Plugin-owned callback cleanup and optional `ObeliskPlugin_Shutdown`.
 - Public SDK header at `include/obelisk/ObeliskApi.h`.
+- Promoted `GameplayPolicyEvent` callback ABI for copied POD structure and
+  inventory-backed policy signals.
+- Metadata-only `DescribeResourceKind` helper for category descriptors; no resource
+  handles or lookup yet.
 - CTest coverage for plugin config and ABI layout.
 
 Experimental:
@@ -40,8 +44,9 @@ Experimental:
 
 Not ready:
 
-- Public gameplay module APIs: players, chat, tribes, inventory, items, dinos,
-  structures, missions, transfers, permissions, timers, admin, and commands.
+- Public gameplay module APIs beyond `GameplayPolicyEvent`: players, chat, tribes,
+  inventory, items, dinos, full structure/resources APIs, missions, transfers,
+  permissions, timers, admin, and commands.
 - Production-ready gameplay SDK.
 
 See [docs/STATUS.md](docs/STATUS.md) for the current stability matrix and
@@ -107,11 +112,11 @@ build/_deps/subhook-build/libsubhook.so
 
 ## Runtime Layout
 
-Obelisk installs under an operator-chosen root. The current ARK debug harness
-uses `/servidor/ark/obelisk`:
+Obelisk installs under an operator-chosen root, referenced in docs as
+`<obelisk-root>`:
 
 ```text
-/servidor/ark/obelisk/
+<obelisk-root>/
   lib/
     libobelisk.so
     libsubhook.so
@@ -153,6 +158,13 @@ Plugins compile against:
 
 ```cpp
 #include <obelisk/ObeliskApi.h>
+```
+
+External plugins should consume the installed SDK package:
+
+```cmake
+find_package(Obelisk 0.1.0 CONFIG REQUIRED)
+target_link_libraries(MyPlugin PRIVATE Obelisk::obelisk_sdk)
 ```
 
 Minimal shape:
@@ -277,6 +289,101 @@ plugin documents and tests explicit cross-process ownership and locking.
 Copy the `ObeliskApi` table by value if shutdown, worker threads, or later callbacks need
 runtime functions.
 
+The promoted gameplay callback path is `GameplayPolicyEvent`. It is copied POD policy
+data, not a UE object/resource handle. Plugins must check the capability, appended
+function pointers, `struct_size`, and a non-zero `plugin_owner_token` before subscribing:
+
+```cpp
+static uint64_t g_gameplay_policy_handle = 0;
+
+static void OnGameplayPolicyEvent(const ObeliskGameplayPolicyEvent* event, void* user_data)
+{
+    (void)user_data;
+    if (!event ||
+        event->abi_version != OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION ||
+        event->struct_size < sizeof(ObeliskGameplayPolicyEvent))
+        return;
+
+    if ((event->field_mask & OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE) != 0)
+    {
+        const bool allowed =
+            (event->bool_values & (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_RETURN_VALUE)) != 0;
+        (void)allowed;
+    }
+
+    if ((event->flags & OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED) != 0)
+    {
+        if ((event->field_mask & OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER) != 0)
+        {
+            const bool requested_by_player =
+                (event->bool_values &
+                    (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_REQUESTED_BY_PLAYER)) != 0;
+            (void)requested_by_player;
+        }
+        if ((event->field_mask & OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN) != 0)
+        {
+            const bool ignore_cooldown =
+                (event->bool_values &
+                    (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_IGNORE_COOLDOWN)) != 0;
+            (void)ignore_cooldown;
+        }
+    }
+}
+
+static bool HasGameplayPolicyEventApi(const ObeliskApi* api, uint64_t owner_token)
+{
+    return api &&
+        owner_token != 0 &&
+        (api->capabilities & OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS) != 0 &&
+        api->struct_size >= offsetof(ObeliskApi, UnregisterGameplayPolicyEventWithOwnerToken) +
+            sizeof(api->UnregisterGameplayPolicyEventWithOwnerToken) &&
+        api->RegisterGameplayPolicyEventWithOwnerTokenHandle &&
+        api->UnregisterGameplayPolicyEventWithOwnerToken;
+}
+
+// During ObeliskPlugin_Init, after copying api/context into plugin-owned state:
+if (HasGameplayPolicyEventApi(&g_api, g_owner_token))
+{
+    const uint64_t event_mask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL;
+    // Use OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY for inventory-backed only.
+    g_gameplay_policy_handle = g_api.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+        g_owner_token,
+        event_mask,
+        OnGameplayPolicyEvent,
+        nullptr);
+    if (g_gameplay_policy_handle == 0)
+        return false;
+}
+
+// During ObeliskPlugin_Shutdown, before callback state can disappear:
+if (g_has_api && g_gameplay_policy_handle != 0 && g_api.UnregisterGameplayPolicyEventWithOwnerToken)
+    g_api.UnregisterGameplayPolicyEventWithOwnerToken(g_owner_token, g_gameplay_policy_handle);
+```
+
+`resource_kind` is categorical only. It is useful for routing or sanitized metrics such as
+"structure-backed policy event" or "inventory-item-backed policy event", but it is not a
+lookup key, persistent resource id, player/tribe/inventory/item identity, coordinates, UE
+pointer, or proof that two events refer to the same game object. Inventory-backed policy
+events are delivered through the same generic `GameplayPolicyEvent` masks, kinds, fields,
+and `INVENTORY_BACKED` flag; v0.1 does not ship a public Inventory SDK, Inventory callback
+ABI, item handle, lookup API, inventory contents API, mutation API, or return-override
+contract.
+
+Use `OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL` to receive every promoted policy event,
+`OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES` for structure-backed policy only, or
+`OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY` for inventory-backed policy only.
+Inventory-backed events currently expose copied scalar booleans only when their field bits
+are present: `REQUESTED_BY_PLAYER` for remote-add checks, `IGNORE_COOLDOWN` for use checks,
+and `RETURN_VALUE` for the observed policy result. These fields are observations, not
+identity, lookup, mutation, or override authority.
+
+Plugins that need category metadata can call `DescribeResourceKind` after checking
+`OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS`, that `struct_size` covers the appended
+`DescribeResourceKind` slot, and that the function pointer is non-null. The returned
+`ObeliskResourceKindDescriptor` is copied POD metadata only: stable category name,
+supported gameplay policy masks, supported field masks, and flags that explicitly mark the
+category as no-identity and no-lookup.
+
 `CallProcessEvent` is a low-level trampoline escape hatch. The ABI slot exists for
 compatibility, but plugins must treat it as unavailable unless `struct_size` covers the
 field, `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT` is advertised, and the function pointer
@@ -332,11 +439,10 @@ OBELISK_ENABLE_NATIVE_EXEC_PROBES=1      + enable-native-exec-probes
 ```
 
 Experimental scanners, candidate module observers, text logging, broad tracing, and native
-exec probes stay opt-in. Reflection captures belong on isolated/debug instances or the
-currently approved named harness only. Do not use these controls on normal player
-performance posture. Current operator direction protects `arkserver` / Ragnarok while
-users are active; `arkserver2` / TheIsland starts powered off and may be used only for an
-explicitly approved scoped test, then shut down afterward.
+exec probes stay opt-in. Reflection captures belong on isolated/debug instances or an
+operator-approved validation target only. Do not use these controls on normal player-facing
+or performance-sensitive servers. Debug targets should be started only for scoped tests and
+returned to stable posture afterward.
 
 Candidate module observers require the environment gate, supported binary SHA, the
 observer-specific instance marker, and `allow-experimental-observers` on the same
@@ -350,8 +456,8 @@ Near-term engineering:
   fixture, and install dry-run.
 - Strengthen sanitized reflection snapshots, manifest regeneration, and second-source
   comparison for candidate modules.
-- Define copied-data ownership and callback lifetime before exposing any plugin-facing
-  gameplay event.
+- Define copied-data ownership and callback lifetime before exposing additional
+  plugin-facing gameplay events.
 - Generalize FName/GObjects/UFunction lookup only after another capture or binary hash
   validates the current field layout.
 - Add small SDK examples for minimal load, filtered events, config, and safe

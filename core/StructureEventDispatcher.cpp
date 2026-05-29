@@ -10,6 +10,7 @@ namespace Obelisk::Core
     {
         struct DispatchRegistration
         {
+            uint64_t Id = 0;
             StructureEventSubscription Subscription;
         };
 
@@ -43,6 +44,27 @@ namespace Obelisk::Core
             }
 
             return true;
+        }
+
+        void DestroySubscriptionUserData(const StructureEventSubscription& subscription)
+        {
+            if (!subscription.DestroyUserData)
+                return;
+
+            try
+            {
+                subscription.DestroyUserData(subscription.UserData);
+            }
+            catch (const std::exception& e)
+            {
+                if (Obelisk::Logger::IsInitialized())
+                    OBELISK_ERROR("Structure event subscription cleanup threw: {}", e.what());
+            }
+            catch (...)
+            {
+                if (Obelisk::Logger::IsInitialized())
+                    OBELISK_ERROR("Structure event subscription cleanup threw an unknown exception.");
+            }
         }
     }
 
@@ -85,22 +107,66 @@ namespace Obelisk::Core
                            });
     }
 
+    bool StructureEventDispatcher::IsRegistrationActive(uint64_t registrationId) const
+    {
+        std::lock_guard<std::mutex> lock(m_Mutex);
+        return HasRegistrationId(registrationId);
+    }
+
     bool StructureEventDispatcher::Unregister(uint64_t registrationId)
     {
         if (registrationId == 0)
             return false;
 
         std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
-        std::lock_guard<std::mutex> lock(m_Mutex);
-        const auto before = m_Registrations.size();
-        m_Registrations.erase(
-            std::remove_if(m_Registrations.begin(),
-                           m_Registrations.end(),
-                           [registrationId](const Registration& item) {
-                               return item.Id == registrationId;
-                           }),
-            m_Registrations.end());
-        return m_Registrations.size() != before;
+        std::vector<StructureEventSubscription> removed;
+        size_t before = 0;
+        size_t after = 0;
+        {
+            std::lock_guard<std::mutex> lock(m_Mutex);
+            before = m_Registrations.size();
+            auto keepEnd = std::remove_if(m_Registrations.begin(),
+                                          m_Registrations.end(),
+                                          [registrationId, &removed](const Registration& item) {
+                                              if (item.Id != registrationId)
+                                                  return false;
+                                              removed.push_back(item.Subscription);
+                                              return true;
+                                          });
+            m_Registrations.erase(keepEnd, m_Registrations.end());
+            after = m_Registrations.size();
+        }
+        for (const StructureEventSubscription& subscription : removed)
+            DestroySubscriptionUserData(subscription);
+        return after != before;
+    }
+
+    bool StructureEventDispatcher::UnregisterCallbackForOwner(void* owner, uint64_t registrationId)
+    {
+        if (!owner || registrationId == 0)
+            return false;
+
+        std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
+        std::vector<StructureEventSubscription> removed;
+        size_t before = 0;
+        size_t after = 0;
+        {
+            std::lock_guard<std::mutex> lock(m_Mutex);
+            before = m_Registrations.size();
+            auto keepEnd = std::remove_if(m_Registrations.begin(),
+                                          m_Registrations.end(),
+                                          [owner, registrationId, &removed](const Registration& item) {
+                                              if (item.Owner != owner || item.Id != registrationId)
+                                                  return false;
+                                              removed.push_back(item.Subscription);
+                                              return true;
+                                          });
+            m_Registrations.erase(keepEnd, m_Registrations.end());
+            after = m_Registrations.size();
+        }
+        for (const StructureEventSubscription& subscription : removed)
+            DestroySubscriptionUserData(subscription);
+        return after != before;
     }
 
     size_t StructureEventDispatcher::UnregisterCallbacksForOwner(void* owner)
@@ -109,16 +175,26 @@ namespace Obelisk::Core
             return 0;
 
         std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
-        std::lock_guard<std::mutex> lock(m_Mutex);
-        const auto before = m_Registrations.size();
-        m_Registrations.erase(
-            std::remove_if(m_Registrations.begin(),
-                           m_Registrations.end(),
-                           [owner](const Registration& item) {
-                               return item.Owner == owner;
-                           }),
-            m_Registrations.end());
-        return before - m_Registrations.size();
+        std::vector<StructureEventSubscription> removed;
+        size_t before = 0;
+        size_t after = 0;
+        {
+            std::lock_guard<std::mutex> lock(m_Mutex);
+            before = m_Registrations.size();
+            auto keepEnd = std::remove_if(m_Registrations.begin(),
+                                          m_Registrations.end(),
+                                          [owner, &removed](const Registration& item) {
+                                              if (item.Owner != owner)
+                                                  return false;
+                                              removed.push_back(item.Subscription);
+                                              return true;
+                                          });
+            m_Registrations.erase(keepEnd, m_Registrations.end());
+            after = m_Registrations.size();
+        }
+        for (const StructureEventSubscription& subscription : removed)
+            DestroySubscriptionUserData(subscription);
+        return before - after;
     }
 
     void StructureEventDispatcher::SetNextRegistrationIdForTesting(uint64_t nextRegistrationId)
@@ -146,12 +222,14 @@ namespace Obelisk::Core
             std::lock_guard<std::mutex> lock(m_Mutex);
             callbacks.reserve(m_Registrations.size());
             for (const Registration& item : m_Registrations)
-                callbacks.push_back({item.Subscription});
+                callbacks.push_back({item.Id, item.Subscription});
         }
 
         size_t dispatched = 0;
         for (const DispatchRegistration& item : callbacks)
         {
+            if (!IsRegistrationActive(item.Id))
+                continue;
             if (!item.Subscription.Callback)
                 continue;
 

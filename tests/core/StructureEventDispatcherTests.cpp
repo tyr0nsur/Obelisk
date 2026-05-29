@@ -133,6 +133,12 @@ namespace
         scalars[0].Field = static_cast<Obelisk::Core::StructureScalarField>(99);
         unknownScalar.Scalars = scalars;
         Require(dispatcher.Dispatch(unknownScalar) == 0, "unknown structure scalar field was dispatched");
+
+        Obelisk::Core::StructureEventView unknownScalarType = MakeEvent(scalars);
+        scalars = MakeScalars();
+        scalars[0].Type = static_cast<Obelisk::Core::StructureScalarType>(99);
+        unknownScalarType.Scalars = scalars;
+        Require(dispatcher.Dispatch(unknownScalarType) == 0, "unknown structure scalar type was dispatched");
         Require(capture.Calls == 0, "invalid structure event reached callback");
     }
 
@@ -148,6 +154,31 @@ namespace
         Require(dispatcher.Unregister(id), "first unregister failed");
         Require(!dispatcher.Unregister(id), "second unregister was not idempotent");
         Require(dispatcher.Dispatch(MakeEvent(scalars)) == 0, "unregistered callback ran");
+    }
+
+    void TestUnregisterForOwnerRequiresMatchingOwner()
+    {
+        Obelisk::Core::StructureEventDispatcher dispatcher;
+        int owner = 0;
+        int otherOwner = 0;
+        Capture capture;
+        const std::vector<Obelisk::Core::StructureScalarValue> scalars = MakeScalars();
+
+        const uint64_t id = dispatcher.Register(&owner, {CaptureCallback, &capture});
+        Require(id != 0, "registration id was not assigned");
+        Require(!dispatcher.UnregisterCallbackForOwner(&otherOwner, id),
+                "wrong owner unregistered a structure callback");
+        Require(dispatcher.Dispatch(MakeEvent(scalars)) == 1,
+                "callback was removed by wrong owner");
+        Require(dispatcher.UnregisterCallbackForOwner(&owner, id),
+                "matching owner could not unregister structure callback");
+        Require(!dispatcher.UnregisterCallbackForOwner(&owner, id),
+                "matching owner unregister succeeded twice");
+        Require(!dispatcher.UnregisterCallbackForOwner(&owner, 0),
+                "zero registration id unregistered a structure callback");
+        Require(!dispatcher.UnregisterCallbackForOwner(nullptr, id),
+                "null owner unregistered a structure callback");
+        Require(dispatcher.SubscriptionCount() == 0, "owner-scoped unregister left callback behind");
     }
 
     void TestRegistrationIdsSkipZeroAndLiveIdsAfterWrap()
@@ -202,6 +233,56 @@ namespace
         Require(capture.Calls == 1, "self-unregister callback ran wrong number of times");
         Require(dispatcher.SubscriptionCount() == 0, "self-unregister callback remained registered");
         Require(dispatcher.Dispatch(MakeEvent(scalars)) == 0, "self-unregistered callback ran twice");
+    }
+
+    struct ReentrantUnregisterOtherState
+    {
+        Obelisk::Core::StructureEventDispatcher* Dispatcher = nullptr;
+        void* Owner = nullptr;
+        uint64_t OtherRegistrationId = 0;
+        int FirstCalls = 0;
+        int SecondCalls = 0;
+        int Destroyed = 0;
+    };
+
+    void ReentrantUnregisterFirstCallback(const Obelisk::Core::StructureEventView&, void* userData)
+    {
+        auto* state = static_cast<ReentrantUnregisterOtherState*>(userData);
+        ++state->FirstCalls;
+        Require(state->Dispatcher != nullptr, "reentrant unregister callback had no dispatcher");
+        Require(state->Dispatcher->UnregisterCallbackForOwner(state->Owner, state->OtherRegistrationId),
+                "reentrant unregister of second structure callback failed");
+    }
+
+    void ReentrantUnregisterSecondCallback(const Obelisk::Core::StructureEventView&, void* userData)
+    {
+        auto* state = static_cast<ReentrantUnregisterOtherState*>(userData);
+        ++state->SecondCalls;
+    }
+
+    void CountDestroyed(void* userData)
+    {
+        auto* state = static_cast<ReentrantUnregisterOtherState*>(userData);
+        ++state->Destroyed;
+    }
+
+    void TestReentrantUnregisterSkipsRemovedSnapshotCallback()
+    {
+        Obelisk::Core::StructureEventDispatcher dispatcher;
+        int owner = 0;
+        ReentrantUnregisterOtherState state{&dispatcher, &owner, 0, 0, 0, 0};
+        const std::vector<Obelisk::Core::StructureScalarValue> scalars = MakeScalars();
+
+        const uint64_t firstId = dispatcher.Register(&owner, {ReentrantUnregisterFirstCallback, &state});
+        state.OtherRegistrationId = dispatcher.Register(&owner, {ReentrantUnregisterSecondCallback, &state, CountDestroyed});
+        Require(firstId != 0 && state.OtherRegistrationId != 0, "reentrant unregister registrations failed");
+
+        Require(dispatcher.Dispatch(MakeEvent(scalars)) == 1,
+                "removed snapshot structure callback was dispatched");
+        Require(state.FirstCalls == 1, "first reentrant structure callback did not run");
+        Require(state.SecondCalls == 0, "unregistered second structure callback ran from stale snapshot");
+        Require(state.Destroyed == 1, "second structure callback user data was not destroyed exactly once");
+        Require(dispatcher.SubscriptionCount() == 1, "wrong structure subscription count after reentrant unregister");
     }
 
     struct BlockingCallbackState
@@ -305,8 +386,10 @@ int main()
     TestRegisterRejectsInvalidInput();
     TestDispatchRejectsUnknownEventShape();
     TestUnregisterIsIdempotent();
+    TestUnregisterForOwnerRequiresMatchingOwner();
     TestRegistrationIdsSkipZeroAndLiveIdsAfterWrap();
     TestCallbackCanUnregisterItself();
+    TestReentrantUnregisterSkipsRemovedSnapshotCallback();
     TestOwnerCleanupWaitsForInFlightDispatch();
     TestOwnerCleanup();
     TestExceptionsDoNotStopDispatch();

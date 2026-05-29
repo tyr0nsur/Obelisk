@@ -233,7 +233,7 @@ namespace
         Require(EvaluateGate("0", true, supportedSha).Status == GateStatus::Disabled,
                 "non-1 enable env should disable chat reflection");
         Require(EvaluateGate("1", false, supportedSha).Status == GateStatus::MissingInstanceMarker,
-                "missing instance marker gate was not rejected");
+                "missing observer-debug marker gate was not rejected");
         Require(EvaluateGate("1", true, nullptr).Status == GateStatus::MissingBinarySha256,
                 "missing binary SHA gate was not rejected");
         Require(EvaluateGate("1", true, "").Status == GateStatus::MissingBinarySha256,

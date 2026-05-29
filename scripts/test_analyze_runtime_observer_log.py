@@ -277,6 +277,20 @@ class RuntimeObserverLogAnalyzerTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("refusing to read live server path", result.stderr)
 
+    def test_allows_offline_workspace_path_past_live_server_guard(self) -> None:
+        offline_path = Path("/servidor/ark/workspace-offline/__missing_observer_policy_test__.log")
+        result = subprocess.run(
+            [sys.executable, str(ANALYZER), str(offline_path)],
+            check=False,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("log does not exist", result.stderr)
+        self.assertNotIn("refusing to read live server path", result.stderr)
+
     def test_fail_on_quality_blockers_allows_clean_observational_summary(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             log_path = Path(temp_dir) / "Obelisk.log"

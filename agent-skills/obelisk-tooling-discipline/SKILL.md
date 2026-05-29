@@ -19,6 +19,13 @@ Offline-safe:
 - Ghidra/rizin/radare2 on copied binaries
 - CMake/CTest validation against copied or installed SDK artifacts
 
+Protected-path validation for offline tools must check both the direct expanded path and
+the symlink-resolved path. A path textually under `/servidor/ark` is rejected even if it is
+a symlink to an outside workspace, and a path outside `/servidor/ark` is rejected if it
+resolves back under the protected server tree. The approved exception is
+`/servidor/ark/workspace-offline`, which may hold hardlinks or copied artifacts for
+offline analysis; do not point tools directly at `/servidor/ark/obelisk/dumps`.
+
 Isolated-debug only:
 
 - `gdb` attach,
@@ -86,6 +93,10 @@ Before adopting a tool into the workflow:
 - Every runtime capture should have both a capture artifact and a post-capture posture
   check. Use an explicit map/instance for the approved debug target; do not use defaults
   or protected live instances as a convenience validation target.
+- Raw captures may live under `/servidor/ark/obelisk/dumps` for disk space and server-local
+  collection. Promotion, snapshot regeneration, static evidence, and second-source intake
+  tools must consume hardlinked or copied artifacts from `/servidor/ark/workspace-offline`
+  or another approved offline root, not direct `dumps` paths.
 - A tool result is not accepted unless another engineer can reproduce it from the command,
   binary hash, Obelisk commit, and copied artifacts.
 - UI-only Ghidra conclusions must be translated into text: function/address, xref path,

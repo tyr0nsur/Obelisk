@@ -19,6 +19,7 @@ from typing import Callable, Iterable
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 import enumerate_core_uobjects as uobjects  # noqa: E402
+from snapshot_evidence_pack import reject_protected_input_path  # noqa: E402
 
 
 DEFAULT_WINDOW_SIZE = 0xC0
@@ -1193,7 +1194,8 @@ def main() -> int:
     ):
         raise SystemExit("evidence metadata flags require --snapshot-json")
 
-    memory = uobjects.CoreMemory(args.core)
+    core_path = reject_protected_input_path(args.core, "--core")
+    memory = uobjects.CoreMemory(core_path)
     try:
         payload = inspect_core(
             memory,
@@ -1213,7 +1215,7 @@ def main() -> int:
         memory.close()
 
     if args.json:
-        print(json.dumps({"core": str(args.core), **payload}, indent=2, sort_keys=True))
+        print(json.dumps({"core": str(core_path), **payload}, indent=2, sort_keys=True))
     elif args.snapshot_json:
         evidence = {
             "ark_binary_sha256": args.evidence_ark_sha256,

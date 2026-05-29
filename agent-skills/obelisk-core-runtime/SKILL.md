@@ -91,8 +91,10 @@ Own these areas:
   value and must not reuse currently-live IDs after counter wrap. `0` remains the failure
   sentinel across plugin-facing registration APIs.
 - Keep plugin-owned lifecycle cleanup shared across `EventManager`, the internal
-  `ChatEventDispatcher`, and `StructureEventDispatcher`; future event families must join
-  the same owner cleanup path before any public SDK exposure.
+  `ChatEventDispatcher`, and `StructureEventDispatcher`. Public `GameplayPolicyEvent`
+  subscriptions are backed by `StructureEventDispatcher` and must keep owner-token handle
+  registration, owner-scoped unregister, `DestroyUserData` cleanup, and plugin unload
+  cleanup intact.
 - Preserve optional plugin shutdown ordering: call `ObeliskPlugin_Shutdown()` before
   plugin-owned callback cleanup and before `dlclose`.
 - Follow `docs/PLUGIN_ARCHITECTURE.md` before adding plugin examples or promoting
@@ -119,8 +121,10 @@ instead of clearing the hook while patched bytes may still execute.
 
 Do not treat any shared or player-facing ARK instance as a validation target by default.
 Read `docs/agent-handoff/CURRENT.md` for the current live target posture before any
-server-backed work, and require explicit operator approval for the exact instance, marker
-changes, restart window, rollback plan, and shutdown expectations.
+server-backed work. If CURRENT grants standing approval for `arkserver2` / TheIsland, that
+instance may be used for scoped Obelisk debug/development validation; other instances
+require explicit operator approval for the exact instance, marker changes, restart window,
+rollback plan, and shutdown expectations.
 
 For risky probes such as ReflectionScanner, native exec, ptrace/gcore, broad tracing, or
 text/gameplay-payload logging, first obtain explicit operator approval for the exact debug

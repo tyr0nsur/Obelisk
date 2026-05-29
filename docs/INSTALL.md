@@ -5,7 +5,7 @@ This guide describes the centralized LinuxGSM layout used by Obelisk.
 ## Build
 
 ```bash
-cd /home/flowcommunity-ark/Obelisk
+cd <repo-root>
 cmake -S . -B build
 cmake --build build -j"$(nproc)"
 ```
@@ -15,7 +15,7 @@ cmake --build build -j"$(nproc)"
 Recommended root:
 
 ```text
-/servidor/ark/obelisk/
+<obelisk-root>/
   lib/
   plugins/
   config/<plugin-id>/<plugin-config-file>
@@ -26,7 +26,7 @@ Recommended root:
 Install the runtime:
 
 ```bash
-./scripts/install_obelisk.sh --backup-existing /servidor/ark/obelisk
+./scripts/install_obelisk.sh --backup-existing <obelisk-root>
 ```
 
 The install root must be supplied explicitly as a positional argument; the installer does
@@ -73,13 +73,13 @@ Plugins loaded from `plugins/` are expected to own their config defaults. The pr
 directory for plugin config is:
 
 ```text
-/servidor/ark/obelisk/config/<plugin-id>/
+<obelisk-root>/config/<plugin-id>/
 ```
 
-The runtime loads every `.so` directly inside `/servidor/ark/obelisk/plugins/` on restart.
+The runtime loads every `.so` directly inside `<obelisk-root>/plugins/` on restart.
 If a plugin should not load, do not place it in `plugins/`.
 Install plugin `.so` files with `scripts/install_obelisk_plugin.sh <PluginName.so>
-/servidor/ark/obelisk`; it stages the copy under a non-`.so` name and publishes it with an
+<obelisk-root>`; it stages the copy under a non-`.so` name and publishes it with an
 atomic rename inside the shared plugin directory. The plugin installer also rejects a
 missing positional root, ignores inherited `OBELISK_ROOT` as an install target, and rejects
 a symlinked `plugins` directory. Do not copy plugins directly into the active directory
@@ -113,7 +113,7 @@ versioned template:
 
 ```bash
 scripts/check_linuxgsm_wrapper_drift.sh \
-  --installed /servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ObeliskRun.sh
+  --installed <ark-root>/serverfiles/ShooterGame/Binaries/Linux/ObeliskRun.sh
 ```
 
 Then configure LinuxGSM:
@@ -122,9 +122,10 @@ Then configure LinuxGSM:
 executable="./ObeliskRun.sh"
 ```
 
-Current instance posture is tracked in `docs/agent-handoff/CURRENT.md`. Do not restart,
-change markers, or run Obelisk tests on shared or player-facing instances without explicit
-operator approval for the target, rollback plan, and shutdown expectations.
+Do not restart, change markers, or run Obelisk tests on shared or player-facing instances
+without explicit operator approval for the target, rollback plan, and shutdown
+expectations. Keep current instance posture in operator-owned deployment notes outside the
+public SDK docs.
 
 ## Instance Identity
 
@@ -178,8 +179,8 @@ Instance marker files are preferred for production operations:
 
 ```bash
 # Approved debug window only. Do not run from an ordinary install or agent round.
-# mkdir -p /servidor/ark/obelisk/state/instances/<approved-instance-id>
-# touch /servidor/ark/obelisk/state/instances/<approved-instance-id>/<approved-marker>
+# mkdir -p <obelisk-root>/state/instances/<approved-instance-id>
+# touch <obelisk-root>/state/instances/<approved-instance-id>/<approved-marker>
 ```
 
 Do not create, remove, or refresh `arkserver` / Ragnarok markers from install or debug
@@ -262,11 +263,9 @@ the release wrapper.
 Runtime logs are written to:
 
 ```text
-/servidor/ark/obelisk/logs/arkserver/Obelisk.log
-/servidor/ark/obelisk/logs/arkserver/Obelisk-Ragnarok.log
-/servidor/ark/obelisk/logs/arkserver2/Obelisk.log
-/servidor/ark/obelisk/logs/arkserver2/Obelisk-TheIsland.log
-/servidor/ark/obelisk/logs/isolated-debug/
+<obelisk-root>/logs/<instance-id>/Obelisk.log
+<obelisk-root>/logs/<instance-id>/Obelisk-<map>.log
+<obelisk-root>/logs/isolated-debug/
 ```
 
 The LinuxGSM wrapper sets `OBELISK_INSTANCE_ID`. Custom launchers should set it explicitly

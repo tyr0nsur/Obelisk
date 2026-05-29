@@ -101,9 +101,9 @@ inputs only. Stable plugin contracts should be expressed through public SDK
 headers and documented runtime behavior.
 
 Current runtime debug work must keep shared/player-facing instances untouched unless the
-operator approves a specific maintenance window. Server-backed validation uses the current
-approved debug/development target from `docs/agent-handoff/CURRENT.md`, with explicit
-gates, rollback checks, and shutdown expectations.
+operator approves a specific maintenance window. Server-backed validation should use an
+operator-approved debug/development target with explicit gates, rollback checks, and
+shutdown expectations.
 
 ## SDK Direction
 

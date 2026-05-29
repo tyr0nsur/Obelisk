@@ -22,7 +22,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SERVER_ROOT = Path("/servidor/ark")
-ALLOWED_SERVER_ARTIFACT_ROOT = SERVER_ROOT / "obelisk" / "dumps"
+APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
 
 DEFAULT_CANDIDATES = [
     ("static_fname_root_slot", 0x5956F30),
@@ -70,6 +70,49 @@ def is_relative_to(path: Path, parent: Path) -> bool:
     except ValueError:
         return False
     return True
+
+
+def is_approved_offline_workspace_path(path: Path) -> bool:
+    resolved = path.resolve()
+    return any(is_relative_to(resolved, root.resolve()) for root in APPROVED_OFFLINE_WORKSPACE_ROOTS)
+
+
+def reject_protected_input_path(path: Path, label: str) -> None:
+    expanded = path.expanduser()
+    if expanded.is_absolute() and is_relative_to(expanded, SERVER_ROOT) and not is_approved_offline_workspace_path(expanded):
+        print(f"{label} must not read from protected server root {SERVER_ROOT}: {expanded}", file=sys.stderr)
+        raise SystemExit(2)
+    resolved = expanded.resolve()
+    if is_relative_to(resolved, SERVER_ROOT.resolve()) and not is_approved_offline_workspace_path(resolved):
+        print(f"{label} must not read from protected server root {SERVER_ROOT}: {resolved}", file=sys.stderr)
+        raise SystemExit(2)
+
+
+def reject_protected_output_path(path: Path, label: str) -> None:
+    expanded = path.expanduser()
+    if expanded.is_absolute() and is_relative_to(expanded, SERVER_ROOT) and not is_approved_offline_workspace_path(expanded):
+        print(f"{label} must not write under protected server root {SERVER_ROOT}: {expanded}", file=sys.stderr)
+        raise SystemExit(2)
+    resolved = expanded.resolve()
+    if is_relative_to(resolved, SERVER_ROOT.resolve()) and not is_approved_offline_workspace_path(resolved):
+        print(f"{label} must not write under protected server root {SERVER_ROOT}: {resolved}", file=sys.stderr)
+        raise SystemExit(2)
+
+
+def require_ignored_output_path(path: Path, label: str) -> None:
+    candidate = path.expanduser().resolve()
+    try:
+        relative = candidate.relative_to(REPO_ROOT)
+    except ValueError:
+        return
+    result = subprocess.run(
+        ["git", "check-ignore", "-q", "--", str(relative)],
+        cwd=REPO_ROOT,
+        check=False,
+    )
+    if result.returncode != 0:
+        print(f"{label} is inside the repository but is not ignored by Git: {candidate}", file=sys.stderr)
+        raise SystemExit(2)
 
 
 def sha256_file(path: Path) -> str:
@@ -121,6 +164,38 @@ def require_success(record: dict[str, object]) -> None:
     if record["returncode"] != 0:
         command = " ".join(str(part) for part in record["command"])
         raise RuntimeError(f"command failed with exit {record['returncode']}: {command}")
+
+
+def load_json_object_if_available(path: Path) -> dict[str, object]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def fname_candidate_manifest_status(scan_payload: dict[str, object], enabled: bool) -> str:
+    if not enabled:
+        return "not_requested"
+    candidate_manifest = scan_payload.get("candidate_manifest")
+    if isinstance(candidate_manifest, dict) and candidate_manifest.get("name_count"):
+        return "written"
+    readiness = scan_payload.get("manifest_readiness")
+    if isinstance(readiness, dict) and readiness.get("blockers"):
+        return "blocked"
+    return "requested"
+
+
+def fname_candidate_manifest_artifact(scan_payload: dict[str, object], enabled: bool) -> str | None:
+    if not enabled:
+        return None
+    candidate_manifest = scan_payload.get("candidate_manifest")
+    if not isinstance(candidate_manifest, dict):
+        return None
+    path = candidate_manifest.get("path")
+    if not isinstance(path, str) or not path:
+        return None
+    return path if Path(path).is_file() else None
 
 
 def parse_int(value: str) -> int:
@@ -206,15 +281,19 @@ def xref_record(
     target: str,
     target_label: str,
     instruction: str,
+    match_kinds: list[str],
     function_start: str | None,
     function_label: str | None,
 ) -> dict[str, object]:
+    is_rip_relative = "[rip" in instruction.lower() or "(%rip)" in instruction.lower()
     return {
         "line": line_number,
         "instruction_address": instruction_address,
         "target_address": target,
         "target_label": target_label,
         "instruction": instruction,
+        "match_kinds": match_kinds,
+        "target_is_rip_relative": is_rip_relative and "comment_target" in match_kinds,
         "access": classify_xref_access(instruction),
         "function_start": function_start,
         "function_label": function_label,
@@ -369,15 +448,16 @@ def collect_static_xrefs(objdump_path: Path, targets: dict[str, str]) -> dict[st
             instruction_address = normalize_hex(instruction_match.group("address"))
             instruction = " ".join(instruction_match.group("body").split())
 
-            matched_targets: set[str] = set()
+            target_match_kinds: dict[str, set[str]] = {}
             match = OBJDUMP_XREF_RE.search(stripped)
             if match:
                 target = normalize_hex(match.group("target"))
                 if target in targets:
-                    matched_targets.add(target)
-            matched_targets.update(immediate_targets_from_instruction(instruction, targets))
+                    target_match_kinds.setdefault(target, set()).add("comment_target")
+            for target in immediate_targets_from_instruction(instruction, targets):
+                target_match_kinds.setdefault(target, set()).add("immediate_literal")
 
-            for target in sorted(matched_targets):
+            for target, match_kinds in sorted(target_match_kinds.items()):
                 xrefs[target].append(
                     xref_record(
                         line_number=line_number,
@@ -385,6 +465,7 @@ def collect_static_xrefs(objdump_path: Path, targets: dict[str, str]) -> dict[st
                         target=target,
                         target_label=targets[target],
                         instruction=instruction,
+                        match_kinds=sorted(match_kinds),
                         function_start=function_start,
                         function_label=function_label,
                     )
@@ -596,13 +677,13 @@ def extend_gobjects_sample_commands(
                     'printf "chunk = %p item = %p\\n", $gobjects_chunk, $fuobject_item',
                     "x/2gx $fuobject_item",
                     "set $uobject = *(void**)$fuobject_item",
-                    "set $fuobject_metadata = *(unsigned long long*)(((char*)$fuobject_item)+0x8)",
-                    "set $fuobject_flags = *(int*)(((char*)$fuobject_item)+0x8)",
-                    "set $fuobject_serial = *(int*)(((char*)$fuobject_item)+0xc)",
+                    "set $fuobject_qword_0x8 = *(unsigned long long*)(((char*)$fuobject_item)+0x8)",
+                    "set $fuobject_dword_0x8 = *(int*)(((char*)$fuobject_item)+0x8)",
+                    "set $fuobject_dword_0xc = *(int*)(((char*)$fuobject_item)+0xc)",
                     (
-                        'printf "object = %p item_metadata = 0x%llx item_flags = 0x%x '
-                        'serial = %d\\n", $uobject, $fuobject_metadata, '
-                        "$fuobject_flags, $fuobject_serial"
+                        'printf "object = %p item_qword_0x8 = 0x%llx item_dword_0x8 = 0x%x '
+                        'item_dword_0xc = %d\\n", $uobject, $fuobject_qword_0x8, '
+                        "$fuobject_dword_0x8, $fuobject_dword_0xc"
                     ),
                     "x/8gx $uobject",
                     "set $uobject_vtable = *(void**)$uobject",
@@ -775,8 +856,8 @@ def parse_args() -> argparse.Namespace:
         required=True,
         type=Path,
         help=(
-            "Artifact directory to create or reuse. Under /servidor/ark, only "
-            "/servidor/ark/obelisk/dumps is allowed."
+            "Offline artifact directory to create or reuse, such as /tmp/obelisk-core-pack. "
+            "Paths under /servidor/ark are rejected."
         ),
     )
     parser.add_argument(
@@ -934,19 +1015,17 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
 
+    try:
+        reject_protected_input_path(args.binary, "--binary")
+        reject_protected_input_path(args.core, "--core")
+        reject_protected_output_path(args.output_dir, "--output-dir")
+        require_ignored_output_path(args.output_dir, "--output-dir")
+    except SystemExit as exc:
+        return int(exc.code)
     binary = args.binary.resolve()
     core = args.core.resolve()
     output_dir = args.output_dir.resolve()
 
-    if is_relative_to(output_dir, SERVER_ROOT) and not is_relative_to(
-        output_dir, ALLOWED_SERVER_ARTIFACT_ROOT
-    ):
-        print(
-            "refusing to write evidence artifacts under "
-            f"{SERVER_ROOT}; use {ALLOWED_SERVER_ARTIFACT_ROOT}",
-            file=sys.stderr,
-        )
-        return 2
     if not binary.is_file():
         print(f"binary does not exist: {binary}", file=sys.stderr)
         return 2
@@ -1001,6 +1080,8 @@ def main() -> int:
         print("--fname-scan-max-pointer-hits must be positive", file=sys.stderr)
         return 2
 
+    binary_sha256 = sha256_file(binary)
+    fname_scan_payload: dict[str, object] = {}
     commands: dict[str, dict[str, object]] = {}
     try:
         commands["binary_file"] = run_command(
@@ -1077,18 +1158,33 @@ def main() -> int:
             gdb_commands.unlink(missing_ok=True)
 
         if args.scan_fname_tables:
-            commands["core_fname_table_scan"] = run_command(
+            fname_scan_command = [
+                sys.executable,
+                str(REPO_ROOT / "scripts" / "scan_core_fname_tables.py"),
+                "--core",
+                str(core),
+                "--max-none-hits",
+                str(args.fname_scan_max_none_hits),
+                "--max-pointer-hits",
+                str(args.fname_scan_max_pointer_hits),
+                "--json",
+            ]
+            for label, index in fname_indices:
+                fname_scan_command.extend(["--index", f"{label}={index}"])
+            if args.no_default_fname_indices and not fname_indices:
+                fname_scan_command.append("--no-default-indices")
+            fname_scan_command.extend(
                 [
-                    sys.executable,
-                    str(REPO_ROOT / "scripts" / "scan_core_fname_tables.py"),
-                    "--core",
-                    str(core),
-                    "--max-none-hits",
-                    str(args.fname_scan_max_none_hits),
-                    "--max-pointer-hits",
-                    str(args.fname_scan_max_pointer_hits),
-                    "--json",
-                ],
+                    "--ark-binary-sha256",
+                    binary_sha256,
+                    "--manifest-out",
+                    str(output_dir / "core.fname-index-manifest.json"),
+                    "--manifest-evidence",
+                    str(output_dir / "manifest.json"),
+                ]
+            )
+            commands["core_fname_table_scan"] = run_command(
+                fname_scan_command,
                 output_dir / "core.fname-table-scan.json",
             )
 
@@ -1102,11 +1198,12 @@ def main() -> int:
                 "gdb core inspection failed; inspect gdb-core.txt.stderr or rerun with "
                 "--allow-partial-gdb for triage-only evidence"
             )
+        if args.scan_fname_tables:
+            fname_scan_payload = load_json_object_if_available(output_dir / "core.fname-table-scan.json")
     except (OSError, RuntimeError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
 
-    binary_sha256 = sha256_file(binary)
     core_sha256 = None if args.skip_core_sha256 else sha256_file(core)
 
     (output_dir / "ShooterGameServer.sha256.txt").write_text(
@@ -1191,6 +1288,16 @@ def main() -> int:
             "enabled": args.scan_fname_tables,
             "max_none_hits": args.fname_scan_max_none_hits,
             "max_pointer_hits": args.fname_scan_max_pointer_hits,
+            "candidate_manifest_status": fname_candidate_manifest_status(
+                fname_scan_payload,
+                args.scan_fname_tables,
+            ),
+            "requested_indices": [
+                {"label": label, "index": index}
+                for label, index in fname_indices
+            ],
+            "manifest_readiness": fname_scan_payload.get("manifest_readiness"),
+            "candidate_manifest": fname_scan_payload.get("candidate_manifest"),
         },
         "artifacts": {
             "binary_file": str(output_dir / "ShooterGameServer.file.txt"),
@@ -1210,6 +1317,12 @@ def main() -> int:
                 str(output_dir / "core.fname-table-scan.json")
                 if args.scan_fname_tables
                 else None
+            ),
+            "core_fname_index_manifest": (
+                fname_candidate_manifest_artifact(
+                    fname_scan_payload,
+                    args.scan_fname_tables,
+                )
             ),
         },
         "commands": commands,

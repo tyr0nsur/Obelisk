@@ -8,6 +8,10 @@
 #error "Public chat API must stay gated until chat ABI promotion requirements are complete."
 #endif
 
+#ifdef OBELISK_API_CAPABILITY_STRUCTURE_EVENTS
+#error "Public structure API must stay gated until StructureEvents promotion requirements are complete."
+#endif
+
 namespace
 {
     template <typename T>
@@ -29,6 +33,20 @@ namespace
         volatile std::uint64_t callbackHandlesCapability = OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES;
         volatile std::uint64_t callProcessEventCapability = OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT;
         volatile std::uint64_t processEventBlockingCapability = OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING;
+        volatile std::uint64_t gameplayPolicyEventsCapability = OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS;
+        volatile std::uint64_t resourceKindDescriptorsCapability = OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS;
+        volatile std::uint32_t gameplayPolicyEventVersion = OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION;
+        volatile std::uint32_t resourceKindDescriptorVersion = OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION;
+        volatile std::uint64_t gameplayPolicyCopiedPayloadFlag = OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD;
+        volatile std::uint64_t gameplayPolicyStructureBackedFlag = OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED;
+        volatile std::uint64_t gameplayPolicyInventoryBackedFlag = OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED;
+        volatile std::uint64_t resourceKindCategoryOnlyFlag = OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_CATEGORY_ONLY;
+        volatile std::uint64_t resourceKindNoIdentityFlag = OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY;
+        volatile std::uint64_t resourceKindNoLookupFlag = OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP;
+        volatile std::uint64_t gameplayPolicyAllStructuresMask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES;
+        volatile std::uint64_t gameplayPolicyAllInventoryMask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY;
+        volatile std::uint64_t gameplayPolicyAllMask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL;
+        volatile std::uint64_t gameplayPolicyReturnValueMask = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE;
 
         (void)apiVersion;
         (void)metadataVersion;
@@ -39,18 +57,114 @@ namespace
         (void)callbackHandlesCapability;
         (void)callProcessEventCapability;
         (void)processEventBlockingCapability;
+        (void)gameplayPolicyEventsCapability;
+        (void)resourceKindDescriptorsCapability;
+        (void)gameplayPolicyEventVersion;
+        (void)resourceKindDescriptorVersion;
+        (void)gameplayPolicyCopiedPayloadFlag;
+        (void)gameplayPolicyStructureBackedFlag;
+        (void)gameplayPolicyInventoryBackedFlag;
+        (void)resourceKindCategoryOnlyFlag;
+        (void)resourceKindNoIdentityFlag;
+        (void)resourceKindNoLookupFlag;
+        (void)gameplayPolicyAllStructuresMask;
+        (void)gameplayPolicyAllInventoryMask;
+        (void)gameplayPolicyAllMask;
+        (void)gameplayPolicyReturnValueMask;
     }
 }
 
 int main()
 {
     static_assert(sizeof(void*) == 8, "Obelisk ABI layout tests target Linux x86_64");
+    static_assert(OBELISK_API_ABI_VERSION == 1u);
+    static_assert(OBELISK_PLUGIN_METADATA_ABI_VERSION == 1u);
+    static_assert(OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION == 1u);
     static_assert(OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS == (1ull << 0));
     static_assert(OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS == (1ull << 1));
     static_assert(OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS == (1ull << 2));
     static_assert(OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES == (1ull << 3));
     static_assert(OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT == (1ull << 4));
     static_assert(OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING == (1ull << 5));
+    static_assert(OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS == (1ull << 6));
+    static_assert(OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS == (1ull << 7));
+    static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION == 1u);
+    static_assert(OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION == 1u);
+    static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD == (1ull << 0));
+    static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED == (1ull << 1));
+    static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED == (1ull << 2));
+    static_assert(OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_CATEGORY_ONLY == (1ull << 0));
+    static_assert(OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY == (1ull << 1));
+    static_assert(OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP == (1ull << 2));
+    static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACCESS_CHECK == (1ull << 0));
+    static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_DEMOLISH_CHECK == (1ull << 1));
+    static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_VARIANT_CHANGE == (1ull << 2));
+    static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACTIVATION_TOGGLE == (1ull << 3));
+    static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_PIN_CODE_CHECK == (1ull << 4));
+    static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_SEAT_CHECK == (1ull << 5));
+    static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_REMOTE_ADD_CHECK == (1ull << 6));
+    static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK == (1ull << 7));
+    static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES == ((1ull << 6) - 1));
+    static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY == ((1ull << 6) | (1ull << 7)));
+    static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL == ((1ull << 8) - 1));
+    static_assert(OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE == (1ull << 0));
+    static_assert(OBELISK_GAMEPLAY_POLICY_FIELD_MASK_VARIANT_INDEX == (1ull << 1));
+    static_assert(OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE_SET == (1ull << 2));
+    static_assert(OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE == (1ull << 3));
+    static_assert(OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER == (1ull << 4));
+    static_assert(OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN == (1ull << 5));
+
+    static_assert(sizeof(ObeliskGameplayPolicyEventKind) == 4);
+    static_assert(static_cast<std::uint32_t>(OBELISK_GAMEPLAY_POLICY_EVENT_KIND_UNKNOWN) == 0);
+    static_assert(static_cast<std::uint32_t>(OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_ACCESS_CHECK) == 1);
+    static_assert(static_cast<std::uint32_t>(OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_DEMOLISH_CHECK) == 2);
+    static_assert(static_cast<std::uint32_t>(OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_VARIANT_CHANGE) == 3);
+    static_assert(static_cast<std::uint32_t>(OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_ACTIVATION_TOGGLE) == 4);
+    static_assert(static_cast<std::uint32_t>(OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_PIN_CODE_CHECK) == 5);
+    static_assert(static_cast<std::uint32_t>(OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_SEAT_CHECK) == 6);
+    static_assert(static_cast<std::uint32_t>(OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK) == 7);
+    static_assert(static_cast<std::uint32_t>(OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK) == 8);
+
+    static_assert(sizeof(ObeliskGameplayPolicyResourceKind) == 4);
+    static_assert(static_cast<std::uint32_t>(OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_UNKNOWN) == 0);
+    static_assert(static_cast<std::uint32_t>(OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE) == 1);
+    static_assert(static_cast<std::uint32_t>(OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM) == 2);
+
+    static_assert(sizeof(ObeliskGameplayPolicyField) == 4);
+    static_assert(static_cast<std::uint32_t>(OBELISK_GAMEPLAY_POLICY_FIELD_RETURN_VALUE) == 0);
+    static_assert(static_cast<std::uint32_t>(OBELISK_GAMEPLAY_POLICY_FIELD_VARIANT_INDEX) == 1);
+    static_assert(static_cast<std::uint32_t>(OBELISK_GAMEPLAY_POLICY_FIELD_FORCE_SET) == 2);
+    static_assert(static_cast<std::uint32_t>(OBELISK_GAMEPLAY_POLICY_FIELD_FORCE) == 3);
+    static_assert(static_cast<std::uint32_t>(OBELISK_GAMEPLAY_POLICY_FIELD_REQUESTED_BY_PLAYER) == 4);
+    static_assert(static_cast<std::uint32_t>(OBELISK_GAMEPLAY_POLICY_FIELD_IGNORE_COOLDOWN) == 5);
+    static_assert(static_cast<std::uint32_t>(OBELISK_GAMEPLAY_POLICY_FIELD_COUNT) == 6);
+
+    static_assert(sizeof(ObeliskGameplayPolicyEventCallback) == sizeof(void*));
+
+    AssertAbiType<ObeliskGameplayPolicyEvent>();
+    static_assert(alignof(ObeliskGameplayPolicyEvent) == 8);
+    static_assert(sizeof(ObeliskGameplayPolicyEvent) == 64);
+    static_assert(offsetof(ObeliskGameplayPolicyEvent, abi_version) == 0);
+    static_assert(offsetof(ObeliskGameplayPolicyEvent, struct_size) == 4);
+    static_assert(offsetof(ObeliskGameplayPolicyEvent, event_kind) == 8);
+    static_assert(offsetof(ObeliskGameplayPolicyEvent, resource_kind) == 12);
+    static_assert(offsetof(ObeliskGameplayPolicyEvent, flags) == 16);
+    static_assert(offsetof(ObeliskGameplayPolicyEvent, field_mask) == 24);
+    static_assert(offsetof(ObeliskGameplayPolicyEvent, bool_values) == 32);
+    static_assert(offsetof(ObeliskGameplayPolicyEvent, int32_values) == 40);
+
+    AssertAbiType<ObeliskResourceKindDescriptor>();
+    static_assert(alignof(ObeliskResourceKindDescriptor) == 8);
+    static_assert(sizeof(ObeliskResourceKindDescriptor) == 136);
+    static_assert(offsetof(ObeliskResourceKindDescriptor, abi_version) == 0);
+    static_assert(offsetof(ObeliskResourceKindDescriptor, struct_size) == 4);
+    static_assert(offsetof(ObeliskResourceKindDescriptor, resource_kind) == 8);
+    static_assert(offsetof(ObeliskResourceKindDescriptor, reserved0) == 12);
+    static_assert(offsetof(ObeliskResourceKindDescriptor, flags) == 16);
+    static_assert(offsetof(ObeliskResourceKindDescriptor, supported_gameplay_policy_event_mask) == 24);
+    static_assert(offsetof(ObeliskResourceKindDescriptor, supported_gameplay_policy_field_mask) == 32);
+    static_assert(offsetof(ObeliskResourceKindDescriptor, stable_name) == 40);
+    static_assert(offsetof(ObeliskResourceKindDescriptor, display_name) == 72);
 
     AssertAbiType<ObeliskPluginMetadata>();
     static_assert(alignof(ObeliskPluginMetadata) == 8);
@@ -75,7 +189,7 @@ int main()
 
     AssertAbiType<ObeliskApi>();
     static_assert(alignof(ObeliskApi) == 8);
-    static_assert(sizeof(ObeliskApi) == 152);
+    static_assert(sizeof(ObeliskApi) == 176);
     static_assert(offsetof(ObeliskApi, LogInfo) == 0);
     static_assert(offsetof(ObeliskApi, LogWarn) == 8);
     static_assert(offsetof(ObeliskApi, LogError) == 16);
@@ -96,6 +210,9 @@ int main()
     static_assert(offsetof(ObeliskApi, RegisterPreProcessEventForNameIndexWithOwnerTokenHandle) == 128);
     static_assert(offsetof(ObeliskApi, RegisterPostProcessEventForNameIndexWithOwnerTokenHandle) == 136);
     static_assert(offsetof(ObeliskApi, UnregisterProcessEventCallbackWithOwnerToken) == 144);
+    static_assert(offsetof(ObeliskApi, RegisterGameplayPolicyEventWithOwnerTokenHandle) == 152);
+    static_assert(offsetof(ObeliskApi, UnregisterGameplayPolicyEventWithOwnerToken) == 160);
+    static_assert(offsetof(ObeliskApi, DescribeResourceKind) == 168);
 
     static_assert(offsetof(ObeliskApi, abi_version) > offsetof(ObeliskApi, CallProcessEvent));
     static_assert(offsetof(ObeliskApi, struct_size) > offsetof(ObeliskApi, abi_version));
@@ -109,8 +226,11 @@ int main()
     static_assert(offsetof(ObeliskApi, RegisterPreProcessEventForNameIndexWithOwnerTokenHandle) > offsetof(ObeliskApi, RegisterPostProcessEventWithOwnerTokenHandle));
     static_assert(offsetof(ObeliskApi, RegisterPostProcessEventForNameIndexWithOwnerTokenHandle) > offsetof(ObeliskApi, RegisterPreProcessEventForNameIndexWithOwnerTokenHandle));
     static_assert(offsetof(ObeliskApi, UnregisterProcessEventCallbackWithOwnerToken) > offsetof(ObeliskApi, RegisterPostProcessEventForNameIndexWithOwnerTokenHandle));
-    static_assert(offsetof(ObeliskApi, UnregisterProcessEventCallbackWithOwnerToken) +
-        sizeof(ObeliskApi::UnregisterProcessEventCallbackWithOwnerToken) == sizeof(ObeliskApi));
+    static_assert(offsetof(ObeliskApi, RegisterGameplayPolicyEventWithOwnerTokenHandle) > offsetof(ObeliskApi, UnregisterProcessEventCallbackWithOwnerToken));
+    static_assert(offsetof(ObeliskApi, UnregisterGameplayPolicyEventWithOwnerToken) > offsetof(ObeliskApi, RegisterGameplayPolicyEventWithOwnerTokenHandle));
+    static_assert(offsetof(ObeliskApi, DescribeResourceKind) > offsetof(ObeliskApi, UnregisterGameplayPolicyEventWithOwnerToken));
+    static_assert(offsetof(ObeliskApi, DescribeResourceKind) +
+        sizeof(ObeliskApi::DescribeResourceKind) == sizeof(ObeliskApi));
 
     RuntimeNoOp();
     return 0;

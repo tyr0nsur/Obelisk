@@ -24,11 +24,12 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         required_release_items = [
             "Runtime bootstrap",
             "ProcessEvent hook",
-            "C plugin ABI",
+            "C plugin ABI, after an explicit first-stable ABI freeze decision",
             "Central install script and LinuxGSM wrappers",
             "`oBaseEvents`",
             "`OBELISK_INSTANCE_ID` logs and state markers",
-            "Filtered, non-mutating `ProcessEvent` observation as the only stable game-facing",
+            "Filtered, non-mutating `ProcessEvent` callback infrastructure as the stable runtime",
+            "Target-specific gameplay/module surfaces remain experimental",
         ]
         required_status_items = [
             "`LD_PRELOAD` bootstrap | Stable baseline",
@@ -43,6 +44,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "Linux `LD_PRELOAD` runtime bootstrap",
             "Absolute x86_64 `UObject::ProcessEvent` hook",
             "C plugin ABI",
+            "Public plugin C ABI v1 is the intended first-stable compatibility contract",
             "Central install layout",
             "LinuxGSM wrapper templates",
             "`oBaseEvents` as the first official plugin example",
@@ -71,9 +73,11 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         for item in [
             "Stable gameplay module interception APIs",
             "Full UE4 reflection",
-            "Higher-level gameplay SDK APIs",
+            "Higher-level gameplay SDK APIs outside `GameplayPolicyEvent`",
             "Gameplay mutation, return overrides, arbitrary UE4 function calls, and public",
             "`CallProcessEvent`-based plugin behavior",
+            "Plugins with background workers, sockets, HTTP listeners/clients, long-lived file\n  readers",
+            "background-work\n  promotion gate",
             "Production HTTP plugins",
         ]:
             with self.subTest(file="docs/RELEASE.md", item=item):
@@ -84,6 +88,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "GObjects/GUObjectArray enumeration | Not ready",
             "General reflected UFunction parameter decoding | Not ready",
             "Higher-level SDK APIs | Not ready",
+            "Internal copied inventory policy events | Internal bridge",
             "Operator CLI | Experimental",
             "ReflectionScanner | Experimental",
         ]:
@@ -105,7 +110,8 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         status = read("docs/STATUS.md")
 
         for item in [
-            "Filtered, non-mutating `ProcessEvent` observation as the only stable game-facing",
+            "Filtered, non-mutating `ProcessEvent` callback infrastructure as the stable runtime",
+            "Target-specific gameplay/module surfaces remain experimental",
             "Gameplay mutation, return overrides, arbitrary UE4 function calls, and public",
             "`CallProcessEvent`-based plugin behavior",
         ]:
@@ -141,6 +147,14 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         workflow_skill = read("agent-skills/obelisk-github-research-workflow/SKILL.md")
 
         self.assertIn("scripts/check_release_readiness.sh", release)
+        self.assertIn("Verify the ABI v1 freeze artifacts before tagging", release)
+        self.assertIn("Obelisk freezes the\n   current append-only `ObeliskApi` ABI v1", release)
+        self.assertIn("Any ABI v2 must use an explicit migration plan", release)
+        self.assertIn("installed SDK consumer validation, and the `oBaseEvents` release\n   example", release)
+        self.assertIn("first-stable plugin scope excludes background-work plugins", release)
+        self.assertIn("idempotent shutdown through `ObeliskPlugin_Shutdown`", release)
+        self.assertIn("owner-token callback handles unregistered before unload", release)
+        self.assertIn("threads\n   joined, sockets/files closed", release)
         self.assertIn("scripts/check_release_readiness.sh", pr_template)
         self.assertIn("scripts/check_release_readiness.sh", ci)
         self.assertIn("scripts/check_release_readiness.sh", build_skill)
@@ -184,11 +198,28 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("--scriptstruct-second-source-target-set", release)
         self.assertIn("--scriptstruct-second-source-target-set", pr_template)
         self.assertIn("--scriptstruct-second-source-target-set", script)
+        self.assertIn("default second-source gate is intentionally scoped to the core-first UFunction intake", release)
+        self.assertIn("`minimal-second-source-intake`", release)
+        self.assertIn("Explicit\n`--ufunction-second-source-target-set` values replace that default", release)
+        self.assertIn("--ufunction-second-source-target-set minimal-second-source-intake", release)
+        self.assertIn("ScriptStruct promotion, including transfer structs, is not\npart of the default gate", release)
+        self.assertIn("ScriptStruct promotion requires explicit opt-in", script)
+        self.assertIn("--scriptstruct-second-source-root requires at least one --scriptstruct-second-source-target-set", script)
+        self.assertNotIn('SCRIPTSTRUCT_SECOND_SOURCE_TARGET_SETS=("transfer-scriptstruct")', script)
         self.assertIn("name every promoted target set", pr_template)
+        self.assertIn(
+            "pass `--scriptstruct-second-source-root` only when a ScriptStruct target set is explicitly named",
+            pr_template,
+        )
         self.assertIn("--second-source-report-dir", release)
         self.assertIn("--second-source-report-dir", pr_template)
         self.assertIn("--second-source-report-dir", script)
         self.assertIn("--fail-on-readiness-gaps", script)
+        self.assertIn("gate_mode=second_source_promotion", release)
+        self.assertIn("promotion_gate.ready=true", release)
+        self.assertIn("gate_mode=informational_gap_report", release)
+        self.assertIn("not_second_source_promotion_gate", release)
+        self.assertIn("gate_mode=base_fixture_readiness", release)
         self.assertIn("required positional install roots even when `OBELISK_ROOT` is set", release)
         self.assertIn("analyze_runtime_observer_log.py --fail-on-quality-blockers", release)
         self.assertIn("not a release gate", release)
@@ -213,9 +244,10 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("Do not commit\n  and push after every routine round", workflow_skill)
         self.assertIn("useful to contributors", workflow_skill)
         self.assertIn("stable integration point", workflow_skill)
-        self.assertIn("Do not send Discord updates for routine commits", workflow_skill)
+        self.assertIn("Community/Discord updates are lead-only", workflow_skill)
+        self.assertIn("explicitly delegates that scope", workflow_skill)
         self.assertIn("useful stable\n   checkpoint", handoff_skill)
-        self.assertIn("intentionally batched for a later useful checkpoint", learning_skill)
+        self.assertIn("intentionally batched for later lead integration", learning_skill)
         self.assertNotIn("Are changes committed and pushed if stable?", learning_skill)
 
     def test_release_example_does_not_publish_map_scoped_config(self) -> None:
@@ -232,6 +264,26 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("Do not publish map-scoped config fields", architecture)
         self.assertIn("scripts/install_obelisk_plugin.sh", architecture)
         self.assertNotIn("operator copies the `.so`", architecture)
+
+    def test_background_work_plugins_stay_experimental_until_shutdown_gate(self) -> None:
+        release = read("docs/RELEASE.md")
+        status = read("docs/STATUS.md")
+        obase_docs = read("docs/oBaseEvents.md")
+
+        for text in (release, status, obase_docs):
+            self.assertIn("background", text)
+            self.assertIn("idempotent shutdown", text)
+            self.assertIn("owner-token", text)
+            self.assertIn("drain", text)
+            self.assertIn("join", text)
+            self.assertIn("sockets", text)
+            self.assertIn("detached workers", text)
+
+        self.assertIn("does not start background workers", obase_docs)
+        self.assertIn("open sockets", obase_docs)
+        self.assertIn("long-lived file readers", obase_docs)
+        self.assertIn("Plugins with background workers", status)
+        self.assertIn("are experimental until they pass a promotion gate", status)
 
 
 if __name__ == "__main__":

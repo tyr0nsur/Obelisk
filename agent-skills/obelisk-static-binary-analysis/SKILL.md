@@ -16,6 +16,16 @@ claims from a stripped Linux server binary.
 - Record binary hash, command, tool version when available, and the Obelisk commit used.
 - Do not edit `/servidor/ark` while doing offline analysis. Copy artifacts to `/tmp` or a
   documented research workspace.
+- Static/offline tooling must reject protected server paths in both forms: the expanded
+  path textually under `/servidor/ark`, and the resolved path after following symlinks.
+  This blocks both symlinks inside the protected root that point outward and symlinks
+  outside the root that point inward. The approved under-`/servidor/ark` offline workspace
+  is `/servidor/ark/workspace-offline`; prefer hardlinks there for large cores so evidence
+  tools do not duplicate 7-11 GB dumps.
+- Pre-existing `objdump`/`readelf` text used as static evidence must have a sibling
+  `<artifact>.provenance.json` with `verified=true`, matching `binary_sha256`, and matching
+  `artifact_sha256`. Missing, unverified, mismatched, malformed, or `/servidor/ark`-
+  resolving sidecars are fail-closed evidence blockers.
 
 ## Baseline Evidence Pack
 
@@ -29,6 +39,11 @@ readelf -S -W ShooterGameServer
 readelf -l -W ShooterGameServer
 objdump -d -M intel ShooterGameServer > /tmp/ShooterGameServer.objdump
 ```
+
+For reusable static global evidence, prefer
+`scripts/build_static_global_promotion_evidence.py` because it writes verified sidecars
+beside generated artifacts and records fail-closed blockers for copied artifacts without
+trusted provenance.
 
 If available, add:
 
@@ -75,11 +90,14 @@ Static reversing agents must return an evidence pack, not just a conclusion:
 2. Confirm the address belongs to the expected ELF segment or loaded runtime range.
 3. Find xrefs from code and data. Prefer RIP-relative references over broad string
    proximity.
-4. Explain how the value flows: initialization store, global load, vtable reference, or
+4. For `GUObjectArray`/`GObjects`, do not accept globally aggregated root/chunks/count/serial
+   references as one coherent static path. Require code-backed RIP-relative field xrefs in
+   one non-oversized instruction window before treating the static contract as satisfied.
+5. Explain how the value flows: initialization store, global load, vtable reference, or
    constructor path.
-5. Reject candidates with single-source evidence, implausible counts, mismatched previews,
+6. Reject candidates with single-source evidence, implausible counts, mismatched previews,
    or no executable/data xref path.
-6. Feed copied logs plus objdump evidence into:
+7. Feed copied logs plus objdump evidence into:
 
 ```bash
 python3 scripts/analyze_reflectionscanner_capture.py \

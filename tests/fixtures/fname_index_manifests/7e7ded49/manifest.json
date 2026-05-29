@@ -1,0 +1,26 @@
+{
+  "ark_binary_sha256": "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+  "evidence_status": "candidate-only",
+  "names": [
+    {
+      "evidence": "docs/research/2026-05-27-arkserver-core-fname-evidence.md",
+      "index": 4884,
+      "name": "ClientMessage",
+      "number": 0
+    },
+    {
+      "evidence": "docs/research/2026-05-27-arkserver-core-fname-evidence.md",
+      "index": 9619,
+      "name": "ServerChat",
+      "number": 0
+    },
+    {
+      "evidence": "docs/research/2026-05-27-arkserver-core-fname-evidence.md",
+      "index": 9622,
+      "name": "SetActiveMissionDebugFlags",
+      "number": 0
+    }
+  ],
+  "schema": "obelisk.fname-index-manifest.v1",
+  "source": "offline_core"
+}

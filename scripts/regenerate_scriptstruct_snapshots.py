@@ -18,7 +18,12 @@ sys.path.insert(0, str(SCRIPT_DIR))
 
 import inspect_core_ufunctions as inspector  # noqa: E402
 from reflection_target_sets import TARGET_SETS, expand_schema_target_sets  # noqa: E402
-from snapshot_evidence_pack import evidence_pack_defaults, merge_manifest_default  # noqa: E402
+from snapshot_evidence_pack import (  # noqa: E402
+    evidence_pack_defaults,
+    merge_manifest_default,
+    reject_protected_input_path,
+    reject_protected_output_path,
+)
 
 
 DEFAULT_MANIFEST = REPO_ROOT / "tests" / "fixtures" / "scriptstruct_snapshots" / "manifest.json"
@@ -54,8 +59,7 @@ def parse_args() -> argparse.Namespace:
         "--fname-root-slot",
         type=inspector.parse_int,
         default=None,
-        help="FName root slot for this artifact. Default is the primary-core fixture candidate; "
-        "override for second-source artifacts.",
+        help="FName root slot for this artifact. Required unless supplied by --evidence-pack-manifest.",
     )
     parser.add_argument("--max-object-scan", type=int, help="Override manifest max_object_scan.")
     parser.add_argument("--obelisk-commit", help="Commit recorded in snapshot evidence. Defaults to current HEAD.")
@@ -162,6 +166,15 @@ def entry_id(entry: dict[str, object]) -> str:
 
 def selected(entry: dict[str, object], filters: set[str]) -> bool:
     return not filters or entry_id(entry) in filters
+
+
+def manifest_entry_ids(entries: list[object]) -> set[str]:
+    ids: set[str] = set()
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise SystemExit("manifest targets must be objects")
+        ids.add(entry_id(entry))
+    return ids
 
 
 def build_snapshot(
@@ -299,6 +312,11 @@ def check_layout_matches(path: Path, payload: dict[str, object]) -> bool:
 
 def main() -> int:
     args = parse_args()
+    reject_protected_input_path(args.core, "--core")
+    reject_protected_input_path(args.manifest, "--manifest")
+    reject_protected_output_path(args.output_root, "--output-root")
+    if args.evidence_pack_manifest is not None:
+        reject_protected_input_path(args.evidence_pack_manifest, "--evidence-pack-manifest")
     manifest = load_manifest(args.manifest)
     manifest_scan = manifest.get("max_object_scan")
     max_object_scan = args.max_object_scan if args.max_object_scan is not None else manifest_scan
@@ -383,28 +401,35 @@ def main() -> int:
             "--gobjects is required when recording artifact identity; "
             "derive or import a GObjects candidate for this artifact instead of using the primary-core default"
         )
+    if args.fname_root_slot is None:
+        raise SystemExit(
+            "--fname-root-slot is required; derive or import a FName root for this artifact "
+            "instead of using the primary-core default"
+        )
     if args.check_layout and not artifact_identity_supplied:
         raise SystemExit(
             "--check-layout is reserved for second-source layout validation and requires "
             "--artifact-kind, --artifact-sha256, --capture-id, --evidence-pack-id, "
             "and --fname-root-slot"
         )
-    fname_root_slot = (
-        args.fname_root_slot
-        if args.fname_root_slot is not None
-        else inspector.uobjects.DEFAULT_FNAME_ROOT_SLOT
-    )
+    fname_root_slot = args.fname_root_slot
     gobjects = args.gobjects if args.gobjects is not None else inspector.uobjects.DEFAULT_GOBJECTS
     filters = set(args.target)
     filters.update(expand_schema_target_sets(args.target_set, SNAPSHOT_SCHEMA))
+    manifest_targets = manifest["targets"]
+    if not isinstance(manifest_targets, list):
+        raise SystemExit("manifest targets must be a list")
+    available_targets = manifest_entry_ids(manifest_targets)
+    if filters:
+        missing = ", ".join(sorted(filters - available_targets))
+        if missing:
+            raise SystemExit(f"unknown target filter(s): {missing}")
     processed = 0
     failures: list[str] = []
 
     memory = inspector.uobjects.CoreMemory(args.core)
     try:
-        for raw_entry in manifest["targets"]:
-            if not isinstance(raw_entry, dict):
-                raise SystemExit("manifest targets must be objects")
+        for raw_entry in manifest_targets:
             if not selected(raw_entry, filters):
                 continue
             processed += 1
@@ -445,9 +470,6 @@ def main() -> int:
     finally:
         memory.close()
 
-    if filters and processed != len(filters):
-        missing = sorted(filters - {entry_id(entry) for entry in manifest["targets"] if isinstance(entry, dict)})
-        raise SystemExit(f"target filter did not match manifest entries: {missing}")
     if failures:
         drift_kind = "layout drift" if args.check_layout else "snapshot drift"
         raise SystemExit(f"{drift_kind} detected: {', '.join(failures)}")

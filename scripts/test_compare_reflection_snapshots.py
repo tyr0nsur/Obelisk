@@ -10,9 +10,13 @@ import tempfile
 import unittest
 from copy import deepcopy
 from pathlib import Path
+from unittest import mock
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parent
+sys.path.insert(0, str(SCRIPT_DIR))
+import compare_reflection_snapshots as compare
 
 
 def base_snapshot() -> dict[str, object]:
@@ -24,6 +28,7 @@ def base_snapshot() -> dict[str, object]:
             "artifact_sha256": "1" * 64,
             "capture_id": "primary-core",
             "evidence_pack_id": "primary-pack",
+            "generated_by": "scripts/inspect_core_ufunctions.py --snapshot-json",
             "obelisk_commit": "1111111",
             "source": "offline_core",
             "status": "candidate-only",
@@ -144,6 +149,31 @@ def rename_target(payload: dict[str, object], *, outer: str, name: str) -> dict[
     return payload
 
 
+def write_minimal_intake_snapshots(
+    base_root: Path,
+    candidate_root: Path,
+    *,
+    mutate_candidate: object | None = None,
+) -> None:
+    targets = (
+        ("sdk_inventory", "PrimalItem", "CanUse"),
+        ("sdk_inventory", "PrimalItem", "AllowRemoteAddToInventory"),
+        ("sdk_structures", "PrimalStructure", "AllowStructureAccess"),
+        ("sdk_structures", "PrimalStructure", "IsAllowedToDemolish"),
+    )
+    for module, outer, name in targets:
+        base_payload = rename_target(base_snapshot(), outer=outer, name=name)
+        candidate_payload = deepcopy(base_payload)
+        if callable(mutate_candidate):
+            mutate_candidate(candidate_payload, outer, name)
+        base_dir = base_root / "sha" / module
+        candidate_dir = candidate_root / "sha" / module
+        base_dir.mkdir(parents=True, exist_ok=True)
+        candidate_dir.mkdir(parents=True, exist_ok=True)
+        write_snapshot(base_dir, base_payload, f"{outer}.{name}.snapshot.json")
+        write_snapshot(candidate_dir, candidate_payload, f"{outer}.{name}.snapshot.json")
+
+
 def run_compare(base: Path, candidate: Path | None, *extra: str) -> subprocess.CompletedProcess[str]:
     command = [
         sys.executable,
@@ -172,6 +202,15 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(report["schema"], "obelisk.reflection-snapshot-target-sets.v1")
         sets = {item["name"]: item["targets"] for item in report["target_sets"]}
         self.assertIn("minimal-second-source-intake", sets)
+        self.assertEqual(
+            sets["minimal-second-source-intake"],
+            [
+                "obelisk.ufunction-chain.snapshot.v1:PrimalItem.CanUse",
+                "obelisk.ufunction-chain.snapshot.v1:PrimalItem.AllowRemoteAddToInventory",
+                "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.AllowStructureAccess",
+                "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToDemolish",
+            ],
+        )
         self.assertIn("obelisk.ufunction-chain.snapshot.v1:PrimalItem.CanUse", sets["minimal-second-source-intake"])
         self.assertIn("buff-compact-intake", sets)
         self.assertIn(
@@ -187,6 +226,17 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertIn("mission-compact-intake", sets)
         self.assertIn("tribe-compact-intake", sets)
         self.assertIn("structure-observer-intake", sets)
+        self.assertEqual(
+            sets["structure-observer-intake"],
+            [
+                "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.AllowStructureAccess",
+                "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToDemolish",
+                "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.SetVariant",
+                "obelisk.ufunction-chain.snapshot.v1:PrimalStructureItemContainer.AllowToggleActivation",
+                "obelisk.ufunction-chain.snapshot.v1:PrimalStructureItemContainer.VerifyPinCode",
+                "obelisk.ufunction-chain.snapshot.v1:PrimalStructureSeating.CanSeat",
+            ],
+        )
         self.assertIn(
             "obelisk.ufunction-chain.snapshot.v1:PrimalStructureItemContainer.VerifyPinCode",
             sets["structure-observer-intake"],
@@ -207,6 +257,144 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("--base-root is required unless --list-target-sets is used", result.stderr)
+
+    def test_rejects_allow_ark_sha_mismatch_for_promotion_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+
+            result = run_compare(
+                base,
+                candidate,
+                "--readiness-report",
+                "--fail-on-readiness-gaps",
+                "--allow-ark-sha-mismatch",
+            )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("--allow-ark-sha-mismatch is incompatible with --fail-on-readiness-gaps", result.stderr)
+
+    def test_rejects_snapshot_roots_under_protected_server_path_before_reading(self) -> None:
+        result = run_compare_raw(
+            "--base-root",
+            "/servidor/ark/obelisk/does-not-need-to-exist",
+            "--readiness-report",
+        )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("--base-root must not read from protected live-server path", result.stderr)
+
+    def test_rejects_snapshot_roots_symlinked_to_protected_server_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            candidate.mkdir()
+            base.symlink_to("/servidor/ark", target_is_directory=True)
+
+            result = run_compare(base, candidate, "--readiness-report")
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("--base-root must not read from protected live-server path", result.stderr)
+
+    def test_rejects_approved_dump_snapshot_root_symlinked_to_protected_server_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir) / "base"
+            base.symlink_to("/servidor/ark/obelisk/dumps/second-source/snapshots", target_is_directory=True)
+            result = run_compare_raw(
+                "--base-root",
+                str(base),
+                "--readiness-report",
+            )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("--base-root must not read from protected live-server path", result.stderr)
+
+    def test_rejects_textually_protected_snapshot_root_even_when_symlink_resolves_outside(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            protected_real = root / "protected-real"
+            protected_link = root / "protected-link"
+            outside = root / "outside"
+            protected_real.mkdir()
+            outside.mkdir()
+            protected_link.symlink_to(protected_real, target_is_directory=True)
+            outward_link = protected_link / "outward-link"
+            outward_link.symlink_to(outside, target_is_directory=True)
+
+            with mock.patch.object(compare, "PROTECTED_SERVER_ROOT", protected_link):
+                with self.assertRaisesRegex(SystemExit, "snapshot root must not read"):
+                    compare.reject_protected_input_path("snapshot root", outward_link / "snapshots")
+
+    def test_rejects_snapshot_file_symlinked_to_protected_server_path_before_reading(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            (base / "linked.snapshot.json").symlink_to("/servidor/ark/obelisk/leaked.snapshot.json")
+
+            result = run_compare(base, candidate, "--readiness-report")
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("snapshot must not read from protected live-server path", result.stderr)
+
+    def test_allows_approved_offline_workspace_snapshot_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            protected = root / "server-root"
+            workspace = protected / "workspace-offline"
+            workspace.mkdir(parents=True)
+
+            with (
+                mock.patch.object(compare, "PROTECTED_SERVER_ROOT", protected),
+                mock.patch.object(compare, "APPROVED_OFFLINE_WORKSPACE_ROOTS", (workspace,)),
+            ):
+                compare.reject_protected_input_path("--base-root", workspace / "snapshots")
+
+    def test_missing_generated_by_blocks_comparable_layout(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            left = base_snapshot()
+            right = deepcopy(left)
+            left["evidence"].pop("generated_by")  # type: ignore[index]
+            write_snapshot(base, left)
+            write_snapshot(candidate, right)
+
+            result = run_compare(base, candidate, "--json")
+
+        self.assertEqual(result.returncode, 2, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["results"][0]["status"], "inconclusive")
+        self.assertIn("base:evidence_generated_by_None", report["results"][0]["reasons"])
+
+    def test_wrong_generated_by_blocks_comparable_layout(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            left = base_snapshot()
+            right = deepcopy(left)
+            right["evidence"]["generated_by"] = "scripts/other.py"  # type: ignore[index]
+            write_snapshot(base, left)
+            write_snapshot(candidate, right)
+
+            result = run_compare(base, candidate, "--json")
+
+        self.assertEqual(result.returncode, 2, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["results"][0]["status"], "inconclusive")
+        self.assertIn("candidate:evidence_generated_by_scripts/other.py", report["results"][0]["reasons"])
 
     def test_accepts_identical_layout_while_ignoring_indices_and_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -230,6 +418,20 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         report = json.loads(result.stdout)
         self.assertEqual(report["counts"], {"accepted": 1, "inconclusive": 0, "rejected": 0})
+
+    def test_plain_comparison_with_zero_selected_targets_is_nonzero(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+
+            result = run_compare(base, candidate, "--json")
+
+        self.assertEqual(result.returncode, 2, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["counts"], {"accepted": 0, "inconclusive": 0, "rejected": 0})
 
     def test_strict_identity_indices_rejects_index_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1000,6 +1202,7 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         report = json.loads(result.stdout)
         self.assertEqual(report["schema"], "obelisk.reflection-snapshot-readiness.v1")
         self.assertEqual(report["second_source_status"], "missing_candidate_root")
+        self.assertEqual(report["gate_mode"], "informational_gap_report")
         self.assertEqual(report["totals"]["targets"], 1)
         self.assertEqual(report["totals"]["comparable"], 1)
         self.assertEqual(report["totals"]["second_source_missing"], 1)
@@ -1030,7 +1233,9 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             )
 
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertIn("gate_mode=informational_gap_report", result.stdout)
         self.assertIn("ufunction:sdk_inventory targets=1 comparable=1", result.stdout)
+        self.assertIn("promotion_gate ready=false blockers=missing_second_source:1", result.stdout)
         self.assertIn(
             "target=obelisk.ufunction-chain.snapshot.v1:PrimalItem.CanUse "
             "comparable=true second_source=missing",
@@ -1077,6 +1282,8 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         self.assertIn("second_source=accepted:1", result.stdout)
+        self.assertIn("gate_mode=informational_gap_report", result.stdout)
+        self.assertIn("promotion_gate ready=false blockers=not_second_source_promotion_gate:1", result.stdout)
         self.assertNotIn("target=obelisk.ufunction-chain.snapshot.v1:PrimalItem.CanUse", result.stdout)
 
     def test_readiness_report_blocks_empty_snapshot_roots(self) -> None:
@@ -1130,7 +1337,106 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             all(detail["second_source_status"] == "not_applicable" for detail in missing_module["target_details"])
         )
 
-    def test_readiness_report_marks_promotion_gate_ready_when_all_targets_are_accepted(self) -> None:
+    def test_readiness_report_blocks_promotion_gate_without_named_target_set(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base" / "sha" / "sdk_inventory"
+            candidate = root / "candidate" / "sha" / "sdk_inventory"
+            base.mkdir(parents=True)
+            candidate.mkdir(parents=True)
+            payload = base_snapshot()
+            write_snapshot(base, payload)
+            write_snapshot(candidate, deepcopy(payload))
+
+            result = run_compare(
+                root / "base",
+                root / "candidate",
+                "--readiness-report",
+                "--target",
+                "PrimalItem.CanUse",
+                "--fail-on-readiness-gaps",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 1)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["gate_mode"], "second_source_promotion")
+        self.assertEqual(report["totals"]["second_source_accepted"], 1)
+        self.assertEqual(
+            report["promotion_gate"],
+            {"ready": False, "blockers": [{"reason": "promotion_requires_target_set", "count": 1}]},
+        )
+
+    def test_readiness_report_target_set_promotion_exit_zero_when_all_targets_are_accepted(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_intake_snapshots(root / "base", root / "candidate")
+
+            result = run_compare(
+                root / "base",
+                root / "candidate",
+                "--readiness-report",
+                "--target-set",
+                "minimal-second-source-intake",
+                "--fail-on-readiness-gaps",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["gate_mode"], "second_source_promotion")
+        self.assertEqual(report["totals"]["second_source_accepted"], 4)
+        self.assertEqual(report["promotion_gate"], {"ready": True, "blockers": []})
+
+    def test_readiness_report_target_set_rejected_second_source_exits_one(self) -> None:
+        def reject_one(payload: dict[str, object], _outer: str, name: str) -> None:
+            if name == "CanUse":
+                payload["targets"][0]["property_chain"]["properties"][1]["offset_internal"] = 2  # type: ignore[index]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_intake_snapshots(root / "base", root / "candidate", mutate_candidate=reject_one)
+
+            result = run_compare(
+                root / "base",
+                root / "candidate",
+                "--readiness-report",
+                "--target-set",
+                "minimal-second-source-intake",
+                "--fail-on-readiness-gaps",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 1)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["totals"]["second_source_rejected"], 1)
+        self.assertIn({"reason": "rejected_second_source", "count": 1}, report["promotion_gate"]["blockers"])
+
+    def test_readiness_report_target_set_inconclusive_second_source_exits_two(self) -> None:
+        def make_one_inconclusive(payload: dict[str, object], _outer: str, name: str) -> None:
+            if name == "CanUse":
+                payload["evidence"]["generated_by"] = "scripts/other.py"  # type: ignore[index]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_intake_snapshots(root / "base", root / "candidate", mutate_candidate=make_one_inconclusive)
+
+            result = run_compare(
+                root / "base",
+                root / "candidate",
+                "--readiness-report",
+                "--target-set",
+                "minimal-second-source-intake",
+                "--fail-on-readiness-gaps",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 2)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["totals"]["second_source_inconclusive"], 1)
+        self.assertIn({"reason": "inconclusive_second_source", "count": 1}, report["promotion_gate"]["blockers"])
+
+    def test_readiness_report_does_not_mark_informational_report_promotable(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             base = root / "base" / "sha" / "sdk_inventory"
@@ -1152,8 +1458,11 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         report = json.loads(result.stdout)
-        self.assertEqual(report["totals"]["second_source_accepted"], 1)
-        self.assertEqual(report["promotion_gate"], {"ready": True, "blockers": []})
+        self.assertEqual(report["gate_mode"], "informational_gap_report")
+        self.assertEqual(
+            report["promotion_gate"],
+            {"ready": False, "blockers": [{"reason": "not_second_source_promotion_gate", "count": 1}]},
+        )
 
     def test_readiness_report_can_fail_on_missing_target_set_entries(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1174,12 +1483,13 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 1)
         report = json.loads(result.stdout)
+        self.assertEqual(report["gate_mode"], "second_source_promotion")
         self.assertEqual(report["totals"]["blocked"], 3)
 
     def test_structure_observer_target_set_matches_committed_base_fixtures(self) -> None:
         result = run_compare_raw(
             "--base-root",
-            str(SCRIPT_DIR.parent / "tests" / "fixtures" / "ufunction_snapshots"),
+            str(REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"),
             "--readiness-report",
             "--target-set",
             "structure-observer-intake",
@@ -1189,10 +1499,43 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         report = json.loads(result.stdout)
+        self.assertEqual(report["gate_mode"], "base_fixture_readiness")
         self.assertEqual(report["totals"]["targets"], 6)
         self.assertEqual(report["totals"]["comparable"], 6)
         self.assertEqual(report["totals"]["blocked"], 0)
         self.assertEqual(report["totals"]["second_source_missing"], 6)
+
+    def test_all_named_target_sets_match_committed_base_fixtures(self) -> None:
+        target_sets = {
+            "minimal-second-source-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 4),
+            "structure-observer-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 6),
+            "buff-compact-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 3),
+            "dino-compact-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 2),
+            "mission-compact-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 4),
+            "tribe-compact-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 5),
+            "transfer-ufunction-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 7),
+            "transfer-scriptstruct": (REPO_ROOT / "tests" / "fixtures" / "scriptstruct_snapshots", 2),
+        }
+
+        for target_set, (base_root, expected_targets) in target_sets.items():
+            with self.subTest(target_set=target_set):
+                result = run_compare_raw(
+                    "--base-root",
+                    str(base_root),
+                    "--readiness-report",
+                    "--target-set",
+                    target_set,
+                    "--fail-on-base-readiness-gaps",
+                    "--json",
+                )
+
+                self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+                report = json.loads(result.stdout)
+                self.assertEqual(report["gate_mode"], "base_fixture_readiness")
+                self.assertEqual(report["totals"]["targets"], expected_targets)
+                self.assertEqual(report["totals"]["comparable"], expected_targets)
+                self.assertEqual(report["totals"]["blocked"], 0)
+                self.assertEqual(report["totals"]["second_source_missing"], expected_targets)
 
     def test_readiness_report_can_fail_on_missing_second_source_only(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

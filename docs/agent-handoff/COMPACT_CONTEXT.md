@@ -1,678 +1,151 @@
 # Compact Context Snapshot
 
-Updated: 2026-05-28
+Updated: 2026-05-29
 
-Use this file when conversation context is compacted or an agent needs to resume Obelisk
-work from repository state instead of chat history.
+Use this file after conversation compaction or when resuming Obelisk from repository
+state. Current routing table only: read `docs/agent-handoff/CURRENT.md` for active
+priorities, and do not use history files as the active source of truth.
 
-## Active Operating Objective
+## Resume Protocol
 
-- The persistent leader objective is tracked in the goal tool. Do not copy the full goal
-  text into default sub-agent prompts.
-- When delegating work, pass only the scoped objective, ownership, relevant skills, safety
-  baseline, and expected deliverable for that agent's task.
-- Safety remains first: no server restarts, `/servidor/ark` changes, marker edits,
-  ReflectionScanner, ptrace/gcore, broad `ProcessEvent` tracing, or runtime observations
-  without explicit operator approval for that run.
-- Community announcement policy is lead-owned in
-  `agent-skills/obelisk-github-research-workflow/SKILL.md`; do not copy it into scoped
-  sub-agent prompts unless the task specifically concerns announcements.
+1. Read this file, `docs/agent-handoff/CURRENT.md`, and the relevant subsystem skill.
+2. Check `git status --short --ignored`.
+3. Close completed or obsolete internal agents before starting a new round.
+4. Continue one local critical-path task plus only scoped parallel sub-agents.
 
-## Current Repo State
+## Active Overrides
+
+- Persistent leader objective lives outside skills and default sub-agent prompts.
+- GitHub work may be delegated only for an evidenced, stable milestone; routine local
+  rounds are not publication events.
+- No server restart, `/servidor/ark` edit, marker change, ReflectionScanner, ptrace/gcore,
+  broad ProcessEvent tracing, or runtime observation outside the standing debug scope or a
+  separately approved exact run.
+- `arkserver` / Ragnarok is protected while users are active. `arkserver2` / TheIsland has
+  standing operator approval for Obelisk debug/development tests when needed; preserve
+  evidence, restore stable posture, and shut it down afterward when no longer needed.
+- Discord/community updates are for major public modder-facing milestones only.
+
+## Stable Baseline
 
 - Repo: `/home/flowcommunity-ark/Obelisk`
 - Remote: `git@github.com:tyr0nsur/Obelisk.git`
-- Current known good baseline: latest pushed and validated `main`. Check
-  `git log --oneline -5` for the exact head if resuming after a compaction, then inspect
-  local validation and CI state before claiming the current head is release-ready.
-- Current development version line: `0.1.0-dev`. This is a coordination label, not a
-  release tag. See `docs/VERSIONING.md`.
-- Local ignored artifacts normally present: `build/`, `Obelisk.log`
-- Do not commit built `.so` files, logs, server config, core dumps, or state markers.
-- Server config restore notes: `docs/SERVER_RESTORE.md`
-- Latest config backup symlink: `/home/flowcommunity-ark/backups/ark-config-latest`
-
-## Production Server State
-
-- ARK root: `/servidor/ark`
 - Central Obelisk root: `/servidor/ark/obelisk`
-- Gameplay config backup was created at
-  `/home/flowcommunity-ark/backups/ark-config-20260527-015805`.
-- Ragnarok stable live posture and protected production target:
-  - `/servidor/ark/obelisk/state/instances/arkserver/enable-process-event-hook`
-  - `/servidor/ark/obelisk/state/instances/arkserver/disable-plugins`
-- Current operator direction as of 2026-05-28:
-  - users are active on `arkserver` / Ragnarok; do not restart it, change markers, or run
-    Obelisk tests there;
-  - `arkserver2` / TheIsland is powered off;
-  - if server validation is needed, start `arkserver2` only with explicit operator
-    approval, run the scoped test, restore posture, and shut it down again.
-- Historical operational correction on 2026-05-28 removed a chat-reflection marker and
-  restarted `arkserver`, but a later read-only audit after user report found active
-  Ragnarok PID `3412724` still has chat, inventory, and structure reflection env enabled.
-  Instance markers for those observers were present under
-  `/servidor/ark/obelisk/state/instances/arkserver`, and quiet posture check fails. Do not
-  fix by restarting while users are active; cleanup requires explicit maintenance approval.
-- Exception already completed with explicit operator approval: `AllowCaveBuildingPvP=True`
-  was applied to Ragnarok `GameUserSettings.ini` on 2026-05-27, `arkserver` was restarted,
-  and a later read-only-agent protocol violation refreshed backup
-  `/home/flowcommunity-ark/backups/ark-config-20260527-190558` as `ark-config-latest`.
-- Do not restart servers, edit marker files, change `/servidor/ark`, or activate
-  ReflectionScanner unless it is part of an explicit approved `arkserver2` / TheIsland
-  test window with shutdown afterward.
-- Structure reflection is gated in code and wrapper by both
-  `OBELISK_WRAPPER_PROFILE=observer-debug`, `allow-observer-debug-window`,
-  `allow-experimental-observers`, and
-  `/servidor/ark/obelisk/state/instances/<instance>/enable-structure-reflection`.
-  Env-only, profile-only, or observer-marker-only activation is rejected; log and
-  internal-dispatch budgets default to `0`.
-- Stable posture rejects structure reflection env, and supervisor snapshots include
-  `structure-reflection.txt`. Structure log and dispatch budgets are separate and are
-  reserved only after an exact structure FName filter passes.
-- Inventory reflection now has an internal hook-side observer and test target. It remains
-  disabled by default, observer-debug profile plus `allow-observer-debug-window`,
-  `allow-experimental-observers`, observer marker/env/SHA/budget gated, metadata-only, and
-  not a public SDK event.
-- Runtime observer marker checks are centralized in `runtime/RuntimeMarkers.*`; unsafe
-  path components, directory markers, symlink markers, and symlink instance directories are
-  rejected before observers can enable.
-- Second-source reversing gates are centralized in
-  `docs/research/2026-05-28-second-source-reversing-gap-matrix.md`. Current
-  `FName`/`GObjects`/`UObject`/`UFunction` evidence remains candidate-only until a second
-  isolated core or independent static path satisfies the matrix.
-- `ue/BuffReflection.*` adds the next broad gameplay API building block: an offline
-  internal `sdk.buffs` recognizer around exact compact `PrimalBuff` fixtures. Keep runtime
-  hooks, callbacks, return overrides, raw object/class exposure, and gameplay mutation
-  blocked.
-- `sdk.transfers` ScriptStruct snapshots preserve target/property object and FName
-  identity fields. UFunction and ScriptStruct `--check-layout` runs are semantic/layout
-  gates for second-source portability and require full artifact identity plus explicit
-  `--fname-root-slot`.
-- `scripts/compare_reflection_snapshots.py --target Outer.Name` supports focused
-  second-source checks for one UFunction or ScriptStruct without preparing a separate
-  fixture root. Use `--list-target-sets` to print named intakes such as
-  `minimal-second-source-intake` and `transfer-scriptstruct`.
-- UFunction and ScriptStruct snapshot regenerators also accept the shared `--target-set`
-  names from `scripts/reflection_target_sets.py`, matching comparison/readiness tooling.
-- Second-source comparison now requires sanitized artifact identity in both roots:
-  `artifact_kind`, `artifact_sha256`, `capture_id`, and `evidence_pack_id`. Missing or
-  matching identity is `inconclusive`, so self-comparison cannot pass as independent
-  evidence. Readiness JSON includes per-target details plus a top-level `promotion_gate`
-  summary. Empty snapshot roots add a `no_targets` blocker. Missing base target-set entries
-  are `not_applicable` for second-source status, and rejected or weak-membership
-  property/nested candidates make a target inconclusive before layout compare. Text
-  readiness reports now list each non-accepted target with `comparable`,
-  `second_source`, blocker reasons, and first diff details.
-- UFunction and ScriptStruct regenerators accept the artifact identity flags above; the
-  committed primary fixtures carry the primary core artifact SHA without storing core
-  paths.
-- Core evidence pack manifests include a structured `promotion_gate` with `ready=false`,
-  emit `fname-static-xrefs.json` for FName root slots, and treat static xrefs as actionable
-  only when a non-oversized anchor window exists.
-- CI and release validation now run reflection snapshot comparison and ScriptStruct
-  fixture tests. README/STATUS present module-first observers and snapshot tooling instead
-  of a chat-centered roadmap. Mixed-schema target-filter behavior is covered by tests.
-- Snapshot comparison promotion target sets are schema-qualified and strict. Missing
-  requested base/candidate targets are inconclusive instead of silently skipped; use
-  `--fail-on-readiness-gaps` when a readiness report is acting as a promotion gate.
-- `scripts/check_release_readiness.sh --require-second-source-readiness` adds the focused
-  UFunction and ScriptStruct second-source promotion gates. The default release check
-  remains the core-first gate and does not require gameplay module second-source evidence.
-  When sanitized second-source roots exist, pass `--ufunction-second-source-root`,
-  `--scriptstruct-second-source-root`, and `--second-source-report-dir`; the release gate
-  writes JSON readiness reports for both target sets and runs both before returning the
-  combined gate status. Hard blockers/rejections exit `1` and take priority over
-  inconclusive/missing-evidence exits `2`. Put the report directory outside the repository
-  or under an ignored artifact path; unignored in-repo report paths are rejected before
-  the release build starts.
-- Second-source release readiness target-set scope is explicit. The default
-  `--require-second-source-readiness` gate covers `minimal-second-source-intake` and
-  `transfer-scriptstruct`; promotion PRs for buffs, dinos, missions, tribes, transfer
-  UFunctions, or future module families must name each promoted target set.
-- Public ProcessEvent callback lifecycle now includes owner-token handle registration:
-  plugins can register with handle-returning owner-token functions and explicitly
-  unregister through `UnregisterProcessEventCallbackWithOwnerToken(owner_token, handle)`.
-  Handles are process-local and must not be stored in shared cluster config or reused
-  across ARK instances.
-- `PluginManager` marks plugin owners as unloading before shutdown on init failure or
-  unload. New callback registrations are rejected while unloading, while owner-token
-  unregister remains valid so shutdown can clean existing handles before `dlclose`.
-- Callback handles and plugin owner tokens skip `0` and currently live IDs after counter
-  wrap. `0` remains the failure sentinel for plugin-facing registration APIs.
-- `oBaseEvents` requires owner-token callback handle support when its ProcessEvent example
-  is enabled. Do not reintroduce legacy filtered registration fallback without an explicit
-  unregister handle.
-- `oBaseEvents` also defensively rejects unsafe `instance_allowlist` entries in direct SDK
-  consumer validation, matching the runtime/config safe instance-id contract.
-- `ProcessEventHook::Remove()` must stay fail-closed: removal failures preserve hook
-  state/trampoline ownership and report failure instead of clearing state while patched
-  bytes may still execute.
-- Public plugin examples and first-party fixtures must copy the `ObeliskApi` table by value
-  if they need runtime functions after `ObeliskPlugin_Init`; the init `ObeliskApi*` and
-  `ObeliskPluginInitContext*` are borrowed only for init. Metadata strings returned by
-  `ObeliskPlugin_GetInfo` must be static or plugin-owned until the shared object closes.
-- Public examples and SDK consumer fixture plugins use metadata version `0.1.0-dev` until
-  the stable tag exists; do not reintroduce `0.1.0` plugin metadata during the dev line.
-- Release-scope guardrails pin the first-stable game interaction boundary: filtered,
-  non-mutating ProcessEvent observation only; gameplay mutation, arbitrary UE4 calls,
-  public `CallProcessEvent` plugin behavior, borrowed UE memory, and higher-level gameplay
-  SDK modules stay blocked.
-- Stable posture rejects scanner env, non-zero `OBELISK_PE_TRACE_LIMIT`, global callbacks,
-  public `CallProcessEvent`, and chat/inventory/structure observer env and markers. Use
-  `scripts/check_obelisk_server_posture.sh --expect-stable --map Ragnarok --instance
-  arkserver` for production-like live validation.
-- Second-source snapshot comparison requires distinct sanitized evidence identity. Missing
-  identity, fully matching identity, or shared `artifact_sha256`, `capture_id`, or
-  `evidence_pack_id` is `inconclusive`, even when layouts match.
-- Snapshot regenerators reject partial artifact identity and require all four identity
-  fields together. GObjects sampling in core evidence packs resolves sampled names only
-  through explicit `--fname-root-slot` values, so primary defaults cannot contaminate a
-  second-source sample.
-- Snapshot regenerators share evidence-pack manifest parsing through
-  `scripts/snapshot_evidence_pack.py`; keep future FName/GObjects/core manifest-default
-  rules centralized there for both UFunction and ScriptStruct paths. Evidence-pack
-  manifests used for regeneration must match the snapshot manifest `ark_binary_sha256`,
-  must have `evidence_status.status=complete`, and must not have `gdb_core_failed=true`;
-  wrong-binary, missing-core, core-SHA-mismatch, or partial-GDB packs are rejected before
-  snapshots are generated.
-- Passive operator-supplied runtime evidence from 2026-05-28 is recorded in
-  `docs/research/2026-05-28-passive-chat-reflection-live-observation.md`: it observed
-  experimental `ServerSendChatMessage` metadata with `GlobalChat` and `GlobalTribeChat`,
-  plus `fname_index=1865` outer-FName candidate rejection, with plugins disabled and no
-  server action performed for the note. Treat it as supporting runtime evidence only, not
-  SDK readiness.
-- The production LinuxGSM wrapper scrubs inherited `OBELISK_ALLOW_CALL_PROCESS_EVENT` and
-  nonzero tracing controls such as `OBELISK_PE_TRACE_LIMIT`; stable posture still derives
-  debug env only from explicit markers.
-- Runtime/plugin installers reject symlinked managed subdirectories before writing
-  artifacts. Keep `lib`, `plugins`, `include`, `config`, `logs`, `state`, and
-  `state/instances` as real directories under the central Obelisk root.
-- Runtime logging rejects explicit relative or symlinked `OBELISK_LOG_DIR` values,
-  symlinked `${OBELISK_ROOT}/logs`, and symlinked per-instance log directories.
-- Plugin config preparation rejects a symlinked per-plugin config directory before
-  first-run default config creation, so default publication cannot write through a config
-  symlink escape.
-- Runtime plugin discovery requires the plugin directory to already be a real non-symlink
-  directory. `PluginManager::LoadPlugins` does not create a missing plugin directory or
-  follow a symlinked plugin directory, and the read-only operator CLI mirrors that posture
-  when listing plugins/config.
-- Runtime and SDK install are treated as one compatibility unit: required artifacts are
-  preflighted before runtime publication, the SDK component is staged into a temporary
-  root, only expected public header/CMake package files are published, and SDK install or
-  publish failures roll back both the runtime pair and any already-published SDK files.
-- Core dump evidence packs fail by default when GDB core inspection returns nonzero.
-  `--allow-partial-gdb` is triage-only and marks the manifest
-  `evidence_status.status=partial-gdb-failed`; do not promote partial GDB evidence.
-- `arkserver2` / TheIsland runbooks from 2026-05-27 are historical/superseded while RAM is
-  constrained unless the operator explicitly reopens that server. Research docs with live
-  marker/restart snippets must carry a historical or approved-runbook banner.
-- Reflection/reversing/type-reconstruction skills now use the shared module promotion
-  ladder and require explicit debug-window approval before marker edits, restarts,
-  scanners, ptrace/gcore, or broad tracing. Public SDK guardrails now block premature
-  gameplay module APIs, not only chat.
-- Operational docs/skills outside `docs/research/` are guarded by
-  `scripts/test_operational_doc_guardrails.py`, which blocks active marker/restart
-  command examples from returning to install, supervision, or skill docs.
-- `scripts/test_public_sdk_guardrails.py` is the canonical module-first public SDK
-  guardrail; it scans every shipped header under `include/obelisk/**` for unpromoted
-  gameplay/API surfaces and keeps public examples/first-party plugins from using the
-  `CallProcessEvent` escape hatch. `test_public_sdk_chat_guardrails.py` remains a legacy
-  wrapper.
-- Commit `cd57189`:
-  - supervisor default was aligned to `arkserver-obelisk-debug`;
-  - CI/release/README were updated to run `scripts/test_obelisk_supervisor_snapshot.sh`;
-  - `PluginManager::LoadPlugins` was hardened so already-loaded `plugin_id` values are
-    skipped on repeated load attempts and duplicate handles are closed without duplicating
-    callbacks.
-- Current agent audit backlog:
-  - runtime/API: owner-token callback handles, active-detour hook removal, owned
-    debug-control shutdown, init-window helper-thread owner-token registration, and
-    `CallProcessEvent` pre-callback double-execution guard are implemented;
-  - cluster/plugin config: shared config default creation is now safe for concurrent
-    multi-instance startup; `enabled=true` now requires a matching non-empty
-    `instance_allowlist` or explicit `allow_all_instances=true`; plugin
-    `default_config_json` must declare `enabled=false`, an `instance_allowlist` array,
-    and `allow_all_instances=false`; plugin loading fails closed when
-    `OBELISK_INSTANCE_ID` is missing/unsafe and allowlist entries use the same safe-token
-    rule; `oBaseEvents` does not publish `map_allowlist`, and SDK consumer CTest rejects
-    non-empty legacy `map_allowlist` until reliable map identity exists; plugin config
-    directories and `config.json` files must be regular non-symlink
-    entries, and `OBELISK_CONFIG_DIR` itself must be absolute and non-symlinked; mutable
-    shared plugin state still requires plugin-level locking/atomic-write design;
-  - lifecycle hardening: PluginManager regression tests cover init-time helper-thread
-    owner-token callbacks when `Init` returns false or throws, invalidating tokens and
-    cleaning callbacks before close; `UnloadAll` also covers cleanup when plugin
-    `Shutdown` throws; each plugin init receives a per-plugin `ObeliskApi` copy so a
-    plugin cannot mutate the manager template or poison later plugin loads;
-  - install hardening: runtime installer stages both `libsubhook.so` and `libobelisk.so`
-    before publishing and rolls back any already-published runtime file if the paired
-    publish fails; layout tests force failure on the second rename and verify the original
-    pair remains intact;
-  - C ABI coverage: public SDK structs have C typedef names, and the SDK consumer suite
-    builds and loads a C-language plugin through the documented `ObeliskPlugin_GetInfo`,
-    `ObeliskPlugin_Init`, and optional `ObeliskPlugin_Shutdown` exports;
-  - build/install consistency: runtime installer accepts `--build-dir` and honors
-    `OBELISK_BUILD_DIR`; release readiness passes the same build dir into layout and
-    dry-run installer validation; runtime/plugin installers reject extra positional args;
-  - `CallProcessEvent` compatibility slot is default-deny; runtime advertises
-    `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT` and calls the trampoline only when
-    `OBELISK_ALLOW_CALL_PROCESS_EVENT=1` plus marker `allow-call-process-event` are active;
-  - plugin pre-callback blocking is default-deny; `false` returns continue the original
-    `ProcessEvent` unless `OBELISK_ALLOW_PROCESS_EVENT_BLOCKING=1`, marker
-    `allow-process-event-blocking`, and
-    `OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING` are active;
-  - event dispatch hardening: EventManager tests initialize logger and verify throwing
-    pre/post callbacks are logged without propagating and without stopping later
-    callbacks;
-  - reflection/offline: second-source evidence is the bottleneck, and safe work should
-    keep improving deterministic readiness/comparison tooling without touching live
-    servers.
-- Commit `6b9fe8a` documents `CallProcessEvent` reentrancy in the SDK
-  header and plugin docs without changing ABI layout: pre-callbacks that call it must
-  return `false` to avoid double execution; later runtime hardening added a guard that
-  skips automatic original execution and warns if a pre-callback calls it and returns
-  `true`.
-- Commit `5cf3de7` adds internal `EventManager` registration IDs and
-  `UnregisterCallback(id)` tests. Public `ObeliskApi` callback registration remains
-  unchanged for ABI v1.
-- Commit `f5d1b0e` tracks active ProcessEvent detour/trampoline frames and avoids
-  unmapping the trampoline during hook removal until frames drain; on timeout it warns and
-  intentionally leaves the trampoline mapped to avoid use-after-free.
-- Commit `8519b2b` owns the debug-control thread and joins it before logger shutdown
-  instead of detaching it.
-- Commit `2095b1a` aligns ProcessEvent callback dispatch with chat dispatcher
-  self-unregister behavior by using a recursive dispatch mutex and testing a callback that
-  unregisters its own registration during dispatch. Public ABI remains unchanged.
-- Commit `228ef7e` snapshots the ProcessEvent original
-  trampoline under a hook-state mutex, starts the active-frame guard before public
-  `CallOriginalProcessEvent` observes hook state, and makes hook removal mark `removing`
-  under the same mutex before restoring bytes or unmapping the trampoline.
-- Commit `0994d3f` makes global ProcessEvent callbacks runtime
-  default-deny. `RegisterPreProcessEvent` and `RegisterPostProcessEvent` no-op with a
-  warning unless `OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS=1` and the per-instance
-  marker `allow-global-process-event-callbacks` are both active. Filtered callbacks remain
-  available by default and ABI v1 layout is unchanged.
-- Global ProcessEvent callback gating uses the existing `OBELISK_ROOT` marker root, and
-  stable posture checks reject `OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS`.
-- Commit `4e4f5cf` adds
-  `scripts/compare_reflection_snapshots.py --readiness-report`. Use it to summarize
-  comparable snapshot coverage and second-source status by schema/module. Current fixtures
-  are layout-comparable: UFunction `35/35`, ScriptStruct `2/2`; both still need a real
-  second sanitized snapshot root with independent artifact identity before promotion.
-- Minimal second-source intake should run before expanding more gameplay surfaces:
-  `PrimalItem.CanUse`, `PrimalItem.AllowRemoteAddToInventory`,
-  `PrimalStructure.AllowStructureAccess`, and `PrimalStructure.IsAllowedToDemolish`.
-  Current primary-fixture comparability is `4/4`, and promotion remains blocked by missing
-  accepted second-source evidence. The current ScriptStruct promotion gate also names
-  `PrimalLocalProfile.ARKTributeDino` and
-  `PrimalLocalProfile.ArkTributePlayerData` as missing accepted second-source targets.
-- `structure-observer-intake` covers all six currently recognized structure observer
-  UFunctions: `AllowStructureAccess`, `IsAllowedToDemolish`, `SetVariant`,
-  `AllowToggleActivation`, `VerifyPinCode`, and `CanSeat`. Current committed base
-  fixtures cover all six with zero blocked base targets; second-source evidence is still
-  missing for each.
-- `docs/research/2026-05-28-second-source-core-intake-runbook.md` is the minimal
-  approved-artifact path for second-source UE4 reflection evidence: build the core pack,
-  verify per-artifact FName/GObjects data, regenerate `minimal-second-source-intake`, and
-  require four accepted targets with distinct artifact identity before promotion.
-- For new second-source artifacts, do not reuse the primary-core FName root slot by
-  default. First derive or scan a verified per-artifact FName root/table, then pass it
-  explicitly to UObjects/UFunction/ScriptStruct tools. UFunction and ScriptStruct
-  regenerators now require explicit `--fname-root-slot` when artifact identity flags are
-  supplied, and GObjects sampling with `build_core_dump_evidence_pack.py
-  --gobjects-sample-index` requires an explicit `--fname-root-slot`. Prefer
-  `--evidence-pack-manifest <pack>/manifest.json` for UFunction/ScriptStruct regeneration
-  so `binary.sha256`, complete `evidence_status`, `core.sha256`, `capture_id`,
-  `evidence_pack_id`, selected FName root, and selected GObjects candidate come from the
-  evidence pack instead of manual CLI transcription; use `--evidence-pack-fname-root-label`
-  or `--evidence-pack-gobjects-label` when the pack has multiple candidates.
-- Latest restart audit:
-  `docs/research/2026-05-27-ops-restart-audit-instance-id.md`
-  - live `ObeliskRun.sh` exports `OBELISK_INSTANCE_ID=arkserver`
-  - active process maps only central `libobelisk.so` and `libsubhook.so`
-  - no active `ChatPlugin`, `ObeliskPlugins`, or deleted Obelisk mappings remain
+- Current dev line: `0.1.0-dev`; the release path should go through `0.1.0-rc.1` before
+  stable.
+- Stable plugin loading requires safe `OBELISK_INSTANCE_ID` plus real non-symlink plugin,
+  config, log, and state roots.
+- `ObeliskApi` v1 is append-only for `v0.1.0`; ABI v2 requires an explicit migration plan.
+- EventManager owner cleanup is expected to wait for in-flight callbacks before plugin
+  unload; tests cover filtered pre-ProcessEvent and post-ProcessEvent callback paths.
+- Runtime posture is default-deny for global callbacks, public `CallProcessEvent`,
+  ProcessEvent blocking, broad tracing, scanner/debug controls, and experimental observers.
 
-## What Is Stable Enough
+## Product Baseline
 
-- LD_PRELOAD runtime bootstrap.
-- Central install layout under `/servidor/ark/obelisk`.
-- `OBELISK_INSTANCE_ID` separates logs and preferred state markers per LinuxGSM instance;
-  plugin loading fails closed if it is missing or unsafe.
-- LinuxGSM production wrapper pins plugin/config/log dirs under `OBELISK_ROOT`; debug
-  wrapper does not enable ptrace by default.
-- Absolute x64 ProcessEvent hook with executable range and known prologue validation.
-- ProcessEvent direct-offset fallback is removed from active runtime code; a unique
-  signature match is required.
-- C ABI plugin loading.
-- Strict plugin metadata/config ABI:
-  - plugins must export `ObeliskPlugin_GetInfo`
-  - runtime creates/validates `${OBELISK_CONFIG_DIR}/<plugin-id>/config.json`
-  - runtime skips `ObeliskPlugin_Init` when common config has `enabled=false` or the
-    current `OBELISK_INSTANCE_ID` is not in `instance_allowlist`
-  - duplicate `plugin_id` values are rejected during one load pass
-  - `ObeliskPlugin_Init` receives `ObeliskPluginInitContext`
-- Stable install only deploys runtime libraries; plugins are activated by publishing `.so`
-  files into `/servidor/ark/obelisk/plugins/` with `scripts/install_obelisk_plugin.sh`,
-  which stages under a non-`.so` name and atomically renames to the final path.
-- Initial operator CLI is `scripts/obelisk.py`; it is read-only and supports `status`,
-  `instances list`, `plugins list`, and `plugins show`. Start/stop/restart commands are
-  not implemented yet and should wrap LinuxGSM with explicit safety gates.
-- Operator CLI instance views apply the runtime/config safe instance-id contract
-  (`[A-Za-z0-9_-]+`); unsafe marker directory names are invalid and excluded from valid
-  instance counts.
-- Plugin-owned callback cleanup on init failure and unload.
-- Optional plugin export: `extern "C" void ObeliskPlugin_Shutdown()`.
-- `plugins/oBaseEvents` builds as the first official plugin example.
-- Public docs present Obelisk as a Linux modding runtime/API/SDK. ARK/LinuxGSM are
-  debug harness/adapters, not the project center.
-- Top-level README has been refreshed for the SDK/runtime direction, current stability
-  boundaries, install layout, plugin ABI, and roadmap.
-- CTest is enabled. `PluginConfigTests` is the first offline C++ test suite and
-  validates runtime-owned plugin config defaults and rejection paths.
-- SDK/API baseline:
-  - canonical public header is `include/obelisk/ObeliskApi.h`
-  - `api/ObeliskApi.h` is a transition wrapper
-  - `obelisk_sdk` is the CMake interface target
-  - `AbiLayoutTests` locks ABI v1 layout on Linux x86_64
-  - `AbiLayoutTests` currently fail if public chat capability is added before intentional
-    ABI promotion
-  - `tests/sdk_consumer` builds and loads a minimal external plugin against the public SDK
-    through CTest, including owner-token handle registration and unregister
-- `EventManagerTests` cover global/filtered pre callbacks, blocking behavior, post
-  callbacks, owner cleanup, and null callback handling.
-- Installed SDK layout validation exists through `scripts/test_install_obelisk_layout.sh`
-  and is run by CI. The layout test now validates installed-header consumption, plugin
-  placement, config dir/path, instance id, `plugin_owner_token`, and owner-token handle
-  registration/unregister passed to a consumer plugin.
-- `oBaseEvents` fails closed when its explicit `process_event` feature is enabled with an
-  invalid negative `filtered_function_index`; SDK consumer CTest covers the rejection.
-- Hook-side structure observer tests cover all six accepted structure targets through
-  `TryIdentifyInvocation`; object parameters stay range-hidden and wrong outer identity is
-  rejected before any runtime promotion claim.
-- `core/StructureEventDispatcher` is an internal copied scalar-only bridge for future
-  structure events. It has owner cleanup, self-unregister, in-flight cleanup wait, unknown
-  shape rejection, and copied-storage tests; it is not public ABI/plugin SDK. `PluginManager`
-  sweeps it on init failure and unload alongside `EventManager` and `ChatEventDispatcher`,
-  with regression coverage that callbacks are gone before `dlclose`.
-- Hook-side structure observation dispatches matched copied scalar-only events through the
-  internal dispatcher only after the original `ProcessEvent` path reports that the original
-  call ran. It remains observer-gated, budget-limited, and not public ABI/plugin SDK.
-- `ProcessEventStructureReflection::TryBuildCopiedStructureEvent` turns matched structure
-  recognizer output into copied scalar-only event storage. Sensitive pin values and object
-  params are omitted; `SetVariant`/`CanSeat` scalars are copied in hook-side tests.
-- `PluginManagerTests` cover plugin lifecycle and rejection paths with a fake loader:
-  valid load/unload, missing entry points, invalid metadata, init failure, callback cleanup,
-  shutdown, disabled/default config skip, instance allowlist skip, duplicate `plugin_id`,
-  and close behavior.
-- `PluginManager::UnloadAll()` unloads plugins in reverse load order and has a multi-plugin
-  order test.
-- The SDK now installs a CMake package export:
-  `lib/cmake/Obelisk/ObeliskTargets.cmake`, `ObeliskConfig.cmake`, and
-  `ObeliskConfigVersion.cmake`.
-- Installed SDK layout validation consumes the installed package with
-  `find_package(Obelisk 0.1.0 CONFIG REQUIRED)` and `Obelisk::obelisk_sdk`, and
-  rejects installed CMake package files that leak local source or build paths.
-- Runtime install uses the CMake `Runtime` component for `libobelisk.so`, which preserves
-  the intended installed `RUNPATH=$ORIGIN` and avoids build-tree dependency path leaks.
-  Runtime libs are staged and published by atomic rename; backup reinstall validation
-  expects paired `libobelisk.so`/`libsubhook.so` backups and no `.incoming.*` or
-  `.install-runtime.*` leftovers. The installer rejects empty/relative/root/symlink
-  install roots and cleans incoming temp files after failed runtime renames.
-- Versioning policy is documented in `docs/VERSIONING.md`: no stable `0.1.0` tag yet;
-  use `0.1.0-alpha.N` only for intentional contributor previews and `0.1.0-rc.N` only
-  after scope freeze.
+- First stable release has one promoted gameplay SDK surface: `GameplayPolicyEvent`.
+  Promotion scope and exclusions are recorded in
+  `docs/research/2026-05-29-public-gameplay-event-readiness-audit.md`.
+- `GameplayPolicyEvent` excludes mutation, raw UE pointer exposure, public
+  callback-by-name APIs, public `StructureEvents`, public Inventory/Chat/etc. module APIs,
+  HTTP/threads/file-reader plugin ingress, and lifecycle-unsafe plugins.
+- `DescribeResourceKind` is a metadata-only v0.1 SDK helper for known resource categories.
+  It returns copied POD descriptors with supported gameplay-policy event/field masks and
+  explicit no-identity/no-lookup flags.
+- `InventoryPolicyEventDispatcher` and `StructureEventDispatcher` are internal
+  copied-scalar infrastructure only. They do not promote public Inventory or
+  StructureEvents SDKs.
+- Release scope wording separates stable filtered ProcessEvent callback infrastructure from
+  experimental target-specific gameplay/module observers.
 
-## What Is Experimental Or Blocked
+## Evidence Baseline
 
-- Legacy chat/monitor prototype source has been removed from the release tree.
-- ReflectionScanner is experimental and must stay disabled on live servers.
-- `arkserver` / Ragnarok is protected because users are active there. `arkserver2` /
-  TheIsland is powered off; if server validation is needed, start it only with explicit
-  operator approval, run the scoped test, restore posture, and shut it down again.
-  High-risk scanners/native exec/ptrace still require an approved `arkserver2` window and
-  rollback plan.
-- General-purpose SDK reflection is not solved yet. However, the current ARK binary has
-  binary-hash-scoped evidence for FName, `GUObjectArray`, chat `UFunction` property chains,
-  bounded param ranges, and an internal UTF-32 `FString` decoder candidate.
-- Analyzer-level GNames table triage is available in
-  `scripts/analyze_reflectionscanner_capture.py` and documented in
-  `docs/research/2026-05-27-reflectionscanner-gname-table-triage.md`. A
-  `research-candidate` label is evidence for follow-up only, not an accepted offset.
-- Analyzer JSON now includes an `evidence_pack` block when run with copied logs. Use
-  `--binary` to record the offline ShooterGameServer SHA256 and `--objdump-xrefs` to attach
-  static xref evidence. Workflow:
-  `docs/research/2026-05-27-gname-evidence-pack-workflow.md`.
-- `scripts/build_reflection_evidence_pack.py` wraps that manual flow into a reproducible
-  offline pack: copied logs, SHA256/file/readelf/objdump artifacts, analyzer JSON, and a
-  manifest. It refuses to write artifacts under `/servidor/ark`.
-- ReflectionScanner analyzer JSON and offline pack manifests expose a structured
-  `promotion_gate` with `ready=false`, `promotable.gnames=false`, and
-  `promotable.gobjects=false`. Treat `evidence_pack.status=research-candidate` as
-  candidate ranking only, never as a runtime offset/API promotion.
-- Analyzer static xref entries now include access classification (`load`, `store`,
-  `address`, `call`, `jump`, or `other`) and evidence-pack access counts.
-- ReflectionScanner can probe explicit static FName root slots supplied through
-  `OBELISK_REFLECTION_STATIC_FNAME_ROOTS` at startup and through a one-minute delayed
-  retry. Analyzer strict mode does not accept static-root probes by themselves; exact
-  static-root matches are reported as inconclusive clues until backed by repeat-confirmed
-  indirect-table evidence, a second isolated capture, or independent static validation; see
-  `docs/research/2026-05-27-static-fname-root-probe.md`.
-- ReflectionScanner can also sample observed `UObject.NamePrivate.ComparisonIndex` values
-  against env-supplied static FName roots with
-  `OBELISK_REFLECTION_SAMPLE_STATIC_FNAME_ROOTS=1`. Analyzer JSON records
-  `static_fname_root_samples` and sample counts by status/reason/target; `--strict` does
-  not pass from samples alone. See
-  `docs/research/2026-05-27-static-fname-root-sampling.md`.
-- First sampling capture produced 44 samples and all rejected with
-  `implausible_num_elements`; this means the sampler currently rejects too early on
-  counters that are known to be zero for the candidate table. Next runtime change should
-  relax only the sampler path to read bounded entries while still logging counters.
-- Authorized `arkserver` core dump evidence changed the FName status. With
-  `OBELISK_DEBUG_ALLOW_PTRACE=1`, `gcore` captured PID `2902200` to
-  `/servidor/ark/obelisk/dumps/arkserver-20260527T031311Z`. The server was then restored
-  to stable posture. The core confirms static FName slot `0x5956f30 -> 0x2ae5c660`,
-  `num_elements=0x4516e`, `num_chunks=0x12`, `0 -> None`,
-  `4884 -> ClientMessage`, and `9619 -> ServerChat`; see
-  `docs/research/2026-05-27-arkserver-core-fname-evidence.md`.
-- Runtime scanner retest with corrected clues was still inconclusive through the old 60s
-  retry window: the slot pointed to `0x30752660`, but counters and clue reads stayed zero.
-  Static-root delayed retry has been extended to 10 minutes; see
-  `docs/research/2026-05-27-static-root-runtime-retry-capture.md`.
-- Runtime debug control now exists behind `OBELISK_ENABLE_DEBUG_CONTROL=1` and the
-  `enable-debug-control` marker. It runs bounded probes after the server is alive and is
-  forbidden by stable posture. First live post-start probe of `0x5956f30` rejected with
-  `table=0x13733660` / `implausible_num_elements`; waiting longer in bootstrap is rejected
-  as a strategy. See `docs/research/2026-05-27-runtime-debug-control.md`.
-- Core evidence promotes `0x595b7e0` to `GUObjectArray research-candidate` for the current
-  ARK binary hash. `0x595b7f0` points to chunks, count-like field at `0x595b804` is
-  `1243796`, first object item resolves to `/Script/CoreUObject`, and its class resolves
-  to `Package` through the confirmed FName table. See
-  `docs/research/2026-05-27-core-gobjects-candidate.md`.
-- `scripts/build_core_dump_evidence_pack.py` writes `gobjects-static-xrefs.json` for
-  `--gobjects-candidate`, covering root, chunks, count, and serial fields. Offline
-  validation for `0x595b7e0` found 3 root, 8016 chunks, 5870 count, and 2 serial xrefs.
-  New packs record the Obelisk commit in `manifest.json`.
-- Static context anchors for `0x595b7e0`: `0x79ce22` is lookup/bootstrap cache,
-  `0x7a27a7` is init/destructor registration, `0x81f118` is startup reset, and
-  `0x81f206` is startup helper. Labels are anchors only, not accepted function names; see
-  `docs/research/2026-05-27-gobjects-static-anchor-classification.md`.
-- `gobjects-static-xrefs.json` groups objdump xrefs by function anchor, but broad
-  nearest-symbol groups can be contaminated. The `0x12d1400` group is not accepted as one
-  decompiler target.
-- Offline core UObject enumeration now works through `scripts/enumerate_core_uobjects.py`
-  and has found real gameplay `Function` objects in `GObjects`; see
-  `docs/research/2026-05-27-core-uobject-enumeration.md`.
-- Do not restart `GObjects` discovery from broad candidate search. Current priority is a
-  second static path for `0x595b7e0`: classify `0x12d1400`, `0x79ce22`, `0x7a27a7`,
-  `0x81f118`, and `0x81f206`, then strengthen class/outer back-reference validation.
-- No second isolated core is currently available; read-only dump inventory only found the
-  existing Ragnarok-derived core and derivative packs. Current core/runtime captures should
-  use `arkserver2` / TheIsland only after explicit approval for that run, then shut it
-  down afterward. Keep `arkserver` / Ragnarok untouched while users are active.
-- Offline `UFunction` and `ScriptStruct` property-chain inspection now works through
-  `scripts/inspect_core_ufunctions.py`. Treat module-specific offsets as candidate-only
-  fixture evidence until second-source comparison and SDK ownership gates pass.
-- `scripts/inspect_core_ufunctions.py` now validates target/class/outer/property objects
-  with direct `GObjects[InternalIndex]` back-references; see
-  `docs/research/2026-05-27-ufunction-membership-backrefs.md`.
-- `scripts/inspect_core_ufunctions.py` supports offline `--name-contains` and
-  `--outer-contains` filters for Function/Struct discovery from core dumps. Use broad
-  substring searches only for discovery; runtime filters should stay exact
-  FName+outer+ParmsSize+property-chain matches.
-- `scripts/inspect_core_ufunctions.py` reports bounded enum candidates for `ByteProperty`
-  through the observed `+0x70` enum pointer.
-- historical module evidence: chat produced useful patterns for exact UFunction/outer/
-  `ParmsSize`/property-chain recognition, bounded FString decoding, marker/env/SHA gates,
-  dispatcher ownership, ABI guardrails, and benchmark gates. Keep details in
-  `docs/research/2026-05-27-*chat*.md`, `docs/research/2026-05-27-fstring-layout.md`,
-  and `docs/research/2026-05-27-sdk-chat-event-ownership-plan.md`.
-- fact: chat remains internal/experimental only. The public SDK exposes no chat
-  structs/capabilities/functions, runtime dispatch is blocked, and tests guard accidental
-  promotion. Treat chat as one module proving promotion gates, not the active project
-  center.
-- Core-pack tooling now supports direct FName entry reads and bounded
-  `--gobjects-candidate` previews for the next `GUObjectArray` investigation.
-- Read-only overnight snapshots are documented in `docs/SUPERVISION.md` and implemented by
-  `scripts/obelisk_supervisor_snapshot.sh`. They write to
-  `/servidor/ark/obelisk/dumps/supervisor/`, fail closed on unstable posture, and must not
-  restart, install, edit markers, attach debuggers, enable scanners, commit, or push.
-- UE4 type reconstruction planning is captured in
-  `docs/research/2026-05-27-ue4-type-reconstruction-roadmap.md`; keep the milestone
-  order as `FName`, `GObjects`, `UFunction`, then bounded params.
-- Current local Ragnarok logs do not contain a usable ReflectionScanner capture. The
-  current GNames evidence audit is inconclusive because scanner logs only show
-  `ReflectionScanner disabled`; see
-  `docs/research/2026-05-27-current-gname-evidence-pack-audit.md`.
-- `scripts/check_obelisk_server_posture.sh --expect-stable --map <map> --instance
-  <instance-id>` is the required read-only guardrail after server debug work. It checks
-  expected env, requires central
-  `${OBELISK_ROOT}/lib/libobelisk.so` in `LD_PRELOAD` and maps, rejects deleted Obelisk
-  mappings, requires stable markers `enable-process-event-hook` / `disable-plugins`,
-  rejects unsafe instance ids/directories and forbidden per-instance marker entries that
-  would re-enable experimental features at next restart, requires explicit `--instance`,
-  and requires explicit `--map` unless `--pid` is provided. It has offline procfs fixture
-  coverage in
-  `scripts/test_check_obelisk_server_posture.sh`.
-- `scripts/check_obelisk_server_posture.sh --expect-stable` rejects experimental chat
-  reflection and chat text logging directly, including `OBELISK_ENABLE_CHAT_REFLECTION`,
-  the chat SHA/log-limit/text env, and the `enable-chat-reflection` marker.
-  `--forbid-chat-reflection` remains a compatibility flag, not a separate stable boundary.
-- Historical read-only quiet-posture audit at commit `5da65d6` found Ragnarok PID
-  `3940524` still had `OBELISK_ENABLE_CHAT_REFLECTION=1`, so it failed the stricter
-  production/performance guard. Later handoff entries may record separate quiet-posture
-  passes, but the current operator direction still protects `arkserver` / Ragnarok from
-  Obelisk restarts, marker edits, and runtime tests while users are active; see
-  `docs/research/2026-05-27-quiet-posture-readonly-audit.md`.
-- `scripts/obelisk_supervisor_snapshot.sh` writes `quiet-posture.txt` and
-  `quiet_posture_status` so debug-stable snapshots do not hide active chat reflection from
-  production/performance review.
-- `Memory::IsReadable` was changed away from `write(/dev/null)` after local evidence showed
-  that probe reports invalid and `PROT_NONE` mappings as readable. The replacement uses
-  cached readable ranges from `/proc/self/maps` and has `MemoryTests`. Commit `257f432` is
-  included in the deployed runtime; keep future scanner reads metadata-bounded and
-  benchmark ProcessEvent overhead separately.
-- A later controlled Ragnarok development capture on commit `8cb3bbe` produced 22
-  UObject/UFunction leads and 22 FName reject rows, with zero positive FName probes.
-  Rejection reasons were `implausible_num_elements` and `implausible_num_chunks`, so the
-  chat UObject globals should not be promoted directly into GNames roots; see
-  `docs/research/2026-05-27-live-fname-reject-capture.md`.
-- A static-root probe for slot `0x5956f30` was added and retried for 60s. The slot becomes
-  non-null (`table=0x41f8d660`) and has `header_index_ok=3/3`, but rejects with
-  `num_elements=0`, `num_chunks=0`, and shifted names (`9619 -> ServerChat`,
-  `9622 -> SetActiveMissionDebugFlags`). Do not accept it as GNames yet; next FName work
-  should sample/validate using observed `UObject.NamePrivate` indices.
-- A controlled Ragnarok development capture on commit `5754fca` tested
-  `OBELISK_REFLECTION_STATIC_FNAME_ROOTS=0x5956f30`; the startup static-root probe rejected
-  it with `table=0x0` / `unreadable_table_header`. The server was restarted afterward
-  without scanner/static-root env. Treat this as inconclusive until a delayed retry or
-  stronger static evidence; see
-  `docs/research/2026-05-27-static-fname-root-live-capture.md`.
+- ProcessEvent, FName, GObjects, UObject, UFunction, and unpromoted gameplay recognizer
+  evidence is binary-scoped until the relevant second-source/static promotion gates pass.
+- The accepted minimal second-source layout evidence is recorded in
+  `docs/research/2026-05-29-minimal-second-source-readiness.md`. It supports the
+  core-first release gate but does not promote GObjects, ResourceHandle, identity,
+  mutation, return overrides, raw params, player/item/inventory identity, or public
+  Inventory/StructureEvents SDK surfaces.
+- Dino, buff, mission, and tribe compact intakes are layout evidence only. Use
+  `docs/research/2026-05-29-dino-compact-second-source-readiness.md`,
+  `docs/research/2026-05-29-buff-compact-second-source-result.md`, and
+  `docs/research/2026-05-29-next-targetset-discovery.md` for exact target counts and
+  blockers.
+- `scripts/evaluate_resource_handle_revalidation.py` is the current offline redacted
+  ResourceHandle readiness gate. Current evidence keeps public/post-callback handles
+  blocked; see `docs/research/2026-05-29-resource-handle-revalidation-evaluator.md` and
+  `docs/research/2026-05-29-uobject-flags-validity-blocker.md`.
+- Static GObjects/FUObjectItem evidence remains research-candidate material. Details live
+  in `docs/research/2026-05-29-static-gobjects-field-window-audit.md`,
+  `docs/research/2026-05-29-static-gobjects-fuobjectitem-correlation.md`, and
+  `docs/research/2026-05-29-static-gobjects-same-fuobjectarray.md`.
+- If the reviewed binary/artifact FName root slot is already known, do not run broad
+  reverse FName scans. Pass the root slot explicitly to evidence-pack, GObjects sampling,
+  or snapshot regeneration tooling.
 
-## Current Research Direction
+## Tooling Baseline
 
-Next technical milestone is `FName -> string` resolution:
+- Offline core evidence-pack outputs and release second-source readiness report paths must
+  stay in `/servidor/ark/workspace-offline` or another approved offline root. Direct and
+  symlinked live-server input/output paths are rejected.
+- Raw core captures under `/servidor/ark/obelisk/dumps` are protected storage, not direct
+  promotion inputs. Promotion tooling consumes hardlinked or copied offline artifacts.
+- Second-source intake must derive artifact-specific FName root, validate GObjects,
+  regenerate snapshots, and compare fail-closed with `--readiness-report
+  --fail-on-readiness-gaps`.
+- `scripts/check_release_readiness.sh --require-second-source-readiness` defaults to the
+  UFunction `minimal-second-source-intake`; ScriptStruct promotion requires an explicit
+  ScriptStruct target set.
+- Static-only global evidence uses `scripts/build_static_global_promotion_evidence.py`;
+  `promotion_gate.ready` remains false for static global candidates.
 
-1. Run `ReflectionScanner` only on a confirmed isolated/debug instance.
-2. Use `docs/research/2026-05-27-reflectionscanner-isolated-capture-runbook.md`.
-3. Add `OBELISK_REFLECTION_LOG_FNAME_REJECTS=1` during isolated captures when we need
-   diagnostic reasons for rejected FName candidates.
-4. For the current static candidate, add
-   `OBELISK_REFLECTION_STATIC_FNAME_ROOTS=0x5956f30` only on an isolated/debug capture.
-   To test observed object name indices instead of fixed clues, also add
-   `OBELISK_REFLECTION_SAMPLE_STATIC_FNAME_ROOTS=1`.
-5. Analyze copied logs with:
+## Checkpoint Baseline
 
-```bash
-python3 scripts/analyze_reflectionscanner_capture.py /path/to/isolated/Obelisk.log
-python3 scripts/analyze_reflectionscanner_capture.py --json /path/to/isolated/Obelisk.log
-objdump -d /path/to/ShooterGameServer > /tmp/ShooterGameServer.objdump
-python3 scripts/analyze_reflectionscanner_capture.py \
-  --json \
-  --binary /path/to/ShooterGameServer \
-  --objdump-xrefs /tmp/ShooterGameServer.objdump \
-  /path/to/isolated/Obelisk.log
-```
+- Current RC direction is core-first: freeze `ObeliskApi` v1 around Linux runtime,
+  ProcessEvent hook infrastructure, plugin lifecycle, central install layout,
+  `oBaseEvents`, `GameplayPolicyEvent`, and `DescribeResourceKind`.
+- The dirty/offline release gate has passed with the accepted minimal second-source root,
+  but a real RC requires focused checkpoints and the same release gate without
+  `--allow-dirty`.
+- Use `docs/research/2026-05-29-rc-checkpoint-slicing-plan.md` for slicing. Handoff docs
+  should be refreshed separately from runtime, release/public docs, offline tooling, and
+  research-evidence slices.
+- Do not promote post-RC work into the RC: ResourceHandle, GNames/GObjects promotion, full
+  UE4 reflection, public Inventory SDK, public StructureEvents, chat/player/tribe/dino/
+  buff/transfer APIs, mutation, return overrides, public `CallProcessEvent`, background
+  worker plugins, operator lifecycle commands, and ScriptStruct/transfer promotion remain
+  blocked unless a later focused gate changes scope.
 
-6. Treat indirect-table `GNames` only as a research candidate when `matched_clues=3/3` repeats for the
-   same table pointer through distinct `source_global` values or distinct targets, and
-   there are no reject markers.
-7. Treat static-root `GNames` only as a research candidate when exact clue matches and
-   `header_index_ok=3/3` appear with plausible counts and no reject markers. Static-root
-   samples are supporting evidence only until promoted by a later gate.
-8. Before committing offsets, require a second isolated capture or static xref validation.
-   Static xrefs are supporting evidence only; inspect whether they are real load/store paths
-   before designing runtime name-resolution code.
+## Agent Coordination
 
-## Hard Rules
+- Use direct supervised sub-agents only. Repo-local JSON queue coordination stays out of
+  active prompts, handoff, and checkpoint planning.
+- When running six sub-agents, keep two on Obelisk engineering/audit/development and the
+  rest on research/knowledge/reversing/dump work; the lead supervises and integrates.
+- Pass sub-agents only scoped objective, ownership, safety baseline, allowed paths,
+  required skills, expert role, and expected decision.
+- Pass only the skills required for each task; sub-agents should not receive the full skill
+  set by default.
+- The lead integrates sub-agent findings, owns commits/pushes, and closes stale or
+  completed work before launching replacements.
 
-- Never enable `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1` plus the
-  `enable-native-exec-probes` instance marker on live servers.
-- Never enable raw chat discovery on live Ragnarok as a normal test.
-- Run Obelisk debug or reversing experiments on `arkserver2` only within an explicitly
-  approved scope; keep Ragnarok untouched while users are active and shut TheIsland down
-  afterward.
-- Do not reintroduce legacy map markers or binary-local `ObeliskPlugins` fallback.
-- Do not treat observed FName indices such as `9619` or `9622` as stable API contracts.
-- Do not promote plugins with HTTP, threads, or file readers until they implement and
-  validate `ObeliskPlugin_Shutdown()`.
-- Global ProcessEvent callbacks are debug-only unless documented and measured.
+## Canonical References
 
-## Key Files To Read First
-
-- `docs/agent-handoff/CURRENT.md`
-  - Current routing table only; historical pre-compaction handoff detail is archived in
-    `docs/agent-handoff/HISTORY-2026-05-28-pre-current-compaction.md`.
-- `docs/STATUS.md`
-- `docs/PLUGIN_ARCHITECTURE.md`
-- `docs/research/README.md`
-- `agent-skills/obelisk-agent-handoff/SKILL.md`
-- `agent-skills/obelisk-continuous-learning/SKILL.md`
-- subsystem-specific skill under `agent-skills/`
-- For reversing/static work also read:
-  `agent-skills/obelisk-static-binary-analysis/SKILL.md`,
-  `agent-skills/obelisk-ue4-type-reconstruction/SKILL.md`, and
-  `agent-skills/obelisk-tooling-discipline/SKILL.md`.
-
-## Next Good Rounds
-
-- Ops: use `arkserver2` / TheIsland only for approved server-backed tests, shut it down
-  afterward, and keep scanner/native-exec/ptrace behind run-window approval. Keep
-  `arkserver` / Ragnarok untouched while users are active.
-- Reflection core: strengthen `RuntimeReflection`, snapshot fixtures, comparators,
-  sanitizer tests, and evidence packs before adding public SDK module surfaces.
-- Module breadth: use focused snapshot comparison for inventory, structures, buffs, dinos,
-  tribes, missions, transfers, and admin candidates. Keep recognizers candidate-only until
-  second-source evidence and ABI/lifetime policy are satisfied.
-- Runtime safety: keep ProcessEvent observers gated by binary hash, markers, budgets, and
-  explicit approval for the current `arkserver` window.
-- SDK/API: promote public module APIs only after copied-data ownership, callback cleanup,
-  installed SDK consumer coverage, and ABI layout tests are in place.
-- Historical chat work remains internal and blocked from public SDK promotion; do not let
-  it dominate new rounds unless the operator explicitly asks for that module.
-- Evidence: after any isolated scanner capture, run
-  `scripts/build_reflection_evidence_pack.py` against copied logs and the matching binary
-  before promoting candidates.
-- Build/QA: keep package/export validation tied to concrete external plugin consumption
-  gaps.
-- Core runtime: extend PluginManager coverage only if a new lifecycle risk is identified;
-  the main missing test surface has moved from basic lifecycle to packaging/export.
+- `docs/agent-handoff/CURRENT.md`: active routing and immediate next steps.
+- `docs/agent-handoff/HISTORY-2026-05-28-pre-current-compaction.md`: historical handoff
+  detail before the active routing file was compacted.
+- `docs/STATUS.md`: contributor-facing stability matrix.
+- `docs/RELEASE.md`: release and second-source gates.
+- `docs/VERSIONING.md`: version and ABI line rules.
+- `docs/PLUGIN_ARCHITECTURE.md`: plugin lifecycle and promotion rules.
+- `docs/research/README.md`: canonical research-note format.
+- `docs/research/2026-05-29-rc-checkpoint-slicing-plan.md`: current dirty-tree checkpoint
+  slicing plan.
+- `docs/research/2026-05-29-public-gameplay-event-readiness-audit.md`: promoted
+  `GameplayPolicyEvent` boundary.
+- `docs/research/2026-05-29-minimal-second-source-readiness.md`: accepted minimal
+  second-source UFunction layout evidence.
+- `docs/research/2026-05-28-second-source-core-intake-runbook.md`: shortest offline
+  second-source intake.
+- `docs/research/2026-05-28-second-source-reversing-gap-matrix.md`: evidence gap matrix.

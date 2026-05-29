@@ -10,7 +10,7 @@ runtime and a general ARK Linux API/SDK core.
 
 - ARK binary SHA256:
   `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`
-- Current repository baseline:
+- Repository baseline when this note was authored:
   `1b33a2e Harden runtime observer log analysis`
 - Primary evidence source:
   existing offline core and committed sanitized fixtures.
@@ -34,6 +34,51 @@ runtime and a general ARK Linux API/SDK core.
 | `sdk.buffs` | Maintain the offline internal recognizer and use it to harden exact reflected metadata validation. | Runtime hooks, callbacks, return override, object/class pointer exposure, gameplay mutation. |
 | `sdk.transfers` | Capture or obtain second source for tribute ScriptStruct layouts. | `ItemNetInfo`, upload/download dispatch. |
 | `ue.reflection` | Keep strengthening exact identity and property-chain validation through the second-source matrix. | Treating FName/object indices as cross-build contracts. |
+
+## 2026-05-28 Priority Adjustment
+
+After the runtime, offline tooling, handoff, and release/public-scope docs groups
+were accepted in scoped review, the fastest general-moddding path is still offline
+second-source/type-reconstruction work, not another chat-specific observer. The minimal
+inventory/structure layout gate is now accepted; other target sets still need independent
+evidence:
+
+| Target Set | Comparable | Current Blocker | Priority |
+| --- | ---: | --- | --- |
+| `minimal-second-source-intake` | 4/4 | accepted layout-only evidence | Done |
+| `buff-compact-intake` | 3/3 | accepted layout-only evidence | Done |
+| `dino-compact-intake` | 2/2 | accepted layout-only evidence | Done |
+
+Use the accepted `minimal-second-source-intake`, `buff-compact-intake`, and
+`dino-compact-intake` results only as compact layout evidence for their exact target sets.
+Keep later module sets as broadening tracks; do not infer `GObjects`, `ResourceHandle`,
+object identity, mutation, return override, runtime hooks, or public SDK readiness from
+these layout results.
+
+Validation commands used for this adjustment:
+
+```bash
+python3 scripts/compare_reflection_snapshots.py \
+  --base-root tests/fixtures/ufunction_snapshots \
+  --readiness-report \
+  --target-set minimal-second-source-intake \
+  --json
+
+python3 scripts/compare_reflection_snapshots.py \
+  --base-root tests/fixtures/ufunction_snapshots \
+  --readiness-report \
+  --target-set buff-compact-intake \
+  --json
+
+python3 scripts/compare_reflection_snapshots.py \
+  --base-root tests/fixtures/ufunction_snapshots \
+  --readiness-report \
+  --target-set dino-compact-intake \
+  --json
+```
+
+These commands do not certify runtime or SDK readiness. They only prove base fixture
+comparability and identify the next missing artifact class.
 
 ## P2 Broadening Tracks
 

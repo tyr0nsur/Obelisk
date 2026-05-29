@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 
@@ -695,6 +696,128 @@ class ReflectionScannerAnalyzerStrictTests(unittest.TestCase):
         self.assertIn("missing_objdump_xrefs", blocker_reasons)
         self.assertNotIn("missing_binary_metadata", blocker_reasons)
 
+    def test_refuses_protected_log_path_before_reading(self) -> None:
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(ANALYZER),
+                "/servidor/ark/serverfiles/Obelisk.log",
+            ],
+            check=False,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("log must not read from protected server root", result.stderr)
+
+    def test_refuses_protected_objdump_xrefs_path_before_reading(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            log_path = Path(temp_dir) / "Obelisk.log"
+            log_path.write_text("offline test\n", encoding="utf-8")
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(ANALYZER),
+                    "--objdump-xrefs",
+                    "/servidor/ark/serverfiles/ShooterGameServer.objdump",
+                    str(log_path),
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("--objdump-xrefs must not read from protected server root", result.stderr)
+
+    def test_refuses_protected_binary_path_before_hashing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            log_path = Path(temp_dir) / "Obelisk.log"
+            log_path.write_text("offline test\n", encoding="utf-8")
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(ANALYZER),
+                    "--binary",
+                    "/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer",
+                    str(log_path),
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("--binary must not read from protected server root", result.stderr)
+
+    def test_rejects_textual_protected_path_even_if_symlink_points_outside(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            protected = root / "server-root"
+            outside = root / "outside"
+            outside.mkdir()
+            protected.mkdir()
+            target = outside / "Obelisk.log"
+            target.write_text("offline test\n", encoding="utf-8")
+            link = protected / "Obelisk.log"
+            link.symlink_to(target)
+
+            import analyze_reflectionscanner_capture as analyzer
+            import snapshot_evidence_pack as evidence_pack
+
+            with (
+                mock.patch.object(evidence_pack, "SERVER_ROOT", protected),
+                self.assertRaisesRegex(SystemExit, "log must not read"),
+            ):
+                analyzer.reject_protected_input_path(link, "log")
+
+    def test_rejects_symlink_resolved_into_protected_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            protected = root / "server-root"
+            outside = root / "outside"
+            outside.mkdir()
+            protected.mkdir()
+            target = protected / "Obelisk.log"
+            target.write_text("offline test\n", encoding="utf-8")
+            link = outside / "Obelisk.log"
+            link.symlink_to(target)
+
+            import analyze_reflectionscanner_capture as analyzer
+            import snapshot_evidence_pack as evidence_pack
+
+            with (
+                mock.patch.object(evidence_pack, "SERVER_ROOT", protected),
+                self.assertRaisesRegex(SystemExit, "log must not read"),
+            ):
+                analyzer.reject_protected_input_path(link, "log")
+
+    def test_allows_approved_offline_workspace_paths_under_server_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            protected = root / "server-root"
+            workspace = protected / "workspace-offline"
+            workspace.mkdir(parents=True)
+            safe_log = workspace / "Obelisk.log"
+            safe_log.write_text("offline test\n", encoding="utf-8")
+
+            import analyze_reflectionscanner_capture as analyzer
+            import snapshot_evidence_pack as evidence_pack
+
+            with (
+                mock.patch.object(evidence_pack, "SERVER_ROOT", protected),
+                mock.patch.object(
+                    evidence_pack,
+                    "APPROVED_OFFLINE_WORKSPACE_ROOTS",
+                    (workspace,),
+                ),
+            ):
+                analyzer.reject_protected_input_path(safe_log, "log")
+
 
 class ReflectionEvidencePackBuilderTests(unittest.TestCase):
     def test_builds_offline_pack_from_copied_log_and_local_elf(self) -> None:
@@ -779,7 +902,74 @@ class ReflectionEvidencePackBuilderTests(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
-            self.assertIn("refusing to write evidence artifacts", result.stderr)
+            self.assertIn("--output-dir must not write under protected server root", result.stderr)
+
+    def test_evidence_pack_rejects_unignored_in_repo_output_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            log_path = Path(temp_dir) / "Obelisk.log"
+            log_path.write_text("offline test\n", encoding="utf-8")
+            output_dir = REPO_ROOT / "docs" / "reflection-pack"
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(EVIDENCE_PACK_BUILDER),
+                    "--binary",
+                    sys.executable,
+                    "--output-dir",
+                    str(output_dir),
+                    str(log_path),
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertIn("--output-dir is inside the repository but is not ignored by Git", result.stderr)
+            self.assertFalse(output_dir.exists())
+
+    def test_refuses_protected_binary_path_before_reading(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            log_path = Path(temp_dir) / "Obelisk.log"
+            log_path.write_text("offline test\n", encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(EVIDENCE_PACK_BUILDER),
+                    "--binary",
+                    "/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer",
+                    "--output-dir",
+                    str(Path(temp_dir) / "out"),
+                    str(log_path),
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertIn("--binary must not read from protected server root", result.stderr)
+
+    def test_allows_approved_offline_workspace_paths_under_server_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            protected = root / "server-root"
+            workspace = protected / "workspace-offline"
+            workspace.mkdir(parents=True)
+
+            import build_reflection_evidence_pack as builder
+
+            with (
+                mock.patch.object(builder, "SERVER_ROOT", protected),
+                mock.patch.object(builder, "APPROVED_OFFLINE_WORKSPACE_ROOTS", (workspace,)),
+            ):
+                builder.reject_protected_input_path(workspace / "ShooterGameServer", "--binary")
+                builder.reject_protected_input_path(workspace / "Obelisk.log", "log")
+                builder.reject_protected_output_path(workspace / "pack", "--output-dir")
 
 
 if __name__ == "__main__":

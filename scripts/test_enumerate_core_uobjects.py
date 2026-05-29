@@ -57,11 +57,11 @@ def build_core_fixture(path: Path) -> dict[str, int]:
         put_i32(address + enum.UOBJECT_NAME_NUMBER_OFFSET, 0)
         put_ptr(address + enum.UOBJECT_OUTER_OFFSET, outer)
 
-    def put_item(index: int, object_address: int, serial: int) -> None:
+    def put_item(index: int, object_address: int, dword_0x8: int, dword_0xC: int) -> None:
         item = addrs["gobjects_chunk0"] + index * enum.FUOBJECT_ITEM_SIZE
         put_ptr(item, object_address)
-        put_u32(item + 0x8, 0)
-        put_i32(item + 0xC, serial)
+        put_u32(item + 0x8, dword_0x8)
+        put_i32(item + 0xC, dword_0xC)
 
     put_ptr(addrs["fname_root_slot"], addrs["fname_table"])
     put_ptr(addrs["fname_table"], addrs["fname_chunk"])
@@ -81,8 +81,8 @@ def build_core_fixture(path: Path) -> dict[str, int]:
     put_uobject(addrs["function_class"], 1, 3, addrs["package_class"], 2, 0)
     put_uobject(addrs["package_object"], 1, 0, addrs["package_class"], 3, 0)
     put_uobject(addrs["chat_function"], 1, 1, addrs["function_class"], 4, addrs["package_object"])
-    put_item(0, addrs["package_object"], 100)
-    put_item(1, addrs["chat_function"], 101)
+    put_item(0, addrs["package_object"], 100, 200)
+    put_item(1, addrs["chat_function"], 101, 201)
 
     write_minimal_elf64_core(path, base, bytes(segment))
     return addrs
@@ -111,7 +111,8 @@ class EnumerateCoreUObjectsTests(unittest.TestCase):
         self.assertEqual(objects[1]["class_name"], "Function")
         self.assertTrue(objects[0]["internal_index_matches"])
         self.assertTrue(objects[1]["internal_index_matches"])
-        self.assertEqual(objects[1]["item_serial_number"], 101)
+        self.assertEqual(objects[1]["item_dword_0x8"], 101)
+        self.assertEqual(objects[1]["item_dword_0xC"], 201)
         self.assertEqual(objects[1]["outer"], hex(addrs["package_object"]))
 
     def test_filters_by_name_and_class(self) -> None:
@@ -163,6 +164,34 @@ class EnumerateCoreUObjectsTests(unittest.TestCase):
         self.assertEqual(payload["metadata"]["object_count"], 4)
         self.assertEqual(len(payload["objects"]), 2)
         self.assertEqual(payload["objects"][1]["name"], "ServerChat")
+
+    def test_cli_rejects_protected_core_and_symlink_before_open(self) -> None:
+        for core_arg in (
+            "/servidor/ark/obelisk/dumps/protected-core",
+            None,
+        ):
+            with self.subTest(core_arg=core_arg), tempfile.TemporaryDirectory() as temp_dir:
+                if core_arg is None:
+                    link = Path(temp_dir) / "core-link"
+                    link.symlink_to("/servidor/ark/obelisk/dumps/protected-core")
+                    selected_core = str(link)
+                else:
+                    selected_core = core_arg
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(SCRIPT_DIR / "enumerate_core_uobjects.py"),
+                        "--core",
+                        selected_core,
+                        "--json",
+                    ],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+
+                self.assertEqual(result.returncode, 1)
+                self.assertIn("--core must not read from protected server root", result.stderr)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,87 @@
+{
+  "schema": "obelisk.public-gameplay-events.v1",
+  "promoted_events": [
+    {
+      "event_id": "obelisk.gameplay_policy.v1",
+      "public_name": "GameplayPolicyEvent",
+      "capability": "OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS",
+      "abi_struct": "ObeliskGameplayPolicyEvent",
+      "registration": "RegisterGameplayPolicyEventWithOwnerTokenHandle",
+      "unregister": "UnregisterGameplayPolicyEventWithOwnerToken",
+      "backing_target_set": "structure-observer-intake",
+      "inventory_backing_target_set": "minimal-second-source-intake",
+      "resource_contract": "kind-only, no identity, no lookup, no persistent handle",
+      "payload": "copied POD scalar fields only",
+      "public_fields": [
+        "abi_version",
+        "struct_size",
+        "event_kind",
+        "resource_kind",
+        "flags",
+        "field_mask",
+        "bool_values",
+        "int32_values"
+      ],
+      "resource_kinds": [
+        "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE",
+        "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM"
+      ],
+      "event_kind_masks": [
+        "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL",
+        "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES",
+        "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY"
+      ],
+      "redacted_fields": [
+        "UObject pointers",
+        "UFunction pointers",
+        "FName/GObjects indices",
+        "raw parameter buffers",
+        "player identity",
+        "character identity",
+        "structure object identity",
+        "inventory object identity",
+        "item identity",
+        "mutation or return override authority",
+        "pinCode"
+      ],
+      "inventory_sdk": "not promoted; inventory-backed policy signals are exposed only through GameplayPolicyEvent",
+      "second_source_ready": true,
+      "copied_obelisk_owned_payload": true,
+      "no_ue_internals_in_public_abi": true,
+      "append_only_abi": true,
+      "capability_gated": true,
+      "owner_token_handle_registration": true,
+      "owner_scoped_unregister": true,
+      "plugin_owner_cleanup": true,
+      "target_sets": [
+        "structure-observer-intake",
+        "minimal-second-source-intake"
+      ],
+      "second_source_reports": [
+        "docs/research/2026-05-28-second-source-reversing-gap-matrix.md",
+        "docs/research/2026-05-28-second-source-core-intake-runbook.md",
+        "docs/research/2026-05-29-minimal-second-source-readiness.md"
+      ],
+      "abi_tests": [
+        "tests/abi/AbiLayoutTests.cpp"
+      ],
+      "sdk_consumer_tests": [
+        "tests/sdk_consumer/MinimalPlugin.cpp",
+        "tests/sdk_consumer/SdkConsumerFixture.cpp",
+        "tests/sdk_consumer/CAbiPlugin.c",
+        "tests/sdk_installed_consumer/c_abi_plugin.c"
+      ],
+      "lifecycle_tests": [
+        "tests/core/PluginManagerTests.cpp",
+        "tests/core/StructureEventDispatcherTests.cpp",
+        "tests/core/InventoryPolicyEventDispatcherTests.cpp"
+      ],
+      "docs": [
+        "docs/PLUGIN_ARCHITECTURE.md",
+        "docs/RELEASE.md",
+        "docs/STATUS.md",
+        "docs/research/2026-05-29-public-gameplay-event-readiness-audit.md"
+      ]
+    }
+  ]
+}

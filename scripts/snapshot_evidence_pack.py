@@ -6,12 +6,16 @@ from __future__ import annotations
 import json
 import hashlib
 import re
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
 SAFE_COMPONENT_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+SERVER_ROOT = Path("/servidor/ark")
+APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 @dataclass(frozen=True)
@@ -29,6 +33,63 @@ def safe_component(value: str, field: str) -> str:
     if SAFE_COMPONENT_RE.fullmatch(value) is None or ".." in value:
         raise SystemExit(f"unsafe {field} in manifest: {value}")
     return value
+
+
+def is_relative_to(path: Path, parent: Path) -> bool:
+    try:
+        path.relative_to(parent)
+    except ValueError:
+        return False
+    return True
+
+
+def is_approved_offline_workspace_path(path: Path) -> bool:
+    expanded = path.expanduser()
+    resolved = path.resolve()
+    return any(
+        expanded.is_absolute()
+        and is_relative_to(expanded, root)
+        and is_relative_to(resolved, root.resolve())
+        for root in APPROVED_OFFLINE_WORKSPACE_ROOTS
+    )
+
+
+def require_ignored_output_path(path: Path, label: str) -> None:
+    resolved = path.expanduser().resolve()
+    if not is_relative_to(resolved, REPO_ROOT):
+        return
+    relative = resolved.relative_to(REPO_ROOT)
+    result = subprocess.run(
+        ["git", "check-ignore", "-q", "--", str(relative)],
+        cwd=REPO_ROOT,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise SystemExit(f"{label} is inside the repository but is not ignored by Git: {resolved}")
+
+
+def reject_protected_input_path(path: Path, label: str) -> Path:
+    expanded = path.expanduser()
+    if expanded.is_absolute() and is_relative_to(expanded, SERVER_ROOT) and not is_approved_offline_workspace_path(expanded):
+        raise SystemExit(f"{label} must not read from protected server root {SERVER_ROOT}: {expanded}")
+    resolved = expanded.resolve()
+    if is_relative_to(resolved, SERVER_ROOT) and not is_approved_offline_workspace_path(expanded):
+        raise SystemExit(f"{label} must not read from protected server root {SERVER_ROOT}: {resolved}")
+    return resolved
+
+
+def reject_protected_output_path(path: Path, label: str) -> Path:
+    expanded = path.expanduser()
+    if expanded.is_absolute() and is_relative_to(expanded, SERVER_ROOT) and not is_approved_offline_workspace_path(expanded):
+        raise SystemExit(f"{label} must not write under protected server root {SERVER_ROOT}: {expanded}")
+    resolved = expanded.resolve()
+    if is_relative_to(resolved, SERVER_ROOT) and not is_approved_offline_workspace_path(expanded):
+        raise SystemExit(f"{label} must not write under protected server root {SERVER_ROOT}: {resolved}")
+    return resolved
+
+
+def reject_protected_core_path(path: Path, manifest_path: Path) -> Path:
+    return reject_protected_input_path(path, f"{manifest_path}: evidence pack core.path")
 
 
 def sha256_file(path: Path) -> str:
@@ -85,6 +146,7 @@ def evidence_pack_defaults(
     expected_ark_binary_sha256: str,
     parse_int: Callable[[str], int],
 ) -> EvidencePackDefaults:
+    path = reject_protected_input_path(path, "--evidence-pack-manifest")
     payload = json.loads(path.read_text(encoding="utf-8"))
     binary = payload.get("binary")
     if not isinstance(binary, dict):
@@ -100,8 +162,8 @@ def evidence_pack_defaults(
     status = evidence_status.get("status")
     if status != "complete":
         raise SystemExit(f"{path}: evidence pack status is not complete: {status}")
-    if evidence_status.get("gdb_core_failed") is True:
-        raise SystemExit(f"{path}: evidence pack has gdb_core_failed=true")
+    if evidence_status.get("gdb_core_failed") is not False:
+        raise SystemExit(f"{path}: evidence pack must include gdb_core_failed=false")
     core = payload.get("core")
     if not isinstance(core, dict):
         raise SystemExit(f"{path}: evidence pack manifest missing core object")
@@ -111,7 +173,7 @@ def evidence_pack_defaults(
     core_path = core.get("path")
     if not isinstance(core_path, str) or not core_path:
         raise SystemExit(f"{path}: evidence pack manifest missing core.path")
-    resolved_core_path = Path(core_path).resolve()
+    resolved_core_path = reject_protected_core_path(Path(core_path), path)
     actual_core_sha = sha256_file(resolved_core_path)
     if actual_core_sha != core_sha:
         raise SystemExit(f"{path}: core.sha256 does not match core.path contents")

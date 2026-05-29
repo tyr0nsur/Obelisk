@@ -41,17 +41,24 @@ Convenience log links may live under:
 ```
 
 Current instance posture belongs in `docs/agent-handoff/CURRENT.md`, not in this durable
-skill. Before server-backed validation, read that file and require explicit operator
-approval for the target instance, marker changes, restart window, rollback plan, and
-whether the server must be shut down afterward. ReflectionScanner, native exec probes,
-ptrace/gcore, broad ProcessEvent tracing, and text/gameplay-payload logging always require
-a specific approved run window before activation.
+skill. Before server-backed validation, read that file. If it grants standing approval for
+`arkserver2` / TheIsland, the lead may start, stop, restart, and adjust Obelisk markers for
+scoped debug/development tests on that instance without asking again. Other instances still
+require explicit operator approval for the target instance, marker changes, restart window,
+rollback plan, and whether the server must be shut down afterward. ReflectionScanner,
+native exec probes, ptrace/gcore, broad ProcessEvent tracing, and text/gameplay-payload
+logging must still have a written scoped run plan before activation.
 
 ## Production Baseline
 
 Keep production/shared baselines simple: ProcessEvent hook enabled only when intended,
 plugins disabled unless a maintenance window explicitly scopes a plugin test,
 scanner/native-exec/broad tracing off, and no restarts or marker edits without approval.
+Offline config preparation tools must not read `ShooterGameServer` directly from
+`/servidor/ark`; use a copied offline binary artifact or an explicit, recorded SHA256.
+Offline evidence-pack and release-readiness report tools must not write under
+`/servidor/ark`, including historical dump subdirectories; use `/tmp` or another offline
+artifact workspace.
 
 ```bash
 # Only run marker/start/stop commands when that change is part of an approved
@@ -103,10 +110,10 @@ scripts/check_obelisk_server_posture.sh --expect-stable \
 - Do not set `OBELISK_DEBUG_ALLOW_PTRACE=1` by default in debug wrappers. Ptrace requires
   an approved isolated run plus the `allow-ptrace` marker.
 - Never enable `ReflectionScanner` on `arkserver` / Ragnarok while users are active.
-  Current operator direction allows `arkserver2` / TheIsland as the debug target when
-  runtime validation is needed; keep plugins disabled unless the test explicitly requires
-  them, preserve copied-log evidence, make marker/env rollback explicit, and shut down
-  TheIsland at the end.
+  Current operator direction grants standing use of `arkserver2` / TheIsland as the debug
+  target when runtime validation is needed; keep plugins disabled unless the test
+  explicitly requires them, preserve copied-log evidence, make marker/env rollback
+  explicit, and shut down TheIsland when the test window no longer needs it.
 - Never persist `OBELISK_WRAPPER_PROFILE=observer-debug` in a normal service environment.
   It is a per-launch debug-window profile for the normal wrapper.
 - Keep `OBELISK_PE_TRACE_LIMIT=0` by default; use short trace windows only for approved
@@ -230,7 +237,7 @@ scripts/check_obelisk_server_posture.sh --expect-stable \
 ```
 
 Current server-backed debug uses `arkserver2` / TheIsland. It normally starts from powered
-off, runs the scoped test, then shuts down:
+off, runs the scoped test, restores stable posture, then shuts down when no longer needed:
 
 ```bash
 tail -n 100 /servidor/ark/obelisk/logs/arkserver2/Obelisk.log
@@ -243,10 +250,10 @@ scripts/check_obelisk_server_posture.sh --expect-stable \
 ## Rollback
 
 If `arkserver2` crashes after an Obelisk change, preserve logs/core files first. Stop
-TheIsland at the end of the approved test or rollback window:
+TheIsland at the end of the test or rollback window:
 
 ```bash
-# Approved test/rollback window only; preserve evidence first.
+# Preserve evidence first.
 # mkdir -p /servidor/ark/obelisk/state/instances/arkserver2
 # touch /servidor/ark/obelisk/state/instances/arkserver2/disable-plugins
 # env -u TMUX ./arkserver2 stop

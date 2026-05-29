@@ -22,6 +22,7 @@ REPO_ROOT = SCRIPT_DIR.parent
 sys.path.insert(0, str(SCRIPT_DIR))
 import enumerate_core_uobjects as uobjects  # noqa: E402
 import inspect_core_ufunctions as inspector  # noqa: E402
+from snapshot_evidence_pack import reject_protected_input_path  # noqa: E402
 
 
 CHAT_REFLECTION_SOURCE = REPO_ROOT / "ue" / "ChatReflection.cpp"
@@ -104,6 +105,13 @@ def _manifest_path(path: Path) -> Path:
     return path / "manifest.json" if path.is_dir() else path
 
 
+def _evidence_pack_manifest_path(path: Path) -> Path:
+    reject_protected_input_path(path, "--evidence-pack")
+    manifest_path = _manifest_path(path)
+    reject_protected_input_path(manifest_path, "--evidence-pack")
+    return manifest_path
+
+
 def _first_address(manifest: dict[str, object], key: str) -> int:
     values = manifest.get(key)
     if not isinstance(values, list) or not values:
@@ -120,7 +128,7 @@ def load_evidence_pack(
     verify_binary_sha: bool = True,
     verify_core_sha: bool = True,
 ) -> EvidencePack:
-    manifest_path = _manifest_path(path)
+    manifest_path = _evidence_pack_manifest_path(path)
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if not isinstance(manifest, dict):
         raise ValueError("evidence pack manifest must be a JSON object")
@@ -129,6 +137,7 @@ def load_evidence_pack(
     if not isinstance(core_payload, dict) or not isinstance(core_payload.get("path"), str):
         raise ValueError("evidence pack manifest missing core.path")
     core = Path(str(core_payload["path"]))
+    reject_protected_input_path(core, f"{manifest_path}: evidence pack core.path")
     if not core.is_file():
         raise ValueError(f"evidence pack core does not exist: {core}")
     core_sha256 = core_payload.get("sha256")
@@ -149,8 +158,11 @@ def load_evidence_pack(
         if isinstance(binary_sha, str) and binary_sha:
             binary_sha256 = binary_sha
         binary_path_value = binary_payload.get("path")
-        if verify_binary_sha and binary_sha256 and isinstance(binary_path_value, str):
+        binary_path = None
+        if isinstance(binary_path_value, str):
             binary_path = Path(binary_path_value)
+            reject_protected_input_path(binary_path, f"{manifest_path}: evidence pack binary.path")
+        if verify_binary_sha and binary_sha256 and binary_path is not None:
             if not binary_path.is_file():
                 raise ValueError(f"evidence pack binary does not exist: {binary_path}")
             observed_sha = sha256_file(binary_path)
@@ -677,6 +689,8 @@ def main() -> int:
         core = evidence_pack.core
         gobjects = evidence_pack.gobjects
         fname_root_slot = evidence_pack.fname_root_slot
+    else:
+        reject_protected_input_path(core, "--core")
 
     chat_spec = parse_chat_reflection_source(args.chat_reflection_source)
     memory = uobjects.CoreMemory(core)

@@ -44,6 +44,36 @@ namespace
             api->UnregisterProcessEventCallbackWithOwnerToken;
     }
 
+    bool ValidateStructureResourceKindDescriptor(const ObeliskApi* api)
+    {
+        if (!api ||
+            (api->capabilities & OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS) == 0 ||
+            api->struct_size < offsetof(ObeliskApi, DescribeResourceKind) + sizeof(api->DescribeResourceKind) ||
+            !api->DescribeResourceKind)
+        {
+            return true;
+        }
+
+        ObeliskResourceKindDescriptor descriptor{};
+        descriptor.struct_size = sizeof(ObeliskResourceKindDescriptor);
+        if (!api->DescribeResourceKind(OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE, &descriptor))
+            return false;
+
+        constexpr uint64_t kRequiredFlags = OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_CATEGORY_ONLY |
+            OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY |
+            OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP;
+        return descriptor.abi_version == OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION &&
+            descriptor.struct_size >= sizeof(ObeliskResourceKindDescriptor) &&
+            descriptor.resource_kind == OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE &&
+            (descriptor.flags & kRequiredFlags) == kRequiredFlags &&
+            (descriptor.supported_gameplay_policy_event_mask &
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES) ==
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES &&
+            (descriptor.supported_gameplay_policy_field_mask &
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE) != 0 &&
+            std::strcmp(descriptor.stable_name, "structure") == 0;
+    }
+
     void ResetState()
     {
         g_Api = {};
@@ -120,6 +150,12 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
                 ResetState();
                 return false;
             }
+        }
+
+        if (!ValidateStructureResourceKindDescriptor(api))
+        {
+            ResetState();
+            return false;
         }
 
         return true;

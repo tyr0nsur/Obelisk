@@ -121,12 +121,12 @@ namespace Obelisk::Hooks::ProcessEventChatReflection
         }
     }
 
-    Gate EvaluateGate(const char* enableChatReflection, bool instanceMarkerEnabled, const char* binarySha256)
+    Gate EvaluateGate(const char* enableChatReflection, bool observerDebugGateEnabled, const char* binarySha256)
     {
         if (!enableChatReflection || std::strcmp(enableChatReflection, "1") != 0)
             return {};
 
-        if (!instanceMarkerEnabled)
+        if (!observerDebugGateEnabled)
             return {GateStatus::MissingInstanceMarker, {}};
 
         if (!binarySha256 || binarySha256[0] == '\0')

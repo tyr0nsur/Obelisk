@@ -8,10 +8,20 @@
 
 namespace Obelisk::Hooks::ProcessEventStructureReflection
 {
-    Gate EvaluateGate(const char* enableStructureReflection, bool instanceMarkerEnabled, const char* binarySha256)
+    Gate EvaluateGate(const char* enableStructureReflection,
+                      bool observerDebugProfileEnabled,
+                      bool observerDebugWindowEnabled,
+                      bool instanceMarkerEnabled,
+                      const char* binarySha256)
     {
         if (!enableStructureReflection || std::strcmp(enableStructureReflection, "1") != 0)
             return {};
+
+        if (!observerDebugProfileEnabled)
+            return {GateStatus::MissingObserverDebugProfile, {}};
+
+        if (!observerDebugWindowEnabled)
+            return {GateStatus::MissingObserverDebugWindow, {}};
 
         if (!instanceMarkerEnabled)
             return {GateStatus::MissingInstanceMarker, {}};
@@ -45,6 +55,15 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
         return ShouldAttemptObservation(logLimit) || ShouldAttemptObservation(dispatchLimit);
     }
 
+    bool ShouldAttemptRuntimeObservation(const std::atomic<uint64_t>& logCounter,
+                                         uint64_t logLimit,
+                                         const std::atomic<uint64_t>& dispatchCounter,
+                                         uint64_t dispatchLimit)
+    {
+        return HasObservationBudgetRemaining(logCounter, logLimit) ||
+               HasObservationBudgetRemaining(dispatchCounter, dispatchLimit);
+    }
+
     bool ShouldAttemptNameObservation(int32_t nameIndex, uint64_t limit)
     {
         return ShouldAttemptObservation(limit) && IsReflectedStructureNameIndex(nameIndex);
@@ -59,6 +78,11 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
     bool ShouldLogObservation(uint64_t observationNumber, uint64_t limit)
     {
         return ShouldAttemptObservation(limit) && observationNumber != 0 && observationNumber <= limit;
+    }
+
+    bool HasObservationBudgetRemaining(const std::atomic<uint64_t>& counter, uint64_t limit)
+    {
+        return ShouldAttemptObservation(limit) && counter.load() < limit;
     }
 
     bool TryReserveObservationBudget(std::atomic<uint64_t>& counter, uint64_t limit, uint64_t& observationNumber)
@@ -79,6 +103,19 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
         }
         observationNumber = 0;
         return false;
+    }
+
+    bool TryReserveDispatchBudgetForMatchedAttempt(const Attempt& attempt,
+                                                   std::atomic<uint64_t>& counter,
+                                                   uint64_t limit,
+                                                   uint64_t& observationNumber)
+    {
+        if (attempt.Status != AttemptStatus::Matched)
+        {
+            observationNumber = 0;
+            return false;
+        }
+        return TryReserveObservationBudget(counter, limit, observationNumber);
     }
 
     namespace
@@ -221,12 +258,25 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
         return true;
     }
 
-    size_t DispatchCopiedStructureEvent(const Obelisk::UE::StructureReflection::StructureInvocation& invocation)
+    namespace
     {
-        CopiedStructureEvent event;
-        if (!TryBuildCopiedStructureEvent(invocation, event))
+        size_t DispatchCopiedStructureEvent(const Obelisk::UE::StructureReflection::StructureInvocation& invocation)
+        {
+            CopiedStructureEvent event;
+            if (!TryBuildCopiedStructureEvent(invocation, event))
+                return 0;
+
+            return Obelisk::Core::StructureEventDispatcher::Get().Dispatch(event.View);
+        }
+    }
+
+    size_t MaybeDispatchCopiedStructureEventAfterOriginal(
+        bool originalWasCalled,
+        const Obelisk::UE::StructureReflection::StructureInvocation& invocation)
+    {
+        if (!originalWasCalled)
             return 0;
 
-        return Obelisk::Core::StructureEventDispatcher::Get().Dispatch(event.View);
+        return DispatchCopiedStructureEvent(invocation);
     }
 }

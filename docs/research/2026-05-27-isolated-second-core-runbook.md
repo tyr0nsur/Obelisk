@@ -5,8 +5,10 @@
 Define the next safe second-source core capture for Obelisk reflection research without
 using `arkserver` / Ragnarok.
 
-This is preparation only. It does not authorize restarts, marker changes, ptrace/gcore,
-text logging, or server launches.
+This is an approved debug runbook template only. It does not authorize restarts, marker
+changes, ptrace/gcore, text logging, or server launches outside a written scoped run plan.
+`arkserver2` / TheIsland has standing approval for scoped Obelisk debug/development tests,
+but ptrace/gcore still requires that written plan before activation.
 
 ## Target Priority
 
@@ -17,8 +19,8 @@ Preferred target:
 
 Fallback target:
 
-- `arkserver2` / TheIsland only if the operator explicitly approves using that instance
-  for the core window.
+- `arkserver2` / TheIsland under the standing scoped debug approval. Preserve evidence,
+  restore stable posture, and shut it down afterward.
 
 Protected target:
 
@@ -35,6 +37,8 @@ Before core capture, the dedicated instance should have:
 - non-public session posture, password, firewall, or local-only access;
 - separated logs, for example
   `OBELISK_LOG_DIR=/servidor/ark/obelisk/logs/isolated-debug`;
+  this is a runtime log source only, not the final evidence location;
+  copied log bundles for review must live in the external artifact workspace.
 - wrapper/env scoped to the debug instance, not shared map markers:
   - `LD_PRELOAD=/servidor/ark/obelisk/lib/libobelisk.so`;
   - `OBELISK_ENABLE_PROCESS_EVENT_HOOK=1`;
@@ -44,8 +48,9 @@ Before core capture, the dedicated instance should have:
 
 ## Preconditions
 
-- The operator explicitly opens a core window for `arkserver-obelisk-debug`, or explicitly
-  names `arkserver2` / TheIsland as the fallback target.
+- The written run plan names the exact target, capture objective, allowed marker changes,
+  rollback, external artifact workspace, and shutdown expectation. A new
+  `arkserver-obelisk-debug` instance still needs separate approval until provisioned.
 - Ragnarok is not touched.
 - The target starts from quiet debug posture:
   - ProcessEvent hook enabled;
@@ -65,6 +70,10 @@ sha256sum /servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer
 pgrep -af '^./ShooterGameServer'
 df -h /servidor/ark
 ```
+
+Copy the matching ARK binary into the external artifact workspace before offline intake
+and record the copied file's SHA256. Offline tooling must use that copied binary, not the
+live path under `/servidor/ark`.
 
 For TheIsland fallback, also run:
 
@@ -103,22 +112,26 @@ stable production posture.
 
 ## Capture
 
-Use a timestamped target-specific output directory:
+Use a timestamped target-specific output directory outside `/servidor/ark` and outside the
+repository:
 
 ```bash
 stamp=$(date -u +%Y%m%dT%H%M%SZ)
-target=arkserver-obelisk-debug   # or arkserver2 only if explicitly approved
-out=/servidor/ark/obelisk/dumps/${target}-${stamp}
-mkdir -p "${out}"/{core,pre,post,logs}
+target=arkserver2
+out=/home/flowcommunity-ark/obelisk-artifacts/second-source/${target}-TheIsland-${stamp}
+mkdir -p "${out}"/{raw,pre,post,logs,intake}
 chmod 700 "${out}"
 
+cp /servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer "${out}/raw/ShooterGameServer"
+sha256sum "${out}/raw/ShooterGameServer" | tee "${out}/raw/ShooterGameServer.sha256.txt"
+
 pid=<single approved target pid>
-timeout 20m gcore -o "${out}/core/${target}-${stamp}" "${pid}" 2>&1 | tee "${out}/gcore.txt"
-core_file="${out}/core/${target}-${stamp}.${pid}"
+timeout 20m gcore -o "${out}/raw/${target}-${stamp}" "${pid}" 2>&1 | tee "${out}/raw/gcore.txt"
+core_file="${out}/raw/${target}-${stamp}.${pid}"
 test -s "${core_file}"
 chmod 600 "${core_file}"
-sha256sum "${core_file}" | tee "${out}/core.sha256.txt"
-ls -lh "${core_file}" | tee "${out}/core.ls.txt"
+sha256sum "${core_file}" | tee "${out}/raw/core.sha256.txt"
+ls -lh "${core_file}" | tee "${out}/raw/core.ls.txt"
 ```
 
 Do not use `kill -ABRT`. Do not retry repeatedly after a failed attach.
@@ -139,63 +152,44 @@ rm -f /servidor/ark/obelisk/state/instances/arkserver2/allow-ptrace
 /servidor/ark/arkserver2 restart
 cd /home/flowcommunity-ark/Obelisk
 scripts/check_obelisk_server_posture.sh --expect-stable --forbid-chat-reflection --map TheIsland --instance arkserver2
+/servidor/ark/arkserver2 stop
 ```
 
-Preserve logs and proc snapshots under the dump directory. Do not commit raw artifacts.
+Preserve logs and proc snapshots under the external artifact directory. Do not commit raw
+artifacts. At the end of the window, `arkserver2` should be stopped, `allow-ptrace` absent,
+scanner/native-exec/debug-control/broad-trace markers absent, plugins disabled, and no raw
+artifact should exist under `/servidor/ark`.
 
 ## Offline Follow-Up
 
-After the capture exists, run only offline tooling:
+After the capture exists, first generate review plans only, using copied paths outside
+`/servidor/ark`:
 
 ```bash
-python3 scripts/build_core_dump_evidence_pack.py \
-  --binary /servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer \
+python3 scripts/run_second_source_core_intake.py \
+  --binary "${out}/raw/ShooterGameServer" \
   --core "${core_file}" \
-  --output-dir "/servidor/ark/obelisk/dumps/core-pack-${stamp}-fname-scan" \
-  --scan-fname-tables \
-  --fname-index None=0 \
-  --fname-index ClientMessage=4884 \
-  --fname-index ServerChat=9619 \
-  --fname-index SetActiveMissionDebugFlags=9622
+  --pack-dir "${out}/intake/pack" \
+  --scan-only \
+  --json-plan
 
-# Inspect the generated pack and choose a verified per-artifact FName root slot.
-verified_fname_root_slot=<verified-slot-from-this-artifact>
-
-python3 scripts/build_core_dump_evidence_pack.py \
-  --binary /servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer \
+python3 scripts/run_second_source_core_intake.py \
+  --binary "${out}/raw/ShooterGameServer" \
   --core "${core_file}" \
-  --output-dir "/servidor/ark/obelisk/dumps/core-pack-${stamp}" \
-  --gobjects-candidate gobjects=0x595b7e0 \
-  --gobjects-sample-index 0 \
-  --gobjects-sample-index 1 \
-  --gobjects-sample-index 25447 \
-  --fname-root-slot verified_fname_root_slot="${verified_fname_root_slot}"
-
-python3 scripts/verify_chat_reflection_constants.py \
-  --core "${core_file}" \
-  --fname-root-slot "${verified_fname_root_slot}" \
-  --max-object-scan 30000
+  --pack-dir "${out}/intake/pack" \
+  --snapshot-root "${out}/intake/ufunction-snapshots" \
+  --verified-fname-root-slot <verified-slot-from-this-artifact> \
+  --gobjects-candidate 0x595b7e0 \
+  --target-set minimal-second-source-intake \
+  --json-plan
 ```
 
-When regenerating UFunction or ScriptStruct snapshots from the second core, prefer passing
-the generated evidence-pack manifest instead of manually retyping artifact identity:
-
-```bash
-python3 scripts/regenerate_ufunction_snapshots.py \
-  --core "${core_file}" \
-  --output-root <second-source-ufunction-snapshots> \
-  --gobjects 0x595b7e0 \
-  --evidence-pack-manifest "/servidor/ark/obelisk/dumps/core-pack-${stamp}/manifest.json" \
-  --target PrimalItem.CanUse \
-  --check-layout
-```
-
-If the manifest contains multiple FName roots, add
-`--evidence-pack-fname-root-label verified_fname_root_slot`. The regenerators copy
-`core.sha256`, `core.path`, the evidence-pack directory name, the selected FName root, and
-the selected GObjects candidate from the manifest, and reject CLI values that contradict
-them. If the manifest contains multiple GObjects candidates, add
-`--evidence-pack-gobjects-label <label>`.
+Review the scan plan and full-intake plan before any `--execute`. Execution should write
+phase outputs under `${out}/intake/pack/fname-scan`,
+`${out}/intake/pack/gobjects-sampling`, and
+`${out}/intake/pack/snapshot-comparison`, never under `/servidor/ark`. See
+`docs/research/2026-05-28-second-source-core-intake-runbook.md` for the detailed intake
+sequence and acceptance criteria.
 
 Expected second-source result:
 

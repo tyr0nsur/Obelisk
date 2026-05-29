@@ -10,13 +10,23 @@ later session.
 
 ## Shared Memory Files
 
-Read these before starting delegated work:
+Lead agents should read these before planning or delegating work:
 
 - `docs/agent-handoff/CURRENT.md`: current active state, blockers, next tasks.
 - `docs/agent-handoff/COMPACT_CONTEXT.md`: compact resume state after long sessions.
 - `docs/research/`: durable investigation notes and evidence.
 - `docs/SERVER_RESTORE.md`: recovery flow for ARK config after SteamCMD/LinuxGSM rewrites.
 - `agent-skills/`: operational rules that future agents must follow.
+
+Treat handoff files as source material for a scoped prompt, not as text to forward
+wholesale. Do not pass the active objective, leader cadence, Discord policy, GitHub flow,
+agent balance, or unrelated module history to a sub-agent unless that detail changes its
+specific task.
+
+Sub-agents should not read `CURRENT.md` or `COMPACT_CONTEXT.md` by default. Give them a
+distilled task brief containing only the facts, risks, allowed paths, required skills, and
+expected decision for their scope. Assign handoff-file edits only as an explicit ownership
+scope.
 
 Update these before finishing:
 
@@ -40,11 +50,13 @@ Do not pass vague claims as facts. Include evidence or mark them as hypotheses.
 
 ## Before Starting
 
-1. Read `docs/agent-handoff/CURRENT.md`.
+1. If you are the lead, read `docs/agent-handoff/CURRENT.md`.
 2. Check `git status --short --ignored`.
 3. Identify your owned files and avoid editing outside that scope.
 4. Read the relevant skills for the subsystem.
 5. Note any stale or conflicting handoff state before changing files.
+6. When delegating, distill only the relevant facts, risks, allowed paths, required skills,
+   and expected decision for that agent's scope.
 
 ## Before Finishing
 

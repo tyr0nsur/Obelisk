@@ -17,6 +17,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Iterable
 
+from snapshot_evidence_pack import reject_protected_input_path
+
 
 UOBJECT_RE = re.compile(
     r"\[ReflectionScanner\] (?P<target>\S+) UObject validation: "
@@ -648,7 +650,7 @@ def iter_lines(paths: list[str]) -> Iterable[tuple[str, int, str]]:
                 yield "<stdin>", line_number, line.rstrip("\n")
             continue
 
-        path = Path(raw_path)
+        path = reject_protected_input_path(Path(raw_path), "log")
         with path.open("r", encoding="utf-8", errors="replace") as handle:
             for line_number, line in enumerate(handle, start=1):
                 yield str(path), line_number, line.rstrip("\n")
@@ -660,6 +662,14 @@ def parse_logs(
     binary_path: Path | None = None,
     obelisk_commit: str | None = None,
 ) -> dict[str, object]:
+    if objdump_xrefs_path is not None:
+        objdump_xrefs_path = reject_protected_input_path(
+            objdump_xrefs_path,
+            "--objdump-xrefs",
+        )
+    if binary_path is not None:
+        binary_path = reject_protected_input_path(binary_path, "--binary")
+
     uobjects: list[UObjectValidation] = []
     fnames: list[FNameProbe] = []
     fname_rejects: list[FNameReject] = []
@@ -1204,12 +1214,16 @@ def print_human(summary: dict[str, object]) -> None:
 
 def main() -> int:
     args = parse_args()
-    summary = parse_logs(
-        args.logs,
-        objdump_xrefs_path=args.objdump_xrefs,
-        binary_path=args.binary,
-        obelisk_commit=args.obelisk_commit,
-    )
+    try:
+        summary = parse_logs(
+            args.logs,
+            objdump_xrefs_path=args.objdump_xrefs,
+            binary_path=args.binary,
+            obelisk_commit=args.obelisk_commit,
+        )
+    except SystemExit as error:
+        print(str(error), file=sys.stderr)
+        return 2
 
     if args.json:
         print(json.dumps(summary, indent=2, sort_keys=True))

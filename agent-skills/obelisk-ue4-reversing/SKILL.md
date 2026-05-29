@@ -38,7 +38,9 @@ from the ELF executable segment plus runtime maps over guesses from one crash lo
 
 ## ProcessEvent Maintenance
 
-- Current validated Ragnarok candidate: `0x1d34e20`.
+- Current binary-hash-scoped ProcessEvent candidate: `0x1d34e20` on the validated
+  non-PIE ARK Linux binary where ELF image base was `0x400000`. Treat this as
+  build-specific evidence, not as permission to touch Ragnarok or as a universal offset.
 - Previous false positive: `0x1d11cb0`. Do not reuse it just because a pattern finds it.
 - Pattern scanning should produce exactly one strong candidate. Multiple candidates means
   the signature is not precise enough.
@@ -74,8 +76,9 @@ cross-validated by object and property metadata.
 
 ## Live Server Safety
 
-- Keep `OBELISK_ENABLE_PROCESS_EVENT_HOOK=1` plus the `enable-process-event-hook` marker
-  and plugins disabled as the baseline safe runtime test.
+- A safe runtime validation posture is explicit ProcessEvent hook enablement plus the
+  `enable-process-event-hook` marker and plugins disabled on the approved instance. This
+  is not a standing permission to restart or probe any player-facing server.
 - Current instance posture belongs in `docs/agent-handoff/CURRENT.md`. Read it before
   server-backed reversing, then require explicit approval for the exact target, marker
   changes, restart window, rollback plan, and shutdown expectations.

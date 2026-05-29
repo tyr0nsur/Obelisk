@@ -90,6 +90,9 @@ class VersioningGuardrailTests(unittest.TestCase):
         cmake = (REPO_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
         header = (REPO_ROOT / "include/obelisk/ObeliskApi.h").read_text(encoding="utf-8")
         config_template = (REPO_ROOT / "cmake/ObeliskConfig.cmake.in").read_text(encoding="utf-8")
+        versioning = (REPO_ROOT / "docs/VERSIONING.md").read_text(encoding="utf-8")
+
+        self.assertIn("freezes the current append-only `ObeliskApi` ABI v1", versioning)
 
         for variable, macro, exported in (
             ("OBELISK_API_ABI_VERSION", "OBELISK_API_ABI_VERSION", "Obelisk_API_ABI_VERSION"),

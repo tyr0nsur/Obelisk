@@ -1,148 +1,105 @@
 # Current Agent Handoff
 
-Updated: 2026-05-28
+Updated: 2026-05-29
 
-This file is the active routing table for the next Obelisk agent or leader round. It keeps
-only current posture, hard rules, and immediate priorities. Historical detail from the
-pre-compaction handoff is preserved in
-`docs/agent-handoff/HISTORY-2026-05-28-pre-current-compaction.md`; durable evidence belongs
-in `docs/research/` and stable resume facts belong in `docs/agent-handoff/COMPACT_CONTEXT.md`.
+This file is the active routing table for the next Obelisk leader or agent round. Keep
+durable evidence in `docs/research/`, stable resume facts in `COMPACT_CONTEXT.md`, and old
+detail in `HISTORY-*.md`.
 
-## Active Operating Objective
+## Active Objective
 
-- fact: The persistent leader objective is tracked in the goal tool, not repeated in skills
-  or default sub-agent prompts.
-- priority: move Obelisk toward a production-stable Linux runtime/API/SDK core for ARK
-  modding: safe hooks, stable C ABI, plugin lifecycle, install layout, UE4 reflection,
-  second-source evidence, and public SDK promotion gates.
-- scope rule: treat chat, inventory, structures, buffs, dinos, tribes, missions,
-  transfers, and admin surfaces as module areas on top of the same core, not as the center
-  of the project.
-- agent rule: pass sub-agents only scoped objective, ownership, relevant skills, safety
-  baseline, and deliverable. Do not pass leader cadence, Discord policy, or unrelated
-  long-term strategy.
-- agent lifecycle rule: every supervised round starts by checking for stale stand-by
-  agents; close completed/obsolete agents before spawning replacements and record any
-  intentionally active agent with a polling/integration plan.
+- Continue the core-first `v0.1.0-rc.1` path: Linux runtime, ProcessEvent hook
+  infrastructure, plugin lifecycle, central install layout, `oBaseEvents`,
+  `GameplayPolicyEvent`, and `DescribeResourceKind`.
+- Do not add public APIs beyond `GameplayPolicyEvent` before the RC unless a new blocker
+  proves the API is required.
+- Treat module work as evidence and tooling above the core, not as the RC center.
 
-## Live Ops Guardrails
+## Hard Overrides
 
-- guardrail: do not restart servers, edit `/servidor/ark`, change markers, run
-  ReflectionScanner, attach ptrace/gcore, enable broad `ProcessEvent` tracing, or publish
-  runtime observations without explicit operator approval for that exact run.
-- fact: Obelisk central install root is `/servidor/ark/obelisk`.
-- fact: ARK config restore notes are in `docs/SERVER_RESTORE.md`; latest config backup
-  symlink is `/home/flowcommunity-ark/backups/ark-config-latest`.
-- fact: `arkserver` / Ragnarok has users and must be protected. Do not restart it, change
-  markers, or use it for Obelisk validation while users are active.
-- fact: read-only audit on 2026-05-28 found active Ragnarok PID `3412724` still carrying
-  experimental chat/inventory/structure reflection env and markers. Stable posture check
-  fails in that state. Do not fix by restart without an approved maintenance window.
-- fact: user-provided live log evidence confirmed reflected `ServerSendChatMessage` events
-  on Ragnarok. Treat this as operational evidence only; do not publish player payloads or
-  enable payload logging.
-- fact: operator has approved using `arkserver2` / TheIsland as the active debug target
-  when runtime validation is needed. Start it only for a concrete test window, keep
-  rollback/posture checks explicit, and shut it down when the test no longer needs it.
-- priority: do not move new debug instrumentation to `arkserver` / Ragnarok just because
-  players are active. First prove a solid low-risk debug base on `arkserver2`; only then
-  propose a player-facing Ragnarok window with privacy, budgets, rollback, and operator
-  approval.
-- fact: stable posture rejects ReflectionScanner, native exec probes, ptrace/debug-control,
-  broad ProcessEvent tracing, global callbacks, public `CallProcessEvent`, ProcessEvent
-  blocking, and observer/debug-window markers unless a specific approved debug workflow
-  says otherwise.
+- GitHub work may be delegated only for an evidenced, stable milestone. Keep commits
+  minimized; no routine push/checkpoint unless the milestone is useful, validated, and
+  explicitly selected for GitHub publication.
+- `arkserver` / Ragnarok is protected while users are active. `arkserver2` / TheIsland has
+  standing debug approval; preserve evidence, restore posture, and shut it down afterward.
+- Do not restart servers, edit `/servidor/ark`, change markers, run ReflectionScanner,
+  attach ptrace/gcore, enable broad ProcessEvent tracing, or publish runtime observations
+  outside the standing `arkserver2` debug scope or a separately approved exact run.
+- Community/Discord updates are lead-only and only for major public modder-facing
+  milestones, previews, migrations, or releases.
 
-## Stable Runtime Baseline
+## Current Routing Facts
 
-- fact: use `git log --oneline -1` for the current pushed checkpoint; do not duplicate the
-  moving HEAD hash in this handoff file.
-- fact: the most recent full core-first release readiness run covered configure/build,
-  31 CTest tests, script tests, install layout/SDK consumer validation, dry-run install
-  checks, `git diff --check`, and a clean tracked worktree.
-- fact: stable installer deploys runtime libraries only. Plugins activate only when their
-  `.so` is published into `/servidor/ark/obelisk/plugins/` with
-  `scripts/install_obelisk_plugin.sh`.
-- fact: stable plugin loading requires a safe `OBELISK_INSTANCE_ID` and real non-symlink
-  plugin/config/log roots. Operator CLI read-only views should surface unsafe entries
-  instead of hiding them.
-- fact: global ProcessEvent callbacks, public `CallProcessEvent`, and pre-callback
-  blocking are runtime default-deny behind env + safe per-instance markers + capability
-  bits where applicable.
-- fact: `ProcessEventHook::Remove()` is fail-closed: removal failures preserve hook
-  state/trampoline ownership and report failure instead of clearing state while patched
-  bytes may still execute.
-- fact: `oBaseEvents` requires owner-token callback handle support for its ProcessEvent
-  example and defensively rejects unsafe `instance_allowlist` entries before callback
-  registration.
-- fact: operator CLI lifecycle/mutation commands such as `obelisk start/stop/restart` and
-  per-plugin start/stop/restart are post-first-stable TODOs. Keep the first stable release
-  focused on runtime/API/install safety.
+- ABI/API: `ObeliskApi` v1 stays append-only for `v0.1.0`; public gameplay SDK surfaces
+  require accepted second-source evidence, copied-data ownership, and lifecycle gates.
+- Promoted surface: `GameplayPolicyEvent` is the only public gameplay event, backed by
+  `docs/public_gameplay_events.json` and
+  `docs/research/2026-05-29-public-gameplay-event-readiness-audit.md`. Its payload is
+  copied/redacted POD only; no UE pointers, raw params, identity, mutation, or return
+  override are promoted.
+- Promoted helper: `DescribeResourceKind` is metadata-only for known resource categories.
+  It is not a `ResourceHandle`, lookup API, object identity, mutation surface, or
+  cross-instance contract.
+- ResourceHandle remains blocked. Use
+  `docs/research/2026-05-29-resource-handle-revalidation-evaluator.md`,
+  `docs/research/2026-05-29-uobject-flags-validity-blocker.md`, and the static/GObjects
+  notes for evidence; do not restate their offsets or sample tables here.
+- Runtime posture remains default-deny for global callbacks, public `CallProcessEvent`,
+  ProcessEvent blocking, broad tracing, scanner/debug controls, and experimental observers.
+- Internal bridges only: `core/StructureEventDispatcher` and
+  `core/InventoryPolicyEventDispatcher` feed copied-scalar policy events. They do not
+  promote public StructureEvents or Inventory SDKs.
+- Release readiness is core-first through `scripts/check_release_readiness.sh`. The dirty
+  offline run passed with the accepted minimal second-source root, but a real RC still
+  requires focused checkpoints and the same gate without `--allow-dirty`.
+- Evidence details for accepted layout-only target sets live in:
+  `docs/research/2026-05-29-minimal-second-source-readiness.md`,
+  `docs/research/2026-05-29-dino-compact-second-source-readiness.md`,
+  `docs/research/2026-05-29-buff-compact-second-source-result.md`, and
+  `docs/research/2026-05-29-next-targetset-discovery.md`.
+- Current dirty tree is intentionally broad. Follow
+  `docs/research/2026-05-29-rc-checkpoint-slicing-plan.md`; do not stage by path
+  proximity.
 
-## Reflection And Reversing State
+## Checkpoint Groups If Commits Reopen
 
-- fact: current binary hash used by committed evidence is
-  `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`.
-- fact: `ProcessEvent` candidate is `0x1d34e20` for the validated non-PIE ARK Linux
-  binary. Historical `0x1d11cb0` is rejected.
-- fact: confirmed FName clues for the current binary include `4884 -> ClientMessage`,
-  `9619 -> ServerChat`, and `9622 -> SetActiveMissionDebugFlags`; older index mappings are
-  obsolete historical evidence.
-- fact: `0x595b7e0` is a binary-hash-scoped `GUObjectArray` research-candidate, not a
-  production contract. Do not restart broad GObjects hunting; repeat classified checks on a
-  second isolated core or independent static path.
-- fact: primary UFunction and ScriptStruct fixtures are comparable but single-source.
-  Promotion requires accepted distinct second-source evidence.
-- fact: `docs/research/2026-05-28-second-source-core-intake-runbook.md` is the current
-  minimal approved-artifact path: build an evidence pack, verify per-artifact FName and
-  GObjects data, regenerate `minimal-second-source-intake`, compare snapshots, and require
-  four accepted targets with distinct artifact identity.
-- fact: shared target sets live in `scripts/reflection_target_sets.py` and are accepted by
-  comparison plus UFunction/ScriptStruct regeneration tooling. Use `--target-set
-  minimal-second-source-intake` for the first UFunction second-source gate and
-  `--target-set transfer-scriptstruct` for transfer ScriptStruct checks.
-- fact: internal recognizers for chat, inventory, structures, and buffs remain
-  candidate-only. No public SDK gameplay callbacks, raw UE pointers, return overrides,
-  mutation, or payload logging until reflected layouts, copied-data ownership, callback
-  lifecycle, ABI, docs, and second-source gates are complete.
-
-## Canonical References
-
-- `docs/STATUS.md`: contributor-facing stability matrix.
-- `docs/RELEASE.md`: release and second-source gate usage.
-- `docs/PLUGIN_ARCHITECTURE.md`: plugin lifecycle and promotion rules.
-- `docs/research/2026-05-28-reversing-objective-map.md`: broad reversing objective.
-- `docs/research/2026-05-28-second-source-reversing-gap-matrix.md`: evidence gaps and
-  target-set promotion matrix.
-- `docs/research/2026-05-28-second-source-core-intake-runbook.md`: shortest offline intake
-  for an approved independent core artifact.
-- `docs/agent-handoff/COMPACT_CONTEXT.md`: compact resume facts after context compaction.
-- `docs/agent-handoff/HISTORY-2026-05-28-pre-current-compaction.md`: full historical handoff
-  snapshot before this file was compacted.
+- RC API and public-scope docs: public ABI, copied policy event payload, resource metadata,
+  SDK consumers, `docs/public_gameplay_events.json`, release docs, and public guardrails.
+- Runtime observer safety: ProcessEvent hook infrastructure, exact-target internal
+  observers, dispatcher tests, and runtime lifecycle tests.
+- Script harness prelude: `scripts/run_script_tests.sh` and
+  `scripts/test_run_script_tests.sh` before script-heavy validation.
+- Offline evidence tooling: FName manifests, second-source intake, snapshot regeneration,
+  static global evidence, ResourceHandle evaluator, protected-path guards, and matching
+  tests.
+- Research and handoff cleanup: dated research notes for evidence; handoff files only for
+  immediate routing; skills only when a repeatable rule changes.
 
 ## Priority Next Steps
 
-- next-step: keep the next engineering rounds offline unless the operator approves a
-  specific debug instance window.
-- next-step: reduce remaining handoff/documentation debt by moving historical detail from
-  active routing files into dated research notes or the handoff history archive.
-- next-step: strengthen second-source tooling/readiness around the minimal intake and
-  ensure all runbooks use executable commands.
-- next-step: continue runtime/API hardening around plugin lifecycle, owner cleanup,
-  install layout, and SDK consumer validation.
-- next-step: prepare for an approved independent core/evidence artifact, but do not capture
-  one without explicit operator approval for target, method, markers, restart window,
-  rollback, and shutdown.
+- Freeze the RC public API around `GameplayPolicyEvent` and `DescribeResourceKind`; keep
+  public Inventory, StructureEvents, dino, buff, mission, tribe, transfer, chat, player,
+  admin, mutation, return override, and public `CallProcessEvent` surfaces out of RC.
+- Revalidate each checkpoint slice independently before any GitHub publication decision.
+- Keep second-source intake fail-closed: derive artifact-specific FName root, validate
+  GObjects, regenerate snapshots, compare with readiness gaps enabled, and review the JSON
+  plan before execution.
+- Reconcile the GObjects coherent field window before promoting beyond
+  binary-hash-scoped research candidate status.
+- Keep ResourceHandle blocked on current evaluator output and
+  `uobject_flags_validity_semantics_unproven`.
+- Treat mission as the cleanest next post-RC module candidate; tribe and transfer wait
+  behind higher identity/payload risk.
+- Keep ignored local artifacts, logs, build output, pycache, raw cores, dumps, generated
+  reports, and server config unstaged.
+- Preserve the current supervised-agent balance requested by the operator: two on Obelisk engineering/audit/development
+  and four on research/knowledge/reversing/dump work.
 
 ## Agent Protocol
 
-- fact: lead owns commits, pushes, handoff integration, and Discord decisions.
-- fact: sub-agents must not commit, amend, rebase, tag, push, or update GitHub state unless
-  explicitly delegated for one turn.
-- fact: split agent rounds by expert focus and file ownership: runtime/core, reversing,
-  ABI/API, build/SDK, ops/docs.
-- fact: read-only reviewers must not edit files. Documentation/skills agents must not edit
-  runtime C++ or `/servidor/ark` unless explicitly assigned.
-- next-step: after each investigation, update this file only with concise active context;
-  put detailed evidence in `docs/research/` and stable resume facts in
-  `COMPACT_CONTEXT.md`.
+- Lead owns commits, pushes, handoff integration, and server-safety decisions.
+- Apply `obelisk-github-research-workflow`; pass sub-agents only scoped objective,
+  ownership, safety baseline, allowed paths, required skills, expert role, and expected decision.
+- Pass only the skills required by scope; sub-agents follow the same minimal-skill rule.
+- Before each supervised round, check for stale stand-by agents and close completed or
+  obsolete agents before launching replacements.

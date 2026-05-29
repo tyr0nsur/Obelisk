@@ -4,10 +4,10 @@ Obelisk is gaining a server-side operator CLI. The first version is intentionall
 read-only and safe to run on shared clusters:
 
 ```bash
-scripts/obelisk.py --root /servidor/ark/obelisk status
-scripts/obelisk.py --root /servidor/ark/obelisk instances list
-scripts/obelisk.py --root /servidor/ark/obelisk plugins list
-scripts/obelisk.py --root /servidor/ark/obelisk plugins show oBaseEvents
+scripts/obelisk.py --root <obelisk-root> status
+scripts/obelisk.py --root <obelisk-root> instances list
+scripts/obelisk.py --root <obelisk-root> plugins list
+scripts/obelisk.py --root <obelisk-root> plugins show oBaseEvents
 ```
 
 The CLI reads the central install root, plugin publication state, plugin config summaries,

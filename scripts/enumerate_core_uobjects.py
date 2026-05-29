@@ -25,6 +25,7 @@ from typing import Iterable
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 from scan_core_fname_tables import CoreMemory, FNAME_CHUNK_SIZE  # noqa: E402
+from snapshot_evidence_pack import reject_protected_input_path  # noqa: E402
 
 
 DEFAULT_GOBJECTS = 0x595B7E0
@@ -154,9 +155,9 @@ def iter_uobjects(
         if not object_address:
             continue
 
-        item_metadata = memory.read_ptr(item_address + 0x8)
-        item_flags = read_u32(memory, item_address + 0x8)
-        item_serial_number = read_i32(memory, item_address + 0xC)
+        item_qword_0x8 = memory.read_ptr(item_address + 0x8)
+        item_dword_0x8 = read_u32(memory, item_address + 0x8)
+        item_dword_0xC = read_i32(memory, item_address + 0xC)
         uobject = read_uobject(memory, object_address, fname_table)
         if uobject is None:
             continue
@@ -172,9 +173,9 @@ def iter_uobjects(
             {
                 "index": index,
                 "fuobject_item": f"0x{item_address:x}",
-                "item_metadata": f"0x{item_metadata:x}" if item_metadata is not None else None,
-                "item_flags": item_flags,
-                "item_serial_number": item_serial_number,
+                "item_qword_0x8": f"0x{item_qword_0x8:x}" if item_qword_0x8 is not None else None,
+                "item_dword_0x8": item_dword_0x8,
+                "item_dword_0xC": item_dword_0xC,
                 "internal_index_matches": uobject.get("internal_index") == index,
             }
         )
@@ -220,7 +221,8 @@ def main() -> int:
     if args.max_objects < 0:
         raise SystemExit("--max-objects must be non-negative")
 
-    memory = CoreMemory(args.core)
+    core_path = reject_protected_input_path(args.core, "--core")
+    memory = CoreMemory(core_path)
     try:
         metadata, objects = iter_uobjects(
             memory,
@@ -234,7 +236,7 @@ def main() -> int:
         memory.close()
 
     if args.json:
-        print(json.dumps({"core": str(args.core), "metadata": metadata, "objects": objects}, indent=2, sort_keys=True))
+        print(json.dumps({"core": str(core_path), "metadata": metadata, "objects": objects}, indent=2, sort_keys=True))
     else:
         print(format_text(metadata, objects))
     return 0

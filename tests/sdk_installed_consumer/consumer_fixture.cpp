@@ -58,6 +58,28 @@ namespace
         return true;
     }
 
+    bool DescribeResourceKind(uint32_t resourceKind, ObeliskResourceKindDescriptor* out)
+    {
+        Require(resourceKind == OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE, "unexpected resource kind");
+        Require(out != nullptr, "resource descriptor output was null");
+        Require(out->struct_size >= sizeof(ObeliskResourceKindDescriptor), "resource descriptor size mismatch");
+
+        out->abi_version = OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION;
+        out->resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE;
+        out->reserved0 = 0;
+        out->flags = OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_CATEGORY_ONLY |
+            OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY |
+            OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP;
+        out->supported_gameplay_policy_event_mask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES;
+        out->supported_gameplay_policy_field_mask = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+            OBELISK_GAMEPLAY_POLICY_FIELD_MASK_VARIANT_INDEX |
+            OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE_SET |
+            OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE;
+        std::strncpy(out->stable_name, "structure", sizeof(out->stable_name) - 1);
+        std::strncpy(out->display_name, "Structure", sizeof(out->display_name) - 1);
+        return true;
+    }
+
     template <typename T>
     T Resolve(void* handle, const char* symbol)
     {
@@ -116,11 +138,13 @@ int main(int argc, char** argv)
         api.struct_size = sizeof(ObeliskApi);
         api.capabilities = OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS |
             OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS |
-            OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES;
+            OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES |
+            OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS;
         api.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle =
             RegisterNamedProcessEventWithOwnerTokenHandle;
         api.UnregisterProcessEventCallbackWithOwnerToken =
             UnregisterProcessEventCallbackWithOwnerToken;
+        api.DescribeResourceKind = DescribeResourceKind;
 
         ObeliskPluginInitContext context{};
         context.abi_version = OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION;

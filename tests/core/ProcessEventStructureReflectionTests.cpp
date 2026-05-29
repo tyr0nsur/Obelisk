@@ -1,13 +1,20 @@
+#include "hooks/ProcessEventDispatch.h"
 #include "hooks/ProcessEventStructureReflection.h"
+#include "core/EventManager.h"
 
 #include <array>
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <vector>
+
+namespace fs = std::filesystem;
 
 namespace
 {
@@ -36,6 +43,9 @@ namespace
     constexpr int32_t kReturnValueNameIndex = 17716;
     constexpr int32_t kVariantIndexNameIndex = 22292;
     constexpr int32_t kBForceSetNameIndex = 22388;
+
+    int g_BlockingPreCallbackCount = 0;
+    int g_OriginalProcessEventCallCount = 0;
 
     struct Region
     {
@@ -85,6 +95,44 @@ namespace
     {
         if (!condition)
             throw std::runtime_error(message);
+    }
+
+    fs::path MakeTempRoot()
+    {
+        char templatePath[] = "/tmp/obelisk_process_event_structure_reflection_tests.XXXXXX";
+        char* directory = mkdtemp(templatePath);
+        Require(directory != nullptr, "mkdtemp failed");
+        return fs::path(directory);
+    }
+
+    void EnableProcessEventBlockingGate(const fs::path& root)
+    {
+        setenv("OBELISK_ROOT", root.string().c_str(), 1);
+        setenv("OBELISK_INSTANCE_ID", "arkserver", 1);
+        setenv("OBELISK_ALLOW_PROCESS_EVENT_BLOCKING", "1", 1);
+        fs::create_directories(root / "state" / "instances" / "arkserver");
+        std::ofstream marker(root / "state" / "instances" / "arkserver" / "allow-process-event-blocking");
+        Require(marker.is_open(), "failed to create ProcessEvent blocking marker");
+        Obelisk::Core::EventManager::SetProcessEventBlockingCapabilityAdvertised(true);
+    }
+
+    void DisableProcessEventBlockingGate()
+    {
+        Obelisk::Core::EventManager::SetProcessEventBlockingCapabilityAdvertised(false);
+        unsetenv("OBELISK_ALLOW_PROCESS_EVENT_BLOCKING");
+        unsetenv("OBELISK_INSTANCE_ID");
+        unsetenv("OBELISK_ROOT");
+    }
+
+    bool BlockingPreCallback(void*, void*, void*)
+    {
+        ++g_BlockingPreCallbackCount;
+        return false;
+    }
+
+    void CountOriginalProcessEventCall(void*, void*, void*)
+    {
+        ++g_OriginalProcessEventCallCount;
     }
 
     void CaptureStructureEvent(const Obelisk::Core::StructureEventView& event, void* userData)
@@ -308,20 +356,24 @@ namespace
     {
         const char* supportedSha = kSupportedShooterGameServerSha256.data();
 
-        Require(EvaluateGate(nullptr, true, supportedSha).Status == GateStatus::Disabled,
+        Require(EvaluateGate(nullptr, true, true, true, supportedSha).Status == GateStatus::Disabled,
                 "missing enable env should disable structure reflection");
-        Require(EvaluateGate("0", true, supportedSha).Status == GateStatus::Disabled,
+        Require(EvaluateGate("0", true, true, true, supportedSha).Status == GateStatus::Disabled,
                 "non-1 enable env should disable structure reflection");
-        Require(EvaluateGate("1", false, supportedSha).Status == GateStatus::MissingInstanceMarker,
+        Require(EvaluateGate("1", false, true, true, supportedSha).Status == GateStatus::MissingObserverDebugProfile,
+                "missing observer-debug profile gate was not rejected");
+        Require(EvaluateGate("1", true, false, true, supportedSha).Status == GateStatus::MissingObserverDebugWindow,
+                "missing observer-debug window marker was not rejected");
+        Require(EvaluateGate("1", true, true, false, supportedSha).Status == GateStatus::MissingInstanceMarker,
                 "missing instance marker gate was not rejected");
-        Require(EvaluateGate("1", true, nullptr).Status == GateStatus::MissingBinarySha256,
+        Require(EvaluateGate("1", true, true, true, nullptr).Status == GateStatus::MissingBinarySha256,
                 "missing binary SHA gate was not rejected");
-        Require(EvaluateGate("1", true, "").Status == GateStatus::MissingBinarySha256,
+        Require(EvaluateGate("1", true, true, true, "").Status == GateStatus::MissingBinarySha256,
                 "empty binary SHA gate was not rejected");
-        Require(EvaluateGate("1", true, "not-this-binary").Status == GateStatus::UnsupportedBinarySha256,
+        Require(EvaluateGate("1", true, true, true, "not-this-binary").Status == GateStatus::UnsupportedBinarySha256,
                 "unsupported binary SHA gate was not rejected");
 
-        Gate gate = EvaluateGate("1", true, supportedSha);
+        Gate gate = EvaluateGate("1", true, true, true, supportedSha);
         Require(gate.Status == GateStatus::Enabled, "supported structure reflection gate did not enable");
         Require(gate.Enabled(), "enabled structure reflection gate did not report enabled");
         Require(gate.BinarySha256 == kSupportedShooterGameServerSha256, "enabled gate did not retain binary SHA");
@@ -354,18 +406,41 @@ namespace
 
         std::atomic<uint64_t> counter{0};
         uint64_t observationNumber = 99;
+        Require(!HasObservationBudgetRemaining(counter, 0), "zero limit reported remaining budget");
+        Require(HasObservationBudgetRemaining(counter, 2), "fresh counter did not report remaining budget");
         Require(!TryReserveObservationBudget(counter, 0, observationNumber),
                 "zero limit reserved observation budget");
         Require(observationNumber == 0, "zero limit did not clear observation number");
         Require(TryReserveObservationBudget(counter, 2, observationNumber),
                 "first observation budget reservation failed");
         Require(observationNumber == 1, "first observation number mismatch");
+        Require(HasObservationBudgetRemaining(counter, 2), "one of two reservations exhausted budget");
         Require(TryReserveObservationBudget(counter, 2, observationNumber),
                 "second observation budget reservation failed");
         Require(observationNumber == 2, "second observation number mismatch");
+        Require(!HasObservationBudgetRemaining(counter, 2), "exhausted counter reported remaining budget");
         Require(!TryReserveObservationBudget(counter, 2, observationNumber),
-                "budget reservation exceeded limit");
+                "exhausted limit reserved observation budget");
         Require(observationNumber == 0, "exhausted budget did not clear observation number");
+
+        std::atomic<uint64_t> dispatchCounter{0};
+        Attempt rejectedAttempt;
+        rejectedAttempt.Status = AttemptStatus::Rejected;
+        observationNumber = 99;
+        Require(!TryReserveDispatchBudgetForMatchedAttempt(rejectedAttempt, dispatchCounter, 1, observationNumber),
+                "rejected structure attempt consumed dispatch budget");
+        Require(observationNumber == 0, "rejected dispatch attempt did not clear observation number");
+        Require(dispatchCounter.load() == 0, "rejected structure attempt changed dispatch counter");
+
+        Attempt matchedAttempt;
+        matchedAttempt.Status = AttemptStatus::Matched;
+        Require(TryReserveDispatchBudgetForMatchedAttempt(matchedAttempt, dispatchCounter, 1, observationNumber),
+                "matched structure attempt did not reserve dispatch budget");
+        Require(observationNumber == 1, "matched dispatch observation number mismatch");
+        Require(dispatchCounter.load() == 1, "matched structure attempt did not advance dispatch counter");
+        Require(!TryReserveDispatchBudgetForMatchedAttempt(matchedAttempt, dispatchCounter, 1, observationNumber),
+                "exhausted matched dispatch budget reserved again");
+        Require(observationNumber == 0, "exhausted matched dispatch budget did not clear observation number");
     }
 
     void TestReflectedStructureNameFilter()
@@ -670,7 +745,7 @@ namespace
             Obelisk::Core::StructureEventSubscription{CaptureStructureEvent, &captured});
         Require(registrationId != 0, "failed to register structure event callback");
 
-        const size_t dispatched = DispatchCopiedStructureEvent(attempt.Invocation);
+        const size_t dispatched = MaybeDispatchCopiedStructureEventAfterOriginal(true, attempt.Invocation);
         Obelisk::Core::StructureEventDispatcher::Get().UnregisterCallbacksForOwner(&owner);
 
         Require(dispatched == 1, "copied structure event was not dispatched");
@@ -690,6 +765,96 @@ namespace
         Require(captured[0].Scalars[0].BoolValue,
                 "dispatched VerifyPinCode return value mismatch");
     }
+
+    void TestCopiedStructureDispatchRequiresOriginalProcessEvent()
+    {
+        StructureFixture fixture;
+        BuildVerifyPinCode(fixture);
+        fixture.Params[4] = 1;
+
+        Attempt attempt = TryIdentifyInvocation(
+            EnabledGate(),
+            kVerifyPinCodeNameIndex,
+            fixture.Reader(),
+            fixture.Function.data(),
+            fixture.Params.data());
+        Require(attempt.Status == AttemptStatus::Matched, attempt.Result.Reason.c_str());
+
+        int owner = 0;
+        std::vector<CapturedStructureEvent> captured;
+        const uint64_t registrationId = Obelisk::Core::StructureEventDispatcher::Get().Register(
+            &owner,
+            Obelisk::Core::StructureEventSubscription{CaptureStructureEvent, &captured});
+        Require(registrationId != 0, "failed to register structure event callback");
+
+        Require(MaybeDispatchCopiedStructureEventAfterOriginal(false, attempt.Invocation) == 0,
+                "blocked original ProcessEvent still dispatched structure event");
+        Require(captured.empty(), "blocked original ProcessEvent reached structure callback");
+        Require(MaybeDispatchCopiedStructureEventAfterOriginal(true, attempt.Invocation) == 1,
+                "post-original structure event did not dispatch");
+        Obelisk::Core::StructureEventDispatcher::Get().UnregisterCallbacksForOwner(&owner);
+
+        Require(captured.size() == 1, "post-original structure event dispatch count mismatch");
+        Require(captured[0].Kind == Obelisk::Core::StructureEventKind::VerifyPinCode,
+                "post-original VerifyPinCode kind mismatch");
+    }
+
+    void TestBlockedPreCallbackPreventsIntegratedStructureDispatch()
+    {
+        g_BlockingPreCallbackCount = 0;
+        g_OriginalProcessEventCallCount = 0;
+
+        const fs::path root = MakeTempRoot();
+        EnableProcessEventBlockingGate(root);
+
+        StructureFixture fixture;
+        BuildVerifyPinCode(fixture);
+        fixture.Params[4] = 1;
+
+        Attempt attempt = TryIdentifyInvocation(
+            EnabledGate(),
+            kVerifyPinCodeNameIndex,
+            fixture.Reader(),
+            fixture.Function.data(),
+            fixture.Params.data());
+        Require(attempt.Status == AttemptStatus::Matched, attempt.Result.Reason.c_str());
+
+        int preOwner = 0;
+        int structureOwner = 0;
+        std::vector<CapturedStructureEvent> captured;
+        auto& eventManager = Obelisk::Core::EventManager::Get();
+        const uint64_t preRegistrationId = eventManager.RegisterPreProcessEventForNameIndexOwned(
+            &preOwner,
+            kVerifyPinCodeNameIndex,
+            BlockingPreCallback);
+        const uint64_t structureRegistrationId = Obelisk::Core::StructureEventDispatcher::Get().Register(
+            &structureOwner,
+            Obelisk::Core::StructureEventSubscription{CaptureStructureEvent, &captured});
+        Require(preRegistrationId != 0, "failed to register blocking pre-callback");
+        Require(structureRegistrationId != 0, "failed to register structure event callback");
+
+        const bool originalWasCalled = Obelisk::Hooks::DispatchProcessEventCallbacks(
+            kVerifyPinCodeNameIndex,
+            reinterpret_cast<void*>(0x1),
+            fixture.Function.data(),
+            fixture.Params.data(),
+            true,
+            false,
+            CountOriginalProcessEventCall);
+        const size_t dispatched =
+            MaybeDispatchCopiedStructureEventAfterOriginal(originalWasCalled, attempt.Invocation);
+
+        eventManager.UnregisterCallbacksForOwner(&preOwner);
+        Obelisk::Core::StructureEventDispatcher::Get().UnregisterCallbacksForOwner(&structureOwner);
+        DisableProcessEventBlockingGate();
+        fs::remove_all(root);
+
+        Require(g_BlockingPreCallbackCount == 1, "blocking pre-callback did not run");
+        Require(g_OriginalProcessEventCallCount == 0, "blocked pre-callback still called original ProcessEvent");
+        Require(!originalWasCalled, "blocked dispatch reported that original ProcessEvent ran");
+        Require(dispatched == 0, "blocked ProcessEvent dispatched copied structure event");
+        Require(captured.empty(), "blocked ProcessEvent reached structure callback");
+    }
 }
 
 int main()
@@ -705,6 +870,8 @@ int main()
     TestBuildsCopiedStructureEventWithoutBorrowedObjectOrSensitiveFields();
     TestBuildsCopiedStructureEventForScalarStructureTargets();
     TestDispatchesCopiedStructureEventThroughInternalDispatcher();
+    TestCopiedStructureDispatchRequiresOriginalProcessEvent();
+    TestBlockedPreCallbackPreventsIntegratedStructureDispatch();
 
     std::cout << "ProcessEventStructureReflectionTests passed\n";
     return 0;

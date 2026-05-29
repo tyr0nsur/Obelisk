@@ -2,6 +2,7 @@
 
 #include <dlfcn.h>
 
+#include <cstddef>
 #include <cstdlib>
 #include <cstdint>
 #include <cstring>
@@ -16,11 +17,16 @@ namespace
     using GetInfoFn = bool (*)(ObeliskPluginMetadata*);
     using InitFn = bool (*)(ObeliskApi*, const ObeliskPluginInitContext*);
     using ShutdownFn = void (*)();
+    using BoolProbeFn = bool (*)();
 
     int g_RegisterCount = 0;
     int g_UnregisterCount = 0;
+    int g_GameplayPolicyRegisterCount = 0;
+    int g_GameplayPolicyUnregisterCount = 0;
     bool g_ThrowLog = false;
     OnProcessEventCallback g_RegisteredCallback = nullptr;
+    ObeliskGameplayPolicyEventCallback g_RegisteredGameplayPolicyCallback = nullptr;
+    void* g_RegisteredGameplayPolicyUserData = nullptr;
 
     void Require(bool condition, const char* message)
     {
@@ -65,6 +71,92 @@ namespace
         g_RegisteredCallback = nullptr;
         ++g_UnregisterCount;
         return true;
+    }
+
+    uint64_t RegisterGameplayPolicyEventWithOwnerTokenHandle(uint64_t ownerToken,
+                                                             uint64_t eventKindMask,
+                                                             ObeliskGameplayPolicyEventCallback callback,
+                                                             void* userData)
+    {
+        Require(ownerToken == 0xC0FFEE, "unexpected owner token in gameplay policy registration");
+        Require(eventKindMask == OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL,
+            "unexpected gameplay policy event mask");
+        Require(callback != nullptr, "gameplay policy registration received null callback");
+        Require(userData != nullptr, "gameplay policy registration received null user data");
+        g_RegisteredGameplayPolicyCallback = callback;
+        g_RegisteredGameplayPolicyUserData = userData;
+        ++g_GameplayPolicyRegisterCount;
+        return 2002;
+    }
+
+    bool UnregisterGameplayPolicyEventWithOwnerToken(uint64_t ownerToken, uint64_t registrationId)
+    {
+        Require(ownerToken == 0xC0FFEE, "unexpected owner token in gameplay policy unregister");
+        Require(registrationId == 2002, "unexpected gameplay policy registration id");
+        g_RegisteredGameplayPolicyCallback = nullptr;
+        g_RegisteredGameplayPolicyUserData = nullptr;
+        ++g_GameplayPolicyUnregisterCount;
+        return true;
+    }
+
+    void DispatchValidStructureGameplayPolicyEvent()
+    {
+        Require(g_RegisteredGameplayPolicyCallback != nullptr, "missing gameplay policy callback");
+        Require(g_RegisteredGameplayPolicyUserData != nullptr, "missing gameplay policy user data");
+
+        ObeliskGameplayPolicyEvent event{};
+        event.abi_version = OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION;
+        event.struct_size = sizeof(ObeliskGameplayPolicyEvent);
+        event.event_kind = OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_VARIANT_CHANGE;
+        event.resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE;
+        event.flags = OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD |
+            OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED;
+        event.field_mask = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+            OBELISK_GAMEPLAY_POLICY_FIELD_MASK_VARIANT_INDEX |
+            OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE_SET;
+        event.bool_values = 1ull << OBELISK_GAMEPLAY_POLICY_FIELD_FORCE_SET;
+        event.int32_values[OBELISK_GAMEPLAY_POLICY_FIELD_VARIANT_INDEX] = 7;
+
+        g_RegisteredGameplayPolicyCallback(&event, g_RegisteredGameplayPolicyUserData);
+    }
+
+    void DispatchValidInventoryRemoteAddGameplayPolicyEvent()
+    {
+        Require(g_RegisteredGameplayPolicyCallback != nullptr, "missing gameplay policy callback");
+        Require(g_RegisteredGameplayPolicyUserData != nullptr, "missing gameplay policy user data");
+
+        ObeliskGameplayPolicyEvent event{};
+        event.abi_version = OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION;
+        event.struct_size = sizeof(ObeliskGameplayPolicyEvent);
+        event.event_kind = OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK;
+        event.resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM;
+        event.flags = OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD |
+            OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED;
+        event.field_mask = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+            OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER;
+        event.bool_values = (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_RETURN_VALUE) |
+            (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_REQUESTED_BY_PLAYER);
+
+        g_RegisteredGameplayPolicyCallback(&event, g_RegisteredGameplayPolicyUserData);
+    }
+
+    void DispatchValidInventoryUseGameplayPolicyEvent()
+    {
+        Require(g_RegisteredGameplayPolicyCallback != nullptr, "missing gameplay policy callback");
+        Require(g_RegisteredGameplayPolicyUserData != nullptr, "missing gameplay policy user data");
+
+        ObeliskGameplayPolicyEvent event{};
+        event.abi_version = OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION;
+        event.struct_size = sizeof(ObeliskGameplayPolicyEvent);
+        event.event_kind = OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK;
+        event.resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM;
+        event.flags = OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD |
+            OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED;
+        event.field_mask = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+            OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN;
+        event.bool_values = 1ull << OBELISK_GAMEPLAY_POLICY_FIELD_RETURN_VALUE;
+
+        g_RegisteredGameplayPolicyCallback(&event, g_RegisteredGameplayPolicyUserData);
     }
 
     constexpr const char* kActiveOBaseEventsConfig = R"json({
@@ -178,6 +270,10 @@ int main(int argc, char** argv)
         GetInfoFn getInfo = ResolveRequired<GetInfoFn>(handle, "ObeliskPlugin_GetInfo");
         InitFn init = ResolveRequired<InitFn>(handle, "ObeliskPlugin_Init");
         ShutdownFn shutdown = ResolveOptional<ShutdownFn>(handle, "ObeliskPlugin_Shutdown");
+        BoolProbeFn gameplayPolicyEventSeen =
+            ResolveOptional<BoolProbeFn>(handle, "SdkConsumerMinimal_GameplayPolicyEventSeen");
+        BoolProbeFn gameplayPolicyEventAccepted =
+            ResolveOptional<BoolProbeFn>(handle, "SdkConsumerMinimal_GameplayPolicyEventAccepted");
 
         ObeliskPluginMetadata metadata{};
         Require(getInfo(&metadata), "ObeliskPlugin_GetInfo failed");
@@ -219,6 +315,14 @@ int main(int argc, char** argv)
             RegisterNamedProcessEventWithOwnerTokenHandle;
         api.UnregisterProcessEventCallbackWithOwnerToken =
             UnregisterProcessEventCallbackWithOwnerToken;
+        if (mode != "no-gameplay-policy-capability")
+        {
+            api.capabilities |= OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS;
+            api.RegisterGameplayPolicyEventWithOwnerTokenHandle =
+                RegisterGameplayPolicyEventWithOwnerTokenHandle;
+            api.UnregisterGameplayPolicyEventWithOwnerToken =
+                UnregisterGameplayPolicyEventWithOwnerToken;
+        }
 
         ObeliskPluginInitContext context{};
         context.abi_version = OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION;
@@ -229,6 +333,8 @@ int main(int argc, char** argv)
         context.config_path = configPathString.c_str();
         context.instance_id = "sdk-consumer-test";
         context.plugin_owner_token = 0xC0FFEE;
+        if (mode == "zero-owner-token")
+            context.plugin_owner_token = 0;
 
         if (mode == "throw-log-init")
             g_ThrowLog = true;
@@ -241,17 +347,38 @@ int main(int argc, char** argv)
             Require(!init(&api, &shortContext), "plugin accepted too-small init context");
             Require(g_RegisterCount == 0, "invalid context unexpectedly registered a callback");
             Require(g_UnregisterCount == 0, "invalid context unexpectedly unregistered a callback");
+            Require(g_GameplayPolicyRegisterCount == 0,
+                "invalid context unexpectedly registered a gameplay policy callback");
+            Require(g_GameplayPolicyUnregisterCount == 0,
+                "invalid context unexpectedly unregistered a gameplay policy callback");
             cleanupConfigDir();
             closeHandle();
             return 0;
         }
 
         const bool initSucceeded = init(&api, &context);
+        if (mode == "zero-owner-token")
+        {
+            Require(!initSucceeded, "plugin accepted zero owner token");
+            Require(g_RegisterCount == 0, "zero owner token unexpectedly registered a callback");
+            Require(g_UnregisterCount == 0, "zero owner token unexpectedly unregistered a callback");
+            Require(g_GameplayPolicyRegisterCount == 0,
+                "zero owner token unexpectedly registered a gameplay policy callback");
+            Require(g_GameplayPolicyUnregisterCount == 0,
+                "zero owner token unexpectedly unregistered a gameplay policy callback");
+            cleanupConfigDir();
+            closeHandle();
+            return 0;
+        }
         if (mode == "throw-log-init")
         {
             Require(!initSucceeded, "plugin allowed log exception to cross or reported init success");
             Require(g_RegisterCount == 0, "failed init unexpectedly registered a callback");
             Require(g_UnregisterCount == 0, "failed init unexpectedly unregistered a callback");
+            Require(g_GameplayPolicyRegisterCount == 0,
+                "failed init unexpectedly registered a gameplay policy callback");
+            Require(g_GameplayPolicyUnregisterCount == 0,
+                "failed init unexpectedly unregistered a gameplay policy callback");
             cleanupConfigDir();
             closeHandle();
             return 0;
@@ -285,6 +412,32 @@ int main(int argc, char** argv)
         }
 
         Require(initSucceeded, "ObeliskPlugin_Init failed");
+        const bool hasGameplayPolicyProbe = gameplayPolicyEventSeen && gameplayPolicyEventAccepted;
+        if (hasGameplayPolicyProbe && mode == "no-gameplay-policy-capability")
+        {
+            Require(g_GameplayPolicyRegisterCount == 0,
+                "plugin registered gameplay policy callback without capability");
+            Require(g_GameplayPolicyUnregisterCount == 0,
+                "plugin unregistered gameplay policy callback without capability");
+            Require(!gameplayPolicyEventSeen(), "plugin reported gameplay policy event without registration");
+            Require(!gameplayPolicyEventAccepted(), "plugin accepted gameplay policy event without registration");
+        }
+        else if (hasGameplayPolicyProbe)
+        {
+            Require(g_GameplayPolicyRegisterCount == 1,
+                "plugin did not register one gameplay policy callback");
+            Require(g_GameplayPolicyUnregisterCount == 0,
+                "plugin unregistered gameplay policy callback before shutdown");
+            DispatchValidStructureGameplayPolicyEvent();
+            Require(gameplayPolicyEventSeen(), "plugin did not observe structure gameplay policy event");
+            Require(gameplayPolicyEventAccepted(), "plugin did not validate copied structure gameplay policy event");
+            DispatchValidInventoryRemoteAddGameplayPolicyEvent();
+            Require(gameplayPolicyEventAccepted(),
+                "plugin did not validate copied requested-by-player inventory policy event");
+            DispatchValidInventoryUseGameplayPolicyEvent();
+            Require(gameplayPolicyEventAccepted(),
+                "plugin did not validate copied ignore-cooldown inventory policy event");
+        }
         if (mode == "callback-throw-log")
         {
             Require(g_RegisterCount == 1, "active plugin did not register one callback");
@@ -302,7 +455,25 @@ int main(int argc, char** argv)
             Require(g_UnregisterCount == 1, "active plugin did not unregister one callback");
             Require(g_RegisteredCallback == nullptr, "active plugin callback survived shutdown unregister");
         }
-        else if (std::strcmp(expectedPluginId, "oBaseEvents") == 0)
+        if (hasGameplayPolicyProbe && mode == "no-gameplay-policy-capability")
+        {
+            Require(g_GameplayPolicyRegisterCount == 0,
+                "plugin registered gameplay policy callback without capability");
+            Require(g_GameplayPolicyUnregisterCount == 0,
+                "plugin unregistered gameplay policy callback without capability");
+        }
+        else if (hasGameplayPolicyProbe)
+        {
+            Require(g_GameplayPolicyRegisterCount == 1,
+                "plugin did not register one gameplay policy callback");
+            Require(g_GameplayPolicyUnregisterCount == 1,
+                "plugin did not unregister one gameplay policy callback");
+            Require(g_RegisteredGameplayPolicyCallback == nullptr,
+                "gameplay policy callback survived shutdown unregister");
+            Require(g_RegisteredGameplayPolicyUserData == nullptr,
+                "gameplay policy user data survived shutdown unregister");
+        }
+        else if (std::strcmp(expectedPluginId, "oBaseEvents") == 0 && mode.empty())
         {
             Require(g_RegisterCount == 0, "disabled oBaseEvents unexpectedly registered a callback");
             Require(g_UnregisterCount == 0, "disabled oBaseEvents unexpectedly unregistered a callback");

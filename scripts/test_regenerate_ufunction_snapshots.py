@@ -141,6 +141,141 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
         self.assertIn("would write", result.stdout)
         self.assertFalse(output.exists())
 
+    def test_rejects_protected_direct_paths_before_core_open(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            manifest = root / "manifest.json"
+            output_root = root / "out"
+            self.write_manifest(manifest)
+            cases = (
+                ("--core", "/servidor/ark/obelisk/dumps/core", "--core must not read from protected server root"),
+                ("--manifest", "/servidor/ark/obelisk/snapshots/manifest.json", "--manifest must not read from protected server root"),
+                ("--output-root", "/servidor/ark/obelisk/snapshots", "--output-root must not write under protected server root"),
+                (
+                    "--evidence-pack-manifest",
+                    "/servidor/ark/obelisk/evidence-pack/manifest.json",
+                    "--evidence-pack-manifest must not read from protected server root",
+                ),
+            )
+            for option, protected_path, expected in cases:
+                with self.subTest(option=option):
+                    args = [
+                        sys.executable,
+                        str(SCRIPT_DIR / "regenerate_ufunction_snapshots.py"),
+                        "--core",
+                        str(root / "missing-core"),
+                        "--manifest",
+                        str(manifest),
+                        "--output-root",
+                        str(output_root),
+                        "--gobjects",
+                        "0x1",
+                        "--fname-root-slot",
+                        "0x2",
+                    ]
+                    if option == "--core":
+                        args[args.index("--core") + 1] = protected_path
+                    elif option == "--manifest":
+                        args[args.index("--manifest") + 1] = protected_path
+                    elif option == "--output-root":
+                        args[args.index("--output-root") + 1] = protected_path
+                    else:
+                        args.extend([option, protected_path])
+
+                    result = subprocess.run(args, capture_output=True, text=True)
+
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn(expected, result.stderr)
+
+    def test_rejects_symlinked_protected_output_root_before_core_open(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            manifest = root / "manifest.json"
+            output_root = root / "snapshots-link"
+            output_root.symlink_to("/servidor/ark/obelisk/snapshots")
+            self.write_manifest(manifest)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "regenerate_ufunction_snapshots.py"),
+                    "--core",
+                    str(root / "missing-core"),
+                    "--manifest",
+                    str(manifest),
+                    "--output-root",
+                    str(output_root),
+                    "--gobjects",
+                    "0x1",
+                    "--fname-root-slot",
+                    "0x2",
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--output-root must not write under protected server root /servidor/ark", result.stderr)
+
+    def test_rejects_symlinked_protected_core_before_core_open(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            manifest = root / "manifest.json"
+            core = root / "core-link"
+            core.symlink_to("/servidor/ark/obelisk/dumps/core")
+            self.write_manifest(manifest)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "regenerate_ufunction_snapshots.py"),
+                    "--core",
+                    str(core),
+                    "--manifest",
+                    str(manifest),
+                    "--output-root",
+                    str(root / "out"),
+                    "--gobjects",
+                    "0x1",
+                    "--fname-root-slot",
+                    "0x2",
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--core must not read from protected server root /servidor/ark", result.stderr)
+
+    def test_allows_paths_that_only_share_protected_prefix_text(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            manifest = root / "manifest.json"
+            self.write_manifest(manifest)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "regenerate_ufunction_snapshots.py"),
+                    "--core",
+                    "/servidor/ark-not-live/offline-core",
+                    "--manifest",
+                    str(manifest),
+                    "--output-root",
+                    "/servidor/ark-not-live/snapshots",
+                    "--gobjects",
+                    "0x1",
+                    "--fname-root-slot",
+                    "0x2",
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("/servidor/ark-not-live/offline-core", result.stderr)
+        self.assertNotIn("protected server root", result.stderr)
+
     def test_target_set_expands_named_ufunction_targets(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -172,10 +307,48 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
             )
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("would write", result.stdout)
+        self.assertNotIn("would write", result.stdout)
         self.assertIn("PrimalItem.CanUse", result.stderr)
         self.assertIn("PrimalItem.AllowRemoteAddToInventory", result.stderr)
         self.assertIn("PrimalStructure.IsAllowedToDemolish", result.stderr)
+
+    def test_unknown_filter_fails_before_write(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            manifest = root / "manifest.json"
+            output_root = root / "out"
+            output = output_root / "7e7ded49e0c6" / "sdk_test" / "PrimalStructure.AllowStructureAccess.snapshot.json"
+            addrs = build_core_fixture(core)
+            self.write_manifest(manifest)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "regenerate_ufunction_snapshots.py"),
+                    "--core",
+                    str(core),
+                    "--manifest",
+                    str(manifest),
+                    "--output-root",
+                    str(output_root),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--target",
+                    "PrimalStructure.AllowStructureAccess",
+                    "--target",
+                    "PrimalStructure.MissingTarget",
+                    "--write",
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unknown target filter(s): PrimalStructure.MissingTarget", result.stderr)
+        self.assertFalse(output.exists())
 
     def test_write_generates_sanitized_snapshot_from_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -309,6 +482,37 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("--fname-root-slot is required when recording artifact identity", result.stderr)
 
+    def test_fname_root_slot_is_required_without_artifact_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            manifest = root / "manifest.json"
+            output_root = root / "out"
+            addrs = build_core_fixture(core)
+            self.write_manifest(manifest)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "regenerate_ufunction_snapshots.py"),
+                    "--core",
+                    str(core),
+                    "--manifest",
+                    str(manifest),
+                    "--output-root",
+                    str(output_root),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--obelisk-commit",
+                    "abcdef1",
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--fname-root-slot is required; derive or import a FName root", result.stderr)
+
     def test_artifact_identity_requires_all_fields_together(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -395,6 +599,7 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
         self.assertEqual(payload["evidence"]["artifact_sha256"], core_sha)
         self.assertEqual(payload["evidence"]["capture_id"], "second-core")
         self.assertEqual(payload["evidence"]["evidence_pack_id"], "second-pack")
+        self.assertEqual(payload["evidence"]["generated_by"], "scripts/inspect_core_ufunctions.py --snapshot-json")
 
     def test_evidence_pack_manifest_rejects_conflicting_identity(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -510,6 +715,46 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("evidence pack status is not complete", result.stderr)
+
+    def test_evidence_pack_manifest_requires_gdb_core_failed_false(self) -> None:
+        invalid_values: list[object] = [True, None, "true", "false", 1, 0]
+        for invalid_value in invalid_values:
+            with self.subTest(gdb_core_failed=invalid_value), tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                core = root / "second-core"
+                manifest = root / "manifest.json"
+                evidence_pack = root / "second-pack" / "manifest.json"
+                output_root = root / "out"
+                addrs = build_core_fixture(core)
+                self.write_manifest(manifest)
+                self.write_evidence_pack_manifest(
+                    evidence_pack,
+                    core=core,
+                    fname_root_slot=addrs["fname_root_slot"],
+                    gobjects=addrs["gobjects"],
+                    evidence_status={"status": "complete", "gdb_core_failed": invalid_value},
+                )
+
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(SCRIPT_DIR / "regenerate_ufunction_snapshots.py"),
+                        "--core",
+                        str(core),
+                        "--manifest",
+                        str(manifest),
+                        "--output-root",
+                        str(output_root),
+                        "--evidence-pack-manifest",
+                        str(evidence_pack),
+                        "--write",
+                    ],
+                    capture_output=True,
+                    text=True,
+                )
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("gdb_core_failed=false", result.stderr)
 
     def test_evidence_pack_manifest_rejects_conflicting_gobjects(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

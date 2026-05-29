@@ -115,6 +115,21 @@ namespace
         const void* Class = nullptr;
     };
 
+    struct CapturedInventoryPolicyEvent
+    {
+        Obelisk::Core::InventoryPolicyEventKind Kind = Obelisk::Core::InventoryPolicyEventKind::CanUse;
+        std::vector<Obelisk::Core::InventoryPolicyScalarValue> Scalars;
+    };
+
+    void CaptureInventoryPolicyEvent(const Obelisk::Core::InventoryPolicyEventView& event, void* userData)
+    {
+        auto* captured = static_cast<std::vector<CapturedInventoryPolicyEvent>*>(userData);
+        captured->push_back({
+            event.Kind,
+            std::vector<Obelisk::Core::InventoryPolicyScalarValue>(event.Scalars.begin(), event.Scalars.end()),
+        });
+    }
+
     struct InventoryFixture
     {
         std::array<uint8_t, 0xb0> Function{};
@@ -238,20 +253,24 @@ namespace
     {
         const char* supportedSha = kSupportedShooterGameServerSha256.data();
 
-        Require(EvaluateGate(nullptr, true, supportedSha).Status == GateStatus::Disabled,
+        Require(EvaluateGate(nullptr, true, true, true, supportedSha).Status == GateStatus::Disabled,
                 "missing enable env should disable inventory reflection");
-        Require(EvaluateGate("0", true, supportedSha).Status == GateStatus::Disabled,
+        Require(EvaluateGate("0", true, true, true, supportedSha).Status == GateStatus::Disabled,
                 "non-1 enable env should disable inventory reflection");
-        Require(EvaluateGate("1", false, supportedSha).Status == GateStatus::MissingInstanceMarker,
+        Require(EvaluateGate("1", false, true, true, supportedSha).Status == GateStatus::MissingObserverDebugProfile,
+                "missing observer-debug profile gate was not rejected");
+        Require(EvaluateGate("1", true, false, true, supportedSha).Status == GateStatus::MissingObserverDebugWindow,
+                "missing observer-debug window marker was not rejected");
+        Require(EvaluateGate("1", true, true, false, supportedSha).Status == GateStatus::MissingInstanceMarker,
                 "missing instance marker gate was not rejected");
-        Require(EvaluateGate("1", true, nullptr).Status == GateStatus::MissingBinarySha256,
+        Require(EvaluateGate("1", true, true, true, nullptr).Status == GateStatus::MissingBinarySha256,
                 "missing binary SHA gate was not rejected");
-        Require(EvaluateGate("1", true, "").Status == GateStatus::MissingBinarySha256,
+        Require(EvaluateGate("1", true, true, true, "").Status == GateStatus::MissingBinarySha256,
                 "empty binary SHA gate was not rejected");
-        Require(EvaluateGate("1", true, "not-this-binary").Status == GateStatus::UnsupportedBinarySha256,
+        Require(EvaluateGate("1", true, true, true, "not-this-binary").Status == GateStatus::UnsupportedBinarySha256,
                 "unsupported binary SHA gate was not rejected");
 
-        Gate gate = EvaluateGate("1", true, supportedSha);
+        Gate gate = EvaluateGate("1", true, true, true, supportedSha);
         Require(gate.Status == GateStatus::Enabled, "supported inventory reflection gate did not enable");
         Require(gate.Enabled(), "enabled inventory reflection gate did not report enabled");
     }
@@ -265,6 +284,10 @@ namespace
                 "AllowRemoteAddToInventory FName should pass observation filter");
         Require(!ShouldAttemptNameObservation(42, 1), "non-inventory FName should not pass observation filter");
         Require(!ShouldAttemptNameObservation(kCanUseNameIndex, 0), "zero budget should skip matching FName");
+        Require(ShouldAttemptNameObservation(kCanUseNameIndex, 0, 1),
+                "dispatch budget should allow inventory observation without log budget");
+        Require(!ShouldAttemptNameObservation(kCanUseNameIndex, 0, 0),
+                "zero log and dispatch budgets should skip inventory observation");
 
         std::atomic<uint64_t> counter{0};
         uint64_t observationNumber = 99;
@@ -274,6 +297,30 @@ namespace
         Require(observationNumber == 1, "first observation number mismatch");
         Require(!TryReserveObservationBudget(counter, 1, observationNumber), "budget reservation exceeded limit");
         Require(counter.load() == 1, "budget counter mismatch");
+
+        std::atomic<uint64_t> logCounter{0};
+        std::atomic<uint64_t> dispatchCounter{0};
+        Require(!ShouldAttemptRuntimeObservation(logCounter, 0, dispatchCounter, 0),
+                "zero log and dispatch budgets reported active runtime observation");
+        Require(ShouldAttemptRuntimeObservation(logCounter, 0, dispatchCounter, 1),
+                "dispatch budget did not activate runtime observation");
+
+        Attempt rejectedAttempt;
+        rejectedAttempt.Status = AttemptStatus::Rejected;
+        Require(!TryReserveDispatchBudgetForMatchedAttempt(rejectedAttempt, dispatchCounter, 1, observationNumber),
+                "rejected inventory attempt consumed dispatch budget");
+        Require(observationNumber == 0, "rejected dispatch attempt did not clear observation number");
+        Require(dispatchCounter.load() == 0, "rejected inventory attempt changed dispatch counter");
+
+        Attempt matchedAttempt;
+        matchedAttempt.Status = AttemptStatus::Matched;
+        Require(TryReserveDispatchBudgetForMatchedAttempt(matchedAttempt, dispatchCounter, 1, observationNumber),
+                "matched inventory attempt did not reserve dispatch budget");
+        Require(observationNumber == 1, "matched dispatch observation number mismatch");
+        Require(dispatchCounter.load() == 1, "matched inventory attempt did not advance dispatch counter");
+        Require(!TryReserveDispatchBudgetForMatchedAttempt(matchedAttempt, dispatchCounter, 1, observationNumber),
+                "exhausted matched dispatch budget reserved again");
+        Require(observationNumber == 0, "exhausted matched dispatch budget did not clear observation number");
     }
 
     void TestDisabledGateDoesNotRead()
@@ -356,6 +403,109 @@ namespace
         Require(attempt.Invocation.Fields[3].Range.Data == fixture.Params.data() + 0x11,
                 "ReturnValue range mismatch");
     }
+
+    void TestBuildsCopiedInventoryPolicyEventWithoutObjectFields()
+    {
+        InventoryFixture fixture;
+        BuildAllowRemoteAdd(fixture);
+        fixture.Params[0x10] = 1;
+        fixture.Params[0x11] = 0;
+
+        Attempt attempt = TryIdentifyInvocation(
+            EnabledGate(),
+            kAllowRemoteAddToInventoryNameIndex,
+            fixture.Reader(),
+            fixture.Function.data(),
+            fixture.Params.data());
+        Require(attempt.Status == AttemptStatus::Matched, attempt.Result.Reason.c_str());
+
+        CopiedInventoryPolicyEvent event;
+        Require(TryBuildCopiedInventoryPolicyEvent(attempt.Invocation, event),
+                "failed to build copied AllowRemoteAddToInventory event");
+        fixture.Params[0x10] = 0;
+        fixture.Params[0x11] = 1;
+
+        Require(event.View.Kind == Obelisk::Core::InventoryPolicyEventKind::AllowRemoteAddToInventory,
+                "AllowRemoteAddToInventory event kind mismatch");
+        Require(event.View.Scalars.size() == 2,
+                "AllowRemoteAddToInventory copied object/player fields");
+        Require(event.View.Scalars[0].Field == Obelisk::Core::InventoryPolicyScalarField::BRequestedByPlayer,
+                "bRequestedByPlayer field mismatch");
+        Require(event.View.Scalars[0].BoolValue, "bRequestedByPlayer value was not copied");
+        Require(event.View.Scalars[1].Field == Obelisk::Core::InventoryPolicyScalarField::ReturnValue,
+                "return field mismatch");
+        Require(!event.View.Scalars[1].BoolValue, "return value was not copied");
+    }
+
+    void TestBuildsCopiedInventoryPolicyEventForCanUse()
+    {
+        InventoryFixture fixture;
+        BuildCanUse(fixture);
+        fixture.Params[0x00] = 1;
+        fixture.Params[0x01] = 1;
+
+        Attempt attempt = TryIdentifyInvocation(
+            EnabledGate(),
+            kCanUseNameIndex,
+            fixture.Reader(),
+            fixture.Function.data(),
+            fixture.Params.data());
+        Require(attempt.Status == AttemptStatus::Matched, attempt.Result.Reason.c_str());
+
+        CopiedInventoryPolicyEvent event;
+        Require(TryBuildCopiedInventoryPolicyEvent(attempt.Invocation, event),
+                "failed to build copied CanUse event");
+        Require(event.View.Kind == Obelisk::Core::InventoryPolicyEventKind::CanUse,
+                "CanUse event kind mismatch");
+        Require(event.View.Scalars.size() == 2, "CanUse scalar count mismatch");
+        Require(event.View.Scalars[0].Field == Obelisk::Core::InventoryPolicyScalarField::BIgnoreCooldown,
+                "bIgnoreCooldown field mismatch");
+        Require(event.View.Scalars[0].BoolValue, "bIgnoreCooldown value mismatch");
+        Require(event.View.Scalars[1].Field == Obelisk::Core::InventoryPolicyScalarField::ReturnValue,
+                "return field mismatch");
+        Require(event.View.Scalars[1].BoolValue, "return value mismatch");
+    }
+
+    void TestDispatchesCopiedInventoryPolicyEventThroughInternalDispatcher()
+    {
+        InventoryFixture fixture;
+        BuildCanUse(fixture);
+        fixture.Params[0x00] = 0;
+        fixture.Params[0x01] = 1;
+
+        Attempt attempt = TryIdentifyInvocation(
+            EnabledGate(),
+            kCanUseNameIndex,
+            fixture.Reader(),
+            fixture.Function.data(),
+            fixture.Params.data());
+        Require(attempt.Status == AttemptStatus::Matched, attempt.Result.Reason.c_str());
+
+        int owner = 0;
+        std::vector<CapturedInventoryPolicyEvent> captured;
+        const uint64_t registrationId = Obelisk::Core::InventoryPolicyEventDispatcher::Get().Register(
+            &owner,
+            Obelisk::Core::InventoryPolicyEventSubscription{CaptureInventoryPolicyEvent, &captured});
+        Require(registrationId != 0, "failed to register inventory policy event callback");
+
+        Require(MaybeDispatchCopiedInventoryPolicyEventAfterOriginal(false, attempt.Invocation) == 0,
+                "blocked original ProcessEvent still dispatched inventory policy event");
+        Require(captured.empty(), "blocked original ProcessEvent reached inventory policy callback");
+        Require(MaybeDispatchCopiedInventoryPolicyEventAfterOriginal(true, attempt.Invocation) == 1,
+                "post-original inventory policy event did not dispatch");
+        Obelisk::Core::InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(&owner);
+
+        Require(captured.size() == 1, "captured inventory policy event count mismatch");
+        Require(captured[0].Kind == Obelisk::Core::InventoryPolicyEventKind::CanUse,
+                "dispatched CanUse kind mismatch");
+        Require(captured[0].Scalars.size() == 2, "dispatched CanUse scalar count mismatch");
+        Require(captured[0].Scalars[0].Field == Obelisk::Core::InventoryPolicyScalarField::BIgnoreCooldown,
+                "dispatched bIgnoreCooldown field mismatch");
+        Require(!captured[0].Scalars[0].BoolValue, "dispatched bIgnoreCooldown value mismatch");
+        Require(captured[0].Scalars[1].Field == Obelisk::Core::InventoryPolicyScalarField::ReturnValue,
+                "dispatched return field mismatch");
+        Require(captured[0].Scalars[1].BoolValue, "dispatched return value mismatch");
+    }
 }
 
 int main()
@@ -366,6 +516,9 @@ int main()
     TestNonInventoryNameDoesNotRead();
     TestIdentifiesCanUse();
     TestIdentifiesAllowRemoteAddWithoutObjectRanges();
+    TestBuildsCopiedInventoryPolicyEventWithoutObjectFields();
+    TestBuildsCopiedInventoryPolicyEventForCanUse();
+    TestDispatchesCopiedInventoryPolicyEventThroughInternalDispatcher();
 
     std::cout << "ProcessEventInventoryReflectionTests passed\n";
     return 0;

@@ -111,3 +111,6 @@ mutation API.
 2. Add an operator runbook for the disabled-by-default structure observation gate.
 3. Schedule controlled debug/development validation only after the recognizer and negative
    gates pass locally and the operator approves the target window.
+4. Keep `StructureEvents` internal-only until `structure-observer-intake` has accepted
+   second-source evidence and the copied-data ownership gate is reflected in tests and
+   release docs.

@@ -48,27 +48,62 @@ metadata.
 - `arkserver` / Ragnarok has carried experimental chat reflection in historical runs. Do
   not add, remove, or rely on that marker for new validation. Current runtime observer
   work belongs only on the currently approved target or a dedicated debug instance;
-  `arkserver2` / TheIsland is an explicit operator-approved fallback while RAM is
-  constrained.
+  current operator direction grants standing use of `arkserver2` / TheIsland for Obelisk
+  debug/development tests when needed.
 - `ReflectionScanner` FName table output must be treated as candidate ranking. Analyzer
   `--strict` requires repeat-confirmed exact `matched_clues=3/3` evidence, and even that
   needs a second isolated capture or static xref before becoming an accepted offset.
-- `FName`/`GObjects`/`UObject`/`UFunction` evidence remains candidate-only until a second
-  isolated core or independent static path validates the same fields. Static xrefs and
-  analyzer evidence are supporting evidence; they are not acceptance by themselves.
+- When the binary-hash-scoped FName root slot is already known for the artifact, do not
+  spend new rounds on broad reverse FName table scans. Reuse the reviewed root slot as an
+  explicit input and abort scan-expansion plans unless the binary hash or artifact
+  evidence contradicts it.
+- `FName`/`GObjects`/`UObject` identity and runtime-global evidence remains candidate-only
+  until a second isolated core or independent static path validates the same fields.
+  UFunction layout evidence is promoted only per target set after a second-source
+  readiness report. Static xrefs and analyzer evidence are supporting evidence; they are
+  not acceptance by themselves.
+- Public/post-callback `ResourceHandle` remains blocked by
+  `uobject_flags_validity_semantics_unproven`: `UObject+0x8` is confirmed only as a 32-bit
+  flags field; helper paths consult `0x100` and `0x4000` after `{index, serial}` validation;
+  accepted samples show `0x81`/`0xc7`/`0xc5`; no rejected sample or exact lifetime semantic
+  is proven.
 - Do not restart `GObjects` work from broad candidate search. Repeat classified checks on a
   second isolated core or future binary before promoting runtime-stable contracts.
+- General/core offline layout promotion has accepted `minimal-second-source-intake`:
+  `PrimalItem.CanUse`, `PrimalItem.AllowRemoteAddToInventory`,
+  `PrimalStructure.AllowStructureAccess`, and `PrimalStructure.IsAllowedToDemolish`.
+  This target set now has accepted offline second-source UFunction layout evidence from
+  `/servidor/ark/workspace-offline/minimal-second-source-intake-direct-20260529T033919Z`
+  with `promotion_gate.ready=true`, empty blockers, and `4/4` accepted targets. Treat it
+  as layout promotion only; it does not promote `GObjects`, `ResourceHandle`, `UObject`
+  identity, mutation, return overrides, raw params, player/item/inventory identity, or
+  public Inventory/StructureEvents SDK surfaces. `dino-compact-intake` is a separate
+  internal-layout result.
 - Module recognizers are active research tracks, not public SDK:
   - `ue/StructureReflection` has a hook-side observer, but it requires env, supported SHA,
     non-zero budget, `state/instances/<id>/allow-experimental-observers`, and
     `state/instances/<id>/enable-structure-reflection`.
+    Its accepted `structure-observer-intake` evidence now backs the public
+    `GameplayPolicyEvent` ABI, but only through copied/redacted POD scalars.
   - `ue/InventoryReflection` is internal recognizer only. A future runtime observer must
     require `allow-experimental-observers`, `enable-inventory-reflection`, exact `CanUse`
     / `AllowRemoteAddToInventory` FName prefiltering before budget reservation, and no
     return override or gameplay mutation.
-  - `ue/BuffReflection` is an offline internal recognizer only. Keep buff hooks,
-    callbacks, return overrides, raw object/class exposure, and gameplay mutation blocked
-    until second-source evidence and SDK policy exist.
+  - `ue/BuffReflection` has accepted `buff-compact-intake` layout evidence for three
+    compact targets, but remains an offline/internal recognizer track only. Keep buff
+    hooks, callbacks, return overrides, raw object/class exposure, and gameplay mutation
+    blocked until SDK policy, copied payload design, runtime gates, and lifecycle tests
+    exist.
+  - `ue/DinoReflection` is allowed only as an internal, fixture-backed compact recognizer
+    for the accepted `dino-compact-intake` layouts
+    (`PrimalDinoCharacter.AddPassenger` and `PrimalDinoCharacter.AllowCarryCharacter`).
+    This is internal layout evidence only; no public Dino SDK/API, runtime observer,
+    object identity, mutation, return override, or resource-handle behavior is promoted.
+  - `mission-compact-intake` and `tribe-compact-intake` now have accepted offline
+    second-source layout evidence. Mission is the next cleaner module candidate after
+    current gameplay policy work; tribe requires a reduced scalar subset before public
+    consideration. Keep player/tribe identity, arrays, strings, object pointers, mutation,
+    return override, and public Mission/Tribe SDK surfaces blocked.
   - Use the same gates for future dinos, tribes, missions, transfers, admin, and item
     recognizers: exact metadata shape, candidate-only fixtures, no mutation, no raw UE
     pointer exposure, and no public callbacks before ABI/lifetime policy.
@@ -131,12 +166,13 @@ Do not skip steps because a single core, log line, or recognizer test looks conv
   ownership, callback lifetime, ABI layout, installed SDK consumer coverage, and runtime
   safety gates are complete.
 - Internal copied-data dispatchers are the required bridge between candidate recognizers
-  and public SDK modules. `core/StructureEventDispatcher` is the current structure example:
-  copy scalar values only through `ProcessEventStructureReflection` event building,
-  dispatch internally only after the original `ProcessEvent` path reports that the original
-  call ran, keep log and internal-dispatch budgets separate, hide object/string/array/raw
-  param storage, keep owner cleanup tested, and do not expose it through the public ABI
-  until the remaining promotion gates are complete.
+  and public SDK modules. `core/StructureEventDispatcher` feeds the promoted
+  `GameplayPolicyEvent` ABI by copying approved scalar values only through
+  `ProcessEventStructureReflection` event building, dispatching only after the original
+  `ProcessEvent` path reports that the original call ran, and hiding object/string/array/
+  raw param storage. Public plugins must receive only `field_mask`, `bool_values`, and
+  `int32_values`; `pinCode`, player identity, object identity, FName/GObjects indices, and
+  UE pointers stay redacted.
 - Use snapshot fixtures and `compare_reflection_snapshots.py` before promoting any
   UFunction or ScriptStruct shape beyond candidate-only.
 - `compare_reflection_snapshots.py --target <Outer.Name>` is offline. It compares
@@ -156,10 +192,10 @@ Do not skip steps because a single core, log line, or recognizer test looks conv
   dispatch public plugin callbacks from candidate evidence.
 - Reserve runtime observation budgets only after cheap exact prefilters pass.
 - On live servers, keep plugin discovery off unless testing a known safe build.
-- Current operator direction as of 2026-05-28 protects `arkserver` / Ragnarok because
-  users are active there. Do not restart it, change markers, or run runtime tests there.
-  `arkserver2` / TheIsland is powered off; if a server is needed, start it only with
-  explicit operator approval and shut it down when the test window ends.
+- Current operator direction protects `arkserver` / Ragnarok because users may be active
+  there. Do not restart it, change markers, or run runtime tests there. `arkserver2` /
+  TheIsland has standing approval for Obelisk debug/development tests when needed; restore
+  stable posture and shut it down when no longer needed.
 - Do not enable raw discovery, broad tracing, native exec probes, ptrace/gcore, or
   `ReflectionScanner` without exact operator approval for that run, copied-log evidence,
   and rollback. Prefer `arkserver2` / TheIsland or `arkserver-obelisk-debug` for

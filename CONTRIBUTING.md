@@ -20,9 +20,8 @@ Open pull requests back to `main`. Keep PRs focused on one subsystem or one
 documentation/research topic. Do not keep long-running integration branches
 unless the team lead explicitly creates one for a release or migration.
 
-Coordinated agent handoff rules live in `docs/agent-handoff/`. Public
-contributor workflow should stay focused on branch scope, validation, and PR
-review.
+Internal coordination notes are separate from the public contributor workflow,
+which should stay focused on branch scope, validation, and PR review.
 
 ## Repository Map
 
@@ -39,7 +38,6 @@ tests/                C++ ABI/runtime/SDK tests and fixtures
 scripts/              Install, validation, and offline reversing tooling
 packaging/            LinuxGSM and harness wrapper templates
 docs/                 Architecture, status, install, release, research notes
-agent-skills/         Operational instructions for coordinated Obelisk agents
 ```
 
 Public plugin contracts live under `include/obelisk/`. ARK/LinuxGSM files are
@@ -89,8 +87,8 @@ scripts/test_install_obelisk_layout.sh
 ## Runtime Testing
 
 Runtime validation requires an operator-approved window for the named instance.
-Do not restart servers, edit `/servidor/ark`, or change markers from a PR unless
-the work explicitly owns live-ops for that window.
+Do not restart servers, edit live server roots, or change markers from a PR
+unless the work explicitly owns live-ops for that window.
 
 For an approved validation target, confirm stable posture with explicit map and instance
 values:
@@ -101,8 +99,8 @@ scripts/check_obelisk_server_posture.sh --expect-stable \
 ```
 
 Experimental debug/scanner work must use explicit env plus instance markers and
-rollback to stable posture. `arkserver2` / TheIsland is powered off by default; use it
-only with explicit operator approval for a scoped test, then shut it down afterward.
+rollback to stable posture. Use only an operator-approved debug or development
+target for a scoped test, then return it to the requested operational state.
 
 ## Commit Style
 
@@ -134,5 +132,5 @@ should answer:
 
 - What subsystem or documentation area changed?
 - Which validation ran, and what was intentionally skipped?
-- Did the change affect live-server safety, research notes, or agent handoff?
+- Did the change affect live-server safety, research notes, or public status docs?
 - Are experimental probes still behind explicit gates?

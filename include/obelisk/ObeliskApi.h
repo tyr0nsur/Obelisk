@@ -12,6 +12,43 @@
 #define OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES (1ull << 3)
 #define OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT (1ull << 4)
 #define OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING (1ull << 5)
+#define OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS (1ull << 6)
+#define OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS (1ull << 7)
+#define OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION 1u
+#define OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION 1u
+#define OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD (1ull << 0)
+#define OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED (1ull << 1)
+#define OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED (1ull << 2)
+#define OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_CATEGORY_ONLY (1ull << 0)
+#define OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY (1ull << 1)
+#define OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP (1ull << 2)
+#define OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACCESS_CHECK (1ull << 0)
+#define OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_DEMOLISH_CHECK (1ull << 1)
+#define OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_VARIANT_CHANGE (1ull << 2)
+#define OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACTIVATION_TOGGLE (1ull << 3)
+#define OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_PIN_CODE_CHECK (1ull << 4)
+#define OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_SEAT_CHECK (1ull << 5)
+#define OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_REMOTE_ADD_CHECK (1ull << 6)
+#define OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK (1ull << 7)
+#define OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES \
+    (OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACCESS_CHECK | \
+     OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_DEMOLISH_CHECK | \
+     OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_VARIANT_CHANGE | \
+     OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACTIVATION_TOGGLE | \
+     OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_PIN_CODE_CHECK | \
+     OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_SEAT_CHECK)
+#define OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY \
+    (OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_REMOTE_ADD_CHECK | \
+     OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK)
+#define OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL \
+    (OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES | \
+     OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY)
+#define OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE (1ull << 0)
+#define OBELISK_GAMEPLAY_POLICY_FIELD_MASK_VARIANT_INDEX (1ull << 1)
+#define OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE_SET (1ull << 2)
+#define OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE (1ull << 3)
+#define OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER (1ull << 4)
+#define OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN (1ull << 5)
 
 #ifdef __cplusplus
 extern "C" {
@@ -28,6 +65,74 @@ extern "C" {
 // Post-process callbacks use the same ABI type, but their return value is ignored; return
 // true from post callbacks for forward compatibility.
 typedef bool (*OnProcessEventCallback)(void* caller, void* function, void* parms);
+
+typedef enum ObeliskGameplayPolicyEventKind {
+    OBELISK_GAMEPLAY_POLICY_EVENT_KIND_UNKNOWN = 0,
+    OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_ACCESS_CHECK = 1,
+    OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_DEMOLISH_CHECK = 2,
+    OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_VARIANT_CHANGE = 3,
+    OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_ACTIVATION_TOGGLE = 4,
+    OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_PIN_CODE_CHECK = 5,
+    OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_SEAT_CHECK = 6,
+    OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK = 7,
+    OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK = 8,
+} ObeliskGameplayPolicyEventKind;
+
+typedef enum ObeliskGameplayPolicyResourceKind {
+    OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_UNKNOWN = 0,
+    OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE = 1,
+    OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM = 2,
+} ObeliskGameplayPolicyResourceKind;
+
+typedef enum ObeliskGameplayPolicyField {
+    OBELISK_GAMEPLAY_POLICY_FIELD_RETURN_VALUE = 0,
+    OBELISK_GAMEPLAY_POLICY_FIELD_VARIANT_INDEX = 1,
+    OBELISK_GAMEPLAY_POLICY_FIELD_FORCE_SET = 2,
+    OBELISK_GAMEPLAY_POLICY_FIELD_FORCE = 3,
+    OBELISK_GAMEPLAY_POLICY_FIELD_REQUESTED_BY_PLAYER = 4,
+    OBELISK_GAMEPLAY_POLICY_FIELD_IGNORE_COOLDOWN = 5,
+    OBELISK_GAMEPLAY_POLICY_FIELD_COUNT = 6,
+} ObeliskGameplayPolicyField;
+
+typedef struct ObeliskGameplayPolicyEvent {
+    uint32_t abi_version;
+    uint32_t struct_size;
+    // ObeliskGameplayPolicyEventKind stored as uint32_t for a fixed C ABI layout.
+    uint32_t event_kind;
+    // ObeliskGameplayPolicyResourceKind stored as uint32_t for a fixed C ABI layout.
+    uint32_t resource_kind;
+    // Flags describe payload ownership and evidence backing.
+    uint64_t flags;
+    // Bitmask of copied scalar fields present in bool_values/int32_values.
+    uint64_t field_mask;
+    // Boolean fields use 1ull << ObeliskGameplayPolicyField.
+    uint64_t bool_values;
+    // Integer fields are indexed by ObeliskGameplayPolicyField.
+    int32_t int32_values[OBELISK_GAMEPLAY_POLICY_FIELD_COUNT];
+} ObeliskGameplayPolicyEvent;
+
+typedef struct ObeliskResourceKindDescriptor {
+    uint32_t abi_version;
+    uint32_t struct_size;
+    // ObeliskGameplayPolicyResourceKind stored as uint32_t for a fixed C ABI layout.
+    uint32_t resource_kind;
+    uint32_t reserved0;
+    // Descriptor flags define what this category is not: identity, lookup, or handle.
+    uint64_t flags;
+    uint64_t supported_gameplay_policy_event_mask;
+    uint64_t supported_gameplay_policy_field_mask;
+    // Stable ASCII identifier for config/routing/log metrics, null-terminated when set.
+    char stable_name[32];
+    // Human-readable ASCII label, null-terminated when set.
+    char display_name[64];
+} ObeliskResourceKindDescriptor;
+
+// Borrowed event data is valid only for the duration of the callback.
+// Gameplay policy events are observational copied POD payloads unless a future
+// append-only API explicitly adds a decision/override contract. This event
+// intentionally exposes no UE4 object pointers, FName/GObjects indices, raw
+// parameter buffers, player identity, secrets, or mutable parameter storage.
+typedef void (*ObeliskGameplayPolicyEventCallback)(const ObeliskGameplayPolicyEvent* event, void* user_data);
 
 typedef struct ObeliskPluginMetadata {
     uint32_t abi_version;
@@ -106,6 +211,23 @@ typedef struct ObeliskApi {
     uint64_t (*RegisterPreProcessEventForNameIndexWithOwnerTokenHandle)(uint64_t ownerToken, int32_t nameIndex, OnProcessEventCallback callback);
     uint64_t (*RegisterPostProcessEventForNameIndexWithOwnerTokenHandle)(uint64_t ownerToken, int32_t nameIndex, OnProcessEventCallback callback);
     bool (*UnregisterProcessEventCallbackWithOwnerToken)(uint64_t ownerToken, uint64_t registrationId);
+
+    // Copied gameplay policy events. Plugins must check struct_size,
+    // OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS, and these function pointers
+    // before use. A return value of 0 means registration was rejected. Non-zero
+    // handles are process-local and must be unregistered with the same owner token.
+    uint64_t (*RegisterGameplayPolicyEventWithOwnerTokenHandle)(
+        uint64_t ownerToken,
+        uint64_t eventKindMask,
+        ObeliskGameplayPolicyEventCallback callback,
+        void* userData);
+    bool (*UnregisterGameplayPolicyEventWithOwnerToken)(uint64_t ownerToken, uint64_t registrationId);
+
+    // Metadata-only resource kind descriptors. This is category information for routing
+    // and plugin capability discovery only; it is not object identity, lookup, persistence,
+    // or a mutable resource API. Callers must initialize out->struct_size to
+    // sizeof(ObeliskResourceKindDescriptor) before use.
+    bool (*DescribeResourceKind)(uint32_t resourceKind, ObeliskResourceKindDescriptor* out);
 } ObeliskApi;
 
 // Plugins must export these functions to be loaded by Obelisk.

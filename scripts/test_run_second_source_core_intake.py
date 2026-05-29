@@ -3,13 +3,37 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import tempfile
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
+from io import StringIO
 from pathlib import Path
+from unittest import mock
+
+import run_second_source_core_intake as intake
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def readiness_report_json(
+    *,
+    target_sets: list[str] | None = None,
+    targets: int = 1,
+    ready: bool = True,
+    blockers: list[dict[str, object]] | None = None,
+) -> str:
+    return json.dumps(
+        {
+            "schema": "obelisk.reflection-snapshot-readiness.v1",
+            "gate_mode": "second_source_promotion",
+            "promotion_gate": {"ready": ready, "blockers": [] if blockers is None else blockers},
+            "target_sets": ["minimal-second-source-intake"] if target_sets is None else target_sets,
+            "totals": {"targets": targets},
+        }
+    ) + "\n"
 
 
 class RunSecondSourceCoreIntakeTests(unittest.TestCase):
@@ -38,16 +62,25 @@ class RunSecondSourceCoreIntakeTests(unittest.TestCase):
         )
 
         self.assertIn("Dry run", result.stdout)
-        self.assertIn("scripts/build_core_dump_evidence_pack.py", result.stdout)
-        self.assertIn("--scan-fname-tables", result.stdout)
-        self.assertIn("--no-default-fname-indices", result.stdout)
-        self.assertIn("--fname-index None=0", result.stdout)
+        self.assertIn("scripts/scan_core_fname_tables.py", result.stdout)
+        self.assertIn("--root-slot 0x1234", result.stdout)
+        self.assertIn("--require-exact-root", result.stdout)
+        self.assertIn("--json-out /tmp/pack/fname-root-validation/core.fname-root-validation.json", result.stdout)
+        self.assertNotIn("--scan-fname-tables", result.stdout)
+        self.assertIn("--output-dir /tmp/pack/gobjects-sampling", result.stdout)
+        self.assertIn("--no-default-candidates", result.stdout)
+        self.assertIn("--no-default-fname-roots", result.stdout)
+        self.assertIn("--no-default-indices", result.stdout)
+        self.assertIn("--index None=0", result.stdout)
         self.assertIn("--fname-root-slot verified_fname_root_slot=0x1234", result.stdout)
         self.assertIn("--gobjects-candidate gobjects=0x595b7e0", result.stdout)
         self.assertIn("--gobjects-sample-index 25447", result.stdout)
         self.assertIn("scripts/regenerate_ufunction_snapshots.py", result.stdout)
+        self.assertIn("--evidence-pack-manifest /tmp/pack/gobjects-sampling/manifest.json", result.stdout)
         self.assertIn("--target-set minimal-second-source-intake", result.stdout)
         self.assertIn("scripts/compare_reflection_snapshots.py", result.stdout)
+        self.assertIn("--readiness-report", result.stdout)
+        self.assertIn("--fail-on-readiness-gaps", result.stdout)
         command_lines = result.stdout.splitlines()[1:]
         self.assertTrue(command_lines)
         self.assertTrue(all("--execute" not in line for line in command_lines))
@@ -73,8 +106,279 @@ class RunSecondSourceCoreIntakeTests(unittest.TestCase):
         )
 
         self.assertNotEqual(result.returncode, 0)
+        self.assertIn("full intake requires these arguments unless --scan-only is used", result.stderr)
         self.assertIn("--verified-fname-root-slot", result.stderr)
         self.assertIn("--gobjects-candidate", result.stderr)
+
+    def test_scan_only_does_not_require_verified_addresses_or_snapshot_root(self) -> None:
+        result = subprocess.run(
+            [
+                "python3",
+                "scripts/run_second_source_core_intake.py",
+                "--binary",
+                "/tmp/ShooterGameServer",
+                "--core",
+                "/tmp/second.core",
+                "--pack-dir",
+                "/tmp/pack",
+                "--scan-only",
+            ],
+            cwd=REPO_ROOT,
+            check=True,
+            text=True,
+            stdout=subprocess.PIPE,
+        )
+
+        self.assertIn("Dry run", result.stdout)
+        self.assertIn("scripts/build_core_dump_evidence_pack.py", result.stdout)
+        self.assertIn("--scan-fname-tables", result.stdout)
+        self.assertNotIn("scripts/regenerate_ufunction_snapshots.py", result.stdout)
+        self.assertNotIn("scripts/compare_reflection_snapshots.py", result.stdout)
+
+    def test_scan_only_rejects_full_intake_arguments(self) -> None:
+        result = subprocess.run(
+            [
+                "python3",
+                "scripts/run_second_source_core_intake.py",
+                "--binary",
+                "/tmp/ShooterGameServer",
+                "--core",
+                "/tmp/second.core",
+                "--pack-dir",
+                "/tmp/pack",
+                "--scan-only",
+                "--gobjects-candidate",
+                "0x595b7e0",
+                "--gobjects-sample-index",
+                "7",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--scan-only cannot be combined with full-intake arguments", result.stderr)
+        self.assertIn("--gobjects-candidate", result.stderr)
+        self.assertIn("--gobjects-sample-index", result.stderr)
+
+    def test_json_plan_emits_structured_review_artifact(self) -> None:
+        result = subprocess.run(
+            [
+                "python3",
+                "scripts/run_second_source_core_intake.py",
+                "--binary",
+                "/tmp/ShooterGameServer",
+                "--core",
+                "/tmp/second.core",
+                "--pack-dir",
+                "/tmp/pack",
+                "--snapshot-root",
+                "/tmp/snapshots",
+                "--verified-fname-root-slot",
+                "0x1234",
+                "--gobjects-candidate",
+                "0x595b7e0",
+                "--json-plan",
+            ],
+            cwd=REPO_ROOT,
+            check=True,
+            text=True,
+            stdout=subprocess.PIPE,
+        )
+
+        plan = json.loads(result.stdout)
+        self.assertEqual(plan["schema"], "obelisk.second-source-core-intake-plan.v1")
+        self.assertEqual(plan["mode"], "full-intake")
+        self.assertFalse(plan["execute"])
+        self.assertEqual(
+            plan["phase_order"],
+            [
+                "fname_root_validation",
+                "gobjects_sampling",
+                "ufunction_snapshot_regeneration",
+                "snapshot_comparison",
+            ],
+        )
+        self.assertEqual(len(plan["commands"]), 4)
+        self.assertEqual(
+            plan["phase_order"],
+            [command["phase"] for command in plan["commands"]],
+        )
+        self.assertEqual(plan["commands"][0]["phase"], "fname_root_validation")
+        self.assertEqual(plan["commands"][-1]["phase"], "snapshot_comparison")
+        self.assertIsNone(plan["phase_output_dirs"]["fname_table_scan"])
+        self.assertEqual(plan["phase_output_dirs"]["fname_root_validation"], "/tmp/pack/fname-root-validation")
+        self.assertEqual(plan["phase_output_dirs"]["gobjects_sampling"], "/tmp/pack/gobjects-sampling")
+        self.assertEqual(plan["phase_output_dirs"]["snapshot_comparison"], "/tmp/pack/snapshot-comparison")
+        self.assertEqual(plan["comparison_report"], "/tmp/pack/snapshot-comparison/readiness-report.json")
+        commands_by_phase = {
+            command["phase"]: command["argv"] for command in plan["commands"]
+        }
+        validation_command = commands_by_phase["fname_root_validation"]
+        sampling_command = commands_by_phase["gobjects_sampling"]
+        self.assertIn("scripts/scan_core_fname_tables.py", validation_command)
+        self.assertIn("--root-slot", validation_command)
+        self.assertIn("--require-exact-root", validation_command)
+        self.assertIn("--json-out", validation_command)
+        self.assertIn("/tmp/pack/fname-root-validation/core.fname-root-validation.json", validation_command)
+        self.assertNotIn("--scan-fname-tables", validation_command)
+        self.assertIn("--no-default-candidates", sampling_command)
+        self.assertIn("--no-default-fname-roots", sampling_command)
+        self.assertNotIn("--no-default-fname-indices", sampling_command)
+        self.assertIn("--readiness-report", plan["commands"][-1]["argv"])
+        self.assertIn("--fail-on-readiness-gaps", plan["commands"][-1]["argv"])
+        self.assertIn("/tmp/pack/gobjects-sampling/manifest.json", commands_by_phase["ufunction_snapshot_regeneration"])
+        self.assertTrue(
+            any(
+                "reviewed artifact-specific FName root" in gate
+                for gate in plan["review_gates"]
+            )
+        )
+        self.assertIn(
+            "offline independent core artifact from the same ARK binary",
+            plan["required_artifact_inputs"],
+        )
+        self.assertIn(
+            "capture_id distinct from the primary-core capture",
+            plan["required_artifact_inputs"],
+        )
+        self.assertIn(
+            "evidence_pack_id distinct from the primary-core evidence pack",
+            plan["required_artifact_inputs"],
+        )
+        self.assertIn(
+            "artifact_kind recorded for both primary and candidate snapshot roots",
+            plan["required_artifact_inputs"],
+        )
+        self.assertIn(
+            "artifact_sha256 distinct from the primary-core artifact",
+            plan["required_artifact_inputs"],
+        )
+        self.assertIn(
+            "missing or partial sanitized artifact identity on either root: artifact_kind, artifact_sha256, capture_id, and evidence_pack_id are all required",
+            plan["promotion_blockers"],
+        )
+        self.assertIn(
+            "matching or reused primary-core artifact_sha256, capture_id, or evidence_pack_id",
+            plan["promotion_blockers"],
+        )
+        self.assertIn(
+            "dry-run or scan-only JSON plan treated as accepted FName or UFunction evidence",
+            plan["promotion_blockers"],
+        )
+        self.assertIn(
+            "FName table scan artifact treated as accepted FName evidence or layout promotion",
+            plan["promotion_blockers"],
+        )
+        self.assertIn(
+            "direct FName root validation missing, failed, or only partially matched",
+            plan["promotion_blockers"],
+        )
+        self.assertIn(
+            "snapshot comparison readiness JSON missing from the executed intake pack",
+            plan["promotion_blockers"],
+        )
+        self.assertIn(
+            "promotion_gate.ready is not true in the readiness report",
+            plan["promotion_blockers"],
+        )
+        self.assertEqual(plan["inputs"]["gobjects_candidate"], "0x595b7e0")
+
+    def test_json_plan_rejects_execute(self) -> None:
+        result = subprocess.run(
+            [
+                "python3",
+                "scripts/run_second_source_core_intake.py",
+                "--binary",
+                "/tmp/ShooterGameServer",
+                "--core",
+                "/tmp/second.core",
+                "--pack-dir",
+                "/tmp/pack",
+                "--snapshot-root",
+                "/tmp/snapshots",
+                "--verified-fname-root-slot",
+                "0x1234",
+                "--gobjects-candidate",
+                "0x595b7e0",
+                "--json-plan",
+                "--execute",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--json-plan is a dry-run review artifact", result.stderr)
+
+    def test_scan_only_json_plan_omits_full_intake_inputs(self) -> None:
+        result = subprocess.run(
+            [
+                "python3",
+                "scripts/run_second_source_core_intake.py",
+                "--binary",
+                "/tmp/ShooterGameServer",
+                "--core",
+                "/tmp/second.core",
+                "--pack-dir",
+                "/tmp/pack",
+                "--scan-only",
+                "--json-plan",
+            ],
+            cwd=REPO_ROOT,
+            check=True,
+            text=True,
+            stdout=subprocess.PIPE,
+        )
+
+        plan = json.loads(result.stdout)
+        self.assertEqual(plan["mode"], "scan-only")
+        self.assertEqual(plan["phase_order"], ["fname_table_scan"])
+        self.assertEqual(len(plan["commands"]), 1)
+        self.assertEqual(
+            plan["phase_order"],
+            [command["phase"] for command in plan["commands"]],
+        )
+        self.assertIsNone(plan["inputs"]["snapshot_root"])
+        self.assertIsNone(plan["inputs"]["target_set"])
+        self.assertIsNone(plan["inputs"]["base_root"])
+        self.assertEqual(plan["phase_output_dirs"]["fname_table_scan"], "/tmp/pack/fname-scan")
+        self.assertIsNone(plan["phase_output_dirs"]["fname_root_validation"])
+        self.assertIsNone(plan["phase_output_dirs"]["gobjects_sampling"])
+        self.assertIsNone(plan["phase_output_dirs"]["snapshot_comparison"])
+        self.assertIsNone(plan["comparison_report"])
+        self.assertEqual(plan["inputs"]["gobjects_sample_indices"], [])
+        self.assertEqual(
+            plan["inputs"]["fname_indices"],
+            ["None=0", "ClientMessage=4884", "ServerChat=9619", "SetActiveMissionDebugFlags=9622"],
+        )
+        self.assertIn(
+            "artifact-specific FName root derived from this core before full intake",
+            plan["required_artifact_inputs"],
+        )
+        self.assertIn(
+            "artifact_kind recorded for both primary and candidate snapshot roots",
+            plan["required_artifact_inputs"],
+        )
+        self.assertIn(
+            "dry-run or scan-only JSON plan treated as accepted FName or UFunction evidence",
+            plan["promotion_blockers"],
+        )
+        self.assertIn(
+            "missing or reused primary-core FName root assumptions",
+            plan["promotion_blockers"],
+        )
+        command = plan["commands"][0]["argv"]
+        self.assertIn("/tmp/pack/fname-scan", command)
+        self.assertIn("--no-default-candidates", command)
+        self.assertIn("--no-default-fname-roots", command)
+        self.assertIn("--no-default-fname-indices", command)
+        self.assertNotIn("--fname-root-slot", command)
+        self.assertNotIn("--gobjects-candidate", command)
 
     def test_custom_target_and_clues_are_preserved(self) -> None:
         result = subprocess.run(
@@ -106,7 +410,7 @@ class RunSecondSourceCoreIntakeTests(unittest.TestCase):
             stdout=subprocess.PIPE,
         )
 
-        self.assertIn("--fname-index None=0", result.stdout)
+        self.assertIn("--index None=0", result.stdout)
         self.assertNotIn("ClientMessage=4884", result.stdout)
         self.assertIn("--gobjects-sample-index 7", result.stdout)
         self.assertNotIn("--gobjects-sample-index 25447", result.stdout)
@@ -174,6 +478,481 @@ class RunSecondSourceCoreIntakeTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("--pack-dir is inside the repository but is not ignored by Git", result.stderr)
+
+    def test_rejects_protected_server_output_roots_even_for_dry_run(self) -> None:
+        for protected_path in ("/servidor/ark", "/servidor/ark/obelisk/second-source-pack"):
+            with self.subTest(protected_path=protected_path):
+                result = subprocess.run(
+                    [
+                        "python3",
+                        "scripts/run_second_source_core_intake.py",
+                        "--binary",
+                        "/tmp/ShooterGameServer",
+                        "--core",
+                        "/tmp/second.core",
+                        "--pack-dir",
+                        protected_path,
+                        "--scan-only",
+                    ],
+                    cwd=REPO_ROOT,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("--pack-dir must not write under protected server root /servidor/ark", result.stderr)
+
+    def test_rejects_protected_server_input_roots_even_for_dry_run(self) -> None:
+        for label, protected_path in (
+            ("--binary", "/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer"),
+            ("--core", "/servidor/ark/serverfiles/core"),
+        ):
+            with self.subTest(label=label):
+                args = [
+                    "python3",
+                    "scripts/run_second_source_core_intake.py",
+                    "--binary",
+                    "/tmp/ShooterGameServer",
+                    "--core",
+                    "/tmp/second.core",
+                    "--pack-dir",
+                    "/tmp/pack",
+                    "--scan-only",
+                ]
+                index = args.index(label)
+                args[index + 1] = protected_path
+                result = subprocess.run(
+                    args,
+                    cwd=REPO_ROOT,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(
+                    f"{label} must not read from protected server root /servidor/ark",
+                    result.stderr,
+                )
+
+    def test_rejects_server_dump_artifact_root_for_dry_run(self) -> None:
+        result = subprocess.run(
+            [
+                "python3",
+                "scripts/run_second_source_core_intake.py",
+                "--binary",
+                "/servidor/ark/obelisk/dumps/second-source/raw/ShooterGameServer",
+                "--core",
+                "/servidor/ark/obelisk/dumps/second-source/raw/core",
+                "--pack-dir",
+                "/servidor/ark/obelisk/dumps/second-source/intake/pack",
+                "--scan-only",
+                "--json-plan",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--binary must not read from protected server root /servidor/ark", result.stderr)
+
+    def test_allows_paths_that_only_share_protected_prefix_text(self) -> None:
+        result = subprocess.run(
+            [
+                "python3",
+                "scripts/run_second_source_core_intake.py",
+                "--binary",
+                "/tmp/ShooterGameServer",
+                "--core",
+                "/tmp/second.core",
+                "--pack-dir",
+                "/servidor/ark-not-live/pack",
+                "--scan-only",
+            ],
+            cwd=REPO_ROOT,
+            check=True,
+            text=True,
+            stdout=subprocess.PIPE,
+        )
+
+        self.assertIn("/servidor/ark-not-live/pack", result.stdout)
+
+    def test_rejects_symlink_textually_under_protected_root_even_when_resolved_outside(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            protected = temp_root / "protected"
+            outside = temp_root / "outside"
+            protected.mkdir()
+            outside.mkdir()
+            linked = protected / "outward-link"
+            linked.symlink_to(outside)
+
+            with mock.patch.object(intake, "PROTECTED_OUTPUT_ROOTS", (protected,)):
+                with self.assertRaises(SystemExit) as output_error:
+                    intake.reject_protected_output_path(str(linked / "pack"), "--pack-dir")
+                with self.assertRaises(SystemExit) as input_error:
+                    intake.reject_protected_input_path(str(linked / "core"), "--core")
+
+        self.assertIn("--pack-dir must not write under protected server root", str(output_error.exception))
+        self.assertIn("--core must not read from protected server root", str(input_error.exception))
+
+    def test_rejects_symlink_resolving_under_protected_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            protected = temp_root / "protected"
+            outside = temp_root / "outside"
+            protected.mkdir()
+            outside.mkdir()
+            linked = outside / "protected-link"
+            linked.symlink_to(protected)
+
+            with mock.patch.object(intake, "PROTECTED_OUTPUT_ROOTS", (protected,)):
+                with self.assertRaises(SystemExit) as output_error:
+                    intake.reject_protected_output_path(str(linked / "pack"), "--pack-dir")
+                with self.assertRaises(SystemExit) as input_error:
+                    intake.reject_protected_input_path(str(linked / "core"), "--core")
+
+        self.assertIn("--pack-dir must not write under protected server root", str(output_error.exception))
+        self.assertIn("--core must not read from protected server root", str(input_error.exception))
+
+    def test_allows_approved_offline_workspace_under_protected_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            protected = temp_root / "protected"
+            workspace = protected / "workspace-offline"
+            workspace.mkdir(parents=True)
+
+            with (
+                mock.patch.object(intake, "PROTECTED_OUTPUT_ROOTS", (protected,)),
+                mock.patch.object(intake, "APPROVED_OFFLINE_WORKSPACE_ROOTS", (workspace,)),
+            ):
+                intake.reject_protected_input_path(str(workspace / "ShooterGameServer"), "--binary")
+                intake.reject_protected_input_path(str(workspace / "core"), "--core")
+                intake.reject_protected_output_path(str(workspace / "pack"), "--pack-dir")
+
+    def test_rejects_protected_snapshot_root_even_for_dry_run(self) -> None:
+        result = subprocess.run(
+            [
+                "python3",
+                "scripts/run_second_source_core_intake.py",
+                "--binary",
+                "/tmp/ShooterGameServer",
+                "--core",
+                "/tmp/second.core",
+                "--pack-dir",
+                "/tmp/pack",
+                "--snapshot-root",
+                "/servidor/ark/obelisk/snapshots",
+                "--verified-fname-root-slot",
+                "0x1234",
+                "--gobjects-candidate",
+                "0x595b7e0",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--snapshot-root must not write under protected server root /servidor/ark", result.stderr)
+
+    def test_rejects_protected_base_root_even_for_dry_run(self) -> None:
+        result = subprocess.run(
+            [
+                "python3",
+                "scripts/run_second_source_core_intake.py",
+                "--binary",
+                "/tmp/ShooterGameServer",
+                "--core",
+                "/tmp/second.core",
+                "--pack-dir",
+                "/tmp/pack",
+                "--snapshot-root",
+                "/tmp/snapshots",
+                "--verified-fname-root-slot",
+                "0x1234",
+                "--gobjects-candidate",
+                "0x595b7e0",
+                "--base-root",
+                "/servidor/ark/obelisk/snapshots",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--base-root must not read from protected server root /servidor/ark", result.stderr)
+
+    def test_rejects_unknown_target_set_before_planning(self) -> None:
+        result = subprocess.run(
+            [
+                "python3",
+                "scripts/run_second_source_core_intake.py",
+                "--binary",
+                "/tmp/ShooterGameServer",
+                "--core",
+                "/tmp/second.core",
+                "--pack-dir",
+                "/tmp/pack",
+                "--snapshot-root",
+                "/tmp/snapshots",
+                "--verified-fname-root-slot",
+                "0x1234",
+                "--gobjects-candidate",
+                "0x595b7e0",
+                "--target-set",
+                "missing-target-set",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--target-set must be one of:", result.stderr)
+        self.assertIn("minimal-second-source-intake", result.stderr)
+
+    def test_rejects_target_set_without_ufunction_targets(self) -> None:
+        result = subprocess.run(
+            [
+                "python3",
+                "scripts/run_second_source_core_intake.py",
+                "--binary",
+                "/tmp/ShooterGameServer",
+                "--core",
+                "/tmp/second.core",
+                "--pack-dir",
+                "/tmp/pack",
+                "--snapshot-root",
+                "/tmp/snapshots",
+                "--verified-fname-root-slot",
+                "0x1234",
+                "--gobjects-candidate",
+                "0x595b7e0",
+                "--target-set",
+                "transfer-scriptstruct",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("has no UFunction snapshot targets", result.stderr)
+
+    def test_rejects_labeled_verified_artifact_addresses_before_planning(self) -> None:
+        for label, option, value in (
+            ("--verified-fname-root-slot", "--verified-fname-root-slot", "fname=0x1234"),
+            ("--gobjects-candidate", "--gobjects-candidate", "gobjects=0x595b7e0"),
+        ):
+            with self.subTest(label=label):
+                args = [
+                    "python3",
+                    "scripts/run_second_source_core_intake.py",
+                    "--binary",
+                    "/tmp/ShooterGameServer",
+                    "--core",
+                    "/tmp/second.core",
+                    "--pack-dir",
+                    "/tmp/pack",
+                    "--snapshot-root",
+                    "/tmp/snapshots",
+                    "--verified-fname-root-slot",
+                    "0x1234",
+                    "--gobjects-candidate",
+                    "0x595b7e0",
+                ]
+                args[args.index(option) + 1] = value
+                result = subprocess.run(
+                    args,
+                    cwd=REPO_ROOT,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(f"{option} expects a raw address", result.stderr)
+
+    def test_rejects_malformed_intake_clues_before_planning(self) -> None:
+        for option, value, expected in (
+            ("--fname-index", "BadName=not-an-int", "--fname-index must be an integer/address"),
+            ("--fname-index", "=7", "--fname-index label must not be empty"),
+            ("--gobjects-sample-index", "-1", "--gobjects-sample-index must be non-negative"),
+        ):
+            with self.subTest(option=option, value=value):
+                result = subprocess.run(
+                    [
+                        "python3",
+                        "scripts/run_second_source_core_intake.py",
+                        "--binary",
+                        "/tmp/ShooterGameServer",
+                        "--core",
+                        "/tmp/second.core",
+                        "--pack-dir",
+                        "/tmp/pack",
+                        "--snapshot-root",
+                        "/tmp/snapshots",
+                        "--verified-fname-root-slot",
+                        "0x1234",
+                        "--gobjects-candidate",
+                        "0x595b7e0",
+                        option,
+                        value,
+                    ],
+                    cwd=REPO_ROOT,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(expected, result.stderr)
+
+    def test_execute_persists_snapshot_comparison_stdout_even_when_gate_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            args = type("Args", (), {"scan_only": False, "pack_dir": str(root / "pack")})()
+            commands = [
+                ["python3", "scan.py"],
+                ["python3", "sample.py"],
+                ["python3", "regen.py"],
+                ["python3", "compare.py", "--target-set", "minimal-second-source-intake"],
+            ]
+            results = [
+                subprocess.CompletedProcess(commands[0], 0),
+                subprocess.CompletedProcess(commands[1], 0),
+                subprocess.CompletedProcess(commands[2], 0),
+                subprocess.CompletedProcess(
+                    commands[3],
+                    2,
+                    stdout='{"promotion_gate":{"ready":false}}\n',
+                    stderr="missing_second_source\n",
+                ),
+            ]
+
+            with mock.patch.object(intake.subprocess, "run", side_effect=results):
+                with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                    return_code = intake.run_commands(args, commands)
+
+            report = root / "pack" / "snapshot-comparison" / "readiness-report.json"
+            stderr = root / "pack" / "snapshot-comparison" / "readiness-report.stderr.txt"
+            self.assertEqual(return_code, 2)
+            self.assertEqual(report.read_text(encoding="utf-8"), '{"promotion_gate":{"ready":false}}\n')
+            self.assertIn("missing_second_source\n", stderr.read_text(encoding="utf-8"))
+            self.assertIn(
+                "snapshot comparison readiness validation failed",
+                stderr.read_text(encoding="utf-8"),
+            )
+
+    def test_execute_rejects_minimal_false_success_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            args = type("Args", (), {"scan_only": False, "pack_dir": str(root / "pack")})()
+            commands = [
+                ["python3", "scan.py"],
+                ["python3", "sample.py"],
+                ["python3", "regen.py"],
+                ["python3", "compare.py", "--target-set", "minimal-second-source-intake"],
+            ]
+            results = [
+                subprocess.CompletedProcess(commands[0], 0),
+                subprocess.CompletedProcess(commands[1], 0),
+                subprocess.CompletedProcess(commands[2], 0),
+                subprocess.CompletedProcess(
+                    commands[3],
+                    0,
+                    stdout='{"promotion_gate":{"ready":true}}\n',
+                    stderr="",
+                ),
+            ]
+
+            with mock.patch.object(intake.subprocess, "run", side_effect=results):
+                with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                    return_code = intake.run_commands(args, commands)
+
+            report = root / "pack" / "snapshot-comparison" / "readiness-report.json"
+            stderr = root / "pack" / "snapshot-comparison" / "readiness-report.stderr.txt"
+            self.assertEqual(return_code, 1)
+            self.assertEqual(report.read_text(encoding="utf-8"), '{"promotion_gate":{"ready":true}}\n')
+            self.assertIn(
+                "schema must be obelisk.reflection-snapshot-readiness.v1",
+                stderr.read_text(encoding="utf-8"),
+            )
+
+    def test_execute_persists_snapshot_comparison_stdout_on_valid_success(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            args = type("Args", (), {"scan_only": False, "pack_dir": str(root / "pack")})()
+            commands = [
+                ["python3", "scan.py"],
+                ["python3", "sample.py"],
+                ["python3", "regen.py"],
+                ["python3", "compare.py", "--target-set", "minimal-second-source-intake"],
+            ]
+            report_json = readiness_report_json()
+            results = [
+                subprocess.CompletedProcess(commands[0], 0),
+                subprocess.CompletedProcess(commands[1], 0),
+                subprocess.CompletedProcess(commands[2], 0),
+                subprocess.CompletedProcess(
+                    commands[3],
+                    0,
+                    stdout=report_json,
+                    stderr="",
+                ),
+            ]
+
+            with mock.patch.object(intake.subprocess, "run", side_effect=results):
+                with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                    return_code = intake.run_commands(args, commands)
+
+            report = root / "pack" / "snapshot-comparison" / "readiness-report.json"
+            stderr = root / "pack" / "snapshot-comparison" / "readiness-report.stderr.txt"
+            self.assertEqual(return_code, 0)
+            self.assertEqual(report.read_text(encoding="utf-8"), report_json)
+            self.assertFalse(stderr.exists())
+
+    def test_execute_rejects_success_json_missing_command_target_set(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            args = type("Args", (), {"scan_only": False, "pack_dir": str(root / "pack")})()
+            commands = [
+                ["python3", "scan.py"],
+                ["python3", "sample.py"],
+                ["python3", "regen.py"],
+                ["python3", "compare.py", "--target-set", "minimal-second-source-intake"],
+            ]
+            results = [
+                subprocess.CompletedProcess(commands[0], 0),
+                subprocess.CompletedProcess(commands[1], 0),
+                subprocess.CompletedProcess(commands[2], 0),
+                subprocess.CompletedProcess(
+                    commands[3],
+                    0,
+                    stdout=readiness_report_json(target_sets=["structure-observer-intake"]),
+                    stderr="",
+                ),
+            ]
+
+            with mock.patch.object(intake.subprocess, "run", side_effect=results):
+                with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                    return_code = intake.run_commands(args, commands)
+
+            stderr = root / "pack" / "snapshot-comparison" / "readiness-report.stderr.txt"
+            self.assertEqual(return_code, 1)
+            self.assertIn(
+                "target_sets missing expected command target set(s): minimal-second-source-intake",
+                stderr.read_text(encoding="utf-8"),
+            )
 
 
 if __name__ == "__main__":

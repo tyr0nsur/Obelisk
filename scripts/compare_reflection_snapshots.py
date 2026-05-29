@@ -41,6 +41,8 @@ EVIDENCE_ARTIFACT_IDENTITY_KEYS = (
     "evidence_pack_id",
 )
 ALLOWED_ARTIFACT_KINDS = {"offline_core"}
+PROTECTED_SERVER_ROOT = Path("/servidor/ark")
+APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
 
 
 def parse_args() -> argparse.Namespace:
@@ -125,6 +127,31 @@ def validate_target_filters(filters: set[str]) -> None:
             raise SystemExit(f"schema-qualified target filter missing target: {target}")
 
 
+def is_under_path(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+        return True
+    except ValueError:
+        return False
+
+
+def is_approved_offline_workspace_path(path: Path) -> bool:
+    resolved = path.resolve()
+    return any(is_under_path(resolved, root.resolve()) for root in APPROVED_OFFLINE_WORKSPACE_ROOTS)
+
+
+def reject_protected_input_path(label: str, path: Path) -> None:
+    expanded = path.expanduser()
+    direct = expanded.absolute()
+    resolved = expanded.resolve()
+    direct_protected = PROTECTED_SERVER_ROOT.absolute()
+    protected = PROTECTED_SERVER_ROOT.resolve()
+    if is_under_path(direct, direct_protected) and not is_approved_offline_workspace_path(expanded):
+        raise SystemExit(f"{label} must not read from protected live-server path: {path}")
+    if is_under_path(resolved, protected) and not is_approved_offline_workspace_path(resolved):
+        raise SystemExit(f"{label} must not read from protected live-server path: {path}")
+
+
 def target_set_report() -> dict[str, Any]:
     return {
         "schema": "obelisk.reflection-snapshot-target-sets.v1",
@@ -136,14 +163,23 @@ def target_set_report() -> dict[str, Any]:
 
 
 def snapshot_paths(root: Path) -> list[Path]:
+    reject_protected_input_path("snapshot root", root)
+    if root.is_symlink():
+        reject_protected_input_path("snapshot", root)
     if root.is_file():
         return [root]
     if not root.exists():
         raise SystemExit(f"snapshot root does not exist: {root}")
-    return sorted(path for path in root.rglob("*.snapshot.json") if path.is_file())
+    paths = []
+    for path in root.rglob("*.snapshot.json"):
+        reject_protected_input_path("snapshot", path)
+        if path.is_file():
+            paths.append(path)
+    return sorted(paths)
 
 
 def load_snapshot(path: Path) -> dict[str, Any]:
+    reject_protected_input_path("snapshot", path)
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
@@ -315,7 +351,7 @@ def evidence_reasons(payload: dict[str, Any]) -> list[str]:
     if evidence.get("status") != "candidate-only":
         reasons.append(f"evidence_status_{evidence.get('status')}")
     generated_by = evidence.get("generated_by")
-    if generated_by is not None and generated_by != "scripts/inspect_core_ufunctions.py --snapshot-json":
+    if generated_by != "scripts/inspect_core_ufunctions.py --snapshot-json":
         reasons.append(f"evidence_generated_by_{generated_by}")
     return reasons
 
@@ -726,11 +762,20 @@ def print_text(report: dict[str, Any]) -> None:
         totals = report["totals"]
         print(
             "readiness targets={targets} comparable={comparable} blocked={blocked} "
-            "second_source_status={second_source_status}".format(
+            "second_source_status={second_source_status} gate_mode={gate_mode}".format(
                 second_source_status=report["second_source_status"],
+                gate_mode=report.get("gate_mode", "unknown"),
                 **totals,
             )
         )
+        promotion_gate = report["promotion_gate"]
+        blocker_reasons = [
+            f"{blocker.get('reason')}:{blocker.get('count')}"
+            for blocker in promotion_gate.get("blockers", [])
+            if isinstance(blocker, dict)
+        ]
+        blockers = ",".join(blocker_reasons) if blocker_reasons else "none"
+        print(f"promotion_gate ready={str(promotion_gate['ready']).lower()} blockers={blockers}")
         for module in report["modules"]:
             second_source = module["second_source"]
             print(
@@ -785,6 +830,36 @@ def print_text(report: dict[str, Any]) -> None:
         print(line)
 
 
+def apply_readiness_gate_mode(report: dict[str, Any]) -> None:
+    if report.get("schema") != "obelisk.reflection-snapshot-readiness.v1":
+        return
+    if report.get("gate_mode") == "second_source_promotion":
+        return
+    promotion_gate = report.get("promotion_gate")
+    if not isinstance(promotion_gate, dict) or not promotion_gate.get("ready"):
+        return
+    promotion_gate["ready"] = False
+    blockers = promotion_gate.setdefault("blockers", [])
+    if isinstance(blockers, list):
+        blockers.append({"reason": "not_second_source_promotion_gate", "count": 1})
+
+
+def require_target_set_for_promotion(report: dict[str, Any], target_sets: list[str]) -> None:
+    if report.get("schema") != "obelisk.reflection-snapshot-readiness.v1":
+        return
+    if report.get("gate_mode") != "second_source_promotion":
+        return
+    if target_sets:
+        return
+    promotion_gate = report.get("promotion_gate")
+    if not isinstance(promotion_gate, dict):
+        return
+    promotion_gate["ready"] = False
+    blockers = promotion_gate.setdefault("blockers", [])
+    if isinstance(blockers, list):
+        blockers.append({"reason": "promotion_requires_target_set", "count": 1})
+
+
 def main() -> int:
     args = parse_args()
     if args.list_target_sets:
@@ -797,6 +872,11 @@ def main() -> int:
 
     if args.base_root is None:
         raise SystemExit("--base-root is required unless --list-target-sets is used")
+    if args.fail_on_readiness_gaps and args.allow_ark_sha_mismatch:
+        raise SystemExit("--allow-ark-sha-mismatch is incompatible with --fail-on-readiness-gaps")
+    reject_protected_input_path("--base-root", args.base_root)
+    if args.candidate_root:
+        reject_protected_input_path("--candidate-root", args.candidate_root)
     base = load_snapshot_set(args.base_root)
     candidate = load_snapshot_set(args.candidate_root) if args.candidate_root else None
     target_filters = expand_target_filters(args.target, args.target_set)
@@ -808,6 +888,14 @@ def main() -> int:
             target_filters=target_filters,
             candidate=candidate,
         )
+        if args.fail_on_readiness_gaps:
+            report["gate_mode"] = "second_source_promotion"
+        elif args.fail_on_base_readiness_gaps:
+            report["gate_mode"] = "base_fixture_readiness"
+        else:
+            report["gate_mode"] = "informational_gap_report"
+        apply_readiness_gate_mode(report)
+        require_target_set_for_promotion(report, args.target_set)
     else:
         if candidate is None:
             raise SystemExit("--candidate-root is required unless --readiness-report is used")
@@ -836,10 +924,14 @@ def main() -> int:
                 return 1
             if totals["second_source_inconclusive"] or totals["second_source_missing"]:
                 return 2
+            if not report["promotion_gate"].get("ready"):
+                return 1
         return 0
     if report["counts"]["rejected"]:
         return 1
     if report["counts"]["inconclusive"]:
+        return 2
+    if sum(report["counts"].values()) == 0:
         return 2
     return 0
 

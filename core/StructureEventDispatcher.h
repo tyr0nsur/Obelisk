@@ -54,6 +54,7 @@ namespace Obelisk::Core
     {
         StructureEventCallback Callback = nullptr;
         void* UserData = nullptr;
+        void (*DestroyUserData)(void*) = nullptr;
     };
 
     class StructureEventDispatcher
@@ -63,6 +64,7 @@ namespace Obelisk::Core
 
         uint64_t Register(void* owner, const StructureEventSubscription& subscription);
         bool Unregister(uint64_t registrationId);
+        bool UnregisterCallbackForOwner(void* owner, uint64_t registrationId);
         size_t UnregisterCallbacksForOwner(void* owner);
         void SetNextRegistrationIdForTesting(uint64_t nextRegistrationId);
 
@@ -79,6 +81,7 @@ namespace Obelisk::Core
 
         uint64_t AllocateRegistrationId();
         bool HasRegistrationId(uint64_t registrationId) const;
+        bool IsRegistrationActive(uint64_t registrationId) const;
 
         mutable std::mutex m_Mutex;
         std::recursive_mutex m_DispatchMutex;

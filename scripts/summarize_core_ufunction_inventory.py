@@ -19,11 +19,20 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 import enumerate_core_uobjects as uobjects  # noqa: E402
+import reflection_target_sets  # noqa: E402
 import verify_chat_reflection_constants as verifier  # noqa: E402
+from snapshot_evidence_pack import reject_protected_input_path  # noqa: E402
 
 
 DEFAULT_MAX_OBJECTS = 30000
 MAX_SAMPLES_PER_GROUP = 8
+DEFAULT_SNAPSHOT_MANIFEST = Path("tests/fixtures/ufunction_snapshots/manifest.json")
+REGENERATOR_SCRIPT = "scripts/regenerate_ufunction_snapshots.py"
+UFUNCTION_TARGET_SETS = sorted(
+    name
+    for name in reflection_target_sets.TARGET_SETS
+    if reflection_target_sets.schema_targets(name, "obelisk.ufunction-chain.snapshot.v1")
+)
 
 
 def parse_int(value: str) -> int:
@@ -106,6 +115,200 @@ def summarize_functions(functions: list[dict[str, object]], *, max_groups: int) 
             {"outer_class_name": key, "count": value} for key, value in class_counts.most_common(max_groups)
         ],
         "outer_groups": top_outer_groups,
+    }
+
+
+def function_key(item: dict[str, object]) -> str:
+    outer = str(item.get("outer_name") or "")
+    name = str(item.get("name") or "")
+    return f"{outer}.{name}" if outer and name else ""
+
+
+def load_snapshot_manifest(path: Path) -> dict[str, object]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if payload.get("schema") != "obelisk.ufunction-snapshot-manifest.v1":
+        raise SystemExit(f"{path}: unsupported UFunction snapshot manifest schema")
+    if payload.get("source") != "offline_core":
+        raise SystemExit(f"{path}: source must be offline_core")
+    if payload.get("status") != "candidate-only":
+        raise SystemExit(f"{path}: status must be candidate-only")
+    entries = payload.get("targets")
+    if not isinstance(entries, list):
+        raise SystemExit(f"{path}: manifest targets must be a list")
+    return payload
+
+
+def snapshot_manifest_targets(manifest: dict[str, object]) -> dict[str, dict[str, object]]:
+    targets: dict[str, dict[str, object]] = {}
+    entries = manifest.get("targets")
+    if not isinstance(entries, list):
+        raise SystemExit("snapshot manifest targets must be a list")
+    for raw_entry in entries:
+        if not isinstance(raw_entry, dict):
+            raise SystemExit("snapshot manifest targets must be objects")
+        outer = raw_entry.get("outer")
+        name = raw_entry.get("name")
+        if not isinstance(outer, str) or not isinstance(name, str) or not outer or not name:
+            raise SystemExit("snapshot manifest target missing outer/name")
+        key = f"{outer}.{name}"
+        if key in targets:
+            raise SystemExit(f"duplicate snapshot manifest target: {key}")
+        targets[key] = raw_entry
+    return targets
+
+
+def suggested_manifest_entry(target: str) -> dict[str, object]:
+    outer, _, name = target.partition(".")
+    return {
+        "module": "sdk_candidates",
+        "outer": outer,
+        "name": name,
+        "file": f"{target}.snapshot.json",
+    }
+
+
+def target_set_regeneration_plan(
+    functions: list[dict[str, object]],
+    *,
+    target_sets: list[str],
+    snapshot_manifest: dict[str, object],
+    snapshot_manifest_path: Path,
+    core: Path,
+    gobjects: int,
+    fname_root_slot: int,
+    evidence_pack_manifest: Path | None = None,
+) -> dict[str, object]:
+    requested_targets = sorted(
+        reflection_target_sets.expand_schema_target_sets(target_sets, "obelisk.ufunction-chain.snapshot.v1")
+    )
+    manifest_targets = snapshot_manifest_targets(snapshot_manifest)
+    inventory_by_key: dict[str, list[dict[str, object]]] = {}
+    for item in functions:
+        key = function_key(item)
+        if key in requested_targets:
+            inventory_by_key.setdefault(key, []).append(item)
+
+    targets: list[dict[str, object]] = []
+    blocked: list[dict[str, object]] = []
+    commands: list[dict[str, object]] = []
+    recommendations: list[dict[str, object]] = []
+
+    for target in requested_targets:
+        inventory_matches = inventory_by_key.get(target, [])
+        manifest_entry = manifest_targets.get(target)
+        if not inventory_matches:
+            inventory_status = "missing"
+        elif len(inventory_matches) == 1:
+            inventory_status = "present"
+        else:
+            inventory_status = "ambiguous"
+        manifest_status = "present" if manifest_entry else "missing"
+
+        record: dict[str, object] = {
+            "target": target,
+            "inventory_status": inventory_status,
+            "inventory_match_count": len(inventory_matches),
+            "manifest_status": manifest_status,
+            "status": "planned",
+        }
+        if inventory_status == "ambiguous":
+            record["status"] = "blocked"
+            record["blocker"] = "ambiguous_inventory_target"
+            blocked.append({"target": target, "reason": "ambiguous_inventory_target"})
+        elif inventory_status == "missing":
+            record["status"] = "blocked"
+            record["blocker"] = "missing_inventory_target"
+            blocked.append({"target": target, "reason": "missing_inventory_target"})
+        elif manifest_entry is None:
+            record["status"] = "needs_manifest_entry_review"
+            recommendation = suggested_manifest_entry(target)
+            record["candidate_manifest_entry"] = recommendation
+            recommendations.append({"target": target, "entry": recommendation})
+        else:
+            command = [
+                sys.executable,
+                REGENERATOR_SCRIPT,
+                "--core",
+                str(core),
+                "--manifest",
+                str(snapshot_manifest_path),
+                "--target",
+                target,
+            ]
+            if evidence_pack_manifest is not None:
+                command.extend(["--evidence-pack-manifest", str(evidence_pack_manifest)])
+            else:
+                command.extend(["--gobjects", hex(gobjects), "--fname-root-slot", hex(fname_root_slot)])
+            record["regenerate_command"] = command
+            commands.append({"target": target, "argv": command})
+        targets.append(record)
+
+    return {
+        "schema": "obelisk.ufunction-target-set-regeneration-plan.v1",
+        "target_sets": target_sets,
+        "snapshot_manifest": str(snapshot_manifest_path),
+        "core": str(core),
+        "evidence_pack_manifest": str(evidence_pack_manifest) if evidence_pack_manifest else None,
+        "gobjects": hex(gobjects),
+        "fname_root_slot": hex(fname_root_slot),
+        "requested_count": len(requested_targets),
+        "planned_command_count": len(commands),
+        "recommendation_count": len(recommendations),
+        "blocked_count": len(blocked),
+        "targets": targets,
+        "regenerate_commands": commands,
+        "candidate_manifest_recommendations": recommendations,
+        "blockers": blocked,
+        "promotion_status": "not_promoted_candidate_only",
+    }
+
+
+def target_set_coverage(
+    functions: list[dict[str, object]],
+    *,
+    target_sets: list[str],
+    max_samples: int = MAX_SAMPLES_PER_GROUP,
+) -> dict[str, object]:
+    if not target_sets:
+        return {}
+
+    requested_targets = sorted(
+        reflection_target_sets.expand_schema_target_sets(target_sets, "obelisk.ufunction-chain.snapshot.v1")
+    )
+    requested = set(requested_targets)
+    by_key: dict[str, list[dict[str, object]]] = {}
+    unassigned_samples: list[dict[str, object]] = []
+    unassigned_count = 0
+
+    for item in functions:
+        key = function_key(item)
+        if key in requested:
+            by_key.setdefault(key, []).append(item)
+        else:
+            unassigned_count += 1
+            if len(unassigned_samples) < max_samples:
+                unassigned_samples.append(item)
+
+    matched = {
+        key: {
+            "count": len(items),
+            "samples": items[:max_samples],
+        }
+        for key, items in sorted(by_key.items())
+    }
+    missing = [target for target in requested_targets if target not in matched]
+
+    return {
+        "schema": "obelisk.ufunction-inventory-target-set-coverage.v1",
+        "target_sets": target_sets,
+        "requested_targets": requested_targets,
+        "requested_count": len(requested_targets),
+        "matched_count": len(matched),
+        "missing_count": len(missing),
+        "missing_targets": missing,
+        "matched_targets": matched,
+        "unassigned_function_count": unassigned_count,
+        "unassigned_samples": unassigned_samples,
     }
 
 
@@ -209,6 +412,26 @@ def format_text(payload: dict[str, object]) -> str:
                     **sample
                 )
             )
+    coverage = payload.get("target_set_coverage")
+    if isinstance(coverage, dict):
+        lines.append(
+            "target_sets={target_sets} requested={requested_count} matched={matched_count} "
+            "missing={missing_count} unassigned={unassigned_function_count}".format(**coverage)
+        )
+        for target in coverage.get("missing_targets", []):
+            lines.append(f"  missing={target}")
+    plan = payload.get("target_set_regeneration_plan")
+    if isinstance(plan, dict):
+        lines.append(
+            "regeneration_plan requested={requested_count} commands={planned_command_count} "
+            "recommendations={recommendation_count} blocked={blocked_count}".format(**plan)
+        )
+        for target in plan.get("targets", []):
+            if isinstance(target, dict):
+                lines.append(
+                    "  target={target} inventory={inventory_status} manifest={manifest_status} "
+                    "status={status}".format(**target)
+                )
     return "\n".join(lines)
 
 
@@ -231,8 +454,41 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Include the filtered function rows in JSON output for focused offline review.",
     )
+    parser.add_argument(
+        "--target-set",
+        action="append",
+        choices=UFUNCTION_TARGET_SETS,
+        default=[],
+        help="Report coverage against a named UFunction target set.",
+    )
+    parser.add_argument(
+        "--plan-regeneration",
+        action="store_true",
+        help="Emit a dry-run target-set regeneration plan. Requires --target-set.",
+    )
+    parser.add_argument(
+        "--snapshot-manifest",
+        type=Path,
+        default=DEFAULT_SNAPSHOT_MANIFEST,
+        help="Candidate-only UFunction snapshot manifest used by --plan-regeneration.",
+    )
     parser.add_argument("--json", action="store_true")
     return parser.parse_args()
+
+
+def reject_evidence_pack_manifest_paths(path: Path) -> None:
+    reject_protected_input_path(path, "--evidence-pack")
+    manifest_path = path / "manifest.json" if path.is_dir() else path
+    reject_protected_input_path(manifest_path, "--evidence-pack")
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise SystemExit(f"{manifest_path}: evidence pack manifest must be a JSON object")
+    core = payload.get("core")
+    if isinstance(core, dict) and isinstance(core.get("path"), str):
+        reject_protected_input_path(Path(str(core["path"])), f"{manifest_path}: evidence pack core.path")
+    binary = payload.get("binary")
+    if isinstance(binary, dict) and isinstance(binary.get("path"), str):
+        reject_protected_input_path(Path(str(binary["path"])), f"{manifest_path}: evidence pack binary.path")
 
 
 def main() -> int:
@@ -247,16 +503,26 @@ def main() -> int:
         raise SystemExit("--max-params must be non-negative")
     if args.min_params is not None and args.max_params is not None and args.min_params > args.max_params:
         raise SystemExit("--min-params must be less than or equal to --max-params")
+    if args.plan_regeneration and not args.target_set:
+        raise SystemExit("--plan-regeneration requires at least one --target-set")
+    if args.core is not None:
+        reject_protected_input_path(args.core, "--core")
+    if args.evidence_pack is not None:
+        reject_evidence_pack_manifest_paths(args.evidence_pack)
+    if args.plan_regeneration:
+        reject_protected_input_path(args.snapshot_manifest, "--snapshot-manifest")
 
     core = args.core
     gobjects = args.gobjects
     fname_root_slot = args.fname_root_slot
     evidence_pack_payload: dict[str, object] | None = None
+    evidence_pack_manifest_path: Path | None = None
     if args.evidence_pack:
         pack = verifier.load_evidence_pack(args.evidence_pack)
         core = pack.core
         gobjects = pack.gobjects
         fname_root_slot = pack.fname_root_slot
+        evidence_pack_manifest_path = pack.manifest_path
         evidence_pack_payload = {
             "manifest": str(pack.manifest_path),
             "binary_sha256": pack.binary_sha256,
@@ -290,6 +556,21 @@ def main() -> int:
         "unfiltered_function_count": len(functions),
         "summary": summarize_functions(filtered_functions, max_groups=args.max_groups),
     }
+    coverage = target_set_coverage(functions, target_sets=args.target_set)
+    if coverage:
+        payload["target_set_coverage"] = coverage
+    if args.plan_regeneration:
+        snapshot_manifest = load_snapshot_manifest(args.snapshot_manifest)
+        payload["target_set_regeneration_plan"] = target_set_regeneration_plan(
+            functions,
+            target_sets=args.target_set,
+            snapshot_manifest=snapshot_manifest,
+            snapshot_manifest_path=args.snapshot_manifest,
+            core=core,
+            gobjects=gobjects,
+            fname_root_slot=fname_root_slot,
+            evidence_pack_manifest=evidence_pack_manifest_path,
+        )
     if evidence_pack_payload:
         payload["evidence_pack"] = evidence_pack_payload
     if args.include_functions:

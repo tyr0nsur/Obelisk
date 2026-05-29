@@ -45,6 +45,16 @@ add_test(
 )
 
 add_test(
+    NAME SdkConsumerFixtureSkipsGameplayPolicyWithoutCapability
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:sdk_consumer_minimal_plugin>" sdk_consumer_minimal no-gameplay-policy-capability
+)
+
+add_test(
+    NAME SdkConsumerFixtureRejectsZeroOwnerToken
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:sdk_consumer_minimal_plugin>" sdk_consumer_minimal zero-owner-token
+)
+
+add_test(
     NAME SdkConsumerFixtureNoShutdown
     COMMAND sdk_consumer_fixture "$<TARGET_FILE:sdk_consumer_minimal_no_shutdown_plugin>"
 )

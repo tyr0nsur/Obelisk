@@ -34,6 +34,20 @@ registration, and any SDK surface that a `.so` will consume.
   runtime must reject it unless `OBELISK_ALLOW_CALL_PROCESS_EVENT=1` and the per-instance
   marker `allow-call-process-event` are active. Plugins must check
   `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT` before treating it as available.
+- `GameplayPolicyEvent` is the first promoted gameplay callback family. Plugins must check
+  `OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS`, `struct_size`, a non-zero
+  `plugin_owner_token`, an event-kind mask, and non-null register/unregister function
+  pointers before using it. The payload is copied POD only: `event_kind`, `resource_kind`,
+  `flags`, `field_mask`, `bool_values`, and `int32_values`. Do not expose `UObject`,
+  `UFunction`, `FString`, raw params, FName/GObjects indices, player/object identity, or
+  pincode values through this ABI.
+- In v0.1, `resource_kind` is categorical only. It is not a resource identity, lookup
+  handle, persistent ID, or proof that two events refer to the same game object. Do not add
+  `GetResource`, `ResolveResource`, `ResourceHandle`, pointer-derived IDs, GObjects-derived
+  IDs, coordinates, owner tribe/player IDs, or mutation APIs without a new promotion gate.
+- `DescribeResourceKind` is metadata-only. It may return copied POD category descriptors,
+  supported event/field masks, and explicit no-identity/no-lookup flags. It must not
+  resolve objects, expose handles, or imply cross-event/cross-instance identity.
 - Plugins may optionally export `extern "C" void ObeliskPlugin_Shutdown()`. The runtime
   resolves it with `dlsym` outside the `ObeliskApi` table and calls it before callback
   owner cleanup and before `dlclose`.
@@ -112,9 +126,10 @@ Validation rules:
   path and should be rare, measured, and disabled by default for experimental plugins.
 - Callback implementations must be non-blocking and must not call back into unsafe UE4
   functions unless reentrancy is explicitly handled.
-- Future gameplay events such as chat must copy data into Obelisk-owned memory before
-  calling plugins. Do not expose borrowed UE4 params, `FString`, `UObject`, `UFunction`, or
-  raw `ProcessEvent` buffers as a stable SDK contract.
+- Future gameplay events beyond `GameplayPolicyEvent`, such as chat or inventory, must
+  copy data into Obelisk-owned memory before calling plugins. Do not expose borrowed UE4
+  params, `FString`, `UObject`, `UFunction`, or raw `ProcessEvent` buffers as a stable SDK
+  contract.
 - Future chat events should pass through the internal `core/ChatEventDispatcher` ownership
   layer before any SDK exposure. Do not dispatch plugin-facing chat callbacks directly from
   the `ProcessEvent` hook.

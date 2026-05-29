@@ -350,7 +350,7 @@ Updated: 2026-05-28
   `VerifyPinCode`, and `CanSeat`) through `TryIdentifyInvocation`. Object parameters stay
   range-hidden, scalar ranges are bounded by `ParmsSize`, and wrong outer identity is
   rejected at the hook wrapper layer.
-- fact: `core/StructureEventDispatcher` is the first non-chat internal copied-data event
+- fact: `core/StructureEventDispatcher` is an internal copied-data structure event
   bridge. It dispatches copied scalar-only structure event views, rejects unknown event or
   scalar shapes, supports owner cleanup/self-unregister, waits for in-flight callbacks, and
   exposes no public ABI or plugin SDK surface yet.
@@ -505,7 +505,8 @@ Updated: 2026-05-28
 - fact: Commit `f3a47d1` runs reflection snapshot comparison and ScriptStruct fixture
   tests in CI and release validation.
 - fact: Commit `3451a19` aligns README and `docs/STATUS.md` around module-first runtime
-  observers and candidate-only snapshot tooling instead of a chat-centered roadmap.
+  observers and candidate-only snapshot tooling as part of the general Obelisk
+  runtime/API/SDK roadmap.
 - fact: Commit `74b123d` covers mixed UFunction/ScriptStruct target-filter behavior so
   short `Outer.Name` filters can match both schemas and schema-qualified filters select
   exactly one.
@@ -1066,6 +1067,116 @@ Updated: 2026-05-28
   `compare_reflection_snapshots.py --fail-on-base-readiness-gaps` for named UFunction and
   ScriptStruct promotion target sets. This checks committed primary fixtures stay present
   and comparable without requiring missing second-source artifacts.
+
+## Post-Compaction Audit Archive
+
+- fact: Review `015` through `017` closed UFunction regeneration planner gaps:
+  artifact-specific GObjects/FName context is preserved, snapshot manifests must be
+  `offline_core` plus `candidate-only`, and evidence-pack manifest paths are normalized.
+- fact: Review `018` was canceled as stale after standby without a completed result.
+- fact: Review `019` accepted the current offline UE4 reflection path as
+  fail-closed, with fastest safe promotion still requiring independent binary/core
+  artifacts plus second-source intake/readiness comparison.
+- fact: Review `020` through `027` hardened static global evidence: standalone
+  fail-closed ELF/xref provenance, explicit `gobjects`/`fname_root` candidate kinds,
+  hashed copied/generated artifacts, protected-path rejection, duplicate rejection,
+  executable segment/section checks, and target-specific RIP-relative match-kind evidence.
+- fact: Internal handoff review hardened coordination validation against forbidden
+  commands embedded after read-only prose, overbroad skill lists, stale blocked heartbeats,
+  and stale docs examples.
+- fact: Review `028` marked static-global evidence, coordination hardening, and
+  related handoff docs checkpoint-ready locally for its allowed scope, but not a whole-repo
+  RC approval.
+- fact: Review `029` accepted ABI/API, SDK packaging, plugin lifecycle, and
+  release-scope dirty changes for its allowed scope. Public `ObeliskApi` remains ABI v1
+  with no public gameplay module SDK expansion, and background-work plugins remain
+  experimental.
+- fact: Local ABI/SDK guardrails and core-first release readiness passed with dirty
+  worktree allowances after the queue/static hardening. Real RC still requires a clean
+  worktree and `scripts/check_release_readiness.sh` without `--allow-dirty`.
+
+## Post-Compaction Audit Archive 050-069b
+
+- fact: Review `050` through `063` are integrated in local review records and local
+  changes. Stable outcomes: current handoff was compacted; offline
+  `minimal-second-source-intake` remains the priority path; second-source release defaults
+  are UFunction-only; ScriptStruct promotion is explicit opt-in; FName/static evidence
+  protected-path guards are hardened; ABI v1 and public SDK unpromoted gameplay token
+  guardrails are stricter; plugin lifecycle cleanup is covered for in-flight callbacks and
+  init-failure unregister; release option semantics are guarded by tests. Broad validation
+  passed only with dirty-worktree allowance, not as real RC readiness.
+- fact: Review `ue4-reflection-next-offline-gap-audit-064` returned
+  `request-changes`: direct `regenerate_ufunction_snapshots.py` and
+  `summarize_core_ufunction_inventory.py` CLI paths needed their own protected-path guards.
+  The local response added direct protected `/servidor/ark` input/output rejection for
+  UFunction snapshot regeneration and inventory planning, shared guard helpers through
+  `snapshot_evidence_pack.py`, added focused regression coverage, added a current-core-path
+  entry to `docs/research/README.md`, and added a PR checkbox blocking accidental public
+  promotion of chat/gameplay modules without status, release, and named second-source
+  gate updates.
+- fact: Review `offline-cli-protected-path-followup-065` accepted the direct offline
+  CLI hardening. Local follow-up added prefix-only tests proving paths such as
+  `/servidor/ark-not-live` are not overblocked while real direct/symlinked `/servidor/ark`
+  paths stay rejected.
+- fact: Internal release/package review clarified that the dirty worktree blocks real RC.
+  Local release docs now describe the first stable scope as filtered non-mutating
+  `ProcessEvent` callback infrastructure; target-specific gameplay/module surfaces remain
+  experimental unless explicitly promoted.
+- fact: Review `rc-clean-checkpoint-sequencing-audit-066` accepted the clean
+  checkpoint order: runtime StructureEvents safety; script-test harness prelude; offline
+  evidence/tooling hardening; handoff workflow; release/public-scope docs
+  and guardrails; research/skill alignment. Keep `docs/oBaseEvents.md` FName docs with
+  offline FName tooling, `scripts/run_script_tests.sh` before script-heavy validation, and
+  live-ops protected-path skill guidance with offline protected-path hardening.
+- fact: Review `runtime-structureevents-first-checkpoint-audit-067` returned
+  `request-changes`: runtime behavior was coherent, but the first checkpoint grouping must
+  name `tests/core/EventManagerTests.cpp` explicitly and keep handoff files out of the
+  runtime checkpoint except as separately refreshed coordination state.
+- fact: Internal script-harness review returned `request-changes`. Local response made
+  `scripts/run_script_tests.sh --list-python-files` introspective, added
+  `--python-tests-only`, and strengthened `scripts/test_run_script_tests.sh` with a
+  sentinel proving untracked `scripts/test_*.py` files are listed without execution in list
+  mode and executed in Python-only mode. Review
+  `script-harness-checkpoint-followup-068` accepted checkpoint 2. A later follow-up added
+  early stale-probe/marker rejection and unknown-argument rejection so explicit path
+  arguments cannot be ignored silently.
+- fact: Local checkpoint 3 smoke validation passed for core evidence packs,
+  second-source intake, FName scan, FName manifest validation, static global evidence,
+  snapshot comparison, UFunction regeneration, evidence-pack defaults, and UFunction
+  inventory tests. Review `offline-tooling-checkpoint-audit-069` was canceled and
+  replaced due to an overbroad skill list. Replacement task
+  `offline-tooling-checkpoint-audit-069b` returned `accept`: checkpoint 3 is coherent as
+  the offline evidence/tooling group after runtime and script-harness prelude. Residual
+  risk remains that broader evidence promotion is blocked until an independent artifact
+  exists; static-only evidence remains review support, not runtime promotion.
+- fact: Internal release/public-scope auditor accepted checkpoint 5 candidate with no
+  required edits. First-stable docs remain core-first, exclude public gameplay/module SDK
+  promotion, require explicit target sets for second-source/module promotion, keep runtime
+  observer summaries non-promotional, and keep Discord/community policy out of contributor
+  release docs. Focused guardrails passed:
+  `test_release_scope_guardrails.py`, `test_versioning_guardrails.py`, and
+  `test_public_sdk_guardrails.py`.
+- fact: Review `second-source-artifact-gap-audit-071` accepted the exact offline
+  path for future second-source promotion: scan-only FName derivation, reviewed
+  artifact-specific FName root, reviewed GObjects candidate, minimal UFunction snapshot
+  regeneration, and fail-closed comparison. At that point, promotion remained deferred
+  until an independent offline artifact existed. Local response hardened
+  `run_second_source_core_intake.py --json-plan` with complete artifact identity
+  requirements, explicit promotion blockers, and separate `fname-scan/` and
+  `gobjects-sampling/` phase output directories so scan provenance is preserved.
+- fact: Review `second-source-phase-dir-followup-072` accepted the local response to
+  071. The wrapper preserves scan provenance with separate phase directories, regenerates
+  snapshots from `gobjects-sampling/manifest.json`, and documents JSON-plan blockers for
+  partial identity, dry-run or scan-only promotion, and FName scan promotion. At that
+  point, no independent offline artifact was available, so this remained planning/tooling
+  readiness, not accepted FName/UFunction evidence.
+- fact: Internal runtime/ABI auditor accepted the first RC-clean checkpoint group:
+  StructureEvents dispatch is post-original only, internal-only, has no public ABI/API
+  capability token, and tests cover owner cleanup, in-flight callbacks, init-failure
+  cleanup, scalar rejection, and blocked-original non-dispatch. Review
+  `rc-clean-checkpoint-order-post-072-073` accepted that the checkpoint order remains:
+  runtime StructureEvents; script harness; offline evidence/tooling; handoff;
+  release docs; research/skills.
 
 ## Agent Protocol
 

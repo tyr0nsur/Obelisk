@@ -1,5 +1,6 @@
 #include "PluginManager.h"
 #include "EventManager.h"
+#include "InventoryPolicyEventDispatcher.h"
 #include "PluginConfig.h"
 #include "StructureEventDispatcher.h"
 #include "hooks/ProcessEventHook.h"
@@ -9,12 +10,15 @@
 #include <filesystem>
 #include <algorithm>
 #include <atomic>
+#include <cstddef>
 #include <cstdlib>
 #include <exception>
+#include <memory>
 #include <mutex>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 namespace fs = std::filesystem;
@@ -31,6 +35,17 @@ namespace Obelisk::Core
         std::unordered_set<void*> g_UnloadingPluginOwners;
         std::atomic<uint64_t> g_NextPluginOwnerToken{1};
         std::unordered_map<uint64_t, void*> g_PluginOwnerTokens;
+        std::mutex g_GameplayPolicyRegistrationMutex;
+        uint64_t g_NextGameplayPolicyRegistrationId = 1;
+
+        struct GameplayPolicyRegistration
+        {
+            void* Owner = nullptr;
+            uint64_t StructureRegistrationId = 0;
+            uint64_t InventoryRegistrationId = 0;
+        };
+
+        std::unordered_map<uint64_t, GameplayPolicyRegistration> g_GameplayPolicyRegistrations;
 
         using GetInfoFunc = bool(*)(ObeliskPluginMetadata*);
         using InitFunc = bool(*)(ObeliskApi*, const ObeliskPluginInitContext*);
@@ -381,7 +396,9 @@ namespace Obelisk::Core
         {
             uint64_t capabilities = OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS |
                 OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS |
-                OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES;
+                OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES |
+                OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS |
+                OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS;
             if (AreGlobalProcessEventCallbacksAllowed())
                 capabilities |= OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS;
             if (IsCallProcessEventAllowed())
@@ -389,6 +406,64 @@ namespace Obelisk::Core
             if (IsProcessEventBlockingAllowed())
                 capabilities |= OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING;
             return capabilities;
+        }
+
+        template <std::size_t N>
+        void CopyDescriptorText(char (&destination)[N], std::string_view value)
+        {
+            static_assert(N > 0);
+            const std::size_t count = std::min(N - 1, value.size());
+            std::copy_n(value.data(), count, destination);
+            destination[count] = '\0';
+        }
+
+        bool DescribeResourceKind(uint32_t resourceKind, ObeliskResourceKindDescriptor* out)
+        {
+            if (!out || out->struct_size < sizeof(ObeliskResourceKindDescriptor))
+                return false;
+
+            ObeliskResourceKindDescriptor descriptor{
+                .abi_version = OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION,
+                .struct_size = sizeof(ObeliskResourceKindDescriptor),
+                .resource_kind = resourceKind,
+                .reserved0 = 0,
+                .flags = OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_CATEGORY_ONLY |
+                    OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY |
+                    OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP,
+                .supported_gameplay_policy_event_mask = 0,
+                .supported_gameplay_policy_field_mask = 0,
+                .stable_name = {},
+                .display_name = {},
+            };
+
+            switch (resourceKind)
+            {
+                case OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE:
+                    descriptor.supported_gameplay_policy_event_mask =
+                        OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES;
+                    descriptor.supported_gameplay_policy_field_mask =
+                        OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+                        OBELISK_GAMEPLAY_POLICY_FIELD_MASK_VARIANT_INDEX |
+                        OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE_SET |
+                        OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE;
+                    CopyDescriptorText(descriptor.stable_name, "structure");
+                    CopyDescriptorText(descriptor.display_name, "Structure");
+                    *out = descriptor;
+                    return true;
+                case OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM:
+                    descriptor.supported_gameplay_policy_event_mask =
+                        OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY;
+                    descriptor.supported_gameplay_policy_field_mask =
+                        OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+                        OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER |
+                        OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN;
+                    CopyDescriptorText(descriptor.stable_name, "inventory_item");
+                    CopyDescriptorText(descriptor.display_name, "Inventory Item");
+                    *out = descriptor;
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         bool IsGlobalProcessEventCallbackCapabilityEnabled()
@@ -418,6 +493,405 @@ namespace Obelisk::Core
 
             OBELISK_WARN("{} rejected invalid negative FName index {}.", apiName, nameIndex);
             return false;
+        }
+
+        bool ValidateGameplayPolicyEventCallback(const char* apiName,
+                                                 ObeliskGameplayPolicyEventCallback callback)
+        {
+            if (callback)
+                return true;
+
+            OBELISK_WARN("{} rejected null callback.", apiName);
+            return false;
+        }
+
+        uint32_t ToGameplayPolicyEventKind(StructureEventKind kind)
+        {
+            switch (kind)
+            {
+            case StructureEventKind::AllowStructureAccess:
+                return OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_ACCESS_CHECK;
+            case StructureEventKind::IsAllowedToDemolish:
+                return OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_DEMOLISH_CHECK;
+            case StructureEventKind::SetVariant:
+                return OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_VARIANT_CHANGE;
+            case StructureEventKind::AllowToggleActivation:
+                return OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_ACTIVATION_TOGGLE;
+            case StructureEventKind::VerifyPinCode:
+                return OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_PIN_CODE_CHECK;
+            case StructureEventKind::CanSeat:
+                return OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_SEAT_CHECK;
+            }
+            return OBELISK_GAMEPLAY_POLICY_EVENT_KIND_UNKNOWN;
+        }
+
+        uint32_t ToGameplayPolicyEventKind(InventoryPolicyEventKind kind)
+        {
+            switch (kind)
+            {
+            case InventoryPolicyEventKind::AllowRemoteAddToInventory:
+                return OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK;
+            case InventoryPolicyEventKind::CanUse:
+                return OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK;
+            }
+            return OBELISK_GAMEPLAY_POLICY_EVENT_KIND_UNKNOWN;
+        }
+
+        uint64_t ToGameplayPolicyEventMask(uint32_t eventKind)
+        {
+            switch (eventKind)
+            {
+            case OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_ACCESS_CHECK:
+                return OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACCESS_CHECK;
+            case OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_DEMOLISH_CHECK:
+                return OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_DEMOLISH_CHECK;
+            case OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_VARIANT_CHANGE:
+                return OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_VARIANT_CHANGE;
+            case OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_ACTIVATION_TOGGLE:
+                return OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACTIVATION_TOGGLE;
+            case OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_PIN_CODE_CHECK:
+                return OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_PIN_CODE_CHECK;
+            case OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_SEAT_CHECK:
+                return OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_SEAT_CHECK;
+            case OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK:
+                return OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_REMOTE_ADD_CHECK;
+            case OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK:
+                return OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK;
+            default:
+                return 0;
+            }
+        }
+
+        void SetGameplayPolicyBoolField(ObeliskGameplayPolicyEvent& publicEvent,
+                                        ObeliskGameplayPolicyField field,
+                                        bool value)
+        {
+            const uint64_t bit = 1ull << static_cast<uint32_t>(field);
+            publicEvent.field_mask |= bit;
+            if (value)
+                publicEvent.bool_values |= bit;
+            else
+                publicEvent.bool_values &= ~bit;
+        }
+
+        void SetGameplayPolicyInt32Field(ObeliskGameplayPolicyEvent& publicEvent,
+                                         ObeliskGameplayPolicyField field,
+                                         int32_t value)
+        {
+            const uint32_t fieldIndex = static_cast<uint32_t>(field);
+            if (fieldIndex >= OBELISK_GAMEPLAY_POLICY_FIELD_COUNT)
+                return;
+            publicEvent.field_mask |= (1ull << fieldIndex);
+            publicEvent.int32_values[fieldIndex] = value;
+        }
+
+        void CopyGameplayPolicyScalar(ObeliskGameplayPolicyEvent& publicEvent,
+                                      const StructureScalarValue& scalar)
+        {
+            switch (scalar.Field)
+            {
+            case StructureScalarField::ReturnValue:
+                if (scalar.Type == StructureScalarType::Bool)
+                    SetGameplayPolicyBoolField(publicEvent,
+                                               OBELISK_GAMEPLAY_POLICY_FIELD_RETURN_VALUE,
+                                               scalar.BoolValue);
+                return;
+            case StructureScalarField::VariantIndex:
+                if (scalar.Type == StructureScalarType::Int32)
+                    SetGameplayPolicyInt32Field(publicEvent,
+                                                OBELISK_GAMEPLAY_POLICY_FIELD_VARIANT_INDEX,
+                                                scalar.Int32Value);
+                return;
+            case StructureScalarField::BForceSet:
+                if (scalar.Type == StructureScalarType::Bool)
+                    SetGameplayPolicyBoolField(publicEvent,
+                                               OBELISK_GAMEPLAY_POLICY_FIELD_FORCE_SET,
+                                               scalar.BoolValue);
+                return;
+            case StructureScalarField::BForce:
+                if (scalar.Type == StructureScalarType::Bool)
+                    SetGameplayPolicyBoolField(publicEvent,
+                                               OBELISK_GAMEPLAY_POLICY_FIELD_FORCE,
+                                               scalar.BoolValue);
+                return;
+            }
+        }
+
+        void CopyGameplayPolicyScalar(ObeliskGameplayPolicyEvent& publicEvent,
+                                      const InventoryPolicyScalarValue& scalar)
+        {
+            switch (scalar.Field)
+            {
+            case InventoryPolicyScalarField::ReturnValue:
+                SetGameplayPolicyBoolField(publicEvent,
+                                           OBELISK_GAMEPLAY_POLICY_FIELD_RETURN_VALUE,
+                                           scalar.BoolValue);
+                return;
+            case InventoryPolicyScalarField::BRequestedByPlayer:
+                SetGameplayPolicyBoolField(publicEvent,
+                                           OBELISK_GAMEPLAY_POLICY_FIELD_REQUESTED_BY_PLAYER,
+                                           scalar.BoolValue);
+                return;
+            case InventoryPolicyScalarField::BIgnoreCooldown:
+                SetGameplayPolicyBoolField(publicEvent,
+                                           OBELISK_GAMEPLAY_POLICY_FIELD_IGNORE_COOLDOWN,
+                                           scalar.BoolValue);
+                return;
+            }
+        }
+
+        struct GameplayPolicyEventCallbackState
+        {
+            uint64_t EventKindMask = 0;
+            ObeliskGameplayPolicyEventCallback Callback = nullptr;
+            void* UserData = nullptr;
+        };
+
+        void DestroyGameplayPolicyEventCallbackState(void* userData)
+        {
+            delete static_cast<GameplayPolicyEventCallbackState*>(userData);
+        }
+
+        void DispatchGameplayPolicyEventFromStructure(const StructureEventView& event, void* userData)
+        {
+            auto* state = static_cast<GameplayPolicyEventCallbackState*>(userData);
+            if (!state || !state->Callback)
+                return;
+
+            const uint32_t eventKind = ToGameplayPolicyEventKind(event.Kind);
+            if (eventKind == OBELISK_GAMEPLAY_POLICY_EVENT_KIND_UNKNOWN)
+                return;
+            const uint64_t eventMask = ToGameplayPolicyEventMask(eventKind);
+            if (eventMask == 0 || (state->EventKindMask & eventMask) == 0)
+                return;
+
+            ObeliskGameplayPolicyEvent publicEvent{
+                .abi_version = OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION,
+                .struct_size = sizeof(ObeliskGameplayPolicyEvent),
+                .event_kind = eventKind,
+                .resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE,
+                .flags = OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD |
+                    OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED,
+                .field_mask = 0,
+                .bool_values = 0,
+                .int32_values = {},
+            };
+            for (const StructureScalarValue& scalar : event.Scalars)
+                CopyGameplayPolicyScalar(publicEvent, scalar);
+            state->Callback(&publicEvent, state->UserData);
+        }
+
+        void DispatchGameplayPolicyEventFromInventory(const InventoryPolicyEventView& event, void* userData)
+        {
+            auto* state = static_cast<GameplayPolicyEventCallbackState*>(userData);
+            if (!state || !state->Callback)
+                return;
+
+            const uint32_t eventKind = ToGameplayPolicyEventKind(event.Kind);
+            if (eventKind == OBELISK_GAMEPLAY_POLICY_EVENT_KIND_UNKNOWN)
+                return;
+            const uint64_t eventMask = ToGameplayPolicyEventMask(eventKind);
+            if (eventMask == 0 || (state->EventKindMask & eventMask) == 0)
+                return;
+
+            ObeliskGameplayPolicyEvent publicEvent{
+                .abi_version = OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION,
+                .struct_size = sizeof(ObeliskGameplayPolicyEvent),
+                .event_kind = eventKind,
+                .resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM,
+                .flags = OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD |
+                    OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED,
+                .field_mask = 0,
+                .bool_values = 0,
+                .int32_values = {},
+            };
+            for (const InventoryPolicyScalarValue& scalar : event.Scalars)
+                CopyGameplayPolicyScalar(publicEvent, scalar);
+            state->Callback(&publicEvent, state->UserData);
+        }
+
+        uint64_t AllocateGameplayPolicyRegistrationIdLocked()
+        {
+            uint64_t id = 0;
+            do
+            {
+                id = g_NextGameplayPolicyRegistrationId++;
+                if (g_NextGameplayPolicyRegistrationId == 0)
+                    g_NextGameplayPolicyRegistrationId = 1;
+            } while (id == 0 || g_GameplayPolicyRegistrations.find(id) != g_GameplayPolicyRegistrations.end());
+            return id;
+        }
+
+        uint64_t RegisterGameplayPolicyEventForOwner(void* owner,
+                                                     uint64_t eventKindMask,
+                                                     ObeliskGameplayPolicyEventCallback callback,
+                                                     void* userData)
+        {
+            if (!owner)
+                return 0;
+
+            uint64_t publicRegistrationId = 0;
+            {
+                std::lock_guard<std::mutex> lock(g_GameplayPolicyRegistrationMutex);
+                publicRegistrationId = AllocateGameplayPolicyRegistrationIdLocked();
+            }
+
+            GameplayPolicyRegistration registration{
+                .Owner = owner,
+                .StructureRegistrationId = 0,
+                .InventoryRegistrationId = 0,
+            };
+
+            if ((eventKindMask & OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES) != 0)
+            {
+                auto state = std::make_unique<GameplayPolicyEventCallbackState>(
+                    GameplayPolicyEventCallbackState{eventKindMask, callback, userData});
+                registration.StructureRegistrationId = StructureEventDispatcher::Get().Register(
+                    owner,
+                    StructureEventSubscription{
+                        DispatchGameplayPolicyEventFromStructure,
+                        state.get(),
+                        DestroyGameplayPolicyEventCallbackState,
+                    });
+                if (registration.StructureRegistrationId == 0)
+                    return 0;
+                (void)state.release();
+            }
+
+            try
+            {
+                if ((eventKindMask & OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY) != 0)
+                {
+                    auto state = std::make_unique<GameplayPolicyEventCallbackState>(
+                        GameplayPolicyEventCallbackState{eventKindMask, callback, userData});
+                    registration.InventoryRegistrationId = InventoryPolicyEventDispatcher::Get().Register(
+                        owner,
+                        InventoryPolicyEventSubscription{
+                            DispatchGameplayPolicyEventFromInventory,
+                            state.get(),
+                            DestroyGameplayPolicyEventCallbackState,
+                        });
+                    if (registration.InventoryRegistrationId == 0)
+                    {
+                        if (registration.StructureRegistrationId != 0)
+                        {
+                            (void)StructureEventDispatcher::Get().UnregisterCallbackForOwner(
+                                owner,
+                                registration.StructureRegistrationId);
+                        }
+                        return 0;
+                    }
+                    (void)state.release();
+                }
+            }
+            catch (...)
+            {
+                if (registration.StructureRegistrationId != 0)
+                {
+                    (void)StructureEventDispatcher::Get().UnregisterCallbackForOwner(
+                        owner,
+                        registration.StructureRegistrationId);
+                }
+                throw;
+            }
+
+            try
+            {
+                std::lock_guard<std::mutex> lock(g_GameplayPolicyRegistrationMutex);
+                g_GameplayPolicyRegistrations[publicRegistrationId] = registration;
+            }
+            catch (...)
+            {
+                if (registration.StructureRegistrationId != 0)
+                {
+                    (void)StructureEventDispatcher::Get().UnregisterCallbackForOwner(
+                        owner,
+                        registration.StructureRegistrationId);
+                }
+                if (registration.InventoryRegistrationId != 0)
+                {
+                    (void)InventoryPolicyEventDispatcher::Get().UnregisterCallbackForOwner(
+                        owner,
+                        registration.InventoryRegistrationId);
+                }
+                throw;
+            }
+            return publicRegistrationId;
+        }
+
+        bool UnregisterGameplayPolicyRegistrationForOwner(void* owner, uint64_t registrationId)
+        {
+            if (!owner || registrationId == 0)
+                return false;
+
+            GameplayPolicyRegistration registration;
+            {
+                std::lock_guard<std::mutex> lock(g_GameplayPolicyRegistrationMutex);
+                const auto it = g_GameplayPolicyRegistrations.find(registrationId);
+                if (it == g_GameplayPolicyRegistrations.end() || it->second.Owner != owner)
+                    return false;
+                registration = it->second;
+                g_GameplayPolicyRegistrations.erase(it);
+            }
+
+            bool removed = false;
+            if (registration.StructureRegistrationId != 0)
+            {
+                removed = StructureEventDispatcher::Get().UnregisterCallbackForOwner(
+                    owner,
+                    registration.StructureRegistrationId) || removed;
+            }
+            if (registration.InventoryRegistrationId != 0)
+            {
+                removed = InventoryPolicyEventDispatcher::Get().UnregisterCallbackForOwner(
+                    owner,
+                    registration.InventoryRegistrationId) || removed;
+            }
+            return removed;
+        }
+
+        size_t UnregisterGameplayPolicyRegistrationsForOwner(void* owner)
+        {
+            if (!owner)
+                return 0;
+
+            std::vector<std::pair<uint64_t, GameplayPolicyRegistration>> registrations;
+            {
+                std::lock_guard<std::mutex> lock(g_GameplayPolicyRegistrationMutex);
+                for (auto it = g_GameplayPolicyRegistrations.begin();
+                     it != g_GameplayPolicyRegistrations.end();)
+                {
+                    if (it->second.Owner != owner)
+                    {
+                        ++it;
+                        continue;
+                    }
+                    registrations.push_back(*it);
+                    it = g_GameplayPolicyRegistrations.erase(it);
+                }
+            }
+
+            size_t removed = 0;
+            for (const auto& item : registrations)
+            {
+                const GameplayPolicyRegistration& registration = item.second;
+                bool removedAny = false;
+                if (registration.StructureRegistrationId != 0)
+                {
+                    removedAny = StructureEventDispatcher::Get().UnregisterCallbackForOwner(
+                        owner,
+                        registration.StructureRegistrationId) || removedAny;
+                }
+                if (registration.InventoryRegistrationId != 0)
+                {
+                    removedAny = InventoryPolicyEventDispatcher::Get().UnregisterCallbackForOwner(
+                        owner,
+                        registration.InventoryRegistrationId) || removedAny;
+                }
+                if (removedAny)
+                    ++removed;
+            }
+            return removed;
         }
 
         template <typename Fn>
@@ -579,6 +1053,53 @@ namespace Obelisk::Core
                 return false;
             return EventManager::Get().UnregisterCallbackForOwner(owner, registrationId);
         }
+        uint64_t PluginRegisterGameplayPolicyEventWithOwnerTokenHandle(
+            uint64_t ownerToken,
+            uint64_t eventKindMask,
+            ObeliskGameplayPolicyEventCallback callback,
+            void* userData) {
+            if (!ValidateGameplayPolicyEventCallback("RegisterGameplayPolicyEventWithOwnerTokenHandle", callback))
+                return 0;
+            if ((eventKindMask & OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL) == 0)
+            {
+                OBELISK_WARN("RegisterGameplayPolicyEventWithOwnerTokenHandle rejected empty gameplay policy event mask.");
+                return 0;
+            }
+            if ((eventKindMask & ~OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL) != 0)
+            {
+                OBELISK_WARN("RegisterGameplayPolicyEventWithOwnerTokenHandle rejected reserved gameplay policy event mask bits.");
+                return 0;
+            }
+
+            try
+            {
+                return RegisterProcessEventCallbackForOwnerToken(
+                    "RegisterGameplayPolicyEventWithOwnerTokenHandle",
+                    ownerToken,
+                    [eventKindMask, callback, userData](void* owner) {
+                        return RegisterGameplayPolicyEventForOwner(owner, eventKindMask, callback, userData);
+                    });
+            }
+            catch (const std::exception& e)
+            {
+                OBELISK_ERROR("RegisterGameplayPolicyEventWithOwnerTokenHandle rejected callback after exception: {}", e.what());
+                return 0;
+            }
+            catch (...)
+            {
+                OBELISK_ERROR("RegisterGameplayPolicyEventWithOwnerTokenHandle rejected callback after unknown exception.");
+                return 0;
+            }
+        }
+        bool PluginUnregisterGameplayPolicyEventWithOwnerToken(uint64_t ownerToken, uint64_t registrationId) {
+            void* owner = ResolveOwnerTokenForUnregister("UnregisterGameplayPolicyEventWithOwnerToken", ownerToken);
+            if (!owner)
+                return false;
+            return UnregisterGameplayPolicyRegistrationForOwner(owner, registrationId);
+        }
+        bool PluginDescribeResourceKind(uint32_t resourceKind, ObeliskResourceKindDescriptor* out) {
+            return DescribeResourceKind(resourceKind, out);
+        }
         void PluginCallProcessEvent(void* caller, void* function, void* parms) {
             if ((g_ApiCapabilities.load(std::memory_order_acquire) &
                  OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT) == 0 ||
@@ -631,6 +1152,9 @@ namespace Obelisk::Core
         m_Api.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle = PluginRegisterPreProcessEventForNameIndexWithOwnerTokenHandle;
         m_Api.RegisterPostProcessEventForNameIndexWithOwnerTokenHandle = PluginRegisterPostProcessEventForNameIndexWithOwnerTokenHandle;
         m_Api.UnregisterProcessEventCallbackWithOwnerToken = PluginUnregisterProcessEventCallbackWithOwnerToken;
+        m_Api.RegisterGameplayPolicyEventWithOwnerTokenHandle = PluginRegisterGameplayPolicyEventWithOwnerTokenHandle;
+        m_Api.UnregisterGameplayPolicyEventWithOwnerToken = PluginUnregisterGameplayPolicyEventWithOwnerToken;
+        m_Api.DescribeResourceKind = PluginDescribeResourceKind;
         g_ApiCapabilities.store(m_Api.capabilities, std::memory_order_release);
         EventManager::SetProcessEventBlockingCapabilityAdvertised(
             (m_Api.capabilities & OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING) != 0);
@@ -654,16 +1178,22 @@ namespace Obelisk::Core
 
     void PluginManager::UnregisterPluginCallbacks(const std::string& pluginName, void* owner, const char* reason)
     {
+        const size_t gameplayPolicyRemoved = UnregisterGameplayPolicyRegistrationsForOwner(owner);
         const size_t eventRemoved = EventManager::Get().UnregisterCallbacksForOwner(owner);
         const size_t chatRemoved = m_ChatDispatcher->UnregisterCallbacksForOwner(owner);
         const size_t structureRemoved = StructureEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
+        const size_t inventoryRemoved = InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
 
+        if (gameplayPolicyRemoved > 0)
+            OBELISK_INFO("Removed {} gameplay policy callback(s) registered by plugin {} {}.", gameplayPolicyRemoved, pluginName, reason);
         if (eventRemoved > 0)
             OBELISK_INFO("Removed {} ProcessEvent callback(s) registered by plugin {} {}.", eventRemoved, pluginName, reason);
         if (chatRemoved > 0)
             OBELISK_INFO("Removed {} chat callback(s) registered by plugin {} {}.", chatRemoved, pluginName, reason);
         if (structureRemoved > 0)
             OBELISK_INFO("Removed {} structure callback(s) registered by plugin {} {}.", structureRemoved, pluginName, reason);
+        if (inventoryRemoved > 0)
+            OBELISK_INFO("Removed {} inventory policy callback(s) registered by plugin {} {}.", inventoryRemoved, pluginName, reason);
     }
 
     bool PluginManager::IsPluginIdLoaded(const std::string& pluginId) const

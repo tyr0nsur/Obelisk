@@ -5,8 +5,9 @@ description: "Use when leading Obelisk toward production stability through super
 
 # Obelisk GitHub Research Workflow
 
-Use this skill when an Obelisk task involves GitHub hygiene, agent handoff, research notes,
-skill updates, or making work reproducible for contributors.
+Use this skill for lead-owned GitHub integration, supervised agent rounds, checkpointing,
+or handoff policy. For ordinary research-note capture, use `obelisk-continuous-learning`
+plus the relevant subsystem skill.
 
 ## Project Vision
 
@@ -37,8 +38,12 @@ to every sub-agent.
   and push after every routine round; create a checkpoint when the accumulated work is
   useful to contributors, changes runtime/release behavior, or needs to be shared as a
   stable integration point.
-- Push stable checkpoints to `origin/main` after validation when they meet that usefulness
-  threshold.
+- Push or delegate GitHub publication only for an evidenced, stable milestone after
+  validation when it meets that usefulness threshold and handoff/user direction allows
+  publication. Routine rounds, internal research, and unbatched guardrail edits should stay
+  local.
+- If current user direction or handoff state says GitHub publication is closed for the
+  current work, do not run `git push`; report the validated local checkpoint state instead.
 - Do not commit server artifacts: `.so`, logs, core files, local configs, state markers, or
   build directories.
 - Server restore documentation is allowed, but never stage copied `/servidor/ark` config
@@ -51,6 +56,9 @@ to every sub-agent.
 
 ## Agent Coordination
 
+- After conversation compaction or a resumed Obelisk turn, first read
+  `docs/agent-handoff/COMPACT_CONTEXT.md` and `docs/agent-handoff/CURRENT.md`, then check
+  `git status --short --ignored` before spawning or reusing agents.
 - Mandatory round preflight: at the start of every new supervised agent round, verify there
   are no stale stand-by agents from the previous round. Close completed or obsolete agents
   before spawning new ones, and record any still-active agent with a concrete
@@ -58,6 +66,11 @@ to every sub-agent.
 - Pass sub-agents only the context they need: task objective, ownership scope, files they
   may edit, files they must not edit, relevant skills to read, current safety baseline, and
   expected deliverable.
+- Pass only the skills required by that task's scope. Do not send the full skill set to a
+  sub-agent by default.
+- Assign agents as scope experts, not generic helpers. Name the expert role in the task
+  prompt, such as ABI/API engineer, UE4 reflection engineer, static binary analysis
+  engineer, build/SDK engineer, live-ops engineer, or release-readiness auditor.
 - Do not pass broad leader cadence, long-term goal wording, Discord policy, commit flow, or
   unrelated module history unless that information changes the agent's concrete task.
 - Before spawning agents, define disjoint ownership:
@@ -83,6 +96,10 @@ to every sub-agent.
   for exactly that turn.
 - Close old agents after their findings are integrated so stale context does not keep
   influencing new work.
+- When the operator requests a six-agent Obelisk round, keep a 2+4 balance: two agents on
+  Obelisk engineering/audit/development and four on research/knowledge/reversing/dump
+  work, with the lead supervising and integrating all six. If the operator requests a
+  different explicit balance, follow that current balance in the handoff state.
 - Relaunch agents after major skill updates when their next task depends on the new rules.
 - Documentation/skills workers must not edit runtime C++ or `/servidor/ark` unless their
   prompt explicitly widens scope.
@@ -91,6 +108,9 @@ to every sub-agent.
 - Reused agents are useful only if the platform preserves their context and they are still
   aligned with current skills. After major skill or research changes, relaunch fresh agents
   and make them read the updated handoff/skills.
+- Coordinate sub-agents directly with scoped ownership, safety baseline, allowed paths,
+  required skills, expert role, and expected decision. Do not introduce separate
+  repo-local task-queue machinery for this workflow.
 
 ## Long-Running Supervision
 
@@ -101,7 +121,7 @@ turn. Convert long-running work into:
 - read-only cron snapshots,
 - research notes,
 - handoff updates,
-- queued next tasks.
+- documented next actions.
 
 Unattended automation must not commit, push, restart servers, change markers, run scanners,
 or attach debuggers. It can collect status snapshots for the lead to review later.
@@ -120,6 +140,7 @@ git commit -m "Short imperative summary"
 git push origin main
 ```
 
+Run the push step only for an evidenced, stable milestone selected for GitHub publication.
 Skip the build only for docs-only or skills-only commits, and say so in the final report.
 
 ## Release Alignment
@@ -136,65 +157,17 @@ Skip the build only for docs-only or skills-only commits, and say so in the fina
 - Prefer adding guardrail tests when fixing coordination drift so the same stale state does
   not return in later rounds.
 
-## Community Discord Updates
+## Community Updates
 
-Do not send Discord updates for routine commits, internal validation, research bookkeeping,
-agent coordination, refactors, or developer-only checkpoints.
-
-Send a short community update to the configured Obelisk Discord webhook only when a change
-is important to future mod creators using the Obelisk core. The audience is modders and
-server/plugin creators, not the internal development team.
-
-Examples that qualify:
-
-- a new or meaningfully expanded public SDK/API capability;
-- a major runtime safety or compatibility milestone that affects plugin authors;
-- a documented module surface becoming ready for external experimentation;
-- a release, preview, migration notice, or breaking/important behavior change.
-
-Examples that do not qualify:
-
-- docs-only research notes;
-- internal recognizers that remain candidate-only;
-- fixture regeneration, guardrail updates, benchmark/test-only work;
-- ordinary commits, pushes, validations, or agent round summaries.
-
-Update style:
-
-- Use Markdown.
-- Write for mod creators who will build against Obelisk.
-- Focus on what they can eventually use, test, migrate to, or rely on.
-- Keep validation details brief and only include them when they explain confidence or
-  compatibility.
-- Do not publish secrets, player chat contents, private server details, full logs, core
-  paths, or sensitive operational data.
-- Be explicit when something is experimental, gated, not deployed, or not yet public SDK.
-
-Suggested shape:
-
-```text
-**Obelisk Dev Update**
-
-<1-2 short paragraphs about what changed for mod creators and why it matters.>
-
-**For modders:** <what is available, experimental, or coming next>
-```
+Community/Discord updates are lead-only. Do not send or draft them unless the task
+explicitly delegates that scope. Keep detailed announcement policy outside default
+sub-agent prompts.
 
 ## Research Notes
 
 Use `docs/research/YYYY-MM-DD-topic.md` for non-trivial investigation.
-
-Every note should include:
-
-- Objective
-- Environment: ARK binary path, SHA256, map/server, Obelisk commit, plugins state
-- Hypothesis
-- Evidence: logs, addresses, signatures, command output summaries
-- Result: confirmed, rejected, or inconclusive
-- Risks
-- Next steps
-
-Do not paste huge logs. Summarize the signal and link or name the log file.
+Use `docs/research/README.md` as the canonical note format. Do not duplicate research
+templates in skills; skills should say when a note is required and where it belongs.
 
 ## Skill Update Rules
 

@@ -10,12 +10,14 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 import enumerate_core_uobjects as enum
 import scan_core_fname_tables as scanner
+import snapshot_evidence_pack
 import verify_chat_reflection_constants as verifier
 
 
@@ -774,6 +776,58 @@ class VerifyChatReflectionConstantsTests(unittest.TestCase):
         self.assertEqual(payload["status"], "ok")
         self.assertEqual(payload["functions"][0]["function"], "ServerChat")
 
+    def test_cli_rejects_protected_core_path_before_open(self) -> None:
+        for core_path in (
+            Path("/servidor/ark/obelisk/dumps/chat-core"),
+            None,
+        ):
+            with self.subTest(core_path=core_path), tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                candidate = core_path
+                if candidate is None:
+                    candidate = root / "core-link"
+                    candidate.symlink_to("/servidor/ark/obelisk/dumps/chat-core")
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(SCRIPT_DIR / "verify_chat_reflection_constants.py"),
+                        "--core",
+                        str(candidate),
+                    ],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("--core must not read from protected server root /servidor/ark", result.stderr)
+
+    def test_cli_rejects_protected_evidence_pack_path_before_manifest_read(self) -> None:
+        for pack_path in (
+            Path("/servidor/ark/obelisk/evidence/chat-pack"),
+            None,
+        ):
+            with self.subTest(pack_path=pack_path), tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                candidate = pack_path
+                if candidate is None:
+                    candidate = root / "pack-link"
+                    candidate.symlink_to("/servidor/ark/obelisk/evidence/chat-pack")
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(SCRIPT_DIR / "verify_chat_reflection_constants.py"),
+                        "--evidence-pack",
+                        str(candidate),
+                    ],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("--evidence-pack must not read from protected server root /servidor/ark", result.stderr)
+
     def test_cli_json_accepts_evidence_pack_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -823,6 +877,88 @@ class VerifyChatReflectionConstantsTests(unittest.TestCase):
         self.assertEqual(payload["metadata"]["fname_root_slot"], hex(addrs["fname_root_slot"]))
         self.assertEqual(payload["evidence_pack"]["manifest"], str(manifest_path))
         self.assertEqual(payload["evidence_pack"]["core_sha256"], expected_core_sha)
+
+    def test_evidence_pack_rejects_protected_manifest_core_path_before_open(self) -> None:
+        for protected_core in (
+            Path("/servidor/ark/obelisk/dumps/chat-core"),
+            None,
+        ):
+            with self.subTest(protected_core=protected_core), tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                core = protected_core
+                if core is None:
+                    core = root / "core-link"
+                    core.symlink_to("/servidor/ark/obelisk/dumps/chat-core")
+                manifest = {
+                    "core": {"path": str(core)},
+                    "gobjects_candidates": [{"label": "gobjects", "address": "0x595b7e0"}],
+                    "fname_root_slots": [{"label": "fname", "address": "0x5956f30"}],
+                }
+                manifest_path = root / "manifest.json"
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+                with self.assertRaisesRegex(SystemExit, "evidence pack core.path must not read"):
+                    verifier.load_evidence_pack(manifest_path, verify_binary_sha=False)
+
+    def test_evidence_pack_rejects_protected_manifest_binary_path_even_without_hashing(self) -> None:
+        for protected_binary in (
+            Path("/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer"),
+            None,
+        ):
+            with self.subTest(protected_binary=protected_binary), tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                core = root / "core"
+                build_chat_core_fixture(core)
+                binary = protected_binary
+                if binary is None:
+                    binary = root / "ShooterGameServer-link"
+                    binary.symlink_to("/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer")
+                manifest = {
+                    "binary": {"path": str(binary)},
+                    "core": {"path": str(core)},
+                    "gobjects_candidates": [{"label": "gobjects", "address": "0x595b7e0"}],
+                    "fname_root_slots": [{"label": "fname", "address": "0x5956f30"}],
+                }
+                manifest_path = root / "manifest.json"
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+                with self.assertRaisesRegex(SystemExit, "evidence pack binary.path must not read"):
+                    verifier.load_evidence_pack(manifest_path, verify_binary_sha=False)
+
+    def test_evidence_pack_allows_approved_offline_workspace_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            protected = root / "server-root"
+            workspace = protected / "workspace-offline"
+            workspace.mkdir(parents=True)
+            core = workspace / "core"
+            binary = workspace / "ShooterGameServer"
+            build_chat_core_fixture(core)
+            binary.write_bytes(b"synthetic-binary")
+            expected_binary_sha = hashlib.sha256(binary.read_bytes()).hexdigest()
+            manifest = {
+                "binary": {
+                    "path": str(binary),
+                    "sha256": expected_binary_sha,
+                },
+                "core": {
+                    "path": str(core),
+                    "sha256": hashlib.sha256(core.read_bytes()).hexdigest(),
+                },
+                "gobjects_candidates": [{"label": "gobjects", "address": "0x595b7e0"}],
+                "fname_root_slots": [{"label": "fname", "address": "0x5956f30"}],
+            }
+            manifest_path = workspace / "manifest.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            with (
+                mock.patch.object(snapshot_evidence_pack, "SERVER_ROOT", protected),
+                mock.patch.object(snapshot_evidence_pack, "APPROVED_OFFLINE_WORKSPACE_ROOTS", (workspace,)),
+            ):
+                pack = verifier.load_evidence_pack(manifest_path)
+
+        self.assertEqual(pack.core, core.resolve())
+        self.assertEqual(pack.binary_sha256, expected_binary_sha)
 
     def test_evidence_pack_rejects_binary_sha_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

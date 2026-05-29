@@ -61,6 +61,7 @@ add_library(obelisk SHARED
     ue/Memory.cpp
     ue/BuffReflection.cpp
     ue/ChatReflection.cpp
+    ue/DinoReflection.cpp
     ue/InventoryReflection.cpp
     ue/StructureReflection.cpp
     ue/RuntimeReflection.cpp
@@ -73,6 +74,7 @@ add_library(obelisk SHARED
     hooks/ProcessEventStructureReflection.cpp
     hooks/ProcessEventHook.cpp
     core/ChatEventDispatcher.cpp
+    core/InventoryPolicyEventDispatcher.cpp
     core/StructureEventDispatcher.cpp
     core/EventManager.cpp
     core/PluginConfig.cpp
@@ -155,9 +157,20 @@ target_link_libraries(structure_event_dispatcher_tests PRIVATE fmt::fmt spdlog::
 
 add_test(NAME StructureEventDispatcherTests COMMAND structure_event_dispatcher_tests)
 
+add_executable(inventory_policy_event_dispatcher_tests
+    tests/core/InventoryPolicyEventDispatcherTests.cpp
+    core/InventoryPolicyEventDispatcher.cpp
+    runtime/Logger.cpp
+)
+target_include_directories(inventory_policy_event_dispatcher_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(inventory_policy_event_dispatcher_tests PRIVATE fmt::fmt spdlog::spdlog)
+
+add_test(NAME InventoryPolicyEventDispatcherTests COMMAND inventory_policy_event_dispatcher_tests)
+
 add_executable(plugin_manager_tests
     tests/core/PluginManagerTests.cpp
     core/ChatEventDispatcher.cpp
+    core/InventoryPolicyEventDispatcher.cpp
     core/StructureEventDispatcher.cpp
     core/EventManager.cpp
     core/PluginConfig.cpp
@@ -230,6 +243,15 @@ target_include_directories(buff_reflection_tests PRIVATE ${CMAKE_CURRENT_SOURCE_
 
 add_test(NAME BuffReflectionTests COMMAND buff_reflection_tests)
 
+add_executable(dino_reflection_tests
+    tests/core/DinoReflectionTests.cpp
+    ue/DinoReflection.cpp
+    ue/RuntimeReflection.cpp
+)
+target_include_directories(dino_reflection_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_test(NAME DinoReflectionTests COMMAND dino_reflection_tests)
+
 add_executable(structure_reflection_tests
     tests/core/StructureReflectionTests.cpp
     ue/StructureReflection.cpp
@@ -261,23 +283,30 @@ add_test(NAME ProcessEventChatReflectionTests COMMAND process_event_chat_reflect
 add_executable(process_event_inventory_reflection_tests
     tests/core/ProcessEventInventoryReflectionTests.cpp
     hooks/ProcessEventInventoryReflection.cpp
+    core/InventoryPolicyEventDispatcher.cpp
     ue/InventoryReflection.cpp
     ue/RuntimeReflection.cpp
+    runtime/Logger.cpp
 )
 target_include_directories(process_event_inventory_reflection_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(process_event_inventory_reflection_tests PRIVATE fmt::fmt spdlog::spdlog)
 
 add_test(NAME ProcessEventInventoryReflectionTests COMMAND process_event_inventory_reflection_tests)
 
 add_executable(process_event_structure_reflection_tests
     tests/core/ProcessEventStructureReflectionTests.cpp
+    hooks/ProcessEventCallGuard.cpp
+    hooks/ProcessEventDispatch.cpp
     hooks/ProcessEventStructureReflection.cpp
+    core/EventManager.cpp
     core/StructureEventDispatcher.cpp
     ue/StructureReflection.cpp
     ue/RuntimeReflection.cpp
     runtime/Logger.cpp
+    runtime/RuntimeMarkers.cpp
 )
 target_include_directories(process_event_structure_reflection_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(process_event_structure_reflection_tests PRIVATE fmt::fmt spdlog::spdlog)
+target_link_libraries(process_event_structure_reflection_tests PRIVATE obelisk_sdk fmt::fmt spdlog::spdlog)
 
 add_test(NAME ProcessEventStructureReflectionTests COMMAND process_event_structure_reflection_tests)
 

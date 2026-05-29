@@ -4,13 +4,18 @@
 from __future__ import annotations
 
 import argparse
+import json
 import shlex
 import subprocess
 import sys
 from pathlib import Path
 
+from reflection_target_sets import TARGET_SETS, schema_targets
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+PROTECTED_OUTPUT_ROOTS = (Path("/servidor/ark"),)
+APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
 DEFAULT_FNAME_INDICES = (
     "None=0",
     "ClientMessage=4884",
@@ -18,6 +23,17 @@ DEFAULT_FNAME_INDICES = (
     "SetActiveMissionDebugFlags=9622",
 )
 DEFAULT_GOBJECTS_SAMPLE_INDICES = ("0", "1", "25447")
+DEFAULT_TARGET_SET = "minimal-second-source-intake"
+DEFAULT_BASE_ROOT = "tests/fixtures/ufunction_snapshots"
+UFUNCTION_SCHEMA = "obelisk.ufunction-chain.snapshot.v1"
+SNAPSHOT_COMPARISON_REPORT = "readiness-report.json"
+SNAPSHOT_COMPARISON_STDERR = "readiness-report.stderr.txt"
+READINESS_SCHEMA = "obelisk.reflection-snapshot-readiness.v1"
+READINESS_GATE_MODE = "second_source_promotion"
+
+
+class ReadinessReportError(ValueError):
+    """Raised when persisted readiness JSON is not acceptable for promotion."""
 
 
 def parse_args() -> argparse.Namespace:
@@ -33,17 +49,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--pack-dir", required=True, help="Evidence pack output directory.")
     parser.add_argument(
         "--snapshot-root",
-        required=True,
         help="Output root for regenerated candidate UFunction snapshots.",
     )
     parser.add_argument(
         "--verified-fname-root-slot",
-        required=True,
         help="Artifact-specific verified FName root slot address, for example 0x1234.",
     )
     parser.add_argument(
         "--gobjects-candidate",
-        required=True,
         help="Artifact-specific GObjects candidate address, for example 0x595b7e0.",
     )
     parser.add_argument(
@@ -65,18 +78,31 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--target-set",
-        default="minimal-second-source-intake",
+        default=DEFAULT_TARGET_SET,
         help="UFunction target set to regenerate and compare.",
     )
     parser.add_argument(
         "--base-root",
-        default="tests/fixtures/ufunction_snapshots",
+        default=DEFAULT_BASE_ROOT,
         help="Committed primary UFunction snapshot root.",
     )
     parser.add_argument(
         "--execute",
         action="store_true",
         help="Run the commands. Without this flag, only print the reproducible plan.",
+    )
+    parser.add_argument(
+        "--scan-only",
+        action="store_true",
+        help=(
+            "Only build the initial FName table scan evidence pack. Use this before an "
+            "artifact-specific FName root and GObjects candidate have been reviewed."
+        ),
+    )
+    parser.add_argument(
+        "--json-plan",
+        action="store_true",
+        help="Print the command plan as JSON for review artifacts. Incompatible with --execute.",
     )
     return parser.parse_args()
 
@@ -108,16 +134,137 @@ def require_ignored_output_path(path: str, label: str) -> None:
         )
 
 
+def is_relative_to(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+
+def is_approved_offline_workspace_path(path: Path) -> bool:
+    resolved = path.resolve()
+    return any(is_relative_to(resolved, root.resolve()) for root in APPROVED_OFFLINE_WORKSPACE_ROOTS)
+
+
+def reject_protected_output_path(path: str, label: str) -> None:
+    expanded = Path(path).expanduser()
+    for root in PROTECTED_OUTPUT_ROOTS:
+        if expanded.is_absolute() and is_relative_to(expanded, root) and not is_approved_offline_workspace_path(expanded):
+            raise SystemExit(f"{label} must not write under protected server root {root}: {expanded}")
+    candidate = expanded.resolve()
+    for root in PROTECTED_OUTPUT_ROOTS:
+        if is_relative_to(candidate, root.resolve()) and not is_approved_offline_workspace_path(candidate):
+            raise SystemExit(f"{label} must not write under protected server root {root}: {candidate}")
+
+
+def reject_protected_input_path(path: str, label: str) -> None:
+    expanded = Path(path).expanduser()
+    for root in PROTECTED_OUTPUT_ROOTS:
+        if expanded.is_absolute() and is_relative_to(expanded, root) and not is_approved_offline_workspace_path(expanded):
+            raise SystemExit(f"{label} must not read from protected server root {root}: {expanded}")
+    candidate = expanded.resolve()
+    for root in PROTECTED_OUTPUT_ROOTS:
+        if is_relative_to(candidate, root.resolve()) and not is_approved_offline_workspace_path(candidate):
+            raise SystemExit(f"{label} must not read from protected server root {root}: {candidate}")
+
+
+def parse_nonnegative_int(value: str, label: str) -> int:
+    try:
+        parsed = int(value, 0)
+    except ValueError as exc:
+        raise SystemExit(f"{label} must be an integer/address: {value}") from exc
+    if parsed < 0:
+        raise SystemExit(f"{label} must be non-negative: {value}")
+    return parsed
+
+
+def validate_unlabeled_address(value: str | None, label: str) -> None:
+    if value is None:
+        return
+    if "=" in value:
+        raise SystemExit(f"{label} expects a raw address, not LABEL=ADDR: {value}")
+    parse_nonnegative_int(value, label)
+
+
+def validate_fname_index(value: str) -> None:
+    if "=" in value:
+        name, raw_index = value.split("=", 1)
+        if not name.strip():
+            raise SystemExit("--fname-index label must not be empty")
+        parse_nonnegative_int(raw_index, "--fname-index")
+        return
+    parse_nonnegative_int(value, "--fname-index")
+
+
 def preflight_execute(args: argparse.Namespace) -> None:
     require_existing_file(args.binary, "--binary")
     require_existing_file(args.core, "--core")
     require_ignored_output_path(args.pack_dir, "--pack-dir")
-    require_ignored_output_path(args.snapshot_root, "--snapshot-root")
+    if not args.scan_only:
+        require_ignored_output_path(args.snapshot_root, "--snapshot-root")
+
+
+def validate_args(args: argparse.Namespace) -> None:
+    if args.json_plan and args.execute:
+        raise SystemExit("--json-plan is a dry-run review artifact and cannot be combined with --execute")
+    reject_protected_input_path(args.binary, "--binary")
+    reject_protected_input_path(args.core, "--core")
+    reject_protected_output_path(args.pack_dir, "--pack-dir")
+    for item in args.fname_index:
+        validate_fname_index(item)
+    for item in args.gobjects_sample_index:
+        parse_nonnegative_int(item, "--gobjects-sample-index")
+    if args.scan_only:
+        incompatible = []
+        if args.snapshot_root:
+            incompatible.append("--snapshot-root")
+        if args.verified_fname_root_slot:
+            incompatible.append("--verified-fname-root-slot")
+        if args.gobjects_candidate:
+            incompatible.append("--gobjects-candidate")
+        if args.gobjects_sample_index:
+            incompatible.append("--gobjects-sample-index")
+        if args.target_set != DEFAULT_TARGET_SET:
+            incompatible.append("--target-set")
+        if args.base_root != DEFAULT_BASE_ROOT:
+            incompatible.append("--base-root")
+        if incompatible:
+            raise SystemExit(
+                "--scan-only cannot be combined with full-intake arguments: "
+                + ", ".join(incompatible)
+            )
+        return
+    if args.target_set not in TARGET_SETS:
+        raise SystemExit(
+            "--target-set must be one of: " + ", ".join(sorted(TARGET_SETS))
+        )
+    if not schema_targets(args.target_set, UFUNCTION_SCHEMA):
+        raise SystemExit(f"--target-set {args.target_set!r} has no UFunction snapshot targets")
+    reject_protected_input_path(args.base_root, "--base-root")
+    missing = []
+    if not args.snapshot_root:
+        missing.append("--snapshot-root")
+    if not args.verified_fname_root_slot:
+        missing.append("--verified-fname-root-slot")
+    if not args.gobjects_candidate:
+        missing.append("--gobjects-candidate")
+    if missing:
+        raise SystemExit(
+            "full intake requires these arguments unless --scan-only is used: "
+            + ", ".join(missing)
+        )
+    validate_unlabeled_address(args.verified_fname_root_slot, "--verified-fname-root-slot")
+    validate_unlabeled_address(args.gobjects_candidate, "--gobjects-candidate")
+    reject_protected_output_path(args.snapshot_root, "--snapshot-root")
 
 
 def build_commands(args: argparse.Namespace) -> list[list[str]]:
     pack_dir = rel_or_abs(args.pack_dir)
-    manifest = str(Path(pack_dir) / "manifest.json")
+    scan_pack_dir = str(Path(pack_dir) / "fname-scan")
+    root_validation_pack_dir = str(Path(pack_dir) / "fname-root-validation")
+    sample_pack_dir = str(Path(pack_dir) / "gobjects-sampling")
+    manifest = str(Path(sample_pack_dir) / "manifest.json")
     fname_indices = args.fname_index or list(DEFAULT_FNAME_INDICES)
     sample_indices = args.gobjects_sample_index or list(DEFAULT_GOBJECTS_SAMPLE_INDICES)
 
@@ -129,12 +276,33 @@ def build_commands(args: argparse.Namespace) -> list[list[str]]:
         "--core",
         rel_or_abs(args.core),
         "--output-dir",
-        pack_dir,
+        scan_pack_dir,
         "--scan-fname-tables",
+        "--no-default-candidates",
+        "--no-default-fname-roots",
         "--no-default-fname-indices",
     ]
     for item in fname_indices:
         scan_command.extend(["--fname-index", item])
+
+    if args.scan_only:
+        return [scan_command]
+
+    root_validation_command = [
+        "python3",
+        "scripts/scan_core_fname_tables.py",
+        "--core",
+        rel_or_abs(args.core),
+        "--root-slot",
+        args.verified_fname_root_slot,
+        "--require-exact-root",
+        "--no-default-indices",
+        "--json",
+        "--json-out",
+        str(Path(root_validation_pack_dir) / "core.fname-root-validation.json"),
+    ]
+    for item in fname_indices:
+        root_validation_command.extend(["--index", item])
 
     sample_command = [
         "python3",
@@ -144,7 +312,9 @@ def build_commands(args: argparse.Namespace) -> list[list[str]]:
         "--core",
         rel_or_abs(args.core),
         "--output-dir",
-        pack_dir,
+        sample_pack_dir,
+        "--no-default-candidates",
+        "--no-default-fname-roots",
         "--fname-root-slot",
         f"verified_fname_root_slot={args.verified_fname_root_slot}",
         "--gobjects-candidate",
@@ -176,27 +346,257 @@ def build_commands(args: argparse.Namespace) -> list[list[str]]:
         rel_or_abs(args.snapshot_root),
         "--target-set",
         args.target_set,
+        "--readiness-report",
+        "--fail-on-readiness-gaps",
         "--json",
     ]
 
-    return [scan_command, sample_command, regenerate_command, compare_command]
+    return [root_validation_command, sample_command, regenerate_command, compare_command]
+
+
+def phase_output_dirs(args: argparse.Namespace) -> dict[str, str | None]:
+    pack_dir = Path(rel_or_abs(args.pack_dir))
+    scan_only = args.scan_only
+    return {
+        "fname_table_scan": str(pack_dir / "fname-scan") if scan_only else None,
+        "fname_root_validation": None if scan_only else str(pack_dir / "fname-root-validation"),
+        "gobjects_sampling": None if scan_only else str(pack_dir / "gobjects-sampling"),
+        "snapshot_comparison": None if scan_only else str(pack_dir / "snapshot-comparison"),
+    }
+
+
+def phase_order(args: argparse.Namespace) -> list[str]:
+    if args.scan_only:
+        return ["fname_table_scan"]
+    return [
+        "fname_root_validation",
+        "gobjects_sampling",
+        "ufunction_snapshot_regeneration",
+        "snapshot_comparison",
+    ]
+
+
+def build_plan(args: argparse.Namespace, commands: list[list[str]]) -> dict[str, object]:
+    scan_only = args.scan_only
+    phases = phase_order(args)
+    output_dirs = phase_output_dirs(args)
+    return {
+        "schema": "obelisk.second-source-core-intake-plan.v1",
+        "mode": "scan-only" if scan_only else "full-intake",
+        "execute": False,
+        "repo_root": str(REPO_ROOT),
+        "phase_output_dirs": output_dirs,
+        "comparison_report": None
+        if scan_only
+        else str(Path(str(output_dirs["snapshot_comparison"])) / SNAPSHOT_COMPARISON_REPORT),
+        "required_artifact_inputs": [
+            "offline copy of the matching ShooterGameServer binary",
+            "offline independent core artifact from the same ARK binary",
+            "binary SHA256 recorded before review",
+            "core/artifact SHA256 recorded before review",
+            "artifact_kind recorded for both primary and candidate snapshot roots",
+            "capture_id distinct from the primary-core capture",
+            "evidence_pack_id distinct from the primary-core evidence pack",
+            "artifact_sha256 distinct from the primary-core artifact",
+            "artifact-specific FName root derived from this core before full intake",
+            "artifact-specific GObjects candidate reviewed against this core before full intake",
+        ],
+        "inputs": {
+            "binary": rel_or_abs(args.binary),
+            "core": rel_or_abs(args.core),
+            "pack_dir": rel_or_abs(args.pack_dir),
+            "snapshot_root": None if scan_only else rel_or_abs(args.snapshot_root),
+            "target_set": None if scan_only else args.target_set,
+            "base_root": None if scan_only else rel_or_abs(args.base_root),
+            "verified_fname_root_slot": args.verified_fname_root_slot,
+            "gobjects_candidate": args.gobjects_candidate,
+            "fname_indices": args.fname_index or list(DEFAULT_FNAME_INDICES),
+            "gobjects_sample_indices": []
+            if scan_only
+            else args.gobjects_sample_index or list(DEFAULT_GOBJECTS_SAMPLE_INDICES),
+        },
+        "phase_order": phases,
+        "review_gates": [
+            "no live server operations",
+            "execute requires existing binary/core paths",
+            "in-repository output paths must be ignored by Git",
+            "direct FName root validation must pass exact requested indices before GObjects sampling",
+            "full intake requires reviewed artifact-specific FName root and GObjects candidate",
+        ],
+        "promotion_blockers": [
+            "missing independent artifact identity",
+            "missing or partial sanitized artifact identity on either root: artifact_kind, artifact_sha256, capture_id, and evidence_pack_id are all required",
+            "matching or reused primary-core artifact_sha256, capture_id, or evidence_pack_id",
+            "dry-run or scan-only JSON plan treated as accepted FName or UFunction evidence",
+            "FName table scan artifact treated as accepted FName evidence or layout promotion",
+            "direct FName root validation missing, failed, or only partially matched",
+            "missing or reused primary-core FName root assumptions",
+            "GDB/core inspection failure in the evidence pack",
+            "missing candidate snapshot root",
+            "snapshot comparison missing, inconclusive, rejected, or base-blocked targets",
+            "snapshot comparison readiness JSON missing from the executed intake pack",
+            "snapshot comparison readiness JSON schema or gate_mode mismatch",
+            "promotion_gate.ready is not true in the readiness report",
+            "promotion_gate.blockers is present and non-empty in the readiness report",
+            "readiness report target_sets does not contain the executed command target set",
+            "readiness report totals.targets is zero or missing",
+        ],
+        "commands": [
+            {
+                "phase": phase,
+                "argv": command,
+                "shell": shlex.join(command),
+            }
+            for phase, command in zip(phases, commands, strict=True)
+        ],
+    }
+
+
+def expected_target_sets_from_command(command: list[str]) -> list[str]:
+    target_sets: list[str] = []
+    iterator = iter(enumerate(command))
+    for index, item in iterator:
+        if item == "--target-set":
+            try:
+                _, target_set = next(iterator)
+            except StopIteration as exc:
+                raise ReadinessReportError("compare command ended after --target-set") from exc
+            target_sets.append(target_set)
+        elif item.startswith("--target-set="):
+            target_sets.append(item.split("=", 1)[1])
+    if not target_sets:
+        raise ReadinessReportError("compare command did not include --target-set")
+    return target_sets
+
+
+def require_persisted_readiness_report(
+    report_path: Path,
+    *,
+    expected_target_sets: list[str],
+) -> None:
+    try:
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise ReadinessReportError(f"readiness report was not written: {report_path}") from exc
+    except json.JSONDecodeError as exc:
+        raise ReadinessReportError(f"readiness report is not valid JSON: {exc}") from exc
+
+    if not isinstance(report, dict):
+        raise ReadinessReportError("readiness report root must be a JSON object")
+    if report.get("schema") != READINESS_SCHEMA:
+        raise ReadinessReportError(
+            f"readiness report schema must be {READINESS_SCHEMA}, got {report.get('schema')!r}"
+        )
+    if report.get("gate_mode") != READINESS_GATE_MODE:
+        raise ReadinessReportError(
+            f"readiness report gate_mode must be {READINESS_GATE_MODE}, got {report.get('gate_mode')!r}"
+        )
+
+    promotion_gate = report.get("promotion_gate")
+    if not isinstance(promotion_gate, dict):
+        raise ReadinessReportError("readiness report promotion_gate must be an object")
+    if promotion_gate.get("ready") is not True:
+        raise ReadinessReportError("readiness report promotion_gate.ready is not true")
+    if "blockers" in promotion_gate and promotion_gate["blockers"] != []:
+        raise ReadinessReportError("readiness report promotion_gate.blockers must be empty or absent")
+
+    target_sets = report.get("target_sets")
+    if not isinstance(target_sets, list) or not all(isinstance(item, str) for item in target_sets):
+        raise ReadinessReportError("readiness report target_sets must be a list of strings")
+    missing_target_sets = sorted(set(expected_target_sets) - set(target_sets))
+    if missing_target_sets:
+        raise ReadinessReportError(
+            "readiness report target_sets missing expected command target set(s): "
+            + ", ".join(missing_target_sets)
+        )
+
+    totals = report.get("totals")
+    if not isinstance(totals, dict):
+        raise ReadinessReportError("readiness report totals must be an object")
+    targets = totals.get("targets")
+    if not isinstance(targets, int) or isinstance(targets, bool) or targets <= 0:
+        raise ReadinessReportError("readiness report totals.targets must be greater than zero")
+
+
+def append_wrapper_stderr(stderr_path: Path, message: str) -> None:
+    prefix = ""
+    if stderr_path.exists() and stderr_path.stat().st_size > 0:
+        existing = stderr_path.read_text(encoding="utf-8")
+        prefix = "" if existing.endswith("\n") else "\n"
+    with stderr_path.open("a", encoding="utf-8") as stream:
+        stream.write(f"{prefix}{message}\n")
+
+
+def run_commands(args: argparse.Namespace, commands: list[list[str]]) -> int:
+    phases = phase_order(args)
+    for phase, command in zip(phases, commands, strict=True):
+        print(f"\n==> {shlex.join(command)}", flush=True)
+        if phase != "snapshot_comparison":
+            subprocess.run(command, cwd=REPO_ROOT, check=True)
+            continue
+
+        output_dir = Path(rel_or_abs(args.pack_dir)) / "snapshot-comparison"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        report_path = output_dir / SNAPSHOT_COMPARISON_REPORT
+        stderr_path = output_dir / SNAPSHOT_COMPARISON_STDERR
+        completed = subprocess.run(
+            command,
+            cwd=REPO_ROOT,
+            check=False,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        report_path.write_text(completed.stdout, encoding="utf-8")
+        if completed.stderr:
+            stderr_path.write_text(completed.stderr, encoding="utf-8")
+        elif stderr_path.exists():
+            stderr_path.unlink()
+        if completed.stdout:
+            print(completed.stdout, end="")
+        if completed.stderr:
+            print(completed.stderr, end="", file=sys.stderr)
+        validation_failure = None
+        try:
+            require_persisted_readiness_report(
+                report_path,
+                expected_target_sets=expected_target_sets_from_command(command),
+            )
+        except ReadinessReportError as exc:
+            validation_failure = str(exc)
+        if completed.returncode != 0:
+            if validation_failure:
+                message = f"snapshot comparison readiness validation failed: {validation_failure}"
+                append_wrapper_stderr(stderr_path, message)
+                print(message, file=sys.stderr)
+            print(f"snapshot comparison report written to {report_path}", file=sys.stderr)
+            return completed.returncode
+        if validation_failure:
+            message = f"snapshot comparison readiness validation failed: {validation_failure}"
+            append_wrapper_stderr(stderr_path, message)
+            print(message, file=sys.stderr)
+            print(f"snapshot comparison report written to {report_path}", file=sys.stderr)
+            return 1
+        print(f"snapshot comparison report written to {report_path}")
+    return 0
 
 
 def main() -> int:
     args = parse_args()
+    validate_args(args)
     commands = build_commands(args)
 
     if not args.execute:
+        if args.json_plan:
+            print(json.dumps(build_plan(args, commands), indent=2, sort_keys=True))
+            return 0
         print("# Dry run: pass --execute to run these offline commands.")
         for command in commands:
             print(shlex.join(command))
         return 0
 
     preflight_execute(args)
-    for command in commands:
-        print(f"\n==> {shlex.join(command)}", flush=True)
-        subprocess.run(command, cwd=REPO_ROOT, check=True)
-    return 0
+    return run_commands(args, commands)
 
 
 if __name__ == "__main__":

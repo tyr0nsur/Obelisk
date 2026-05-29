@@ -10,7 +10,8 @@ engineering work, or failed attempts that teach something useful.
 
 ## Learning Loop
 
-Every serious investigation should end with one of these outcomes:
+Every serious lead-owned investigation, or docs/research task explicitly assigned to a
+worker, should end with one of these outcomes:
 
 - Code change with tests or live validation.
 - Research note under `docs/research/`.
@@ -19,6 +20,16 @@ Every serious investigation should end with one of these outcomes:
 
 If the finding changes how agents should behave, update a skill. If it only records one
 experiment or evidence trail, update `docs/research/`.
+
+Adopted knowledge should not remain only in chat or an agent result. Promote it to the
+smallest durable place that will help the next worker:
+
+- skill rule when it changes repeatable behavior;
+- research note when it records evidence, rejected hypotheses, or a design investigation;
+- active handoff only when it changes the next turn's routing or immediate priorities.
+
+Keep the promoted form concise. Avoid copying full agent transcripts, leader cadence, or
+coordination chatter into skills or contributor docs.
 
 Sub-agents may recommend skill changes in their final report or in an assigned research
 note, but the team lead owns skill edits, commits, pushes, and handoff updates. Do not let
@@ -62,24 +73,13 @@ Create or update:
 docs/research/YYYY-MM-DD-topic.md
 ```
 
-Use these sections:
-
-- Objective
-- Environment
-- Hypothesis
-- Method
-- Evidence
-- Result
-- Rejected paths
-- Risks
-- Next steps
-- Skill updates needed
-
-Keep raw logs out of Git. Summarize the important lines and reference local paths.
+Use `docs/research/README.md` as the canonical template. Keep raw logs out of Git;
+summarize the important lines and reference local paths.
 
 ## Skill Update Pattern
 
-Update `agent-skills/` when a research result changes future behavior:
+The lead, or an explicitly assigned docs/skills worker, updates `agent-skills/` when a
+research result changes future behavior:
 
 - `obelisk-core-runtime`: runtime safety, plugin lifecycle, API ownership.
 - `obelisk-linux-hooking`: hook mechanism, trampolines, memory protection.
@@ -129,5 +129,5 @@ starting a new round.
       explicit next actions?
 - [ ] Did the relevant skill get updated?
 - [ ] Did `docs/research/` get updated when the evidence is too detailed for a skill?
-- [ ] Are changes either intentionally batched for a later useful checkpoint or committed
-      and pushed because they are checkpoint-worthy now?
+- [ ] Are changes intentionally batched for later lead integration, or ready for the lead
+      to checkpoint?

@@ -15,6 +15,8 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
     enum class GateStatus
     {
         Disabled,
+        MissingObserverDebugProfile,
+        MissingObserverDebugWindow,
         MissingInstanceMarker,
         MissingBinarySha256,
         UnsupportedBinarySha256,
@@ -54,14 +56,27 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
         size_t ScalarCount = 0;
     };
 
-    Gate EvaluateGate(const char* enableStructureReflection, bool instanceMarkerEnabled, const char* binarySha256);
+    Gate EvaluateGate(const char* enableStructureReflection,
+                      bool observerDebugProfileEnabled,
+                      bool observerDebugWindowEnabled,
+                      bool instanceMarkerEnabled,
+                      const char* binarySha256);
     bool IsReflectedStructureNameIndex(int32_t nameIndex);
     bool ShouldAttemptObservation(uint64_t limit);
     bool ShouldAttemptRuntimeObservation(uint64_t logLimit, uint64_t dispatchLimit);
+    bool ShouldAttemptRuntimeObservation(const std::atomic<uint64_t>& logCounter,
+                                         uint64_t logLimit,
+                                         const std::atomic<uint64_t>& dispatchCounter,
+                                         uint64_t dispatchLimit);
     bool ShouldAttemptNameObservation(int32_t nameIndex, uint64_t limit);
     bool ShouldAttemptNameObservation(int32_t nameIndex, uint64_t logLimit, uint64_t dispatchLimit);
     bool ShouldLogObservation(uint64_t observationNumber, uint64_t limit);
+    bool HasObservationBudgetRemaining(const std::atomic<uint64_t>& counter, uint64_t limit);
     bool TryReserveObservationBudget(std::atomic<uint64_t>& counter, uint64_t limit, uint64_t& observationNumber);
+    bool TryReserveDispatchBudgetForMatchedAttempt(const Attempt& attempt,
+                                                   std::atomic<uint64_t>& counter,
+                                                   uint64_t limit,
+                                                   uint64_t& observationNumber);
 
     Attempt TryIdentifyInvocation(const Gate& gate,
                                   int32_t nameIndex,
@@ -70,5 +85,7 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
                                   void* params);
     bool TryBuildCopiedStructureEvent(const Obelisk::UE::StructureReflection::StructureInvocation& invocation,
                                       CopiedStructureEvent& out);
-    size_t DispatchCopiedStructureEvent(const Obelisk::UE::StructureReflection::StructureInvocation& invocation);
+    size_t MaybeDispatchCopiedStructureEventAfterOriginal(
+        bool originalWasCalled,
+        const Obelisk::UE::StructureReflection::StructureInvocation& invocation);
 }

@@ -9,6 +9,11 @@ namespace
     bool g_HasApi = false;
     uint64_t g_OwnerToken = 0;
     uint64_t g_ProcessEventHandle = 0;
+    uint64_t g_GameplayPolicyEventHandle = 0;
+    uint64_t g_GameplayPolicyEventUserData = 0x5DC0DE;
+    bool g_GameplayPolicyEventSeen = false;
+    bool g_GameplayPolicyEventAccepted = false;
+    ObeliskGameplayPolicyEvent g_GameplayPolicyEventCopy{};
 
     constexpr const char* kDefaultConfig = R"json({
     "enabled": false,
@@ -19,6 +24,84 @@ namespace
     bool OnProcessEvent(void*, void*, void*)
     {
         return true;
+    }
+
+    bool ValidateGameplayPolicyEventCopy(const ObeliskGameplayPolicyEvent& event, void* userData)
+    {
+        constexpr uint64_t kCopiedPayload = OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD;
+        if (userData != &g_GameplayPolicyEventUserData ||
+            event.abi_version != OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION ||
+            event.struct_size < sizeof(ObeliskGameplayPolicyEvent) ||
+            (event.flags & kCopiedPayload) == 0)
+        {
+            return false;
+        }
+
+        if (event.event_kind == OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_VARIANT_CHANGE)
+        {
+            constexpr uint64_t kRequiredFlags = OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD |
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED;
+            constexpr uint64_t kRequiredFields = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_VARIANT_INDEX |
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE_SET;
+
+            return event.resource_kind == OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE &&
+                (event.flags & kRequiredFlags) == kRequiredFlags &&
+                (event.flags & OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED) == 0 &&
+                (event.field_mask & kRequiredFields) == kRequiredFields &&
+                (event.bool_values & (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_FORCE_SET)) != 0 &&
+                (event.bool_values & (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_RETURN_VALUE)) == 0 &&
+                event.int32_values[OBELISK_GAMEPLAY_POLICY_FIELD_VARIANT_INDEX] == 7;
+        }
+
+        if (event.event_kind == OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK)
+        {
+            constexpr uint64_t kRequiredFlags = OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD |
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED;
+            constexpr uint64_t kRequiredFields = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER;
+
+            return event.resource_kind == OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM &&
+                (event.flags & kRequiredFlags) == kRequiredFlags &&
+                (event.flags & OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED) == 0 &&
+                (event.field_mask & kRequiredFields) == kRequiredFields &&
+                (event.bool_values & (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_REQUESTED_BY_PLAYER)) != 0 &&
+                (event.bool_values & (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_RETURN_VALUE)) != 0;
+        }
+
+        if (event.event_kind == OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK)
+        {
+            constexpr uint64_t kRequiredFlags = OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD |
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED;
+            constexpr uint64_t kRequiredFields = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN;
+
+            return event.resource_kind == OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM &&
+                (event.flags & kRequiredFlags) == kRequiredFlags &&
+                (event.flags & OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED) == 0 &&
+                (event.field_mask & kRequiredFields) == kRequiredFields &&
+                (event.bool_values & (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_IGNORE_COOLDOWN)) == 0 &&
+                (event.bool_values & (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_RETURN_VALUE)) != 0;
+        }
+
+        return false;
+    }
+
+    void OnGameplayPolicyEvent(const ObeliskGameplayPolicyEvent* event, void* userData)
+    {
+        g_GameplayPolicyEventSeen = true;
+        g_GameplayPolicyEventAccepted = false;
+        g_GameplayPolicyEventCopy = {};
+
+        if (!event ||
+            event->abi_version != OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION ||
+            event->struct_size < sizeof(ObeliskGameplayPolicyEvent))
+        {
+            return;
+        }
+
+        g_GameplayPolicyEventCopy = *event;
+        g_GameplayPolicyEventAccepted = ValidateGameplayPolicyEventCopy(g_GameplayPolicyEventCopy, userData);
     }
 
     bool HasProcessEventHandleApi(const ObeliskApi* api)
@@ -32,12 +115,53 @@ namespace
             api->UnregisterProcessEventCallbackWithOwnerToken;
     }
 
+    bool HasGameplayPolicyEventApi(const ObeliskApi* api)
+    {
+        return api &&
+            (api->capabilities & OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS) != 0 &&
+            api->struct_size >= offsetof(ObeliskApi, UnregisterGameplayPolicyEventWithOwnerToken) +
+                sizeof(api->UnregisterGameplayPolicyEventWithOwnerToken) &&
+            api->RegisterGameplayPolicyEventWithOwnerTokenHandle &&
+            api->UnregisterGameplayPolicyEventWithOwnerToken;
+    }
+
+    void UnregisterCallbacks()
+    {
+        if (g_HasApi && g_GameplayPolicyEventHandle != 0 && g_Api.UnregisterGameplayPolicyEventWithOwnerToken)
+        {
+            try
+            {
+                g_Api.UnregisterGameplayPolicyEventWithOwnerToken(g_OwnerToken, g_GameplayPolicyEventHandle);
+                g_GameplayPolicyEventHandle = 0;
+            }
+            catch (...)
+            {
+            }
+        }
+
+        if (g_HasApi && g_ProcessEventHandle != 0 && g_Api.UnregisterProcessEventCallbackWithOwnerToken)
+        {
+            try
+            {
+                g_Api.UnregisterProcessEventCallbackWithOwnerToken(g_OwnerToken, g_ProcessEventHandle);
+                g_ProcessEventHandle = 0;
+            }
+            catch (...)
+            {
+            }
+        }
+    }
+
     void ResetState()
     {
         g_Api = {};
         g_HasApi = false;
         g_OwnerToken = 0;
         g_ProcessEventHandle = 0;
+        g_GameplayPolicyEventHandle = 0;
+        g_GameplayPolicyEventSeen = false;
+        g_GameplayPolicyEventAccepted = false;
+        g_GameplayPolicyEventCopy = {};
     }
 }
 
@@ -75,7 +199,8 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
         if (api->abi_version != OBELISK_API_ABI_VERSION ||
             api->struct_size < sizeof(ObeliskApi) ||
             context->abi_version != OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION ||
-            context->struct_size < sizeof(ObeliskPluginInitContext))
+            context->struct_size < sizeof(ObeliskPluginInitContext) ||
+            context->plugin_owner_token == 0)
         {
             return false;
         }
@@ -100,10 +225,26 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
             }
         }
 
+        if (HasGameplayPolicyEventApi(&g_Api))
+        {
+            g_GameplayPolicyEventHandle = g_Api.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                g_OwnerToken,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL,
+                OnGameplayPolicyEvent,
+                &g_GameplayPolicyEventUserData);
+            if (g_GameplayPolicyEventHandle == 0)
+            {
+                UnregisterCallbacks();
+                ResetState();
+                return false;
+            }
+        }
+
         return true;
     }
     catch (...)
     {
+        UnregisterCallbacks();
         ResetState();
         return false;
     }
@@ -113,8 +254,7 @@ extern "C" __attribute__((visibility("default"))) void ObeliskPlugin_Shutdown()
 {
     try
     {
-        if (g_HasApi && g_ProcessEventHandle != 0 && g_Api.UnregisterProcessEventCallbackWithOwnerToken)
-            g_Api.UnregisterProcessEventCallbackWithOwnerToken(g_OwnerToken, g_ProcessEventHandle);
+        UnregisterCallbacks();
 
         if (g_HasApi && g_Api.LogInfo)
             g_Api.LogInfo("[sdk_consumer_minimal] Shutdown.");
@@ -123,4 +263,14 @@ extern "C" __attribute__((visibility("default"))) void ObeliskPlugin_Shutdown()
     {
     }
     ResetState();
+}
+
+extern "C" __attribute__((visibility("default"))) bool SdkConsumerMinimal_GameplayPolicyEventSeen()
+{
+    return g_GameplayPolicyEventSeen;
+}
+
+extern "C" __attribute__((visibility("default"))) bool SdkConsumerMinimal_GameplayPolicyEventAccepted()
+{
+    return g_GameplayPolicyEventAccepted;
 }

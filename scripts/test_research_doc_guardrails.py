@@ -43,11 +43,14 @@ class ResearchDocGuardrailTests(unittest.TestCase):
         text = runbook.read_text(encoding="utf-8")
         offline_follow_up = text.split("## Offline Follow-Up", 1)[1]
 
-        self.assertIn("--scan-fname-tables", offline_follow_up)
-        self.assertIn("verified_fname_root_slot=<verified-slot-from-this-artifact>", offline_follow_up)
-        self.assertIn("--fname-root-slot verified_fname_root_slot=\"${verified_fname_root_slot}\"", offline_follow_up)
+        self.assertIn("--scan-only", offline_follow_up)
+        self.assertIn("--json-plan", offline_follow_up)
+        self.assertIn("--verified-fname-root-slot <verified-slot-from-this-artifact>", offline_follow_up)
+        self.assertIn("--gobjects-candidate 0x595b7e0", offline_follow_up)
         self.assertIn("not copied from the\n  primary-core-only `0x5956f30` slot", offline_follow_up)
         self.assertNotIn("static_fname_root_slot=0x5956f30", offline_follow_up)
+        self.assertNotIn("--binary /servidor/ark", offline_follow_up)
+        self.assertNotIn("/servidor/ark/obelisk/dumps", offline_follow_up)
 
     def test_historical_core_dump_runbook_is_not_ragnarok_executable(self) -> None:
         runbook = REPO_ROOT / "docs/research/2026-05-27-arkserver-core-dump-runbook.md"
@@ -121,6 +124,90 @@ class ResearchDocGuardrailTests(unittest.TestCase):
                     offenders.append(f"{note.relative_to(REPO_ROOT)}: {phrase}")
 
         self.assertEqual(offenders, [])
+
+    def test_second_source_intake_runbook_keeps_planner_phases_explicit(self) -> None:
+        runbook = REPO_ROOT / "docs/research/2026-05-28-second-source-core-intake-runbook.md"
+        text = runbook.read_text(encoding="utf-8")
+
+        self.assertIn("Full-intake planning is offline and does not touch any live server", text)
+        self.assertIn("abort broad\nFName-table scans and plan the full sequence with direct root validation", text)
+        self.assertIn("scripts/scan_core_fname_tables.py", text)
+        self.assertIn("--root-slot <verified-slot>", text)
+        self.assertIn("--require-exact-root", text)
+        self.assertIn("fname-root-validation/core.fname-root-validation.json", text)
+        self.assertIn("--scan-only", text)
+        self.assertIn("only while deriving and reviewing an artifact-specific FName root for a\nnew binary hash", text)
+        self.assertIn("cannot be\nmistaken for GObjects sampling or snapshot comparison", text)
+        self.assertIn("--json-plan", text)
+        self.assertIn("obelisk.second-source-core-intake-plan.v1", text)
+        self.assertIn("stores both argv and shell-rendered commands", text)
+        self.assertIn("incompatible with\n`--execute`", text)
+        self.assertIn("--fail-on-readiness-gaps", text)
+        self.assertIn("promotion_gate.ready=true", text)
+        self.assertIn("reject direct or symlink-resolved live-server roots under\n`/servidor/ark`", text)
+        self.assertIn("store large raw captures under\n`/servidor/ark/obelisk/dumps`", text)
+        self.assertIn("promotion tooling must consume\nhardlinked or copied offline artifacts from the workspace", text)
+        self.assertIn("`/servidor/ark/workspace-offline`", text)
+        self.assertIn("contains UFunction snapshot\ntargets before expensive", text)
+        self.assertIn("`--verified-fname-root-slot` and `--gobjects-candidate` take raw non-negative addresses", text)
+        self.assertIn("not `LABEL=ADDR`", text)
+        self.assertIn("`--fname-index` takes either `LABEL=INDEX` or a raw\nnon-negative index", text)
+        self.assertIn("`--gobjects-sample-index` takes a non-negative integer", text)
+
+    def test_gap_matrix_minimal_second_source_compare_is_promotion_gate(self) -> None:
+        note = REPO_ROOT / "docs/research/2026-05-28-second-source-reversing-gap-matrix.md"
+        text = note.read_text(encoding="utf-8")
+        section = text.split("When a second sanitized snapshot root exists, compare only this intake first:", 1)[1]
+        command = section.split("```", 2)[1]
+
+        self.assertIn("--target-set minimal-second-source-intake", command)
+        self.assertIn("--readiness-report", command)
+        self.assertIn("--fail-on-readiness-gaps", command)
+        self.assertIn("--json", command)
+
+    def test_static_binary_skill_documents_verified_static_artifact_provenance(self) -> None:
+        skill = REPO_ROOT / "agent-skills/obelisk-static-binary-analysis/SKILL.md"
+        text = skill.read_text(encoding="utf-8")
+
+        self.assertIn("<artifact>.provenance.json", text)
+        self.assertIn("verified=true", text)
+        self.assertIn("matching `binary_sha256`", text)
+        self.assertIn("matching\n  `artifact_sha256`", text)
+        self.assertIn("resolving sidecars are fail-closed evidence blockers", text)
+        self.assertIn("build_static_global_promotion_evidence.py", text)
+        self.assertIn("writes verified sidecars", text)
+
+    def test_fname_manifest_plan_keeps_indices_binary_scoped(self) -> None:
+        note = REPO_ROOT / "docs/research/2026-05-28-fname-index-manifest-plan.md"
+        text = note.read_text(encoding="utf-8")
+
+        self.assertIn("obelisk.fname-index-manifest.v1", text)
+        self.assertIn("ark_binary_sha256", text)
+        self.assertIn("strict lowercase SHA256 hex", text)
+        self.assertIn("Hash mismatch must fail closed", text)
+        self.assertIn("Raw\nindices", text)
+        self.assertIn("runtime `int32_t` ABI", text)
+        self.assertIn("number` values other than `0` are rejected", text)
+        self.assertIn("candidate-only", text)
+        self.assertIn("accepted", text)
+        self.assertIn("obelisk.fname-index-promotion-evidence.v1", text)
+        self.assertIn("docs/research/YYYY-MM-DD-*.md", text)
+        self.assertIn("evidence-pack `manifest.json` path", text)
+        self.assertIn("Acceptance Criteria For `accepted`", text)
+        self.assertIn("artifact_kind", text)
+        self.assertIn("artifact_sha256", text)
+        self.assertIn("capture_id", text)
+        self.assertIn("evidence_pack_id", text)
+        self.assertIn("Static\nevidence alone must not turn `promotion_gate.ready` true", text)
+        self.assertIn("must\nnot point under `/servidor/ark`", text)
+        self.assertIn("--require-accepted", text)
+        self.assertIn("`--ark-binary <ShooterGameServer>`", text)
+        self.assertIn("`--resolve-name` must always include an expected\n   binary hash", text)
+        self.assertIn("Candidate-only manifests must use `--allow-candidate` explicitly", text)
+        self.assertIn("Non-JSON resolver output must print that field", text)
+        self.assertIn("preferably computed from an offline binary path", text)
+        self.assertIn("Do not expose a public plugin ABI callback-by-name", text)
+        self.assertIn("operator-side name-to-index workflow", text)
 
 
 if __name__ == "__main__":

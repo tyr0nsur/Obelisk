@@ -263,6 +263,65 @@ Promotion from experimental to stable requires proving that a plugin can run
 with filtered callbacks only, or documenting why a global callback is necessary
 and measuring its overhead on an isolated server.
 
+## Gameplay Event Promotion Gate
+
+Future gameplay event APIs must be Obelisk-level contracts, not thin wrappers over UE4
+runtime objects. Do not promote a module event into the public SDK until the promotion PR
+proves all of these items together:
+
+- the reflected function or struct target set has accepted, distinct second-source
+  evidence and the readiness report says `promotion_gate.ready=true`;
+- every callback payload is copied into Obelisk-owned POD storage before plugin code runs;
+- the public structs contain explicit sizes and primitive fields only, with no `UObject`,
+  `UFunction`, `FString`, raw parameter buffer, UE property pointer, STL type, reference,
+  exception, or ownership-bearing C++ object crossing the ABI;
+- registration is append-only in `ObeliskApi`, guarded by a capability bit, returns a
+  non-zero process-local handle, and has an owner-token unregister path;
+- plugin-owner cleanup removes the event callbacks on init failure and before `dlclose`;
+- SDK consumer tests build against the installed headers and exercise register,
+  unregister, shutdown cleanup, and rejected capability paths;
+- release docs name every promoted target set and keep runtime-observer log summaries
+  separate from second-source promotion evidence.
+
+The promoted v0.1 gameplay surface is `GameplayPolicyEvent`, an Obelisk-level copied POD
+policy signal backed by the accepted `structure-observer-intake` target set and the
+accepted compact inventory/structure layouts from `minimal-second-source-intake`. It is
+not a public `StructureEvents` wrapper, not a public Inventory SDK, and it does not expose
+UE4 objects. Plugins subscribe with `RegisterGameplayPolicyEventWithOwnerTokenHandle`, an
+event-kind mask, and a process-local owner-token handle; shutdown must call
+`UnregisterGameplayPolicyEventWithOwnerToken`.
+
+`GameplayPolicyEvent` exposes only approved scalar fields through `field_mask`,
+`bool_values`, and `int32_values`: return values, variant index, force-set, force,
+requested-by-player, and ignore-cooldown where the backing target contains them. Pincode
+values, player identity, character identity, structure identity, inventory identity, item
+identity, raw params, FName/GObjects indices, and all UE pointers remain redacted.
+`STRUCTURE_PIN_CODE_CHECK` is ReturnValue-only; plugins that do not want that timing
+signal should omit its event-kind mask. Inventory-backed policy events are still generic
+policy events under the same callback family. They use
+`OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL` for every promoted policy event,
+`OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY`,
+`OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED`, and
+`OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM`; they do not promote
+`InventoryPolicyEvent*` structs, Inventory callback capability bits, item handles,
+inventory lookup, inventory contents, item/player handles, mutation, or return override
+authority.
+Filtered `ProcessEvent` callbacks and runtime-observer log summaries are still not a public gameplay event API.
+
+In v0.1, `resource_kind` is a category only, not a game object identity. It may be used for
+routing, metrics, and sanitized logs such as "this policy event is structure-backed" or
+"inventory-item-backed"; it must not be treated as "this same structure/item", a lookup
+handle, a persistent ID, or a way to link events to a player, tribe, inventory, actor,
+coordinates, or UE object.
+`DescribeResourceKind` is the only v0.1 resource metadata helper: it returns a copied POD
+descriptor for known categories with supported event/field masks and explicit
+category-only/no-identity/no-lookup flags. Plugins must check the resource descriptor
+capability bit, that `struct_size` covers the appended `DescribeResourceKind` slot, and
+that the function pointer is non-null before calling it. Do not add `GetResource`,
+`ResolveResource`, `ResourceHandle`, pointer-derived IDs, GObjects-derived IDs, or object
+mutation APIs until a later promotion gate defines identity stability, privacy, lifecycle,
+and cross-instance semantics.
+
 ## HTTP And Security
 
 HTTP-capable plugins are two systems: an Obelisk plugin and a network service.

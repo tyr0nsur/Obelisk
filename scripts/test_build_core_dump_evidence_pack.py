@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import contextlib
+import io
 import sys
 import tempfile
 import unittest
@@ -15,7 +17,19 @@ import build_core_dump_evidence_pack as core_pack
 
 
 class CoreDumpEvidencePackCommandTests(unittest.TestCase):
-    def run_main_with_gdb_status(self, gdb_returncode: int, extra_args: list[str] | None = None) -> tuple[int, Path]:
+    def run_main_raw(self, argv: list[str]) -> tuple[int, str]:
+        stderr = io.StringIO()
+        with mock.patch.object(sys, "argv", argv), contextlib.redirect_stderr(stderr):
+            result = core_pack.main()
+        return result, stderr.getvalue()
+
+    def run_main_with_gdb_status(
+        self,
+        gdb_returncode: int,
+        extra_args: list[str] | None = None,
+        scan_payload: dict[str, object] | None = None,
+        create_scan_manifest: bool = False,
+    ) -> tuple[int, Path]:
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         temp_dir = Path(temp.name)
@@ -27,7 +41,25 @@ class CoreDumpEvidencePackCommandTests(unittest.TestCase):
 
         def fake_run_command(command: list[str], output_path: Path) -> dict[str, object]:
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            output_path.write_text("", encoding="utf-8")
+            if command and str(command[0]) == sys.executable and "scan_core_fname_tables.py" in str(command[1]):
+                payload = dict(scan_payload or {})
+                if payload.pop("__use_manifest_out_path", False):
+                    manifest_index = command.index("--manifest-out") + 1
+                    candidate_manifest = dict(payload.get("candidate_manifest") or {})
+                    candidate_manifest["path"] = command[manifest_index]
+                    payload["candidate_manifest"] = candidate_manifest
+                output_path.write_text(
+                    core_pack.json.dumps(payload),
+                    encoding="utf-8",
+                )
+                if create_scan_manifest:
+                    manifest_index = command.index("--manifest-out") + 1
+                    Path(command[manifest_index]).write_text(
+                        core_pack.json.dumps({"schema": "obelisk.fname-index-manifest.v1", "names": []}),
+                        encoding="utf-8",
+                    )
+            else:
+                output_path.write_text("", encoding="utf-8")
             returncode = gdb_returncode if command and command[0] == "gdb" else 0
             stderr_path = output_path.with_suffix(output_path.suffix + ".stderr")
             if returncode:
@@ -68,6 +100,213 @@ class CoreDumpEvidencePackCommandTests(unittest.TestCase):
         self.assertFalse((output_dir / "manifest.json").exists())
         self.assertTrue((output_dir / "gdb-core.txt.stderr").exists())
 
+    def test_rejects_protected_server_binary_input_before_file_checks(self) -> None:
+        result, stderr = self.run_main_raw(
+            [
+                "build_core_dump_evidence_pack.py",
+                "--binary",
+                "/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer",
+                "--core",
+                "/tmp/offline-core",
+                "--output-dir",
+                "/tmp/offline-pack",
+            ]
+        )
+
+        self.assertEqual(result, 2)
+        self.assertIn("--binary must not read from protected server root /servidor/ark", stderr)
+
+    def test_rejects_protected_server_core_input_before_file_checks(self) -> None:
+        result, stderr = self.run_main_raw(
+            [
+                "build_core_dump_evidence_pack.py",
+                "--binary",
+                "/tmp/offline-ShooterGameServer",
+                "--core",
+                "/servidor/ark/serverfiles/core",
+                "--output-dir",
+                "/tmp/offline-pack",
+            ]
+        )
+
+        self.assertEqual(result, 2)
+        self.assertIn("--core must not read from protected server root /servidor/ark", stderr)
+
+    def test_rejects_symlink_to_protected_server_binary_input(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            link = Path(temp_dir) / "ShooterGameServer"
+            link.symlink_to("/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer")
+            result, stderr = self.run_main_raw(
+                [
+                    "build_core_dump_evidence_pack.py",
+                    "--binary",
+                    str(link),
+                    "--core",
+                    "/tmp/offline-core",
+                    "--output-dir",
+                    "/tmp/offline-pack",
+                ]
+            )
+
+        self.assertEqual(result, 2)
+        self.assertIn("--binary must not read from protected server root /servidor/ark", stderr)
+
+    def test_rejects_approved_dump_symlink_to_protected_server_binary_input(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            link = Path(temp_dir) / "ShooterGameServer"
+            link.symlink_to("/servidor/ark/obelisk/dumps/second-source/raw/ShooterGameServer")
+            result, stderr = self.run_main_raw(
+                [
+                    "build_core_dump_evidence_pack.py",
+                    "--binary",
+                    str(link),
+                    "--core",
+                    "/tmp/offline-core",
+                    "--output-dir",
+                    "/tmp/offline-pack",
+                ]
+            )
+
+        self.assertEqual(result, 2)
+        self.assertIn("--binary must not read from protected server root /servidor/ark", stderr)
+
+    def test_rejects_protected_server_output_dir_before_file_checks(self) -> None:
+        result, stderr = self.run_main_raw(
+            [
+                "build_core_dump_evidence_pack.py",
+                "--binary",
+                "/tmp/offline-ShooterGameServer",
+                "--core",
+                "/tmp/offline-core",
+                "--output-dir",
+                "/servidor/ark/obelisk/state/offline-pack",
+            ]
+        )
+
+        self.assertEqual(result, 2)
+        self.assertIn("--output-dir must not write under protected server root /servidor/ark", stderr)
+
+    def test_rejects_unignored_in_repo_output_dir_before_writing_raw_artifacts(self) -> None:
+        output_dir = core_pack.REPO_ROOT / "docs" / "raw-core-pack"
+        result, stderr = self.run_main_raw(
+            [
+                "build_core_dump_evidence_pack.py",
+                "--binary",
+                "/tmp/offline-ShooterGameServer",
+                "--core",
+                "/tmp/offline-core",
+                "--output-dir",
+                str(output_dir),
+            ]
+        )
+
+        self.assertEqual(result, 2)
+        self.assertIn("--output-dir is inside the repository but is not ignored by Git", stderr)
+        self.assertFalse(output_dir.exists())
+
+    def test_rejects_symlink_to_protected_server_output_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            link = Path(temp_dir) / "pack"
+            link.symlink_to("/servidor/ark/obelisk/state/offline-pack")
+            result, stderr = self.run_main_raw(
+                [
+                    "build_core_dump_evidence_pack.py",
+                    "--binary",
+                    "/tmp/offline-ShooterGameServer",
+                    "--core",
+                    "/tmp/offline-core",
+                    "--output-dir",
+                    str(link),
+                ]
+            )
+
+        self.assertEqual(result, 2)
+        self.assertIn("--output-dir must not write under protected server root /servidor/ark", stderr)
+
+    def test_rejects_approved_dump_symlink_to_protected_server_output_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            link = Path(temp_dir) / "pack"
+            link.symlink_to("/servidor/ark/obelisk/dumps/second-source/intake/pack")
+            result, stderr = self.run_main_raw(
+                [
+                    "build_core_dump_evidence_pack.py",
+                    "--binary",
+                    "/tmp/offline-ShooterGameServer",
+                    "--core",
+                    "/tmp/offline-core",
+                    "--output-dir",
+                    str(link),
+                ]
+            )
+
+        self.assertEqual(result, 2)
+        self.assertIn("--output-dir must not write under protected server root /servidor/ark", stderr)
+
+    def test_rejects_server_dump_artifact_root_before_file_checks(self) -> None:
+        result, stderr = self.run_main_raw(
+            [
+                "build_core_dump_evidence_pack.py",
+                "--binary",
+                "/servidor/ark/obelisk/dumps/second-source/raw/ShooterGameServer",
+                "--core",
+                "/servidor/ark/obelisk/dumps/second-source/raw/core",
+                "--output-dir",
+                "/servidor/ark/obelisk/dumps/second-source/intake/pack",
+            ]
+        )
+
+        self.assertEqual(result, 2)
+        self.assertIn("--binary must not read from protected server root /servidor/ark", stderr)
+
+    def test_allows_paths_that_only_share_protected_prefix_text(self) -> None:
+        result, stderr = self.run_main_raw(
+            [
+                "build_core_dump_evidence_pack.py",
+                "--binary",
+                "/servidor/ark-not-live/ShooterGameServer",
+                "--core",
+                "/tmp/offline-core",
+                "--output-dir",
+                "/tmp/offline-pack",
+            ]
+        )
+
+        self.assertEqual(result, 2)
+        self.assertIn("binary does not exist", stderr)
+        self.assertNotIn("protected server root", stderr)
+
+    def test_allows_output_paths_that_only_share_protected_prefix_text(self) -> None:
+        result, stderr = self.run_main_raw(
+            [
+                "build_core_dump_evidence_pack.py",
+                "--binary",
+                "/tmp/offline-ShooterGameServer",
+                "--core",
+                "/tmp/offline-core",
+                "--output-dir",
+                "/servidor/ark-not-live/offline-pack",
+            ]
+        )
+
+        self.assertEqual(result, 2)
+        self.assertIn("binary does not exist", stderr)
+        self.assertNotIn("protected server root", stderr)
+
+    def test_allows_approved_offline_workspace_paths_under_server_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            protected = root / "server-root"
+            workspace = protected / "workspace-offline"
+            workspace.mkdir(parents=True)
+
+            with (
+                mock.patch.object(core_pack, "SERVER_ROOT", protected),
+                mock.patch.object(core_pack, "APPROVED_OFFLINE_WORKSPACE_ROOTS", (workspace,)),
+            ):
+                core_pack.reject_protected_input_path(workspace / "ShooterGameServer", "--binary")
+                core_pack.reject_protected_input_path(workspace / "core", "--core")
+                core_pack.reject_protected_output_path(workspace / "pack", "--output-dir")
+
     def test_main_marks_allowed_gdb_failure_as_partial(self) -> None:
         result, output_dir = self.run_main_with_gdb_status(1, ["--allow-partial-gdb"])
 
@@ -103,6 +342,56 @@ class CoreDumpEvidencePackCommandTests(unittest.TestCase):
             },
         )
 
+    def test_scan_fname_tables_receives_configured_indices(self) -> None:
+        result, output_dir = self.run_main_with_gdb_status(
+            0,
+            [
+                "--scan-fname-tables",
+                "--no-default-fname-indices",
+                "--fname-index",
+                "ServerChat=9619",
+                "--fname-index",
+                "SetActiveMissionDebugFlags=9622",
+            ],
+        )
+
+        self.assertEqual(result, 0)
+        manifest = core_pack.json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+        command = manifest["commands"]["core_fname_table_scan"]["command"]
+        self.assertIn("--index", command)
+        self.assertIn("ServerChat=9619", command)
+        self.assertIn("SetActiveMissionDebugFlags=9622", command)
+        self.assertNotIn("None=0", command)
+        self.assertNotIn("ClientMessage=4884", command)
+        self.assertIn("--ark-binary-sha256", command)
+        self.assertIn("--manifest-out", command)
+        self.assertIn(str(output_dir / "core.fname-index-manifest.json"), command)
+        self.assertIsNone(manifest["artifacts"]["core_fname_index_manifest"])
+        self.assertEqual(manifest["fname_table_scan"]["candidate_manifest_status"], "requested")
+        self.assertEqual(
+            manifest["fname_table_scan"]["requested_indices"],
+            [
+                {"label": "ServerChat", "index": 9619},
+                {"label": "SetActiveMissionDebugFlags", "index": 9622},
+            ],
+        )
+
+    def test_scan_fname_tables_preserves_empty_configured_indices(self) -> None:
+        result, output_dir = self.run_main_with_gdb_status(
+            0,
+            [
+                "--scan-fname-tables",
+                "--no-default-fname-indices",
+            ],
+        )
+
+        self.assertEqual(result, 0)
+        manifest = core_pack.json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+        command = manifest["commands"]["core_fname_table_scan"]["command"]
+        self.assertIn("--no-default-indices", command)
+        self.assertNotIn("--index", command)
+        self.assertEqual(manifest["fname_indices"], [])
+
     def test_core_promotion_gate_omits_static_xref_blocker_when_actionable(self) -> None:
         gate = core_pack.core_promotion_gate(gdb_failed=False, static_xrefs_actionable=True)
 
@@ -114,6 +403,77 @@ class CoreDumpEvidencePackCommandTests(unittest.TestCase):
                 "single_core_artifact",
                 "needs_second_isolated_capture_or_static_path",
             },
+        )
+
+    def test_fname_candidate_manifest_status_tracks_scan_payload(self) -> None:
+        self.assertEqual(core_pack.fname_candidate_manifest_status({}, False), "not_requested")
+        self.assertEqual(core_pack.fname_candidate_manifest_status({}, True), "requested")
+        self.assertEqual(
+            core_pack.fname_candidate_manifest_status(
+                {
+                    "candidate_manifest": {
+                        "name_count": 3,
+                    }
+                },
+                True,
+            ),
+            "written",
+        )
+        self.assertEqual(
+            core_pack.fname_candidate_manifest_status(
+                {
+                    "manifest_readiness": {
+                        "blockers": ["ambiguous_ready_candidates"],
+                    }
+                },
+                True,
+            ),
+            "blocked",
+        )
+
+    def test_scan_fname_tables_records_blocked_manifest_readiness_without_failing_pack(self) -> None:
+        result, output_dir = self.run_main_with_gdb_status(
+            0,
+            ["--scan-fname-tables"],
+            scan_payload={
+                "manifest_readiness": {
+                    "ready": False,
+                    "blockers": ["ambiguous_ready_candidates"],
+                },
+                "candidate_manifest": {
+                    "path": None,
+                    "name_count": 0,
+                },
+            },
+        )
+
+        self.assertEqual(result, 0)
+        manifest = core_pack.json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["fname_table_scan"]["candidate_manifest_status"], "blocked")
+        self.assertEqual(
+            manifest["fname_table_scan"]["manifest_readiness"]["blockers"],
+            ["ambiguous_ready_candidates"],
+        )
+        self.assertIsNone(manifest["artifacts"]["core_fname_index_manifest"])
+
+    def test_scan_fname_tables_records_manifest_artifact_only_when_written(self) -> None:
+        result, output_dir = self.run_main_with_gdb_status(
+            0,
+            ["--scan-fname-tables"],
+            scan_payload={
+                "__use_manifest_out_path": True,
+                "candidate_manifest": {
+                    "name_count": 3,
+                },
+            },
+            create_scan_manifest=True,
+        )
+
+        self.assertEqual(result, 0)
+        manifest = core_pack.json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(
+            manifest["artifacts"]["core_fname_index_manifest"],
+            str(output_dir / "core.fname-index-manifest.json"),
         )
 
     def test_gdb_commands_include_direct_fname_entry_reads(self) -> None:
@@ -188,7 +548,10 @@ class CoreDumpEvidencePackCommandTests(unittest.TestCase):
             self.assertIn("set $fuobject_item = ((char*)$gobjects_chunk)+0x0", text)
             self.assertIn("== gobjects sample gobjects[1] direct @ 0x595b7e0 ==", text)
             self.assertIn("set $fuobject_item = ((char*)$gobjects_chunk)+0x10", text)
-            self.assertIn("set $fuobject_metadata = *(unsigned long long*)(((char*)$fuobject_item)+0x8)", text)
+            self.assertIn("set $fuobject_qword_0x8 = *(unsigned long long*)(((char*)$fuobject_item)+0x8)", text)
+            self.assertIn("set $fuobject_dword_0x8 = *(int*)(((char*)$fuobject_item)+0x8)", text)
+            self.assertIn("set $fuobject_dword_0xc = *(int*)(((char*)$fuobject_item)+0xc)", text)
+            self.assertNotIn("$fuobject_serial", text)
             self.assertIn("set $uobject_internal_index = *(int*)(((char*)$uobject)+0xc)", text)
             self.assertIn("set $uobject_class = *(void**)(((char*)$uobject)+0x10)", text)
             self.assertIn("set $uobject_name_index = *(int*)(((char*)$uobject)+0x18)", text)

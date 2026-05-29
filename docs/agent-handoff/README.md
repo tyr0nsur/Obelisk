@@ -16,12 +16,19 @@ longer investigation notes.
 These files are internal coordination notes for agents and the project lead. Public
 contributor workflow belongs in `CONTRIBUTING.md`.
 
+When assigning sub-agent work, use these files to extract only the scoped facts, risks,
+allowed paths, required skills, and expected decision. Do not copy the full active
+objective, agent balance, GitHub flow, Discord policy, or unrelated module history into
+default sub-agent prompts.
+
 ## Rules
 
 - Keep entries concise and dated.
 - Mark each item as `fact`, `hypothesis`, `rejected`, `risk`, or `next-step`.
 - Reference commits, files, logs, or research notes when possible.
 - Do not paste raw logs here.
-- Update this file before closing an agent or handing work to another agent.
+- The lead updates the relevant handoff file before closing an agent or handing work to
+  another agent. Sub-agents report status and touched paths unless handoff edits are
+  explicitly delegated.
 - Keep `CURRENT.md` as a routing table. Move durable evidence to `docs/research/` and
   archive stale handoff detail instead of letting active state grow into a research log.

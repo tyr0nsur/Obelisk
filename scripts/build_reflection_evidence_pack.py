@@ -21,6 +21,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_ANALYZER = REPO_ROOT / "scripts" / "analyze_reflectionscanner_capture.py"
 SERVER_ROOT = Path("/servidor/ark")
+APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
 
 
 def sha256_file(path: Path) -> str:
@@ -37,6 +38,46 @@ def is_relative_to(path: Path, parent: Path) -> bool:
     except ValueError:
         return False
     return True
+
+
+def is_approved_offline_workspace_path(path: Path) -> bool:
+    resolved = path.resolve()
+    return any(is_relative_to(resolved, root.resolve()) for root in APPROVED_OFFLINE_WORKSPACE_ROOTS)
+
+
+def reject_protected_input_path(path: Path, label: str) -> Path:
+    expanded = path.expanduser()
+    if expanded.is_absolute() and is_relative_to(expanded, SERVER_ROOT) and not is_approved_offline_workspace_path(expanded):
+        raise SystemExit(f"{label} must not read from protected server root {SERVER_ROOT}: {expanded}")
+    resolved = expanded.resolve()
+    if is_relative_to(resolved, SERVER_ROOT.resolve()) and not is_approved_offline_workspace_path(resolved):
+        raise SystemExit(f"{label} must not read from protected server root {SERVER_ROOT}: {resolved}")
+    return resolved
+
+
+def reject_protected_output_path(path: Path, label: str) -> Path:
+    expanded = path.expanduser()
+    if expanded.is_absolute() and is_relative_to(expanded, SERVER_ROOT) and not is_approved_offline_workspace_path(expanded):
+        raise SystemExit(f"{label} must not write under protected server root {SERVER_ROOT}: {expanded}")
+    resolved = expanded.resolve()
+    if is_relative_to(resolved, SERVER_ROOT.resolve()) and not is_approved_offline_workspace_path(resolved):
+        raise SystemExit(f"{label} must not write under protected server root {SERVER_ROOT}: {resolved}")
+    return resolved
+
+
+def require_ignored_output_path(path: Path, label: str) -> None:
+    candidate = path.expanduser().resolve()
+    try:
+        relative = candidate.relative_to(REPO_ROOT)
+    except ValueError:
+        return
+    result = subprocess.run(
+        ["git", "check-ignore", "-q", "--", str(relative)],
+        cwd=REPO_ROOT,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise SystemExit(f"{label} is inside the repository but is not ignored by Git: {candidate}")
 
 
 def unique_copy_path(directory: Path, source: Path) -> Path:
@@ -179,16 +220,14 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
 
-    binary = args.binary.resolve()
-    analyzer = args.analyzer.resolve()
-    output_dir = args.output_dir.resolve()
-    logs = [path.resolve() for path in args.logs]
-
-    if is_relative_to(output_dir, SERVER_ROOT):
-        print(
-            f"refusing to write evidence artifacts under {SERVER_ROOT}",
-            file=sys.stderr,
-        )
+    try:
+        binary = reject_protected_input_path(args.binary, "--binary")
+        analyzer = reject_protected_input_path(args.analyzer, "--analyzer")
+        output_dir = reject_protected_output_path(args.output_dir, "--output-dir")
+        require_ignored_output_path(output_dir, "--output-dir")
+        logs = [reject_protected_input_path(path, "log") for path in args.logs]
+    except SystemExit as exc:
+        print(str(exc), file=sys.stderr)
         return 2
     if not binary.is_file():
         print(f"binary does not exist: {binary}", file=sys.stderr)

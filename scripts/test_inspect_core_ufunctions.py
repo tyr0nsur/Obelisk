@@ -164,11 +164,11 @@ def build_core_fixture(path: Path) -> dict[str, int]:
         put_i32(address + enum.UOBJECT_NAME_NUMBER_OFFSET, 0)
         put_ptr(address + enum.UOBJECT_OUTER_OFFSET, outer)
 
-    def put_item(index: int, object_address: int, serial: int) -> None:
+    def put_item(index: int, object_address: int, dword_0xC: int) -> None:
         item = addrs["gobjects_chunk0"] + index * enum.FUOBJECT_ITEM_SIZE
         put_ptr(item, object_address)
         put_u32(item + 0x8, 0)
-        put_i32(item + 0xC, serial)
+        put_i32(item + 0xC, dword_0xC)
 
     def add_uobject(
         key: str,
@@ -2289,6 +2289,40 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
         self.assertIn("object_membership=candidate-uobject", result.stdout)
         self.assertIn("class_membership=candidate-uobject", result.stdout)
         self.assertIn("outer_membership=candidate-uobject", result.stdout)
+
+    def test_cli_rejects_protected_core_and_symlink_before_open(self) -> None:
+        for core_arg in (
+            "/servidor/ark/obelisk/dumps/protected-core",
+            None,
+        ):
+            with self.subTest(core_arg=core_arg), tempfile.TemporaryDirectory() as temp_dir:
+                if core_arg is None:
+                    link = Path(temp_dir) / "core-link"
+                    link.symlink_to("/servidor/ark/obelisk/dumps/protected-core")
+                    selected_core = str(link)
+                else:
+                    selected_core = core_arg
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(SCRIPT_DIR / "inspect_core_ufunctions.py"),
+                        "--core",
+                        selected_core,
+                        "--gobjects",
+                        "0x595b7e0",
+                        "--fname-root-slot",
+                        "0x5956f30",
+                        "--object",
+                        "0x1",
+                        "--json",
+                    ],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+
+                self.assertEqual(result.returncode, 1)
+                self.assertIn("--core must not read from protected server root", result.stderr)
 
 
 if __name__ == "__main__":

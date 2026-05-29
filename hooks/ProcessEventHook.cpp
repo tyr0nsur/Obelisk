@@ -76,6 +76,7 @@ namespace Obelisk::Hooks
     static std::atomic<uint64_t> s_ReflectedChatRejects{0};
     static std::atomic<uint64_t> s_ReflectedInventoryCalls{0};
     static std::atomic<uint64_t> s_ReflectedInventoryRejects{0};
+    static std::atomic<uint64_t> s_ReflectedInventoryDispatches{0};
     static std::atomic<uint64_t> s_ReflectedStructureCalls{0};
     static std::atomic<uint64_t> s_ReflectedStructureDispatches{0};
     static std::atomic<uint64_t> s_ReflectedStructureRejects{0};
@@ -347,13 +348,33 @@ namespace Obelisk::Hooks
                                                   observerMarkerName);
     }
 
+    static bool IsObserverDebugProfileEnabled()
+    {
+        const char* profile = std::getenv("OBELISK_WRAPPER_PROFILE");
+        return profile && std::strcmp(profile, "observer-debug") == 0;
+    }
+
+    static bool IsObserverDebugWindowMarkerEnabled()
+    {
+        return Runtime::IsInstanceMarkerEnabled(std::getenv("OBELISK_ROOT"),
+                                                std::getenv("OBELISK_INSTANCE_ID"),
+                                                "allow-observer-debug-window");
+    }
+
+    static bool IsChatReflectionObserverDebugGateEnabled()
+    {
+        return IsObserverDebugProfileEnabled() &&
+               IsObserverDebugWindowMarkerEnabled() &&
+               AreExperimentalObserverMarkersEnabled("enable-chat-reflection");
+    }
+
     static const ProcessEventChatReflection::Gate& GetChatReflectionGate()
     {
         static ProcessEventChatReflection::Gate gate = [] {
             ProcessEventChatReflection::Gate value =
                 ProcessEventChatReflection::EvaluateGate(
                     std::getenv("OBELISK_ENABLE_CHAT_REFLECTION"),
-                    AreExperimentalObserverMarkersEnabled("enable-chat-reflection"),
+                    IsChatReflectionObserverDebugGateEnabled(),
                     std::getenv("OBELISK_CHAT_REFLECTION_BINARY_SHA256"));
 
             switch (value.Status)
@@ -361,8 +382,19 @@ namespace Obelisk::Hooks
             case ProcessEventChatReflection::GateStatus::Disabled:
                 break;
             case ProcessEventChatReflection::GateStatus::MissingInstanceMarker:
-                OBELISK_WARN("Chat reflection disabled: instance markers allow-experimental-observers and "
-                             "enable-chat-reflection are required.");
+                if (!IsObserverDebugProfileEnabled())
+                {
+                    OBELISK_WARN("Chat reflection disabled: OBELISK_WRAPPER_PROFILE=observer-debug is required.");
+                }
+                else if (!IsObserverDebugWindowMarkerEnabled())
+                {
+                    OBELISK_WARN("Chat reflection disabled: allow-observer-debug-window instance marker is required.");
+                }
+                else
+                {
+                    OBELISK_WARN("Chat reflection disabled: instance markers allow-experimental-observers and "
+                                 "enable-chat-reflection are required.");
+                }
                 break;
             case ProcessEventChatReflection::GateStatus::MissingBinarySha256:
                 OBELISK_WARN("Chat reflection disabled: OBELISK_CHAT_REFLECTION_BINARY_SHA256 is required.");
@@ -393,12 +425,20 @@ namespace Obelisk::Hooks
             ProcessEventStructureReflection::Gate value =
                 ProcessEventStructureReflection::EvaluateGate(
                     std::getenv("OBELISK_ENABLE_STRUCTURE_REFLECTION"),
+                    IsObserverDebugProfileEnabled(),
+                    IsObserverDebugWindowMarkerEnabled(),
                     AreExperimentalObserverMarkersEnabled("enable-structure-reflection"),
                     std::getenv("OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256"));
 
             switch (value.Status)
             {
             case ProcessEventStructureReflection::GateStatus::Disabled:
+                break;
+            case ProcessEventStructureReflection::GateStatus::MissingObserverDebugProfile:
+                OBELISK_WARN("Structure reflection disabled: OBELISK_WRAPPER_PROFILE=observer-debug is required.");
+                break;
+            case ProcessEventStructureReflection::GateStatus::MissingObserverDebugWindow:
+                OBELISK_WARN("Structure reflection disabled: allow-observer-debug-window instance marker is required.");
                 break;
             case ProcessEventStructureReflection::GateStatus::MissingInstanceMarker:
                 OBELISK_WARN("Structure reflection disabled: instance markers allow-experimental-observers and "
@@ -433,12 +473,20 @@ namespace Obelisk::Hooks
             ProcessEventInventoryReflection::Gate value =
                 ProcessEventInventoryReflection::EvaluateGate(
                     std::getenv("OBELISK_ENABLE_INVENTORY_REFLECTION"),
+                    IsObserverDebugProfileEnabled(),
+                    IsObserverDebugWindowMarkerEnabled(),
                     AreExperimentalObserverMarkersEnabled("enable-inventory-reflection"),
                     std::getenv("OBELISK_INVENTORY_REFLECTION_BINARY_SHA256"));
 
             switch (value.Status)
             {
             case ProcessEventInventoryReflection::GateStatus::Disabled:
+                break;
+            case ProcessEventInventoryReflection::GateStatus::MissingObserverDebugProfile:
+                OBELISK_WARN("Inventory reflection disabled: OBELISK_WRAPPER_PROFILE=observer-debug is required.");
+                break;
+            case ProcessEventInventoryReflection::GateStatus::MissingObserverDebugWindow:
+                OBELISK_WARN("Inventory reflection disabled: allow-observer-debug-window instance marker is required.");
                 break;
             case ProcessEventInventoryReflection::GateStatus::MissingInstanceMarker:
                 OBELISK_WARN("Inventory reflection disabled: instance markers allow-experimental-observers and "
@@ -516,18 +564,34 @@ namespace Obelisk::Hooks
         return limit;
     }
 
+    static uint64_t GetInventoryReflectionDispatchLimit()
+    {
+        static uint64_t limit = [] {
+            const char* env = std::getenv("OBELISK_INVENTORY_REFLECTION_DISPATCH_LIMIT");
+            if (!env || env[0] == '\0') return uint64_t{0};
+            return static_cast<uint64_t>(std::strtoull(env, nullptr, 10));
+        }();
+        return limit;
+    }
+
     static bool IsStructureObservationActive()
     {
         return IsStructureReflectionEnabled() &&
                ProcessEventStructureReflection::ShouldAttemptRuntimeObservation(
+                   s_ReflectedStructureCalls,
                    GetStructureReflectionLogLimit(),
+                   s_ReflectedStructureDispatches,
                    GetStructureReflectionDispatchLimit());
     }
 
     static bool IsInventoryObservationActive()
     {
         return IsInventoryReflectionEnabled() &&
-               ProcessEventInventoryReflection::ShouldAttemptObservation(GetInventoryReflectionLogLimit());
+               ProcessEventInventoryReflection::ShouldAttemptRuntimeObservation(
+                   s_ReflectedInventoryCalls,
+                   GetInventoryReflectionLogLimit(),
+                   s_ReflectedInventoryDispatches,
+                   GetInventoryReflectionDispatchLimit());
     }
 
     static const char* ChatFunctionName(Obelisk::UE::ChatReflection::ChatFunction function)
@@ -746,8 +810,11 @@ namespace Obelisk::Hooks
         }
     }
 
-    static void TraceReflectedStructureInvocation(int32_t nameIndex, void* function, void* params)
+    static void TraceReflectedStructureInvocation(bool originalWasCalled, int32_t nameIndex, void* function, void* params)
     {
+        if (!originalWasCalled)
+            return;
+
         const ProcessEventStructureReflection::Gate& gate = GetStructureReflectionGate();
         if (!gate.Enabled())
             return;
@@ -755,9 +822,17 @@ namespace Obelisk::Hooks
         const uint64_t dispatchLimit = GetStructureReflectionDispatchLimit();
         if (!ProcessEventStructureReflection::ShouldAttemptNameObservation(nameIndex, logLimit, dispatchLimit))
             return;
+        if (!ProcessEventStructureReflection::HasObservationBudgetRemaining(s_ReflectedStructureCalls, logLimit) &&
+            !ProcessEventStructureReflection::HasObservationBudgetRemaining(s_ReflectedStructureDispatches, dispatchLimit))
+        {
+            return;
+        }
         uint64_t logObservationNumber = 0;
         const bool logReserved = ProcessEventStructureReflection::TryReserveObservationBudget(
             s_ReflectedStructureCalls, logLimit, logObservationNumber);
+        if (!logReserved &&
+            !ProcessEventStructureReflection::HasObservationBudgetRemaining(s_ReflectedStructureDispatches, dispatchLimit))
+            return;
 
         Obelisk::UE::RuntimeReflection::MemoryReader reader{RuntimeReflectionReader, nullptr};
         ProcessEventStructureReflection::Attempt attempt =
@@ -779,12 +854,15 @@ namespace Obelisk::Hooks
         }
 
         const Obelisk::UE::StructureReflection::StructureInvocation& invocation = attempt.Invocation;
-        uint64_t dispatchObservationNumber = 0;
         size_t dispatched = 0;
-        if (ProcessEventStructureReflection::TryReserveObservationBudget(
-                s_ReflectedStructureDispatches, dispatchLimit, dispatchObservationNumber))
+        uint64_t dispatchObservationNumber = 0;
+        const bool dispatchReserved = ProcessEventStructureReflection::TryReserveDispatchBudgetForMatchedAttempt(
+            attempt, s_ReflectedStructureDispatches, dispatchLimit, dispatchObservationNumber);
+        if (dispatchReserved)
         {
-            dispatched = ProcessEventStructureReflection::DispatchCopiedStructureEvent(invocation);
+            dispatched = ProcessEventStructureReflection::MaybeDispatchCopiedStructureEventAfterOriginal(
+                originalWasCalled,
+                invocation);
         }
 
         if (!logReserved || !ProcessEventStructureReflection::ShouldLogObservation(logObservationNumber, logLimit))
@@ -812,20 +890,29 @@ namespace Obelisk::Hooks
         }
     }
 
-    static void TraceReflectedInventoryInvocation(int32_t nameIndex, void* function, void* params)
+    static void TraceReflectedInventoryInvocation(bool originalWasCalled, int32_t nameIndex, void* function, void* params)
     {
+        if (!originalWasCalled)
+            return;
+
         const ProcessEventInventoryReflection::Gate& gate = GetInventoryReflectionGate();
         if (!gate.Enabled())
             return;
-        const uint64_t limit = GetInventoryReflectionLogLimit();
-        if (!ProcessEventInventoryReflection::ShouldAttemptNameObservation(nameIndex, limit))
+        const uint64_t logLimit = GetInventoryReflectionLogLimit();
+        const uint64_t dispatchLimit = GetInventoryReflectionDispatchLimit();
+        if (!ProcessEventInventoryReflection::ShouldAttemptNameObservation(nameIndex, logLimit, dispatchLimit))
             return;
-        uint64_t observationNumber = 0;
-        if (!ProcessEventInventoryReflection::TryReserveObservationBudget(
-                s_ReflectedInventoryCalls, limit, observationNumber))
+        if (!ProcessEventInventoryReflection::HasObservationBudgetRemaining(s_ReflectedInventoryCalls, logLimit) &&
+            !ProcessEventInventoryReflection::HasObservationBudgetRemaining(s_ReflectedInventoryDispatches, dispatchLimit))
         {
             return;
         }
+        uint64_t observationNumber = 0;
+        const bool logReserved = ProcessEventInventoryReflection::TryReserveObservationBudget(
+            s_ReflectedInventoryCalls, logLimit, observationNumber);
+        if (!logReserved &&
+            !ProcessEventInventoryReflection::HasObservationBudgetRemaining(s_ReflectedInventoryDispatches, dispatchLimit))
+            return;
 
         Obelisk::UE::RuntimeReflection::MemoryReader reader{RuntimeReflectionReader, nullptr};
         ProcessEventInventoryReflection::Attempt attempt =
@@ -838,7 +925,7 @@ namespace Obelisk::Hooks
         if (attempt.Status == ProcessEventInventoryReflection::AttemptStatus::Rejected)
         {
             ++s_ReflectedInventoryRejects;
-            if (ProcessEventInventoryReflection::ShouldLogObservation(observationNumber, limit))
+            if (logReserved && ProcessEventInventoryReflection::ShouldLogObservation(observationNumber, logLimit))
             {
                 OBELISK_INFO("Reflected inventory rejected #{} fname_index={} reason={}",
                              observationNumber, nameIndex, attempt.Result.Reason);
@@ -847,7 +934,18 @@ namespace Obelisk::Hooks
         }
 
         const Obelisk::UE::InventoryReflection::InventoryInvocation& invocation = attempt.Invocation;
-        if (!ProcessEventInventoryReflection::ShouldLogObservation(observationNumber, limit))
+        size_t dispatched = 0;
+        uint64_t dispatchObservationNumber = 0;
+        const bool dispatchReserved = ProcessEventInventoryReflection::TryReserveDispatchBudgetForMatchedAttempt(
+            attempt, s_ReflectedInventoryDispatches, dispatchLimit, dispatchObservationNumber);
+        if (dispatchReserved)
+        {
+            dispatched = ProcessEventInventoryReflection::MaybeDispatchCopiedInventoryPolicyEventAfterOriginal(
+                originalWasCalled,
+                invocation);
+        }
+
+        if (!logReserved || !ProcessEventInventoryReflection::ShouldLogObservation(observationNumber, logLimit))
             return;
 
         OBELISK_INFO("Reflected inventory ProcessEvent #{} function={} fname_index={} outer_fname_index={} fields={}",
@@ -856,6 +954,11 @@ namespace Obelisk::Hooks
                      invocation.FunctionNameIndex,
                      invocation.OuterNameIndex,
                      invocation.Fields.size());
+        if (dispatched > 0)
+        {
+            OBELISK_INFO("Reflected inventory dispatched {} copied internal event callback(s).",
+                         dispatched);
+        }
         for (const auto& field : invocation.Fields)
         {
             OBELISK_INFO("Reflected inventory field {} offset=0x{:X} size={} has_range={}",
@@ -884,7 +987,6 @@ namespace Obelisk::Hooks
         const int32_t nameIndex = needsNameIndex ? GetFunctionNameIndex(function) : -1;
 
         TraceReflectedChatInvocation(nameIndex, function, params);
-        TraceReflectedInventoryInvocation(nameIndex, function, params);
         const bool originalWasCalled = DispatchProcessEventCallbacks(
             nameIndex,
             object,
@@ -894,8 +996,8 @@ namespace Obelisk::Hooks
             hasPostCallbacks,
             SnapshotOriginalProcessEvent());
 
-        if (originalWasCalled)
-            TraceReflectedStructureInvocation(nameIndex, function, params);
+        TraceReflectedInventoryInvocation(originalWasCalled, nameIndex, function, params);
+        TraceReflectedStructureInvocation(originalWasCalled, nameIndex, function, params);
     }
 
     void ProcessEventHook::Install()

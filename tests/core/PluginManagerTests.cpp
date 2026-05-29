@@ -1,10 +1,12 @@
 #include "core/ChatEventDispatcher.h"
 #include "core/EventManager.h"
+#include "core/InventoryPolicyEventDispatcher.h"
 #include "core/PluginManager.h"
 #include "core/StructureEventDispatcher.h"
 #include "runtime/Logger.h"
 
 #include <chrono>
+#include <cstring>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -45,7 +47,9 @@ namespace
         bool registerNullFilteredCallback = false;
         bool registerOwnerTokenFromInitThread = false;
         bool registerChatCallback = false;
+        bool registerInventoryPolicyCallback = false;
         bool registerStructureCallback = false;
+        bool registerGameplayPolicyCallback = false;
         bool callProcessEventInInit = false;
         bool registerOwnerTokenCallbackInShutdown = false;
         bool unregisterOwnerTokenCallbackInShutdown = false;
@@ -64,6 +68,7 @@ namespace
         std::string initInstanceId;
         uint64_t initOwnerToken = 0;
         uint64_t initThreadRegistrationId = 0;
+        uint64_t gameplayPolicyRegistrationId = 0;
         uint64_t shutdownRegistrationId = 0;
         bool shutdownUnregisterResult = false;
         void* owner = this;
@@ -73,6 +78,17 @@ namespace
         bool eventCallbacksAtShutdown = false;
         size_t chatSubscriptionsAtShutdown = 0;
         size_t chatSubscriptionsAtClose = 0;
+        size_t inventoryPolicySubscriptionsAtShutdown = 0;
+        size_t inventoryPolicySubscriptionsAtClose = 0;
+        int gameplayPolicyEventCalls = 0;
+        uint32_t gameplayPolicyEventKind = 0;
+        uint32_t gameplayPolicyResourceKind = 0;
+        uint64_t gameplayPolicyFlags = 0;
+        uint64_t gameplayPolicyFieldMask = 0;
+        uint64_t gameplayPolicyBoolValues = 0;
+        int32_t gameplayPolicyInt32Values[OBELISK_GAMEPLAY_POLICY_FIELD_COUNT]{};
+        uint32_t gameplayPolicyEventAbiVersion = 0;
+        uint32_t gameplayPolicyEventStructSize = 0;
         size_t structureSubscriptionsAtShutdown = 0;
         size_t structureSubscriptionsAtClose = 0;
     };
@@ -94,8 +110,132 @@ namespace
     {
     }
 
+    void FakeInventoryPolicyCallback(const Obelisk::Core::InventoryPolicyEventView&, void*)
+    {
+    }
+
     void FakeStructureCallback(const Obelisk::Core::StructureEventView&, void*)
     {
+    }
+
+    void FakeGameplayPolicyEventCallback(const ObeliskGameplayPolicyEvent* event, void* userData)
+    {
+        Require(event != nullptr, "gameplay policy callback received null event");
+        auto* plugin = static_cast<FakePlugin*>(userData);
+        ++plugin->gameplayPolicyEventCalls;
+        plugin->gameplayPolicyEventKind = event->event_kind;
+        plugin->gameplayPolicyResourceKind = event->resource_kind;
+        plugin->gameplayPolicyFlags = event->flags;
+        plugin->gameplayPolicyFieldMask = event->field_mask;
+        plugin->gameplayPolicyBoolValues = event->bool_values;
+        for (uint32_t i = 0; i < OBELISK_GAMEPLAY_POLICY_FIELD_COUNT; ++i)
+            plugin->gameplayPolicyInt32Values[i] = event->int32_values[i];
+        plugin->gameplayPolicyEventAbiVersion = event->abi_version;
+        plugin->gameplayPolicyEventStructSize = event->struct_size;
+    }
+
+    std::vector<Obelisk::Core::StructureScalarValue> MakeStructureScalars()
+    {
+        return {
+            {
+                .Field = Obelisk::Core::StructureScalarField::ReturnValue,
+                .Type = Obelisk::Core::StructureScalarType::Bool,
+                .BoolValue = true,
+                .Int32Value = 0,
+            },
+        };
+    }
+
+    Obelisk::Core::StructureEventView MakeStructureEvent(
+        const std::vector<Obelisk::Core::StructureScalarValue>& scalars)
+    {
+        return {
+            .Kind = Obelisk::Core::StructureEventKind::AllowStructureAccess,
+            .FunctionNameIndex = 7605,
+            .OuterNameIndex = 7539,
+            .Scalars = scalars,
+        };
+    }
+
+    std::vector<Obelisk::Core::StructureScalarValue> MakeSetVariantScalars()
+    {
+        return {
+            {
+                .Field = Obelisk::Core::StructureScalarField::VariantIndex,
+                .Type = Obelisk::Core::StructureScalarType::Int32,
+                .BoolValue = false,
+                .Int32Value = 3,
+            },
+            {
+                .Field = Obelisk::Core::StructureScalarField::BForceSet,
+                .Type = Obelisk::Core::StructureScalarType::Bool,
+                .BoolValue = true,
+                .Int32Value = 0,
+            },
+            {
+                .Field = Obelisk::Core::StructureScalarField::ReturnValue,
+                .Type = Obelisk::Core::StructureScalarType::Bool,
+                .BoolValue = false,
+                .Int32Value = 0,
+            },
+        };
+    }
+
+    Obelisk::Core::StructureEventView MakeSetVariantEvent(
+        const std::vector<Obelisk::Core::StructureScalarValue>& scalars)
+    {
+        return {
+            .Kind = Obelisk::Core::StructureEventKind::SetVariant,
+            .FunctionNameIndex = 7606,
+            .OuterNameIndex = 7539,
+            .Scalars = scalars,
+        };
+    }
+
+    std::vector<Obelisk::Core::InventoryPolicyScalarValue> MakeInventoryRemoteAddScalars()
+    {
+        return {
+            {
+                .Field = Obelisk::Core::InventoryPolicyScalarField::BRequestedByPlayer,
+                .BoolValue = true,
+            },
+            {
+                .Field = Obelisk::Core::InventoryPolicyScalarField::ReturnValue,
+                .BoolValue = true,
+            },
+        };
+    }
+
+    Obelisk::Core::InventoryPolicyEventView MakeInventoryRemoteAddEvent(
+        const std::vector<Obelisk::Core::InventoryPolicyScalarValue>& scalars)
+    {
+        return {
+            .Kind = Obelisk::Core::InventoryPolicyEventKind::AllowRemoteAddToInventory,
+            .Scalars = scalars,
+        };
+    }
+
+    std::vector<Obelisk::Core::InventoryPolicyScalarValue> MakeInventoryCanUseScalars()
+    {
+        return {
+            {
+                .Field = Obelisk::Core::InventoryPolicyScalarField::BIgnoreCooldown,
+                .BoolValue = false,
+            },
+            {
+                .Field = Obelisk::Core::InventoryPolicyScalarField::ReturnValue,
+                .BoolValue = true,
+            },
+        };
+    }
+
+    Obelisk::Core::InventoryPolicyEventView MakeInventoryCanUseEvent(
+        const std::vector<Obelisk::Core::InventoryPolicyScalarValue>& scalars)
+    {
+        return {
+            .Kind = Obelisk::Core::InventoryPolicyEventKind::CanUse,
+            .Scalars = scalars,
+        };
     }
 
     bool FakeGetInfo(ObeliskPluginMetadata* out)
@@ -187,12 +327,34 @@ namespace
             Require(registrationId != 0, "fake chat callback registration failed");
         }
 
+        if (g_CurrentFakePlugin->registerInventoryPolicyCallback)
+        {
+            const uint64_t registrationId = Obelisk::Core::InventoryPolicyEventDispatcher::Get().Register(
+                g_CurrentFakePlugin->owner,
+                Obelisk::Core::InventoryPolicyEventSubscription{FakeInventoryPolicyCallback, g_CurrentFakePlugin});
+            Require(registrationId != 0, "fake inventory policy callback registration failed");
+        }
+
         if (g_CurrentFakePlugin->registerStructureCallback)
         {
             const uint64_t registrationId = Obelisk::Core::StructureEventDispatcher::Get().Register(
                 g_CurrentFakePlugin->owner,
                 Obelisk::Core::StructureEventSubscription{FakeStructureCallback, g_CurrentFakePlugin});
             Require(registrationId != 0, "fake structure callback registration failed");
+        }
+
+        if (g_CurrentFakePlugin->registerGameplayPolicyCallback)
+        {
+            Require(api->RegisterGameplayPolicyEventWithOwnerTokenHandle != nullptr,
+                    "fake plugin requested gameplay policy callback without registration API");
+            g_CurrentFakePlugin->gameplayPolicyRegistrationId =
+                api->RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                    context->plugin_owner_token,
+                    OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL,
+                    FakeGameplayPolicyEventCallback,
+                    g_CurrentFakePlugin);
+            Require(g_CurrentFakePlugin->gameplayPolicyRegistrationId != 0,
+                    "fake gameplay policy callback registration failed");
         }
 
         if (g_CurrentFakePlugin->callProcessEventInInit)
@@ -222,6 +384,8 @@ namespace
         if (g_CurrentFakePlugin->chatDispatcher)
             g_CurrentFakePlugin->chatSubscriptionsAtShutdown =
                 g_CurrentFakePlugin->chatDispatcher->SubscriptionCount();
+        g_CurrentFakePlugin->inventoryPolicySubscriptionsAtShutdown =
+            Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount();
         g_CurrentFakePlugin->structureSubscriptionsAtShutdown =
             Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount();
         ++g_CurrentFakePlugin->shutdownCalls;
@@ -292,6 +456,8 @@ namespace
             auto* plugin = static_cast<FakePlugin*>(handle);
             if (plugin->chatDispatcher)
                 plugin->chatSubscriptionsAtClose = plugin->chatDispatcher->SubscriptionCount();
+            plugin->inventoryPolicySubscriptionsAtClose =
+                Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount();
             plugin->structureSubscriptionsAtClose =
                 Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount();
             ++plugin->closeCalls;
@@ -347,6 +513,7 @@ namespace
         Obelisk::Core::EventManager::Get().UnregisterCallbacksForOwner(plugin.owner);
         if (plugin.chatDispatcher)
             plugin.chatDispatcher->UnregisterCallbacksForOwner(plugin.owner);
+        Obelisk::Core::InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(plugin.owner);
         Obelisk::Core::StructureEventDispatcher::Get().UnregisterCallbacksForOwner(plugin.owner);
         g_CurrentFakePlugin = nullptr;
     }
@@ -462,6 +629,8 @@ namespace
         FakePlugin plugin{.filename = "valid.so", .registerFilteredCallback = true};
         Obelisk::Core::ChatEventDispatcher chatDispatcher;
         plugin.registerChatCallback = true;
+        plugin.registerInventoryPolicyCallback = true;
+        plugin.registerStructureCallback = true;
         plugin.chatDispatcher = &chatDispatcher;
         FakeLoader loader;
         loader.Add(plugin);
@@ -480,6 +649,10 @@ namespace
                 "owned callback was not registered during plugin init");
         Require(chatDispatcher.SubscriptionCount() == 1,
                 "owned chat callback was not registered during plugin init");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 1,
+                "owned inventory policy callback was not registered during plugin init");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 1,
+                "owned structure callback was not registered during plugin init");
 
         manager.UnloadAll();
 
@@ -488,11 +661,22 @@ namespace
                 "ProcessEvent callbacks were removed before plugin shutdown");
         Require(plugin.chatSubscriptionsAtShutdown == 1,
                 "chat callback was removed before plugin shutdown");
+        Require(plugin.inventoryPolicySubscriptionsAtShutdown == 1,
+                "inventory policy callback was removed before plugin shutdown");
+        Require(plugin.structureSubscriptionsAtShutdown == 1,
+                "structure callback was removed before plugin shutdown");
         Require(plugin.closeCalls == 1, "valid plugin was not closed during unload");
         Require(plugin.chatSubscriptionsAtClose == 0, "chat callback was still registered at dlclose");
+        Require(plugin.inventoryPolicySubscriptionsAtClose == 0,
+                "inventory policy callback was still registered at dlclose");
+        Require(plugin.structureSubscriptionsAtClose == 0, "structure callback was still registered at dlclose");
         Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
                 "owned callback survived plugin unload");
         Require(chatDispatcher.SubscriptionCount() == 0, "owned chat callback survived plugin unload");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
+                "owned inventory policy callback survived plugin unload");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
+                "owned structure callback survived plugin unload");
 
         CleanupPlugin(plugin);
         fs::remove_all(root);
@@ -861,6 +1045,401 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestOwnerTokenGameplayPolicyEventRegistrationCanUnregister()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_owner_token_gameplay_policy_handle");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "owner_token_gameplay_policy_a.so",
+            .pluginId = "owner_token_gameplay_policy_a",
+            .captureApi = true,
+        };
+        FakePlugin otherPlugin{
+            .filename = "owner_token_gameplay_policy_b.so",
+            .pluginId = "owner_token_gameplay_policy_b",
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        loader.Add(otherPlugin);
+        TouchPlugin(root, plugin.filename);
+        TouchPlugin(root, otherPlugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+        WritePluginConfig(root, otherPlugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        Require((manager.ApiCapabilitiesForTesting() & OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS) != 0,
+                "gameplay policy event capability was not advertised");
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "owner-token gameplay-policy plugin was not initialized");
+        Require(otherPlugin.initCalls == 1, "second owner-token gameplay-policy plugin was not initialized");
+        Require(plugin.initOwnerToken != 0, "owner-token gameplay-policy plugin did not receive a token");
+        Require(otherPlugin.initOwnerToken != 0, "second owner-token gameplay-policy plugin did not receive a token");
+        Require(plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle != nullptr,
+                "gameplay policy event registration function was not exposed");
+        Require(plugin.capturedApi.UnregisterGameplayPolicyEventWithOwnerToken != nullptr,
+                "gameplay policy event unregister function was not exposed");
+
+        const uint64_t invalidRegistrationId =
+            plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                plugin.initOwnerToken + 1000,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL,
+                FakeGameplayPolicyEventCallback,
+                &plugin);
+        Require(invalidRegistrationId == 0, "invalid owner token registered a gameplay policy callback");
+
+        Require(plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES,
+                    nullptr,
+                    &plugin) == 0,
+                "null gameplay policy callback was registered");
+        Require(plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    0,
+                    FakeGameplayPolicyEventCallback,
+                    &plugin) == 0,
+                "empty gameplay policy event mask was registered");
+        Require(plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACCESS_CHECK | (1ull << 63),
+                    FakeGameplayPolicyEventCallback,
+                    &plugin) == 0,
+                "reserved gameplay policy event mask bits were registered");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
+                "invalid gameplay policy registrations left structure subscriptions behind");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
+                "invalid gameplay policy registrations left inventory subscriptions behind");
+
+        const uint64_t registrationId =
+            plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                plugin.initOwnerToken,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACCESS_CHECK,
+                FakeGameplayPolicyEventCallback,
+                &plugin);
+        Require(registrationId != 0, "owner-token gameplay policy registration returned zero");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 1,
+                "owner-token gameplay policy callback was not bridged into structure dispatcher");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
+                "structure-only gameplay policy callback registered inventory dispatcher");
+
+        Require(!plugin.capturedApi.UnregisterGameplayPolicyEventWithOwnerToken(
+                    otherPlugin.initOwnerToken,
+                    registrationId),
+                "wrong owner token unregistered a gameplay policy callback");
+
+        const std::vector<Obelisk::Core::StructureScalarValue> scalars = MakeStructureScalars();
+        Require(Obelisk::Core::StructureEventDispatcher::Get().Dispatch(MakeStructureEvent(scalars)) == 1,
+                "wrong-token unregister removed the gameplay policy callback");
+        Require(plugin.gameplayPolicyEventCalls == 1,
+                "owner-token gameplay policy callback did not dispatch");
+        Require(plugin.gameplayPolicyEventAbiVersion == OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION,
+                "gameplay policy event ABI version mismatch");
+        Require(plugin.gameplayPolicyEventStructSize == sizeof(ObeliskGameplayPolicyEvent),
+                "gameplay policy event struct size mismatch");
+        Require(plugin.gameplayPolicyEventKind ==
+                    OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_ACCESS_CHECK,
+                "structure event kind was not mapped to gameplay policy event kind");
+        Require(plugin.gameplayPolicyResourceKind ==
+                    OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE,
+                "gameplay policy event resource kind was not structure");
+        Require((plugin.gameplayPolicyFlags & OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD) != 0,
+                "gameplay policy event was not marked copied-payload");
+        Require((plugin.gameplayPolicyFlags & OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED) != 0,
+                "gameplay policy event was not marked structure-backed");
+        Require((plugin.gameplayPolicyFieldMask & OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE) != 0,
+                "gameplay policy event did not expose copied return value");
+        Require((plugin.gameplayPolicyBoolValues &
+                    (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_RETURN_VALUE)) != 0,
+                "gameplay policy event copied wrong return value");
+        Require((plugin.gameplayPolicyFieldMask &
+                    (OBELISK_GAMEPLAY_POLICY_FIELD_MASK_VARIANT_INDEX |
+                     OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE_SET |
+                     OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE)) == 0,
+                "gameplay policy event exposed unrelated scalar fields");
+
+        const std::vector<Obelisk::Core::StructureScalarValue> setVariantScalars = MakeSetVariantScalars();
+        Require(Obelisk::Core::StructureEventDispatcher::Get().Dispatch(MakeSetVariantEvent(setVariantScalars)) == 1,
+                "masked gameplay policy callback did not receive structure dispatcher call");
+        Require(plugin.gameplayPolicyEventCalls == 1,
+                "gameplay policy callback ignored event kind mask");
+
+        Require(plugin.capturedApi.UnregisterGameplayPolicyEventWithOwnerToken(
+                    plugin.initOwnerToken,
+                    registrationId),
+                "owner-token gameplay policy unregister failed");
+        Require(!plugin.capturedApi.UnregisterGameplayPolicyEventWithOwnerToken(
+                    plugin.initOwnerToken,
+                    registrationId),
+                "owner-token gameplay policy unregister succeeded twice");
+        Require(!plugin.capturedApi.UnregisterGameplayPolicyEventWithOwnerToken(
+                    plugin.initOwnerToken,
+                    0),
+                "zero gameplay policy callback handle unregistered a callback");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
+                "owner-token gameplay policy callback survived explicit unregister");
+
+        const uint64_t unloadRegistrationId =
+            plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                plugin.initOwnerToken,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL,
+                FakeGameplayPolicyEventCallback,
+                &plugin);
+        Require(unloadRegistrationId != 0, "owner-token gameplay policy callback could not re-register before unload");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 1,
+                "all gameplay policy callback did not register structure dispatcher");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 1,
+                "all gameplay policy callback did not register inventory dispatcher");
+
+        Require(Obelisk::Core::StructureEventDispatcher::Get().Dispatch(MakeSetVariantEvent(setVariantScalars)) == 1,
+                "all-structures gameplay policy callback did not receive set variant dispatch");
+        Require(plugin.gameplayPolicyEventCalls == 2,
+                "all-structures gameplay policy callback did not dispatch set variant event");
+        Require(plugin.gameplayPolicyEventKind ==
+                    OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_VARIANT_CHANGE,
+                "set variant event kind was not mapped");
+        Require((plugin.gameplayPolicyFieldMask & OBELISK_GAMEPLAY_POLICY_FIELD_MASK_VARIANT_INDEX) != 0,
+                "set variant event did not expose copied variant index");
+        Require(plugin.gameplayPolicyInt32Values[OBELISK_GAMEPLAY_POLICY_FIELD_VARIANT_INDEX] == 3,
+                "set variant event copied wrong variant index");
+        Require((plugin.gameplayPolicyFieldMask & OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE_SET) != 0,
+                "set variant event did not expose copied force-set flag");
+        Require((plugin.gameplayPolicyBoolValues &
+                    (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_FORCE_SET)) != 0,
+                "set variant event copied wrong force-set flag");
+        Require((plugin.gameplayPolicyFieldMask & OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE) != 0,
+                "set variant event did not expose copied return value");
+        Require((plugin.gameplayPolicyBoolValues &
+                    (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_RETURN_VALUE)) == 0,
+                "set variant event copied wrong false return value");
+
+        const std::vector<Obelisk::Core::InventoryPolicyScalarValue> inventoryRemoteAddScalars =
+            MakeInventoryRemoteAddScalars();
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().Dispatch(
+                    MakeInventoryRemoteAddEvent(inventoryRemoteAddScalars)) == 1,
+                "all gameplay policy callback did not receive inventory remote-add dispatch");
+        Require(plugin.gameplayPolicyEventCalls == 3,
+                "inventory gameplay policy callback did not dispatch");
+        Require(plugin.gameplayPolicyEventKind ==
+                    OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK,
+                "inventory remote-add event kind was not mapped");
+        Require(plugin.gameplayPolicyResourceKind ==
+                    OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM,
+                "inventory gameplay policy resource kind was not inventory item");
+        Require((plugin.gameplayPolicyFlags & OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD) != 0,
+                "inventory gameplay policy event was not marked copied-payload");
+        Require((plugin.gameplayPolicyFlags & OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED) != 0,
+                "inventory gameplay policy event was not marked inventory-backed");
+        Require((plugin.gameplayPolicyFlags & OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED) == 0,
+                "inventory gameplay policy event was incorrectly marked structure-backed");
+        Require((plugin.gameplayPolicyFieldMask & OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER) != 0,
+                "inventory remote-add did not expose copied requested-by-player flag");
+        Require((plugin.gameplayPolicyBoolValues &
+                    (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_REQUESTED_BY_PLAYER)) != 0,
+                "inventory remote-add copied wrong requested-by-player value");
+        Require((plugin.gameplayPolicyFieldMask & OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE) != 0,
+                "inventory remote-add did not expose copied return value");
+        Require((plugin.gameplayPolicyBoolValues &
+                    (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_RETURN_VALUE)) != 0,
+                "inventory remote-add copied wrong return value");
+
+        const std::vector<Obelisk::Core::InventoryPolicyScalarValue> inventoryCanUseScalars =
+            MakeInventoryCanUseScalars();
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().Dispatch(
+                    MakeInventoryCanUseEvent(inventoryCanUseScalars)) == 1,
+                "all gameplay policy callback did not receive inventory can-use dispatch");
+        Require(plugin.gameplayPolicyEventCalls == 4,
+                "inventory can-use gameplay policy callback did not dispatch");
+        Require(plugin.gameplayPolicyEventKind ==
+                    OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK,
+                "inventory use event kind was not mapped");
+        Require((plugin.gameplayPolicyFieldMask & OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN) != 0,
+                "inventory can-use did not expose copied ignore-cooldown flag");
+        Require((plugin.gameplayPolicyBoolValues &
+                    (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_IGNORE_COOLDOWN)) == 0,
+                "inventory can-use copied wrong ignore-cooldown value");
+
+        manager.UnloadAll();
+
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
+                "owner-token gameplay policy callback survived plugin unload");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
+                "owner-token gameplay policy inventory callback survived plugin unload");
+        Require(plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL,
+                    FakeGameplayPolicyEventCallback,
+                    &plugin) == 0,
+                "owner token remained valid for gameplay policy callbacks after plugin unload");
+
+        CleanupPlugin(plugin);
+        CleanupPlugin(otherPlugin);
+        fs::remove_all(root);
+    }
+
+    void TestDescribeResourceKind()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_describe_resource_kind");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "describe_resource_kind.so",
+            .pluginId = "describe_resource_kind",
+            .captureApi = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        Require((manager.ApiCapabilitiesForTesting() & OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS) != 0,
+                "resource kind descriptor capability was not advertised");
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "resource descriptor plugin was not initialized");
+        Require(plugin.capturedApi.DescribeResourceKind != nullptr,
+                "DescribeResourceKind function was not exposed");
+
+        ObeliskResourceKindDescriptor descriptor{};
+        Require(!plugin.capturedApi.DescribeResourceKind(
+                    OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE,
+                    &descriptor),
+                "DescribeResourceKind accepted a zero-size descriptor");
+
+        descriptor.struct_size = sizeof(ObeliskResourceKindDescriptor);
+        Require(plugin.capturedApi.DescribeResourceKind(
+                    OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE,
+                    &descriptor),
+                "DescribeResourceKind rejected structure resource kind");
+        Require(descriptor.abi_version == OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION,
+                "resource descriptor ABI version mismatch");
+        Require(descriptor.struct_size == sizeof(ObeliskResourceKindDescriptor),
+                "resource descriptor struct size mismatch");
+        Require(descriptor.resource_kind == OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE,
+                "resource descriptor kind mismatch");
+        Require((descriptor.flags & OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_CATEGORY_ONLY) != 0,
+                "resource descriptor did not mark category-only");
+        Require((descriptor.flags & OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY) != 0,
+                "resource descriptor did not mark no-identity");
+        Require((descriptor.flags & OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP) != 0,
+                "resource descriptor did not mark no-lookup");
+        Require(descriptor.supported_gameplay_policy_event_mask ==
+                    OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES,
+                "resource descriptor event mask mismatch");
+        Require((descriptor.supported_gameplay_policy_field_mask &
+                    OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE) != 0,
+                "resource descriptor field mask did not include return value");
+        Require(std::strcmp(descriptor.stable_name, "structure") == 0,
+                "resource descriptor stable name mismatch");
+        Require(std::strcmp(descriptor.display_name, "Structure") == 0,
+                "resource descriptor display name mismatch");
+
+        descriptor = {};
+        descriptor.struct_size = sizeof(ObeliskResourceKindDescriptor);
+        Require(plugin.capturedApi.DescribeResourceKind(
+                    OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM,
+                    &descriptor),
+                "DescribeResourceKind rejected inventory item resource kind");
+        Require(descriptor.resource_kind == OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM,
+                "inventory resource descriptor kind mismatch");
+        Require((descriptor.flags & OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_CATEGORY_ONLY) != 0,
+                "inventory resource descriptor did not mark category-only");
+        Require((descriptor.flags & OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY) != 0,
+                "inventory resource descriptor did not mark no-identity");
+        Require((descriptor.flags & OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP) != 0,
+                "inventory resource descriptor did not mark no-lookup");
+        Require(descriptor.supported_gameplay_policy_event_mask ==
+                    OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY,
+                "inventory resource descriptor event mask mismatch");
+        Require((descriptor.supported_gameplay_policy_field_mask &
+                    OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER) != 0,
+                "inventory resource descriptor field mask did not include requested-by-player");
+        Require((descriptor.supported_gameplay_policy_field_mask &
+                    OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN) != 0,
+                "inventory resource descriptor field mask did not include ignore-cooldown");
+        Require(std::strcmp(descriptor.stable_name, "inventory_item") == 0,
+                "inventory resource descriptor stable name mismatch");
+        Require(std::strcmp(descriptor.display_name, "Inventory Item") == 0,
+                "inventory resource descriptor display name mismatch");
+
+        descriptor = {};
+        descriptor.struct_size = sizeof(ObeliskResourceKindDescriptor);
+        Require(!plugin.capturedApi.DescribeResourceKind(
+                    OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_UNKNOWN,
+                    &descriptor),
+                "DescribeResourceKind accepted unknown resource kind");
+
+        manager.UnloadAll();
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestGameplayPolicyCallbackCleansOnInitFailure()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_gameplay_policy_init_fail");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "gameplay_policy_init_fail.so",
+            .initResult = false,
+            .registerGameplayPolicyCallback = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "gameplay-policy init-fail plugin was not initialized");
+        Require(plugin.shutdownCalls == 1, "gameplay-policy init-fail plugin shutdown was not called");
+        Require(plugin.closeCalls == 1, "gameplay-policy init-fail plugin was not closed");
+        Require(plugin.gameplayPolicyRegistrationId != 0,
+                "gameplay-policy callback was not registered before init failure");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
+                "gameplay-policy structure callback survived init failure");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
+                "gameplay-policy inventory callback survived init failure");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestGameplayPolicyCallbackCleansOnInitException()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_gameplay_policy_init_throw");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "gameplay_policy_init_throw.so",
+            .registerGameplayPolicyCallback = true,
+            .throwInInitAfterCallbacks = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "gameplay-policy init-throw plugin was not initialized");
+        Require(plugin.shutdownCalls == 1, "gameplay-policy init-throw plugin shutdown was not called");
+        Require(plugin.closeCalls == 1, "gameplay-policy init-throw plugin was not closed");
+        Require(plugin.gameplayPolicyRegistrationId != 0,
+                "gameplay-policy callback was not registered before init exception");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
+                "gameplay-policy structure callback survived init exception");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
+                "gameplay-policy inventory callback survived init exception");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestOwnerTokenRegistrationRejectedDuringShutdown()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_owner_token_shutdown_register");
@@ -948,6 +1527,38 @@ namespace
                 "owner-token callback unregister was rejected while plugin was unloading");
         Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
                 "shutdown-unregistered owner-token callback survived unload");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestOwnerTokenUnregisterAllowedDuringInitFailureShutdown()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_owner_token_init_fail_shutdown_unregister");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "owner_token_init_fail_shutdown_unregister.so",
+            .initResult = false,
+            .registerOwnerTokenFromInitThread = true,
+            .unregisterOwnerTokenCallbackInShutdown = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "init-failure shutdown-unregister plugin Init was not called");
+        Require(plugin.shutdownCalls == 1, "init-failure shutdown-unregister plugin shutdown was not called");
+        Require(plugin.initThreadRegistrationId != 0,
+                "init-failure shutdown-unregister plugin did not register a callback before failing");
+        Require(plugin.shutdownUnregisterResult,
+                "owner-token callback unregister was rejected during init-failure shutdown");
+        Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
+                "init-failure shutdown-unregistered owner-token callback survived load failure");
 
         CleanupPlugin(plugin);
         fs::remove_all(root);
@@ -1410,6 +2021,8 @@ namespace
         FakePlugin plugin{.filename = "init_fail.so", .initResult = false, .registerFilteredCallback = true};
         Obelisk::Core::ChatEventDispatcher chatDispatcher;
         plugin.registerChatCallback = true;
+        plugin.registerInventoryPolicyCallback = true;
+        plugin.registerStructureCallback = true;
         plugin.chatDispatcher = &chatDispatcher;
         FakeLoader loader;
         loader.Add(plugin);
@@ -1423,15 +2036,27 @@ namespace
         Require(plugin.initCalls == 1, "init-failing plugin Init was not called");
         Require(plugin.shutdownCalls == 1, "init-failing plugin shutdown was not called");
         Require(plugin.eventCallbacksAtShutdown,
-                "init-failing plugin ProcessEvent callback was removed before shutdown");
+                "init-failing plugin ProcessEvent callback was not present during shutdown");
         Require(plugin.chatSubscriptionsAtShutdown == 1,
-                "init-failing plugin chat callback was removed before shutdown");
+                "init-failing plugin chat callback was not present during shutdown");
+        Require(plugin.inventoryPolicySubscriptionsAtShutdown == 1,
+                "init-failing plugin inventory policy callback was not present during shutdown");
+        Require(plugin.structureSubscriptionsAtShutdown == 1,
+                "init-failing plugin structure callback was not present during shutdown");
         Require(plugin.closeCalls == 1, "init-failing plugin was not closed");
         Require(plugin.chatSubscriptionsAtClose == 0, "failed plugin chat callback was still registered at dlclose");
+        Require(plugin.inventoryPolicySubscriptionsAtClose == 0,
+                "failed plugin inventory policy callback was still registered at dlclose");
+        Require(plugin.structureSubscriptionsAtClose == 0,
+                "failed plugin structure callback was still registered at dlclose");
         Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
                 "callback registered by failed plugin survived load failure");
         Require(chatDispatcher.SubscriptionCount() == 0,
                 "chat callback registered by failed plugin survived load failure");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
+                "inventory policy callback registered by failed plugin survived load failure");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
+                "structure callback registered by failed plugin survived load failure");
 
         CleanupPlugin(plugin);
         fs::remove_all(root);
@@ -1449,6 +2074,8 @@ namespace
         };
         Obelisk::Core::ChatEventDispatcher chatDispatcher;
         plugin.registerChatCallback = true;
+        plugin.registerInventoryPolicyCallback = true;
+        plugin.registerStructureCallback = true;
         plugin.chatDispatcher = &chatDispatcher;
         FakeLoader loader;
         loader.Add(plugin);
@@ -1462,15 +2089,27 @@ namespace
         Require(plugin.initCalls == 1, "init-throw plugin Init was not called");
         Require(plugin.shutdownCalls == 1, "init-throw plugin shutdown was not called");
         Require(plugin.eventCallbacksAtShutdown,
-                "init-throw plugin ProcessEvent callback was removed before shutdown");
+                "init-throw plugin ProcessEvent callback was not present during shutdown");
         Require(plugin.chatSubscriptionsAtShutdown == 1,
-                "init-throw plugin chat callback was removed before shutdown");
+                "init-throw plugin chat callback was not present during shutdown");
+        Require(plugin.inventoryPolicySubscriptionsAtShutdown == 1,
+                "init-throw plugin inventory policy callback was not present during shutdown");
+        Require(plugin.structureSubscriptionsAtShutdown == 1,
+                "init-throw plugin structure callback was not present during shutdown");
         Require(plugin.closeCalls == 1, "init-throw plugin was not closed");
         Require(plugin.chatSubscriptionsAtClose == 0, "init-throw plugin chat callback was still registered at dlclose");
+        Require(plugin.inventoryPolicySubscriptionsAtClose == 0,
+                "init-throw plugin inventory policy callback was still registered at dlclose");
+        Require(plugin.structureSubscriptionsAtClose == 0,
+                "init-throw plugin structure callback was still registered at dlclose");
         Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
                 "ProcessEvent callback registered by throwing plugin survived load failure");
         Require(chatDispatcher.SubscriptionCount() == 0,
                 "chat callback registered by throwing plugin survived load failure");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
+                "inventory policy callback registered by throwing plugin survived load failure");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
+                "structure callback registered by throwing plugin survived load failure");
 
         CleanupPlugin(plugin);
         fs::remove_all(root);
@@ -1592,6 +2231,7 @@ namespace
             .registerFilteredCallback = true,
             .registerOwnerTokenFromInitThread = true,
             .registerChatCallback = true,
+            .registerInventoryPolicyCallback = true,
             .registerStructureCallback = true,
             .throwOnShutdown = true,
         };
@@ -1610,6 +2250,8 @@ namespace
                 "shutdown-throw plugin ProcessEvent callbacks were not registered");
         Require(chatDispatcher.SubscriptionCount() == 1,
                 "shutdown-throw plugin chat callback was not registered");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 1,
+                "shutdown-throw plugin inventory policy callback was not registered");
         Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 1,
                 "shutdown-throw plugin structure callback was not registered");
 
@@ -1618,20 +2260,26 @@ namespace
 
         Require(plugin.shutdownCalls == 1, "shutdown-throw plugin shutdown was not called once");
         Require(plugin.eventCallbacksAtShutdown,
-                "shutdown-throw plugin ProcessEvent callbacks were removed before shutdown");
+                "shutdown-throw plugin ProcessEvent callbacks were not present during shutdown");
         Require(plugin.chatSubscriptionsAtShutdown == 1,
-                "shutdown-throw plugin chat callback was removed before shutdown");
+                "shutdown-throw plugin chat callback was not present during shutdown");
+        Require(plugin.inventoryPolicySubscriptionsAtShutdown == 1,
+                "shutdown-throw plugin inventory policy callback was not present during shutdown");
         Require(plugin.structureSubscriptionsAtShutdown == 1,
-                "shutdown-throw plugin structure callback was removed before shutdown");
+                "shutdown-throw plugin structure callback was not present during shutdown");
         Require(plugin.closeCalls == 1, "shutdown-throw plugin was not closed once");
         Require(plugin.chatSubscriptionsAtClose == 0,
                 "shutdown-throw plugin chat callback was still registered at dlclose");
+        Require(plugin.inventoryPolicySubscriptionsAtClose == 0,
+                "shutdown-throw plugin inventory policy callback was still registered at dlclose");
         Require(plugin.structureSubscriptionsAtClose == 0,
                 "shutdown-throw plugin structure callback was still registered at dlclose");
         Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
                 "shutdown-throw plugin ProcessEvent callbacks survived unload");
         Require(chatDispatcher.SubscriptionCount() == 0,
                 "shutdown-throw plugin chat callback survived unload");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
+                "shutdown-throw plugin inventory policy callback survived unload");
         Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
                 "shutdown-throw plugin structure callback survived unload");
 
@@ -1721,12 +2369,17 @@ int main()
     TestInitFailureCleansInitThreadOwnerTokenCallbackAndToken();
     TestInitExceptionCleansInitThreadOwnerTokenCallbackAndToken();
     TestOwnerTokenHandleRegistrationCanUnregister();
+    TestOwnerTokenGameplayPolicyEventRegistrationCanUnregister();
+    TestDescribeResourceKind();
+    TestGameplayPolicyCallbackCleansOnInitFailure();
+    TestGameplayPolicyCallbackCleansOnInitException();
     TestOwnerTokenGlobalHandleRejectedByDefault();
     TestInvalidOwnerTokenCallbackRegistrationIsRejected();
     TestInvalidProcessEventCallbacksAreRejected();
     TestOwnerTokenRegistrationRejectedDuringShutdown();
     TestOwnerTokenRegistrationRejectedDuringInitFailureShutdown();
     TestOwnerTokenUnregisterAllowedDuringShutdown();
+    TestOwnerTokenUnregisterAllowedDuringInitFailureShutdown();
     TestUnsafeInstanceIdDisablesPluginLoading();
     TestUnsafeConfigRootDisablesPluginLoading();
     TestGlobalProcessEventCallbackAllowedWithGate();

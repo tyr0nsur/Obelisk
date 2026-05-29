@@ -39,6 +39,7 @@ namespace
         bool exiting = false;
     };
 
+    BlockingCallbackState* g_BlockingPreState = nullptr;
     BlockingCallbackState* g_BlockingPostState = nullptr;
 
     void ResetCounters()
@@ -81,6 +82,20 @@ namespace
     bool FilteredPost(void*, void*, void*)
     {
         ++g_Counters.filtered_post;
+        return true;
+    }
+
+    bool BlockingPre(void*, void*, void*)
+    {
+        Require(g_BlockingPreState != nullptr, "blocking pre callback has no state");
+        std::unique_lock<std::mutex> lock(g_BlockingPreState->mutex);
+        g_BlockingPreState->entered = true;
+        g_BlockingPreState->cv.notify_all();
+        g_BlockingPreState->cv.wait(lock, [] {
+            return g_BlockingPreState->release;
+        });
+        g_BlockingPreState->exiting = true;
+        g_BlockingPreState->cv.notify_all();
         return true;
     }
 
@@ -405,6 +420,55 @@ namespace
         g_SelfUnregisterId = 0;
     }
 
+    void TestOwnerCleanupWaitsForInFlightFilteredPreCallback()
+    {
+        ResetCounters();
+        Obelisk::Core::EventManager events;
+        int owner = 0;
+        BlockingCallbackState state;
+        g_BlockingPreState = &state;
+
+        const uint64_t id = events.RegisterPreProcessEventForNameIndexOwned(&owner, 42, BlockingPre);
+        Require(id != 0, "blocking filtered pre registration id was zero");
+
+        std::thread dispatchThread([&events] {
+            Require(events.TriggerPreProcessEvent(42, nullptr, nullptr, nullptr),
+                    "blocking filtered pre callback blocked dispatch");
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.mutex);
+            Require(state.cv.wait_for(lock, std::chrono::seconds(2), [&state] {
+                        return state.entered;
+                    }),
+                    "blocking filtered pre callback did not enter");
+        }
+
+        std::atomic_bool cleanupReturned = false;
+        size_t removed = 0;
+        std::thread cleanupThread([&] {
+            removed = events.UnregisterCallbacksForOwner(&owner);
+            cleanupReturned.store(true);
+        });
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        Require(!cleanupReturned.load(), "owner cleanup returned while filtered pre callback was in flight");
+
+        {
+            std::lock_guard<std::mutex> lock(state.mutex);
+            state.release = true;
+        }
+        state.cv.notify_all();
+
+        cleanupThread.join();
+        dispatchThread.join();
+
+        Require(cleanupReturned.load(), "owner cleanup did not return after filtered pre callback exit");
+        Require(removed == 1, "owner cleanup removed wrong count after filtered pre dispatch");
+        Require(!events.HasPreProcessEventCallbacks(), "filtered pre callback survived owner cleanup");
+        g_BlockingPreState = nullptr;
+    }
+
     void TestOwnerCleanupWaitsForInFlightPostCallback()
     {
         ResetCounters();
@@ -494,6 +558,7 @@ int main()
     TestSingleRegistrationUnregister();
     TestNullCallbacksAreIgnored();
     TestCallbackCanUnregisterItself();
+    TestOwnerCleanupWaitsForInFlightFilteredPreCallback();
     TestOwnerCleanupWaitsForInFlightPostCallback();
     TestRegistrationIdsSkipZeroAfterWrap();
 
