@@ -68,17 +68,93 @@ def gobjects_manifest_json(
 
 
 def full_intake_args(pack_dir: Path) -> object:
+    root = pack_dir.parent
     return type(
         "Args",
         (),
         {
             "scan_only": False,
             "pack_dir": str(pack_dir),
+            "base_root": str(root / "base"),
+            "snapshot_root": str(root / "candidate"),
+            "target_set": "minimal-second-source-intake",
             "gobjects_candidate": "0x595b7e0",
             "gobjects_sample_index": [],
             "verified_fname_root_slot": "0x1234",
         },
     )()
+
+
+def snapshot_json(
+    target: str,
+    *,
+    artifact_sha256: str,
+    capture_id: str,
+    evidence_pack_id: str,
+    artifact_kind: str = "offline_core",
+) -> str:
+    outer, name = target.split(".", 1)
+    return json.dumps(
+        {
+            "schema": intake.UFUNCTION_SCHEMA,
+            "evidence": {
+                "artifact_kind": artifact_kind,
+                "artifact_sha256": artifact_sha256,
+                "capture_id": capture_id,
+                "evidence_pack_id": evidence_pack_id,
+            },
+            "targets": [
+                {
+                    "target": {
+                        "outer_name": outer,
+                        "name": name,
+                    }
+                }
+            ],
+        }
+    ) + "\n"
+
+
+def write_snapshot_identities(
+    root: Path,
+    *,
+    artifact_sha256: str,
+    capture_id: str,
+    evidence_pack_id: str,
+    omit_identity_key: str | None = None,
+) -> None:
+    module = root / "sdk"
+    module.mkdir(parents=True)
+    for target in sorted(intake.schema_targets(intake.DEFAULT_TARGET_SET, intake.UFUNCTION_SCHEMA)):
+        payload = json.loads(
+            snapshot_json(
+                target,
+                artifact_sha256=artifact_sha256,
+                capture_id=capture_id,
+                evidence_pack_id=evidence_pack_id,
+            )
+        )
+        if omit_identity_key:
+            payload["evidence"].pop(omit_identity_key)
+        (module / f"{target}.snapshot.json").write_text(
+            json.dumps(payload),
+            encoding="utf-8",
+        )
+
+
+def write_distinct_snapshot_identities(root: Path) -> None:
+    write_snapshot_identities(
+        root / "base",
+        artifact_sha256="1" * 64,
+        capture_id="primary-core",
+        evidence_pack_id="primary-pack",
+    )
+    write_snapshot_identities(
+        root / "candidate",
+        artifact_sha256="2" * 64,
+        capture_id="second-core",
+        evidence_pack_id="second-pack",
+    )
 
 
 class RunSecondSourceCoreIntakeTests(unittest.TestCase):
@@ -1034,6 +1110,68 @@ class RunSecondSourceCoreIntakeTests(unittest.TestCase):
 
                 self.assertIn(expected, str(raised.exception))
 
+    def test_validates_distinct_snapshot_artifact_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_distinct_snapshot_identities(root)
+
+            intake.require_distinct_snapshot_artifact_identities(
+                root / "base",
+                root / "candidate",
+                target_set=intake.DEFAULT_TARGET_SET,
+            )
+
+    def test_rejects_snapshot_with_partial_artifact_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_snapshot_identities(
+                root / "base",
+                artifact_sha256="1" * 64,
+                capture_id="primary-core",
+                evidence_pack_id="primary-pack",
+            )
+            write_snapshot_identities(
+                root / "candidate",
+                artifact_sha256="2" * 64,
+                capture_id="second-core",
+                evidence_pack_id="second-pack",
+                omit_identity_key="capture_id",
+            )
+
+            with self.assertRaises(intake.ReadinessReportError) as raised:
+                intake.require_distinct_snapshot_artifact_identities(
+                    root / "base",
+                    root / "candidate",
+                    target_set=intake.DEFAULT_TARGET_SET,
+                )
+
+        self.assertIn("missing evidence artifact identity: capture_id", str(raised.exception))
+
+    def test_rejects_snapshot_that_reuses_base_artifact_identity_field(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_snapshot_identities(
+                root / "base",
+                artifact_sha256="1" * 64,
+                capture_id="primary-core",
+                evidence_pack_id="primary-pack",
+            )
+            write_snapshot_identities(
+                root / "candidate",
+                artifact_sha256="1" * 64,
+                capture_id="second-core",
+                evidence_pack_id="second-pack",
+            )
+
+            with self.assertRaises(intake.ReadinessReportError) as raised:
+                intake.require_distinct_snapshot_artifact_identities(
+                    root / "base",
+                    root / "candidate",
+                    target_set=intake.DEFAULT_TARGET_SET,
+                )
+
+        self.assertIn("candidate reuses base artifact identity field(s): artifact_sha256", str(raised.exception))
+
     def test_execute_persists_snapshot_comparison_stdout_even_when_gate_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -1049,6 +1187,7 @@ class RunSecondSourceCoreIntakeTests(unittest.TestCase):
                 gobjects_manifest_json(),
                 encoding="utf-8",
             )
+            write_distinct_snapshot_identities(root)
             results = [
                 subprocess.CompletedProcess(commands[0], 0),
                 subprocess.CompletedProcess(commands[1], 0),
@@ -1090,6 +1229,7 @@ class RunSecondSourceCoreIntakeTests(unittest.TestCase):
                 gobjects_manifest_json(),
                 encoding="utf-8",
             )
+            write_distinct_snapshot_identities(root)
             results = [
                 subprocess.CompletedProcess(commands[0], 0),
                 subprocess.CompletedProcess(commands[1], 0),
@@ -1131,6 +1271,7 @@ class RunSecondSourceCoreIntakeTests(unittest.TestCase):
                 gobjects_manifest_json(),
                 encoding="utf-8",
             )
+            write_distinct_snapshot_identities(root)
             results = [
                 subprocess.CompletedProcess(commands[0], 0),
                 subprocess.CompletedProcess(commands[1], 0),
@@ -1153,6 +1294,61 @@ class RunSecondSourceCoreIntakeTests(unittest.TestCase):
             self.assertEqual(report.read_text(encoding="utf-8"), report_json)
             self.assertFalse(stderr.exists())
 
+    def test_execute_rejects_success_when_candidate_snapshot_identity_is_partial(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            args = full_intake_args(root / "pack")
+            commands = [
+                ["python3", "scan.py"],
+                ["python3", "sample.py"],
+                ["python3", "regen.py"],
+                ["python3", "compare.py", "--target-set", "minimal-second-source-intake"],
+            ]
+            (root / "pack" / "gobjects-sampling").mkdir(parents=True)
+            (root / "pack" / "gobjects-sampling" / "manifest.json").write_text(
+                gobjects_manifest_json(),
+                encoding="utf-8",
+            )
+            write_snapshot_identities(
+                root / "base",
+                artifact_sha256="1" * 64,
+                capture_id="primary-core",
+                evidence_pack_id="primary-pack",
+            )
+            write_snapshot_identities(
+                root / "candidate",
+                artifact_sha256="2" * 64,
+                capture_id="second-core",
+                evidence_pack_id="second-pack",
+                omit_identity_key="evidence_pack_id",
+            )
+            results = [
+                subprocess.CompletedProcess(commands[0], 0),
+                subprocess.CompletedProcess(commands[1], 0),
+                subprocess.CompletedProcess(commands[2], 0),
+                subprocess.CompletedProcess(
+                    commands[3],
+                    0,
+                    stdout=readiness_report_json(),
+                    stderr="",
+                ),
+            ]
+
+            with mock.patch.object(intake.subprocess, "run", side_effect=results):
+                with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                    return_code = intake.run_commands(args, commands)
+
+            stderr = root / "pack" / "snapshot-comparison" / "readiness-report.stderr.txt"
+            self.assertEqual(return_code, 1)
+            self.assertIn(
+                "snapshot artifact identity validation failed",
+                stderr.read_text(encoding="utf-8"),
+            )
+            self.assertIn(
+                "missing evidence artifact identity: evidence_pack_id",
+                stderr.read_text(encoding="utf-8"),
+            )
+
     def test_execute_rejects_success_json_missing_command_target_set(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -1168,6 +1364,7 @@ class RunSecondSourceCoreIntakeTests(unittest.TestCase):
                 gobjects_manifest_json(),
                 encoding="utf-8",
             )
+            write_distinct_snapshot_identities(root)
             results = [
                 subprocess.CompletedProcess(commands[0], 0),
                 subprocess.CompletedProcess(commands[1], 0),

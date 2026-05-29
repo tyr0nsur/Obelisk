@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shlex
 import subprocess
 import sys
@@ -31,6 +32,15 @@ SNAPSHOT_COMPARISON_REPORT = "readiness-report.json"
 SNAPSHOT_COMPARISON_STDERR = "readiness-report.stderr.txt"
 READINESS_SCHEMA = "obelisk.reflection-snapshot-readiness.v1"
 READINESS_GATE_MODE = "second_source_promotion"
+ARTIFACT_IDENTITY_KEYS = (
+    "artifact_kind",
+    "artifact_sha256",
+    "capture_id",
+    "evidence_pack_id",
+)
+ALLOWED_ARTIFACT_KINDS = {"offline_core"}
+SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+SAFE_ARTIFACT_ID_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 
 
 class ReadinessReportError(ValueError):
@@ -603,6 +613,99 @@ def require_persisted_gobjects_manifest(
         raise ReadinessReportError("gobjects sampling manifest sample indices do not match command inputs")
 
 
+def snapshot_target_key(payload: dict[str, object], path: Path) -> str:
+    if payload.get("schema") != UFUNCTION_SCHEMA:
+        raise ReadinessReportError(f"{path}: unsupported snapshot schema {payload.get('schema')!r}")
+    targets = payload.get("targets")
+    if not isinstance(targets, list) or len(targets) != 1 or not isinstance(targets[0], dict):
+        raise ReadinessReportError(f"{path}: expected exactly one target")
+    identity = targets[0].get("target")
+    if not isinstance(identity, dict):
+        raise ReadinessReportError(f"{path}: snapshot target missing identity object")
+    outer = identity.get("outer_name")
+    name = identity.get("name")
+    if not isinstance(outer, str) or not isinstance(name, str):
+        raise ReadinessReportError(f"{path}: snapshot target missing string outer_name/name")
+    return f"{outer}.{name}"
+
+
+def snapshot_artifact_identity(payload: dict[str, object], path: Path, label: str) -> dict[str, str]:
+    evidence = payload.get("evidence")
+    if not isinstance(evidence, dict):
+        raise ReadinessReportError(f"{label} {path}: missing evidence object")
+    values = {key: evidence.get(key) for key in ARTIFACT_IDENTITY_KEYS}
+    missing = [key for key, value in values.items() if not isinstance(value, str) or not value]
+    if missing:
+        raise ReadinessReportError(
+            f"{label} {path}: missing evidence artifact identity: {', '.join(missing)}"
+        )
+    identity = {key: str(values[key]) for key in ARTIFACT_IDENTITY_KEYS}
+    artifact_kind = identity["artifact_kind"]
+    if artifact_kind not in ALLOWED_ARTIFACT_KINDS:
+        raise ReadinessReportError(f"{label} {path}: invalid artifact_kind {artifact_kind!r}")
+    artifact_sha256 = identity["artifact_sha256"]
+    if SHA256_RE.fullmatch(artifact_sha256) is None:
+        raise ReadinessReportError(f"{label} {path}: invalid artifact_sha256")
+    for key in ("capture_id", "evidence_pack_id"):
+        if SAFE_ARTIFACT_ID_RE.fullmatch(identity[key]) is None or ".." in identity[key]:
+            raise ReadinessReportError(f"{label} {path}: invalid {key}")
+    return identity
+
+
+def artifact_identities_by_target(root: Path, target_set: str, label: str) -> dict[str, dict[str, str]]:
+    targets = schema_targets(target_set, UFUNCTION_SCHEMA)
+    identities: dict[str, dict[str, str]] = {}
+    if not root.exists():
+        raise ReadinessReportError(f"{label} snapshot root does not exist: {root}")
+    for path in sorted(root.rglob("*.snapshot.json")):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise ReadinessReportError(f"{label} {path}: invalid JSON: {exc}") from exc
+        if not isinstance(payload, dict):
+            raise ReadinessReportError(f"{label} {path}: snapshot root must be a JSON object")
+        if payload.get("schema") != UFUNCTION_SCHEMA:
+            continue
+        target = snapshot_target_key(payload, path)
+        if target not in targets:
+            continue
+        if target in identities:
+            raise ReadinessReportError(f"{label} snapshot root has duplicate target {target}")
+        identities[target] = snapshot_artifact_identity(payload, path, label)
+    missing_targets = sorted(targets - set(identities))
+    if missing_targets:
+        raise ReadinessReportError(
+            f"{label} snapshot root missing target snapshot(s): {', '.join(missing_targets)}"
+        )
+    return identities
+
+
+def require_distinct_snapshot_artifact_identities(
+    base_root: Path,
+    candidate_root: Path,
+    *,
+    target_set: str,
+) -> None:
+    base = artifact_identities_by_target(base_root, target_set, "base")
+    candidate = artifact_identities_by_target(candidate_root, target_set, "candidate")
+    for target in sorted(base):
+        base_identity = base[target]
+        candidate_identity = candidate[target]
+        if tuple(base_identity[key] for key in ARTIFACT_IDENTITY_KEYS) == tuple(
+            candidate_identity[key] for key in ARTIFACT_IDENTITY_KEYS
+        ):
+            raise ReadinessReportError(f"{target}: candidate reuses full base artifact identity")
+        reused = [
+            key
+            for key in ("artifact_sha256", "capture_id", "evidence_pack_id")
+            if base_identity[key] == candidate_identity[key]
+        ]
+        if reused:
+            raise ReadinessReportError(
+                f"{target}: candidate reuses base artifact identity field(s): {', '.join(reused)}"
+            )
+
+
 def append_wrapper_stderr(stderr_path: Path, message: str) -> None:
     prefix = ""
     if stderr_path.exists() and stderr_path.stat().st_size > 0:
@@ -649,25 +752,32 @@ def run_commands(args: argparse.Namespace, commands: list[list[str]]) -> int:
             print(completed.stdout, end="")
         if completed.stderr:
             print(completed.stderr, end="", file=sys.stderr)
-        validation_failure = None
+        validation_failures = []
         try:
             require_persisted_readiness_report(
                 report_path,
                 expected_target_sets=expected_target_sets_from_command(command),
             )
         except ReadinessReportError as exc:
-            validation_failure = str(exc)
+            validation_failures.append(f"snapshot comparison readiness validation failed: {exc}")
+        try:
+            require_distinct_snapshot_artifact_identities(
+                Path(rel_or_abs(args.base_root)),
+                Path(rel_or_abs(args.snapshot_root)),
+                target_set=args.target_set,
+            )
+        except ReadinessReportError as exc:
+            validation_failures.append(f"snapshot artifact identity validation failed: {exc}")
         if completed.returncode != 0:
-            if validation_failure:
-                message = f"snapshot comparison readiness validation failed: {validation_failure}"
+            for message in validation_failures:
                 append_wrapper_stderr(stderr_path, message)
                 print(message, file=sys.stderr)
             print(f"snapshot comparison report written to {report_path}", file=sys.stderr)
             return completed.returncode
-        if validation_failure:
-            message = f"snapshot comparison readiness validation failed: {validation_failure}"
-            append_wrapper_stderr(stderr_path, message)
-            print(message, file=sys.stderr)
+        if validation_failures:
+            for message in validation_failures:
+                append_wrapper_stderr(stderr_path, message)
+                print(message, file=sys.stderr)
             print(f"snapshot comparison report written to {report_path}", file=sys.stderr)
             return 1
         print(f"snapshot comparison report written to {report_path}")

@@ -24,6 +24,8 @@ def reconciliation_report(
     *,
     serial_values: list[object],
     sha256: str | None = None,
+    artifact_identity_sha256: str | None = None,
+    artifact_identity_override: dict[str, object] | None = None,
 ) -> dict[str, object]:
     samples: list[dict[str, object]] = []
     for number, serial_value in enumerate(serial_values):
@@ -62,10 +64,25 @@ def reconciliation_report(
     }
     if sha256 is not None:
         payload["artifact"] = {"sha256": sha256}
+    if artifact_identity_sha256 is not None:
+        payload["artifact_identity"] = {
+            "artifact_kind": "core",
+            "artifact_sha256": artifact_identity_sha256,
+            "capture_id": "capture-a",
+            "evidence_pack_id": "pack-a",
+        }
+    if artifact_identity_override is not None:
+        payload["artifact_identity"] = artifact_identity_override
     return payload
 
 
-def static_evidence(*, coherent: bool, sha256: str | None = None) -> dict[str, object]:
+def static_evidence(
+    *,
+    coherent: bool,
+    sha256: str | None = None,
+    artifact_identity_sha256: str | None = None,
+    artifact_identity_override: dict[str, object] | None = None,
+) -> dict[str, object]:
     blockers = [] if coherent else [evaluator.BLOCKER_MISSING_COHERENT_WINDOW]
     payload: dict[str, object] = {
         "schema": evaluator.STATIC_GLOBAL_EVIDENCE_SCHEMA,
@@ -84,6 +101,15 @@ def static_evidence(*, coherent: bool, sha256: str | None = None) -> dict[str, o
         ],
         "promotion_gate": {"ready": False, "blockers": []},
     }
+    if artifact_identity_sha256 is not None:
+        payload["artifact_identity"] = {
+            "artifact_kind": "objdump",
+            "artifact_sha256": artifact_identity_sha256,
+            "capture_id": "capture-b",
+            "evidence_pack_id": "pack-b",
+        }
+    if artifact_identity_override is not None:
+        payload["artifact_identity"] = artifact_identity_override
     return payload
 
 
@@ -100,6 +126,84 @@ class ResourceHandleRevalidationEvaluatorTests(unittest.TestCase):
         self.assertIn(evaluator.BLOCKER_ZERO_OR_MISSING_SERIAL, payload["blockers"])
         self.assertIn(evaluator.BLOCKER_UOBJECT_FLAGS, payload["blockers"])
         self.assertIn(evaluator.BLOCKER_MISSING_COHERENT_WINDOW, payload["blockers"])
+        self.assertNotIn("required", payload["artifact_identity"])
+        self.assertNotIn("required_artifact_identity_present", payload["evidence_checks"])
+        self.assertNotIn(evaluator.BLOCKER_MISSING_ARTIFACT_IDENTITY, payload["blockers"])
+
+    def test_require_artifact_identity_adds_blocker_for_anonymous_reports(self) -> None:
+        report = reconciliation_report(serial_values=[17, 23])
+        payload = evaluator.build_evaluation(
+            [report],
+            static_evidence(coherent=True),
+            require_artifact_identity=True,
+        )
+
+        self.assertFalse(payload["post_callback_resource_handle_ready"])
+        self.assertFalse(payload["evidence_checks"]["evidence_without_lifetime_flags_ready"])
+        self.assertTrue(payload["artifact_identity"]["required"])
+        self.assertEqual(payload["artifact_identity"]["hash_count"], 0)
+        self.assertEqual(payload["artifact_identity"]["missing_or_partial_input_count"], 2)
+        self.assertEqual(payload["artifact_identity"]["invalid_input_count"], 0)
+        self.assertIn(evaluator.BLOCKER_MISSING_ARTIFACT_IDENTITY, payload["blockers"])
+
+    def test_require_artifact_identity_rejects_bare_hashes_without_complete_identity(self) -> None:
+        report = reconciliation_report(serial_values=[17, 23], sha256="a" * 64)
+        payload = evaluator.build_evaluation(
+            [report],
+            static_evidence(coherent=True, sha256="b" * 64),
+            require_artifact_identity=True,
+        )
+
+        self.assertFalse(payload["post_callback_resource_handle_ready"])
+        self.assertFalse(payload["evidence_checks"]["evidence_without_lifetime_flags_ready"])
+        self.assertEqual(payload["artifact_identity"]["hash_count"], 2)
+        self.assertEqual(payload["artifact_identity"]["complete_input_count"], 0)
+        self.assertEqual(payload["artifact_identity"]["missing_or_partial_input_count"], 2)
+        self.assertEqual(payload["artifact_identity"]["invalid_input_count"], 0)
+        self.assertIn(evaluator.BLOCKER_MISSING_ARTIFACT_IDENTITY, payload["blockers"])
+
+    def test_require_artifact_identity_adds_blocker_for_invalid_identity(self) -> None:
+        invalid_values = (
+            {"artifact_sha256": "A" * 64},
+            {"capture_id": "../bad"},
+            {"capture_id": "bad/path"},
+            {"evidence_pack_id": ""},
+        )
+        for override in invalid_values:
+            with self.subTest(override=override):
+                report = reconciliation_report(serial_values=[17], artifact_identity_sha256="a" * 64)
+                artifact_identity = report["artifact_identity"]
+                assert isinstance(artifact_identity, dict)
+                artifact_identity.update(override)
+
+                payload = evaluator.build_evaluation(
+                    [report],
+                    static_evidence(coherent=True, artifact_identity_sha256="b" * 64),
+                    require_artifact_identity=True,
+                )
+
+                self.assertFalse(payload["evidence_checks"]["evidence_without_lifetime_flags_ready"])
+                self.assertEqual(payload["artifact_identity"]["complete_input_count"], 1)
+                self.assertEqual(payload["artifact_identity"]["missing_or_partial_input_count"], 0)
+                self.assertEqual(payload["artifact_identity"]["invalid_input_count"], 1)
+                self.assertIn(evaluator.BLOCKER_INVALID_ARTIFACT_IDENTITY, payload["blockers"])
+
+    def test_require_artifact_identity_accepts_complete_identity_without_changing_lifetime_blocker(self) -> None:
+        report = reconciliation_report(serial_values=[17, 23], artifact_identity_sha256="a" * 64)
+        payload = evaluator.build_evaluation(
+            [report],
+            static_evidence(coherent=True, artifact_identity_sha256="b" * 64),
+            require_artifact_identity=True,
+        )
+
+        self.assertFalse(payload["post_callback_resource_handle_ready"])
+        self.assertTrue(payload["evidence_checks"]["evidence_without_lifetime_flags_ready"])
+        self.assertEqual(payload["artifact_identity"]["hash_count"], 2)
+        self.assertEqual(payload["artifact_identity"]["complete_input_count"], 2)
+        self.assertEqual(payload["artifact_identity"]["missing_or_partial_input_count"], 0)
+        self.assertEqual(payload["artifact_identity"]["invalid_input_count"], 0)
+        self.assertNotIn(evaluator.BLOCKER_MISSING_ARTIFACT_IDENTITY, payload["blockers"])
+        self.assertEqual(payload["blockers"], [evaluator.BLOCKER_UOBJECT_FLAGS])
 
     def test_cli_output_is_redacted_and_keeps_only_counts_and_hashes(self) -> None:
         artifact_hash = "a" * 64
@@ -109,8 +213,8 @@ class ResourceHandleRevalidationEvaluatorTests(unittest.TestCase):
             reconciliation = root / "reconciliation.json"
             static = root / "static.json"
             output = root / "resource-handle-readiness.json"
-            write_json(reconciliation, reconciliation_report(serial_values=[0], sha256=artifact_hash))
-            write_json(static, static_evidence(coherent=False, sha256=binary_hash))
+            write_json(reconciliation, reconciliation_report(serial_values=[0], artifact_identity_sha256=artifact_hash))
+            write_json(static, static_evidence(coherent=False, artifact_identity_sha256=binary_hash))
 
             subprocess.run(
                 [
@@ -120,6 +224,7 @@ class ResourceHandleRevalidationEvaluatorTests(unittest.TestCase):
                     str(reconciliation),
                     "--static-global-evidence",
                     str(static),
+                    "--require-artifact-identity",
                     "--output",
                     str(output),
                 ],
@@ -132,6 +237,10 @@ class ResourceHandleRevalidationEvaluatorTests(unittest.TestCase):
             payload = json.loads(text)
 
         self.assertEqual(payload["artifact_identity"]["hashes"], [artifact_hash, binary_hash])
+        self.assertTrue(payload["artifact_identity"]["required"])
+        self.assertEqual(payload["artifact_identity"]["complete_input_count"], 2)
+        self.assertEqual(payload["artifact_identity"]["missing_or_partial_input_count"], 0)
+        self.assertEqual(payload["artifact_identity"]["invalid_input_count"], 0)
         for forbidden in (
             "0x",
             "ServerChat",

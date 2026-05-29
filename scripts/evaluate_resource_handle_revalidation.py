@@ -25,8 +25,11 @@ STATUS_CANDIDATE_UOBJECT = "candidate-uobject"
 BLOCKER_ZERO_OR_MISSING_SERIAL = "zero_or_missing_fuobjectitem_serial_candidates"
 BLOCKER_UOBJECT_FLAGS = "uobject_flags_validity_semantics_unproven"
 BLOCKER_MISSING_COHERENT_WINDOW = "missing_gobjects_coherent_field_window"
+BLOCKER_MISSING_ARTIFACT_IDENTITY = "missing_or_partial_artifact_identity"
+BLOCKER_INVALID_ARTIFACT_IDENTITY = "invalid_artifact_identity"
 
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+SAFE_ARTIFACT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
 
 
 def load_json(path: Path, label: str) -> dict[str, Any]:
@@ -58,6 +61,37 @@ def collect_identity_hashes(value: object, hashes: set[str]) -> None:
     elif isinstance(value, list):
         for child in value:
             collect_identity_hashes(child, hashes)
+
+
+def identity_hashes(value: object) -> set[str]:
+    hashes: set[str] = set()
+    collect_identity_hashes(value, hashes)
+    return hashes
+
+
+def safe_artifact_id(value: object) -> bool:
+    return isinstance(value, str) and SAFE_ARTIFACT_ID_RE.fullmatch(value) is not None and ".." not in value
+
+
+def classify_artifact_identity(report: dict[str, Any]) -> tuple[str, set[str]]:
+    identity = report.get("artifact_identity")
+    if not isinstance(identity, dict):
+        return "missing", set()
+
+    artifact_kind = identity.get("artifact_kind")
+    artifact_sha256 = identity.get("artifact_sha256")
+    capture_id = identity.get("capture_id")
+    evidence_pack_id = identity.get("evidence_pack_id")
+    if any(value is None for value in (artifact_kind, artifact_sha256, capture_id, evidence_pack_id)):
+        return "partial", set()
+    if (
+        not safe_artifact_id(artifact_kind)
+        or not is_sha256(artifact_sha256)
+        or not safe_artifact_id(capture_id)
+        or not safe_artifact_id(evidence_pack_id)
+    ):
+        return "invalid", set()
+    return "complete", {str(artifact_sha256)}
 
 
 def int_value(value: object) -> int | None:
@@ -146,10 +180,15 @@ def count_static_gobjects_candidates(report: dict[str, Any]) -> int:
 def build_evaluation(
     reconciliation_reports: list[dict[str, Any]],
     static_global_evidence: dict[str, Any] | None,
+    *,
+    require_artifact_identity: bool = False,
 ) -> dict[str, Any]:
     blockers: list[str] = []
-    identity_hashes: set[str] = set()
+    collected_identity_hashes: set[str] = set()
     invalid_reconciliation_schema_count = 0
+    complete_artifact_identity_report_count = 0
+    missing_or_partial_artifact_identity_report_count = 0
+    invalid_artifact_identity_report_count = 0
 
     totals = {
         "sample_count": 0,
@@ -161,7 +200,16 @@ def build_evaluation(
         "serial_candidate_missing_count": 0,
     }
     for report in reconciliation_reports:
-        collect_identity_hashes(report, identity_hashes)
+        report_hashes = identity_hashes(report)
+        collected_identity_hashes.update(report_hashes)
+        identity_status, strict_hashes = classify_artifact_identity(report)
+        collected_identity_hashes.update(strict_hashes)
+        if identity_status == "complete":
+            complete_artifact_identity_report_count += 1
+        elif identity_status == "invalid":
+            invalid_artifact_identity_report_count += 1
+        else:
+            missing_or_partial_artifact_identity_report_count += 1
         if report.get("schema") != GOBJECTS_RECONCILIATION_SCHEMA:
             invalid_reconciliation_schema_count += 1
         counts = reconciliation_counts(report)
@@ -186,7 +234,16 @@ def build_evaluation(
     coherent_window_proven = False
     static_gobjects_candidate_count = 0
     if static_global_evidence is not None:
-        collect_identity_hashes(static_global_evidence, identity_hashes)
+        static_hashes = identity_hashes(static_global_evidence)
+        collected_identity_hashes.update(static_hashes)
+        identity_status, strict_hashes = classify_artifact_identity(static_global_evidence)
+        collected_identity_hashes.update(strict_hashes)
+        if identity_status == "complete":
+            complete_artifact_identity_report_count += 1
+        elif identity_status == "invalid":
+            invalid_artifact_identity_report_count += 1
+        else:
+            missing_or_partial_artifact_identity_report_count += 1
         static_gobjects_candidate_count = count_static_gobjects_candidates(static_global_evidence)
         coherent_window_proven = static_coherent_window_proven(static_global_evidence)
         if not static_schema_valid:
@@ -195,7 +252,19 @@ def build_evaluation(
         blockers.append(BLOCKER_MISSING_COHERENT_WINDOW)
 
     blockers.append(BLOCKER_UOBJECT_FLAGS)
+    if require_artifact_identity and missing_or_partial_artifact_identity_report_count:
+        blockers.append(BLOCKER_MISSING_ARTIFACT_IDENTITY)
+    if require_artifact_identity and invalid_artifact_identity_report_count:
+        blockers.append(BLOCKER_INVALID_ARTIFACT_IDENTITY)
     blockers = sorted(set(blockers))
+
+    required_artifact_identity_present = (
+        not require_artifact_identity
+        or (
+            missing_or_partial_artifact_identity_report_count == 0
+            and invalid_artifact_identity_report_count == 0
+        )
+    )
 
     evidence_without_lifetime_flags_ready = (
         bool(reconciliation_reports)
@@ -205,7 +274,34 @@ def build_evaluation(
         and totals["serial_candidate_zero_count"] == 0
         and totals["serial_candidate_missing_count"] == 0
         and coherent_window_proven
+        and required_artifact_identity_present
     )
+
+    artifact_identity: dict[str, Any] = {
+        "hash_count": len(collected_identity_hashes),
+        "hashes": sorted(collected_identity_hashes),
+    }
+    evidence_checks = {
+        "accepted_reconciliation_samples_present": totals["accepted_sample_count"] > 0,
+        "nonzero_serial_candidates_present": totals["serial_candidate_nonzero_count"] > 0,
+        "zero_or_missing_serial_candidates_present": (
+            totals["serial_candidate_zero_count"] > 0 or totals["serial_candidate_missing_count"] > 0
+        ),
+        "gobjects_coherent_field_window_proven": coherent_window_proven,
+        "uobject_flags_validity_semantics_proven": False,
+        "evidence_without_lifetime_flags_ready": evidence_without_lifetime_flags_ready,
+    }
+    if require_artifact_identity:
+        artifact_identity.update(
+            {
+                "required": True,
+                "complete_input_count": complete_artifact_identity_report_count,
+                "missing_or_partial_input_count": missing_or_partial_artifact_identity_report_count,
+                "invalid_input_count": invalid_artifact_identity_report_count,
+            }
+        )
+        evidence_checks["artifact_identity_present"] = bool(collected_identity_hashes)
+        evidence_checks["required_artifact_identity_present"] = required_artifact_identity_present
 
     return {
         "schema": SCHEMA,
@@ -216,25 +312,13 @@ def build_evaluation(
             "invalid_reconciliation_schema": invalid_reconciliation_schema_count,
             "static_global_evidence_schema_valid": static_schema_valid,
         },
-        "artifact_identity": {
-            "hash_count": len(identity_hashes),
-            "hashes": sorted(identity_hashes),
-        },
+        "artifact_identity": artifact_identity,
         "reconciliation_summary": totals,
         "static_global_evidence_summary": {
             "gobjects_candidate_count": static_gobjects_candidate_count,
             "coherent_field_window_proven": coherent_window_proven,
         },
-        "evidence_checks": {
-            "accepted_reconciliation_samples_present": totals["accepted_sample_count"] > 0,
-            "nonzero_serial_candidates_present": totals["serial_candidate_nonzero_count"] > 0,
-            "zero_or_missing_serial_candidates_present": (
-                totals["serial_candidate_zero_count"] > 0 or totals["serial_candidate_missing_count"] > 0
-            ),
-            "gobjects_coherent_field_window_proven": coherent_window_proven,
-            "uobject_flags_validity_semantics_proven": False,
-            "evidence_without_lifetime_flags_ready": evidence_without_lifetime_flags_ready,
-        },
+        "evidence_checks": evidence_checks,
         "blockers": blockers,
         "post_callback_resource_handle_ready": False,
     }
@@ -251,6 +335,14 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--static-global-evidence", type=Path, help="Optional static global evidence JSON.")
     parser.add_argument("--output", type=Path, help="Optional redacted JSON output path.")
+    parser.add_argument(
+        "--require-artifact-identity",
+        action="store_true",
+        help=(
+            "Add fail-closed blockers when any supplied report lacks complete sanitized "
+            "artifact_identity metadata."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -269,7 +361,11 @@ def main() -> int:
         for path in reconciliation_paths
     ]
     static_report = load_json(static_path, "--static-global-evidence") if static_path is not None else None
-    evaluation = build_evaluation(reconciliation_reports, static_report)
+    evaluation = build_evaluation(
+        reconciliation_reports,
+        static_report,
+        require_artifact_identity=args.require_artifact_identity,
+    )
     text = json.dumps(evaluation, indent=2, sort_keys=True)
     if output_path:
         output_path.parent.mkdir(parents=True, exist_ok=True)
