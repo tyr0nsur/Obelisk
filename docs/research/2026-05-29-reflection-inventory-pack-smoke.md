@@ -16,6 +16,8 @@ UFunction inventory without promoting UE4 internals as public API.
   `62d1768fd5962ee9270641f0a340dc04dc15edde53eacefbf247eff37e5bed78`
 - Evidence-pack manifest:
   `/servidor/ark/workspace-offline/minimal-second-source-intake-direct-20260529T033919Z/pack/gobjects-sampling/manifest.json`
+- Primary artifact identity: `artifact_kind=offline_core`, `capture_id=core`,
+  `evidence_pack_id=gobjects-sampling`
 - Output pack:
   `/servidor/ark/workspace-offline/reflection-inventory-pack-smoke-20260529T000000Z`
 - Second-source output pack:
@@ -85,9 +87,21 @@ python3 scripts/build_reflection_inventory_pack.py \
 ```
 
 The second pack also reported `fname_root_ready=true`, `function_count=5269`,
-`target_matched_count=8`, `target_missing_count=0`, and `blockers=[]`. A quick local key
-comparison found `0` missing `(outer_name, name)` pairs in either direction, and the eight
-requested target rows matched on flags, parameter count, and parameter size. This remains a
+`target_matched_count=8`, `target_missing_count=0`, and `blockers=[]`.
+
+Formal comparison:
+
+```bash
+python3 scripts/compare_reflection_inventory_packs.py \
+  --base-pack /servidor/ark/workspace-offline/reflection-inventory-pack-smoke-20260529T000000Z \
+  --candidate-pack /servidor/ark/workspace-offline/reflection-inventory-pack-second-source-20260529T000000Z \
+  --fail-on-gaps \
+  --json
+```
+
+The comparison reported schema `obelisk.reflection-inventory-pack-comparison.v1`,
+`status=accepted`, `shared_function_count=5269`, `missing_in_candidate=[]`,
+`new_in_candidate=[]`, `changed_functions=[]`, and `blockers=[]`. This remains a
 candidate-only inventory check, not a replacement for strict snapshot readiness reports.
 
 ## Non-Claims

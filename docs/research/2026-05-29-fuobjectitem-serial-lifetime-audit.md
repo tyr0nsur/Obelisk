@@ -87,6 +87,92 @@ push.
 - `ue/RuntimeReflection` validates `UObject` shape and `InternalIndex`, but it does not
   validate `GObjects[InternalIndex]`, `FUObjectItem` serials, stale handles, or slot reuse.
 
+## Static Weak Helper Truth Table
+
+Follow-up static/offline review of the copied binary refined the internal helper polarity
+without closing the public `ResourceHandle` blocker.
+
+Environment:
+
+- Offline binary:
+  `/home/flowcommunity-ark/obelisk-artifacts/offline-binaries/7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520/ShooterGameServer`
+- SHA256:
+  `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`
+- Obelisk commit used by the static review: `3cb248a`
+- `.text` range: `0x648400..0x3f6170f`
+
+Common weak shape:
+
+```text
+Weak = { int32 index @ +0, int32 serial @ +4 }
+
+serial != 0
+index >= 0 && index < *(int32*)0x595b804
+chunk = (*(void***)0x595b7f0)[index >> 16]
+item = chunk + 0x10 * (index & 0xffff)
+item_serial = *(int32*)(item + 0x8)
+obj = *(void**)(item + 0x0)
+flags = *(uint32*)(obj + 0x8)
+```
+
+Observed raw flag bits remain `0x100` and `0x4000`. Do not assign UE4 semantic names to
+them yet.
+
+| Address | Working name | Static result |
+| --- | --- | --- |
+| `0x1d56d00` | `GetRaw(Weak*) -> UObject*` | Returns `obj` when serial is nonzero, index is in range, and `item+0x8 == serial`; no flag filtering. |
+| `0x1d56c00` | `GetStrict(Weak*) -> UObject*` | Like raw lookup, but requires `obj != 0`, no `0x100`, and no `0x4000`. |
+| `0x1d56c70` | `GetMaybePending(Weak*, bool allow4000)` | Requires `obj != 0` and no `0x100`; `0x4000` is allowed only when `sil != 0`. |
+| `0x1d56a30` | `IsValidLike(Weak*, bool allow4000, bool threadSafe)` | With `dl != 0`, validates only index and serial. Otherwise true when serial matches and either `obj == 0` or no `0x100` and (`allow4000` or no `0x4000`). Preserve the static `obj == 0 => true` edge case as unresolved. |
+| `0x1d56ae0` | `IsValidStrictNoArgsLike(Weak*)` | True when index and serial match and either `obj == 0` or flags have neither `0x100` nor `0x4000`; false for zero serial, invalid index, or mismatch. |
+| `0x1d56b60` | `IsStaleLike(Weak*, bool include4000, bool threadSafe)` | `serial == 0 => false`; invalid index or serial mismatch => true. With `dl == 0`, `sil == 0` reports stale only for `0x100`; `sil != 0` reports stale for `0x100 | 0x4000`. `obj == 0 => false`. |
+| `0x1d56d60` | `Assign/repair weak from object via virtual callback` | Resolves the current weak, calls virtual `[this+vtable+0x18]`, writes `index = obj+0xc` when an object is returned, lazily publishes `item+0x8` with `lock xadd`/`cmpxchg` when serial is zero, and writes `-1` to the weak when no object is available. |
+
+Reviewed caller windows:
+
+- `0x83a2a0..0x83a2c6`: calls `0x1d56c00`; later use requires a returned object, so both
+  `0x100` and `0x4000` are filtered.
+- `0x83a340..0x83a370`: calls `0x1d56c70(elem, 1)` while iterating 16-byte elements; this
+  permits `0x4000` but not `0x100`.
+- `0x3522bf0..0x3522c1d`: calls `0x1d56ae0`, then `0x1d56c00`; because `ae0` may be
+  true when `obj == 0`, the downstream call may receive null in that static edge case.
+
+Direct call counts observed by bounded objdump scan:
+
+```text
+0x1d56a30: 8958
+0x1d56ae0: 315
+0x1d56b60: 4
+0x1d56c00: 512
+0x1d56c70: 6
+0x1d56d00: 0
+0x1d56d60: 14
+```
+
+Reproducible offline commands:
+
+```bash
+BIN=/home/flowcommunity-ark/obelisk-artifacts/offline-binaries/7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520/ShooterGameServer
+
+sha256sum "$BIN"
+file "$BIN"
+readelf -h -W "$BIN"
+readelf -S -W "$BIN" | sed -n '1,80p'
+
+objdump -d -M intel --start-address=0x1d56a00 --stop-address=0x1d56df0 "$BIN"
+objdump -d -M intel --start-address=0x1d56d60 --stop-address=0x1d56f60 "$BIN"
+objdump -d -M intel --start-address=0x83a260 --stop-address=0x83a3b0 "$BIN"
+objdump -d -M intel --start-address=0x3522bb0 --stop-address=0x3522c60 "$BIN"
+
+objdump -d -M intel "$BIN" |
+  awk '/call/ {for (i=1;i<=NF;i++) if ($i ~ /^1d56(a30|ae0|b60|c00|c70|d00|d60)$/) count[$i]++}
+       END {for (t in count) print t, count[t]}' | sort
+```
+
+This table is durable internal static evidence only. It does not prove UE4 flag names,
+runtime invalidation semantics, post-callback safety, or a public/persistent
+`ResourceHandle`.
+
 ## Rejected Assumptions
 
 - Do not expose or design a `ResourceHandle` around `GObjects` index plus `item+0xc`

@@ -30,6 +30,9 @@ metadata.
 - `scripts/compare_reflection_snapshots.py` compares sanitized UFunction/ScriptStruct
   snapshots offline and supports `--target Outer.Name` or schema-qualified targets for
   focused second-source checks.
+- Reflection inventory packs are candidate-only review aids unless backed by a separate
+  strict readiness note. Record artifact identity, hashes, commands, output paths,
+  redacted field sets, second-source comparison, and explicit non-claims.
 - Internal runtime layers exist:
   - `ue/RuntimeReflection.{h,cpp}` for binary-hash-gated `UObject`/`UFunction`/
     `UProperty` validation and UTF-32 `FString` decoding helpers.

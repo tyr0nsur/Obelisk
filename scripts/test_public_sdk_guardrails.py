@@ -79,6 +79,15 @@ UNPROMOTED_GAMEPLAY_SURFACES = (
     "Admin",
     "Command",
 )
+UNPROMOTED_IDENTITY_SURFACE_TOKENS = (
+    "ObeliskResourceHandle",
+    "ResourceHandle",
+    "GetResource",
+    "ResolveResource",
+    "GObjects",
+    "GUObjectArray",
+    "GNames",
+)
 
 
 def unpromoted_gameplay_tokens() -> list[str]:
@@ -615,6 +624,18 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 continue
             text = path.read_text(encoding="utf-8")
             for token in forbidden:
+                if token in text:
+                    offenders.append(f"{path.relative_to(REPO_ROOT)}: {token}")
+
+        self.assertEqual(offenders, [])
+
+    def test_public_sdk_headers_have_no_resource_identity_or_ue_global_api_until_promotion(self) -> None:
+        offenders: list[str] = []
+        for path in (REPO_ROOT / "include" / "obelisk").rglob("*"):
+            if not path.is_file() or path.suffix not in {".h", ".hpp"}:
+                continue
+            text = strip_c_comments(path.read_text(encoding="utf-8"))
+            for token in UNPROMOTED_IDENTITY_SURFACE_TOKENS:
                 if token in text:
                     offenders.append(f"{path.relative_to(REPO_ROOT)}: {token}")
 
