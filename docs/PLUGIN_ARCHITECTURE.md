@@ -336,6 +336,20 @@ identity, UE lookup, mutation path, or return-override API. Plugins must check
 `OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS`, `struct_size`, and the
 function pointer before using it.
 
+`ChatMessageEvent` is the other v0.1-rc public event ABI surface, but it is intentionally
+minimal and separate from gameplay policy events. It carries copied UTF-8 chat message
+bytes, `send_mode`, copied-payload flags, and a process-local `sequence` through
+`RegisterChatMessageEventWithOwnerTokenHandle` and
+`UnregisterChatMessageEventWithOwnerToken`. Plugins must check
+`OBELISK_API_CAPABILITY_CHAT_EVENTS`, `struct_size`, a non-zero owner token, and both
+function pointers before subscribing. The callback data is valid only for the callback
+duration. The event does not expose sender/player identity, resource identity, raw
+`FString`, `UObject`, `UFunction`, raw parameter buffers, FName/GObjects indices, chat
+send/moderation/blocking authority, command registration/routing, mutation, or return
+override. Plugins that want commands must parse the copied text locally; Obelisk v0.1 does
+not ship a separate command SDK. Runtime producer hookup remains a separate gate, so
+registration support does not by itself prove end-to-end chat delivery.
+
 ## HTTP And Security
 
 HTTP-capable plugins are two systems: an Obelisk plugin and a network service.

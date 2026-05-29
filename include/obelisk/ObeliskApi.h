@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 
 #define OBELISK_API_ABI_VERSION 1u
 #define OBELISK_PLUGIN_METADATA_ABI_VERSION 1u
@@ -15,12 +16,15 @@
 #define OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS (1ull << 6)
 #define OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS (1ull << 7)
 #define OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS (1ull << 8)
+#define OBELISK_API_CAPABILITY_CHAT_EVENTS (1ull << 9)
 #define OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION 1u
 #define OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION 1u
 #define OBELISK_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION 1u
+#define OBELISK_CHAT_MESSAGE_EVENT_ABI_VERSION 1u
 #define OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD (1ull << 0)
 #define OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED (1ull << 1)
 #define OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED (1ull << 2)
+#define OBELISK_CHAT_MESSAGE_EVENT_FLAG_COPIED_PAYLOAD (1ull << 0)
 #define OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_CATEGORY_ONLY (1ull << 0)
 #define OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY (1ull << 1)
 #define OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP (1ull << 2)
@@ -67,6 +71,36 @@ extern "C" {
 // Post-process callbacks use the same ABI type, but their return value is ignored; return
 // true from post callbacks for forward compatibility.
 typedef bool (*OnProcessEventCallback)(void* caller, void* function, void* parms);
+
+typedef struct ObeliskStringView {
+    const char* data;
+    size_t size;
+} ObeliskStringView;
+
+typedef enum ObeliskChatSendMode {
+    OBELISK_CHAT_SEND_MODE_GLOBAL = 0,
+    OBELISK_CHAT_SEND_MODE_TRIBE = 1,
+    OBELISK_CHAT_SEND_MODE_LOCAL = 2,
+    OBELISK_CHAT_SEND_MODE_ALLIANCE = 3,
+} ObeliskChatSendMode;
+
+#define OBELISK_CHAT_SEND_MODE_MIN OBELISK_CHAT_SEND_MODE_GLOBAL
+#define OBELISK_CHAT_SEND_MODE_MAX OBELISK_CHAT_SEND_MODE_ALLIANCE
+#define OBELISK_CHAT_SEND_MODE_COUNT 4u
+
+typedef struct ObeliskChatMessageEvent {
+    uint32_t abi_version;
+    uint32_t struct_size;
+    // ObeliskChatSendMode stored as uint32_t for a fixed C ABI layout.
+    uint32_t send_mode;
+    uint32_t reserved0;
+    uint64_t flags;
+    // Process-local monotonically increasing sequence for ordering observations. It is
+    // not persistent identity and may reset on restart.
+    uint64_t sequence;
+    // UTF-8 copied message text, not NUL-termination dependent.
+    ObeliskStringView message;
+} ObeliskChatMessageEvent;
 
 typedef enum ObeliskGameplayPolicyEventKind {
     OBELISK_GAMEPLAY_POLICY_EVENT_KIND_UNKNOWN = 0,
@@ -158,6 +192,12 @@ typedef struct ObeliskGameplayPolicyEventDescriptor {
 // intentionally exposes no UE4 object pointers, FName/GObjects indices, raw
 // parameter buffers, player identity, secrets, or mutable parameter storage.
 typedef void (*ObeliskGameplayPolicyEventCallback)(const ObeliskGameplayPolicyEvent* event, void* user_data);
+
+// Borrowed event data is valid only for the duration of the callback.
+// Chat events are copied UTF-8 notifications for command-style plugins. They expose no UE4
+// object pointers, raw ProcessEvent params, FName/GObjects indices, mutable message storage,
+// or authoritative sender/resource identity.
+typedef void (*ObeliskChatMessageEventCallback)(const ObeliskChatMessageEvent* event, void* user_data);
 
 typedef struct ObeliskPluginMetadata {
     uint32_t abi_version;
@@ -259,6 +299,16 @@ typedef struct ObeliskApi {
     // return-override authority. Callers must initialize out->struct_size to
     // sizeof(ObeliskGameplayPolicyEventDescriptor) before use.
     bool (*DescribeGameplayPolicyEventKind)(uint32_t eventKind, ObeliskGameplayPolicyEventDescriptor* out);
+
+    // Copied chat message events for command-style plugins. Plugins must check struct_size,
+    // OBELISK_API_CAPABILITY_CHAT_EVENTS, and these function pointers before use. A return
+    // value of 0 means registration was rejected. Non-zero handles are process-local and
+    // must be unregistered with the same owner token.
+    uint64_t (*RegisterChatMessageEventWithOwnerTokenHandle)(
+        uint64_t ownerToken,
+        ObeliskChatMessageEventCallback callback,
+        void* userData);
+    bool (*UnregisterChatMessageEventWithOwnerToken)(uint64_t ownerToken, uint64_t registrationId);
 } ObeliskApi;
 
 // Plugins must export these functions to be loaded by Obelisk.

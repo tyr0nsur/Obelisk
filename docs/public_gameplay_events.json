@@ -168,5 +168,86 @@
         "docs/research/2026-05-29-public-gameplay-event-readiness-audit.md"
       ]
     }
+  ],
+  "rc_events": [
+    {
+      "event_id": "obelisk.chat_message.v1",
+      "public_name": "ChatMessageEvent",
+      "capability": "OBELISK_API_CAPABILITY_CHAT_EVENTS",
+      "abi_struct": "ObeliskChatMessageEvent",
+      "registration": "RegisterChatMessageEventWithOwnerTokenHandle",
+      "unregister": "UnregisterChatMessageEventWithOwnerToken",
+      "backing_target_set": "chat-message-intake",
+      "target_sets": [
+        "chat-message-intake"
+      ],
+      "scope": "v0.1-rc SDK ABI surface for copied UTF-8 chat notifications; no command SDK, no sender identity, no UE internals, no mutation, no return override",
+      "payload": "copied UTF-8 message bytes, send mode, copied-payload flag, and process-local sequence",
+      "public_fields": [
+        "abi_version",
+        "struct_size",
+        "send_mode",
+        "reserved0",
+        "flags",
+        "sequence",
+        "message"
+      ],
+      "send_modes": [
+        "OBELISK_CHAT_SEND_MODE_GLOBAL",
+        "OBELISK_CHAT_SEND_MODE_TRIBE",
+        "OBELISK_CHAT_SEND_MODE_LOCAL",
+        "OBELISK_CHAT_SEND_MODE_ALLIANCE"
+      ],
+      "flags": [
+        "OBELISK_CHAT_MESSAGE_EVENT_FLAG_COPIED_PAYLOAD"
+      ],
+      "redacted_fields": [
+        "UObject pointers",
+        "UFunction pointers",
+        "FString storage",
+        "FName/GObjects indices",
+        "raw parameter buffers",
+        "sender identity",
+        "player identity",
+        "Steam/platform identity",
+        "chat send authority",
+        "chat moderation or blocking authority",
+        "command routing or command registration",
+        "mutation or return override authority"
+      ],
+      "command_sdk": "not promoted; plugins may parse copied text locally",
+      "second_source_ready": false,
+      "copied_obelisk_owned_payload": true,
+      "no_ue_internals_in_public_abi": true,
+      "append_only_abi": true,
+      "capability_gated": true,
+      "owner_token_handle_registration": true,
+      "owner_scoped_unregister": true,
+      "plugin_owner_cleanup": true,
+      "runtime_producer_gate_pending": true,
+      "abi_tests": [
+        "tests/abi/AbiLayoutTests.cpp"
+      ],
+      "sdk_consumer_tests": [
+        "tests/sdk_consumer/MinimalPlugin.cpp",
+        "tests/sdk_consumer/SdkConsumerFixture.cpp",
+        "tests/sdk_consumer/CAbiPlugin.c",
+        "tests/sdk_installed_consumer/consumer_plugin.cpp",
+        "tests/sdk_installed_consumer/consumer_fixture.cpp",
+        "tests/sdk_installed_consumer/c_abi_plugin.c"
+      ],
+      "lifecycle_tests": [
+        "tests/core/PluginManagerTests.cpp",
+        "tests/core/ChatEventDispatcherTests.cpp"
+      ],
+      "docs": [
+        "README.md",
+        "CHANGELOG.md",
+        "docs/PLUGIN_ARCHITECTURE.md",
+        "docs/RELEASE.md",
+        "docs/STATUS.md",
+        "docs/research/2026-05-27-chat-sdk-abi-preflight.md"
+      ]
+    }
   ]
 }

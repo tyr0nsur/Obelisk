@@ -74,7 +74,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         for item in [
             "Stable gameplay module interception APIs",
             "Full UE4 reflection",
-            "Higher-level gameplay SDK APIs outside `GameplayPolicyEvent`",
+            "Higher-level gameplay SDK APIs outside `GameplayPolicyEvent` and the minimal",
             "Gameplay mutation, return overrides, arbitrary UE4 function calls, and public",
             "`CallProcessEvent`-based plugin behavior",
             "Experimental first-party plugins such as `oPolicyAudit`",
@@ -101,7 +101,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
 
         for item in [
             "GNames/GObjects-backed reflection layer",
-            "timer SDKs, including chat/command APIs",
+            "timer SDKs, including richer chat APIs and command APIs beyond `ChatMessageEvent`",
             "Mutable operator lifecycle commands",
             "Production-ready HTTP plugins",
         ]:

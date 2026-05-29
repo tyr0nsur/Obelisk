@@ -13,6 +13,27 @@ namespace Obelisk::Core
         {
             ChatMessageSubscription Subscription;
         };
+
+        void DestroySubscriptionUserData(const ChatMessageSubscription& subscription)
+        {
+            if (!subscription.DestroyUserData)
+                return;
+
+            try
+            {
+                subscription.DestroyUserData(subscription.UserData);
+            }
+            catch (const std::exception& e)
+            {
+                if (Obelisk::Logger::IsInitialized())
+                    OBELISK_ERROR("Chat message subscription cleanup threw: {}", e.what());
+            }
+            catch (...)
+            {
+                if (Obelisk::Logger::IsInitialized())
+                    OBELISK_ERROR("Chat message subscription cleanup threw an unknown exception.");
+            }
+        }
     }
 
     ChatEventDispatcher& ChatEventDispatcher::Get()
@@ -60,13 +81,19 @@ namespace Obelisk::Core
         std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
         std::lock_guard<std::mutex> lock(m_Mutex);
         const auto before = m_Registrations.size();
+        std::vector<ChatMessageSubscription> removed;
         m_Registrations.erase(
             std::remove_if(m_Registrations.begin(),
                            m_Registrations.end(),
-                           [registrationId](const Registration& item) {
-                               return item.Id == registrationId;
+                           [registrationId, &removed](const Registration& item) {
+                               if (item.Id != registrationId)
+                                   return false;
+                               removed.push_back(item.Subscription);
+                               return true;
                            }),
             m_Registrations.end());
+        for (const ChatMessageSubscription& subscription : removed)
+            DestroySubscriptionUserData(subscription);
         return m_Registrations.size() != before;
     }
 
@@ -78,13 +105,19 @@ namespace Obelisk::Core
         std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
         std::lock_guard<std::mutex> lock(m_Mutex);
         const auto before = m_Registrations.size();
+        std::vector<ChatMessageSubscription> removed;
         m_Registrations.erase(
             std::remove_if(m_Registrations.begin(),
                            m_Registrations.end(),
-                           [owner](const Registration& item) {
-                               return item.Owner == owner;
+                           [owner, &removed](const Registration& item) {
+                               if (item.Owner != owner)
+                                   return false;
+                               removed.push_back(item.Subscription);
+                               return true;
                            }),
             m_Registrations.end());
+        for (const ChatMessageSubscription& subscription : removed)
+            DestroySubscriptionUserData(subscription);
         return before - m_Registrations.size();
     }
 

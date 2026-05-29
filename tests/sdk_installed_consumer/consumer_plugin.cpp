@@ -15,6 +15,9 @@ namespace
     bool g_HasApi = false;
     uint64_t g_OwnerToken = 0;
     uint64_t g_ProcessEventHandle = 0;
+    uint64_t g_ChatMessageEventHandle = 0;
+    uint64_t g_ChatMessageEventUserData = 0xC0FFEE02;
+    bool g_ChatMessageEventSeen = false;
 
     constexpr const char* kDefaultConfig = R"json({
     "enabled": false,
@@ -31,6 +34,23 @@ namespace
     bool OnProcessEvent(void*, void*, void*)
     {
         return true;
+    }
+
+    void OnChatMessageEvent(const ObeliskChatMessageEvent* event, void* userData)
+    {
+        if (event &&
+            event->abi_version == OBELISK_CHAT_MESSAGE_EVENT_ABI_VERSION &&
+            event->struct_size >= sizeof(ObeliskChatMessageEvent) &&
+            event->send_mode == OBELISK_CHAT_SEND_MODE_GLOBAL &&
+            (event->flags & OBELISK_CHAT_MESSAGE_EVENT_FLAG_COPIED_PAYLOAD) != 0 &&
+            event->sequence != 0 &&
+            event->message.data &&
+            event->message.size == 5 &&
+            userData == &g_ChatMessageEventUserData &&
+            std::memcmp(event->message.data, "!ping", 5) == 0)
+        {
+            g_ChatMessageEventSeen = true;
+        }
     }
 
     bool HasProcessEventHandleApi(const ObeliskApi* api)
@@ -105,12 +125,24 @@ namespace
             std::strcmp(descriptor.stable_name, "structure.variant_change") == 0;
     }
 
+    bool HasChatMessageEventApi(const ObeliskApi* api)
+    {
+        return api &&
+            (api->capabilities & OBELISK_API_CAPABILITY_CHAT_EVENTS) != 0 &&
+            api->struct_size >= offsetof(ObeliskApi, UnregisterChatMessageEventWithOwnerToken) +
+                sizeof(api->UnregisterChatMessageEventWithOwnerToken) &&
+            api->RegisterChatMessageEventWithOwnerTokenHandle &&
+            api->UnregisterChatMessageEventWithOwnerToken;
+    }
+
     void ResetState()
     {
         g_Api = {};
         g_HasApi = false;
         g_OwnerToken = 0;
         g_ProcessEventHandle = 0;
+        g_ChatMessageEventHandle = 0;
+        g_ChatMessageEventSeen = false;
     }
 }
 
@@ -183,6 +215,19 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
             }
         }
 
+        if (HasChatMessageEventApi(api))
+        {
+            g_ChatMessageEventHandle = api->RegisterChatMessageEventWithOwnerTokenHandle(
+                g_OwnerToken,
+                OnChatMessageEvent,
+                &g_ChatMessageEventUserData);
+            if (g_ChatMessageEventHandle == 0)
+            {
+                ResetState();
+                return false;
+            }
+        }
+
         if (!ValidateStructureResourceKindDescriptor(api))
         {
             ResetState();
@@ -209,9 +254,16 @@ extern "C" __attribute__((visibility("default"))) void ObeliskPlugin_Shutdown()
     {
         if (g_HasApi && g_ProcessEventHandle != 0 && g_Api.UnregisterProcessEventCallbackWithOwnerToken)
             g_Api.UnregisterProcessEventCallbackWithOwnerToken(g_OwnerToken, g_ProcessEventHandle);
+        if (g_HasApi && g_ChatMessageEventHandle != 0 && g_Api.UnregisterChatMessageEventWithOwnerToken)
+            g_Api.UnregisterChatMessageEventWithOwnerToken(g_OwnerToken, g_ChatMessageEventHandle);
     }
     catch (...)
     {
     }
     ResetState();
+}
+
+extern "C" __attribute__((visibility("default"))) bool InstallLayoutConsumer_ChatMessageEventSeen()
+{
+    return g_ChatMessageEventSeen;
 }

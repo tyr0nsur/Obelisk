@@ -31,6 +31,7 @@ namespace Obelisk::Core
     {
         ChatMessageCallback Callback = nullptr;
         void* UserData = nullptr;
+        void (*DestroyUserData)(void*) = nullptr;
     };
 
     class ChatEventDispatcher

@@ -13,9 +13,14 @@ namespace
     using GetInfoFn = bool (*)(ObeliskPluginMetadata*);
     using InitFn = bool (*)(ObeliskApi*, const ObeliskPluginInitContext*);
     using ShutdownFn = void (*)();
+    using BoolProbeFn = bool (*)();
 
     int g_RegisterCount = 0;
     int g_UnregisterCount = 0;
+    int g_ChatMessageRegisterCount = 0;
+    int g_ChatMessageUnregisterCount = 0;
+    ObeliskChatMessageEventCallback g_ChatMessageCallback = nullptr;
+    void* g_ChatMessageUserData = nullptr;
 
     void Require(bool condition, const char* message)
     {
@@ -56,6 +61,45 @@ namespace
         Require(registrationId == 1001, "unexpected callback registration id");
         ++g_UnregisterCount;
         return true;
+    }
+
+    uint64_t RegisterChatMessageEventWithOwnerTokenHandle(uint64_t ownerToken,
+                                                          ObeliskChatMessageEventCallback callback,
+                                                          void* userData)
+    {
+        Require(ownerToken == 0xC0FFEE, "unexpected owner token in chat message registration");
+        Require(callback != nullptr, "chat message registration received null callback");
+        Require(userData != nullptr, "chat message registration received null user data");
+        ++g_ChatMessageRegisterCount;
+        g_ChatMessageCallback = callback;
+        g_ChatMessageUserData = userData;
+        return 3003;
+    }
+
+    bool UnregisterChatMessageEventWithOwnerToken(uint64_t ownerToken, uint64_t registrationId)
+    {
+        Require(ownerToken == 0xC0FFEE, "unexpected owner token in chat message unregister");
+        Require(registrationId == 3003, "unexpected chat message registration id");
+        ++g_ChatMessageUnregisterCount;
+        g_ChatMessageCallback = nullptr;
+        g_ChatMessageUserData = nullptr;
+        return true;
+    }
+
+    void DispatchValidChatMessageEvent()
+    {
+        Require(g_ChatMessageCallback != nullptr, "chat message callback was not registered");
+        Require(g_ChatMessageUserData != nullptr, "chat message user data was not registered");
+        const char message[] = "!ping";
+        ObeliskChatMessageEvent event{};
+        event.abi_version = OBELISK_CHAT_MESSAGE_EVENT_ABI_VERSION;
+        event.struct_size = sizeof(ObeliskChatMessageEvent);
+        event.send_mode = OBELISK_CHAT_SEND_MODE_GLOBAL;
+        event.flags = OBELISK_CHAT_MESSAGE_EVENT_FLAG_COPIED_PAYLOAD;
+        event.sequence = 7;
+        event.message.data = message;
+        event.message.size = 5;
+        g_ChatMessageCallback(&event, g_ChatMessageUserData);
     }
 
     bool DescribeResourceKind(uint32_t resourceKind, ObeliskResourceKindDescriptor* out)
@@ -138,6 +182,8 @@ int main(int argc, char** argv)
         GetInfoFn getInfo = Resolve<GetInfoFn>(handle, "ObeliskPlugin_GetInfo");
         InitFn init = Resolve<InitFn>(handle, "ObeliskPlugin_Init");
         ShutdownFn shutdown = ResolveOptional<ShutdownFn>(handle, "ObeliskPlugin_Shutdown");
+        BoolProbeFn chatMessageEventSeen =
+            ResolveOptional<BoolProbeFn>(handle, "InstallLayoutConsumer_ChatMessageEventSeen");
 
         ObeliskPluginMetadata metadata{};
         Require(getInfo(&metadata), "ObeliskPlugin_GetInfo failed");
@@ -162,13 +208,16 @@ int main(int argc, char** argv)
             OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS |
             OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES |
             OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS |
-            OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS;
+            OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS |
+            OBELISK_API_CAPABILITY_CHAT_EVENTS;
         api.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle =
             RegisterNamedProcessEventWithOwnerTokenHandle;
         api.UnregisterProcessEventCallbackWithOwnerToken =
             UnregisterProcessEventCallbackWithOwnerToken;
         api.DescribeResourceKind = DescribeResourceKind;
         api.DescribeGameplayPolicyEventKind = DescribeGameplayPolicyEventKind;
+        api.RegisterChatMessageEventWithOwnerTokenHandle = RegisterChatMessageEventWithOwnerTokenHandle;
+        api.UnregisterChatMessageEventWithOwnerToken = UnregisterChatMessageEventWithOwnerToken;
 
         ObeliskPluginInitContext context{};
         context.abi_version = OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION;
@@ -180,18 +229,31 @@ int main(int argc, char** argv)
 
         g_RegisterCount = 0;
         g_UnregisterCount = 0;
+        g_ChatMessageRegisterCount = 0;
+        g_ChatMessageUnregisterCount = 0;
+        g_ChatMessageCallback = nullptr;
+        g_ChatMessageUserData = nullptr;
         Require(init(&api, &context), "ObeliskPlugin_Init failed");
         if (shutdown)
         {
             Require(g_RegisterCount == 1, "expected one owner-token callback registration");
+            Require(g_ChatMessageRegisterCount == 1, "expected one chat message callback registration");
+            DispatchValidChatMessageEvent();
+            if (chatMessageEventSeen)
+                Require(chatMessageEventSeen(), "expected plugin to accept chat message event");
             api = {};
             shutdown();
             Require(g_UnregisterCount == 1, "expected one owner-token callback unregister");
+            Require(g_ChatMessageUnregisterCount == 1, "expected one chat message callback unregister");
+            Require(g_ChatMessageCallback == nullptr, "chat message callback was not cleared");
+            Require(g_ChatMessageUserData == nullptr, "chat message user data was not cleared");
         }
         else
         {
             Require(g_RegisterCount == 0, "no-shutdown fixture should not register callbacks");
             Require(g_UnregisterCount == 0, "no-shutdown fixture should not unregister callbacks");
+            Require(g_ChatMessageRegisterCount == 0, "no-shutdown fixture should not register chat callbacks");
+            Require(g_ChatMessageUnregisterCount == 0, "no-shutdown fixture should not unregister chat callbacks");
         }
         dlclose(handle);
     }

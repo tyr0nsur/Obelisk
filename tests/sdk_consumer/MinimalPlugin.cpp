@@ -10,10 +10,15 @@ namespace
     uint64_t g_OwnerToken = 0;
     uint64_t g_ProcessEventHandle = 0;
     uint64_t g_GameplayPolicyEventHandle = 0;
+    uint64_t g_ChatMessageEventHandle = 0;
     uint64_t g_GameplayPolicyEventUserData = 0x5DC0DE;
+    uint64_t g_ChatMessageEventUserData = 0xC0FFEE;
     bool g_GameplayPolicyEventSeen = false;
     bool g_GameplayPolicyEventAccepted = false;
+    bool g_ChatMessageEventSeen = false;
+    bool g_ChatMessageEventAccepted = false;
     ObeliskGameplayPolicyEvent g_GameplayPolicyEventCopy{};
+    ObeliskChatMessageEvent g_ChatMessageEventCopy{};
 
     constexpr const char* kDefaultConfig = R"json({
     "enabled": false,
@@ -104,6 +109,34 @@ namespace
         g_GameplayPolicyEventAccepted = ValidateGameplayPolicyEventCopy(g_GameplayPolicyEventCopy, userData);
     }
 
+    void OnChatMessageEvent(const ObeliskChatMessageEvent* event, void* userData)
+    {
+        g_ChatMessageEventSeen = true;
+        g_ChatMessageEventAccepted = false;
+        g_ChatMessageEventCopy = {};
+
+        if (!event ||
+            event->abi_version != OBELISK_CHAT_MESSAGE_EVENT_ABI_VERSION ||
+            event->struct_size < sizeof(ObeliskChatMessageEvent) ||
+            event->send_mode > OBELISK_CHAT_SEND_MODE_MAX ||
+            (event->flags & OBELISK_CHAT_MESSAGE_EVENT_FLAG_COPIED_PAYLOAD) == 0 ||
+            event->sequence == 0 ||
+            !event->message.data ||
+            event->message.size != 5 ||
+            userData != &g_ChatMessageEventUserData)
+        {
+            return;
+        }
+
+        g_ChatMessageEventCopy = *event;
+        g_ChatMessageEventAccepted =
+            event->message.data[0] == '!' &&
+            event->message.data[1] == 'p' &&
+            event->message.data[2] == 'i' &&
+            event->message.data[3] == 'n' &&
+            event->message.data[4] == 'g';
+    }
+
     bool HasProcessEventHandleApi(const ObeliskApi* api)
     {
         return api &&
@@ -125,8 +158,30 @@ namespace
             api->UnregisterGameplayPolicyEventWithOwnerToken;
     }
 
+    bool HasChatMessageEventApi(const ObeliskApi* api)
+    {
+        return api &&
+            (api->capabilities & OBELISK_API_CAPABILITY_CHAT_EVENTS) != 0 &&
+            api->struct_size >= offsetof(ObeliskApi, UnregisterChatMessageEventWithOwnerToken) +
+                sizeof(api->UnregisterChatMessageEventWithOwnerToken) &&
+            api->RegisterChatMessageEventWithOwnerTokenHandle &&
+            api->UnregisterChatMessageEventWithOwnerToken;
+    }
+
     void UnregisterCallbacks()
     {
+        if (g_HasApi && g_ChatMessageEventHandle != 0 && g_Api.UnregisterChatMessageEventWithOwnerToken)
+        {
+            try
+            {
+                g_Api.UnregisterChatMessageEventWithOwnerToken(g_OwnerToken, g_ChatMessageEventHandle);
+                g_ChatMessageEventHandle = 0;
+            }
+            catch (...)
+            {
+            }
+        }
+
         if (g_HasApi && g_GameplayPolicyEventHandle != 0 && g_Api.UnregisterGameplayPolicyEventWithOwnerToken)
         {
             try
@@ -159,9 +214,13 @@ namespace
         g_OwnerToken = 0;
         g_ProcessEventHandle = 0;
         g_GameplayPolicyEventHandle = 0;
+        g_ChatMessageEventHandle = 0;
         g_GameplayPolicyEventSeen = false;
         g_GameplayPolicyEventAccepted = false;
+        g_ChatMessageEventSeen = false;
+        g_ChatMessageEventAccepted = false;
         g_GameplayPolicyEventCopy = {};
+        g_ChatMessageEventCopy = {};
     }
 }
 
@@ -240,6 +299,20 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
             }
         }
 
+        if (HasChatMessageEventApi(&g_Api))
+        {
+            g_ChatMessageEventHandle = g_Api.RegisterChatMessageEventWithOwnerTokenHandle(
+                g_OwnerToken,
+                OnChatMessageEvent,
+                &g_ChatMessageEventUserData);
+            if (g_ChatMessageEventHandle == 0)
+            {
+                UnregisterCallbacks();
+                ResetState();
+                return false;
+            }
+        }
+
         return true;
     }
     catch (...)
@@ -273,4 +346,14 @@ extern "C" __attribute__((visibility("default"))) bool SdkConsumerMinimal_Gamepl
 extern "C" __attribute__((visibility("default"))) bool SdkConsumerMinimal_GameplayPolicyEventAccepted()
 {
     return g_GameplayPolicyEventAccepted;
+}
+
+extern "C" __attribute__((visibility("default"))) bool SdkConsumerMinimal_ChatMessageEventSeen()
+{
+    return g_ChatMessageEventSeen;
+}
+
+extern "C" __attribute__((visibility("default"))) bool SdkConsumerMinimal_ChatMessageEventAccepted()
+{
+    return g_ChatMessageEventAccepted;
 }

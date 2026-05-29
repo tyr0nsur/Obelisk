@@ -40,6 +40,7 @@ define or protect runtime behavior.
 | `oPolicyAudit` | Experimental | First-party `GameplayPolicyEvent` audit example excluded from the default build and release scope unless `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`; not published by `scripts/check_release_readiness.sh`. |
 | Game interaction surface | Experimental | Obelisk can already observe selected UE4 `ProcessEvent` calls through filtered callbacks when the target `FName` index is known. Outside the promoted copied-POD `GameplayPolicyEvent` surface, gameplay mutation, return overrides, arbitrary UE4 calls, and public module SDK dispatch remain blocked until reflection-backed parameter decoding, ownership policy, and isolated runtime evidence exist. |
 | GameplayPolicyEvent | Promoted v0.1 SDK surface | Public copied POD policy event backed by accepted `structure-observer-intake` evidence plus accepted compact inventory/structure layouts from `minimal-second-source-intake`. Plugins use owner-token handle registration, event-kind masks, and owner-scoped unregister. Payloads expose only approved scalar fields through `field_mask`, `bool_values`, and `int32_values`; pincode values, player identity, object/item/inventory identity, raw params, FName/GObjects indices, UE pointers, mutation, and return overrides remain blocked. Inventory-backed signals use the same `GameplayPolicyEvent` family, not a separate Inventory SDK. |
+| ChatMessageEvent | v0.1-rc SDK ABI surface | Minimal copied UTF-8 chat notification contract for plugins that parse text locally. Plugins use owner-token handle registration and owner-scoped unregister. Payloads expose `send_mode`, copied-payload flags, a process-local sequence, and message bytes only; sender/player identity, resource identity, raw `FString`, raw params, FName/GObjects indices, UE pointers, chat send/moderation/blocking, command routing, mutation, and return overrides remain blocked. Runtime producer hookup is still a separate gate, so the SDK ABI alone is not an end-to-end delivery claim. |
 | Resource kind descriptors | Promoted v0.1 SDK metadata | `DescribeResourceKind` exposes metadata-only category descriptors for known resource kinds, currently `STRUCTURE` and `INVENTORY_ITEM`: stable category name, supported `GameplayPolicyEvent` masks, supported field masks, and explicit flags that the category has no identity or lookup. It is not a `ResourceHandle`, object identity, lookup API, persistent handle, or proof that two events refer to the same game object. |
 | Gameplay policy event descriptors | Promoted v0.1 SDK metadata | `DescribeGameplayPolicyEventKind` exposes metadata-only descriptors for promoted `GameplayPolicyEvent` kinds: stable event name, resource category, event-kind mask, supported field mask, and copied-payload/backing flags. It is discovery data only, not a separate module SDK, object identity, UE lookup, mutation path, or return-override API. |
 | Resources API | Not ready | Real resource identity, lookup, mutation, coordinates, ownership, and cross-event correlation remain postponed until identity stability, privacy, lifecycle, and cross-instance semantics are proven. |
@@ -53,7 +54,7 @@ define or protect runtime behavior.
 | GNames/FNamePool resolution | Not ready | Priority research item. |
 | GObjects/GUObjectArray enumeration | Not ready | Validate object shapes in isolation before accepting offsets. |
 | General reflected UFunction parameter decoding | Not ready | Candidate-only module recognizers exist, but SDK-facing decoding remains unpromoted. |
-| Higher-level SDK APIs | Not ready | Outside the first promoted `GameplayPolicyEvent` surface, Inventory, players, chat, tribes, dinos, missions, transfers, permissions, timers, admin, commands, and public `StructureEvents` remain roadmap items until each has copied payloads, ABI tests, privacy policy, and accepted target-set evidence. |
+| Higher-level SDK APIs | Not ready | Outside the promoted `GameplayPolicyEvent` and minimal `ChatMessageEvent` surfaces, Inventory, players, richer chat, tribes, dinos, missions, transfers, permissions, timers, admin, commands, and public `StructureEvents` remain roadmap items until each has copied payloads, ABI tests, privacy policy, and accepted target-set evidence. |
 
 ## Current Game Interaction Boundary
 
@@ -67,6 +68,8 @@ Current safe interaction shape:
 - record metadata or plugin-local state only;
 - consume `GameplayPolicyEvent` as copied POD policy data, including inventory-backed
   policy signals, without identity, lookup, mutation, return override, or UE internals;
+- consume `ChatMessageEvent` as copied UTF-8 notification data without sender identity,
+  command routing, chat mutation, return override, or UE internals;
 - restore stable posture after any approved debug-server experiment.
 
 Blocked from stable plugin APIs until promoted with evidence:
@@ -76,8 +79,8 @@ Blocked from stable plugin APIs until promoted with evidence:
   debug/experimental gate;
 - calling arbitrary UE4 functions or replaying events through `CallProcessEvent`;
 - exposing borrowed `UObject`, `FString`, `UFunction`, or raw parameter memory to plugins;
-- publishing gameplay module APIs for players, chat, tribes, buffs, inventory, items,
-  dinos, structures, missions, transfers, permissions, timers, admin, or commands.
+- publishing gameplay module APIs for players, richer chat, tribes, buffs, inventory,
+  items, dinos, structures, missions, transfers, permissions, timers, admin, or commands.
 
 ## Harness Safety Baseline
 

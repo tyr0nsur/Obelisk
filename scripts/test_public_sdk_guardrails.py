@@ -41,6 +41,7 @@ V010_CORE_API_CAPABILITY_ALLOWLIST = [
     "OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS",
     "OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS",
     "OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS",
+    "OBELISK_API_CAPABILITY_CHAT_EVENTS",
 ]
 V010_CORE_OBELISK_API_FIELD_ALLOWLIST = [
     "LogInfo",
@@ -67,10 +68,11 @@ V010_CORE_OBELISK_API_FIELD_ALLOWLIST = [
     "UnregisterGameplayPolicyEventWithOwnerToken",
     "DescribeResourceKind",
     "DescribeGameplayPolicyEventKind",
+    "RegisterChatMessageEventWithOwnerTokenHandle",
+    "UnregisterChatMessageEventWithOwnerToken",
 ]
 UNPROMOTED_GAMEPLAY_SURFACES = (
     "Player",
-    "Chat",
     "Tribe",
     "Buff",
     "Inventory",
@@ -325,7 +327,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertIsInstance(promoted_events, list)
 
         declared_capabilities = {
-            event.get("capability") for event in promoted_events if isinstance(event, dict)
+            event.get("capability") for section in ("promoted_events", "rc_events")
+            for event in manifest.get(section, []) if isinstance(event, dict)
         }
         public_event_capabilities = {
             match.group(0)
@@ -518,18 +521,33 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         self.assertEqual(offenders, [])
 
-    def test_public_header_has_no_chat_api_until_promotion(self) -> None:
+    def test_public_header_exposes_only_minimal_chat_message_event_api(self) -> None:
         header = (REPO_ROOT / "include/obelisk/ObeliskApi.h").read_text(encoding="utf-8")
-        forbidden = [
+        required = [
             "OBELISK_API_CAPABILITY_CHAT_EVENTS",
+            "OBELISK_CHAT_MESSAGE_EVENT_ABI_VERSION",
+            "OBELISK_CHAT_MESSAGE_EVENT_FLAG_COPIED_PAYLOAD",
+            "ObeliskStringView",
             "ObeliskChatMessage",
+            "ObeliskChatSendMode",
+            "ObeliskChatMessageEventCallback",
+            "RegisterChatMessageEventWithOwnerTokenHandle",
+            "UnregisterChatMessageEventWithOwnerToken",
+        ]
+        forbidden = [
             "ObeliskChatMessageSubscription",
             "ObeliskOnChatMessageCallback",
             "RegisterOnChatMessage",
-            "OnChatMessage",
-            "UnregisterChatMessage",
+            "ObeliskOnChatMessageCallback",
+            "sender_name",
+            "sender_platform",
+            "sender_name_index",
+            "UObject*",
+            "UFunction*",
         ]
 
+        for token in required:
+            self.assertIn(token, header)
         offenders = [token for token in forbidden if token in header]
         self.assertEqual(offenders, [])
 
@@ -622,14 +640,105 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         self.assertEqual(offenders, [])
 
-    def test_sdk_consumer_does_not_depend_on_experimental_chat(self) -> None:
+    def test_sdk_consumers_cover_minimal_chat_message_event_api(self) -> None:
+        scanned_roots = [
+            REPO_ROOT / "tests" / "sdk_consumer",
+            REPO_ROOT / "tests" / "sdk_installed_consumer",
+        ]
+        required = {
+            "OBELISK_API_CAPABILITY_CHAT_EVENTS": False,
+            "ObeliskChatMessageEvent": False,
+            "RegisterChatMessageEventWithOwnerTokenHandle": False,
+            "UnregisterChatMessageEventWithOwnerToken": False,
+            "OBELISK_CHAT_MESSAGE_EVENT_FLAG_COPIED_PAYLOAD": False,
+        }
+        forbidden = ("RegisterOnChatMessage", "ObeliskChatMessageSubscription")
+
+        for root in scanned_roots:
+            for path in root.rglob("*"):
+                if not path.is_file() or path.suffix not in {".c", ".cpp", ".h", ".hpp", ".txt"}:
+                    continue
+                text = path.read_text(encoding="utf-8")
+                for token in required:
+                    if token in text:
+                        required[token] = True
+                offenders = [token for token in forbidden if token in text]
+                self.assertEqual(offenders, [], f"{path.relative_to(REPO_ROOT)} used deprecated chat API names")
+
+        self.assertEqual([token for token, seen in required.items() if not seen], [])
+
+    def test_public_manifest_declares_chat_message_rc_surface(self) -> None:
+        manifest = json.loads(PUBLIC_GAMEPLAY_EVENTS_MANIFEST.read_text(encoding="utf-8"))
+        rc_events = manifest.get("rc_events")
+        self.assertIsInstance(rc_events, list)
+        chat = next(
+            (event for event in rc_events if event.get("event_id") == "obelisk.chat_message.v1"),
+            None,
+        )
+        self.assertIsNotNone(chat)
+        self.assertEqual(chat.get("capability"), "OBELISK_API_CAPABILITY_CHAT_EVENTS")
+        self.assertEqual(chat.get("abi_struct"), "ObeliskChatMessageEvent")
+        self.assertEqual(chat.get("registration"), "RegisterChatMessageEventWithOwnerTokenHandle")
+        self.assertEqual(chat.get("unregister"), "UnregisterChatMessageEventWithOwnerToken")
+        self.assertEqual(chat.get("target_sets"), ["chat-message-intake"])
+        self.assertIn("message", chat.get("public_fields", []))
+        self.assertIn("send_mode", chat.get("public_fields", []))
+        self.assertIn("no sender identity", chat.get("scope", ""))
+        self.assertIs(chat.get("copied_obelisk_owned_payload"), True)
+        self.assertIs(chat.get("no_ue_internals_in_public_abi"), True)
+        self.assertIs(chat.get("append_only_abi"), True)
+        self.assertIs(chat.get("owner_token_handle_registration"), True)
+        self.assertIs(chat.get("owner_scoped_unregister"), True)
+        self.assertIs(chat.get("plugin_owner_cleanup"), True)
+        self.assertIs(chat.get("runtime_producer_gate_pending"), True)
+        for field in ("abi_tests", "sdk_consumer_tests", "lifecycle_tests", "docs"):
+            entries = chat.get(field)
+            self.assertIsInstance(entries, list)
+            self.assertGreater(len(entries), 0)
+            for entry in entries:
+                self.assertTrue((REPO_ROOT / entry).exists(), f"missing chat RC evidence path {entry}")
+
+    def test_public_sdk_has_no_deprecated_or_experimental_chat_api_names(self) -> None:
+        scanned_roots = [
+            REPO_ROOT / "include" / "obelisk",
+            REPO_ROOT / "tests" / "sdk_consumer",
+            REPO_ROOT / "tests" / "sdk_installed_consumer",
+            REPO_ROOT / "plugins",
+        ]
+        forbidden_substrings = (
+            "ObeliskChatMessageSubscription",
+            "ObeliskOnChatMessageCallback",
+            "RegisterOnChatMessage",
+            "sender_name_index",
+            "sender_platform",
+        )
+        forbidden_regexes = (
+            r"\bOnChatMessage\s*\(",
+            r"\bUnregisterChatMessage\s*\(",
+        )
+        offenders: list[str] = []
+        for root in scanned_roots:
+            for path in root.rglob("*"):
+                if not path.is_file() or path.suffix not in {".c", ".cpp", ".h", ".hpp", ".txt"}:
+                    continue
+                text = path.read_text(encoding="utf-8")
+                for token in forbidden_substrings:
+                    if token in text:
+                        offenders.append(f"{path.relative_to(REPO_ROOT)}: {token}")
+                for pattern in forbidden_regexes:
+                    if re.search(pattern, text):
+                        offenders.append(f"{path.relative_to(REPO_ROOT)}: {pattern}")
+
+        self.assertEqual(offenders, [])
+
+    def test_sdk_consumer_does_not_depend_on_experimental_chat_reflection(self) -> None:
         sdk_dir = REPO_ROOT / "tests/sdk_consumer"
         offenders: list[str] = []
         for path in sdk_dir.rglob("*"):
             if not path.is_file() or path.suffix not in {".cpp", ".h", ".hpp", ".txt"}:
                 continue
             text = path.read_text(encoding="utf-8")
-            for token in ("RegisterOnChatMessage", "ObeliskChatMessage", "OBELISK_API_CAPABILITY_CHAT_EVENTS"):
+            for token in ("OBELISK_ENABLE_CHAT_REFLECTION", "ProcessEventChatReflection", "ChatReflection"):
                 if token in text:
                     offenders.append(f"{path.relative_to(REPO_ROOT)}: {token}")
 

@@ -29,6 +29,8 @@ Stable baseline:
 - Public SDK header at `include/obelisk/ObeliskApi.h`.
 - Promoted `GameplayPolicyEvent` callback ABI for copied POD structure and
   inventory-backed policy signals.
+- Minimal v0.1-rc `ChatMessageEvent` callback ABI for copied UTF-8 chat notifications;
+  runtime producer hookup remains a separate gate.
 - Metadata-only `DescribeResourceKind` helper for category descriptors; no resource
   handles or lookup yet.
 - Metadata-only `DescribeGameplayPolicyEventKind` helper for promoted event-kind
@@ -46,9 +48,9 @@ Experimental:
 
 Not ready:
 
-- Public gameplay module APIs beyond `GameplayPolicyEvent`: players, chat, tribes,
-  inventory, items, dinos, full structure/resources APIs, missions, transfers,
-  permissions, timers, admin, and commands.
+- Public gameplay module APIs beyond `GameplayPolicyEvent` and the minimal
+  `ChatMessageEvent`: players, richer chat, tribes, inventory, items, dinos, full
+  structure/resources APIs, missions, transfers, permissions, timers, admin, and commands.
 - Production-ready gameplay SDK.
 
 See [docs/STATUS.md](docs/STATUS.md) for the current stability matrix and
@@ -413,6 +415,18 @@ covers the appended slot, and that the function pointer is non-null. The returne
 resource category, event-kind mask, supported field mask, and copied-payload/backing
 flags. It does not expose UE internals, identity, lookup, mutation, or override authority.
 
+The v0.1-rc chat callback ABI is `ChatMessageEvent`. It is a copied UTF-8 notification
+contract for plugins that parse text locally, not a command SDK or chat authority surface.
+Plugins must check `OBELISK_API_CAPABILITY_CHAT_EVENTS`, the appended function pointers,
+`struct_size`, and a non-zero `plugin_owner_token` before subscribing. The event exposes
+message bytes, `send_mode`, copied-payload flags, and a process-local sequence only; it
+does not expose sender identity, resource identity, raw `FString`, UE pointers,
+FName/GObjects indices, raw params, chat send/moderation/blocking, mutation, or return
+override authority. Callback data is valid only for the callback duration, and the handle
+must be unregistered with `UnregisterChatMessageEventWithOwnerToken` during shutdown.
+Runtime producer hookup is a separate gate, so SDK registration support alone is not an
+end-to-end delivery claim.
+
 `CallProcessEvent` is a low-level trampoline escape hatch. The ABI slot exists for
 compatibility, but plugins must treat it as unavailable unless `struct_size` covers the
 field, `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT` is advertised, and the function pointer
@@ -495,8 +509,8 @@ Near-term engineering:
 
 Later:
 
-- Public module APIs for players, chat, tribes, inventory, items, dinos, structures,
-  missions, transfers, permissions, timers, admin, and commands.
+- Public module APIs for players, richer chat, tribes, inventory, items, dinos,
+  structures, missions, transfers, permissions, timers, admin, and commands.
 
 ## Contributing
 

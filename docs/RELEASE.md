@@ -17,21 +17,29 @@ Included:
 - Filtered, non-mutating `ProcessEvent` callback infrastructure as the stable runtime
   observation model. Target-specific gameplay/module surfaces remain experimental unless
   explicitly promoted through the documented gates.
-- `GameplayPolicyEvent` as the only promoted v0.1 gameplay callback family, with copied
+- `GameplayPolicyEvent` as the promoted v0.1 gameplay policy callback family, with copied
   POD scalar payloads and no identity, lookup, mutation, or return override authority.
 - `DescribeResourceKind` as metadata-only resource category descriptors, not
   `ResourceHandle`, resource lookup, object identity, or cross-event correlation.
 - `DescribeGameplayPolicyEventKind` as metadata-only descriptors for promoted
   `GameplayPolicyEvent` kinds, not UE lookup, module-specific SDK, mutation, or
   return-override authority.
+- `ChatMessageEvent` as a minimal v0.1-rc chat plugin event ABI: copied UTF-8 message
+  text, send mode, copied-payload flag, and process-local sequence only. It is a
+  notification contract for plugins that parse their own text locally, not a command SDK,
+  chat send/moderation API, sender identity API, UE lookup path, mutation surface, or
+  return-override authority. Runtime producer hookup remains a separate gate and must not
+  be implied by the SDK ABI alone.
 
 Excluded:
 
 - Stable gameplay module interception APIs.
 - Full UE4 reflection.
-- Higher-level gameplay SDK APIs outside `GameplayPolicyEvent`.
+- Higher-level gameplay SDK APIs outside `GameplayPolicyEvent` and the minimal
+  `ChatMessageEvent` notification surface.
 - `ResourceHandle`, GNames/GObjects promotion, public Inventory SDK, public
-  `StructureEvents`, and chat/player/tribe/dino/buff/mission/transfer APIs.
+  `StructureEvents`, command SDKs, chat APIs beyond `ChatMessageEvent`, and
+  player/tribe/dino/buff/mission/transfer APIs.
 - Experimental first-party plugins such as `oPolicyAudit`, which require
   `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON` and are not published by the release gate.
 - Gameplay mutation, return overrides, arbitrary UE4 function calls, and public
@@ -164,7 +172,16 @@ summary remains observational until the second-source and SDK ownership gates ar
 satisfied. Public `StructureEvents`, separate Inventory callback ABI/capability bits, SDK
 structs, or plugin-facing Inventory registrations are outside the first stable release
 scope unless a later release-prep pass promotes them through those gates.
-`GameplayPolicyEvent` is the only promoted gameplay callback family in the v0.1 scope.
+`GameplayPolicyEvent` is the promoted gameplay policy callback family in the v0.1 scope.
+`ChatMessageEvent` is separately tracked as a minimal v0.1-rc copied-notification ABI for
+chat-text plugins. It is declared in `docs/public_gameplay_events.json` so public event
+capabilities stay audited, but it does not promote a command SDK, sender/player identity,
+chat sending, moderation/blocking, raw `FString`, `UObject`, `UFunction`, FName/GObjects
+indices, raw params, mutation, or return overrides. SDK acceptance for this event is ABI
+layout coverage, `ChatEventDispatcher` copy/lifetime tests, plugin-manager owner-token
+registration/unregister tests, and installed SDK consumer coverage. Runtime producer
+hookup remains a separate gate; runtime-observer summaries and chat reflection logs do not
+promote additional chat fields or prove end-to-end delivery.
 
 5. Confirm `scripts/test_install_obelisk_layout.sh` covered runtime backup reinstall:
    one backup each for `libobelisk.so` and `libsubhook.so`, no `.incoming.*` files, no

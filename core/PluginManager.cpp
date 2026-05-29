@@ -37,6 +37,10 @@ namespace Obelisk::Core
         std::unordered_map<uint64_t, void*> g_PluginOwnerTokens;
         std::mutex g_GameplayPolicyRegistrationMutex;
         uint64_t g_NextGameplayPolicyRegistrationId = 1;
+        std::mutex g_ChatMessageRegistrationMutex;
+        uint64_t g_NextChatMessageRegistrationId = 1;
+        std::atomic<uint64_t> g_NextChatMessageSequence{1};
+        std::atomic<ChatEventDispatcher*> g_PublicChatDispatcher{nullptr};
 
         struct GameplayPolicyRegistration
         {
@@ -45,7 +49,15 @@ namespace Obelisk::Core
             uint64_t InventoryRegistrationId = 0;
         };
 
+        struct ChatMessageRegistration
+        {
+            void* Owner = nullptr;
+            ChatEventDispatcher* Dispatcher = nullptr;
+            uint64_t InternalRegistrationId = 0;
+        };
+
         std::unordered_map<uint64_t, GameplayPolicyRegistration> g_GameplayPolicyRegistrations;
+        std::unordered_map<uint64_t, ChatMessageRegistration> g_ChatMessageRegistrations;
 
         using GetInfoFunc = bool(*)(ObeliskPluginMetadata*);
         using InitFunc = bool(*)(ObeliskApi*, const ObeliskPluginInitContext*);
@@ -392,6 +404,12 @@ namespace Obelisk::Core
                                                           "allow-process-event-blocking");
         }
 
+        bool AreChatMessageEventsAllowed()
+        {
+            return Runtime::IsEnvAndInstanceMarkerEnabled("OBELISK_ENABLE_CHAT_EVENTS",
+                                                          "enable-chat-events");
+        }
+
         uint64_t BuildApiCapabilities()
         {
             uint64_t capabilities = OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS |
@@ -406,6 +424,8 @@ namespace Obelisk::Core
                 capabilities |= OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT;
             if (IsProcessEventBlockingAllowed())
                 capabilities |= OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING;
+            if (AreChatMessageEventsAllowed())
+                capabilities |= OBELISK_API_CAPABILITY_CHAT_EVENTS;
             return capabilities;
         }
 
@@ -599,6 +619,16 @@ namespace Obelisk::Core
 
         bool ValidateGameplayPolicyEventCallback(const char* apiName,
                                                  ObeliskGameplayPolicyEventCallback callback)
+        {
+            if (callback)
+                return true;
+
+            OBELISK_WARN("{} rejected null callback.", apiName);
+            return false;
+        }
+
+        bool ValidateChatMessageEventCallback(const char* apiName,
+                                              ObeliskChatMessageEventCallback callback)
         {
             if (callback)
                 return true;
@@ -810,6 +840,156 @@ namespace Obelisk::Core
             for (const InventoryPolicyScalarValue& scalar : event.Scalars)
                 CopyGameplayPolicyScalar(publicEvent, scalar);
             state->Callback(&publicEvent, state->UserData);
+        }
+
+        struct ChatMessageEventCallbackState
+        {
+            ObeliskChatMessageEventCallback Callback = nullptr;
+            void* UserData = nullptr;
+        };
+
+        void DestroyChatMessageEventCallbackState(void* userData)
+        {
+            delete static_cast<ChatMessageEventCallbackState*>(userData);
+        }
+
+        void DispatchPublicChatMessageEvent(const ChatMessageView& message, void* userData)
+        {
+            auto* state = static_cast<ChatMessageEventCallbackState*>(userData);
+            if (!state || !state->Callback)
+                return;
+
+            const uint32_t sendMode = static_cast<uint32_t>(message.SendMode);
+            if (sendMode > static_cast<uint32_t>(ChatSendMode::Alliance))
+                return;
+
+            ObeliskChatMessageEvent publicEvent{
+                .abi_version = OBELISK_CHAT_MESSAGE_EVENT_ABI_VERSION,
+                .struct_size = sizeof(ObeliskChatMessageEvent),
+                .send_mode = sendMode,
+                .reserved0 = 0,
+                .flags = OBELISK_CHAT_MESSAGE_EVENT_FLAG_COPIED_PAYLOAD,
+                .sequence = g_NextChatMessageSequence.fetch_add(1, std::memory_order_relaxed),
+                .message = {
+                    .data = message.Message.data(),
+                    .size = message.Message.size(),
+                },
+            };
+            state->Callback(&publicEvent, state->UserData);
+        }
+
+        uint64_t AllocateChatMessageRegistrationIdLocked()
+        {
+            uint64_t id = 0;
+            do
+            {
+                id = g_NextChatMessageRegistrationId++;
+                if (g_NextChatMessageRegistrationId == 0)
+                    g_NextChatMessageRegistrationId = 1;
+            } while (id == 0 || g_ChatMessageRegistrations.find(id) != g_ChatMessageRegistrations.end());
+            return id;
+        }
+
+        uint64_t RegisterChatMessageEventForOwner(void* owner,
+                                                  ObeliskChatMessageEventCallback callback,
+                                                  void* userData)
+        {
+            if (!owner || !callback)
+                return 0;
+            if (!AreChatMessageEventsAllowed())
+                return 0;
+
+            ChatEventDispatcher* dispatcher = g_PublicChatDispatcher.load(std::memory_order_acquire);
+            if (!dispatcher)
+                return 0;
+
+            uint64_t publicRegistrationId = 0;
+            {
+                std::lock_guard<std::mutex> lock(g_ChatMessageRegistrationMutex);
+                publicRegistrationId = AllocateChatMessageRegistrationIdLocked();
+            }
+
+            auto state = std::make_unique<ChatMessageEventCallbackState>(
+                ChatMessageEventCallbackState{callback, userData});
+            const uint64_t internalRegistrationId = dispatcher->Register(
+                owner,
+                ChatMessageSubscription{
+                    DispatchPublicChatMessageEvent,
+                    state.get(),
+                    DestroyChatMessageEventCallbackState,
+                });
+            if (internalRegistrationId == 0)
+                return 0;
+            (void)state.release();
+
+            try
+            {
+                std::lock_guard<std::mutex> lock(g_ChatMessageRegistrationMutex);
+                g_ChatMessageRegistrations[publicRegistrationId] = ChatMessageRegistration{
+                    .Owner = owner,
+                    .Dispatcher = dispatcher,
+                    .InternalRegistrationId = internalRegistrationId,
+                };
+            }
+            catch (...)
+            {
+                (void)dispatcher->Unregister(internalRegistrationId);
+                throw;
+            }
+            return publicRegistrationId;
+        }
+
+        bool UnregisterChatMessageRegistrationForOwner(void* owner, uint64_t registrationId)
+        {
+            if (!owner || registrationId == 0)
+                return false;
+
+            ChatMessageRegistration registration;
+            {
+                std::lock_guard<std::mutex> lock(g_ChatMessageRegistrationMutex);
+                const auto it = g_ChatMessageRegistrations.find(registrationId);
+                if (it == g_ChatMessageRegistrations.end() || it->second.Owner != owner)
+                    return false;
+                registration = it->second;
+                g_ChatMessageRegistrations.erase(it);
+            }
+
+            return registration.Dispatcher &&
+                registration.Dispatcher->Unregister(registration.InternalRegistrationId);
+        }
+
+        size_t UnregisterChatMessageRegistrationsForOwner(void* owner)
+        {
+            if (!owner)
+                return 0;
+
+            std::vector<std::pair<uint64_t, ChatMessageRegistration>> registrations;
+            {
+                std::lock_guard<std::mutex> lock(g_ChatMessageRegistrationMutex);
+                for (auto it = g_ChatMessageRegistrations.begin();
+                     it != g_ChatMessageRegistrations.end();)
+                {
+                    if (it->second.Owner != owner)
+                    {
+                        ++it;
+                        continue;
+                    }
+                    registrations.push_back(*it);
+                    it = g_ChatMessageRegistrations.erase(it);
+                }
+            }
+
+            size_t removed = 0;
+            for (const auto& item : registrations)
+            {
+                const ChatMessageRegistration& registration = item.second;
+                if (registration.Dispatcher &&
+                    registration.Dispatcher->Unregister(registration.InternalRegistrationId))
+                {
+                    ++removed;
+                }
+            }
+            return removed;
         }
 
         uint64_t AllocateGameplayPolicyRegistrationIdLocked()
@@ -1199,6 +1379,39 @@ namespace Obelisk::Core
                 return false;
             return UnregisterGameplayPolicyRegistrationForOwner(owner, registrationId);
         }
+        uint64_t PluginRegisterChatMessageEventWithOwnerTokenHandle(
+            uint64_t ownerToken,
+            ObeliskChatMessageEventCallback callback,
+            void* userData) {
+            if (!ValidateChatMessageEventCallback("RegisterChatMessageEventWithOwnerTokenHandle", callback))
+                return 0;
+
+            try
+            {
+                return RegisterProcessEventCallbackForOwnerToken(
+                    "RegisterChatMessageEventWithOwnerTokenHandle",
+                    ownerToken,
+                    [callback, userData](void* owner) {
+                        return RegisterChatMessageEventForOwner(owner, callback, userData);
+                    });
+            }
+            catch (const std::exception& e)
+            {
+                OBELISK_ERROR("RegisterChatMessageEventWithOwnerTokenHandle rejected callback after exception: {}", e.what());
+                return 0;
+            }
+            catch (...)
+            {
+                OBELISK_ERROR("RegisterChatMessageEventWithOwnerTokenHandle rejected callback after unknown exception.");
+                return 0;
+            }
+        }
+        bool PluginUnregisterChatMessageEventWithOwnerToken(uint64_t ownerToken, uint64_t registrationId) {
+            void* owner = ResolveOwnerTokenForUnregister("UnregisterChatMessageEventWithOwnerToken", ownerToken);
+            if (!owner)
+                return false;
+            return UnregisterChatMessageRegistrationForOwner(owner, registrationId);
+        }
         bool PluginDescribeResourceKind(uint32_t resourceKind, ObeliskResourceKindDescriptor* out) {
             return DescribeResourceKind(resourceKind, out);
         }
@@ -1261,6 +1474,9 @@ namespace Obelisk::Core
         m_Api.UnregisterGameplayPolicyEventWithOwnerToken = PluginUnregisterGameplayPolicyEventWithOwnerToken;
         m_Api.DescribeResourceKind = PluginDescribeResourceKind;
         m_Api.DescribeGameplayPolicyEventKind = PluginDescribeGameplayPolicyEventKind;
+        m_Api.RegisterChatMessageEventWithOwnerTokenHandle = PluginRegisterChatMessageEventWithOwnerTokenHandle;
+        m_Api.UnregisterChatMessageEventWithOwnerToken = PluginUnregisterChatMessageEventWithOwnerToken;
+        g_PublicChatDispatcher.store(m_ChatDispatcher, std::memory_order_release);
         g_ApiCapabilities.store(m_Api.capabilities, std::memory_order_release);
         EventManager::SetProcessEventBlockingCapabilityAdvertised(
             (m_Api.capabilities & OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING) != 0);
@@ -1280,12 +1496,19 @@ namespace Obelisk::Core
     PluginManager::~PluginManager()
     {
         UnloadAll();
+        ChatEventDispatcher* expected = m_ChatDispatcher;
+        g_PublicChatDispatcher.compare_exchange_strong(
+            expected,
+            nullptr,
+            std::memory_order_acq_rel,
+            std::memory_order_acquire);
     }
 
     void PluginManager::UnregisterPluginCallbacks(const std::string& pluginName, void* owner, const char* reason)
     {
         const size_t gameplayPolicyRemoved = UnregisterGameplayPolicyRegistrationsForOwner(owner);
         const size_t eventRemoved = EventManager::Get().UnregisterCallbacksForOwner(owner);
+        const size_t publicChatRemoved = UnregisterChatMessageRegistrationsForOwner(owner);
         const size_t chatRemoved = m_ChatDispatcher->UnregisterCallbacksForOwner(owner);
         const size_t structureRemoved = StructureEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
         const size_t inventoryRemoved = InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
@@ -1294,6 +1517,8 @@ namespace Obelisk::Core
             OBELISK_INFO("Removed {} gameplay policy callback(s) registered by plugin {} {}.", gameplayPolicyRemoved, pluginName, reason);
         if (eventRemoved > 0)
             OBELISK_INFO("Removed {} ProcessEvent callback(s) registered by plugin {} {}.", eventRemoved, pluginName, reason);
+        if (publicChatRemoved > 0)
+            OBELISK_INFO("Removed {} public chat callback(s) registered by plugin {} {}.", publicChatRemoved, pluginName, reason);
         if (chatRemoved > 0)
             OBELISK_INFO("Removed {} chat callback(s) registered by plugin {} {}.", chatRemoved, pluginName, reason);
         if (structureRemoved > 0)

@@ -70,6 +70,8 @@ namespace
         uint64_t initThreadRegistrationId = 0;
         uint64_t gameplayPolicyRegistrationId = 0;
         bool gameplayPolicySelfUnregisterResult = false;
+        uint64_t chatMessageRegistrationId = 0;
+        bool chatMessageSelfUnregisterResult = false;
         uint64_t shutdownRegistrationId = 0;
         bool shutdownUnregisterResult = false;
         void* owner = this;
@@ -90,6 +92,13 @@ namespace
         int32_t gameplayPolicyInt32Values[OBELISK_GAMEPLAY_POLICY_FIELD_COUNT]{};
         uint32_t gameplayPolicyEventAbiVersion = 0;
         uint32_t gameplayPolicyEventStructSize = 0;
+        int chatMessageEventCalls = 0;
+        uint32_t chatMessageSendMode = 0;
+        uint64_t chatMessageFlags = 0;
+        uint64_t chatMessageSequence = 0;
+        std::string chatMessageText;
+        uint32_t chatMessageEventAbiVersion = 0;
+        uint32_t chatMessageEventStructSize = 0;
         size_t structureSubscriptionsAtShutdown = 0;
         size_t structureSubscriptionsAtClose = 0;
     };
@@ -143,6 +152,29 @@ namespace
             plugin->capturedApi.UnregisterGameplayPolicyEventWithOwnerToken(
                 plugin->initOwnerToken,
                 plugin->gameplayPolicyRegistrationId);
+    }
+
+    void FakeChatMessageEventCallback(const ObeliskChatMessageEvent* event, void* userData)
+    {
+        Require(event != nullptr, "chat message callback received null event");
+        auto* plugin = static_cast<FakePlugin*>(userData);
+        ++plugin->chatMessageEventCalls;
+        plugin->chatMessageSendMode = event->send_mode;
+        plugin->chatMessageFlags = event->flags;
+        plugin->chatMessageSequence = event->sequence;
+        plugin->chatMessageText.assign(event->message.data, event->message.size);
+        plugin->chatMessageEventAbiVersion = event->abi_version;
+        plugin->chatMessageEventStructSize = event->struct_size;
+    }
+
+    void FakeChatMessageSelfUnregisterCallback(const ObeliskChatMessageEvent* event, void* userData)
+    {
+        FakeChatMessageEventCallback(event, userData);
+        auto* plugin = static_cast<FakePlugin*>(userData);
+        plugin->chatMessageSelfUnregisterResult =
+            plugin->capturedApi.UnregisterChatMessageEventWithOwnerToken(
+                plugin->initOwnerToken,
+                plugin->chatMessageRegistrationId);
     }
 
     std::vector<Obelisk::Core::StructureScalarValue> MakeStructureScalars()
@@ -568,6 +600,7 @@ namespace
         unsetenv("OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS");
         unsetenv("OBELISK_ALLOW_CALL_PROCESS_EVENT");
         unsetenv("OBELISK_ALLOW_PROCESS_EVENT_BLOCKING");
+        unsetenv("OBELISK_ENABLE_CHAT_EVENTS");
         Obelisk::Core::EventManager::SetProcessEventBlockingCapabilityAdvertised(false);
     }
 
@@ -1369,6 +1402,155 @@ namespace
                     FakeGameplayPolicyEventCallback,
                     &plugin) == 0,
                 "owner token remained valid for gameplay policy callbacks after plugin unload");
+
+        CleanupPlugin(plugin);
+        CleanupPlugin(otherPlugin);
+        fs::remove_all(root);
+    }
+
+    void TestOwnerTokenChatMessageEventRegistrationCanUnregister()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_owner_token_chat_message_handle");
+        ConfigureEnvironment(root);
+        fs::create_directories(root / "state" / "instances" / "arkserver");
+
+        {
+            Obelisk::Core::ChatEventDispatcher disabledDispatcher;
+            FakeLoader disabledLoader;
+            Obelisk::Core::PluginManager disabledManager(disabledLoader, disabledDispatcher);
+            Require((disabledManager.ApiCapabilitiesForTesting() & OBELISK_API_CAPABILITY_CHAT_EVENTS) == 0,
+                    "chat message capability was advertised without the chat events gate");
+        }
+
+        setenv("OBELISK_ENABLE_CHAT_EVENTS", "1", 1);
+        {
+            std::ofstream marker(root / "state" / "instances" / "arkserver" / "enable-chat-events");
+            Require(marker.is_open(), "failed to create chat events marker");
+        }
+
+        FakePlugin plugin{
+            .filename = "owner_token_chat_message_a.so",
+            .pluginId = "owner_token_chat_message_a",
+            .captureApi = true,
+        };
+        FakePlugin otherPlugin{
+            .filename = "owner_token_chat_message_b.so",
+            .pluginId = "owner_token_chat_message_b",
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        loader.Add(otherPlugin);
+        TouchPlugin(root, plugin.filename);
+        TouchPlugin(root, otherPlugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+        WritePluginConfig(root, otherPlugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::ChatEventDispatcher chatDispatcher;
+        Obelisk::Core::PluginManager manager(loader, chatDispatcher);
+        Require((manager.ApiCapabilitiesForTesting() & OBELISK_API_CAPABILITY_CHAT_EVENTS) != 0,
+                "chat message event capability was not advertised");
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "owner-token chat plugin was not initialized");
+        Require(otherPlugin.initCalls == 1, "second owner-token chat plugin was not initialized");
+        Require(plugin.initOwnerToken != 0, "owner-token chat plugin did not receive a token");
+        Require(otherPlugin.initOwnerToken != 0, "second owner-token chat plugin did not receive a token");
+        Require(plugin.capturedApi.RegisterChatMessageEventWithOwnerTokenHandle != nullptr,
+                "chat message event registration function was not exposed");
+        Require(plugin.capturedApi.UnregisterChatMessageEventWithOwnerToken != nullptr,
+                "chat message event unregister function was not exposed");
+
+        Require(plugin.capturedApi.RegisterChatMessageEventWithOwnerTokenHandle(
+                    plugin.initOwnerToken + 1000,
+                    FakeChatMessageEventCallback,
+                    &plugin) == 0,
+                "invalid owner token registered a chat message callback");
+        Require(plugin.capturedApi.RegisterChatMessageEventWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    nullptr,
+                    &plugin) == 0,
+                "null chat message callback was registered");
+        Require(chatDispatcher.SubscriptionCount() == 0,
+                "invalid chat registrations left subscriptions behind");
+
+        const uint64_t registrationId =
+            plugin.capturedApi.RegisterChatMessageEventWithOwnerTokenHandle(
+                plugin.initOwnerToken,
+                FakeChatMessageEventCallback,
+                &plugin);
+        Require(registrationId != 0, "owner-token chat message registration returned zero");
+        Require(chatDispatcher.SubscriptionCount() == 1,
+                "owner-token chat callback was not bridged into chat dispatcher");
+
+        Require(!plugin.capturedApi.UnregisterChatMessageEventWithOwnerToken(
+                    otherPlugin.initOwnerToken,
+                    registrationId),
+                "wrong owner token unregistered a chat message callback");
+
+        const Obelisk::Core::ChatMessageView message{
+            .Message = "!ping",
+            .SenderName = "ignored",
+            .SenderPlatformId = "ignored",
+            .SendMode = Obelisk::Core::ChatSendMode::Global,
+            .SenderNameIndex = 777,
+        };
+        Require(chatDispatcher.Dispatch(message) == 1,
+                "wrong-token unregister removed the chat message callback");
+        Require(plugin.chatMessageEventCalls == 1,
+                "owner-token chat message callback did not dispatch");
+        Require(plugin.chatMessageEventAbiVersion == OBELISK_CHAT_MESSAGE_EVENT_ABI_VERSION,
+                "chat message event ABI version mismatch");
+        Require(plugin.chatMessageEventStructSize == sizeof(ObeliskChatMessageEvent),
+                "chat message event struct size mismatch");
+        Require(plugin.chatMessageSendMode == OBELISK_CHAT_SEND_MODE_GLOBAL,
+                "chat message send mode mismatch");
+        Require((plugin.chatMessageFlags & OBELISK_CHAT_MESSAGE_EVENT_FLAG_COPIED_PAYLOAD) != 0,
+                "chat message event was not marked copied-payload");
+        Require(plugin.chatMessageSequence != 0,
+                "chat message event sequence was zero");
+        Require(plugin.chatMessageText == "!ping",
+                "chat message event copied wrong text");
+
+        Require(plugin.capturedApi.UnregisterChatMessageEventWithOwnerToken(
+                    plugin.initOwnerToken,
+                    registrationId),
+                "owner-token chat message unregister failed");
+        Require(!plugin.capturedApi.UnregisterChatMessageEventWithOwnerToken(
+                    plugin.initOwnerToken,
+                    registrationId),
+                "owner-token chat message unregister succeeded twice");
+        Require(!plugin.capturedApi.UnregisterChatMessageEventWithOwnerToken(
+                    plugin.initOwnerToken,
+                    0),
+                "zero chat message callback handle unregistered a callback");
+        Require(chatDispatcher.SubscriptionCount() == 0,
+                "owner-token chat message callback survived explicit unregister");
+
+        plugin.chatMessageRegistrationId =
+            plugin.capturedApi.RegisterChatMessageEventWithOwnerTokenHandle(
+                plugin.initOwnerToken,
+                FakeChatMessageSelfUnregisterCallback,
+                &plugin);
+        Require(plugin.chatMessageRegistrationId != 0,
+                "owner-token chat message self-unregister callback could not register");
+        Require(chatDispatcher.Dispatch(message) == 1,
+                "chat message self-unregister callback did not dispatch");
+        Require(plugin.chatMessageSelfUnregisterResult,
+                "chat message self-unregister callback failed to unregister itself");
+        Require(chatDispatcher.SubscriptionCount() == 0,
+                "chat message self-unregister callback survived dispatch");
+
+        const uint64_t unloadRegistrationId =
+            plugin.capturedApi.RegisterChatMessageEventWithOwnerTokenHandle(
+                plugin.initOwnerToken,
+                FakeChatMessageEventCallback,
+                &plugin);
+        Require(unloadRegistrationId != 0, "owner-token chat message callback could not re-register before unload");
+        Require(chatDispatcher.SubscriptionCount() == 1,
+                "chat message callback did not register before unload");
+        manager.UnloadAll();
+        Require(chatDispatcher.SubscriptionCount() == 0,
+                "chat message callback survived plugin unload");
 
         CleanupPlugin(plugin);
         CleanupPlugin(otherPlugin);
@@ -2743,6 +2925,7 @@ int main()
     TestInitExceptionCleansInitThreadOwnerTokenCallbackAndToken();
     TestOwnerTokenHandleRegistrationCanUnregister();
     TestOwnerTokenGameplayPolicyEventRegistrationCanUnregister();
+    TestOwnerTokenChatMessageEventRegistrationCanUnregister();
     TestGameplayPolicyCallbackCanSelfUnregisterDuringDispatch();
     TestDescribeResourceKind();
     TestDescribeGameplayPolicyEventKind();

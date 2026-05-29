@@ -30,7 +30,7 @@ Current baseline:
 - LinuxGSM wrapper templates for the current ARK debug harness.
 - `oBaseEvents` as the first official plugin example, including owner-token handle
   registration and safe `instance_allowlist` validation.
-- `GameplayPolicyEvent` as the only promoted v0.1 gameplay callback family, exposing
+- `GameplayPolicyEvent` as the promoted v0.1 gameplay policy callback family, exposing
   copied POD scalar policy signals through owner-token handle registration without
   resource identity, lookup, mutation, or return override authority.
 - `DescribeResourceKind` as metadata-only descriptors for known resource categories,
@@ -38,6 +38,10 @@ Current baseline:
 - `DescribeGameplayPolicyEventKind` as metadata-only descriptors for promoted
   `GameplayPolicyEvent` kinds, explicitly not a module SDK, UE lookup, mutation, or
   return-override surface.
+- `ChatMessageEvent` as a minimal promoted v0.1 chat plugin event with copied UTF-8
+  message bytes, send mode, copied-payload flag, and process-local sequence only;
+  explicitly not a command SDK, sender identity API, chat send/moderation surface, UE
+  lookup, mutation, or return-override surface.
 - First-stable plugin scope now excludes background workers, sockets, HTTP
   listeners/clients, long-lived file readers, and other external ingress unless a future
   plugin passes explicit shutdown, unregister, drain, join, and close gates.
@@ -69,7 +73,7 @@ Not included yet:
 - GNames/GObjects-backed reflection layer.
 - `ResourceHandle`, public `StructureEvents`, public Inventory SDK, and player, tribe,
   inventory, item, structure, dino, buff, mission, transfer, admin, permission, command, or
-  timer SDKs, including chat/command APIs.
+  timer SDKs, including richer chat APIs and command APIs beyond `ChatMessageEvent`.
 - Gameplay mutation, return override APIs, and public `CallProcessEvent`-based plugin
   behavior.
 - Mutable operator lifecycle commands such as `obelisk restart` and

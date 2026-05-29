@@ -23,10 +23,14 @@ namespace
     int g_UnregisterCount = 0;
     int g_GameplayPolicyRegisterCount = 0;
     int g_GameplayPolicyUnregisterCount = 0;
+    int g_ChatMessageRegisterCount = 0;
+    int g_ChatMessageUnregisterCount = 0;
     bool g_ThrowLog = false;
     OnProcessEventCallback g_RegisteredCallback = nullptr;
     ObeliskGameplayPolicyEventCallback g_RegisteredGameplayPolicyCallback = nullptr;
     void* g_RegisteredGameplayPolicyUserData = nullptr;
+    ObeliskChatMessageEventCallback g_RegisteredChatMessageCallback = nullptr;
+    void* g_RegisteredChatMessageUserData = nullptr;
 
     void Require(bool condition, const char* message)
     {
@@ -97,6 +101,46 @@ namespace
         g_RegisteredGameplayPolicyUserData = nullptr;
         ++g_GameplayPolicyUnregisterCount;
         return true;
+    }
+
+    uint64_t RegisterChatMessageEventWithOwnerTokenHandle(uint64_t ownerToken,
+                                                          ObeliskChatMessageEventCallback callback,
+                                                          void* userData)
+    {
+        Require(ownerToken == 0xC0FFEE, "unexpected owner token in chat message registration");
+        Require(callback != nullptr, "chat message registration received null callback");
+        Require(userData != nullptr, "chat message registration received null user data");
+        g_RegisteredChatMessageCallback = callback;
+        g_RegisteredChatMessageUserData = userData;
+        ++g_ChatMessageRegisterCount;
+        return 3003;
+    }
+
+    bool UnregisterChatMessageEventWithOwnerToken(uint64_t ownerToken, uint64_t registrationId)
+    {
+        Require(ownerToken == 0xC0FFEE, "unexpected owner token in chat message unregister");
+        Require(registrationId == 3003, "unexpected chat message registration id");
+        g_RegisteredChatMessageCallback = nullptr;
+        g_RegisteredChatMessageUserData = nullptr;
+        ++g_ChatMessageUnregisterCount;
+        return true;
+    }
+
+    void DispatchValidChatMessageEvent()
+    {
+        Require(g_RegisteredChatMessageCallback != nullptr, "missing chat message callback");
+        Require(g_RegisteredChatMessageUserData != nullptr, "missing chat message user data");
+
+        const char message[] = "!ping";
+        ObeliskChatMessageEvent event{};
+        event.abi_version = OBELISK_CHAT_MESSAGE_EVENT_ABI_VERSION;
+        event.struct_size = sizeof(ObeliskChatMessageEvent);
+        event.send_mode = OBELISK_CHAT_SEND_MODE_GLOBAL;
+        event.flags = OBELISK_CHAT_MESSAGE_EVENT_FLAG_COPIED_PAYLOAD;
+        event.sequence = 42;
+        event.message = {message, sizeof(message) - 1};
+
+        g_RegisteredChatMessageCallback(&event, g_RegisteredChatMessageUserData);
     }
 
     void DispatchValidStructureGameplayPolicyEvent()
@@ -274,6 +318,10 @@ int main(int argc, char** argv)
             ResolveOptional<BoolProbeFn>(handle, "SdkConsumerMinimal_GameplayPolicyEventSeen");
         BoolProbeFn gameplayPolicyEventAccepted =
             ResolveOptional<BoolProbeFn>(handle, "SdkConsumerMinimal_GameplayPolicyEventAccepted");
+        BoolProbeFn chatMessageEventSeen =
+            ResolveOptional<BoolProbeFn>(handle, "SdkConsumerMinimal_ChatMessageEventSeen");
+        BoolProbeFn chatMessageEventAccepted =
+            ResolveOptional<BoolProbeFn>(handle, "SdkConsumerMinimal_ChatMessageEventAccepted");
 
         ObeliskPluginMetadata metadata{};
         Require(getInfo(&metadata), "ObeliskPlugin_GetInfo failed");
@@ -323,6 +371,14 @@ int main(int argc, char** argv)
             api.UnregisterGameplayPolicyEventWithOwnerToken =
                 UnregisterGameplayPolicyEventWithOwnerToken;
         }
+        if (mode != "no-chat-message-capability")
+        {
+            api.capabilities |= OBELISK_API_CAPABILITY_CHAT_EVENTS;
+            api.RegisterChatMessageEventWithOwnerTokenHandle =
+                RegisterChatMessageEventWithOwnerTokenHandle;
+            api.UnregisterChatMessageEventWithOwnerToken =
+                UnregisterChatMessageEventWithOwnerToken;
+        }
 
         ObeliskPluginInitContext context{};
         context.abi_version = OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION;
@@ -351,6 +407,10 @@ int main(int argc, char** argv)
                 "invalid context unexpectedly registered a gameplay policy callback");
             Require(g_GameplayPolicyUnregisterCount == 0,
                 "invalid context unexpectedly unregistered a gameplay policy callback");
+            Require(g_ChatMessageRegisterCount == 0,
+                "invalid context unexpectedly registered a chat message callback");
+            Require(g_ChatMessageUnregisterCount == 0,
+                "invalid context unexpectedly unregistered a chat message callback");
             cleanupConfigDir();
             closeHandle();
             return 0;
@@ -366,6 +426,10 @@ int main(int argc, char** argv)
                 "zero owner token unexpectedly registered a gameplay policy callback");
             Require(g_GameplayPolicyUnregisterCount == 0,
                 "zero owner token unexpectedly unregistered a gameplay policy callback");
+            Require(g_ChatMessageRegisterCount == 0,
+                "zero owner token unexpectedly registered a chat message callback");
+            Require(g_ChatMessageUnregisterCount == 0,
+                "zero owner token unexpectedly unregistered a chat message callback");
             cleanupConfigDir();
             closeHandle();
             return 0;
@@ -379,6 +443,10 @@ int main(int argc, char** argv)
                 "failed init unexpectedly registered a gameplay policy callback");
             Require(g_GameplayPolicyUnregisterCount == 0,
                 "failed init unexpectedly unregistered a gameplay policy callback");
+            Require(g_ChatMessageRegisterCount == 0,
+                "failed init unexpectedly registered a chat message callback");
+            Require(g_ChatMessageUnregisterCount == 0,
+                "failed init unexpectedly unregistered a chat message callback");
             cleanupConfigDir();
             closeHandle();
             return 0;
@@ -413,6 +481,7 @@ int main(int argc, char** argv)
 
         Require(initSucceeded, "ObeliskPlugin_Init failed");
         const bool hasGameplayPolicyProbe = gameplayPolicyEventSeen && gameplayPolicyEventAccepted;
+        const bool hasChatMessageProbe = chatMessageEventSeen && chatMessageEventAccepted;
         if (hasGameplayPolicyProbe && mode == "no-gameplay-policy-capability")
         {
             Require(g_GameplayPolicyRegisterCount == 0,
@@ -437,6 +506,25 @@ int main(int argc, char** argv)
             DispatchValidInventoryUseGameplayPolicyEvent();
             Require(gameplayPolicyEventAccepted(),
                 "plugin did not validate copied ignore-cooldown inventory policy event");
+        }
+        if (hasChatMessageProbe && mode == "no-chat-message-capability")
+        {
+            Require(g_ChatMessageRegisterCount == 0,
+                "plugin registered chat message callback without capability");
+            Require(g_ChatMessageUnregisterCount == 0,
+                "plugin unregistered chat message callback without capability");
+            Require(!chatMessageEventSeen(), "plugin reported chat message event without registration");
+            Require(!chatMessageEventAccepted(), "plugin accepted chat message event without registration");
+        }
+        else if (hasChatMessageProbe)
+        {
+            Require(g_ChatMessageRegisterCount == 1,
+                "plugin did not register one chat message callback");
+            Require(g_ChatMessageUnregisterCount == 0,
+                "plugin unregistered chat message callback before shutdown");
+            DispatchValidChatMessageEvent();
+            Require(chatMessageEventSeen(), "plugin did not observe chat message event");
+            Require(chatMessageEventAccepted(), "plugin did not validate copied chat message event");
         }
         if (mode == "callback-throw-log")
         {
@@ -472,6 +560,24 @@ int main(int argc, char** argv)
                 "gameplay policy callback survived shutdown unregister");
             Require(g_RegisteredGameplayPolicyUserData == nullptr,
                 "gameplay policy user data survived shutdown unregister");
+        }
+        if (hasChatMessageProbe && mode == "no-chat-message-capability")
+        {
+            Require(g_ChatMessageRegisterCount == 0,
+                "plugin registered chat message callback without capability");
+            Require(g_ChatMessageUnregisterCount == 0,
+                "plugin unregistered chat message callback without capability");
+        }
+        else if (hasChatMessageProbe)
+        {
+            Require(g_ChatMessageRegisterCount == 1,
+                "plugin did not register one chat message callback");
+            Require(g_ChatMessageUnregisterCount == 1,
+                "plugin did not unregister one chat message callback");
+            Require(g_RegisteredChatMessageCallback == nullptr,
+                "chat message callback survived shutdown unregister");
+            Require(g_RegisteredChatMessageUserData == nullptr,
+                "chat message user data survived shutdown unregister");
         }
         else if (std::strcmp(expectedPluginId, "oBaseEvents") == 0 && mode.empty())
         {
