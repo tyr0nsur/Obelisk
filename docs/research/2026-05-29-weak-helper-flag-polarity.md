@@ -11,12 +11,15 @@ weak-handle helper family around `0x1d56a30..0x1d56cf8` for the current Linux
 - Binary: `/home/flowcommunity-ark/obelisk-artifacts/offline-binaries/7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520/ShooterGameServer`
 - SHA256: `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`
 - Objdump: GNU Binutils 2.42
+- Ghidra: 12.1 PUBLIC with OpenJDK 21.0.10, headless `-noanalysis`
 - Workspace: `/servidor/ark/workspace-offline/weak-helper-flag-polarity-20260529`
 - Key artifacts:
   - `objdump/weak-helper-family.objdump.txt`
   - `objdump/caller-windows.objdump.txt`
   - `objdump/direct-call-counts.txt`
   - `ghidra/ghidra-headless-java.stdout`
+- Supplemental bounded decompiler run:
+  `/tmp/weak-helper-ghidra-noanalysis-20260529/`
 
 ## Hypothesis
 
@@ -52,6 +55,14 @@ Caller windows provide useful polarity context:
   object pointer.
 - `0x83a358` calls `0x1d56c70` with `esi=1`; the returned object controls whether the
   surrounding array element is removed.
+
+A supplemental Ghidra headless `-noanalysis` run directly against the hash-matched binary
+decompiled 11 bounded helper/caller windows and reinforced the same internal polarity:
+`0x1d56ae0` rejects `0x100` and `0x4000`, `0x1d56c00` rejects
+`0x100 | 0x4000`, `0x1d56c70` always rejects `0x100` and rejects `0x4000`
+in strict mode, and callers at `0x83a260`, `0x83a320`, and `0x3522bc0` use
+non-null/true helper results as the valid path. This remains bounded static evidence, not
+promotion-grade public lifetime semantics.
 
 This is stronger than prior broad core scans because the flag checks appear in executable
 helper code and at least two bounded caller windows use true/non-null as the valid path.

@@ -70,8 +70,8 @@ namespace Obelisk::Core
 
     StructureEventDispatcher& StructureEventDispatcher::Get()
     {
-        static StructureEventDispatcher dispatcher;
-        return dispatcher;
+        static auto* dispatcher = new StructureEventDispatcher();
+        return *dispatcher;
     }
 
     uint64_t StructureEventDispatcher::Register(void* owner, const StructureEventSubscription& subscription)

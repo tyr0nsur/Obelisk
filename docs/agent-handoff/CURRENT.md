@@ -118,10 +118,11 @@ detail in `HISTORY-*.md`.
 - Inventory hardening now requires exact per-target `FunctionFlags` for
   `PrimalItem.CanUse` and `PrimalItem.AllowRemoteAddToInventory`, plus copied bool ranges
   only. Do not promote public Inventory SDK, identity, mutation, or return override.
-- Runtime hardening should resolve fallback teardown ordering for `EventManager`,
-  `StructureEventDispatcher`, `InventoryPolicyEventDispatcher`, and chat cleanup before
-  relying on plugin cleanup from C++ static destruction. Prefer explicit shutdown, but do
-  not leave destructible function-local STL registries on fallback cleanup paths.
+- Runtime hardening has moved `EventManager`, `ChatEventDispatcher`,
+  `StructureEventDispatcher`, and `InventoryPolicyEventDispatcher` singleton storage to
+  process lifetime to avoid fallback teardown ordering hazards. Prefer explicit shutdown,
+  and do not reintroduce destructible function-local STL registries on plugin cleanup
+  paths.
 - After inventory hardening, mission is the next clean internal module candidate as a
   reduced copied-scalar observer. Tribe and transfer wait behind higher identity/payload
   risk.

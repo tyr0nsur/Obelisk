@@ -38,8 +38,8 @@ namespace Obelisk::Core
 
     ChatEventDispatcher& ChatEventDispatcher::Get()
     {
-        static ChatEventDispatcher dispatcher;
-        return dispatcher;
+        static auto* dispatcher = new ChatEventDispatcher();
+        return *dispatcher;
     }
 
     uint64_t ChatEventDispatcher::Register(void* owner, const ChatMessageSubscription& subscription)

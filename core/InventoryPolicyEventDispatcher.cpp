@@ -93,8 +93,8 @@ namespace Obelisk::Core
 
     InventoryPolicyEventDispatcher& InventoryPolicyEventDispatcher::Get()
     {
-        static InventoryPolicyEventDispatcher dispatcher;
-        return dispatcher;
+        static auto* dispatcher = new InventoryPolicyEventDispatcher();
+        return *dispatcher;
     }
 
     uint64_t InventoryPolicyEventDispatcher::Register(

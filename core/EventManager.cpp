@@ -21,8 +21,8 @@ namespace Obelisk::Core
 
     EventManager& EventManager::Get()
     {
-        static EventManager instance;
-        return instance;
+        static auto* instance = new EventManager();
+        return *instance;
     }
 
     void EventManager::SetProcessEventBlockingCapabilityAdvertised(bool advertised)

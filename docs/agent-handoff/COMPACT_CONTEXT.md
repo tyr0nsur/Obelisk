@@ -72,8 +72,9 @@ priorities, and do not use history files as the active source of truth.
   Inventory/StructureEvents SDK surfaces.
 - The minimal copied `ChatMessageEvent` RC surface is backed by
   `chat-message-intake`; second-source comparison accepted
-  `ShooterPlayerController.ServerSendChatMessage` in
-  `/servidor/ark/workspace-offline/chat-message-intake-20260529T000000Z/readiness-report.json`.
+  `ShooterPlayerController.ServerSendChatMessage`. Use
+  `docs/research/2026-05-29-chat-message-second-source-readiness.md` as the repo-local
+  evidence summary instead of workspace-local report paths.
   It still needs isolated `arkserver2` delivery validation before publication as a public
   milestone.
 - Dino, buff, mission, and tribe compact intakes are layout evidence only. Use

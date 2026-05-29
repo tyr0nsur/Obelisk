@@ -38,10 +38,11 @@ Current baseline:
 - `DescribeGameplayPolicyEventKind` as metadata-only descriptors for promoted
   `GameplayPolicyEvent` kinds, explicitly not a module SDK, UE lookup, mutation, or
   return-override surface.
-- `ChatMessageEvent` as a minimal promoted v0.1 chat plugin event with copied UTF-8
+- `ChatMessageEvent` as a minimal v0.1-rc chat plugin event candidate with copied UTF-8
   message bytes, send mode, copied-payload flag, and process-local sequence only;
   explicitly not a command SDK, sender identity API, chat send/moderation surface, UE
-  lookup, mutation, or return-override surface.
+  lookup, mutation, or return-override surface. Actual plugin-facing delivery from a real
+  chat message still needs isolated `arkserver2` validation before milestone publication.
 - First-stable plugin scope now excludes background workers, sockets, HTTP
   listeners/clients, long-lived file readers, and other external ingress unless a future
   plugin passes explicit shutdown, unregister, drain, join, and close gates.

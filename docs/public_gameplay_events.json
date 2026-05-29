@@ -227,7 +227,7 @@
       "runtime_producer_gate_pending": false,
       "live_debug_delivery_pending": true,
       "second_source_reports": [
-        "/servidor/ark/workspace-offline/chat-message-intake-20260529T000000Z/readiness-report.json"
+        "docs/research/2026-05-29-chat-message-second-source-readiness.md"
       ],
       "abi_tests": [
         "tests/abi/AbiLayoutTests.cpp"
