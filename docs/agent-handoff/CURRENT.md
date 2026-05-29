@@ -11,8 +11,9 @@ detail in `HISTORY-*.md`.
 - Continue the core-first `v0.1.0-rc.1` path: Linux runtime, ProcessEvent hook
   infrastructure, plugin lifecycle, central install layout, `oBaseEvents`,
   `GameplayPolicyEvent`, `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`.
-- Do not add public APIs beyond `GameplayPolicyEvent` before the RC unless a new blocker
-  proves the API is required.
+- Do not add public gameplay callback/module APIs beyond `GameplayPolicyEvent`, or public
+  metadata helpers beyond `DescribeResourceKind` / `DescribeGameplayPolicyEventKind`,
+  before the RC unless a new blocker proves the API is required.
 - Treat module work as evidence and tooling above the core, not as the RC center.
 
 ## Hard Overrides
@@ -45,13 +46,20 @@ detail in `HISTORY-*.md`.
   object identity, UE lookup, mutation path, or return-override API.
 - ResourceHandle remains blocked. Use
   `docs/research/2026-05-29-resource-handle-revalidation-evaluator.md`,
+  `docs/research/2026-05-29-resource-handle-nonzero-revalidation.md`,
   `docs/research/2026-05-29-uobject-flags-validity-blocker.md`, and the static/GObjects
-  notes for evidence; do not restate their offsets or sample tables here.
+  notes for evidence. The current nonzero revalidation pack clears serial-zero and
+  coherent-window blockers for that input set, but public handles remain blocked on
+  `uobject_flags_validity_semantics_unproven`; do not restate offsets or sample tables
+  here.
 - Runtime posture remains default-deny for global callbacks, public `CallProcessEvent`,
   ProcessEvent blocking, broad tracing, scanner/debug controls, and experimental observers.
 - Internal bridges only: `core/StructureEventDispatcher` and
   `core/InventoryPolicyEventDispatcher` feed copied-scalar policy events. They do not
   promote public StructureEvents or Inventory SDKs.
+- `plugins/oPolicyAudit` is an experimental first-party example for
+  `GameplayPolicyEvent` descriptors and callbacks. It is outside the first release scope
+  and builds only with `-DOBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`.
 - Release readiness is core-first through `scripts/check_release_readiness.sh`. The
   documented local gate evidence is the dirty/offline run with the accepted minimal
   second-source root; the current integration round is open and must rerun that gate
@@ -93,8 +101,9 @@ detail in `HISTORY-*.md`.
   binary-hash-scoped research candidate status.
 - Keep ResourceHandle blocked on current evaluator output and
   `uobject_flags_validity_semantics_unproven`.
-- Treat mission as the cleanest next post-RC module candidate; tribe and transfer wait
-  behind higher identity/payload risk.
+- For utility after the core RC, the fastest safe path is internal copied-scalar inventory
+  observation from the accepted minimal target set; if choosing a new module, mission is
+  the cleanest next candidate. Tribe and transfer wait behind higher identity/payload risk.
 - Keep ignored local artifacts, logs, build output, pycache, raw cores, dumps, generated
   reports, and server config unstaged.
 - Preserve the current supervised-agent balance requested by the operator: two on Obelisk engineering/audit/development

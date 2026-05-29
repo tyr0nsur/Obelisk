@@ -72,6 +72,12 @@ Own these areas:
   helpers consult `0x100` and `0x4000` after `{index, serial}` validation, accepted samples
   include `0x81`/`0xc7`/`0xc5`, and no rejected sample or named lifetime semantic is
   proven. Keep identity, handles, mutation, and return overrides unpromoted.
+- Full copied-core scans across the two available offline cores found thousands of nonzero
+  `FUObjectItem+0x8` serial candidates and zero `InternalIndex` mismatches, but no
+  `UObject+0x8` samples with masks `0x100` or `0x4000`. Treat this as blocker refinement:
+  further broad scans are low value unless a new artifact likely contains destroyed or
+  pending objects; resolve the blocker through static/decompiler semantics or targeted
+  negative samples instead.
 - `minimal-second-source-intake` has accepted offline second-source UFunction layout
   evidence from
   `/servidor/ark/workspace-offline/minimal-second-source-intake-direct-20260529T033919Z`:

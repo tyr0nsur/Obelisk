@@ -19,6 +19,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 enable_testing()
 set(SUBHOOK_NO_TESTS ON CACHE BOOL "Disable subhook tests" FORCE)
+option(OBELISK_BUILD_EXPERIMENTAL_PLUGINS "Build experimental first-party plugins outside the release scope" OFF)
 
 add_library(obelisk_sdk INTERFACE)
 target_include_directories(obelisk_sdk INTERFACE
@@ -93,6 +94,9 @@ set_target_properties(obelisk PROPERTIES BUILD_RPATH "\$ORIGIN")
 set_target_properties(obelisk PROPERTIES INSTALL_RPATH "\$ORIGIN")
 
 add_subdirectory(plugins/oBaseEvents)
+if(OBELISK_BUILD_EXPERIMENTAL_PLUGINS)
+    add_subdirectory(plugins/oPolicyAudit)
+endif()
 add_subdirectory(tests/sdk_consumer)
 
 add_executable(plugin_config_tests

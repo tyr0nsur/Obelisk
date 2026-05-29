@@ -103,3 +103,10 @@ add_test(
     NAME SdkConsumerFixtureOBaseEventsRejectsUnsafeInstanceAllowlist
     COMMAND sdk_consumer_fixture "$<TARGET_FILE:oBaseEvents>" oBaseEvents unsafe-instance-allowlist
 )
+
+if(TARGET oPolicyAudit)
+    add_test(
+        NAME SdkConsumerFixtureOPolicyAudit
+        COMMAND sdk_consumer_fixture "$<TARGET_FILE:oPolicyAudit>" oPolicyAudit
+    )
+endif()

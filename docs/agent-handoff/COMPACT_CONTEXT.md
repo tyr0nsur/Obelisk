@@ -43,7 +43,7 @@ priorities, and do not use history files as the active source of truth.
 
 ## Product Baseline
 
-- First stable release has one promoted gameplay SDK surface: `GameplayPolicyEvent`.
+- First stable release has one promoted gameplay callback surface: `GameplayPolicyEvent`.
   Promotion scope and exclusions are recorded in
   `docs/research/2026-05-29-public-gameplay-event-readiness-audit.md`.
 - `GameplayPolicyEvent` excludes mutation, raw UE pointer exposure, public
@@ -52,6 +52,9 @@ priorities, and do not use history files as the active source of truth.
 - `DescribeResourceKind` is a metadata-only v0.1 SDK helper for known resource categories.
   It returns copied POD descriptors with supported gameplay-policy event/field masks and
   explicit no-identity/no-lookup flags.
+- `DescribeGameplayPolicyEventKind` is a metadata-only v0.1 SDK helper for promoted
+  `GameplayPolicyEvent` kinds. It returns copied POD descriptors for routing/config, not
+  UE lookup, identity, mutation, or return override.
 - `InventoryPolicyEventDispatcher` and `StructureEventDispatcher` are internal
   copied-scalar infrastructure only. They do not promote public Inventory or
   StructureEvents SDKs.
@@ -75,7 +78,9 @@ priorities, and do not use history files as the active source of truth.
 - `scripts/evaluate_resource_handle_revalidation.py` is the current offline redacted
   ResourceHandle readiness gate. Current evidence keeps public/post-callback handles
   blocked; see `docs/research/2026-05-29-resource-handle-revalidation-evaluator.md` and
-  `docs/research/2026-05-29-uobject-flags-validity-blocker.md`.
+  `docs/research/2026-05-29-resource-handle-nonzero-revalidation.md`. The latest nonzero
+  pack clears serial-zero and coherent-window blockers for that input set, but
+  `uobject_flags_validity_semantics_unproven` still blocks public handles.
 - Static GObjects/FUObjectItem evidence remains research-candidate material. Details live
   in `docs/research/2026-05-29-static-gobjects-field-window-audit.md`,
   `docs/research/2026-05-29-static-gobjects-fuobjectitem-correlation.md`, and
@@ -106,6 +111,8 @@ priorities, and do not use history files as the active source of truth.
   ProcessEvent hook infrastructure, plugin lifecycle, central install layout,
   `oBaseEvents`, `GameplayPolicyEvent`, `DescribeResourceKind`, and
   `DescribeGameplayPolicyEventKind`.
+- `plugins/oPolicyAudit` is experimental and excluded from the default build/release
+  scope unless `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`.
 - The dirty/offline release gate has passed with the accepted minimal second-source root,
   but a real RC requires focused checkpoints and the same release gate without
   `--allow-dirty`.
