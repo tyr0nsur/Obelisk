@@ -1481,6 +1481,188 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestDescribeGameplayPolicyEventKind()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_describe_gameplay_policy_event_kind");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "describe_gameplay_policy_event_kind.so",
+            .pluginId = "describe_gameplay_policy_event_kind",
+            .captureApi = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        Require((manager.ApiCapabilitiesForTesting() &
+                    OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS) != 0,
+                "gameplay policy event descriptor capability was not advertised");
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "event descriptor plugin was not initialized");
+        Require(plugin.capturedApi.DescribeGameplayPolicyEventKind != nullptr,
+                "DescribeGameplayPolicyEventKind function was not exposed");
+
+        ObeliskGameplayPolicyEventDescriptor descriptor{};
+        Require(!plugin.capturedApi.DescribeGameplayPolicyEventKind(
+                    OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_VARIANT_CHANGE,
+                    &descriptor),
+                "DescribeGameplayPolicyEventKind accepted a zero-size descriptor");
+
+        struct ExpectedEventDescriptor
+        {
+            uint32_t eventKind;
+            uint32_t resourceKind;
+            uint64_t flags;
+            uint64_t eventMask;
+            uint64_t fieldMask;
+            const char* stableName;
+            const char* displayName;
+        };
+
+        const ExpectedEventDescriptor expectedDescriptors[] = {
+            {
+                OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_ACCESS_CHECK,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE,
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD |
+                    OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACCESS_CHECK,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE,
+                "structure.access_check",
+                "Structure Access Check",
+            },
+            {
+                OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_DEMOLISH_CHECK,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE,
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD |
+                    OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_DEMOLISH_CHECK,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE,
+                "structure.demolish_check",
+                "Structure Demolish Check",
+            },
+            {
+                OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_VARIANT_CHANGE,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE,
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD |
+                    OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_VARIANT_CHANGE,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+                    OBELISK_GAMEPLAY_POLICY_FIELD_MASK_VARIANT_INDEX |
+                    OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE_SET,
+                "structure.variant_change",
+                "Structure Variant Change",
+            },
+            {
+                OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_ACTIVATION_TOGGLE,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE,
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD |
+                    OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACTIVATION_TOGGLE,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+                    OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE,
+                "structure.activation_toggle",
+                "Structure Activation Toggle",
+            },
+            {
+                OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_PIN_CODE_CHECK,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE,
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD |
+                    OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_PIN_CODE_CHECK,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE,
+                "structure.pin_code_check",
+                "Structure Pin Code Check",
+            },
+            {
+                OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_SEAT_CHECK,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE,
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD |
+                    OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_SEAT_CHECK,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE,
+                "structure.seat_check",
+                "Structure Seat Check",
+            },
+            {
+                OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM,
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD |
+                    OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_REMOTE_ADD_CHECK,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+                    OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER,
+                "inventory.remote_add_check",
+                "Inventory Remote Add Check",
+            },
+            {
+                OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM,
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD |
+                    OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+                    OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN,
+                "inventory.use_check",
+                "Inventory Use Check",
+            },
+        };
+
+        Require(sizeof(expectedDescriptors) / sizeof(expectedDescriptors[0]) ==
+                    OBELISK_GAMEPLAY_POLICY_EVENT_KIND_COUNT,
+                "event descriptor test matrix is out of sync with public event count");
+
+        ObeliskResourceKindDescriptor resourceDescriptor{};
+        for (const ExpectedEventDescriptor& expected : expectedDescriptors)
+        {
+            descriptor = {};
+            descriptor.struct_size = sizeof(ObeliskGameplayPolicyEventDescriptor);
+            Require(plugin.capturedApi.DescribeGameplayPolicyEventKind(expected.eventKind, &descriptor),
+                    "DescribeGameplayPolicyEventKind rejected a promoted event kind");
+            Require(descriptor.abi_version == OBELISK_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION,
+                    "event descriptor ABI version mismatch");
+            Require(descriptor.struct_size == sizeof(ObeliskGameplayPolicyEventDescriptor),
+                    "event descriptor struct size mismatch");
+            Require(descriptor.event_kind == expected.eventKind,
+                    "event descriptor kind mismatch");
+            Require(descriptor.resource_kind == expected.resourceKind,
+                    "event descriptor resource kind mismatch");
+            Require(descriptor.flags == expected.flags,
+                    "event descriptor flags mismatch");
+            Require(descriptor.event_kind_mask == expected.eventMask,
+                    "event descriptor event mask mismatch");
+            Require(descriptor.field_mask == expected.fieldMask,
+                    "event descriptor field mask mismatch");
+            Require(std::strcmp(descriptor.stable_name, expected.stableName) == 0,
+                    "event descriptor stable name mismatch");
+            Require(std::strcmp(descriptor.display_name, expected.displayName) == 0,
+                    "event descriptor display name mismatch");
+
+            resourceDescriptor = {};
+            resourceDescriptor.struct_size = sizeof(ObeliskResourceKindDescriptor);
+            Require(plugin.capturedApi.DescribeResourceKind(expected.resourceKind, &resourceDescriptor),
+                    "DescribeResourceKind rejected descriptor resource kind");
+            Require((resourceDescriptor.supported_gameplay_policy_event_mask & descriptor.event_kind_mask) != 0,
+                    "event descriptor mask is not supported by its resource descriptor");
+            Require((descriptor.field_mask & ~resourceDescriptor.supported_gameplay_policy_field_mask) == 0,
+                    "event descriptor exposes fields outside resource descriptor support");
+        }
+
+        descriptor = {};
+        descriptor.struct_size = sizeof(ObeliskGameplayPolicyEventDescriptor);
+        Require(!plugin.capturedApi.DescribeGameplayPolicyEventKind(
+                    OBELISK_GAMEPLAY_POLICY_EVENT_KIND_UNKNOWN,
+                    &descriptor),
+                "DescribeGameplayPolicyEventKind accepted unknown event kind");
+
+        manager.UnloadAll();
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestGameplayPolicyCallbackCleansOnInitFailure()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_gameplay_policy_init_fail");
@@ -2477,6 +2659,7 @@ int main()
     TestOwnerTokenGameplayPolicyEventRegistrationCanUnregister();
     TestGameplayPolicyCallbackCanSelfUnregisterDuringDispatch();
     TestDescribeResourceKind();
+    TestDescribeGameplayPolicyEventKind();
     TestGameplayPolicyCallbackCleansOnInitFailure();
     TestGameplayPolicyCallbackCleansOnInitException();
     TestOwnerTokenGlobalHandleRejectedByDefault();

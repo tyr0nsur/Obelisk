@@ -10,7 +10,7 @@ detail in `HISTORY-*.md`.
 
 - Continue the core-first `v0.1.0-rc.1` path: Linux runtime, ProcessEvent hook
   infrastructure, plugin lifecycle, central install layout, `oBaseEvents`,
-  `GameplayPolicyEvent`, and `DescribeResourceKind`.
+  `GameplayPolicyEvent`, `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`.
 - Do not add public APIs beyond `GameplayPolicyEvent` before the RC unless a new blocker
   proves the API is required.
 - Treat module work as evidence and tooling above the core, not as the RC center.
@@ -40,6 +40,9 @@ detail in `HISTORY-*.md`.
 - Promoted helper: `DescribeResourceKind` is metadata-only for known resource categories.
   It is not a `ResourceHandle`, lookup API, object identity, mutation surface, or
   cross-instance contract.
+- Promoted helper: `DescribeGameplayPolicyEventKind` is metadata-only for promoted
+  `GameplayPolicyEvent` kinds. It is event discovery for routing/config, not a module SDK,
+  object identity, UE lookup, mutation path, or return-override API.
 - ResourceHandle remains blocked. Use
   `docs/research/2026-05-29-resource-handle-revalidation-evaluator.md`,
   `docs/research/2026-05-29-uobject-flags-validity-blocker.md`, and the static/GObjects
@@ -78,7 +81,8 @@ detail in `HISTORY-*.md`.
 
 ## Priority Next Steps
 
-- Freeze the RC public API around `GameplayPolicyEvent` and `DescribeResourceKind`; keep
+- Freeze the RC public API around `GameplayPolicyEvent`, `DescribeResourceKind`, and
+  `DescribeGameplayPolicyEventKind`; keep
   public Inventory, StructureEvents, dino, buff, mission, tribe, transfer, chat, player,
   admin, mutation, return override, and public `CallProcessEvent` surfaces out of RC.
 - Revalidate each checkpoint slice independently before any GitHub publication decision.

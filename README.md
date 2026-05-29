@@ -31,6 +31,8 @@ Stable baseline:
   inventory-backed policy signals.
 - Metadata-only `DescribeResourceKind` helper for category descriptors; no resource
   handles or lookup yet.
+- Metadata-only `DescribeGameplayPolicyEventKind` helper for promoted event-kind
+  descriptors.
 - CTest coverage for plugin config and ABI layout.
 
 Experimental:
@@ -403,6 +405,13 @@ Plugins that need category metadata can call `DescribeResourceKind` after checki
 `ObeliskResourceKindDescriptor` is copied POD metadata only: stable category name,
 supported gameplay policy masks, supported field masks, and flags that explicitly mark the
 category as no-identity and no-lookup.
+
+Plugins that need event-kind discovery can call `DescribeGameplayPolicyEventKind` after
+checking `OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS`, that `struct_size`
+covers the appended slot, and that the function pointer is non-null. The returned
+`ObeliskGameplayPolicyEventDescriptor` is copied POD metadata only: stable event name,
+resource category, event-kind mask, supported field mask, and copied-payload/backing
+flags. It does not expose UE internals, identity, lookup, mutation, or override authority.
 
 `CallProcessEvent` is a low-level trampoline escape hatch. The ABI slot exists for
 compatibility, but plugins must treat it as unavailable unless `struct_size` covers the

@@ -48,6 +48,13 @@ registration, and any SDK surface that a `.so` will consume.
 - `DescribeResourceKind` is metadata-only. It may return copied POD category descriptors,
   supported event/field masks, and explicit no-identity/no-lookup flags. It must not
   resolve objects, expose handles, or imply cross-event/cross-instance identity.
+- `DescribeGameplayPolicyEventKind` is metadata-only. It may return copied POD event-kind
+  descriptors, stable names, event masks, field masks, and copied-payload/backing flags.
+  It must not expose UE internals, resolve objects, imply identity, mutate state, or imply
+  return-override authority.
+- v1 descriptor structs are fixed-size contracts. Keep `ObeliskResourceKindDescriptor`
+  and `ObeliskGameplayPolicyEventDescriptor` at their tested sizes during ABI v1 unless a
+  deliberate compatibility design changes the helpers to support prefix writes.
 - Plugins may optionally export `extern "C" void ObeliskPlugin_Shutdown()`. The runtime
   resolves it with `dlsym` outside the `ObeliskApi` table and calls it before callback
   owner cleanup and before `dlclose`.

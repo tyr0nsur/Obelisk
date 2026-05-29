@@ -30,6 +30,8 @@ static void CompileGameplayPolicyAbi(void)
 {
     volatile uint64_t capability = OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS;
     volatile uint64_t resource_descriptor_capability = OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS;
+    volatile uint64_t event_descriptor_capability =
+        OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS;
     volatile uint64_t all_events = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL;
     volatile uint64_t all_structures = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES;
     volatile uint64_t all_inventory = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY;
@@ -39,6 +41,7 @@ static void CompileGameplayPolicyAbi(void)
     volatile uint64_t requested_by_player = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER;
     volatile uint64_t ignore_cooldown = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN;
     volatile uint64_t category_only = OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_CATEGORY_ONLY;
+    volatile uint32_t event_descriptor_abi = OBELISK_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION;
     ObeliskGameplayPolicyEvent event = {
         OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION,
         sizeof(ObeliskGameplayPolicyEvent),
@@ -88,12 +91,26 @@ static void CompileGameplayPolicyAbi(void)
         "structure",
         "Structure",
     };
+    ObeliskGameplayPolicyEventDescriptor event_descriptor = {
+        OBELISK_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION,
+        sizeof(ObeliskGameplayPolicyEventDescriptor),
+        OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_VARIANT_CHANGE,
+        OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE,
+        OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD |
+            OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED,
+        OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_VARIANT_CHANGE,
+        OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+            OBELISK_GAMEPLAY_POLICY_FIELD_MASK_VARIANT_INDEX,
+        "structure.variant_change",
+        "Structure Variant Change",
+    };
     ObeliskGameplayPolicyEventCallback callback = OnGameplayPolicyEvent;
     callback(&event, NULL);
     callback(&inventory_remote_add_event, NULL);
     callback(&inventory_use_event, NULL);
     (void)capability;
     (void)resource_descriptor_capability;
+    (void)event_descriptor_capability;
     (void)all_events;
     (void)all_structures;
     (void)all_inventory;
@@ -103,7 +120,9 @@ static void CompileGameplayPolicyAbi(void)
     (void)requested_by_player;
     (void)ignore_cooldown;
     (void)category_only;
+    (void)event_descriptor_abi;
     (void)descriptor;
+    (void)event_descriptor;
 }
 
 static const char* kDefaultConfig = "{\n"

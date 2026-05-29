@@ -398,7 +398,8 @@ namespace Obelisk::Core
                 OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS |
                 OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES |
                 OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS |
-                OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS;
+                OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS |
+                OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS;
             if (AreGlobalProcessEventCallbacksAllowed())
                 capabilities |= OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS;
             if (IsCallProcessEventAllowed())
@@ -459,6 +460,107 @@ namespace Obelisk::Core
                         OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN;
                     CopyDescriptorText(descriptor.stable_name, "inventory_item");
                     CopyDescriptorText(descriptor.display_name, "Inventory Item");
+                    *out = descriptor;
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        bool DescribeGameplayPolicyEventKind(uint32_t eventKind, ObeliskGameplayPolicyEventDescriptor* out)
+        {
+            if (!out || out->struct_size < sizeof(ObeliskGameplayPolicyEventDescriptor))
+                return false;
+
+            ObeliskGameplayPolicyEventDescriptor descriptor{
+                .abi_version = OBELISK_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION,
+                .struct_size = sizeof(ObeliskGameplayPolicyEventDescriptor),
+                .event_kind = eventKind,
+                .resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_UNKNOWN,
+                .flags = OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD,
+                .event_kind_mask = 0,
+                .field_mask = 0,
+                .stable_name = {},
+                .display_name = {},
+            };
+
+            switch (eventKind)
+            {
+                case OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_ACCESS_CHECK:
+                    descriptor.resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE;
+                    descriptor.flags |= OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED;
+                    descriptor.event_kind_mask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACCESS_CHECK;
+                    descriptor.field_mask = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE;
+                    CopyDescriptorText(descriptor.stable_name, "structure.access_check");
+                    CopyDescriptorText(descriptor.display_name, "Structure Access Check");
+                    *out = descriptor;
+                    return true;
+                case OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_DEMOLISH_CHECK:
+                    descriptor.resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE;
+                    descriptor.flags |= OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED;
+                    descriptor.event_kind_mask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_DEMOLISH_CHECK;
+                    descriptor.field_mask = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE;
+                    CopyDescriptorText(descriptor.stable_name, "structure.demolish_check");
+                    CopyDescriptorText(descriptor.display_name, "Structure Demolish Check");
+                    *out = descriptor;
+                    return true;
+                case OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_VARIANT_CHANGE:
+                    descriptor.resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE;
+                    descriptor.flags |= OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED;
+                    descriptor.event_kind_mask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_VARIANT_CHANGE;
+                    descriptor.field_mask = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+                        OBELISK_GAMEPLAY_POLICY_FIELD_MASK_VARIANT_INDEX |
+                        OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE_SET;
+                    CopyDescriptorText(descriptor.stable_name, "structure.variant_change");
+                    CopyDescriptorText(descriptor.display_name, "Structure Variant Change");
+                    *out = descriptor;
+                    return true;
+                case OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_ACTIVATION_TOGGLE:
+                    descriptor.resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE;
+                    descriptor.flags |= OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED;
+                    descriptor.event_kind_mask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACTIVATION_TOGGLE;
+                    descriptor.field_mask = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+                        OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE;
+                    CopyDescriptorText(descriptor.stable_name, "structure.activation_toggle");
+                    CopyDescriptorText(descriptor.display_name, "Structure Activation Toggle");
+                    *out = descriptor;
+                    return true;
+                case OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_PIN_CODE_CHECK:
+                    descriptor.resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE;
+                    descriptor.flags |= OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED;
+                    descriptor.event_kind_mask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_PIN_CODE_CHECK;
+                    descriptor.field_mask = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE;
+                    CopyDescriptorText(descriptor.stable_name, "structure.pin_code_check");
+                    CopyDescriptorText(descriptor.display_name, "Structure Pin Code Check");
+                    *out = descriptor;
+                    return true;
+                case OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_SEAT_CHECK:
+                    descriptor.resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE;
+                    descriptor.flags |= OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED;
+                    descriptor.event_kind_mask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_SEAT_CHECK;
+                    descriptor.field_mask = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE;
+                    CopyDescriptorText(descriptor.stable_name, "structure.seat_check");
+                    CopyDescriptorText(descriptor.display_name, "Structure Seat Check");
+                    *out = descriptor;
+                    return true;
+                case OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK:
+                    descriptor.resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM;
+                    descriptor.flags |= OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED;
+                    descriptor.event_kind_mask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_REMOTE_ADD_CHECK;
+                    descriptor.field_mask = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+                        OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER;
+                    CopyDescriptorText(descriptor.stable_name, "inventory.remote_add_check");
+                    CopyDescriptorText(descriptor.display_name, "Inventory Remote Add Check");
+                    *out = descriptor;
+                    return true;
+                case OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK:
+                    descriptor.resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM;
+                    descriptor.flags |= OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED;
+                    descriptor.event_kind_mask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK;
+                    descriptor.field_mask = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+                        OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN;
+                    CopyDescriptorText(descriptor.stable_name, "inventory.use_check");
+                    CopyDescriptorText(descriptor.display_name, "Inventory Use Check");
                     *out = descriptor;
                     return true;
                 default:
@@ -1100,6 +1202,9 @@ namespace Obelisk::Core
         bool PluginDescribeResourceKind(uint32_t resourceKind, ObeliskResourceKindDescriptor* out) {
             return DescribeResourceKind(resourceKind, out);
         }
+        bool PluginDescribeGameplayPolicyEventKind(uint32_t eventKind, ObeliskGameplayPolicyEventDescriptor* out) {
+            return DescribeGameplayPolicyEventKind(eventKind, out);
+        }
         void PluginCallProcessEvent(void* caller, void* function, void* parms) {
             if ((g_ApiCapabilities.load(std::memory_order_acquire) &
                  OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT) == 0 ||
@@ -1155,6 +1260,7 @@ namespace Obelisk::Core
         m_Api.RegisterGameplayPolicyEventWithOwnerTokenHandle = PluginRegisterGameplayPolicyEventWithOwnerTokenHandle;
         m_Api.UnregisterGameplayPolicyEventWithOwnerToken = PluginUnregisterGameplayPolicyEventWithOwnerToken;
         m_Api.DescribeResourceKind = PluginDescribeResourceKind;
+        m_Api.DescribeGameplayPolicyEventKind = PluginDescribeGameplayPolicyEventKind;
         g_ApiCapabilities.store(m_Api.capabilities, std::memory_order_release);
         EventManager::SetProcessEventBlockingCapabilityAdvertised(
             (m_Api.capabilities & OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING) != 0);

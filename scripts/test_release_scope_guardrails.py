@@ -228,7 +228,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("not used as promotion evidence", release)
         self.assertIn("per target set/function", release)
         self.assertIn("per-function analyzer fixture coverage", pr_template)
-        self.assertIn("supervisor snapshot coverage", pr_template)
+        self.assertIn("approved sanitized observer capture/research-note coverage", pr_template)
         self.assertIn("module-level field aggregates are not used as promotion evidence", pr_template)
         self.assertIn("readiness_gate=none", release)
         self.assertIn("runtime_observer_observational_only", release)

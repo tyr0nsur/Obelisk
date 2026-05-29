@@ -6,6 +6,9 @@
       "public_name": "GameplayPolicyEvent",
       "capability": "OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS",
       "abi_struct": "ObeliskGameplayPolicyEvent",
+      "descriptor_capability": "OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS",
+      "descriptor_struct": "ObeliskGameplayPolicyEventDescriptor",
+      "descriptor": "DescribeGameplayPolicyEventKind",
       "registration": "RegisterGameplayPolicyEventWithOwnerTokenHandle",
       "unregister": "UnregisterGameplayPolicyEventWithOwnerToken",
       "backing_target_set": "structure-observer-intake",
@@ -22,6 +25,17 @@
         "bool_values",
         "int32_values"
       ],
+      "descriptor_fields": [
+        "abi_version",
+        "struct_size",
+        "event_kind",
+        "resource_kind",
+        "flags",
+        "event_kind_mask",
+        "field_mask",
+        "stable_name",
+        "display_name"
+      ],
       "resource_kinds": [
         "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE",
         "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM"
@@ -30,6 +44,77 @@
         "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL",
         "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES",
         "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY"
+      ],
+      "event_kinds": [
+        {
+          "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_ACCESS_CHECK",
+          "stable_name": "structure.access_check",
+          "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE",
+          "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACCESS_CHECK",
+          "field_mask": ["OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"]
+        },
+        {
+          "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_DEMOLISH_CHECK",
+          "stable_name": "structure.demolish_check",
+          "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE",
+          "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_DEMOLISH_CHECK",
+          "field_mask": ["OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"]
+        },
+        {
+          "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_VARIANT_CHANGE",
+          "stable_name": "structure.variant_change",
+          "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE",
+          "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_VARIANT_CHANGE",
+          "field_mask": [
+            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
+            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_VARIANT_INDEX",
+            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE_SET"
+          ]
+        },
+        {
+          "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_ACTIVATION_TOGGLE",
+          "stable_name": "structure.activation_toggle",
+          "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE",
+          "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACTIVATION_TOGGLE",
+          "field_mask": [
+            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
+            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE"
+          ]
+        },
+        {
+          "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_PIN_CODE_CHECK",
+          "stable_name": "structure.pin_code_check",
+          "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE",
+          "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_PIN_CODE_CHECK",
+          "field_mask": ["OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"]
+        },
+        {
+          "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_SEAT_CHECK",
+          "stable_name": "structure.seat_check",
+          "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE",
+          "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_SEAT_CHECK",
+          "field_mask": ["OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"]
+        },
+        {
+          "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK",
+          "stable_name": "inventory.remote_add_check",
+          "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM",
+          "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_REMOTE_ADD_CHECK",
+          "field_mask": [
+            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
+            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER"
+          ]
+        },
+        {
+          "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK",
+          "stable_name": "inventory.use_check",
+          "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM",
+          "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK",
+          "field_mask": [
+            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
+            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN"
+          ]
+        }
       ],
       "redacted_fields": [
         "UObject pointers",

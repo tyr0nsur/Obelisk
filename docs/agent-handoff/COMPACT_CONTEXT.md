@@ -104,7 +104,8 @@ priorities, and do not use history files as the active source of truth.
 
 - Current RC direction is core-first: freeze `ObeliskApi` v1 around Linux runtime,
   ProcessEvent hook infrastructure, plugin lifecycle, central install layout,
-  `oBaseEvents`, `GameplayPolicyEvent`, and `DescribeResourceKind`.
+  `oBaseEvents`, `GameplayPolicyEvent`, `DescribeResourceKind`, and
+  `DescribeGameplayPolicyEventKind`.
 - The dirty/offline release gate has passed with the accepted minimal second-source root,
   but a real RC requires focused checkpoints and the same release gate without
   `--allow-dirty`.

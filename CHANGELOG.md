@@ -35,6 +35,9 @@ Current baseline:
   resource identity, lookup, mutation, or return override authority.
 - `DescribeResourceKind` as metadata-only descriptors for known resource categories,
   explicitly not `ResourceHandle`, object identity, lookup, or cross-event correlation.
+- `DescribeGameplayPolicyEventKind` as metadata-only descriptors for promoted
+  `GameplayPolicyEvent` kinds, explicitly not a module SDK, UE lookup, mutation, or
+  return-override surface.
 - First-stable plugin scope now excludes background workers, sockets, HTTP
   listeners/clients, long-lived file readers, and other external ingress unless a future
   plugin passes explicit shutdown, unregister, drain, join, and close gates.

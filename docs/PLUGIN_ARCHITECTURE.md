@@ -322,6 +322,14 @@ that the function pointer is non-null before calling it. Do not add `GetResource
 mutation APIs until a later promotion gate defines identity stability, privacy, lifecycle,
 and cross-instance semantics.
 
+`DescribeGameplayPolicyEventKind` is the matching event-kind metadata helper. It returns
+copied POD descriptors for promoted `GameplayPolicyEvent` kinds: stable event name,
+resource category, event-kind mask, supported field mask, and copied-payload/backing flags.
+It is discovery data for routing and plugin configuration, not a module SDK, object
+identity, UE lookup, mutation path, or return-override API. Plugins must check
+`OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS`, `struct_size`, and the
+function pointer before using it.
+
 ## HTTP And Security
 
 HTTP-capable plugins are two systems: an Obelisk plugin and a network service.

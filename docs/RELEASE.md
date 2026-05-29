@@ -21,6 +21,9 @@ Included:
   POD scalar payloads and no identity, lookup, mutation, or return override authority.
 - `DescribeResourceKind` as metadata-only resource category descriptors, not
   `ResourceHandle`, resource lookup, object identity, or cross-event correlation.
+- `DescribeGameplayPolicyEventKind` as metadata-only descriptors for promoted
+  `GameplayPolicyEvent` kinds, not UE lookup, module-specific SDK, mutation, or
+  return-override authority.
 
 Excluded:
 

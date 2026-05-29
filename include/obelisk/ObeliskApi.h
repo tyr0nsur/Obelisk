@@ -14,8 +14,10 @@
 #define OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING (1ull << 5)
 #define OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS (1ull << 6)
 #define OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS (1ull << 7)
+#define OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS (1ull << 8)
 #define OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION 1u
 #define OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION 1u
+#define OBELISK_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION 1u
 #define OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD (1ull << 0)
 #define OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED (1ull << 1)
 #define OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED (1ull << 2)
@@ -78,6 +80,12 @@ typedef enum ObeliskGameplayPolicyEventKind {
     OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK = 8,
 } ObeliskGameplayPolicyEventKind;
 
+#define OBELISK_GAMEPLAY_POLICY_EVENT_KIND_MIN \
+    OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_ACCESS_CHECK
+#define OBELISK_GAMEPLAY_POLICY_EVENT_KIND_MAX \
+    OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK
+#define OBELISK_GAMEPLAY_POLICY_EVENT_KIND_COUNT 8u
+
 typedef enum ObeliskGameplayPolicyResourceKind {
     OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_UNKNOWN = 0,
     OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE = 1,
@@ -126,6 +134,23 @@ typedef struct ObeliskResourceKindDescriptor {
     // Human-readable ASCII label, null-terminated when set.
     char display_name[64];
 } ObeliskResourceKindDescriptor;
+
+typedef struct ObeliskGameplayPolicyEventDescriptor {
+    uint32_t abi_version;
+    uint32_t struct_size;
+    // ObeliskGameplayPolicyEventKind stored as uint32_t for a fixed C ABI layout.
+    uint32_t event_kind;
+    // ObeliskGameplayPolicyResourceKind stored as uint32_t for a fixed C ABI layout.
+    uint32_t resource_kind;
+    // Same evidence/ownership flags used by ObeliskGameplayPolicyEvent for this kind.
+    uint64_t flags;
+    uint64_t event_kind_mask;
+    uint64_t field_mask;
+    // Stable ASCII identifier for config/routing/log metrics, null-terminated when set.
+    char stable_name[48];
+    // Human-readable ASCII label, null-terminated when set.
+    char display_name[64];
+} ObeliskGameplayPolicyEventDescriptor;
 
 // Borrowed event data is valid only for the duration of the callback.
 // Gameplay policy events are observational copied POD payloads unless a future
@@ -228,6 +253,12 @@ typedef struct ObeliskApi {
     // or a mutable resource API. Callers must initialize out->struct_size to
     // sizeof(ObeliskResourceKindDescriptor) before use.
     bool (*DescribeResourceKind)(uint32_t resourceKind, ObeliskResourceKindDescriptor* out);
+
+    // Metadata-only gameplay policy event descriptors. This is event-kind discovery for
+    // routing and plugin capability checks only; it is not identity, lookup, mutation, or
+    // return-override authority. Callers must initialize out->struct_size to
+    // sizeof(ObeliskGameplayPolicyEventDescriptor) before use.
+    bool (*DescribeGameplayPolicyEventKind)(uint32_t eventKind, ObeliskGameplayPolicyEventDescriptor* out);
 } ObeliskApi;
 
 // Plugins must export these functions to be loaded by Obelisk.

@@ -74,6 +74,37 @@ namespace
             std::strcmp(descriptor.stable_name, "structure") == 0;
     }
 
+    bool ValidateGameplayPolicyEventDescriptor(const ObeliskApi* api)
+    {
+        if (!api ||
+            (api->capabilities & OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS) == 0 ||
+            api->struct_size < offsetof(ObeliskApi, DescribeGameplayPolicyEventKind) +
+                sizeof(api->DescribeGameplayPolicyEventKind) ||
+            !api->DescribeGameplayPolicyEventKind)
+        {
+            return true;
+        }
+
+        ObeliskGameplayPolicyEventDescriptor descriptor{};
+        descriptor.struct_size = sizeof(ObeliskGameplayPolicyEventDescriptor);
+        if (!api->DescribeGameplayPolicyEventKind(
+                OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_VARIANT_CHANGE,
+                &descriptor))
+        {
+            return false;
+        }
+
+        return descriptor.abi_version == OBELISK_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION &&
+            descriptor.struct_size >= sizeof(ObeliskGameplayPolicyEventDescriptor) &&
+            descriptor.event_kind == OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_VARIANT_CHANGE &&
+            descriptor.resource_kind == OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE &&
+            (descriptor.flags & OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD) != 0 &&
+            (descriptor.flags & OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED) != 0 &&
+            descriptor.event_kind_mask == OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_VARIANT_CHANGE &&
+            (descriptor.field_mask & OBELISK_GAMEPLAY_POLICY_FIELD_MASK_VARIANT_INDEX) != 0 &&
+            std::strcmp(descriptor.stable_name, "structure.variant_change") == 0;
+    }
+
     void ResetState()
     {
         g_Api = {};
@@ -153,6 +184,11 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
         }
 
         if (!ValidateStructureResourceKindDescriptor(api))
+        {
+            ResetState();
+            return false;
+        }
+        if (!ValidateGameplayPolicyEventDescriptor(api))
         {
             ResetState();
             return false;

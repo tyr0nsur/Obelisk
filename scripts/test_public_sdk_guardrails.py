@@ -35,6 +35,7 @@ V010_CORE_API_CAPABILITY_ALLOWLIST = [
     "OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING",
     "OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS",
     "OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS",
+    "OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS",
 ]
 V010_CORE_OBELISK_API_FIELD_ALLOWLIST = [
     "LogInfo",
@@ -60,6 +61,7 @@ V010_CORE_OBELISK_API_FIELD_ALLOWLIST = [
     "RegisterGameplayPolicyEventWithOwnerTokenHandle",
     "UnregisterGameplayPolicyEventWithOwnerToken",
     "DescribeResourceKind",
+    "DescribeGameplayPolicyEventKind",
 ]
 UNPROMOTED_GAMEPLAY_SURFACES = (
     "Player",
@@ -332,6 +334,23 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                     "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY",
                     event.get("event_kind_masks", []),
                 )
+                event_kinds = event.get("event_kinds")
+                self.assertIsInstance(event_kinds, list, f"{event.get('event_id')} missing event_kinds")
+                self.assertEqual(len(event_kinds), 8, f"{event.get('event_id')} event kind count drifted")
+                for event_kind in event_kinds:
+                    self.assertIsInstance(event_kind, dict)
+                    self.assertRegex(
+                        event_kind.get("kind", ""),
+                        r"^OBELISK_GAMEPLAY_POLICY_EVENT_KIND_[A-Z0-9_]+$",
+                    )
+                    self.assertIsInstance(event_kind.get("stable_name"), str)
+                    self.assertIn(event_kind.get("resource_kind"), event.get("resource_kinds", []))
+                    self.assertRegex(
+                        event_kind.get("event_kind_mask", ""),
+                        r"^OBELISK_GAMEPLAY_POLICY_EVENT_MASK_[A-Z0-9_]+$",
+                    )
+                    self.assertIsInstance(event_kind.get("field_mask"), list)
+                    self.assertGreater(len(event_kind["field_mask"]), 0)
                 self.assertIn("not promoted", event.get("inventory_sdk", ""))
                 for field in required_path_lists:
                     entries = event.get(field)

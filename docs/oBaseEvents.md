@@ -3,6 +3,11 @@
 `oBaseEvents` is the first official Obelisk plugin example. It is intentionally small and
 safe by default.
 
+It demonstrates plugin lifecycle, config, and filtered `ProcessEvent` callback mechanics.
+The promoted v0.1 gameplay callback path is `GameplayPolicyEvent`; use
+`DescribeGameplayPolicyEventKind` and `DescribeResourceKind` for metadata-only discovery
+when building gameplay policy plugins.
+
 It demonstrates:
 
 - C ABI validation with `abi_version` and `struct_size`.
