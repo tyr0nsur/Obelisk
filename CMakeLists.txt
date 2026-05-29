@@ -64,6 +64,7 @@ add_library(obelisk SHARED
     ue/ChatReflection.cpp
     ue/DinoReflection.cpp
     ue/InventoryReflection.cpp
+    ue/MissionReflection.cpp
     ue/StructureReflection.cpp
     ue/RuntimeReflection.cpp
     ue/ReflectionScanner.cpp
@@ -256,6 +257,15 @@ add_executable(dino_reflection_tests
 target_include_directories(dino_reflection_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_test(NAME DinoReflectionTests COMMAND dino_reflection_tests)
+
+add_executable(mission_reflection_tests
+    tests/core/MissionReflectionTests.cpp
+    ue/MissionReflection.cpp
+    ue/RuntimeReflection.cpp
+)
+target_include_directories(mission_reflection_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_test(NAME MissionReflectionTests COMMAND mission_reflection_tests)
 
 add_executable(structure_reflection_tests
     tests/core/StructureReflectionTests.cpp
