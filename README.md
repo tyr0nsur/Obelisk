@@ -102,6 +102,26 @@ scripts/install_obelisk.sh --dry-run /tmp/obelisk-install-check
 scripts/test_install_obelisk_layout.sh /tmp/obelisk-layout-check
 ```
 
+Release-candidate, installer, SDK package, CMake export, and first-stable
+scope changes use the canonical release gate instead of ad hoc command groups:
+
+```bash
+scripts/check_release_readiness.sh
+```
+
+When promoting reflected gameplay/module surfaces, use the same gate with
+second-source readiness enabled and explicitly named target sets. See
+[docs/RELEASE.md](docs/RELEASE.md) for the full promotion policy.
+
+Changes on the `ProcessEvent` hot path, including chat/reflection observer work,
+should also run the local benchmark checker before review:
+
+```bash
+cmake --build build --target chat_reflection_benchmark
+./build/chat_reflection_benchmark 20000 > /tmp/obelisk-chat-reflection-benchmark.txt
+python3 scripts/check_chat_reflection_benchmark.py /tmp/obelisk-chat-reflection-benchmark.txt
+```
+
 Main build outputs:
 
 ```text
@@ -452,8 +472,9 @@ instance. Stable posture rejects that allow marker.
 
 Near-term engineering:
 
-- Keep CI as a real quality gate: build, CTest, analyzer tests, SDK consumer
-  fixture, and install dry-run.
+- Keep CI as a fast quality gate for build, CTest, analyzer tests, SDK consumer
+  fixtures, and install dry-runs. Release-candidate validation stays centered on
+  `scripts/check_release_readiness.sh`.
 - Strengthen sanitized reflection snapshots, manifest regeneration, and second-source
   comparison for candidate modules.
 - Define copied-data ownership and callback lifetime before exposing additional

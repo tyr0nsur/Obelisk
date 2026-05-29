@@ -64,25 +64,60 @@ validation adapters, not the product API.
 - Follow [docs/PLUGIN_ARCHITECTURE.md](docs/PLUGIN_ARCHITECTURE.md) before
   adding or promoting plugins.
 
-## Build Check
+## Build And Release Checks
 
-Before opening a pull request:
+Before opening a normal development pull request, run the focused fast checks
+that match your change:
 
 ```bash
 git diff --check
-cmake -S . -B build
+cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake --build build -j"$(nproc)"
 ctest --test-dir build --output-on-failure
 scripts/run_script_tests.sh
 ```
 
 Docs-only changes may skip the CMake build, but the PR should say why.
-Changes to install layout, CMake package exports, public headers, or SDK
-packaging should also run:
+
+Release-candidate, installer, SDK package, CMake export, public-header, or
+first-stable scope changes must use the core-first release gate instead of
+hand-picking equivalent commands:
 
 ```bash
-scripts/test_install_obelisk_layout.sh
+scripts/check_release_readiness.sh
 ```
+
+That gate requires a clean worktree by default and runs the build, CTest,
+script tests, install-layout validation, operator CLI status check, install
+dry-runs, plugin install dry-run, and whitespace checks with one set of
+defaults.
+
+PRs that promote reflected gameplay or module surfaces must run the same gate
+with second-source readiness enabled and explicitly name every promoted target
+set:
+
+```bash
+scripts/check_release_readiness.sh --require-second-source-readiness \
+  --ufunction-second-source-root <candidate-snapshot-root> \
+  --ufunction-second-source-target-set <target-set>
+```
+
+Add `--scriptstruct-second-source-root` only with an explicitly named
+`--scriptstruct-second-source-target-set`. If readiness reports are kept, write
+them under an ignored report directory with `--second-source-report-dir`.
+
+Changes on the `ProcessEvent` hot path, including chat/reflection observer work,
+should also run the local benchmark checker before review:
+
+```bash
+cmake --build build --target chat_reflection_benchmark
+./build/chat_reflection_benchmark 20000 > /tmp/obelisk-chat-reflection-benchmark.txt
+python3 scripts/check_chat_reflection_benchmark.py /tmp/obelisk-chat-reflection-benchmark.txt
+```
+
+This benchmark is synthetic local regression coverage. It does not promote chat
+or any gameplay module to SDK scope, and it does not replace an operator-approved
+runtime validation window when a change requires one.
 
 ## Runtime Testing
 
@@ -114,13 +149,19 @@ Harden reflected event parameter decoding
 
 ## Current Priorities
 
-1. Build the general UE4 reflection pipeline: `FName`, `GNames`, `GObjects`,
-   `UObject`, `UFunction`, and property-chain validation.
-2. Keep runtime hooks, marker gates, plugin lifecycle, and C ABI behavior stable.
+1. Close the core-first `v0.1.0-rc` surface around stable runtime hooks, marker
+   gates, plugin lifecycle, C ABI behavior, `GameplayPolicyEvent`, and
+   `DescribeResourceKind`.
+2. Keep additional gameplay/module APIs out of public scope until their copied
+   payloads, callback lifetime, SDK consumer coverage, and explicitly named
+   second-source gates are complete.
 3. Expand offline snapshot tooling and second-source comparison before promoting
    public SDK module APIs.
-4. Add safe plugin examples only after the relevant promotion gates are met.
-5. Reduce operational and documentation debt that can mislead new contributors.
+4. Build the general UE4 reflection pipeline (`FName`, `GNames`, `GObjects`,
+   `UObject`, `UFunction`, and property-chain validation) as research/tooling
+   work unless a scoped RC task requires it.
+5. Add safe plugin examples only after the relevant promotion gates are met.
+6. Reduce operational and documentation debt that can mislead new contributors.
 
 Use [docs/STATUS.md](docs/STATUS.md) before changing runtime behavior. It
 defines which pieces are stable baseline, experimental, or not ready.
