@@ -46,6 +46,7 @@ namespace Obelisk::UE::DinoReflection
             uint16_t NumParms;
             uint16_t ParmsSize;
             uint16_t ReturnValueOffset;
+            uint32_t FunctionFlags;
             const DinoFieldSpec* Fields;
             size_t FieldCount;
         };
@@ -111,6 +112,7 @@ namespace Obelisk::UE::DinoReflection
             6,
             0x10,
             0x0f,
+            0x04020401,
             kAddPassengerFields.data(),
             kAddPassengerFields.size(),
         };
@@ -122,6 +124,7 @@ namespace Obelisk::UE::DinoReflection
             2,
             0x09,
             0x08,
+            0x04020400,
             kAllowCarryCharacterFields.data(),
             kAllowCarryCharacterFields.size(),
         };
@@ -190,6 +193,9 @@ namespace Obelisk::UE::DinoReflection
             if (function.ReturnValueOffset != spec.ReturnValueOffset)
                 return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
                                                            "dino UFunction ReturnValueOffset mismatch");
+            if (function.FunctionFlags != spec.FunctionFlags)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                           "dino UFunction FunctionFlags mismatch");
             if (function.Parameters.size() != spec.FieldCount)
                 return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
                                                            "dino property count mismatch");
@@ -318,6 +324,9 @@ namespace Obelisk::UE::DinoReflection
         value.FunctionNameIndex = spec->NameIndex;
         value.OuterNameIndex = spec->OuterNameIndex;
         value.HasParameterRanges = params != nullptr;
+        if (spec->FieldCount > value.Fields.capacity())
+            return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::OutOfBounds,
+                                                       "dino field count exceeds storage capacity");
         value.Fields.reserve(spec->FieldCount);
 
         for (size_t i = 0; i < spec->FieldCount; ++i)

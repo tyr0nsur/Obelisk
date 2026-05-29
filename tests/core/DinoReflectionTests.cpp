@@ -185,6 +185,7 @@ namespace
 
     void BuildFunction(DinoFixture& fixture,
                        int32_t functionNameIndex,
+                       uint32_t functionFlags,
                        uint16_t numParms,
                        uint16_t parmsSize,
                        uint16_t returnValueOffset,
@@ -222,7 +223,6 @@ namespace
                           fields[i].ElementSize);
         }
 
-        const uint32_t functionFlags = 0x4020400;
         WriteAt(fixture.Function, 0x38, numParms > 0 ? fixture.PropertyA.data() : nullptr);
         WriteAt(fixture.Function, 0x90, functionFlags);
         WriteAt(fixture.Function, 0x96, numParms);
@@ -234,6 +234,7 @@ namespace
     {
         BuildFunction(fixture,
                       functionNameIndex,
+                      0x04020401,
                       6,
                       0x10,
                       0x0f,
@@ -252,6 +253,7 @@ namespace
     {
         BuildFunction(fixture,
                       functionNameIndex,
+                      0x04020400,
                       2,
                       0x09,
                       0x08,
@@ -470,6 +472,20 @@ namespace
 
     void TestRejectsWrongShape()
     {
+        {
+            DinoFixture fixture;
+            BuildAddPassenger(fixture);
+            WriteAt(fixture.Function, 0x90, uint32_t{0x04020400});
+
+            DinoReflection::DinoInvocation invocation;
+            ReadResult result = DinoReflection::TryIdentifyDinoInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "wrong dino FunctionFlags were accepted");
+        }
         {
             DinoFixture fixture;
             BuildAddPassenger(fixture);
