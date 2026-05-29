@@ -17,6 +17,11 @@ SCRIPTSTRUCT_SECOND_SOURCE_ROOT="${OBELISK_SCRIPTSTRUCT_SECOND_SOURCE_ROOT:-}"
 SECOND_SOURCE_REPORT_DIR="${OBELISK_SECOND_SOURCE_REPORT_DIR:-}"
 UFUNCTION_SECOND_SOURCE_TARGET_SETS=()
 SCRIPTSTRUCT_SECOND_SOURCE_TARGET_SETS=()
+PUBLIC_RC_UFUNCTION_SECOND_SOURCE_TARGET_SETS=(
+    "minimal-second-source-intake"
+    "structure-observer-intake"
+    "chat-message-intake"
+)
 
 is_under_path() {
     local path="$1"
@@ -59,6 +64,33 @@ reject_protected_path() {
     fi
 }
 
+validate_second_source_report_dir() {
+    local report_dir="$1"
+
+    reject_protected_path "--second-source-report-dir" "write under" "${report_dir}"
+
+    local report_dir_abs
+    local repo_abs
+    report_dir_abs="$(realpath -m "${report_dir}")"
+    repo_abs="$(realpath -m "${REPO_ROOT}")"
+    if [[ "${report_dir_abs}" == "${repo_abs}" || "${report_dir_abs}" == "${repo_abs}/"* ]]; then
+        if [[ "${report_dir_abs}" == "${repo_abs}" ]]; then
+            printf 'Second-source report dir inside the repository must be ignored: %s\n' \
+                "${report_dir}" >&2
+            exit 2
+        fi
+
+        local report_dir_rel
+        report_dir_rel="${report_dir_abs#${repo_abs}/}"
+        if ! git check-ignore -q -- "${report_dir_rel}" && \
+            ! git check-ignore -q -- "${report_dir_rel}/"; then
+            printf 'Second-source report dir inside the repository must be ignored: %s\n' \
+                "${report_dir}" >&2
+            exit 2
+        fi
+    fi
+}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --allow-dirty)
@@ -87,7 +119,9 @@ Options:
   --scriptstruct-second-source-root Candidate ScriptStruct snapshot root for second-source promotion.
   --ufunction-second-source-target-set
                                     UFunction target set to gate. Repeat for each promoted module.
-                                    Defaults to minimal-second-source-intake.
+                                    Defaults to the public RC target sets:
+                                    minimal-second-source-intake,
+                                    structure-observer-intake, and chat-message-intake.
   --scriptstruct-second-source-target-set
                                     ScriptStruct target set to gate. Repeat for each promoted module.
                                     No default; ScriptStruct promotion requires explicit opt-in.
@@ -148,9 +182,18 @@ if [[ "${second_source_options_present}" == "1" \
 fi
 
 if [[ "${REQUIRE_SECOND_SOURCE_READINESS}" == "1" ]]; then
-    if [[ "${#UFUNCTION_SECOND_SOURCE_TARGET_SETS[@]}" -eq 0 ]]; then
-        UFUNCTION_SECOND_SOURCE_TARGET_SETS=("minimal-second-source-intake")
-    fi
+    for required_target_set in "${PUBLIC_RC_UFUNCTION_SECOND_SOURCE_TARGET_SETS[@]}"; do
+        target_set_present=0
+        for target_set in "${UFUNCTION_SECOND_SOURCE_TARGET_SETS[@]}"; do
+            if [[ "${target_set}" == "${required_target_set}" ]]; then
+                target_set_present=1
+                break
+            fi
+        done
+        if [[ "${target_set_present}" == "0" ]]; then
+            UFUNCTION_SECOND_SOURCE_TARGET_SETS+=("${required_target_set}")
+        fi
+    done
     if [[ -n "${SCRIPTSTRUCT_SECOND_SOURCE_ROOT}" && "${#SCRIPTSTRUCT_SECOND_SOURCE_TARGET_SETS[@]}" -eq 0 ]]; then
         echo "--scriptstruct-second-source-root requires at least one --scriptstruct-second-source-target-set." >&2
         exit 2
@@ -164,20 +207,7 @@ if [[ -n "${SCRIPTSTRUCT_SECOND_SOURCE_ROOT}" ]]; then
     reject_protected_path "--scriptstruct-second-source-root" "read from" "${SCRIPTSTRUCT_SECOND_SOURCE_ROOT}"
 fi
 if [[ -n "${SECOND_SOURCE_REPORT_DIR}" ]]; then
-    reject_protected_path "--second-source-report-dir" "write under" "${SECOND_SOURCE_REPORT_DIR}"
-fi
-
-if [[ -n "${SECOND_SOURCE_REPORT_DIR}" ]]; then
-    report_dir_abs="$(realpath -m "${SECOND_SOURCE_REPORT_DIR}")"
-    repo_abs="$(realpath -m "${REPO_ROOT}")"
-    if [[ "${report_dir_abs}" == "${repo_abs}" || "${report_dir_abs}" == "${repo_abs}/"* ]]; then
-        report_dir_rel="${report_dir_abs#${repo_abs}/}"
-        if ! git check-ignore -q -- "${report_dir_rel}" "${report_dir_rel}/"; then
-            printf 'Second-source report dir inside the repository must be ignored: %s\n' \
-                "${SECOND_SOURCE_REPORT_DIR}" >&2
-            exit 2
-        fi
-    fi
+    validate_second_source_report_dir "${SECOND_SOURCE_REPORT_DIR}"
 fi
 
 cleanup() {

@@ -43,6 +43,16 @@ if ! grep -Fq -- "ScriptStruct promotion requires explicit opt-in" <<<"${help_ou
     exit 1
 fi
 
+for expected in \
+    "Defaults to the public RC target sets" \
+    "structure-observer-intake" \
+    "chat-message-intake"; do
+    if ! grep -Fq -- "${expected}" <<<"${help_output}"; then
+        printf 'missing public RC target-set help text: %s\n' "${expected}" >&2
+        exit 1
+    fi
+done
+
 if ! grep -Fq -- "temporary directory under the release check root" <<<"${help_output}"; then
     printf 'missing temporary second-source report dir help text\n' >&2
     exit 1
@@ -65,11 +75,15 @@ if [[ -z "${second_source_default_block}" ]]; then
     exit 1
 fi
 
-if ! grep -Fq -- 'UFUNCTION_SECOND_SOURCE_TARGET_SETS=("minimal-second-source-intake")' <<<"${second_source_default_block}"; then
-    printf 'missing minimal-second-source-intake UFunction default\n%s\n' \
-        "${second_source_default_block}" >&2
-    exit 1
-fi
+for expected in \
+    'PUBLIC_RC_UFUNCTION_SECOND_SOURCE_TARGET_SETS[@]' \
+    'UFUNCTION_SECOND_SOURCE_TARGET_SETS+=("${required_target_set}")'; do
+    if ! grep -Fq -- "${expected}" <<<"${second_source_default_block}"; then
+        printf 'missing public RC UFunction default logic %s\n%s\n' \
+            "${expected}" "${second_source_default_block}" >&2
+        exit 1
+    fi
+done
 
 if grep -Fq -- 'SCRIPTSTRUCT_SECOND_SOURCE_TARGET_SETS=("transfer-scriptstruct")' <<<"${second_source_default_block}"; then
     printf 'ScriptStruct transfer target set returned as a default\n%s\n' \
@@ -88,6 +102,11 @@ assert_ufunction_target_sets_after_defaults() {
     shift
     local REQUIRE_SECOND_SOURCE_READINESS=1
     local SCRIPTSTRUCT_SECOND_SOURCE_ROOT=""
+    local PUBLIC_RC_UFUNCTION_SECOND_SOURCE_TARGET_SETS=(
+        "minimal-second-source-intake"
+        "structure-observer-intake"
+        "chat-message-intake"
+    )
     local UFUNCTION_SECOND_SOURCE_TARGET_SETS=("$@")
     local SCRIPTSTRUCT_SECOND_SOURCE_TARGET_SETS=()
     local actual
@@ -104,10 +123,13 @@ assert_ufunction_target_sets_after_defaults() {
     fi
 }
 
-assert_ufunction_target_sets_after_defaults "minimal-second-source-intake"
-assert_ufunction_target_sets_after_defaults "buff-compact-intake" "buff-compact-intake"
 assert_ufunction_target_sets_after_defaults \
-    "minimal-second-source-intake,dino-compact-intake" \
+    "minimal-second-source-intake,structure-observer-intake,chat-message-intake"
+assert_ufunction_target_sets_after_defaults \
+    "buff-compact-intake,minimal-second-source-intake,structure-observer-intake,chat-message-intake" \
+    "buff-compact-intake"
+assert_ufunction_target_sets_after_defaults \
+    "minimal-second-source-intake,dino-compact-intake,structure-observer-intake,chat-message-intake" \
     "minimal-second-source-intake" \
     "dino-compact-intake"
 
@@ -727,6 +749,171 @@ assert_run_second_source_rejects_fake_ready_json() {
 assert_run_second_source_uses_temp_report_dir_and_validates_json
 assert_run_second_source_rejects_fake_ready_json
 
+write_minimal_only_ufunction_second_source_root() {
+    local root="$1"
+    local base_root="tests/fixtures/ufunction_snapshots/7e7ded49e0c6"
+    local rel_path
+
+    for rel_path in \
+        "sdk_inventory/PrimalItem.CanUse.snapshot.json" \
+        "sdk_inventory/PrimalItem.AllowRemoteAddToInventory.snapshot.json" \
+        "sdk_structures/PrimalStructure.AllowStructureAccess.snapshot.json" \
+        "sdk_structures/PrimalStructure.IsAllowedToDemolish.snapshot.json"; do
+        mkdir -p "${root}/7e7ded49e0c6/$(dirname "${rel_path}")"
+        cp "${base_root}/${rel_path}" "${root}/7e7ded49e0c6/${rel_path}"
+    done
+
+    python3 - "${root}" <<'PY'
+import json
+import pathlib
+import sys
+
+root = pathlib.Path(sys.argv[1])
+for path in root.rglob("*.snapshot.json"):
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    evidence = payload["evidence"]
+    evidence["artifact_sha256"] = "2" * 64
+    evidence["capture_id"] = "second_source_minimal_only"
+    evidence["evidence_pack_id"] = "second_source_minimal_only_pack"
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+}
+
+assert_public_rc_report_state() {
+    local report_path="$1"
+    local target_set="$2"
+    local expected_ready="$3"
+    local expected_accepted="$4"
+    local expected_inconclusive="$5"
+
+    python3 - \
+        "${report_path}" \
+        "${target_set}" \
+        "${expected_ready}" \
+        "${expected_accepted}" \
+        "${expected_inconclusive}" <<'PY'
+import json
+import sys
+
+report_path, target_set, expected_ready_text, expected_accepted_text, expected_inconclusive_text = sys.argv[1:6]
+with open(report_path, "r", encoding="utf-8") as handle:
+    report = json.load(handle)
+
+expected_ready = expected_ready_text == "true"
+expected_accepted = int(expected_accepted_text)
+expected_inconclusive = int(expected_inconclusive_text)
+errors = []
+
+if target_set not in report.get("target_sets", []):
+    errors.append(f"target_sets missing {target_set}")
+promotion_gate = report.get("promotion_gate", {})
+if promotion_gate.get("ready") is not expected_ready:
+    errors.append(f"promotion_gate.ready expected {expected_ready}")
+totals = report.get("totals", {})
+if totals.get("second_source_accepted") != expected_accepted:
+    errors.append(f"second_source_accepted expected {expected_accepted}")
+if totals.get("second_source_inconclusive") != expected_inconclusive:
+    errors.append(f"second_source_inconclusive expected {expected_inconclusive}")
+if not expected_ready:
+    blocker_reasons = {
+        blocker.get("reason")
+        for blocker in promotion_gate.get("blockers", [])
+        if isinstance(blocker, dict)
+    }
+    if "inconclusive_second_source" not in blocker_reasons:
+        errors.append("missing inconclusive_second_source blocker")
+
+if errors:
+    for error in errors:
+        print(f"{target_set} report state invalid: {error}", file=sys.stderr)
+    raise SystemExit(1)
+PY
+}
+
+assert_minimal_only_ufunction_root_does_not_satisfy_public_rc_target_sets() {
+    local candidate_root="${TEST_TEMP_ROOT}/minimal-only-ufunction-second-source"
+    local REQUIRE_SECOND_SOURCE_READINESS=1
+    local SCRIPTSTRUCT_SECOND_SOURCE_ROOT=""
+    local PUBLIC_RC_UFUNCTION_SECOND_SOURCE_TARGET_SETS=(
+        "minimal-second-source-intake"
+        "structure-observer-intake"
+        "chat-message-intake"
+    )
+    local UFUNCTION_SECOND_SOURCE_TARGET_SETS=()
+    local SCRIPTSTRUCT_SECOND_SOURCE_TARGET_SETS=()
+    local target_set
+    local output
+    local report_path
+    local second_source_status=0
+
+    write_minimal_only_ufunction_second_source_root "${candidate_root}"
+    eval "${second_source_default_block}"
+
+    RELEASE_CHECK_ROOT="${TEST_TEMP_ROOT}/release-root-minimal-only-rc"
+    SECOND_SOURCE_REPORT_DIR="${RELEASE_CHECK_ROOT}/second-source-readiness-reports"
+    mkdir -p "${RELEASE_CHECK_ROOT}"
+
+    for target_set in "${UFUNCTION_SECOND_SOURCE_TARGET_SETS[@]}"; do
+        set +e
+        output="$(
+            run_second_source_readiness \
+                "ufunction-${target_set}" \
+                tests/fixtures/ufunction_snapshots \
+                "${target_set}" \
+                "${candidate_root}" 2>&1
+        )"
+        status=$?
+        set -e
+        second_source_status="$(merge_second_source_status "${second_source_status}" "${status}")"
+
+        report_path="${SECOND_SOURCE_REPORT_DIR}/ufunction-${target_set}-second-source-readiness.json"
+        if [[ ! -f "${report_path}" ]]; then
+            printf 'expected public RC second-source report for %s\n%s\n' \
+                "${target_set}" "${output}" >&2
+            exit 1
+        fi
+
+        case "${target_set}" in
+            minimal-second-source-intake)
+                if [[ "${status}" -ne 0 ]]; then
+                    printf 'minimal-only UFunction second source should satisfy only minimal RC target set, got %s\n%s\n' \
+                        "${status}" "${output}" >&2
+                    exit 1
+                fi
+                assert_public_rc_report_state "${report_path}" "${target_set}" true 4 0
+                ;;
+            structure-observer-intake)
+                if [[ "${status}" -eq 0 ]]; then
+                    printf 'minimal-only UFunction second source unexpectedly satisfied structure observer RC target set\n%s\n' \
+                        "${output}" >&2
+                    exit 1
+                fi
+                assert_public_rc_report_state "${report_path}" "${target_set}" false 2 4
+                ;;
+            chat-message-intake)
+                if [[ "${status}" -eq 0 ]]; then
+                    printf 'minimal-only UFunction second source unexpectedly satisfied chat message RC target set\n%s\n' \
+                        "${output}" >&2
+                    exit 1
+                fi
+                assert_public_rc_report_state "${report_path}" "${target_set}" false 0 1
+                ;;
+            *)
+                printf 'unexpected public RC UFunction target set in minimal-only guardrail: %s\n' \
+                    "${target_set}" >&2
+                exit 1
+                ;;
+        esac
+    done
+
+    if [[ "${second_source_status}" -eq 0 ]]; then
+        printf 'minimal-only UFunction second source unexpectedly satisfied all public RC target sets\n' >&2
+        exit 1
+    fi
+}
+
+assert_minimal_only_ufunction_root_does_not_satisfy_public_rc_target_sets
+
 assert_protected_path_rejected() {
     local label="$1"
     local action="$2"
@@ -763,6 +950,40 @@ assert_path_not_rejected_by_prefix_only() {
     fi
 }
 
+assert_report_dir_validates() {
+    local path="$1"
+    local output
+
+    set +e
+    output="$(validate_second_source_report_dir "${path}" 2>&1)"
+    status=$?
+    set -e
+    if [[ "${status}" -ne 0 ]]; then
+        printf 'expected report dir to validate: %s\n%s\n' "${path}" "${output}" >&2
+        exit 1
+    fi
+}
+
+assert_report_dir_rejected() {
+    local path="$1"
+    local expected="$2"
+    local output
+
+    set +e
+    output="$(validate_second_source_report_dir "${path}" 2>&1)"
+    status=$?
+    set -e
+    if [[ "${status}" -ne 2 ]]; then
+        printf 'expected report dir rejection for %s, got %s\n%s\n' \
+            "${path}" "${status}" "${output}" >&2
+        exit 1
+    fi
+    if ! grep -Fq -- "${expected}" <<<"${output}"; then
+        printf 'missing report dir rejection text for %s\n%s\n' "${path}" "${output}" >&2
+        exit 1
+    fi
+}
+
 assert_protected_path_rejected \
     "--ufunction-second-source-root" \
     "read from" \
@@ -790,6 +1011,14 @@ assert_protected_path_rejected \
     "--scriptstruct-second-source-root must not read from protected server root /servidor/ark"
 assert_path_not_rejected_by_prefix_only "/servidor/ark-not-live/reports"
 assert_path_not_rejected_by_prefix_only "/servidor/ark/workspace-offline/reports"
+assert_report_dir_validates "local/release-readiness-options-test"
+assert_report_dir_validates "local/release-readiness-options-test/"
+assert_report_dir_rejected \
+    "second-source-reports" \
+    "Second-source report dir inside the repository must be ignored"
+assert_report_dir_rejected \
+    "." \
+    "Second-source report dir inside the repository must be ignored"
 
 before_error_roots="$(count_temp_roots)"
 set +e
@@ -830,6 +1059,63 @@ fi
 
 if ! grep -Fq -- "Second-source roots, target sets, or report dirs require --require-second-source-readiness." <<<"${target_set_error_output}"; then
     printf 'missing target-set option validation error\n%s\n' "${target_set_error_output}" >&2
+    exit 1
+fi
+
+set +e
+report_dir_without_gate_output="$(
+    scripts/check_release_readiness.sh \
+        --second-source-report-dir /tmp/obelisk-second-source-reports 2>&1
+)"
+status=$?
+set -e
+
+if [[ "${status}" -ne 2 ]]; then
+    printf 'expected report-dir validation to exit 2, got %s\n%s\n' \
+        "${status}" "${report_dir_without_gate_output}" >&2
+    exit 1
+fi
+
+if ! grep -Fq -- "Second-source roots, target sets, or report dirs require --require-second-source-readiness." <<<"${report_dir_without_gate_output}"; then
+    printf 'missing report-dir option validation error\n%s\n' "${report_dir_without_gate_output}" >&2
+    exit 1
+fi
+
+set +e
+env_root_without_gate_output="$(
+    OBELISK_UFUNCTION_SECOND_SOURCE_ROOT=/tmp/obelisk-candidate \
+        scripts/check_release_readiness.sh 2>&1
+)"
+status=$?
+set -e
+
+if [[ "${status}" -ne 2 ]]; then
+    printf 'expected env root validation to exit 2, got %s\n%s\n' \
+        "${status}" "${env_root_without_gate_output}" >&2
+    exit 1
+fi
+
+if ! grep -Fq -- "Second-source roots, target sets, or report dirs require --require-second-source-readiness." <<<"${env_root_without_gate_output}"; then
+    printf 'missing env root option validation error\n%s\n' "${env_root_without_gate_output}" >&2
+    exit 1
+fi
+
+set +e
+env_report_dir_without_gate_output="$(
+    OBELISK_SECOND_SOURCE_REPORT_DIR=/tmp/obelisk-second-source-reports \
+        scripts/check_release_readiness.sh 2>&1
+)"
+status=$?
+set -e
+
+if [[ "${status}" -ne 2 ]]; then
+    printf 'expected env report-dir validation to exit 2, got %s\n%s\n' \
+        "${status}" "${env_report_dir_without_gate_output}" >&2
+    exit 1
+fi
+
+if ! grep -Fq -- "Second-source roots, target sets, or report dirs require --require-second-source-readiness." <<<"${env_report_dir_without_gate_output}"; then
+    printf 'missing env report-dir option validation error\n%s\n' "${env_report_dir_without_gate_output}" >&2
     exit 1
 fi
 
