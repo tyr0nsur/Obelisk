@@ -19,14 +19,16 @@ plugin, not to become a feature-heavy server plugin.
 ## Experimental Examples
 
 `oPolicyAudit` demonstrates the promoted `GameplayPolicyEvent` callback family without
-touching `ProcessEvent`, UE internals, object identity, or pointer-derived data. Its
-default config is safe-disabled and cluster-scoped. It is not part of the first release
-scope or the default top-level build; build it only when explicitly investigating
+touching `ProcessEvent`, UE internals, object identity, or pointer-derived data.
+`oChatLogger` demonstrates the minimal copied `ChatMessageEvent` surface by logging only
+event metadata and copied message size, not player identity or raw chat payload text.
+Their default configs are safe-disabled and cluster-scoped. They are not part of the first
+release scope or the default top-level build; build them only when explicitly investigating
 experimental examples:
 
 ```bash
 cmake -S . -B build -DOBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON
-cmake --build build --target oPolicyAudit -j"$(nproc)"
+cmake --build build --target oPolicyAudit oChatLogger -j"$(nproc)"
 ```
 
 ```json
@@ -38,6 +40,19 @@ cmake --build build --target oPolicyAudit -j"$(nproc)"
     "enabled": false,
     "event_kind_mask": 255,
     "log_limit": 10
+  }
+}
+```
+
+`oChatLogger` config:
+
+```json
+{
+  "enabled": false,
+  "allow_all_instances": false,
+  "instance_allowlist": [],
+  "chat_logger": {
+    "log_limit": 5
   }
 }
 ```

@@ -96,6 +96,7 @@ set_target_properties(obelisk PROPERTIES INSTALL_RPATH "\$ORIGIN")
 add_subdirectory(plugins/oBaseEvents)
 if(OBELISK_BUILD_EXPERIMENTAL_PLUGINS)
     add_subdirectory(plugins/oPolicyAudit)
+    add_subdirectory(plugins/oChatLogger)
 endif()
 add_subdirectory(tests/sdk_consumer)
 

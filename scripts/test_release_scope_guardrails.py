@@ -142,6 +142,48 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             with self.subTest(file="README.md", item=item):
                 self.assertIn(item, readme)
 
+    def test_chat_message_event_release_docs_keep_rc_boundary_explicit(self) -> None:
+        release = read("docs/RELEASE.md")
+        status = read("docs/STATUS.md")
+
+        required_release_items = [
+            "`ChatMessageEvent` as a minimal v0.1-rc chat plugin event ABI",
+            "copied UTF-8 message\n  text, send mode, copied-payload flag, and process-local sequence only",
+            "not a command SDK,\n  chat send/moderation API, sender identity API, UE lookup path, mutation surface, or\n  return-override authority",
+            "accepted `chat-message-intake` second-source comparison",
+            "The runtime producer\nexists behind observer-debug gates, SHA, marker, and positive dispatch budget",
+            "isolated\n`arkserver2` delivery validation is still required",
+        ]
+        required_status_items = [
+            "ChatMessageEvent | v0.1-rc SDK ABI surface",
+            "Minimal copied UTF-8 chat notification contract for plugins that parse text locally",
+            "sender/player identity, resource identity, raw `FString`, raw params, FName/GObjects indices, UE pointers, chat send/moderation/blocking, command routing, mutation, and return overrides remain blocked",
+            "The target layout now has accepted second-source evidence",
+            "isolated debug-server delivery validation is still pending",
+        ]
+        forbidden_claims = [
+            "ChatMessageEvent | Promoted v0.1 SDK surface",
+            "ChatMessageEvent | Stable baseline",
+            "ChatMessageEvent` as a promoted v0.1 chat plugin event ABI",
+            "ChatMessageEvent` as a stable chat plugin event ABI",
+            "promotes a command SDK",
+            "promotes sender/player identity",
+            "promotes chat send/moderation",
+            "live debug delivery validated",
+            "end-to-end public milestone claim",
+        ]
+
+        for item in required_release_items:
+            with self.subTest(file="docs/RELEASE.md", item=item):
+                self.assertIn(item, release)
+        for item in required_status_items:
+            with self.subTest(file="docs/STATUS.md", item=item):
+                self.assertIn(item, status)
+        for item in forbidden_claims:
+            for path, text in (("docs/RELEASE.md", release), ("docs/STATUS.md", status)):
+                with self.subTest(file=path, item=item):
+                    self.assertNotIn(item, text)
+
     def test_release_readiness_is_the_documented_release_gate(self) -> None:
         release = read("docs/RELEASE.md")
         pr_template = read(".github/pull_request_template.md")
@@ -245,7 +287,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertNotIn("--map Ragnarok --instance arkserver", release)
         self.assertIn("--map <map> --instance <instance-id>", release)
 
-    def test_experimental_policy_audit_plugin_stays_out_of_release_scope(self) -> None:
+    def test_experimental_plugins_stay_out_of_release_scope(self) -> None:
         cmake = read("CMakeLists.txt")
         architecture = read("docs/PLUGIN_ARCHITECTURE.md")
         status = read("docs/STATUS.md")
@@ -262,12 +304,14 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             re.compile(
                 r"if\(OBELISK_BUILD_EXPERIMENTAL_PLUGINS\)\s+"
                 r"add_subdirectory\(plugins/oPolicyAudit\)\s+"
+                r"add_subdirectory\(plugins/oChatLogger\)\s+"
                 r"endif\(\)",
                 re.M,
             ),
         )
         for text in (architecture, status, release, plugins_readme):
             self.assertIn("oPolicyAudit", text)
+            self.assertIn("oChatLogger", text)
             self.assertIn("OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON", text)
         self.assertIn("Experimental Examples", plugins_readme)
         self.assertIn("Excluded unless `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`", architecture)

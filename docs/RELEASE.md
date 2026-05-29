@@ -40,7 +40,7 @@ Excluded:
 - `ResourceHandle`, GNames/GObjects promotion, public Inventory SDK, public
   `StructureEvents`, command SDKs, chat APIs beyond `ChatMessageEvent`, and
   player/tribe/dino/buff/mission/transfer APIs.
-- Experimental first-party plugins such as `oPolicyAudit`, which require
+- Experimental first-party plugins such as `oPolicyAudit` and `oChatLogger`, which require
   `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON` and are not published by the release gate.
 - Gameplay mutation, return overrides, arbitrary UE4 function calls, and public
   `CallProcessEvent`-based plugin behavior.

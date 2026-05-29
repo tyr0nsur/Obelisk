@@ -12,14 +12,16 @@ plugins/
   README.md
   oBaseEvents/
   oPolicyAudit/
+  oChatLogger/
 ```
 
 `oBaseEvents` is the first official plugin planned for release. Keep it small and focused
 on teaching the plugin model.
 
 `oPolicyAudit` is an experimental first-party example for `GameplayPolicyEvent`
-descriptors and callbacks. It is excluded from the default build and release scope unless
-`OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`.
+descriptors and callbacks. `oChatLogger` is an experimental first-party smoke test for
+minimal `ChatMessageEvent` delivery. They are excluded from the default build and release
+scope unless `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`.
 
 ## Plugin Categories
 
@@ -27,6 +29,7 @@ descriptors and callbacks. It is excluded from the default build and release sco
 | --- | --- | --- | --- |
 | `oBaseEvents` | Official reference plugin for event/config/lifecycle patterns. | Built by default. | Published with `scripts/install_obelisk_plugin.sh`; activation remains config and instance gated. |
 | `oPolicyAudit` | Experimental example for copied `GameplayPolicyEvent` auditing. | Excluded unless `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`. | Do not publish as part of the first release; install only for isolated tests. |
+| `oChatLogger` | Experimental example for copied `ChatMessageEvent` smoke validation. | Excluded unless `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`. | Log metadata and copied message size only; do not log player identity or raw chat text during validation. |
 | research branches | Probes and prototype integrations. | Excluded from top-level build by default. | Do not install into `plugins/` except isolated tests. |
 | stable plugin directories | Operational plugins with documented config, tests, and rollback. | Eligible for top-level build after review. | Instance-gated rollout only. |
 
