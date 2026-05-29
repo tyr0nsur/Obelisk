@@ -41,8 +41,14 @@ def is_relative_to(path: Path, parent: Path) -> bool:
 
 
 def is_approved_offline_workspace_path(path: Path) -> bool:
+    expanded = path.expanduser()
     resolved = path.resolve()
-    return any(is_relative_to(resolved, root.resolve()) for root in APPROVED_OFFLINE_WORKSPACE_ROOTS)
+    return any(
+        expanded.is_absolute()
+        and is_relative_to(expanded, root)
+        and is_relative_to(resolved, root.resolve())
+        for root in APPROVED_OFFLINE_WORKSPACE_ROOTS
+    )
 
 
 def reject_protected_input_path(path: Path, label: str) -> Path:
@@ -50,7 +56,7 @@ def reject_protected_input_path(path: Path, label: str) -> Path:
     if expanded.is_absolute() and is_relative_to(expanded, SERVER_ROOT) and not is_approved_offline_workspace_path(expanded):
         raise SystemExit(f"{label} must not read from protected server root {SERVER_ROOT}: {expanded}")
     resolved = expanded.resolve()
-    if is_relative_to(resolved, SERVER_ROOT.resolve()) and not is_approved_offline_workspace_path(resolved):
+    if is_relative_to(resolved, SERVER_ROOT.resolve()) and not is_approved_offline_workspace_path(expanded):
         raise SystemExit(f"{label} must not read from protected server root {SERVER_ROOT}: {resolved}")
     return resolved
 
@@ -60,9 +66,19 @@ def reject_protected_output_path(path: Path, label: str) -> Path:
     if expanded.is_absolute() and is_relative_to(expanded, SERVER_ROOT) and not is_approved_offline_workspace_path(expanded):
         raise SystemExit(f"{label} must not write under protected server root {SERVER_ROOT}: {expanded}")
     resolved = expanded.resolve()
-    if is_relative_to(resolved, SERVER_ROOT.resolve()) and not is_approved_offline_workspace_path(resolved):
+    if is_relative_to(resolved, SERVER_ROOT.resolve()) and not is_approved_offline_workspace_path(expanded):
         raise SystemExit(f"{label} must not write under protected server root {SERVER_ROOT}: {resolved}")
     return resolved
+
+
+def reject_preexisting_symlink_outputs(path: Path, label: str) -> None:
+    if path.is_symlink():
+        raise SystemExit(f"{label} must not contain pre-existing symlink output: {path}")
+    if not path.exists():
+        return
+    for child in path.rglob("*"):
+        if child.is_symlink():
+            raise SystemExit(f"{label} must not contain pre-existing symlink output: {child}")
 
 
 def require_ignored_output_path(path: Path, label: str) -> None:
@@ -225,6 +241,7 @@ def main() -> int:
         analyzer = reject_protected_input_path(args.analyzer, "--analyzer")
         output_dir = reject_protected_output_path(args.output_dir, "--output-dir")
         require_ignored_output_path(output_dir, "--output-dir")
+        reject_preexisting_symlink_outputs(output_dir, "--output-dir")
         logs = [reject_protected_input_path(path, "log") for path in args.logs]
     except SystemExit as exc:
         print(str(exc), file=sys.stderr)

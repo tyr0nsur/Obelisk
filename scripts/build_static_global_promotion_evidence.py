@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import shutil
@@ -48,6 +49,7 @@ SEMANTIC_ROLE_KEYWORDS = (
 )
 GOBJECTS_FIELD_NAMES = {"root", "chunks", "count", "serial"}
 FIELD_WINDOW_BLOCKER = "missing_gobjects_coherent_field_window"
+SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 def is_relative_to(path: Path, parent: Path) -> bool:
@@ -845,6 +847,7 @@ def candidate_payload(
     *,
     label: str,
     address: int,
+    binary_sha256: str,
     kind_overrides: dict[str, str],
     segments: list[dict[str, object]],
     sections: list[dict[str, object]],
@@ -897,6 +900,12 @@ def candidate_payload(
             else:
                 blockers.append(FIELD_WINDOW_BLOCKER)
         redacted_field_window = field_window_evidence.get(label)
+        if redacted_field_window is not None:
+            expected_address_sha256 = candidate_address_sha256(binary_sha256, address)
+            if redacted_field_window.get("candidate_address_sha256") != expected_address_sha256:
+                raise SystemExit(
+                    f"field-window evidence candidate address hash mismatch for {label}"
+                )
         if redacted_field_window is not None and FIELD_WINDOW_BLOCKER in blockers:
             blockers = [blocker for blocker in blockers if blocker != FIELD_WINDOW_BLOCKER]
         elif redacted_field_window is None:
@@ -933,6 +942,11 @@ def candidate_payload(
     }
 
 
+def candidate_address_sha256(binary_sha256: str, candidate: int) -> str:
+    material = f"obelisk.fuobjectarray-field-window:{binary_sha256}:0x{candidate:x}"
+    return hashlib.sha256(material.encode("ascii")).hexdigest()
+
+
 def load_fuobjectarray_field_window_evidence(path: Path, binary_sha256: str) -> tuple[str, dict[str, object]]:
     reject_protected_path(path, "--fuobjectarray-field-window-evidence")
     payload = json.loads(path.read_text(encoding="utf-8"))
@@ -951,6 +965,9 @@ def load_fuobjectarray_field_window_evidence(path: Path, binary_sha256: str) -> 
     label = candidate.get("label")
     if not isinstance(label, str) or not label:
         raise SystemExit(f"{path}: field-window evidence candidate label is missing")
+    address_sha256 = candidate.get("address_sha256")
+    if not isinstance(address_sha256, str) or not SHA256_RE.fullmatch(address_sha256):
+        raise SystemExit(f"{path}: field-window evidence candidate address hash is missing")
     window = payload.get("fuobjectarray_window")
     if not isinstance(window, dict):
         raise SystemExit(f"{path}: field-window evidence missing fuobjectarray_window")
@@ -979,6 +996,7 @@ def load_fuobjectarray_field_window_evidence(path: Path, binary_sha256: str) -> 
         "same_base_flow": same_base_flow,
         "required_fields": fields,
         "sources": payload.get("sources"),
+        "candidate_address_sha256": address_sha256,
         "consumption_scope": contract.get("consumption_scope"),
         "clears_blocker": FIELD_WINDOW_BLOCKER,
     }
@@ -1080,6 +1098,7 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         candidate_payload(
             label=label,
             address=address,
+            binary_sha256=binary_sha256,
             kind_overrides=kind_overrides,
             segments=segments,
             sections=sections,

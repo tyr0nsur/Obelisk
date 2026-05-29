@@ -4,24 +4,20 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${REPO_ROOT}"
 
+tmp_dir="$(mktemp -d /tmp/obelisk-run-script-tests.XXXXXX)"
 probe="scripts/test_000_tmp_untracked_probe.py"
-marker="scripts/test_000_tmp_untracked_probe.executed"
+marker="${tmp_dir}/test_000_tmp_untracked_probe.executed"
 shell_probe="scripts/test_999_tmp_unlisted_shell.sh"
-shell_marker="scripts/test_999_tmp_unlisted_shell.executed"
-unknown_stdout="/tmp/obelisk-run-script-tests-unknown.out"
-unknown_stderr="/tmp/obelisk-run-script-tests-unknown.err"
-shell_guard_stdout="/tmp/obelisk-run-script-tests-shell-guard.out"
-shell_guard_stderr="/tmp/obelisk-run-script-tests-shell-guard.err"
+shell_marker="${tmp_dir}/test_999_tmp_unlisted_shell.executed"
+unknown_stdout="${tmp_dir}/unknown.out"
+unknown_stderr="${tmp_dir}/unknown.err"
+shell_guard_stdout="${tmp_dir}/shell-guard.out"
+shell_guard_stderr="${tmp_dir}/shell-guard.err"
 cleanup() {
     rm -f \
         "${probe}" \
-        "${marker}" \
-        "${shell_probe}" \
-        "${shell_marker}" \
-        "${unknown_stdout}" \
-        "${unknown_stderr}" \
-        "${shell_guard_stdout}" \
-        "${shell_guard_stderr}"
+        "${shell_probe}"
+    rm -rf "${tmp_dir}"
 }
 trap cleanup EXIT
 

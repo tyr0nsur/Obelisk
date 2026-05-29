@@ -32,6 +32,11 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def candidate_address_sha256(binary_sha256: str, candidate: int) -> str:
+    material = f"obelisk.fuobjectarray-field-window:{binary_sha256}:0x{candidate:x}"
+    return hashlib.sha256(material.encode("ascii")).hexdigest()
+
+
 def parse_tool_version(value: str) -> tuple[str, str]:
     if "=" not in value:
         raise argparse.ArgumentTypeError("tool version must be NAME=VERSION")
@@ -154,6 +159,7 @@ def build_payload(args: argparse.Namespace) -> dict[str, object]:
             "label": args.candidate_label,
             "kind": "gobjects",
             "address_redacted": True,
+            "address_sha256": candidate_address_sha256(args.binary_sha256, candidate),
         },
         "redaction": {
             "absolute_addresses": "omitted",

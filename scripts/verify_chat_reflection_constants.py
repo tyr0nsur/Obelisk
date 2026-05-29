@@ -692,7 +692,11 @@ def main() -> int:
     else:
         reject_protected_input_path(core, "--core")
 
-    chat_spec = parse_chat_reflection_source(args.chat_reflection_source)
+    chat_reflection_source = reject_protected_input_path(
+        args.chat_reflection_source,
+        "--chat-reflection-source",
+    )
+    chat_spec = parse_chat_reflection_source(chat_reflection_source)
     memory = uobjects.CoreMemory(core)
     try:
         payload = verify_core(
@@ -709,7 +713,7 @@ def main() -> int:
 
     payload = {
         "core": str(core),
-        "chat_reflection_source": str(args.chat_reflection_source),
+        "chat_reflection_source": str(chat_reflection_source),
         **payload,
     }
     if evidence_pack:

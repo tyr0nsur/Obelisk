@@ -971,6 +971,39 @@ class ReflectionEvidencePackBuilderTests(unittest.TestCase):
                 builder.reject_protected_input_path(workspace / "Obelisk.log", "log")
                 builder.reject_protected_output_path(workspace / "pack", "--output-dir")
 
+    def test_rejects_textually_protected_non_workspace_symlink_to_workspace_input(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            protected = root / "server-root"
+            workspace = protected / "workspace-offline"
+            blocked = protected / "obelisk"
+            workspace.mkdir(parents=True)
+            blocked.mkdir()
+            binary = workspace / "ShooterGameServer"
+            binary.write_bytes(b"binary")
+            link = blocked / "ShooterGameServer"
+            link.symlink_to(binary)
+
+            import build_reflection_evidence_pack as builder
+
+            with (
+                mock.patch.object(builder, "SERVER_ROOT", protected),
+                mock.patch.object(builder, "APPROVED_OFFLINE_WORKSPACE_ROOTS", (workspace,)),
+                self.assertRaisesRegex(SystemExit, "--binary must not read from protected server root"),
+            ):
+                builder.reject_protected_input_path(link, "--binary")
+
+    def test_rejects_preexisting_symlink_output_child(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "pack"
+            output_dir.mkdir()
+            (output_dir / "manifest.json").symlink_to("/servidor/ark/obelisk/state/manifest.json")
+
+            import build_reflection_evidence_pack as builder
+
+            with self.assertRaisesRegex(SystemExit, "--output-dir must not contain pre-existing symlink output"):
+                builder.reject_preexisting_symlink_outputs(output_dir, "--output-dir")
+
 
 if __name__ == "__main__":
     unittest.main()

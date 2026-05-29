@@ -307,6 +307,39 @@ class CoreDumpEvidencePackCommandTests(unittest.TestCase):
                 core_pack.reject_protected_input_path(workspace / "core", "--core")
                 core_pack.reject_protected_output_path(workspace / "pack", "--output-dir")
 
+    def test_rejects_textually_protected_non_workspace_symlink_to_workspace_input(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            protected = root / "server-root"
+            workspace = protected / "workspace-offline"
+            blocked = protected / "obelisk"
+            workspace.mkdir(parents=True)
+            blocked.mkdir()
+            binary = workspace / "ShooterGameServer"
+            binary.write_bytes(b"binary")
+            link = blocked / "ShooterGameServer"
+            link.symlink_to(binary)
+
+            with (
+                mock.patch.object(core_pack, "SERVER_ROOT", protected),
+                mock.patch.object(core_pack, "APPROVED_OFFLINE_WORKSPACE_ROOTS", (workspace,)),
+            ):
+                with self.assertRaises(SystemExit) as raised:
+                    core_pack.reject_protected_input_path(link, "--binary")
+
+        self.assertEqual(raised.exception.code, 2)
+
+    def test_rejects_preexisting_symlink_output_child(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "pack"
+            output_dir.mkdir()
+            (output_dir / "gdb-core.txt").symlink_to("/servidor/ark/obelisk/state/gdb-core.txt")
+
+            with self.assertRaises(SystemExit) as raised:
+                core_pack.reject_preexisting_symlink_outputs(output_dir, "--output-dir")
+
+        self.assertEqual(raised.exception.code, 2)
+
     def test_main_marks_allowed_gdb_failure_as_partial(self) -> None:
         result, output_dir = self.run_main_with_gdb_status(1, ["--allow-partial-gdb"])
 

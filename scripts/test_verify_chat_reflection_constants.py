@@ -828,6 +828,39 @@ class VerifyChatReflectionConstantsTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("--evidence-pack must not read from protected server root /servidor/ark", result.stderr)
 
+    def test_cli_rejects_protected_chat_reflection_source_before_open(self) -> None:
+        for source_path in (
+            Path("/servidor/ark/serverfiles/ChatReflection.cpp"),
+            None,
+        ):
+            with self.subTest(source_path=source_path), tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                core = root / "core"
+                core.write_bytes(b"not-a-real-core")
+                candidate = source_path
+                if candidate is None:
+                    candidate = root / "ChatReflection.cpp"
+                    candidate.symlink_to("/servidor/ark/serverfiles/ChatReflection.cpp")
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(SCRIPT_DIR / "verify_chat_reflection_constants.py"),
+                        "--core",
+                        str(core),
+                        "--chat-reflection-source",
+                        str(candidate),
+                    ],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "--chat-reflection-source must not read from protected server root /servidor/ark",
+                result.stderr,
+            )
+
     def test_cli_json_accepts_evidence_pack_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

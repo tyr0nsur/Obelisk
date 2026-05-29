@@ -83,7 +83,12 @@ def write_minimal_static_inputs(root: Path) -> tuple[Path, Path, Path, Path]:
     return binary, programs, sections, objdump
 
 
-def write_redacted_field_window_evidence(path: Path, binary_sha256: str) -> None:
+def write_redacted_field_window_evidence(
+    path: Path,
+    binary_sha256: str,
+    *,
+    candidate_address: int = 0x595B7E0,
+) -> None:
     payload = {
         "schema": build_static_global_promotion_evidence.FUOBJECTARRAY_FIELD_WINDOW_SCHEMA,
         "status": "accepted_internal_static_evidence",
@@ -95,6 +100,10 @@ def write_redacted_field_window_evidence(path: Path, binary_sha256: str) -> None
             "label": "gobjects",
             "kind": "gobjects",
             "address_redacted": True,
+            "address_sha256": build_static_global_promotion_evidence.candidate_address_sha256(
+                binary_sha256,
+                candidate_address,
+            ),
         },
         "sources": {
             "ghidra_stdout": {"artifact_sha256": "a" * 64, "tool": "ghidra", "version": "12.1"},
@@ -1031,6 +1040,38 @@ class StaticGlobalPromotionEvidenceTests(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("field-window evidence binary SHA256 mismatch", result.stderr)
+
+    def test_redacted_field_window_evidence_rejects_candidate_address_hash_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            binary, programs, sections, objdump = write_minimal_static_inputs(root)
+            field_window = root / "fuobjectarray-field-window.json"
+            write_redacted_field_window_evidence(
+                field_window,
+                sha256_file(binary),
+                candidate_address=0x595B7F0,
+            )
+
+            result = self.run_script(
+                "--binary",
+                str(binary),
+                "--candidate",
+                "gobjects=0x595b7e0",
+                "--output-dir",
+                str(root / "pack"),
+                "--readelf-programs",
+                str(programs),
+                "--readelf-sections",
+                str(sections),
+                "--objdump",
+                str(objdump),
+                "--fuobjectarray-field-window-evidence",
+                str(field_window),
+                check=False,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("field-window evidence candidate address hash mismatch", result.stderr)
 
     def test_gobjects_semantics_do_not_weaken_split_window_blocker(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

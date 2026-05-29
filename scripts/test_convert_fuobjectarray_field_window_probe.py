@@ -96,6 +96,7 @@ class ConvertFuObjectArrayFieldWindowProbeTests(unittest.TestCase):
         self.assertEqual(payload["schema"], "obelisk.fuobjectarray-field-window-redacted.v1")
         self.assertTrue(payload["fuobjectarray_window"]["same_base_flow"]["proven"])
         self.assertEqual(payload["candidate"]["label"], "gobjects")
+        self.assertRegex(payload["candidate"]["address_sha256"], r"^[0-9a-f]{64}$")
         self.assertNotIn("0x595b7e0", first)
         self.assertNotIn(str(root), first)
 
