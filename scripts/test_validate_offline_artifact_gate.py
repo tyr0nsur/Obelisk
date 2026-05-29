@@ -1,0 +1,3557 @@
+#!/usr/bin/env python3
+"""Tests for validate_offline_artifact_gate.py."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest import mock
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import validate_offline_artifact_gate as gate
+
+
+BINARY_SHA = "a" * 64
+SNAPSHOT_SCHEMA = "obelisk.ufunction-chain.snapshot.v1"
+
+
+def weak_helper_address_sha(address: str) -> str:
+    return hashlib.sha256(
+        f"obelisk.weak-helper-caller-mode:{gate.WEAK_HELPER_BINARY_SHA256}:{address}".encode("ascii")
+    ).hexdigest()
+
+
+def weak_helper_caller_mode_manifest() -> dict:
+    return {
+        "schema": gate.WEAK_HELPER_CALLER_MODE_SCHEMA,
+        "status": "accepted_internal_static_evidence",
+        "binary": {
+            "sha256": gate.WEAK_HELPER_BINARY_SHA256,
+            "path_redacted": True,
+        },
+        "direct_call_coverage": {
+            "0x1d56b60": {"expected": 4, "observed": 4},
+            "0x1d56c70": {"expected": 6, "observed": 6},
+        },
+        "builder_contract": {
+            "promotion_gate_ready": False,
+            "consumption_scope": "internal_static_research_only",
+            "remaining_blockers": ["static_only_evidence"],
+            "not_promoted": ["ResourceHandle"],
+        },
+        "sources": {
+            "direct_call_counts": {
+                "artifact_sha256": "b" * 64,
+                "tool": "objdump-or-radare2",
+                "version": "5.5.0",
+                "provenance": {
+                    "schema": "obelisk.offline-artifact-provenance.v1",
+                    "verified": True,
+                    "path_redacted": True,
+                    "binary_sha256": gate.WEAK_HELPER_BINARY_SHA256,
+                    "artifact_sha256": "b" * 64,
+                    "sidecar_sha256": "e" * 64,
+                },
+            },
+            "ghidra_stdout": {
+                "artifact_sha256": "c" * 64,
+                "tool": "ghidra",
+                "version": "12.1",
+                "provenance": {
+                    "schema": "obelisk.offline-artifact-provenance.v1",
+                    "verified": True,
+                    "path_redacted": True,
+                    "binary_sha256": gate.WEAK_HELPER_BINARY_SHA256,
+                    "artifact_sha256": "c" * 64,
+                    "sidecar_sha256": "f" * 64,
+                },
+            },
+            "r2_windows": {
+                "artifact_sha256": "d" * 64,
+                "tool": "radare2",
+                "version": "5.5.0",
+                "provenance": {
+                    "schema": "obelisk.offline-artifact-provenance.v1",
+                    "verified": True,
+                    "path_redacted": True,
+                    "binary_sha256": gate.WEAK_HELPER_BINARY_SHA256,
+                    "artifact_sha256": "d" * 64,
+                    "sidecar_sha256": "a" * 64,
+                },
+            },
+        },
+        "required_evidence": [
+            "all_c70_callers_set_allow4000_and_use_nonnull",
+            "b60_callers_are_pairwise_not_validity",
+            "direct_call_count_1d56b60_complete",
+            "direct_call_count_1d56c70_complete",
+            "maybe_pending_ghidra_mode_logic",
+            "maybe_pending_helper_window_present",
+            "r2_has_maybe_pending_flag_logic",
+            "r2_has_stale_flag_logic",
+            "stale_ghidra_pairwise_mode_logic",
+            "stale_helper_window_present",
+        ],
+        "helpers": {
+            "0x1d56b60": {
+                "return_kind": "boolean_like",
+                "mode_args": ["sil", "dl"],
+            },
+            "0x1d56c70": {
+                "return_kind": "uobject_pointer_or_null",
+                "mode_args": ["sil"],
+            },
+        },
+        "callers": [
+            {
+                "helper": "0x1d56c70",
+                "caller_window_count": 6,
+                "mode_args": {"sil": {"source": "const", "value": 1}},
+                "return_use": {"register": "rax", "nonzero_path": "kept_or_valid"},
+            },
+            {
+                "helper": "0x1d56b60",
+                "caller_window_count": 2,
+                "mode_args": {"sil": {"source": "const", "value": 0}, "dl": {"source": "const", "value": 1}},
+                "return_use": {"kind": "pairwise_boolean_comparison"},
+            },
+        ],
+        "caller_rows": [
+            {
+                "helper": "0x1d56c70",
+                "helper_address_sha256": weak_helper_address_sha("0x1d56c70"),
+                "caller_address_sha256": weak_helper_address_sha(caller),
+                "mode_args": {"sil": {"source": "const", "value": 1}},
+                "return_use": {"register": "rax", "nonzero_path": "kept_or_valid"},
+                "source_count": 2,
+                "evidence": ["ghidra", "radare2"],
+                "policy_observation": {
+                    "0x100": "null_always",
+                    "0x4000": "not_rejected_in_observed_sil_1_callers",
+                },
+                "claim_level": "static_caller_mode_candidate",
+                "path_redacted": True,
+                "lifecycle_names": "not_promoted",
+            }
+            for caller in (
+                "0x83a340",
+                "0x83a720",
+                "0x83cde0",
+                "0x9f80f0",
+                "0x1d299b0",
+                "0x1d29a20",
+            )
+        ],
+    }
+
+
+def redacted_signature_manifest(
+    *,
+    target: str = "PrimalItem.AllowEquipItem",
+    signature_count: int = 1,
+    safety_overrides: dict | None = None,
+    target_sets: list[str] | None = None,
+    artifact_hygiene: dict | None = None,
+) -> dict:
+    target_sets = target_sets or []
+    safety = {
+        "artifact_status": "candidate_only",
+        "intended_use": "offline_review_only",
+        "evidence_scope": "redacted_ufunction_signature_metadata",
+        "promotion_ready": False,
+        "signature_count": 1,
+        "zero_param_signature_count": 0,
+        "snapshot_count": 1,
+        "target_set_count": len(target_sets),
+        "missing_target_count": 0,
+        "param_count_total": 2,
+        "copied_scalar_count_total": 1,
+        "copied_scalar_by_kind": {"bool": 1},
+        "redacted_count_total": 1,
+        "redacted_by_reason": {"object_ref": 1},
+        "blocked_count_total": 0,
+        "blocked_by_reason": {},
+        "promotion_blocker_count_total": 2,
+        "promotion_blockers_by_reason": {
+            "function_flags_not_bound_to_exact_target_gate": 1,
+            "property_flags_unknown_bits": 1,
+        },
+        "direction_counts": {"in": 1, "return": 1},
+        "bool_masked_field_count": 0,
+        "unknown_or_blocked_present": False,
+        "not_promoted_surfaces": sorted(gate.REQUIRED_REDACTED_SIGNATURE_NON_PROMOTED_SURFACES),
+    }
+    if safety_overrides:
+        safety.update(safety_overrides)
+    payload = {
+        "schema": gate.REDACTED_UFUNCTION_SIGNATURE_SCHEMA,
+        "snapshot_root": "redacted",
+        "signature_count": signature_count,
+        "snapshot_count": 1,
+        "target_sets": target_sets,
+        "generated_from": {
+            "snapshot_schema": SNAPSHOT_SCHEMA,
+            "input_snapshots": [{"id": "snapshot-0001", "sha256": "d" * 64}],
+        },
+        "missing_targets": [],
+        "non_claims": sorted(gate.REQUIRED_REDACTED_SIGNATURE_NON_CLAIMS),
+        "safety_summary": safety,
+        "signatures": [
+            {
+                "target": target,
+                "source_snapshot": "snapshot-0001",
+                "source_snapshot_sha256": "d" * 64,
+                "signature_status": "candidate-only",
+                "runtime_ready": False,
+                "params": [
+                    {
+                        "name": "toInventory",
+                        "direction": "in",
+                        "type": "redacted_uobject_ref",
+                    },
+                    {
+                        "name": "ReturnValue",
+                        "direction": "return",
+                        "type": "bool",
+                        "promotion_blockers": ["property_flags_unknown_bits"],
+                    },
+                ],
+                "blocked_properties": [],
+                "promotion_blockers": ["function_flags_not_bound_to_exact_target_gate"],
+            }
+        ],
+    }
+    if artifact_hygiene is not None:
+        payload["artifact_hygiene"] = artifact_hygiene
+    return payload
+
+
+def historical_missing_coverage_marker() -> dict:
+    return {
+        "schema": gate.REDACTED_UFUNCTION_ARTIFACT_HYGIENE_SCHEMA,
+        "classification": "historical",
+        "promotion_hygienic": False,
+        "consume_mode_allowed": True,
+        "reason": "missing_target_set_coverage_pre_strict_gate",
+    }
+
+
+def readiness_report_manifest(*, ready: bool = True, include_boundaries: bool = True) -> dict:
+    payload = {
+        "schema": gate.READINESS_REPORT_SCHEMA,
+        "gate_mode": "second_source_promotion",
+        "promotion_gate": {
+            "ready": ready,
+            "ready_scope": "layout_only" if ready else "not_ready",
+            "layout_ready": ready,
+            "promotion_ready": False,
+            "blockers": [],
+        },
+        "totals": {"targets": 1},
+    }
+    if include_boundaries:
+        payload.update(
+            {
+                "evidence_scope": "second_source_layout_evidence_only",
+                "not_promoted_surfaces": sorted(gate.REQUIRED_READINESS_NON_PROMOTED_SURFACES),
+                "non_claims": ["accepted second-source readiness is layout evidence only"],
+            }
+        )
+    return payload
+
+
+def rc_ufunction_second_source_root_manifest(root: Path) -> dict:
+    expected_sources = gate.expected_rc_ufunction_target_sources()
+    assert expected_sources is not None
+    snapshots = []
+    for index, target in enumerate(sorted(expected_sources)):
+        relative_path = f"snapshots/{index:02d}.snapshot.json"
+        snapshot_path = root / relative_path
+        snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+        snapshot_path.write_text(json.dumps({"schema": SNAPSHOT_SCHEMA, "target": target}) + "\n", encoding="utf-8")
+        snapshots.append(
+            {
+                "target": target,
+                "relative_path": relative_path,
+                "snapshot_sha256": gate.sha256_file(snapshot_path),
+                "source_target_sets": sorted(expected_sources[target]),
+                "evidence": {
+                    "ark_binary_sha256": BINARY_SHA,
+                    "artifact_sha256": "d" * 64,
+                    "status": "accepted",
+                },
+            }
+        )
+    return {
+        "schema": gate.RC_UFUNCTION_SECOND_SOURCE_ROOT_SCHEMA,
+        "snapshot_schema": gate.RC_UFUNCTION_SNAPSHOT_SCHEMA,
+        "target_sets": list(gate.RC_UFUNCTION_TARGET_SETS),
+        "target_count": len(snapshots),
+        "snapshots": snapshots,
+        "path_redacted": True,
+        "non_claims": sorted(gate.REQUIRED_RC_UFUNCTION_NON_CLAIMS),
+    }
+
+
+def static_global_promotion_evidence_manifest(*, ready: bool = False) -> dict:
+    return {
+        "schema": gate.STATIC_GLOBAL_PROMOTION_EVIDENCE_SCHEMA,
+        "promotion_gate": {
+            "ready": ready,
+            "blockers": [] if ready else ["static_only_evidence"],
+        },
+        "remaining_blockers": [] if ready else ["static_only_evidence"],
+        "non_claims": ["static_only_evidence"],
+    }
+
+
+def resource_handle_revalidation_evaluator_manifest(*, ready: bool = False) -> dict:
+    return {
+        "schema": gate.RESOURCE_HANDLE_REVALIDATION_EVALUATOR_SCHEMA,
+        "accepted_sample_count": 32,
+        "post_callback_resource_handle_ready": ready,
+        "uobject_flags_validity_semantics_proven": ready,
+        "blockers": [] if ready else ["uobject_flags_validity_semantics_unproven"],
+        "promotion_gate": {
+            "ready": ready,
+            "blockers": [] if ready else ["uobject_flags_validity_semantics_unproven"],
+        },
+    }
+
+
+def resource_handle_serial_scan_manifest(
+    *,
+    include_candidate: bool = True,
+    candidate_flags: int = 0x100,
+    core_path: str = "/tmp/copied-core",
+    core_sha256: str = "b" * 64,
+) -> dict:
+    expected_allow4000 = "reject" if candidate_flags & (0x100 | 0x8000) else "allow_candidate"
+    return {
+        "schema": gate.RESOURCE_HANDLE_SERIAL_SCAN_SCHEMA,
+        "status": "candidate_blocked",
+        "evidence_kind": "internal_offline_scan_candidate",
+        "source_label": "unit-test",
+        "core_path": core_path,
+        "core_sha256": core_sha256,
+        "core_sha256_verified": True,
+        "binary_sha256": BINARY_SHA,
+        "gobjects": "0x595b7e0",
+        "fname_root_slot": "0x5956f30",
+        "scan_limit": 1024,
+        "provenance": {
+            "schema": gate.RESOURCE_HANDLE_SERIAL_SCAN_PROVENANCE_SCHEMA,
+            "producer": "scan_resource_handle_serials.py",
+            "tool_path": "scripts/scan_resource_handle_serials.py",
+            "verified": True,
+            "path_redacted": True,
+            "argv": ["scripts/scan_resource_handle_serials.py", "--core", "<redacted-path>"],
+            "obelisk_commit": "unit-test",
+            "core_sha256_verified": True,
+            "core_sha256": core_sha256,
+            "binary_sha256": BINARY_SHA,
+            "gobjects": "0x595b7e0",
+            "fname_root_slot": "0x5956f30",
+            "scan_limit": 1024,
+        },
+        "metadata": {},
+        "totals": {
+            "objects_read": 1,
+            "serial_nonzero": 1,
+            "membership_pass_count": 1,
+            "flags_any": 1,
+        },
+        "flag_rejection_candidate_samples": [
+            {
+                "index": 0,
+                "serial": 1001,
+                "object_ptr_present": True,
+                "gobjects_membership_pass": True,
+                "flags": candidate_flags,
+                "has_0x100": bool(candidate_flags & 0x100),
+                "has_0x4000": bool(candidate_flags & 0x4000),
+                "has_0x8000": bool(candidate_flags & 0x8000),
+                "policy_result_strict": "reject",
+                "policy_result_allow4000": expected_allow4000,
+            }
+        ]
+        if include_candidate
+        else [],
+        "interpretation": {
+            "item_dword_0x8": "nonzero samples support serial-backed FUObjectItem+0x8 for internal tooling",
+            "uobject_flags_masks": "coherent 0x100/0x4000/0x8000 candidate rejection samples found; semantics still require classification",
+            "public_resource_handle_ready": False,
+        },
+        "consume_gate_expectation": {
+            "schema": gate.RESOURCE_HANDLE_SERIAL_SCAN_CONSUME_GATE_SCHEMA,
+            "consume_ready": True,
+            "promote_ready": False,
+            "blockers": [],
+            "non_claims": sorted(gate.REQUIRED_RESOURCE_HANDLE_SERIAL_SCAN_NON_CLAIMS),
+        },
+    }
+
+
+def resource_handle_serial_scan_manifest_with_core(workspace: Path, **overrides: object) -> dict:
+    core = workspace / "copied-core"
+    core.parent.mkdir(parents=True, exist_ok=True)
+    core.write_bytes(b"offline copied core fixture\n")
+    return resource_handle_serial_scan_manifest(
+        core_path=str(core),
+        core_sha256=gate.sha256_file(core),
+        **overrides,
+    )
+
+
+def uobject_flag_policy_report_manifest(*, promotion_ready: bool = False) -> dict:
+    return {
+        "schema": gate.UOBJECT_FLAG_POLICY_REPORT_SCHEMA,
+        "evidence_kind": "static_negative_equivalent_candidate",
+        "status": "candidate_blocked",
+        "binary": {
+            "sha256": BINARY_SHA,
+            "path_redacted": True,
+        },
+        "promotion_ready": promotion_ready,
+        "post_callback_resource_handle_ready": False,
+        "windows_summary": {
+            "required": sorted(gate.REQUIRED_UOBJECT_FLAG_POLICY_WINDOWS),
+            "observed": [
+                {
+                    "name": name,
+                    "artifact_sha256": "b" * 64,
+                    "byte_count": 128,
+                    "matched_patterns": sorted(gate.REQUIRED_UOBJECT_FLAG_POLICY_WINDOW_PATTERNS[name]),
+                    "path_redacted": True,
+                    "provenance": {
+                        "schema": "obelisk.offline-artifact-provenance.v1",
+                        "binary_sha256": BINARY_SHA,
+                        "artifact_sha256": "b" * 64,
+                        "sidecar_sha256": "d" * 64,
+                        "verified": True,
+                        "path_redacted": True,
+                    },
+                }
+                for name in sorted(gate.REQUIRED_UOBJECT_FLAG_POLICY_WINDOWS)
+            ],
+            "all_required_present": True,
+            "all_required_patterns_present": True,
+        },
+        "weak_helper_caller_mode": {
+            "schema": gate.WEAK_HELPER_CALLER_MODE_SCHEMA,
+            "artifact_sha256": "e" * 64,
+            "promotion_gate_ready": False,
+            "direct_call_coverage": {
+                "0x1d56c70": {
+                    "expected": 6,
+                    "observed": 6,
+                },
+            },
+            "flag_rules": [
+                {"mask": "0x100", "result": "null_always"},
+                {"mask": "0x4000", "result": "null_when_sil_zero"},
+            ],
+            "caller_rows_summary": {
+                "helper": "0x1d56c70",
+                "row_count": 6,
+                "unique_caller_hash_count": 6,
+                "mode_args": {"sil": {"source": "const", "value": 1}},
+                "return_use": {"register": "rax", "nonzero_path": "kept_or_valid"},
+                "source_count": 2,
+                "evidence": ["ghidra", "radare2"],
+                "policy_observation": {
+                    "0x100": "null_always",
+                    "0x4000": "not_rejected_in_observed_sil_1_callers",
+                },
+                "claim_level": "internal_static_caller_mode_candidate",
+                "lifecycle_names": "not_promoted",
+                "path_redacted": True,
+                "caller_rows_sha256": "f" * 64,
+            },
+            "caller_rows_source": {
+                "schema": gate.WEAK_HELPER_CALLER_MODE_SCHEMA,
+                "source_artifact_sha256": "e" * 64,
+                "binary_sha256": BINARY_SHA,
+                "caller_rows_sha256": "f" * 64,
+                "path_redacted": True,
+            },
+        },
+        "remaining_blockers": sorted(gate.REQUIRED_UOBJECT_FLAG_POLICY_BLOCKERS),
+        "non_claims": sorted(gate.REQUIRED_UOBJECT_FLAG_POLICY_NON_CLAIMS),
+    }
+
+
+def uobject_flag_transition_matrix_manifest(*, promotion_ready: bool = False) -> dict:
+    required_windows = sorted(gate.REQUIRED_UOBJECT_FLAG_TRANSITION_WINDOWS)
+    return {
+        "schema": gate.UOBJECT_FLAG_TRANSITION_MATRIX_SCHEMA,
+        "evidence_kind": "static_uobject_plus_0x8_flag_transition_candidate",
+        "status": "candidate_blocked",
+        "binary": {
+            "sha256": BINARY_SHA,
+            "path_redacted": True,
+        },
+        "builder_contract": {
+            "input_kind": "precut_objdump_windows",
+            "matrix_kind": "semantic_helper_windows",
+            "fail_closed": True,
+            "requires_live_server": False,
+            "promotion_ready": promotion_ready,
+            "resource_handle_claim": False,
+            "public_lifecycle_names_assigned": False,
+        },
+        "windows_summary": {
+            "required": required_windows,
+            "optional": ["uobject_100_clear_1d637c8_1d63888"],
+            "observed": [
+                {
+                    "name": name,
+                    "artifact_sha256": "c" * 64,
+                    "byte_count": 128,
+                    "matched_patterns": sorted(gate.REQUIRED_UOBJECT_FLAG_TRANSITION_WINDOW_PATTERNS[name]),
+                    "path_redacted": True,
+                    "provenance": {
+                        "schema": "obelisk.offline-artifact-provenance.v1",
+                        "binary_sha256": BINARY_SHA,
+                        "artifact_sha256": "c" * 64,
+                        "sidecar_sha256": "d" * 64,
+                        "verified": True,
+                        "path_redacted": True,
+                    },
+                }
+                for name in required_windows
+            ],
+            "all_required_present": True,
+            "all_required_patterns_present": True,
+            "groups": {
+                "predicate_windows": ["weak_validity_mode_a30_1d56a30_1d56ae0"],
+                "caller_mode_windows": ["weak_publish_from_uobject_1d56970_1d56a30"],
+                "mutation_windows": ["gc_mark_100_8000_1d18a90_1d18c70"],
+            },
+        },
+        "transition_matrix": {
+            "0x100": {
+                "candidate_only": True,
+                "public_lifecycle_name_assigned": False,
+                "promotion_ready": False,
+                "mask": "0x100",
+                "predicate_windows": ["weak_validity_mode_a30_1d56a30_1d56ae0"],
+                "mutation_windows": ["gc_mark_100_8000_1d18a90_1d18c70"],
+                "remaining_blocker": "candidate_requires_independent_lifecycle_validation",
+            },
+            "0x4000": {
+                "candidate_only": True,
+                "public_lifecycle_name_assigned": False,
+                "promotion_ready": False,
+                "mask": "0x4000",
+                "predicate_windows": ["weak_lookup_strict_c00_1d56c00_1d56c70"],
+                "mutation_windows": ["gobjects_4000_skip_mark_2982920_2982b60"],
+                "remaining_blocker": "candidate_requires_independent_lifecycle_validation",
+            },
+            "0x8000": {
+                "candidate_only": True,
+                "public_lifecycle_name_assigned": False,
+                "promotion_ready": False,
+                "mask": "0x8000",
+                "predicate_windows": [],
+                "mutation_windows": ["gc_mark_100_8000_1d18a90_1d18c70"],
+                "remaining_blocker": "candidate_requires_independent_lifecycle_validation",
+            },
+        },
+        "remaining_blockers": sorted(gate.REQUIRED_UOBJECT_FLAG_TRANSITION_BLOCKERS),
+        "non_claims": sorted(gate.REQUIRED_UOBJECT_FLAG_TRANSITION_NON_CLAIMS),
+    }
+
+
+def uobject_flag_sample_report_manifest(*, promotion_ready: bool = False) -> dict:
+    return {
+        "schema": gate.UOBJECT_FLAG_SAMPLE_REPORT_SCHEMA,
+        "status": "candidate_blocked",
+        "promotion_ready": promotion_ready,
+        "resource_handle_claim": False,
+        "post_callback_resource_handle_ready": False,
+        "binary": {
+            "sha256": BINARY_SHA,
+            "path_redacted": True,
+        },
+        "source_artifacts": [
+            {
+                "schema": gate.UOBJECT_FLAG_TRANSITION_MATRIX_SCHEMA,
+                "artifact_sha256": "b" * 64,
+                "binary_sha256": BINARY_SHA,
+                "path_redacted": True,
+                "consume_gate": {
+                    "schema": gate.SCHEMA,
+                    "status": "accepted",
+                    "mode": "consume",
+                    "gate_sha256": "d" * 64,
+                    "artifact_sha256": "b" * 64,
+                    "binary_sha256": BINARY_SHA,
+                    "blocker_count": 0,
+                    "path_redacted": True,
+                },
+            },
+            {
+                "schema": gate.UOBJECT_FLAG_POLICY_REPORT_SCHEMA,
+                "artifact_sha256": "c" * 64,
+                "binary_sha256": BINARY_SHA,
+                "path_redacted": True,
+                "consume_gate": {
+                    "schema": gate.SCHEMA,
+                    "status": "accepted",
+                    "mode": "consume",
+                    "gate_sha256": "e" * 64,
+                    "artifact_sha256": "c" * 64,
+                    "binary_sha256": BINARY_SHA,
+                    "blocker_count": 0,
+                    "path_redacted": True,
+                },
+            },
+        ],
+        "flag_samples": [
+            {
+                "mask": "0x100",
+                "uobject_field": "+0x8",
+                "sample_kind": "static_policy_and_transition_candidate",
+                "public_lifecycle_name_assigned": False,
+                "promotion_ready": False,
+                "support": ["weak_validity_mode_a30_1d56a30_1d56ae0"],
+            },
+            {
+                "mask": "0x4000",
+                "uobject_field": "+0x8",
+                "sample_kind": "static_policy_and_transition_candidate",
+                "public_lifecycle_name_assigned": False,
+                "promotion_ready": False,
+                "support": ["weak_lookup_strict_c00_1d56c00_1d56c70"],
+            },
+            {
+                "mask": "0x8000",
+                "uobject_field": "+0x8",
+                "sample_kind": "static_transition_candidate",
+                "public_lifecycle_name_assigned": False,
+                "promotion_ready": False,
+                "support": ["gc_mark_100_8000_1d18a90_1d18c70"],
+            },
+        ],
+        "non_claims": sorted(gate.REQUIRED_UOBJECT_FLAG_SAMPLE_NON_CLAIMS),
+        "remaining_blockers": sorted(gate.REQUIRED_UOBJECT_FLAG_SAMPLE_BLOCKERS),
+        "redaction": {
+            "paths": "redacted",
+            "raw_snippets": "omitted",
+            "addresses": "omitted_or_source_artifact_only",
+        },
+    }
+
+
+def uobject_flag_semantic_correlation_manifest(*, promotion_ready: bool = False) -> dict:
+    return {
+        "schema": gate.UOBJECT_FLAG_SEMANTIC_CORRELATION_SCHEMA,
+        "evidence_kind": "static_uobject_flag_semantic_correlation_candidate",
+        "status": "candidate_blocked",
+        "promotion_ready": promotion_ready,
+        "binary": {
+            "sha256": BINARY_SHA,
+            "path_redacted": True,
+        },
+        "builder_contract": {
+            "fail_closed": True,
+            "requires_live_server": False,
+            "promotion_ready": promotion_ready,
+            "resource_handle_claim": False,
+            "public_lifecycle_names_assigned": False,
+            "lookup_promotion": False,
+            "mutation_promotion": False,
+            "return_override_promotion": False,
+        },
+        "source_pack": {
+            "id": "uobject-flag-semantic-decompiler-20260529T155658Z",
+            "sha256": "e" * 64,
+            "path_redacted": True,
+        },
+        "inputs": {
+            "weak_helper_predicates.txt": {
+                "bytes": 128,
+                "sha256": "c" * 64,
+                "path_redacted": True,
+                "provenance": {
+                    "schema": "obelisk.offline-artifact-provenance.v1",
+                    "binary_sha256": BINARY_SHA,
+                    "artifact_sha256": "c" * 64,
+                    "sidecar_sha256": "d" * 64,
+                    "verified": True,
+                    "path_redacted": True,
+                },
+            }
+        },
+        "observations": [
+            {
+                "id": "weak_helper_reject_predicates",
+                "claim_level": "static_observation",
+            }
+        ],
+        "remaining_blockers": sorted(gate.REQUIRED_UOBJECT_FLAG_SEMANTIC_BLOCKERS),
+        "non_claims": sorted(gate.REQUIRED_UOBJECT_FLAG_SEMANTIC_NON_CLAIMS),
+    }
+
+
+def weak_helper_static_polarity_manifest(*, promotion_ready: bool = False) -> dict:
+    return {
+        "schema": gate.WEAK_HELPER_STATIC_POLARITY_REPORT_SCHEMA,
+        "evidence_kind": "static_weak_helper_polarity_candidate",
+        "status": "candidate_blocked",
+        "promotion_ready": promotion_ready,
+        "binary": {
+            "sha256": BINARY_SHA,
+            "path_redacted": True,
+        },
+        "builder_contract": {
+            "fail_closed": True,
+            "requires_live_server": False,
+            "promotion_ready": promotion_ready,
+            "resource_handle_claim": False,
+            "public_lifecycle_names_assigned": False,
+            "lookup_promotion": False,
+            "mutation_promotion": False,
+            "return_override_promotion": False,
+        },
+        "source_pack": {
+            "id": "weak-helper-static-polarity-20260529T170000Z",
+            "sha256": "e" * 64,
+            "path_redacted": True,
+            "provenance": {
+                "schema": "obelisk.offline-artifact-provenance.v1",
+                "binary_sha256": BINARY_SHA,
+                "artifact_sha256": "e" * 64,
+                "sidecar_sha256": "f" * 64,
+                "verified": True,
+                "path_redacted": True,
+            },
+        },
+        "inputs": {
+            "weak_helper_polarity_windows.txt": {
+                "bytes": 128,
+                "sha256": "c" * 64,
+                "path_redacted": True,
+                "provenance": {
+                    "schema": "obelisk.static-artifact-provenance.v1",
+                    "binary_sha256": BINARY_SHA,
+                    "artifact_sha256": "c" * 64,
+                    "sidecar_sha256": "d" * 64,
+                    "verified": True,
+                    "path_redacted": True,
+                },
+            }
+        },
+        "remaining_blockers": sorted(gate.REQUIRED_WEAK_HELPER_STATIC_POLARITY_BLOCKERS),
+        "non_claims": sorted(gate.REQUIRED_WEAK_HELPER_STATIC_POLARITY_NON_CLAIMS),
+    }
+
+
+def weak_helper_polarity_caller_mode_manifest() -> dict:
+    return {
+        "schema": gate.WEAK_HELPER_POLARITY_CALLER_MODE_REPORT_SCHEMA,
+        "status": "candidate_blocked",
+        "consumption_scope": "internal_static_research_only",
+        "binary": {
+            "sha256": BINARY_SHA,
+            "path_redacted": True,
+        },
+        "source_artifacts": {
+            "prior_caller_mode_redacted": {
+                "sha256": "a" * 64,
+                "path_redacted": True,
+            },
+            "semantic_correlation": {
+                "sha256": "b" * 64,
+                "path_redacted": True,
+            },
+            "transition_matrix": {
+                "sha256": "c" * 64,
+                "path_redacted": True,
+            },
+        },
+        "helpers": {
+            "0x1d56a30": {
+                "window": "weak_validity_mode_a30_1d56a30_1d56ae0.txt",
+                "return_kind": "boolean_like_inverted_at_exit",
+                "mode_args": ["sil", "dl"],
+                "flag_rules": [
+                    {"mask": "0x100", "result": "true_before_final_xor_then_inverted_return"},
+                    {"mask": "0x4000", "result": "mode_dependent_when_sil_zero"},
+                ],
+            }
+        },
+        "remaining_blockers": sorted(gate.REQUIRED_WEAK_HELPER_POLARITY_CALLER_MODE_BLOCKERS),
+        "non_claims": sorted(gate.REQUIRED_WEAK_HELPER_POLARITY_CALLER_MODE_NON_CLAIMS),
+    }
+
+
+def write_json(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def args(
+    *,
+    root: Path,
+    protected_root: Path,
+    manifests: list[Path] | None = None,
+    artifacts: list[tuple[str, Path]] | None = None,
+    mode: str = "consume",
+    expected_binary_sha256: str | None = BINARY_SHA,
+    strict_target_set_coverage: bool = False,
+) -> argparse.Namespace:
+    return argparse.Namespace(
+        root=root,
+        protected_root=protected_root,
+        manifest=manifests or [],
+        artifact=artifacts or [],
+        expected_binary_sha256=expected_binary_sha256,
+        mode=mode,
+        strict_target_set_coverage=strict_target_set_coverage,
+        json=True,
+    )
+
+
+class ValidateOfflineArtifactGateTests(unittest.TestCase):
+    def test_accepts_artifact_with_verified_sidecar_under_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            artifact = workspace / "pack" / "artifact.txt"
+            artifact.parent.mkdir(parents=True)
+            artifact.write_text("offline evidence\n", encoding="utf-8")
+            artifact_sha = gate.sha256_file(artifact)
+            write_json(
+                Path(f"{artifact}.provenance.json"),
+                {
+                    "schema": gate.PROVENANCE_SCHEMA,
+                    "verified": True,
+                    "artifact_kind": "objdump",
+                    "producer": "test",
+                    "tool": "objdump",
+                    "binary_sha256": BINARY_SHA,
+                    "artifact_sha256": artifact_sha,
+                    "source_provenance": {},
+                },
+            )
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, artifacts=[("objdump", artifact)]))
+
+        self.assertEqual("accepted", result["status"])
+        self.assertEqual([], result["blockers"])
+        self.assertTrue(result["artifacts"][0]["provenance_verified"])
+        self.assertEqual(artifact_sha, result["artifacts"][0]["sha256"])
+
+    def test_rejects_direct_protected_dump_path_before_existence_check(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            dump = protected / "obelisk" / "dumps" / "core"
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, artifacts=[("core", dump)]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertEqual("blocked", result["status"])
+        self.assertIn("path_text_under_protected_root", reasons)
+
+    def test_rejects_workspace_symlink_resolving_to_live_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            live = protected / "live"
+            live.mkdir(parents=True)
+            workspace.mkdir(parents=True)
+            link = workspace / "linked-live"
+            link.symlink_to(live)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, artifacts=[("linked", link)]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertEqual("blocked", result["status"])
+        self.assertIn("path_not_resolved_under_workspace_root", reasons)
+
+    def test_rejects_live_symlink_even_when_it_resolves_into_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            artifact = workspace / "artifact.txt"
+            artifact.parent.mkdir(parents=True)
+            artifact.write_text("offline evidence\n", encoding="utf-8")
+            live_link = protected / "live-link"
+            live_link.symlink_to(artifact)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, artifacts=[("linked", live_link)]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertEqual("blocked", result["status"])
+        self.assertIn("path_text_under_protected_root", reasons)
+
+    def test_allows_similar_prefix_outside_protected_but_not_as_workspace_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            similar = Path(tmp) / "server-not-live" / "artifact.txt"
+            similar.parent.mkdir(parents=True)
+            similar.write_text("not protected prefix\n", encoding="utf-8")
+
+            path_only = gate.path_blockers(
+                similar,
+                label="similar",
+                workspace_root=workspace,
+                protected_root=protected,
+                require_workspace=False,
+            )
+            artifact_result = gate.build_result(args(root=workspace, protected_root=protected, artifacts=[("similar", similar)]))
+
+        self.assertEqual([], path_only)
+        self.assertIn("path_not_textually_under_workspace_root", {b["reason"] for b in artifact_result["blockers"]})
+
+    def test_rejects_missing_malformed_unverified_and_hash_mismatch_sidecars(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            artifact = workspace / "artifact.txt"
+            artifact.parent.mkdir(parents=True)
+            artifact.write_text("offline evidence\n", encoding="utf-8")
+
+            missing = gate.build_result(args(root=workspace, protected_root=protected, artifacts=[("missing", artifact)]))
+            Path(f"{artifact}.provenance.json").write_text("{", encoding="utf-8")
+            malformed = gate.build_result(args(root=workspace, protected_root=protected, artifacts=[("bad", artifact)]))
+            write_json(
+                Path(f"{artifact}.provenance.json"),
+                {
+                    "schema": gate.PROVENANCE_SCHEMA,
+                    "verified": False,
+                    "binary_sha256": BINARY_SHA,
+                    "artifact_sha256": "b" * 64,
+                },
+            )
+            bad = gate.build_result(args(root=workspace, protected_root=protected, artifacts=[("bad", artifact)]))
+
+        self.assertIn("missing_provenance_sidecar", {b["reason"] for b in missing["blockers"]})
+        self.assertIn("malformed_json", {b["reason"] for b in malformed["blockers"]})
+        bad_reasons = {b["reason"] for b in bad["blockers"]}
+        self.assertIn("provenance_not_verified", bad_reasons)
+        self.assertIn("provenance_artifact_sha256_mismatch", bad_reasons)
+
+    def test_rejects_nested_protected_path_in_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            artifact = workspace / "artifact.txt"
+            artifact.parent.mkdir(parents=True)
+            artifact.write_text("offline evidence\n", encoding="utf-8")
+            write_json(
+                Path(f"{artifact}.provenance.json"),
+                {
+                    "schema": gate.PROVENANCE_SCHEMA,
+                    "verified": True,
+                    "binary_sha256": BINARY_SHA,
+                    "artifact_sha256": gate.sha256_file(artifact),
+                    "source_provenance": {"nested": {"source_path": str(protected / "live" / "objdump.txt")}},
+                },
+            )
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, artifacts=[("objdump", artifact)]))
+
+        self.assertIn("path_text_under_protected_root", {b["reason"] for b in result["blockers"]})
+
+    def test_rejects_protected_path_list_in_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            artifact = workspace / "artifact.txt"
+            artifact.parent.mkdir(parents=True)
+            artifact.write_text("offline evidence\n", encoding="utf-8")
+            write_json(
+                Path(f"{artifact}.provenance.json"),
+                {
+                    "schema": gate.PROVENANCE_SCHEMA,
+                    "verified": True,
+                    "binary_sha256": BINARY_SHA,
+                    "artifact_sha256": gate.sha256_file(artifact),
+                    "source": [str(protected / "live" / "objdump.txt")],
+                },
+            )
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, artifacts=[("objdump", artifact)]))
+
+        self.assertIn("path_text_under_protected_root", {b["reason"] for b in result["blockers"]})
+
+    def test_accepts_complete_core_manifest_and_blocks_partial(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "pack" / "manifest.json"
+            write_json(
+                manifest,
+                {
+                    "schema": "obelisk.core-dump-evidence-pack.v1",
+                    "binary": {"sha256": BINARY_SHA},
+                    "evidence_status": {"status": "complete", "gdb_core_failed": False},
+                    "core": {"path": str(workspace / "core"), "sha256": "c" * 64},
+                },
+            )
+            accepted = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+            write_json(
+                manifest,
+                {
+                    "schema": "obelisk.core-dump-evidence-pack.v1",
+                    "binary": {"sha256": BINARY_SHA},
+                    "evidence_status": {"status": "partial-gdb-failed", "gdb_core_failed": True},
+                },
+            )
+            blocked = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual("accepted", accepted["status"])
+        blocked_reasons = {b["reason"] for b in blocked["blockers"]}
+        self.assertIn("evidence_pack_not_complete", blocked_reasons)
+        self.assertIn("evidence_pack_gdb_core_failed", blocked_reasons)
+
+    def test_blocks_unknown_manifest_schema_before_generic_claims_acceptance(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "pack" / "manifest.json"
+            write_json(
+                manifest,
+                {
+                    "schema": "obelisk.future-unreviewed-artifact.v1",
+                    "promotion_ready": False,
+                    "hidden_live_input": str(protected / "live" / "core"),
+                },
+            )
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("unsupported_manifest_schema", reasons)
+
+    def test_accepts_rc_ufunction_second_source_root_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            root = workspace / "rc-root"
+            manifest = root / "manifest.json"
+            write_json(manifest, rc_ufunction_second_source_root_manifest(root))
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual("accepted", result["status"])
+        self.assertEqual([], result["blockers"])
+        self.assertEqual(gate.RC_UFUNCTION_SECOND_SOURCE_ROOT_SCHEMA, result["manifests"][0]["schema"])
+
+    def test_blocks_rc_ufunction_second_source_root_manifest_hygiene_mismatches(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            root = workspace / "rc-root"
+            manifest = root / "manifest.json"
+            payload = rc_ufunction_second_source_root_manifest(root)
+            payload["target_sets"] = ["minimal-second-source-intake"]
+            payload["target_count"] = payload["target_count"] - 1
+            payload["non_claims"] = []
+            payload["note"] = "copied from /tmp/raw-rc-root"
+            payload["snapshots"][0]["snapshot_sha256"] = "f" * 64
+            payload["snapshots"][1]["relative_path"] = "/tmp/leaked.snapshot.json"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("rc_ufunction_manifest_target_sets_mismatch", reasons)
+        self.assertIn("rc_ufunction_manifest_target_count_mismatch", reasons)
+        self.assertIn("rc_ufunction_manifest_non_claims_missing", reasons)
+        self.assertIn("rc_ufunction_manifest_snapshot_sha256_mismatch", reasons)
+        self.assertIn("rc_ufunction_manifest_snapshot_relative_path_invalid", reasons)
+        self.assertIn("rc_ufunction_manifest_absolute_or_sensitive_path_string", reasons)
+
+    def test_blocks_supported_manifest_hidden_live_path_string(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-policy-report.json"
+            payload = uobject_flag_policy_report_manifest()
+            payload["note"] = str(protected / "live" / "core")
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "manifest_string_under_protected_root",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_supported_manifest_mixed_workspace_and_live_path_string(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-policy-report.json"
+            payload = uobject_flag_policy_report_manifest()
+            payload["note"] = f"workspace={workspace / 'artifact'} live={protected / 'serverfiles' / 'core'}"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "manifest_string_under_protected_root",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_promotion_overclaims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "pack" / "manifest.json"
+            write_json(
+                manifest,
+                {
+                    "schema": "obelisk.gobjects-two-core-manifest.v1",
+                    "public_gobjects_promotion_ready": True,
+                    "promotion_ready": True,
+                    "blockers": ["identity blocked"],
+                },
+            )
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("public_gobjects_promotion_overclaim", reasons)
+        self.assertIn("promotion_ready_with_blockers", reasons)
+
+    def test_blocks_signature_manifest_unredacted_snapshot_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "signatures" / "signatures.json"
+            write_json(
+                manifest,
+                {
+                    "schema": gate.REDACTED_UFUNCTION_SIGNATURE_SCHEMA,
+                    "snapshot_root": str(protected / "live" / "snapshots"),
+                    "signatures": [],
+                },
+            )
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("signature_manifest_unredacted_snapshot_root", reasons)
+        self.assertIn("path_text_under_protected_root", reasons)
+
+    def test_accepts_redacted_signature_manifest_candidate_only_claims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "signatures" / "signatures.json"
+            write_json(manifest, redacted_signature_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual("accepted", result["status"])
+        self.assertEqual([], result["blockers"])
+
+    def test_strict_accepts_builder_target_set_coverage(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "signatures" / "signatures.json"
+            target = "SyntheticOfflineArtifact.Target"
+            target_set = "offline-artifact-hygiene-intake"
+            report = redacted_signature_manifest(
+                target=target,
+                target_sets=[target_set],
+            )
+            report["target_set_coverage"] = {
+                "schema": gate.TARGET_SET_COVERAGE_SCHEMA,
+                "status": "complete",
+                "complete": True,
+                "declared_target_sets": [
+                    {
+                        "name": target_set,
+                        "source": "manifest",
+                        "expected_targets": [target],
+                        "covered_targets": [target],
+                        "missing_targets": [],
+                        "complete": True,
+                    }
+                ],
+                "expected_targets": [target],
+                "emitted_targets": [target],
+                "missing_targets": [],
+                "unexpected_targets": [],
+            }
+            write_json(manifest, report)
+
+            with mock.patch.object(
+                gate,
+                "known_ufunction_target_set_targets",
+                return_value=[target],
+            ):
+                result = gate.build_result(
+                    args(
+                        root=workspace,
+                        protected_root=protected,
+                        manifests=[manifest],
+                        strict_target_set_coverage=True,
+                    )
+                )
+
+        self.assertEqual("accepted", result["status"])
+        self.assertEqual([], result["blockers"])
+
+    def test_strict_blocks_redacted_signature_manifest_missing_target_set_coverage(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "signatures" / "signatures.json"
+            write_json(manifest, redacted_signature_manifest())
+
+            result = gate.build_result(
+                args(
+                    root=workspace,
+                    protected_root=protected,
+                    manifests=[manifest],
+                    strict_target_set_coverage=True,
+                )
+            )
+
+        self.assertIn(
+            "signature_manifest_missing_target_set_coverage",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_consume_blocks_named_signature_manifest_missing_coverage_without_historical_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "signatures" / "signatures.json"
+            payload = redacted_signature_manifest(target_sets=["item-compact-intake"])
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "signature_manifest_missing_target_set_coverage_without_historical_marker",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_consume_accepts_historical_named_signature_manifest_missing_coverage(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "signatures" / "signatures.json"
+            payload = redacted_signature_manifest(
+                target_sets=["item-compact-intake"],
+                artifact_hygiene=historical_missing_coverage_marker(),
+            )
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual("accepted", result["status"])
+        self.assertEqual([], result["blockers"])
+
+    def test_strict_blocks_historical_named_signature_manifest_missing_coverage(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "signatures" / "signatures.json"
+            payload = redacted_signature_manifest(
+                target_sets=["item-compact-intake"],
+                artifact_hygiene=historical_missing_coverage_marker(),
+            )
+            write_json(manifest, payload)
+
+            result = gate.build_result(
+                args(
+                    root=workspace,
+                    protected_root=protected,
+                    manifests=[manifest],
+                    strict_target_set_coverage=True,
+                )
+            )
+
+        self.assertIn(
+            "signature_manifest_missing_target_set_coverage",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_strict_blocks_unknown_target_set_coverage(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "signatures" / "signatures.json"
+            payload = redacted_signature_manifest(safety_overrides={"target_set_count": 1})
+            payload["source_target_sets"] = ["not-a-target-set"]
+            payload["target_set_coverage"] = {
+                "schema": gate.TARGET_SET_COVERAGE_SCHEMA,
+                "status": "complete",
+                "complete": True,
+                "declared_target_sets": [
+                    {
+                        "name": "not-a-target-set",
+                        "source": "snapshot",
+                        "expected_targets": ["PrimalItem.AllowEquipItem"],
+                        "covered_targets": ["PrimalItem.AllowEquipItem"],
+                        "missing_targets": [],
+                        "complete": True,
+                    }
+                ],
+                "expected_targets": ["PrimalItem.AllowEquipItem"],
+                "emitted_targets": ["PrimalItem.AllowEquipItem"],
+                "missing_targets": [],
+                "unexpected_targets": [],
+            }
+            write_json(manifest, payload)
+
+            result = gate.build_result(
+                args(
+                    root=workspace,
+                    protected_root=protected,
+                    manifests=[manifest],
+                    strict_target_set_coverage=True,
+                )
+            )
+
+        self.assertIn(
+            "signature_manifest_unknown_target_set",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_redacted_signature_manifest_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "signatures" / "signatures.json"
+            write_json(manifest, redacted_signature_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        self.assertIn("promote_mode_signature_manifest_candidate_only", {blocker["reason"] for blocker in result["blockers"]})
+
+    def test_blocks_redacted_signature_manifest_summary_count_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "signatures" / "signatures.json"
+            write_json(manifest, redacted_signature_manifest(safety_overrides={"copied_scalar_by_kind": {}}))
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "signature_manifest_safety_summary_count_mismatch",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_redacted_signature_manifest_top_level_snapshot_count_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "signatures" / "signatures.json"
+            payload = redacted_signature_manifest()
+            payload["snapshot_count"] = 2
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "signature_manifest_snapshot_count_mismatch",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_redacted_signature_manifest_target_set_count_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "signatures" / "signatures.json"
+            payload = redacted_signature_manifest()
+            payload["target_sets"] = ["item-compact-intake"]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "signature_manifest_safety_summary_count_mismatch",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_redacted_signature_manifest_invalid_target_sets(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "signatures" / "signatures.json"
+            payload = redacted_signature_manifest()
+            payload["target_sets"] = ["item-compact-intake", ""]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "signature_manifest_target_sets_invalid",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_redacted_signature_manifest_source_snapshot_sha_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "signatures" / "signatures.json"
+            payload = redacted_signature_manifest()
+            payload["signatures"][0]["source_snapshot_sha256"] = "e" * 64
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "signature_manifest_source_snapshot_sha256_mismatch",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_accepts_weak_helper_caller_mode_internal_static_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "weak-helper" / "weak-helper.json"
+            write_json(
+                manifest,
+                {
+                    "schema": gate.WEAK_HELPER_CALLER_MODE_SCHEMA,
+                    "status": "accepted_internal_static_evidence",
+                    "binary": {
+                        "sha256": gate.WEAK_HELPER_BINARY_SHA256,
+                        "path_redacted": True,
+                    },
+                    "direct_call_coverage": {
+                        "0x1d56b60": {"expected": 4, "observed": 4},
+                        "0x1d56c70": {"expected": 6, "observed": 6},
+                    },
+                    "builder_contract": {
+                        "promotion_gate_ready": False,
+                        "consumption_scope": "internal_static_research_only",
+                        "remaining_blockers": ["static_only_evidence"],
+                        "not_promoted": ["ResourceHandle"],
+                    },
+                    "sources": {
+                        "direct_call_counts": {
+                            "artifact_sha256": "b" * 64,
+                            "tool": "objdump-or-radare2",
+                            "version": "5.5.0",
+                            "provenance": {
+                                "schema": "obelisk.offline-artifact-provenance.v1",
+                                "verified": True,
+                                "path_redacted": True,
+                                "binary_sha256": gate.WEAK_HELPER_BINARY_SHA256,
+                                "artifact_sha256": "b" * 64,
+                                "sidecar_sha256": "e" * 64,
+                            },
+                        },
+                        "ghidra_stdout": {
+                            "artifact_sha256": "c" * 64,
+                            "tool": "ghidra",
+                            "version": "12.1",
+                            "provenance": {
+                                "schema": "obelisk.offline-artifact-provenance.v1",
+                                "verified": True,
+                                "path_redacted": True,
+                                "binary_sha256": gate.WEAK_HELPER_BINARY_SHA256,
+                                "artifact_sha256": "c" * 64,
+                                "sidecar_sha256": "f" * 64,
+                            },
+                        },
+                        "r2_windows": {
+                            "artifact_sha256": "d" * 64,
+                            "tool": "radare2",
+                            "version": "5.5.0",
+                            "provenance": {
+                                "schema": "obelisk.offline-artifact-provenance.v1",
+                                "verified": True,
+                                "path_redacted": True,
+                                "binary_sha256": gate.WEAK_HELPER_BINARY_SHA256,
+                                "artifact_sha256": "d" * 64,
+                                "sidecar_sha256": "a" * 64,
+                            },
+                        },
+                    },
+                    "required_evidence": [
+                        "all_c70_callers_set_allow4000_and_use_nonnull",
+                        "b60_callers_are_pairwise_not_validity",
+                        "direct_call_count_1d56b60_complete",
+                        "direct_call_count_1d56c70_complete",
+                        "maybe_pending_ghidra_mode_logic",
+                        "maybe_pending_helper_window_present",
+                        "r2_has_maybe_pending_flag_logic",
+                        "r2_has_stale_flag_logic",
+                        "stale_ghidra_pairwise_mode_logic",
+                        "stale_helper_window_present",
+                    ],
+                    "helpers": {
+                        "0x1d56b60": {
+                            "return_kind": "boolean_like",
+                            "mode_args": ["sil", "dl"],
+                        },
+                        "0x1d56c70": {
+                            "return_kind": "uobject_pointer_or_null",
+                            "mode_args": ["sil"],
+                        },
+                    },
+                    "callers": [
+                        {
+                            "helper": "0x1d56c70",
+                            "caller_window_count": 6,
+                            "mode_args": {"sil": {"source": "const", "value": 1}},
+                            "return_use": {"register": "rax", "nonzero_path": "kept_or_valid"},
+                        },
+                        {
+                            "helper": "0x1d56b60",
+                            "caller_window_count": 2,
+                            "mode_args": {"sil": {"source": "const", "value": 0}, "dl": {"source": "const", "value": 1}},
+                            "return_use": {"kind": "pairwise_boolean_comparison"},
+                        },
+                    ],
+                    "caller_rows": [
+                        {
+                            "helper": "0x1d56c70",
+                            "helper_address_sha256": weak_helper_address_sha("0x1d56c70"),
+                            "caller_address_sha256": weak_helper_address_sha(caller),
+                            "mode_args": {"sil": {"source": "const", "value": 1}},
+                            "return_use": {"register": "rax", "nonzero_path": "kept_or_valid"},
+                            "source_count": 2,
+                            "evidence": ["ghidra", "radare2"],
+                            "policy_observation": {
+                                "0x100": "null_always",
+                                "0x4000": "not_rejected_in_observed_sil_1_callers",
+                            },
+                            "claim_level": "static_caller_mode_candidate",
+                            "path_redacted": True,
+                            "lifecycle_names": "not_promoted",
+                        }
+                        for caller in (
+                            "0x83a340",
+                            "0x83a720",
+                            "0x83cde0",
+                            "0x9f80f0",
+                            "0x1d299b0",
+                            "0x1d29a20",
+                        )
+                    ],
+                },
+            )
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual("accepted", result["status"])
+        self.assertEqual([], result["blockers"])
+
+    def test_blocks_weak_helper_caller_mode_missing_source_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "weak-helper" / "weak-helper.json"
+            write_json(
+                manifest,
+                {
+                    "schema": gate.WEAK_HELPER_CALLER_MODE_SCHEMA,
+                    "status": "accepted_internal_static_evidence",
+                    "binary": {
+                        "sha256": gate.WEAK_HELPER_BINARY_SHA256,
+                        "path_redacted": True,
+                    },
+                    "direct_call_coverage": {
+                        "0x1d56b60": {"expected": 4, "observed": 4},
+                        "0x1d56c70": {"expected": 6, "observed": 6},
+                    },
+                    "builder_contract": {
+                        "promotion_gate_ready": False,
+                        "consumption_scope": "internal_static_research_only",
+                        "remaining_blockers": ["static_only_evidence"],
+                        "not_promoted": ["ResourceHandle"],
+                    },
+                    "sources": {
+                        "direct_call_counts": {
+                            "artifact_sha256": "b" * 64,
+                            "tool": "objdump-or-radare2",
+                            "version": "5.5.0",
+                        },
+                        "ghidra_stdout": {
+                            "artifact_sha256": "c" * 64,
+                            "tool": "ghidra",
+                            "version": "12.1",
+                        },
+                        "r2_windows": {
+                            "artifact_sha256": "d" * 64,
+                            "tool": "radare2",
+                            "version": "5.5.0",
+                        },
+                    },
+                    "required_evidence": [
+                        "all_c70_callers_set_allow4000_and_use_nonnull",
+                        "b60_callers_are_pairwise_not_validity",
+                        "direct_call_count_1d56b60_complete",
+                        "direct_call_count_1d56c70_complete",
+                        "maybe_pending_ghidra_mode_logic",
+                        "maybe_pending_helper_window_present",
+                        "r2_has_maybe_pending_flag_logic",
+                        "r2_has_stale_flag_logic",
+                        "stale_ghidra_pairwise_mode_logic",
+                        "stale_helper_window_present",
+                    ],
+                    "helpers": {
+                        "0x1d56b60": {
+                            "return_kind": "boolean_like",
+                            "mode_args": ["sil", "dl"],
+                        },
+                        "0x1d56c70": {
+                            "return_kind": "uobject_pointer_or_null",
+                            "mode_args": ["sil"],
+                        },
+                    },
+                    "callers": [
+                        {
+                            "helper": "0x1d56c70",
+                            "caller_window_count": 6,
+                            "mode_args": {"sil": {"source": "const", "value": 1}},
+                            "return_use": {"register": "rax", "nonzero_path": "kept_or_valid"},
+                        },
+                        {
+                            "helper": "0x1d56b60",
+                            "caller_window_count": 2,
+                            "mode_args": {"sil": {"source": "const", "value": 0}, "dl": {"source": "const", "value": 1}},
+                            "return_use": {"kind": "pairwise_boolean_comparison"},
+                        },
+                    ],
+                },
+            )
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn("weak_helper_source_ghidra_stdout_provenance_missing", {blocker["reason"] for blocker in result["blockers"]})
+
+    def test_blocks_weak_helper_caller_mode_bad_caller_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "weak-helper" / "weak-helper.json"
+            payload = weak_helper_caller_mode_manifest()
+            row = {
+                "helper": "0x1d56b60",
+                "helper_address_sha256": "not-a-sha",
+                "caller_address_sha256": "c" * 64,
+                "mode_args": {"sil": {"source": "const", "value": 0}},
+                "return_use": {"register": "rax", "nonzero_path": "ResourceHandle lookup ready"},
+                "source_count": 1,
+                "evidence": ["ghidra"],
+                "policy_observation": {"0x100": "pending-kill"},
+                "claim_level": "public_sdk_ready",
+                "path_redacted": False,
+                "lifecycle_names": "destroyed",
+                "source_path": str(workspace / "raw.txt"),
+            }
+            payload["caller_rows"] = [dict(row) for _ in range(6)]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("weak_helper_caller_row_path_present", reasons)
+        self.assertIn("weak_helper_caller_row_helper_mismatch", reasons)
+        self.assertIn("weak_helper_caller_row_helper_sha256_mismatch", reasons)
+        self.assertIn("weak_helper_caller_row_caller_sha256_duplicate", reasons)
+        self.assertIn("weak_helper_caller_row_mode_args_mismatch", reasons)
+        self.assertIn("weak_helper_caller_row_return_use_mismatch", reasons)
+        self.assertIn("weak_helper_caller_row_source_evidence_mismatch", reasons)
+        self.assertIn("weak_helper_caller_row_policy_observation_mismatch", reasons)
+        self.assertIn("weak_helper_caller_row_claim_level_mismatch", reasons)
+        self.assertIn("weak_helper_caller_row_boundary_mismatch", reasons)
+        self.assertIn("weak_helper_caller_row_public_overclaim_resourcehandle", reasons)
+        self.assertIn("weak_helper_caller_row_public_overclaim_lookup_ready", reasons)
+        self.assertIn("weak_helper_ue_lifecycle_name_overclaim", reasons)
+
+    def test_blocks_weak_helper_caller_mode_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "weak-helper" / "weak-helper.json"
+            write_json(
+                manifest,
+                {
+                    "schema": gate.WEAK_HELPER_CALLER_MODE_SCHEMA,
+                    "status": "accepted_internal_static_evidence",
+                    "binary": {
+                        "sha256": gate.WEAK_HELPER_BINARY_SHA256,
+                        "path_redacted": True,
+                    },
+                    "direct_call_coverage": {
+                        "0x1d56b60": {"expected": 4, "observed": 4},
+                        "0x1d56c70": {"expected": 6, "observed": 6},
+                    },
+                    "builder_contract": {
+                        "promotion_gate_ready": False,
+                        "consumption_scope": "internal_static_research_only",
+                        "remaining_blockers": ["static_only_evidence"],
+                        "not_promoted": ["ResourceHandle"],
+                    },
+                },
+            )
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        self.assertIn("promote_mode_weak_helper_internal_static_only", {blocker["reason"] for blocker in result["blockers"]})
+
+    def test_blocks_weak_helper_caller_mode_promotion_overclaims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "weak-helper" / "weak-helper.json"
+            write_json(
+                manifest,
+                {
+                    "schema": gate.WEAK_HELPER_CALLER_MODE_SCHEMA,
+                    "status": "accepted_internal_static_evidence",
+                    "binary": {
+                        "sha256": gate.WEAK_HELPER_BINARY_SHA256,
+                        "path_redacted": False,
+                    },
+                    "direct_call_coverage": {
+                        "0x1d56b60": {"expected": 4, "observed": 3},
+                        "0x1d56c70": {"expected": 6, "observed": 6},
+                    },
+                    "helpers": {"note": "pending-kill"},
+                    "builder_contract": {
+                        "promotion_gate_ready": True,
+                        "consumption_scope": "runtime_ready",
+                        "remaining_blockers": [],
+                        "not_promoted": [],
+                    },
+                },
+            )
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("weak_helper_binary_path_not_redacted", reasons)
+        self.assertIn("weak_helper_direct_call_coverage_incomplete", reasons)
+        self.assertIn("weak_helper_promotion_ready_overclaim", reasons)
+        self.assertIn("weak_helper_consumption_scope_not_internal_static", reasons)
+        self.assertIn("weak_helper_missing_remaining_blockers", reasons)
+        self.assertIn("weak_helper_missing_resourcehandle_nonclaim", reasons)
+        self.assertIn("weak_helper_ue_lifecycle_name_overclaim", reasons)
+
+    def test_blocks_signature_manifest_legacy_absolute_path_strings(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "signatures" / "signatures.json"
+            write_json(
+                manifest,
+                {
+                    "schema": gate.REDACTED_UFUNCTION_SIGNATURE_SCHEMA,
+                    "snapshot_root": "redacted",
+                    "signatures": [
+                        {
+                            "target": "Synthetic.Target",
+                            "source_snapshot": str(protected / "live" / "Target.snapshot.json"),
+                        }
+                    ],
+                },
+            )
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn("path_text_under_protected_root", {blocker["reason"] for blocker in result["blockers"]})
+
+    def test_blocks_signature_manifest_promotion_ready_overclaim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "signatures" / "signatures.json"
+            write_json(
+                manifest,
+                {
+                    "schema": gate.REDACTED_UFUNCTION_SIGNATURE_SCHEMA,
+                    "snapshot_root": "redacted",
+                    "safety_summary": {
+                        "artifact_status": "candidate_only",
+                        "intended_use": "offline_review_only",
+                        "promotion_ready": True,
+                    },
+                    "signatures": [
+                        {
+                            "target": "Synthetic.Target",
+                            "source_snapshot": "snapshot-0001",
+                            "signature_status": "candidate-only",
+                        }
+                    ],
+                },
+            )
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "signature_manifest_promotion_ready_overclaim",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_signature_manifest_signature_status_and_runtime_ready_overclaims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "signatures" / "signatures.json"
+            write_json(
+                manifest,
+                {
+                    "schema": gate.REDACTED_UFUNCTION_SIGNATURE_SCHEMA,
+                    "snapshot_root": "redacted",
+                    "safety_summary": {
+                        "artifact_status": "candidate_only",
+                        "intended_use": "offline_review_only",
+                        "promotion_ready": False,
+                    },
+                    "signatures": [
+                        {
+                            "target": "Synthetic.Target",
+                            "source_snapshot": "snapshot-0001",
+                            "signature_status": "promoted",
+                            "runtime_ready": True,
+                        }
+                    ],
+                },
+            )
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("signature_manifest_signature_status_not_candidate_only", reasons)
+        self.assertIn("signature_manifest_signature_readiness_overclaim", reasons)
+
+    def test_accepts_layout_only_readiness_report_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "readiness.json"
+            write_json(manifest, readiness_report_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual(result["blockers"], [])
+
+    def test_blocks_ready_readiness_report_without_layout_boundaries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "readiness.json"
+            write_json(manifest, readiness_report_manifest(include_boundaries=False))
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("readiness_report_evidence_scope_not_layout_only", reasons)
+        self.assertIn("readiness_report_missing_non_promoted_surfaces", reasons)
+
+    def test_blocks_ready_readiness_report_with_reduced_non_promoted_surfaces(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "readiness.json"
+            payload = readiness_report_manifest()
+            payload["not_promoted_surfaces"] = ["mutation", "object_identity", "public_sdk"]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("readiness_report_missing_non_promoted_surfaces", reasons)
+
+    def test_blocks_ready_readiness_report_without_explicit_promotion_ready_false(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "readiness.json"
+            payload = readiness_report_manifest()
+            del payload["promotion_gate"]["promotion_ready"]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("readiness_report_promotion_ready_not_false", reasons)
+
+    def test_blocks_readiness_report_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "readiness.json"
+            write_json(manifest, readiness_report_manifest())
+
+            result = gate.build_result(
+                args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote")
+            )
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("promote_mode_readiness_report_layout_only", reasons)
+
+    def test_accepts_static_global_promotion_evidence_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "static-global.json"
+            write_json(manifest, static_global_promotion_evidence_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual(result["blockers"], [])
+
+    def test_blocks_static_global_promotion_evidence_in_promote_mode_when_static_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "static-global.json"
+            write_json(manifest, static_global_promotion_evidence_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("promote_mode_static_global_promotion_gate_not_ready", reasons)
+        self.assertIn("promote_mode_static_global_has_blockers", reasons)
+        self.assertIn("promote_mode_static_global_has_remaining_blockers", reasons)
+        self.assertIn("promote_mode_static_global_static_only_evidence", reasons)
+
+    def test_accepts_resource_handle_revalidation_evaluator_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle.json"
+            write_json(manifest, resource_handle_revalidation_evaluator_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual(result["blockers"], [])
+
+    def test_blocks_resource_handle_revalidation_evaluator_in_promote_mode_when_not_ready(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle.json"
+            write_json(manifest, resource_handle_revalidation_evaluator_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("promote_mode_resource_handle_post_callback_not_ready", reasons)
+        self.assertIn("promote_mode_resource_handle_flag_semantics_unproven", reasons)
+        self.assertIn("promote_mode_resource_handle_manifest_has_blockers", reasons)
+        self.assertIn("promote_mode_resource_handle_promotion_gate_not_ready", reasons)
+        self.assertIn("promote_mode_resource_handle_promotion_gate_has_blockers", reasons)
+
+    def test_accepts_resource_handle_serial_scan_with_rejection_candidate_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            write_json(manifest, resource_handle_serial_scan_manifest_with_core(workspace))
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual(result["blockers"], [])
+
+    def test_blocks_resource_handle_serial_scan_missing_candidate_status_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            payload = resource_handle_serial_scan_manifest_with_core(workspace)
+            payload.pop("status")
+            payload.pop("evidence_kind")
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("resource_handle_serial_scan_status_overclaim", reasons)
+        self.assertIn("resource_handle_serial_scan_evidence_kind_overclaim", reasons)
+
+    def test_blocks_resource_handle_serial_scan_missing_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            payload = resource_handle_serial_scan_manifest_with_core(workspace)
+            payload.pop("provenance")
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "resource_handle_serial_scan_provenance_missing",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_resource_handle_serial_scan_bad_provenance_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            payload = resource_handle_serial_scan_manifest_with_core(workspace)
+            payload["provenance"].update(
+                {
+                    "schema": "wrong.schema",
+                    "producer": "other.py",
+                    "tool_path": "scripts/other.py",
+                    "verified": False,
+                    "path_redacted": False,
+                    "argv": "not-a-list",
+                    "core_sha256_verified": False,
+                    "core_sha256": "c" * 64,
+                    "binary_sha256": "d" * 64,
+                    "gobjects": "0x1",
+                    "fname_root_slot": "0x2",
+                    "scan_limit": 7,
+                }
+            )
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("resource_handle_serial_scan_provenance_schema_mismatch", reasons)
+        self.assertIn("resource_handle_serial_scan_provenance_not_verified", reasons)
+        self.assertIn("resource_handle_serial_scan_provenance_path_not_redacted", reasons)
+        self.assertIn("resource_handle_serial_scan_provenance_producer_mismatch", reasons)
+        self.assertIn("resource_handle_serial_scan_provenance_tool_path_mismatch", reasons)
+        self.assertIn("resource_handle_serial_scan_provenance_argv_invalid", reasons)
+        self.assertIn("resource_handle_serial_scan_provenance_core_sha256_not_verified", reasons)
+        self.assertIn("resource_handle_serial_scan_provenance_core_sha256_mismatch", reasons)
+        self.assertIn("resource_handle_serial_scan_provenance_binary_sha256_mismatch", reasons)
+        self.assertIn("resource_handle_serial_scan_provenance_address_mismatch", reasons)
+        self.assertIn("resource_handle_serial_scan_provenance_scan_limit_mismatch", reasons)
+
+    def test_blocks_resource_handle_serial_scan_missing_consume_gate_expectation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            payload = resource_handle_serial_scan_manifest_with_core(workspace)
+            payload.pop("consume_gate_expectation")
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "resource_handle_serial_scan_consume_gate_missing",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_resource_handle_serial_scan_bad_consume_gate_expectation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            payload = resource_handle_serial_scan_manifest_with_core(workspace)
+            payload["consume_gate_expectation"] = {
+                "schema": "wrong.schema",
+                "consume_ready": False,
+                "promote_ready": True,
+                "blockers": ["still_blocked"],
+                "non_claims": [],
+            }
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("resource_handle_serial_scan_consume_gate_schema_mismatch", reasons)
+        self.assertIn("resource_handle_serial_scan_consume_gate_not_ready", reasons)
+        self.assertIn("resource_handle_serial_scan_consume_gate_promote_overclaim", reasons)
+        self.assertIn("resource_handle_serial_scan_consume_gate_has_blockers", reasons)
+        self.assertIn("resource_handle_serial_scan_consume_gate_non_claims_missing", reasons)
+
+    def test_accepts_resource_handle_serial_scan_0x4000_allow_candidate_policy(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            write_json(manifest, resource_handle_serial_scan_manifest_with_core(workspace, candidate_flags=0x4000))
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual(result["blockers"], [])
+
+    def test_accepts_resource_handle_serial_scan_in_temp_with_core_under_approved_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            approved_workspace = protected / "workspace-offline"
+            report_root = Path(tmp) / "reports"
+            report_root.mkdir()
+            manifest = report_root / "resource-handle-serial-scan.json"
+            payload = resource_handle_serial_scan_manifest_with_core(approved_workspace, candidate_flags=0x4000)
+            write_json(manifest, payload)
+
+            with mock.patch.object(gate, "DEFAULT_WORKSPACE_ROOT", approved_workspace):
+                result = gate.build_result(args(root=report_root, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual(result["blockers"], [])
+
+    def test_accepts_resource_handle_serial_scan_0x8000_reject_policy(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            write_json(manifest, resource_handle_serial_scan_manifest_with_core(workspace, candidate_flags=0x8000))
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual(result["blockers"], [])
+
+    def test_blocks_resource_handle_serial_scan_0x4000_reject_policy_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            payload = resource_handle_serial_scan_manifest(candidate_flags=0x4000)
+            payload["flag_rejection_candidate_samples"][0]["policy_result_allow4000"] = "reject"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "resource_handle_serial_scan_candidate_allow4000_policy_mismatch",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_resource_handle_serial_scan_public_handle_ready_overclaim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            payload = resource_handle_serial_scan_manifest()
+            payload["interpretation"]["public_resource_handle_ready"] = True
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "resource_handle_serial_scan_public_handle_overclaim",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_resource_handle_serial_scan_ready_overclaims_anywhere(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            payload = resource_handle_serial_scan_manifest(core_path=str(workspace / "copied-core"))
+            payload["resource_handle_ready"] = True
+            payload["metadata"]["public_resource_handle_ready"] = True
+            payload["interpretation"]["resource_handle_ready"] = True
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        labels = {blocker["label"] for blocker in result["blockers"] if blocker["reason"] == "resource_handle_serial_scan_ready_overclaim"}
+        self.assertTrue(any(label.endswith("$.resource_handle_ready") for label in labels))
+        self.assertTrue(any(label.endswith("$.metadata.public_resource_handle_ready") for label in labels))
+        self.assertTrue(any(label.endswith("$.interpretation.resource_handle_ready") for label in labels))
+
+    def test_blocks_resource_handle_serial_scan_missing_binary_sha256_when_expected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            payload = resource_handle_serial_scan_manifest()
+            payload.pop("binary_sha256")
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "resource_handle_serial_scan_binary_sha256_invalid",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_resource_handle_serial_scan_missing_binary_sha256_without_expected_hash(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            payload = resource_handle_serial_scan_manifest(core_path=str(workspace / "copied-core"))
+            payload.pop("binary_sha256")
+            write_json(manifest, payload)
+
+            result = gate.build_result(
+                args(root=workspace, protected_root=protected, manifests=[manifest], expected_binary_sha256=None)
+            )
+
+        self.assertIn(
+            "resource_handle_serial_scan_binary_sha256_invalid",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_resource_handle_serial_scan_core_hash_self_assertion(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            core = workspace / "copied-core"
+            core.parent.mkdir(parents=True)
+            core.write_bytes(b"different core bytes\n")
+            manifest = workspace / "resource-handle-serial-scan.json"
+            write_json(
+                manifest,
+                resource_handle_serial_scan_manifest(core_path=str(core), core_sha256="b" * 64),
+            )
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "resource_handle_serial_scan_core_sha256_mismatch",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_resource_handle_serial_scan_unreadable_core_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            write_json(manifest, resource_handle_serial_scan_manifest(core_path=str(workspace / "missing-core")))
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "resource_handle_serial_scan_core_path_unreadable",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_resource_handle_serial_scan_core_path_outside_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            write_json(manifest, resource_handle_serial_scan_manifest(core_path=str(Path(tmp) / "copied-core")))
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "path_not_textually_under_workspace_root",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_resource_handle_serial_scan_core_path_relative_traversal(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            write_json(manifest, resource_handle_serial_scan_manifest(core_path="../obelisk/dumps/core"))
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "resource_handle_serial_scan_core_path_invalid",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_resource_handle_serial_scan_core_path_symlink_to_protected_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            outside = protected / "obelisk" / "dumps"
+            outside.mkdir(parents=True)
+            link = workspace / "core-link"
+            link.parent.mkdir(parents=True, exist_ok=True)
+            link.symlink_to(outside / "core")
+            manifest = workspace / "resource-handle-serial-scan.json"
+            write_json(manifest, resource_handle_serial_scan_manifest(core_path=str(link)))
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "path_not_resolved_under_workspace_root",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_resource_handle_serial_scan_totals_contradict_candidates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            payload = resource_handle_serial_scan_manifest(core_path=str(workspace / "copied-core"))
+            payload["totals"] = {
+                "objects_read": 0,
+                "serial_nonzero": 0,
+                "membership_pass_count": 0,
+                "flags_any": 0,
+            }
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "resource_handle_serial_scan_total_contradicts_candidates",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_resource_handle_serial_scan_boolean_numeric_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            payload = resource_handle_serial_scan_manifest(core_path=str(workspace / "copied-core"))
+            payload["totals"]["objects_read"] = True
+            candidate = payload["flag_rejection_candidate_samples"][0]
+            candidate["index"] = True
+            candidate["serial"] = True
+            candidate["flags"] = True
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("resource_handle_serial_scan_total_invalid", reasons)
+        self.assertIn("resource_handle_serial_scan_candidate_index_invalid", reasons)
+        self.assertIn("resource_handle_serial_scan_candidate_serial_invalid", reasons)
+        self.assertIn("resource_handle_serial_scan_candidate_flags_invalid", reasons)
+
+    def test_blocks_resource_handle_serial_scan_nested_ready_overclaims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            payload = resource_handle_serial_scan_manifest_with_core(workspace)
+            payload["consume_gate_expectation"] = {"promote_ready": False}
+            payload["consume_gate_expectation"]["promote_ready"] = True
+            payload["metadata"]["promotion_ready"] = True
+            payload["metadata"]["runtime_ready"] = True
+            payload["interpretation"]["lookup_ready"] = True
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        labels = {blocker["label"] for blocker in result["blockers"] if blocker["reason"] == "resource_handle_serial_scan_ready_overclaim"}
+        self.assertTrue(any(label.endswith("$.consume_gate_expectation.promote_ready") for label in labels))
+        self.assertTrue(any(label.endswith("$.metadata.promotion_ready") for label in labels))
+        self.assertTrue(any(label.endswith("$.metadata.runtime_ready") for label in labels))
+        self.assertTrue(any(label.endswith("$.interpretation.lookup_ready") for label in labels))
+
+    def test_blocks_resource_handle_serial_scan_promoted_status_strings(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            payload = resource_handle_serial_scan_manifest_with_core(workspace)
+            payload["status"] = "promoted"
+            payload["evidence_kind"] = "public_resource_handle_evidence"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("resource_handle_serial_scan_status_overclaim", reasons)
+        self.assertIn("resource_handle_serial_scan_evidence_kind_overclaim", reasons)
+
+    def test_blocks_resource_handle_serial_scan_hidden_protected_path_strings(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            payload = resource_handle_serial_scan_manifest_with_core(workspace)
+            payload["metadata"]["live_input"] = "/servidor/ark/obelisk/dumps/core"
+            payload["interpretation"]["note"] = "../obelisk/dumps/core"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "resource_handle_serial_scan_protected_path_string",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_resource_handle_serial_scan_impossible_totals(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            payload = resource_handle_serial_scan_manifest_with_core(workspace)
+            payload["totals"] = {
+                "objects_read": 1,
+                "serial_nonzero": 2,
+                "membership_pass_count": 2,
+                "flags_any": 2,
+            }
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "resource_handle_serial_scan_total_impossible",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_resource_handle_serial_scan_missing_scan_limit(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            payload = resource_handle_serial_scan_manifest_with_core(workspace)
+            payload.pop("scan_limit")
+            payload["provenance"].pop("scan_limit")
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "resource_handle_serial_scan_scan_limit_invalid",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_resource_handle_serial_scan_objects_read_exceeds_scan_limit(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            payload = resource_handle_serial_scan_manifest_with_core(workspace)
+            payload["scan_limit"] = 1
+            payload["provenance"]["scan_limit"] = 1
+            payload["totals"]["objects_read"] = 2
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "resource_handle_serial_scan_objects_read_exceeds_scan_limit",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_resource_handle_serial_scan_sample_index_outside_scan_limit(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            payload = resource_handle_serial_scan_manifest_with_core(workspace)
+            payload["flag_rejection_candidate_samples"][0]["index"] = payload["scan_limit"]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "resource_handle_serial_scan_candidate_index_out_of_range",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_accepts_resource_handle_serial_scan_sparse_candidate_index_below_scan_limit(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            payload = resource_handle_serial_scan_manifest_with_core(workspace, candidate_flags=0x4000)
+            payload["totals"]["objects_read"] = 1
+            payload["scan_limit"] = 1024
+            payload["provenance"]["scan_limit"] = 1024
+            payload["flag_rejection_candidate_samples"][0]["index"] = 1000
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual(result["blockers"], [])
+
+    def test_blocks_resource_handle_serial_scan_duplicate_candidate_indices(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            payload = resource_handle_serial_scan_manifest_with_core(workspace)
+            payload["totals"]["objects_read"] = 2
+            payload["flag_rejection_candidate_samples"].append(dict(payload["flag_rejection_candidate_samples"][0]))
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "resource_handle_serial_scan_candidate_index_duplicate",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_resource_handle_serial_scan_flags_outside_u32(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            payload = resource_handle_serial_scan_manifest_with_core(workspace)
+            candidate = payload["flag_rejection_candidate_samples"][0]
+            candidate["flags"] = 0x1_0000_0100
+            candidate["has_0x100"] = True
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "resource_handle_serial_scan_candidate_flags_outside_u32",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_resource_handle_serial_scan_without_rejection_candidates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            write_json(manifest, resource_handle_serial_scan_manifest(include_candidate=False))
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "resource_handle_serial_scan_missing_rejection_candidates",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_resource_handle_serial_scan_malformed_candidate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            payload = resource_handle_serial_scan_manifest()
+            candidate = payload["flag_rejection_candidate_samples"][0]
+            candidate["serial"] = 0
+            candidate["gobjects_membership_pass"] = False
+            candidate["has_0x100"] = False
+            candidate["policy_result_strict"] = "allow_candidate"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("resource_handle_serial_scan_candidate_serial_invalid", reasons)
+        self.assertIn("resource_handle_serial_scan_candidate_membership_failed", reasons)
+        self.assertIn("resource_handle_serial_scan_candidate_mask_mismatch", reasons)
+        self.assertIn("resource_handle_serial_scan_candidate_strict_policy_not_reject", reasons)
+
+    def test_blocks_resource_handle_serial_scan_binary_sha256_mismatch_without_confusing_core_hash(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            payload = resource_handle_serial_scan_manifest()
+            payload["binary_sha256"] = "c" * 64
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("resource_handle_serial_scan_binary_sha256_mismatch", reasons)
+        self.assertNotIn("resource_handle_serial_scan_core_sha256_mismatch", reasons)
+
+    def test_blocks_resource_handle_serial_scan_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle-serial-scan.json"
+            write_json(manifest, resource_handle_serial_scan_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        self.assertIn(
+            "promote_mode_resource_handle_serial_scan_candidate_only",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_accepts_uobject_flag_policy_candidate_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flags.json"
+            write_json(manifest, uobject_flag_policy_report_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual(result["blockers"], [])
+
+    def test_blocks_uobject_flag_policy_candidate_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flags.json"
+            write_json(manifest, uobject_flag_policy_report_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("promote_mode_uobject_flag_policy_candidate_only", reasons)
+
+    def test_blocks_uobject_flag_policy_overclaims_and_missing_boundaries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flags.json"
+            payload = uobject_flag_policy_report_manifest(promotion_ready=True)
+            payload["post_callback_resource_handle_ready"] = True
+            payload["windows_summary"]["observed"] = payload["windows_summary"]["observed"][:-1]
+            payload["remaining_blockers"] = []
+            payload["non_claims"] = []
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("uobject_flag_policy_promotion_ready_overclaim", reasons)
+        self.assertIn("uobject_flag_policy_post_callback_resourcehandle_overclaim", reasons)
+        self.assertIn("uobject_flag_policy_required_windows_mismatch", reasons)
+        self.assertIn("uobject_flag_policy_remaining_blockers_missing", reasons)
+        self.assertIn("uobject_flag_policy_non_claims_missing", reasons)
+
+    def test_blocks_uobject_flag_policy_incomplete_matched_patterns(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flags.json"
+            payload = uobject_flag_policy_report_manifest()
+            payload["windows_summary"]["observed"][0]["matched_patterns"] = ["gobjects_count_ref"]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "uobject_flag_policy_window_required_patterns_mismatch",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_uobject_flag_policy_extra_matched_patterns(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flags.json"
+            payload = uobject_flag_policy_report_manifest()
+            payload["windows_summary"]["observed"][0]["matched_patterns"].append("legacy_static_negative_marker")
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        blockers = result["blockers"]
+        self.assertIn(
+            "uobject_flag_policy_window_required_patterns_mismatch",
+            {blocker["reason"] for blocker in blockers},
+        )
+        self.assertIn("legacy_static_negative_marker", blockers[0].get("unexpected", []))
+
+    def test_blocks_uobject_flag_policy_non_candidate_status(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flags.json"
+            payload = uobject_flag_policy_report_manifest()
+            payload["status"] = "accepted"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "uobject_flag_policy_status_not_candidate_blocked",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_uobject_flag_policy_resourcehandle_ready_overclaim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flags.json"
+            payload = uobject_flag_policy_report_manifest()
+            payload["resource_handle_ready"] = True
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "uobject_flag_policy_readiness_overclaim",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_uobject_flag_policy_missing_weak_helper_caller_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flags.json"
+            payload = uobject_flag_policy_report_manifest()
+            del payload["weak_helper_caller_mode"]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "uobject_flag_policy_missing_weak_helper_caller_mode",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_uobject_flag_policy_bad_caller_rows_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flags.json"
+            payload = uobject_flag_policy_report_manifest()
+            summary = payload["weak_helper_caller_mode"]["caller_rows_summary"]
+            source = payload["weak_helper_caller_mode"]["caller_rows_source"]
+            summary["row_count"] = 5
+            summary["return_use"] = {"register": "rax", "nonzero_path": "ResourceHandle lookup ready"}
+            summary["lifecycle_names"] = "pending-kill"
+            summary["source_path"] = "/tmp/raw-ghidra.txt"
+            source["source_artifact_sha256"] = "0" * 64
+            source["caller_rows_sha256"] = "1" * 64
+            source["binary_sha256"] = "2" * 64
+            source["artifact_path"] = "/tmp/weak-helper.json"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("uobject_flag_policy_caller_rows_summary_unexpected_fields", reasons)
+        self.assertIn("uobject_flag_policy_caller_rows_summary_row_count_mismatch", reasons)
+        self.assertIn("uobject_flag_policy_caller_rows_summary_return_use_mismatch", reasons)
+        self.assertIn("uobject_flag_policy_caller_rows_summary_lifecycle_names_mismatch", reasons)
+        self.assertIn("uobject_flag_policy_caller_rows_summary_public_overclaim_resourcehandle", reasons)
+        self.assertIn("uobject_flag_policy_caller_rows_summary_public_overclaim_lookup_ready", reasons)
+        self.assertIn("uobject_flag_policy_caller_rows_source_unexpected_fields", reasons)
+        self.assertIn("uobject_flag_policy_caller_rows_source_artifact_mismatch", reasons)
+        self.assertIn("uobject_flag_policy_caller_rows_source_binary_mismatch", reasons)
+        self.assertIn("uobject_flag_policy_caller_rows_source_digest_mismatch", reasons)
+        self.assertIn("uobject_flag_policy_ue_lifecycle_name_overclaim", reasons)
+
+    def test_blocks_uobject_flag_policy_duplicate_observed_windows(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flags.json"
+            payload = uobject_flag_policy_report_manifest()
+            payload["windows_summary"]["observed"].append(payload["windows_summary"]["observed"][0])
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "uobject_flag_policy_observed_window_count_mismatch",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_uobject_flag_policy_missing_window_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flags.json"
+            payload = uobject_flag_policy_report_manifest()
+            payload["windows_summary"]["observed"][0].pop("provenance")
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "uobject_flag_policy_window_provenance_missing",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_uobject_flag_policy_incomplete_provenance_record(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flags.json"
+            payload = uobject_flag_policy_report_manifest()
+            provenance = payload["windows_summary"]["observed"][0]["provenance"]
+            provenance["schema"] = "wrong.schema"
+            provenance["artifact_sha256"] = "e" * 64
+            provenance["binary_sha256"] = "f" * 64
+            provenance["sidecar_sha256"] = "not-a-sha"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("uobject_flag_policy_window_provenance_schema_mismatch", reasons)
+        self.assertIn("uobject_flag_policy_window_provenance_artifact_sha256_mismatch", reasons)
+        self.assertIn("uobject_flag_policy_window_provenance_binary_sha256_mismatch", reasons)
+        self.assertIn("uobject_flag_policy_window_provenance_sidecar_sha256_invalid", reasons)
+
+    def test_accepts_uobject_flag_transition_matrix_candidate_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-transition.json"
+            write_json(manifest, uobject_flag_transition_matrix_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual(result["blockers"], [])
+
+    def test_accepts_uobject_flag_transition_matrix_with_optional_clear_window(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-transition.json"
+            payload = uobject_flag_transition_matrix_manifest()
+            optional_window = {
+                "name": "uobject_100_clear_1d637c8_1d63888",
+                "artifact_sha256": "e" * 64,
+                "byte_count": 128,
+                "matched_patterns": sorted(
+                    gate.REQUIRED_UOBJECT_FLAG_TRANSITION_WINDOW_PATTERNS[
+                        "uobject_100_clear_1d637c8_1d63888"
+                    ]
+                ),
+                "path_redacted": True,
+                "provenance": {
+                    "schema": "obelisk.offline-artifact-provenance.v1",
+                    "binary_sha256": BINARY_SHA,
+                    "artifact_sha256": "e" * 64,
+                    "sidecar_sha256": "f" * 64,
+                    "verified": True,
+                    "path_redacted": True,
+                },
+            }
+            payload["windows_summary"]["observed"].append(optional_window)
+            payload["windows_summary"]["groups"]["mutation_windows"].append("uobject_100_clear_1d637c8_1d63888")
+            payload["transition_matrix"]["0x100"]["mutation_windows"].append("uobject_100_clear_1d637c8_1d63888")
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual(result["blockers"], [])
+
+    def test_blocks_uobject_flag_transition_optional_window_reference_without_observed_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-transition.json"
+            payload = uobject_flag_transition_matrix_manifest()
+            payload["transition_matrix"]["0x100"]["mutation_windows"].append("uobject_100_clear_1d637c8_1d63888")
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "uobject_flag_transition_matrix_window_not_observed",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_uobject_flag_transition_optional_window_with_incomplete_patterns(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-transition.json"
+            payload = uobject_flag_transition_matrix_manifest()
+            optional_window = {
+                "name": "uobject_100_clear_1d637c8_1d63888",
+                "artifact_sha256": "e" * 64,
+                "byte_count": 128,
+                "matched_patterns": ["uobject_plus_0x8_operand"],
+                "path_redacted": True,
+                "provenance": {
+                    "schema": "obelisk.offline-artifact-provenance.v1",
+                    "binary_sha256": BINARY_SHA,
+                    "artifact_sha256": "e" * 64,
+                    "sidecar_sha256": "f" * 64,
+                    "verified": True,
+                    "path_redacted": True,
+                },
+            }
+            payload["windows_summary"]["observed"].append(optional_window)
+            payload["windows_summary"]["groups"]["mutation_windows"].append("uobject_100_clear_1d637c8_1d63888")
+            payload["transition_matrix"]["0x100"]["mutation_windows"].append("uobject_100_clear_1d637c8_1d63888")
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "uobject_flag_transition_window_required_patterns_mismatch",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_uobject_flag_transition_unknown_and_duplicate_observed_windows(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-transition.json"
+            payload = uobject_flag_transition_matrix_manifest()
+            payload["windows_summary"]["observed"].append(dict(payload["windows_summary"]["observed"][0]))
+            unknown = dict(payload["windows_summary"]["observed"][0])
+            unknown["name"] = "unknown_window"
+            payload["windows_summary"]["observed"].append(unknown)
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("uobject_flag_transition_observed_window_duplicate", reasons)
+        self.assertIn("uobject_flag_transition_observed_window_unknown", reasons)
+
+    def test_blocks_uobject_flag_transition_matrix_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-transition.json"
+            write_json(manifest, uobject_flag_transition_matrix_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        self.assertIn(
+            "promote_mode_uobject_flag_transition_candidate_only",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_uobject_flag_transition_overclaims_and_missing_boundaries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-transition.json"
+            payload = uobject_flag_transition_matrix_manifest(promotion_ready=True)
+            payload["builder_contract"]["resource_handle_claim"] = True
+            payload["windows_summary"]["observed"] = payload["windows_summary"]["observed"][:-1]
+            payload["windows_summary"]["groups"]["mutation_windows"] = []
+            payload["transition_matrix"]["0x8000"]["predicate_windows"] = ["gc_mark_100_8000_1d18a90_1d18c70"]
+            payload["remaining_blockers"] = []
+            payload["non_claims"] = []
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("uobject_flag_transition_promotion_ready_overclaim", reasons)
+        self.assertIn("uobject_flag_transition_resourcehandle_overclaim", reasons)
+        self.assertIn("uobject_flag_transition_required_windows_mismatch", reasons)
+        self.assertIn("uobject_flag_transition_window_group_empty", reasons)
+        self.assertIn("uobject_flag_transition_8000_predicate_overclaim", reasons)
+        self.assertIn("uobject_flag_transition_remaining_blockers_missing", reasons)
+        self.assertIn("uobject_flag_transition_non_claims_missing", reasons)
+
+    def test_blocks_uobject_flag_transition_lifecycle_name_overclaim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-transition.json"
+            payload = uobject_flag_transition_matrix_manifest()
+            payload["transition_matrix"]["0x100"]["hypothesis"] = "pending-kill lifecycle name"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "uobject_flag_transition_ue_lifecycle_name_overclaim",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_uobject_flag_transition_incomplete_matched_patterns(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-transition.json"
+            payload = uobject_flag_transition_matrix_manifest()
+            payload["windows_summary"]["observed"][0]["matched_patterns"] = ["uobject_plus_0x8_operand"]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "uobject_flag_transition_window_required_patterns_mismatch",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_uobject_flag_transition_incomplete_provenance_record(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-transition.json"
+            payload = uobject_flag_transition_matrix_manifest()
+            provenance = payload["windows_summary"]["observed"][0]["provenance"]
+            provenance["schema"] = "wrong.schema"
+            provenance["artifact_sha256"] = "e" * 64
+            provenance["binary_sha256"] = "f" * 64
+            provenance["sidecar_sha256"] = "not-a-sha"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("uobject_flag_transition_window_provenance_schema_mismatch", reasons)
+        self.assertIn("uobject_flag_transition_window_provenance_artifact_sha256_mismatch", reasons)
+        self.assertIn("uobject_flag_transition_window_provenance_binary_sha256_mismatch", reasons)
+        self.assertIn("uobject_flag_transition_window_provenance_sidecar_sha256_invalid", reasons)
+
+    def test_accepts_uobject_flag_sample_report_candidate_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-samples.json"
+            write_json(manifest, uobject_flag_sample_report_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual(result["blockers"], [])
+
+    def test_blocks_uobject_flag_sample_missing_consume_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-samples.json"
+            payload = uobject_flag_sample_report_manifest()
+            payload["source_artifacts"][0].pop("consume_gate")
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "uobject_flag_sample_source_consume_gate_missing",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_uobject_flag_sample_incomplete_consume_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-samples.json"
+            payload = uobject_flag_sample_report_manifest()
+            consume_gate = payload["source_artifacts"][0]["consume_gate"]
+            consume_gate["schema"] = "wrong.schema"
+            consume_gate["status"] = "blocked"
+            consume_gate["mode"] = "promote"
+            consume_gate["blocker_count"] = 1
+            consume_gate["gate_sha256"] = "not-a-sha"
+            consume_gate["path_redacted"] = False
+            consume_gate["artifact_sha256"] = "e" * 64
+            consume_gate["binary_sha256"] = "f" * 64
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("uobject_flag_sample_source_consume_gate_schema_mismatch", reasons)
+        self.assertIn("uobject_flag_sample_source_consume_gate_status_not_accepted", reasons)
+        self.assertIn("uobject_flag_sample_source_consume_gate_mode_not_consume", reasons)
+        self.assertIn("uobject_flag_sample_source_consume_gate_has_blockers", reasons)
+        self.assertIn("uobject_flag_sample_source_consume_gate_sha256_invalid", reasons)
+        self.assertIn("uobject_flag_sample_source_consume_gate_path_not_redacted", reasons)
+        self.assertIn("uobject_flag_sample_source_consume_gate_artifact_sha256_mismatch", reasons)
+        self.assertIn("uobject_flag_sample_source_consume_gate_binary_sha256_mismatch", reasons)
+
+    def test_blocks_uobject_flag_sample_report_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-samples.json"
+            write_json(manifest, uobject_flag_sample_report_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        self.assertIn(
+            "promote_mode_uobject_flag_sample_candidate_only",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_uobject_flag_sample_report_overclaims_and_missing_boundaries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-samples.json"
+            payload = uobject_flag_sample_report_manifest(promotion_ready=True)
+            payload["resource_handle_claim"] = True
+            payload["post_callback_resource_handle_ready"] = True
+            payload["source_artifacts"][0]["source_path"] = "/tmp/static-window.txt"
+            payload["source_artifacts"][0]["path_redacted"] = False
+            payload["flag_samples"] = payload["flag_samples"][:-1]
+            payload["flag_samples"][0]["sample_kind"] = "runtime_rejected_object"
+            payload["flag_samples"][0]["support"] = ["bad/path"]
+            payload["flag_samples"][0]["public_lifecycle_name_assigned"] = True
+            payload["non_claims"] = []
+            payload["remaining_blockers"] = []
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("uobject_flag_sample_promotion_ready_overclaim", reasons)
+        self.assertIn("uobject_flag_sample_resourcehandle_overclaim", reasons)
+        self.assertIn("uobject_flag_sample_post_callback_ready_overclaim", reasons)
+        self.assertIn("uobject_flag_sample_source_artifact_path_present", reasons)
+        self.assertIn("uobject_flag_sample_source_path_not_redacted", reasons)
+        self.assertIn("uobject_flag_sample_required_masks_missing", reasons)
+        self.assertIn("uobject_flag_sample_kind_invalid", reasons)
+        self.assertIn("uobject_flag_sample_support_invalid", reasons)
+        self.assertIn("uobject_flag_sample_lifecycle_name_overclaim", reasons)
+        self.assertIn("uobject_flag_sample_non_claims_missing", reasons)
+        self.assertIn("uobject_flag_sample_remaining_blockers_missing", reasons)
+
+    def test_blocks_uobject_flag_sample_missing_source_schema_coverage(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-samples.json"
+            payload = uobject_flag_sample_report_manifest()
+            payload["source_artifacts"] = [
+                source
+                for source in payload["source_artifacts"]
+                if source["schema"] == gate.UOBJECT_FLAG_TRANSITION_MATRIX_SCHEMA
+            ]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "uobject_flag_sample_source_schema_coverage_missing",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_uobject_flag_sample_duplicate_mask_entries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-samples.json"
+            payload = uobject_flag_sample_report_manifest()
+            payload["flag_samples"].append(dict(payload["flag_samples"][0]))
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "uobject_flag_sample_mask_cardinality_mismatch",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_uobject_flag_sample_report_lifecycle_name_text_overclaim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-samples.json"
+            payload = uobject_flag_sample_report_manifest()
+            payload["flag_samples"][0]["hypothesis"] = "RF_TagGarbageTemp lifecycle name"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "uobject_flag_sample_ue_lifecycle_name_overclaim",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_uobject_flag_sample_absolute_paths_in_neutral_strings(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-samples.json"
+            payload = uobject_flag_sample_report_manifest()
+            payload["flag_samples"][0]["note"] = "/tmp/static-window.txt"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "uobject_flag_sample_absolute_path_string",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_accepts_uobject_flag_semantic_correlation_candidate_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-semantic.json"
+            write_json(manifest, uobject_flag_semantic_correlation_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual(result["blockers"], [])
+
+    def test_accepts_uobject_flag_semantic_correlation_from_workspace_outside_protected_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = Path(tmp) / "offline-artifacts"
+            manifest = workspace / "uobject-flag-semantic.json"
+            write_json(manifest, uobject_flag_semantic_correlation_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual("accepted", result["status"])
+        self.assertEqual([], result["blockers"])
+
+    def test_blocks_uobject_flag_semantic_correlation_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-semantic.json"
+            write_json(manifest, uobject_flag_semantic_correlation_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        self.assertIn(
+            "promote_mode_uobject_flag_semantic_candidate_only",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_uobject_flag_semantic_correlation_overclaims_and_missing_boundaries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-semantic.json"
+            payload = uobject_flag_semantic_correlation_manifest(promotion_ready=True)
+            payload["builder_contract"]["resource_handle_claim"] = True
+            payload["builder_contract"]["lookup_promotion"] = True
+            payload["source_pack"] = str(workspace / "semantic-pack")
+            payload["inputs"]["weak_helper_predicates.txt"]["path_redacted"] = False
+            payload["inputs"]["weak_helper_predicates.txt"]["provenance"] = {"verified": False}
+            payload["remaining_blockers"] = []
+            payload["non_claims"] = []
+            payload["observations"][0]["hypothesis"] = "pending-kill lifecycle name"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("uobject_flag_semantic_promotion_ready_overclaim", reasons)
+        self.assertIn("uobject_flag_semantic_contract_promotion_ready_overclaim", reasons)
+        self.assertIn("uobject_flag_semantic_resourcehandle_overclaim", reasons)
+        self.assertIn("uobject_flag_semantic_lookup_overclaim", reasons)
+        self.assertIn("uobject_flag_semantic_source_pack_not_redacted", reasons)
+        self.assertIn("uobject_flag_semantic_input_path_not_redacted", reasons)
+        self.assertIn("uobject_flag_semantic_input_provenance_missing", reasons)
+        self.assertIn("uobject_flag_semantic_remaining_blockers_missing", reasons)
+        self.assertIn("uobject_flag_semantic_non_claims_missing", reasons)
+        self.assertIn("uobject_flag_semantic_ue_lifecycle_name_overclaim", reasons)
+
+    def test_blocks_uobject_flag_semantic_source_pack_path_even_outside_protected_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-semantic.json"
+            payload = uobject_flag_semantic_correlation_manifest()
+            payload["source_pack"]["path"] = str(Path(tmp) / "outside-protected" / "semantic-pack")
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("uobject_flag_semantic_source_pack_path_present", reasons)
+
+    def test_blocks_uobject_flag_semantic_source_pack_id_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-semantic.json"
+            payload = uobject_flag_semantic_correlation_manifest()
+            payload["source_pack"]["id"] = "../semantic-pack"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "uobject_flag_semantic_source_pack_id_invalid",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_uobject_flag_semantic_input_names_that_are_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-semantic.json"
+            payload = uobject_flag_semantic_correlation_manifest()
+            payload["inputs"]["../weak_helper_predicates.txt"] = payload["inputs"].pop("weak_helper_predicates.txt")
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("uobject_flag_semantic_input_name_invalid", reasons)
+
+    def test_blocks_uobject_flag_semantic_input_record_path_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-semantic.json"
+            payload = uobject_flag_semantic_correlation_manifest()
+            payload["inputs"]["weak_helper_predicates.txt"]["source_file"] = str(workspace / "raw.txt")
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("uobject_flag_semantic_input_path_present", reasons)
+
+    def test_blocks_uobject_flag_semantic_input_provenance_path_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-semantic.json"
+            payload = uobject_flag_semantic_correlation_manifest()
+            payload["inputs"]["weak_helper_predicates.txt"]["provenance"]["artifact_path"] = str(workspace / "raw.txt")
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("uobject_flag_semantic_input_provenance_path_present", reasons)
+
+    def test_blocks_uobject_flag_semantic_additional_builder_contract_overclaims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-semantic.json"
+            payload = uobject_flag_semantic_correlation_manifest()
+            payload["builder_contract"]["requires_live_server"] = True
+            payload["builder_contract"]["public_lifecycle_names_assigned"] = True
+            payload["builder_contract"]["mutation_promotion"] = True
+            payload["builder_contract"]["return_override_promotion"] = True
+            payload["builder_contract"]["fail_closed"] = False
+            payload["observations"][0]["runtime_ready"] = True
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("uobject_flag_semantic_requires_live_server_overclaim", reasons)
+        self.assertIn("uobject_flag_semantic_lifecycle_name_overclaim", reasons)
+        self.assertIn("uobject_flag_semantic_mutation_overclaim", reasons)
+        self.assertIn("uobject_flag_semantic_return_override_overclaim", reasons)
+        self.assertIn("uobject_flag_semantic_not_fail_closed", reasons)
+        self.assertIn("uobject_flag_semantic_readiness_overclaim", reasons)
+
+    def test_blocks_uobject_flag_semantic_public_overclaims_outside_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-semantic.json"
+            payload = uobject_flag_semantic_correlation_manifest()
+            payload["observations"][0]["claim"] = "ResourceHandle lookup safe for public SDK"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("uobject_flag_semantic_public_overclaim_resourcehandle", reasons)
+        self.assertIn("uobject_flag_semantic_public_overclaim_lookup_safe", reasons)
+        self.assertIn("uobject_flag_semantic_public_overclaim_public_sdk", reasons)
+
+    def test_blocks_current_style_uobject_flag_semantic_correlation_generic_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flag-semantic.json"
+            payload = {
+                "schema": gate.UOBJECT_FLAG_SEMANTIC_CORRELATION_SCHEMA,
+                "binary": {"sha256": BINARY_SHA, "source": "offline copied ShooterGameServer artifact"},
+                "source_pack": str(workspace / "semantic-pack"),
+                "inputs": {"weak_helper_predicates.txt": {"bytes": 128, "sha256": "c" * 64}},
+                "blockers_remaining": ["no coherent runtime negative sample"],
+                "non_claims": sorted(gate.REQUIRED_UOBJECT_FLAG_SEMANTIC_NON_CLAIMS),
+            }
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("uobject_flag_semantic_evidence_kind_mismatch", reasons)
+        self.assertIn("uobject_flag_semantic_status_not_candidate_blocked", reasons)
+        self.assertIn("uobject_flag_semantic_missing_builder_contract", reasons)
+        self.assertIn("uobject_flag_semantic_binary_path_not_redacted", reasons)
+        self.assertIn("uobject_flag_semantic_source_pack_not_redacted", reasons)
+        self.assertIn("uobject_flag_semantic_input_path_not_redacted", reasons)
+        self.assertIn("uobject_flag_semantic_input_provenance_missing", reasons)
+        self.assertIn("uobject_flag_semantic_remaining_blockers_missing", reasons)
+
+    def test_accepts_weak_helper_static_polarity_candidate_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "weak-helper-static-polarity.json"
+            write_json(manifest, weak_helper_static_polarity_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual(result["blockers"], [])
+
+    def test_blocks_weak_helper_static_polarity_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "weak-helper-static-polarity.json"
+            write_json(manifest, weak_helper_static_polarity_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        self.assertIn(
+            "promote_mode_weak_helper_static_polarity_candidate_only",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_weak_helper_static_polarity_overclaims_and_missing_boundaries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "weak-helper-static-polarity.json"
+            payload = weak_helper_static_polarity_manifest(promotion_ready=True)
+            payload["builder_contract"]["resource_handle_claim"] = True
+            payload["builder_contract"]["lookup_promotion"] = True
+            payload["source_pack"]["path"] = str(workspace / "source-pack")
+            payload["inputs"]["weak_helper_polarity_windows.txt"]["path_redacted"] = False
+            payload["inputs"]["weak_helper_polarity_windows.txt"]["provenance"] = {"verified": False}
+            payload["remaining_blockers"] = []
+            payload["non_claims"] = []
+            payload["observations"] = [{"hypothesis": "pending-kill lifecycle name"}]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("weak_helper_static_polarity_promotion_ready_overclaim", reasons)
+        self.assertIn("weak_helper_static_polarity_contract_promotion_ready_overclaim", reasons)
+        self.assertIn("weak_helper_static_polarity_resourcehandle_overclaim", reasons)
+        self.assertIn("weak_helper_static_polarity_lookup_overclaim", reasons)
+        self.assertIn("weak_helper_static_polarity_source_pack_path_present", reasons)
+        self.assertIn("weak_helper_static_polarity_input_path_not_redacted", reasons)
+        self.assertIn("weak_helper_static_polarity_input_provenance_missing", reasons)
+        self.assertIn("weak_helper_static_polarity_remaining_blockers_missing", reasons)
+        self.assertIn("weak_helper_static_polarity_non_claims_missing", reasons)
+        self.assertIn("weak_helper_static_polarity_ue_lifecycle_name_overclaim", reasons)
+
+    def test_blocks_weak_helper_static_polarity_source_pack_id_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "weak-helper-static-polarity.json"
+            payload = weak_helper_static_polarity_manifest()
+            payload["source_pack"]["id"] = str(protected / "live" / "source-pack")
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "weak_helper_static_polarity_source_pack_id_invalid",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_weak_helper_static_polarity_source_and_input_provenance_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "weak-helper-static-polarity.json"
+            payload = weak_helper_static_polarity_manifest()
+            payload["source_pack"]["provenance"]["artifact_sha256"] = "a" * 64
+            payload["inputs"]["weak_helper_polarity_windows.txt"]["provenance"]["binary_sha256"] = "b" * 64
+            payload["inputs"]["weak_helper_polarity_windows.txt"]["provenance"]["sidecar_sha256"] = "not-a-sha"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("weak_helper_static_polarity_source_pack_provenance_artifact_sha256_mismatch", reasons)
+        self.assertIn("weak_helper_static_polarity_input_provenance_binary_sha256_mismatch", reasons)
+        self.assertIn("weak_helper_static_polarity_input_provenance_sidecar_sha256_invalid", reasons)
+
+    def test_accepts_weak_helper_static_polarity_bundled_provenance_schema(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "weak-helper-static-polarity.json"
+            payload = weak_helper_static_polarity_manifest()
+            payload["source_pack"]["provenance"]["schema"] = "obelisk.weak-helper-bundled-artifact-provenance.v1"
+            payload["inputs"]["weak_helper_polarity_windows.txt"]["provenance"][
+                "schema"
+            ] = "obelisk.weak-helper-bundled-artifact-provenance.v1"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual(result["blockers"], [])
+
+    def test_accepts_weak_helper_polarity_caller_mode_candidate_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "weak-helper-polarity-caller-mode.json"
+            write_json(manifest, weak_helper_polarity_caller_mode_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual("accepted", result["status"])
+        self.assertEqual([], result["blockers"])
+
+    def test_blocks_weak_helper_polarity_caller_mode_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "weak-helper-polarity-caller-mode.json"
+            write_json(manifest, weak_helper_polarity_caller_mode_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        self.assertIn(
+            "promote_mode_weak_helper_polarity_caller_mode_candidate_only",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_weak_helper_polarity_caller_mode_source_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "weak-helper-polarity-caller-mode.json"
+            payload = weak_helper_polarity_caller_mode_manifest()
+            payload["source_artifacts"]["semantic_correlation"].pop("path_redacted")
+            payload["source_artifacts"]["semantic_correlation"]["path"] = str(workspace / "semantic.json")
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("weak_helper_polarity_caller_mode_source_artifact_path_present", reasons)
+        self.assertIn("weak_helper_polarity_caller_mode_source_artifact_path_not_redacted", reasons)
+
+    def test_blocks_weak_helper_polarity_caller_mode_missing_candidate_boundaries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "weak-helper-polarity-caller-mode.json"
+            payload = weak_helper_polarity_caller_mode_manifest()
+            payload["status"] = "ready"
+            payload["consumption_scope"] = "public_resource_handle"
+            payload["remaining_blockers"] = []
+            payload["non_claims"] = []
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("weak_helper_polarity_caller_mode_status_not_candidate_blocked", reasons)
+        self.assertIn("weak_helper_polarity_caller_mode_scope_mismatch", reasons)
+        self.assertIn("weak_helper_polarity_caller_mode_remaining_blockers_missing", reasons)
+        self.assertIn("weak_helper_polarity_caller_mode_non_claims_missing", reasons)
+
+    def test_blocks_weak_helper_polarity_caller_mode_public_overclaims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "weak-helper-polarity-caller-mode.json"
+            payload = weak_helper_polarity_caller_mode_manifest()
+            payload["helpers"]["0x1d56a30"]["claim"] = "ResourceHandle lookup ready"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("weak_helper_polarity_caller_mode_public_overclaim_resourcehandle", reasons)
+        self.assertIn("weak_helper_polarity_caller_mode_public_overclaim_lookup_ready", reasons)
+
+    def test_blocks_weak_helper_static_polarity_missing_second_source_blocker(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "weak-helper-static-polarity.json"
+            payload = weak_helper_static_polarity_manifest()
+            payload["remaining_blockers"] = [
+                blocker
+                for blocker in payload["remaining_blockers"]
+                if blocker != "no_second_source_lifecycle_semantics"
+            ]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "weak_helper_static_polarity_remaining_blockers_missing",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()
