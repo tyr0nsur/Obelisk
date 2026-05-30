@@ -43,4 +43,9 @@ namespace Obelisk::UE::TransferReflection
                                                                 const void* function,
                                                                 const void* params,
                                                                 TransferInvocation& out);
+    RuntimeReflection::ReadResult TryCopyBAccept(const RuntimeReflection::MemoryReader& reader,
+                                                 const RuntimeReflection::ReadOptions& options,
+                                                 const void* function,
+                                                 const void* params,
+                                                 bool& outAccepted);
 }

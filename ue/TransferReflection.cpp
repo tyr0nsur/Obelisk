@@ -465,4 +465,42 @@ namespace Obelisk::UE::TransferReflection
         out = std::move(value);
         return RuntimeReflection::ReadResult::Ok();
     }
+
+    RuntimeReflection::ReadResult TryCopyBAccept(const RuntimeReflection::MemoryReader& reader,
+                                                 const RuntimeReflection::ReadOptions& options,
+                                                 const void* function,
+                                                 const void* params,
+                                                 bool& outAccepted)
+    {
+        outAccepted = false;
+        if (!params)
+            return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::InvalidArgument,
+                                                       "null transfer params pointer");
+
+        TransferInvocation invocation;
+        RuntimeReflection::ReadResult result =
+            TryIdentifyTransferInvocation(reader, options, function, params, invocation);
+        if (!result)
+            return result;
+
+        if (invocation.Function != TransferFunction::ServerTransferredPlayerConfirmationResult ||
+            invocation.Fields.size() != 1 ||
+            invocation.Fields[0].Field != TransferField::BAccept ||
+            !invocation.Fields[0].ExposesRange ||
+            invocation.Fields[0].Range.Size != kBoolPropertySize ||
+            !invocation.Fields[0].Range.Data)
+        {
+            return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                       "transfer bAccept copied shape mismatch");
+        }
+
+        uint8_t value = 0;
+        std::memcpy(&value, invocation.Fields[0].Range.Data, sizeof(value));
+        if (value > 1)
+            return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                       "transfer bAccept value is not canonical");
+
+        outAccepted = value != 0;
+        return RuntimeReflection::ReadResult::Ok();
+    }
 }

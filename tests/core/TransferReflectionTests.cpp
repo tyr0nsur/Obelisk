@@ -801,6 +801,74 @@ namespace
         Require(invocation.ParameterSize == 0, "rejected transfer invocation left stale parameter size");
         Require(invocation.Fields.empty(), "rejected transfer invocation left stale fields");
     }
+
+    void TestTryCopyBAccept()
+    {
+        {
+            TransferFixture fixture;
+            BuildConfirmationResult(fixture);
+            fixture.Params[0] = 0;
+
+            bool accepted = true;
+            ReadResult result = TransferReflection::TryCopyBAccept(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                accepted);
+
+            Require(static_cast<bool>(result), result.Reason.c_str());
+            Require(!accepted, "transfer bAccept helper did not copy false");
+        }
+        {
+            TransferFixture fixture;
+            BuildConfirmationResult(fixture);
+            fixture.Params[0] = 1;
+
+            bool accepted = false;
+            ReadResult result = TransferReflection::TryCopyBAccept(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                accepted);
+
+            Require(static_cast<bool>(result), result.Reason.c_str());
+            Require(accepted, "transfer bAccept helper did not copy true");
+        }
+        {
+            TransferFixture fixture;
+            BuildConfirmationResult(fixture);
+
+            bool accepted = true;
+            ReadResult result = TransferReflection::TryCopyBAccept(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                nullptr,
+                accepted);
+
+            Require(result.Status == ReadStatus::InvalidArgument, "transfer bAccept helper accepted null params");
+            Require(!accepted, "transfer bAccept helper left stale output after null params");
+        }
+        {
+            TransferFixture fixture;
+            BuildConfirmationResult(fixture);
+            fixture.Params[0] = 2;
+
+            bool accepted = true;
+            ReadResult result = TransferReflection::TryCopyBAccept(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                accepted);
+
+            Require(result.Status == ReadStatus::Implausible,
+                    "transfer bAccept helper accepted non-canonical bool");
+            Require(!accepted, "transfer bAccept helper left stale output after non-canonical bool");
+        }
+    }
 }
 
 int main()
@@ -817,6 +885,7 @@ int main()
     TestGateRejectsBeforeReading();
     TestRejectsNullAndUnreadableParams();
     TestRejectsClearStaleInvocation();
+    TestTryCopyBAccept();
 
     std::cout << "TransferReflectionTests passed\n";
     return 0;
