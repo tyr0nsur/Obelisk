@@ -31,6 +31,11 @@ namespace Obelisk::Hooks
     void SetProcessEventCallOriginalThrowForTesting(bool enabled);
 }
 
+namespace Obelisk::Core
+{
+    void SetPluginCallbackCleanupFailureForTesting(bool enabled);
+}
+
 namespace
 {
     constexpr const char* kDefaultConfig =
@@ -4280,6 +4285,111 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestUnloadAllRetainsPluginWhenCallbackCleanupFails()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_cleanup_fail");
+        ConfigureEnvironment(root);
+        fs::create_directories(root / "state" / "instances" / "arkserver");
+        setenv("OBELISK_ENABLE_CHAT_EVENTS", "1", 1);
+        {
+            std::ofstream marker(root / "state" / "instances" / "arkserver" / "enable-chat-events");
+            Require(marker.is_open(), "failed to create chat events marker");
+        }
+
+        FakePlugin plugin{.filename = "cleanup_fail.so", .registerChatCallback = true, .captureApi = true};
+        Obelisk::Core::ChatEventDispatcher chatDispatcher;
+        plugin.chatDispatcher = &chatDispatcher;
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader, chatDispatcher);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "cleanup-fail plugin was not initialized");
+        Require(chatDispatcher.SubscriptionCount() == 1, "cleanup-fail plugin chat callback was not registered");
+        const uint64_t ownerTokenRegistrationId =
+            plugin.capturedApi.RegisterChatMessageEventWithOwnerTokenHandle(
+                plugin.initOwnerToken,
+                FakeChatMessageEventCallback,
+                &plugin);
+        Require(ownerTokenRegistrationId != 0, "cleanup-fail plugin owner-token chat callback was not registered");
+        Require(chatDispatcher.SubscriptionCount() == 2,
+                "cleanup-fail plugin owner-token chat callback was not bridged");
+
+        Obelisk::Core::SetPluginCallbackCleanupFailureForTesting(true);
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1, "cleanup-fail plugin shutdown was not called");
+        Require(plugin.closeCalls == 0, "cleanup-fail plugin was closed despite failed callback cleanup");
+        Require(chatDispatcher.SubscriptionCount() == 2,
+                "cleanup-fail plugin callback was removed despite injected cleanup failure");
+        Require(plugin.capturedApi.RegisterChatMessageEventWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    FakeChatMessageEventCallback,
+                    &plugin) == 0,
+                "cleanup-fail retained plugin accepted a new owner-token callback while unloading");
+
+        Obelisk::Core::SetPluginCallbackCleanupFailureForTesting(false);
+        Require(plugin.capturedApi.UnregisterChatMessageEventWithOwnerToken(
+                    plugin.initOwnerToken,
+                    ownerTokenRegistrationId),
+                "cleanup-fail retained plugin owner-token unregister failed");
+        Require(chatDispatcher.SubscriptionCount() == 1,
+                "cleanup-fail retained plugin owner-token unregister did not remove its callback");
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1, "cleanup-fail plugin shutdown was repeated after retained unload retry");
+        Require(plugin.closeCalls == 1, "cleanup-fail plugin was not closed after cleanup retry");
+        Require(plugin.chatSubscriptionsAtClose == 0, "cleanup-fail plugin chat callback was still registered at dlclose");
+        Require(chatDispatcher.SubscriptionCount() == 0, "cleanup-fail plugin callback survived cleanup retry");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestInitFailureRetainsPluginWhenCallbackCleanupFailsAndRetries()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_init_cleanup_fail");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "init_cleanup_fail.so",
+            .initResult = false,
+            .registerChatCallback = true,
+        };
+        Obelisk::Core::ChatEventDispatcher chatDispatcher;
+        plugin.chatDispatcher = &chatDispatcher;
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader, chatDispatcher);
+        Obelisk::Core::SetPluginCallbackCleanupFailureForTesting(true);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "init-cleanup-fail plugin was not initialized");
+        Require(plugin.shutdownCalls == 1, "init-cleanup-fail plugin shutdown was not called after init failure");
+        Require(plugin.closeCalls == 0, "init-cleanup-fail plugin was closed despite failed callback cleanup");
+        Require(chatDispatcher.SubscriptionCount() == 1,
+                "init-cleanup-fail plugin callback was removed despite injected cleanup failure");
+
+        Obelisk::Core::SetPluginCallbackCleanupFailureForTesting(false);
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1, "init-cleanup-fail plugin shutdown was repeated after cleanup retry");
+        Require(plugin.closeCalls == 1, "init-cleanup-fail plugin was not closed after cleanup retry");
+        Require(plugin.chatSubscriptionsAtClose == 0,
+                "init-cleanup-fail plugin chat callback was still registered at dlclose");
+        Require(chatDispatcher.SubscriptionCount() == 0,
+                "init-cleanup-fail plugin callback survived cleanup retry");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestDuplicatePluginIdRejectsSecondPlugin()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_duplicate_id");
@@ -4414,6 +4524,8 @@ int main()
     TestPluginApiMutationDoesNotPoisonLaterPlugins();
     TestUnloadAllContinuesAfterCloseException();
     TestUnloadAllCleansAfterShutdownException();
+    TestUnloadAllRetainsPluginWhenCallbackCleanupFails();
+    TestInitFailureRetainsPluginWhenCallbackCleanupFailsAndRetries();
     TestDuplicatePluginIdRejectsSecondPlugin();
     TestLoadPluginsSkipsAlreadyLoadedPluginId();
 

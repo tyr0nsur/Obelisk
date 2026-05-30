@@ -40,6 +40,7 @@ namespace Obelisk::Core
             void* owner;
             uint64_t ownerToken;
             void (*shutdown)();
+            bool shutdownCalled = false;
         };
 
         std::vector<PluginInfo> m_LoadedPlugins;
@@ -47,7 +48,7 @@ namespace Obelisk::Core
         LibraryLoader* m_Loader;
         ChatEventDispatcher* m_ChatDispatcher;
 
-        void UnregisterPluginCallbacks(const std::string& pluginName, void* owner, const char* reason);
+        bool UnregisterPluginCallbacks(const std::string& pluginName, void* owner, const char* reason);
         bool IsPluginIdLoaded(const std::string& pluginId) const;
     };
 }

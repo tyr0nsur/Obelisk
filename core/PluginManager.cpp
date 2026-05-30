@@ -30,6 +30,7 @@ namespace Obelisk::Core
     {
         thread_local void* g_CurrentPluginOwner = nullptr;
         std::atomic<uint64_t> g_ApiCapabilities{OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS};
+        std::atomic_bool g_ForcePluginCallbackCleanupFailureForTesting{false};
 
         struct GameplayPolicyRegistration
         {
@@ -1941,6 +1942,11 @@ namespace Obelisk::Core
         return *instance;
     }
 
+    void SetPluginCallbackCleanupFailureForTesting(bool enabled)
+    {
+        g_ForcePluginCallbackCleanupFailureForTesting.store(enabled, std::memory_order_release);
+    }
+
     PluginManager::PluginManager()
         : PluginManager(DefaultLoader(), ChatEventDispatcher::Get())
     {
@@ -2020,23 +2026,28 @@ namespace Obelisk::Core
         }
     }
 
-    void PluginManager::UnregisterPluginCallbacks(const std::string& pluginName, void* owner, const char* reason)
+    bool PluginManager::UnregisterPluginCallbacks(const std::string& pluginName, void* owner, const char* reason)
     {
+        bool cleanupSucceeded = true;
         const auto cleanupFamily = [&](const char* label, auto cleanup) -> size_t {
             try
             {
+                if (g_ForcePluginCallbackCleanupFailureForTesting.load(std::memory_order_acquire))
+                    throw std::runtime_error("injected plugin callback cleanup failure");
                 return cleanup();
             }
             catch (const std::exception& e)
             {
                 SafeLogErrorNoThrow((std::string("Failed to remove ") + label + " callbacks for plugin " + pluginName).c_str(),
                                     e.what());
+                cleanupSucceeded = false;
                 return 0;
             }
             catch (...)
             {
                 SafeLogErrorNoThrow((std::string("Failed to remove ") + label + " callbacks for plugin " + pluginName +
                                     " with unknown exception").c_str());
+                cleanupSucceeded = false;
                 return 0;
             }
         };
@@ -2077,6 +2088,8 @@ namespace Obelisk::Core
         logRemoved(chatRemoved, "chat");
         logRemoved(structureRemoved, "structure");
         logRemoved(inventoryRemoved, "inventory policy");
+
+        return cleanupSucceeded;
     }
 
     bool PluginManager::IsPluginIdLoaded(const std::string& pluginId) const
@@ -2319,6 +2332,41 @@ namespace Obelisk::Core
                         SafeLogErrorNoThrow("Failed to remove initializing plugin owner after init failure with unknown exception");
                     }
 
+                    bool callbacksCleaned = false;
+                    try
+                    {
+                        callbacksCleaned =
+                            UnregisterPluginCallbacks(pluginName, pluginOwner, "after init failure and before dlclose");
+                    }
+                    catch (const std::exception& e)
+                    {
+                        SafeLogErrorNoThrow("Failed to unregister plugin callbacks after init failure", e.what());
+                    }
+                    catch (...)
+                    {
+                        SafeLogErrorNoThrow("Failed to unregister plugin callbacks after init failure with unknown exception");
+                    }
+
+                    if (!callbacksCleaned)
+                    {
+                        handleCleanup.Dismiss();
+                        ownerTokenCleanup.Dismiss();
+                        initializingOwnerCleanup.Dismiss();
+                        m_LoadedPlugins.push_back({
+                            pluginName,
+                            metadata.plugin_id,
+                            handle,
+                            pluginOwner,
+                            pluginOwnerToken,
+                            shutdownFunc,
+                            true,
+                        });
+                        SafeLogErrorNoThrow(
+                            "Plugin callback cleanup failed after init failure; retaining library mapped for retry",
+                            pluginName.c_str());
+                        return;
+                    }
+
                     try
                     {
                         RemovePluginOwnerToken(pluginOwnerToken);
@@ -2330,19 +2378,6 @@ namespace Obelisk::Core
                     catch (...)
                     {
                         SafeLogErrorNoThrow("Failed to remove plugin owner token after init failure with unknown exception");
-                    }
-
-                    try
-                    {
-                        UnregisterPluginCallbacks(pluginName, pluginOwner, "after init failure and before dlclose");
-                    }
-                    catch (const std::exception& e)
-                    {
-                        SafeLogErrorNoThrow("Failed to unregister plugin callbacks after init failure", e.what());
-                    }
-                    catch (...)
-                    {
-                        SafeLogErrorNoThrow("Failed to unregister plugin callbacks after init failure with unknown exception");
                     }
 
                     try
@@ -2415,6 +2450,8 @@ namespace Obelisk::Core
 
     void PluginManager::UnloadAll()
     {
+        std::vector<PluginInfo> retainedPlugins;
+
         for (auto it = m_LoadedPlugins.rbegin(); it != m_LoadedPlugins.rend(); ++it)
         {
             auto& plugin = *it;
@@ -2432,17 +2469,46 @@ namespace Obelisk::Core
                 SafeLogErrorNoThrow("Failed to mark plugin owner unloading with unknown exception");
             }
 
+            if (!plugin.shutdownCalled)
+            {
+                try
+                {
+                    CallPluginShutdown(plugin.name, plugin.shutdown);
+                    plugin.shutdownCalled = true;
+                }
+                catch (const std::exception& e)
+                {
+                    plugin.shutdownCalled = true;
+                    SafeLogErrorNoThrow("Failed to call plugin shutdown during unload", e.what());
+                }
+                catch (...)
+                {
+                    plugin.shutdownCalled = true;
+                    SafeLogErrorNoThrow("Failed to call plugin shutdown during unload with unknown exception");
+                }
+            }
+
+            bool callbacksCleaned = false;
             try
             {
-                CallPluginShutdown(plugin.name, plugin.shutdown);
+                callbacksCleaned = UnregisterPluginCallbacks(plugin.name, plugin.owner, "before dlclose");
             }
             catch (const std::exception& e)
             {
-                SafeLogErrorNoThrow("Failed to call plugin shutdown during unload", e.what());
+                SafeLogErrorNoThrow("Failed to unregister plugin callbacks before dlclose", e.what());
             }
             catch (...)
             {
-                SafeLogErrorNoThrow("Failed to call plugin shutdown during unload with unknown exception");
+                SafeLogErrorNoThrow("Failed to unregister plugin callbacks before dlclose with unknown exception");
+            }
+
+            if (!callbacksCleaned)
+            {
+                SafeLogErrorNoThrow(
+                    "Plugin callback cleanup failed during unload; skipping dlclose and retaining plugin for retry",
+                    plugin.name.c_str());
+                retainedPlugins.push_back(plugin);
+                continue;
             }
 
             try
@@ -2460,6 +2526,19 @@ namespace Obelisk::Core
 
             try
             {
+                RemoveInitializingPluginOwner(plugin.owner);
+            }
+            catch (const std::exception& e)
+            {
+                SafeLogErrorNoThrow("Failed to remove initializing plugin owner", e.what());
+            }
+            catch (...)
+            {
+                SafeLogErrorNoThrow("Failed to remove initializing plugin owner with unknown exception");
+            }
+
+            try
+            {
                 RemovePluginOwnerToken(plugin.ownerToken);
             }
             catch (const std::exception& e)
@@ -2469,19 +2548,6 @@ namespace Obelisk::Core
             catch (...)
             {
                 SafeLogErrorNoThrow("Failed to remove plugin owner token with unknown exception");
-            }
-
-            try
-            {
-                UnregisterPluginCallbacks(plugin.name, plugin.owner, "before dlclose");
-            }
-            catch (const std::exception& e)
-            {
-                SafeLogErrorNoThrow("Failed to unregister plugin callbacks before dlclose", e.what());
-            }
-            catch (...)
-            {
-                SafeLogErrorNoThrow("Failed to unregister plugin callbacks before dlclose with unknown exception");
             }
 
             try
@@ -2496,6 +2562,7 @@ namespace Obelisk::Core
             {
                 SafeLogErrorNoThrow("Failed to clear plugin owner unloading with unknown exception");
             }
+
             try
             {
                 SafeCloseLibrary(*m_Loader, plugin.handle, plugin.name);
@@ -2509,6 +2576,7 @@ namespace Obelisk::Core
                 SafeLogErrorNoThrow("Failed to close plugin library during unload with unknown exception");
             }
         }
-        m_LoadedPlugins.clear();
+        std::reverse(retainedPlugins.begin(), retainedPlugins.end());
+        m_LoadedPlugins = std::move(retainedPlugins);
     }
 }

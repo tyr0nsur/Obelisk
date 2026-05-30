@@ -74,6 +74,11 @@ recovery context is not active routing for the current head; use
   on plugin init failure/unload. Timer ids are not shared config, cluster state, UE
   identity, or persistent handles. `oProcessTimer` is the first-party example with SDK
   consumer coverage and release-gate dry-run publication.
+- Plugin unload now treats callback cleanup failure as a hard `dlclose` blocker: unload
+  calls shutdown once, attempts owner cleanup, retains the plugin mapped for retry when
+  cleanup fails, and only closes the library after a successful cleanup retry. Init-failure
+  cleanup follows the same retry path if callback cleanup cannot be proven complete. This
+  is internal runtime hardening, not a C ABI change.
 - `oBaseEvents` has a disabled-by-default plugin-local `chat_command_helper` over copied
   `ChatMessageEvent` bytes. It has config and owner-token register/unregister, but no
   command ABI/router, identity, reply, mutation, or extra exported plugin symbols beyond

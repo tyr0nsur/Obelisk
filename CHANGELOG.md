@@ -12,6 +12,9 @@
   artifact identity hash and ScriptStruct inventory packs must preserve bool-tail metadata.
 - Added EventManager owner-cleanup coverage for in-flight global pre and filtered post
   callbacks.
+- Hardened plugin unload/init-failure cleanup so a callback cleanup failure prevents
+  `dlclose`, retains the plugin for retry, and avoids repeating plugin shutdown on the
+  retained unload attempt.
 
 ## 0.1.0-rc.2
 

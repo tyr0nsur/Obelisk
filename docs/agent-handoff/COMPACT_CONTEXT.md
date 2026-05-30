@@ -70,6 +70,11 @@ priorities, and do not use history files as the active source of truth.
 - EventManager owner cleanup is expected to wait for in-flight callbacks before plugin
   unload; tests cover debug-gated filtered pre-ProcessEvent and post-ProcessEvent callback
   paths.
+- PluginManager unload must not `dlclose` if any plugin-owned callback cleanup family
+  fails. The current runtime retains the plugin mapped for a later `UnloadAll()` retry
+  and records that shutdown was already called so retry cleanup/close does not invoke
+  plugin shutdown twice. Init-failure cleanup also leaves the library mapped if callback
+  cleanup cannot be proven complete.
 - Runtime posture is default-deny for filtered raw `ProcessEvent` callbacks, global
   callbacks, public `CallProcessEvent`, ProcessEvent blocking, broad tracing,
   scanner/debug controls, and experimental observers.
