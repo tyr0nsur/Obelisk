@@ -186,6 +186,13 @@ sequence.
   This is not a public Buff SDK/runtime promotion and does not authorize hooks, callbacks,
   object/class exposure, mutation, return override, raw params, `ResourceHandle`, or
   gameplay semantics.
+- Structure return-only now has an internal consume-mode policy slice at
+  `/home/flowcommunity-ark/obelisk-artifacts/structure-return-only-policy-slice-20260530T093002Z/`.
+  It copies only the two `AllowStructureAccess`/`IsAllowedToDemolish` return bools,
+  redacts `ForPC`, defers `VerifyPinCode`/activation/variant/seating targets, accepts
+  consume mode, and blocks promote mode. No public `StructureEvents`, identity, lookup,
+  mutation, return override, `ResourceHandle`, hook wiring, dispatcher wiring, or runtime
+  observation is promoted.
 - Do not rerun broad FName, GObjects, or core scans for ResourceHandle unless the binary
   hash changes or evidence contradicts current roots/candidates. The next ResourceHandle
   work should use the durable flag-policy refresh as internal static input and focus on
@@ -193,13 +200,9 @@ sequence.
   Keep the internal label `InternalUObjectRevalidationCandidate`; do not expose
   ResourceHandle, GObjects, identity, lookup, lifecycle names, mutation, return override,
   object indices, serials, or UE pointers to plugins.
-  The offline flag-policy report/gate now requires an explicit internal revalidation
-  contract: frame-local only, post-callback lookup rejected, `0x100` rejected, `0x4000`
-  rejected by default, output limited to copied bool/reason or Obelisk-owned copied data,
-  and public API not promoted. The consume gate also validates the exact
-  `weak_helper_caller_mode` shape/flag rules, rejects candidate fields outside the known
-  contract, and blocks extra blocker/non-claim text that overclaims public
-  `ResourceHandle`, lookup, SDK, runtime, or callback readiness.
+  The offline flag-policy evaluator now records an internal revalidation candidate only:
+  frame-local, post-callback lookup rejected, `0x100` rejected, `0x4000` rejected by
+  default, copied/Obelisk-owned output only, and no public API.
 - Chat command ergonomics should start as a plugin-local parser/helper over the existing
   copied `ChatMessageEvent`, not as a new ABI. The minimum contract is callback-scope
   slices over copied UTF-8 bytes with valid ABI/version/struct-size/send-mode checks.
@@ -212,7 +215,5 @@ sequence.
 
 - Lead owns server-safety decisions, GitHub, and stale-agent cleanup.
 - Sub-agents receive scoped expert tasks, not leader cadence or unrelated project policy.
-- Before each sub-agent round: close stale agents, assign expert role, declare
-  read-only/edit paths, declare allowed paths and required skills, pass only the skills
-  required for that scope, state validation expected, state the expected decision, and
-  keep integration with lead.
+- Before each sub-agent round: close stale agents, assign expert role, declare allowed paths,
+  required skills, pass only the skills required, state validation and expected decision.

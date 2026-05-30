@@ -31,6 +31,9 @@ namespace Obelisk::UE::BuffReflection
     {
         BuffField Field = BuffField::ReturnValue;
         int32_t PropertyNameIndex = -1;
+        int32_t PropertyClassNameIndex = -1;
+        int32_t PropertyClassObjectIndex = -1;
+        uint64_t PropertyFlags = 0;
         int32_t Offset = -1;
         size_t Size = 0;
         bool ExposesRange = false;
@@ -43,6 +46,8 @@ namespace Obelisk::UE::BuffReflection
         int32_t FunctionNameIndex = -1;
         int32_t OuterNameIndex = -1;
         bool HasParameterRanges = false;
+        const uint8_t* ParameterData = nullptr;
+        size_t ParameterSize = 0;
         RuntimeReflection::FixedVector<BuffFieldRange, 4> Fields;
     };
 

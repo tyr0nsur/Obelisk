@@ -20,10 +20,13 @@ namespace
     constexpr int32_t kBPPreventAddingOtherBuffNameIndex = 1690;
     constexpr int32_t kBuffOverrideInventoryAccessInputNameIndex = 1814;
     constexpr int32_t kPrimalBuffNameIndex = 7843;
+    constexpr int32_t kPrimalBuffObjectIndex = 195;
     constexpr int32_t kBoolPropertyClassNameIndex = 3;
+    constexpr int32_t kFunctionClassNameIndex = 10650;
     constexpr int32_t kObjectPropertyClassNameIndex = 5;
     constexpr int32_t kClassPropertyClassNameIndex = 8;
     constexpr int32_t kBoolPropertyClassObjectIndex = 532;
+    constexpr int32_t kFunctionClassObjectIndex = 518;
     constexpr int32_t kObjectPropertyClassObjectIndex = 534;
     constexpr int32_t kClassPropertyClassObjectIndex = 535;
     constexpr int32_t kReturnValueNameIndex = 17716;
@@ -32,6 +35,11 @@ namespace
     constexpr int32_t kAnotherBuffClassNameIndex = 24180;
     constexpr int32_t kBInputPressedNameIndex = 24188;
     constexpr int32_t kInControllerNameIndex = 24189;
+    constexpr uint32_t kBuffEventFunctionFlags = 0x0c020800;
+    constexpr uint32_t kBuffEventWithReturnFunctionFlags = 0x0c020c00;
+    constexpr uint64_t kObjectInputPropertyFlags = 0x1040000280;
+    constexpr uint64_t kBoolInputPropertyFlags = 0x1040000280;
+    constexpr uint64_t kBoolReturnPropertyFlags = 0x1040000780;
 
     struct Region
     {
@@ -99,12 +107,12 @@ namespace
                        const void* klass,
                        int32_t nameIndex,
                        int32_t offset,
-                       int32_t elementSize)
+                       int32_t elementSize,
+                       uint64_t propertyFlags)
     {
         WriteObject(buffer, nameIndex, nameIndex, klass, owner);
 
         const int32_t arrayDim = 1;
-        const uint64_t propertyFlags = 0x80;
         WriteAt(buffer, 0x28, next);
         WriteAt(buffer, 0x30, arrayDim);
         WriteAt(buffer, 0x34, elementSize);
@@ -118,6 +126,7 @@ namespace
         int32_t Offset = -1;
         int32_t ElementSize = 0;
         const void* Class = nullptr;
+        uint64_t PropertyFlags = 0;
     };
 
     struct BuffFixture
@@ -129,6 +138,7 @@ namespace
         std::array<uint8_t, 0x40> ObjectPropertyClass{};
         std::array<uint8_t, 0x40> BoolPropertyClass{};
         std::array<uint8_t, 0x40> ClassPropertyClass{};
+        std::array<uint8_t, 0x40> FunctionClass{};
         std::array<uint8_t, 0x40> Outer{};
         std::array<uint8_t, 0x20> Params{};
         ReaderContext Context;
@@ -143,6 +153,7 @@ namespace
             Context.Regions.push_back({ObjectPropertyClass.data(), ObjectPropertyClass.size()});
             Context.Regions.push_back({BoolPropertyClass.data(), BoolPropertyClass.size()});
             Context.Regions.push_back({ClassPropertyClass.data(), ClassPropertyClass.size()});
+            Context.Regions.push_back({FunctionClass.data(), FunctionClass.size()});
             Context.Regions.push_back({Outer.data(), Outer.size()});
             Context.Regions.push_back({Params.data(), Params.size()});
             return {RegionReader, &Context};
@@ -171,21 +182,27 @@ namespace
                     kClassPropertyClassObjectIndex,
                     nullptr,
                     nullptr);
+        WriteObject(fixture.FunctionClass,
+                    kFunctionClassNameIndex,
+                    kFunctionClassObjectIndex,
+                    nullptr,
+                    nullptr);
     }
 
     void BuildFunction(BuffFixture& fixture,
                        int32_t functionNameIndex,
+                       uint32_t functionFlags,
                        uint16_t numParms,
                        uint16_t parmsSize,
                        uint16_t returnValueOffset,
                        const std::array<FieldDef, 3>& fields)
     {
         InitClasses(fixture);
-        WriteObject(fixture.Outer, kPrimalBuffNameIndex, kPrimalBuffNameIndex, nullptr, nullptr);
+        WriteObject(fixture.Outer, kPrimalBuffNameIndex, kPrimalBuffObjectIndex, nullptr, nullptr);
         WriteObject(fixture.Function,
                     functionNameIndex,
                     functionNameIndex,
-                    reinterpret_cast<const void*>(0x20000),
+                    fixture.FunctionClass.data(),
                     fixture.Outer.data());
 
         std::array<std::array<uint8_t, 0x80>*, 3> properties{
@@ -202,10 +219,10 @@ namespace
                           fields[i].Class,
                           fields[i].NameIndex,
                           fields[i].Offset,
-                          fields[i].ElementSize);
+                          fields[i].ElementSize,
+                          fields[i].PropertyFlags);
         }
 
-        const uint32_t functionFlags = 0x204000;
         WriteAt(fixture.Function, 0x38, numParms > 0 ? fixture.PropertyA.data() : nullptr);
         WriteAt(fixture.Function, 0x90, functionFlags);
         WriteAt(fixture.Function, 0x96, numParms);
@@ -217,11 +234,12 @@ namespace
     {
         BuildFunction(fixture,
                       functionNameIndex,
+                      kBuffEventWithReturnFunctionFlags,
                       1,
                       0x01,
                       0x00,
                       {{
-                          {kReturnValueNameIndex, 0x00, 0x01, fixture.BoolPropertyClass.data()},
+                          {kReturnValueNameIndex, 0x00, 0x01, fixture.BoolPropertyClass.data(), kBoolReturnPropertyFlags},
                           {},
                           {},
                       }});
@@ -229,20 +247,27 @@ namespace
 
     void BuildZeroParam(BuffFixture& fixture)
     {
-        BuildFunction(fixture, kBPOnBuffLifetimeUpdatedNameIndex, 0, 0x00, 0xffff, {{{}, {}, {}}});
+        BuildFunction(fixture,
+                      kBPOnBuffLifetimeUpdatedNameIndex,
+                      kBuffEventFunctionFlags,
+                      0,
+                      0x00,
+                      0xffff,
+                      {{{}, {}, {}}});
     }
 
     void BuildBuffOverrideInventoryAccessInput(BuffFixture& fixture)
     {
         BuildFunction(fixture,
                       kBuffOverrideInventoryAccessInputNameIndex,
+                      kBuffEventWithReturnFunctionFlags,
                       3,
                       0x0a,
                       0x09,
                       {{
-                          {kInControllerNameIndex, 0x00, 0x08, fixture.ObjectPropertyClass.data()},
-                          {kBInputPressedNameIndex, 0x08, 0x01, fixture.BoolPropertyClass.data()},
-                          {kReturnValueNameIndex, 0x09, 0x01, fixture.BoolPropertyClass.data()},
+                          {kInControllerNameIndex, 0x00, 0x08, fixture.ObjectPropertyClass.data(), kObjectInputPropertyFlags},
+                          {kBInputPressedNameIndex, 0x08, 0x01, fixture.BoolPropertyClass.data(), kBoolInputPropertyFlags},
+                          {kReturnValueNameIndex, 0x09, 0x01, fixture.BoolPropertyClass.data(), kBoolReturnPropertyFlags},
                       }});
     }
 
@@ -250,13 +275,14 @@ namespace
     {
         BuildFunction(fixture,
                       kBPCustomAllowAddBuffNameIndex,
+                      kBuffEventFunctionFlags,
                       3,
                       0x11,
                       0x10,
                       {{
-                          {kForCharacterNameIndex, 0x00, 0x08, fixture.ObjectPropertyClass.data()},
-                          {kDamageCauserNameIndex, 0x08, 0x08, fixture.ObjectPropertyClass.data()},
-                          {kReturnValueNameIndex, 0x10, 0x01, fixture.BoolPropertyClass.data()},
+                          {kForCharacterNameIndex, 0x00, 0x08, fixture.ObjectPropertyClass.data(), kObjectInputPropertyFlags},
+                          {kDamageCauserNameIndex, 0x08, 0x08, fixture.ObjectPropertyClass.data(), kObjectInputPropertyFlags},
+                          {kReturnValueNameIndex, 0x10, 0x01, fixture.BoolPropertyClass.data(), kBoolReturnPropertyFlags},
                       }});
     }
 
@@ -264,12 +290,13 @@ namespace
     {
         BuildFunction(fixture,
                       kBPPreventAddingOtherBuffNameIndex,
+                      kBuffEventFunctionFlags,
                       2,
                       0x09,
                       0x08,
                       {{
-                          {kAnotherBuffClassNameIndex, 0x00, 0x08, fixture.ClassPropertyClass.data()},
-                          {kReturnValueNameIndex, 0x08, 0x01, fixture.BoolPropertyClass.data()},
+                          {kAnotherBuffClassNameIndex, 0x00, 0x08, fixture.ClassPropertyClass.data(), kObjectInputPropertyFlags},
+                          {kReturnValueNameIndex, 0x08, 0x01, fixture.BoolPropertyClass.data(), kBoolReturnPropertyFlags},
                           {},
                       }});
     }
@@ -294,9 +321,18 @@ namespace
 
             Require(static_cast<bool>(result), result.Reason.c_str());
             Require(invocation.Function == function, "bool-return buff function mismatch");
+            Require(invocation.HasParameterRanges, "bool-return parameter ranges missing");
+            Require(invocation.ParameterData == fixture.Params.data(), "bool-return parameter provenance data mismatch");
+            Require(invocation.ParameterSize == 0x01, "bool-return parameter provenance size mismatch");
             Require(invocation.Fields.size() == 1, "bool-return field count mismatch");
             Require(invocation.Fields[0].Field == BuffReflection::BuffField::ReturnValue,
                     "bool-return ReturnValue field mismatch");
+            Require(invocation.Fields[0].PropertyClassNameIndex == kBoolPropertyClassNameIndex,
+                    "bool-return property class name mismatch");
+            Require(invocation.Fields[0].PropertyClassObjectIndex == kBoolPropertyClassObjectIndex,
+                    "bool-return property class object mismatch");
+            Require(invocation.Fields[0].PropertyFlags == kBoolReturnPropertyFlags,
+                    "bool-return property flags mismatch");
             Require(invocation.Fields[0].Range.Data == fixture.Params.data(), "bool-return range mismatch");
         }
     }
@@ -339,6 +375,10 @@ namespace
             Require(static_cast<bool>(result), result.Reason.c_str());
             Require(invocation.Function == BuffReflection::BuffFunction::BuffOverrideInventoryAccessInput,
                     "BuffOverrideInventoryAccessInput kind mismatch");
+            Require(invocation.ParameterData == fixture.Params.data(),
+                    "BuffOverrideInventoryAccessInput parameter provenance data mismatch");
+            Require(invocation.ParameterSize == 0x0a,
+                    "BuffOverrideInventoryAccessInput parameter provenance size mismatch");
             Require(invocation.Fields[0].Range.Data == nullptr, "object pointer range should not be exposed");
             Require(invocation.Fields[1].Range.Data == fixture.Params.data() + 0x08,
                     "bInputPressed range mismatch");
@@ -410,7 +450,7 @@ namespace
             WriteObject(fixture.Function,
                         kAllowPostProcessEffectNameIndex,
                         kAllowPostProcessEffectNameIndex,
-                        reinterpret_cast<const void*>(0x20000),
+                        fixture.FunctionClass.data(),
                         fixture.Outer.data(),
                         1);
 
@@ -427,6 +467,20 @@ namespace
 
     void TestRejectsWrongShape()
     {
+        {
+            BuffFixture fixture;
+            BuildBoolReturn(fixture, kAllowPostProcessEffectNameIndex);
+            WriteAt(fixture.Function, 0x90, uint32_t{kBuffEventWithReturnFunctionFlags ^ 0x400});
+
+            BuffReflection::BuffInvocation invocation;
+            ReadResult result = BuffReflection::TryIdentifyBuffInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "wrong FunctionFlags were accepted");
+        }
         {
             BuffFixture fixture;
             BuildBoolReturn(fixture, kAllowPostProcessEffectNameIndex);
@@ -464,7 +518,8 @@ namespace
                           fixture.BoolPropertyClass.data(),
                           kInControllerNameIndex,
                           0x00,
-                          0x01);
+                          0x01,
+                          kBoolInputPropertyFlags);
 
             BuffReflection::BuffInvocation invocation;
             ReadResult result = BuffReflection::TryIdentifyBuffInvocation(
@@ -484,7 +539,8 @@ namespace
                           fixture.ObjectPropertyClass.data(),
                           kAnotherBuffClassNameIndex,
                           0x00,
-                          0x08);
+                          0x08,
+                          kObjectInputPropertyFlags);
 
             BuffReflection::BuffInvocation invocation;
             ReadResult result = BuffReflection::TryIdentifyBuffInvocation(
@@ -518,7 +574,8 @@ namespace
                           fixture.BoolPropertyClass.data(),
                           kReturnValueNameIndex,
                           0x01,
-                          0x01);
+                          0x01,
+                          kBoolReturnPropertyFlags);
 
             BuffReflection::BuffInvocation invocation;
             ReadResult result = BuffReflection::TryIdentifyBuffInvocation(
@@ -538,7 +595,8 @@ namespace
                           fixture.BoolPropertyClass.data(),
                           kReturnValueNameIndex,
                           0x00,
-                          0x02);
+                          0x02,
+                          kBoolReturnPropertyFlags);
 
             BuffReflection::BuffInvocation invocation;
             ReadResult result = BuffReflection::TryIdentifyBuffInvocation(
@@ -563,6 +621,46 @@ namespace
                 invocation);
             Require(!result, "wrong ArrayDim was accepted");
         }
+        {
+            BuffFixture fixture;
+            BuildBoolReturn(fixture, kAllowPostProcessEffectNameIndex);
+            WriteAt(fixture.PropertyA, 0x38, uint64_t{kBoolReturnPropertyFlags ^ 0x400});
+
+            BuffReflection::BuffInvocation invocation;
+            ReadResult result = BuffReflection::TryIdentifyBuffInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(!result, "wrong property flags were accepted");
+        }
+    }
+
+    void TestRejectsNonCanonicalCopiedBoolsAndClearsOutput()
+    {
+        BuffFixture fixture;
+        BuildBuffOverrideInventoryAccessInput(fixture);
+        fixture.Params[0x08] = 2;
+        fixture.Params[0x09] = 1;
+
+        BuffReflection::BuffInvocation invocation;
+        invocation.ParameterData = fixture.Params.data();
+        invocation.ParameterSize = fixture.Params.size();
+        invocation.HasParameterRanges = true;
+
+        ReadResult result = BuffReflection::TryIdentifyBuffInvocation(
+            fixture.Reader(),
+            Options(),
+            fixture.Function.data(),
+            fixture.Params.data(),
+            invocation);
+
+        Require(result.Status == ReadStatus::Implausible, "non-canonical buff bool byte was accepted");
+        Require(!invocation.HasParameterRanges, "rejected buff attempt kept parameter range flag");
+        Require(invocation.ParameterData == nullptr, "rejected buff attempt kept parameter data");
+        Require(invocation.ParameterSize == 0, "rejected buff attempt kept parameter size");
+        Require(invocation.Fields.empty(), "rejected buff attempt left copied field ranges");
     }
 
     void TestRejectsUnsupportedTarget()
@@ -613,6 +711,7 @@ int main()
     TestRecognizesObjectAndClassTargetsWithoutPointerRanges();
     TestRejectsWrongOuterAndNameNumber();
     TestRejectsWrongShape();
+    TestRejectsNonCanonicalCopiedBoolsAndClearsOutput();
     TestRejectsUnsupportedTarget();
     TestGateRejectsBeforeReading();
 

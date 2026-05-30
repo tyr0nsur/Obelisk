@@ -495,6 +495,127 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         finally:
             sys.argv = original_argv
 
+    def test_structure_return_only_policy_slice_emits_only_allowed_return_bools(self) -> None:
+        fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
+
+        report = tool.build_structure_return_only_policy_slice(snapshot_root=fixture_root)
+
+        self.assertEqual(tool.STRUCTURE_RETURN_ONLY_POLICY_SCHEMA, report["schema"])
+        self.assertEqual("redacted", report["snapshot_root"])
+        self.assertEqual("structure-observer-intake", report["input_target_set"])
+        self.assertEqual("structure-return-only-policy-slice", report["output_target_set"])
+        self.assertEqual("complete", report["coverage"]["status"])
+        self.assertEqual(6, len(report["generated_from"]["input_snapshots"]))
+        self.assertEqual(
+            [
+                "PrimalStructure.AllowStructureAccess.ReturnValue",
+                "PrimalStructure.IsAllowedToDemolish.ReturnValue",
+            ],
+            [entry["copied_field"] for entry in report["copied_return_bools"]],
+        )
+        self.assertEqual(
+            [
+                "PrimalStructure.AllowStructureAccess.ForPC",
+                "PrimalStructure.IsAllowedToDemolish.ForPC",
+            ],
+            [entry["redacted_field"] for entry in report["redacted_structure_fields"]],
+        )
+        self.assertEqual(
+            [
+                "PrimalStructure.SetVariant",
+                "PrimalStructureItemContainer.AllowToggleActivation",
+                "PrimalStructureItemContainer.VerifyPinCode",
+                "PrimalStructureSeating.CanSeat",
+            ],
+            sorted(entry["deferred_target"] for entry in report["deferred_structure_targets"]),
+        )
+        self.assertEqual(2, report["safety_summary"]["copied_bool_count"])
+        self.assertEqual(2, report["safety_summary"]["redacted_field_count"])
+        self.assertEqual(4, report["safety_summary"]["deferred_target_count"])
+        self.assertIs(False, report["safety_summary"]["promotion_ready"])
+        self.assertIn("resource_handle", report["safety_summary"]["explicitly_excluded"])
+        self.assertIn("return_override", report["safety_summary"]["explicitly_excluded"])
+        self.assertIn("ForPC", report["safety_summary"]["explicitly_excluded"])
+        self.assertTrue(all(entry["direction"] == "return" for entry in report["copied_return_bools"]))
+        self.assertTrue(all(entry["type"] == "bool" for entry in report["copied_return_bools"]))
+        self.assertTrue(all(entry["byte_mask"] == "0x01" for entry in report["copied_return_bools"]))
+        self.assertTrue(all(entry["field_mask"] == "0xff" for entry in report["copied_return_bools"]))
+
+        snapshots = {
+            snapshot["id"]: snapshot
+            for snapshot in report["generated_from"]["input_snapshots"]
+        }
+        self.assertEqual(
+            sorted(report["coverage"]["input_targets"]),
+            sorted(snapshot["target"] for snapshot in snapshots.values()),
+        )
+        self.assertTrue(
+            all(
+                entry["source_snapshot"] in snapshots
+                and snapshots[entry["source_snapshot"]]["sha256"] == entry["source_snapshot_sha256"]
+                and snapshots[entry["source_snapshot"]]["target"] == entry["target"]
+                for entry in [
+                    *report["copied_return_bools"],
+                    *report["redacted_structure_fields"],
+                    *report["deferred_structure_targets"],
+                ]
+            )
+        )
+
+        serialized = json.dumps(report)
+        self.assertNotIn(str(fixture_root), serialized)
+        self.assertNotIn("tests/fixtures/ufunction_snapshots", serialized)
+        copied_serialized = json.dumps(report["copied_return_bools"])
+        self.assertNotIn("ForPC", copied_serialized)
+        self.assertNotIn("pinCode", copied_serialized)
+        self.assertNotIn("AllowToggleActivation", copied_serialized)
+        self.assertNotIn("SetVariant", copied_serialized)
+        self.assertNotIn("CanSeat", copied_serialized)
+
+    def test_structure_return_only_policy_slice_rejects_forpc_copy_drift(self) -> None:
+        fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            copied_root = Path(temp_dir) / "ufunction_snapshots"
+            shutil.copytree(fixture_root, copied_root)
+            snapshot = (
+                copied_root
+                / "7e7ded49e0c6"
+                / "sdk_structures"
+                / "PrimalStructure.AllowStructureAccess.snapshot.json"
+            )
+            payload = json.loads(snapshot.read_text(encoding="utf-8"))
+            prop = payload["targets"][0]["property_chain"]["properties"][0]
+            prop["class_name"] = "BoolProperty"
+            write_json(snapshot, payload)
+
+            with self.assertRaisesRegex(SystemExit, "property shape drifted"):
+                tool.build_structure_return_only_policy_slice(snapshot_root=copied_root)
+
+    def test_structure_return_only_target_set_contains_only_return_policy_targets(self) -> None:
+        from reflection_target_sets import TARGET_SETS
+
+        self.assertEqual(
+            (
+                "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.AllowStructureAccess",
+                "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToDemolish",
+            ),
+            TARGET_SETS["structure-return-only-policy-slice"],
+        )
+
+    def test_structure_return_only_cli_mode_returns_success(self) -> None:
+        original_argv = sys.argv
+        try:
+            sys.argv = [
+                "build_redacted_ufunction_signatures.py",
+                "--structure-return-only-policy-slice",
+                "--json",
+            ]
+            with contextlib.redirect_stdout(io.StringIO()) as stdout:
+                self.assertEqual(0, tool.main())
+            self.assertIn(tool.STRUCTURE_RETURN_ONLY_POLICY_SCHEMA, stdout.getvalue())
+        finally:
+            sys.argv = original_argv
+
     def test_inventory_action_compact_target_set_stays_candidate_only_and_redacted(self) -> None:
         fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
 

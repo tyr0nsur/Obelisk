@@ -62,6 +62,10 @@ TARGET_SETS = {
         "obelisk.ufunction-chain.snapshot.v1:PrimalStructureItemContainer.VerifyPinCode",
         "obelisk.ufunction-chain.snapshot.v1:PrimalStructureSeating.CanSeat",
     ),
+    "structure-return-only-policy-slice": (
+        "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.AllowStructureAccess",
+        "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToDemolish",
+    ),
     "transfer-ufunction-intake": (
         "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerDownloadTransferredPlayer",
         "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerTransferredPlayerConfirmationResult",

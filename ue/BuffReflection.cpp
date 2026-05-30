@@ -1,6 +1,7 @@
 #include "BuffReflection.h"
 
 #include <array>
+#include <cstring>
 #include <utility>
 
 namespace Obelisk::UE::BuffReflection
@@ -14,11 +15,14 @@ namespace Obelisk::UE::BuffReflection
         constexpr int32_t kBPPreventAddingOtherBuffNameIndex = 1690;
         constexpr int32_t kBuffOverrideInventoryAccessInputNameIndex = 1814;
         constexpr int32_t kPrimalBuffNameIndex = 7843;
+        constexpr int32_t kPrimalBuffObjectIndex = 195;
 
         constexpr int32_t kBoolPropertyClassNameIndex = 3;
+        constexpr int32_t kFunctionClassNameIndex = 10650;
         constexpr int32_t kObjectPropertyClassNameIndex = 5;
         constexpr int32_t kClassPropertyClassNameIndex = 8;
         constexpr int32_t kBoolPropertyClassObjectIndex = 532;
+        constexpr int32_t kFunctionClassObjectIndex = 518;
         constexpr int32_t kObjectPropertyClassObjectIndex = 534;
         constexpr int32_t kClassPropertyClassObjectIndex = 535;
 
@@ -31,6 +35,9 @@ namespace Obelisk::UE::BuffReflection
 
         constexpr size_t kObjectPropertySize = 0x8;
         constexpr size_t kBoolPropertySize = 0x1;
+        constexpr uint64_t kObjectInputPropertyFlags = 0x1040000280;
+        constexpr uint64_t kBoolInputPropertyFlags = 0x1040000280;
+        constexpr uint64_t kBoolReturnPropertyFlags = 0x1040000780;
 
         struct BuffFieldSpec
         {
@@ -40,6 +47,7 @@ namespace Obelisk::UE::BuffReflection
             size_t Size;
             int32_t ClassNameIndex;
             int32_t ClassObjectIndex;
+            uint64_t PropertyFlags;
             bool ExposesRange;
         };
 
@@ -48,6 +56,8 @@ namespace Obelisk::UE::BuffReflection
             BuffFunction Function;
             int32_t NameIndex;
             int32_t OuterNameIndex;
+            int32_t OuterObjectIndex;
+            uint32_t FunctionFlags;
             uint16_t NumParms;
             uint16_t ParmsSize;
             uint16_t ReturnValueOffset;
@@ -62,6 +72,7 @@ namespace Obelisk::UE::BuffReflection
              kBoolPropertySize,
              kBoolPropertyClassNameIndex,
              kBoolPropertyClassObjectIndex,
+             kBoolReturnPropertyFlags,
              true},
         }};
 
@@ -74,6 +85,7 @@ namespace Obelisk::UE::BuffReflection
              kObjectPropertySize,
              kObjectPropertyClassNameIndex,
              kObjectPropertyClassObjectIndex,
+             kObjectInputPropertyFlags,
              false},
             {BuffField::BInputPressed,
              kBInputPressedNameIndex,
@@ -81,6 +93,7 @@ namespace Obelisk::UE::BuffReflection
              kBoolPropertySize,
              kBoolPropertyClassNameIndex,
              kBoolPropertyClassObjectIndex,
+             kBoolInputPropertyFlags,
              true},
             {BuffField::ReturnValue,
              kReturnValueNameIndex,
@@ -88,6 +101,7 @@ namespace Obelisk::UE::BuffReflection
              kBoolPropertySize,
              kBoolPropertyClassNameIndex,
              kBoolPropertyClassObjectIndex,
+             kBoolReturnPropertyFlags,
              true},
         }};
 
@@ -98,6 +112,7 @@ namespace Obelisk::UE::BuffReflection
              kObjectPropertySize,
              kObjectPropertyClassNameIndex,
              kObjectPropertyClassObjectIndex,
+             kObjectInputPropertyFlags,
              false},
             {BuffField::DamageCauser,
              kDamageCauserNameIndex,
@@ -105,6 +120,7 @@ namespace Obelisk::UE::BuffReflection
              kObjectPropertySize,
              kObjectPropertyClassNameIndex,
              kObjectPropertyClassObjectIndex,
+             kObjectInputPropertyFlags,
              false},
             {BuffField::ReturnValue,
              kReturnValueNameIndex,
@@ -112,6 +128,7 @@ namespace Obelisk::UE::BuffReflection
              kBoolPropertySize,
              kBoolPropertyClassNameIndex,
              kBoolPropertyClassObjectIndex,
+             kBoolReturnPropertyFlags,
              true},
         }};
 
@@ -122,6 +139,7 @@ namespace Obelisk::UE::BuffReflection
              kObjectPropertySize,
              kClassPropertyClassNameIndex,
              kClassPropertyClassObjectIndex,
+             kObjectInputPropertyFlags,
              false},
             {BuffField::ReturnValue,
              kReturnValueNameIndex,
@@ -129,6 +147,7 @@ namespace Obelisk::UE::BuffReflection
              kBoolPropertySize,
              kBoolPropertyClassNameIndex,
              kBoolPropertyClassObjectIndex,
+             kBoolReturnPropertyFlags,
              true},
         }};
 
@@ -136,6 +155,8 @@ namespace Obelisk::UE::BuffReflection
             BuffFunction::AllowPostProcessEffect,
             kAllowPostProcessEffectNameIndex,
             kPrimalBuffNameIndex,
+            kPrimalBuffObjectIndex,
+            0x0c020c00,
             1,
             0x01,
             0x00,
@@ -147,6 +168,8 @@ namespace Obelisk::UE::BuffReflection
             BuffFunction::BPBuffPreventUploading,
             kBPBuffPreventUploadingNameIndex,
             kPrimalBuffNameIndex,
+            kPrimalBuffObjectIndex,
+            0x0c020c00,
             1,
             0x01,
             0x00,
@@ -158,6 +181,8 @@ namespace Obelisk::UE::BuffReflection
             BuffFunction::BPOnBuffLifetimeUpdated,
             kBPOnBuffLifetimeUpdatedNameIndex,
             kPrimalBuffNameIndex,
+            kPrimalBuffObjectIndex,
+            0x0c020800,
             0,
             0x00,
             0xffff,
@@ -169,6 +194,8 @@ namespace Obelisk::UE::BuffReflection
             BuffFunction::BuffOverrideInventoryAccessInput,
             kBuffOverrideInventoryAccessInputNameIndex,
             kPrimalBuffNameIndex,
+            kPrimalBuffObjectIndex,
+            0x0c020c00,
             3,
             0x0a,
             0x09,
@@ -180,6 +207,8 @@ namespace Obelisk::UE::BuffReflection
             BuffFunction::BPCustomAllowAddBuff,
             kBPCustomAllowAddBuffNameIndex,
             kPrimalBuffNameIndex,
+            kPrimalBuffObjectIndex,
+            0x0c020800,
             3,
             0x11,
             0x10,
@@ -191,6 +220,8 @@ namespace Obelisk::UE::BuffReflection
             BuffFunction::BPPreventAddingOtherBuff,
             kBPPreventAddingOtherBuffNameIndex,
             kPrimalBuffNameIndex,
+            kPrimalBuffObjectIndex,
+            0x0c020800,
             2,
             0x09,
             0x08,
@@ -233,6 +264,30 @@ namespace Obelisk::UE::BuffReflection
             return RuntimeReflection::ReadResult::Ok();
         }
 
+        RuntimeReflection::ReadResult ValidateFunctionClass(const RuntimeReflection::MemoryReader& reader,
+                                                            const RuntimeReflection::FieldLayout& layout,
+                                                            const RuntimeReflection::UFunctionView& function)
+        {
+            if (!function.Object.ClassPrivate)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                           "buff UFunction has null class");
+
+            RuntimeReflection::UObjectView functionClass;
+            RuntimeReflection::ReadResult result =
+                RuntimeReflection::TryReadUObject(reader, layout, function.Object.ClassPrivate, functionClass);
+            if (!result)
+                return result;
+
+            if (functionClass.NamePrivate.ComparisonIndex != kFunctionClassNameIndex ||
+                functionClass.NamePrivate.Number != 0)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                           "buff UFunction class FName mismatch");
+            if (functionClass.InternalIndex != kFunctionClassObjectIndex)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                           "buff UFunction class object index mismatch");
+            return RuntimeReflection::ReadResult::Ok();
+        }
+
         RuntimeReflection::ReadResult ValidateFunctionShape(const RuntimeReflection::UFunctionView& function,
                                                             const BuffFunctionSpec& spec)
         {
@@ -240,6 +295,9 @@ namespace Obelisk::UE::BuffReflection
                 function.Object.NamePrivate.Number != 0)
                 return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
                                                            "UFunction FName does not match buff spec");
+            if (function.FunctionFlags != spec.FunctionFlags)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                           "buff UFunction FunctionFlags mismatch");
             if (function.NumParms != spec.NumParms)
                 return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
                                                            "buff UFunction NumParms mismatch");
@@ -274,6 +332,9 @@ namespace Obelisk::UE::BuffReflection
                 outer.NamePrivate.Number != 0)
                 return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
                                                            "buff UFunction outer FName mismatch");
+            if (outer.InternalIndex != spec.OuterObjectIndex)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                           "buff UFunction outer object index mismatch");
             return RuntimeReflection::ReadResult::Ok();
         }
 
@@ -323,8 +384,26 @@ namespace Obelisk::UE::BuffReflection
             if (property.ArrayDim != 1)
                 return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
                                                            "buff property ArrayDim mismatch");
+            if (property.PropertyFlags != spec.PropertyFlags)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                           "buff property flags mismatch");
 
             return ValidatePropertyClass(reader, layout, property, spec);
+        }
+
+        RuntimeReflection::ReadResult ValidateCanonicalCopiedBool(const RuntimeReflection::ParamRange& range)
+        {
+            if (!range.Data || range.Size != kBoolPropertySize)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                           "buff bool range is not a single byte");
+
+            uint8_t value = 0;
+            std::memcpy(&value, range.Data, sizeof(value));
+            if (value > 1)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                           "buff bool byte is not canonical");
+
+            return RuntimeReflection::ReadResult::Ok();
         }
     }
 
@@ -334,6 +413,8 @@ namespace Obelisk::UE::BuffReflection
                                                             const void* params,
                                                             BuffInvocation& out)
     {
+        out = {};
+
         if (RuntimeReflection::ReadResult gate = ValidateGate(options); !gate)
             return gate;
         if (!function)
@@ -360,6 +441,12 @@ namespace Obelisk::UE::BuffReflection
         {
             return result;
         }
+        if (RuntimeReflection::ReadResult result =
+                ValidateFunctionClass(reader, *options.Layout, reflectedFunction);
+            !result)
+        {
+            return result;
+        }
         if (RuntimeReflection::ReadResult result = ValidateFunctionShape(reflectedFunction, *spec); !result)
             return result;
         if (RuntimeReflection::ReadResult result =
@@ -374,6 +461,11 @@ namespace Obelisk::UE::BuffReflection
         value.FunctionNameIndex = spec->NameIndex;
         value.OuterNameIndex = spec->OuterNameIndex;
         value.HasParameterRanges = params != nullptr;
+        if (value.HasParameterRanges)
+        {
+            value.ParameterData = static_cast<const uint8_t*>(params);
+            value.ParameterSize = reflectedFunction.ParmsSize;
+        }
         if (spec->FieldCount > value.Fields.capacity())
             return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::OutOfBounds,
                                                        "buff field count exceeds storage capacity");
@@ -393,6 +485,9 @@ namespace Obelisk::UE::BuffReflection
             BuffFieldRange field;
             field.Field = fieldSpec.Field;
             field.PropertyNameIndex = fieldSpec.NameIndex;
+            field.PropertyClassNameIndex = fieldSpec.ClassNameIndex;
+            field.PropertyClassObjectIndex = fieldSpec.ClassObjectIndex;
+            field.PropertyFlags = fieldSpec.PropertyFlags;
             field.Offset = fieldSpec.Offset;
             field.Size = fieldSpec.Size;
             field.ExposesRange = fieldSpec.ExposesRange;
@@ -409,6 +504,11 @@ namespace Obelisk::UE::BuffReflection
                     !result)
                 {
                     return result;
+                }
+                if (fieldSpec.ClassNameIndex == kBoolPropertyClassNameIndex)
+                {
+                    if (RuntimeReflection::ReadResult result = ValidateCanonicalCopiedBool(field.Range); !result)
+                        return result;
                 }
             }
 

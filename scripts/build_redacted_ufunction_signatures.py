@@ -23,6 +23,7 @@ TARGET_SET_COVERAGE_SCHEMA = "obelisk.redacted-ufunction-target-set-coverage.v1"
 ITEM_RETURN_ONLY_POLICY_SCHEMA = "obelisk.item-return-only-policy-slice.v1"
 TRANSFER_BACCEPT_ONLY_POLICY_SCHEMA = "obelisk.transfer-baccept-only-policy-slice.v1"
 MISSION_COPIED_BOOL_POLICY_SCHEMA = "obelisk.mission-copied-bool-policy-slice.v1"
+STRUCTURE_RETURN_ONLY_POLICY_SCHEMA = "obelisk.structure-return-only-policy-slice.v1"
 PROTECTED_SERVER_ROOT = Path("/servidor/ark")
 APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
 
@@ -47,6 +48,8 @@ TRANSFER_BACCEPT_ONLY_INPUT_TARGET_SET = "transfer-ufunction-intake"
 TRANSFER_BACCEPT_ONLY_OUTPUT_TARGET_SET = "transfer-baccept-only-policy-slice"
 MISSION_COPIED_BOOL_INPUT_TARGET_SET = "mission-compact-intake"
 MISSION_COPIED_BOOL_OUTPUT_TARGET_SET = "mission-copied-bool-policy-slice"
+STRUCTURE_RETURN_ONLY_INPUT_TARGET_SET = "structure-observer-intake"
+STRUCTURE_RETURN_ONLY_OUTPUT_TARGET_SET = "structure-return-only-policy-slice"
 
 ITEM_RETURN_ONLY_EXPECTED_SHAPES: dict[str, dict[str, Any]] = {
     "PrimalItem.AllowEquipItem": {
@@ -187,6 +190,89 @@ MISSION_REDACTED_FIELD_REASONS = {
     "MissionType.BPOnPlayerRemovedFromMission.Controller": "object_ref_excluded",
     "MissionType.GetPlayerUsableItems.Character": "object_ref_excluded",
     "MissionType.GetPlayerUsableItems.OutItemIDs": "array_payload_excluded",
+}
+
+STRUCTURE_RETURN_ONLY_EXPECTED_SHAPES: dict[str, dict[str, Any]] = {
+    "PrimalStructure.AllowStructureAccess": {
+        "function_flags": 0x4020400,
+        "num_parms": 2,
+        "parms_size": 9,
+        "return_value_offset": 0x8,
+        "properties": (
+            ("ForPC", "ObjectProperty"),
+            ("ReturnValue", "BoolProperty"),
+        ),
+    },
+    "PrimalStructure.IsAllowedToDemolish": {
+        "function_flags": 0x4020401,
+        "num_parms": 2,
+        "parms_size": 9,
+        "return_value_offset": 0x8,
+        "properties": (
+            ("ForPC", "ObjectProperty"),
+            ("ReturnValue", "BoolProperty"),
+        ),
+    },
+    "PrimalStructure.SetVariant": {
+        "function_flags": 0x4020401,
+        "num_parms": 3,
+        "parms_size": 6,
+        "return_value_offset": 0x5,
+        "properties": (
+            ("VariantIndex", "IntProperty"),
+            ("bForceSet", "BoolProperty"),
+            ("ReturnValue", "BoolProperty"),
+        ),
+    },
+    "PrimalStructureItemContainer.AllowToggleActivation": {
+        "function_flags": 0x4020401,
+        "num_parms": 2,
+        "parms_size": 9,
+        "return_value_offset": 0x8,
+        "properties": (
+            ("ForPC", "ObjectProperty"),
+            ("ReturnValue", "BoolProperty"),
+        ),
+    },
+    "PrimalStructureItemContainer.VerifyPinCode": {
+        "function_flags": 0x54020401,
+        "num_parms": 2,
+        "parms_size": 5,
+        "return_value_offset": 0x4,
+        "properties": (
+            ("pinCode", "IntProperty"),
+            ("ReturnValue", "BoolProperty"),
+        ),
+    },
+    "PrimalStructureSeating.CanSeat": {
+        "function_flags": 0x4020400,
+        "num_parms": 4,
+        "parms_size": 18,
+        "return_value_offset": 0x11,
+        "properties": (
+            ("ForPC", "ObjectProperty"),
+            ("forCharacter", "ObjectProperty"),
+            ("bForce", "BoolProperty"),
+            ("ReturnValue", "BoolProperty"),
+        ),
+    },
+}
+
+STRUCTURE_RETURN_ONLY_COPIED_FIELDS = (
+    "PrimalStructure.AllowStructureAccess.ReturnValue",
+    "PrimalStructure.IsAllowedToDemolish.ReturnValue",
+)
+
+STRUCTURE_RETURN_ONLY_REDACTED_FIELD_REASONS = {
+    "PrimalStructure.AllowStructureAccess.ForPC": "player_controller_ref_excluded",
+    "PrimalStructure.IsAllowedToDemolish.ForPC": "player_controller_ref_excluded",
+}
+
+STRUCTURE_RETURN_ONLY_DEFERRED_REASONS = {
+    "PrimalStructure.SetVariant": "mutation_surface_deferred",
+    "PrimalStructureItemContainer.AllowToggleActivation": "activation_policy_deferred",
+    "PrimalStructureItemContainer.VerifyPinCode": "pin_code_surface_deferred",
+    "PrimalStructureSeating.CanSeat": "seating_policy_deferred",
 }
 
 SCALAR_TYPE_BY_CLASS = {
@@ -347,6 +433,14 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Emit a focused evidence-only mission policy slice that validates "
             "mission-compact-intake and copies only approved mission BoolProperty fields."
+        ),
+    )
+    parser.add_argument(
+        "--structure-return-only-policy-slice",
+        action="store_true",
+        help=(
+            "Emit a focused evidence-only structure policy slice that validates "
+            "structure-observer-intake and copies only approved ReturnValue bools."
         ),
     )
     return parser.parse_args()
@@ -1446,6 +1540,134 @@ def require_mission_copied_bool_shape(target_payload: dict[str, Any], source_sna
     return copied, redacted
 
 
+def require_structure_return_only_shape(
+    target_payload: dict[str, Any],
+    source_snapshot: dict[str, str],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    target_identity = target_payload.get("target")
+    property_chain = target_payload.get("property_chain")
+    if not isinstance(target_identity, dict) or not isinstance(property_chain, dict):
+        raise SystemExit("structure policy snapshot missing target identity or property chain")
+    target = target_name(target_identity)
+    expected = STRUCTURE_RETURN_ONLY_EXPECTED_SHAPES.get(target)
+    if expected is None:
+        raise SystemExit(f"unexpected structure policy target: {target}")
+    if target_payload.get("status") != "candidate":
+        raise SystemExit(f"{target} is not a candidate UFunction snapshot")
+    if target_payload.get("inspection_mode") != "ufunction":
+        raise SystemExit(f"{target} is not a UFunction inspection snapshot")
+
+    if require_int_field(target_payload, "function_flags", target) != expected["function_flags"]:
+        raise SystemExit(f"{target} FunctionFlags drifted")
+    if require_int_field(target_payload, "num_parms", target) != expected["num_parms"]:
+        raise SystemExit(f"{target} NumParms drifted")
+    if require_int_field(target_payload, "parms_size", target) != expected["parms_size"]:
+        raise SystemExit(f"{target} ParmsSize drifted")
+    return_value_offset = require_int_field(target_payload, "return_value_offset", target)
+    if return_value_offset != expected["return_value_offset"]:
+        raise SystemExit(f"{target} ReturnValueOffset drifted")
+
+    properties = property_chain.get("properties")
+    if not isinstance(properties, list):
+        raise SystemExit(f"{target} property_chain.properties is not a list")
+    if parse_int_value(property_chain.get("expected_count")) != len(expected["properties"]):
+        raise SystemExit(f"{target} expected property count drifted")
+    if parse_int_value(property_chain.get("observed_count")) != len(expected["properties"]):
+        raise SystemExit(f"{target} observed property count drifted")
+    if len(properties) != len(expected["properties"]):
+        raise SystemExit(f"{target} property list length drifted")
+
+    copied: list[dict[str, Any]] = []
+    redacted: list[dict[str, Any]] = []
+    for prop, (expected_name, expected_class) in zip(properties, expected["properties"], strict=True):
+        if not isinstance(prop, dict):
+            raise SystemExit(f"{target} property entry is not an object")
+        name = prop.get("name")
+        class_name = prop.get("class_name")
+        if name != expected_name or class_name != expected_class:
+            raise SystemExit(f"{target} property shape drifted: expected {expected_name}:{expected_class}")
+        if prop.get("status") != "candidate":
+            raise SystemExit(f"{target}.{expected_name} is not a candidate property")
+        require_candidate_membership(prop, target, expected_name)
+        field_key = f"{target}.{expected_name}"
+
+        common = {
+            "target": target,
+            "field": expected_name,
+            "offset": format_hex(require_int_field(prop, "offset_internal", field_key)),
+            "offset_internal": require_int_field(prop, "offset_internal", field_key),
+            "element_size": require_int_field(prop, "element_size", field_key),
+            "array_dim": require_int_field(prop, "array_dim", field_key),
+            "property_flags": format_hex(property_flags(prop) or 0),
+            "property_class": expected_class,
+            "function_flags": format_hex(require_int_field(target_payload, "function_flags", target)),
+            "num_parms": require_int_field(target_payload, "num_parms", target),
+            "parms_size": require_int_field(target_payload, "parms_size", target),
+            "return_value_offset": format_hex(return_value_offset),
+            "source_snapshot": source_snapshot["id"],
+            "source_snapshot_sha256": source_snapshot["sha256"],
+        }
+        if field_key in STRUCTURE_RETURN_ONLY_COPIED_FIELDS:
+            bool_field_size, bool_byte_offset = require_bool_tail(prop, field_key)
+            field = classify_property(prop, return_value_offset)
+            masks = field.get("bool_masks")
+            if (
+                field["type"] != "bool"
+                or field["direction"] != "return"
+                or bool_field_size != 1
+                or bool_byte_offset != 0
+                or not isinstance(masks, dict)
+                or masks.get("byte_mask") != "0x01"
+                or masks.get("field_mask") != "0xff"
+                or prop.get("native_bool") is not False
+            ):
+                raise SystemExit(f"{field_key} copied return bool shape drifted")
+            copied.append(
+                {
+                    **common,
+                    "copied_field": field_key,
+                    "direction": "return",
+                    "type": "bool",
+                    "bool_field_size": bool_field_size,
+                    "bool_byte_offset": bool_byte_offset,
+                    "byte_mask": masks["byte_mask"],
+                    "field_mask": masks["field_mask"],
+                    "native_bool": False,
+                    "evidence_status": "copied-structure-return-bool-only",
+                }
+            )
+        elif field_key in STRUCTURE_RETURN_ONLY_REDACTED_FIELD_REASONS:
+            redacted.append(
+                {
+                    **common,
+                    "redacted_field": field_key,
+                    "reason": STRUCTURE_RETURN_ONLY_REDACTED_FIELD_REASONS[field_key],
+                    "evidence_status": "recognition-only-redacted",
+                }
+            )
+        elif target not in STRUCTURE_RETURN_ONLY_DEFERRED_REASONS:
+            raise SystemExit(f"{field_key} has no structure redaction or copy policy")
+
+    deferred: list[dict[str, Any]] = []
+    if target in STRUCTURE_RETURN_ONLY_DEFERRED_REASONS:
+        deferred.append(
+            {
+                "target": target,
+                "deferred_target": target,
+                "reason": STRUCTURE_RETURN_ONLY_DEFERRED_REASONS[target],
+                "function_flags": format_hex(require_int_field(target_payload, "function_flags", target)),
+                "num_parms": require_int_field(target_payload, "num_parms", target),
+                "parms_size": require_int_field(target_payload, "parms_size", target),
+                "return_value_offset": format_hex(return_value_offset),
+                "property_count": len(properties),
+                "source_snapshot": source_snapshot["id"],
+                "source_snapshot_sha256": source_snapshot["sha256"],
+                "evidence_status": "explicitly-deferred-target",
+            }
+        )
+    return copied, redacted, deferred
+
+
 def build_item_return_only_policy_slice(*, snapshot_root: Path = DEFAULT_SNAPSHOT_ROOT) -> dict[str, Any]:
     paths, missing_targets = snapshot_paths_from_target_sets(snapshot_root, [ITEM_RETURN_ONLY_INPUT_TARGET_SET])
     if missing_targets:
@@ -1777,6 +1999,130 @@ def build_mission_copied_bool_policy_slice(*, snapshot_root: Path = DEFAULT_SNAP
     }
 
 
+def build_structure_return_only_policy_slice(*, snapshot_root: Path = DEFAULT_SNAPSHOT_ROOT) -> dict[str, Any]:
+    paths, missing_targets = snapshot_paths_from_target_sets(snapshot_root, [STRUCTURE_RETURN_ONLY_INPUT_TARGET_SET])
+    if missing_targets:
+        raise SystemExit("structure return-only policy manifest missing targets: " + ",".join(missing_targets))
+
+    input_snapshots = []
+    copied: list[dict[str, Any]] = []
+    redacted: list[dict[str, Any]] = []
+    deferred: list[dict[str, Any]] = []
+    seen_targets: set[str] = set()
+    for index, path in enumerate(paths, start=1):
+        source_snapshot = {"id": f"snapshot-{index:04d}", "sha256": file_sha256(path)}
+        payload = load_json_file("snapshot", path)
+        targets = require_snapshot_payload(payload, path)
+        for target_payload in targets:
+            target_identity = target_payload.get("target")
+            if not isinstance(target_identity, dict):
+                raise SystemExit(f"snapshot missing target identity: {path}")
+            target = target_name(target_identity)
+            if target in seen_targets:
+                raise SystemExit(f"duplicate structure policy target: {target}")
+            seen_targets.add(target)
+            source_snapshot["target"] = target
+            input_snapshots.append(source_snapshot)
+            target_copied, target_redacted, target_deferred = require_structure_return_only_shape(
+                target_payload,
+                source_snapshot,
+            )
+            copied.extend(target_copied)
+            redacted.extend(target_redacted)
+            deferred.extend(target_deferred)
+
+    expected_input_targets = expand_ufunction_targets([STRUCTURE_RETURN_ONLY_INPUT_TARGET_SET])
+    expected_output_targets = expand_ufunction_targets([STRUCTURE_RETURN_ONLY_OUTPUT_TARGET_SET])
+    emitted_copied_fields = [entry["copied_field"] for entry in copied]
+    emitted_redacted_fields = [entry["redacted_field"] for entry in redacted]
+    emitted_deferred_targets = [entry["deferred_target"] for entry in deferred]
+    missing_input_targets = [target for target in expected_input_targets if target not in seen_targets]
+    unexpected_input_targets = [target for target in seen_targets if target not in expected_input_targets]
+    missing_output_targets = [target for target in expected_output_targets if target not in {entry["target"] for entry in copied}]
+    unexpected_output_targets = [target for target in {entry["target"] for entry in copied} if target not in expected_output_targets]
+    missing_copied_fields = [field for field in STRUCTURE_RETURN_ONLY_COPIED_FIELDS if field not in emitted_copied_fields]
+    unexpected_copied_fields = [field for field in emitted_copied_fields if field not in STRUCTURE_RETURN_ONLY_COPIED_FIELDS]
+    missing_redacted_fields = [
+        field for field in STRUCTURE_RETURN_ONLY_REDACTED_FIELD_REASONS if field not in emitted_redacted_fields
+    ]
+    unexpected_redacted_fields = [
+        field for field in emitted_redacted_fields if field not in STRUCTURE_RETURN_ONLY_REDACTED_FIELD_REASONS
+    ]
+    missing_deferred_targets = [
+        target for target in STRUCTURE_RETURN_ONLY_DEFERRED_REASONS if target not in emitted_deferred_targets
+    ]
+    unexpected_deferred_targets = [
+        target for target in emitted_deferred_targets if target not in STRUCTURE_RETURN_ONLY_DEFERRED_REASONS
+    ]
+    blockers = [
+        *[f"missing_input_target:{target}" for target in missing_input_targets],
+        *[f"unexpected_input_target:{target}" for target in unexpected_input_targets],
+        *[f"missing_output_target:{target}" for target in missing_output_targets],
+        *[f"unexpected_output_target:{target}" for target in unexpected_output_targets],
+        *[f"missing_copied_field:{field}" for field in missing_copied_fields],
+        *[f"unexpected_copied_field:{field}" for field in unexpected_copied_fields],
+        *[f"missing_redacted_field:{field}" for field in missing_redacted_fields],
+        *[f"unexpected_redacted_field:{field}" for field in unexpected_redacted_fields],
+        *[f"missing_deferred_target:{target}" for target in missing_deferred_targets],
+        *[f"unexpected_deferred_target:{target}" for target in unexpected_deferred_targets],
+    ]
+    if blockers:
+        raise SystemExit("structure return-only policy slice failed closed: " + ",".join(blockers))
+
+    return {
+        "schema": STRUCTURE_RETURN_ONLY_POLICY_SCHEMA,
+        "generated_from": {
+            "snapshot_schema": SUPPORTED_SNAPSHOT_SCHEMA,
+            "input_snapshots": input_snapshots,
+        },
+        "snapshot_root": "redacted",
+        "input_target_set": STRUCTURE_RETURN_ONLY_INPUT_TARGET_SET,
+        "output_target_set": STRUCTURE_RETURN_ONLY_OUTPUT_TARGET_SET,
+        "policy_status": "evidence-only",
+        "missing_targets": [],
+        "coverage": {
+            "status": "complete",
+            "input_targets": expected_input_targets,
+            "copied_targets": expected_output_targets,
+            "copied_fields": list(STRUCTURE_RETURN_ONLY_COPIED_FIELDS),
+            "redacted_fields": list(STRUCTURE_RETURN_ONLY_REDACTED_FIELD_REASONS),
+            "deferred_targets": list(STRUCTURE_RETURN_ONLY_DEFERRED_REASONS),
+        },
+        "copied_return_bools": copied,
+        "redacted_structure_fields": redacted,
+        "deferred_structure_targets": deferred,
+        "safety_summary": {
+            "artifact_status": "evidence_only",
+            "promotion_ready": False,
+            "intended_use": "offline_review_only",
+            "copied_bool_count": len(copied),
+            "redacted_field_count": len(redacted),
+            "deferred_target_count": len(deferred),
+            "explicitly_excluded": [
+                "AllowToggleActivation",
+                "CanSeat",
+                "ForPC",
+                "SetVariant",
+                "VerifyPinCode",
+                "identity",
+                "lookup",
+                "mutation",
+                "object_refs",
+                "pinCode",
+                "public_sdk",
+                "resource_handle",
+                "return_override",
+            ],
+        },
+        "non_claims": [
+            "does not expose UE pointers, object identity, class identity, raw params, mutation, or return overrides",
+            "does not promote public SDK callbacks or public metadata helpers",
+            "does not promote StructureEvents, identity, lookup, ResourceHandle, mutation, or return override",
+            "does not copy ForPC, VerifyPinCode, AllowToggleActivation, SetVariant, CanSeat, pin codes, object refs, or structure identity",
+        ],
+    }
+
+
 def print_text(report: dict[str, Any]) -> None:
     for signature in report["signatures"]:
         print(
@@ -1810,6 +2156,7 @@ def main() -> int:
         args.item_return_only_policy_slice,
         args.transfer_baccept_only_policy_slice,
         args.mission_copied_bool_policy_slice,
+        args.structure_return_only_policy_slice,
     ]
     if sum(1 for enabled in policy_modes if enabled) > 1:
         raise SystemExit("policy-slice modes cannot be combined")
@@ -1825,6 +2172,10 @@ def main() -> int:
         if args.target_set or args.source_target_set or args.snapshot:
             raise SystemExit("--mission-copied-bool-policy-slice cannot be combined with target-set or snapshot inputs")
         report = build_mission_copied_bool_policy_slice(snapshot_root=args.snapshot_root)
+    elif args.structure_return_only_policy_slice:
+        if args.target_set or args.source_target_set or args.snapshot:
+            raise SystemExit("--structure-return-only-policy-slice cannot be combined with target-set or snapshot inputs")
+        report = build_structure_return_only_policy_slice(snapshot_root=args.snapshot_root)
     else:
         report = build_report(
             snapshot_root=args.snapshot_root,

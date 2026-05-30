@@ -637,6 +637,134 @@ def mission_copied_bool_policy_slice_manifest(
     }
 
 
+def structure_return_only_policy_slice_manifest(
+    *,
+    policy_status: str = "evidence-only",
+    promotion_ready: bool = False,
+    copied_bool_count: int = 2,
+    redacted_field_count: int = 2,
+    deferred_target_count: int = 4,
+    missing_targets: list[str] | None = None,
+    non_claims: list[str] | None = None,
+) -> dict:
+    copied_fields = sorted(gate.REQUIRED_STRUCTURE_RETURN_ONLY_COPIED_FIELDS)
+    redacted_fields = sorted(gate.REQUIRED_STRUCTURE_RETURN_ONLY_REDACTED_FIELDS)
+    deferred_targets = sorted(gate.REQUIRED_STRUCTURE_RETURN_ONLY_DEFERRED_TARGETS)
+    if missing_targets is None:
+        missing_targets = []
+    if non_claims is None:
+        non_claims = sorted(gate.REQUIRED_STRUCTURE_RETURN_ONLY_NON_CLAIMS)
+    input_snapshots = [
+        {"id": f"snapshot-{index:04d}", "sha256": f"{index}" * 64, "target": target}
+        for index, target in enumerate(sorted(gate.REQUIRED_STRUCTURE_RETURN_ONLY_INPUT_TARGETS), start=1)
+    ]
+    source_by_target = {snapshot["target"]: snapshot for snapshot in input_snapshots}
+    copied_shapes = {
+        "PrimalStructure.AllowStructureAccess.ReturnValue": {"field": "ReturnValue", "function_flags": "0x4020400"},
+        "PrimalStructure.IsAllowedToDemolish.ReturnValue": {"field": "ReturnValue", "function_flags": "0x4020401"},
+    }
+    redacted_shapes = {
+        "PrimalStructure.AllowStructureAccess.ForPC": {"field": "ForPC", "function_flags": "0x4020400"},
+        "PrimalStructure.IsAllowedToDemolish.ForPC": {"field": "ForPC", "function_flags": "0x4020401"},
+    }
+    deferred_shapes = {
+        "PrimalStructure.SetVariant": {"function_flags": "0x4020401", "num_parms": 3, "parms_size": 6, "return_value_offset": "0x5", "property_count": 3},
+        "PrimalStructureItemContainer.AllowToggleActivation": {"function_flags": "0x4020401", "num_parms": 2, "parms_size": 9, "return_value_offset": "0x8", "property_count": 2},
+        "PrimalStructureItemContainer.VerifyPinCode": {"function_flags": "0x54020401", "num_parms": 2, "parms_size": 5, "return_value_offset": "0x4", "property_count": 2},
+        "PrimalStructureSeating.CanSeat": {"function_flags": "0x4020400", "num_parms": 4, "parms_size": 18, "return_value_offset": "0x11", "property_count": 4},
+    }
+    return {
+        "schema": gate.STRUCTURE_RETURN_ONLY_POLICY_SLICE_SCHEMA,
+        "snapshot_root": "redacted",
+        "input_target_set": "structure-observer-intake",
+        "output_target_set": "structure-return-only-policy-slice",
+        "policy_status": policy_status,
+        "missing_targets": missing_targets,
+        "generated_from": {
+            "snapshot_schema": SNAPSHOT_SCHEMA,
+            "input_snapshots": input_snapshots,
+        },
+        "coverage": {
+            "status": "complete",
+            "copied_fields": copied_fields,
+            "copied_targets": sorted(gate.REQUIRED_STRUCTURE_RETURN_ONLY_COPIED_TARGETS),
+            "redacted_fields": redacted_fields,
+            "deferred_targets": deferred_targets,
+            "input_targets": sorted(gate.REQUIRED_STRUCTURE_RETURN_ONLY_INPUT_TARGETS),
+        },
+        "copied_return_bools": [
+            {
+                "target": field.rsplit(".", 1)[0],
+                "copied_field": field,
+                "direction": "return",
+                "type": "bool",
+                "property_class": "BoolProperty",
+                "bool_field_size": 1,
+                "bool_byte_offset": 0,
+                "offset": "0x8",
+                "offset_internal": 8,
+                "element_size": 1,
+                "array_dim": 1,
+                "byte_mask": "0x01",
+                "field_mask": "0xff",
+                "native_bool": False,
+                "num_parms": 2,
+                "parms_size": 9,
+                "return_value_offset": "0x8",
+                "property_flags": "0x1040000780",
+                "evidence_status": "copied-structure-return-bool-only",
+                "source_snapshot": source_by_target[field.rsplit(".", 1)[0]]["id"],
+                "source_snapshot_sha256": source_by_target[field.rsplit(".", 1)[0]]["sha256"],
+                **copied_shapes[field],
+            }
+            for field in copied_fields
+        ],
+        "redacted_structure_fields": [
+            {
+                "target": field.rsplit(".", 1)[0],
+                "redacted_field": field,
+                "reason": "unit_test_redacted",
+                "property_class": "ObjectProperty",
+                "offset": "0x0",
+                "offset_internal": 0,
+                "element_size": 8,
+                "array_dim": 1,
+                "num_parms": 2,
+                "parms_size": 9,
+                "return_value_offset": "0x8",
+                "property_flags": "0x1040000280",
+                "evidence_status": "recognition-only-redacted",
+                "source_snapshot": source_by_target[field.rsplit(".", 1)[0]]["id"],
+                "source_snapshot_sha256": source_by_target[field.rsplit(".", 1)[0]]["sha256"],
+                **redacted_shapes[field],
+            }
+            for field in redacted_fields
+        ],
+        "deferred_structure_targets": [
+            {
+                "target": target,
+                "deferred_target": target,
+                "reason": "unit_test_deferred",
+                "evidence_status": "explicitly-deferred-target",
+                "source_snapshot": source_by_target[target]["id"],
+                "source_snapshot_sha256": source_by_target[target]["sha256"],
+                **deferred_shapes[target],
+            }
+            for target in deferred_targets
+        ],
+        "non_claims": non_claims,
+        "safety_summary": {
+            "artifact_status": "evidence_only",
+            "intended_use": "offline_review_only",
+            "promotion_ready": promotion_ready,
+            "copied_bool_count": copied_bool_count,
+            "redacted_field_count": redacted_field_count,
+            "deferred_target_count": deferred_target_count,
+            "explicitly_excluded": sorted(gate.REQUIRED_STRUCTURE_RETURN_ONLY_EXPLICIT_EXCLUSIONS),
+        },
+    }
+
+
 def rc_ufunction_second_source_root_manifest(root: Path) -> dict:
     expected_sources = gate.expected_rc_ufunction_target_sources()
     assert expected_sources is not None
@@ -3030,6 +3158,127 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("mission_copied_bool_policy_public_overclaim_runtime_ready", reasons)
         self.assertIn("mission_copied_bool_policy_input_target_set_mismatch", reasons)
         self.assertIn("mission_copied_bool_policy_input_snapshot_count_mismatch", reasons)
+
+    def test_accepts_structure_return_only_policy_slice_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "structure-return-policy.json"
+            write_json(manifest, structure_return_only_policy_slice_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual(result["blockers"], [])
+
+    def test_blocks_structure_return_only_policy_slice_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "structure-return-policy.json"
+            write_json(manifest, structure_return_only_policy_slice_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("promote_mode_structure_return_policy_slice_evidence_only", reasons)
+
+    def test_blocks_structure_return_only_policy_slice_with_bad_counts_or_boundaries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "structure-return-policy.json"
+            payload = structure_return_only_policy_slice_manifest(
+                policy_status="accepted",
+                promotion_ready=True,
+                copied_bool_count=1,
+                redacted_field_count=1,
+                deferred_target_count=3,
+                missing_targets=["PrimalStructureItemContainer.VerifyPinCode"],
+                non_claims=["does not copy ForPC"],
+            )
+            payload["copied_return_bools"] = payload["copied_return_bools"][:-1]
+            payload["redacted_structure_fields"] = payload["redacted_structure_fields"][:-1]
+            payload["deferred_structure_targets"] = payload["deferred_structure_targets"][:-1]
+            payload["coverage"]["copied_fields"] = payload["coverage"]["copied_fields"][:-1]
+            payload["coverage"]["redacted_fields"] = payload["coverage"]["redacted_fields"][:-1]
+            payload["coverage"]["deferred_targets"] = payload["coverage"]["deferred_targets"][:-1]
+            payload["coverage"]["input_targets"] = ["PrimalStructure.AllowStructureAccess"]
+            payload["coverage"]["copied_targets"] = ["PrimalStructure.AllowStructureAccess"]
+            payload["safety_summary"]["explicitly_excluded"] = ["ForPC"]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("structure_return_policy_status_not_evidence_only", reasons)
+        self.assertIn("structure_return_policy_missing_targets_present", reasons)
+        self.assertIn("structure_return_policy_promotion_ready_not_false", reasons)
+        self.assertIn("structure_return_policy_copied_bool_count_mismatch", reasons)
+        self.assertIn("structure_return_policy_redacted_field_count_mismatch", reasons)
+        self.assertIn("structure_return_policy_deferred_target_count_mismatch", reasons)
+        self.assertIn("structure_return_policy_copied_return_bools_count_mismatch", reasons)
+        self.assertIn("structure_return_policy_redacted_fields_count_mismatch", reasons)
+        self.assertIn("structure_return_policy_deferred_targets_count_mismatch", reasons)
+        self.assertIn("structure_return_policy_coverage_input_targets_mismatch", reasons)
+        self.assertIn("structure_return_policy_coverage_copied_targets_mismatch", reasons)
+        self.assertIn("structure_return_policy_coverage_copied_fields_mismatch", reasons)
+        self.assertIn("structure_return_policy_coverage_redacted_fields_mismatch", reasons)
+        self.assertIn("structure_return_policy_coverage_deferred_targets_mismatch", reasons)
+        self.assertIn("structure_return_policy_non_claims_missing_required_boundaries", reasons)
+        self.assertIn("structure_return_policy_explicit_exclusions_missing_internal_boundaries", reasons)
+
+    def test_blocks_structure_return_only_policy_slice_with_tampered_shape_or_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "structure-return-policy.json"
+            payload = structure_return_only_policy_slice_manifest()
+            payload["copied_return_bools"][0]["property_flags"] = "0x80"
+            payload["copied_return_bools"][0]["bool_byte_offset"] = 1
+            payload["copied_return_bools"][0]["source_snapshot_sha256"] = "7" * 64
+            payload["redacted_structure_fields"][0]["offset"] = "0x40"
+            payload["deferred_structure_targets"][0]["property_count"] = 99
+            payload["deferred_structure_targets"][1]["source_snapshot"] = payload["copied_return_bools"][0]["source_snapshot"]
+            payload["deferred_structure_targets"][1]["source_snapshot_sha256"] = next(
+                snapshot["sha256"]
+                for snapshot in payload["generated_from"]["input_snapshots"]
+                if snapshot["id"] == payload["copied_return_bools"][0]["source_snapshot"]
+            )
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("structure_return_policy_copied_bool_shape_mismatch", reasons)
+        self.assertIn("structure_return_policy_copied_bool_source_snapshot_sha256_mismatch", reasons)
+        self.assertIn("structure_return_policy_redacted_field_shape_mismatch", reasons)
+        self.assertIn("structure_return_policy_deferred_target_shape_mismatch", reasons)
+        self.assertIn("structure_return_policy_deferred_target_source_snapshot_target_mismatch", reasons)
+
+    def test_blocks_structure_return_only_policy_slice_public_runtime_overclaim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "structure-return-policy.json"
+            payload = structure_return_only_policy_slice_manifest()
+            payload["runtime_ready"] = True
+            payload["public_structure_events_ready"] = True
+            payload["claim"] = "public SDK ready"
+            payload["structure_claim"] = "public StructureEvents ready"
+            payload["runtime_claim"] = "runtime ready"
+            payload["input_target_set"] = "structure-public-events-intake"
+            payload["generated_from"]["input_snapshots"] = payload["generated_from"]["input_snapshots"][:2]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("structure_return_policy_readiness_overclaim", reasons)
+        self.assertIn("structure_return_policy_public_overclaim_public_sdk", reasons)
+        self.assertIn("structure_return_policy_public_overclaim_public_structure_events", reasons)
+        self.assertIn("structure_return_policy_public_overclaim_runtime_ready", reasons)
+        self.assertIn("structure_return_policy_input_target_set_mismatch", reasons)
+        self.assertIn("structure_return_policy_input_snapshot_count_mismatch", reasons)
 
     def test_accepts_static_global_promotion_evidence_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

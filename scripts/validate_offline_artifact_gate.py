@@ -45,6 +45,7 @@ WEAK_HELPER_POLARITY_CALLER_MODE_REPORT_SCHEMA = "obelisk.weak-helper-polarity-c
 ITEM_RETURN_ONLY_POLICY_SLICE_SCHEMA = "obelisk.item-return-only-policy-slice.v1"
 TRANSFER_BACCEPT_ONLY_POLICY_SLICE_SCHEMA = "obelisk.transfer-baccept-only-policy-slice.v1"
 MISSION_COPIED_BOOL_POLICY_SLICE_SCHEMA = "obelisk.mission-copied-bool-policy-slice.v1"
+STRUCTURE_RETURN_ONLY_POLICY_SLICE_SCHEMA = "obelisk.structure-return-only-policy-slice.v1"
 SUPPORTED_MANIFEST_SCHEMAS = {
     CORE_DUMP_EVIDENCE_PACK_SCHEMA,
     GOBJECTS_TWO_CORE_MANIFEST_SCHEMA,
@@ -66,6 +67,7 @@ SUPPORTED_MANIFEST_SCHEMAS = {
     ITEM_RETURN_ONLY_POLICY_SLICE_SCHEMA,
     TRANSFER_BACCEPT_ONLY_POLICY_SLICE_SCHEMA,
     MISSION_COPIED_BOOL_POLICY_SLICE_SCHEMA,
+    STRUCTURE_RETURN_ONLY_POLICY_SLICE_SCHEMA,
 }
 UOBJECT_FLAG_TRANSITION_PROVENANCE_SCHEMAS = {
     "obelisk.offline-artifact-provenance.v1",
@@ -284,6 +286,53 @@ REQUIRED_MISSION_COPIED_BOOL_EXPLICIT_EXCLUSIONS = {
     "resource_handle",
     "return_override",
     "runtime_markers",
+}
+REQUIRED_STRUCTURE_RETURN_ONLY_COPIED_FIELDS = {
+    "PrimalStructure.AllowStructureAccess.ReturnValue",
+    "PrimalStructure.IsAllowedToDemolish.ReturnValue",
+}
+REQUIRED_STRUCTURE_RETURN_ONLY_REDACTED_FIELDS = {
+    "PrimalStructure.AllowStructureAccess.ForPC",
+    "PrimalStructure.IsAllowedToDemolish.ForPC",
+}
+REQUIRED_STRUCTURE_RETURN_ONLY_INPUT_TARGETS = {
+    "PrimalStructure.AllowStructureAccess",
+    "PrimalStructure.IsAllowedToDemolish",
+    "PrimalStructure.SetVariant",
+    "PrimalStructureItemContainer.AllowToggleActivation",
+    "PrimalStructureItemContainer.VerifyPinCode",
+    "PrimalStructureSeating.CanSeat",
+}
+REQUIRED_STRUCTURE_RETURN_ONLY_COPIED_TARGETS = {
+    "PrimalStructure.AllowStructureAccess",
+    "PrimalStructure.IsAllowedToDemolish",
+}
+REQUIRED_STRUCTURE_RETURN_ONLY_DEFERRED_TARGETS = {
+    "PrimalStructure.SetVariant",
+    "PrimalStructureItemContainer.AllowToggleActivation",
+    "PrimalStructureItemContainer.VerifyPinCode",
+    "PrimalStructureSeating.CanSeat",
+}
+REQUIRED_STRUCTURE_RETURN_ONLY_NON_CLAIMS = {
+    "does not expose UE pointers, object identity, class identity, raw params, mutation, or return overrides",
+    "does not promote public SDK callbacks or public metadata helpers",
+    "does not promote StructureEvents, identity, lookup, ResourceHandle, mutation, or return override",
+    "does not copy ForPC, VerifyPinCode, AllowToggleActivation, SetVariant, CanSeat, pin codes, object refs, or structure identity",
+}
+REQUIRED_STRUCTURE_RETURN_ONLY_EXPLICIT_EXCLUSIONS = {
+    "AllowToggleActivation",
+    "CanSeat",
+    "ForPC",
+    "SetVariant",
+    "VerifyPinCode",
+    "identity",
+    "lookup",
+    "mutation",
+    "object_refs",
+    "pinCode",
+    "public_sdk",
+    "resource_handle",
+    "return_override",
 }
 REQUIRED_UOBJECT_FLAG_POLICY_WINDOWS = {
     "weak_helper_reject_0x100",
@@ -3137,6 +3186,272 @@ def validate_mission_copied_bool_policy_slice_manifest(payload: dict[str, Any], 
     return blockers
 
 
+def validate_structure_return_only_policy_slice_manifest(payload: dict[str, Any], *, label: str, mode: str) -> list[dict[str, Any]]:
+    if payload.get("schema") != STRUCTURE_RETURN_ONLY_POLICY_SLICE_SCHEMA:
+        return []
+
+    blockers: list[dict[str, Any]] = []
+    safety_summary = payload.get("safety_summary")
+    if not isinstance(safety_summary, dict):
+        blockers.append({"reason": "structure_return_policy_safety_summary_missing", "label": f"{label}:$.safety_summary"})
+        return blockers
+
+    if payload.get("policy_status") != "evidence-only":
+        blockers.append({"reason": "structure_return_policy_status_not_evidence_only", "label": f"{label}:$.policy_status"})
+    if payload.get("snapshot_root") != "redacted":
+        blockers.append({"reason": "structure_return_policy_snapshot_root_not_redacted", "label": f"{label}:$.snapshot_root"})
+    if payload.get("input_target_set") != "structure-observer-intake":
+        blockers.append({"reason": "structure_return_policy_input_target_set_mismatch", "label": f"{label}:$.input_target_set"})
+    if payload.get("output_target_set") != "structure-return-only-policy-slice":
+        blockers.append({"reason": "structure_return_policy_output_target_set_mismatch", "label": f"{label}:$.output_target_set"})
+    if payload.get("missing_targets") != []:
+        blockers.append({"reason": "structure_return_policy_missing_targets_present", "label": f"{label}:$.missing_targets"})
+
+    input_snapshot_sources: dict[str, dict[str, str]] = {}
+    generated_from = payload.get("generated_from")
+    if not isinstance(generated_from, dict):
+        blockers.append({"reason": "structure_return_policy_generated_from_missing", "label": f"{label}:$.generated_from"})
+    else:
+        if generated_from.get("snapshot_schema") != RC_UFUNCTION_SNAPSHOT_SCHEMA:
+            blockers.append({"reason": "structure_return_policy_snapshot_schema_mismatch", "label": f"{label}:$.generated_from.snapshot_schema"})
+        input_snapshots = generated_from.get("input_snapshots")
+        if not isinstance(input_snapshots, list) or len(input_snapshots) != len(REQUIRED_STRUCTURE_RETURN_ONLY_INPUT_TARGETS):
+            blockers.append({"reason": "structure_return_policy_input_snapshot_count_mismatch", "label": f"{label}:$.generated_from.input_snapshots"})
+        else:
+            for index, snapshot in enumerate(input_snapshots):
+                snapshot_label = f"{label}:$.generated_from.input_snapshots[{index}]"
+                if not isinstance(snapshot, dict):
+                    blockers.append({"reason": "structure_return_policy_input_snapshot_entry_invalid", "label": snapshot_label})
+                    continue
+                snapshot_id = snapshot.get("id")
+                snapshot_sha256 = snapshot.get("sha256")
+                snapshot_target = snapshot.get("target")
+                if not isinstance(snapshot_id, str) or not snapshot_id:
+                    blockers.append({"reason": "structure_return_policy_input_snapshot_id_invalid", "label": f"{snapshot_label}.id"})
+                    continue
+                if snapshot_id in input_snapshot_sources:
+                    blockers.append({"reason": "structure_return_policy_input_snapshot_id_duplicate", "label": f"{snapshot_label}.id"})
+                if not isinstance(snapshot_sha256, str) or SHA256_RE.fullmatch(snapshot_sha256) is None:
+                    blockers.append({"reason": "structure_return_policy_input_snapshot_sha256_invalid", "label": f"{snapshot_label}.sha256"})
+                    continue
+                if not isinstance(snapshot_target, str) or snapshot_target not in REQUIRED_STRUCTURE_RETURN_ONLY_INPUT_TARGETS:
+                    blockers.append({"reason": "structure_return_policy_input_snapshot_target_invalid", "label": f"{snapshot_label}.target"})
+                    continue
+                input_snapshot_sources[snapshot_id] = {"sha256": snapshot_sha256, "target": snapshot_target}
+            if {entry["target"] for entry in input_snapshot_sources.values()} != REQUIRED_STRUCTURE_RETURN_ONLY_INPUT_TARGETS:
+                blockers.append({"reason": "structure_return_policy_input_snapshot_targets_mismatch", "label": f"{label}:$.generated_from.input_snapshots"})
+
+    if safety_summary.get("artifact_status") != "evidence_only":
+        blockers.append({"reason": "structure_return_policy_artifact_status_not_evidence_only", "label": f"{label}:$.safety_summary.artifact_status"})
+    if safety_summary.get("intended_use") != "offline_review_only":
+        blockers.append({"reason": "structure_return_policy_intended_use_not_offline_review_only", "label": f"{label}:$.safety_summary.intended_use"})
+    if safety_summary.get("promotion_ready") is not False:
+        blockers.append({"reason": "structure_return_policy_promotion_ready_not_false", "label": f"{label}:$.safety_summary.promotion_ready"})
+    if safety_summary.get("copied_bool_count") != len(REQUIRED_STRUCTURE_RETURN_ONLY_COPIED_FIELDS):
+        blockers.append({"reason": "structure_return_policy_copied_bool_count_mismatch", "label": f"{label}:$.safety_summary.copied_bool_count"})
+    if safety_summary.get("redacted_field_count") != len(REQUIRED_STRUCTURE_RETURN_ONLY_REDACTED_FIELDS):
+        blockers.append({"reason": "structure_return_policy_redacted_field_count_mismatch", "label": f"{label}:$.safety_summary.redacted_field_count"})
+    if safety_summary.get("deferred_target_count") != len(REQUIRED_STRUCTURE_RETURN_ONLY_DEFERRED_TARGETS):
+        blockers.append({"reason": "structure_return_policy_deferred_target_count_mismatch", "label": f"{label}:$.safety_summary.deferred_target_count"})
+
+    copied_expected_shapes = {
+        "PrimalStructure.AllowStructureAccess.ReturnValue": {"target": "PrimalStructure.AllowStructureAccess", "field": "ReturnValue", "offset": "0x8", "offset_internal": 8, "function_flags": "0x4020400"},
+        "PrimalStructure.IsAllowedToDemolish.ReturnValue": {"target": "PrimalStructure.IsAllowedToDemolish", "field": "ReturnValue", "offset": "0x8", "offset_internal": 8, "function_flags": "0x4020401"},
+    }
+    copied_bools = payload.get("copied_return_bools")
+    if not isinstance(copied_bools, list) or len(copied_bools) != len(REQUIRED_STRUCTURE_RETURN_ONLY_COPIED_FIELDS):
+        blockers.append({"reason": "structure_return_policy_copied_return_bools_count_mismatch", "label": f"{label}:$.copied_return_bools"})
+    else:
+        copied_fields = {entry.get("copied_field") for entry in copied_bools if isinstance(entry, dict)}
+        if copied_fields != REQUIRED_STRUCTURE_RETURN_ONLY_COPIED_FIELDS:
+            blockers.append({"reason": "structure_return_policy_copied_fields_mismatch", "label": f"{label}:$.copied_return_bools"})
+        for index, entry in enumerate(copied_bools):
+            entry_label = f"{label}:$.copied_return_bools[{index}]"
+            if not isinstance(entry, dict):
+                blockers.append({"reason": "structure_return_policy_copied_bool_entry_invalid", "label": entry_label})
+                continue
+            copied_field = entry.get("copied_field")
+            expected_shape = copied_expected_shapes.get(copied_field)
+            if expected_shape is None:
+                blockers.append({"reason": "structure_return_policy_copied_bool_shape_unknown", "label": entry_label})
+            else:
+                expected_common = {
+                    **expected_shape,
+                    "direction": "return",
+                    "type": "bool",
+                    "property_class": "BoolProperty",
+                    "bool_field_size": 1,
+                    "bool_byte_offset": 0,
+                    "element_size": 1,
+                    "array_dim": 1,
+                    "byte_mask": "0x01",
+                    "field_mask": "0xff",
+                    "native_bool": False,
+                    "num_parms": 2,
+                    "parms_size": 9,
+                    "return_value_offset": "0x8",
+                    "property_flags": "0x1040000780",
+                    "evidence_status": "copied-structure-return-bool-only",
+                }
+                for key, expected in expected_common.items():
+                    if entry.get(key) != expected:
+                        blockers.append({"reason": "structure_return_policy_copied_bool_shape_mismatch", "label": f"{entry_label}.{key}", "expected": expected, "recorded": entry.get(key)})
+            source_snapshot = entry.get("source_snapshot")
+            source_snapshot_sha256 = entry.get("source_snapshot_sha256")
+            if not isinstance(source_snapshot, str) or source_snapshot not in input_snapshot_sources:
+                blockers.append({"reason": "structure_return_policy_copied_bool_source_snapshot_unknown", "label": f"{entry_label}.source_snapshot"})
+            elif source_snapshot_sha256 != input_snapshot_sources[source_snapshot]["sha256"]:
+                blockers.append({"reason": "structure_return_policy_copied_bool_source_snapshot_sha256_mismatch", "label": f"{entry_label}.source_snapshot_sha256"})
+            elif entry.get("target") != input_snapshot_sources[source_snapshot]["target"]:
+                blockers.append({"reason": "structure_return_policy_copied_bool_source_snapshot_target_mismatch", "label": f"{entry_label}.source_snapshot"})
+
+    redacted_expected_shapes = {
+        "PrimalStructure.AllowStructureAccess.ForPC": {"target": "PrimalStructure.AllowStructureAccess", "field": "ForPC", "function_flags": "0x4020400"},
+        "PrimalStructure.IsAllowedToDemolish.ForPC": {"target": "PrimalStructure.IsAllowedToDemolish", "field": "ForPC", "function_flags": "0x4020401"},
+    }
+    redacted_entries = payload.get("redacted_structure_fields")
+    if not isinstance(redacted_entries, list) or len(redacted_entries) != len(REQUIRED_STRUCTURE_RETURN_ONLY_REDACTED_FIELDS):
+        blockers.append({"reason": "structure_return_policy_redacted_fields_count_mismatch", "label": f"{label}:$.redacted_structure_fields"})
+    else:
+        redacted_fields = {entry.get("redacted_field") for entry in redacted_entries if isinstance(entry, dict)}
+        if redacted_fields != REQUIRED_STRUCTURE_RETURN_ONLY_REDACTED_FIELDS:
+            blockers.append({"reason": "structure_return_policy_redacted_fields_mismatch", "label": f"{label}:$.redacted_structure_fields"})
+        for index, entry in enumerate(redacted_entries):
+            entry_label = f"{label}:$.redacted_structure_fields[{index}]"
+            if not isinstance(entry, dict):
+                blockers.append({"reason": "structure_return_policy_redacted_field_entry_invalid", "label": entry_label})
+                continue
+            redacted_field = entry.get("redacted_field")
+            expected_shape = redacted_expected_shapes.get(redacted_field)
+            expected_common = {
+                **(expected_shape or {}),
+                "property_class": "ObjectProperty",
+                "offset": "0x0",
+                "offset_internal": 0,
+                "element_size": 8,
+                "array_dim": 1,
+                "num_parms": 2,
+                "parms_size": 9,
+                "return_value_offset": "0x8",
+                "property_flags": "0x1040000280",
+            }
+            if expected_shape is None:
+                blockers.append({"reason": "structure_return_policy_redacted_field_shape_unknown", "label": entry_label})
+            else:
+                for key, expected in expected_common.items():
+                    if entry.get(key) != expected:
+                        blockers.append({"reason": "structure_return_policy_redacted_field_shape_mismatch", "label": f"{entry_label}.{key}", "expected": expected, "recorded": entry.get(key)})
+            if entry.get("evidence_status") != "recognition-only-redacted":
+                blockers.append({"reason": "structure_return_policy_redacted_field_evidence_status_mismatch", "label": f"{entry_label}.evidence_status"})
+            source_snapshot = entry.get("source_snapshot")
+            source_snapshot_sha256 = entry.get("source_snapshot_sha256")
+            if not isinstance(source_snapshot, str) or source_snapshot not in input_snapshot_sources:
+                blockers.append({"reason": "structure_return_policy_redacted_field_source_snapshot_unknown", "label": f"{entry_label}.source_snapshot"})
+            elif source_snapshot_sha256 != input_snapshot_sources[source_snapshot]["sha256"]:
+                blockers.append({"reason": "structure_return_policy_redacted_field_source_snapshot_sha256_mismatch", "label": f"{entry_label}.source_snapshot_sha256"})
+            elif entry.get("target") != input_snapshot_sources[source_snapshot]["target"]:
+                blockers.append({"reason": "structure_return_policy_redacted_field_source_snapshot_target_mismatch", "label": f"{entry_label}.source_snapshot"})
+
+    deferred_expected_shapes = {
+        "PrimalStructure.SetVariant": {"function_flags": "0x4020401", "num_parms": 3, "parms_size": 6, "return_value_offset": "0x5", "property_count": 3},
+        "PrimalStructureItemContainer.AllowToggleActivation": {"function_flags": "0x4020401", "num_parms": 2, "parms_size": 9, "return_value_offset": "0x8", "property_count": 2},
+        "PrimalStructureItemContainer.VerifyPinCode": {"function_flags": "0x54020401", "num_parms": 2, "parms_size": 5, "return_value_offset": "0x4", "property_count": 2},
+        "PrimalStructureSeating.CanSeat": {"function_flags": "0x4020400", "num_parms": 4, "parms_size": 18, "return_value_offset": "0x11", "property_count": 4},
+    }
+    deferred_entries = payload.get("deferred_structure_targets")
+    if not isinstance(deferred_entries, list) or len(deferred_entries) != len(REQUIRED_STRUCTURE_RETURN_ONLY_DEFERRED_TARGETS):
+        blockers.append({"reason": "structure_return_policy_deferred_targets_count_mismatch", "label": f"{label}:$.deferred_structure_targets"})
+    else:
+        deferred_targets = {entry.get("deferred_target") for entry in deferred_entries if isinstance(entry, dict)}
+        if deferred_targets != REQUIRED_STRUCTURE_RETURN_ONLY_DEFERRED_TARGETS:
+            blockers.append({"reason": "structure_return_policy_deferred_targets_mismatch", "label": f"{label}:$.deferred_structure_targets"})
+        for index, entry in enumerate(deferred_entries):
+            entry_label = f"{label}:$.deferred_structure_targets[{index}]"
+            if not isinstance(entry, dict):
+                blockers.append({"reason": "structure_return_policy_deferred_target_entry_invalid", "label": entry_label})
+                continue
+            deferred_target = entry.get("deferred_target")
+            expected_shape = deferred_expected_shapes.get(deferred_target)
+            if expected_shape is None:
+                blockers.append({"reason": "structure_return_policy_deferred_target_shape_unknown", "label": entry_label})
+            else:
+                if entry.get("target") != deferred_target:
+                    blockers.append({"reason": "structure_return_policy_deferred_target_mismatch", "label": f"{entry_label}.target"})
+                for key, expected in expected_shape.items():
+                    if entry.get(key) != expected:
+                        blockers.append({"reason": "structure_return_policy_deferred_target_shape_mismatch", "label": f"{entry_label}.{key}", "expected": expected, "recorded": entry.get(key)})
+            if entry.get("evidence_status") != "explicitly-deferred-target":
+                blockers.append({"reason": "structure_return_policy_deferred_target_evidence_status_mismatch", "label": f"{entry_label}.evidence_status"})
+            source_snapshot = entry.get("source_snapshot")
+            source_snapshot_sha256 = entry.get("source_snapshot_sha256")
+            if not isinstance(source_snapshot, str) or source_snapshot not in input_snapshot_sources:
+                blockers.append({"reason": "structure_return_policy_deferred_target_source_snapshot_unknown", "label": f"{entry_label}.source_snapshot"})
+            elif source_snapshot_sha256 != input_snapshot_sources[source_snapshot]["sha256"]:
+                blockers.append({"reason": "structure_return_policy_deferred_target_source_snapshot_sha256_mismatch", "label": f"{entry_label}.source_snapshot_sha256"})
+            elif entry.get("target") != input_snapshot_sources[source_snapshot]["target"]:
+                blockers.append({"reason": "structure_return_policy_deferred_target_source_snapshot_target_mismatch", "label": f"{entry_label}.source_snapshot"})
+
+    coverage = payload.get("coverage")
+    if not isinstance(coverage, dict):
+        blockers.append({"reason": "structure_return_policy_coverage_missing", "label": f"{label}:$.coverage"})
+    else:
+        if coverage.get("status") != "complete":
+            blockers.append({"reason": "structure_return_policy_coverage_not_complete", "label": f"{label}:$.coverage.status"})
+        if set(coverage.get("input_targets") or []) != REQUIRED_STRUCTURE_RETURN_ONLY_INPUT_TARGETS:
+            blockers.append({"reason": "structure_return_policy_coverage_input_targets_mismatch", "label": f"{label}:$.coverage.input_targets"})
+        if set(coverage.get("copied_targets") or []) != REQUIRED_STRUCTURE_RETURN_ONLY_COPIED_TARGETS:
+            blockers.append({"reason": "structure_return_policy_coverage_copied_targets_mismatch", "label": f"{label}:$.coverage.copied_targets"})
+        if set(coverage.get("copied_fields") or []) != REQUIRED_STRUCTURE_RETURN_ONLY_COPIED_FIELDS:
+            blockers.append({"reason": "structure_return_policy_coverage_copied_fields_mismatch", "label": f"{label}:$.coverage.copied_fields"})
+        if set(coverage.get("redacted_fields") or []) != REQUIRED_STRUCTURE_RETURN_ONLY_REDACTED_FIELDS:
+            blockers.append({"reason": "structure_return_policy_coverage_redacted_fields_mismatch", "label": f"{label}:$.coverage.redacted_fields"})
+        if set(coverage.get("deferred_targets") or []) != REQUIRED_STRUCTURE_RETURN_ONLY_DEFERRED_TARGETS:
+            blockers.append({"reason": "structure_return_policy_coverage_deferred_targets_mismatch", "label": f"{label}:$.coverage.deferred_targets"})
+
+    non_claims = payload.get("non_claims")
+    if not isinstance(non_claims, list) or not REQUIRED_STRUCTURE_RETURN_ONLY_NON_CLAIMS.issubset(set(non_claims)):
+        blockers.append({"reason": "structure_return_policy_non_claims_missing_required_boundaries", "label": f"{label}:$.non_claims"})
+    explicitly_excluded = safety_summary.get("explicitly_excluded")
+    if not isinstance(explicitly_excluded, list) or not REQUIRED_STRUCTURE_RETURN_ONLY_EXPLICIT_EXCLUSIONS.issubset(set(explicitly_excluded)):
+        blockers.append({"reason": "structure_return_policy_explicit_exclusions_missing_internal_boundaries", "label": f"{label}:$.safety_summary.explicitly_excluded"})
+
+    if mode == "promote":
+        blockers.append({"reason": "promote_mode_structure_return_policy_slice_evidence_only", "label": label})
+    for trail, _ in collect_ready_overclaims(payload):
+        blockers.append({"reason": "structure_return_policy_readiness_overclaim", "label": f"{label}:{trail}"})
+    for trail, value in collect_bool_fields(payload):
+        if value is True and trail.rsplit(".", 1)[-1] in {
+            "dispatcher_ready",
+            "identity_ready",
+            "lookup_ready",
+            "mutation_ready",
+            "public_api_ready",
+            "public_sdk_ready",
+            "public_structure_events_ready",
+            "resource_handle_ready",
+            "return_override_ready",
+            "runtime_hook_ready",
+            "structure_events_ready",
+        }:
+            blockers.append({"reason": "structure_return_policy_readiness_overclaim", "label": f"{label}:{trail}"})
+    for trail, _, reason in collect_candidate_public_overclaims(
+        payload,
+        allowed_prefixes=(
+            "$.non_claims",
+            "$.safety_summary.explicitly_excluded",
+        ),
+    ):
+        blockers.append({"reason": f"structure_return_policy_public_overclaim_{reason}", "label": f"{label}:{trail}"})
+    for trail, raw_value in collect_string_fields(payload):
+        if trail.startswith("$.non_claims") or trail.startswith("$.safety_summary.explicitly_excluded"):
+            continue
+        text = raw_value.casefold()
+        if "structureevents" in text or "structure events" in text:
+            blockers.append({"reason": "structure_return_policy_public_overclaim_public_structure_events", "label": f"{label}:{trail}"})
+
+    return blockers
+
+
 def validate_static_global_promotion_evidence_manifest(
     payload: dict[str, Any],
     *,
@@ -4983,6 +5298,7 @@ def validate_manifest(
     blockers.extend(validate_item_return_only_policy_slice_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_transfer_baccept_only_policy_slice_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_mission_copied_bool_policy_slice_manifest(payload, label=str(resolved), mode=mode))
+    blockers.extend(validate_structure_return_only_policy_slice_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_gobjects_two_core_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_static_global_promotion_evidence_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_resource_handle_revalidation_evaluator_manifest(payload, label=str(resolved), mode=mode))

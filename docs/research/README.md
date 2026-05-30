@@ -9,10 +9,10 @@ hash, and runtime flags.
 
 Historical module-specific notes, especially early chat reflection notes, remain indexed as
 evidence trails. Treat them as examples of the common reflection and promotion-gate ladder,
-not as the current product center. For RC work, follow `docs/agent-handoff/CURRENT.md` and
-the RC required path below; broad UE4 reflection, FName/GObjects expansion, and new module
-surface discovery are post-RC unless a new binary hash or contradictory evidence changes
-the active routing.
+not as the current product center. For contributor-facing release scope, use
+`docs/STATUS.md` and `docs/RELEASE.md` plus the RC evidence path below; broad UE4
+reflection, FName/GObjects expansion, and new module surface discovery are post-RC unless a
+new binary hash or contradictory evidence changes the active routing.
 
 ## Start Here
 
@@ -29,6 +29,7 @@ RC required path:
 - [2026-05-29-minimal-second-source-readiness.md](2026-05-29-minimal-second-source-readiness.md)
 - [2026-05-29-public-gameplay-event-readiness-audit.md](2026-05-29-public-gameplay-event-readiness-audit.md)
 - [2026-05-29-chat-message-second-source-readiness.md](2026-05-29-chat-message-second-source-readiness.md)
+- [2026-05-30-rc-second-source-release-gate-check.md](2026-05-30-rc-second-source-release-gate-check.md)
 
 Current UE4 reflection evidence ledger:
 
@@ -60,6 +61,7 @@ Post-RC/research candidates:
 - [2026-05-29-transfer-second-source-readiness.md](2026-05-29-transfer-second-source-readiness.md)
 - [2026-05-29-transfer-copied-scalar-feasibility.md](2026-05-29-transfer-copied-scalar-feasibility.md)
 - [2026-05-30-redacted-scriptstruct-signatures.md](2026-05-30-redacted-scriptstruct-signatures.md)
+- [2026-05-30-structure-return-only-policy-slice.md](2026-05-30-structure-return-only-policy-slice.md)
 - [2026-05-28-fname-index-manifest-plan.md](2026-05-28-fname-index-manifest-plan.md)
 - [2026-05-29-ghidra-fuobjectarray-field-window-probe.md](2026-05-29-ghidra-fuobjectarray-field-window-probe.md)
 - [2026-05-29-resource-handle-revalidation-evaluator.md](2026-05-29-resource-handle-revalidation-evaluator.md)
