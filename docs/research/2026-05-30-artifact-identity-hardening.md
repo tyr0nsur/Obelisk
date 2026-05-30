@@ -31,11 +31,10 @@ The offline artifact gate now requires complete static-global identity, safe IDs
 valid SHA256, and matching canonical hash. Consume mode still fails closed on bad
 identity; promote mode remains blocked by static-only evidence and existing blockers.
 
-## Next Strict-Identity Step
+## UObject Flag-Policy Evidence
 
-`reconcile_gobjects_samples.py` and static-global evidence now produce complete top-level
-identity. The remaining direct ResourceHandle strict input is the UObject flag-policy
-report:
+`reconcile_gobjects_samples.py`, static-global evidence, and the UObject flag-policy
+report now produce complete top-level identity:
 
 ```text
 scripts/build_uobject_flag_policy_report.py
@@ -43,12 +42,28 @@ scripts/run_uobject_flag_policy_refresh.py
 scripts/evaluate_resource_handle_revalidation.py
 ```
 
-Strict mode should classify the UObject flag-policy report identity the same way it
-classifies reconciliation and static-global inputs. Missing, partial, or invalid policy
-identity must keep `promotion_ready=false`, `public_resource_handle_ready=false`, and
-`post_callback_resource_handle_ready=false`.
+The policy-report identity hash is built from the path-redacted report projection:
+schema/status gates, binary SHA, weak-helper summary, window artifact hashes and verified
+provenance summaries, policy candidates, the internal revalidation contract, blockers,
+non-claims, and redaction metadata. It excludes the identity hash itself, raw paths,
+timestamps, raw disassembly snippets, raw helper/caller addresses, object indices,
+serials, UE pointers, and lifecycle names.
 
-## Compatibility Direction
+`validate_offline_artifact_gate.py` now requires complete UObject flag-policy identity in
+consume mode and verifies the canonical hash. `evaluate_resource_handle_revalidation.py`
+counts a complete policy identity as a complete strict input; missing, partial, invalid,
+or hash-mismatched identity keeps the internal UObject revalidation candidate rejected.
+Public `ResourceHandle`, public GObjects, post-callback lookup, lifecycle names,
+mutation, and return override remain blocked.
+
+## Manifest Compatibility
+
+Keep strict fail-closed compatibility for stale manifests. Do not infer identity from bare
+hashes. Regenerate current static-global or UObject flag-policy manifests through the
+current producers when a gate requires complete `artifact_identity`; older durable packs
+remain historical evidence unless normalized.
+
+## Plugin Compatibility Direction
 
 The lowest-risk ArkApi-familiar plugin categories remain:
 

@@ -182,9 +182,11 @@ sequence.
   hash changes or evidence contradicts current roots/candidates. Do not relax
   `evaluate_resource_handle_revalidation.py` to infer artifact identity from bare hashes.
   The correct strict-mode path is complete top-level `artifact_identity` from producers.
-  `reconcile_gobjects_samples.py` and `build_static_global_promotion_evidence.py` now
-  emit it; the next producer gap is `build_uobject_flag_policy_report.py` plus strict
-  evaluator consumption. Keep `InternalUObjectRevalidationCandidate` internal:
+  `reconcile_gobjects_samples.py`, `build_static_global_promotion_evidence.py`, and
+  `build_uobject_flag_policy_report.py` now emit it; the UObject flag-policy refresh
+  wrapper passes identity args through, the offline artifact gate verifies the canonical
+  policy-report hash, and the strict ResourceHandle evaluator consumes the policy identity.
+  Keep `InternalUObjectRevalidationCandidate` internal:
   no public ResourceHandle, GObjects, identity, lookup, lifecycle names, mutation, return
   override, object indices, serials, or UE pointers. ResourceHandle semantic work still
   needs helper evidence, mutation-window rejection, runtime negative samples, and a

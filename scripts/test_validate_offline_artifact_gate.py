@@ -1074,8 +1074,8 @@ def resource_handle_serial_scan_manifest_with_core(workspace: Path, **overrides:
     )
 
 
-def uobject_flag_policy_report_manifest(*, promotion_ready: bool = False) -> dict:
-    return {
+def uobject_flag_policy_report_manifest(*, promotion_ready: bool = False, include_artifact_identity: bool = True) -> dict:
+    payload = {
         "schema": gate.UOBJECT_FLAG_POLICY_REPORT_SCHEMA,
         "evidence_kind": "static_negative_equivalent_candidate",
         "status": "candidate_blocked",
@@ -1167,6 +1167,14 @@ def uobject_flag_policy_report_manifest(*, promotion_ready: bool = False) -> dic
         "remaining_blockers": sorted(gate.REQUIRED_UOBJECT_FLAG_POLICY_BLOCKERS),
         "non_claims": sorted(gate.REQUIRED_UOBJECT_FLAG_POLICY_NON_CLAIMS),
     }
+    if include_artifact_identity:
+        payload["artifact_identity"] = gate.uobject_flag_policy_artifact_identity(
+            payload,
+            artifact_kind=gate.UOBJECT_FLAG_POLICY_REPORT_SCHEMA,
+            capture_id="uobject-flag-policy-capture",
+            evidence_pack_id="uobject-flag-policy-pack",
+        )
+    return payload
 
 
 def uobject_flag_policy_report_manifest_with_legacy_caller_mode() -> dict:
@@ -4282,6 +4290,52 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
 
         self.assertEqual(result["blockers"], [])
 
+    def test_blocks_uobject_flag_policy_missing_artifact_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flags.json"
+            write_json(manifest, uobject_flag_policy_report_manifest(include_artifact_identity=False))
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "uobject_flag_policy_missing_artifact_identity",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_uobject_flag_policy_invalid_artifact_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flags.json"
+            payload = uobject_flag_policy_report_manifest()
+            payload["artifact_identity"]["capture_id"] = "../bad"
+            payload["artifact_identity"]["artifact_sha256"] = "ABC"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("uobject_flag_policy_artifact_identity_capture_id_invalid", reasons)
+        self.assertIn("uobject_flag_policy_artifact_identity_sha_invalid", reasons)
+
+    def test_blocks_uobject_flag_policy_artifact_identity_hash_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flags.json"
+            payload = uobject_flag_policy_report_manifest()
+            payload["windows_summary"]["observed"][0]["byte_count"] = 256
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "uobject_flag_policy_artifact_identity_hash_mismatch",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
     def test_blocks_uobject_flag_policy_legacy_redacted_caller_mode_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"
@@ -4360,7 +4414,10 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
             "uobject_flag_policy_window_required_patterns_mismatch",
             {blocker["reason"] for blocker in blockers},
         )
-        self.assertIn("legacy_static_negative_marker", blockers[0].get("unexpected", []))
+        pattern_blocker = next(
+            blocker for blocker in blockers if blocker["reason"] == "uobject_flag_policy_window_required_patterns_mismatch"
+        )
+        self.assertIn("legacy_static_negative_marker", pattern_blocker.get("unexpected", []))
 
     def test_blocks_uobject_flag_policy_non_candidate_status(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -40,6 +40,7 @@ Current UE4 reflection evidence ledger:
 | UObject | Object fields and flags remain evidence for candidate classification; public lifecycle/validity semantics are not proven. | [2026-05-29-uobject-flags-validity-blocker.md](2026-05-29-uobject-flags-validity-blocker.md) |
 | UFunction layout | Accepted only per named target set after fixture and second-source comparison; RC target sets cover the current public copied surfaces. | [2026-05-30-rc-ufunction-layout-evidence-audit.md](2026-05-30-rc-ufunction-layout-evidence-audit.md) |
 | ResourceHandle | Post-RC/internal and blocked until lifecycle, validity, reuse, lookup privacy, and fail-closed semantics are proven. | [2026-05-30-post-rc-offline-resourcehandle-priority.md](2026-05-30-post-rc-offline-resourcehandle-priority.md) |
+| Artifact identity | Strict consume gates require complete top-level `artifact_identity` for current static-global and UObject flag-policy evidence. | [2026-05-30-artifact-identity-hardening.md](2026-05-30-artifact-identity-hardening.md) |
 
 Historical recovery reference:
 
@@ -62,6 +63,7 @@ Post-RC/research candidates:
 - [2026-05-29-transfer-copied-scalar-feasibility.md](2026-05-29-transfer-copied-scalar-feasibility.md)
 - [2026-05-30-redacted-scriptstruct-signatures.md](2026-05-30-redacted-scriptstruct-signatures.md)
 - [2026-05-30-structure-return-only-policy-slice.md](2026-05-30-structure-return-only-policy-slice.md)
+- [2026-05-30-structure-nonpin-copied-scalar-policy-slice.md](2026-05-30-structure-nonpin-copied-scalar-policy-slice.md)
 - [2026-05-28-fname-index-manifest-plan.md](2026-05-28-fname-index-manifest-plan.md)
 - [2026-05-29-ghidra-fuobjectarray-field-window-probe.md](2026-05-29-ghidra-fuobjectarray-field-window-probe.md)
 - [2026-05-29-resource-handle-revalidation-evaluator.md](2026-05-29-resource-handle-revalidation-evaluator.md)
@@ -74,6 +76,7 @@ Post-RC/research candidates:
 - [2026-05-29-fuobjectitem-serial-lifetime-audit.md](2026-05-29-fuobjectitem-serial-lifetime-audit.md)
 - [2026-05-29-resource-handle-flag-policy-candidate.md](2026-05-29-resource-handle-flag-policy-candidate.md)
 - [2026-05-30-post-rc-offline-resourcehandle-priority.md](2026-05-30-post-rc-offline-resourcehandle-priority.md)
+- [2026-05-30-artifact-identity-hardening.md](2026-05-30-artifact-identity-hardening.md)
 - [2026-05-29-reflection-inventory-pack-smoke.md](2026-05-29-reflection-inventory-pack-smoke.md)
 
 Historical reusable evidence:

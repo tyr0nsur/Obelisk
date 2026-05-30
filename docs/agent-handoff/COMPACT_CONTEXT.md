@@ -341,6 +341,11 @@ priorities, and do not use history files as the active source of truth.
   validation. `promotion_gate.ready` remains false for static global candidates, and this
   still does not promote public GObjects, ResourceHandle, identity, lookup, mutation, or
   return override.
+- UObject flag-policy reports now follow the same strict artifact identity contract:
+  `build_uobject_flag_policy_report.py` emits complete identity, the refresh wrapper can
+  pass explicit identity IDs, `validate_offline_artifact_gate.py` verifies the canonical
+  report hash in consume mode, and the ResourceHandle evaluator counts complete policy
+  identity without promoting public `ResourceHandle` or post-callback lookup.
 - Weak-helper evidence archives use `scripts/build_weak_helper_provenance_bundle.py`.
   Missing or invalid source sidecars are preserved as blockers and keep
   `promotion_ready=false`; the current bundle is valid archival material but blocked by

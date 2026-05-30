@@ -13,6 +13,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import build_uobject_flag_policy_report as builder
 import validate_offline_artifact_gate as gate
 
 
@@ -24,6 +25,20 @@ BINARY_SHA256 = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c52
 
 def sha256_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def recompute_artifact_sha256(payload: dict[str, object]) -> str:
+    identity = dict(payload["artifact_identity"])
+    identity_without_hash = {
+        "artifact_kind": identity["artifact_kind"],
+        "capture_id": identity["capture_id"],
+        "evidence_pack_id": identity["evidence_pack_id"],
+    }
+    material = {
+        "artifact_identity": identity_without_hash,
+        "report": builder.canonical_policy_report(payload),
+    }
+    return hashlib.sha256(builder.canonical_json_bytes(material)).hexdigest()
 
 
 def write_source_provenance(path: Path) -> None:
@@ -304,6 +319,14 @@ class BuildUObjectFlagPolicyReportTests(unittest.TestCase):
             payload = json.loads(output.read_text(encoding="utf-8"))
 
         self.assertEqual(payload["schema"], "obelisk.uobject-flag-policy-report.v1")
+        self.assertEqual(
+            set(payload["artifact_identity"]),
+            {"artifact_kind", "artifact_sha256", "capture_id", "evidence_pack_id"},
+        )
+        self.assertEqual(payload["artifact_identity"]["artifact_kind"], "obelisk.uobject-flag-policy-report.v1")
+        self.assertEqual(payload["artifact_identity"]["capture_id"], "uobject-flag-policy-capture")
+        self.assertEqual(payload["artifact_identity"]["evidence_pack_id"], "uobject-flag-policy-pack")
+        self.assertEqual(payload["artifact_identity"]["artifact_sha256"], recompute_artifact_sha256(payload))
         self.assertEqual(payload["evidence_kind"], "static_negative_equivalent_candidate")
         self.assertIs(payload["promotion_ready"], False)
         self.assertIs(payload["post_callback_resource_handle_ready"], False)
@@ -356,6 +379,75 @@ class BuildUObjectFlagPolicyReportTests(unittest.TestCase):
         self.assertNotIn("pending-kill", json.dumps(payload).lower())
         for address in ("0x83a340", "0x83a720", "0x83cde0", "0x9f80f0", "0x1d299b0", "0x1d29a20", "0x1d56c70"):
             self.assertNotIn(address, json.dumps(payload))
+
+    def test_artifact_identity_is_stable_across_output_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            weak_helper, windows = self.write_inputs(root / "inputs")
+            args = self.builder_args(weak_helper, windows, root / "report-a.json")
+            args.extend(
+                [
+                    "--artifact-kind",
+                    "obelisk.uobject-flag-policy-report.v1",
+                    "--capture-id",
+                    "capture.alpha",
+                    "--evidence-pack-id",
+                    "pack.alpha",
+                ]
+            )
+            self.run_builder(*args)
+            args_b = self.builder_args(weak_helper, windows, root / "nested" / "report-b.json")
+            args_b.extend(
+                [
+                    "--artifact-kind",
+                    "obelisk.uobject-flag-policy-report.v1",
+                    "--capture-id",
+                    "capture.alpha",
+                    "--evidence-pack-id",
+                    "pack.alpha",
+                ]
+            )
+            self.run_builder(*args_b)
+            payload_a = json.loads((root / "report-a.json").read_text(encoding="utf-8"))
+            payload_b = json.loads((root / "nested" / "report-b.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(payload_a["artifact_identity"], payload_b["artifact_identity"])
+        self.assertEqual(payload_a["artifact_identity"]["artifact_sha256"], recompute_artifact_sha256(payload_a))
+        self.assertEqual(payload_b["artifact_identity"]["artifact_sha256"], recompute_artifact_sha256(payload_b))
+
+    def test_artifact_identity_changes_when_window_content_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            weak_helper, windows = self.write_inputs(root / "inputs-a")
+            self.run_builder(*self.builder_args(weak_helper, windows, root / "report-a.json"))
+            texts = window_texts()
+            texts["weak_helper_reject_0x100"] = texts["weak_helper_reject_0x100"].replace(
+                "1d56cf3: c3                    ret",
+                "1d56cf4: c3                    ret",
+            )
+            weak_helper_b, windows_b = self.write_inputs(root / "inputs-b", windows=texts)
+            self.run_builder(*self.builder_args(weak_helper_b, windows_b, root / "report-b.json"))
+            payload_a = json.loads((root / "report-a.json").read_text(encoding="utf-8"))
+            payload_b = json.loads((root / "report-b.json").read_text(encoding="utf-8"))
+
+        self.assertNotEqual(
+            payload_a["artifact_identity"]["artifact_sha256"],
+            payload_b["artifact_identity"]["artifact_sha256"],
+        )
+
+    def test_cli_rejects_unsafe_artifact_identity_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            weak_helper, windows = self.write_inputs(root)
+            result = self.run_builder(
+                *self.builder_args(weak_helper, windows, root / "report.json"),
+                "--capture-id",
+                "../bad",
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--capture-id must not contain '..'", result.stderr)
 
     def test_converter_builder_output_is_consumable_candidate_and_promote_blocked(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

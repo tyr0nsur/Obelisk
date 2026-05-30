@@ -162,6 +162,14 @@ def classify_artifact_identity(report: dict[str, Any]) -> tuple[str, set[str]]:
     return "complete", {str(artifact_sha256)}
 
 
+def artifact_identity_issue(identity_status: str) -> str | None:
+    if identity_status in {"missing", "partial"}:
+        return BLOCKER_MISSING_ARTIFACT_IDENTITY
+    if identity_status == "invalid":
+        return BLOCKER_INVALID_ARTIFACT_IDENTITY
+    return None
+
+
 def int_value(value: object) -> int | None:
     return value if isinstance(value, int) and not isinstance(value, bool) else None
 
@@ -515,9 +523,24 @@ def build_evaluation(
     if uobject_flag_policy is not None:
         policy_hashes = identity_hashes(uobject_flag_policy)
         collected_identity_hashes.update(policy_hashes)
+        identity_status, strict_hashes = classify_artifact_identity(uobject_flag_policy)
+        collected_identity_hashes.update(strict_hashes)
+        if identity_status == "complete":
+            complete_artifact_identity_report_count += 1
+        elif identity_status == "invalid":
+            invalid_artifact_identity_report_count += 1
+        else:
+            missing_or_partial_artifact_identity_report_count += 1
         internal_uobject_revalidation_candidate, policy_issues = build_internal_uobject_revalidation_candidate(
             uobject_flag_policy
         )
+        if require_artifact_identity:
+            identity_issue = artifact_identity_issue(identity_status)
+            if identity_issue is not None:
+                internal_uobject_revalidation_candidate["accepted"] = False
+                internal_uobject_revalidation_candidate["issues"] = sorted(
+                    set(internal_uobject_revalidation_candidate["issues"]) | {identity_issue}
+                )
         if policy_issues:
             blockers.append(BLOCKER_INVALID_UOBJECT_FLAG_POLICY_CANDIDATE)
 

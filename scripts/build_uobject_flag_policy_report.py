@@ -25,6 +25,7 @@ PROVENANCE_SCHEMAS = {
 }
 EVIDENCE_KIND = "static_negative_equivalent_candidate"
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+SAFE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 PATH_KEY_RE = re.compile(r"(?:^|_)(path|file|source|artifact|binary|core|stdout|stderr|copied_to)$")
 WINDOW_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
 OBJDUMP_INSTRUCTION_RE = re.compile(r"^\s*([0-9a-f]+):\s+(?:[0-9a-f]{2}\s+)+\s+\S+", re.IGNORECASE)
@@ -126,6 +127,37 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def validate_safe_id(value: str, field_name: str) -> str:
+    if not value:
+        raise argparse.ArgumentTypeError(f"{field_name} must not be empty")
+    if ".." in value:
+        raise argparse.ArgumentTypeError(f"{field_name} must not contain '..'")
+    if "/" in value or "\\" in value:
+        raise argparse.ArgumentTypeError(f"{field_name} must not contain path separators")
+    if SAFE_ID_RE.fullmatch(value) is None:
+        raise argparse.ArgumentTypeError(
+            f"{field_name} must be 1-128 characters of ASCII letters, digits, '.', '_', or '-' "
+            "and start with a letter or digit"
+        )
+    return value
+
+
+def parse_artifact_kind(value: str) -> str:
+    return validate_safe_id(value, "--artifact-kind")
+
+
+def parse_capture_id(value: str) -> str:
+    return validate_safe_id(value, "--capture-id")
+
+
+def parse_evidence_pack_id(value: str) -> str:
+    return validate_safe_id(value, "--evidence-pack-id")
+
+
+def canonical_json_bytes(value: object) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
 
 
 def load_json(path: Path, label: str) -> dict[str, Any]:
@@ -497,6 +529,46 @@ def read_and_validate_windows(windows: list[tuple[str, Path]], *, binary_sha256:
     return summaries
 
 
+def canonical_policy_report(report: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "schema": report.get("schema"),
+        "evidence_kind": report.get("evidence_kind"),
+        "status": report.get("status"),
+        "binary": report.get("binary"),
+        "promotion_ready": report.get("promotion_ready"),
+        "post_callback_resource_handle_ready": report.get("post_callback_resource_handle_ready"),
+        "weak_helper_caller_mode": report.get("weak_helper_caller_mode"),
+        "windows_summary": report.get("windows_summary"),
+        "policy_candidates": report.get("policy_candidates"),
+        "internal_revalidation_contract": report.get("internal_revalidation_contract"),
+        "remaining_blockers": report.get("remaining_blockers"),
+        "non_claims": report.get("non_claims"),
+        "redaction": report.get("redaction"),
+    }
+
+
+def build_artifact_identity(
+    *,
+    artifact_kind: str,
+    capture_id: str,
+    evidence_pack_id: str,
+    report: dict[str, Any],
+) -> dict[str, str]:
+    identity_without_hash = {
+        "artifact_kind": validate_safe_id(artifact_kind, "artifact_kind"),
+        "capture_id": validate_safe_id(capture_id, "capture_id"),
+        "evidence_pack_id": validate_safe_id(evidence_pack_id, "evidence_pack_id"),
+    }
+    material = {
+        "artifact_identity": identity_without_hash,
+        "report": canonical_policy_report(report),
+    }
+    return {
+        **identity_without_hash,
+        "artifact_sha256": hashlib.sha256(canonical_json_bytes(material)).hexdigest(),
+    }
+
+
 def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     if not SHA256_RE.fullmatch(args.binary_sha256):
         raise SystemExit("--binary-sha256 must be a lowercase SHA256")
@@ -516,7 +588,7 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         }
     window_summaries = read_and_validate_windows(args.window or [], binary_sha256=args.binary_sha256)
 
-    return {
+    report = {
         "schema": SCHEMA,
         "evidence_kind": EVIDENCE_KIND,
         "status": "candidate_blocked",
@@ -573,6 +645,15 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             "raw_snippets": "omitted",
         },
     }
+    return {
+        "artifact_identity": build_artifact_identity(
+            artifact_kind=args.artifact_kind,
+            capture_id=args.capture_id,
+            evidence_pack_id=args.evidence_pack_id,
+            report=report,
+        ),
+        **report,
+    }
 
 
 def parse_args() -> argparse.Namespace:
@@ -581,6 +662,24 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--weak-helper-caller-mode", type=Path, required=True)
     parser.add_argument("--window", action="append", type=parse_window, default=[])
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--artifact-kind",
+        type=parse_artifact_kind,
+        default=SCHEMA,
+        help="Safe artifact kind to include in artifact_identity.",
+    )
+    parser.add_argument(
+        "--capture-id",
+        type=parse_capture_id,
+        default="uobject-flag-policy-capture",
+        help="Safe capture identifier to include in artifact_identity.",
+    )
+    parser.add_argument(
+        "--evidence-pack-id",
+        type=parse_evidence_pack_id,
+        default="uobject-flag-policy-pack",
+        help="Safe evidence pack identifier to include in artifact_identity.",
+    )
     return parser.parse_args()
 
 

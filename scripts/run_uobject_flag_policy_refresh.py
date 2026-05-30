@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -17,6 +18,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 import validate_offline_artifact_gate as gate  # noqa: E402
 
 
+SAFE_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 REQUIRED_WEAK_INPUTS = {
     "ghidra_stdout": Path("weak/ghidra-headless.stdout"),
     "r2_windows": Path("weak/r2-weak-helper-caller-modes.txt"),
@@ -36,6 +38,61 @@ def is_relative_to(path: Path, root: Path) -> bool:
         return True
     except ValueError:
         return False
+
+
+def parse_safe_id(value: str, field_name: str) -> str:
+    if ".." in value:
+        raise argparse.ArgumentTypeError(f"{field_name} must not contain '..'")
+    if "/" in value or "\\" in value:
+        raise argparse.ArgumentTypeError(f"{field_name} must not contain path separators")
+    if not SAFE_ID_PATTERN.fullmatch(value):
+        raise argparse.ArgumentTypeError(
+            f"{field_name} must be 1-128 characters of ASCII letters, digits, '.', '_', or '-' "
+            "and start with a letter or digit"
+        )
+    return value
+
+
+def parse_artifact_kind(value: str) -> str:
+    return parse_safe_id(value, "--artifact-kind")
+
+
+def parse_capture_id(value: str) -> str:
+    return parse_safe_id(value, "--capture-id")
+
+
+def parse_evidence_pack_id(value: str) -> str:
+    return parse_safe_id(value, "--evidence-pack-id")
+
+
+def artifact_identity(args: argparse.Namespace) -> dict[str, str] | None:
+    values = {
+        "artifact_kind": args.artifact_kind,
+        "capture_id": args.capture_id,
+        "evidence_pack_id": args.evidence_pack_id,
+    }
+    if not any(value is not None for value in values.values()):
+        return None
+    if not all(value is not None for value in values.values()):
+        raise SystemExit(
+            "artifact identity must include --artifact-kind, --capture-id, and --evidence-pack-id together"
+        )
+    return {key: value for key, value in values.items() if value is not None}
+
+
+def append_artifact_identity_args(command: list[str], identity: dict[str, str] | None) -> None:
+    if identity is None:
+        return
+    command.extend(
+        [
+            "--artifact-kind",
+            identity["artifact_kind"],
+            "--capture-id",
+            identity["capture_id"],
+            "--evidence-pack-id",
+            identity["evidence_pack_id"],
+        ]
+    )
 
 
 def reject_repo_output(path: Path) -> None:
@@ -102,6 +159,7 @@ def assert_safe_output_files(paths: list[Path]) -> None:
 
 
 def build_result(args: argparse.Namespace) -> dict[str, Any]:
+    identity = artifact_identity(args)
     input_root = args.input_root.expanduser().resolve(strict=False)
     output_root = args.output_root.expanduser().resolve(strict=False)
     reject_protected_input_root(args.input_root)
@@ -178,6 +236,7 @@ def build_result(args: argparse.Namespace) -> dict[str, Any]:
         "--output",
         str(policy_output),
     ]
+    append_artifact_identity_args(builder_command, identity)
     for label, path in window_paths.items():
         builder_command.extend(["--window", f"{label}={path}"])
     run_command(builder_command)
@@ -228,7 +287,7 @@ def build_result(args: argparse.Namespace) -> dict[str, Any]:
     if "promote_mode_uobject_flag_policy_candidate_only" not in promote_reasons:
         raise SystemExit(f"promote gate did not include candidate-only blocker; inspect {promote_output}")
 
-    return {
+    result = {
         "schema": "obelisk.uobject-flag-policy-refresh-run.v1",
         "status": "accepted_internal_static_evidence",
         "promotion_status": "blocked",
@@ -247,6 +306,9 @@ def build_result(args: argparse.Namespace) -> dict[str, Any]:
             "does not promote ResourceHandle, object identity, lookup, mutation, return override, or lifecycle names",
         ],
     }
+    if identity is not None:
+        result["artifact_identity"] = identity
+    return result
 
 
 def parse_args() -> argparse.Namespace:
@@ -254,6 +316,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--input-root", type=Path, required=True)
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--expected-binary-sha256", required=True)
+    parser.add_argument("--artifact-kind", type=parse_artifact_kind)
+    parser.add_argument("--capture-id", type=parse_capture_id)
+    parser.add_argument("--evidence-pack-id", type=parse_evidence_pack_id)
     parser.add_argument("--tool-version", action="append", default=[])
     parser.add_argument("--json", action="store_true")
     return parser.parse_args()

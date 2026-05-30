@@ -128,7 +128,13 @@ def static_evidence(
     return payload
 
 
-def uobject_flag_policy_report(*, include_contract: bool = True, promotion_ready: bool = False) -> dict[str, object]:
+def uobject_flag_policy_report(
+    *,
+    include_contract: bool = True,
+    promotion_ready: bool = False,
+    artifact_identity_sha256: str | None = None,
+    artifact_identity_override: dict[str, object] | None = None,
+) -> dict[str, object]:
     payload: dict[str, object] = {
         "schema": evaluator.UOBJECT_FLAG_POLICY_REPORT_SCHEMA,
         "evidence_kind": "static_negative_equivalent_candidate",
@@ -212,6 +218,15 @@ def uobject_flag_policy_report(*, include_contract: bool = True, promotion_ready
         payload["internal_revalidation_contract"] = json.loads(
             json.dumps(evaluator.INTERNAL_UOBJECT_REVALIDATION_CONTRACT)
         )
+    if artifact_identity_sha256 is not None:
+        payload["artifact_identity"] = {
+            "artifact_kind": "uobject-flag-policy",
+            "artifact_sha256": artifact_identity_sha256,
+            "capture_id": "capture-policy",
+            "evidence_pack_id": "pack-policy",
+        }
+    if artifact_identity_override is not None:
+        payload["artifact_identity"] = artifact_identity_override
     return payload
 
 
@@ -407,6 +422,71 @@ class ResourceHandleRevalidationEvaluatorTests(unittest.TestCase):
         candidate = payload["internal_uobject_revalidation_candidate"]
         self.assertFalse(candidate["accepted"])
         self.assertIn("uobject_flag_policy_promotion_ready_overclaim", candidate["issues"])
+
+    def test_require_artifact_identity_blocks_policy_without_top_level_identity(self) -> None:
+        payload = evaluator.build_evaluation(
+            [reconciliation_report(serial_values=[17], artifact_identity_sha256="a" * 64)],
+            static_evidence(coherent=True, artifact_identity_sha256="b" * 64),
+            require_artifact_identity=True,
+            uobject_flag_policy=uobject_flag_policy_report(),
+        )
+
+        assert_fail_closed_resource_handle_contract(self, payload)
+        self.assertFalse(payload["evidence_checks"]["evidence_without_lifetime_flags_ready"])
+        self.assertFalse(payload["evidence_checks"]["internal_uobject_revalidation_candidate_present"])
+        self.assertEqual(payload["artifact_identity"]["complete_input_count"], 2)
+        self.assertEqual(payload["artifact_identity"]["missing_or_partial_input_count"], 1)
+        self.assertEqual(payload["artifact_identity"]["invalid_input_count"], 0)
+        self.assertIn(evaluator.BLOCKER_MISSING_ARTIFACT_IDENTITY, payload["blockers"])
+        candidate = payload["internal_uobject_revalidation_candidate"]
+        self.assertFalse(candidate["accepted"])
+        self.assertIn(evaluator.BLOCKER_MISSING_ARTIFACT_IDENTITY, candidate["issues"])
+
+    def test_require_artifact_identity_blocks_policy_with_invalid_top_level_identity(self) -> None:
+        payload = evaluator.build_evaluation(
+            [reconciliation_report(serial_values=[17], artifact_identity_sha256="a" * 64)],
+            static_evidence(coherent=True, artifact_identity_sha256="b" * 64),
+            require_artifact_identity=True,
+            uobject_flag_policy=uobject_flag_policy_report(
+                artifact_identity_override={
+                    "artifact_kind": "uobject-flag-policy",
+                    "artifact_sha256": "C" * 64,
+                    "capture_id": "capture-policy",
+                    "evidence_pack_id": "pack-policy",
+                }
+            ),
+        )
+
+        assert_fail_closed_resource_handle_contract(self, payload)
+        self.assertFalse(payload["evidence_checks"]["evidence_without_lifetime_flags_ready"])
+        self.assertFalse(payload["evidence_checks"]["internal_uobject_revalidation_candidate_present"])
+        self.assertEqual(payload["artifact_identity"]["complete_input_count"], 2)
+        self.assertEqual(payload["artifact_identity"]["missing_or_partial_input_count"], 0)
+        self.assertEqual(payload["artifact_identity"]["invalid_input_count"], 1)
+        self.assertIn(evaluator.BLOCKER_INVALID_ARTIFACT_IDENTITY, payload["blockers"])
+        candidate = payload["internal_uobject_revalidation_candidate"]
+        self.assertFalse(candidate["accepted"])
+        self.assertIn(evaluator.BLOCKER_INVALID_ARTIFACT_IDENTITY, candidate["issues"])
+
+    def test_require_artifact_identity_counts_complete_policy_identity_without_public_promotion(self) -> None:
+        payload = evaluator.build_evaluation(
+            [reconciliation_report(serial_values=[17], artifact_identity_sha256="a" * 64)],
+            static_evidence(coherent=True, artifact_identity_sha256="b" * 64),
+            require_artifact_identity=True,
+            uobject_flag_policy=uobject_flag_policy_report(artifact_identity_sha256="c" * 64),
+        )
+
+        assert_fail_closed_resource_handle_contract(self, payload)
+        self.assertTrue(payload["evidence_checks"]["evidence_without_lifetime_flags_ready"])
+        self.assertTrue(payload["evidence_checks"]["internal_uobject_revalidation_candidate_present"])
+        self.assertEqual(payload["artifact_identity"]["complete_input_count"], 3)
+        self.assertEqual(payload["artifact_identity"]["missing_or_partial_input_count"], 0)
+        self.assertEqual(payload["artifact_identity"]["invalid_input_count"], 0)
+        self.assertNotIn(evaluator.BLOCKER_MISSING_ARTIFACT_IDENTITY, payload["blockers"])
+        self.assertNotIn(evaluator.BLOCKER_INVALID_ARTIFACT_IDENTITY, payload["blockers"])
+        self.assertFalse(payload["public_resource_handle_ready"])
+        self.assertFalse(payload["post_callback_resource_handle_ready"])
+        self.assertTrue(payload["internal_uobject_revalidation_candidate"]["accepted"])
 
     def test_cli_uobject_flag_policy_output_is_redacted(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

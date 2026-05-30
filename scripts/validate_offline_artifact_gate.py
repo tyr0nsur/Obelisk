@@ -586,6 +586,46 @@ def static_global_artifact_identity(payload: dict[str, Any], *, capture_id: str,
         **identity_without_hash,
         "artifact_sha256": hashlib.sha256(canonical_json_bytes(material)).hexdigest(),
     }
+
+
+def uobject_flag_policy_canonical_report(payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "schema": payload.get("schema"),
+        "evidence_kind": payload.get("evidence_kind"),
+        "status": payload.get("status"),
+        "binary": payload.get("binary"),
+        "promotion_ready": payload.get("promotion_ready"),
+        "post_callback_resource_handle_ready": payload.get("post_callback_resource_handle_ready"),
+        "weak_helper_caller_mode": payload.get("weak_helper_caller_mode"),
+        "windows_summary": payload.get("windows_summary"),
+        "policy_candidates": payload.get("policy_candidates"),
+        "internal_revalidation_contract": payload.get("internal_revalidation_contract"),
+        "remaining_blockers": payload.get("remaining_blockers"),
+        "non_claims": payload.get("non_claims"),
+        "redaction": payload.get("redaction"),
+    }
+
+
+def uobject_flag_policy_artifact_identity(
+    payload: dict[str, Any],
+    *,
+    artifact_kind: str,
+    capture_id: str,
+    evidence_pack_id: str,
+) -> dict[str, str]:
+    identity_without_hash = {
+        "artifact_kind": artifact_kind,
+        "capture_id": capture_id,
+        "evidence_pack_id": evidence_pack_id,
+    }
+    material = {
+        "artifact_identity": identity_without_hash,
+        "report": uobject_flag_policy_canonical_report(payload),
+    }
+    return {
+        **identity_without_hash,
+        "artifact_sha256": hashlib.sha256(canonical_json_bytes(material)).hexdigest(),
+    }
 OPTIONAL_UOBJECT_FLAG_TRANSITION_WINDOWS = {
     "uobject_100_clear_1d637c8_1d63888",
     "uobject_4000_set_call_clear_251f970_251f986",
@@ -4166,6 +4206,48 @@ def validate_uobject_flag_policy_report_manifest(
 
     blockers: list[dict[str, Any]] = []
     blockers.extend(validate_uobject_flag_policy_public_redaction(payload, label=label))
+    artifact_identity = payload.get("artifact_identity")
+    identity_ready_for_hash = False
+    if not isinstance(artifact_identity, dict):
+        blockers.append({"reason": "uobject_flag_policy_missing_artifact_identity", "label": f"{label}:$.artifact_identity"})
+    else:
+        expected_keys = {"artifact_kind", "artifact_sha256", "capture_id", "evidence_pack_id"}
+        if set(artifact_identity) != expected_keys:
+            blockers.append({"reason": "uobject_flag_policy_artifact_identity_fields_mismatch", "label": f"{label}:$.artifact_identity"})
+        if artifact_identity.get("artifact_kind") != UOBJECT_FLAG_POLICY_REPORT_SCHEMA:
+            blockers.append({"reason": "uobject_flag_policy_artifact_identity_kind_mismatch", "label": f"{label}:$.artifact_identity.artifact_kind"})
+        artifact_sha256 = artifact_identity.get("artifact_sha256")
+        if not isinstance(artifact_sha256, str) or SHA256_RE.fullmatch(artifact_sha256) is None:
+            blockers.append({"reason": "uobject_flag_policy_artifact_identity_sha_invalid", "label": f"{label}:$.artifact_identity.artifact_sha256"})
+        capture_id = artifact_identity.get("capture_id")
+        evidence_pack_id = artifact_identity.get("evidence_pack_id")
+        if not static_global_safe_id(capture_id):
+            blockers.append({"reason": "uobject_flag_policy_artifact_identity_capture_id_invalid", "label": f"{label}:$.artifact_identity.capture_id"})
+        if not static_global_safe_id(evidence_pack_id):
+            blockers.append({"reason": "uobject_flag_policy_artifact_identity_evidence_pack_id_invalid", "label": f"{label}:$.artifact_identity.evidence_pack_id"})
+        identity_ready_for_hash = (
+            artifact_identity.get("artifact_kind") == UOBJECT_FLAG_POLICY_REPORT_SCHEMA
+            and isinstance(artifact_sha256, str)
+            and SHA256_RE.fullmatch(artifact_sha256) is not None
+            and static_global_safe_id(capture_id)
+            and static_global_safe_id(evidence_pack_id)
+        )
+        if identity_ready_for_hash:
+            expected_identity = uobject_flag_policy_artifact_identity(
+                payload,
+                artifact_kind=str(artifact_identity["artifact_kind"]),
+                capture_id=str(artifact_identity["capture_id"]),
+                evidence_pack_id=str(artifact_identity["evidence_pack_id"]),
+            )
+            if artifact_identity.get("artifact_sha256") != expected_identity["artifact_sha256"]:
+                blockers.append(
+                    {
+                        "reason": "uobject_flag_policy_artifact_identity_hash_mismatch",
+                        "label": f"{label}:$.artifact_identity.artifact_sha256",
+                        "expected": expected_identity["artifact_sha256"],
+                        "recorded": artifact_identity.get("artifact_sha256"),
+                    }
+                )
     if payload.get("evidence_kind") != "static_negative_equivalent_candidate":
         blockers.append({"reason": "uobject_flag_policy_evidence_kind_mismatch", "label": f"{label}:$.evidence_kind"})
     if payload.get("status") != "candidate_blocked":
