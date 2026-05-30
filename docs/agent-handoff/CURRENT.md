@@ -118,6 +118,11 @@ sequence.
   4/4 targets accepted, consume gates accepted, and `promotion_ready=false`. It supports
   the copied `GameplayPolicyEvent` structure/inventory lane only, not Inventory SDK,
   StructureEvents, identity, lookup, mutation, return override, or raw UE internals.
+  The pack has been normalized with relative checksums and `artifact-pack.manifest.json`
+  (`sha256=072ff1f71c59e59189fa53922376dfc61d00915cfcd57817b1e5eacbc8200f8c`);
+  `SHA256SUMS`
+  (`sha256=21d8b0c0f30799b43110ddd4eed2484cc8c8527df878139dde28bc7d12598cf0`)
+  verifies the manifest, readiness report, gate results, and redacted signatures.
 - Current post-RC focus: Item return-only policy, Mission copied-bool observer,
   then Transfer `bAccept`. This is no RC public SDK/API promotion. Item return-only and
   Mission copied-bool now have internal/test-only consume-mode policy slices, and Mission

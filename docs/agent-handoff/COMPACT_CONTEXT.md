@@ -141,7 +141,12 @@ priorities, and do not use history files as the active source of truth.
   The latest focused consume refresh is preserved at
   `/home/flowcommunity-ark/obelisk-artifacts/minimal-second-source-intake-offline-20260530T075501Z/`;
   it has 4/4 targets accepted and consume gates accepted for the copied
-  `GameplayPolicyEvent` structure/inventory lane only.
+  `GameplayPolicyEvent` structure/inventory lane only. The pack is normalized with
+  relative checksums and `artifact-pack.manifest.json`
+  (`sha256=072ff1f71c59e59189fa53922376dfc61d00915cfcd57817b1e5eacbc8200f8c`);
+  `SHA256SUMS`
+  (`sha256=21d8b0c0f30799b43110ddd4eed2484cc8c8527df878139dde28bc7d12598cf0`)
+  verifies the durable pack.
 - Minimal copied `ChatMessageEvent` has accepted `chat-message-intake` second-source
   evidence and approved beta delivery evidence for known send modes. Keep future route
   observations `delivery_claim=none` unless a new controlled copied-plugin delivery window
