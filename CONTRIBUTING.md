@@ -149,7 +149,7 @@ Harden reflected event parameter decoding
 
 ## Current Priorities
 
-1. Hold the published core-first `v0.1.0-rc.1` surface stable after release confirmation:
+1. Hold the published core-first `v0.1.0-rc.2` surface stable after release confirmation:
    stable runtime hooks, marker gates, plugin lifecycle, C ABI behavior,
    `GameplayPolicyEvent`, minimal `ChatMessageEvent`, and metadata helpers
    `DescribeResourceKind` and `DescribeGameplayPolicyEventKind`. Accept only
@@ -165,7 +165,7 @@ Harden reflected event parameter decoding
 4. Build the general UE4 reflection pipeline (`FName`, `GNames`, `GObjects`,
    `UObject`, `UFunction`, and property-chain validation) as research/tooling
    work unless a scoped RC task requires it.
-5. Add safe plugin examples only after the relevant promotion gates are met.
+5. Harden safe plugin examples only after the relevant promotion gates are met.
 6. Reduce operational and documentation debt that can mislead new contributors.
 
 ArkServerApi/AseApi may be consulted only as a names and demand dictionary for familiar

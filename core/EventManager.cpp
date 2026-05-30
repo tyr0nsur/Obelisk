@@ -1,3 +1,7 @@
+#if !defined(obelisk_EXPORTS)
+#define OBELISK_EVENT_MANAGER_ENABLE_TEST_HOOKS
+#endif
+
 #include "EventManager.h"
 #include "runtime/Logger.h"
 #include "runtime/RuntimeMarkers.h"
@@ -11,7 +15,9 @@ namespace Obelisk::Core
     namespace
     {
         std::atomic<bool> g_ProcessEventBlockingCapabilityAdvertised{false};
-        std::atomic<bool> g_ForceSnapshotFailureForTesting{false};
+#ifdef OBELISK_EVENT_MANAGER_ENABLE_TEST_HOOKS
+        std::atomic<int> g_ForcedSnapshotFailuresRemaining{0};
+#endif
 
         bool IsProcessEventBlockingAllowed()
         {
@@ -22,8 +28,20 @@ namespace Obelisk::Core
 
         void MaybeForceSnapshotFailureForTesting()
         {
-            if (g_ForceSnapshotFailureForTesting.load(std::memory_order_acquire))
+#ifdef OBELISK_EVENT_MANAGER_ENABLE_TEST_HOOKS
+            int remaining = g_ForcedSnapshotFailuresRemaining.load(std::memory_order_acquire);
+            while (remaining > 0)
+            {
+                if (g_ForcedSnapshotFailuresRemaining.compare_exchange_weak(
+                        remaining,
+                        remaining - 1,
+                        std::memory_order_acq_rel,
+                        std::memory_order_acquire))
+                    throw std::bad_alloc();
+            }
+            if (remaining < 0)
                 throw std::bad_alloc();
+#endif
         }
 
         void SafeLogWarnNoThrow(const char* message) noexcept
@@ -66,10 +84,18 @@ namespace Obelisk::Core
         g_ProcessEventBlockingCapabilityAdvertised.store(advertised, std::memory_order_release);
     }
 
+#ifdef OBELISK_EVENT_MANAGER_ENABLE_TEST_HOOKS
     void EventManager::SetForceSnapshotFailureForTesting(bool enabled)
     {
-        g_ForceSnapshotFailureForTesting.store(enabled, std::memory_order_release);
+        g_ForcedSnapshotFailuresRemaining.store(enabled ? -1 : 0, std::memory_order_release);
     }
+
+    void EventManager::SetForcedSnapshotFailuresRemainingForTesting(int failuresRemaining)
+    {
+        g_ForcedSnapshotFailuresRemaining.store(failuresRemaining < 0 ? -1 : failuresRemaining,
+                                                std::memory_order_release);
+    }
+#endif
 
     void EventManager::RegisterPreProcessEvent(OnProcessEventCallback callback)
     {
@@ -291,8 +317,15 @@ namespace Obelisk::Core
 
     bool EventManager::TriggerPreProcessEvent(void* caller, void* function, void* parms)
     {
+        return TriggerPreProcessEvent(caller, function, parms, nullptr);
+    }
+
+    bool EventManager::TriggerPreProcessEvent(void* caller, void* function, void* parms, bool* setupFailed)
+    {
         try
         {
+            if (setupFailed)
+                *setupFailed = false;
             std::vector<CallbackSnapshot> callbacks;
             std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
             const auto isSnapshotActive = [this](const CallbackSnapshot& snapshot) {
@@ -346,11 +379,15 @@ namespace Obelisk::Core
         }
         catch (const std::exception& e)
         {
+            if (setupFailed)
+                *setupFailed = true;
             SafeLogErrorNoThrow("PreProcessEvent dispatch failed internally; continuing original event", e.what());
             return true;
         }
         catch (...)
         {
+            if (setupFailed)
+                *setupFailed = true;
             SafeLogErrorNoThrow("PreProcessEvent dispatch failed internally with an unknown exception; continuing original event.");
             return true;
         }
@@ -358,8 +395,11 @@ namespace Obelisk::Core
 
     bool EventManager::TriggerPreProcessEvent(int32_t nameIndex, void* caller, void* function, void* parms)
     {
-        if (!TriggerPreProcessEvent(caller, function, parms))
+        bool setupFailed = false;
+        if (!TriggerPreProcessEvent(caller, function, parms, &setupFailed))
             return false;
+        if (setupFailed)
+            return true;
 
         try
         {
@@ -432,8 +472,15 @@ namespace Obelisk::Core
 
     void EventManager::TriggerPostProcessEvent(void* caller, void* function, void* parms)
     {
+        TriggerPostProcessEvent(caller, function, parms, nullptr);
+    }
+
+    void EventManager::TriggerPostProcessEvent(void* caller, void* function, void* parms, bool* setupFailed)
+    {
         try
         {
+            if (setupFailed)
+                *setupFailed = false;
             std::vector<CallbackSnapshot> callbacks;
             std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
             const auto isSnapshotActive = [this](const CallbackSnapshot& snapshot) {
@@ -480,17 +527,24 @@ namespace Obelisk::Core
         }
         catch (const std::exception& e)
         {
+            if (setupFailed)
+                *setupFailed = true;
             SafeLogErrorNoThrow("PostProcessEvent dispatch failed internally", e.what());
         }
         catch (...)
         {
+            if (setupFailed)
+                *setupFailed = true;
             SafeLogErrorNoThrow("PostProcessEvent dispatch failed internally with an unknown exception.");
         }
     }
 
     void EventManager::TriggerPostProcessEvent(int32_t nameIndex, void* caller, void* function, void* parms)
     {
-        TriggerPostProcessEvent(caller, function, parms);
+        bool setupFailed = false;
+        TriggerPostProcessEvent(caller, function, parms, &setupFailed);
+        if (setupFailed)
+            return;
 
         try
         {

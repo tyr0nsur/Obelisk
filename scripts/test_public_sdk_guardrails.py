@@ -3211,6 +3211,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "it does not promise ArkApi plugin compatibility",
             "Neither tier means the corresponding ArkApi plugin family can be ported",
             "not as portable behavior, source, ABI, constants, schemas, command parsers, or implementation patterns",
+            "Promoted copied-data ABI surface; experimental Plugin Hub seed",
+            "it does not turn copied chat/policy examples into production Plugin Hub modules",
         ):
             with self.subTest(required=required):
                 self.assertIn(required, compact)

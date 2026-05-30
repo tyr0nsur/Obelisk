@@ -1254,12 +1254,15 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--evidence-ark-sha256", help="ARK binary SHA256 for --snapshot-json evidence metadata.")
     parser.add_argument("--evidence-artifact-sha256", help="Source artifact SHA256 for --snapshot-json evidence metadata.")
-    parser.add_argument("--evidence-artifact-kind", default="offline_core", help="Source artifact kind for --snapshot-json evidence metadata.")
+    parser.add_argument(
+        "--evidence-artifact-kind",
+        help="Source artifact kind for --snapshot-json evidence metadata. Defaults to offline_core.",
+    )
     parser.add_argument("--evidence-capture-id", help="Capture id for --snapshot-json evidence metadata.")
     parser.add_argument("--evidence-pack-id", help="Evidence pack id for --snapshot-json evidence metadata.")
     parser.add_argument("--evidence-obelisk-commit", help="Obelisk commit for --snapshot-json evidence metadata.")
-    parser.add_argument("--evidence-source", default="offline_core", help="Evidence source label for --snapshot-json.")
-    parser.add_argument("--evidence-status", default="candidate-only", help="Evidence status label for --snapshot-json.")
+    parser.add_argument("--evidence-source", help="Evidence source label for --snapshot-json. Defaults to offline_core.")
+    parser.add_argument("--evidence-status", help="Evidence status label for --snapshot-json. Defaults to candidate-only.")
     return parser.parse_args()
 
 
@@ -1270,15 +1273,15 @@ def validate_snapshot_evidence_args(args: argparse.Namespace) -> None:
         "--evidence-capture-id": args.evidence_capture_id,
         "--evidence-pack-id": args.evidence_pack_id,
         "--evidence-obelisk-commit": args.evidence_obelisk_commit,
-        "--evidence-artifact-kind": args.evidence_artifact_kind,
-        "--evidence-source": args.evidence_source,
-        "--evidence-status": args.evidence_status,
     }
     missing = [flag for flag, value in required_fields.items() if not value or not str(value).strip()]
     if missing:
         raise SystemExit(
             "--snapshot-json requires complete evidence metadata: " + ", ".join(missing)
         )
+    args.evidence_artifact_kind = args.evidence_artifact_kind or "offline_core"
+    args.evidence_source = args.evidence_source or "offline_core"
+    args.evidence_status = args.evidence_status or "candidate-only"
     if not is_sha256_hex(args.evidence_ark_sha256):
         raise SystemExit("--evidence-ark-sha256 must be a 64-character hex SHA256")
     if not is_sha256_hex(args.evidence_artifact_sha256):
@@ -1324,9 +1327,12 @@ def main() -> int:
     evidence_args = (
         args.evidence_ark_sha256,
         args.evidence_artifact_sha256,
+        args.evidence_artifact_kind,
         args.evidence_capture_id,
         args.evidence_pack_id,
         args.evidence_obelisk_commit,
+        args.evidence_source,
+        args.evidence_status,
     )
     if not args.snapshot_json and any(value is not None for value in evidence_args):
         raise SystemExit("evidence metadata flags require --snapshot-json")

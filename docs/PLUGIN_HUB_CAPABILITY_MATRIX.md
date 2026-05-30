@@ -92,7 +92,7 @@ be simulated through raw game access.
 | Log through Obelisk | `ObeliskApi::LogInfo`, `LogWarn`, and `LogError` after `struct_size` checks | Stable baseline | Long-lived ownership of callback data or cross-thread logging contracts not proven by the plugin |
 | Discover resource categories | `DescribeResourceKind` | Promoted metadata | Resource identity, object lookup, persistent handles, or correlation between events |
 | Discover promoted policy event kinds | `DescribeGameplayPolicyEventKind` | Promoted metadata | No complete gameplay inventory, public module SDK, mutation path, or return override |
-| Observe promoted structure/item policy data | `GameplayPolicyEvent` with owner-token registration | Promoted v0.1 SDK surface | Public `StructureEvents`, Inventory SDK, Items SDK, UE pointers, player/item/structure identity, mutation, or return override |
+| Observe promoted structure/item policy data | `GameplayPolicyEvent` with owner-token registration | Promoted copied-data ABI surface; experimental Plugin Hub seed | Public `StructureEvents`, Inventory SDK, Items SDK, UE pointers, player/item/structure identity, mutation, or return override |
 | Parse copied chat text locally | `ChatMessageEvent` with owner-token registration | Minimal v0.1-rc ABI surface | Command SDK, sender identity, replies, moderation, chat blocking, or send-chat API |
 | Run process-local scheduled work | Owner-token timers | Promoted v0.1 core primitive | UE/gameplay timers, cluster scheduler, persistent ids, permission system, or command router |
 | Inspect descriptor output safely | `oDescriptorCatalog` | First-party metadata example | Resource discovery, callback subscription, identity, lookup, mutation, or return override |
@@ -109,7 +109,10 @@ be simulated through raw game access.
 
 ## Current Safe Route
 
-For plugin authors, the stable v0.1.x shape is descriptor-driven:
+For plugin authors, the stable v0.1.x shape is descriptor-driven. In this section,
+`promoted` means a copied, capability-gated ABI entry can be discovered or subscribed to;
+it does not turn copied chat/policy examples into production Plugin Hub modules, command
+or policy SDKs, enforcement APIs, identity APIs, mutation APIs, or ArkApi compatibility.
 
 1. Check `abi_version`, `struct_size`, capability bits, and function pointers.
 2. Use `DescribeResourceKind` to discover promoted categories.

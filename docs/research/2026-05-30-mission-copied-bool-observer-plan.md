@@ -131,6 +131,11 @@ array or item identity may be exposed.
 The observer is internal, log-only, post-original, and default-off. It must never dispatch
 plugin callbacks or write back to UE parameters.
 
+`FunctionNameIndex`, `OuterNameIndex`, and `PropertyNameIndex` are internal matcher
+sentinels used by the current test helper to prove exact reflected metadata shape. They are
+not Mission identity, not stable cross-binary identifiers, not public payload fields, and
+must not appear in observer logs or SDK-facing data.
+
 The internal `TryBuildCopiedMissionBoolObservationForMatchedAttempt` helper is
 bool-bearing only. It accepts only `AttemptStatus::Matched` attempts whose copied
 observation contains at least one approved bool, and it returns false for disabled,

@@ -1,3 +1,4 @@
+#define OBELISK_EVENT_MANAGER_ENABLE_TEST_HOOKS
 #include "core/EventManager.h"
 #include "runtime/Logger.h"
 
@@ -447,6 +448,18 @@ namespace
                 Obelisk::Core::EventManager::SetForceSnapshotFailureForTesting(false);
             }
         };
+        struct SnapshotFailureCountGuard
+        {
+            explicit SnapshotFailureCountGuard(int failuresRemaining)
+            {
+                Obelisk::Core::EventManager::SetForcedSnapshotFailuresRemainingForTesting(failuresRemaining);
+            }
+
+            ~SnapshotFailureCountGuard()
+            {
+                Obelisk::Core::EventManager::SetForceSnapshotFailureForTesting(false);
+            }
+        };
 
         ResetCounters();
         Obelisk::Core::EventManager events;
@@ -472,6 +485,23 @@ namespace
         Require(g_Counters.filtered_pre == 0, "filtered pre callback ran after snapshot setup failure");
         Require(g_Counters.global_post == 0, "global post callback ran after snapshot setup failure");
         Require(g_Counters.filtered_post == 0, "filtered post callback ran after snapshot setup failure");
+
+        {
+            SnapshotFailureCountGuard guard(1);
+            Require(events.TriggerPreProcessEvent(42, nullptr, nullptr, nullptr),
+                    "one-shot global snapshot setup failure blocked original ProcessEvent");
+        }
+        Require(g_Counters.global_pre == 0, "global pre callback ran after one-shot setup failure");
+        Require(g_Counters.filtered_pre == 0,
+                "filtered pre callback ran after global snapshot setup failure");
+
+        {
+            SnapshotFailureCountGuard guard(1);
+            events.TriggerPostProcessEvent(42, nullptr, nullptr, nullptr);
+        }
+        Require(g_Counters.global_post == 0, "global post callback ran after one-shot setup failure");
+        Require(g_Counters.filtered_post == 0,
+                "filtered post callback ran after global snapshot setup failure");
 
         Require(events.TriggerPreProcessEvent(42, nullptr, nullptr, nullptr),
                 "pre callbacks did not recover after snapshot failure injection");

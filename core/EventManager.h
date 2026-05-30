@@ -16,7 +16,10 @@ namespace Obelisk::Core
 
         static EventManager& Get();
         static void SetProcessEventBlockingCapabilityAdvertised(bool advertised);
+#ifdef OBELISK_EVENT_MANAGER_ENABLE_TEST_HOOKS
         static void SetForceSnapshotFailureForTesting(bool enabled);
+        static void SetForcedSnapshotFailuresRemainingForTesting(int failuresRemaining);
+#endif
 
         void RegisterPreProcessEvent(OnProcessEventCallback callback);
         void RegisterPostProcessEvent(OnProcessEventCallback callback);
@@ -68,6 +71,8 @@ namespace Obelisk::Core
         uint64_t AllocateRegistrationGeneration();
         bool HasRegistrationId(uint64_t registrationId) const;
         bool IsRegistrationActive(uint64_t registrationId) const;
+        bool TriggerPreProcessEvent(void* caller, void* function, void* parms, bool* setupFailed);
+        void TriggerPostProcessEvent(void* caller, void* function, void* parms, bool* setupFailed);
 
         std::mutex m_Mutex;
         std::recursive_mutex m_DispatchMutex;

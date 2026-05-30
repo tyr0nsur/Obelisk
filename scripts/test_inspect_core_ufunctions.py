@@ -2460,6 +2460,37 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("evidence metadata flags require --snapshot-json", result.stderr)
 
+    def test_cli_rejects_evidence_labels_without_snapshot_json(self) -> None:
+        for flag, value in (
+            ("--evidence-artifact-kind", "offline_core"),
+            ("--evidence-source", "offline_core"),
+            ("--evidence-status", "candidate-only"),
+        ):
+            with self.subTest(flag=flag), tempfile.TemporaryDirectory() as temp_dir:
+                core = Path(temp_dir) / "core"
+                addrs = build_core_fixture(core)
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(SCRIPT_DIR / "inspect_core_ufunctions.py"),
+                        "--core",
+                        str(core),
+                        "--gobjects",
+                        hex(addrs["gobjects"]),
+                        "--fname-root-slot",
+                        hex(addrs["fname_root_slot"]),
+                        "--index",
+                        "7",
+                        flag,
+                        value,
+                    ],
+                    capture_output=True,
+                    text=True,
+                )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("evidence metadata flags require --snapshot-json", result.stderr)
+
     def test_cli_name_contains_finds_matching_function(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             core = Path(temp_dir) / "core"
