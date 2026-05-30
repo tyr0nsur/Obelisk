@@ -14,6 +14,12 @@
   tooling evidence and smoke outputs reject symlink races.
 - Blocked guidance-only target sets such as `players-identity-lifecycle-intake` and
   NextGen/Plugin Hub planning lanes from release readiness target-set promotion.
+- Marked `mission-copied-bool-policy-slice` as an internal planning-only lane and blocked
+  it from release/public promotion while preserving consume-side guidance.
+- Hardened offline artifact tooling so symlinked parent directories fail closed for
+  critical manifests, core paths, static-tool binaries, and smoke output roots.
+- Added characterization coverage for current raw `EventManager` unregister behavior when
+  a ProcessEvent callback is already in flight.
 - Mark post-RC installed SDK packages as `0.1.0-dev` / `dev` so development builds do not
   masquerade as the published `v0.1.0-rc.2` tag.
 - Hardened the internal Mission copied-bool recognizer to validate Unreal `BoolProperty`

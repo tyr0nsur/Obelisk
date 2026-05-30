@@ -80,10 +80,27 @@ def reject_protected_output_path(path: Path, label: str) -> Path:
     )
 
 
+def first_symlink_component(path: Path) -> Path | None:
+    expanded = path.expanduser()
+    candidate = expanded if expanded.is_absolute() else expanded.absolute()
+    current = Path(candidate.anchor) if candidate.anchor else Path()
+    parts = candidate.parts[1:] if candidate.anchor else candidate.parts
+    for part in parts:
+        current = current / part
+        if current.is_symlink():
+            return current
+    return None
+
+
+def reject_symlink_component(path: Path, label: str) -> None:
+    symlink_component = first_symlink_component(path)
+    if symlink_component is not None:
+        raise SystemExit(f"{label} must not be a symlink: {symlink_component}")
+
+
 def reject_protected_core_path(path: Path, manifest_path: Path) -> Path:
     resolved = reject_protected_input_path(path, f"{manifest_path}: evidence pack core.path")
-    if path.expanduser().is_symlink():
-        raise SystemExit(f"{manifest_path}: evidence pack core.path must not be a symlink: {path}")
+    reject_symlink_component(path, f"{manifest_path}: evidence pack core.path")
     return resolved
 
 
@@ -143,8 +160,7 @@ def evidence_pack_defaults(
 ) -> EvidencePackDefaults:
     original_path = path
     path = reject_protected_input_path(path, "--evidence-pack-manifest")
-    if original_path.expanduser().is_symlink():
-        raise SystemExit(f"--evidence-pack-manifest must not be a symlink: {original_path}")
+    reject_symlink_component(original_path, "--evidence-pack-manifest")
     payload = json.loads(path.read_text(encoding="utf-8"))
     binary = payload.get("binary")
     if not isinstance(binary, dict):

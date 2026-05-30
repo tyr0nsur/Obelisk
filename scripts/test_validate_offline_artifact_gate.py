@@ -2669,6 +2669,40 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertEqual("blocked", result["status"])
         self.assertIn("path_is_symlink", reasons)
 
+    def test_rejects_workspace_manifest_under_symlinked_directory_even_when_it_resolves_inside_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            target = workspace / "pack" / "manifest.json"
+            target.parent.mkdir(parents=True)
+            write_json(target, readiness_report_manifest())
+            link_dir = workspace / "pack-link"
+            link_dir.symlink_to(target.parent, target_is_directory=True)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[link_dir / "manifest.json"]))
+
+        blockers = result["blockers"]
+        self.assertEqual("blocked", result["status"])
+        self.assertIn("path_is_symlink", {blocker["reason"] for blocker in blockers})
+        self.assertTrue(any(str(link_dir) == blocker.get("symlink_component") for blocker in blockers))
+
+    def test_rejects_workspace_artifact_under_symlinked_directory_even_when_it_resolves_inside_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            target = workspace / "pack" / "artifact.txt"
+            target.parent.mkdir(parents=True)
+            target.write_text("offline evidence\n", encoding="utf-8")
+            link_dir = workspace / "pack-link"
+            link_dir.symlink_to(target.parent, target_is_directory=True)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, artifacts=[("objdump", link_dir / "artifact.txt")]))
+
+        blockers = result["blockers"]
+        self.assertEqual("blocked", result["status"])
+        self.assertIn("path_is_symlink", {blocker["reason"] for blocker in blockers})
+        self.assertTrue(any(str(link_dir) == blocker.get("symlink_component") for blocker in blockers))
+
     def test_allows_similar_prefix_outside_protected_but_not_as_workspace_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"

@@ -45,6 +45,9 @@ PUBLIC_RELEASE_SCOPE_DOC_FILES = [
     REPO_ROOT / "docs" / "RELEASE.md",
     REPO_ROOT / "docs" / "STATUS.md",
 ]
+CHAT_COMMAND_HELPER_ROADMAP = (
+    REPO_ROOT / "docs" / "research" / "2026-05-30-chat-command-helper-roadmap.md"
+)
 NEXTGEN_DEMAND_BOUNDARY_FILES = [
     REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md",
     REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md",
@@ -1160,6 +1163,47 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                     for token in ROADMAP_COMMAND_HELPER_PROMOTION_TOKENS:
                         if token in literal:
                             offenders.append(f"{path.relative_to(REPO_ROOT)}: runtime log/string token {token}")
+
+        self.assertEqual(offenders, [])
+
+    def test_chat_command_helper_roadmap_stays_plugin_local_and_unbranded(self) -> None:
+        roadmap = CHAT_COMMAND_HELPER_ROADMAP.read_text(encoding="utf-8")
+        compact = normalized(roadmap)
+        offenders: list[str] = []
+
+        for required in (
+            "documentation-only design guidance",
+            "not a request to change `include/obelisk/ObeliskApi.h`",
+            "It should not be promoted as a runtime service",
+            "No command registration in `ObeliskApi`",
+            "No public command SDK claim for v0.1",
+            "No sender/player identity or per-player permission checks",
+            "No chat send, reply, moderation, block, mutation, or return override",
+            "A real command module remains blocked",
+            "Do not add a first-party `oCommand*` plugin, installed helper target, packaged helper, "
+            "or command-branded public example until command identity and permissions are designed",
+            "keep it uninstalled, non-command-branded, and guarded as local parsing only",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(normalized(required), compact)
+
+        forbidden_positive_claims = (
+            r"\bpublic\s+command\s+SDK\b",
+            r"\bpromoted\s+(?:runtime\s+)?command\s+(?:service|module|API|SDK)\b",
+            r"\bproduction\s+Plugin\s+Hub\s+command\s+module\b",
+            r"\bfirst-party\s+`?oCommand\*?`?\s+plugin\s+(?:is|as|for)\s+(?:available|ready|promoted|installed)\b",
+            r"\binstalled\s+command\s+helper\s+target\b",
+        )
+        negated_context = re.compile(
+            r"\b(?:do\s+not|does\s+not|must\s+not|not|no|never|without|blocked|until)\b",
+            re.IGNORECASE,
+        )
+
+        for line_no, line in enumerate(roadmap.splitlines(), start=1):
+            for pattern in forbidden_positive_claims:
+                if re.search(pattern, line, flags=re.IGNORECASE) and not negated_context.search(line):
+                    relative = CHAT_COMMAND_HELPER_ROADMAP.relative_to(REPO_ROOT)
+                    offenders.append(f"{relative}:{line_no}: {line.strip()}")
 
         self.assertEqual(offenders, [])
 

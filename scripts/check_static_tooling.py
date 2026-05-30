@@ -121,8 +121,14 @@ def tool_report(name: str, *, timeout_sec: int) -> dict[str, Any]:
 
 
 def reject_symlink(path: Path, label: str) -> None:
-    if path.is_symlink():
-        raise SystemExit(f"{label} must not be a symlink: {path}")
+    expanded = path.expanduser()
+    candidate = expanded if expanded.is_absolute() else expanded.absolute()
+    current = Path(candidate.anchor) if candidate.anchor else Path()
+    parts = candidate.parts[1:] if candidate.anchor else candidate.parts
+    for part in parts:
+        current = current / part
+        if current.is_symlink():
+            raise SystemExit(f"{label} must not be a symlink: {current}")
 
 
 def ensure_real_directory(path: Path, label: str) -> None:

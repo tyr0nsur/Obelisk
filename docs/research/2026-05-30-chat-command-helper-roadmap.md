@@ -135,6 +135,8 @@ A real command module remains blocked on:
 ## Recommended Placement
 
 For now, keep this as a roadmap note plus a short cross-reference from plugin architecture
-docs. Do not add a first-party `oCommand*` plugin or installed helper target until command
-identity and permissions are designed, or until the project explicitly accepts an
-experimental plugin-local example whose non-goals are enforced by guardrails.
+docs. Do not add a first-party `oCommand*` plugin, installed helper target, packaged helper,
+or command-branded public example until command identity and permissions are designed. If
+the project explicitly accepts an experimental plugin-local example before then, keep it
+uninstalled, non-command-branded, and guarded as local parsing only with the same non-goals
+listed above.

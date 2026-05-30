@@ -107,6 +107,12 @@ triage alone.
 
 ## Minimum Next Offline Step
 
+The fixture-only `missing_base_snapshot` result is already conclusive for repo state.
+Do not spend another pass rerunning target-set or fixture coverage checks to find this
+lane. The next useful artifact is a new sanitized candidate snapshot generated from an
+approved copied/offline core or complete evidence-pack manifest outside protected server
+paths, with explicit FName root, GObjects, binary hash, and artifact identity.
+
 When a scoped offline core/snapshot task is approved, first generate a sanitized
 candidate snapshot for the exact target only. Because this target is not in the current
 fixture manifest, use the ad hoc inspection path before adding any target set:

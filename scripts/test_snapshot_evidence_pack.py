@@ -204,6 +204,24 @@ class SnapshotEvidencePackTests(unittest.TestCase):
                     parse_int,
                 )
 
+    def test_rejects_evidence_pack_manifest_under_symlinked_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            real_manifest = root / "pack-A" / "manifest.json"
+            core = root / "core"
+            self.write_pack(real_manifest, core_path=core)
+            pack_link = root / "pack-link"
+            pack_link.symlink_to(real_manifest.parent, target_is_directory=True)
+
+            with self.assertRaisesRegex(SystemExit, "--evidence-pack-manifest must not be a symlink"):
+                evidence_pack_defaults(
+                    pack_link / "manifest.json",
+                    None,
+                    None,
+                    "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                    parse_int,
+                )
+
     def test_rejects_partial_gdb_failed_pack(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -339,6 +357,32 @@ class SnapshotEvidencePackTests(unittest.TestCase):
             core_link.symlink_to(core_target)
             manifest = root / "pack-A" / "manifest.json"
             self.write_pack(manifest, core_path=core_link, sha=sha256_bytes(b"core"), write_core=False)
+
+            with self.assertRaisesRegex(SystemExit, "core.path must not be a symlink"):
+                evidence_pack_defaults(
+                    manifest,
+                    None,
+                    None,
+                    "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                    parse_int,
+                )
+
+    def test_rejects_manifest_core_path_under_symlinked_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core_dir = root / "cores"
+            core_target = core_dir / "core"
+            core_target.parent.mkdir()
+            core_target.write_bytes(b"core")
+            core_link_dir = root / "core-link-dir"
+            core_link_dir.symlink_to(core_dir, target_is_directory=True)
+            manifest = root / "pack-A" / "manifest.json"
+            self.write_pack(
+                manifest,
+                core_path=core_link_dir / "core",
+                sha=sha256_bytes(b"core"),
+                write_core=False,
+            )
 
             with self.assertRaisesRegex(SystemExit, "core.path must not be a symlink"):
                 evidence_pack_defaults(

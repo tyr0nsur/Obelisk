@@ -1470,6 +1470,57 @@ namespace
         }
     }
 
+    void TestCopiedObservationRejectsForgedNonCanonicalBoolRanges()
+    {
+        {
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+            fixture.Params[0x08] = 1;
+            fixture.Params[0x09] = 1;
+            Attempt attempt = Identify(fixture, kAddPlayerToMissionNameIndex);
+
+            fixture.Params[0x08] = 2;
+
+            CopiedMissionObservation observation;
+            PoisonObservation(observation);
+            Require(!TryBuildCopiedMissionObservation(attempt.Invocation, observation),
+                    "forged non-canonical AddPlayerToMission bool range was accepted");
+            RequireObservationCleared(observation,
+                                      "forged non-canonical AddPlayerToMission range did not clear output");
+        }
+        {
+            MissionFixture fixture;
+            BuildBPAllowPlayerToLeaveMission(fixture);
+            fixture.Params[0x08] = 1;
+            Attempt attempt = Identify(fixture, kBPAllowPlayerToLeaveMissionNameIndex);
+
+            fixture.Params[0x08] = 2;
+
+            CopiedMissionObservation observation;
+            PoisonObservation(observation);
+            Require(!TryBuildCopiedMissionObservation(attempt.Invocation, observation),
+                    "forged non-canonical BPAllowPlayerToLeaveMission bool range was accepted");
+            RequireObservationCleared(observation,
+                                      "forged non-canonical BPAllowPlayerToLeaveMission range did not clear output");
+        }
+        {
+            MissionFixture fixture;
+            BuildBPOnPlayerRemovedFromMission(fixture);
+            fixture.Params[0x10] = 1;
+            fixture.Params[0x11] = 1;
+            Attempt attempt = Identify(fixture, kBPOnPlayerRemovedFromMissionNameIndex);
+
+            fixture.Params[0x11] = 2;
+
+            CopiedMissionObservation observation;
+            PoisonObservation(observation);
+            Require(!TryBuildCopiedMissionObservation(attempt.Invocation, observation),
+                    "forged non-canonical BPOnPlayerRemovedFromMission bool range was accepted");
+            RequireObservationCleared(observation,
+                                      "forged non-canonical BPOnPlayerRemovedFromMission range did not clear output");
+        }
+    }
+
     void TestCopiedObservationApprovedBoolSurface()
     {
         std::array<MissionReflection::MissionField, 5> observed{};
@@ -1610,6 +1661,7 @@ int main()
     TestPostOriginalBoolObservationHelper();
     TestCopiedObservationRejectsWrongFieldShape();
     TestCopiedObservationRejectsInvalidBoolRangesAndCounts();
+    TestCopiedObservationRejectsForgedNonCanonicalBoolRanges();
     TestCopiedObservationApprovedBoolSurface();
     TestCopiedObservationRequiresParameterRangesForCopiedTargets();
     TestMetadataOnlyObservationIsLimitedToGetPlayerUsableItems();

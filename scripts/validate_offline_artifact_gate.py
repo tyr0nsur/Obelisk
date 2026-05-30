@@ -1099,11 +1099,24 @@ def path_state(path: Path, *, workspace_root: Path, protected_root: Path) -> dic
     }
 
 
+def first_symlink_component(path: Path) -> Path | None:
+    expanded = path.expanduser()
+    candidate = expanded if expanded.is_absolute() else expanded.absolute()
+    current = Path(candidate.anchor) if candidate.anchor else Path()
+    parts = candidate.parts[1:] if candidate.anchor else candidate.parts
+    for part in parts:
+        current = current / part
+        if current.is_symlink():
+            return current
+    return None
+
+
 def path_blockers(path: Path, *, label: str, workspace_root: Path, protected_root: Path, require_workspace: bool) -> list[dict[str, Any]]:
     state = path_state(path, workspace_root=workspace_root, protected_root=protected_root)
     blockers: list[dict[str, Any]] = []
-    if path.expanduser().is_symlink():
-        blockers.append({"reason": "path_is_symlink", "label": label, **state})
+    symlink_component = first_symlink_component(path)
+    if symlink_component is not None:
+        blockers.append({"reason": "path_is_symlink", "label": label, "symlink_component": str(symlink_component), **state})
     if state["direct_under_protected"] and not state["direct_under_workspace"]:
         blockers.append({"reason": "path_text_under_protected_root", "label": label, **state})
     if state["resolved_under_protected"] and not state["resolved_under_workspace"]:

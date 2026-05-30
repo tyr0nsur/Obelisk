@@ -745,6 +745,66 @@ namespace
         g_BlockingPostState = nullptr;
     }
 
+    void TestGranularOwnerUnregisterCurrentlyWaitsBehindInFlightCallback()
+    {
+        ResetCounters();
+        Obelisk::Core::EventManager events;
+        int blockingOwner = 0;
+        int targetOwner = 0;
+        BlockingCallbackState state;
+        g_BlockingPostState = &state;
+
+        const uint64_t blockingId = events.RegisterPostProcessEventOwned(&blockingOwner, BlockingPost);
+        const uint64_t targetId = events.RegisterPostProcessEventOwned(&targetOwner, GlobalPost);
+        Require(blockingId != 0, "blocking post registration id was zero");
+        Require(targetId != 0, "target post registration id was zero");
+
+        std::thread dispatchThread([&events] {
+            events.TriggerPostProcessEvent(nullptr, nullptr, nullptr);
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.mutex);
+            Require(state.cv.wait_for(lock, std::chrono::seconds(2), [&state] {
+                        return state.entered;
+                    }),
+                    "blocking post callback did not enter before granular unregister");
+        }
+
+        std::atomic_bool unregisterReturned = false;
+        bool unregistered = false;
+        std::thread unregisterThread([&] {
+            unregistered = events.UnregisterCallbackForOwner(&targetOwner, targetId);
+            unregisterReturned.store(true);
+        });
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        Require(!unregisterReturned.load(),
+                "granular owner unregister returned while another callback was in flight");
+
+        {
+            std::lock_guard<std::mutex> lock(state.mutex);
+            state.release = true;
+        }
+        state.cv.notify_all();
+
+        dispatchThread.join();
+        unregisterThread.join();
+
+        Require(unregisterReturned.load(), "granular owner unregister did not return after dispatch");
+        Require(unregistered, "granular owner unregister failed after waiting for dispatch");
+        Require(g_Counters.global_post == 1,
+                "target callback did not run from the snapshot before delayed unregister took effect");
+
+        ResetCounters();
+        events.TriggerPostProcessEvent(nullptr, nullptr, nullptr);
+        Require(g_Counters.global_post == 0, "target callback survived granular owner unregister");
+
+        Require(events.UnregisterCallbackForOwner(&blockingOwner, blockingId),
+                "blocking callback could not unregister after characterization test");
+        g_BlockingPostState = nullptr;
+    }
+
     void TestRegistrationIdsSkipZeroAfterWrap()
     {
         ResetCounters();
@@ -791,6 +851,7 @@ int main()
     TestOwnerCleanupWaitsForInFlightGlobalPreCallback();
     TestOwnerCleanupWaitsForInFlightPostCallback();
     TestOwnerCleanupWaitsForInFlightFilteredPostCallback();
+    TestGranularOwnerUnregisterCurrentlyWaitsBehindInFlightCallback();
     TestRegistrationIdsSkipZeroAfterWrap();
 
     Obelisk::Logger::Shutdown();

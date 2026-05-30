@@ -103,6 +103,20 @@ class CheckStaticToolingTests(unittest.TestCase):
         self.assertNotEqual(0, result.returncode)
         self.assertIn("--binary must not be a symlink", result.stderr)
 
+    def test_rejects_binary_under_symlinked_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            real_dir = root / "real"
+            real_dir.mkdir()
+            (real_dir / "ShooterGameServer").write_bytes(b"not really an elf")
+            link_dir = root / "linked"
+            link_dir.symlink_to(real_dir, target_is_directory=True)
+
+            result = self.run_tool("--binary", str(link_dir / "ShooterGameServer"), "--json", check=False)
+
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("--binary must not be a symlink", result.stderr)
+
     def test_rejects_protected_smoke_output_root(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             binary = Path(temp_dir) / "ShooterGameServer"
@@ -120,6 +134,29 @@ class CheckStaticToolingTests(unittest.TestCase):
 
         self.assertNotEqual(0, result.returncode)
         self.assertIn("--output-root must not write under protected server root", result.stderr)
+
+    def test_rejects_smoke_output_root_under_symlinked_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            binary = root / "ShooterGameServer"
+            real_dir = root / "real-output-parent"
+            link_dir = root / "linked-output-parent"
+            binary.write_bytes(b"not really an elf")
+            real_dir.mkdir()
+            link_dir.symlink_to(real_dir, target_is_directory=True)
+
+            result = self.run_tool(
+                "--binary",
+                str(binary),
+                "--output-root",
+                str(link_dir / "out"),
+                "--run-smoke",
+                "--json",
+                check=False,
+            )
+
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("--output-root must not be a symlink", result.stderr)
 
     def test_rejects_symlinked_smoke_output_file(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -48,6 +48,31 @@ This closes the Mission compact bool second-source gap for observer planning onl
 does not close runtime observer, dispatcher lifecycle, callback ABI, public SDK, identity,
 array payload, mutation, return override, or server-validation gates.
 
+## 2026-05-30 Second-Source Guidance Audit
+
+Decision: `mission-copied-bool-policy-slice` has enough consume-side guidance to be the
+next internal offline lane, but only as evidence-only planning. The comparison tooling now
+marks it as a planning-only target set for promotion gates: accepted second-source layout
+can make the slice consume-eligible, but `--fail-on-readiness-gaps` must still keep
+release/public promotion blocked for this target set.
+
+Target coverage is intentionally narrower than `mission-compact-intake`. The policy slice
+covers only the three bool-bearing targets:
+
+- `MissionType.AddPlayerToMission`
+- `MissionType.BPAllowPlayerToLeaveMission`
+- `MissionType.BPOnPlayerRemovedFromMission`
+
+`MissionType.GetPlayerUsableItems` stays in `mission-compact-intake` as recognition-only
+coverage and must not be added to the copied-bool policy slice. Its `Character` and
+`OutItemIDs` fields remain redacted and cannot produce copied bool output.
+
+The blocked-promotion wording for the slice is: consume-mode only, promote-mode blocked,
+not a release/readiness target, no public Mission SDK, no mission payload decoding, no
+identity, no lookup, no mutation, no return override, no runtime hooks, and no target-set
+expansion. Any later runtime observation request still needs a separate operator-approved
+window and the gates below.
+
 ## Frozen Target Surface
 
 Only these four reflected functions are in scope:

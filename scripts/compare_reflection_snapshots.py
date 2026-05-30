@@ -69,7 +69,8 @@ TARGET_BLOCKER_GUIDANCE = {
         ],
         "next_offline_input": (
             "approved non-protected copied/offline core or complete core evidence-pack manifest "
-            "with FName root, GObjects, binary hash, and artifact identity"
+            "with FName root, GObjects, binary hash, and artifact identity; do not repeat "
+            "fixture-only missing_base_snapshot checks as discovery"
         ),
         "snapshot_prep_checks": [
             "emit exact schema-qualified target obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild",
@@ -94,7 +95,8 @@ TARGET_BLOCKER_GUIDANCE = {
         ],
         "next_offline_input": (
             "approved non-protected copied/offline core or complete core evidence-pack manifest "
-            "that proves whether APrimalStructure is a reflected owner"
+            "that proves whether APrimalStructure is a reflected owner; do not repeat "
+            "fixture-only missing_base_snapshot checks as discovery"
         ),
         "snapshot_prep_checks": [
             "treat APrimalStructure as an ArkApi dictionary seed until a sanitized snapshot proves the reflected owner",
@@ -140,20 +142,25 @@ TARGET_SET_BLOCKER_GUIDANCE = {
         "classification": "internal_mission_copied_bool_policy_candidate",
         "why_blocked": [
             "policy_slice_evidence_only",
-            "missing_distinct_second_source_layout",
+            "consume_mode_only",
+            "promote_mode_blocked",
+            "not_release_readiness_target",
             "mission_payload_decoding_blocked",
             "public_mission_sdk_blocked",
             "runtime_observation_requires_separate_approval",
         ],
         "next_offline_input": (
-            "sanitized mission UFunction snapshots from distinct non-protected copied/offline "
-            "artifacts with complete artifact identity"
+            "consume the focused mission copied-bool policy artifact or refresh sanitized "
+            "mission UFunction snapshots from distinct non-protected copied/offline artifacts "
+            "with complete artifact identity"
         ),
         "snapshot_prep_checks": [
             "compare schema-qualified targets through --target-set mission-copied-bool-policy-slice",
             "require AddPlayerToMission, BPAllowPlayerToLeaveMission, and BPOnPlayerRemovedFromMission layouts to be comparable",
+            "keep GetPlayerUsableItems in mission-compact-intake as recognition-only; do not add it to the copied-bool policy slice",
             "keep player/controller/character object refs, item arrays, mission payload identity, and raw params redacted or recognition-only",
             "require distinct artifact identity before any second-source readiness claim",
+            "do not use this target set for release/readiness or public SDK promotion gates",
         ],
         "non_claim": (
             "does not promote Mission SDK, mission payload decoding, identity, lookup, mutation, "

@@ -491,11 +491,27 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         )
         mission = guidance["mission-copied-bool-policy-slice"]
         self.assertEqual(mission["classification"], "internal_mission_copied_bool_policy_candidate")
+        self.assertIn("consume_mode_only", mission["why_blocked"])
+        self.assertIn("promote_mode_blocked", mission["why_blocked"])
+        self.assertIn("not_release_readiness_target", mission["why_blocked"])
         self.assertIn("public_mission_sdk_blocked", mission["why_blocked"])
         self.assertIn("Mission SDK", mission["non_claim"])
         self.assertIn("mission payload decoding", mission["non_claim"])
+        self.assertIn("consume the focused mission copied-bool policy artifact", mission["next_offline_input"])
+        self.assertIn(
+            "require AddPlayerToMission, BPAllowPlayerToLeaveMission, and BPOnPlayerRemovedFromMission layouts to be comparable",
+            mission["snapshot_prep_checks"],
+        )
+        self.assertIn(
+            "keep GetPlayerUsableItems in mission-compact-intake as recognition-only; do not add it to the copied-bool policy slice",
+            mission["snapshot_prep_checks"],
+        )
         self.assertIn(
             "keep player/controller/character object refs, item arrays, mission payload identity, and raw params redacted or recognition-only",
+            mission["snapshot_prep_checks"],
+        )
+        self.assertIn(
+            "do not use this target set for release/readiness or public SDK promotion gates",
             mission["snapshot_prep_checks"],
         )
         transfer = guidance["transfer-baccept-only-policy-slice"]
@@ -517,6 +533,7 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertIn("target_guidance count=0 scope=offline_planning_only target_set_guidance=2", text_result.stdout)
         self.assertIn("target_set=mission-copied-bool-policy-slice", text_result.stdout)
         self.assertIn("target_set=transfer-baccept-only-policy-slice", text_result.stdout)
+        self.assertIn("consume_mode_only,promote_mode_blocked,not_release_readiness_target", text_result.stdout)
         self.assertIn("does not promote Mission SDK", text_result.stdout)
         self.assertIn("does not promote Transfer SDK", text_result.stdout)
 
@@ -1938,6 +1955,49 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(report["target_sets"], [target_set])
         self.assertEqual(report["totals"]["targets"], len(compare.TARGET_SETS[target_set]))
         self.assertEqual(report["totals"]["second_source_accepted"], len(compare.TARGET_SETS[target_set]))
+        self.assertEqual(
+            report["promotion_gate"],
+            {
+                "ready": False,
+                "ready_scope": "planning_only",
+                "layout_ready": True,
+                "promotion_ready": False,
+                "blockers": [{"reason": "target_set_not_release_readiness", "count": 1}],
+            },
+        )
+
+    def test_readiness_report_blocks_mission_copied_bool_policy_slice_promotion_gate(self) -> None:
+        target_set = "mission-copied-bool-policy-slice"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base_dir = root / "base" / "sha" / "sdk_missions"
+            candidate_dir = root / "candidate" / "sha" / "sdk_missions"
+            base_dir.mkdir(parents=True)
+            candidate_dir.mkdir(parents=True)
+            for target in compare.TARGET_SETS[target_set]:
+                _, _, short_key = target.partition(":")
+                outer, _, name = short_key.partition(".")
+                base_payload = rename_target(base_snapshot(), outer=outer, name=name)
+                candidate_payload = deepcopy(base_payload)
+                write_snapshot(base_dir, base_payload, f"{outer}.{name}.snapshot.json")
+                write_snapshot(candidate_dir, candidate_payload, f"{outer}.{name}.snapshot.json")
+
+            result = run_compare(
+                root / "base",
+                root / "candidate",
+                "--readiness-report",
+                "--target-set",
+                target_set,
+                "--fail-on-readiness-gaps",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 1)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["gate_mode"], "second_source_promotion")
+        self.assertEqual(report["target_sets"], [target_set])
+        self.assertEqual(report["totals"]["targets"], 3)
+        self.assertEqual(report["totals"]["second_source_accepted"], 3)
         self.assertEqual(
             report["promotion_gate"],
             {
