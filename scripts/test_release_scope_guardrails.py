@@ -604,15 +604,22 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("helper predicate", release)
         self.assertIn("caller mode", release)
         self.assertIn("mutation windows", release)
+        self.assertIn("Strict serial reuse/wraparound policy artifacts", release)
+        self.assertNormalizedIn("internal candidate-only contracts", release)
+        self.assertNormalizedIn("does not prove runtime reuse semantics", release)
+        self.assertNormalizedIn("public lookup safety, persistent handles, identity, mutation", release)
         self.assertIn("refreshed default `minimal-second-source-intake` evidence remains layout-only", status)
         self.assertIn("promotion_ready=false", status)
         self.assertIn("accepted transfer evidence for `transfer-ufunction-intake` and `transfer-scriptstruct`", status)
         self.assertIn("does not promote a public Transfer SDK", status)
         self.assertIn("UObject flag validity policy | Not ready", status)
-        self.assertIn("Static flag-policy reports and transition matrices", status)
+        self.assertIn("Static flag-policy reports, transition matrices, and strict serial-policy artifacts", status)
+        self.assertIn("do not prove lifecycle/validity or serial reuse semantics", status)
         self.assertIn("do not unlock `ResourceHandle`, object lookup, GObjects promotion", status)
         self.assertIn("capability-snapshot tests for owner-token public registrations", status)
         self.assertIn("Current ResourceHandle semantic work remains blocked", status)
+        self.assertIn("strict serial reuse/wraparound policy", status)
+        self.assertIn("internal candidate-only contracts", status)
         self.assertIn("cross-event correlation", status)
         self.assertIn("refreshed default `minimal-second-source-intake`", changelog)
         self.assertIn("does not promote public\n  Inventory/Structure SDKs", changelog)
@@ -1275,10 +1282,12 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
     def test_uobject_flag_policy_current_blockers_stay_explicit(self) -> None:
         current = read("docs/agent-handoff/CURRENT.md")
         status = read("docs/STATUS.md")
+        release = read("docs/RELEASE.md")
         research = read("docs/research/2026-05-30-uobject-flag-policy-gate-refresh.md")
 
         compact_current = normalized(current)
         compact_status = normalized(status)
+        compact_release = normalized(release)
         compact_research = normalized(research)
 
         for item in [
@@ -1297,11 +1306,24 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
 
         for item in [
             "UObject flag validity policy | Not ready",
+            "strict serial-policy artifacts",
             "candidate-only evidence",
+            "do not prove lifecycle/validity or serial reuse semantics",
             "do not unlock `ResourceHandle`, object lookup, GObjects promotion",
+            "persistent handles, identity, mutation, or return overrides",
         ]:
             with self.subTest(file="docs/STATUS.md", item=item):
                 self.assertIn(normalized(item), compact_status)
+
+        for item in [
+            "Strict serial reuse/wraparound policy artifacts are also internal candidate-only contracts",
+            "does not prove runtime reuse semantics",
+            "public lookup safety",
+            "persistent handles, identity, mutation, return overrides, runtime negative samples",
+            "public `ResourceHandle`",
+        ]:
+            with self.subTest(file="docs/RELEASE.md", item=item):
+                self.assertIn(normalized(item), compact_release)
 
         for item in [
             "old labels",

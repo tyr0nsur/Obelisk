@@ -23,6 +23,8 @@ cross-binary portability.
 - Pack contents must be regular files or directories; symlinked entries fail closed.
 - Root outputs must be named exactly `artifact-pack.manifest.json` and `SHA256SUMS`.
 - Manifest schema must be `obelisk.artifact-pack.manifest.v1`.
+- Legacy spellings such as `obelisk.artifact_pack.manifest.v1` are unsupported and fail
+  closed as unknown schemas.
 - `artifact_id` must be a safe component, normally the pack directory name.
 - `generated_utc` must be a real UTC timestamp in `YYYY-MM-DDTHH:MM:SSZ` form.
 - Every recorded file path must be pack-relative, not absolute, not empty, and not
@@ -31,6 +33,9 @@ cross-binary portability.
 - Child JSON is always scanned for generic hygiene blockers such as protected-root
   strings and promotion overclaims. Child JSON with a supported schema is additionally
   revalidated by the consume gate; unknown `obelisk.*` schemas fail closed.
+- Do not keep normalizer stdout files such as `normalize-artifact-pack.json` in the pack
+  root. The normalizer treats them as payload; a zero-byte or stale JSON summary then
+  blocks the consume gate as malformed or drifted child evidence.
 
 ## Normalize And Check
 
@@ -70,6 +75,10 @@ python3 scripts/validate_offline_artifact_gate.py \
   --mode consume \
   --json
 ```
+
+Use `--manifest` for `artifact-pack.manifest.json`. Do not pass pack manifests through
+`--artifact`; that path is for raw static artifacts with provenance sidecars and does not
+recurse into or validate the pack container.
 
 The expected result for a usable pack is `status=accepted` with no blockers. If blockers
 are present, keep the pack as rejected or fix the source artifact and normalize again.

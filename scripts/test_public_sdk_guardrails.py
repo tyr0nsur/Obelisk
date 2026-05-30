@@ -28,6 +28,14 @@ PUBLIC_DOC_FILES = [
     REPO_ROOT / "docs" / "oBaseEvents.md",
     REPO_ROOT / ".github" / "pull_request_template.md",
 ]
+PUBLIC_PLUGIN_EXAMPLE_DOC_FILES = [
+    REPO_ROOT / "docs" / "oDescriptorCatalog.md",
+    REPO_ROOT / "docs" / "oProcessTimer.md",
+]
+PUBLIC_SDK_GUIDANCE_DOC_FILES = [
+    *PUBLIC_DOC_FILES,
+    *PUBLIC_PLUGIN_EXAMPLE_DOC_FILES,
+]
 PUBLIC_RELEASE_SCOPE_DOC_FILES = [
     REPO_ROOT / "docs" / "PLUGIN_ARCHITECTURE.md",
     REPO_ROOT / "docs" / "RELEASE.md",
@@ -235,7 +243,7 @@ V010_PUBLIC_GAMEPLAY_POLICY_STABLE_NAMES = [
 ]
 CHAT_MESSAGE_EVENT_PUBLIC_CLAIM_FILES = [
     PUBLIC_GAMEPLAY_EVENTS_MANIFEST,
-    *PUBLIC_DOC_FILES,
+    *PUBLIC_SDK_GUIDANCE_DOC_FILES,
     REPO_ROOT / "plugins" / "README.md",
 ]
 CHAT_MESSAGE_EVENT_POSITIVE_CLAIM_WINDOW = 8
@@ -757,7 +765,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         for path, value in json_string_values(manifest, "manifest"):
             sources.append((f"{PUBLIC_GAMEPLAY_EVENTS_MANIFEST.relative_to(REPO_ROOT)}:{path}", value))
-        for path in PUBLIC_DOC_FILES:
+        for path in PUBLIC_SDK_GUIDANCE_DOC_FILES:
             text = path.read_text(encoding="utf-8")
             relative = path.relative_to(REPO_ROOT)
             for line, segment in sentence_like_segments(text):
@@ -802,7 +810,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         )
         offenders: list[str] = []
 
-        for path in PUBLIC_DOC_FILES:
+        for path in PUBLIC_SDK_GUIDANCE_DOC_FILES:
             text = path.read_text(encoding="utf-8")
             for line, segment in sentence_like_segments(text):
                 context_start = max(0, line - 160)
@@ -908,6 +916,69 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             with self.subTest(item=item):
                 self.assertIn(normalized(item), compact)
 
+    def test_first_party_examples_stay_on_fastest_honest_creator_path(self) -> None:
+        plugins_readme = (REPO_ROOT / "plugins" / "README.md").read_text(encoding="utf-8")
+        foundation = (REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md").read_text(encoding="utf-8")
+        matrix = (REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md").read_text(encoding="utf-8")
+        obase_doc = (REPO_ROOT / "docs" / "oBaseEvents.md").read_text(encoding="utf-8")
+        descriptor_doc = (REPO_ROOT / "docs" / "oDescriptorCatalog.md").read_text(encoding="utf-8")
+        timer_doc = (REPO_ROOT / "docs" / "oProcessTimer.md").read_text(encoding="utf-8")
+        policy_source = (REPO_ROOT / "plugins" / "oPolicyAudit" / "oPolicyAudit.cpp").read_text(
+            encoding="utf-8"
+        )
+
+        for name in ("oBaseEvents", "oDescriptorCatalog", "oProcessTimer", "oPolicyAudit"):
+            with self.subTest(name=name):
+                self.assertIn(name, plugins_readme)
+
+        for text, required in (
+            (foundation, "## Fastest Honest Creator Path"),
+            (foundation, "Add descriptor reads"),
+            (foundation, "Add passive copied chat parsing"),
+            (foundation, "Add process-local timers"),
+            (foundation, "Add copied policy auditors"),
+            (matrix, "## Post-v0.1 Creator Ladder"),
+            (matrix, "Descriptor consumers"),
+            (matrix, "Passive chat text parsers"),
+            (matrix, "Timer utilities"),
+            (matrix, "Copied policy auditors"),
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, text)
+
+        for text, required in (
+            (obase_doc, "filtered raw `ProcessEvent` callback when the runtime explicitly advertises the filtered debug capability"),
+            (obase_doc, "optional plugin-local chat command helper layered on copied `ChatMessageEvent`"),
+            (descriptor_doc, "metadata-only SDK discovery"),
+            (descriptor_doc, "does not register callbacks, timers, chat handlers"),
+            (timer_doc, "process-local timers"),
+            (timer_doc, "does not use or imply UE timers, gameplay timers, `ProcessEvent`"),
+            (plugins_readme, "raw `ProcessEvent` callbacks\n  require explicit debug gates"),
+            (plugins_readme, "`oPolicyAudit` demonstrates the promoted `GameplayPolicyEvent` callback family"),
+        ):
+            with self.subTest(required=required):
+                self.assertIn(normalized(required), normalized(text))
+
+        for required in (
+            "OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS",
+            "RegisterGameplayPolicyEventWithOwnerTokenHandle",
+            "UnregisterGameplayPolicyEventWithOwnerToken",
+            "DescribeResourceKind",
+            "DescribeGameplayPolicyEventKind",
+        ):
+            with self.subTest(policy_required=required):
+                self.assertIn(required, policy_source)
+
+        for forbidden in (
+            "CallProcessEvent",
+            "RegisterPreProcessEvent",
+            "RegisterPostProcessEvent",
+            "ChatMessageEvent",
+            "RegisterTimer",
+        ):
+            with self.subTest(policy_forbidden=forbidden):
+                self.assertNotIn(forbidden, policy_source)
+
     def test_nextgenplugins_absolute_path_stays_out_of_public_docs_and_skills(self) -> None:
         offenders: list[str] = []
 
@@ -917,7 +988,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 if "/home/flowcommunity-ark/NextGenPlugins" in text:
                     offenders.append(str(path.relative_to(REPO_ROOT)))
 
-        for path in PUBLIC_DOC_FILES:
+        for path in PUBLIC_SDK_GUIDANCE_DOC_FILES:
             text = path.read_text(encoding="utf-8")
             if "/home/flowcommunity-ark/NextGenPlugins" in text:
                 offenders.append(str(path.relative_to(REPO_ROOT)))
@@ -2059,7 +2130,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         )
         offenders: list[str] = []
 
-        for path in PUBLIC_DOC_FILES:
+        for path in PUBLIC_SDK_GUIDANCE_DOC_FILES:
             text = path.read_text(encoding="utf-8")
             lowered = text.lower()
             for token in forbidden:
@@ -2073,7 +2144,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         public_files = [
             PUBLIC_API_HEADER,
             PUBLIC_GAMEPLAY_EVENTS_MANIFEST,
-            *PUBLIC_DOC_FILES,
+            *PUBLIC_SDK_GUIDANCE_DOC_FILES,
         ]
         forbidden = (
             "enable-chat-route-observer",
@@ -2621,6 +2692,11 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         script = (REPO_ROOT / "scripts" / "build_resource_handle_serial_policy.py").read_text(
             encoding="utf-8"
         )
+        release = (REPO_ROOT / "docs" / "RELEASE.md").read_text(encoding="utf-8")
+        status = (REPO_ROOT / "docs" / "STATUS.md").read_text(encoding="utf-8")
+        current = (REPO_ROOT / "docs" / "agent-handoff" / "CURRENT.md").read_text(
+            encoding="utf-8"
+        )
         research_note = (
             REPO_ROOT / "docs" / "research" / "2026-05-30-post-rc-offline-resourcehandle-priority.md"
         ).read_text(encoding="utf-8")
@@ -2659,13 +2735,32 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             with self.subTest(file="docs/research/2026-05-30-post-rc-offline-resourcehandle-priority.md", item=item):
                 self.assertIn(normalized(item), compact_research)
 
+        for path, text in (
+            ("docs/RELEASE.md", release),
+            ("docs/STATUS.md", status),
+            ("docs/agent-handoff/CURRENT.md", current),
+        ):
+            compact = normalized(text)
+            compact_lower = compact.lower()
+            with self.subTest(file=path, item="strict serial policy remains candidate-only"):
+                self.assertIn("strict serial", compact_lower)
+                self.assertRegex(compact, r"candidate-only|candidate only")
+            with self.subTest(file=path, item="ResourceHandle stays unpromoted"):
+                self.assertIn("ResourceHandle", compact)
+                self.assertRegex(compact, r"does not (?:unlock|prove)|remain blocked|blocks it")
+                self.assertIn("public lookup", compact)
+
         forbidden_public_markers = (
             "build_resource_handle_serial_policy.py",
             "obelisk.internal-uobject-revalidation-serial-policy.v1",
             "allow_candidate_frame_local_only",
         )
         offenders: list[str] = []
-        for path in (PUBLIC_GAMEPLAY_EVENTS_MANIFEST, *PUBLIC_DOC_FILES, REPO_ROOT / "plugins" / "README.md"):
+        for path in (
+            PUBLIC_GAMEPLAY_EVENTS_MANIFEST,
+            *PUBLIC_SDK_GUIDANCE_DOC_FILES,
+            REPO_ROOT / "plugins" / "README.md",
+        ):
             text = path.read_text(encoding="utf-8")
             for marker in forbidden_public_markers:
                 if marker in text:

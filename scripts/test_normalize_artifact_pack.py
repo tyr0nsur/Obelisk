@@ -164,6 +164,10 @@ class NormalizeArtifactPackTests(unittest.TestCase):
             result = self.run_tool(str(pack), "--check", check=False)
             self.assertIn("unsupported schema", result.stderr)
 
+            manifest.write_text(json.dumps({"schema": "obelisk.artifact_pack.manifest.v1"}) + "\n", encoding="utf-8")
+            result = self.run_tool(str(pack), "--check", check=False)
+            self.assertIn("unsupported schema", result.stderr)
+
             manifest.write_text(
                 json.dumps(
                     {

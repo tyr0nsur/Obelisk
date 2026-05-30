@@ -425,3 +425,42 @@ promote_mode_manifest_has_non_claims
 Use `--manifest` for this structured JSON report. The generic `--artifact` path still
 requires a `.provenance.json` sidecar because it validates unstructured files rather than
 schema-aware JSON reports.
+
+## Serial Policy Gate Audit
+
+An offline audit of the generated serial-policy artifact confirmed the schema-aware gate
+path against the durable artifact:
+
+```text
+/home/flowcommunity-ark/obelisk-artifacts/resourcehandle-serial-policy-20260530T190642Z/serial-policy.json
+```
+
+Validation:
+
+- `sha256sum serial-policy.json`:
+  `a4fe1b1390103b31e49c241deadc3bca0f12adc37d4a1efa306a02dbf8de3532`
+- `SHA256SUMS` records the same file hash.
+- `output_artifact_identity.artifact_sha256`:
+  `01cb5335dca3fe6301ddee007284e61044d30b288a0f2c33e160df562344406d`
+- consume gate with `--manifest` and `--root /home/flowcommunity-ark/obelisk-artifacts`:
+  `accepted`, blockers `0`
+- promote gate with the same manifest: blocked by
+  `promote_mode_serial_policy_candidate_only` and `promote_mode_manifest_has_non_claims`
+- no `/servidor/ark`, local artifact paths, or ready-state overclaims were present in the
+  serial-policy JSON.
+
+Focused tests passed:
+
+```text
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_build_resource_handle_serial_policy
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_validate_offline_artifact_gate
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_public_sdk_guardrails.PublicSdkGuardrailTests.test_resource_handle_serial_policy_tooling_stays_internal_candidate_only
+```
+
+Audit result: consume acceptance is valid for indexing and planning only. The immediate
+strict gate blocker remains `promote_mode_serial_policy_candidate_only`. For the
+ResourceHandle promotion lane, the next strict evidence blocker is rejected runtime object
+samples plus runtime serial reuse/wraparound semantics; the accepted serial-policy
+artifact only defines fail-closed policy and explicitly does not prove runtime reuse
+safety, public lookup safety, persistent handles, identity, mutation, return overrides,
+or public `ResourceHandle`.

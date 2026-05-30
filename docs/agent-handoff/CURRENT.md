@@ -115,7 +115,10 @@ for the current checkpoint.
   manifest consume mode accepts it and promote mode blocks it as candidate-only. This
   narrows the serial-policy design gap but does not unlock runtime negative samples,
   public lookup, object identity, mutation, return override, persistent handles, or
-  public `ResourceHandle`.
+  public `ResourceHandle`. The next strict ResourceHandle blocker is rejected runtime
+  object samples plus runtime serial reuse/wraparound semantics; it requires a future
+  approved live-ops/runtime-observation plan, not another broad offline FName/GObjects
+  scan.
 - Transfer ScriptStruct bool-tail evidence has a refreshed local root; older
   `/servidor/ark/workspace-offline/...20260529...` transfer roots are stale under current
   bool-tail strictness.
@@ -160,6 +163,10 @@ for the current checkpoint.
 - Artifact-pack contributor onboarding now has `docs/OFFLINE_ARTIFACT_PACKS.md` as the
   concise contributor runbook. It documents normalize/check, consume gate, strict
   target-set coverage, second-source compare, pack-shape expectations, and non-claims.
+  Use `--manifest` for structured JSON reports and artifact-pack manifests; keep
+  normalizer stdout summaries outside the pack; legacy
+  `obelisk.artifact_pack.manifest.v1` spelling and in-pack zero-byte normalizer summaries
+  fail closed.
   The default release gate and `check_rc_layout_evidence_smoke.sh` are aligned on the four
   public RC UFunction target sets, including `item-return-only-policy-slice`; the combined
   RC UFunction root helper now requires `--item-return-root` and assembles 12 snapshots.

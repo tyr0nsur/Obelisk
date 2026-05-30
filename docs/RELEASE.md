@@ -190,6 +190,10 @@ must not unlock `ResourceHandle`, object lookup, GObjects promotion, mutation, o
 overrides. ResourceHandle semantic work must remain blocked until the helper predicate,
 caller mode, mutation windows, rejected-object samples, and fail-closed lookup contract
 are accepted through promote-mode gates.
+Strict serial reuse/wraparound policy artifacts are also internal candidate-only
+contracts. Consume-mode acceptance may narrow the design gap, but it does not prove
+runtime reuse semantics, public lookup safety, persistent handles, identity, mutation,
+return overrides, runtime negative samples, or public `ResourceHandle`.
 
 Pass sanitized second-source snapshot roots into the same gate and keep JSON reports as
 promotion artifacts. Write the report directory outside the repository

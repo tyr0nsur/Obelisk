@@ -185,3 +185,129 @@ the same command with `--outer-exact APrimalStructure`. Do not add target sets, 
 signatures, runtime callbacks, descriptors, ABI enums, mutation, return override, or
 public Structure SDK surfaces until the candidate snapshot and a distinct second-source
 layout comparison exist.
+
+## Offline Snapshot Planner Recheck
+
+Date: 2026-05-30
+Obelisk commit: `2186c77`
+
+Scope: offline-only inspection of repository scripts and
+`/home/flowcommunity-ark/obelisk-artifacts`. This pass did not read or write
+`/servidor/ark`, did not start server operations, did not run ptrace/gcore/scanner tools,
+and did not generate a snapshot.
+
+Commands run:
+
+```bash
+git rev-parse --short HEAD
+git status --short
+
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/compare_reflection_snapshots.py \
+  --base-root tests/fixtures/ufunction_snapshots \
+  --readiness-report \
+  --target obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild \
+  --json
+
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/compare_reflection_snapshots.py \
+  --base-root tests/fixtures/ufunction_snapshots \
+  --readiness-report \
+  --target obelisk.ufunction-chain.snapshot.v1:APrimalStructure.IsAllowedToBuild \
+  --json
+
+find /home/flowcommunity-ark/obelisk-artifacts -xdev -type f -size +100M -printf '%s %p\n' | sort -nr
+find /home/flowcommunity-ark/obelisk-artifacts -xdev -type l -printf '%p -> %l\n' | sort
+find /home/flowcommunity-ark/obelisk-artifacts -xdev \( -iname '*core*' -o -iname '*.core' -o -iname 'core.*' -o -iname '*gcore*' -o -iname '*dump*' \) -printf '%y %s %p -> %l\n' | sort
+rg -n --glob '*.json' --glob '*.md' --glob '*.txt' --glob '*.tsv' --glob '!*.objdump' --glob '!ShooterGameServer' \
+  'IsAllowedToBuild|AllowedToBuild|BPIsAllowedToBuild|PlacementData|bFinalPlacement|bDontAdjustForMaxRange|PlayerViewRotation|AtLocation|AtRotation' \
+  /home/flowcommunity-ark/obelisk-artifacts
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/inspect_core_ufunctions.py --help | rg -n -- '--core|--gobjects|--fname-root-slot|--outer-exact|--name-exact|--inspection-mode|--snapshot-json|--evidence-|--max-object-scan'
+
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate_offline_artifact_gate.py \
+  --root /home/flowcommunity-ark/obelisk-artifacts/structure-return-only-policy-slice-20260530T093002Z \
+  --manifest /home/flowcommunity-ark/obelisk-artifacts/structure-return-only-policy-slice-20260530T093002Z/structure-return-only-policy-slice.json \
+  --mode consume --json
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate_offline_artifact_gate.py \
+  --root /home/flowcommunity-ark/obelisk-artifacts/structure-return-only-policy-slice-20260530T093002Z \
+  --manifest /home/flowcommunity-ark/obelisk-artifacts/structure-return-only-policy-slice-20260530T093002Z/structure-return-only-policy-slice.json \
+  --mode promote --json
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate_offline_artifact_gate.py \
+  --root /home/flowcommunity-ark/obelisk-artifacts/structure-nonpin-copied-scalar-policy-slice-20260530T100717Z \
+  --manifest /home/flowcommunity-ark/obelisk-artifacts/structure-nonpin-copied-scalar-policy-slice-20260530T100717Z/structure-nonpin-copied-scalar-policy-slice.json \
+  --mode consume --json
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate_offline_artifact_gate.py \
+  --root /home/flowcommunity-ark/obelisk-artifacts/structure-nonpin-copied-scalar-policy-slice-20260530T100717Z \
+  --manifest /home/flowcommunity-ark/obelisk-artifacts/structure-nonpin-copied-scalar-policy-slice-20260530T100717Z/structure-nonpin-copied-scalar-policy-slice.json \
+  --mode promote --json
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate_offline_artifact_gate.py \
+  --root /home/flowcommunity-ark/obelisk-artifacts/static-global-preflight-20260529 \
+  --manifest /home/flowcommunity-ark/obelisk-artifacts/static-global-preflight-20260529/manifest.json \
+  --expected-binary-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
+  --mode consume --json
+```
+
+Results:
+
+- Both exact readiness checks still report `missing_base_snapshot`, `layout_ready=false`,
+  and `promotion_ready=false`.
+- The artifact root currently lists 285 files, 66 directories, and 1 symlink. The symlink
+  points to the offline binary under
+  `/home/flowcommunity-ark/obelisk-artifacts/offline-binaries/.../ShooterGameServer`.
+- The only file larger than 100 MB is
+  `/home/flowcommunity-ark/obelisk-artifacts/static-global-preflight-20260529/ShooterGameServer.objdump`;
+  no eligible raw core file was found under the non-protected artifact root.
+- The artifact text search found no exact `IsAllowedToBuild` snapshot, candidate pack, or
+  redacted signature under `/home/flowcommunity-ark/obelisk-artifacts`.
+- `scripts/inspect_core_ufunctions.py` exposes the required offline snapshot flags:
+  `--core`, `--gobjects`, `--fname-root-slot`, `--outer-exact`, `--name-exact`,
+  `--inspection-mode ufunction`, `--snapshot-json`, and the evidence identity fields.
+- Adjacent structure policy-slice artifacts remain evidence-only: both return-only and
+  non-PIN copied-scalar slices pass consume mode and block promote mode.
+- Static-global preflight remains useful context for `0x5956f30` and `0x595b7e0`, but
+  current consume-mode validation blocks it on `static_global_missing_artifact_identity`
+  and `static_global_static_xrefs_sha256_invalid`.
+- Some artifact manifests preserve protected core path strings such as
+  `/servidor/ark/workspace-offline/.../raw/core`; those manifests are not eligible inputs
+  for this task because the requested snapshot must be producible without protected
+  paths.
+
+Decision: no eligible core or complete core evidence-pack manifest exists under
+`/home/flowcommunity-ark/obelisk-artifacts` for producing a sanitized
+`IsAllowedToBuild` snapshot without protected paths.
+
+Exact missing input:
+
+- A copied/offline ELF core file outside `/servidor/ark`, preferably under
+  `/home/flowcommunity-ark/obelisk-artifacts/<approved-build-policy-core>/raw/core`, or a
+  complete core evidence-pack manifest whose `core.path` resolves outside `/servidor/ark`.
+- Matching binary identity for
+  `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`, or a clearly
+  documented second-source binary hash with its own FName/GObjects evidence.
+- Sanitized artifact identity values for `artifact_sha256`, `capture_id`, and
+  `evidence_pack_id`.
+
+Command shape once that input exists:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/inspect_core_ufunctions.py \
+  --core <non-protected-offline-core> \
+  --gobjects 0x595b7e0 \
+  --fname-root-slot 0x5956f30 \
+  --outer-exact PrimalStructure \
+  --name-exact IsAllowedToBuild \
+  --max-object-scan 30000 \
+  --inspection-mode ufunction \
+  --snapshot-json \
+  --evidence-ark-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
+  --evidence-artifact-sha256 <offline-core-or-pack-sha256> \
+  --evidence-artifact-kind offline_core \
+  --evidence-capture-id <sanitized-capture-id> \
+  --evidence-pack-id <sanitized-pack-id> \
+  --evidence-obelisk-commit <commit> \
+  > <non-protected-review-output>/PrimalStructure.IsAllowedToBuild.snapshot.json
+```
+
+If an evidence-pack manifest is supplied instead of a direct core path, first validate that
+its `core.path` resolves outside `/servidor/ark`; then use that non-protected resolved
+core path in the command above. If the artifact proves `APrimalStructure` is the reflected
+owner, rerun the same command with `--outer-exact APrimalStructure`. Do not generate from
+or dereference protected `/servidor/ark` paths.

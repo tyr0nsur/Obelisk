@@ -2602,6 +2602,41 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
 
         self.assertIn("unsupported_manifest_schema", {blocker["reason"] for blocker in result["blockers"]})
 
+    def test_artifact_pack_blocks_zero_byte_normalizer_summary_child(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            pack = workspace / "artifact-pack-20260530T072255Z"
+            pack.mkdir(parents=True)
+            (pack / "normalize-artifact-pack.json").write_bytes(b"")
+            (pack / "report.json").write_text('{"schema":"fixture"}\n', encoding="utf-8")
+            artifact_pack.normalize_pack(pack, pack.name, "2026-05-30T07:22:55Z")
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[pack / artifact_pack.MANIFEST_NAME]))
+
+        self.assertIn("malformed_json", {blocker["reason"] for blocker in result["blockers"]})
+
+    def test_blocks_legacy_artifact_pack_schema_spelling(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            pack = workspace / "artifact-pack-20260530T072255Z"
+            pack.mkdir(parents=True)
+            write_json(
+                pack / artifact_pack.MANIFEST_NAME,
+                {
+                    "schema": "obelisk.artifact_pack.manifest.v1",
+                    "artifact_id": pack.name,
+                    "generated_utc": "2026-05-30T07:22:55Z",
+                    "files": [],
+                },
+            )
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[pack / artifact_pack.MANIFEST_NAME]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("unsupported_manifest_schema", reasons)
+
     def test_protected_root_string_workspace_exception_is_component_aware(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"
@@ -2703,6 +2738,47 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         reasons = {blocker["reason"] for blocker in result["blockers"]}
         self.assertIn("promote_mode_artifact_pack_manifest_container_only", reasons)
         self.assertIn("gobjects_two_core_manifest_promote_mode_blocked", reasons)
+        self.assertIn("promote_mode_manifest_has_non_claims", reasons)
+
+    def test_artifact_pack_manifest_passed_as_artifact_does_not_validate_pack(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            pack = workspace / "artifact-pack-20260530T072255Z"
+            pack.mkdir(parents=True)
+            (pack / "report.json").write_text('{"schema":"fixture"}\n', encoding="utf-8")
+            artifact_pack.normalize_pack(pack, pack.name, "2026-05-30T07:22:55Z")
+
+            result = gate.build_result(
+                args(
+                    root=workspace,
+                    protected_root=protected,
+                    artifacts=[("pack", pack / artifact_pack.MANIFEST_NAME)],
+                )
+            )
+
+        self.assertEqual([], result["manifests"])
+        self.assertIn("missing_provenance_sidecar", {blocker["reason"] for blocker in result["blockers"]})
+
+    def test_artifact_pack_accepts_serial_policy_child_for_consume_and_blocks_promote(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            pack = workspace / "serial-policy-pack-20260530T190642Z"
+            pack.mkdir(parents=True)
+            write_json(pack / "serial-policy.json", internal_uobject_serial_policy_manifest())
+            artifact_pack.normalize_pack(pack, pack.name, "2026-05-30T19:06:42Z")
+
+            consume = gate.build_result(args(root=workspace, protected_root=protected, manifests=[pack / artifact_pack.MANIFEST_NAME]))
+            promote = gate.build_result(
+                args(root=workspace, protected_root=protected, manifests=[pack / artifact_pack.MANIFEST_NAME], mode="promote")
+            )
+
+        self.assertEqual("accepted", consume["status"])
+        self.assertEqual([], consume["blockers"])
+        reasons = {blocker["reason"] for blocker in promote["blockers"]}
+        self.assertIn("promote_mode_artifact_pack_manifest_container_only", reasons)
+        self.assertIn("promote_mode_serial_policy_candidate_only", reasons)
         self.assertIn("promote_mode_manifest_has_non_claims", reasons)
 
     def test_accepts_rc_ufunction_second_source_root_manifest(self) -> None:

@@ -376,6 +376,62 @@ namespace
                 "AllowCarryCharacter ReturnValue range mismatch");
     }
 
+    void TestRecognitionOnlyDinoObjectFieldsDoNotReadParams()
+    {
+        {
+            DinoFixture fixture;
+            BuildAddPassenger(fixture);
+            fixture.Params[0x08] = 7;
+            fixture.Params[0x0c] = 1;
+            fixture.Params[0x0d] = 0;
+            fixture.Params[0x0e] = 1;
+            fixture.Params[0x0f] = 1;
+
+            MemoryReader reader = fixture.Reader();
+            fixture.Context.Regions.back() = {fixture.Params.data() + 0x08, fixture.Params.size() - 0x08};
+
+            DinoReflection::DinoInvocation invocation;
+            ReadResult result = DinoReflection::TryIdentifyDinoInvocation(
+                reader,
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+
+            Require(static_cast<bool>(result), result.Reason.c_str());
+            Require(invocation.Function == DinoReflection::DinoFunction::AddPassenger,
+                    "AddPassenger kind mismatch with unreadable object params");
+            Require(!invocation.Fields[0].ExposesRange, "AddPassenger object field exposed params");
+            Require(invocation.Fields[0].Range.Data == nullptr, "AddPassenger object field read params");
+            Require(invocation.Fields[1].Range.Data == fixture.Params.data() + 0x08,
+                    "AddPassenger scalar range was not still copied");
+        }
+        {
+            DinoFixture fixture;
+            BuildAllowCarryCharacter(fixture);
+            fixture.Params[0x08] = 1;
+
+            MemoryReader reader = fixture.Reader();
+            fixture.Context.Regions.back() = {fixture.Params.data() + 0x08, 1};
+
+            DinoReflection::DinoInvocation invocation;
+            ReadResult result = DinoReflection::TryIdentifyDinoInvocation(
+                reader,
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+
+            Require(static_cast<bool>(result), result.Reason.c_str());
+            Require(invocation.Function == DinoReflection::DinoFunction::AllowCarryCharacter,
+                    "AllowCarryCharacter kind mismatch with unreadable object params");
+            Require(!invocation.Fields[0].ExposesRange, "AllowCarryCharacter object field exposed params");
+            Require(invocation.Fields[0].Range.Data == nullptr, "AllowCarryCharacter object field read params");
+            Require(invocation.Fields[1].Range.Data == fixture.Params.data() + 0x08,
+                    "AllowCarryCharacter scalar range was not still copied");
+        }
+    }
+
     void TestAcceptsMetadataOnlyRecognition()
     {
         DinoFixture fixture;
@@ -935,6 +991,7 @@ int main()
 {
     TestRecognizesAddPassengerWithoutObjectRange();
     TestRecognizesAllowCarryCharacterWithoutObjectRange();
+    TestRecognitionOnlyDinoObjectFieldsDoNotReadParams();
     TestAcceptsMetadataOnlyRecognition();
     TestRejectsPartialNameCollisions();
     TestRejectsWrongOuterNameNumberAndClass();
