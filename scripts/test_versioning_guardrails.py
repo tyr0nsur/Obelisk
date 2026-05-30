@@ -86,6 +86,13 @@ class VersioningGuardrailTests(unittest.TestCase):
                 self.assertIn('out->version = "0.1.0-rc.1";', text)
                 self.assertNotIn('out->version = "0.1.0";', text)
 
+    def test_post_rc_timer_example_does_not_claim_rc_or_stable_version(self) -> None:
+        text = (REPO_ROOT / "plugins/oProcessTimer/oProcessTimer.cpp").read_text(encoding="utf-8")
+
+        self.assertIn('out->version = "0.2.0-dev";', text)
+        self.assertNotIn('out->version = "0.1.0";', text)
+        self.assertNotIn('out->version = "0.1.0-rc.1";', text)
+
     def test_cmake_exported_abi_versions_match_public_sdk_header(self) -> None:
         cmake = (REPO_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
         header = (REPO_ROOT / "include/obelisk/ObeliskApi.h").read_text(encoding="utf-8")

@@ -49,6 +49,29 @@ The builder emits `obelisk.structure-nonpin-copied-scalar-policy-slice.v1` from 
 UFunction fixtures. The offline artifact gate accepts the slice in consume mode and blocks
 promotion with `promote_mode_structure_nonpin_copied_scalar_policy_slice_evidence_only`.
 
+Generated artifact pack:
+
+```text
+/home/flowcommunity-ark/obelisk-artifacts/structure-nonpin-copied-scalar-policy-slice-20260530T100717Z/
+```
+
+Files:
+
+```text
+artifact-pack.manifest.json
+SHA256SUMS
+structure-nonpin-copied-scalar-policy-slice.json
+structure-nonpin-copied-scalar-policy-slice.consume-gate.json
+structure-nonpin-copied-scalar-policy-slice.promote-gate.json
+```
+
+Gate result:
+
+```text
+consume: accepted mode=consume blockers=0
+promote: blocked mode=promote blockers=2
+```
+
 Validation performed:
 
 ```text

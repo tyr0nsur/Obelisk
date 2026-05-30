@@ -580,6 +580,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "docs/ARCHITECTURE.md": read("docs/ARCHITECTURE.md"),
             "CONTRIBUTING.md": read("CONTRIBUTING.md"),
             "docs/agent-handoff/CURRENT.md": read("docs/agent-handoff/CURRENT.md"),
+            "plugins/README.md": read("plugins/README.md"),
         }
         required = [
             "process-local",
@@ -598,6 +599,13 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             with self.subTest(file=path):
                 for item in required:
                     self.assertIn(item, compact)
+
+        plugins_readme = normalized(read("plugins/README.md"))
+        timer_source = read("plugins/oProcessTimer/oProcessTimer.cpp")
+        self.assertIn("`oProcessTimer` is post-RC/v1 core scope, not part of the `v0.1.0-rc.1` public surface", plugins_readme)
+        self.assertIn('out->version = "0.2.0-dev";', timer_source)
+        self.assertNotIn('out->version = "0.1.0";', timer_source)
+        self.assertNotIn('out->version = "0.1.0-rc.1";', timer_source)
 
     def test_arkapi_reference_is_names_behavior_only_not_porting_or_copying(self) -> None:
         docs = {
