@@ -187,14 +187,9 @@ This active routing table keeps only next-round facts; put durable evidence in
   strict RC `minimal-second-source-intake` redacted signature pack has complete coverage.
 - Post-RC internal recognizer work stays test-only. The post-RC internal recognizer order
   is Mission copied-bool observer, Item return-only policy, then Transfer `bAccept`; this
-  is no RC public SDK/API promotion. None of these promote public Mission, Items,
-  Transfer, Inventory, or Structure SDKs; public callbacks; ABI; marker/env; runtime
-  logs; hook wiring; mutation; return override; object identity; lookup; or
-  `ResourceHandle`. Mission helper tests cover disabled/non-mission no-read/no-budget
-  paths, blocked object/array field range forgeries, null bool data, stale-output
-  clearing on rejection, and the exact five-bool internal copied surface. Item helper
-  tests document bounded budget reservation before metadata reads and forged
-  `DestinationItem` rejection while keeping copied output return-only.
+  is no RC public SDK/API promotion. It does not promote public module SDKs, callbacks,
+  ABI, marker/env, runtime logs, hook wiring, mutation, return override, object identity,
+  lookup, or `ResourceHandle`; keep detailed test coverage in dated research notes.
 - Post-RC offline tooling checkpoint `8e76d3c` added candidate-only UObject flag,
   weak-helper, and GObjects evidence builders plus gate tests. These tools are for
   consume-mode internal/offline indexing only. They do not promote public GObjects,
