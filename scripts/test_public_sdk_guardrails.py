@@ -140,6 +140,15 @@ V010_GAMEPLAY_POLICY_TARGET_SETS = [
     "structure-observer-intake",
     "minimal-second-source-intake",
 ]
+V010_GAMEPLAY_POLICY_RESOURCE_KINDS = [
+    "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE",
+    "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM",
+]
+V010_GAMEPLAY_POLICY_EVENT_KIND_MASKS = [
+    "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY",
+]
 V010_CHAT_MESSAGE_TARGET_SETS = [
     "chat-message-intake",
 ]
@@ -253,6 +262,8 @@ UNPROMOTED_COMMAND_ADMIN_PLAYER_API_TOKENS = (
 UNPROMOTED_SDK_CONSUMER_API_TOKENS = (
     "OBELISK_API_CAPABILITY_INVENTORY_EVENTS",
     "OBELISK_API_CAPABILITY_INVENTORY_POLICY_EVENTS",
+    "OBELISK_API_CAPABILITY_ITEM_EVENTS",
+    "OBELISK_API_CAPABILITY_ITEM_POLICY_EVENTS",
     "OBELISK_API_CAPABILITY_STRUCTURE_EVENTS",
     "OBELISK_API_CAPABILITY_RESOURCE_HANDLES",
     "OBELISK_API_CAPABILITY_RESOURCE_MUTATION",
@@ -267,6 +278,16 @@ UNPROMOTED_SDK_CONSUMER_API_TOKENS = (
     "RegisterOnInventoryPolicyEvent",
     "UnregisterInventoryEvent",
     "UnregisterInventoryPolicyEvent",
+    "ObeliskItemEvent",
+    "ObeliskItemPolicyEvent",
+    "ObeliskItem",
+    "ObeliskItemStack",
+    "RegisterItemEvent",
+    "RegisterItemPolicyEvent",
+    "RegisterOnItemEvent",
+    "RegisterOnItemPolicyEvent",
+    "UnregisterItemEvent",
+    "UnregisterItemPolicyEvent",
     "ObeliskStructureEvent",
     "ObeliskStructureEvents",
     "RegisterStructureEvent",
@@ -825,18 +846,29 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         forbidden = (
             "OBELISK_API_CAPABILITY_INVENTORY_EVENTS",
             "OBELISK_API_CAPABILITY_INVENTORY_POLICY_EVENTS",
+            "OBELISK_API_CAPABILITY_ITEM_EVENTS",
+            "OBELISK_API_CAPABILITY_ITEM_POLICY_EVENTS",
             "OBELISK_API_CAPABILITY_RESOURCE_HANDLES",
             "ObeliskInventory",
             "ObeliskInventoryItem",
+            "ObeliskItemEvent",
+            "ObeliskItemPolicyEvent",
+            "ObeliskItem",
+            "ObeliskItemStack",
             "ObeliskResourceHandle",
             "ResourceHandle",
             "GetResource",
             "ResolveResource",
             "GetInventory",
             "ResolveInventory",
+            "GetItem",
+            "ResolveItem",
             "MutateInventory",
+            "MutateItem",
             "SetInventory",
+            "SetItem",
             "OverrideInventory",
+            "OverrideItem",
             "OverrideReturn",
             "ReturnOverride",
             "GObject",
@@ -1077,13 +1109,15 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                     ],
                     f"{event.get('event_id')} public_fields widened the minimal copied POD contract",
                 )
-                self.assertIn(
-                    "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM",
-                    event.get("resource_kinds", []),
+                self.assertEqual(
+                    event.get("resource_kinds"),
+                    V010_GAMEPLAY_POLICY_RESOURCE_KINDS,
+                    f"{event.get('event_id')} resource_kinds widened the public resource contract",
                 )
-                self.assertIn(
-                    "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY",
-                    event.get("event_kind_masks", []),
+                self.assertEqual(
+                    event.get("event_kind_masks"),
+                    V010_GAMEPLAY_POLICY_EVENT_KIND_MASKS,
+                    f"{event.get('event_id')} event_kind_masks widened the public event contract",
                 )
                 event_kinds = event.get("event_kinds")
                 self.assertIsInstance(event_kinds, list, f"{event.get('event_id')} missing event_kinds")
@@ -1133,6 +1167,15 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 for target_set, item in evidence_by_target_set.items():
                     self.assertIsInstance(target_set, str)
                     self.assertIsInstance(item.get("scope"), str)
+                    if target_set == "minimal-second-source-intake":
+                        scope = item["scope"]
+                        for required_scope_term in (
+                            "layout-only",
+                            "no standalone",
+                            "module-specific",
+                            "inventory",
+                        ):
+                            self.assertIn(required_scope_term, scope)
                     reports = item.get("reports")
                     self.assertIsInstance(reports, list)
                     self.assertGreater(len(reports), 0)
@@ -1193,13 +1236,13 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 if "minimal-second-source-intake" in event.get("target_sets", []):
                     self.assertEqual(event.get("event_id"), "obelisk.gameplay_policy.v1")
                     self.assertEqual(event.get("inventory_backing_target_set"), "minimal-second-source-intake")
-                    self.assertIn(
-                        "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM",
-                        event.get("resource_kinds", []),
+                    self.assertEqual(
+                        event.get("resource_kinds"),
+                        V010_GAMEPLAY_POLICY_RESOURCE_KINDS,
                     )
-                    self.assertIn(
-                        "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY",
-                        event.get("event_kind_masks", []),
+                    self.assertEqual(
+                        event.get("event_kind_masks"),
+                        V010_GAMEPLAY_POLICY_EVENT_KIND_MASKS,
                     )
                     self.assertIn("not promoted", event.get("inventory_sdk", ""))
 

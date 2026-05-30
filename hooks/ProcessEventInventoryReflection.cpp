@@ -460,8 +460,22 @@ namespace Obelisk::Hooks::ProcessEventInventoryReflection
 
     namespace
     {
+        bool IsSelfContainedCopiedEvent(const CopiedInventoryPolicyEvent& event)
+        {
+            if (event.ScalarCount > event.ScalarStorage.size())
+                return false;
+            if (event.View.Scalars.size() != event.ScalarCount)
+                return false;
+            if (event.ScalarCount == 0)
+                return event.View.Scalars.empty();
+            return event.View.Scalars.data() == event.ScalarStorage.data();
+        }
+
         size_t DispatchCopiedInventoryPolicyEvent(const CopiedInventoryPolicyEvent& event)
         {
+            if (!IsSelfContainedCopiedEvent(event))
+                return 0;
+
             return Obelisk::Core::InventoryPolicyEventDispatcher::Get().Dispatch(event.View);
         }
     }

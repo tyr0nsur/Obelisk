@@ -1424,6 +1424,62 @@ namespace
                 "dispatched remote-add return field mismatch");
         Require(!captured[1].Scalars[1].BoolValue, "dispatched remote-add return value was not copied");
     }
+
+    void TestCopiedInventoryPolicyEventDispatchRequiresOwnedScalarSpan()
+    {
+        int owner = 0;
+        std::vector<CapturedInventoryPolicyEvent> captured;
+        const uint64_t registrationId = Obelisk::Core::InventoryPolicyEventDispatcher::Get().Register(
+            &owner,
+            Obelisk::Core::InventoryPolicyEventSubscription{CaptureInventoryPolicyEvent, &captured});
+        Require(registrationId != 0, "failed to register inventory policy event callback for span ownership test");
+
+        std::array<Obelisk::Core::InventoryPolicyScalarValue, 2> borrowedScalars{{
+            {
+                .Field = Obelisk::Core::InventoryPolicyScalarField::BIgnoreCooldown,
+                .BoolValue = true,
+            },
+            {
+                .Field = Obelisk::Core::InventoryPolicyScalarField::ReturnValue,
+                .BoolValue = false,
+            },
+        }};
+        CopiedInventoryPolicyEvent forged;
+        forged.View.Kind = Obelisk::Core::InventoryPolicyEventKind::CanUse;
+        forged.View.Scalars = borrowedScalars;
+        forged.ScalarCount = borrowedScalars.size();
+
+        Require(MaybeDispatchCopiedInventoryPolicyEventAfterOriginal(true, forged) == 0,
+                "borrowed scalar span dispatched as a copied inventory policy event");
+        Require(captured.empty(), "borrowed scalar span reached inventory policy callback");
+
+        forged.ScalarStorage[0] = borrowedScalars[0];
+        forged.ScalarStorage[1] = borrowedScalars[1];
+        forged.RebindScalarSpan();
+        forged.ScalarCount = 1;
+        Require(MaybeDispatchCopiedInventoryPolicyEventAfterOriginal(true, forged) == 0,
+                "mismatched copied inventory scalar span/count dispatched");
+        Require(captured.empty(), "mismatched copied inventory scalar span/count reached callback");
+
+        forged.ScalarCount = borrowedScalars.size();
+        forged.RebindScalarSpan();
+        Require(MaybeDispatchCopiedInventoryPolicyEventAfterOriginal(false, forged) == 0,
+                "blocked original ProcessEvent dispatched owned copied inventory event");
+        Require(MaybeDispatchCopiedInventoryPolicyEventAfterOriginal(true, forged) == 1,
+                "owned copied inventory policy event did not dispatch");
+
+        Obelisk::Core::InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(&owner);
+        Require(captured.size() == 1, "owned copied inventory policy event dispatched wrong count");
+        Require(captured[0].Scalars.size() == 2, "owned copied inventory policy scalar count mismatch");
+        Require(captured[0].Scalars[0].Field == Obelisk::Core::InventoryPolicyScalarField::BIgnoreCooldown,
+                "owned copied inventory policy first scalar mismatch");
+        Require(captured[0].Scalars[0].BoolValue,
+                "owned copied inventory policy first scalar value mismatch");
+        Require(captured[0].Scalars[1].Field == Obelisk::Core::InventoryPolicyScalarField::ReturnValue,
+                "owned copied inventory policy return scalar mismatch");
+        Require(!captured[0].Scalars[1].BoolValue,
+                "owned copied inventory policy return scalar value mismatch");
+    }
 }
 
 int main()
@@ -1447,6 +1503,7 @@ int main()
     TestRejectsDispatchWhenPolicyFieldSequenceDiffers();
     TestDoesNotCopySensitiveInventoryRangesFromForgedInvocation();
     TestDispatchesCopiedInventoryPolicyEventsThroughInternalDispatcher();
+    TestCopiedInventoryPolicyEventDispatchRequiresOwnedScalarSpan();
 
     std::cout << "ProcessEventInventoryReflectionTests passed\n";
     return 0;
