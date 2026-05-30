@@ -39,6 +39,7 @@ namespace
     bool g_FailChatMessageRegistration = false;
     bool g_FailTimerRegistration = false;
     bool g_ThrowLogAfterTimerRegistration = false;
+    bool g_BadGameplayPolicyDescriptor = false;
     std::vector<std::string> g_InfoLogs;
     std::vector<std::string> g_ErrorLogs;
     OnProcessEventCallback g_RegisteredCallback = nullptr;
@@ -396,7 +397,8 @@ namespace
             out->resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM;
             out->flags |= OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED;
             out->event_kind_mask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK;
-            out->field_mask |= OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN;
+            if (!g_BadGameplayPolicyDescriptor)
+                out->field_mask |= OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN;
             std::strncpy(out->stable_name, "inventory.use_check", sizeof(out->stable_name) - 1);
             std::strncpy(out->display_name, "Inventory Use Check", sizeof(out->display_name) - 1);
             return true;
@@ -677,6 +679,8 @@ int main(int argc, char** argv)
             g_FailTimerRegistration = true;
         if (mode == "throw-log-after-timer-registration")
             g_ThrowLogAfterTimerRegistration = true;
+        if (mode == "bad-gameplay-policy-descriptor")
+            g_BadGameplayPolicyDescriptor = true;
 
         ObeliskPluginInitContext context{};
         context.abi_version = OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION;
@@ -794,6 +798,22 @@ int main(int argc, char** argv)
             Require(g_TimerRegisterCount == 0,
                 "plugin registered timer after gameplay policy registration failed");
             g_FailGameplayPolicyRegistration = false;
+            cleanupConfigDir();
+            closeHandle();
+            return 0;
+        }
+        if (mode == "bad-gameplay-policy-descriptor")
+        {
+            Require(!initSucceeded, "plugin accepted malformed gameplay policy descriptor metadata");
+            Require(g_RegisterCount == 0,
+                "bad gameplay policy descriptor unexpectedly registered a ProcessEvent callback");
+            Require(g_GameplayPolicyRegisterCount == 0,
+                "bad gameplay policy descriptor unexpectedly registered a gameplay policy callback");
+            Require(g_ChatMessageRegisterCount == 0,
+                "bad gameplay policy descriptor unexpectedly registered a chat message callback");
+            Require(g_TimerRegisterCount == 0,
+                "bad gameplay policy descriptor unexpectedly registered a timer callback");
+            g_BadGameplayPolicyDescriptor = false;
             cleanupConfigDir();
             closeHandle();
             return 0;

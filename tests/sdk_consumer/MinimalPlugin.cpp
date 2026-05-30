@@ -180,6 +180,122 @@ namespace
             api->UnregisterGameplayPolicyEventWithOwnerToken;
     }
 
+    bool ValidateResourceKindDescriptor(const ObeliskApi* api,
+                                        uint32_t resourceKind,
+                                        uint64_t eventMask,
+                                        uint64_t fieldMask,
+                                        const char* stableName)
+    {
+        if (!api ||
+            (api->capabilities & OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS) == 0 ||
+            api->struct_size < offsetof(ObeliskApi, DescribeResourceKind) +
+                sizeof(api->DescribeResourceKind) ||
+            !api->DescribeResourceKind)
+        {
+            return true;
+        }
+
+        ObeliskResourceKindDescriptor descriptor{};
+        descriptor.struct_size = sizeof(ObeliskResourceKindDescriptor);
+        if (!api->DescribeResourceKind(resourceKind, &descriptor))
+            return false;
+
+        constexpr uint64_t kRequiredFlags = OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_CATEGORY_ONLY |
+            OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY |
+            OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP;
+
+        return descriptor.abi_version == OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION &&
+            descriptor.struct_size >= sizeof(ObeliskResourceKindDescriptor) &&
+            descriptor.resource_kind == resourceKind &&
+            (descriptor.flags & kRequiredFlags) == kRequiredFlags &&
+            descriptor.supported_gameplay_policy_event_mask == eventMask &&
+            descriptor.supported_gameplay_policy_field_mask == fieldMask &&
+            std::strcmp(descriptor.stable_name, stableName) == 0;
+    }
+
+    bool ValidateResourceKindDescriptors(const ObeliskApi* api)
+    {
+        return ValidateResourceKindDescriptor(
+                api,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+                    OBELISK_GAMEPLAY_POLICY_FIELD_MASK_VARIANT_INDEX |
+                    OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE_SET |
+                    OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE,
+                "structure") &&
+            ValidateResourceKindDescriptor(
+                api,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+                    OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER |
+                    OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN,
+                "inventory_item");
+    }
+
+    bool ValidateGameplayPolicyEventDescriptor(const ObeliskApi* api,
+                                               uint32_t eventKind,
+                                               uint32_t resourceKind,
+                                               uint64_t flags,
+                                               uint64_t eventKindMask,
+                                               uint64_t fieldMask,
+                                               const char* stableName)
+    {
+        if (!api ||
+            (api->capabilities & OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS) == 0 ||
+            api->struct_size < offsetof(ObeliskApi, DescribeGameplayPolicyEventKind) +
+                sizeof(api->DescribeGameplayPolicyEventKind) ||
+            !api->DescribeGameplayPolicyEventKind)
+        {
+            return true;
+        }
+
+        ObeliskGameplayPolicyEventDescriptor descriptor{};
+        descriptor.struct_size = sizeof(ObeliskGameplayPolicyEventDescriptor);
+        if (!api->DescribeGameplayPolicyEventKind(eventKind, &descriptor))
+            return false;
+
+        return descriptor.abi_version == OBELISK_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION &&
+            descriptor.struct_size >= sizeof(ObeliskGameplayPolicyEventDescriptor) &&
+            descriptor.event_kind == eventKind &&
+            descriptor.resource_kind == resourceKind &&
+            (descriptor.flags & OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD) != 0 &&
+            (descriptor.flags & flags) == flags &&
+            descriptor.event_kind_mask == eventKindMask &&
+            (descriptor.field_mask & fieldMask) == fieldMask &&
+            std::strcmp(descriptor.stable_name, stableName) == 0;
+    }
+
+    bool ValidateGameplayPolicyDescriptors(const ObeliskApi* api)
+    {
+        return ValidateResourceKindDescriptors(api) &&
+            ValidateGameplayPolicyEventDescriptor(
+                api,
+                OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_VARIANT_CHANGE,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE,
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_VARIANT_CHANGE,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_VARIANT_INDEX,
+                "structure.variant_change") &&
+            ValidateGameplayPolicyEventDescriptor(
+                api,
+                OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM,
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_REMOTE_ADD_CHECK,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER,
+                "inventory.remote_add_check") &&
+            ValidateGameplayPolicyEventDescriptor(
+                api,
+                OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM,
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN,
+                "inventory.use_check");
+    }
+
     bool HasChatMessageEventApi(const ObeliskApi* api)
     {
         return api &&
@@ -316,6 +432,12 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
 
         if (g_Api.LogInfo)
             g_Api.LogInfo("[sdk_consumer_minimal] Loaded.");
+
+        if (!ValidateGameplayPolicyDescriptors(&g_Api))
+        {
+            ResetState();
+            return false;
+        }
 
         if (HasProcessEventHandleApi(&g_Api))
         {

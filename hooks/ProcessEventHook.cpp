@@ -3,7 +3,9 @@
 #include "ProcessEventDispatch.h"
 #include "ProcessEventChatReflection.h"
 #include "ProcessEventInventoryReflection.h"
+#include "ProcessEventItemReflection.h"
 #include "ProcessEventStructureReflection.h"
+#include "core/ItemReturnEventDispatcher.h"
 #include "ue/Memory.h"
 #include "runtime/Logger.h"
 #include "runtime/RuntimeMarkers.h"
@@ -15,6 +17,7 @@
 #include <cstring>
 #include <exception>
 #include <mutex>
+#include <span>
 #include <string>
 #include <string_view>
 #include <sys/mman.h>
@@ -103,6 +106,7 @@ namespace Obelisk::Hooks
     static std::atomic<uint64_t> s_ReflectedInventoryCalls{0};
     static std::atomic<uint64_t> s_ReflectedInventoryRejects{0};
     static std::atomic<uint64_t> s_ReflectedInventoryDispatches{0};
+    static std::atomic<uint64_t> s_ReflectedItemReturnDispatches{0};
     static std::atomic<uint64_t> s_ReflectedStructureCalls{0};
     static std::atomic<uint64_t> s_ReflectedStructureDispatches{0};
     static std::atomic<uint64_t> s_ReflectedStructureRejects{0};
@@ -708,6 +712,54 @@ namespace Obelisk::Hooks
         return GetInventoryReflectionGate().Enabled();
     }
 
+    static const ProcessEventItemReflection::Gate& GetItemReturnEventGate()
+    {
+        static ProcessEventItemReflection::Gate gate = [] {
+            ProcessEventItemReflection::Gate value =
+                ProcessEventItemReflection::EvaluateGate(
+                    std::getenv("OBELISK_ENABLE_ITEM_RETURN_EVENTS"),
+                    IsObserverDebugProfileEnabled(),
+                    IsObserverDebugWindowMarkerEnabled(),
+                    AreExperimentalObserverMarkersEnabled("enable-item-return-events"),
+                    std::getenv("OBELISK_ITEM_RETURN_EVENTS_BINARY_SHA256"));
+
+            switch (value.Status)
+            {
+            case ProcessEventItemReflection::GateStatus::Disabled:
+                break;
+            case ProcessEventItemReflection::GateStatus::MissingObserverDebugProfile:
+                OBELISK_WARN("Item return event producer disabled: OBELISK_WRAPPER_PROFILE=observer-debug is required.");
+                break;
+            case ProcessEventItemReflection::GateStatus::MissingObserverDebugWindow:
+                OBELISK_WARN("Item return event producer disabled: allow-observer-debug-window instance marker is required.");
+                break;
+            case ProcessEventItemReflection::GateStatus::MissingInstanceMarker:
+                OBELISK_WARN("Item return event producer disabled: instance markers allow-experimental-observers and "
+                             "enable-item-return-events are required.");
+                break;
+            case ProcessEventItemReflection::GateStatus::MissingBinarySha256:
+                OBELISK_WARN("Item return event producer disabled: OBELISK_ITEM_RETURN_EVENTS_BINARY_SHA256 is required.");
+                break;
+            case ProcessEventItemReflection::GateStatus::UnsupportedBinarySha256:
+                OBELISK_WARN("Item return event producer disabled: unsupported ShooterGameServer SHA256 '{}'.",
+                             value.BinarySha256);
+                break;
+            case ProcessEventItemReflection::GateStatus::Enabled:
+                OBELISK_WARN("Experimental item return event producer enabled for ShooterGameServer SHA256 {}.",
+                             value.BinarySha256);
+                break;
+            }
+
+            return value;
+        }();
+        return gate;
+    }
+
+    static bool IsItemReturnEventProducerEnabled()
+    {
+        return GetItemReturnEventGate().Enabled();
+    }
+
     static uint64_t GetChatReflectionLogLimit()
     {
         static uint64_t limit = [] {
@@ -804,6 +856,16 @@ namespace Obelisk::Hooks
         return limit;
     }
 
+    static uint64_t GetItemReturnEventDispatchLimit()
+    {
+        static uint64_t limit = [] {
+            const char* env = std::getenv("OBELISK_ITEM_RETURN_EVENTS_DISPATCH_LIMIT");
+            if (!env || env[0] == '\0') return uint64_t{0};
+            return static_cast<uint64_t>(std::strtoull(env, nullptr, 10));
+        }();
+        return limit;
+    }
+
     static bool IsStructureObservationActive()
     {
         const uint64_t logLimit = GetStructureReflectionLogLimit();
@@ -830,6 +892,16 @@ namespace Obelisk::Hooks
                     s_ReflectedInventoryDispatches,
                     dispatchLimit,
                     Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount()));
+    }
+
+    static bool IsItemReturnEventProducerActive()
+    {
+        const uint64_t dispatchLimit = GetItemReturnEventDispatchLimit();
+        return IsItemReturnEventProducerEnabled() &&
+               ProcessEventItemReflection::ShouldAttemptRuntimeObservation(
+                   s_ReflectedItemReturnDispatches,
+                   dispatchLimit) &&
+               Core::ItemReturnEventDispatcher::Get().SubscriptionCount() > 0;
     }
 
     static const char* ChatFunctionName(Obelisk::UE::ChatReflection::ChatFunction function)
@@ -962,6 +1034,103 @@ namespace Obelisk::Hooks
             return "ReturnValue";
         }
         return "Unknown";
+    }
+
+    static bool TryMapItemReturnKind(Obelisk::UE::ItemReflection::ItemFunction function,
+                                     Core::ItemReturnEventKind& out)
+    {
+        using Obelisk::UE::ItemReflection::ItemFunction;
+        switch (function)
+        {
+        case ItemFunction::AllowEquipItem:
+            out = Core::ItemReturnEventKind::AllowEquipItem;
+            return true;
+        case ItemFunction::CanRepair:
+            out = Core::ItemReturnEventKind::CanRepair;
+            return true;
+        case ItemFunction::UseItemOntoItem:
+            out = Core::ItemReturnEventKind::UseItemOntoItem;
+            return true;
+        case ItemFunction::CraftBlueprint:
+            return false;
+        }
+        return false;
+    }
+
+    static bool TryBuildItemReturnEventView(
+        const ProcessEventItemReflection::CopiedItemObservation& observation,
+        std::array<Core::ItemReturnScalarValue, 1>& scalarStorage,
+        Core::ItemReturnEventView& out)
+    {
+        Core::ItemReturnEventKind kind = Core::ItemReturnEventKind::AllowEquipItem;
+        if (!TryMapItemReturnKind(observation.Function, kind))
+            return false;
+        if (observation.BoolCount != 1)
+            return false;
+
+        const ProcessEventItemReflection::ItemBoolObservation& returnValue =
+            observation.BoolStorage[0];
+        if (returnValue.Field != Obelisk::UE::ItemReflection::ItemField::ReturnValue)
+            return false;
+
+        scalarStorage[0] = {
+            .Field = Core::ItemReturnScalarField::ReturnValue,
+            .BoolValue = returnValue.Value,
+        };
+        out = {
+            .Kind = kind,
+            .Scalars = std::span<const Core::ItemReturnScalarValue>(scalarStorage.data(), 1),
+        };
+        return true;
+    }
+
+    static size_t DispatchReflectedItemReturnEventAfterOriginal(
+        bool originalWasCalled,
+        int32_t nameIndex,
+        void* function,
+        void* params)
+    {
+        if (!originalWasCalled)
+            return 0;
+
+        const ProcessEventItemReflection::Gate& gate = GetItemReturnEventGate();
+        if (!gate.Enabled())
+            return 0;
+        if (!ProcessEventItemReflection::IsReflectedItemNameIndex(nameIndex))
+            return 0;
+        if (Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 0)
+            return 0;
+
+        const uint64_t dispatchLimit = GetItemReturnEventDispatchLimit();
+        if (!ProcessEventItemReflection::ShouldAttemptRuntimeObservation(
+                s_ReflectedItemReturnDispatches,
+                dispatchLimit))
+        {
+            return 0;
+        }
+
+        Obelisk::UE::RuntimeReflection::MemoryReader reader{RuntimeReflectionReader, nullptr};
+        ProcessEventItemReflection::Attempt attempt =
+            ProcessEventItemReflection::TryIdentifyInvocation(gate, nameIndex, reader, function, params);
+
+        uint64_t dispatchNumber = 0;
+        ProcessEventItemReflection::CopiedItemObservation observation;
+        if (!ProcessEventItemReflection::TryBuildAndReserveItemReturnObservationForMatchedAttempt(
+                attempt,
+                s_ReflectedItemReturnDispatches,
+                dispatchLimit,
+                dispatchNumber,
+                observation))
+        {
+            return 0;
+        }
+
+        std::array<Core::ItemReturnScalarValue, 1> scalarStorage{};
+        Core::ItemReturnEventView event;
+        if (!TryBuildItemReturnEventView(observation, scalarStorage, event))
+            return 0;
+
+        return Core::ItemReturnEventDispatcher::Get().Dispatch(event);
     }
 
     static void TraceReflectedChatInvocation(int32_t nameIndex, void* function, void* params)
@@ -1349,10 +1518,12 @@ namespace Obelisk::Hooks
             const bool chatEventProducerActive = IsChatEventProducerActive();
             const bool chatRouteObserverActive = IsChatRouteObserverActive();
             const bool inventoryObservationActive = IsInventoryObservationActive();
+            const bool itemReturnEventProducerActive = IsItemReturnEventProducerActive();
             const bool structureObservationActive = IsStructureObservationActive();
             const bool needsNameIndex =
                 hasPreCallbacks || hasPostCallbacks || chatReflectionEnabled || chatEventProducerActive ||
-                chatRouteObserverActive || inventoryObservationActive || structureObservationActive;
+                chatRouteObserverActive || inventoryObservationActive || itemReturnEventProducerActive ||
+                structureObservationActive;
             const int32_t nameIndex = needsNameIndex ? GetFunctionNameIndex(function) : -1;
 
             TraceReflectedChatInvocation(nameIndex, function, params);
@@ -1367,6 +1538,7 @@ namespace Obelisk::Hooks
 
             ObserveChatRouteAfterOriginal(originalWasCalled, nameIndex, function, params);
             DispatchReflectedChatMessageEventAfterOriginal(originalWasCalled, nameIndex, function, params);
+            DispatchReflectedItemReturnEventAfterOriginal(originalWasCalled, nameIndex, function, params);
             TraceReflectedInventoryInvocation(originalWasCalled, nameIndex, function, params);
             TraceReflectedStructureInvocation(originalWasCalled, nameIndex, function, params);
         }

@@ -50,6 +50,11 @@ add_test(
 )
 
 add_test(
+    NAME SdkConsumerFixtureRejectsBadGameplayPolicyDescriptor
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:sdk_consumer_minimal_plugin>" sdk_consumer_minimal bad-gameplay-policy-descriptor
+)
+
+add_test(
     NAME SdkConsumerFixtureRejectsZeroOwnerToken
     COMMAND sdk_consumer_fixture "$<TARGET_FILE:sdk_consumer_minimal_plugin>" sdk_consumer_minimal zero-owner-token
 )

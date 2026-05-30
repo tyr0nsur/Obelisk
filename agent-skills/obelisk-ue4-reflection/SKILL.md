@@ -150,9 +150,10 @@ Do not skip steps because a single core, log line, or recognizer test looks conv
   `int32_values`; `pinCode`, player identity, object identity, FName/GObjects indices, and
   UE pointers stay redacted.
 - Item return-only observations use a private `core/ItemReturnEventDispatcher` before any
-  public SDK promotion. It is post-original, copied `ReturnValue` bool only, and must not
-  be routed through `InventoryPolicyEventKind::CanUse` or public ABI/docs until a separate
-  append-only `GameplayPolicyEvent` promotion is designed and tested.
+  public SDK promotion. Its hook producer is default-off and observer/SHA/budget-gated; it
+  is post-original, copied `ReturnValue` bool only, and must not be routed through
+  `InventoryPolicyEventKind::CanUse` or public ABI/docs until a separate append-only
+  `GameplayPolicyEvent` promotion is designed and tested.
 - Use snapshot fixtures and `compare_reflection_snapshots.py` before promoting any
   UFunction or ScriptStruct shape beyond candidate-only.
 - `compare_reflection_snapshots.py --target <Outer.Name>` is offline. It compares

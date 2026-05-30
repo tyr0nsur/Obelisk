@@ -1244,7 +1244,6 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "ue/MissionReflection.cpp",
             "ue/TransferReflection.cpp",
             "hooks/ProcessEventMissionReflection.cpp",
-            "hooks/ProcessEventItemReflection.cpp",
             "hooks/ProcessEventTransferReflection.cpp",
         ]:
             with self.subTest(target="obelisk", source=source):
@@ -1252,7 +1251,6 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
 
         for token in [
             "ProcessEventMissionReflection",
-            "ProcessEventItemReflection",
             "ProcessEventTransferReflection",
         ]:
             with self.subTest(file="hooks/ProcessEventHook.cpp", token=token):
@@ -1268,6 +1266,34 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "RegisterMission",
             "RegisterItem",
             "RegisterTransfer",
+        ]:
+            with self.subTest(file="include/obelisk/ObeliskApi.h", token=token):
+                self.assertNotIn(token, public_header)
+
+    def test_item_return_runtime_producer_remains_private_and_gated(self) -> None:
+        process_event_hook = read("hooks/ProcessEventHook.cpp")
+        public_header = read("include/obelisk/ObeliskApi.h")
+
+        for token in [
+            "ProcessEventItemReflection",
+            "ItemReturnEventDispatcher",
+            "OBELISK_ENABLE_ITEM_RETURN_EVENTS",
+            "enable-item-return-events",
+            "OBELISK_ITEM_RETURN_EVENTS_BINARY_SHA256",
+            "OBELISK_ITEM_RETURN_EVENTS_DISPATCH_LIMIT",
+            "MissingObserverDebugProfile",
+            "MissingObserverDebugWindow",
+            "TryBuildAndReserveItemReturnObservationForMatchedAttempt",
+        ]:
+            with self.subTest(file="hooks/ProcessEventHook.cpp", token=token):
+                self.assertIn(token, process_event_hook)
+
+        for token in [
+            "ObeliskItem",
+            "ITEM_EVENTS",
+            "RegisterItem",
+            "OBELISK_ENABLE_ITEM_RETURN_EVENTS",
+            "ItemReturnEventDispatcher",
         ]:
             with self.subTest(file="include/obelisk/ObeliskApi.h", token=token):
                 self.assertNotIn(token, public_header)
@@ -1320,7 +1346,6 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         cmake = read("CMakeLists.txt")
         post_rc_hook_sources = [
             "hooks/ProcessEventMissionReflection.cpp",
-            "hooks/ProcessEventItemReflection.cpp",
             "hooks/ProcessEventTransferReflection.cpp",
         ]
         offenders: list[str] = []

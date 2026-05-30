@@ -292,6 +292,9 @@ scalar field (`ReturnValue` bool). The dispatcher mirrors existing owner-scoped 
 lifecycle behavior, copies payload storage for callback duration, contains callback
 exceptions, and defers user-data cleanup safely when a callback unregisters itself.
 
-This is still internal plumbing. It does not add public `GameplayPolicyEvent` mapping, ABI
-values, plugin callback registration, runtime hook wiring, marker/env gate, live-server
-validation, mutation, blocking, return override, or an Items SDK.
+This is still internal plumbing. The hook producer is default-off and gated by
+`OBELISK_ENABLE_ITEM_RETURN_EVENTS`, observer debug profile/window markers, binary SHA, and
+dispatch budget before it builds or dispatches copied observations. It does not add public
+`GameplayPolicyEvent` mapping, ABI values, plugin callback registration, live-server
+validation, mutation, blocking, return override, object identity, `ResourceHandle`, or an
+Items SDK.
