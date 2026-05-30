@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import subprocess
 import sys
 import tempfile
@@ -33,6 +34,10 @@ def assert_fail_closed_resource_handle_contract(testcase: unittest.TestCase, pay
 
 def write_json(path: Path, payload: object) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def canonical_json_bytes(value: object) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
 
 
 def reconciliation_report(
@@ -401,6 +406,177 @@ class ResourceHandleRevalidationEvaluatorTests(unittest.TestCase):
             "fuobject_item",
         ):
             self.assertNotIn(forbidden, text)
+
+    def test_cli_can_emit_output_artifact_identity_without_promoting_resourcehandle(self) -> None:
+        artifact_hash = "a" * 64
+        binary_hash = "b" * 64
+        policy_hash = "c" * 64
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            reconciliation = root / "reconciliation.json"
+            static = root / "static.json"
+            policy = root / "uobject-flag-policy.json"
+            output = root / "resource-handle-readiness.json"
+            write_json(reconciliation, reconciliation_report(serial_values=[17], artifact_identity_sha256=artifact_hash))
+            write_json(static, static_evidence(coherent=True, artifact_identity_sha256=binary_hash))
+            write_json(policy, uobject_flag_policy_report(artifact_identity_sha256=policy_hash))
+
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "evaluate_resource_handle_revalidation.py"),
+                    "--reconciliation",
+                    str(reconciliation),
+                    "--static-global-evidence",
+                    str(static),
+                    "--uobject-flag-policy",
+                    str(policy),
+                    "--require-artifact-identity",
+                    "--require-output-artifact-identity",
+                    "--artifact-kind",
+                    "obelisk.resource-handle-revalidation-evaluator.v1",
+                    "--capture-id",
+                    "resourcehandle-eval-test",
+                    "--evidence-pack-id",
+                    "resourcehandle-eval-pack",
+                    "--output",
+                    str(output),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            text = output.read_text(encoding="utf-8")
+            payload = json.loads(text)
+
+        assert_fail_closed_resource_handle_contract(self, payload)
+        self.assertEqual(
+            payload["output_artifact_identity"]["artifact_kind"],
+            "obelisk.resource-handle-revalidation-evaluator.v1",
+        )
+        self.assertEqual(payload["output_artifact_identity"]["capture_id"], "resourcehandle-eval-test")
+        self.assertEqual(payload["output_artifact_identity"]["evidence_pack_id"], "resourcehandle-eval-pack")
+        self.assertRegex(payload["output_artifact_identity"]["artifact_sha256"], r"^[0-9a-f]{64}$")
+        report_without_identity = dict(payload)
+        output_identity = dict(report_without_identity.pop("output_artifact_identity"))
+        identity_without_hash = {
+            key: output_identity[key]
+            for key in ("artifact_kind", "capture_id", "evidence_pack_id")
+        }
+        expected_hash = hashlib.sha256(
+            canonical_json_bytes(
+                {
+                    "artifact_identity": identity_without_hash,
+                    "report": report_without_identity,
+                }
+            )
+        ).hexdigest()
+        self.assertEqual(output_identity["artifact_sha256"], expected_hash)
+        self.assertEqual(payload["artifact_identity"]["complete_input_count"], 3)
+        self.assertFalse(payload["public_resource_handle_ready"])
+        self.assertFalse(payload["post_callback_resource_handle_ready"])
+        for forbidden in (
+            "0x1111222233334444",
+            "0x5555666677778888",
+            "ServerChat",
+            "Function",
+            "CoreUObject",
+            "/servidor/ark",
+            "25447",
+            "42424242",
+            "fuobject_item",
+            "class_name",
+            "outer_name",
+        ):
+            self.assertNotIn(forbidden, text)
+
+    def test_cli_rejects_partial_output_artifact_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            reconciliation = root / "reconciliation.json"
+            output = root / "resource-handle-readiness.json"
+            write_json(reconciliation, reconciliation_report(serial_values=[17]))
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "evaluate_resource_handle_revalidation.py"),
+                    "--reconciliation",
+                    str(reconciliation),
+                    "--require-output-artifact-identity",
+                    "--artifact-kind",
+                    "obelisk.resource-handle-revalidation-evaluator.v1",
+                    "--output",
+                    str(output),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--require-output-artifact-identity requires", result.stderr)
+
+    def test_cli_rejects_placeholder_output_artifact_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            reconciliation = root / "reconciliation.json"
+            output = root / "resource-handle-readiness.json"
+            write_json(reconciliation, reconciliation_report(serial_values=[17]))
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "evaluate_resource_handle_revalidation.py"),
+                    "--reconciliation",
+                    str(reconciliation),
+                    "--artifact-kind",
+                    "obelisk.resource-handle-revalidation-evaluator.v1",
+                    "--capture-id",
+                    "unspecified-capture",
+                    "--evidence-pack-id",
+                    "pack",
+                    "--output",
+                    str(output),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--capture-id must not use a placeholder artifact id", result.stderr)
+
+    def test_cli_rejects_wrong_output_artifact_kind(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            reconciliation = root / "reconciliation.json"
+            output = root / "resource-handle-readiness.json"
+            write_json(reconciliation, reconciliation_report(serial_values=[17]))
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "evaluate_resource_handle_revalidation.py"),
+                    "--reconciliation",
+                    str(reconciliation),
+                    "--artifact-kind",
+                    "obelisk.other-artifact.v1",
+                    "--capture-id",
+                    "capture",
+                    "--evidence-pack-id",
+                    "pack",
+                    "--output",
+                    str(output),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(f"--artifact-kind must be {evaluator.SCHEMA}", result.stderr)
 
     def test_uobject_flag_policy_emits_internal_candidate_without_promoting_resourcehandle(self) -> None:
         payload = evaluator.build_evaluation(

@@ -151,3 +151,76 @@ Superseded inputs should stay historical only:
 
 Do not rerun broad FName, GObjects, or core scans for this path unless the binary hash
 changes or new evidence contradicts the canonical pack.
+
+## Identity-Complete Fail-Closed Evaluation
+
+The ResourceHandle revalidation lane now has a strict identity-complete evaluator artifact
+that keeps the result fail-closed:
+
+```text
+/home/flowcommunity-ark/obelisk-artifacts/resourcehandle-identity-complete-failclosed-20260530T165521Z/
+```
+
+Inputs:
+
+- `gobjects/gobjects-reconciliation.json`: regenerated from the existing 44
+  `rh_flag4000_*` sample indices with `--strict-artifact-identity`.
+- `uobject-policy/uobject-flag-policy.redacted.json`: regenerated from the durable
+  rich-provenance input root with `--strict-artifact-identity`.
+- `/servidor/ark/workspace-offline/static-global-strict-with-field-window-20260530T000000Z/manifest.json`:
+  consumed read-only in place because it is already under the approved offline workspace
+  and carries complete `artifact_identity`.
+
+Command:
+
+```bash
+python3 scripts/evaluate_resource_handle_revalidation.py \
+  --reconciliation "$OUT/gobjects/gobjects-reconciliation.json" \
+  --static-global-evidence /servidor/ark/workspace-offline/static-global-strict-with-field-window-20260530T000000Z/manifest.json \
+  --uobject-flag-policy "$OUT/uobject-policy/uobject-flag-policy.redacted.json" \
+  --require-artifact-identity \
+  --require-output-artifact-identity \
+  --artifact-kind obelisk.resource-handle-revalidation-evaluator.v1 \
+  --capture-id resourcehandle-revalidation-20260530T165521Z \
+  --evidence-pack-id resourcehandle-identity-complete-failclosed-20260530T165521Z \
+  --output "$OUT/resourcehandle-revalidation.json"
+```
+
+Result:
+
+```text
+output_artifact_identity.artifact_sha256=d358b16e4c70ef3b320e00143f3ed2bd41581c4d40045974b02ef61c55b4dab2
+artifact_identity.complete_input_count=3
+artifact_identity.missing_or_partial_input_count=0
+reconciliation_summary.sample_count=44
+reconciliation_summary.accepted_sample_count=44
+reconciliation_summary.serial_candidate_nonzero_count=44
+static_global_evidence_summary.coherent_field_window_proven=true
+promotion_ready=false
+public_resource_handle_ready=false
+post_callback_resource_handle_ready=false
+```
+
+Remaining blockers:
+
+```text
+no_post_callback_lifetime_contract
+no_public_resource_handle_contract
+no_rejected_runtime_object_samples
+no_serial_reuse_or_wraparound_policy
+no_version_matched_source_decompiler_correlation_for_public_lifecycle_names
+post_callback_lifetime_policy_unproven
+public_resourcehandle_policy_missing
+uobject_flags_validity_semantics_unproven
+```
+
+This clears the previous missing/partial artifact identity gap for both the evaluator
+input set and the evaluator output. It does not clear ResourceHandle promotion.
+`InternalUObjectRevalidationCandidate` remains internal, frame-local, and fail-closed;
+public `ResourceHandle`, public GObjects, object identity, lookup, mutation, return
+override, post-callback handles, and plugin SDK exposure remain blocked.
+
+Next useful work is not more broad static scanning. The remaining evidence gap is semantic:
+negative runtime samples, serial reuse/wraparound policy, and a strict post-callback
+lifetime/lookup rejection contract before any public identity or lookup surface can be
+considered.

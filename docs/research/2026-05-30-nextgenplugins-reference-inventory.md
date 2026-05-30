@@ -59,6 +59,24 @@ replacement work. It can help rank public SDK surfaces by real plugin demand:
 - RCON/operator integration;
 - plugin crash/recovery and lifecycle expectations.
 
+The visible demand clusters from the local clone are:
+
+- permissions/admin: groups, temporary grants, tribe/player permissions, and operator
+  checks;
+- chat/commands: aliases, help, message routing, announcements, MOTD, and command
+  responses;
+- economy/rewards: shops, kits, points, kill rewards, database-backed balances, and
+  reward hooks;
+- homes/teleport/safe zones: cooldowns, costs, combat/enemy restrictions, PvP/building
+  policies, and entry/exit behavior;
+- structures/ownership: structure limits, ownership cleanup, no-collision/admin
+  exceptions, and blueprint/category policies;
+- dinos/items/inventory: dino colors/spawns, carry rules, give-item/shop flows, and
+  inventory inspection needs;
+- RCON/operator I/O: remote commands, reloads, broadcasts, and Unicode/text robustness;
+- lifecycle/ops: plugin crash handling, timers, reload expectations, shutdown cleanup,
+  and multi-instance configuration.
+
 ## Constraints
 
 - Keep the current Obelisk core route first: copied events, stable C ABI, owner-token
@@ -76,6 +94,10 @@ Keep this local clone out of the Obelisk repository and use it later to build a
 `Plugin Hub compatibility matrix` once the v0.1 stable core is ready. The first useful
 matrix should list plugin name, feature category, required Obelisk API surface, current
 Obelisk readiness, and blocked capabilities.
+
+Do not convert this into a public compatibility promise yet. The matrix should stay in
+`docs/research/` until the v1 core has stable copied surfaces, lifecycle cleanup,
+multi-instance config, and secret-safe DB/webhook/RCON patterns.
 
 Do not let this inventory pull internal evidence lanes into Plugin Hub scope prematurely.
 For example, Transfer remains an internal evidence backlog item unless a concrete plugin

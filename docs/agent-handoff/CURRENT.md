@@ -183,10 +183,17 @@ recovery context is not active routing for the current head; use
   serials, or UE pointers.
 - `ResourceHandle` semantic promotion still needs helper evidence, mutation-window
   rejection, runtime negative samples, and a fail-closed lookup contract.
-- After local GObjects field-window evidence, the next useful ResourceHandle step is an
-  identity-complete redacted `evaluate_resource_handle_revalidation.py` artifact that
-  still proves fail-closed; more static scanning alone cannot clear
-  `uobject_flags_validity_semantics_unproven`.
+- The ResourceHandle evaluator now has identity-complete strict input under
+  `/home/flowcommunity-ark/obelisk-artifacts/resourcehandle-identity-complete-failclosed-20260530T165521Z/`:
+  3/3 inputs have complete `artifact_identity`, the evaluator output carries
+  `output_artifact_identity.artifact_sha256=d358b16e4c70ef3b320e00143f3ed2bd41581c4d40045974b02ef61c55b4dab2`,
+  44/44 reconciliation samples are accepted, field-window evidence is coherent, and the
+  result remains fail-closed with `promotion_ready=false`,
+  `public_resource_handle_ready=false`, and `post_callback_resource_handle_ready=false`.
+- Next useful ResourceHandle work is semantic, not more broad static scanning: rejected
+  runtime object samples, serial reuse/wraparound policy, and a strict post-callback
+  lifetime/lookup rejection contract before any public identity or lookup surface can be
+  considered.
 
 ## Priority Next Steps
 

@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import argparse
+import copy
+import hashlib
 import json
 import re
 import sys
@@ -97,7 +99,7 @@ RESOURCE_HANDLE_LIFETIME_BLOCKERS = (
 )
 
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
-SAFE_ARTIFACT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
+SAFE_ARTIFACT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 PLACEHOLDER_ARTIFACT_ID_PREFIXES = ("unspecified-", "static-global-default-")
 
 
@@ -144,6 +146,61 @@ def safe_artifact_id(value: object) -> bool:
 
 def placeholder_artifact_id(value: object) -> bool:
     return isinstance(value, str) and value.casefold().startswith(PLACEHOLDER_ARTIFACT_ID_PREFIXES)
+
+
+def canonical_json_bytes(value: object) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+
+
+def validate_artifact_identity_value(value: str | None, field_name: str) -> str | None:
+    if value is None:
+        return None
+    if not safe_artifact_id(value):
+        raise SystemExit(f"{field_name} must be a safe artifact id")
+    if placeholder_artifact_id(value):
+        raise SystemExit(f"{field_name} must not use a placeholder artifact id")
+    return value
+
+
+def validate_output_artifact_identity_args(args: argparse.Namespace) -> dict[str, str] | None:
+    artifact_kind = validate_artifact_identity_value(args.artifact_kind, "--artifact-kind")
+    capture_id = validate_artifact_identity_value(args.capture_id, "--capture-id")
+    evidence_pack_id = validate_artifact_identity_value(args.evidence_pack_id, "--evidence-pack-id")
+    supplied = [value is not None for value in (artifact_kind, capture_id, evidence_pack_id)]
+    if args.require_output_artifact_identity and not all(supplied):
+        raise SystemExit(
+            "--require-output-artifact-identity requires --artifact-kind, --capture-id, and --evidence-pack-id"
+        )
+    if any(supplied) and not all(supplied):
+        raise SystemExit(
+            "output artifact identity requires --artifact-kind, --capture-id, and --evidence-pack-id together"
+        )
+    if not all(supplied):
+        return None
+    assert artifact_kind is not None
+    assert capture_id is not None
+    assert evidence_pack_id is not None
+    if artifact_kind != SCHEMA:
+        raise SystemExit(f"--artifact-kind must be {SCHEMA}")
+    return {
+        "artifact_kind": artifact_kind,
+        "capture_id": capture_id,
+        "evidence_pack_id": evidence_pack_id,
+    }
+
+
+def add_output_artifact_identity(evaluation: dict[str, Any], identity: dict[str, str]) -> dict[str, Any]:
+    report = copy.deepcopy(evaluation)
+    report.pop("output_artifact_identity", None)
+    material = {
+        "artifact_identity": identity,
+        "report": report,
+    }
+    evaluation["output_artifact_identity"] = {
+        **identity,
+        "artifact_sha256": hashlib.sha256(canonical_json_bytes(material)).hexdigest(),
+    }
+    return evaluation
 
 
 def classify_artifact_identity(report: dict[str, Any]) -> tuple[str, set[str]]:
@@ -680,11 +737,29 @@ def parse_args() -> argparse.Namespace:
             "artifact_identity metadata."
         ),
     )
+    parser.add_argument(
+        "--artifact-kind",
+        help="Safe kind for the output artifact identity. Must be supplied with --capture-id and --evidence-pack-id.",
+    )
+    parser.add_argument(
+        "--capture-id",
+        help="Safe capture id for the output artifact identity. Must be supplied with --artifact-kind and --evidence-pack-id.",
+    )
+    parser.add_argument(
+        "--evidence-pack-id",
+        help="Safe evidence pack id for the output artifact identity. Must be supplied with --artifact-kind and --capture-id.",
+    )
+    parser.add_argument(
+        "--require-output-artifact-identity",
+        action="store_true",
+        help="Require the emitted evaluator report to include a complete output_artifact_identity block.",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
+    output_identity_args = validate_output_artifact_identity_args(args)
     reconciliation_paths = [reject_protected_input_path(path, "--reconciliation") for path in args.reconciliation]
     static_path = (
         reject_protected_input_path(args.static_global_evidence, "--static-global-evidence")
@@ -714,6 +789,8 @@ def main() -> int:
         require_artifact_identity=args.require_artifact_identity,
         uobject_flag_policy=uobject_flag_policy_report,
     )
+    if output_identity_args is not None:
+        add_output_artifact_identity(evaluation, output_identity_args)
     text = json.dumps(evaluation, indent=2, sort_keys=True)
     if output_path:
         output_path.parent.mkdir(parents=True, exist_ok=True)
