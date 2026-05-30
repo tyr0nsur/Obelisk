@@ -2,8 +2,10 @@
 
 ## Objective
 
-Add a narrow `sdk.tribes` control fixture for a gameplay zero-parameter reflected
-function before exploring broader tribe/alliance policy surfaces.
+Add a narrow tribe snapshot-namespace control fixture for a gameplay zero-parameter
+reflected function before exploring broader tribe/alliance policy surfaces. The
+`sdk.tribes`/`sdk_tribes` labels in this note are fixture namespaces only, not a public
+Tribe SDK claim.
 
 ## Environment
 
@@ -55,7 +57,9 @@ python3 scripts/test_ufunction_snapshot_fixtures.py
 ## Result
 
 Confirmed as `candidate-only`. This adds one low-risk shape to the fixture matrix:
-gameplay exact target, no params, no param buffer reads.
+gameplay exact target, no params, no param buffer reads. It does not promote tribe
+identity, tribe membership, permissions, runtime observation, callbacks, or public SDK
+surface.
 
 ## Rejected Paths
 

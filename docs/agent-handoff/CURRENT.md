@@ -63,10 +63,7 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - Promoted copied events are observational and non-authoritative: no UE pointers, raw
   params, identity, lookup, mutation, return override, pincode/player text publication, or
   broad module SDK claim.
-- Plugin unload/init-failure cleanup skips `dlclose` when callback cleanup cannot be
-  proven complete, retains the plugin for retry, does not repeat plugin shutdown, leaves
-  mapped on retention failure, and release readiness rejects production `libobelisk.so`
-  builds exposing manager/dispatcher test-only symbols.
+- Plugin unload/init-failure cleanup skips `dlclose` when callback cleanup cannot be proven complete, retains the plugin for retry, does not repeat plugin shutdown, avoids copied-event `DestroyUserData` reentrant cleanup deadlocks, and release readiness rejects production `libobelisk.so` builds exposing manager/dispatcher test-only symbols.
 - `oProcessTimer` is the first process-local timer example. Timer ids are process-local,
   not cluster state, UE identity, gameplay/module timer abstractions, or persistent
   handles, or shared scheduler state; owner-token timers require explicit unregister.
@@ -146,12 +143,9 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   blockers, container-only promote blocking, protected-root checks, and duplicate target
   guidance rejection.
 - UFunction target-set listing and release-gate option parsing are classified as
-  `release_readiness`, `planning_only`, or `internal_layout_only`; promotion accepts only
-  explicit release-readiness sets, rejects explicit `--target` widening outside named
-  target sets, reports target-set guidance in readiness JSON, and marks internal/layout-only gaps as `target_set_not_release_readiness`.
+  `release_readiness`, `planning_only`, or `internal_layout_only`; promotion accepts only explicit release-readiness sets, rejects explicit `--target` widening outside named target sets, reports target-set guidance/non-claims in readiness JSON, and marks internal/layout-only gaps as `target_set_not_release_readiness`.
 - Offline artifact JSON manifests, provenance sidecars, artifact checksum reads, and core inspector inputs use no-symlink regular-file opens after protected-path prechecks; relative
-  manifest/provenance/resource-handle core paths resolve against their sidecar, and
-  `--snapshot-json` verifies the observed offline core SHA256 before emitting evidence.
+  manifest/provenance/resource-handle core paths resolve against their sidecar, and `--snapshot-json` verifies observed offline core SHA256 plus safe capture/evidence-pack IDs before emitting evidence.
 - `scripts/check_static_tooling.py` records optional radare2/rizin/Ghidra availability and
   runs smoke checks only on approved offline binaries/output roots.
 - `APrimalStructure.IsAllowedToBuild` is second-wave only: no committed snapshot,

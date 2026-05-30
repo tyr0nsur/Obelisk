@@ -20,6 +20,7 @@ from typing import Callable, Iterable
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 import enumerate_core_uobjects as uobjects  # noqa: E402
+from artifact_identity import is_safe_artifact_id  # noqa: E402
 from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component  # noqa: E402
 
 
@@ -1298,6 +1299,12 @@ def validate_snapshot_evidence_args(args: argparse.Namespace) -> None:
         raise SystemExit("--evidence-ark-sha256 must be a 64-character hex SHA256")
     if not is_sha256_hex(args.evidence_artifact_sha256):
         raise SystemExit("--evidence-artifact-sha256 must be a 64-character hex SHA256")
+    args.evidence_ark_sha256 = args.evidence_ark_sha256.lower()
+    args.evidence_artifact_sha256 = args.evidence_artifact_sha256.lower()
+    if not is_safe_artifact_id(args.evidence_capture_id):
+        raise SystemExit("--evidence-capture-id must be a safe artifact identity component")
+    if not is_safe_artifact_id(args.evidence_pack_id):
+        raise SystemExit("--evidence-pack-id must be a safe artifact identity component")
     if args.evidence_artifact_kind != "offline_core":
         raise SystemExit("--snapshot-json only supports --evidence-artifact-kind offline_core")
     if args.evidence_source != "offline_core":

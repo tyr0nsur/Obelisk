@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Hardened dispatcher cleanup and evidence identity so `DestroyUserData` reentrancy does
+  not deadlock copied-event dispatcher cleanup, snapshot evidence IDs must be safe
+  non-placeholder components, SHA256 metadata is normalized, release-readiness target
+  sets carry explicit non-claims, and local webhook/log/dump artifacts stay ignored.
 - Hardened release and evidence gates so release readiness rejects production
   `libobelisk.so` builds exposing test-only symbols, snapshot JSON verifies offline core
   artifact SHA256, readiness reports carry target-set guidance, Plugin Hub contributor

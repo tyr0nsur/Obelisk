@@ -127,9 +127,14 @@ The script requires a clean worktree by default. Use `--allow-dirty` only while 
 the release gate itself. Set `OBELISK_KEEP_RELEASE_CHECK_ROOTS=1` to keep the temporary
 install roots for manual inspection after the script completes.
 
-Treat this command as a local smoke/build gate. A final RC or stable candidate must also
-pass the second-source readiness gate below on a clean worktree with the accepted snapshot
-root configured.
+Treat this command as the canonical core-first release gate, not just a local smoke/build
+gate. It builds with experimental plugins off, runs CTest and script tests, rejects
+production `libobelisk.so` builds that expose test-only/internal symbol patterns, validates
+the install/SDK layout and dry-runs, checks the read-only CLI status path, and enforces a
+clean worktree. Keep those checks in this script instead of adding parallel CI release
+checks with different defaults. A final RC or stable candidate must also pass the
+second-source readiness gate below on a clean worktree with the accepted snapshot root
+configured.
 
 After assembling an RC second-source root, run the committed RC layout smoke. This checks
 that the copied second-source snapshots compare cleanly against the in-repo sanitized

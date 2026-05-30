@@ -32,6 +32,12 @@ cross-binary portability.
 - Legacy spellings such as `obelisk.artifact_pack.manifest.v1` are unsupported and fail
   closed as unknown schemas.
 - `artifact_id` must be a safe component, normally the pack directory name.
+- Snapshot/evidence identity fields such as `capture_id` and `evidence_pack_id` must be
+  safe artifact identity components: start with an alphanumeric character, contain only
+  alphanumerics plus `.`, `_`, or `-`, and avoid placeholder prefixes such as
+  `unspecified-` or `static-global-default-`.
+- SHA256 fields in manifests and generated snapshot evidence should be recorded as
+  lowercase 64-character hex strings.
 - `generated_utc` must be a real UTC timestamp in `YYYY-MM-DDTHH:MM:SSZ` form.
 - Every recorded file path must be pack-relative, not absolute, not empty, and not
   traversing upward.

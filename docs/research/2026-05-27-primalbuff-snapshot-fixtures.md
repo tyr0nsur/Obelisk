@@ -2,8 +2,10 @@
 
 ## Objective
 
-Run the first focused `sdk.buffs` offline round and determine whether compact, exact
-`PrimalBuff` functions are strong enough for real-core snapshot fixtures.
+Run the first focused buff snapshot-namespace offline round and determine whether compact,
+exact `PrimalBuff` functions are strong enough for real-core snapshot fixtures. The
+`sdk.buffs`/`sdk_buffs` labels in this note are fixture namespaces only, not a public Buff
+SDK claim.
 
 ## Environment
 
@@ -109,11 +111,11 @@ PrimalBuff.BPPreventAddingOtherBuff
 
 ## Result
 
-Confirmed as `candidate-only`. `sdk.buffs` now has a focused real-core snapshot foothold
-and an offline internal recognizer in `ue/BuffReflection.*`: inventory-access input,
-allow-add-buff policy, class-based prevent-add-buff, bool-return, and zero-param shapes.
-This is useful for reflection coverage, but not enough to define a public buff SDK or
-runtime observation plan.
+Confirmed as `candidate-only`. The buff snapshot namespace now has a focused real-core
+snapshot foothold and an offline internal recognizer in `ue/BuffReflection.*`:
+inventory-access input, allow-add-buff policy, class-based prevent-add-buff, bool-return,
+and zero-param shapes. This is useful for reflection coverage, but not enough to define a
+public Buff SDK, runtime observer, callback family, or UE identity surface.
 
 ## Rejected Paths
 

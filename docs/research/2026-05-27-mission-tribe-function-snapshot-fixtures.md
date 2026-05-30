@@ -5,6 +5,9 @@
 Broaden gameplay fixture coverage with compact mission lifecycle and tribe permission
 UFunction snapshots.
 
+The `sdk.missions` and `sdk.tribes` labels in this note are fixture namespaces only, not
+public Mission or Tribe SDK claims.
+
 ## Environment
 
 - Snapshot manifest:
@@ -43,9 +46,11 @@ bounded property chains in the inspected core.
 
 ## Result
 
-`sdk.missions` now covers add, leave, and removal lifecycle metadata. `sdk.tribes` now
-has more than the zero-param tribe-log control: it includes a compact permission enum
-shape and a membership bool-return query. These remain offline metadata fixtures only.
+The mission snapshot namespace now covers add, leave, and removal lifecycle metadata. The
+tribe snapshot namespace now has more than the zero-param tribe-log control: it includes a
+compact permission enum shape and a membership bool-return query. These remain offline
+metadata fixtures only and do not promote public SDKs, runtime hooks, identity, lookup, or
+permission authority.
 
 ## Rejected Paths
 

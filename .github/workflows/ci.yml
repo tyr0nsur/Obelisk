@@ -128,6 +128,7 @@ jobs:
             ninja-build
 
       - name: Run first-stable core release gate
+        # Canonical gate owns production libobelisk.so test-only symbol checks plus install/SDK dry-runs.
         # Gameplay/module promotion requires scripts/check_release_readiness.sh --require-second-source-readiness.
         run: scripts/check_release_readiness.sh
 

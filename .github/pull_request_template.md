@@ -25,7 +25,8 @@
 - [ ] `ctest --test-dir build --output-on-failure`
 - [ ] `scripts/run_script_tests.sh`
 - [ ] `scripts/test_install_obelisk_layout.sh` for install, SDK, packaging, or CMake export changes.
-- [ ] `scripts/check_release_readiness.sh` for installer, SDK package, or first-stable scope changes that are not release-candidate publication.
+- [ ] `scripts/check_release_readiness.sh` for runtime/shared-library symbol-surface, installer, SDK package, or first-stable scope changes that are not release-candidate publication.
+- [ ] Production `libobelisk.so` remains free of test-only/internal symbols through the canonical release gate; no parallel CI `nm` check with different defaults was added.
 - [ ] Release-candidate publication PRs rerun `scripts/check_release_readiness.sh --require-second-source-readiness` on a clean worktree with the accepted second-source root and preserved report directory.
 - [ ] `scripts/check_release_readiness.sh --require-second-source-readiness` for PRs that promote reflected gameplay/module surfaces; name every promoted target set with `--ufunction-second-source-target-set` or `--scriptstruct-second-source-target-set`, pass `--ufunction-second-source-root` for promoted UFunction snapshots, pass `--scriptstruct-second-source-root` only when a ScriptStruct target set is explicitly named, and set `--second-source-report-dir` when keeping readiness reports.
 - [ ] Release tags and release-ref pushes have explicit release-manager/lead authorization for this PR/turn.

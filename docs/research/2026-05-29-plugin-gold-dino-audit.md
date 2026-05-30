@@ -9,7 +9,7 @@ promotion:
 1. artifact-specific `FName` root,
 2. `GObjects`/`UObject` membership,
 3. `UFunction` parameter layouts bounded by `ParmsSize`,
-4. the smallest useful `sdk.dinos` target.
+4. the smallest useful dino snapshot target set.
 
 No live servers were touched. This note used only repo files and offline-safe artifacts
 under `/servidor/ark/workspace-offline`.

@@ -8,6 +8,7 @@
 #include <condition_variable>
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <mutex>
 #include <stdexcept>
 #include <string>
@@ -572,6 +573,112 @@ namespace
         Require(dispatcher.SubscriptionCount() == 0, "chat callbacks survived reentrant destroy cleanup");
     }
 
+    struct DeferredDestroyUnregisterOtherState
+    {
+        Obelisk::Core::ChatEventDispatcher* dispatcher = nullptr;
+        uint64_t otherRegistrationId = 0;
+        std::mutex mutex;
+        std::condition_variable cv;
+        bool callbackEntered = false;
+        bool releaseCallback = false;
+        bool destroyEntered = false;
+        bool unregisterReturned = false;
+        bool unregisterResult = false;
+    };
+
+    void BlockingDeferredDestroyCallback(const Obelisk::Core::ChatMessageView&, void* userData)
+    {
+        auto* state = static_cast<DeferredDestroyUnregisterOtherState*>(userData);
+        std::unique_lock<std::mutex> lock(state->mutex);
+        state->callbackEntered = true;
+        state->cv.notify_all();
+        state->cv.wait(lock, [&state]() { return state->releaseCallback; });
+    }
+
+    void DeferredDestroyAndUnregisterOther(void* userData)
+    {
+        auto* state = static_cast<DeferredDestroyUnregisterOtherState*>(userData);
+        {
+            std::lock_guard<std::mutex> lock(state->mutex);
+            state->destroyEntered = true;
+        }
+        state->cv.notify_all();
+
+        const bool result = state->dispatcher && state->dispatcher->Unregister(state->otherRegistrationId);
+        {
+            std::lock_guard<std::mutex> lock(state->mutex);
+            state->unregisterResult = result;
+            state->unregisterReturned = true;
+        }
+        state->cv.notify_all();
+    }
+
+    void TestDeferredDestroyUserDataCanUnregisterAnotherCallbackWithoutDeadlock()
+    {
+        auto dispatcher = std::make_unique<Obelisk::Core::ChatEventDispatcher>();
+        int owner = 0;
+        Capture capture;
+        DeferredDestroyUnregisterOtherState state{dispatcher.get(), 0};
+        std::atomic<size_t> dispatchCount{0};
+
+        const uint64_t destroyRegistrationId = dispatcher->Register(
+            &owner,
+            {BlockingDeferredDestroyCallback, &state, DeferredDestroyAndUnregisterOther});
+        Require(destroyRegistrationId != 0, "deferred destroy callback registration failed");
+        state.otherRegistrationId = dispatcher->Register(&owner, {CaptureCallback, &capture});
+        Require(state.otherRegistrationId != 0, "other deferred destroy callback registration failed");
+
+        std::thread dispatchThread([&]() {
+            dispatchCount.store(dispatcher->Dispatch(MakeMessage()), std::memory_order_release);
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.mutex);
+            Require(state.cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
+                        return state.callbackEntered;
+                    }),
+                    "deferred destroy callback did not enter");
+        }
+
+        std::thread cleanupThread([&]() {
+            Require(dispatcher->Unregister(destroyRegistrationId),
+                    "deferred destroy callback unregister failed");
+        });
+
+        {
+            std::lock_guard<std::mutex> lock(state.mutex);
+            state.releaseCallback = true;
+        }
+        state.cv.notify_all();
+
+        bool unregisterReturned = false;
+        {
+            std::unique_lock<std::mutex> lock(state.mutex);
+            unregisterReturned = state.cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
+                return state.unregisterReturned;
+            });
+        }
+
+        if (!unregisterReturned)
+        {
+            dispatchThread.detach();
+            cleanupThread.detach();
+            (void)dispatcher.release();
+            Require(false, "deferred DestroyUserData deadlocked while unregistering another chat callback");
+        }
+
+        dispatchThread.join();
+        cleanupThread.join();
+
+        Require(state.destroyEntered, "deferred destroy cleanup did not run");
+        Require(state.unregisterResult,
+                "deferred DestroyUserData failed to unregister the other chat callback");
+        Require(dispatchCount.load(std::memory_order_acquire) == 2,
+                "deferred destroy dispatch count changed unexpectedly");
+        Require(dispatcher->SubscriptionCount() == 0,
+                "chat callbacks survived deferred reentrant destroy cleanup");
+    }
+
     void TestRejectsUnknownSendMode()
     {
         Obelisk::Core::ChatEventDispatcher dispatcher;
@@ -613,6 +720,7 @@ int main()
     TestOwnerCleanupWaitsForDeferredDestroyAfterInFlightDispatch();
     TestOwnerCleanup();
     TestDestroyUserDataCanUnregisterAnotherCallbackWithoutDeadlock();
+    TestDeferredDestroyUserDataCanUnregisterAnotherCallbackWithoutDeadlock();
     TestRejectsUnknownSendMode();
     TestExceptionsDoNotStopDispatch();
 

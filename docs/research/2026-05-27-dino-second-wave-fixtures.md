@@ -2,8 +2,10 @@
 
 ## Objective
 
-Extend `sdk.dinos` beyond the first attack/passenger-notify fixtures into passenger,
-carry, tame-state, and controller dino-stat property chains.
+Extend the dino snapshot namespace beyond the first attack/passenger-notify fixtures into
+passenger, carry, tame-state, and controller dino-stat property chains. The `sdk.dinos`
+and `sdk_dinos` labels in this note are fixture namespaces only, not a public Dino SDK
+claim.
 
 ## Environment
 
@@ -95,9 +97,10 @@ Ran 1 test: OK
 
 ## Result
 
-Confirmed as `candidate-only`. `sdk.dinos` now has richer fixture-backed coverage and two
-real-core sanitized snapshots. This strengthens metadata reconstruction and module
-planning, but does not create a runtime hook, invocation path, or public SDK dino API.
+Confirmed as `candidate-only`. The dino snapshot namespace now has richer fixture-backed
+coverage and two real-core sanitized snapshots. This strengthens metadata reconstruction
+and module planning, but does not create a runtime hook, invocation path, callback family,
+UE identity surface, or public Dino SDK API.
 
 ## Rejected Paths
 

@@ -2,8 +2,9 @@
 
 ## Objective
 
-Promote compact transfer/upload/download metadata snapshots while keeping large struct,
-array, and string payloads deferred.
+Record compact transfer/upload/download metadata snapshots while keeping large struct,
+array, and string payloads deferred. The `sdk.transfers`/`sdk_transfers` labels in this
+note are fixture namespaces only, not a public Transfer SDK claim.
 
 ## Environment
 
@@ -42,9 +43,10 @@ property chains in the inspected core.
 
 ## Result
 
-`sdk.transfers` now has a compact metadata foothold for transfer/download/upload surfaces.
-This does not imply runtime invocation safety, upload/download policy correctness, or
-public SDK readiness.
+The transfer snapshot namespace now has a compact metadata foothold for
+transfer/download/upload surfaces. This does not imply runtime invocation safety,
+upload/download policy correctness, payload decoding, identity, callbacks, or public
+Transfer SDK readiness.
 
 ## Rejected Paths
 
@@ -72,6 +74,6 @@ public SDK readiness.
 
 ## Next Steps
 
-- Keep `sdk.transfers` candidate-only and offline.
+- Keep the transfer snapshot namespace candidate-only and offline.
 - Add ScriptStruct field evidence before any large transfer payload fixture.
 - Do not expose transfer SDK callbacks until ownership, policy, and rollback gates exist.

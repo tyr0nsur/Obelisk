@@ -702,6 +702,63 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertIn("release_gameplay_policy_item_return_only", text_result.stdout)
         self.assertIn("does not promote Items SDK, Inventory SDK", text_result.stdout)
 
+    def test_structure_release_target_set_guidance_blocks_public_sdk_promotion(self) -> None:
+        result = run_compare_raw(
+            "--list-target-guidance",
+            "--target-set",
+            "minimal-second-source-intake",
+            "--target-set",
+            "structure-observer-intake",
+            "--json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["schema"], "obelisk.reflection-target-guidance.v1")
+        self.assertEqual(
+            report["target_sets"],
+            ["minimal-second-source-intake", "structure-observer-intake"],
+        )
+        guidance = {item["target_set"]: item for item in report["target_set_guidance"]}
+        self.assertEqual(set(guidance), {"minimal-second-source-intake", "structure-observer-intake"})
+
+        minimal = guidance["minimal-second-source-intake"]
+        self.assertEqual(minimal["classification"], "release_compact_inventory_structure_layout_evidence")
+        self.assertIn("compact_layout_evidence_only", minimal["why_blocked"])
+        self.assertIn("public_inventory_items_structure_sdks_blocked", minimal["why_blocked"])
+        self.assertIn("identity_lookup_resourcehandle_blocked", minimal["why_blocked"])
+        self.assertIn("mutation_return_override_blocked", minimal["why_blocked"])
+        self.assertIn("CanUse, AllowRemoteAddToInventory", " ".join(minimal["snapshot_prep_checks"]))
+        self.assertIn("Inventory SDK", minimal["non_claim"])
+        self.assertIn("Items SDK", minimal["non_claim"])
+        self.assertIn("StructureEvents", minimal["non_claim"])
+        self.assertIn("target-set expansion", minimal["non_claim"])
+
+        structure = guidance["structure-observer-intake"]
+        self.assertEqual(structure["classification"], "release_gameplay_policy_structure_observer")
+        self.assertIn("structure_observer_layout_evidence_only", structure["why_blocked"])
+        self.assertIn("public_structureevents_sdk_blocked", structure["why_blocked"])
+        self.assertIn("pincode_player_structure_identity_redaction_required", structure["why_blocked"])
+        self.assertIn("runtime_producer_validation_requires_separate_approval", structure["why_blocked"])
+        self.assertIn("GameplayPolicyEvent lane", " ".join(structure["snapshot_prep_checks"]))
+        self.assertIn("IsAllowedToBuild", " ".join(structure["snapshot_prep_checks"]))
+        self.assertIn("public StructureEvents", structure["non_claim"])
+        self.assertIn("Structure SDK", structure["non_claim"])
+        self.assertIn("runtime validation", structure["non_claim"])
+
+        text_result = run_compare_raw(
+            "--list-target-guidance",
+            "--target-set",
+            "minimal-second-source-intake",
+            "--target-set",
+            "structure-observer-intake",
+        )
+        self.assertEqual(text_result.returncode, 0, text_result.stderr + text_result.stdout)
+        self.assertIn("target_set_guidance=2", text_result.stdout)
+        self.assertIn("release_compact_inventory_structure_layout_evidence", text_result.stdout)
+        self.assertIn("release_gameplay_policy_structure_observer", text_result.stdout)
+        self.assertIn("does not promote public StructureEvents", text_result.stdout)
+
     def test_player_identity_lifecycle_guidance_can_be_listed_without_snapshots(self) -> None:
         result = run_compare_raw(
             "--list-target-guidance",

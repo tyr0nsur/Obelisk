@@ -283,9 +283,11 @@ Usage: scripts/check_release_readiness.sh [--allow-dirty] [--require-second-sour
                                           [--scriptstruct-second-source-target-set <name>]
                                           [--second-source-report-dir <path>]
 
-Runs the local first-stable core release gate. By default the command fails if tracked or
-untracked non-ignored files are present before or after validation. Ignored build/cache
-directories are allowed. Gameplay/module second-source promotion gates run only when
+Runs the local first-stable core release gate. It owns build, CTest, script tests,
+production libobelisk.so symbol surface checks, install/SDK dry-runs, read-only CLI
+status, and clean-tree validation. By default the command fails if tracked or untracked
+non-ignored files are present before or after validation. Ignored build/cache directories
+are allowed. Gameplay/module second-source promotion gates run only when
 --require-second-source-readiness is supplied.
 
 Options:

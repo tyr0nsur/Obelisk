@@ -20,6 +20,26 @@ namespace Obelisk::Core
             ItemReturnEventSubscription Subscription;
         };
 
+        thread_local size_t g_DestroyUserDataDepth = 0;
+
+        struct DestroyUserDataScope
+        {
+            DestroyUserDataScope()
+            {
+                ++g_DestroyUserDataDepth;
+            }
+
+            ~DestroyUserDataScope()
+            {
+                --g_DestroyUserDataDepth;
+            }
+        };
+
+        bool IsInsideDispatcherCleanup()
+        {
+            return g_DestroyUserDataDepth > 0;
+        }
+
         bool IsKnownEventKind(ItemReturnEventKind kind)
         {
             return static_cast<uint32_t>(kind) <=
@@ -49,6 +69,7 @@ namespace Obelisk::Core
 
             try
             {
+                DestroyUserDataScope cleanupScope;
                 subscription.DestroyUserData(subscription.UserData);
             }
             catch (const std::exception& e)
@@ -142,7 +163,9 @@ namespace Obelisk::Core
                 m_SubscriptionCount.fetch_sub(before - after, std::memory_order_release);
             if (QueueOrDestroyRemovedSubscriptions(removed, lock))
                 m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
-            else if (!IsInsideAnyGameplayCallback() && !IsDispatchCleanupComplete())
+            else if (!IsInsideAnyGameplayCallback() &&
+                     !IsInsideDispatcherCleanup() &&
+                     !IsDispatchCleanupComplete())
                 m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
         }
         for (const ItemReturnEventSubscription& subscription : removed)
@@ -175,7 +198,9 @@ namespace Obelisk::Core
                 m_SubscriptionCount.fetch_sub(before - after, std::memory_order_release);
             if (QueueOrDestroyRemovedSubscriptions(removed, lock))
                 m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
-            else if (!IsInsideAnyGameplayCallback() && !IsDispatchCleanupComplete())
+            else if (!IsInsideAnyGameplayCallback() &&
+                     !IsInsideDispatcherCleanup() &&
+                     !IsDispatchCleanupComplete())
                 m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
         }
         for (const ItemReturnEventSubscription& subscription : removed)
@@ -208,7 +233,9 @@ namespace Obelisk::Core
                 m_SubscriptionCount.fetch_sub(before - after, std::memory_order_release);
             if (QueueOrDestroyRemovedSubscriptions(removed, lock))
                 m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
-            else if (!IsInsideAnyGameplayCallback() && !IsDispatchCleanupComplete())
+            else if (!IsInsideAnyGameplayCallback() &&
+                     !IsInsideDispatcherCleanup() &&
+                     !IsDispatchCleanupComplete())
                 m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
         }
         for (const ItemReturnEventSubscription& subscription : removed)

@@ -34,7 +34,7 @@ Stable baseline:
 - Plugin-owned callback cleanup and optional `ObeliskPlugin_Shutdown`.
 - Public SDK header at `include/obelisk/ObeliskApi.h`.
 
-v0.1-rc SDK surfaces:
+v0.1-rc public C ABI slices:
 
 - Promoted `GameplayPolicyEvent` callback ABI for copied POD structure-backed policy
   signals tied to fresh [`structure-observer-intake` evidence](docs/research/2026-05-29-structure-observer-intake-refresh.md)
@@ -525,10 +525,11 @@ Near-term engineering:
   plugin-facing gameplay events.
 - Generalize FName/GObjects/UFunction lookup only after another capture or binary hash
   validates the current field layout.
-- Harden the small SDK seed set for production contributors: installed package
-  consumers, lifecycle/config examples, descriptors, process-local timers, and copied
-  event examples that stay inside the Plugin Hub Foundation and Capability Matrix instead
-  of relying on raw UE pointers or compatibility-source behavior.
+- Harden the small production-supported Plugin Hub seed set for contributors:
+  installed package consumers, lifecycle/config examples, descriptors, and
+  process-local timers. Keep copied event examples explicitly experimental and inside
+  the Plugin Hub Foundation and Capability Matrix instead of relying on raw UE pointers
+  or compatibility-source behavior.
 
 Later:
 

@@ -304,14 +304,14 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             with self.subTest(file="docs/STATUS.md", item=item):
                 self.assertIn(item, status)
         for item in [
-            "v0.1-rc SDK surfaces:",
+            "v0.1-rc public C ABI slices:",
             "Minimal v0.1-rc `ChatMessageEvent` callback ABI",
             "This remains a copied notification contract only",
         ]:
             with self.subTest(file="README.md", item=item):
                 self.assertIn(item, readme)
         self.assertLess(
-            readme.index("v0.1-rc SDK surfaces:"),
+            readme.index("v0.1-rc public C ABI slices:"),
             readme.index("Minimal v0.1-rc `ChatMessageEvent` callback ABI"),
         )
         for item in forbidden_claims:
@@ -544,6 +544,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("not counted as delivery evidence", pr_template)
         self.assertIn("Core-first release readiness", ci)
         self.assertIn("first-stable core release gate", ci)
+        self.assertIn("production libobelisk.so test-only symbol checks", ci)
         self.assertNotIn("scripts/install_obelisk.sh --dry-run /tmp/obelisk-ci-install", ci)
         self.assertNotIn("scripts/test_install_obelisk_layout.sh /tmp/obelisk-ci-layout", ci)
         self.assertIn("Reflection base readiness", ci)
@@ -567,9 +568,15 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("--require-second-source-readiness", ci)
         self.assertIn("Release readiness requires a clean worktree", script)
         self.assertIn("first-stable core release gate", script)
+        self.assertIn("production libobelisk.so symbol surface checks", script)
+        self.assertIn("check_production_runtime_symbols", script)
+        self.assertIn("Production libobelisk.so exposes test-only/internal symbols", script)
         self.assertIn("gameplay/module second-source promotion gate was not run", script)
         self.assertIn("pre-build readiness metadata preflight", script)
         self.assertIn("current BoolProperty tail metadata", script)
+        self.assertIn("test-only/internal symbol patterns", release)
+        self.assertIn("Production `libobelisk.so` remains free of test-only/internal symbols", pr_template)
+        self.assertIn("canonical release gate rejecting production `libobelisk.so`", status)
         self.assertNormalizedIn("fail before the build/test/install steps", release)
         self.assertIn("preflights the configured UFunction root before build/test/install work", status)
         self.assertIn("unambiguous public RC target coverage", changelog)

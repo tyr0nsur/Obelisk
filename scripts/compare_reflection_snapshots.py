@@ -145,6 +145,32 @@ TARGET_BLOCKER_GUIDANCE = {
     },
 }
 TARGET_SET_BLOCKER_GUIDANCE = {
+    "minimal-second-source-intake": {
+        "classification": "release_compact_inventory_structure_layout_evidence",
+        "why_blocked": [
+            "compact_layout_evidence_only",
+            "public_inventory_items_structure_sdks_blocked",
+            "identity_lookup_resourcehandle_blocked",
+            "mutation_return_override_blocked",
+            "runtime_validation_requires_narrower_target_policy",
+        ],
+        "next_offline_input": (
+            "use distinct sanitized offline snapshots only for CanUse, AllowRemoteAddToInventory, "
+            "AllowStructureAccess, and IsAllowedToDemolish; use narrower policy target sets "
+            "for copied-scalar release work"
+        ),
+        "snapshot_prep_checks": [
+            "compare only CanUse, AllowRemoteAddToInventory, AllowStructureAccess, and IsAllowedToDemolish through --target-set minimal-second-source-intake",
+            "treat readiness as compact second-source layout evidence for the mixed Item/Structure lane only",
+            "keep item identity, inventory identity, structure identity, object refs, raw params, and UE pointers redacted or recognition-only",
+            "keep Inventory SDK, Items SDK, StructureEvents, ResourceHandle, mutation, and return override blocked",
+            "do not use this target set to expand runtime hooks, public SDKs, or target-set coverage",
+        ],
+        "non_claim": (
+            "does not promote Inventory SDK, Items SDK, StructureEvents, identity, lookup, "
+            "ResourceHandle, mutation, return override, runtime validation, or target-set expansion"
+        ),
+    },
     "item-return-only-policy-slice": {
         "classification": "release_gameplay_policy_item_return_only",
         "why_blocked": [
@@ -228,6 +254,33 @@ TARGET_SET_BLOCKER_GUIDANCE = {
         "non_claim": (
             "does not promote Mission SDK, mission payload decoding, identity, lookup, mutation, "
             "return override, runtime hooks, or target-set expansion"
+        ),
+    },
+    "structure-observer-intake": {
+        "classification": "release_gameplay_policy_structure_observer",
+        "why_blocked": [
+            "structure_observer_layout_evidence_only",
+            "public_structureevents_sdk_blocked",
+            "pincode_player_structure_identity_redaction_required",
+            "identity_lookup_resourcehandle_blocked",
+            "mutation_return_override_blocked",
+            "runtime_producer_validation_requires_separate_approval",
+        ],
+        "next_offline_input": (
+            "use distinct sanitized offline snapshots for the six structure-observer targets; "
+            "keep runtime/copied-event validation behind a separate approved debug-window brief"
+        ),
+        "snapshot_prep_checks": [
+            "compare only AllowStructureAccess, IsAllowedToDemolish, SetVariant, AllowToggleActivation, VerifyPinCode, and CanSeat through --target-set structure-observer-intake",
+            "treat release readiness as the narrow copied/redacted GameplayPolicyEvent lane, not a public StructureEvents SDK",
+            "keep pin codes, player context, structure identity, object refs, strings, arrays, raw params, and UE pointers redacted or recognition-only",
+            "require target, class, outer, every property, and nested struct/array candidates to be candidate-uobject",
+            "keep build placement policy targets such as IsAllowedToBuild out of this target set",
+            "runtime producer validation still requires a separate gated debug-window brief",
+        ],
+        "non_claim": (
+            "does not promote public StructureEvents, Structure SDK, pincode/player identity exposure, "
+            "identity, lookup, ResourceHandle, mutation, return override, runtime validation, or target-set expansion"
         ),
     },
     "transfer-baccept-only-policy-slice": {

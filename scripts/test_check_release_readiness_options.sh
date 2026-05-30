@@ -51,6 +51,11 @@ for expected in \
     fi
 done
 
+if ! grep -Fq -- "production libobelisk.so symbol surface checks" <<<"${help_output}"; then
+    printf 'missing production symbol-surface help text\n' >&2
+    exit 1
+fi
+
 if ! grep -Fq -- "ScriptStruct promotion requires explicit opt-in" <<<"${help_output}"; then
     printf 'missing ScriptStruct opt-in help text\n' >&2
     exit 1

@@ -2216,6 +2216,95 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("--evidence-artifact-sha256 does not match --core contents", result.stderr)
 
+    def test_cli_snapshot_json_normalizes_uppercase_sha256_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            core = Path(temp_dir) / "core"
+            addrs = build_core_fixture(core)
+            core_sha256 = sha256_file(core)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "inspect_core_ufunctions.py"),
+                    "--core",
+                    str(core),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--name-exact",
+                    "BPAllowPlayerToLeaveMission",
+                    "--outer-exact",
+                    "MissionType",
+                    "--snapshot-json",
+                    "--evidence-ark-sha256",
+                    "A" * 64,
+                    "--evidence-artifact-sha256",
+                    core_sha256.upper(),
+                    "--evidence-capture-id",
+                    "fixture-capture",
+                    "--evidence-pack-id",
+                    "fixture-pack",
+                    "--evidence-obelisk-commit",
+                    "fixture-commit",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["evidence"]["ark_binary_sha256"], "a" * 64)
+        self.assertEqual(payload["evidence"]["artifact_sha256"], core_sha256)
+
+    def test_cli_snapshot_json_rejects_unsafe_evidence_identity_ids(self) -> None:
+        cases = (
+            ("--evidence-capture-id", "../bad", "--evidence-capture-id must be a safe"),
+            ("--evidence-pack-id", "unspecified-pack", "--evidence-pack-id must be a safe"),
+        )
+        for flag, value, message in cases:
+            with self.subTest(flag=flag), tempfile.TemporaryDirectory() as temp_dir:
+                core = Path(temp_dir) / "core"
+                addrs = build_core_fixture(core)
+                core_sha256 = sha256_file(core)
+                capture_id = "fixture-capture"
+                evidence_pack_id = "fixture-pack"
+                if flag == "--evidence-capture-id":
+                    capture_id = value
+                else:
+                    evidence_pack_id = value
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(SCRIPT_DIR / "inspect_core_ufunctions.py"),
+                        "--core",
+                        str(core),
+                        "--gobjects",
+                        hex(addrs["gobjects"]),
+                        "--fname-root-slot",
+                        hex(addrs["fname_root_slot"]),
+                        "--name-exact",
+                        "BPAllowPlayerToLeaveMission",
+                        "--outer-exact",
+                        "MissionType",
+                        "--snapshot-json",
+                        "--evidence-ark-sha256",
+                        "f" * 64,
+                        "--evidence-artifact-sha256",
+                        core_sha256,
+                        "--evidence-capture-id",
+                        capture_id,
+                        "--evidence-pack-id",
+                        evidence_pack_id,
+                        "--evidence-obelisk-commit",
+                        "fixture-commit",
+                    ],
+                    capture_output=True,
+                    text=True,
+                )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(message, result.stderr)
+
     def test_cli_script_struct_mode_emits_script_struct_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             core = Path(temp_dir) / "core"

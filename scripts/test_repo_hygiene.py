@@ -18,10 +18,13 @@ class RepoHygieneTests(unittest.TestCase):
             "scripts/__pycache__/",
             "compile_commands.json",
             "Obelisk.log",
+            "Obelisk-unknown.log",
             "logs/arkserver/Obelisk.log",
             "build/libobelisk.so",
+            "local/discord-webhooks.env",
             "arkserver.core",
             "core.12345",
+            "dumps/ShooterGameServer.core",
             "tmp/local.txt",
         ]
         result = subprocess.run(

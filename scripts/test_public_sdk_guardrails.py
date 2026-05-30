@@ -74,6 +74,13 @@ PLUGIN_HUB_V1_ROADMAP_BOUNDARY_FILES = [
     REPO_ROOT / "docs" / "research" / "README.md",
     REPO_ROOT / "plugins" / "README.md",
 ]
+PLUGIN_HUB_PUBLIC_BOUNDARY_DOC_FILES = [
+    REPO_ROOT / "README.md",
+    REPO_ROOT / "CONTRIBUTING.md",
+    REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md",
+    REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md",
+    REPO_ROOT / "plugins" / "README.md",
+]
 V010_CORE_API_CAPABILITY_ALLOWLIST = [
     "OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS",
     "OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS",
@@ -1124,7 +1131,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             (plugins_readme, "raw `ProcessEvent` callbacks\n  require explicit debug gates"),
             (plugins_readme, "`oPolicyAudit` demonstrates the promoted `GameplayPolicyEvent` callback family"),
             (plugins_readme, "storage/database services, webhooks, inventory/item mutation"),
-            (plugins_readme, "until the matching public surface is promoted in the\ncapability matrix"),
+            (plugins_readme, "until the matching public surface is promoted in the\npublic ABI, recorded in the capability matrix"),
         ):
             with self.subTest(required=required):
                 self.assertIn(normalized(required), normalized(text))
@@ -3316,6 +3323,74 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             for phrase in phrases:
                 with self.subTest(file=path.relative_to(REPO_ROOT), phrase=phrase):
                     self.assertIn(normalized(phrase), compact)
+
+    def test_plugin_hub_public_docs_keep_foundation_matrix_and_experimental_split(self) -> None:
+        required_phrases = {
+            REPO_ROOT / "README.md": (
+                "v0.1-rc public C ABI slices",
+                "Plugin Hub work starts with",
+                "define the current supported seed boundary before any new public SDK surface is proposed",
+                "Harden the small production-supported Plugin Hub seed set",
+                "Keep copied event examples explicitly experimental",
+            ),
+            REPO_ROOT / "CONTRIBUTING.md": (
+                "Start Plugin Hub work from",
+                "ArkServerApi, AseApi, and NextGenPlugins are names and demand dictionaries only",
+                "not sources for code, offsets, control flow, parsers, schemas, or implementation behavior",
+            ),
+            REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md": (
+                "Post-RC production-supported seed work is limited to lifecycle/config/logging skeletons",
+                "Copied `ChatMessageEvent` parsing and copied `GameplayPolicyEvent` auditing remain experimental seed patterns only",
+                "Foundation V1 does not provide or imply",
+            ),
+            REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md": (
+                "Post-RC production-supported Plugin Hub seed work is limited to lifecycle/config/logging",
+                "`experimental seed only`: allowed for explicitly labeled pattern examples",
+                "not supported as production Plugin Hub modules",
+            ),
+            REPO_ROOT / "plugins" / "README.md": (
+                "The production-supported additions after `v0.1` are descriptor readers and process-local timer utilities",
+                "Passive copied-chat parsers and copied policy auditors are experimental pattern examples only",
+                "promoted in the public ABI, recorded in the capability matrix, and documented with its own evidence gate",
+            ),
+        }
+
+        offenders: list[str] = []
+        for path, phrases in required_phrases.items():
+            compact = normalized(path.read_text(encoding="utf-8"))
+            for phrase in phrases:
+                if normalized(phrase) not in compact:
+                    offenders.append(f"{path.relative_to(REPO_ROOT)}: missing {phrase}")
+
+        forbidden_phrases = (
+            "v0.1-rc SDK surfaces",
+            "small SDK seed set for production contributors",
+        )
+        forbidden_production_experimental_mix = re.compile(
+            r"\bproduction-supported\b[^.!?\n;]*(?:copied[- ]chat|copied\s+policy|"
+            r"ChatMessageEvent|GameplayPolicyEvent|policy\s+auditors?|chat\s+parsers?)",
+            re.IGNORECASE,
+        )
+        negated_or_split_context = re.compile(
+            r"\b(?:not|experimental|only\s+patterns?|remain|remains|may\s+demonstrate)\b",
+            re.IGNORECASE,
+        )
+
+        for path in PLUGIN_HUB_PUBLIC_BOUNDARY_DOC_FILES:
+            text = path.read_text(encoding="utf-8")
+            for phrase in forbidden_phrases:
+                if phrase in text:
+                    offenders.append(f"{path.relative_to(REPO_ROOT)}: forbidden phrase {phrase}")
+            for segment_start, segment in sentence_like_segments(text):
+                if forbidden_production_experimental_mix.search(segment) and not (
+                    negated_or_split_context.search(segment)
+                ):
+                    line_no = text.count("\n", 0, segment_start) + 1
+                    offenders.append(
+                        f"{path.relative_to(REPO_ROOT)}:{line_no}: {normalized(segment)}"
+                    )
+
+        self.assertEqual(offenders, [])
 
     def test_mission_plugin_hub_boundary_stays_planning_only(self) -> None:
         foundation = (REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md").read_text(
