@@ -818,23 +818,36 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         workflow_skill = (
             REPO_ROOT / "agent-skills" / "obelisk-github-research-workflow" / "SKILL.md"
         ).read_text(encoding="utf-8")
+        current_handoff = (REPO_ROOT / "docs" / "agent-handoff" / "CURRENT.md").read_text(
+            encoding="utf-8"
+        )
 
         for text, required in (
             (matrix, "not as portable implementation source"),
             (matrix, "rebuild every promoted surface through Obelisk reflection"),
+            (matrix, "provenance for\n"
+             "demand analysis only"),
+            (matrix, "not license clearance, runtime evidence, an ArkApi\n"
+             "compatibility target, or an ABI reference"),
             (inventory, "Use this clone as a demand-map and dictionary source"),
-            (inventory, "Do not treat it as source code to port"),
+            (inventory, "not as source code to port"),
             (inventory, "Do not trust `DECLARE_HOOK` declarations as Linux ABI"),
+            (inventory, "not runtime evidence and do not authorize copied implementation"),
             (workflow_skill, "only as names, demand signals, and behavior dictionaries"),
             (workflow_skill, "must not copy ArkServerApi/AseApi, NextGenPlugins"),
+            (current_handoff, "names and behavior dictionaries\n  plus demand signals only"),
+            (current_handoff, "Do not copy code,\n  offsets, layouts, vtables, ABI assumptions"),
         ):
             with self.subTest(required=required):
                 self.assertIn(required, text)
 
         forbidden_positive_claims = (
-            r"\bArkApi[- ]compatible\b",
-            r"\bport(?:s|ed|ing)?\s+(?:ArkApi|NextGenPlugins)\b",
-            r"\bcopy(?:ing|ied)?\s+(?:ArkApi|NextGenPlugins)\s+(?:code|implementations?)\b",
+            r"\b(?:ArkApi|ArkServerApi|AseApi|ARK-Server-API|ASE-Plugins|NextGenPlugins)[- ]compatible\b",
+            r"\b(?:drop[- ]in\s+compatible|API\s+parity)\b",
+            r"\bport(?:s|ed|ing)?\s+(?:ArkApi|ArkServerApi|AseApi|ARK-Server-API|ASE-Plugins|NextGenPlugins)\b",
+            r"\bcopy(?:ing|ied)?\s+(?:ArkApi|ArkServerApi|AseApi|ARK-Server-API|ASE-Plugins|NextGenPlugins)\s+(?:code|implementations?)\b",
+            r"\b(?:reuse|mirror)\s+(?:ArkApi|ArkServerApi|AseApi|ARK-Server-API|ASE-Plugins|NextGenPlugins)\s+(?:implementation|ABI)\b",
+            r"\b(?:Windows|MSVC)\s+ABI\s+(?:reference|target|support|surface)\b",
             r"\buse\s+`?DECLARE_HOOK`?\s+(?:as|for)\s+(?:Linux\s+)?ABI\b",
         )
         negated_context = re.compile(
@@ -848,6 +861,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             ("docs/PLUGIN_HUB_CAPABILITY_MATRIX.md", matrix),
             ("docs/research/2026-05-30-nextgenplugins-reference-inventory.md", inventory),
             ("agent-skills/obelisk-github-research-workflow/SKILL.md", workflow_skill),
+            ("docs/agent-handoff/CURRENT.md", current_handoff),
         ):
             for line_no, line in enumerate(text.splitlines(), start=1):
                 for pattern in forbidden_positive_claims:
@@ -855,6 +869,31 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                         offenders.append(f"{name}:{line_no}: {line.strip()}")
 
         self.assertEqual(offenders, [])
+
+    def test_nextgenplugins_absolute_path_stays_out_of_public_docs_and_skills(self) -> None:
+        offenders: list[str] = []
+
+        for root in (REPO_ROOT / "agent-skills",):
+            for path in root.rglob("*.md"):
+                text = path.read_text(encoding="utf-8")
+                if "/home/flowcommunity-ark/NextGenPlugins" in text:
+                    offenders.append(str(path.relative_to(REPO_ROOT)))
+
+        for path in PUBLIC_DOC_FILES:
+            text = path.read_text(encoding="utf-8")
+            if "/home/flowcommunity-ark/NextGenPlugins" in text:
+                offenders.append(str(path.relative_to(REPO_ROOT)))
+
+        self.assertEqual(offenders, [])
+
+    def test_nextgenplugins_inventory_mentions_existing_public_matrix(self) -> None:
+        inventory = (
+            REPO_ROOT / "docs" / "research" / "2026-05-30-nextgenplugins-reference-inventory.md"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("Use the existing\n`docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`", inventory)
+        self.assertNotIn("use it later to build a\n`Plugin Hub capability matrix`", inventory)
+        self.assertNotIn("The matrix should stay in\n`docs/research/`", inventory)
 
     def test_public_manifest_does_not_use_static_resource_or_command_evidence_for_rc_surfaces(self) -> None:
         manifest = json.loads(PUBLIC_GAMEPLAY_EVENTS_MANIFEST.read_text(encoding="utf-8"))

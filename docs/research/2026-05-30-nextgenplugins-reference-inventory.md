@@ -18,6 +18,11 @@ Top-level collections:
 - `/home/flowcommunity-ark/NextGenPlugins/Michidu-Ark-Server-Plugins`
 - `/home/flowcommunity-ark/NextGenPlugins/ASE-Plugins`
 
+Local source revisions observed on 2026-05-30:
+
+- `Michidu-Ark-Server-Plugins`: `65ada1d42ac1`
+- `ASE-Plugins`: `81a0a07637af`
+
 Verification note: both roots currently expose the same visible plugin family set at
 shallow depth. Treat duplicated repositories as one demand signal until a later Plugin Hub
 matrix records exact source commits, licenses, and per-plugin provenance.
@@ -46,9 +51,11 @@ Observed plugin directories:
 - `UnicodeRcon`
 
 The `Michidu-Ark-Server-Plugins` root declares an `ARK-Server-API` submodule, currently not
-initialized in this local copy. The visible top-level license is MIT, but individual
-submodules/plugins must still be checked before any derived documentation or compatibility
-claim.
+initialized in this local copy. Both visible top-level roots expose license/readme files,
+but individual plugin provenance and licenses must still be checked before any derived
+public Plugin Hub note. These revisions are provenance for demand analysis only; they are
+not runtime evidence and do not authorize copied implementation, offsets, layouts, ABI
+assumptions, or ArkApi compatibility claims.
 
 ## Value For Obelisk
 
@@ -95,7 +102,7 @@ chat/server messages; permissions; and save/respawn/build/damage-style gameplay 
 build-placement policy lane, but they do not promote `APrimalStructure.IsAllowedToBuild`
 or any return-code semantics today.
 
-Use this clone as a demand-map and dictionary source, not as source code to port. Do not treat it as source code to port.
+Use this clone as a demand-map and dictionary source, not as source code to port.
 Do not trust `DECLARE_HOOK` declarations as Linux ABI, direct UE pointer wrappers as safe
 public API shape, or ArkApi return constants as accepted Linux ARK behavior.
 
@@ -112,14 +119,13 @@ public API shape, or ArkApi return constants as accepted Linux ARK behavior.
 
 ## Recommendation
 
-Keep this local clone out of the Obelisk repository and use it later to build a
-`Plugin Hub capability matrix` once the v0.1 stable core is ready. The first useful
-matrix should list plugin name, feature category, required Obelisk API surface, current
-Obelisk readiness, and blocked capabilities.
+Keep this local clone out of the Obelisk repository. Use the existing
+`docs/PLUGIN_HUB_CAPABILITY_MATRIX.md` as the public boundary document and keep detailed
+plugin-family provenance, license checks, and demand scans in research notes until the v1
+core has stable copied surfaces, lifecycle cleanup, multi-instance config, and secret-safe
+DB/webhook/RCON patterns.
 
-Do not convert this into a public compatibility promise yet. The matrix should stay in
-`docs/research/` until the v1 core has stable copied surfaces, lifecycle cleanup,
-multi-instance config, and secret-safe DB/webhook/RCON patterns.
+Do not convert this inventory into a public compatibility promise.
 
 Do not let this inventory pull internal evidence lanes into Plugin Hub scope prematurely.
 For example, Transfer remains an internal evidence backlog item unless a concrete plugin

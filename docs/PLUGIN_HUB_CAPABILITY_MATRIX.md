@@ -12,11 +12,15 @@ The local `NextGenPlugins` clones are useful as a demand map for future Plugin H
 categories, not as portable implementation source. Treat their plugin families as evidence
 of operator needs, then rebuild every promoted surface through Obelisk reflection,
 second-source fixtures, copied C ABI contracts, and runtime safety gates.
+The detailed local inventory lives in
+`docs/research/2026-05-30-nextgenplugins-reference-inventory.md` and records provenance for
+demand analysis only; it is not license clearance, runtime evidence, an ArkApi
+compatibility target, or an ABI reference.
 
 | Modder intent | Use now | Status | Must not imply |
 | --- | --- | --- | --- |
 | Load a Linux-native plugin | `ObeliskPlugin_GetInfo`, `ObeliskPlugin_Init`, optional `ObeliskPlugin_Shutdown` | Stable baseline | Hot reload of Obelisk itself, detached workers, or background ingress without shutdown proof |
-| Log through Obelisk | `ObeliskPluginInitContext::Log` after `struct_size` checks | Stable baseline | Long-lived ownership of callback data or cross-thread logging contracts not proven by the plugin |
+| Log through Obelisk | `ObeliskApi::LogInfo`, `LogWarn`, and `LogError` after `struct_size` checks | Stable baseline | Long-lived ownership of callback data or cross-thread logging contracts not proven by the plugin |
 | Discover resource categories | `DescribeResourceKind` | Promoted metadata | Resource identity, object lookup, persistent handles, or correlation between events |
 | Discover promoted policy event kinds | `DescribeGameplayPolicyEventKind` | Promoted metadata | No complete gameplay inventory, public module SDK, mutation path, or return override |
 | Observe promoted structure/item policy data | `GameplayPolicyEvent` with owner-token registration | Promoted v0.1 SDK surface | Public `StructureEvents`, Inventory SDK, Items SDK, UE pointers, player/item/structure identity, mutation, or return override |
