@@ -133,8 +133,8 @@ namespace
     {
         Require(ownerToken == 0xC0FFEE, "unexpected owner token in timer registration");
         Require(delayMs == 1000, "unexpected timer delay");
-        Require(intervalMs == 0, "unexpected timer interval");
-        Require(flags == 0, "unexpected timer flags");
+        Require(intervalMs == 1000, "unexpected repeating timer interval");
+        Require(flags == OBELISK_TIMER_FLAG_REPEATING, "unexpected repeating timer flags");
         Require(callback != nullptr, "timer registration received null callback");
         Require(userData != nullptr, "timer registration received null user data");
         ++g_TimerRegisterCount;

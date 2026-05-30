@@ -430,8 +430,8 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
             g_ScheduledHandle = api->OBELISK_CONCAT(Register, TimerWithOwnerTokenHandle)(
                 g_OwnerToken,
                 1000,
-                0,
-                0,
+                1000,
+                OBELISK_TIMER_FLAG_REPEATING,
                 HandleScheduledCallback,
                 &g_ScheduledUserData);
             if (g_ScheduledHandle == 0)

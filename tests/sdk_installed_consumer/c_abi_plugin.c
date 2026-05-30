@@ -703,8 +703,8 @@ __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
         g_TimerHandle = api->OBELISK_CONCAT(Register, TimerWithOwnerTokenHandle)(
             g_OwnerToken,
             1000,
-            0,
-            0,
+            1000,
+            OBELISK_TIMER_FLAG_REPEATING,
             HandleScheduledCallback,
             &g_TimerUserData);
         if (g_TimerHandle == 0)
