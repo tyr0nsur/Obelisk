@@ -25,9 +25,8 @@ offsets, vtables, layouts, `.lib` artifacts, MSVC/Windows ABI assumptions, direc
 implementations; Linux support is rebuilt from Obelisk reflection and ProcessEvent
 copied-data evidence.
 
-Keep leader-only strategy, cadence, and active goal text outside this skill. The active
-leader objective belongs in the goal tool and short-lived handoff state, not in prompts sent
-to every sub-agent.
+Keep leader-only strategy, cadence, and active goal text out of sub-agent prompts unless
+that context changes the agent's concrete task.
 
 ## Working Contract
 
@@ -105,8 +104,7 @@ to every sub-agent.
 - Close old agents after their findings are integrated so stale context does not keep
   influencing new work.
 - Follow explicit lead-provided routing only when it is included in the current task
-  prompt, and keep operator cadence plus long-term goal wording out of default sub-agent
-  prompts.
+  prompt.
 - Relaunch agents after major skill updates when their next task depends on the new rules.
 - Documentation/skills workers must not edit runtime C++ or `/servidor/ark` unless their
   prompt explicitly widens scope.
@@ -173,68 +171,14 @@ verification.
 
 ## Community Updates
 
-Do not draft or send community announcements unless explicitly delegated for the current
-turn. In-game beta-test activation notices are live-ops messages, not routine development
-updates; require an operator-approved notice path for that turn and never store secret
-endpoints in repo files or sub-agent prompts.
-
-Discord webhook endpoints are operator secrets stored only in
-`/home/flowcommunity-ark/Obelisk/local/discord-webhooks.env` under ignored `local/`.
-Use variable names only in repo files, handoff notes, and prompts:
-
-- `OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL`: major public, modder-facing Obelisk milestones
-  only. Examples: release/RC publication, new stable public plugin surface, important SDK
-  migration, or a documented compatibility breakthrough that plugin authors can act on.
-- `OBELISK_BETA_TEST_WEBHOOK_URL`: operator-approved in-game test windows only. Use this
-  when players need to perform a bounded action in game, such as testing a named copied
-  public event or feature on an approved server window.
-
-Decision rule:
-
-- If the message is for mod authors and server owners to understand a stable Obelisk
-  milestone they can act on, use `--channel community`.
-- If the message asks players/testers to perform an in-game action during an approved
-  bounded window, use `--channel beta-test`.
-- If the message is only an internal round, validation result, agent status, speculative
-  finding, or private live-ops detail, do not send Discord.
-
-Channel routing:
-
-| Channel | Webhook variable | Use for | Do not use for |
-| --- | --- | --- | --- |
-| `community` | `OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL` | Release/RC publication, stable public plugin surfaces, modder-actionable SDK/API changes, documented compatibility breakthroughs | beta instructions, live server windows, routine validations, internal research |
-| `beta-test` | `OBELISK_BETA_TEST_WEBHOOK_URL` | Operator-approved player/tester action windows for one named feature and server window | general announcements, release notes, speculative findings, private ops details |
-
-Pre-send checklist:
-
-- Confirm the user explicitly approved this Discord send for the current turn. Prior
-  release/publication approval does not imply approval for a new Discord message.
-- Select exactly one channel from intent, not convenience: `community` for stable
-  modder-facing Obelisk milestones, `beta-test` for approved player test windows.
-- Load the endpoint only through the matching variable in ignored `local/discord-webhooks.env`;
-  never paste or pass raw webhook URLs into prompts, docs, commits, or sub-agent tasks.
-- Run `scripts/send_discord_embed.py --dry-run` first and inspect that the embed has a
-  professional title, concise description, status/scope, and 2-5 useful fields.
-
-Never use Discord for routine validation logs, internal agent status, private server
-details, raw player text, secrets, hashes that are not part of a public artifact, or
-speculative reverse-engineering notes. Prefer one professional Discord embed per update:
-clear title, concise description, 2-5 short fields, explicit status/scope, no raw logs,
-timestamp, and a restrained color (`0x2ecc71` release/success, `0x3498db` beta/info,
-`0xf1c40f` caution). Plain content should be empty or a short label; put the substantive
-message in the embed.
-
-Embed shape:
-
-- `title`: concrete milestone or bounded test name, not a vague status phrase.
-- `description`: one short public-safe summary of what changed or what testers should do.
-- `status`: release state or test-window state.
-- `scope`: exact public API/module scope or exact approved test scope.
-- `field`: 2-5 concise fields such as `Impacto`, `Incluye`, `Validacion`, `Accion`,
-  `Privacidad`, or `Rollback`.
-
-When sending is explicitly approved, prefer the guarded helper instead of hand-written
-`curl`:
+Do not draft or send Discord updates unless explicitly approved for the current turn.
+Endpoints are operator secrets in ignored `local/discord-webhooks.env`; use only variable
+names in repo files, handoff notes, commits, and prompts. Use `--channel community` for
+major public, modder-facing milestones only, and `--channel beta-test` only for
+operator-approved in-game test windows. Never use Discord for routine validations, internal
+agent status, speculative reversing notes, private live-ops detail, raw player text, or
+secrets. Always run `scripts/send_discord_embed.py --dry-run` first and send one concise
+professional embed with title, description, status/scope, and 2-5 public-safe fields.
 
 ```bash
 python3 scripts/send_discord_embed.py --channel community --title "..." \
@@ -242,27 +186,15 @@ python3 scripts/send_discord_embed.py --channel community --title "..." \
   --field "Cambio=..." --field "Impacto=..."
 ```
 
-Use `--channel community` only for `OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL` and
-`--channel beta-test` only for `OBELISK_BETA_TEST_WEBHOOK_URL`. Run with `--dry-run` first
-when composing a new message shape.
-
 ## Research Notes
 
-Use `docs/research/YYYY-MM-DD-topic.md` for non-trivial investigation.
-Use `docs/research/README.md` as the canonical note format. Do not duplicate research
-templates in skills; skills should say when a note is required and where it belongs.
+Use `docs/research/YYYY-MM-DD-topic.md` for non-trivial investigation. Use
+`obelisk-continuous-learning` for research-note and skill-update criteria.
 
 ## Skill Update Rules
 
-Update skills when:
-
-- a previous instruction becomes unsafe or false
-- a new stable workflow exists
-- a new live-server safety rule is discovered
-- an offset/signature is accepted or rejected with evidence
-- contributor workflow changes
-
-Keep skills short and operational. Put detailed experiment records in `docs/research/`.
+Use `obelisk-continuous-learning` for skill-update criteria. Keep this skill focused on
+lead workflow, GitHub ownership, supervised agents, publication, and handoff policy.
 
 ## Release Promotion Gates
 

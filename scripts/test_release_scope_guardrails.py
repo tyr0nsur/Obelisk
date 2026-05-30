@@ -923,9 +923,11 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
 
         for item in [
             "ResourceHandle/public GObjects remain blocked",
-            "blocked by old artifact vocabulary and missing provenance/caller rows",
-            "Regenerate the blocked UObject flag-policy artifact with current provenance/caller-row requirements",
-            "before spending more ResourceHandle effort",
+            "old flag-policy artifact is obsolete",
+            "durable rich-provenance refresh is preserved",
+            "Consume mode accepts it and promote mode stays blocked",
+            "Do not rerun broad FName, GObjects, or core scans for ResourceHandle",
+            "mutation-window rejection, runtime negative samples, and a fail-closed lookup contract",
         ]:
             with self.subTest(file="docs/agent-handoff/CURRENT.md", item=item):
                 self.assertIn(normalized(item), compact_current)
@@ -945,6 +947,10 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "consume",
             "promote",
             "ResourceHandle",
+            "Durable Rich-Provenance Refresh",
+            "status=accepted_internal_static_evidence",
+            "promote_mode_uobject_flag_policy_candidate_only",
+            "direct consume gate accepts candidate reports with minimal verified sidecars",
         ]:
             with self.subTest(file="docs/research/2026-05-30-uobject-flag-policy-gate-refresh.md", item=item):
                 self.assertIn(normalized(item), compact_research)
@@ -1225,8 +1231,9 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("Do not commit\n  and push after every routine round", workflow_skill)
         self.assertIn("useful to contributors", workflow_skill)
         self.assertIn("stable integration point", workflow_skill)
-        self.assertIn("Do not draft or send community announcements unless explicitly delegated", workflow_skill)
-        self.assertIn("never store secret\nendpoints", workflow_skill)
+        self.assertIn("Do not draft or send Discord updates unless explicitly approved", workflow_skill)
+        self.assertIn("Endpoints are operator secrets", workflow_skill)
+        self.assertIn("scripts/send_discord_embed.py --dry-run", workflow_skill)
         self.assertIn("useful stable\n   checkpoint", handoff_skill)
         self.assertIn("intentionally batched for later lead integration", learning_skill)
         self.assertNotIn("Are changes committed and pushed if stable?", learning_skill)

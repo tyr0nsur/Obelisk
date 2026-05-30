@@ -185,10 +185,12 @@ priorities, and do not use history files as the active source of truth.
   `/home/flowcommunity-ark/obelisk-artifacts/rc-minimal-redacted-signatures-strict-20260530T000000Z/`;
   consume mode is accepted and promote mode remains candidate-only blocked.
 - The historical static-negative UObject flag policy pack is obsolete and blocked by old
-  vocabulary/provenance. A `/tmp` rich-provenance rehearsal proved the small refresh route
-  can pass preflight and consume mode while promote mode stays blocked; durable refresh
-  still needs preserved regenerated/enriched sidecars and must remain internal static
-  evidence only.
+  vocabulary/provenance. The durable rich-provenance refresh is preserved at
+  `/home/flowcommunity-ark/obelisk-artifacts/uobject-flag-policy-refresh-20260530T071436Z/`;
+  consume mode is accepted and promote mode is blocked with candidate-only/non-claim
+  blockers. This is internal static evidence only and does not promote public GObjects,
+  lookup, identity, lifecycle, `ResourceHandle`, mutation, return override, or SDK
+  surfaces.
 - Post-RC offline tooling added candidate-only UObject flag, weak-helper, and GObjects
   evidence builders. They are consume-mode internal/offline indexing tools only and do not
   promote public GObjects, lookup, identity, lifecycle, `ResourceHandle`, mutation, return

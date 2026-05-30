@@ -84,12 +84,11 @@ sequence.
 - Internal bridges only: `StructureEventDispatcher`, `InventoryPolicyEventDispatcher`,
   Item/Mission/Transfer recognizers, weak-helper artifacts, GObjects evidence, and route
   observers are planning/evidence inputs until a separate promotion gate changes scope.
-- ResourceHandle/public GObjects remain blocked. The old flag-policy artifact is blocked
-  by old artifact vocabulary and missing provenance/caller rows; a `/tmp`
-  rich-provenance rehearsal proved the small refresh route can pass preflight and consume
-  mode while promote mode stays blocked. Durable refresh still needs preserved
-  regenerated/enriched sidecars; see
-  `docs/research/2026-05-30-uobject-flag-policy-gate-refresh.md`.
+- ResourceHandle/public GObjects remain blocked. The old flag-policy artifact is obsolete;
+  the durable rich-provenance refresh is preserved at
+  `/home/flowcommunity-ark/obelisk-artifacts/uobject-flag-policy-refresh-20260530T071436Z/`.
+  Consume mode accepts it and promote mode stays blocked with candidate-only/non-claim
+  blockers; see `docs/research/2026-05-30-uobject-flag-policy-gate-refresh.md`.
 
 ## Priority Next Steps
 
@@ -110,13 +109,10 @@ sequence.
   ArkServerApi/AseApi remains a names and behavior dictionary only; it is not a porting
   target or copying source. Do not copy offsets, layouts, ABI assumptions, wrappers, raw
   UE pointer APIs, or algorithmic implementations.
-- Regenerate the blocked UObject flag-policy artifact with current provenance/caller-row
-  requirements before spending more ResourceHandle effort. Do not rerun broad FName,
-  GObjects, or core scans unless the binary hash changes or evidence contradicts current
-  roots/candidates. A `/tmp` rehearsal proved the small rich-provenance route can pass
-  preflight and consume mode while promote mode remains blocked; keep it internal static
-  evidence only and use the command shape recorded in
-  `docs/research/2026-05-30-uobject-flag-policy-gate-refresh.md`.
+- Do not rerun broad FName, GObjects, or core scans for ResourceHandle unless the binary
+  hash changes or evidence contradicts current roots/candidates. The next ResourceHandle
+  work should use the durable flag-policy refresh as internal static input and focus on
+  mutation-window rejection, runtime negative samples, and a fail-closed lookup contract.
 - Any future live/player validation requires a new approved live-ops brief and, when
   players are involved, a beta-test notice through the configured local webhook variable.
 

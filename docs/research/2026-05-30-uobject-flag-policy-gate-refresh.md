@@ -160,3 +160,38 @@ outputs under a caller-provided output root outside Git, requires consume mode t
 and requires promote mode to stay blocked with the candidate-only blocker. The driver
 rejects input roots under protected live-server paths except the approved offline
 workspace and rejects outputs inside Git or protected live-server paths.
+
+## Durable Rich-Provenance Refresh
+
+The `/tmp` rehearsal inputs were preserved under:
+
+```text
+/home/flowcommunity-ark/obelisk-artifacts/uobject-flag-policy-rich-inputs-20260530T071436Z
+```
+
+The canonical driver then produced a durable refresh under:
+
+```text
+/home/flowcommunity-ark/obelisk-artifacts/uobject-flag-policy-refresh-20260530T071436Z
+```
+
+Result:
+
+- `scripts/run_uobject_flag_policy_refresh.py` returned
+  `status=accepted_internal_static_evidence`.
+- Consume gate accepted
+  `uobject-flag-policy.redacted.json`
+  (`sha256=836723c1c88314a5d8c52b3a67b0dcac455708e4fc577d449740c2a6ba33d758`).
+- Promote gate stayed blocked with
+  `promote_mode_uobject_flag_policy_candidate_only` and
+  `promote_mode_manifest_has_non_claims`.
+
+This closes the stale-artifact refresh blocker for internal ResourceHandle research only.
+It still does not promote `ResourceHandle`, public GObjects, object identity, lookup,
+lifecycle names, mutation, return override, or any public SDK surface.
+
+For future durable refreshes, prefer `scripts/run_uobject_flag_policy_refresh.py` rather
+than calling only the offline artifact gate. The direct consume gate accepts candidate
+reports with minimal verified sidecars for mechanical indexing, while the driver requires
+the richer preflight (`command`, `tool`, `tool_version`, `source_path`, and address ranges)
+that makes this refresh reproducible enough for ongoing ResourceHandle research.
