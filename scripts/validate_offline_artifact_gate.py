@@ -73,6 +73,8 @@ STATIC_GLOBAL_PROMOTION_EVIDENCE_SCHEMA = "obelisk.static-global-promotion-evide
 RESOURCE_HANDLE_REVALIDATION_EVALUATOR_SCHEMA = "obelisk.resource-handle-revalidation-evaluator.v1"
 INTERNAL_UOBJECT_POST_CALLBACK_CONTRACT_SCHEMA = "obelisk.internal-uobject-revalidation-post-callback-contract.v1"
 INTERNAL_UOBJECT_REVALIDATION_SERIAL_POLICY_SCHEMA = "obelisk.internal-uobject-revalidation-serial-policy.v1"
+INTERNAL_UOBJECT_RUNTIME_REJECTION_SAMPLES_SCHEMA = "obelisk.internal-uobject-revalidation-runtime-rejection-samples.v1"
+INTERNAL_UOBJECT_RUNTIME_SERIAL_SEMANTICS_SCHEMA = "obelisk.internal-uobject-revalidation-runtime-serial-semantics.v1"
 RESOURCE_HANDLE_SERIAL_SCAN_SCHEMA = "obelisk.resource-handle-serial-scan.v1"
 RESOURCE_HANDLE_SERIAL_SCAN_PROVENANCE_SCHEMA = "obelisk.resource-handle-serial-scan.v1.provenance.v1"
 RESOURCE_HANDLE_SERIAL_SCAN_CONSUME_GATE_SCHEMA = "obelisk.resource-handle-serial-scan.v1.consume-gate-expectation.v1"
@@ -101,6 +103,8 @@ SUPPORTED_MANIFEST_SCHEMAS = {
     RESOURCE_HANDLE_REVALIDATION_EVALUATOR_SCHEMA,
     INTERNAL_UOBJECT_POST_CALLBACK_CONTRACT_SCHEMA,
     INTERNAL_UOBJECT_REVALIDATION_SERIAL_POLICY_SCHEMA,
+    INTERNAL_UOBJECT_RUNTIME_REJECTION_SAMPLES_SCHEMA,
+    INTERNAL_UOBJECT_RUNTIME_SERIAL_SEMANTICS_SCHEMA,
     RESOURCE_HANDLE_SERIAL_SCAN_SCHEMA,
     READINESS_REPORT_SCHEMA,
     UOBJECT_FLAG_POLICY_REPORT_SCHEMA,
@@ -840,6 +844,103 @@ REQUIRED_UOBJECT_FLAG_SAMPLE_BLOCKERS = {
 REQUIRED_RESOURCE_HANDLE_SERIAL_SCAN_NON_CLAIMS = {
     "internal offline scan only",
     "does not promote ResourceHandle, object identity, lookup, mutation, or return override",
+}
+REQUIRED_RUNTIME_REJECTION_SAMPLE_NON_CLAIMS = {
+    "does_not_unlock_resource_handle",
+    "does_not_promote_gobjects_lookup",
+    "does_not_promote_public_object_identity",
+    "does_not_allow_mutation_or_return_override",
+    "does_not_promote_persistent_handles",
+    "does_not_replace_runtime_serial_semantics",
+}
+REQUIRED_RUNTIME_SERIAL_SEMANTICS_NON_CLAIMS = {
+    "does_not_unlock_resource_handle",
+    "does_not_promote_persistent_handles",
+    "does_not_claim_wraparound_safety",
+    "does_not_allow_cross_frame_lookup",
+    "does_not_allow_mutation_or_return_override",
+}
+RUNTIME_REDACTED_RUN_IDENTITY_REQUIRED_TRUE = {
+    "redacted",
+    "approved_debug_window",
+    "target_instance_redacted",
+    "map_redacted",
+}
+RUNTIME_REDACTED_RUN_IDENTITY_REQUIRED_FALSE = {
+    "broad_tracing",
+    "reflection_scanner",
+    "ptrace_or_gcore",
+}
+RUNTIME_PRIVACY_REQUIRED_FALSE = {
+    "raw_ue_pointers",
+    "object_indices",
+    "serial_values",
+    "class_name_outer_paths",
+    "player_or_gameplay_payloads",
+    "persistent_lookup_tokens",
+    "broad_tracing_evidence",
+    "fuobjectitem_0xC_as_serial",
+}
+RUNTIME_REJECTION_SAMPLE_ALLOWED_ROW_KEYS = {
+    "row_id",
+    "allowlist_label",
+    "candidate_slot_in_bounds",
+    "fuobjectitem_readable",
+    "object_present",
+    "fuobjectitem_dword_0x8_match",
+    "fuobjectitem_dword_0xC",
+    "uobject_0x8_candidate_reject_bits",
+    "decision",
+    "reject_reason",
+    "copied_output",
+}
+RUNTIME_REJECTION_SAMPLE_REASONS = {
+    "flag_policy_0x100",
+    "flag_policy_0x4000",
+    "serial_policy_mismatch",
+    "missing_or_null_object",
+    "post_callback_use",
+}
+RUNTIME_SERIAL_SEMANTICS_ALLOWED_ROW_KEYS = {
+    "row_id",
+    "allowlist_label",
+    "case",
+    "same_frame",
+    "fuobjectitem_dword_0x8_status",
+    "fuobjectitem_dword_0xC",
+    "decision",
+    "reject_reason",
+    "copied_output",
+}
+RUNTIME_SERIAL_SEMANTICS_REJECT_REASONS = {
+    "zero_serial",
+    "missing_serial",
+    "serial_mismatch",
+    "wraparound_unknown",
+    "slot_reuse_without_fresh_serial",
+    "post_callback_or_cross_frame",
+}
+RUNTIME_FORBIDDEN_DISCLOSURE_FIELD_NAMES = {
+    "uobject_pointer",
+    "object_pointer",
+    "pointer",
+    "ptr",
+    "fuobjectitem_address",
+    "object_index",
+    "gobjects_index",
+    "internal_index",
+    "internalindex",
+    "serial_value",
+    "raw_serial",
+    "class_path",
+    "name_path",
+    "outer_path",
+    "class_name_outer",
+    "player_text",
+    "gameplay_payload",
+    "inventory_payload",
+    "lookup_token",
+    "persistent_lookup_token",
 }
 REQUIRED_UOBJECT_FLAG_SAMPLE_NON_CLAIMS = {
     "does_not_promote_resourcehandle",
@@ -4988,6 +5089,392 @@ def validate_internal_uobject_serial_policy_manifest(
     return blockers
 
 
+def internal_uobject_runtime_rejection_samples_canonical_report(payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "schema": payload.get("schema"),
+        "evidence_kind": payload.get("evidence_kind"),
+        "status": payload.get("status"),
+        "redacted_run_identity": payload.get("redacted_run_identity"),
+        "source_artifacts": payload.get("source_artifacts"),
+        "binary_sha256": payload.get("binary_sha256"),
+        "rows": payload.get("rows"),
+        "summary": payload.get("summary"),
+        "privacy": payload.get("privacy"),
+        "remaining_blockers": payload.get("remaining_blockers"),
+        "non_claims": payload.get("non_claims"),
+        "promotion_ready": payload.get("promotion_ready"),
+        "public_resource_handle_ready": payload.get("public_resource_handle_ready"),
+        "post_callback_resource_handle_ready": payload.get("post_callback_resource_handle_ready"),
+        "promotion_gate": payload.get("promotion_gate"),
+    }
+
+
+def internal_uobject_runtime_serial_semantics_canonical_report(payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "schema": payload.get("schema"),
+        "evidence_kind": payload.get("evidence_kind"),
+        "status": payload.get("status"),
+        "redacted_run_identity": payload.get("redacted_run_identity"),
+        "source_artifacts": payload.get("source_artifacts"),
+        "binary_sha256": payload.get("binary_sha256"),
+        "rows": payload.get("rows"),
+        "serial_semantics": payload.get("serial_semantics"),
+        "privacy": payload.get("privacy"),
+        "remaining_blockers": payload.get("remaining_blockers"),
+        "non_claims": payload.get("non_claims"),
+        "promotion_ready": payload.get("promotion_ready"),
+        "public_resource_handle_ready": payload.get("public_resource_handle_ready"),
+        "post_callback_resource_handle_ready": payload.get("post_callback_resource_handle_ready"),
+        "promotion_gate": payload.get("promotion_gate"),
+    }
+
+
+def validate_output_artifact_identity_for_canonical_report(
+    payload: dict[str, Any],
+    *,
+    label: str,
+    reason_prefix: str,
+    expected_artifact_kind: str,
+    report: dict[str, Any],
+) -> list[dict[str, Any]]:
+    blockers: list[dict[str, Any]] = []
+    identity, identity_errors = complete_artifact_identity(
+        payload,
+        container_key="output_artifact_identity",
+        expected_artifact_kind=expected_artifact_kind,
+    )
+    if identity_errors or identity is None:
+        return [
+            {
+                "reason": f"{reason_prefix}_output_artifact_identity_invalid",
+                "label": f"{label}:$.output_artifact_identity",
+                "errors": identity_errors,
+            }
+        ]
+    identity_without_hash = {
+        "artifact_kind": identity["artifact_kind"],
+        "capture_id": identity["capture_id"],
+        "evidence_pack_id": identity["evidence_pack_id"],
+    }
+    material = {
+        "artifact_identity": identity_without_hash,
+        "report": report,
+    }
+    expected_hash = hashlib.sha256(canonical_json_bytes(material)).hexdigest()
+    if identity["artifact_sha256"] != expected_hash:
+        blockers.append(
+            {
+                "reason": f"{reason_prefix}_output_artifact_identity_hash_mismatch",
+                "label": f"{label}:$.output_artifact_identity.artifact_sha256",
+                "expected": expected_hash,
+                "recorded": identity["artifact_sha256"],
+            }
+        )
+    return blockers
+
+
+def validate_runtime_serial_policy_source_artifact(
+    source_artifacts: object,
+    *,
+    label: str,
+    reason_prefix: str,
+) -> list[dict[str, Any]]:
+    blockers: list[dict[str, Any]] = []
+    if not isinstance(source_artifacts, list) or len(source_artifacts) != 1 or not isinstance(source_artifacts[0], dict):
+        return [{"reason": f"{reason_prefix}_source_artifacts_invalid", "label": f"{label}:$.source_artifacts"}]
+
+    source = source_artifacts[0]
+    if source.get("schema") != INTERNAL_UOBJECT_REVALIDATION_SERIAL_POLICY_SCHEMA:
+        blockers.append({"reason": f"{reason_prefix}_source_schema_mismatch", "label": f"{label}:$.source_artifacts[0].schema"})
+    if not isinstance(source.get("artifact_sha256"), str) or SHA256_RE.fullmatch(source["artifact_sha256"]) is None:
+        blockers.append({"reason": f"{reason_prefix}_source_artifact_sha_invalid", "label": f"{label}:$.source_artifacts[0].artifact_sha256"})
+    if source.get("consume_gate_status") != "accepted":
+        blockers.append({"reason": f"{reason_prefix}_source_consume_gate_not_accepted", "label": f"{label}:$.source_artifacts[0].consume_gate_status"})
+    if source.get("path_redacted") is not True:
+        blockers.append({"reason": f"{reason_prefix}_source_path_not_redacted", "label": f"{label}:$.source_artifacts[0].path_redacted"})
+    return blockers
+
+
+def validate_runtime_redacted_run_identity(
+    run_identity: object,
+    *,
+    label: str,
+    reason_prefix: str,
+    binary_sha256: object,
+) -> list[dict[str, Any]]:
+    blockers: list[dict[str, Any]] = []
+    if not isinstance(run_identity, dict):
+        return [{"reason": f"{reason_prefix}_run_identity_missing", "label": f"{label}:$.redacted_run_identity"}]
+    for key in RUNTIME_REDACTED_RUN_IDENTITY_REQUIRED_TRUE:
+        if run_identity.get(key) is not True:
+            blockers.append({"reason": f"{reason_prefix}_run_identity_{key}_not_true", "label": f"{label}:$.redacted_run_identity.{key}"})
+    for key in RUNTIME_REDACTED_RUN_IDENTITY_REQUIRED_FALSE:
+        if run_identity.get(key) is not False:
+            blockers.append({"reason": f"{reason_prefix}_run_identity_{key}_not_false", "label": f"{label}:$.redacted_run_identity.{key}"})
+    if run_identity.get("binary_sha256") != binary_sha256:
+        blockers.append({"reason": f"{reason_prefix}_run_identity_binary_sha256_mismatch", "label": f"{label}:$.redacted_run_identity.binary_sha256"})
+    if not is_safe_artifact_id(run_identity.get("obelisk_commit")):
+        blockers.append({"reason": f"{reason_prefix}_run_identity_commit_invalid", "label": f"{label}:$.redacted_run_identity.obelisk_commit"})
+    if not is_safe_semantic_input_name(run_identity.get("marker_profile")):
+        blockers.append({"reason": f"{reason_prefix}_run_identity_marker_profile_invalid", "label": f"{label}:$.redacted_run_identity.marker_profile"})
+    if not is_safe_semantic_input_name(run_identity.get("allowlist_label")):
+        blockers.append({"reason": f"{reason_prefix}_run_identity_allowlist_label_invalid", "label": f"{label}:$.redacted_run_identity.allowlist_label"})
+    return blockers
+
+
+def validate_runtime_privacy_contract(
+    privacy: object,
+    *,
+    label: str,
+    reason_prefix: str,
+) -> list[dict[str, Any]]:
+    blockers: list[dict[str, Any]] = []
+    if not isinstance(privacy, dict):
+        return [{"reason": f"{reason_prefix}_privacy_missing", "label": f"{label}:$.privacy"}]
+    for key in RUNTIME_PRIVACY_REQUIRED_FALSE:
+        if privacy.get(key) is not False:
+            blockers.append({"reason": f"{reason_prefix}_privacy_{key}_not_false", "label": f"{label}:$.privacy.{key}"})
+    return blockers
+
+
+def validate_runtime_schema_common(
+    payload: dict[str, Any],
+    *,
+    label: str,
+    mode: str,
+    schema: str,
+    reason_prefix: str,
+    required_non_claims: set[str],
+    canonical_report: dict[str, Any],
+    promotion_blocker: str,
+) -> list[dict[str, Any]]:
+    blockers: list[dict[str, Any]] = []
+    blockers.extend(
+        validate_output_artifact_identity_for_canonical_report(
+            payload,
+            label=label,
+            reason_prefix=reason_prefix,
+            expected_artifact_kind=schema,
+            report=canonical_report,
+        )
+    )
+    binary_sha256 = payload.get("binary_sha256")
+    if not isinstance(binary_sha256, str) or SHA256_RE.fullmatch(binary_sha256) is None:
+        blockers.append({"reason": f"{reason_prefix}_binary_sha256_invalid", "label": f"{label}:$.binary_sha256"})
+    blockers.extend(
+        validate_runtime_redacted_run_identity(
+            payload.get("redacted_run_identity"),
+            label=label,
+            reason_prefix=reason_prefix,
+            binary_sha256=binary_sha256,
+        )
+    )
+    blockers.extend(
+        validate_runtime_serial_policy_source_artifact(
+            payload.get("source_artifacts"),
+            label=label,
+            reason_prefix=reason_prefix,
+        )
+    )
+    blockers.extend(validate_runtime_privacy_contract(payload.get("privacy"), label=label, reason_prefix=reason_prefix))
+
+    if payload.get("promotion_ready") is not False:
+        blockers.append({"reason": f"{reason_prefix}_promotion_ready_overclaim", "label": f"{label}:$.promotion_ready"})
+    if payload.get("public_resource_handle_ready") is not False:
+        blockers.append({"reason": f"{reason_prefix}_public_resourcehandle_overclaim", "label": f"{label}:$.public_resource_handle_ready"})
+    if payload.get("post_callback_resource_handle_ready") is not False:
+        blockers.append({"reason": f"{reason_prefix}_post_callback_resourcehandle_overclaim", "label": f"{label}:$.post_callback_resource_handle_ready"})
+
+    non_claims = payload.get("non_claims")
+    if not isinstance(non_claims, list) or not required_non_claims.issubset(set(non_claims)):
+        blockers.append({"reason": f"{reason_prefix}_non_claims_missing", "label": f"{label}:$.non_claims"})
+
+    promotion_gate = payload.get("promotion_gate")
+    if not isinstance(promotion_gate, dict) or promotion_gate.get("ready") is not False:
+        blockers.append({"reason": f"{reason_prefix}_promotion_gate_not_false", "label": f"{label}:$.promotion_gate.ready"})
+    elif promotion_blocker not in set(promotion_gate.get("blockers") or []):
+        blockers.append({"reason": f"{reason_prefix}_promotion_gate_blocker_missing", "label": f"{label}:$.promotion_gate.blockers"})
+
+    for trail, value in collect_string_fields(payload):
+        if str(SERVER_ROOT) in value:
+            blockers.append({"reason": f"{reason_prefix}_protected_path_string", "label": f"{label}:{trail}"})
+        if trail.startswith("$.rows") and UOBJECT_FLAG_POLICY_PUBLIC_ADDRESS_RE.search(value):
+            blockers.append({"reason": f"{reason_prefix}_raw_address_string", "label": f"{label}:{trail}"})
+    for trail, key in collect_key_names(payload):
+        key_text = key.casefold()
+        if key_text in RUNTIME_PRIVACY_REQUIRED_FALSE:
+            continue
+        if key_text in RUNTIME_FORBIDDEN_DISCLOSURE_FIELD_NAMES:
+            blockers.append({"reason": f"{reason_prefix}_forbidden_disclosure_field", "label": f"{label}:{trail}"})
+
+    for trail, _, reason in collect_candidate_public_overclaims(
+        payload,
+        allowed_prefixes=(
+            "$.output_artifact_identity",
+            "$.source_artifacts",
+            "$.remaining_blockers",
+            "$.promotion_gate.blockers",
+            "$.non_claims",
+        ),
+    ):
+        blockers.append({"reason": f"{reason_prefix}_public_overclaim_{reason}", "label": f"{label}:{trail}"})
+
+    if mode == "promote":
+        blockers.append({"reason": f"promote_mode_{reason_prefix}_candidate_only", "label": label})
+    return blockers
+
+
+def validate_internal_uobject_runtime_rejection_samples_manifest(
+    payload: dict[str, Any],
+    *,
+    label: str,
+    mode: str,
+) -> list[dict[str, Any]]:
+    if payload.get("schema") != INTERNAL_UOBJECT_RUNTIME_REJECTION_SAMPLES_SCHEMA:
+        return []
+
+    blockers = validate_runtime_schema_common(
+        payload,
+        label=label,
+        mode=mode,
+        schema=INTERNAL_UOBJECT_RUNTIME_REJECTION_SAMPLES_SCHEMA,
+        reason_prefix="runtime_rejection_samples",
+        required_non_claims=REQUIRED_RUNTIME_REJECTION_SAMPLE_NON_CLAIMS,
+        canonical_report=internal_uobject_runtime_rejection_samples_canonical_report(payload),
+        promotion_blocker="candidate_only_runtime_rejection_samples",
+    )
+
+    if payload.get("evidence_kind") != "internal_runtime_rejection_samples_candidate":
+        blockers.append({"reason": "runtime_rejection_samples_evidence_kind_mismatch", "label": f"{label}:$.evidence_kind"})
+    if payload.get("status") != "accepted_internal_candidate_samples":
+        blockers.append({"reason": "runtime_rejection_samples_status_mismatch", "label": f"{label}:$.status"})
+
+    rows = payload.get("rows")
+    if not isinstance(rows, list) or not rows:
+        blockers.append({"reason": "runtime_rejection_samples_rows_missing", "label": f"{label}:$.rows"})
+    else:
+        object_present_reject_count = 0
+        for index, row in enumerate(rows):
+            row_label = f"{label}:$.rows[{index}]"
+            if not isinstance(row, dict):
+                blockers.append({"reason": "runtime_rejection_samples_row_not_object", "label": row_label})
+                continue
+            unexpected = sorted(set(row) - RUNTIME_REJECTION_SAMPLE_ALLOWED_ROW_KEYS)
+            if unexpected:
+                blockers.append({"reason": "runtime_rejection_samples_row_unexpected_field", "label": row_label, "fields": unexpected})
+            if not is_safe_semantic_input_name(row.get("row_id")):
+                blockers.append({"reason": "runtime_rejection_samples_row_id_invalid", "label": f"{row_label}.row_id"})
+            if not is_safe_semantic_input_name(row.get("allowlist_label")):
+                blockers.append({"reason": "runtime_rejection_samples_allowlist_label_invalid", "label": f"{row_label}.allowlist_label"})
+            for key in ("candidate_slot_in_bounds", "fuobjectitem_readable", "object_present"):
+                if row.get(key) is not True:
+                    blockers.append({"reason": f"runtime_rejection_samples_{key}_not_true", "label": f"{row_label}.{key}"})
+            if row.get("fuobjectitem_dword_0x8_match") != "nonzero_match":
+                blockers.append({"reason": "runtime_rejection_samples_fuobjectitem_0x8_not_nonzero_match", "label": f"{row_label}.fuobjectitem_dword_0x8_match"})
+            if row.get("fuobjectitem_dword_0xC") != "observed_unknown_dword_present":
+                blockers.append({"reason": "runtime_rejection_samples_fuobjectitem_0xC_not_unknown", "label": f"{row_label}.fuobjectitem_dword_0xC"})
+            bits = row.get("uobject_0x8_candidate_reject_bits")
+            if not isinstance(bits, dict):
+                blockers.append({"reason": "runtime_rejection_samples_reject_bits_missing", "label": f"{row_label}.uobject_0x8_candidate_reject_bits"})
+            else:
+                bit_0100 = bits.get("bit_0x100") is True
+                bit_4000 = bits.get("bit_0x4000") is True
+                if not bit_0100 and not bit_4000:
+                    blockers.append({"reason": "runtime_rejection_samples_no_candidate_reject_bit", "label": f"{row_label}.uobject_0x8_candidate_reject_bits"})
+            if row.get("decision") != "reject":
+                blockers.append({"reason": "runtime_rejection_samples_decision_not_reject", "label": f"{row_label}.decision"})
+            if row.get("reject_reason") not in RUNTIME_REJECTION_SAMPLE_REASONS:
+                blockers.append({"reason": "runtime_rejection_samples_reject_reason_invalid", "label": f"{row_label}.reject_reason"})
+            if row.get("copied_output") != "reason_category_only":
+                blockers.append({"reason": "runtime_rejection_samples_copied_output_invalid", "label": f"{row_label}.copied_output"})
+            if row.get("object_present") is True and row.get("decision") == "reject":
+                object_present_reject_count += 1
+        if object_present_reject_count < 1:
+            blockers.append({"reason": "runtime_rejection_samples_missing_object_present_reject", "label": f"{label}:$.rows"})
+
+    summary = payload.get("summary")
+    if not isinstance(summary, dict) or not is_json_int(summary.get("object_present_reject_rows")) or summary["object_present_reject_rows"] < 1:
+        blockers.append({"reason": "runtime_rejection_samples_summary_missing_object_present_reject", "label": f"{label}:$.summary.object_present_reject_rows"})
+    return blockers
+
+
+def validate_internal_uobject_runtime_serial_semantics_manifest(
+    payload: dict[str, Any],
+    *,
+    label: str,
+    mode: str,
+) -> list[dict[str, Any]]:
+    if payload.get("schema") != INTERNAL_UOBJECT_RUNTIME_SERIAL_SEMANTICS_SCHEMA:
+        return []
+
+    blockers = validate_runtime_schema_common(
+        payload,
+        label=label,
+        mode=mode,
+        schema=INTERNAL_UOBJECT_RUNTIME_SERIAL_SEMANTICS_SCHEMA,
+        reason_prefix="runtime_serial_semantics",
+        required_non_claims=REQUIRED_RUNTIME_SERIAL_SEMANTICS_NON_CLAIMS,
+        canonical_report=internal_uobject_runtime_serial_semantics_canonical_report(payload),
+        promotion_blocker="candidate_only_runtime_serial_semantics",
+    )
+
+    if payload.get("evidence_kind") != "internal_runtime_serial_semantics_candidate":
+        blockers.append({"reason": "runtime_serial_semantics_evidence_kind_mismatch", "label": f"{label}:$.evidence_kind"})
+    if payload.get("status") != "accepted_internal_candidate_semantics":
+        blockers.append({"reason": "runtime_serial_semantics_status_mismatch", "label": f"{label}:$.status"})
+
+    serial_semantics = payload.get("serial_semantics")
+    if not isinstance(serial_semantics, dict):
+        blockers.append({"reason": "runtime_serial_semantics_contract_missing", "label": f"{label}:$.serial_semantics"})
+    else:
+        if serial_semantics.get("unknown_wraparound_reject") is not True:
+            blockers.append({"reason": "runtime_serial_semantics_unknown_wraparound_not_reject", "label": f"{label}:$.serial_semantics.unknown_wraparound_reject"})
+        if serial_semantics.get("cross_frame_lookup") != "reject":
+            blockers.append({"reason": "runtime_serial_semantics_cross_frame_not_reject", "label": f"{label}:$.serial_semantics.cross_frame_lookup"})
+        if serial_semantics.get("fuobjectitem_dword_0xC") != "unknown_not_serial_evidence":
+            blockers.append({"reason": "runtime_serial_semantics_fuobjectitem_0xC_not_unknown", "label": f"{label}:$.serial_semantics.fuobjectitem_dword_0xC"})
+
+    rows = payload.get("rows")
+    if not isinstance(rows, list) or not rows:
+        blockers.append({"reason": "runtime_serial_semantics_rows_missing", "label": f"{label}:$.rows"})
+    else:
+        has_fresh_allow = False
+        has_reject = False
+        for index, row in enumerate(rows):
+            row_label = f"{label}:$.rows[{index}]"
+            if not isinstance(row, dict):
+                blockers.append({"reason": "runtime_serial_semantics_row_not_object", "label": row_label})
+                continue
+            unexpected = sorted(set(row) - RUNTIME_SERIAL_SEMANTICS_ALLOWED_ROW_KEYS)
+            if unexpected:
+                blockers.append({"reason": "runtime_serial_semantics_row_unexpected_field", "label": row_label, "fields": unexpected})
+            if not is_safe_semantic_input_name(row.get("row_id")):
+                blockers.append({"reason": "runtime_serial_semantics_row_id_invalid", "label": f"{row_label}.row_id"})
+            if not is_safe_semantic_input_name(row.get("allowlist_label")):
+                blockers.append({"reason": "runtime_serial_semantics_allowlist_label_invalid", "label": f"{row_label}.allowlist_label"})
+            if row.get("fuobjectitem_dword_0xC") != "observed_unknown_dword_present":
+                blockers.append({"reason": "runtime_serial_semantics_row_fuobjectitem_0xC_not_unknown", "label": f"{row_label}.fuobjectitem_dword_0xC"})
+            decision = row.get("decision")
+            if row.get("case") == "fresh_nonzero_match_same_frame":
+                if row.get("same_frame") is not True or row.get("fuobjectitem_dword_0x8_status") != "fresh_nonzero_match" or decision != "allow_candidate_frame_local_only":
+                    blockers.append({"reason": "runtime_serial_semantics_fresh_case_not_frame_local_only", "label": row_label})
+                else:
+                    has_fresh_allow = True
+            elif decision == "reject":
+                if row.get("reject_reason") not in RUNTIME_SERIAL_SEMANTICS_REJECT_REASONS:
+                    blockers.append({"reason": "runtime_serial_semantics_reject_reason_invalid", "label": f"{row_label}.reject_reason"})
+                if row.get("copied_output") != "reason_category_only":
+                    blockers.append({"reason": "runtime_serial_semantics_copied_output_invalid", "label": f"{row_label}.copied_output"})
+                has_reject = True
+            else:
+                blockers.append({"reason": "runtime_serial_semantics_row_decision_invalid", "label": f"{row_label}.decision"})
+        if not has_fresh_allow:
+            blockers.append({"reason": "runtime_serial_semantics_missing_fresh_frame_local_allow", "label": f"{label}:$.rows"})
+        if not has_reject:
+            blockers.append({"reason": "runtime_serial_semantics_missing_negative_reject", "label": f"{label}:$.rows"})
+    return blockers
+
+
 def validate_resource_handle_serial_scan_manifest(
     payload: dict[str, Any],
     *,
@@ -6863,6 +7350,8 @@ def validate_manifest(
     blockers.extend(validate_resource_handle_revalidation_evaluator_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_internal_uobject_post_callback_contract_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_internal_uobject_serial_policy_manifest(payload, label=str(resolved), mode=mode))
+    blockers.extend(validate_internal_uobject_runtime_rejection_samples_manifest(payload, label=str(resolved), mode=mode))
+    blockers.extend(validate_internal_uobject_runtime_serial_semantics_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(
         validate_resource_handle_serial_scan_manifest(
             payload,

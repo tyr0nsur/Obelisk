@@ -916,6 +916,12 @@ def print_text(report: dict[str, Any]) -> None:
                         parts.append(f"guidance={classification}")
                     if isinstance(why_blocked, list) and why_blocked:
                         parts.append(f"why_blocked={','.join(str(reason) for reason in why_blocked)}")
+                    next_offline_input = guidance.get("next_offline_input")
+                    if isinstance(next_offline_input, str) and next_offline_input:
+                        parts.append(f"next_offline_input={next_offline_input}")
+                    non_claim = guidance.get("non_claim")
+                    if isinstance(non_claim, str) and non_claim:
+                        parts.append(f"non_claim={non_claim}")
                 if "first_diff" in detail:
                     parts.append(f"first_diff={detail['first_diff']}")
                 print(f"  {' '.join(parts)}")

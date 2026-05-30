@@ -539,6 +539,40 @@ namespace
         }
     }
 
+    void TestRejectsPropertyChainDrift()
+    {
+        {
+            StructureFixture fixture;
+            BuildCanSeat(fixture);
+            WriteAt(fixture.PropertyB, 0x28, static_cast<const void*>(nullptr));
+
+            StructureReflection::StructureInvocation invocation;
+            ReadResult result = StructureReflection::TryIdentifyStructureInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+
+            Require(result.Status == ReadStatus::Implausible, "truncated structure property chain was accepted");
+        }
+        {
+            StructureFixture fixture;
+            BuildSetVariant(fixture);
+            WriteAt(fixture.PropertyC, 0x28, fixture.PropertyA.data());
+
+            StructureReflection::StructureInvocation invocation;
+            ReadResult result = StructureReflection::TryIdentifyStructureInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+
+            Require(result.Status == ReadStatus::Implausible, "cyclic structure property chain was accepted");
+        }
+    }
+
     void TestGateRejectsBeforeReading()
     {
         StructureFixture fixture;
@@ -610,6 +644,7 @@ int main()
     TestRejectsPartialNameCollisionByOuter();
     TestRejectsWrongShapeAndUnsupportedProperty();
     TestRejectsPropertyMetadataDrift();
+    TestRejectsPropertyChainDrift();
     TestGateRejectsBeforeReading();
     TestNonPinCopiedScalarFilterIsExact();
 

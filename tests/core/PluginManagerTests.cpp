@@ -3713,6 +3713,8 @@ namespace
                 "gameplay-policy structure callback survived init failure");
         Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
                 "gameplay-policy inventory callback survived init failure");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 0,
+                "gameplay-policy item-return callback survived init failure");
 
         CleanupPlugin(plugin);
         fs::remove_all(root);
@@ -3745,6 +3747,8 @@ namespace
                 "gameplay-policy structure callback survived init exception");
         Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
                 "gameplay-policy inventory callback survived init exception");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 0,
+                "gameplay-policy item-return callback survived init exception");
 
         CleanupPlugin(plugin);
         fs::remove_all(root);

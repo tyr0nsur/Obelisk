@@ -122,6 +122,29 @@ public API shape, or ArkApi return constants as accepted Linux ARK behavior.
   copied payloads, second-source evidence where relevant, ABI tests, privacy policy,
   lifecycle cleanup, and no identity/mutation/return override unless explicitly promoted.
 
+## v1 Planning Clarification
+
+The next high-value Plugin Hub clarification is production-readiness criteria for the
+current safe seed classes, not another demand category from this inventory.
+
+For v1 planning, split work into two lanes:
+
+- Production Plugin Hub lane: lifecycle/config/logging, descriptor readers,
+  process-local timers, passive copied chat parsing, and copied policy audit examples.
+  This lane can improve docs, examples, packaging, capability checks, fail-closed config,
+  shutdown cleanup, and multi-instance-safe file layout without adding new SDK symbols.
+- Evidence/design backlog: permissions/admin, RCON, economy, homes/safe zones, broadcasts,
+  structure enforcement, inventory/items, dinos, tribes, transfers, and persistence-backed
+  services. These remain design notes until copied identity, privacy, storage or ingress,
+  mutation/enforcement, and second-source evidence are promoted for each surface.
+
+The first release-facing clarification should define acceptance boundaries for a passive
+chat parser/auditor: copied text is callback-scope and local; it does not include sender
+identity, command SDK guarantees, replies or send-chat, moderation or blocking,
+permissions, operator ingress, or durable cross-event identity. That gives Plugin Hub a
+production-quality v1 seed while keeping player identity and other dependency work in the
+core evidence backlog rather than turning it into a public API promise.
+
 ## Recommendation
 
 Keep this local clone out of the Obelisk repository. Use the existing

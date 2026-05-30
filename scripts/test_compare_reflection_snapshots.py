@@ -391,6 +391,11 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             "why_blocked=missing_committed_sanitized_snapshot,missing_distinct_second_source_layout",
             text_result.stdout,
         )
+        self.assertIn("next_offline_input=approved non-protected copied/offline core", text_result.stdout)
+        self.assertIn(
+            "non_claim=does not promote StructureEvents, build-policy SDK, identity, lookup, mutation",
+            text_result.stdout,
+        )
 
     def test_requires_base_root_unless_listing_target_sets(self) -> None:
         result = run_compare_raw("--readiness-report")

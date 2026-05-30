@@ -1201,6 +1201,195 @@ def internal_uobject_serial_policy_manifest() -> dict:
     )
 
 
+def runtime_artifact_source_serial_policy() -> dict:
+    return {
+        "schema": gate.INTERNAL_UOBJECT_REVALIDATION_SERIAL_POLICY_SCHEMA,
+        "artifact_sha256": "d" * 64,
+        "capture_id": "serial-policy-source",
+        "evidence_pack_id": "serial-policy-pack",
+        "consume_gate_status": "accepted",
+        "path_redacted": True,
+    }
+
+
+def runtime_redacted_run_identity() -> dict:
+    return {
+        "redacted": True,
+        "approved_debug_window": True,
+        "target_instance_redacted": True,
+        "map_redacted": True,
+        "binary_sha256": BINARY_SHA,
+        "obelisk_commit": "unit-test-commit",
+        "marker_profile": "approved-runtime-observation",
+        "allowlist_label": "unit-test-allowlist",
+        "broad_tracing": False,
+        "reflection_scanner": False,
+        "ptrace_or_gcore": False,
+    }
+
+
+def runtime_privacy_contract() -> dict:
+    return {
+        "raw_ue_pointers": False,
+        "object_indices": False,
+        "serial_values": False,
+        "class_name_outer_paths": False,
+        "player_or_gameplay_payloads": False,
+        "persistent_lookup_tokens": False,
+        "broad_tracing_evidence": False,
+        "fuobjectitem_0xC_as_serial": False,
+    }
+
+
+def attach_runtime_output_identity(payload: dict, *, schema: str, capture_id: str, evidence_pack_id: str) -> None:
+    identity_without_hash = {
+        "artifact_kind": schema,
+        "capture_id": capture_id,
+        "evidence_pack_id": evidence_pack_id,
+    }
+    if schema == gate.INTERNAL_UOBJECT_RUNTIME_REJECTION_SAMPLES_SCHEMA:
+        report = gate.internal_uobject_runtime_rejection_samples_canonical_report(payload)
+    elif schema == gate.INTERNAL_UOBJECT_RUNTIME_SERIAL_SEMANTICS_SCHEMA:
+        report = gate.internal_uobject_runtime_serial_semantics_canonical_report(payload)
+    else:
+        raise AssertionError(f"unexpected runtime schema: {schema}")
+    material = {
+        "artifact_identity": identity_without_hash,
+        "report": report,
+    }
+    payload["output_artifact_identity"] = {
+        **identity_without_hash,
+        "artifact_sha256": hashlib.sha256(gate.canonical_json_bytes(material)).hexdigest(),
+    }
+
+
+def runtime_rejection_samples_manifest() -> dict:
+    payload = {
+        "schema": gate.INTERNAL_UOBJECT_RUNTIME_REJECTION_SAMPLES_SCHEMA,
+        "evidence_kind": "internal_runtime_rejection_samples_candidate",
+        "status": "accepted_internal_candidate_samples",
+        "redacted_run_identity": runtime_redacted_run_identity(),
+        "source_artifacts": [runtime_artifact_source_serial_policy()],
+        "binary_sha256": BINARY_SHA,
+        "rows": [
+            {
+                "row_id": "reject-row-1",
+                "allowlist_label": "unit-test-allowlist",
+                "candidate_slot_in_bounds": True,
+                "fuobjectitem_readable": True,
+                "object_present": True,
+                "fuobjectitem_dword_0x8_match": "nonzero_match",
+                "fuobjectitem_dword_0xC": "observed_unknown_dword_present",
+                "uobject_0x8_candidate_reject_bits": {
+                    "bit_0x100": True,
+                    "bit_0x4000": False,
+                },
+                "decision": "reject",
+                "reject_reason": "flag_policy_0x100",
+                "copied_output": "reason_category_only",
+            }
+        ],
+        "summary": {
+            "object_present_reject_rows": 1,
+            "accepted_rows": 0,
+        },
+        "privacy": runtime_privacy_contract(),
+        "remaining_blockers": [
+            "candidate_only_runtime_rejection_samples",
+            "public_resourcehandle_policy_missing",
+            "no_public_resource_handle_contract",
+        ],
+        "non_claims": [
+            "does_not_unlock_resource_handle",
+            "does_not_promote_gobjects_lookup",
+            "does_not_promote_public_object_identity",
+            "does_not_allow_mutation_or_return_override",
+            "does_not_promote_persistent_handles",
+            "does_not_replace_runtime_serial_semantics",
+        ],
+        "promotion_ready": False,
+        "public_resource_handle_ready": False,
+        "post_callback_resource_handle_ready": False,
+        "promotion_gate": {
+            "ready": False,
+            "blockers": ["candidate_only_runtime_rejection_samples"],
+        },
+    }
+    attach_runtime_output_identity(
+        payload,
+        schema=gate.INTERNAL_UOBJECT_RUNTIME_REJECTION_SAMPLES_SCHEMA,
+        capture_id="runtime-rejection-test",
+        evidence_pack_id="runtime-rejection-pack",
+    )
+    return payload
+
+
+def runtime_serial_semantics_manifest() -> dict:
+    payload = {
+        "schema": gate.INTERNAL_UOBJECT_RUNTIME_SERIAL_SEMANTICS_SCHEMA,
+        "evidence_kind": "internal_runtime_serial_semantics_candidate",
+        "status": "accepted_internal_candidate_semantics",
+        "redacted_run_identity": runtime_redacted_run_identity(),
+        "source_artifacts": [runtime_artifact_source_serial_policy()],
+        "binary_sha256": BINARY_SHA,
+        "rows": [
+            {
+                "row_id": "fresh-row",
+                "allowlist_label": "unit-test-allowlist",
+                "case": "fresh_nonzero_match_same_frame",
+                "same_frame": True,
+                "fuobjectitem_dword_0x8_status": "fresh_nonzero_match",
+                "fuobjectitem_dword_0xC": "observed_unknown_dword_present",
+                "decision": "allow_candidate_frame_local_only",
+                "copied_output": "reason_category_only",
+            },
+            {
+                "row_id": "reject-row",
+                "allowlist_label": "unit-test-allowlist",
+                "case": "same_frame_mismatch",
+                "same_frame": True,
+                "fuobjectitem_dword_0x8_status": "mismatch",
+                "fuobjectitem_dword_0xC": "observed_unknown_dword_present",
+                "decision": "reject",
+                "reject_reason": "serial_mismatch",
+                "copied_output": "reason_category_only",
+            },
+        ],
+        "serial_semantics": {
+            "unknown_wraparound_reject": True,
+            "cross_frame_lookup": "reject",
+            "fuobjectitem_dword_0xC": "unknown_not_serial_evidence",
+        },
+        "privacy": runtime_privacy_contract(),
+        "remaining_blockers": [
+            "candidate_only_runtime_serial_semantics",
+            "public_resourcehandle_policy_missing",
+            "no_public_resource_handle_contract",
+        ],
+        "non_claims": [
+            "does_not_unlock_resource_handle",
+            "does_not_promote_persistent_handles",
+            "does_not_claim_wraparound_safety",
+            "does_not_allow_cross_frame_lookup",
+            "does_not_allow_mutation_or_return_override",
+        ],
+        "promotion_ready": False,
+        "public_resource_handle_ready": False,
+        "post_callback_resource_handle_ready": False,
+        "promotion_gate": {
+            "ready": False,
+            "blockers": ["candidate_only_runtime_serial_semantics"],
+        },
+    }
+    attach_runtime_output_identity(
+        payload,
+        schema=gate.INTERNAL_UOBJECT_RUNTIME_SERIAL_SEMANTICS_SCHEMA,
+        capture_id="runtime-serial-test",
+        evidence_pack_id="runtime-serial-pack",
+    )
+    return payload
+
+
 def resource_handle_serial_scan_manifest(
     *,
     include_candidate: bool = True,
@@ -4604,6 +4793,107 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
 
         reasons = {blocker["reason"] for blocker in result["blockers"]}
         self.assertIn("serial_policy_output_artifact_identity_hash_mismatch", reasons)
+
+    def test_accepts_runtime_rejection_samples_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "runtime-rejection-samples.json"
+            write_json(manifest, runtime_rejection_samples_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual(result["blockers"], [])
+
+    def test_blocks_runtime_rejection_samples_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "runtime-rejection-samples.json"
+            write_json(manifest, runtime_rejection_samples_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        self.assertIn(
+            "promote_mode_runtime_rejection_samples_candidate_only",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_runtime_rejection_samples_raw_disclosures_and_overclaims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "runtime-rejection-samples.json"
+            payload = runtime_rejection_samples_manifest()
+            payload["public_resource_handle_ready"] = True
+            payload["privacy"]["raw_ue_pointers"] = True
+            payload["redacted_run_identity"]["broad_tracing"] = True
+            payload["rows"][0]["uobject_pointer"] = "0x12345678"
+            payload["summary"]["operator_note"] = "/servidor/ark/live-capture"
+            payload["summary"]["serial_value"] = 17
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("runtime_rejection_samples_public_resourcehandle_overclaim", reasons)
+        self.assertIn("runtime_rejection_samples_privacy_raw_ue_pointers_not_false", reasons)
+        self.assertIn("runtime_rejection_samples_run_identity_broad_tracing_not_false", reasons)
+        self.assertIn("runtime_rejection_samples_row_unexpected_field", reasons)
+        self.assertIn("runtime_rejection_samples_forbidden_disclosure_field", reasons)
+        self.assertIn("runtime_rejection_samples_raw_address_string", reasons)
+        self.assertIn("runtime_rejection_samples_protected_path_string", reasons)
+
+    def test_accepts_runtime_serial_semantics_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "runtime-serial-semantics.json"
+            write_json(manifest, runtime_serial_semantics_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual(result["blockers"], [])
+
+    def test_blocks_runtime_serial_semantics_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "runtime-serial-semantics.json"
+            write_json(manifest, runtime_serial_semantics_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        self.assertIn(
+            "promote_mode_runtime_serial_semantics_candidate_only",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_runtime_serial_semantics_cross_frame_and_serial_overclaims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "runtime-serial-semantics.json"
+            payload = runtime_serial_semantics_manifest()
+            payload["post_callback_resource_handle_ready"] = True
+            payload["serial_semantics"]["unknown_wraparound_reject"] = False
+            payload["serial_semantics"]["cross_frame_lookup"] = "allow"
+            payload["serial_semantics"]["fuobjectitem_dword_0xC"] = "serial"
+            payload["rows"][0]["same_frame"] = False
+            payload["rows"][0]["decision"] = "allow_cross_frame"
+            payload["rows"][0]["serial_value"] = 17
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("runtime_serial_semantics_post_callback_resourcehandle_overclaim", reasons)
+        self.assertIn("runtime_serial_semantics_unknown_wraparound_not_reject", reasons)
+        self.assertIn("runtime_serial_semantics_cross_frame_not_reject", reasons)
+        self.assertIn("runtime_serial_semantics_fuobjectitem_0xC_not_unknown", reasons)
+        self.assertIn("runtime_serial_semantics_row_unexpected_field", reasons)
+        self.assertIn("runtime_serial_semantics_forbidden_disclosure_field", reasons)
+        self.assertIn("runtime_serial_semantics_fresh_case_not_frame_local_only", reasons)
 
     def test_accepts_resource_handle_serial_scan_with_rejection_candidate_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

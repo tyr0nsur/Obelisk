@@ -117,7 +117,8 @@ blocker without server paths:
 python3 scripts/compare_reflection_snapshots.py \
   --base-root tests/fixtures/ufunction_snapshots \
   --readiness-report \
-  --target obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild
+  --target obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild \
+  --target obelisk.ufunction-chain.snapshot.v1:APrimalStructure.IsAllowedToBuild
 ```
 
 The expected blocked state is `missing_base_snapshot` with candidate-only guidance. For

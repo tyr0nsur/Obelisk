@@ -45,6 +45,9 @@ priorities, and do not use history files as the active source of truth.
   artifacts, MSVC/Windows ABI assumptions, direct `GetNativePointerField`/`NativeCall`
   wrappers, raw UE pointer APIs, or algorithmic implementations; all access must be
   rebuilt through Obelisk reflection/ProcessEvent copied-data evidence.
+- Local `NextGenPlugins` clones are names and demand dictionaries only, not porting or
+  copying sources. Keep clones out of the repo and do not copy code, constants, schemas,
+  control flow, command parsers, return constants, or implementations.
 
 ## Stable Baseline
 
@@ -198,6 +201,12 @@ priorities, and do not use history files as the active source of truth.
   is `9334831106ce31818a64ed762baf95aadc01eeec4470c77ea5d7f47759e67209`. This does not
   promote public `StructureEvents`, SDK callbacks, identity, lookup, mutation, return
   override, dispatcher/hook wiring, `ResourceHandle`, runtime observation, or probing.
+- `PrimalStructure.IsAllowedToBuild` / `APrimalStructure.IsAllowedToBuild` is a
+  second-wave build-policy dictionary seed only. There is no committed candidate pack,
+  second-source comparison, target-set promotion, public StructureEvents/build-policy SDK,
+  mutation, or return override. First useful work is an approved offline focused snapshot
+  and distinct second-source compare; do not add either key to release targets, ABI enums,
+  descriptors, dispatchers, public docs, or runtime gates.
 - `ue/MissionReflection.*` is an internal fixture-backed recognizer for
   `mission-compact-intake`: copied bool ranges only, object refs and `OutItemIDs` arrays
   recognition-only, no hook/runtime dispatcher/public Mission SDK.
@@ -227,12 +236,14 @@ priorities, and do not use history files as the active source of truth.
   and `SHA256SUMS` SHA256
   `715f7c2b048370a74dbacfadd13d06496cf7e56867bb571351c2653d4fd297f8`;
   consume mode accepts it and promote mode remains blocked.
-- ResourceHandle remains post-RC/internal and blocked by
-  `uobject_flags_validity_semantics_unproven`; see the ResourceHandle/UObject flag
-  research notes for evidence. Do not reopen broad FName/GObjects discovery or create
-  another semantic-correlation artifact unless new evidence contradicts the current
-  consume-accepted/promote-blocked semantic artifact. A primary Ragnarok copied-core scan
-  produced 44 coherent `0x4000` rejected-object candidate samples and is preserved under
+- ResourceHandle remains post-RC/internal. The old flag-policy artifact is obsolete; the
+  durable rich-provenance refresh and strict serial policy are consume-accepted but
+  promote-blocked candidate evidence only. Do not rerun broad FName, GObjects, or core
+  scans for ResourceHandle unless the binary hash changes or evidence is contradicted.
+  The next strict blocker is rejected runtime object samples plus runtime serial
+  reuse/wraparound semantics under an operator-approved live-ops brief. A primary Ragnarok
+  copied-core scan produced 44 coherent `0x4000` rejected-object candidate samples and is
+  preserved under
   `/home/flowcommunity-ark/obelisk-artifacts/resource-handle-serial-scan-primary-20260530T000000Z/`;
   consume mode is accepted and promote mode remains blocked. A focused `GObjects`
   reconciliation resolved all 44 as `ParticleSystemComponent0` under `Text_Actor` /
@@ -399,8 +410,9 @@ priorities, and do not use history files as the active source of truth.
 - ResourceHandle remains post-RC/internal only. The copied/offline core blocker artifact
   now yields 44 coherent `0x4000` rejected-object candidates, reconciled as
   `ParticleSystemComponent0` under `Text_Actor` / `Text_Actor_C`; this is internal
-  blocker evidence only. Avoid more broad ResourceHandle scanning for the RC unless a
-  later focused lifecycle/reuse plan explicitly changes scope.
+  blocker evidence only. Avoid more broad ResourceHandle scanning unless the binary hash
+  changes, evidence is contradicted, or an approved focused runtime lifecycle/reuse plan
+  explicitly changes scope.
 - `obelisk.resource-handle-serial-scan.v1` is now gated for that exact internal candidate
   shape: consume requires coherent `flag_rejection_candidate_samples`, a required
   `binary_sha256`, verified `core_sha256` bytes, required `scan_limit` matching
