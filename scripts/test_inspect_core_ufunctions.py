@@ -2064,7 +2064,7 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
                     "MissionType",
                     "--snapshot-json",
                     "--evidence-ark-sha256",
-                    "fixture-sha",
+                    "f" * 64,
                     "--evidence-artifact-sha256",
                     "0" * 64,
                     "--evidence-capture-id",
@@ -2080,7 +2080,7 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
             )
 
         payload = json.loads(result.stdout)
-        self.assertEqual(payload["evidence"]["ark_binary_sha256"], "fixture-sha")
+        self.assertEqual(payload["evidence"]["ark_binary_sha256"], "f" * 64)
         self.assertEqual(payload["evidence"]["artifact_kind"], "offline_core")
         self.assertEqual(payload["evidence"]["artifact_sha256"], "0" * 64)
         self.assertEqual(payload["evidence"]["capture_id"], "fixture-capture")
@@ -2164,6 +2164,16 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
                     "--name-exact",
                     "ARKTributeDino",
                     "--snapshot-json",
+                    "--evidence-ark-sha256",
+                    "3" * 64,
+                    "--evidence-artifact-sha256",
+                    "4" * 64,
+                    "--evidence-capture-id",
+                    "fixture-scriptstruct-capture",
+                    "--evidence-pack-id",
+                    "fixture-scriptstruct-pack",
+                    "--evidence-obelisk-commit",
+                    "fixture-commit",
                 ],
                 check=True,
                 capture_output=True,
@@ -2222,6 +2232,16 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
                     "--name-exact",
                     "ARKTributeDino",
                     "--snapshot-json",
+                    "--evidence-ark-sha256",
+                    "5" * 64,
+                    "--evidence-artifact-sha256",
+                    "6" * 64,
+                    "--evidence-capture-id",
+                    "fixture-mixed-capture",
+                    "--evidence-pack-id",
+                    "fixture-mixed-pack",
+                    "--evidence-obelisk-commit",
+                    "fixture-commit",
                 ],
                 capture_output=True,
                 text=True,
@@ -2229,6 +2249,41 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("single inspection_mode", result.stderr)
+
+    def test_cli_snapshot_json_rejects_no_matched_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            core = Path(temp_dir) / "core"
+            addrs = build_core_fixture(core)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "inspect_core_ufunctions.py"),
+                    "--core",
+                    str(core),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--name-exact",
+                    "DoesNotExist",
+                    "--snapshot-json",
+                    "--evidence-ark-sha256",
+                    "7" * 64,
+                    "--evidence-artifact-sha256",
+                    "8" * 64,
+                    "--evidence-capture-id",
+                    "fixture-empty-capture",
+                    "--evidence-pack-id",
+                    "fixture-empty-pack",
+                    "--evidence-obelisk-commit",
+                    "fixture-commit",
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--snapshot-json requires at least one matched target", result.stderr)
 
     def test_cli_rejects_full_and_snapshot_json_together(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

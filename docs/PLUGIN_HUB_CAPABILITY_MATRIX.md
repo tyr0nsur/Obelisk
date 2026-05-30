@@ -1,7 +1,8 @@
 # Plugin Hub Capability Matrix
 
 This matrix is a contributor-facing planning aid for future Obelisk Plugin Hub work. It
-maps common modder intents to the public Obelisk surface that is safe today.
+maps common modder intents to the public Obelisk surface that is safe today and separates
+post-RC production seed work from experimental copied-data examples.
 `PLUGIN_HUB_FOUNDATION_V1.md` defines the minimal foundation contract that this matrix
 builds on.
 
@@ -20,29 +21,46 @@ The detailed local inventory lives in
 demand analysis only; it is not license clearance, runtime evidence, an ArkApi
 compatibility target, or an ABI reference.
 
+## Post-RC Support Boundary
+
+Post-RC production-supported Plugin Hub seed work is limited to lifecycle/config/logging
+skeletons, descriptor/catalog consumers, and process-local timer utilities that use the
+current C ABI with fail-closed capability checks. Copied `ChatMessageEvent` parsing and
+copied `GameplayPolicyEvent` auditing may remain useful experimental seed examples, but
+they are not production Plugin Hub modules, command/chat SDKs, policy-enforcement SDKs, or
+compatibility targets for ArkApi plugin families.
+
+Every higher-level demand category below remains planning-only until its own copied-data
+payload, identity/privacy policy, lifecycle cleanup, persistence or ingress design where
+needed, SDK consumer tests, and second-source/runtime evidence gate are promoted.
+
 ## NextGenPlugins Demand Snapshot
 
 The local dictionary currently points to these high-demand Plugin Hub categories. The
 status below describes only what Obelisk can expose safely today or after promotion gates;
 it does not promise ArkApi plugin compatibility.
 
-| Priority | Category | Obelisk status | Safe interpretation |
+| Priority | Category | Post-RC support tier | Safe interpretation |
 | --- | --- | --- | --- |
-| 1 | Lifecycle, descriptors, logging, config, local timers | available | Build native examples around current core primitives; process restart/crash management is not public SDK surface |
-| 2 | Passive chat parsing and plugin-local text routing | narrowly available | Use copied `ChatMessageEvent` for local parsing only; no command SDK, sender identity, replies, blocking, or moderation contract |
-| 3 | Timed notices and chat broadcasts | blocked | Owner-token timers exist, but public send-chat/broadcast policy is not promoted |
-| 4 | Permissions/admin groups | blocked | Needs identity, persistence, privacy-safe grants/checks, and operator reload policy |
-| 5 | RCON/operator I/O and Unicode text | blocked | Needs secret-safe ingress, audit policy, encoding rules, and command lifecycle |
-| 6 | Economy, shops, kits, rewards, stats | blocked | Needs commands, identity, permissions, persistence, item mutation, and event evidence |
-| 7 | Homes, teleport, safe zones, area policy | blocked | Needs location/area data, identity, combat/enemy restrictions, and safe mutation/enforcement contracts |
-| 8 | Structure counts, placement, ownership, collision policy | mostly blocked | Only narrow copied policy observer examples are experimental; census, ownership, placement denial, collision control, and mutation are not public surfaces |
-| 9 | Dino colors, carry rules, spawn/cosmetic policy | blocked | Needs dino/player identity, classification, interaction events, and safe mutation/enforcement |
-| 10 | Engrams, inventory, item give/remove flows | blocked | Needs player/inventory/item identity, progression or item mutation APIs, rollback, and privacy policy |
+| 1 | Lifecycle, descriptors, logging, config, local timers | production seed available | Build native examples around current core primitives; process restart/crash management is not public SDK surface |
+| 2 | Passive chat parsing and plugin-local text routing | experimental seed only | Use copied `ChatMessageEvent` for local parsing only; no command SDK, sender identity, replies, blocking, or moderation contract |
+| 3 | Copied structure/item policy auditing | experimental seed only | Use copied `GameplayPolicyEvent` only for observational audits of promoted event kinds; no StructureEvents SDK, Inventory SDK, identity, mutation, enforcement, or return override |
+| 4 | Timed notices and chat broadcasts | blocked | Owner-token timers exist, but public send-chat/broadcast policy is not promoted |
+| 5 | Permissions/admin groups | blocked | Needs identity, persistence, privacy-safe grants/checks, and operator reload policy |
+| 6 | RCON/operator I/O and Unicode text | blocked | Needs secret-safe ingress, audit policy, encoding rules, and command lifecycle |
+| 7 | Economy, shops, kits, rewards, stats | blocked | Needs commands, identity, permissions, persistence, item mutation, and event evidence |
+| 8 | Homes, teleport, safe zones, area policy | blocked | Needs location/area data, identity, combat/enemy restrictions, and safe mutation/enforcement contracts |
+| 9 | Structure counts, placement, ownership, collision policy | blocked except experimental auditing | Only narrow copied policy observer examples are experimental; census, ownership, placement denial, collision control, and mutation are not public surfaces |
+| 10 | Dino colors, carry rules, spawn/cosmetic policy | blocked | Needs dino/player identity, classification, interaction events, and safe mutation/enforcement |
+| 11 | Engrams, inventory, item give/remove flows | blocked | Needs player/inventory/item identity, progression or item mutation APIs, rollback, and privacy policy |
 
-`available` or `narrowly available` means an Obelisk-native plugin can be written against
-the stated current public ABI slice today. It does not mean the corresponding ArkApi
-plugin family can be ported, that command or identity semantics exist, or that blocked
-dependencies can be simulated through raw game access.
+`production seed available` means an Obelisk-native plugin can be written and documented
+as a supported Plugin Hub seed against the stated current public ABI slice. `experimental
+seed only` means the example can teach copied-data callback patterns, but it should not be
+marketed as a production Plugin Hub module or as general chat, command, policy, structure,
+or inventory SDK availability. Neither tier means the corresponding ArkApi plugin family
+can be ported, that command or identity semantics exist, or that blocked dependencies can
+be simulated through raw game access.
 
 | Modder intent | Use now | Status | Must not imply |
 | --- | --- | --- | --- |

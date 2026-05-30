@@ -964,6 +964,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             (matrix, "Passive chat text parsers"),
             (matrix, "Timer utilities"),
             (matrix, "Copied policy auditors"),
+            (matrix, "## Post-RC Support Boundary"),
+            (matrix, "Post-RC production-supported Plugin Hub seed work is limited to lifecycle/config/logging"),
+            (matrix, "Copied `ChatMessageEvent` parsing and\ncopied `GameplayPolicyEvent` auditing may remain useful experimental seed examples"),
             (matrix, "Those three are seed examples only, not production Plugin Hub modules"),
         ):
             with self.subTest(required=required):

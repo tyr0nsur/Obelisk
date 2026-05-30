@@ -55,7 +55,10 @@ def generated_utc_from_artifact_id(artifact_id: str) -> str:
     match = ARTIFACT_ID_TIMESTAMP_RE.search(artifact_id)
     if match is None:
         return datetime.now(timezone.utc).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
-    parsed = datetime.strptime(match.group("stamp"), "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
+    try:
+        parsed = datetime.strptime(match.group("stamp"), "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
+    except ValueError as exc:
+        raise SystemExit(f"artifact id has an invalid trailing timestamp: {artifact_id}") from exc
     return parsed.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 

@@ -511,6 +511,23 @@ Historical evaluator blockers to retain as provenance until directly superseded:
 - `no_post_callback_lifetime_contract`
 - `uobject_flags_validity_semantics_unproven`
 
+Blocker interpretation checkpoint:
+
+| Blocker label | Already narrowed by | Still needed to clear it |
+| --- | --- | --- |
+| `no_rejected_runtime_object_samples` | Static/core evaluator, flag policy, post-callback contract, and serial policy all keep the candidate fail-closed. | Approved debug-runtime rejection rows using the future runtime-rejection schema. Offline/core scans cannot satisfy this. |
+| `no_serial_reuse_or_wraparound_policy` | The serial-policy artifact defines the current fail-closed candidate policy. | Approved runtime serial-semantics evidence that does not contradict the policy. Unknown wraparound remains rejection unless separately planned. |
+| `post_callback_lifetime_policy_unproven` | The post-callback contract proves only the negative rule: post-callback lookup/use rejects. | A separate public lookup/lifetime contract, ABI guardrail, and privacy policy. Do not treat negative rejection as public handle support. |
+| `no_version_matched_source_decompiler_correlation_for_public_lifecycle_names` | Static flag evidence names only internal candidate bits. | Version-matched source/decompiler correlation before public lifecycle names. More flag sweeps do not clear this. |
+| `public_resourcehandle_policy_missing` and `no_public_resource_handle_contract` | All current artifacts explicitly keep public API exposure as a non-claim. | A separate public policy/contract plus SDK, ABI, privacy, and operator-safety gates. |
+| `uobject_flags_validity_semantics_unproven` | Candidate flag policy rejects `0x100` and rejects `0x4000` by default. | Runtime/source-backed lifecycle semantics, or keep it as historical provenance until a later accepted artifact directly supersedes it. |
+| `no_post_callback_lifetime_contract` | Superseded for internal negative behavior by the post-callback rejection contract. | Keep as historical provenance only unless a later audit removes it with an explicit supersession note. |
+
+Do not convert any row in this table into a request for broad FName, GObjects, core,
+UFunction, serial-sweep, ReflectionScanner, or scanner-like discovery. If a future note
+cannot name which blocker it narrows and which canonical input it consumes, it should not
+extend this lane.
+
 ## Next Repo-Local Improvement
 
 After serial-policy artifact acceptance, the smallest useful repo-local improvement is a

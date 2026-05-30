@@ -183,11 +183,11 @@ for the current checkpoint.
   distinct second-source compare. Do not add either key to release target sets, ABI enums,
   descriptors, dispatchers, public docs, or runtime gates.
 - Plugin Hub planning order from current demand map and local `NextGenPlugins` dictionary:
-  `docs/PLUGIN_HUB_FOUNDATION_V1.md` is now the contributor-facing foundation boundary,
-  backed by `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`. The fastest honest creator path after
-  `v0.1` is small Obelisk-native examples for lifecycle/config/logging, descriptor reads,
-  passive copied-chat parsing, process-local timers, and copied policy auditing. Treat
-  that as a non-production-ready seed, not a Plugin Hub stability or compatibility claim.
+  `docs/PLUGIN_HUB_FOUNDATION_V1.md` is the contributor-facing foundation boundary,
+  backed by `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`. Post-RC production-supported seeds
+  are lifecycle/config/logging, descriptor/catalog, and process-local timer examples.
+  Copied chat parsing and copied policy auditing remain experimental seed patterns, not
+  production modules, command/chat SDKs, policy-enforcement SDKs, or ArkApi compatibility.
   Keep permissions, RCON, economy, homes/safe zones, structure enforcement, dinos, tribes,
   transfers, inventory, item mutation, identity, lookup, replies, send-chat, moderation,
   and ArkApi portability as design backlogs until their own public surfaces are promoted.

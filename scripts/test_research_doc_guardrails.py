@@ -107,6 +107,7 @@ class ResearchDocGuardrailTests(unittest.TestCase):
         historical_blockers = [
             line.strip("- `")
             for line in section.split("Historical evaluator blockers to retain as provenance", 1)[1]
+            .split("Blocker interpretation checkpoint:", 1)[0]
             .splitlines()
             if line.startswith("- `")
         ]
@@ -117,6 +118,19 @@ class ResearchDocGuardrailTests(unittest.TestCase):
                 "uobject_flags_validity_semantics_unproven",
             ],
         )
+
+        interpretation = section.split("Blocker interpretation checkpoint:", 1)[1]
+        for phrase in (
+            "Offline/core scans cannot satisfy this.",
+            "Unknown wraparound remains rejection unless separately planned.",
+            "Do not treat negative rejection as public handle support.",
+            "More flag sweeps do not clear this.",
+            "public API exposure as a non-claim",
+            "Do not convert any row in this table into a request for broad FName, GObjects, core,",
+            "If a future note\ncannot name which blocker it narrows and which canonical input it consumes",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, interpretation)
 
     def test_no_obsolete_theisland_second_core_runbook_references(self) -> None:
         forbidden = [

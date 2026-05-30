@@ -5056,10 +5056,12 @@ namespace
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_init_cleanup_fail");
         ConfigureEnvironment(root);
+        EnableFilteredProcessEventCallbacks(root);
 
         FakePlugin plugin{
             .filename = "init_cleanup_fail.so",
             .initResult = false,
+            .registerFilteredCallback = true,
             .registerChatCallback = true,
         };
         Obelisk::Core::ChatEventDispatcher chatDispatcher;
@@ -5076,6 +5078,8 @@ namespace
         Require(plugin.initCalls == 1, "init-cleanup-fail plugin was not initialized");
         Require(plugin.shutdownCalls == 1, "init-cleanup-fail plugin shutdown was not called after init failure");
         Require(plugin.closeCalls == 0, "init-cleanup-fail plugin was closed despite failed callback cleanup");
+        Require(Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
+                "init-cleanup-fail plugin ProcessEvent callback was removed despite injected cleanup failure");
         Require(chatDispatcher.SubscriptionCount() == 1,
                 "init-cleanup-fail plugin callback was removed despite injected cleanup failure");
 
@@ -5086,6 +5090,8 @@ namespace
         Require(plugin.closeCalls == 1, "init-cleanup-fail plugin was not closed after cleanup retry");
         Require(plugin.chatSubscriptionsAtClose == 0,
                 "init-cleanup-fail plugin chat callback was still registered at dlclose");
+        Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
+                "init-cleanup-fail plugin ProcessEvent callback survived cleanup retry");
         Require(chatDispatcher.SubscriptionCount() == 0,
                 "init-cleanup-fail plugin callback survived cleanup retry");
 

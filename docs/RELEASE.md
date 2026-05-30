@@ -5,6 +5,19 @@ published core-first RC baseline. Use this checklist for future RC/stable candid
 the eventual first public stable `0.1.0` tag. Version labels and pre-release rules are
 defined in [VERSIONING.md](VERSIONING.md).
 
+Read scope labels literally:
+
+- Published RC baseline means the already-tagged `v0.1.0-rc.2` contract; later docs,
+  examples, or release-gate hardening do not expand that tag retroactively.
+- Current post-RC candidate means `HEAD` work for a future RC/stable candidate. It must
+  pass a fresh clean release gate before any tag or release-ref push.
+- Plugin Hub seed means examples built only from the current public ABI. It is not an
+  ArkApi compatibility layer, module SDK roadmap, identity/lookup surface, mutation path,
+  or return-override authority.
+- Planning-only lanes and target sets are guidance or demand signals. They are not release
+  evidence, not public SDK surface, and are rejected by the release gate until replaced by
+  a separately promoted target set.
+
 ## Scope
 
 Release scope is intentionally narrower than the active research roadmap. Post-RC
@@ -18,7 +31,9 @@ Included:
 - C plugin ABI, after an explicit first-stable ABI freeze decision.
 - Central install script and LinuxGSM wrappers.
 - `oBaseEvents`, `oProcessTimer`, and `oDescriptorCatalog` as the built-by-default
-  first-party reference plugin set published by the release gate.
+  first-party reference plugin set published by the release gate for the current post-RC
+  candidate; this does not retroactively add `oDescriptorCatalog` to the frozen
+  `v0.1.0-rc.2` tag.
 - `OBELISK_INSTANCE_ID` logs and state markers.
 - Filtered raw `ProcessEvent` callback infrastructure as debug-gated runtime plumbing.
   Stable plugin paths should use copied Obelisk-owned events. Target-specific gameplay/module

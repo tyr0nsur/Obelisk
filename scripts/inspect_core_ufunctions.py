@@ -25,6 +25,7 @@ from snapshot_evidence_pack import reject_protected_input_path  # noqa: E402
 DEFAULT_WINDOW_SIZE = 0xC0
 DEFAULT_MAX_OBJECT_SCAN = 30000
 POINTER_ALIGNMENT = 8
+SHA256_HEX_LENGTH = 64
 
 
 @dataclass(frozen=True)
@@ -48,6 +49,14 @@ def parse_hex_string(value: object) -> int | None:
     if not isinstance(value, str) or not value.startswith("0x"):
         return None
     return int(value, 16)
+
+
+def is_sha256_hex(value: str | None) -> bool:
+    return (
+        value is not None
+        and len(value) == SHA256_HEX_LENGTH
+        and all(char in "0123456789abcdefABCDEF" for char in value)
+    )
 
 
 def read_int(memory: uobjects.CoreMemory, address: int, fmt: str) -> int | None:
@@ -1236,6 +1245,28 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def validate_snapshot_evidence_args(args: argparse.Namespace) -> None:
+    required_fields = {
+        "--evidence-ark-sha256": args.evidence_ark_sha256,
+        "--evidence-artifact-sha256": args.evidence_artifact_sha256,
+        "--evidence-capture-id": args.evidence_capture_id,
+        "--evidence-pack-id": args.evidence_pack_id,
+        "--evidence-obelisk-commit": args.evidence_obelisk_commit,
+        "--evidence-artifact-kind": args.evidence_artifact_kind,
+        "--evidence-source": args.evidence_source,
+        "--evidence-status": args.evidence_status,
+    }
+    missing = [flag for flag, value in required_fields.items() if not value or not str(value).strip()]
+    if missing:
+        raise SystemExit(
+            "--snapshot-json requires complete evidence metadata: " + ", ".join(missing)
+        )
+    if not is_sha256_hex(args.evidence_ark_sha256):
+        raise SystemExit("--evidence-ark-sha256 must be a 64-character hex SHA256")
+    if not is_sha256_hex(args.evidence_artifact_sha256):
+        raise SystemExit("--evidence-artifact-sha256 must be a 64-character hex SHA256")
+
+
 def main() -> int:
     args = parse_args()
     if (
@@ -1264,6 +1295,8 @@ def main() -> int:
     )
     if not args.snapshot_json and any(value is not None for value in evidence_args):
         raise SystemExit("evidence metadata flags require --snapshot-json")
+    if args.snapshot_json:
+        validate_snapshot_evidence_args(args)
 
     core_path = reject_protected_input_path(args.core, "--core")
     memory = uobjects.CoreMemory(core_path)
@@ -1303,6 +1336,8 @@ def main() -> int:
             snapshot = build_fixture_snapshot(payload, evidence=evidence)
         except ValueError as exc:
             raise SystemExit(str(exc)) from exc
+        if not snapshot.get("targets"):
+            raise SystemExit("--snapshot-json requires at least one matched target")
         print(json.dumps(snapshot, indent=2, sort_keys=True))
     else:
         print(format_text(payload))

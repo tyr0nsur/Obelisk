@@ -199,6 +199,18 @@ class NormalizeArtifactPackTests(unittest.TestCase):
             result = self.run_tool(str(pack), "--check", check=False)
             self.assertIn("must be a real UTC timestamp", result.stderr)
 
+    def test_rejects_invalid_trailing_artifact_id_timestamp_cleanly(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            pack = Path(temp_dir) / "mission-copied-bool-policy-slice-20269999T999999Z"
+            pack.mkdir()
+            (pack / "report.json").write_text("{}\n", encoding="utf-8")
+
+            result = self.run_tool(str(pack), check=False)
+
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn("artifact id has an invalid trailing timestamp", result.stderr)
+            self.assertNotIn("Traceback", result.stderr)
+
     def test_rejects_symlinked_output(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

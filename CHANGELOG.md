@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Clarified post-RC Plugin Hub terminology so production-supported seeds are limited to
+  lifecycle/config/logging, descriptor/catalog, and process-local timer examples, while
+  copied chat and copied policy examples remain experimental seed patterns.
+- Hardened offline snapshot/artifact tooling: `inspect_core_ufunctions.py --snapshot-json`
+  now requires complete evidence metadata and 64-character SHA256 inputs, and artifact
+  pack normalization reports invalid timestamp-derived artifact ids without a traceback.
+- Added PluginManager coverage that retained init-failure cleanup keeps both chat and
+  filtered ProcessEvent callbacks registered until the later cleanup retry succeeds.
 - Reduced raw `EventManager` granular unregister blocking so a targeted unregister can
   take effect while an unrelated ProcessEvent callback is in flight, while owner cleanup
   still waits as the plugin unload barrier.

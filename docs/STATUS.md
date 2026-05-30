@@ -23,6 +23,15 @@ reflection evidence, copied-data module APIs, operator lifecycle safety, metadat
 reference plugins such as `oDescriptorCatalog`, and ArkApi-style plugin replacement
 capacity without retroactively expanding the published RC tag.
 
+Scope terms used here:
+
+- published RC baseline: the frozen `v0.1.0-rc.2` tag and its public contract;
+- current post-RC candidate: `HEAD` work that still needs a fresh clean release gate before
+  publication;
+- Plugin Hub seed: narrow examples that consume only existing ABI surfaces;
+- planning-only lane: guidance/demand work that is not release evidence or public SDK
+  surface.
+
 Contributor reading guide:
 
 - use the matrix below for current public SDK status;

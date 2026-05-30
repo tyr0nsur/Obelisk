@@ -10,6 +10,11 @@ AseApi, and local popular-plugin clones are names and demand dictionaries only, 
 porting or copying sources; every Obelisk surface must be rebuilt through Obelisk
 reflection, copied C ABI contracts, second-source fixtures, and runtime safety gates.
 
+This foundation is a post-RC contributor seed for the current ABI, not a change to the
+published `v0.1.0-rc.2` tag. It explains what small native examples can honestly teach
+while module lanes such as commands, permissions, inventory, structures, players,
+missions, and transfers remain planning-only until separately promoted.
+
 ## Public Surface
 
 Foundation V1 contains only the public ABI already exposed by `ObeliskApi.h`:
