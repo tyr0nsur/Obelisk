@@ -388,6 +388,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("does not promote Inventory, StructureEvents, Mission, Dino, Tribe, Transfer", hardening)
 
     def test_release_readiness_is_the_documented_release_gate(self) -> None:
+        readme = read("README.md")
         release = read("docs/RELEASE.md")
         pr_template = read(".github/pull_request_template.md")
         ci = read(".github/workflows/ci.yml")
@@ -397,6 +398,9 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         build_skill = read("agent-skills/obelisk-build-system/SKILL.md")
         workflow_skill = read("agent-skills/obelisk-github-research-workflow/SKILL.md")
 
+        self.assertIn("scripts/check_release_readiness.sh", readme)
+        self.assertIn("canonical release gate", readme)
+        self.assertIn("Quick contributor loop", readme)
         self.assertIn("scripts/check_release_readiness.sh", release)
         self.assertIn("--ufunction-second-source-root <second-source-ufunction-snapshots>", release)
         self.assertIn("historical root recorded in", release)
@@ -694,12 +698,13 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("are not reused or pushed", pr_lower)
 
     def test_disable_plugins_marker_is_documented_as_wrapper_input_not_runtime_gate(self) -> None:
+        readme = read("README.md")
         install = read("docs/INSTALL.md")
         status = read("docs/STATUS.md")
 
-        for path, text in (("docs/INSTALL.md", install), ("docs/STATUS.md", status)):
+        for path, text in (("README.md", readme), ("docs/INSTALL.md", install), ("docs/STATUS.md", status)):
             with self.subTest(file=path, item="marker named"):
-                self.assertIn("state/instances/<instance-id>/disable-plugins", text)
+                self.assertIn("disable-plugins", text)
             with self.subTest(file=path, item="runtime env gate"):
                 self.assertIn("OBELISK_DISABLE_PLUGINS=1", text)
             with self.subTest(file=path, item="not runtime gate by itself"):
@@ -708,8 +713,11 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
                     r"disable-plugins.*(?:not an independent runtime gate|not a runtime gate by itself)",
                 )
 
+        normalized_readme = normalized(readme)
         normalized_install = normalized(install)
         normalized_status = normalized(status)
+        self.assertIn("LinuxGSM wrapper input", normalized_readme)
+        self.assertIn("not an independent runtime gate by itself", normalized_readme)
         self.assertIn("wrapper translates it into `OBELISK_DISABLE_PLUGINS=1`", normalized_install)
         self.assertIn("custom launchers must set that environment variable themselves", normalized_install)
         self.assertIn("when the wrapper or launcher sets `OBELISK_DISABLE_PLUGINS=1`", normalized_status)

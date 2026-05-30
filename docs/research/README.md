@@ -21,7 +21,7 @@ navigation aid, not an exhaustive inventory of every evidence note; unlisted not
 still preserve durable evidence and should not be deleted only because they are absent
 from this index.
 
-RC required path:
+Current release gate lane:
 
 - [2026-05-28-reversing-objective-map.md](2026-05-28-reversing-objective-map.md)
 - [2026-05-28-second-source-reversing-gap-matrix.md](2026-05-28-second-source-reversing-gap-matrix.md)
@@ -31,7 +31,7 @@ RC required path:
 - [2026-05-29-chat-message-second-source-readiness.md](2026-05-29-chat-message-second-source-readiness.md)
 - [2026-05-30-rc-second-source-release-gate-check.md](2026-05-30-rc-second-source-release-gate-check.md)
 
-Current UE4 reflection evidence ledger:
+Current reflection evidence lane:
 
 | Area | Current status | Primary notes |
 | --- | --- | --- |
@@ -46,7 +46,7 @@ Historical recovery reference:
 
 - [2026-05-29-rc-checkpoint-slicing-plan.md](2026-05-29-rc-checkpoint-slicing-plan.md)
 
-Post-RC/research candidates:
+Current post-RC research lane:
 
 - [2026-05-30-v1-core-capability-map.md](2026-05-30-v1-core-capability-map.md)
 - [2026-05-30-aseapi-reference-scan.md](2026-05-30-aseapi-reference-scan.md)

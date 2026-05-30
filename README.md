@@ -116,17 +116,27 @@ Requirements:
 - C++20 compiler
 - Git
 
+Quick contributor loop:
+
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake --build build -j"$(nproc)"
 ctest --test-dir build --output-on-failure
 scripts/run_script_tests.sh
+```
+
+Packaging layout checks:
+
+```bash
 scripts/install_obelisk.sh --dry-run /tmp/obelisk-install-check
 scripts/test_install_obelisk_layout.sh /tmp/obelisk-layout-check
 ```
 
-Release-candidate, installer, SDK package, CMake export, and first-stable
-scope changes use the canonical release gate instead of ad hoc command groups:
+Release gate:
+
+Release-candidate, installer, SDK package, CMake export, promoted public API,
+and first-stable scope changes use this canonical release gate instead of ad hoc
+command groups:
 
 ```bash
 scripts/check_release_readiness.sh
@@ -179,11 +189,14 @@ Obelisk installs under an operator-chosen root, referenced in docs as
         disable-plugins
 ```
 
-The stable posture markers are `enable-process-event-hook` and `disable-plugins`.
-Experimental observer, scanner, outbound-call, ptrace, native-exec, and raw callback
-markers are documented in [docs/INSTALL.md](docs/INSTALL.md) and
-[docs/STATUS.md](docs/STATUS.md); they are not stable posture and require an approved
-debug or beta window.
+The stable runtime posture uses `enable-process-event-hook` for the core hook and
+fail-closed plugin suppression through `OBELISK_DISABLE_PLUGINS=1`. The
+`disable-plugins` marker is the LinuxGSM wrapper input that records this intent; it
+is not an independent runtime gate by itself. Experimental observer, scanner,
+outbound-call, ptrace, native-exec, and raw callback markers are debug-only posture,
+documented in [docs/INSTALL.md](docs/INSTALL.md) and [docs/STATUS.md](docs/STATUS.md);
+they require an approved debug or beta window and should not be treated as stable
+operational defaults.
 
 The target binary directory should only need a thin launcher/wrapper. Runtime
 libraries, plugins, config, logs, and state markers belong under the Obelisk

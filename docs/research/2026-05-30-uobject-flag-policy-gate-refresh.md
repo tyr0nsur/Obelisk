@@ -240,3 +240,15 @@ overclaims.
 This is a validator hardening only. It does not change the durable artifact's promotion
 status and does not promote `ResourceHandle`, public GObjects, object identity, lookup,
 lifecycle names, mutation, return override, or any public SDK surface.
+
+Strict identity refresh follow-up: `scripts/run_uobject_flag_policy_refresh.py` now has a
+strict artifact identity mode. Use `--strict-artifact-identity` together with complete
+`--artifact-kind`, `--capture-id`, and `--evidence-pack-id` when regenerating an
+identity-ready UObject flag-policy report for strict ResourceHandle evaluation. In this
+mode the driver passes those identity fields to `build_uobject_flag_policy_report.py` and
+then rejects the run unless the generated `uobject-flag-policy.redacted.json` contains a
+complete matching top-level `artifact_identity`, including `artifact_sha256`. This is
+still internal static evidence only: consume mode must accept, promote mode must remain
+blocked with the candidate-only blocker, and the result must not be treated as public
+`ResourceHandle`, public GObjects, object identity, lookup, lifecycle names, mutation,
+return override, or SDK promotion.

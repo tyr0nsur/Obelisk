@@ -153,6 +153,14 @@ This clears only the static `gobjects` coherent field-window blocker for the rev
 binary/candidate pair. It still does not promote public `GObjects`, `ResourceHandle`,
 lookup, identity, lifetime, mutation, return override, or UE call replay.
 
+Durable neutral workspace refresh: the same static-global refresh was regenerated under
+`/servidor/ark/workspace-offline/static-global-strict-with-field-window-20260530T000000Z`
+and accepted by `validate_offline_artifact_gate.py --root /servidor/ark/workspace-offline
+--mode consume`. Prefer this neutral root for future strict static-global citations. A
+parallel path whose directory name included `resourcehandle` was rejected by the static
+global gate with `static_global_public_overclaim_resourcehandle` because manifest path
+strings themselves are scanned for public overclaims.
+
 ## Blocked Field-Window Upgrade
 
 `scripts/build_static_global_promotion_evidence.py` can clear only the
