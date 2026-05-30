@@ -32,6 +32,10 @@ namespace Obelisk::UE::MissionReflection
         constexpr size_t kObjectPropertySize = 0x8;
         constexpr size_t kBoolPropertySize = 0x1;
         constexpr size_t kArrayPropertySize = 0x10;
+        constexpr uint64_t kObjectInputPropertyFlags = 0x1040000280;
+        constexpr uint64_t kBoolInputPropertyFlags = 0x1040000280;
+        constexpr uint64_t kBoolReturnPropertyFlags = 0x1040000780;
+        constexpr uint64_t kArrayOutPropertyFlags = 0x380;
 
         struct MissionFieldSpec
         {
@@ -40,6 +44,7 @@ namespace Obelisk::UE::MissionReflection
             int32_t Offset;
             size_t Size;
             int32_t ClassNameIndex;
+            uint64_t PropertyFlags;
             bool ExposesRange;
         };
 
@@ -62,12 +67,14 @@ namespace Obelisk::UE::MissionReflection
              0x00,
              kObjectPropertySize,
              kObjectPropertyClassNameIndex,
+             kObjectInputPropertyFlags,
              false},
             {MissionField::OutItemIDs,
              kOutItemIDsNameIndex,
              0x08,
              kArrayPropertySize,
              kArrayPropertyClassNameIndex,
+             kArrayOutPropertyFlags,
              false},
         }};
 
@@ -77,18 +84,21 @@ namespace Obelisk::UE::MissionReflection
              0x00,
              kObjectPropertySize,
              kObjectPropertyClassNameIndex,
+             kObjectInputPropertyFlags,
              false},
             {MissionField::BForceAdd,
              kBForceAddNameIndex,
              0x08,
              kBoolPropertySize,
              kBoolPropertyClassNameIndex,
+             kBoolInputPropertyFlags,
              true},
             {MissionField::ReturnValue,
              kReturnValueNameIndex,
              0x09,
              kBoolPropertySize,
              kBoolPropertyClassNameIndex,
+             kBoolReturnPropertyFlags,
              true},
         }};
 
@@ -98,12 +108,14 @@ namespace Obelisk::UE::MissionReflection
              0x00,
              kObjectPropertySize,
              kObjectPropertyClassNameIndex,
+             kObjectInputPropertyFlags,
              false},
             {MissionField::ReturnValue,
              kReturnValueNameIndex,
              0x08,
              kBoolPropertySize,
              kBoolPropertyClassNameIndex,
+             kBoolReturnPropertyFlags,
              true},
         }};
 
@@ -113,24 +125,28 @@ namespace Obelisk::UE::MissionReflection
              0x00,
              kObjectPropertySize,
              kObjectPropertyClassNameIndex,
+             kObjectInputPropertyFlags,
              false},
             {MissionField::Controller,
              kControllerNameIndex,
              0x08,
              kObjectPropertySize,
              kObjectPropertyClassNameIndex,
+             kObjectInputPropertyFlags,
              false},
             {MissionField::BFromMissionCompleteEvent,
              kBFromMissionCompleteEventNameIndex,
              0x10,
              kBoolPropertySize,
              kBoolPropertyClassNameIndex,
+             kBoolInputPropertyFlags,
              true},
             {MissionField::BLastPhaseSuccess,
              kBLastPhaseSuccessNameIndex,
              0x11,
              kBoolPropertySize,
              kBoolPropertyClassNameIndex,
+             kBoolInputPropertyFlags,
              true},
         }};
 
@@ -318,6 +334,9 @@ namespace Obelisk::UE::MissionReflection
             if (property.ByteSize != spec.Size)
                 return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
                                                            "mission property size mismatch");
+            if (property.PropertyFlags != spec.PropertyFlags)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                           "mission property flags mismatch");
             if (property.ElementSize != static_cast<int32_t>(spec.Size))
                 return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
                                                            "mission property ElementSize mismatch");
@@ -335,6 +354,8 @@ namespace Obelisk::UE::MissionReflection
                                                                const void* params,
                                                                MissionInvocation& out)
     {
+        out = {};
+
         if (RuntimeReflection::ReadResult gate = ValidateGate(options); !gate)
             return gate;
         if (!function)

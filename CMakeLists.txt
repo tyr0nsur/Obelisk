@@ -64,7 +64,6 @@ add_library(obelisk SHARED
     ue/ChatReflection.cpp
     ue/DinoReflection.cpp
     ue/InventoryReflection.cpp
-    ue/MissionReflection.cpp
     ue/StructureReflection.cpp
     ue/RuntimeReflection.cpp
     ue/ReflectionScanner.cpp

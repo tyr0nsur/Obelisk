@@ -839,6 +839,39 @@ namespace
             invocation);
         Require(result.Status == ReadStatus::UnsupportedLayout, "mutated item layout was accepted");
     }
+
+    void TestRejectsClearStaleInvocation()
+    {
+        ItemFixture fixture;
+        BuildCanRepair(fixture);
+        fixture.Params[0x00] = 1;
+        fixture.Params[0x01] = 1;
+
+        ItemReflection::ItemInvocation invocation;
+        ReadResult result = ItemReflection::TryIdentifyItemInvocation(
+            fixture.Reader(),
+            Options(),
+            fixture.Function.data(),
+            fixture.Params.data(),
+            invocation);
+        Require(static_cast<bool>(result), result.Reason.c_str());
+        Require(invocation.FunctionNameIndex == kCanRepairNameIndex,
+                "valid item invocation did not populate stale source");
+        Require(invocation.Fields.size() == 2, "valid item invocation did not populate fields");
+
+        WriteAt(fixture.Function, 0x98, uint16_t{0x03});
+        result = ItemReflection::TryIdentifyItemInvocation(
+            fixture.Reader(),
+            Options(),
+            fixture.Function.data(),
+            fixture.Params.data(),
+            invocation);
+        Require(result.Status == ReadStatus::Implausible, "invalid item invocation was accepted");
+        Require(invocation.FunctionNameIndex == -1, "rejected item invocation left stale function name");
+        Require(invocation.OuterNameIndex == -1, "rejected item invocation left stale outer name");
+        Require(!invocation.HasParameterRanges, "rejected item invocation left stale range state");
+        Require(invocation.Fields.empty(), "rejected item invocation left stale fields");
+    }
 }
 
 int main()
@@ -853,6 +886,7 @@ int main()
     TestRejectsWrongFunctionClass();
     TestRejectsWrongShapeAndPropertyChain();
     TestGateRejectsBeforeReading();
+    TestRejectsClearStaleInvocation();
 
     std::cout << "ItemReflectionTests passed\n";
     return 0;

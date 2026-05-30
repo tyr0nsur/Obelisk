@@ -362,6 +362,8 @@ namespace Obelisk::UE::ItemReflection
                                                             const void* params,
                                                             ItemInvocation& out)
     {
+        out = {};
+
         if (RuntimeReflection::ReadResult gate = ValidateGate(options); !gate)
             return gate;
         if (!function)

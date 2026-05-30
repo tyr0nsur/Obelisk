@@ -36,6 +36,10 @@ namespace
     constexpr int32_t kBLastPhaseSuccessNameIndex = 22976;
     constexpr int32_t kBFromMissionCompleteEventNameIndex = 22980;
     constexpr int32_t kOutItemIDsNameIndex = 23031;
+    constexpr uint64_t kObjectInputPropertyFlags = 0x1040000280;
+    constexpr uint64_t kBoolInputPropertyFlags = 0x1040000280;
+    constexpr uint64_t kBoolReturnPropertyFlags = 0x1040000780;
+    constexpr uint64_t kArrayOutPropertyFlags = 0x380;
 
     struct Region
     {
@@ -103,12 +107,12 @@ namespace
                        const void* klass,
                        int32_t nameIndex,
                        int32_t offset,
-                       int32_t elementSize)
+                       int32_t elementSize,
+                       uint64_t propertyFlags)
     {
         WriteObject(buffer, nameIndex, nameIndex, klass, owner);
 
         const int32_t arrayDim = 1;
-        const uint64_t propertyFlags = 0x80;
         WriteAt(buffer, 0x28, next);
         WriteAt(buffer, 0x30, arrayDim);
         WriteAt(buffer, 0x34, elementSize);
@@ -122,6 +126,7 @@ namespace
         int32_t Offset = -1;
         int32_t ElementSize = 0;
         const void* Class = nullptr;
+        uint64_t PropertyFlags = 0;
     };
 
     struct MissionFixture
@@ -213,7 +218,8 @@ namespace
                           fields[i].Class,
                           fields[i].NameIndex,
                           fields[i].Offset,
-                          fields[i].ElementSize);
+                          fields[i].ElementSize,
+                          fields[i].PropertyFlags);
         }
 
         WriteAt(fixture.Function, 0x38, numParms > 0 ? fixture.PropertyA.data() : nullptr);
@@ -233,8 +239,12 @@ namespace
                       0x18,
                       0xffff,
                       {{
-                          {kCharacterNameIndex, 0x00, 0x08, fixture.ObjectPropertyClass.data()},
-                          {kOutItemIDsNameIndex, 0x08, 0x10, fixture.ArrayPropertyClass.data()},
+                          {kCharacterNameIndex,
+                           0x00,
+                           0x08,
+                           fixture.ObjectPropertyClass.data(),
+                           kObjectInputPropertyFlags},
+                          {kOutItemIDsNameIndex, 0x08, 0x10, fixture.ArrayPropertyClass.data(), kArrayOutPropertyFlags},
                           {},
                           {},
                       }});
@@ -250,9 +260,13 @@ namespace
                       0x0a,
                       0x09,
                       {{
-                          {kPlayerCharacterNameIndex, 0x00, 0x08, fixture.ObjectPropertyClass.data()},
-                          {kBForceAddNameIndex, 0x08, 0x01, fixture.BoolPropertyClass.data()},
-                          {kReturnValueNameIndex, 0x09, 0x01, fixture.BoolPropertyClass.data()},
+                          {kPlayerCharacterNameIndex,
+                           0x00,
+                           0x08,
+                           fixture.ObjectPropertyClass.data(),
+                           kObjectInputPropertyFlags},
+                          {kBForceAddNameIndex, 0x08, 0x01, fixture.BoolPropertyClass.data(), kBoolInputPropertyFlags},
+                          {kReturnValueNameIndex, 0x09, 0x01, fixture.BoolPropertyClass.data(), kBoolReturnPropertyFlags},
                           {},
                       }});
     }
@@ -266,8 +280,12 @@ namespace
                       0x09,
                       0x08,
                       {{
-                          {kPlayerPawnNameIndex, 0x00, 0x08, fixture.ObjectPropertyClass.data()},
-                          {kReturnValueNameIndex, 0x08, 0x01, fixture.BoolPropertyClass.data()},
+                          {kPlayerPawnNameIndex,
+                           0x00,
+                           0x08,
+                           fixture.ObjectPropertyClass.data(),
+                           kObjectInputPropertyFlags},
+                          {kReturnValueNameIndex, 0x08, 0x01, fixture.BoolPropertyClass.data(), kBoolReturnPropertyFlags},
                           {},
                           {},
                       }});
@@ -282,10 +300,18 @@ namespace
                       0x12,
                       0xffff,
                       {{
-                          {kPlayerNameIndex, 0x00, 0x08, fixture.ObjectPropertyClass.data()},
-                          {kControllerNameIndex, 0x08, 0x08, fixture.ObjectPropertyClass.data()},
-                          {kBFromMissionCompleteEventNameIndex, 0x10, 0x01, fixture.BoolPropertyClass.data()},
-                          {kBLastPhaseSuccessNameIndex, 0x11, 0x01, fixture.BoolPropertyClass.data()},
+                          {kPlayerNameIndex, 0x00, 0x08, fixture.ObjectPropertyClass.data(), kObjectInputPropertyFlags},
+                          {kControllerNameIndex, 0x08, 0x08, fixture.ObjectPropertyClass.data(), kObjectInputPropertyFlags},
+                          {kBFromMissionCompleteEventNameIndex,
+                           0x10,
+                           0x01,
+                           fixture.BoolPropertyClass.data(),
+                           kBoolInputPropertyFlags},
+                          {kBLastPhaseSuccessNameIndex,
+                           0x11,
+                           0x01,
+                           fixture.BoolPropertyClass.data(),
+                           kBoolInputPropertyFlags},
                       }});
     }
 
@@ -671,7 +697,8 @@ namespace
                           fixture.ObjectPropertyClass.data(),
                           kOutItemIDsNameIndex,
                           0x08,
-                          0x08);
+                          0x08,
+                          kArrayOutPropertyFlags);
 
             MissionReflection::MissionInvocation invocation;
             ReadResult result = MissionReflection::TryIdentifyMissionInvocation(
@@ -691,7 +718,8 @@ namespace
                           fixture.BoolPropertyClass.data(),
                           kPlayerNameIndex,
                           0x00,
-                          0x01);
+                          0x01,
+                          kObjectInputPropertyFlags);
 
             MissionReflection::MissionInvocation invocation;
             ReadResult result = MissionReflection::TryIdentifyMissionInvocation(
@@ -715,6 +743,20 @@ namespace
                 fixture.Params.data(),
                 invocation);
             Require(!result, "wrong mission property ArrayDim was accepted");
+        }
+        {
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+            WriteAt(fixture.PropertyB, 0x38, uint64_t{kBoolInputPropertyFlags ^ 0x400});
+
+            MissionReflection::MissionInvocation invocation;
+            ReadResult result = MissionReflection::TryIdentifyMissionInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "wrong mission property flags were accepted");
         }
     }
 
@@ -864,6 +906,38 @@ namespace
             invocation);
         Require(result.Status == ReadStatus::InvalidArgument, "null mission UFunction pointer was accepted");
     }
+
+    void TestRejectsClearStaleInvocation()
+    {
+        MissionFixture fixture;
+        BuildAddPlayerToMission(fixture);
+        fixture.Params[0x08] = 1;
+
+        MissionReflection::MissionInvocation invocation;
+        ReadResult result = MissionReflection::TryIdentifyMissionInvocation(
+            fixture.Reader(),
+            Options(),
+            fixture.Function.data(),
+            fixture.Params.data(),
+            invocation);
+        Require(static_cast<bool>(result), result.Reason.c_str());
+        Require(invocation.Function == MissionReflection::MissionFunction::AddPlayerToMission,
+                "valid mission invocation did not populate stale source");
+        Require(invocation.Fields.size() == 3, "valid mission invocation did not populate fields");
+
+        WriteAt(fixture.Function, 0x98, uint16_t{0x11});
+        result = MissionReflection::TryIdentifyMissionInvocation(
+            fixture.Reader(),
+            Options(),
+            fixture.Function.data(),
+            fixture.Params.data(),
+            invocation);
+        Require(result.Status == ReadStatus::Implausible, "invalid mission invocation was accepted");
+        Require(invocation.FunctionNameIndex == -1, "rejected mission invocation left stale function name");
+        Require(invocation.OuterNameIndex == -1, "rejected mission invocation left stale outer name");
+        Require(!invocation.HasParameterRanges, "rejected mission invocation left stale range state");
+        Require(invocation.Fields.empty(), "rejected mission invocation left stale fields");
+    }
 }
 
 int main()
@@ -881,6 +955,7 @@ int main()
     TestRejectsUnsupportedTarget();
     TestGateRejectsBeforeReading();
     TestRejectsNullFunction();
+    TestRejectsClearStaleInvocation();
 
     std::cout << "MissionReflectionTests passed\n";
     return 0;
