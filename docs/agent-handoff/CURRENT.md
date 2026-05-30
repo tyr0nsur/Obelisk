@@ -161,7 +161,9 @@ recovery context is not active routing for the current head; use
   `transfer-scriptstruct` 2/2 as layout-only at
   `/home/flowcommunity-ark/obelisk-artifacts/transfer-scriptstruct-bool-tail-refresh-20260530T163945Z`.
   Its regenerated `inventory-pack` includes structs, has consume gate accepted, promote
-  gate blocked, and normalized `artifact-pack.manifest.json`/`SHA256SUMS`.
+  gate blocked, and normalized `artifact-pack.manifest.json`/`SHA256SUMS`. The offline
+  artifact gate now rejects `transfer-scriptstruct` inventory packs that omit
+  `scriptstructs` or any of the three exact `ArkTributePlayerData` bool-tail contracts.
   The older root under `/servidor/ark/workspace-offline/transfer-second-source-20260529T154200Z/scriptstruct-snapshots`
   is stale under current bool-tail strictness and should not be reused for current
   comparisons.
@@ -196,11 +198,11 @@ recovery context is not active routing for the current head; use
   `GameplayPolicyEvent` kinds.
 - Current post-RC focus: keep remaining item producer/runtime validation and Mission
   copied-bool work internal, then if Transfer continues, consume the refreshed
-  bool-tail-complete ScriptStruct root for inventory-pack normalization or redacted
-  signature refresh before any Transfer payload/redaction work. The inventory pack is now
-  normalized locally; redacted signatures or a stricter transfer-specific inventory
-  guardrail are the next evidence-only steps. Public Inventory SDK,
-  Items SDK, Mission SDK, and Transfer SDK surfaces remain absent, and this does not
+  bool-tail-complete ScriptStruct root for redacted signature hardening/refresh before any
+  Transfer payload/redaction work. The inventory pack is now normalized locally and guarded
+  by a transfer-specific bool-tail contract; redacted signatures still need to preserve
+  bool-tail metadata before they can be treated as bool-tail-complete. Public Inventory
+  SDK, Items SDK, Mission SDK, and Transfer SDK surfaces remain absent, and this does not
   authorize Transfer runtime work.
 - Runtime lifecycle callback-cleanup debt is addressed in post-RC head: `PluginManager`
   now skips `dlclose` when callback cleanup fails, retains the plugin for retry, preserves

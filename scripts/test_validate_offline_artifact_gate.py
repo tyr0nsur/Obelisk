@@ -1600,7 +1600,13 @@ def scriptstruct_inventory_child_payload(count: int = 2, *, include_scriptstruct
     if include_scriptstructs:
         payload["scriptstructs"] = [
             {
-                "target": "PrimalLocalProfile.ArkTributePlayerData",
+                "outer_name": "PrimalLocalProfile",
+                "name": "ARKTributeDino",
+                "properties": [],
+            },
+            {
+                "outer_name": "PrimalLocalProfile",
+                "name": "ArkTributePlayerData",
                 "properties": [
                     {
                         "name": "bWasAllowDPCUpload",
@@ -1619,7 +1625,43 @@ def scriptstruct_inventory_child_payload(count: int = 2, *, include_scriptstruct
                             "bool_field_size": 1,
                             "bool_byte_offset": 0,
                         },
-                    }
+                    },
+                    {
+                        "name": "bWithItems",
+                        "class_name": "BoolProperty",
+                        "offset_internal": 273,
+                        "element_size": 1,
+                        "array_dim": 1,
+                        "bool_field_size": 1,
+                        "bool_byte_offset": 0,
+                        "byte_mask": "0x01",
+                        "field_mask": "0xff",
+                        "native_bool": False,
+                        "bool_property_semantics": {
+                            "status": "candidate",
+                            "reject_reasons": [],
+                            "bool_field_size": 1,
+                            "bool_byte_offset": 0,
+                        },
+                    },
+                    {
+                        "name": "bForServerTransfer",
+                        "class_name": "BoolProperty",
+                        "offset_internal": 280,
+                        "element_size": 1,
+                        "array_dim": 1,
+                        "bool_field_size": 1,
+                        "bool_byte_offset": 0,
+                        "byte_mask": "0x1",
+                        "field_mask": "0xff",
+                        "native_bool": False,
+                        "bool_property_semantics": {
+                            "status": "candidate",
+                            "reject_reasons": [],
+                            "bool_field_size": 1,
+                            "bool_byte_offset": 0,
+                        },
+                    },
                 ],
             }
         ]
@@ -1773,7 +1815,7 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
             protected = Path(tmp) / "server"
             workspace = protected / "workspace-offline"
             manifest = workspace / "scriptstruct-pack" / "manifest.json"
-            inventory_sha, fname_sha = write_scriptstruct_inventory_children(manifest.parent)
+            inventory_sha, fname_sha = write_scriptstruct_inventory_children(manifest.parent, include_scriptstructs=True)
             write_json(manifest, scriptstruct_inventory_pack_manifest(workspace, inventory_sha=inventory_sha, fname_sha=fname_sha))
 
             result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
@@ -1786,7 +1828,7 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
             protected = Path(tmp) / "server"
             workspace = protected / "workspace-offline"
             manifest = workspace / "scriptstruct-pack" / "manifest.json"
-            inventory_sha, fname_sha = write_scriptstruct_inventory_children(manifest.parent)
+            inventory_sha, fname_sha = write_scriptstruct_inventory_children(manifest.parent, include_scriptstructs=True)
             write_json(manifest, scriptstruct_inventory_pack_manifest(workspace, inventory_sha=inventory_sha, fname_sha=fname_sha))
 
             result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
@@ -1799,7 +1841,7 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
             protected = Path(tmp) / "server"
             workspace = protected / "workspace-offline"
             manifest = workspace / "scriptstruct-pack" / "manifest.json"
-            inventory_sha, fname_sha = write_scriptstruct_inventory_children(manifest.parent)
+            inventory_sha, fname_sha = write_scriptstruct_inventory_children(manifest.parent, include_scriptstructs=True)
             write_json(manifest, scriptstruct_inventory_pack_manifest(workspace, inventory_sha=inventory_sha, fname_sha=fname_sha))
 
             result = gate.build_result(
@@ -1828,12 +1870,40 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         reasons = {blocker["reason"] for blocker in result["blockers"]}
         self.assertIn("scriptstruct_inventory_artifact_not_file", reasons)
 
+    def test_blocks_transfer_scriptstruct_inventory_without_scriptstructs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "scriptstruct-pack" / "manifest.json"
+            inventory_sha, fname_sha = write_scriptstruct_inventory_children(manifest.parent)
+            write_json(manifest, scriptstruct_inventory_pack_manifest(workspace, inventory_sha=inventory_sha, fname_sha=fname_sha))
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("scriptstruct_inventory_transfer_scriptstructs_missing", reasons)
+
+    def test_non_transfer_scriptstruct_inventory_does_not_require_transfer_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "scriptstruct-pack" / "manifest.json"
+            inventory_sha, fname_sha = write_scriptstruct_inventory_children(manifest.parent)
+            payload = scriptstruct_inventory_pack_manifest(workspace, inventory_sha=inventory_sha, fname_sha=fname_sha)
+            payload["inputs"]["target_sets"] = ["mission-scriptstruct"]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual(result["status"], "accepted")
+        self.assertEqual([], result["blockers"])
+
     def test_blocks_scriptstruct_inventory_pack_child_schema_and_summary_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"
             workspace = protected / "workspace-offline"
             manifest = workspace / "scriptstruct-pack" / "manifest.json"
-            inventory_sha, fname_sha = write_scriptstruct_inventory_children(manifest.parent, count=1)
+            inventory_sha, fname_sha = write_scriptstruct_inventory_children(manifest.parent, count=1, include_scriptstructs=True)
             payload = scriptstruct_inventory_pack_manifest(workspace, inventory_sha=inventory_sha, fname_sha=fname_sha)
             child = json.loads((manifest.parent / "scriptstruct-inventory.json").read_text(encoding="utf-8"))
             child["schema"] = "wrong.schema"
@@ -1858,7 +1928,7 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
             )
             inventory_path = manifest.parent / "scriptstruct-inventory.json"
             inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
-            bool_prop = inventory["scriptstructs"][0]["properties"][0]
+            bool_prop = inventory["scriptstructs"][1]["properties"][0]
             bool_prop.pop("bool_field_size")
             bool_prop.pop("bool_byte_offset")
             bool_prop["bool_property_semantics"].pop("bool_field_size")
@@ -1874,6 +1944,30 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("scriptstruct_inventory_bool_bool_byte_offset_mismatch", reasons)
         self.assertIn("scriptstruct_inventory_bool_property_semantics_bool_field_size_mismatch", reasons)
         self.assertIn("scriptstruct_inventory_bool_property_semantics_bool_byte_offset_mismatch", reasons)
+
+    def test_blocks_transfer_scriptstruct_inventory_missing_expected_bool(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "scriptstruct-pack" / "manifest.json"
+            inventory_sha, fname_sha = write_scriptstruct_inventory_children(
+                manifest.parent,
+                include_scriptstructs=True,
+            )
+            inventory_path = manifest.parent / "scriptstruct-inventory.json"
+            inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+            player_data = inventory["scriptstructs"][1]
+            player_data["properties"] = [
+                prop for prop in player_data["properties"] if prop["name"] != "bForServerTransfer"
+            ]
+            write_json(inventory_path, inventory)
+            inventory_sha = gate.sha256_file(inventory_path)
+            write_json(manifest, scriptstruct_inventory_pack_manifest(workspace, inventory_sha=inventory_sha, fname_sha=fname_sha))
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("scriptstruct_inventory_transfer_bool_missing", reasons)
 
     def test_accepts_redacted_scriptstruct_signatures_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

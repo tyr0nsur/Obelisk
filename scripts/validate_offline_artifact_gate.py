@@ -32,6 +32,35 @@ GOBJECTS_TWO_CORE_MANIFEST_SCHEMA = "obelisk.gobjects-two-core-manifest.v1"
 REDACTED_UFUNCTION_SIGNATURE_SCHEMA = "obelisk.redacted-ufunction-signatures.v1"
 REDACTED_SCRIPTSTRUCT_SIGNATURE_SCHEMA = "obelisk.redacted-scriptstruct-signatures.v1"
 SCRIPTSTRUCT_INVENTORY_PACK_SCHEMA = "obelisk.scriptstruct-inventory-pack.v1"
+TRANSFER_SCRIPTSTRUCT_TARGET_SET = "transfer-scriptstruct"
+TRANSFER_SCRIPTSTRUCT_BOOL_TAIL_CONTRACT = {
+    "PrimalLocalProfile.ArkTributePlayerData": {
+        "bWasAllowDPCUpload": {
+            "offset_internal": 272,
+            "bool_field_size": 1,
+            "bool_byte_offset": 0,
+            "byte_mask": 0x01,
+            "field_mask": 0xff,
+            "native_bool": False,
+        },
+        "bWithItems": {
+            "offset_internal": 273,
+            "bool_field_size": 1,
+            "bool_byte_offset": 0,
+            "byte_mask": 0x01,
+            "field_mask": 0xff,
+            "native_bool": False,
+        },
+        "bForServerTransfer": {
+            "offset_internal": 280,
+            "bool_field_size": 1,
+            "bool_byte_offset": 0,
+            "byte_mask": 0x01,
+            "field_mask": 0xff,
+            "native_bool": False,
+        },
+    }
+}
 TARGET_SET_COVERAGE_SCHEMA = "obelisk.redacted-ufunction-target-set-coverage.v1"
 REDACTED_UFUNCTION_ARTIFACT_HYGIENE_SCHEMA = "obelisk.redacted-ufunction-artifact-hygiene.v1"
 RC_UFUNCTION_SECOND_SOURCE_ROOT_SCHEMA = "obelisk.rc-ufunction-second-source-root-manifest.v1"
@@ -2412,6 +2441,7 @@ def validate_scriptstruct_inventory_child_artifact(
     protected_root: Path,
     expected_schema: str,
     summary_count: int | None = None,
+    require_transfer_bool_tail: bool = False,
 ) -> list[dict[str, Any]]:
     blockers: list[dict[str, Any]] = []
     artifact = artifacts.get(key)
@@ -2483,7 +2513,29 @@ def validate_scriptstruct_inventory_child_artifact(
                 }
             )
         blockers.extend(validate_scriptstruct_inventory_bool_tail(child_payload, artifact_label=artifact_label))
+        if require_transfer_bool_tail:
+            blockers.extend(validate_transfer_scriptstruct_bool_tail_contract(child_payload, artifact_label=artifact_label))
     return blockers
+
+
+def scriptstruct_identity(struct: dict[str, Any]) -> str | None:
+    target = struct.get("target")
+    if isinstance(target, str) and target:
+        return target
+    outer_name = struct.get("outer_name")
+    name = struct.get("name")
+    if isinstance(outer_name, str) and outer_name and isinstance(name, str) and name:
+        return f"{outer_name}.{name}"
+    return None
+
+
+def parse_hex_mask(value: object) -> int | None:
+    if isinstance(value, str):
+        try:
+            return int(value, 16)
+        except ValueError:
+            return None
+    return None
 
 
 def validate_scriptstruct_inventory_bool_tail(
@@ -2531,10 +2583,7 @@ def validate_scriptstruct_inventory_bool_tail(
                     )
             for key, expected in (("byte_mask", 0x01), ("field_mask", 0xff)):
                 mask = prop.get(key)
-                try:
-                    observed = int(mask, 16) if isinstance(mask, str) else None
-                except ValueError:
-                    observed = None
+                observed = parse_hex_mask(mask)
                 if observed != expected:
                     blockers.append(
                         {
@@ -2572,6 +2621,124 @@ def validate_scriptstruct_inventory_bool_tail(
                     blockers.append(
                         {
                             "reason": f"scriptstruct_inventory_bool_property_semantics_{key}_mismatch",
+                            "label": f"{prop_label}.bool_property_semantics.{key}",
+                            "expected": expected,
+                            "recorded": semantics.get(key),
+                        }
+                    )
+    return blockers
+
+
+def validate_transfer_scriptstruct_bool_tail_contract(
+    child_payload: dict[str, Any],
+    *,
+    artifact_label: str,
+) -> list[dict[str, Any]]:
+    blockers: list[dict[str, Any]] = []
+    scriptstructs = child_payload.get("scriptstructs")
+    if scriptstructs is None:
+        return [
+            {
+                "reason": "scriptstruct_inventory_transfer_scriptstructs_missing",
+                "label": f"{artifact_label}.scriptstructs",
+            }
+        ]
+    if not isinstance(scriptstructs, list):
+        return []
+
+    structs_by_identity = {
+        identity: struct
+        for struct in scriptstructs
+        if isinstance(struct, dict)
+        for identity in [scriptstruct_identity(struct)]
+        if identity is not None
+    }
+    for struct_name, expected_props in TRANSFER_SCRIPTSTRUCT_BOOL_TAIL_CONTRACT.items():
+        struct = structs_by_identity.get(struct_name)
+        if not isinstance(struct, dict):
+            blockers.append(
+                {
+                    "reason": "scriptstruct_inventory_transfer_struct_missing",
+                    "label": f"{artifact_label}.scriptstructs",
+                    "target": struct_name,
+                }
+            )
+            continue
+        properties = struct.get("properties")
+        if not isinstance(properties, list):
+            blockers.append(
+                {
+                    "reason": "scriptstruct_inventory_transfer_struct_properties_invalid",
+                    "label": f"{artifact_label}.scriptstructs.{struct_name}.properties",
+                    "target": struct_name,
+                }
+            )
+            continue
+        props_by_name = {prop.get("name"): prop for prop in properties if isinstance(prop, dict) and isinstance(prop.get("name"), str)}
+        for prop_name, expected_values in expected_props.items():
+            prop = props_by_name.get(prop_name)
+            prop_label = f"{artifact_label}.scriptstructs.{struct_name}.{prop_name}"
+            if not isinstance(prop, dict):
+                blockers.append(
+                    {
+                        "reason": "scriptstruct_inventory_transfer_bool_missing",
+                        "label": prop_label,
+                        "target": struct_name,
+                        "property": prop_name,
+                    }
+                )
+                continue
+            if prop.get("class_name") != "BoolProperty":
+                blockers.append(
+                    {
+                        "reason": "scriptstruct_inventory_transfer_bool_class_mismatch",
+                        "label": f"{prop_label}.class_name",
+                        "expected": "BoolProperty",
+                        "recorded": prop.get("class_name"),
+                    }
+                )
+            for key, expected in expected_values.items():
+                recorded = parse_hex_mask(prop.get(key)) if key in {"byte_mask", "field_mask"} else prop.get(key)
+                if recorded != expected:
+                    blockers.append(
+                        {
+                            "reason": f"scriptstruct_inventory_transfer_bool_{key}_mismatch",
+                            "label": f"{prop_label}.{key}",
+                            "expected": f"0x{expected:x}" if key in {"byte_mask", "field_mask"} else expected,
+                            "recorded": prop.get(key),
+                        }
+                    )
+            semantics = prop.get("bool_property_semantics")
+            if not isinstance(semantics, dict):
+                blockers.append(
+                    {
+                        "reason": "scriptstruct_inventory_transfer_bool_property_semantics_missing",
+                        "label": f"{prop_label}.bool_property_semantics",
+                    }
+                )
+                continue
+            if semantics.get("status") != "candidate":
+                blockers.append(
+                    {
+                        "reason": "scriptstruct_inventory_transfer_bool_property_semantics_status_mismatch",
+                        "label": f"{prop_label}.bool_property_semantics.status",
+                        "expected": "candidate",
+                        "recorded": semantics.get("status"),
+                    }
+                )
+            if semantics.get("reject_reasons", []) != []:
+                blockers.append(
+                    {
+                        "reason": "scriptstruct_inventory_transfer_bool_property_semantics_has_reject_reasons",
+                        "label": f"{prop_label}.bool_property_semantics.reject_reasons",
+                    }
+                )
+            for key in ("bool_field_size", "bool_byte_offset"):
+                expected = expected_values[key]
+                if semantics.get(key) != expected:
+                    blockers.append(
+                        {
+                            "reason": f"scriptstruct_inventory_transfer_bool_property_semantics_{key}_mismatch",
                             "label": f"{prop_label}.bool_property_semantics.{key}",
                             "expected": expected,
                             "recorded": semantics.get(key),
@@ -2625,6 +2792,9 @@ def validate_scriptstruct_inventory_pack_manifest(
     if not isinstance(artifacts, dict):
         blockers.append({"reason": "scriptstruct_inventory_artifacts_missing", "label": f"{label}:$.artifacts"})
     else:
+        inputs = payload.get("inputs")
+        target_sets = inputs.get("target_sets") if isinstance(inputs, dict) else None
+        require_transfer_bool_tail = isinstance(target_sets, list) and TRANSFER_SCRIPTSTRUCT_TARGET_SET in target_sets
         blockers.extend(
             validate_scriptstruct_inventory_child_artifact(
                 artifacts,
@@ -2635,6 +2805,7 @@ def validate_scriptstruct_inventory_pack_manifest(
                 protected_root=protected_root,
                 expected_schema="obelisk.scriptstruct-inventory.v1",
                 summary_count=summary_count,
+                require_transfer_bool_tail=require_transfer_bool_tail,
             )
         )
         blockers.extend(

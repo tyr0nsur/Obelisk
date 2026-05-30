@@ -132,6 +132,12 @@ The inventory pack was regenerated with `--include-structs`, so the child
 `scriptstruct-inventory.json` carries the same bool-tail details instead of relying only on
 the readiness report.
 
+The offline artifact gate now treats `transfer-scriptstruct` inventory packs as
+bool-tail-sensitive: consume mode requires the child inventory to include `scriptstructs`
+and requires `PrimalLocalProfile.ArkTributePlayerData` to preserve
+`bWasAllowDPCUpload`, `bWithItems`, and `bForServerTransfer` with exact offsets and
+bool-tail metadata. This is a gate hardening only; it does not promote Transfer.
+
 Gate result:
 
 ```text
@@ -174,8 +180,10 @@ is stale with current comparator strictness. It accepts `ARKTributeDino`, but le
 
 ## Next Step
 
-If Transfer continues, keep it internal and evidence-only. The next useful step is a
-redacted signature refresh that consumes this bool-tail-complete snapshot/inventory pack,
-still with `promotion_ready=false`. A future tooling hardening task should make
-`transfer-scriptstruct` inventory gates require `scriptstructs` plus the three exact
-`ArkTributePlayerData` bool contracts so incomplete packs fail earlier.
+If Transfer continues, keep it internal and evidence-only. The next useful step is to
+harden redacted ScriptStruct signatures so `BoolProperty` entries carry
+`bool_field_size`, `bool_byte_offset`, masks, and `native_bool`, then reject
+`transfer-scriptstruct` redacted signatures unless the same three
+`ArkTributePlayerData` bool contracts are present. Keep consume accepted / promote
+blocked and do not add a public Transfer SDK, runtime observer, payload decoder, identity,
+mutation, or return override.
