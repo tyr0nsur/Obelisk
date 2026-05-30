@@ -27,6 +27,36 @@ that own background work stay experimental until they prove idempotent shutdown,
 external ingress, unregister owner-token callback handles, drain queues, join threads,
 close sockets/files, and avoid detached workers or persisted runtime handles.
 
+## Plugin-Local Chat Command Parsing
+
+Command-like chat helpers should be implemented inside a plugin on top of the copied
+`ChatMessageEvent` notification. Do not add command registration, routing, reply, send,
+permission, identity, or mutation functions to `ObeliskApi` for this pattern.
+
+A plugin-local helper should:
+
+- subscribe with `RegisterChatMessageEventWithOwnerTokenHandle` only after checking
+  `OBELISK_API_CAPABILITY_CHAT_EVENTS`, `struct_size`, a non-zero `plugin_owner_token`,
+  and non-null chat register/unregister function pointers;
+- reject malformed events unless `event`, `event->struct_size >= sizeof(ObeliskChatMessageEvent)`,
+  `event->abi_version == OBELISK_CHAT_MESSAGE_EVENT_ABI_VERSION`,
+  `event->send_mode <= OBELISK_CHAT_SEND_MODE_MAX`, and
+  `event->message.data != nullptr || event->message.size == 0` are all valid;
+- treat empty messages and messages without a configured command prefix as local no-match
+  cases, not authorization failures;
+- treat `event->message` as callback-scope borrowed bytes and copy the command text into
+  plugin-owned memory before any deferred work;
+- parse only plugin-owned prefixes and command tables from that copied text;
+- pass `principal=unknown` to every local handler;
+- log command names, send mode, sequence, and rejection reasons only, not raw chat text by
+  default.
+
+Handlers must stay plugin-local and fail closed for anything that needs a real sender,
+player identity, permissions, targeted replies, chat send, moderation, blocking, mutation,
+return override, UE lookup, `FString`, `UObject`, raw params, or FName/GObjects indices.
+`sequence` is process-local diagnostic ordering only and must not be persisted or used as
+identity across server processes.
+
 ## Build
 
 ```bash

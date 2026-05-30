@@ -128,6 +128,93 @@ def static_evidence(
     return payload
 
 
+def uobject_flag_policy_report(*, include_contract: bool = True, promotion_ready: bool = False) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "schema": evaluator.UOBJECT_FLAG_POLICY_REPORT_SCHEMA,
+        "evidence_kind": "static_negative_equivalent_candidate",
+        "status": "candidate_blocked",
+        "binary": {
+            "sha256": "c" * 64,
+            "path_redacted": True,
+        },
+        "promotion_ready": promotion_ready,
+        "post_callback_resource_handle_ready": False,
+        "weak_helper_caller_mode": {
+            "schema": "obelisk.weak-helper-caller-mode-redacted.v1",
+            "artifact_sha256": "d" * 64,
+            "promotion_gate_ready": False,
+            "direct_call_coverage": {
+                "weak_helper_flag_policy_candidate": {
+                    "expected": 6,
+                    "observed": 6,
+                },
+            },
+            "flag_rules": [
+                {"mask": "0x100", "result": "null_always"},
+                {"mask": "0x4000", "result": "null_when_sil_zero"},
+            ],
+            "caller_rows_summary": {
+                "helper": "weak_helper_flag_policy_candidate",
+                "row_count": 6,
+                "unique_caller_hash_count": 6,
+                "source_count": 2,
+                "claim_level": "internal_static_caller_mode_candidate",
+                "lifecycle_names": "not_promoted",
+                "path_redacted": True,
+            },
+        },
+        "windows_summary": {
+            "required": [
+                "weak_helper_reject_0x100",
+                "strict_0x4000_behavior",
+                "gobjects_backed_0x4000_skip",
+                "gc_static_0x100_support",
+            ],
+            "observed": [
+                {"path_redacted": True, "artifact_sha256": "e" * 64},
+                {"path_redacted": True, "artifact_sha256": "f" * 64},
+                {"path_redacted": True, "artifact_sha256": "1" * 64},
+                {"path_redacted": True, "artifact_sha256": "2" * 64},
+            ],
+            "all_required_present": True,
+            "all_required_patterns_present": True,
+        },
+        "policy_candidates": [
+            {
+                "mask": "0x100",
+                "candidate": "hard_invalid_static_negative_equivalent",
+                "support": [
+                    "weak_helper_flag_policy_candidate_null_always",
+                    "gc_static_0x100_support",
+                ],
+                "ue_lifecycle_name": "not_promoted",
+            },
+            {
+                "mask": "0x4000",
+                "candidate": "strict_invalid_static_negative_equivalent",
+                "support": [
+                    "weak_helper_flag_policy_candidate_null_when_mode_zero",
+                    "strict_0x4000_behavior",
+                    "gobjects_backed_0x4000_skip",
+                ],
+                "ue_lifecycle_name": "not_promoted",
+            },
+        ],
+        "remaining_blockers": list(evaluator.UOBJECT_FLAG_POLICY_REMAINING_BLOCKERS),
+        "non_claims": list(evaluator.UOBJECT_FLAG_POLICY_NON_CLAIMS),
+        "redaction": {
+            "paths": "redacted",
+            "addresses": "redacted",
+            "raw_snippets": "omitted",
+        },
+    }
+    if include_contract:
+        payload["internal_revalidation_contract"] = json.loads(
+            json.dumps(evaluator.INTERNAL_UOBJECT_REVALIDATION_CONTRACT)
+        )
+    return payload
+
+
 class ResourceHandleRevalidationEvaluatorTests(unittest.TestCase):
     def test_fail_closed_with_current_style_zero_serials_and_missing_static_evidence(self) -> None:
         report = reconciliation_report(serial_values=[0, 0, 0])
@@ -269,6 +356,105 @@ class ResourceHandleRevalidationEvaluatorTests(unittest.TestCase):
             "class_name",
             "outer_name",
             "fuobject_item",
+        ):
+            self.assertNotIn(forbidden, text)
+
+    def test_uobject_flag_policy_emits_internal_candidate_without_promoting_resourcehandle(self) -> None:
+        payload = evaluator.build_evaluation(
+            [reconciliation_report(serial_values=[17, 23])],
+            static_evidence(coherent=True),
+            uobject_flag_policy=uobject_flag_policy_report(),
+        )
+
+        assert_fail_closed_resource_handle_contract(self, payload)
+        self.assertTrue(payload["evidence_checks"]["internal_uobject_revalidation_candidate_present"])
+        self.assertFalse(payload["uobject_flags_validity_semantics_proven"])
+        self.assertIn(evaluator.BLOCKER_UOBJECT_FLAGS, payload["blockers"])
+        self.assertNotIn(evaluator.BLOCKER_INVALID_UOBJECT_FLAG_POLICY_CANDIDATE, payload["blockers"])
+        candidate = payload["internal_uobject_revalidation_candidate"]
+        self.assertTrue(candidate["accepted"])
+        self.assertEqual(candidate["contract_source"], "embedded")
+        self.assertEqual(candidate["candidate"], evaluator.INTERNAL_UOBJECT_REVALIDATION_CONTRACT)
+        self.assertEqual(candidate["policy_candidate_masks"], ["0x100", "0x4000"])
+        self.assertEqual(candidate["evidence_summary"]["windows"]["observed_count"], 4)
+        self.assertEqual(candidate["source_promotion_ready"], False)
+        self.assertEqual(candidate["source_post_callback_resource_handle_ready"], False)
+
+    def test_uobject_flag_policy_can_derive_internal_candidate_from_current_durable_artifact_shape(self) -> None:
+        payload = evaluator.build_evaluation(
+            [reconciliation_report(serial_values=[17])],
+            static_evidence(coherent=True),
+            uobject_flag_policy=uobject_flag_policy_report(include_contract=False),
+        )
+
+        assert_fail_closed_resource_handle_contract(self, payload)
+        candidate = payload["internal_uobject_revalidation_candidate"]
+        self.assertTrue(candidate["accepted"])
+        self.assertEqual(candidate["contract_source"], "derived_from_policy_candidates")
+        self.assertEqual(candidate["candidate"]["post_callback_lookup"], "rejected")
+        self.assertEqual(candidate["candidate"]["public_api"], "not_promoted")
+
+    def test_invalid_uobject_flag_policy_keeps_internal_candidate_fail_closed(self) -> None:
+        payload = evaluator.build_evaluation(
+            [reconciliation_report(serial_values=[17])],
+            static_evidence(coherent=True),
+            uobject_flag_policy=uobject_flag_policy_report(promotion_ready=True),
+        )
+
+        assert_fail_closed_resource_handle_contract(self, payload)
+        self.assertFalse(payload["evidence_checks"]["internal_uobject_revalidation_candidate_present"])
+        self.assertIn(evaluator.BLOCKER_INVALID_UOBJECT_FLAG_POLICY_CANDIDATE, payload["blockers"])
+        candidate = payload["internal_uobject_revalidation_candidate"]
+        self.assertFalse(candidate["accepted"])
+        self.assertIn("uobject_flag_policy_promotion_ready_overclaim", candidate["issues"])
+
+    def test_cli_uobject_flag_policy_output_is_redacted(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            reconciliation = root / "reconciliation.json"
+            static = root / "static.json"
+            policy = root / "uobject-flag-policy.json"
+            output = root / "resource-handle-readiness.json"
+            write_json(reconciliation, reconciliation_report(serial_values=[17]))
+            write_json(static, static_evidence(coherent=True))
+            write_json(policy, uobject_flag_policy_report(include_contract=False))
+
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "evaluate_resource_handle_revalidation.py"),
+                    "--reconciliation",
+                    str(reconciliation),
+                    "--static-global-evidence",
+                    str(static),
+                    "--uobject-flag-policy",
+                    str(policy),
+                    "--output",
+                    str(output),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            text = output.read_text(encoding="utf-8")
+            payload = json.loads(text)
+
+        candidate = payload["internal_uobject_revalidation_candidate"]
+        self.assertTrue(candidate["accepted"])
+        self.assertEqual(candidate["contract_source"], "derived_from_policy_candidates")
+        for forbidden in (
+            "0x1111222233334444",
+            "0x5555666677778888",
+            "ServerChat",
+            "Function",
+            "CoreUObject",
+            "/servidor/ark",
+            "25447",
+            "42424242",
+            "fuobject_item",
+            "class_name",
+            "outer_name",
         ):
             self.assertNotIn(forbidden, text)
 

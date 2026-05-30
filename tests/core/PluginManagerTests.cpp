@@ -41,6 +41,7 @@ namespace
         std::condition_variable Cv;
         int Calls = 0;
         int Completed = 0;
+        uint64_t LastTimerId = 0;
         bool Release = false;
         bool ShutdownEntered = false;
         bool CloseEntered = false;
@@ -149,19 +150,21 @@ namespace
         ++plugin->timerEventCalls;
     }
 
-    void CountingTimerCallback(uint64_t, void* userData)
+    void CountingTimerCallback(uint64_t timerId, void* userData)
     {
         auto* state = static_cast<TimerFenceState*>(userData);
         std::lock_guard<std::mutex> lock(state->Mutex);
         ++state->Calls;
+        state->LastTimerId = timerId;
         state->Cv.notify_all();
     }
 
-    void BlockingTimerCallback(uint64_t, void* userData)
+    void BlockingTimerCallback(uint64_t timerId, void* userData)
     {
         auto* state = static_cast<TimerFenceState*>(userData);
         std::unique_lock<std::mutex> lock(state->Mutex);
         ++state->Calls;
+        state->LastTimerId = timerId;
         state->Cv.notify_all();
         state->Cv.wait(lock, [state]() { return state->Release; });
         ++state->Completed;
@@ -2067,6 +2070,8 @@ namespace
                         return state.Calls >= 2;
                     }),
                     "public repeating timer did not fire twice");
+            Require(state.LastTimerId == timerId,
+                    "public repeating timer callback received wrong timer handle");
             callsAtUnregister = state.Calls;
         }
 
@@ -2126,6 +2131,8 @@ namespace
                         return state.Calls == 1;
                     }),
                     "blocking plugin-owned timer callback did not enter");
+            Require(state.LastTimerId == timerId,
+                    "blocking plugin-owned timer callback received wrong timer handle");
         }
 
         std::thread unloadThread([&]() {

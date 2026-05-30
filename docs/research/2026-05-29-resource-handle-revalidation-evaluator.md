@@ -80,6 +80,27 @@ The evaluator adds those blockers both to the top-level `blockers` set and to
 stronger offline inputs, but the required lifetime blockers remain until a separate
 public ResourceHandle contract is designed and validated.
 
+## 2026-05-30 Internal UObject Revalidation Candidate
+
+The evaluator can now consume an optional redacted
+`obelisk.uobject-flag-policy-report.v1` via `--uobject-flag-policy` and emit an
+`internal_uobject_revalidation_candidate` section. This section is an internal static
+candidate only. It records counts, hashes, the redacted `0x100`/`0x4000` policy candidate,
+and a fail-closed contract:
+
+- lifetime: `frame_local_only`
+- post-callback lookup: `rejected`
+- output: `copied_bool_or_obelisk_owned_data_only`
+- public API: `not_promoted`
+
+For the durable artifact
+`/home/flowcommunity-ark/obelisk-artifacts/uobject-flag-policy-refresh-20260530T071436Z/uobject-flag-policy.redacted.json`,
+the evaluator derives that contract from the candidate matrix because the artifact predates
+the embedded `internal_revalidation_contract` field. This does not promote
+`ResourceHandle`, object identity, lookup, mutation, return override, SDK surface, or UE
+lifecycle names. `uobject_flags_validity_semantics_proven`,
+`public_resource_handle_ready`, and `post_callback_resource_handle_ready` remain `false`.
+
 ## Validation
 
 No runtime/server action is required. Inputs under `/servidor/ark` are rejected unless

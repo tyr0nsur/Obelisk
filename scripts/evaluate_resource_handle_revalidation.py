@@ -20,6 +20,8 @@ from snapshot_evidence_pack import reject_protected_input_path, reject_protected
 SCHEMA = "obelisk.resource-handle-revalidation-evaluator.v1"
 GOBJECTS_RECONCILIATION_SCHEMA = "obelisk.gobjects-sample-reconciliation.v1"
 STATIC_GLOBAL_EVIDENCE_SCHEMA = "obelisk.static-global-promotion-evidence.v1"
+UOBJECT_FLAG_POLICY_REPORT_SCHEMA = "obelisk.uobject-flag-policy-report.v1"
+INTERNAL_UOBJECT_REVALIDATION_CANDIDATE_SCHEMA = "obelisk.internal-uobject-revalidation-candidate.v1"
 
 STATUS_CANDIDATE_UOBJECT = "candidate-uobject"
 BLOCKER_ZERO_OR_MISSING_SERIAL = "zero_or_missing_fuobjectitem_serial_candidates"
@@ -27,6 +29,54 @@ BLOCKER_UOBJECT_FLAGS = "uobject_flags_validity_semantics_unproven"
 BLOCKER_MISSING_COHERENT_WINDOW = "missing_gobjects_coherent_field_window"
 BLOCKER_MISSING_ARTIFACT_IDENTITY = "missing_or_partial_artifact_identity"
 BLOCKER_INVALID_ARTIFACT_IDENTITY = "invalid_artifact_identity"
+BLOCKER_INVALID_UOBJECT_FLAG_POLICY_CANDIDATE = "invalid_uobject_flag_policy_candidate"
+UOBJECT_FLAG_POLICY_REMAINING_BLOCKERS = (
+    "static_only_evidence",
+    "no_rejected_runtime_object_samples",
+    "no_named_lifecycle_semantics",
+    "public_resourcehandle_policy_missing",
+    "post_callback_lifetime_policy_unproven",
+)
+UOBJECT_FLAG_POLICY_NON_CLAIMS = (
+    "does_not_promote_resourcehandle",
+    "does_not_promote_post_callback_lookup",
+    "does_not_claim_mutation_or_return_override_safety",
+    "does_not_assign_public_ue_lifecycle_flag_names",
+    "does_not_prove_public_sdk_object_identity",
+    "does_not_replace_rejected_runtime_object_samples",
+)
+INTERNAL_UOBJECT_REVALIDATION_CONTRACT = {
+    "name": "InternalUObjectRevalidationCandidate",
+    "lifetime": "frame_local_only",
+    "post_callback_lookup": "rejected",
+    "flag_policy": {
+        "0x100": "reject",
+        "0x4000": "reject_by_default",
+    },
+    "output": "copied_bool_or_obelisk_owned_data_only",
+    "public_api": "not_promoted",
+}
+EXPECTED_UOBJECT_FLAG_POLICY_CANDIDATES = {
+    "0x100": {
+        "candidate": "hard_invalid_static_negative_equivalent",
+        "support": {
+            "weak_helper_flag_policy_candidate_null_always",
+            "gc_static_0x100_support",
+        },
+    },
+    "0x4000": {
+        "candidate": "strict_invalid_static_negative_equivalent",
+        "support": {
+            "weak_helper_flag_policy_candidate_null_when_mode_zero",
+            "strict_0x4000_behavior",
+            "gobjects_backed_0x4000_skip",
+        },
+    },
+}
+EXPECTED_UOBJECT_FLAG_RULES = [
+    {"mask": "0x100", "result": "null_always"},
+    {"mask": "0x4000", "result": "null_when_sil_zero"},
+]
 RESOURCE_HANDLE_NON_CLAIMS = (
     "does_not_unlock_resource_handle",
     "does_not_promote_gobjects_lookup",
@@ -195,11 +245,202 @@ def count_static_gobjects_candidates(report: dict[str, Any]) -> int:
     return sum(1 for candidate in candidates if isinstance(candidate, dict) and candidate.get("kind") == "gobjects")
 
 
+def validate_policy_candidates(candidates: object) -> tuple[dict[str, str], list[str]]:
+    issues: list[str] = []
+    if not isinstance(candidates, list):
+        return {}, ["missing_policy_candidates"]
+
+    observed: dict[str, str] = {}
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            issues.append("policy_candidate_not_object")
+            continue
+        mask = candidate.get("mask")
+        if not isinstance(mask, str):
+            issues.append("policy_candidate_mask_invalid")
+            continue
+        expected = EXPECTED_UOBJECT_FLAG_POLICY_CANDIDATES.get(mask)
+        if expected is None:
+            issues.append("policy_candidate_mask_unexpected")
+            continue
+        observed[mask] = str(candidate.get("candidate"))
+        if candidate.get("candidate") != expected["candidate"]:
+            issues.append(f"policy_candidate_{mask}_kind_mismatch")
+        support = candidate.get("support")
+        if not isinstance(support, list) or set(support) != expected["support"]:
+            issues.append(f"policy_candidate_{mask}_support_mismatch")
+        if candidate.get("ue_lifecycle_name") != "not_promoted":
+            issues.append(f"policy_candidate_{mask}_lifecycle_name_promoted")
+
+    if set(observed) != set(EXPECTED_UOBJECT_FLAG_POLICY_CANDIDATES):
+        issues.append("policy_candidate_masks_mismatch")
+    return observed, issues
+
+
+def build_internal_uobject_revalidation_candidate(report: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    issues: list[str] = []
+    source_hashes = identity_hashes(report)
+
+    if report.get("schema") != UOBJECT_FLAG_POLICY_REPORT_SCHEMA:
+        issues.append("uobject_flag_policy_schema_mismatch")
+    if report.get("evidence_kind") != "static_negative_equivalent_candidate":
+        issues.append("uobject_flag_policy_evidence_kind_mismatch")
+    if report.get("status") != "candidate_blocked":
+        issues.append("uobject_flag_policy_status_not_candidate_blocked")
+    if report.get("promotion_ready") is not False:
+        issues.append("uobject_flag_policy_promotion_ready_overclaim")
+    if report.get("post_callback_resource_handle_ready") is not False:
+        issues.append("uobject_flag_policy_post_callback_resourcehandle_overclaim")
+
+    binary = report.get("binary")
+    binary_sha256: str | None = None
+    if not isinstance(binary, dict):
+        issues.append("uobject_flag_policy_binary_missing")
+    else:
+        if binary.get("path_redacted") is not True:
+            issues.append("uobject_flag_policy_binary_path_not_redacted")
+        if is_sha256(binary.get("sha256")):
+            binary_sha256 = str(binary["sha256"])
+        else:
+            issues.append("uobject_flag_policy_binary_sha256_invalid")
+
+    redaction = report.get("redaction")
+    if isinstance(redaction, dict):
+        if redaction.get("paths") != "redacted":
+            issues.append("uobject_flag_policy_paths_not_redacted")
+        if redaction.get("addresses") != "redacted":
+            issues.append("uobject_flag_policy_addresses_not_redacted")
+        if redaction.get("raw_snippets") != "omitted":
+            issues.append("uobject_flag_policy_raw_snippets_not_omitted")
+
+    weak_helper = report.get("weak_helper_caller_mode")
+    weak_helper_summary: dict[str, Any] = {
+        "present": isinstance(weak_helper, dict),
+        "direct_call_coverage_complete": False,
+        "caller_rows_summary_present": False,
+    }
+    if not isinstance(weak_helper, dict):
+        issues.append("uobject_flag_policy_weak_helper_missing")
+    else:
+        if weak_helper.get("promotion_gate_ready") is not False:
+            issues.append("uobject_flag_policy_weak_helper_promotion_gate_overclaim")
+        if weak_helper.get("flag_rules") != EXPECTED_UOBJECT_FLAG_RULES:
+            issues.append("uobject_flag_policy_weak_helper_flag_rules_mismatch")
+        coverage = weak_helper.get("direct_call_coverage")
+        coverage_entry = coverage.get("weak_helper_flag_policy_candidate") if isinstance(coverage, dict) else None
+        if isinstance(coverage_entry, dict):
+            expected_calls = int_value(coverage_entry.get("expected"))
+            observed_calls = int_value(coverage_entry.get("observed"))
+            weak_helper_summary["direct_call_coverage"] = {
+                "expected": expected_calls,
+                "observed": observed_calls,
+            }
+            weak_helper_summary["direct_call_coverage_complete"] = (
+                expected_calls == 6 and observed_calls == 6
+            )
+        if not weak_helper_summary["direct_call_coverage_complete"]:
+            issues.append("uobject_flag_policy_direct_call_coverage_incomplete")
+
+        caller_rows = weak_helper.get("caller_rows_summary")
+        if isinstance(caller_rows, dict):
+            weak_helper_summary["caller_rows_summary_present"] = True
+            weak_helper_summary["caller_rows"] = {
+                "row_count": int_value(caller_rows.get("row_count")),
+                "unique_caller_hash_count": int_value(caller_rows.get("unique_caller_hash_count")),
+                "source_count": int_value(caller_rows.get("source_count")),
+                "claim_level": caller_rows.get("claim_level") if isinstance(caller_rows.get("claim_level"), str) else None,
+                "lifecycle_names": caller_rows.get("lifecycle_names") if isinstance(caller_rows.get("lifecycle_names"), str) else None,
+                "path_redacted": caller_rows.get("path_redacted") is True,
+            }
+            if caller_rows.get("claim_level") != "internal_static_caller_mode_candidate":
+                issues.append("uobject_flag_policy_caller_rows_claim_level_mismatch")
+            if caller_rows.get("lifecycle_names") != "not_promoted":
+                issues.append("uobject_flag_policy_caller_rows_lifecycle_names_promoted")
+            if caller_rows.get("path_redacted") is not True:
+                issues.append("uobject_flag_policy_caller_rows_path_not_redacted")
+
+    observed_candidates, candidate_issues = validate_policy_candidates(report.get("policy_candidates"))
+    issues.extend(candidate_issues)
+
+    windows = report.get("windows_summary")
+    windows_summary = {
+        "present": isinstance(windows, dict),
+        "required_count": 0,
+        "observed_count": 0,
+        "all_required_present": False,
+        "all_required_patterns_present": False,
+    }
+    if not isinstance(windows, dict):
+        issues.append("uobject_flag_policy_windows_summary_missing")
+    else:
+        required = windows.get("required")
+        observed = windows.get("observed")
+        windows_summary = {
+            "present": True,
+            "required_count": len(required) if isinstance(required, list) else 0,
+            "observed_count": len(observed) if isinstance(observed, list) else 0,
+            "all_required_present": windows.get("all_required_present") is True,
+            "all_required_patterns_present": windows.get("all_required_patterns_present") is True,
+        }
+        if not windows_summary["all_required_present"]:
+            issues.append("uobject_flag_policy_required_windows_not_present")
+        if not windows_summary["all_required_patterns_present"]:
+            issues.append("uobject_flag_policy_required_patterns_not_present")
+        if isinstance(observed, list) and any(
+            not isinstance(window, dict) or window.get("path_redacted") is not True
+            for window in observed
+        ):
+            issues.append("uobject_flag_policy_window_path_not_redacted")
+
+    embedded_contract = report.get("internal_revalidation_contract")
+    contract_source = "derived_from_policy_candidates"
+    if isinstance(embedded_contract, dict):
+        contract_source = "embedded"
+        if embedded_contract != INTERNAL_UOBJECT_REVALIDATION_CONTRACT:
+            issues.append("internal_uobject_revalidation_contract_mismatch")
+
+    remaining_blockers = report.get("remaining_blockers")
+    if not isinstance(remaining_blockers, list) or not set(UOBJECT_FLAG_POLICY_REMAINING_BLOCKERS).issubset(set(remaining_blockers)):
+        issues.append("uobject_flag_policy_remaining_blockers_missing")
+    non_claims = report.get("non_claims")
+    if not isinstance(non_claims, list) or not set(UOBJECT_FLAG_POLICY_NON_CLAIMS).issubset(set(non_claims)):
+        issues.append("uobject_flag_policy_non_claims_missing")
+
+    accepted = not issues
+    return (
+        {
+            "schema": INTERNAL_UOBJECT_REVALIDATION_CANDIDATE_SCHEMA,
+            "accepted": accepted,
+            "candidate_level": "internal_static_candidate",
+            "contract_source": contract_source,
+            "source_schema": report.get("schema") if isinstance(report.get("schema"), str) else None,
+            "source_status": report.get("status") if isinstance(report.get("status"), str) else None,
+            "source_candidate_blocked": report.get("status") == "candidate_blocked",
+            "source_promotion_ready": False,
+            "source_post_callback_resource_handle_ready": False,
+            "binary_sha256": binary_sha256,
+            "source_artifact_hashes": sorted(source_hashes),
+            "policy_candidate_masks": sorted(observed_candidates),
+            "candidate": INTERNAL_UOBJECT_REVALIDATION_CONTRACT,
+            "evidence_summary": {
+                "policy_candidate_count": len(observed_candidates),
+                "weak_helper_caller_mode": weak_helper_summary,
+                "windows": windows_summary,
+            },
+            "non_claims": list(UOBJECT_FLAG_POLICY_NON_CLAIMS),
+            "remaining_blockers": list(UOBJECT_FLAG_POLICY_REMAINING_BLOCKERS),
+            "issues": sorted(set(issues)),
+        },
+        sorted(set(issues)),
+    )
+
+
 def build_evaluation(
     reconciliation_reports: list[dict[str, Any]],
     static_global_evidence: dict[str, Any] | None,
     *,
     require_artifact_identity: bool = False,
+    uobject_flag_policy: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     blockers: list[str] = []
     collected_identity_hashes: set[str] = set()
@@ -269,6 +510,17 @@ def build_evaluation(
     if not coherent_window_proven:
         blockers.append(BLOCKER_MISSING_COHERENT_WINDOW)
 
+    internal_uobject_revalidation_candidate: dict[str, Any] | None = None
+    uobject_flag_policy_report_count = 1 if uobject_flag_policy is not None else 0
+    if uobject_flag_policy is not None:
+        policy_hashes = identity_hashes(uobject_flag_policy)
+        collected_identity_hashes.update(policy_hashes)
+        internal_uobject_revalidation_candidate, policy_issues = build_internal_uobject_revalidation_candidate(
+            uobject_flag_policy
+        )
+        if policy_issues:
+            blockers.append(BLOCKER_INVALID_UOBJECT_FLAG_POLICY_CANDIDATE)
+
     blockers.append(BLOCKER_UOBJECT_FLAGS)
     if require_artifact_identity and missing_or_partial_artifact_identity_report_count:
         blockers.append(BLOCKER_MISSING_ARTIFACT_IDENTITY)
@@ -308,6 +560,10 @@ def build_evaluation(
         ),
         "gobjects_coherent_field_window_proven": coherent_window_proven,
         "uobject_flags_validity_semantics_proven": False,
+        "internal_uobject_revalidation_candidate_present": (
+            internal_uobject_revalidation_candidate is not None
+            and internal_uobject_revalidation_candidate["accepted"] is True
+        ),
         "public_resource_handle_contract_present": False,
         "public_resourcehandle_policy_present": False,
         "post_callback_lifetime_contract_present": False,
@@ -329,12 +585,13 @@ def build_evaluation(
         evidence_checks["artifact_identity_present"] = bool(collected_identity_hashes)
         evidence_checks["required_artifact_identity_present"] = required_artifact_identity_present
 
-    return {
+    evaluation = {
         "schema": SCHEMA,
         "generated_at_utc": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
         "report_counts": {
             "reconciliation": len(reconciliation_reports),
             "static_global_evidence": static_report_count,
+            "uobject_flag_policy": uobject_flag_policy_report_count,
             "invalid_reconciliation_schema": invalid_reconciliation_schema_count,
             "static_global_evidence_schema_valid": static_schema_valid,
         },
@@ -363,6 +620,9 @@ def build_evaluation(
             "blockers": blockers,
         },
     }
+    if internal_uobject_revalidation_candidate is not None:
+        evaluation["internal_uobject_revalidation_candidate"] = internal_uobject_revalidation_candidate
+    return evaluation
 
 
 def parse_args() -> argparse.Namespace:
@@ -375,6 +635,11 @@ def parse_args() -> argparse.Namespace:
         help="Offline gobjects reconciliation report JSON. May be repeated.",
     )
     parser.add_argument("--static-global-evidence", type=Path, help="Optional static global evidence JSON.")
+    parser.add_argument(
+        "--uobject-flag-policy",
+        type=Path,
+        help="Optional redacted UObject flag-policy candidate report JSON.",
+    )
     parser.add_argument("--output", type=Path, help="Optional redacted JSON output path.")
     parser.add_argument(
         "--require-artifact-identity",
@@ -395,6 +660,11 @@ def main() -> int:
         if args.static_global_evidence
         else None
     )
+    uobject_flag_policy_path = (
+        reject_protected_input_path(args.uobject_flag_policy, "--uobject-flag-policy")
+        if args.uobject_flag_policy
+        else None
+    )
     output_path = reject_protected_output_path(args.output, "--output") if args.output else None
 
     reconciliation_reports = [
@@ -402,10 +672,16 @@ def main() -> int:
         for path in reconciliation_paths
     ]
     static_report = load_json(static_path, "--static-global-evidence") if static_path is not None else None
+    uobject_flag_policy_report = (
+        load_json(uobject_flag_policy_path, "--uobject-flag-policy")
+        if uobject_flag_policy_path is not None
+        else None
+    )
     evaluation = build_evaluation(
         reconciliation_reports,
         static_report,
         require_artifact_identity=args.require_artifact_identity,
+        uobject_flag_policy=uobject_flag_policy_report,
     )
     text = json.dumps(evaluation, indent=2, sort_keys=True)
     if output_path:
