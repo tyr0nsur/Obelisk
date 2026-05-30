@@ -2065,6 +2065,12 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
                     "--snapshot-json",
                     "--evidence-ark-sha256",
                     "fixture-sha",
+                    "--evidence-artifact-sha256",
+                    "0" * 64,
+                    "--evidence-capture-id",
+                    "fixture-capture",
+                    "--evidence-pack-id",
+                    "fixture-pack",
                     "--evidence-obelisk-commit",
                     "fixture-commit",
                 ],
@@ -2075,6 +2081,10 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
 
         payload = json.loads(result.stdout)
         self.assertEqual(payload["evidence"]["ark_binary_sha256"], "fixture-sha")
+        self.assertEqual(payload["evidence"]["artifact_kind"], "offline_core")
+        self.assertEqual(payload["evidence"]["artifact_sha256"], "0" * 64)
+        self.assertEqual(payload["evidence"]["capture_id"], "fixture-capture")
+        self.assertEqual(payload["evidence"]["evidence_pack_id"], "fixture-pack")
         self.assertEqual(payload["evidence"]["obelisk_commit"], "fixture-commit")
         self.assertEqual(payload["evidence"]["source"], "offline_core")
         self.assertEqual(payload["evidence"]["status"], "candidate-only")

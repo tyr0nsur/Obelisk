@@ -16,6 +16,9 @@ for the exact command and artifact root. RC public scope remains limited to
 `GameplayPolicyEvent`, the minimal copied `ChatMessageEvent`, `DescribeResourceKind`, and
 `DescribeGameplayPolicyEventKind`. It does not promote a public Inventory/Items SDK,
 `ResourceHandle`, identity, lookup, mutation, return override, or live-server claim.
+The historical RC second-source root is the publication baseline only; refresh the RC
+UFunction second-source root for current `HEAD` before any `v0.1.0-rc.2` or stable
+`v0.1.0` candidate.
 Post-RC development promotes process-local owner-token timers as a first-stable v0.1 core
 primitive while still targeting the broader `v1.0` core-stability track: general
 reflection evidence, copied-data module APIs, operator lifecycle safety, and ArkApi-style

@@ -1226,6 +1226,10 @@ def parse_args() -> argparse.Namespace:
         help="Emit a sanitized JSON fixture snapshot without core paths or absolute addresses.",
     )
     parser.add_argument("--evidence-ark-sha256", help="ARK binary SHA256 for --snapshot-json evidence metadata.")
+    parser.add_argument("--evidence-artifact-sha256", help="Source artifact SHA256 for --snapshot-json evidence metadata.")
+    parser.add_argument("--evidence-artifact-kind", default="offline_core", help="Source artifact kind for --snapshot-json evidence metadata.")
+    parser.add_argument("--evidence-capture-id", help="Capture id for --snapshot-json evidence metadata.")
+    parser.add_argument("--evidence-pack-id", help="Evidence pack id for --snapshot-json evidence metadata.")
     parser.add_argument("--evidence-obelisk-commit", help="Obelisk commit for --snapshot-json evidence metadata.")
     parser.add_argument("--evidence-source", default="offline_core", help="Evidence source label for --snapshot-json.")
     parser.add_argument("--evidence-status", default="candidate-only", help="Evidence status label for --snapshot-json.")
@@ -1251,9 +1255,14 @@ def main() -> int:
         raise SystemExit("--max-object-scan must be non-negative")
     if args.json and args.snapshot_json:
         raise SystemExit("choose only one of --json or --snapshot-json")
-    if not args.snapshot_json and (
-        args.evidence_ark_sha256 is not None or args.evidence_obelisk_commit is not None
-    ):
+    evidence_args = (
+        args.evidence_ark_sha256,
+        args.evidence_artifact_sha256,
+        args.evidence_capture_id,
+        args.evidence_pack_id,
+        args.evidence_obelisk_commit,
+    )
+    if not args.snapshot_json and any(value is not None for value in evidence_args):
         raise SystemExit("evidence metadata flags require --snapshot-json")
 
     core_path = reject_protected_input_path(args.core, "--core")
@@ -1281,6 +1290,10 @@ def main() -> int:
     elif args.snapshot_json:
         evidence = {
             "ark_binary_sha256": args.evidence_ark_sha256,
+            "artifact_kind": args.evidence_artifact_kind,
+            "artifact_sha256": args.evidence_artifact_sha256,
+            "capture_id": args.evidence_capture_id,
+            "evidence_pack_id": args.evidence_pack_id,
             "obelisk_commit": args.evidence_obelisk_commit,
             "source": args.evidence_source,
             "status": args.evidence_status,

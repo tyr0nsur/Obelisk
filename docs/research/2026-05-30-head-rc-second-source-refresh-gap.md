@@ -69,6 +69,48 @@ the current snapshot schema, including these fields on every accepted BoolProper
 - matching `bool_property_semantics.bool_field_size`
 - matching `bool_property_semantics.bool_byte_offset`
 
+The refreshed diagnostic root
+`/tmp/obelisk-head-rc-second-source-root-20260530Trefresh` was generated from the existing
+second-source offline core with `scripts/inspect_core_ufunctions.py --snapshot-json` and
+accepted all nine RC targets:
+
+```text
+readiness targets=9 comparable=9 blocked=0 second_source_status=compared gate_mode=second_source_promotion
+promotion_gate ready=true blockers=none
+ufunction:sdk_chat targets=1 comparable=1 blocked=0 second_source=accepted:1,rejected:0,inconclusive:0,missing:0
+ufunction:sdk_inventory targets=2 comparable=2 blocked=0 second_source=accepted:2,rejected:0,inconclusive:0,missing:0
+ufunction:sdk_structures targets=6 comparable=6 blocked=0 second_source=accepted:6,rejected:0,inconclusive:0,missing:0
+```
+
+Source identity used for the refreshed inventory/structure snapshots:
+
+- Core path: `/servidor/ark/workspace-offline/second-source-arkserver2-TheIsland-20260529T011227Z/raw/core`
+- `artifact_sha256=62d1768fd5962ee9270641f0a340dc04dc15edde53eacefbf247eff37e5bed78`
+- `capture_id=core`
+- `evidence_pack_id=gobjects-sampling`
+- `gobjects=0x595b7e0`
+- `fname_root_slot=0x5956f30`
+
+Example generation command:
+
+```bash
+python3 scripts/inspect_core_ufunctions.py \
+  --core /servidor/ark/workspace-offline/second-source-arkserver2-TheIsland-20260529T011227Z/raw/core \
+  --gobjects 0x595b7e0 \
+  --fname-root-slot 0x5956f30 \
+  --outer-exact PrimalItem \
+  --name-exact CanUse \
+  --inspection-mode ufunction \
+  --snapshot-json \
+  --evidence-ark-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
+  --evidence-artifact-sha256 62d1768fd5962ee9270641f0a340dc04dc15edde53eacefbf247eff37e5bed78 \
+  --evidence-capture-id core \
+  --evidence-pack-id gobjects-sampling \
+  --evidence-obelisk-commit <commit> \
+  --evidence-source offline_core \
+  --evidence-status candidate-only
+```
+
 The root must then pass:
 
 ```bash
