@@ -86,11 +86,11 @@ class VersioningGuardrailTests(unittest.TestCase):
                 self.assertIn('out->version = "0.1.0-rc.1";', text)
                 self.assertNotIn('out->version = "0.1.0";', text)
 
-    def test_post_rc_timer_example_does_not_claim_rc_or_stable_version(self) -> None:
+    def test_timer_example_claims_first_stable_core_version_only(self) -> None:
         text = (REPO_ROOT / "plugins/oProcessTimer/oProcessTimer.cpp").read_text(encoding="utf-8")
 
-        self.assertIn('out->version = "0.2.0-dev";', text)
-        self.assertNotIn('out->version = "0.1.0";', text)
+        self.assertIn('out->version = "0.1.0";', text)
+        self.assertNotIn('out->version = "0.2.0-dev";', text)
         self.assertNotIn('out->version = "0.1.0-rc.1";', text)
 
     def test_cmake_exported_abi_versions_match_public_sdk_header(self) -> None:

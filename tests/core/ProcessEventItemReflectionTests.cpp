@@ -308,6 +308,41 @@ namespace
         Require(context.Calls == 0, "zero-budget item observation read memory");
     }
 
+    void TestClosedGatesDoNotReadOrReserve()
+    {
+        ReaderContext context;
+        MemoryReader reader{CountingReader, &context};
+        std::array<Gate, 6> closedGates{{
+            EvaluateGate(nullptr, true, true, true, kSupportedShooterGameServerSha256.data()),
+            EvaluateGate("1", false, true, true, kSupportedShooterGameServerSha256.data()),
+            EvaluateGate("1", true, false, true, kSupportedShooterGameServerSha256.data()),
+            EvaluateGate("1", true, true, false, kSupportedShooterGameServerSha256.data()),
+            EvaluateGate("1", true, true, true, nullptr),
+            EvaluateGate("1", true, true, true, "bad-sha"),
+        }};
+
+        for (const Gate& gate : closedGates)
+        {
+            std::atomic<uint64_t> counter{0};
+            uint64_t observationNumber = 99;
+            Attempt attempt = TryObserveInvocation(
+                gate,
+                kCanRepairNameIndex,
+                reader,
+                reinterpret_cast<void*>(0x1000),
+                reinterpret_cast<void*>(0x2000),
+                counter,
+                1,
+                observationNumber);
+
+            Require(attempt.Status == AttemptStatus::Disabled,
+                    "closed item gate did not fail as disabled");
+            Require(observationNumber == 0, "closed item gate left observation number set");
+            Require(counter.load() == 0, "closed item gate reserved budget");
+            Require(context.Calls == 0, "closed item gate read memory");
+        }
+    }
+
     void TestIdentifyContainsReaderExceptions()
     {
         MemoryReader reader{ThrowingReader, nullptr};
@@ -612,6 +647,20 @@ namespace
         Require(counter.load() == 0, "invalid item return observation advanced counter");
         Require(observationNumber == 0, "invalid item return observation left observation number");
         Require(observation.BoolCount == 0, "invalid item return observation left copied output");
+
+        uint8_t invalidIgnoredRequirement = 2;
+        uint8_t validReturnValue = 1;
+        matched.Invocation = MakeValidCanRepairInvocation(invalidIgnoredRequirement, validReturnValue);
+        observation.BoolCount = 1;
+        observation.BoolStorage[0].Value = true;
+        observationNumber = 99;
+
+        Require(!TryBuildAndReserveItemReturnObservationForMatchedAttempt(
+                    matched, counter, 1, observationNumber, observation),
+                "invalid non-return item bool observation reserved budget");
+        Require(counter.load() == 0, "invalid non-return item bool observation advanced counter");
+        Require(observationNumber == 0, "invalid non-return item bool observation left observation number");
+        Require(observation.BoolCount == 0, "invalid non-return item bool observation left copied output");
     }
 
     void TestRejectsMalformedReturnOnlyShapes()
@@ -938,6 +987,7 @@ int main()
     TestObservationBudgetAndFilter();
     TestDisabledAndNonItemDoNotRead();
     TestObserveDisabledNonItemAndZeroBudgetDoNotReadOrReserve();
+    TestClosedGatesDoNotReadOrReserve();
     TestIdentifyContainsReaderExceptions();
     TestBuildsCopiedItemObservations();
     TestCopiedItemObservationAbiShape();

@@ -100,7 +100,8 @@ Not included yet:
 - GNames/GObjects-backed reflection layer.
 - `ResourceHandle`, public `StructureEvents`, public Inventory SDK, and player, tribe,
   inventory, item, structure, dino, buff, mission, transfer, admin, permission, command, or
-  timer SDKs, including richer chat APIs and command APIs beyond `ChatMessageEvent`.
+  gameplay/module timer SDKs, including richer chat APIs and command APIs beyond
+  `ChatMessageEvent`.
 - Gameplay mutation, return override APIs, and public `CallProcessEvent`-based plugin
   behavior.
 - Mutable operator lifecycle commands such as `obelisk restart` and

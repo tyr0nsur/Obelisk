@@ -131,7 +131,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
 
         for item in [
             "GNames/GObjects-backed reflection layer",
-            "timer SDKs, including richer chat APIs and command APIs beyond `ChatMessageEvent`",
+            "gameplay/module timer SDKs, including richer chat APIs and command APIs beyond",
             "Mutable operator lifecycle commands",
             "Production-ready HTTP plugins",
         ]:
@@ -585,6 +585,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "docs/ARCHITECTURE.md": read("docs/ARCHITECTURE.md"),
             "CONTRIBUTING.md": read("CONTRIBUTING.md"),
             "docs/agent-handoff/CURRENT.md": read("docs/agent-handoff/CURRENT.md"),
+            "docs/agent-handoff/COMPACT_CONTEXT.md": read("docs/agent-handoff/COMPACT_CONTEXT.md"),
             "plugins/README.md": read("plugins/README.md"),
         }
         required = [
@@ -611,6 +612,34 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn('out->version = "0.1.0";', timer_source)
         self.assertNotIn('out->version = "0.2.0-dev";', timer_source)
         self.assertNotIn('out->version = "0.1.0-rc.1";', timer_source)
+
+    def test_core_timer_release_scope_separates_published_rc_from_future_v0_1(self) -> None:
+        docs = {
+            "docs/agent-handoff/COMPACT_CONTEXT.md": read("docs/agent-handoff/COMPACT_CONTEXT.md"),
+            "docs/STATUS.md": read("docs/STATUS.md"),
+            "docs/RELEASE.md": read("docs/RELEASE.md"),
+            "CHANGELOG.md": read("CHANGELOG.md"),
+            "plugins/README.md": read("plugins/README.md"),
+            "docs/PLUGIN_ARCHITECTURE.md": read("docs/PLUGIN_ARCHITECTURE.md"),
+        }
+
+        for path, text in docs.items():
+            compact = normalized(text)
+            lower = compact.lower()
+            with self.subTest(file=path, item="no post-RC/v1 timer label"):
+                self.assertNotIn("post-rc/v1 timers", lower)
+                self.assertNotRegex(lower, r"timers? (?:are|as) post-rc/v1")
+                self.assertNotRegex(lower, r"timers?.{0,80}not part of (?:the )?v0\.1")
+
+        compact_context = normalized(docs["docs/agent-handoff/COMPACT_CONTEXT.md"])
+        release = normalized(docs["docs/RELEASE.md"])
+        changelog = normalized(docs["CHANGELOG.md"])
+
+        self.assertIn("First-stable `v0.1.0` timers are the first non-UE-dependent core primitive", compact_context)
+        self.assertIn("not part of the `v0.1.0-rc.1` public surface", compact_context)
+        self.assertIn("RC public scope remains limited to `GameplayPolicyEvent`, the minimal copied", release)
+        self.assertIn("future first-stable `v0.1.0` scope additionally includes process-local owner-token timers", release)
+        self.assertIn("Promoted the owner-token timer API as the first non-UE-dependent v0.1 core primitive", changelog)
 
     def test_arkapi_reference_is_names_behavior_only_not_porting_or_copying(self) -> None:
         docs = {

@@ -60,9 +60,10 @@ priorities, and do not use history files as the active source of truth.
 - Stable plugin loading requires safe `OBELISK_INSTANCE_ID` plus real non-symlink plugin,
   config, log, and state roots.
 - `ObeliskApi` v1 is append-only for `v0.1.0`; ABI v2 requires an explicit migration plan.
-- Post-RC/v1 timers are the first non-UE-dependent core primitive, not part of the
-  `v0.1.0-rc.1` public surface: owner-token scoped, process-local, zero-failure handles,
-  one-shot/repeating callbacks, explicit unregister, and unload/init-failure cleanup.
+- First-stable `v0.1.0` timers are the first non-UE-dependent core primitive, not part
+  of the `v0.1.0-rc.1` public surface: owner-token scoped, process-local, zero-failure
+  handles, one-shot/repeating callbacks, explicit unregister, and unload/init-failure
+  cleanup.
   Timer ids are not shared config, cluster state, UE identity, gameplay/module timer
   abstractions, shared scheduler state, or persistent handles. `oProcessTimer` is the
   first-party process-local timer example.
