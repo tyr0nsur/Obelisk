@@ -67,6 +67,14 @@ array or item identity may be exposed.
 The observer is internal, log-only, post-original, and default-off. It must never dispatch
 plugin callbacks or write back to UE parameters.
 
+The internal `TryBuildCopiedMissionBoolObservationForMatchedAttempt` helper is
+bool-bearing only. It accepts only `AttemptStatus::Matched` attempts whose copied
+observation contains at least one approved bool, and it returns false for disabled,
+budget-exhausted, non-mission, rejected, metadata-only, or recognition-only
+`GetPlayerUsableItems` attempts with `copied_bool_count=0`. It does not replace
+`TryBuildCopiedMissionObservation` for recognition-only records and does not authorize
+public Mission SDK/API/runtime wiring.
+
 The runtime recognizer, if later approved, must:
 
 - apply the exact Mission FName prefilter before any reflected metadata or parameter read;

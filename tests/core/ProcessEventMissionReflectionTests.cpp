@@ -397,6 +397,10 @@ namespace
                 "single non-zero mission observation/log budget should activate runtime observation");
         Require(!ShouldAttemptRuntimeObservation(0),
                 "single zero mission observation/log budget should skip runtime observation");
+        Require(ShouldLogObservation(1, 1), "in-budget mission observation should log");
+        Require(!ShouldLogObservation(0, 25), "zero mission observation number should not log");
+        Require(!ShouldLogObservation(2, 1), "over-budget mission observation should not log");
+        Require(!ShouldLogObservation(1, 0), "zero mission observation log limit should disable logs");
 
         std::atomic<uint64_t> counter{0};
         uint64_t observationNumber = 99;
@@ -909,6 +913,187 @@ namespace
         Require(!observation.BoolStorage[1].Value, message);
     }
 
+    void TestMatchedAttemptBoolObservationFence()
+    {
+        {
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+
+            std::atomic<uint64_t> observationCounter{0};
+            uint64_t observationNumber = 99;
+            Attempt attempt = TryObserveInvocation(
+                EnabledGate(),
+                kAddPlayerToMissionNameIndex,
+                fixture.Reader(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                observationCounter,
+                0,
+                observationNumber);
+
+            CopiedMissionObservation observation;
+            PoisonObservation(observation);
+            Require(!TryBuildCopiedMissionBoolObservationForMatchedAttempt(attempt, observation),
+                    "zero-budget mission attempt produced copied bool output");
+            RequireObservationCleared(observation,
+                                      "zero-budget mission attempt did not clear copied bool output");
+        }
+        {
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+
+            std::atomic<uint64_t> observationCounter{1};
+            uint64_t observationNumber = 99;
+            Attempt attempt = TryObserveInvocation(
+                EnabledGate(),
+                kAddPlayerToMissionNameIndex,
+                fixture.Reader(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                observationCounter,
+                1,
+                observationNumber);
+
+            CopiedMissionObservation observation;
+            PoisonObservation(observation);
+            Require(!TryBuildCopiedMissionBoolObservationForMatchedAttempt(attempt, observation),
+                    "exhausted-budget mission attempt produced copied bool output");
+            RequireObservationCleared(observation,
+                                      "exhausted-budget mission attempt did not clear copied bool output");
+        }
+        {
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+
+            Attempt attempt = TryIdentifyInvocation(
+                {GateStatus::Disabled, std::string(kSupportedShooterGameServerSha256)},
+                kAddPlayerToMissionNameIndex,
+                fixture.Reader(),
+                fixture.Function.data(),
+                fixture.Params.data());
+
+            CopiedMissionObservation observation;
+            PoisonObservation(observation);
+            Require(!TryBuildCopiedMissionBoolObservationForMatchedAttempt(attempt, observation),
+                    "disabled mission attempt produced copied bool output");
+            RequireObservationCleared(observation,
+                                      "disabled mission attempt did not clear copied bool output");
+        }
+        {
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+            Attempt attempt = TryIdentifyInvocation(
+                EnabledGate(),
+                42,
+                fixture.Reader(),
+                fixture.Function.data(),
+                fixture.Params.data());
+
+            CopiedMissionObservation observation;
+            PoisonObservation(observation);
+            Require(!TryBuildCopiedMissionBoolObservationForMatchedAttempt(attempt, observation),
+                    "non-mission attempt produced copied bool output");
+            RequireObservationCleared(observation,
+                                      "non-mission attempt did not clear copied bool output");
+        }
+        {
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+            WriteAt(fixture.Function, 0x90, uint32_t{0x0c020c00});
+            Attempt attempt = TryIdentifyInvocation(
+                EnabledGate(),
+                kAddPlayerToMissionNameIndex,
+                fixture.Reader(),
+                fixture.Function.data(),
+                fixture.Params.data());
+
+            CopiedMissionObservation observation;
+            PoisonObservation(observation);
+            Require(!TryBuildCopiedMissionBoolObservationForMatchedAttempt(attempt, observation),
+                    "rejected mission attempt produced copied bool output");
+            RequireObservationCleared(observation,
+                                      "rejected mission attempt did not clear copied bool output");
+        }
+        {
+            MissionFixture fixture;
+            BuildGetPlayerUsableItems(fixture);
+            Attempt attempt = Identify(fixture, kGetPlayerUsableItemsNameIndex);
+
+            CopiedMissionObservation observation;
+            PoisonObservation(observation);
+            Require(!TryBuildCopiedMissionBoolObservationForMatchedAttempt(attempt, observation),
+                    "GetPlayerUsableItems produced copied bool output");
+            RequireObservationCleared(observation,
+                                      "GetPlayerUsableItems bool-only attempt did not clear copied output");
+        }
+        {
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+            Attempt attempt = IdentifyMetadataOnly(fixture, kAddPlayerToMissionNameIndex);
+
+            CopiedMissionObservation observation;
+            PoisonObservation(observation);
+            Require(!TryBuildCopiedMissionBoolObservationForMatchedAttempt(attempt, observation),
+                    "metadata-only AddPlayerToMission produced copied bool output");
+            RequireObservationCleared(observation,
+                                      "metadata-only mission attempt did not clear copied bool output");
+        }
+        {
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+            fixture.Params[0x08] = 1;
+            fixture.Params[0x09] = 0;
+            Attempt attempt = Identify(fixture, kAddPlayerToMissionNameIndex);
+
+            CopiedMissionObservation observation;
+            Require(TryBuildCopiedMissionBoolObservationForMatchedAttempt(attempt, observation),
+                    "matched AddPlayerToMission attempt did not produce copied bool output");
+            Require(observation.BoolCount == 2, "AddPlayerToMission bool-only count mismatch");
+            Require(observation.BoolStorage[0].Field == MissionReflection::MissionField::BForceAdd,
+                    "AddPlayerToMission bool-only first field mismatch");
+            Require(observation.BoolStorage[0].Value, "AddPlayerToMission bool-only first value mismatch");
+            Require(observation.BoolStorage[1].Field == MissionReflection::MissionField::ReturnValue,
+                    "AddPlayerToMission bool-only return field mismatch");
+            Require(!observation.BoolStorage[1].Value, "AddPlayerToMission bool-only return value mismatch");
+        }
+        {
+            MissionFixture fixture;
+            BuildBPAllowPlayerToLeaveMission(fixture);
+            fixture.Params[0x08] = 1;
+            Attempt attempt = Identify(fixture, kBPAllowPlayerToLeaveMissionNameIndex);
+
+            CopiedMissionObservation observation;
+            Require(TryBuildCopiedMissionBoolObservationForMatchedAttempt(attempt, observation),
+                    "matched BPAllowPlayerToLeaveMission attempt did not produce copied bool output");
+            Require(observation.BoolCount == 1, "BPAllowPlayerToLeaveMission bool-only count mismatch");
+            Require(observation.BoolStorage[0].Field == MissionReflection::MissionField::ReturnValue,
+                    "BPAllowPlayerToLeaveMission bool-only return field mismatch");
+            Require(observation.BoolStorage[0].Value,
+                    "BPAllowPlayerToLeaveMission bool-only return value mismatch");
+        }
+        {
+            MissionFixture fixture;
+            BuildBPOnPlayerRemovedFromMission(fixture);
+            fixture.Params[0x10] = 1;
+            fixture.Params[0x11] = 0;
+            Attempt attempt = Identify(fixture, kBPOnPlayerRemovedFromMissionNameIndex);
+
+            CopiedMissionObservation observation;
+            Require(TryBuildCopiedMissionBoolObservationForMatchedAttempt(attempt, observation),
+                    "matched BPOnPlayerRemovedFromMission attempt did not produce copied bool output");
+            Require(observation.BoolCount == 2, "BPOnPlayerRemovedFromMission bool-only count mismatch");
+            Require(observation.BoolStorage[0].Field ==
+                        MissionReflection::MissionField::BFromMissionCompleteEvent,
+                    "BPOnPlayerRemovedFromMission bool-only first field mismatch");
+            Require(observation.BoolStorage[0].Value,
+                    "BPOnPlayerRemovedFromMission bool-only first value mismatch");
+            Require(observation.BoolStorage[1].Field == MissionReflection::MissionField::BLastPhaseSuccess,
+                    "BPOnPlayerRemovedFromMission bool-only second field mismatch");
+            Require(!observation.BoolStorage[1].Value,
+                    "BPOnPlayerRemovedFromMission bool-only second value mismatch");
+        }
+    }
+
     void TestCopiedObservationRejectsWrongFieldShape()
     {
         {
@@ -1187,6 +1372,7 @@ int main()
     TestCopiedObservationPayloadShape();
     TestBuildsMetadataAndCopiedBoolObservationOnly();
     TestCopiedObservationRejectsForgedObjectAndArrayRanges();
+    TestMatchedAttemptBoolObservationFence();
     TestCopiedObservationRejectsWrongFieldShape();
     TestCopiedObservationRejectsInvalidBoolRangesAndCounts();
     TestCopiedObservationApprovedBoolSurface();

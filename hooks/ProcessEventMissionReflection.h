@@ -98,4 +98,6 @@ namespace Obelisk::Hooks::ProcessEventMissionReflection
                                  uint64_t& observationNumber);
     bool TryBuildCopiedMissionObservation(const Obelisk::UE::MissionReflection::MissionInvocation& invocation,
                                           CopiedMissionObservation& out);
+    bool TryBuildCopiedMissionBoolObservationForMatchedAttempt(const Attempt& attempt,
+                                                               CopiedMissionObservation& out);
 }
