@@ -105,3 +105,19 @@ family creates demand for a public Transfer surface and the Obelisk promotion ga
 met. The current high-demand families are permissions/admin, economy/shop/rewards, chat
 commands, homes/teleport/safe-zone, RCON/operator integration, structures, dinos, tribes,
 and lifecycle/crash handling.
+
+Recommended v1 ordering from this demand inventory:
+
+1. Hub foundation: lifecycle, descriptors, timers, config/logging, reload posture, and
+   multi-instance-safe packaging.
+2. Chat commands on top of copied `ChatMessageEvent`, without claiming a moderation or
+   reply/send-chat SDK yet.
+3. Permissions/admin with copied identity and privacy-safe grants/checks; do not use
+   public `ResourceHandle` or UE pointers.
+4. RCON/operator I/O and secret-safe configuration.
+5. Basic economy/rewards that depend on commands, permissions, identity, and persistence,
+   before any give-item or mutation surface.
+6. Homes/safe zones/structures after location, ownership, enforcement, and mutation
+   contracts are promoted.
+7. Items, inventory, dinos, transfers, and missions remain investigation/internal until
+   copied-data, lifecycle, identity/privacy, and promotion gates are complete.

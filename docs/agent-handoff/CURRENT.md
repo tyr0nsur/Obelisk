@@ -164,6 +164,11 @@ recovery context is not active routing for the current head; use
   gate blocked, and normalized `artifact-pack.manifest.json`/`SHA256SUMS`. The offline
   artifact gate now rejects `transfer-scriptstruct` inventory packs that omit
   `scriptstructs` or any of the three exact `ArkTributePlayerData` bool-tail contracts.
+  The gate also treats `PrimalLocalProfile.ArkTributePlayerData` redacted ScriptStruct
+  signatures as Transfer evidence even if `target_sets/source_target_sets` omit
+  `transfer-scriptstruct`, and requires complete
+  `obelisk.redacted-scriptstruct-target-set-coverage.v1` coverage before accepting that
+  Transfer signature family.
   The older root under `/servidor/ark/workspace-offline/transfer-second-source-20260529T154200Z/scriptstruct-snapshots`
   is stale under current bool-tail strictness and should not be reused for current
   comparisons.
@@ -191,9 +196,9 @@ recovery context is not active routing for the current head; use
   result remains fail-closed with `promotion_ready=false`,
   `public_resource_handle_ready=false`, and `post_callback_resource_handle_ready=false`.
 - Next useful ResourceHandle work is semantic, not more broad static scanning: rejected
-  runtime object samples, serial reuse/wraparound policy, and a strict post-callback
-  lifetime/lookup rejection contract before any public identity or lookup surface can be
-  considered.
+  runtime object samples, serial reuse/wraparound policy, and especially a strict
+  post-callback lifetime/lookup rejection contract before any public identity or lookup
+  surface can be considered.
 
 ## Priority Next Steps
 
@@ -220,8 +225,13 @@ recovery context is not active routing for the current head; use
   `InventoryPolicyEventKind::CanUse`, and do not expand into an Items SDK or Inventory SDK
   without a separate promotion gate. Before requesting `arkserver2`, keep evidence offline:
   `analyze_runtime_observer_log.py` recognizes sanitized item-return enabled/rejected/
-  dispatched lines, but the current comparison tooling still needs a reproducible
-  second-source refresh or normalization with full bool-tail semantics.
+  dispatched lines, but the current comparison tooling does not reproduce the old
+  item-return-only second-source acceptance because the stale candidate snapshots lack
+  `bool_field_size` and `bool_byte_offset`. Regenerate the
+  `item-return-only-policy-slice` snapshots from the existing offline core with
+  `scripts/regenerate_ufunction_snapshots.py`, then rerun
+  `scripts/compare_reflection_snapshots.py --target-set item-return-only-policy-slice`
+  before asking for any live item runtime window.
 - Secondary evidence-only lanes may continue for structure non-pin copied scalars and Buff
   breadth, but they must not imply runtime work, marker/env changes, public SDK expansion,
   or RC surface changes.

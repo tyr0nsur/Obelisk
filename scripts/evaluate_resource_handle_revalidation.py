@@ -7,7 +7,6 @@ import argparse
 import copy
 import hashlib
 import json
-import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -16,6 +15,12 @@ from typing import Any
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
+from artifact_identity import (  # noqa: E402
+    canonical_json_bytes,
+    complete_artifact_identity,
+    is_safe_artifact_id,
+    is_sha256,
+)
 from snapshot_evidence_pack import reject_protected_input_path, reject_protected_output_path  # noqa: E402
 
 
@@ -98,11 +103,6 @@ RESOURCE_HANDLE_LIFETIME_BLOCKERS = (
     "no_rejected_runtime_object_samples",
 )
 
-SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
-SAFE_ARTIFACT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
-PLACEHOLDER_ARTIFACT_ID_PREFIXES = ("unspecified-", "static-global-default-")
-
-
 def load_json(path: Path, label: str) -> dict[str, Any]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -115,10 +115,6 @@ def load_json(path: Path, label: str) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise SystemExit(f"{label} must be a JSON object: {path}")
     return payload
-
-
-def is_sha256(value: object) -> bool:
-    return isinstance(value, str) and SHA256_RE.fullmatch(value) is not None
 
 
 def collect_identity_hashes(value: object, hashes: set[str]) -> None:
@@ -140,25 +136,11 @@ def identity_hashes(value: object) -> set[str]:
     return hashes
 
 
-def safe_artifact_id(value: object) -> bool:
-    return isinstance(value, str) and SAFE_ARTIFACT_ID_RE.fullmatch(value) is not None and ".." not in value
-
-
-def placeholder_artifact_id(value: object) -> bool:
-    return isinstance(value, str) and value.casefold().startswith(PLACEHOLDER_ARTIFACT_ID_PREFIXES)
-
-
-def canonical_json_bytes(value: object) -> bytes:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
-
-
 def validate_artifact_identity_value(value: str | None, field_name: str) -> str | None:
     if value is None:
         return None
-    if not safe_artifact_id(value):
+    if not is_safe_artifact_id(value):
         raise SystemExit(f"{field_name} must be a safe artifact id")
-    if placeholder_artifact_id(value):
-        raise SystemExit(f"{field_name} must not use a placeholder artifact id")
     return value
 
 
@@ -207,24 +189,14 @@ def classify_artifact_identity(report: dict[str, Any]) -> tuple[str, set[str]]:
     identity = report.get("artifact_identity")
     if not isinstance(identity, dict):
         return "missing", set()
-
-    artifact_kind = identity.get("artifact_kind")
-    artifact_sha256 = identity.get("artifact_sha256")
-    capture_id = identity.get("capture_id")
-    evidence_pack_id = identity.get("evidence_pack_id")
-    if any(value is None for value in (artifact_kind, artifact_sha256, capture_id, evidence_pack_id)):
+    if not all(key in identity for key in ("artifact_kind", "artifact_sha256", "capture_id", "evidence_pack_id")):
         return "partial", set()
-    if (
-        not safe_artifact_id(artifact_kind)
-        or not is_sha256(artifact_sha256)
-        or not safe_artifact_id(capture_id)
-        or not safe_artifact_id(evidence_pack_id)
-        or placeholder_artifact_id(artifact_kind)
-        or placeholder_artifact_id(capture_id)
-        or placeholder_artifact_id(evidence_pack_id)
-    ):
+    normalized, errors = complete_artifact_identity(report)
+    if errors or normalized is None:
         return "invalid", set()
-    return "complete", {str(artifact_sha256)}
+    if not is_safe_artifact_id(normalized["artifact_kind"]):
+        return "invalid", set()
+    return "complete", {normalized["artifact_sha256"]}
 
 
 def artifact_identity_issue(identity_status: str) -> str | None:

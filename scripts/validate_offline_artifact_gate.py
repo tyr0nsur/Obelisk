@@ -31,6 +31,7 @@ CORE_DUMP_EVIDENCE_PACK_SCHEMA = "obelisk.core-dump-evidence-pack.v1"
 GOBJECTS_TWO_CORE_MANIFEST_SCHEMA = "obelisk.gobjects-two-core-manifest.v1"
 REDACTED_UFUNCTION_SIGNATURE_SCHEMA = "obelisk.redacted-ufunction-signatures.v1"
 REDACTED_SCRIPTSTRUCT_SIGNATURE_SCHEMA = "obelisk.redacted-scriptstruct-signatures.v1"
+REDACTED_SCRIPTSTRUCT_TARGET_SET_COVERAGE_SCHEMA = "obelisk.redacted-scriptstruct-target-set-coverage.v1"
 SCRIPTSTRUCT_INVENTORY_PACK_SCHEMA = "obelisk.scriptstruct-inventory-pack.v1"
 TRANSFER_SCRIPTSTRUCT_TARGET_SET = "transfer-scriptstruct"
 TRANSFER_SCRIPTSTRUCT_BOOL_TAIL_CONTRACT = {
@@ -2394,6 +2395,7 @@ def validate_redacted_scriptstruct_signature_manifest(
     if not isinstance(signatures, list):
         blockers.append({"reason": "scriptstruct_signature_signatures_not_list", "label": f"{source_label}:$.signatures"})
     elif target_sets_include_transfer(payload):
+        blockers.extend(validate_transfer_redacted_scriptstruct_target_set_coverage(payload, source_label=source_label))
         blockers.extend(validate_transfer_redacted_scriptstruct_bool_tail_contract(payload, source_label=source_label))
     return blockers
 
@@ -2403,7 +2405,102 @@ def target_sets_include_transfer(payload: dict[str, Any]) -> bool:
         values = payload.get(key)
         if isinstance(values, list) and TRANSFER_SCRIPTSTRUCT_TARGET_SET in values:
             return True
+    signatures = payload.get("signatures")
+    if isinstance(signatures, list):
+        transfer_targets = set(TRANSFER_SCRIPTSTRUCT_BOOL_TAIL_CONTRACT)
+        for signature in signatures:
+            if isinstance(signature, dict) and signature.get("target") in transfer_targets:
+                return True
     return False
+
+
+def validate_transfer_redacted_scriptstruct_target_set_coverage(
+    payload: dict[str, Any],
+    *,
+    source_label: str,
+) -> list[dict[str, Any]]:
+    blockers: list[dict[str, Any]] = []
+    signatures = payload.get("signatures")
+    signatures_list = [signature for signature in signatures if isinstance(signature, dict)] if isinstance(signatures, list) else []
+    signature_targets = {
+        str(signature["target"])
+        for signature in signatures_list
+        if isinstance(signature.get("target"), str)
+    }
+    if payload.get("signature_count") != len(signatures_list):
+        blockers.append(
+            {
+                "reason": "scriptstruct_signature_signature_count_mismatch",
+                "label": f"{source_label}:$.signature_count",
+                "expected": len(signatures_list),
+                "recorded": payload.get("signature_count"),
+            }
+        )
+
+    coverage = payload.get("target_set_coverage")
+    if not isinstance(coverage, dict):
+        blockers.append(
+            {
+                "reason": "scriptstruct_signature_transfer_target_set_coverage_missing",
+                "label": f"{source_label}:$.target_set_coverage",
+            }
+        )
+        return blockers
+    if coverage.get("schema") != REDACTED_SCRIPTSTRUCT_TARGET_SET_COVERAGE_SCHEMA:
+        blockers.append(
+            {
+                "reason": "scriptstruct_signature_transfer_target_set_coverage_schema_mismatch",
+                "label": f"{source_label}:$.target_set_coverage.schema",
+                "expected": REDACTED_SCRIPTSTRUCT_TARGET_SET_COVERAGE_SCHEMA,
+                "recorded": coverage.get("schema"),
+            }
+        )
+    if coverage.get("status") != "complete":
+        blockers.append(
+            {
+                "reason": "scriptstruct_signature_transfer_target_set_coverage_status_mismatch",
+                "label": f"{source_label}:$.target_set_coverage.status",
+                "expected": "complete",
+                "recorded": coverage.get("status"),
+            }
+        )
+    if coverage.get("complete") is not True:
+        blockers.append(
+            {
+                "reason": "scriptstruct_signature_transfer_target_set_coverage_incomplete",
+                "label": f"{source_label}:$.target_set_coverage.complete",
+            }
+        )
+    missing_targets = coverage.get("missing_targets")
+    if missing_targets != []:
+        blockers.append(
+            {
+                "reason": "scriptstruct_signature_transfer_target_set_coverage_missing_targets",
+                "label": f"{source_label}:$.target_set_coverage.missing_targets",
+                "recorded": missing_targets,
+            }
+        )
+    expected_targets = coverage.get("expected_targets")
+    observed_targets = coverage.get("observed_targets")
+    if not isinstance(expected_targets, list) or not set(TRANSFER_SCRIPTSTRUCT_BOOL_TAIL_CONTRACT).issubset(set(expected_targets)):
+        blockers.append(
+            {
+                "reason": "scriptstruct_signature_transfer_target_set_coverage_expected_targets_incomplete",
+                "label": f"{source_label}:$.target_set_coverage.expected_targets",
+                "expected": sorted(TRANSFER_SCRIPTSTRUCT_BOOL_TAIL_CONTRACT),
+                "recorded": expected_targets,
+            }
+        )
+    if not isinstance(observed_targets, list) or not signature_targets.issubset(set(observed_targets)):
+        blockers.append(
+            {
+                "reason": "scriptstruct_signature_transfer_target_set_coverage_observed_targets_mismatch",
+                "label": f"{source_label}:$.target_set_coverage.observed_targets",
+                "expected": sorted(signature_targets),
+                "recorded": observed_targets,
+            }
+        )
+    return blockers
 
 
 def transfer_contract_recorded_value(container: dict[str, Any], key: str) -> object:

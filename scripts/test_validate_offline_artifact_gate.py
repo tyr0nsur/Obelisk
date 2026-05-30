@@ -1778,6 +1778,23 @@ def redacted_scriptstruct_signature_manifest() -> dict:
         "snapshot_count": 2,
         "signature_count": 2,
         "missing_targets": [],
+        "target_set_coverage": {
+            "schema": gate.REDACTED_SCRIPTSTRUCT_TARGET_SET_COVERAGE_SCHEMA,
+            "status": "complete",
+            "complete": True,
+            "source": "manifest",
+            "declared_target_sets": ["transfer-scriptstruct"],
+            "expected_targets": [
+                "PrimalLocalProfile.ARKTributeDino",
+                "PrimalLocalProfile.ArkTributePlayerData",
+            ],
+            "observed_targets": [
+                "PrimalLocalProfile.ARKTributeDino",
+                "PrimalLocalProfile.ArkTributePlayerData",
+            ],
+            "missing_targets": [],
+            "unexpected_targets": [],
+        },
         "generated_from": {
             "snapshot_schema": "obelisk.scriptstruct-chain.snapshot.v1",
             "input_snapshots": [
@@ -2029,6 +2046,25 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         reasons = {blocker["reason"] for blocker in result["blockers"]}
         self.assertIn("scriptstruct_signature_transfer_bool_missing", reasons)
 
+    def test_blocks_redacted_transfer_scriptstruct_missing_bool_even_without_target_set_label(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "scriptstruct-signatures" / "manifest.json"
+            payload = redacted_scriptstruct_signature_manifest()
+            payload["target_sets"] = []
+            payload["source_target_sets"] = []
+            player_data = payload["signatures"][1]
+            player_data["fields"] = [
+                field for field in player_data["fields"] if field["name"] != "bForServerTransfer"
+            ]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("scriptstruct_signature_transfer_bool_missing", reasons)
+
     def test_blocks_redacted_transfer_scriptstruct_bool_tail_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"
@@ -2044,6 +2080,30 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
 
         reasons = {blocker["reason"] for blocker in result["blockers"]}
         self.assertIn("scriptstruct_signature_transfer_bool_bool_field_size_mismatch", reasons)
+
+    def test_blocks_redacted_transfer_scriptstruct_incomplete_target_set_coverage(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "scriptstruct-signatures" / "manifest.json"
+            payload = redacted_scriptstruct_signature_manifest()
+            payload["target_set_coverage"]["status"] = "incomplete"
+            payload["target_set_coverage"]["complete"] = False
+            payload["target_set_coverage"]["missing_targets"] = [
+                "PrimalLocalProfile.ArkTributePlayerData"
+            ]
+            payload["target_set_coverage"]["observed_targets"] = [
+                "PrimalLocalProfile.ARKTributeDino"
+            ]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("scriptstruct_signature_transfer_target_set_coverage_status_mismatch", reasons)
+        self.assertIn("scriptstruct_signature_transfer_target_set_coverage_incomplete", reasons)
+        self.assertIn("scriptstruct_signature_transfer_target_set_coverage_missing_targets", reasons)
+        self.assertIn("scriptstruct_signature_transfer_target_set_coverage_observed_targets_mismatch", reasons)
 
     def test_non_transfer_redacted_scriptstruct_does_not_require_transfer_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

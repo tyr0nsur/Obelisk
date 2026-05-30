@@ -226,6 +226,17 @@ The consume gate accepts the policy slice in this pack. The promote gate still b
 second-source gap for Item return-only, but it does not promote public API, runtime wiring,
 identity, mutation, return override, or an Inventory/Items SDK.
 
+Current tooling caveat: the preserved second-source result above predates strict
+`BoolProperty` tail comparison. Rerunning `compare_reflection_snapshots.py` with the
+current comparator against
+`/servidor/ark/workspace-offline/item-compact-intake-second-source-20260529T141900Z/ufunction-snapshots`
+now yields `accepted=0` and `inconclusive=3` because the stale candidate snapshots do not
+carry `bool_field_size` and `bool_byte_offset`. Before any live item runtime brief,
+regenerate only the `item-return-only-policy-slice` UFunction snapshots from the existing
+offline core with `scripts/regenerate_ufunction_snapshots.py`, then rerun the focused
+comparison and preserve a fresh bool-tail-complete artifact pack. Do not normalize these
+fields by hand.
+
 ## Descriptor-Only Preflight
 
 The next descriptor shape, if this slice is ever promoted, should be three distinct

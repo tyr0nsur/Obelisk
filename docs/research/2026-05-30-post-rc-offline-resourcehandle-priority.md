@@ -224,3 +224,11 @@ Next useful work is not more broad static scanning. The remaining evidence gap i
 negative runtime samples, serial reuse/wraparound policy, and a strict post-callback
 lifetime/lookup rejection contract before any public identity or lookup surface can be
 considered.
+
+Among those semantic gaps, the next offline artifact should be the post-callback rejection
+contract. It can use the accepted internal candidate already present in the evaluator
+output to state, in redacted/fail-closed form, that `InternalUObjectRevalidationCandidate`
+is frame-local only, post-callback lookup is rejected, output remains copied bool or
+Obelisk-owned copied data, and no public `ResourceHandle`, GObjects lookup, identity,
+mutation, or return override is promoted. This advances the lifecycle contract without
+inventing runtime samples or relaxing the public API blocker.

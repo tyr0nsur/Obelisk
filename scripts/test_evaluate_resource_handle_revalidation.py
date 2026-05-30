@@ -296,6 +296,8 @@ class ResourceHandleRevalidationEvaluatorTests(unittest.TestCase):
             {"artifact_kind": "static-global-default-kind"},
             {"capture_id": "static-global-default-capture"},
             {"evidence_pack_id": "static-global-default-pack"},
+            {"artifact_kind": "bad/kind"},
+            {"artifact_kind": "bad\\kind"},
         )
         for override in invalid_values:
             with self.subTest(override=override):
@@ -328,6 +330,30 @@ class ResourceHandleRevalidationEvaluatorTests(unittest.TestCase):
                     "evidence_pack_id": "pack-b",
                 },
             ),
+            require_artifact_identity=True,
+        )
+
+        assert_fail_closed_resource_handle_contract(self, payload)
+        self.assertFalse(payload["evidence_checks"]["evidence_without_lifetime_flags_ready"])
+        self.assertEqual(payload["artifact_identity"]["complete_input_count"], 1)
+        self.assertEqual(payload["artifact_identity"]["missing_or_partial_input_count"], 0)
+        self.assertEqual(payload["artifact_identity"]["invalid_input_count"], 1)
+        self.assertIn(evaluator.BLOCKER_INVALID_ARTIFACT_IDENTITY, payload["blockers"])
+
+    def test_require_artifact_identity_rejects_identity_with_extra_fields(self) -> None:
+        report = reconciliation_report(
+            serial_values=[17],
+            artifact_identity_override={
+                "artifact_kind": "core",
+                "artifact_sha256": "a" * 64,
+                "capture_id": "capture-a",
+                "evidence_pack_id": "pack-a",
+                "extra": "not-allowed",
+            },
+        )
+        payload = evaluator.build_evaluation(
+            [report],
+            static_evidence(coherent=True, artifact_identity_sha256="b" * 64),
             require_artifact_identity=True,
         )
 
@@ -546,7 +572,7 @@ class ResourceHandleRevalidationEvaluatorTests(unittest.TestCase):
             )
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("--capture-id must not use a placeholder artifact id", result.stderr)
+        self.assertIn("--capture-id must be a safe artifact id", result.stderr)
 
     def test_cli_rejects_wrong_output_artifact_kind(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

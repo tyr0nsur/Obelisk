@@ -138,6 +138,14 @@ and requires `PrimalLocalProfile.ArkTributePlayerData` to preserve
 `bWasAllowDPCUpload`, `bWithItems`, and `bForServerTransfer` with exact offsets and
 bool-tail metadata. This is a gate hardening only; it does not promote Transfer.
 
+The redacted ScriptStruct signature gate now applies the same Transfer bool-tail contract
+by content, not only by target-set label. If a redacted ScriptStruct report contains
+`PrimalLocalProfile.ArkTributePlayerData`, the gate treats it as Transfer evidence even
+when `target_sets/source_target_sets` omit `transfer-scriptstruct`, requires complete
+`obelisk.redacted-scriptstruct-target-set-coverage.v1` coverage, and rejects reports that
+drop any of the three exact bool-tail fields. This prevents stale or hand-edited
+signature reports from bypassing the Transfer contract by losing the label.
+
 Gate result:
 
 ```text
