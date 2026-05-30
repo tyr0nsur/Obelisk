@@ -2089,6 +2089,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         forbidden = unpromoted_gameplay_tokens()
         forbidden_positive_claims = (
             r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported)\s+(?:a\s+)?(?:public\s+)?Inventory\s+SDKs?\b",
+            r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported)\s+(?:a\s+)?(?:public\s+)?Items?\s+(?:SDKs?|APIs?|surfaces?)\b",
+            r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported)\s+(?:a\s+)?(?:public\s+)?Missions?\s+(?:SDKs?|APIs?|surfaces?)\b",
+            r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported)\s+(?:a\s+)?(?:public\s+)?Transfers?\s+(?:SDKs?|APIs?|surfaces?)\b",
             r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported)\s+(?:a\s+)?(?:public\s+)?StructureEvents?\b",
             r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported)\s+(?:a\s+)?(?:public\s+)?ResourceHandle\s+(?:SDKs?|APIs?|surfaces?)\b",
             r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported)\s+(?:public\s+)?(?:gameplay\s+)?mutation\s+(?:SDKs?|APIs?|surfaces?|authority)\b",
@@ -2096,6 +2099,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported)\s+(?:public\s+)?richer\s+chat\s+(?:SDKs?|APIs?|surfaces?|events?)\b",
             r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported)\s+(?:public\s+)?commands?\s+(?:SDKs?|APIs?|surfaces?)\b",
             r"\bInventory\s+SDKs?\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
+            r"\bItems?\s+(?:SDKs?|APIs?|surfaces?)\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
+            r"\bMissions?\s+(?:SDKs?|APIs?|surfaces?)\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
+            r"\bTransfers?\s+(?:SDKs?|APIs?|surfaces?)\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
             r"\bStructureEvents?\s+(?:SDKs?|APIs?|surfaces?)?\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
             r"\bResourceHandle\s+(?:SDKs?|APIs?|surfaces?)\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
             r"\b(?:gameplay\s+)?mutation\s+(?:SDKs?|APIs?|surfaces?|authority)\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",

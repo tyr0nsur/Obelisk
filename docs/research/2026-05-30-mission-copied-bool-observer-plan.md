@@ -21,6 +21,9 @@ The current evidence source is
 - Refreshed target result: `targets=4`, `comparable=4`, `second_source_accepted=4`
 - Redacted signature schema: `obelisk.redacted-ufunction-signatures.v1`
 - Redacted signature status: `candidate_only`
+- Focused policy artifact schema: `obelisk.mission-copied-bool-policy-slice.v1`
+- Focused policy artifact status: `evidence-only`, consume-mode accepted,
+  promote-mode blocked
 - Consume gate: `accepted`
 - Promotion ready: `false`
 - Copied scalar count: `5` bool fields

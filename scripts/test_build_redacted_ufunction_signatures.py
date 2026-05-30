@@ -379,6 +379,99 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         finally:
             sys.argv = original_argv
 
+    def test_mission_copied_bool_policy_slice_emits_only_allowed_bools(self) -> None:
+        fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
+
+        report = tool.build_mission_copied_bool_policy_slice(snapshot_root=fixture_root)
+
+        self.assertEqual(tool.MISSION_COPIED_BOOL_POLICY_SCHEMA, report["schema"])
+        self.assertEqual("redacted", report["snapshot_root"])
+        self.assertEqual("mission-compact-intake", report["input_target_set"])
+        self.assertEqual("mission-copied-bool-policy-slice", report["output_target_set"])
+        self.assertEqual("complete", report["coverage"]["status"])
+        self.assertEqual(4, len(report["generated_from"]["input_snapshots"]))
+        self.assertEqual(
+            [
+                "MissionType.AddPlayerToMission.bForceAdd",
+                "MissionType.AddPlayerToMission.ReturnValue",
+                "MissionType.BPAllowPlayerToLeaveMission.ReturnValue",
+                "MissionType.BPOnPlayerRemovedFromMission.bFromMissionCompleteEvent",
+                "MissionType.BPOnPlayerRemovedFromMission.bLastPhaseSuccess",
+            ],
+            [entry["copied_field"] for entry in report["copied_bools"]],
+        )
+        self.assertEqual(
+            [
+                "MissionType.AddPlayerToMission.PlayerCharacter",
+                "MissionType.BPAllowPlayerToLeaveMission.PlayerPawn",
+                "MissionType.BPOnPlayerRemovedFromMission.Controller",
+                "MissionType.BPOnPlayerRemovedFromMission.Player",
+                "MissionType.GetPlayerUsableItems.Character",
+                "MissionType.GetPlayerUsableItems.OutItemIDs",
+            ],
+            sorted(entry["redacted_field"] for entry in report["redacted_mission_fields"]),
+        )
+        self.assertEqual(5, report["safety_summary"]["copied_bool_count"])
+        self.assertEqual(6, report["safety_summary"]["redacted_field_count"])
+        self.assertIs(False, report["safety_summary"]["promotion_ready"])
+        self.assertIn("Mission SDK", report["safety_summary"]["explicitly_excluded"])
+        self.assertIn("resource_handle", report["safety_summary"]["explicitly_excluded"])
+        self.assertIn("return_override", report["safety_summary"]["explicitly_excluded"])
+        self.assertTrue(all(entry["type"] == "bool" for entry in report["copied_bools"]))
+        self.assertTrue(all(entry["byte_mask"] == "0x01" for entry in report["copied_bools"]))
+        self.assertTrue(all(entry["field_mask"] == "0xff" for entry in report["copied_bools"]))
+
+        snapshots = {
+            snapshot["id"]: snapshot
+            for snapshot in report["generated_from"]["input_snapshots"]
+        }
+        self.assertEqual(
+            sorted(report["coverage"]["input_targets"]),
+            sorted(snapshot["target"] for snapshot in snapshots.values()),
+        )
+        self.assertTrue(
+            all(
+                entry["source_snapshot"] in snapshots
+                and snapshots[entry["source_snapshot"]]["sha256"] == entry["source_snapshot_sha256"]
+                and snapshots[entry["source_snapshot"]]["target"] == entry["target"]
+                for entry in [*report["copied_bools"], *report["redacted_mission_fields"]]
+            )
+        )
+
+        serialized = json.dumps(report)
+        self.assertNotIn(str(fixture_root), serialized)
+        self.assertNotIn("tests/fixtures/ufunction_snapshots", serialized)
+        copied_serialized = json.dumps(report["copied_bools"])
+        self.assertNotIn("PlayerCharacter", copied_serialized)
+        self.assertNotIn("PlayerPawn", copied_serialized)
+        self.assertNotIn("OutItemIDs", copied_serialized)
+
+    def test_mission_copied_bool_target_set_excludes_metadata_only_target(self) -> None:
+        from reflection_target_sets import TARGET_SETS
+
+        self.assertEqual(
+            (
+                "obelisk.ufunction-chain.snapshot.v1:MissionType.AddPlayerToMission",
+                "obelisk.ufunction-chain.snapshot.v1:MissionType.BPAllowPlayerToLeaveMission",
+                "obelisk.ufunction-chain.snapshot.v1:MissionType.BPOnPlayerRemovedFromMission",
+            ),
+            TARGET_SETS["mission-copied-bool-policy-slice"],
+        )
+
+    def test_mission_copied_bool_cli_mode_returns_success(self) -> None:
+        original_argv = sys.argv
+        try:
+            sys.argv = [
+                "build_redacted_ufunction_signatures.py",
+                "--mission-copied-bool-policy-slice",
+                "--json",
+            ]
+            with contextlib.redirect_stdout(io.StringIO()) as stdout:
+                self.assertEqual(0, tool.main())
+            self.assertIn(tool.MISSION_COPIED_BOOL_POLICY_SCHEMA, stdout.getvalue())
+        finally:
+            sys.argv = original_argv
+
     def test_inventory_action_compact_target_set_stays_candidate_only_and_redacted(self) -> None:
         fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
 

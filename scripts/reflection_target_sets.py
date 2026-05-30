@@ -28,6 +28,11 @@ TARGET_SETS = {
         "obelisk.ufunction-chain.snapshot.v1:MissionType.BPOnPlayerRemovedFromMission",
         "obelisk.ufunction-chain.snapshot.v1:MissionType.GetPlayerUsableItems",
     ),
+    "mission-copied-bool-policy-slice": (
+        "obelisk.ufunction-chain.snapshot.v1:MissionType.AddPlayerToMission",
+        "obelisk.ufunction-chain.snapshot.v1:MissionType.BPAllowPlayerToLeaveMission",
+        "obelisk.ufunction-chain.snapshot.v1:MissionType.BPOnPlayerRemovedFromMission",
+    ),
     "minimal-second-source-intake": (
         "obelisk.ufunction-chain.snapshot.v1:PrimalItem.CanUse",
         "obelisk.ufunction-chain.snapshot.v1:PrimalItem.AllowRemoteAddToInventory",

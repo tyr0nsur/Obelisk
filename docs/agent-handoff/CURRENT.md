@@ -95,17 +95,17 @@ sequence.
 
 - Preserve RC scope while moving toward `v1.0`: reduce architecture debt, improve evidence
   tooling, and promote only copied module APIs with strict gates.
-- Current post-RC focus: Item return-only policy, Mission copied-bool observer, then
-  Transfer `bAccept`. This is no RC public SDK/API promotion. Item return-only is
-  validated as an internal/test-only copied-bool slice, and Mission copied-bool
-  observer hardening now includes recognizer-side canonical-bool rejection plus
-  hook-side `params + offset` provenance checks. Keep Item and Mission free of
+- Current post-RC focus: Item return-only policy, Mission copied-bool observer,
+  then Transfer `bAccept`. This is no RC public SDK/API promotion. Item return-only and
+  Mission copied-bool now have internal/test-only consume-mode policy slices, and Mission
+  copied-bool observer hardening also includes recognizer-side canonical-bool rejection
+  plus hook-side `params + offset` provenance checks. Keep Item and Mission free of
   `ResourceHandle`, identity, mutation, return override, public Inventory SDK, public
   Mission SDK, hook wiring, marker/env, or runtime logs unless a future separate promotion
-  gate changes scope. After local validation, Transfer `bAccept` is only the next
-  internal/test-only copied-bool candidate when a scoped task explicitly selects it; this
-  handoff does not authorize Transfer runtime work. ResourceHandle semantic work still
-  needs helper evidence, mutation-window rejection, and a fail-closed contract.
+  gate changes scope. Transfer `bAccept` is likewise an internal/test-only consume-mode
+  policy slice; this handoff does not authorize Transfer runtime work. ResourceHandle
+  semantic work still needs helper evidence, mutation-window rejection, and a fail-closed
+  contract.
   Commands/chat routing waits on player context, permissions, and safe response semantics.
   ArkServerApi/AseApi remains a names and behavior dictionary only; it is not a porting
   target or copying source. Do not copy offsets, layouts, ABI assumptions, wrappers, raw

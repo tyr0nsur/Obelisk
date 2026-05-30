@@ -540,6 +540,101 @@ def transfer_baccept_only_policy_slice_manifest(
     }
 
 
+def mission_copied_bool_policy_slice_manifest(
+    *,
+    policy_status: str = "evidence-only",
+    promotion_ready: bool = False,
+    copied_bool_count: int = 5,
+    redacted_field_count: int = 6,
+    missing_targets: list[str] | None = None,
+    non_claims: list[str] | None = None,
+) -> dict:
+    copied_fields = sorted(gate.REQUIRED_MISSION_COPIED_BOOL_FIELDS)
+    redacted_fields = sorted(gate.REQUIRED_MISSION_COPIED_BOOL_REDACTED_FIELDS)
+    if missing_targets is None:
+        missing_targets = []
+    if non_claims is None:
+        non_claims = sorted(gate.REQUIRED_MISSION_COPIED_BOOL_NON_CLAIMS)
+    input_snapshots = [
+        {"id": f"snapshot-{index:04d}", "sha256": f"{index}" * 64, "target": target}
+        for index, target in enumerate(sorted(gate.REQUIRED_MISSION_COPIED_BOOL_INPUT_TARGETS), start=1)
+    ]
+    source_by_target = {snapshot["target"]: snapshot for snapshot in input_snapshots}
+    copied_shapes = {
+        "MissionType.AddPlayerToMission.bForceAdd": {"field": "bForceAdd", "direction": "in", "offset": "0x8", "offset_internal": 8, "property_flags": "0x1040000280", "return_value_offset": "0x9"},
+        "MissionType.AddPlayerToMission.ReturnValue": {"field": "ReturnValue", "direction": "return", "offset": "0x9", "offset_internal": 9, "property_flags": "0x1040000780", "return_value_offset": "0x9"},
+        "MissionType.BPAllowPlayerToLeaveMission.ReturnValue": {"field": "ReturnValue", "direction": "return", "offset": "0x8", "offset_internal": 8, "property_flags": "0x1040000780", "return_value_offset": "0x8"},
+        "MissionType.BPOnPlayerRemovedFromMission.bFromMissionCompleteEvent": {"field": "bFromMissionCompleteEvent", "direction": "in", "offset": "0x10", "offset_internal": 16, "property_flags": "0x1040000280", "return_value_offset": "0xffff"},
+        "MissionType.BPOnPlayerRemovedFromMission.bLastPhaseSuccess": {"field": "bLastPhaseSuccess", "direction": "in", "offset": "0x11", "offset_internal": 17, "property_flags": "0x1040000280", "return_value_offset": "0xffff"},
+    }
+    redacted_shapes = {
+        "MissionType.AddPlayerToMission.PlayerCharacter": {"field": "PlayerCharacter", "property_class": "ObjectProperty", "offset": "0x0", "offset_internal": 0, "element_size": 8, "array_dim": 1, "property_flags": "0x1040000280"},
+        "MissionType.BPAllowPlayerToLeaveMission.PlayerPawn": {"field": "PlayerPawn", "property_class": "ObjectProperty", "offset": "0x0", "offset_internal": 0, "element_size": 8, "array_dim": 1, "property_flags": "0x1040000280"},
+        "MissionType.BPOnPlayerRemovedFromMission.Controller": {"field": "Controller", "property_class": "ObjectProperty", "offset": "0x8", "offset_internal": 8, "element_size": 8, "array_dim": 1, "property_flags": "0x1040000280"},
+        "MissionType.BPOnPlayerRemovedFromMission.Player": {"field": "Player", "property_class": "ObjectProperty", "offset": "0x0", "offset_internal": 0, "element_size": 8, "array_dim": 1, "property_flags": "0x1040000280"},
+        "MissionType.GetPlayerUsableItems.Character": {"field": "Character", "property_class": "ObjectProperty", "offset": "0x0", "offset_internal": 0, "element_size": 8, "array_dim": 1, "property_flags": "0x1040000280"},
+        "MissionType.GetPlayerUsableItems.OutItemIDs": {"field": "OutItemIDs", "property_class": "ArrayProperty", "offset": "0x8", "offset_internal": 8, "element_size": 16, "array_dim": 1, "property_flags": "0x380"},
+    }
+    return {
+        "schema": gate.MISSION_COPIED_BOOL_POLICY_SLICE_SCHEMA,
+        "snapshot_root": "redacted",
+        "input_target_set": "mission-compact-intake",
+        "output_target_set": "mission-copied-bool-policy-slice",
+        "policy_status": policy_status,
+        "missing_targets": missing_targets,
+        "generated_from": {
+            "snapshot_schema": SNAPSHOT_SCHEMA,
+            "input_snapshots": input_snapshots,
+        },
+        "coverage": {
+            "status": "complete",
+            "copied_fields": copied_fields,
+            "copied_targets": sorted(gate.REQUIRED_MISSION_COPIED_BOOL_COPIED_TARGETS),
+            "redacted_fields": redacted_fields,
+            "input_targets": sorted(gate.REQUIRED_MISSION_COPIED_BOOL_INPUT_TARGETS),
+        },
+        "copied_bools": [
+            {
+                "target": field.rsplit(".", 1)[0],
+                "copied_field": field,
+                "type": "bool",
+                "property_class": "BoolProperty",
+                "element_size": 1,
+                "array_dim": 1,
+                "byte_mask": "0x01",
+                "field_mask": "0xff",
+                "native_bool": False,
+                "evidence_status": "copied-mission-bool-only",
+                "source_snapshot": source_by_target[field.rsplit(".", 1)[0]]["id"],
+                "source_snapshot_sha256": source_by_target[field.rsplit(".", 1)[0]]["sha256"],
+                **copied_shapes[field],
+            }
+            for field in copied_fields
+        ],
+        "redacted_mission_fields": [
+            {
+                "target": field.rsplit(".", 1)[0],
+                "redacted_field": field,
+                "reason": "unit_test_redacted",
+                "evidence_status": "recognition-only-redacted",
+                "source_snapshot": source_by_target[field.rsplit(".", 1)[0]]["id"],
+                "source_snapshot_sha256": source_by_target[field.rsplit(".", 1)[0]]["sha256"],
+                **redacted_shapes[field],
+            }
+            for field in redacted_fields
+        ],
+        "non_claims": non_claims,
+        "safety_summary": {
+            "artifact_status": "evidence_only",
+            "intended_use": "offline_review_only",
+            "promotion_ready": promotion_ready,
+            "copied_bool_count": copied_bool_count,
+            "redacted_field_count": redacted_field_count,
+            "explicitly_excluded": sorted(gate.REQUIRED_MISSION_COPIED_BOOL_EXPLICIT_EXCLUSIONS),
+        },
+    }
+
+
 def rc_ufunction_second_source_root_manifest(root: Path) -> dict:
     expected_sources = gate.expected_rc_ufunction_target_sources()
     assert expected_sources is not None
@@ -2819,6 +2914,116 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("transfer_baccept_policy_public_overclaim_runtime_ready", reasons)
         self.assertIn("transfer_baccept_policy_input_target_set_mismatch", reasons)
         self.assertIn("transfer_baccept_policy_input_snapshot_count_mismatch", reasons)
+
+    def test_accepts_mission_copied_bool_policy_slice_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "mission-copied-bool-policy.json"
+            write_json(manifest, mission_copied_bool_policy_slice_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual(result["blockers"], [])
+
+    def test_blocks_mission_copied_bool_policy_slice_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "mission-copied-bool-policy.json"
+            write_json(manifest, mission_copied_bool_policy_slice_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("promote_mode_mission_copied_bool_policy_slice_evidence_only", reasons)
+
+    def test_blocks_mission_copied_bool_policy_slice_with_bad_counts_or_boundaries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "mission-copied-bool-policy.json"
+            payload = mission_copied_bool_policy_slice_manifest(
+                policy_status="accepted",
+                promotion_ready=True,
+                copied_bool_count=4,
+                redacted_field_count=5,
+                missing_targets=["MissionType.GetPlayerUsableItems"],
+                non_claims=["does not copy some mission fields"],
+            )
+            payload["copied_bools"] = payload["copied_bools"][:-1]
+            payload["redacted_mission_fields"] = payload["redacted_mission_fields"][:-1]
+            payload["coverage"]["copied_fields"] = payload["coverage"]["copied_fields"][:-1]
+            payload["coverage"]["redacted_fields"] = payload["coverage"]["redacted_fields"][:-1]
+            payload["coverage"]["input_targets"] = ["MissionType.AddPlayerToMission"]
+            payload["coverage"]["copied_targets"] = ["MissionType.AddPlayerToMission"]
+            payload["safety_summary"]["explicitly_excluded"] = ["mutation"]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("mission_copied_bool_policy_status_not_evidence_only", reasons)
+        self.assertIn("mission_copied_bool_policy_missing_targets_present", reasons)
+        self.assertIn("mission_copied_bool_policy_promotion_ready_not_false", reasons)
+        self.assertIn("mission_copied_bool_policy_copied_bool_count_mismatch", reasons)
+        self.assertIn("mission_copied_bool_policy_redacted_field_count_mismatch", reasons)
+        self.assertIn("mission_copied_bool_policy_copied_bools_count_mismatch", reasons)
+        self.assertIn("mission_copied_bool_policy_redacted_fields_count_mismatch", reasons)
+        self.assertIn("mission_copied_bool_policy_coverage_input_targets_mismatch", reasons)
+        self.assertIn("mission_copied_bool_policy_coverage_copied_targets_mismatch", reasons)
+        self.assertIn("mission_copied_bool_policy_coverage_copied_fields_mismatch", reasons)
+        self.assertIn("mission_copied_bool_policy_coverage_redacted_fields_mismatch", reasons)
+        self.assertIn("mission_copied_bool_policy_non_claims_missing_required_boundaries", reasons)
+        self.assertIn("mission_copied_bool_policy_explicit_exclusions_missing_internal_boundaries", reasons)
+
+    def test_blocks_mission_copied_bool_policy_slice_with_tampered_shape_or_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "mission-copied-bool-policy.json"
+            payload = mission_copied_bool_policy_slice_manifest()
+            payload["copied_bools"][0]["property_flags"] = "0x80"
+            payload["copied_bools"][0]["source_snapshot_sha256"] = "7" * 64
+            payload["redacted_mission_fields"][0]["offset"] = "0x40"
+            payload["redacted_mission_fields"][1]["source_snapshot"] = payload["copied_bools"][0]["source_snapshot"]
+            payload["redacted_mission_fields"][1]["source_snapshot_sha256"] = next(
+                snapshot["sha256"]
+                for snapshot in payload["generated_from"]["input_snapshots"]
+                if snapshot["id"] == payload["copied_bools"][0]["source_snapshot"]
+            )
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("mission_copied_bool_policy_copied_bool_shape_mismatch", reasons)
+        self.assertIn("mission_copied_bool_policy_copied_bool_source_snapshot_sha256_mismatch", reasons)
+        self.assertIn("mission_copied_bool_policy_redacted_field_shape_mismatch", reasons)
+        self.assertIn("mission_copied_bool_policy_redacted_field_source_snapshot_target_mismatch", reasons)
+
+    def test_blocks_mission_copied_bool_policy_slice_public_runtime_overclaim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "mission-copied-bool-policy.json"
+            payload = mission_copied_bool_policy_slice_manifest()
+            payload["runtime_ready"] = True
+            payload["public_mission_sdk_ready"] = True
+            payload["claim"] = "public Mission SDK ready"
+            payload["runtime_claim"] = "runtime ready"
+            payload["input_target_set"] = "mission-public-sdk-intake"
+            payload["generated_from"]["input_snapshots"] = payload["generated_from"]["input_snapshots"][:2]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("mission_copied_bool_policy_readiness_overclaim", reasons)
+        self.assertIn("mission_copied_bool_policy_public_overclaim_public_sdk", reasons)
+        self.assertIn("mission_copied_bool_policy_public_overclaim_runtime_ready", reasons)
+        self.assertIn("mission_copied_bool_policy_input_target_set_mismatch", reasons)
+        self.assertIn("mission_copied_bool_policy_input_snapshot_count_mismatch", reasons)
 
     def test_accepts_static_global_promotion_evidence_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

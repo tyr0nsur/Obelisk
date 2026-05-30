@@ -71,12 +71,14 @@ AddPlayerToMission: 3/3 properties
   ReturnValue BoolProperty offset 0x9 element 1
 
 BPAllowPlayerToLeaveMission: 2/2 properties
-  PlayerCharacter ObjectProperty offset 0x0 element 8
+  PlayerPawn ObjectProperty offset 0x0 element 8
   ReturnValue BoolProperty offset 0x8 element 1
 
-BPOnPlayerAddedToMission: 2/2 properties
-  PlayerCharacter ObjectProperty offset 0x0 element 8
-  PlayerController ObjectProperty offset 0x8 element 8
+BPOnPlayerRemovedFromMission: 4/4 properties
+  Player ObjectProperty offset 0x0 element 8
+  Controller ObjectProperty offset 0x8 element 8
+  bFromMissionCompleteEvent BoolProperty offset 0x10 element 1
+  bLastPhaseSuccess BoolProperty offset 0x11 element 1
 ```
 
 Deferred/rejected fixture:
