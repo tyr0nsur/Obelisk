@@ -601,6 +601,55 @@ class StaticGlobalPromotionEvidenceTests(unittest.TestCase):
             self.assertIn(expected, result.stderr)
             self.assertIn("placeholder artifact identity is not valid reusable evidence", result.stderr)
 
+    def test_cli_strict_artifact_identity_rejects_placeholder_prefixes(self) -> None:
+        for flag, value, expected in (
+            ("--capture-id", "unspecified-capture", "--strict-artifact-identity requires explicit --capture-id"),
+            (
+                "--capture-id",
+                "static-global-default-capture-old",
+                "--strict-artifact-identity requires explicit --capture-id",
+            ),
+            (
+                "--evidence-pack-id",
+                "unspecified-evidence-pack",
+                "--strict-artifact-identity requires explicit --evidence-pack-id",
+            ),
+            (
+                "--evidence-pack-id",
+                "static-global-default-pack-old",
+                "--strict-artifact-identity requires explicit --evidence-pack-id",
+            ),
+        ):
+            with self.subTest(flag=flag, value=value), tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                binary, programs, sections, objdump = write_minimal_static_inputs(root)
+                result = self.run_script(
+                    "--binary",
+                    str(binary),
+                    "--candidate",
+                    "gobjects=0x595b7e0",
+                    "--output-dir",
+                    str(root / "pack"),
+                    "--readelf-programs",
+                    str(programs),
+                    "--readelf-sections",
+                    str(sections),
+                    "--objdump",
+                    str(objdump),
+                    "--capture-id",
+                    "static-capture.alpha",
+                    "--evidence-pack-id",
+                    "static-pack.alpha",
+                    flag,
+                    value,
+                    "--strict-artifact-identity",
+                    check=False,
+                )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(expected, result.stderr)
+            self.assertIn("placeholder artifact identity is not valid reusable evidence", result.stderr)
+
     def test_cli_strict_artifact_identity_allows_explicit_ids(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

@@ -19,7 +19,7 @@ import validate_offline_artifact_gate as gate  # noqa: E402
 
 
 SAFE_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
-UNSPECIFIED_PLACEHOLDER_PREFIX = "unspecified-"
+PLACEHOLDER_ARTIFACT_ID_PREFIXES = ("unspecified-", "static-global-default-")
 REQUIRED_WEAK_INPUTS = {
     "ghidra_stdout": Path("weak/ghidra-headless.stdout"),
     "r2_windows": Path("weak/r2-weak-helper-caller-modes.txt"),
@@ -90,7 +90,7 @@ def require_strict_artifact_identity(args: argparse.Namespace) -> dict[str, str]
     placeholders = [
         field
         for field in ("capture_id", "evidence_pack_id")
-        if identity[field].startswith(UNSPECIFIED_PLACEHOLDER_PREFIX)
+        if identity[field].startswith(PLACEHOLDER_ARTIFACT_ID_PREFIXES)
     ]
     if placeholders:
         flags = ", ".join("--" + field.replace("_", "-") for field in placeholders)

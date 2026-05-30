@@ -1,12 +1,22 @@
 # RC Checkpoint Slicing Plan
 
+## Historical Status
+
+This note is historical dirty-tree recovery context from 2026-05-29. It is not active
+routing for the current head, not a request to stage checkpoints, and not current chat or
+release authorization. For active routing use `docs/agent-handoff/CURRENT.md`; for the
+published RC gate and accepted minimal copied `ChatMessageEvent` evidence use
+`docs/research/2026-05-30-rc-second-source-release-gate-check.md` and
+`docs/research/2026-05-29-chat-message-second-source-readiness.md`.
+
 ## Objective
 
-Turn the current broad dirty worktree into reviewable local checkpoints toward
+Record how the then-current broad dirty worktree could be split into reviewable local
+checkpoints toward
 `v0.1.0-rc.1` without pushing to GitHub or mixing post-RC research into the first public
 release candidate.
 
-## Current Gate
+## Historical Dirty Gate
 
 The core-first release gate passed locally in dirty mode with the accepted minimal
 second-source root:
@@ -19,12 +29,16 @@ scripts/check_release_readiness.sh \
   --second-source-report-dir /tmp/obelisk-rc-second-source-current
 ```
 
-This was a point-in-time dirty-mode validation for an earlier integration state. It does
-not prove the current broad worktree satisfies the technical gate, and it does not prove
-RC readiness. A real RC still requires focused checkpoints and a clean worktree run
-without `--allow-dirty`.
+This was a point-in-time dirty-mode validation for an earlier integration state. It did
+not prove later worktree state satisfied the technical gate, and it did not prove RC
+readiness. The later published RC baseline is documented separately in
+`docs/research/2026-05-30-rc-second-source-release-gate-check.md`.
 
-## Checkpoint Order
+## Historical Checkpoint Order
+
+The subsections below preserve the old recovery sequence for audit context only. Do not
+use them as current checkpoint routing; use `docs/agent-handoff/CURRENT.md` for current
+priorities.
 
 ### 0-pre. Local Guardrail Prelude: Staged-Path Helper
 
@@ -50,7 +64,7 @@ requirement for 0a; compare `git diff --cached --name-only` manually instead.
 ### 0a. Local Guardrail Prelude: Artifact Gate
 
 Purpose: make the local review surface deterministic before slicing runtime/API changes.
-This checkpoint is the recommended first local checkpoint for the current broad worktree.
+This checkpoint was the recommended first local checkpoint for the then-broad worktree.
 Keep it narrow: artifact hygiene only, so it can be reviewed without staging API,
 runtime, public docs, handoff, skills, or research-evidence changes. It assumes 0-pre has
 already made `scripts/check_staged_paths.py` available in the checkout if the staged-path
@@ -189,14 +203,14 @@ Keep out:
 - dino/buff/mission/tribe public APIs;
 - public `CallProcessEvent` behavior.
 
-Review note: `GameplayPolicyEvent` is a stable public subscription surface, while
-`ChatMessageEvent` is a minimal copied notification ABI whose plugin-facing delivery is
-validated for all four known send modes through the `enable-chat-events` beta window. Keep
-the public claim scoped to copied notification ABI only; no richer chat APIs, identity,
-moderation, mutation, return override, route evidence, or UE internals are promoted.
-Runtime producers for structure/inventory/chat remain exact-target,
-marker-gated, and budgeted. The RC API checkpoint must document this as "stable API,
-gated production" rather than implying events are always produced on every install.
+Review note: `GameplayPolicyEvent` became the stable public subscription surface for the
+RC, while `ChatMessageEvent` became a minimal copied notification ABI. Its accepted
+second-source and beta delivery evidence is recorded in
+`docs/research/2026-05-29-chat-message-second-source-readiness.md`; this old checkpoint
+plan is not current chat routing. Keep the public claim scoped to copied notification ABI
+only; no richer chat APIs, identity, moderation, mutation, return override, route
+evidence, or UE internals are promoted. Runtime producers for structure/inventory/chat
+remain exact-target, marker-gated, and budgeted.
 
 ### 2. Runtime Observer Safety
 
@@ -451,13 +465,18 @@ Post-RC internal recognizer work, if reopened after the RC, should proceed in th
 Item return-only policy, Mission copied-bool observer, then Transfer `bAccept`. That sequence
 is an internal planning order only; it does not change the RC public API or release gate.
 
-## Final RC Validation
+## Historical Final RC Validation Recipe
 
-Assemble the UFunction second-source root from the accepted per-target-set roots before
-running the final release gate. The helper copies existing sanitized snapshots only; it
-does not regenerate evidence. The valid manifest for this final flow is the fresh
-path-redacted manifest written by the helper; do not reuse or publish older `/tmp`
-manifests that captured absolute source roots or other non-redacted input paths:
+The commands below document the old final validation recipe. They are preserved as
+historical audit context only; do not treat them as current authorization to assemble,
+stage, tag, or publish an RC. The later accepted release-gate result is recorded in
+`docs/research/2026-05-30-rc-second-source-release-gate-check.md`.
+
+The recipe assembled the UFunction second-source root from the accepted per-target-set
+roots before running the final release gate. The helper copied existing sanitized
+snapshots only and did not regenerate evidence. The valid manifest for that final flow
+was the fresh path-redacted manifest written by the helper; older `/tmp` manifests that
+captured absolute source roots or other non-redacted input paths were not reusable:
 
 ```bash
 python3 scripts/assemble_rc_ufunction_second_source_root.py \
@@ -469,7 +488,7 @@ scripts/check_rc_layout_evidence_smoke.sh \
   --candidate-root /tmp/obelisk-rc-ufunction-second-source-root
 ```
 
-After all selected checkpoints are cleanly integrated:
+The historical clean-gate command was:
 
 ```bash
 scripts/check_release_readiness.sh \
@@ -482,10 +501,11 @@ scripts/check_release_readiness.sh \
 git status --short --ignored
 ```
 
-Only tag `v0.1.0-rc.1` after the release gate passes without `--allow-dirty`, no generated
-artifacts are staged, and the public scope still names only `GameplayPolicyEvent`, minimal
-copied `ChatMessageEvent`, `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`
-as RC public callback/metadata surfaces. `DescribeGameplayPolicyEventKind` must remain
-metadata-only: no module SDK, UE lookup, mutation, identity, or return override.
-The final UFunction second-source root must contain the candidate snapshots for all three
-public RC target sets; do not reuse a minimal-only root for the structure and chat gates.
+The historical tag condition was a release gate passing without `--allow-dirty`, no
+generated artifacts staged, and a public scope limited to `GameplayPolicyEvent`, minimal
+copied `ChatMessageEvent`, `DescribeResourceKind`, and
+`DescribeGameplayPolicyEventKind` as RC public callback/metadata surfaces.
+`DescribeGameplayPolicyEventKind` remained metadata-only: no module SDK, UE lookup,
+mutation, identity, or return override. The final UFunction second-source root had to
+contain the candidate snapshots for all three public RC target sets; a minimal-only root
+was not valid for the structure and chat gates.

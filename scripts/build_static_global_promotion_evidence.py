@@ -24,6 +24,7 @@ STATIC_ARTIFACT_PROVENANCE_SCHEMA = "obelisk.static-artifact-provenance.v1"
 FUOBJECTARRAY_FIELD_WINDOW_SCHEMA = "obelisk.fuobjectarray-field-window-redacted.v1"
 DEFAULT_CAPTURE_ID = "static-global-default-capture"
 DEFAULT_EVIDENCE_PACK_ID = "static-global-default-pack"
+PLACEHOLDER_ARTIFACT_ID_PREFIXES = ("unspecified-", "static-global-default-")
 PROVENANCE_PRODUCER = Path(__file__).name
 PROTECTED_SERVER_ROOT = Path("/servidor/ark")
 APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
@@ -1055,9 +1056,9 @@ def build_artifact_identity(
 
 def require_explicit_artifact_identity(capture_id: str, evidence_pack_id: str) -> None:
     missing = []
-    if capture_id == DEFAULT_CAPTURE_ID:
+    if capture_id.startswith(PLACEHOLDER_ARTIFACT_ID_PREFIXES):
         missing.append("--capture-id")
-    if evidence_pack_id == DEFAULT_EVIDENCE_PACK_ID:
+    if evidence_pack_id.startswith(PLACEHOLDER_ARTIFACT_ID_PREFIXES):
         missing.append("--evidence-pack-id")
     if missing:
         raise SystemExit(

@@ -24,7 +24,7 @@ from snapshot_evidence_pack import (  # noqa: E402
 REPORT_SCHEMA = "obelisk.gobjects-sample-reconciliation.v1"
 DEFAULT_CAPTURE_ID = "unspecified-capture"
 DEFAULT_EVIDENCE_PACK_ID = "unspecified-evidence-pack"
-UNSPECIFIED_PLACEHOLDER_PREFIX = "unspecified-"
+PLACEHOLDER_ARTIFACT_ID_PREFIXES = ("unspecified-", "static-global-default-")
 STATUS_CANDIDATE_UOBJECT = "candidate-uobject"
 STATUS_NOT_IN_GOBJECTS = "not-in-gobjects"
 STATUS_NULL = "null"
@@ -83,9 +83,9 @@ def parse_safe_evidence_pack_id(value: str) -> str:
 
 def require_explicit_artifact_identity(capture_id: str, evidence_pack_id: str) -> None:
     missing = []
-    if capture_id.startswith(UNSPECIFIED_PLACEHOLDER_PREFIX):
+    if capture_id.startswith(PLACEHOLDER_ARTIFACT_ID_PREFIXES):
         missing.append("--capture-id")
-    if evidence_pack_id.startswith(UNSPECIFIED_PLACEHOLDER_PREFIX):
+    if evidence_pack_id.startswith(PLACEHOLDER_ARTIFACT_ID_PREFIXES):
         missing.append("--evidence-pack-id")
     if missing:
         raise SystemExit(

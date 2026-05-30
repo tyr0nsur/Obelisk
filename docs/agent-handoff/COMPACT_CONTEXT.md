@@ -150,7 +150,10 @@ priorities, and do not use history files as the active source of truth.
   (`sha256=21d8b0c0f30799b43110ddd4eed2484cc8c8527df878139dde28bc7d12598cf0`)
   verifies the durable pack.
 - Minimal copied `ChatMessageEvent` has accepted `chat-message-intake` second-source
-  evidence and approved beta delivery evidence for known send modes. Keep future route
+  evidence and approved beta delivery evidence for known send modes. The durable evidence
+  is recorded in `docs/research/2026-05-29-chat-message-second-source-readiness.md` and
+  `docs/research/2026-05-30-rc-second-source-release-gate-check.md`; use
+  `docs/agent-handoff/CURRENT.md` for any current chat routing. Keep future route
   observations `delivery_claim=none` unless a new controlled copied-plugin delivery window
   is approved and preserved.
 - Historical server prep note: `/servidor/ark/obelisk` and `oChatLogger` were installed
@@ -159,10 +162,12 @@ priorities, and do not use history files as the active source of truth.
   any new runtime observation; rollback plans must remove beta launch/config changes,
   restore stable markers such as `disable-plugins`, restart only in an approved window,
   and validate stable posture afterward.
-- The only near-term player-backed test candidate is minimal `ChatMessageEvent` delivery.
-  Inventory/mission/item/dino/buff/tribe/transfer/admin surfaces stay internal/offline
-  until their copied-data, callback lifecycle, ABI, and runtime gate requirements are
-  satisfied.
+- Historical player-backed beta scope was minimal `ChatMessageEvent` delivery, now
+  recorded as accepted evidence in the chat readiness note. Future player-backed
+  validation is not authorized by this snapshot; use `CURRENT.md` and a current live-ops
+  brief. Inventory/mission/item/dino/buff/tribe/transfer/admin surfaces stay
+  internal/offline until their copied-data, callback lifecycle, ABI, and runtime gate
+  requirements are satisfied.
 - Dino, buff, mission, and tribe compact intakes are layout evidence only. Use
   `docs/research/2026-05-29-dino-compact-second-source-readiness.md`,
   `docs/research/2026-05-29-buff-compact-second-source-result.md`, and
@@ -351,9 +356,9 @@ priorities, and do not use history files as the active source of truth.
   `promotion_ready=false`; the current bundle is valid archival material but blocked by
   missing original source sidecars.
 
-## Checkpoint Baseline
+## Historical Checkpoint Baseline
 
-- Current RC direction is core-first: freeze `ObeliskApi` v1 around Linux runtime,
+- Published RC baseline is core-first: `ObeliskApi` v1 is frozen around Linux runtime,
   ProcessEvent hook infrastructure, plugin lifecycle, central install layout,
   `oBaseEvents`, `GameplayPolicyEvent`, minimal copied `ChatMessageEvent`,
   `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`.
@@ -365,9 +370,9 @@ priorities, and do not use history files as the active source of truth.
   requires a new RC tag.
 - `docs/research/2026-05-29-rc-checkpoint-slicing-plan.md` is historical recovery
   context, not active routing for the current head. Use `git log --oneline -1` for the
-  current head, use `CURRENT.md` for current
-  blockers and keep future changes focused by subsystem rather than by the old 0-pre/0a/0b
-  slicing sequence.
+  current head, use `CURRENT.md` for current blockers, and use the accepted
+  `ChatMessageEvent` evidence notes above for chat facts. Keep future changes focused by
+  subsystem rather than by the old 0-pre/0a/0b slicing sequence.
 - Current ResourceHandle flag-policy pointer:
   `docs/research/2026-05-30-post-rc-offline-resourcehandle-priority.md`. It records
   consume-accepted/promote-blocked internal evidence; public `ResourceHandle`, lookup,

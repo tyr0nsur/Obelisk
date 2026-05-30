@@ -465,6 +465,40 @@ class ReconcileGObjectsSamplesTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("requires explicit --evidence-pack-id", result.stderr)
 
+    def test_cli_strict_artifact_identity_rejects_static_global_default_placeholders(self) -> None:
+        for flag, value, expected in (
+            ("--capture-id", "static-global-default-capture-old", "requires explicit --capture-id"),
+            (
+                "--evidence-pack-id",
+                "static-global-default-pack-old",
+                "requires explicit --evidence-pack-id",
+            ),
+        ):
+            with self.subTest(flag=flag, value=value):
+                command = [
+                    sys.executable,
+                    str(SCRIPT_DIR / "reconcile_gobjects_samples.py"),
+                    "--core",
+                    "/tmp/nonexistent-core",
+                    "--gobjects-candidate",
+                    "0x595b7e0",
+                    "--fname-root-slot",
+                    "0x5956f30",
+                    "--capture-id",
+                    "capture_2026-05-30",
+                    "--evidence-pack-id",
+                    "evidence-pack.alpha_1",
+                    flag,
+                    value,
+                    "--strict-artifact-identity",
+                    "--sample-index",
+                    "0",
+                ]
+                result = subprocess.run(command, check=False, capture_output=True, text=True)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(expected, result.stderr)
+
     def test_cli_rejects_protected_core_path(self) -> None:
         result = subprocess.run(
             [

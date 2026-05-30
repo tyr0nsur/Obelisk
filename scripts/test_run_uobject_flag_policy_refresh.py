@@ -227,7 +227,9 @@ class RunUObjectFlagPolicyRefreshTests(unittest.TestCase):
     def test_strict_artifact_identity_rejects_unspecified_placeholders(self) -> None:
         for flag, value in (
             ("--capture-id", "unspecified-capture-from-old-producer"),
+            ("--capture-id", "static-global-default-capture-old"),
             ("--evidence-pack-id", "unspecified-evidence-pack-from-old-producer"),
+            ("--evidence-pack-id", "static-global-default-pack-old"),
         ):
             with self.subTest(flag=flag), tempfile.TemporaryDirectory() as tmp:
                 input_root = Path(tmp) / "input"
