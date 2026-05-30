@@ -15,6 +15,7 @@ on contributors, plugin authors, operators, and reproducible research.
 ## Plugin Author
 
 - `PLUGIN_ARCHITECTURE.md`: plugin lifecycle, ABI rules, examples, and promotion gates.
+- `PLUGIN_HUB_FOUNDATION_V1.md`: minimal Plugin Hub foundation contract and anti-promises.
 - `PLUGIN_HUB_CAPABILITY_MATRIX.md`: current safe plugin intents and future Plugin Hub boundaries.
 - `oBaseEvents.md`: first-party reference plugin notes.
 - `../include/obelisk/ObeliskApi.h`: public C ABI header.

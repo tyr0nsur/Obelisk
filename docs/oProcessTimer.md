@@ -44,4 +44,9 @@ unregisters the handle on shutdown. Shutdown is idempotent, and an init failure 
 accepted timer registration unregisters the process-local handle before state is reset.
 Timer callbacks use stable process-local user data and do not read borrowed init context.
 
+`UnregisterTimerWithOwnerToken` cancels future timer delivery for the handle, but plugin
+authors should not treat individual timer unregister as a full quiescence barrier. The
+runtime owner cleanup during plugin unload is the final barrier before plugin code and
+owner state are released.
+
 Callbacks must return quickly and must not call into UE/gameplay state.

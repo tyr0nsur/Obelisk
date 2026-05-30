@@ -140,10 +140,23 @@ for the current checkpoint.
   distinct second-source compare. Do not add it to release target sets, ABI enums,
   descriptors, dispatchers, public docs, or runtime gates.
 - Plugin Hub planning order from current demand map and local `NextGenPlugins` inventory:
-  hub foundation first, then copied-chat command ergonomics, privacy-safe
+  `docs/PLUGIN_HUB_FOUNDATION_V1.md` is now the contributor-facing foundation boundary,
+  backed by `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`. Next useful Plugin Hub work is copied
+  chat text ergonomics without command SDK promises, then privacy-safe
   identity/permissions, RCON/operator I/O, economy/persistence, homes/safe zones and
   structure/player-world policy after their promotion gates. Keep the clone out of repo
   and use it only as a dictionary/demand signal.
+- Artifact-pack contributor onboarding has a real documentation gap. A read-only audit
+  found the mechanics are tested, but the flow is spread across research and handoff
+  notes. Next docs/tooling priority is a concise contributor runbook for offline artifact
+  packs, including normalize/check, consume gate, strict target-set coverage,
+  second-source compare, pack-shape expectations, and non-claims. Also reconcile why
+  `check_rc_layout_evidence_smoke.sh` includes `item-return-only-policy-slice` while
+  `check_release_readiness.sh` defaults do not, or align the gates.
+- Runtime/plugin lifecycle audit found no P1 blocker. Documented guardrail: individual
+  timer unregister cancels future delivery but is not a general quiescence barrier; owner
+  cleanup during unload is the final barrier. Future test debt: add PluginManager
+  lifecycle coverage for item-return owner cleanup.
 - Any future live/player validation requires a new approved live-ops brief and beta-test
   notice through the configured local webhook variable when players are involved.
 

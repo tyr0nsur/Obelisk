@@ -25,6 +25,8 @@ offsets, vtables, layouts, `.lib` artifacts, MSVC/Windows ABI assumptions, direc
 `GetNativePointerField`/`NativeCall` wrappers, raw UE pointer APIs, or algorithmic
 implementations; Linux support is rebuilt from Obelisk reflection and ProcessEvent
 copied-data evidence.
+For Plugin Hub work, start from `docs/PLUGIN_HUB_FOUNDATION_V1.md` and
+`docs/PLUGIN_HUB_CAPABILITY_MATRIX.md` before proposing new public SDK surface.
 
 Keep leader-only strategy, cadence, and active goal text out of sub-agent prompts unless
 that context changes the agent's concrete task.

@@ -2,6 +2,8 @@
 
 This matrix is a contributor-facing planning aid for future Obelisk Plugin Hub work. It
 maps common modder intents to the public Obelisk surface that is safe today.
+`PLUGIN_HUB_FOUNDATION_V1.md` defines the minimal foundation contract that this matrix
+builds on.
 
 It is not a compatibility promise for ArkApi plugins, not a module SDK roadmap freeze, and
 not a replacement for promotion gates. If a row says "not ready", plugins must not work

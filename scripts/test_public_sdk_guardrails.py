@@ -20,6 +20,7 @@ PUBLIC_DOC_FILES = [
     REPO_ROOT / "docs" / "INSTALL.md",
     REPO_ROOT / "docs" / "OPERATOR_CLI.md",
     REPO_ROOT / "docs" / "PLUGIN_ARCHITECTURE.md",
+    REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md",
     REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md",
     REPO_ROOT / "docs" / "RELEASE.md",
     REPO_ROOT / "docs" / "STATUS.md",
@@ -811,6 +812,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertEqual(offenders, [])
 
     def test_plugin_hub_planning_uses_arkapi_sources_as_demand_dictionary_only(self) -> None:
+        foundation = (REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md").read_text(encoding="utf-8")
         matrix = (REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md").read_text(encoding="utf-8")
         inventory = (
             REPO_ROOT / "docs" / "research" / "2026-05-30-nextgenplugins-reference-inventory.md"
@@ -823,6 +825,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         )
 
         for text, required in (
+            (foundation, "does not promise ArkApi/AseApi\ncompatibility"),
+            (foundation, "demand dictionaries only"),
+            (foundation, "rebuilt through Obelisk reflection"),
             (matrix, "not as portable implementation source"),
             (matrix, "rebuild every promoted surface through Obelisk reflection"),
             (matrix, "provenance for\n"
@@ -858,6 +863,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         offenders: list[str] = []
         for name, text in (
+            ("docs/PLUGIN_HUB_FOUNDATION_V1.md", foundation),
             ("docs/PLUGIN_HUB_CAPABILITY_MATRIX.md", matrix),
             ("docs/research/2026-05-30-nextgenplugins-reference-inventory.md", inventory),
             ("agent-skills/obelisk-github-research-workflow/SKILL.md", workflow_skill),
@@ -869,6 +875,32 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                         offenders.append(f"{name}:{line_no}: {line.strip()}")
 
         self.assertEqual(offenders, [])
+
+    def test_plugin_hub_foundation_v1_stays_minimal_and_non_authoritative(self) -> None:
+        foundation = (REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md").read_text(encoding="utf-8")
+        compact = normalized(foundation)
+
+        required = (
+            "does not add public symbols, structs, callbacks, capabilities, or gameplay modules",
+            "raw `ProcessEvent` callbacks only as debug-gated runtime plumbing, not as Plugin Hub API",
+            "optional calls require the capability bit, sufficient `struct_size`, and a non-null function pointer",
+            "Any callback or timer registration must use a non-null owner token",
+            "Registration returns handle `0` on failure",
+            "Individual unregister calls cancel future delivery but are not a quiescence barrier",
+            "Event payloads are callback-scope",
+            "must not be persisted or shared across maps, processes, or clusters",
+            "copied `ChatMessageEvent` text parsers without sender identity, replies, moderation, or a command SDK",
+            "Foundation V1 does not provide or imply",
+            "`ResourceHandle`, object identity, resource identity, player identity",
+            "public Inventory SDK, Items SDK, StructureEvents SDK, command SDK",
+            "gameplay mutation, inventory mutation",
+            "return override authority",
+            "persistent or cross-cluster handles",
+        )
+
+        for item in required:
+            with self.subTest(item=item):
+                self.assertIn(normalized(item), compact)
 
     def test_nextgenplugins_absolute_path_stays_out_of_public_docs_and_skills(self) -> None:
         offenders: list[str] = []
