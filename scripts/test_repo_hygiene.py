@@ -21,6 +21,7 @@ class RepoHygieneTests(unittest.TestCase):
             "logs/arkserver/Obelisk.log",
             "build/libobelisk.so",
             "arkserver.core",
+            "core.12345",
             "tmp/local.txt",
         ]
         result = subprocess.run(
