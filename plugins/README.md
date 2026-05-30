@@ -15,9 +15,9 @@ plugins/
                   Official metadata-only example for descriptor discovery.
 ```
 
-`oBaseEvents` is the first plugin planned for the initial public release. It should remain
-small and instructional: it exists to show contributors how to build their own Obelisk
-plugin, not to become a feature-heavy server plugin.
+`oBaseEvents` is the baseline public event example from the current RC scope. It should
+remain small and instructional: it exists to show contributors how to build their own
+Obelisk plugin, not to become a feature-heavy server plugin.
 
 `oProcessTimer` is part of the first-stable core plugin set for `v0.1.0`. It demonstrates
 only the process-local timer ABI: owner-token registration, zero-failure handles, and
@@ -25,11 +25,12 @@ explicit unregister on shutdown. It is not a gameplay/module timer abstraction a
 use UE timers, gameplay timers, UE identity, lookup, permissions, commands, shared
 scheduler state, persistent handles, or cluster coordination.
 
-`oDescriptorCatalog` is a first-party reference plugin for descriptor discovery. It reads
-`DescribeResourceKind` and `DescribeGameplayPolicyEventKind`, validates routing metadata,
-and logs sanitized category/event summaries. It does not register callbacks, timers,
-threads, chat handlers, HTTP endpoints, resource identities, lookups, mutations, return
-overrides, or raw `ProcessEvent` access.
+`oDescriptorCatalog` is the post-RC reference plugin for descriptor discovery and the next
+release-scope metadata example. It reads `DescribeResourceKind` and
+`DescribeGameplayPolicyEventKind`, validates routing metadata, and logs sanitized
+category/event summaries. It does not register callbacks, timers, threads, chat handlers,
+HTTP endpoints, resource identities, lookups, mutations, return overrides, or raw
+`ProcessEvent` access.
 
 ## Experimental Examples
 

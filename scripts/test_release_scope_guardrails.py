@@ -387,6 +387,46 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("non-callback owner/plugin cleanup still waits", hardening)
         self.assertIn("does not promote Inventory, StructureEvents, Mission, Dino, Tribe, Transfer", hardening)
 
+    def test_plugin_cleanup_failure_retry_policy_stays_documented(self) -> None:
+        status = read("docs/STATUS.md")
+        current = read("docs/agent-handoff/CURRENT.md")
+        compact = read("docs/agent-handoff/COMPACT_CONTEXT.md")
+        architecture = read("docs/PLUGIN_ARCHITECTURE.md")
+
+        required = [
+            "skips `dlclose`",
+            "retains the plugin",
+            "retry",
+            "does not repeat plugin shutdown",
+        ]
+        for path, text in (
+            ("docs/STATUS.md", status),
+            ("docs/agent-handoff/CURRENT.md", current),
+            ("docs/agent-handoff/COMPACT_CONTEXT.md", compact),
+        ):
+            for item in required:
+                with self.subTest(file=path, item=item):
+                    self.assertIn(item, text)
+
+        for item in [
+            "must keep the plugin\nlibrary mapped and retry cleanup later",
+            "must not call shutdown a\nsecond time on that retry",
+        ]:
+            with self.subTest(file="docs/PLUGIN_ARCHITECTURE.md", item=item):
+                self.assertIn(item, architecture)
+
+        for stale in [
+            "Runtime lifecycle debt remains open",
+            "should prevent `dlclose`",
+            "a later\n  no-ABI-change patch",
+        ]:
+            for path, text in (
+                ("docs/agent-handoff/CURRENT.md", current),
+                ("docs/agent-handoff/COMPACT_CONTEXT.md", compact),
+            ):
+                with self.subTest(file=path, stale=stale):
+                    self.assertNotIn(stale, text)
+
     def test_release_readiness_is_the_documented_release_gate(self) -> None:
         readme = read("README.md")
         release = read("docs/RELEASE.md")

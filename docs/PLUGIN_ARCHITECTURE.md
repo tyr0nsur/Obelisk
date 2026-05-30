@@ -157,7 +157,10 @@ callbacks run on an Obelisk worker thread, must return quickly, must not throw a
 C ABI, and must not call unsafe UE4 functions. A timer may unregister its own handle from
 inside its callback, but plugins should still unregister outstanding timers during
 shutdown while callback code and state are valid; runtime owner cleanup on init
-failure/unload is only the backstop and waits for in-flight callbacks before `dlclose`.
+failure/unload is only the backstop. If cleanup succeeds, it waits for in-flight callbacks
+before `dlclose`; if any owner cleanup family fails, the runtime must keep the plugin
+library mapped and retry cleanup later instead of unloading code that callbacks may still
+reference.
 
 ## Build And Drop-In Model
 
@@ -252,12 +255,13 @@ void ObeliskPlugin_Shutdown();
 ```
 
 This export is not part of the `ObeliskApi` function table, so it does not shift
-existing ABI offsets. When present, the runtime calls shutdown before
-unregistering plugin-owned callbacks and before `dlclose`. Plugin shutdown must
-be idempotent, must stop external ingress first, and must catch all exceptions
-before returning across the C ABI boundary. Plugins that start threads, sockets,
-or long-lived file readers remain experimental until they implement and validate
-this shutdown path.
+existing ABI offsets. When present, the runtime calls shutdown once before
+unregistering plugin-owned callbacks and before `dlclose`. If callback cleanup fails, the
+runtime retains the mapped plugin for a later cleanup retry and must not call shutdown a
+second time on that retry. Plugin shutdown must be idempotent, must stop external ingress
+first, and must catch all exceptions before returning across the C ABI boundary. Plugins
+that start threads, sockets, or long-lived file readers remain experimental until they
+implement and validate this shutdown path.
 
 ## ProcessEvent Policy
 

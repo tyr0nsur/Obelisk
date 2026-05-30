@@ -65,3 +65,9 @@ UE lookup, or `ResourceHandle` APIs.
    permissions, command routing, UE/gameplay timers, and shared-cluster state.
 5. Keep server-backed validation behind explicit live-ops windows; prefer offline
    artifacts and fixture-backed tests until a concrete runtime signal is required.
+6. After descriptor/smoke coverage, Transfer bool-tail refresh, and Item return-only
+   lifecycle work are closed, the next broad v1 discovery family should be
+   `players_identity_lifecycle`: build a closed offline target set around
+   `ShooterPlayerController`/`PlayerState` login and lifecycle names, classify only
+   copied/redacted fields, and keep `ResourceHandle`, lookup, UE pointers, mutation,
+   return override, and runtime work out of scope until a separate gate exists.

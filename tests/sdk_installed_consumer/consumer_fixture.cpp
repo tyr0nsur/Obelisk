@@ -440,6 +440,8 @@ int main(int argc, char** argv)
         ResolveOptional<BoolProbeFn>(handle, "InstallLayoutConsumer_GameplayPolicyEventAccepted");
     BoolProbeFn timerSeen =
         ResolveOptional<BoolProbeFn>(handle, "InstallLayoutConsumer_ScheduledCallbackSeen");
+    BoolProbeFn descriptorCatalogValidated =
+        ResolveOptional<BoolProbeFn>(handle, "InstallLayoutConsumer_DescriptorCatalogValidated");
     const bool expectsGameplayPolicy = gameplayPolicyEventSeen != nullptr && gameplayPolicyEventAccepted != nullptr;
     const bool expectsTimer = timerSeen != nullptr;
 
@@ -509,6 +511,16 @@ int main(int argc, char** argv)
         g_TimerCallback = nullptr;
         g_TimerUserData = nullptr;
         Require(init(&api, &context), "ObeliskPlugin_Init failed");
+        if (descriptorCatalogValidated)
+        {
+            Require(descriptorCatalogValidated(), "expected plugin to validate descriptor catalog");
+            Require(g_RegisterCount == 0, "descriptor catalog consumer unexpectedly registered ProcessEvent callback");
+            Require(g_GameplayPolicyRegisterCount == 0,
+                    "descriptor catalog consumer unexpectedly registered gameplay policy callback");
+            Require(g_ChatMessageRegisterCount == 0,
+                    "descriptor catalog consumer unexpectedly registered chat message callback");
+            Require(g_TimerRegisterCount == 0, "descriptor catalog consumer unexpectedly registered timer");
+        }
         if (shutdown)
         {
             Require(g_RegisterCount == 1, "expected one owner-token callback registration");

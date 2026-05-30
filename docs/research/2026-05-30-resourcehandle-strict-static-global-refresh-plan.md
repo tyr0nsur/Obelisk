@@ -207,6 +207,60 @@ blocker: uobject_flags_validity_semantics_unproven / lifecycle blockers remain
 The evaluator command is therefore useful as a fail-closed audit, not as a promotion run,
 until identity-ready reconciliation and flag-policy reports are regenerated.
 
+## Post-RC Agent Refresh
+
+Lead-supervised offline refresh after the post-RC descriptor/runtime hardening work:
+
+```text
+output_dir: /tmp/obelisk-static-global-agent-refresh-20260530
+capture_id: primary-static-global-20260530-agent-refresh
+evidence_pack_id: static-global-preflight-20260529-agent-refresh
+manifest_sha256: cc3ef023eaadbe1c7f4b63ff1a81b4a0d4fc0cbd71dbfa78fc907506a93ee9a2
+artifact_identity.artifact_sha256: c0ad038aab85d17d64a1bd145be1245ce9b9eaa41b6aaa81e6bcc79bd3039cd6
+static_xrefs_sha256: cd9e5e95973fc9359ac5c0989c3c862a85626840c92e8019505ca752523ef584
+candidate: gobjects=0x595b7e0
+near_miss.context: gobjects_required_field_window
+near_miss.windows: 3
+split_evidence.status: split_near_miss
+gobjects blocker: missing_gobjects_coherent_field_window
+promotion_gate.ready: false
+consume_gate with --root /tmp: accepted
+promote_gate with --root /tmp: blocked
+promote blockers: promote_mode_static_global_promotion_gate_not_ready,
+  promote_mode_static_global_has_blockers,
+  promote_mode_static_global_static_only_evidence
+```
+
+This run intentionally used only the existing offline binary plus objdump/readelf artifacts
+under `/home/flowcommunity-ark/obelisk-artifacts` and wrote only to `/tmp`. It confirms
+that the current strict tooling preserves `near_miss` and `split_evidence` for
+`0x595b7e0` while keeping promotion blocked. It does not supersede the durable
+field-window-backed workspace refresh above; it is a fresh local audit that the blocker is
+still explicit and machine-gated.
+
+Follow-up local field-window refresh from the same offline binary:
+
+```text
+field_window_output: /tmp/obelisk-guobjectarray-field-window-local-20260530/fuobjectarray-field-window.redacted.json
+field_window_schema: obelisk.fuobjectarray-field-window-redacted.v1
+static_global_output: /tmp/obelisk-static-global-agent-field-window-refresh-20260530
+manifest_sha256: 7fbba5ab88b94aefb04e2551d003027c93aa1ca98e4ea50ac7f4ebbe0367eef2
+artifact_identity.artifact_sha256: 08a517cd4b4448c8998fa2ecac642889d819982abeefb48e0b67902b6b13f681
+candidate: gobjects=0x595b7e0
+gobjects static_contract.satisfied: true
+gobjects blockers: []
+redacted_field_window_evidence: present
+promotion_gate.ready: false
+promotion_gate blocker: static_only_evidence
+consume_gate with --root /tmp: accepted
+promote_gate with --root /tmp: blocked
+```
+
+This clears only the local static `missing_gobjects_coherent_field_window` blocker for the
+matching binary/candidate pair. It still does not promote public `GObjects`,
+`ResourceHandle`, lookup, identity, lifecycle, mutation, return override, or UE call
+replay.
+
 ## What This Still Does Not Demonstrate
 
 Even a strict static-global manifest with complete `artifact_identity` does not prove:

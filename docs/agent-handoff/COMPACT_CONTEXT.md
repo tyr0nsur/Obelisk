@@ -426,9 +426,10 @@ priorities, and do not use history files as the active source of truth.
   durable artifacts under `/servidor/ark/workspace-offline` are stale until regenerated
   with `bool_field_size` and `bool_byte_offset`; do not cite the old readiness report as
   current acceptance.
-- Runtime lifecycle debt remains open: if PluginManager callback cleanup fails, a later
-  no-ABI-change patch should prevent `dlclose` and leave the plugin mapped for retry
-  rather than risking callbacks into an unloaded library.
+- Runtime lifecycle callback-cleanup debt is addressed in post-RC head: if PluginManager
+  callback cleanup fails, unload skips `dlclose`, retains the plugin mapped for retry,
+  preserves owner-token unregister while unloading, and does not repeat plugin shutdown on
+  the retry.
 - Runtime dispatcher hardening: hook-called Chat, Structure, and Inventory dispatchers
   must fail closed on setup/internal errors instead of rethrowing into `ProcessEvent`.
   Chat dispatch snapshots registration ids, skips callbacks removed during the same
