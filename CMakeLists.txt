@@ -63,6 +63,7 @@ add_library(obelisk SHARED
     ue/BuffReflection.cpp
     ue/ChatReflection.cpp
     ue/DinoReflection.cpp
+    ue/ItemReflection.cpp
     ue/InventoryReflection.cpp
     ue/StructureReflection.cpp
     ue/RuntimeReflection.cpp
@@ -72,6 +73,7 @@ add_library(obelisk SHARED
     hooks/ProcessEventDispatch.cpp
     hooks/ProcessEventChatReflection.cpp
     hooks/ProcessEventInventoryReflection.cpp
+    hooks/ProcessEventItemReflection.cpp
     hooks/ProcessEventStructureReflection.cpp
     hooks/ProcessEventHook.cpp
     core/ChatEventDispatcher.cpp
