@@ -170,6 +170,21 @@ namespace
         g_TimerSeen.store(false);
         g_TimerAccepted.store(false);
     }
+
+    void UnregisterTimer() noexcept
+    {
+        try
+        {
+            if (g_HasApi && g_TimerId != 0 && g_Api.UnregisterTimerWithOwnerToken)
+            {
+                g_Api.UnregisterTimerWithOwnerToken(g_OwnerToken, g_TimerId);
+                g_TimerId = 0;
+            }
+        }
+        catch (...)
+        {
+        }
+    }
 }
 
 extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out)
@@ -252,12 +267,14 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
     catch (const std::exception& e)
     {
         SafeLogError(api, (std::string("[oProcessTimer] Init failed: ") + e.what()).c_str());
+        UnregisterTimer();
         ResetState();
         return false;
     }
     catch (...)
     {
         SafeLogError(api, "[oProcessTimer] Init failed with unknown exception.");
+        UnregisterTimer();
         ResetState();
         return false;
     }
@@ -267,11 +284,7 @@ extern "C" __attribute__((visibility("default"))) void ObeliskPlugin_Shutdown()
 {
     try
     {
-        if (g_HasApi && g_TimerId != 0 && g_Api.UnregisterTimerWithOwnerToken)
-        {
-            g_Api.UnregisterTimerWithOwnerToken(g_OwnerToken, g_TimerId);
-            g_TimerId = 0;
-        }
+        UnregisterTimer();
         SafeLogInfo("[oProcessTimer] Shutdown.");
     }
     catch (...)

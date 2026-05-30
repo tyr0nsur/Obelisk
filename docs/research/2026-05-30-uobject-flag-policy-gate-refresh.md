@@ -2,10 +2,10 @@
 
 ## Context
 
-Hilbert audited `/servidor/ark/workspace-offline` and identified the current
-`uobject-flag-policy-static-negative` artifact as the most useful read-only blocker check
-for ResourceHandle-related research. This note records the gate result so future rounds do
-not repeat broad scans or treat the old artifact as consume-accepted.
+A read-only static/offline audit of `/servidor/ark/workspace-offline` identified the
+current `uobject-flag-policy-static-negative` artifact as the most useful blocker check
+for ResourceHandle-related research. This note records the gate result so future rounds
+do not repeat broad scans or treat the old artifact as consume-accepted.
 
 ## Command
 
@@ -152,3 +152,11 @@ made `validate_uobject_flag_policy_provenance_inputs.py --require-rich-provenanc
 accepted, the consume gate accepted, and promote mode blocked with the expected
 candidate-only blockers. Keep this as internal static evidence only; it does not promote
 `ResourceHandle`, object identity, lookup, lifecycle names, mutation, or return override.
+
+The canonical repo-side orchestration command is now
+`scripts/run_uobject_flag_policy_refresh.py`. It expects an input root with `weak/` and
+`windows/` subdirectories, requires rich provenance sidecars, writes generated redacted
+outputs under a caller-provided output root outside Git, requires consume mode to accept,
+and requires promote mode to stay blocked with the candidate-only blocker. The driver
+rejects input roots under protected live-server paths except the approved offline
+workspace and rejects outputs inside Git or protected live-server paths.

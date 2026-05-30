@@ -35,6 +35,7 @@ namespace
     bool g_FailGameplayPolicyRegistration = false;
     bool g_FailChatMessageRegistration = false;
     bool g_FailTimerRegistration = false;
+    bool g_ThrowLogAfterTimerRegistration = false;
     OnProcessEventCallback g_RegisteredCallback = nullptr;
     ObeliskGameplayPolicyEventCallback g_RegisteredGameplayPolicyCallback = nullptr;
     void* g_RegisteredGameplayPolicyUserData = nullptr;
@@ -159,6 +160,8 @@ namespace
         g_RegisteredTimerCallback = callback;
         g_RegisteredTimerUserData = userData;
         ++g_TimerRegisterCount;
+        if (g_ThrowLogAfterTimerRegistration)
+            g_ThrowLog = true;
         return 4004;
     }
 
@@ -488,6 +491,8 @@ int main(int argc, char** argv)
         if (mode == "active-process-event" || mode == "callback-throw-log")
             configJson = kActiveOBaseEventsConfig;
         else if (mode == "active-timer" ||
+            mode == "active-timer-double-shutdown" ||
+            mode == "throw-log-after-timer-registration" ||
             (mode == "fail-timer-registration" && std::strcmp(expectedPluginId, "oProcessTimer") == 0))
             configJson = R"json({
     "enabled": true,
@@ -567,6 +572,8 @@ int main(int argc, char** argv)
             g_FailChatMessageRegistration = true;
         if (mode == "fail-timer-registration")
             g_FailTimerRegistration = true;
+        if (mode == "throw-log-after-timer-registration")
+            g_ThrowLogAfterTimerRegistration = true;
 
         ObeliskPluginInitContext context{};
         context.abi_version = OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION;
@@ -643,6 +650,21 @@ int main(int argc, char** argv)
                 "failed init unexpectedly unregistered a chat message callback");
             Require(g_TimerRegisterCount == 0, "failed init unexpectedly registered a timer callback");
             Require(g_TimerUnregisterCount == 0, "failed init unexpectedly unregistered a timer callback");
+            cleanupConfigDir();
+            closeHandle();
+            return 0;
+        }
+        if (mode == "throw-log-after-timer-registration")
+        {
+            Require(!initSucceeded, "plugin accepted log failure after timer registration");
+            Require(g_TimerRegisterCount == 1, "plugin did not register timer before injected log failure");
+            Require(g_TimerUnregisterCount == 1, "plugin did not unregister timer after injected log failure");
+            Require(g_RegisteredTimerCallback == nullptr,
+                "timer callback survived post-registration init failure cleanup");
+            Require(g_RegisteredTimerUserData == nullptr,
+                "timer user data survived post-registration init failure cleanup");
+            g_ThrowLog = false;
+            g_ThrowLogAfterTimerRegistration = false;
             cleanupConfigDir();
             closeHandle();
             return 0;
@@ -849,7 +871,9 @@ int main(int argc, char** argv)
             Require(!timerSeen(), "plugin reported timer event without registration");
             Require(!timerAccepted(), "plugin accepted timer event without registration");
         }
-        else if (hasTimerProbe && (mode == "active-timer" || std::strcmp(expectedPluginId, "oProcessTimer") != 0))
+        else if (hasTimerProbe && (mode == "active-timer" ||
+            mode == "active-timer-double-shutdown" ||
+            std::strcmp(expectedPluginId, "oProcessTimer") != 0))
         {
             Require(g_TimerRegisterCount == 1, "plugin did not register one timer callback");
             Require(g_TimerUnregisterCount == 0, "plugin unregistered timer callback before shutdown");
@@ -874,6 +898,8 @@ int main(int argc, char** argv)
         }
         api = {};
         if (shutdown)
+            shutdown();
+        if (mode == "active-timer-double-shutdown" && shutdown)
             shutdown();
         if (mode == "active-process-event" || mode == "callback-throw-log")
         {
@@ -945,7 +971,9 @@ int main(int argc, char** argv)
             Require(g_TimerUnregisterCount == 0,
                 "plugin unregistered timer callback without capability");
         }
-        else if (hasTimerProbe && (mode == "active-timer" || std::strcmp(expectedPluginId, "oProcessTimer") != 0))
+        else if (hasTimerProbe && (mode == "active-timer" ||
+            mode == "active-timer-double-shutdown" ||
+            std::strcmp(expectedPluginId, "oProcessTimer") != 0))
         {
             Require(g_TimerRegisterCount == 1, "plugin did not register one timer callback");
             Require(g_TimerUnregisterCount == 1, "plugin did not unregister one timer callback");

@@ -33,6 +33,7 @@ logs; timer ids are process-local runtime handles only.
 
 When enabled, the plugin validates the timer capability and owner token, registers one
 one-shot timer with a 1000 ms delay, logs a fixed message when the callback fires, and
-unregisters the handle on shutdown.
+unregisters the handle on shutdown. Shutdown is idempotent, and an init failure after an
+accepted timer registration unregisters the process-local handle before state is reset.
 
 Callbacks must return quickly and must not call into UE/gameplay state.

@@ -71,6 +71,24 @@ without reading memory before the gate. The borrowed pointer exists only for imm
 internal validation; it must not be persisted, logged, exposed to plugins, used as object
 identity, or treated as authorization for a Transfer hook or SDK.
 
+## 2026-05-30 Next Evidence Slice
+
+The next useful transfer step is a `transfer-baccept-only-policy-slice` offline artifact,
+not hook wiring. It should narrow the broad `transfer-ufunction-intake` evidence to exactly
+one copied field:
+
+- `ShooterPlayerController.ServerTransferredPlayerConfirmationResult.bAccept`
+
+The slice should fail closed unless the committed snapshot proves `FunctionFlags=0x220cc0`,
+`NumParms=1`, `ParmsSize=1`, `ReturnValueOffset=0xffff`, a single `BoolProperty` named
+`bAccept` at offset `0`, `ElementSize=1`, `ArrayDim=1`, byte mask `0x01`, field mask
+`0xff`, and `native_bool=false`.
+
+It must explicitly exclude spawn point ids, region indexes, player data ids, bed ids,
+return bools, object refs, class refs, tribute structs, arrays, strings, ids, mutation,
+return override, dispatcher wiring, runtime hook wiring, and public SDK promotion. The
+artifact should remain `promotion_ready=false`.
+
 ## Non-Claims
 
 This note does not promote transfer to the RC, does not promote any public transfer API,

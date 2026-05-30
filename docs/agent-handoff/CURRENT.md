@@ -19,7 +19,7 @@ sequence.
 - Do not expand or retag the RC for routine post-RC development. Future work should move
   toward a broader `v1.0` production-stable Obelisk core: general UE4 reflection,
   copied-data module APIs, lifecycle-safe plugins, operator lifecycle tooling, and enough
-  compatibility surface to later recreate common ArkApi plugins on Linux.
+  compatibility surface for familiar ARK plugin concepts on Linux.
 - Treat chat, inventory, structures, players, tribes, dinos, buffs, missions, transfers,
   commands, permissions, timers, economy/database integrations, and admin tooling as
   module areas above the core. Promote each only through copied-data ABI, privacy,
@@ -43,16 +43,18 @@ sequence.
   outside an approved exact run. For in-game function tests, use an operator-approved
   notice before activation; keep operator secret endpoints out of repo files, skills,
   prompts, and handoff notes.
-- Community updates are lead-only for major public modder-facing milestones, previews,
-  migrations, or releases; beta-test activation notices are separate live-ops messages.
+- Community updates are lead-only for major public modder-facing milestones, migrations,
+  or releases; beta-test activation notices are separate live-ops messages.
   Webhook URLs live only in ignored `local/discord-webhooks.env`: use
   `OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL` for public modder-facing milestones and
   `OBELISK_BETA_TEST_WEBHOOK_URL` for approved in-game test windows. Send professional
   Discord embeds only; never expose raw URLs, player text, secrets, routine validation
   logs, or speculative reversing notes. Use `community` only for stable modder-facing
   milestones, `beta-test` only for approved player action windows, and no Discord for
-  internal rounds or agent status. Prefer `scripts/send_discord_embed.py --dry-run` before
-  any approved send.
+  internal rounds or agent status. Explicit current-turn approval is required for every
+  Discord send; publication approval does not imply Discord approval. Prefer `scripts/send_discord_embed.py --dry-run` as the
+  guarded workflow; run it before any approved send, then verify title, description,
+  status/scope, and 2-5 fields are public-safe.
 
 ## Current Routing Facts
 
@@ -76,13 +78,16 @@ sequence.
   on plugin init failure/unload. Timer ids are not shared config, cluster state, UE
   identity, or persistent handles. `oProcessTimer` is the first-party process-local timer
   example and has SDK consumer coverage for disabled config, active one-shot callback,
-  missing capability, short API, zero owner token, registration failure, and shutdown
-  unregister.
+  missing capability, short API, zero owner token, registration failure, post-registration
+  init-failure cleanup, idempotent shutdown, and shutdown unregister.
 - Internal bridges only: `StructureEventDispatcher`, `InventoryPolicyEventDispatcher`,
   Item/Mission/Transfer recognizers, weak-helper artifacts, GObjects evidence, and route
   observers are planning/evidence inputs until a separate promotion gate changes scope.
-- ResourceHandle/public GObjects remain blocked. Latest flag-policy consume check is
-  blocked by old artifact vocabulary and missing provenance/caller rows; see
+- ResourceHandle/public GObjects remain blocked. The old flag-policy artifact is blocked
+  by old artifact vocabulary and missing provenance/caller rows; a `/tmp`
+  rich-provenance rehearsal proved the small refresh route can pass preflight and consume
+  mode while promote mode stays blocked. Durable refresh still needs preserved
+  regenerated/enriched sidecars; see
   `docs/research/2026-05-30-uobject-flag-policy-gate-refresh.md`.
 
 ## Priority Next Steps
@@ -101,7 +106,9 @@ sequence.
   handoff does not authorize Transfer runtime work. ResourceHandle semantic work still
   needs helper evidence, mutation-window rejection, and a fail-closed contract.
   Commands/chat routing waits on player context, permissions, and safe response semantics.
-  ArkServerApi/AseApi remains names/behavior reference only.
+  ArkServerApi/AseApi remains a names/behavior reference only; do not copy offsets,
+  layouts, ABI assumptions, wrappers, raw UE pointer APIs, or algorithmic
+  implementations.
 - Regenerate the blocked UObject flag-policy artifact with current provenance/caller-row
   requirements before spending more ResourceHandle effort. Do not rerun broad FName,
   GObjects, or core scans unless the binary hash changes or evidence contradicts current

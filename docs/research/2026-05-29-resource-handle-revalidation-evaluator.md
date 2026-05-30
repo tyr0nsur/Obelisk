@@ -41,6 +41,37 @@ object-array scans.
 `post_callback_resource_handle_ready` remains `false`. ResourceHandle, object identity,
 mutation, and return override surfaces remain unpromoted.
 
+## 2026-05-30 Fail-Closed Evaluator Direction
+
+The next ResourceHandle evaluator should keep measuring the blocker instead of promoting a
+handle. A future `obelisk.resource-handle-lifetime-blocker-evaluator.v1` artifact should
+remain internal and emit `promotion_ready=false`, `public_resource_handle_ready=false`,
+and `post_callback_resource_handle_ready=false`.
+
+Required non-claims should include:
+
+- `does_not_unlock_resource_handle`
+- `does_not_promote_gobjects_lookup`
+- `does_not_promote_public_object_identity`
+- `does_not_claim_post_callback_lookup`
+- `does_not_name_ue_lifecycle_flags_publicly`
+- `does_not_allow_mutation_or_return_override`
+- `does_not_replace_rejected_runtime_object_samples`
+
+Required blockers should include:
+
+- `no_public_resource_handle_contract`
+- `public_resourcehandle_policy_missing`
+- `no_post_callback_lifetime_contract`
+- `post_callback_lifetime_policy_unproven`
+- `no_serial_reuse_or_wraparound_policy`
+- `no_version_matched_source_decompiler_correlation_for_public_lifecycle_names`
+- `no_rejected_runtime_object_samples`
+
+Even strong serial/GObjects evidence may set only internal measurement booleans. It must
+not flip public or post-callback readiness until lifecycle, reuse/wraparound, lookup
+privacy, and post-callback validity contracts are separately proven.
+
 ## Validation
 
 No runtime/server action is required. Inputs under `/servidor/ark` are rejected unless

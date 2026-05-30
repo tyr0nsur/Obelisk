@@ -43,6 +43,12 @@ and public SDK exposure.
 ```bash
 python3 scripts/test_build_redacted_ufunction_signatures.py
 python3 scripts/build_redacted_ufunction_signatures.py --item-return-only-policy-slice --json
+python3 scripts/validate_offline_artifact_gate.py \
+  --root /tmp \
+  --manifest /tmp/obelisk-item-slice.json \
+  --expected-binary-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
+  --mode consume \
+  --json
 ```
 
 Expected policy report result:
@@ -66,6 +72,11 @@ Expected policy report result:
 
 Confirmed as an offline evidence-only slice. The implementation proves that the committed
 snapshots support exactly three copied return bool observations and no wider item payload.
+The offline artifact gate accepts this schema in consume mode only when the evidence-only
+contract, exact copied/excluded field sets, non-claims, and `promotion_ready=false` are
+present. It also pins the compact input/copy target sets, requires four declared source
+snapshot hashes, and rejects public/runtime readiness overclaims. Promote mode remains
+blocked with `promote_mode_item_return_policy_slice_evidence_only`.
 
 The internal `TryBuildCopiedItemReturnObservationForMatchedAttempt` helper is
 return-bearing only. It accepts only `AttemptStatus::Matched` attempts whose copied

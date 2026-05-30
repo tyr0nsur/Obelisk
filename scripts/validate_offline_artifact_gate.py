@@ -42,6 +42,7 @@ UOBJECT_FLAG_SAMPLE_REPORT_SCHEMA = "obelisk.uobject-flag-sample-report.v1"
 UOBJECT_FLAG_SEMANTIC_CORRELATION_SCHEMA = "obelisk.uobject-flag-semantic-correlation.v1"
 WEAK_HELPER_STATIC_POLARITY_REPORT_SCHEMA = "obelisk.weak-helper-static-polarity-report.v1"
 WEAK_HELPER_POLARITY_CALLER_MODE_REPORT_SCHEMA = "obelisk.weak-helper-polarity-caller-mode-report.v1"
+ITEM_RETURN_ONLY_POLICY_SLICE_SCHEMA = "obelisk.item-return-only-policy-slice.v1"
 SUPPORTED_MANIFEST_SCHEMAS = {
     CORE_DUMP_EVIDENCE_PACK_SCHEMA,
     GOBJECTS_TWO_CORE_MANIFEST_SCHEMA,
@@ -60,6 +61,7 @@ SUPPORTED_MANIFEST_SCHEMAS = {
     UOBJECT_FLAG_SEMANTIC_CORRELATION_SCHEMA,
     WEAK_HELPER_STATIC_POLARITY_REPORT_SCHEMA,
     WEAK_HELPER_POLARITY_CALLER_MODE_REPORT_SCHEMA,
+    ITEM_RETURN_ONLY_POLICY_SLICE_SCHEMA,
 }
 UOBJECT_FLAG_TRANSITION_PROVENANCE_SCHEMAS = {
     "obelisk.offline-artifact-provenance.v1",
@@ -141,6 +143,42 @@ REQUIRED_READINESS_NON_PROMOTED_SURFACES = {
     "resource_handle",
     "return_override",
     "runtime_hooks",
+}
+REQUIRED_ITEM_RETURN_ONLY_COPIED_FIELDS = {
+    "PrimalItem.AllowEquipItem.ReturnValue",
+    "PrimalItem.CanRepair.ReturnValue",
+    "PrimalItem.UseItemOntoItem.ReturnValue",
+}
+REQUIRED_ITEM_RETURN_ONLY_EXCLUDED_FIELDS = {
+    "PrimalItem.AllowEquipItem.toInventory",
+    "PrimalItem.CanRepair.bIgnoreInventoryRequirement",
+    "PrimalItem.CraftBlueprint.bConsumeResources",
+    "PrimalItem.UseItemOntoItem.DestinationItem",
+    "PrimalItem.UseItemOntoItem.AdditionalData",
+}
+REQUIRED_ITEM_RETURN_ONLY_COPIED_TARGETS = {
+    "PrimalItem.AllowEquipItem",
+    "PrimalItem.CanRepair",
+    "PrimalItem.UseItemOntoItem",
+}
+REQUIRED_ITEM_RETURN_ONLY_INPUT_TARGETS = REQUIRED_ITEM_RETURN_ONLY_COPIED_TARGETS | {
+    "PrimalItem.CraftBlueprint",
+}
+REQUIRED_ITEM_RETURN_ONLY_NON_CLAIMS = {
+    "does not promote public SDK callbacks or public metadata helpers",
+    "does not expose UE pointers, object identity, class identity, raw params, mutation, or return overrides",
+}
+REQUIRED_ITEM_RETURN_ONLY_EXPLICIT_EXCLUSIONS = {
+    "CraftBlueprint",
+    "CanRepair.bIgnoreInventoryRequirement",
+    "CraftBlueprint.bConsumeResources",
+    "toInventory",
+    "DestinationItem",
+    "AdditionalData",
+    "object_refs",
+    "mutation",
+    "return_override",
+    "public_sdk",
 }
 REQUIRED_UOBJECT_FLAG_POLICY_WINDOWS = {
     "weak_helper_reject_0x100",
@@ -610,6 +648,10 @@ def collect_candidate_public_overclaims(
         "post-callback lookup ready": "post_callback_lookup_ready",
         "post callback lookup ready": "post_callback_lookup_ready",
         "public object identity": "public_object_identity",
+        "public callback": "public_callback",
+        "runtime ready": "runtime_ready",
+        "runtime promotion": "runtime_promotion",
+        "runtime hook ready": "runtime_hook_ready",
     }
     found: list[tuple[str, str, str]] = []
     for trail, raw_value in collect_string_fields(value):
@@ -2213,6 +2255,187 @@ def validate_readiness_report_manifest(payload: dict[str, Any], *, label: str, m
             blockers.append({"reason": "readiness_report_missing_non_promoted_surfaces", "label": label})
         if mode == "promote":
             blockers.append({"reason": "promote_mode_readiness_report_layout_only", "label": label})
+    return blockers
+
+
+def validate_item_return_only_policy_slice_manifest(payload: dict[str, Any], *, label: str, mode: str) -> list[dict[str, Any]]:
+    if payload.get("schema") != ITEM_RETURN_ONLY_POLICY_SLICE_SCHEMA:
+        return []
+
+    blockers: list[dict[str, Any]] = []
+    safety_summary = payload.get("safety_summary")
+    if not isinstance(safety_summary, dict):
+        blockers.append({"reason": "item_return_policy_safety_summary_missing", "label": f"{label}:$.safety_summary"})
+        return blockers
+
+    if payload.get("policy_status") != "evidence-only":
+        blockers.append({"reason": "item_return_policy_status_not_evidence_only", "label": f"{label}:$.policy_status"})
+    if payload.get("snapshot_root") != "redacted":
+        blockers.append({"reason": "item_return_policy_snapshot_root_not_redacted", "label": f"{label}:$.snapshot_root"})
+    if payload.get("input_target_set") != "item-compact-intake":
+        blockers.append({"reason": "item_return_policy_input_target_set_mismatch", "label": f"{label}:$.input_target_set"})
+    if payload.get("output_target_set") != "item-return-only-policy-slice":
+        blockers.append({"reason": "item_return_policy_output_target_set_mismatch", "label": f"{label}:$.output_target_set"})
+    if payload.get("missing_targets") != []:
+        blockers.append({"reason": "item_return_policy_missing_targets_present", "label": f"{label}:$.missing_targets"})
+
+    generated_from = payload.get("generated_from")
+    if not isinstance(generated_from, dict):
+        blockers.append({"reason": "item_return_policy_generated_from_missing", "label": f"{label}:$.generated_from"})
+    else:
+        if generated_from.get("snapshot_schema") != RC_UFUNCTION_SNAPSHOT_SCHEMA:
+            blockers.append({"reason": "item_return_policy_snapshot_schema_mismatch", "label": f"{label}:$.generated_from.snapshot_schema"})
+        input_snapshots = generated_from.get("input_snapshots")
+        if not isinstance(input_snapshots, list) or len(input_snapshots) != 4:
+            blockers.append({"reason": "item_return_policy_input_snapshot_count_mismatch", "label": f"{label}:$.generated_from.input_snapshots"})
+        else:
+            seen_snapshot_ids: set[str] = set()
+            for index, snapshot in enumerate(input_snapshots):
+                snapshot_label = f"{label}:$.generated_from.input_snapshots[{index}]"
+                if not isinstance(snapshot, dict):
+                    blockers.append({"reason": "item_return_policy_input_snapshot_entry_invalid", "label": snapshot_label})
+                    continue
+                snapshot_id = snapshot.get("id")
+                snapshot_sha256 = snapshot.get("sha256")
+                if not isinstance(snapshot_id, str) or not snapshot_id or snapshot_id in seen_snapshot_ids:
+                    blockers.append({"reason": "item_return_policy_input_snapshot_id_invalid", "label": f"{snapshot_label}.id"})
+                else:
+                    seen_snapshot_ids.add(snapshot_id)
+                if not isinstance(snapshot_sha256, str) or SHA256_RE.fullmatch(snapshot_sha256) is None:
+                    blockers.append({"reason": "item_return_policy_input_snapshot_sha256_invalid", "label": f"{snapshot_label}.sha256"})
+
+    if safety_summary.get("artifact_status") != "evidence_only":
+        blockers.append({"reason": "item_return_policy_artifact_status_not_evidence_only", "label": f"{label}:$.safety_summary.artifact_status"})
+    if safety_summary.get("intended_use") != "offline_review_only":
+        blockers.append({"reason": "item_return_policy_intended_use_not_offline_review_only", "label": f"{label}:$.safety_summary.intended_use"})
+    if safety_summary.get("promotion_ready") is not False:
+        blockers.append({"reason": "item_return_policy_promotion_ready_not_false", "label": f"{label}:$.safety_summary.promotion_ready"})
+    if safety_summary.get("copied_bool_count") != 3:
+        blockers.append({"reason": "item_return_policy_copied_bool_count_not_three", "label": f"{label}:$.safety_summary.copied_bool_count"})
+    if safety_summary.get("excluded_field_count") != 5:
+        blockers.append({"reason": "item_return_policy_excluded_field_count_not_five", "label": f"{label}:$.safety_summary.excluded_field_count"})
+
+    copied_bools = payload.get("copied_return_bools")
+    if not isinstance(copied_bools, list) or len(copied_bools) != 3:
+        blockers.append({"reason": "item_return_policy_copied_return_bools_count_mismatch", "label": f"{label}:$.copied_return_bools"})
+    else:
+        copied_field_values = [entry.get("copied_field") for entry in copied_bools if isinstance(entry, dict)]
+        copied_fields = {field for field in copied_field_values if isinstance(field, str)}
+        if copied_fields != REQUIRED_ITEM_RETURN_ONLY_COPIED_FIELDS:
+            blockers.append(
+                {
+                    "reason": "item_return_policy_copied_fields_mismatch",
+                    "label": f"{label}:$.copied_return_bools",
+                    "expected": sorted(REQUIRED_ITEM_RETURN_ONLY_COPIED_FIELDS),
+                    "recorded": sorted(field for field in copied_fields if isinstance(field, str)),
+                }
+            )
+        for index, entry in enumerate(copied_bools):
+            entry_label = f"{label}:$.copied_return_bools[{index}]"
+            if not isinstance(entry, dict):
+                blockers.append({"reason": "item_return_policy_copied_bool_entry_invalid", "label": entry_label})
+                continue
+            copied_field = entry.get("copied_field")
+            expected_target = copied_field.rsplit(".", 1)[0] if isinstance(copied_field, str) and "." in copied_field else None
+            if entry.get("target") != expected_target:
+                blockers.append({"reason": "item_return_policy_copied_bool_target_mismatch", "label": entry_label})
+            if entry.get("field") != "ReturnValue" or entry.get("direction") != "return" or entry.get("type") != "bool":
+                blockers.append({"reason": "item_return_policy_copied_bool_not_return_bool", "label": entry_label})
+            if entry.get("evidence_status") != "copied-return-bool-only":
+                blockers.append({"reason": "item_return_policy_copied_bool_evidence_status_mismatch", "label": entry_label})
+
+    excluded_entries = payload.get("excluded_fields")
+    if not isinstance(excluded_entries, list) or len(excluded_entries) != 5:
+        blockers.append({"reason": "item_return_policy_excluded_fields_count_mismatch", "label": f"{label}:$.excluded_fields"})
+    else:
+        excluded_field_values = [entry.get("excluded_field") for entry in excluded_entries if isinstance(entry, dict)]
+        excluded_fields = {field for field in excluded_field_values if isinstance(field, str)}
+        if excluded_fields != REQUIRED_ITEM_RETURN_ONLY_EXCLUDED_FIELDS:
+            blockers.append(
+                {
+                    "reason": "item_return_policy_excluded_fields_mismatch",
+                    "label": f"{label}:$.excluded_fields",
+                    "expected": sorted(REQUIRED_ITEM_RETURN_ONLY_EXCLUDED_FIELDS),
+                    "recorded": sorted(field for field in excluded_fields if isinstance(field, str)),
+                }
+            )
+
+    coverage = payload.get("coverage")
+    if not isinstance(coverage, dict):
+        blockers.append({"reason": "item_return_policy_coverage_missing", "label": f"{label}:$.coverage"})
+    else:
+        if coverage.get("status") != "complete":
+            blockers.append({"reason": "item_return_policy_coverage_not_complete", "label": f"{label}:$.coverage.status"})
+        coverage_copied_fields = coverage.get("copied_fields")
+        if (
+            not isinstance(coverage_copied_fields, list)
+            or any(not isinstance(field, str) for field in coverage_copied_fields)
+            or set(coverage_copied_fields) != REQUIRED_ITEM_RETURN_ONLY_COPIED_FIELDS
+        ):
+            blockers.append({"reason": "item_return_policy_coverage_copied_fields_mismatch", "label": f"{label}:$.coverage.copied_fields"})
+        coverage_copied_targets = coverage.get("copied_targets")
+        if (
+            not isinstance(coverage_copied_targets, list)
+            or any(not isinstance(target, str) for target in coverage_copied_targets)
+            or set(coverage_copied_targets) != REQUIRED_ITEM_RETURN_ONLY_COPIED_TARGETS
+        ):
+            blockers.append({"reason": "item_return_policy_coverage_copied_targets_mismatch", "label": f"{label}:$.coverage.copied_targets"})
+        coverage_excluded_fields = coverage.get("excluded_fields")
+        if (
+            not isinstance(coverage_excluded_fields, list)
+            or any(not isinstance(field, str) for field in coverage_excluded_fields)
+            or set(coverage_excluded_fields) != REQUIRED_ITEM_RETURN_ONLY_EXCLUDED_FIELDS
+        ):
+            blockers.append({"reason": "item_return_policy_coverage_excluded_fields_mismatch", "label": f"{label}:$.coverage.excluded_fields"})
+        coverage_input_targets = coverage.get("input_targets")
+        if (
+            not isinstance(coverage_input_targets, list)
+            or any(not isinstance(target, str) for target in coverage_input_targets)
+            or set(coverage_input_targets) != REQUIRED_ITEM_RETURN_ONLY_INPUT_TARGETS
+        ):
+            blockers.append({"reason": "item_return_policy_coverage_input_targets_mismatch", "label": f"{label}:$.coverage.input_targets"})
+
+    non_claims = payload.get("non_claims")
+    if (
+        not isinstance(non_claims, list)
+        or any(not isinstance(non_claim, str) for non_claim in non_claims)
+        or not REQUIRED_ITEM_RETURN_ONLY_NON_CLAIMS.issubset(set(non_claims))
+    ):
+        blockers.append(
+            {
+                "reason": "item_return_policy_non_claims_missing_required_boundaries",
+                "label": f"{label}:$.non_claims",
+                "expected": sorted(REQUIRED_ITEM_RETURN_ONLY_NON_CLAIMS),
+            }
+        )
+
+    explicitly_excluded = safety_summary.get("explicitly_excluded")
+    if (
+        not isinstance(explicitly_excluded, list)
+        or any(not isinstance(exclusion, str) for exclusion in explicitly_excluded)
+        or not REQUIRED_ITEM_RETURN_ONLY_EXPLICIT_EXCLUSIONS.issubset(set(explicitly_excluded))
+    ):
+        blockers.append(
+            {
+                "reason": "item_return_policy_explicit_exclusions_missing_internal_boundaries",
+                "label": f"{label}:$.safety_summary.explicitly_excluded",
+                "expected": sorted(REQUIRED_ITEM_RETURN_ONLY_EXPLICIT_EXCLUSIONS),
+            }
+        )
+
+    if mode == "promote":
+        blockers.append({"reason": "promote_mode_item_return_policy_slice_evidence_only", "label": label})
+    for trail, _ in collect_ready_overclaims(payload):
+        blockers.append({"reason": "item_return_policy_readiness_overclaim", "label": f"{label}:{trail}"})
+    for trail, _, reason in collect_candidate_public_overclaims(
+        payload,
+        allowed_prefixes=(
+            "$.non_claims",
+            "$.safety_summary.explicitly_excluded",
+        ),
+    ):
+        blockers.append({"reason": f"item_return_policy_public_overclaim_{reason}", "label": f"{label}:{trail}"})
+
     return blockers
 
 
@@ -4018,6 +4241,7 @@ def validate_manifest(
         )
     )
     blockers.extend(validate_readiness_report_manifest(payload, label=str(resolved), mode=mode))
+    blockers.extend(validate_item_return_only_policy_slice_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_gobjects_two_core_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_static_global_promotion_evidence_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_resource_handle_revalidation_evaluator_manifest(payload, label=str(resolved), mode=mode))

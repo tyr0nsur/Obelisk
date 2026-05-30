@@ -11,17 +11,19 @@ plus the relevant subsystem skill.
 
 ## Project Vision
 
-Obelisk is a Linux runtime/API/SDK core for ARK modding. Coordinate work toward a robust
-general modding substrate: UE4 reflection, safe runtime hooks, stable C ABI, plugin
-lifecycle, install layout, live-ops safety, reproducible reversing evidence, and public SDK
-promotion gates. Treat chat, inventory, structures, buffs, dinos, tribes, missions,
-transfers, and admin surfaces as module areas on top of the same core, not as the center of
-the project.
+Obelisk is being built as a Linux runtime with gated API/SDK surfaces for ARK modding.
+Coordinate work toward a robust general modding substrate: UE4 reflection, safe runtime
+hooks, stable C ABI, plugin lifecycle, install layout, live-ops safety, reproducible
+reversing evidence, and public SDK promotion gates. Treat chat, inventory, structures,
+buffs, dinos, tribes, missions, transfers, and admin surfaces as module areas on top of
+the same core, not as the center of the project.
 
-Compatibility research may consult ArkServerApi/AseApi only as a naming/behavior
-dictionary for familiar ARK plugin concepts. Obelisk must not copy ArkServerApi offsets,
-vtables, layouts, `.lib` artifacts, MSVC conventions, or direct UE pointer APIs; Linux
-support is rebuilt from Obelisk reflection and hook evidence.
+Compatibility research may consult ArkServerApi/AseApi only as a names and behavior
+dictionary for familiar ARK plugin concepts. Obelisk must not copy ArkServerApi/AseApi
+offsets, vtables, layouts, `.lib` artifacts, MSVC/Windows ABI assumptions, direct
+`GetNativePointerField`/`NativeCall` wrappers, raw UE pointer APIs, or algorithmic
+implementations; Linux support is rebuilt from Obelisk reflection and ProcessEvent
+copied-data evidence.
 
 Keep leader-only strategy, cadence, and active goal text outside this skill. The active
 leader objective belongs in the goal tool and short-lived handoff state, not in prompts sent
@@ -196,6 +198,13 @@ Decision rule:
 - If the message is only an internal round, validation result, agent status, speculative
   finding, or private live-ops detail, do not send Discord.
 
+Channel routing:
+
+| Channel | Webhook variable | Use for | Do not use for |
+| --- | --- | --- | --- |
+| `community` | `OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL` | Release/RC publication, stable public plugin surfaces, modder-actionable SDK/API changes, documented compatibility breakthroughs | beta instructions, live server windows, routine validations, internal research |
+| `beta-test` | `OBELISK_BETA_TEST_WEBHOOK_URL` | Operator-approved player/tester action windows for one named feature and server window | general announcements, release notes, speculative findings, private ops details |
+
 Pre-send checklist:
 
 - Confirm the user explicitly approved this Discord send for the current turn. Prior
@@ -214,6 +223,15 @@ clear title, concise description, 2-5 short fields, explicit status/scope, no ra
 timestamp, and a restrained color (`0x2ecc71` release/success, `0x3498db` beta/info,
 `0xf1c40f` caution). Plain content should be empty or a short label; put the substantive
 message in the embed.
+
+Embed shape:
+
+- `title`: concrete milestone or bounded test name, not a vague status phrase.
+- `description`: one short public-safe summary of what changed or what testers should do.
+- `status`: release state or test-window state.
+- `scope`: exact public API/module scope or exact approved test scope.
+- `field`: 2-5 concise fields such as `Impacto`, `Incluye`, `Validacion`, `Accion`,
+  `Privacidad`, or `Rollback`.
 
 When sending is explicitly approved, prefer the guarded helper instead of hand-written
 `curl`:

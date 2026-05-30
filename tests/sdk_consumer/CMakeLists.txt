@@ -150,6 +150,11 @@ add_test(
 )
 
 add_test(
+    NAME SdkConsumerFixtureOProcessTimerDoubleShutdown
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oProcessTimer>" oProcessTimer active-timer-double-shutdown
+)
+
+add_test(
     NAME SdkConsumerFixtureOProcessTimerNoTimerCapability
     COMMAND sdk_consumer_fixture "$<TARGET_FILE:oProcessTimer>" oProcessTimer no-timer-capability
 )
@@ -167,6 +172,11 @@ add_test(
 add_test(
     NAME SdkConsumerFixtureOProcessTimerRegistrationFailure
     COMMAND sdk_consumer_fixture "$<TARGET_FILE:oProcessTimer>" oProcessTimer fail-timer-registration
+)
+
+add_test(
+    NAME SdkConsumerFixtureOProcessTimerCleansUpPostRegistrationInitFailure
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oProcessTimer>" oProcessTimer throw-log-after-timer-registration
 )
 
 if(TARGET oPolicyAudit)

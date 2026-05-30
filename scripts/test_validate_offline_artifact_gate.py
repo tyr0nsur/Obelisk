@@ -274,6 +274,97 @@ def readiness_report_manifest(
     return payload
 
 
+def item_return_only_policy_slice_manifest(
+    *,
+    policy_status: str = "evidence-only",
+    promotion_ready: bool = False,
+    copied_bool_count: int = 3,
+    excluded_field_count: int = 5,
+    missing_targets: list[str] | None = None,
+    non_claims: list[str] | None = None,
+) -> dict:
+    copied_fields = sorted(gate.REQUIRED_ITEM_RETURN_ONLY_COPIED_FIELDS)
+    excluded_fields = sorted(gate.REQUIRED_ITEM_RETURN_ONLY_EXCLUDED_FIELDS)
+    if missing_targets is None:
+        missing_targets = []
+    if non_claims is None:
+        non_claims = sorted(gate.REQUIRED_ITEM_RETURN_ONLY_NON_CLAIMS) + [
+            "does not copy CraftBlueprint, bIgnoreInventoryRequirement, bConsumeResources, toInventory, DestinationItem, or AdditionalData"
+        ]
+    return {
+        "schema": gate.ITEM_RETURN_ONLY_POLICY_SLICE_SCHEMA,
+        "snapshot_root": "redacted",
+        "input_target_set": "item-compact-intake",
+        "output_target_set": "item-return-only-policy-slice",
+        "policy_status": policy_status,
+        "missing_targets": missing_targets,
+        "generated_from": {
+            "snapshot_schema": SNAPSHOT_SCHEMA,
+            "input_snapshots": [{"id": f"snapshot-{index:04d}", "sha256": f"{index}" * 64} for index in range(1, 5)],
+        },
+        "coverage": {
+            "status": "complete",
+            "copied_fields": copied_fields,
+            "copied_targets": [
+                "PrimalItem.AllowEquipItem",
+                "PrimalItem.CanRepair",
+                "PrimalItem.UseItemOntoItem",
+            ],
+            "excluded_fields": excluded_fields,
+            "input_targets": [
+                "PrimalItem.AllowEquipItem",
+                "PrimalItem.CanRepair",
+                "PrimalItem.CraftBlueprint",
+                "PrimalItem.UseItemOntoItem",
+            ],
+        },
+        "copied_return_bools": [
+            {
+                "target": field.rsplit(".", 1)[0],
+                "field": "ReturnValue",
+                "copied_field": field,
+                "direction": "return",
+                "type": "bool",
+                "element_size": 1,
+                "evidence_status": "copied-return-bool-only",
+                "source_snapshot": f"snapshot-{index:04d}",
+                "source_snapshot_sha256": f"{index}" * 64,
+            }
+            for index, field in enumerate(copied_fields, start=1)
+        ],
+        "excluded_fields": [
+            {
+                "target": field.rsplit(".", 1)[0],
+                "field": field.rsplit(".", 1)[1],
+                "excluded_field": field,
+                "reason": "unit_test_excluded",
+                "source_snapshot": f"snapshot-{index:04d}",
+            }
+            for index, field in enumerate(excluded_fields, start=1)
+        ],
+        "non_claims": non_claims,
+        "safety_summary": {
+            "artifact_status": "evidence_only",
+            "intended_use": "offline_review_only",
+            "promotion_ready": promotion_ready,
+            "copied_bool_count": copied_bool_count,
+            "excluded_field_count": excluded_field_count,
+            "explicitly_excluded": [
+                "CraftBlueprint",
+                "CanRepair.bIgnoreInventoryRequirement",
+                "CraftBlueprint.bConsumeResources",
+                "toInventory",
+                "DestinationItem",
+                "AdditionalData",
+                "object_refs",
+                "mutation",
+                "return_override",
+                "public_sdk",
+            ],
+        },
+    }
+
+
 def rc_ufunction_second_source_root_manifest(root: Path) -> dict:
     expected_sources = gate.expected_rc_ufunction_target_sources()
     assert expected_sources is not None
@@ -2335,6 +2426,97 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
 
         reasons = {blocker["reason"] for blocker in result["blockers"]}
         self.assertIn("promote_mode_readiness_report_layout_only", reasons)
+
+    def test_accepts_item_return_only_policy_slice_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "item-return-policy.json"
+            write_json(manifest, item_return_only_policy_slice_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual(result["blockers"], [])
+
+    def test_blocks_item_return_only_policy_slice_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "item-return-policy.json"
+            write_json(manifest, item_return_only_policy_slice_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("promote_mode_item_return_policy_slice_evidence_only", reasons)
+
+    def test_blocks_item_return_only_policy_slice_with_overclaims_or_bad_counts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "item-return-policy.json"
+            payload = item_return_only_policy_slice_manifest(
+                policy_status="accepted",
+                promotion_ready=True,
+                copied_bool_count=4,
+                excluded_field_count=4,
+                missing_targets=["PrimalItem.CanRepair"],
+                non_claims=["does not copy the excluded fields"],
+            )
+            payload["copied_return_bools"] = payload["copied_return_bools"][:-1]
+            payload["excluded_fields"] = payload["excluded_fields"][:-1]
+            payload["coverage"]["copied_fields"] = payload["coverage"]["copied_fields"][:-1]
+            payload["coverage"]["excluded_fields"] = payload["coverage"]["excluded_fields"][:-1]
+            payload["safety_summary"]["explicitly_excluded"] = ["CraftBlueprint"]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("item_return_policy_status_not_evidence_only", reasons)
+        self.assertIn("item_return_policy_missing_targets_present", reasons)
+        self.assertIn("item_return_policy_promotion_ready_not_false", reasons)
+        self.assertIn("item_return_policy_copied_bool_count_not_three", reasons)
+        self.assertIn("item_return_policy_excluded_field_count_not_five", reasons)
+        self.assertIn("item_return_policy_copied_return_bools_count_mismatch", reasons)
+        self.assertIn("item_return_policy_excluded_fields_count_mismatch", reasons)
+        self.assertIn("item_return_policy_coverage_copied_fields_mismatch", reasons)
+        self.assertIn("item_return_policy_coverage_excluded_fields_mismatch", reasons)
+        self.assertIn("item_return_policy_non_claims_missing_required_boundaries", reasons)
+        self.assertIn("item_return_policy_explicit_exclusions_missing_internal_boundaries", reasons)
+
+    def test_blocks_item_return_only_policy_slice_public_runtime_overclaim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "item-return-policy.json"
+            payload = item_return_only_policy_slice_manifest()
+            payload["runtime_ready"] = True
+            payload["public_sdk_ready"] = True
+            payload["claim"] = "public SDK ready"
+            payload["runtime_claim"] = "runtime ready"
+            payload["input_target_set"] = "item-public-sdk-intake"
+            payload["coverage"]["copied_targets"] = ["PrimalItem.AllowEquipItem"]
+            payload["coverage"]["input_targets"] = [
+                "PrimalItem.AllowEquipItem",
+                "PrimalItem.CanRepair",
+                "PrimalItem.UseItemOntoItem",
+            ]
+            payload["generated_from"]["input_snapshots"] = payload["generated_from"]["input_snapshots"][:3]
+            payload["copied_return_bools"][0]["target"] = "PublicSdk.PrimalItem"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("item_return_policy_readiness_overclaim", reasons)
+        self.assertIn("item_return_policy_public_overclaim_public_sdk", reasons)
+        self.assertIn("item_return_policy_public_overclaim_runtime_ready", reasons)
+        self.assertIn("item_return_policy_input_target_set_mismatch", reasons)
+        self.assertIn("item_return_policy_coverage_copied_targets_mismatch", reasons)
+        self.assertIn("item_return_policy_coverage_input_targets_mismatch", reasons)
+        self.assertIn("item_return_policy_input_snapshot_count_mismatch", reasons)
+        self.assertIn("item_return_policy_copied_bool_target_mismatch", reasons)
 
     def test_accepts_static_global_promotion_evidence_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

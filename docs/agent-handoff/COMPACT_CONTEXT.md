@@ -37,12 +37,14 @@ priorities, and do not use history files as the active source of truth.
   name, and send concise professional embeds without raw logs, player text, secrets, or
   speculative reversing notes. Use `community` only for stable modder-facing milestones,
   `beta-test` only for approved player action windows, and no Discord for internal rounds
-  or agent status.
-- `ArkServerApi/AseApi` may be used only as an algorithmic/name dictionary for
-  ArkApi-style compatibility research. Do not import offsets, vtables, layouts, `.lib`
+  or agent status. Explicit current-turn approval is required for every Discord send;
+  publication approval does not imply Discord approval. Always dry-run the embed first and
+  verify a public-safe title, description, status/scope, and 2-5 useful fields.
+- `ArkServerApi/AseApi` may be used only as a names and behavior dictionary for familiar
+  ArkApi-style plugin concepts. Do not import offsets, vtables, layouts, `.lib`
   artifacts, MSVC/Windows ABI assumptions, direct `GetNativePointerField`/`NativeCall`
-  wrappers, or raw UE pointer APIs; all access must be rebuilt through Obelisk
-  reflection/ProcessEvent copied-data evidence.
+  wrappers, raw UE pointer APIs, or algorithmic implementations; all access must be
+  rebuilt through Obelisk reflection/ProcessEvent copied-data evidence.
 
 ## Stable Baseline
 
@@ -53,14 +55,15 @@ priorities, and do not use history files as the active source of truth.
   baseline after a clean release gate and exact tag/ref verification. It is not a
   production-stable `v1.0` claim. Post-RC work should move toward a broader `v1.0`
   production core through architecture hardening, UE4 reflection evidence, copied-data
-  module APIs, and later ArkApi-style plugin replacement on top of Obelisk primitives.
+  module APIs, and later compatibility for familiar ARK plugin concepts on top of
+  Obelisk primitives.
 - Stable plugin loading requires safe `OBELISK_INSTANCE_ID` plus real non-symlink plugin,
   config, log, and state roots.
 - `ObeliskApi` v1 is append-only for `v0.1.0`; ABI v2 requires an explicit migration plan.
 - Post-RC timers are the first non-UE-dependent v1 primitive: owner-token scoped,
   process-local, zero-failure handles, one-shot/repeating callbacks, explicit unregister,
   and unload/init-failure cleanup. Timer ids are not shared config, cluster state, UE
-  identity, or persistent handles.
+  identity, or persistent handles. `oProcessTimer` is the first-party timer example.
 - EventManager owner cleanup is expected to wait for in-flight callbacks before plugin
   unload; tests cover debug-gated filtered pre-ProcessEvent and post-ProcessEvent callback
   paths.
@@ -181,10 +184,11 @@ priorities, and do not use history files as the active source of truth.
   target-set coverage is preserved at
   `/home/flowcommunity-ark/obelisk-artifacts/rc-minimal-redacted-signatures-strict-20260530T000000Z/`;
   consume mode is accepted and promote mode remains candidate-only blocked.
-- The historical static-negative UObject flag policy pack is obsolete. The regenerated
-  strict-pattern artifact is accepted for consume-mode indexing only; it is not
-  ResourceHandle promotion evidence, and promote mode remains blocked by
-  candidate-only/non-claims.
+- The historical static-negative UObject flag policy pack is obsolete and blocked by old
+  vocabulary/provenance. A `/tmp` rich-provenance rehearsal proved the small refresh route
+  can pass preflight and consume mode while promote mode stays blocked; durable refresh
+  still needs preserved regenerated/enriched sidecars and must remain internal static
+  evidence only.
 - Post-RC offline tooling added candidate-only UObject flag, weak-helper, and GObjects
   evidence builders. They are consume-mode internal/offline indexing tools only and do not
   promote public GObjects, lookup, identity, lifecycle, `ResourceHandle`, mutation, return
