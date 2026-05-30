@@ -397,11 +397,47 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             text_result.stdout,
         )
 
+    def test_structure_build_policy_guidance_can_be_listed_without_snapshots(self) -> None:
+        result = run_compare_raw(
+            "--list-target-guidance",
+            "--target",
+            "PrimalStructure.IsAllowedToBuild",
+            "--json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["schema"], "obelisk.reflection-target-guidance.v1")
+        self.assertEqual(report["guidance_scope"], "offline_planning_only")
+        self.assertEqual(report["target_filters"], ["PrimalStructure.IsAllowedToBuild"])
+        self.assertEqual(len(report["targets"]), 1)
+        guidance = report["targets"][0]
+        self.assertEqual(
+            guidance["target"],
+            "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild",
+        )
+        self.assertEqual(guidance["classification"], "second_wave_structure_build_policy_candidate")
+        self.assertIn("missing_committed_sanitized_snapshot", guidance["why_blocked"])
+        self.assertIn("approved non-protected copied/offline core", guidance["next_offline_input"])
+        self.assertIn("return override", guidance["non_claim"])
+        self.assertIn("runtime_hooks", report["not_promoted_surfaces"])
+
+        text_result = run_compare_raw("--list-target-guidance")
+        self.assertEqual(text_result.returncode, 0, text_result.stderr + text_result.stdout)
+        self.assertIn("target_guidance count=2 scope=offline_planning_only", text_result.stdout)
+        self.assertIn(
+            "target=obelisk.ufunction-chain.snapshot.v1:APrimalStructure.IsAllowedToBuild",
+            text_result.stdout,
+        )
+
     def test_requires_base_root_unless_listing_target_sets(self) -> None:
         result = run_compare_raw("--readiness-report")
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("--base-root is required unless --list-target-sets is used", result.stderr)
+        self.assertIn(
+            "--base-root is required unless --list-target-sets or --list-target-guidance is used",
+            result.stderr,
+        )
 
     def test_rejects_allow_ark_sha_mismatch_for_promotion_gate(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -731,6 +731,22 @@ namespace
         }
     }
 
+    void TestRejectsCyclicPropertyChain()
+    {
+        InventoryFixture fixture;
+        BuildAllowRemoteAdd(fixture);
+        WriteAt(fixture.PropertyB, 0x28, fixture.PropertyA.data());
+
+        InventoryReflection::InventoryInvocation invocation;
+        ReadResult result = InventoryReflection::TryIdentifyInventoryInvocation(
+            fixture.Reader(),
+            Options(),
+            fixture.Function.data(),
+            fixture.Params.data(),
+            invocation);
+        Require(result.Status == ReadStatus::Implausible, "cyclic inventory property chain was accepted");
+    }
+
     void RequireRejectedNonCanonicalCopiedBool(InventoryFixture& fixture,
                                                size_t paramOffset,
                                                const char* message)
@@ -842,6 +858,7 @@ int main()
     TestRejectsWrongFunctionClass();
     TestRejectsWrongShape();
     TestRejectsWrongPropertyMetadata();
+    TestRejectsCyclicPropertyChain();
     TestRejectsNonCanonicalCopiedBoolParams();
     TestGateRejectsBeforeReading();
 

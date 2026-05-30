@@ -110,6 +110,15 @@ checks, but strict mode still blocks them.
 
 ## Build-Policy Gap Checks
 
+To review known deferred build-policy blockers without a core, fixture root, or snapshot
+pack, list the offline planning guidance first:
+
+```sh
+python3 scripts/compare_reflection_snapshots.py \
+  --list-target-guidance \
+  --target PrimalStructure.IsAllowedToBuild
+```
+
 For deferred structure build-policy targets, contributors can check the current fixture
 blocker without server paths:
 

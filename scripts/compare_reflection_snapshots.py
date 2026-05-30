@@ -156,6 +156,14 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="List named target sets and exit without reading snapshot roots.",
     )
+    parser.add_argument(
+        "--list-target-guidance",
+        action="store_true",
+        help=(
+            "List deferred-target blocker guidance and exit without reading snapshot roots. "
+            "Use --target to filter."
+        ),
+    )
     parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     return parser.parse_args()
 
@@ -207,6 +215,21 @@ def target_set_report() -> dict[str, Any]:
             {"name": name, "targets": list(targets)}
             for name, targets in sorted(TARGET_SETS.items())
         ],
+    }
+
+
+def target_guidance_report(target_filters: set[str]) -> dict[str, Any]:
+    guidance = []
+    for target in sorted(TARGET_BLOCKER_GUIDANCE):
+        if matches_target_filter(target, target_filters):
+            guidance.append({"target": target, **(target_blocker_guidance(target) or {})})
+    return {
+        "schema": "obelisk.reflection-target-guidance.v1",
+        "guidance_scope": "offline_planning_only",
+        "target_filters": sorted(target_filters),
+        "not_promoted_surfaces": sorted(READINESS_NOT_PROMOTED_SURFACES),
+        "non_claims": list(READINESS_NON_CLAIMS),
+        "targets": guidance,
     }
 
 
@@ -857,6 +880,30 @@ def print_text(report: dict[str, Any]) -> None:
                 print(f"  {target}")
         return
 
+    if report["schema"] == "obelisk.reflection-target-guidance.v1":
+        print(
+            "target_guidance count={count} scope={scope}".format(
+                count=len(report["targets"]),
+                scope=report["guidance_scope"],
+            )
+        )
+        for item in report["targets"]:
+            parts = [
+                f"target={item['target']}",
+                f"classification={item.get('classification')}",
+            ]
+            why_blocked = item.get("why_blocked")
+            if isinstance(why_blocked, list) and why_blocked:
+                parts.append(f"why_blocked={','.join(str(reason) for reason in why_blocked)}")
+            next_offline_input = item.get("next_offline_input")
+            if isinstance(next_offline_input, str) and next_offline_input:
+                parts.append(f"next_offline_input={next_offline_input}")
+            non_claim = item.get("non_claim")
+            if isinstance(non_claim, str) and non_claim:
+                parts.append(f"non_claim={non_claim}")
+            print("  " + " ".join(parts))
+        return
+
     if report["schema"] == "obelisk.reflection-snapshot-readiness.v1":
         totals = report["totals"]
         print(
@@ -982,9 +1029,18 @@ def main() -> int:
         else:
             print_text(report)
         return 0
+    target_filters = expand_target_filters(args.target, args.target_set)
+    if args.list_target_guidance:
+        report = target_guidance_report(target_filters)
+        report["target_sets"] = sorted(args.target_set)
+        if args.json:
+            print(json.dumps(report, indent=2, sort_keys=True))
+        else:
+            print_text(report)
+        return 0
 
     if args.base_root is None:
-        raise SystemExit("--base-root is required unless --list-target-sets is used")
+        raise SystemExit("--base-root is required unless --list-target-sets or --list-target-guidance is used")
     if args.fail_on_readiness_gaps and args.allow_ark_sha_mismatch:
         raise SystemExit("--allow-ark-sha-mismatch is incompatible with --fail-on-readiness-gaps")
     reject_protected_input_path("--base-root", args.base_root)
@@ -992,7 +1048,6 @@ def main() -> int:
         reject_protected_input_path("--candidate-root", args.candidate_root)
     base = load_snapshot_set(args.base_root)
     candidate = load_snapshot_set(args.candidate_root) if args.candidate_root else None
-    target_filters = expand_target_filters(args.target, args.target_set)
     if args.readiness_report:
         report = readiness_report(
             base,

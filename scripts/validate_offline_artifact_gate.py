@@ -5350,6 +5350,7 @@ def validate_internal_uobject_runtime_rejection_samples_manifest(
         blockers.append({"reason": "runtime_rejection_samples_status_mismatch", "label": f"{label}:$.status"})
 
     rows = payload.get("rows")
+    actual_object_present_reject_count: int | None = None
     if not isinstance(rows, list) or not rows:
         blockers.append({"reason": "runtime_rejection_samples_rows_missing", "label": f"{label}:$.rows"})
     else:
@@ -5389,12 +5390,18 @@ def validate_internal_uobject_runtime_rejection_samples_manifest(
                 blockers.append({"reason": "runtime_rejection_samples_copied_output_invalid", "label": f"{row_label}.copied_output"})
             if row.get("object_present") is True and row.get("decision") == "reject":
                 object_present_reject_count += 1
+        actual_object_present_reject_count = object_present_reject_count
         if object_present_reject_count < 1:
             blockers.append({"reason": "runtime_rejection_samples_missing_object_present_reject", "label": f"{label}:$.rows"})
 
     summary = payload.get("summary")
     if not isinstance(summary, dict) or not is_json_int(summary.get("object_present_reject_rows")) or summary["object_present_reject_rows"] < 1:
         blockers.append({"reason": "runtime_rejection_samples_summary_missing_object_present_reject", "label": f"{label}:$.summary.object_present_reject_rows"})
+    else:
+        if actual_object_present_reject_count is not None and summary["object_present_reject_rows"] != actual_object_present_reject_count:
+            blockers.append({"reason": "runtime_rejection_samples_summary_object_present_reject_rows_mismatch", "label": f"{label}:$.summary.object_present_reject_rows"})
+        if not is_json_int(summary.get("accepted_rows")) or summary["accepted_rows"] != 0:
+            blockers.append({"reason": "runtime_rejection_samples_summary_accepted_rows_not_zero", "label": f"{label}:$.summary.accepted_rows"})
     return blockers
 
 

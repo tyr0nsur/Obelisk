@@ -47,6 +47,19 @@ enforcement, identity, lookup, replies, send-chat, moderation, or ArkApi portabi
 the matching public surface is promoted in the capability matrix and documented with its
 own evidence gate.
 
+Seed examples are production-ready only when they keep the safe default config above,
+fail closed on missing capabilities or callbacks, validate instance scoping, unregister
+owner-token handles on every shutdown or partial-init path, treat callback payloads as
+callback-scope, keep mutable state process-local unless a locking model is documented,
+and log only bounded, sanitized output.
+
+Passive copied-chat parser or audit examples must add one stricter rule: copied chat text
+is local routing input only. They may count, bucket, redact, or parse text in memory, but
+must not persist raw player text, expose sender/player identity, claim command SDK
+semantics, reply or send chat, block or moderate chat, perform permission checks, bridge
+operator ingress, correlate events into durable identity, or use raw UE/`ProcessEvent`
+data to fill those gaps.
+
 ## Experimental Examples
 
 `oPolicyAudit` demonstrates the promoted `GameplayPolicyEvent` callback family without

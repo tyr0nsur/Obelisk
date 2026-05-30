@@ -4844,6 +4844,28 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("runtime_rejection_samples_raw_address_string", reasons)
         self.assertIn("runtime_rejection_samples_protected_path_string", reasons)
 
+    def test_blocks_runtime_rejection_samples_summary_acceptance_overclaim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "runtime-rejection-samples.json"
+            payload = runtime_rejection_samples_manifest()
+            payload["summary"]["object_present_reject_rows"] = 2
+            payload["summary"]["accepted_rows"] = 1
+            attach_runtime_output_identity(
+                payload,
+                schema=gate.INTERNAL_UOBJECT_RUNTIME_REJECTION_SAMPLES_SCHEMA,
+                capture_id="runtime-rejection-test",
+                evidence_pack_id="runtime-rejection-pack",
+            )
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("runtime_rejection_samples_summary_object_present_reject_rows_mismatch", reasons)
+        self.assertIn("runtime_rejection_samples_summary_accepted_rows_not_zero", reasons)
+
     def test_accepts_runtime_serial_semantics_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"

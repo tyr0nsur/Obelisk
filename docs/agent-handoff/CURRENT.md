@@ -119,8 +119,12 @@ for the current checkpoint.
   narrows the serial-policy design gap but does not unlock runtime negative samples,
   public lookup, object identity, mutation, return override, persistent handles, or
   public `ResourceHandle`. The next strict ResourceHandle blocker is rejected runtime
-  object samples plus runtime serial reuse/wraparound semantics. The minimal planning
-  note now lives in
+  object samples plus runtime serial reuse/wraparound semantics. Future runtime artifacts
+  must use the candidate-only
+  `obelisk.internal-uobject-revalidation-runtime-rejection-samples.v1` and
+  `obelisk.internal-uobject-revalidation-runtime-serial-semantics.v1` schemas, remain
+  consume-only/promote-blocked, redact run identity and privacy-sensitive values, and
+  still reject post-callback lookup. The minimal planning note now lives in
   `docs/research/2026-05-30-post-rc-offline-resourcehandle-priority.md#future-runtime-observation-plan`;
   execution is still blocked until an operator-approved live-ops brief names the exact
   debug target, gates, window, rollback, artifacts, and posture checks. Do not replace
@@ -153,7 +157,8 @@ for the current checkpoint.
   candidate pack to validate; fixture-only readiness reports `missing_base_snapshot` for
   both `PrimalStructure.IsAllowedToBuild` and `APrimalStructure.IsAllowedToBuild`. First
   useful action is a sanitized focused snapshot from an approved copied/offline core or
-  complete core evidence-pack manifest outside protected server paths, using the
+  complete core evidence-pack manifest outside protected server paths; fixture-only
+  reports are a negative guardrail, not promotion evidence. Use the
   binary-scoped `0x5956f30` FName root slot and `0x595b7e0` GObjects candidate, then a
   distinct second-source compare. Do not add either key to release target sets, ABI enums,
   descriptors, dispatchers, public docs, or runtime gates.

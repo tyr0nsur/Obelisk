@@ -113,6 +113,13 @@ priorities, and do not use history files as the active source of truth.
   callback-by-name APIs, public `StructureEvents`, public Inventory/etc. module APIs,
   richer chat APIs beyond minimal `ChatMessageEvent`, HTTP/threads/file-reader plugin
   ingress, and lifecycle-unsafe plugins.
+- Plugin Hub v1 seed work starts from `docs/PLUGIN_HUB_FOUNDATION_V1.md` and
+  `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`. The near-term seed boundary is small
+  Obelisk-native examples for lifecycle/config/logging, descriptor reads, passive copied
+  chat parsing, process-local timers, and copied policy auditing; demand-map or
+  `NextGenPlugins` dictionary entries do not promote permissions, RCON, economy,
+  homes/safe zones, structure enforcement, dinos, tribes, transfers, inventory, item
+  mutation, identity, lookup, replies, send-chat, moderation, or ArkApi portability.
 - `DescribeResourceKind` is a metadata-only v0.1 SDK helper for known resource categories.
   It returns copied POD descriptors with supported gameplay-policy event/field masks and
   explicit no-identity/no-lookup flags.
@@ -204,9 +211,10 @@ priorities, and do not use history files as the active source of truth.
 - `PrimalStructure.IsAllowedToBuild` / `APrimalStructure.IsAllowedToBuild` is a
   second-wave build-policy dictionary seed only. There is no committed candidate pack,
   second-source comparison, target-set promotion, public StructureEvents/build-policy SDK,
-  mutation, or return override. First useful work is an approved offline focused snapshot
-  and distinct second-source compare; do not add either key to release targets, ABI enums,
-  descriptors, dispatchers, public docs, or runtime gates.
+  mutation, or return override. Fixture-only `missing_base_snapshot` readiness is a
+  negative guardrail, not promotion evidence. First useful work is an approved offline
+  focused snapshot and distinct second-source compare; do not add either key to release
+  targets, ABI enums, descriptors, dispatchers, public docs, or runtime gates.
 - `ue/MissionReflection.*` is an internal fixture-backed recognizer for
   `mission-compact-intake`: copied bool ranges only, object refs and `OutItemIDs` arrays
   recognition-only, no hook/runtime dispatcher/public Mission SDK.
@@ -346,6 +354,13 @@ priorities, and do not use history files as the active source of truth.
   provenance, required `scan_limit` matching provenance, coherent
   `consume_gate_expectation`, and real copied-core hash checks; it is always blocked in
   promote mode.
+- Future ResourceHandle runtime observations are gated by candidate-only
+  `obelisk.internal-uobject-revalidation-runtime-rejection-samples.v1` and
+  `obelisk.internal-uobject-revalidation-runtime-serial-semantics.v1` manifests. These
+  schemas require redacted run identity, privacy-safe copied output, the strict serial
+  policy source artifact, consume-only acceptance, promote-mode blockers, and no
+  post-callback lookup, public `ResourceHandle`, object identity, mutation, return
+  override, raw UE pointer, serial-value, or protected-path disclosure.
 - Raw core captures under `/servidor/ark/obelisk/dumps` are protected storage, not direct
   promotion inputs. Promotion tooling consumes hardlinked or copied offline artifacts.
 - Second-source intake must derive artifact-specific FName root, validate GObjects,
@@ -412,7 +427,8 @@ priorities, and do not use history files as the active source of truth.
   `ParticleSystemComponent0` under `Text_Actor` / `Text_Actor_C`; this is internal
   blocker evidence only. Avoid more broad ResourceHandle scanning unless the binary hash
   changes, evidence is contradicted, or an approved focused runtime lifecycle/reuse plan
-  explicitly changes scope.
+  explicitly changes scope. Runtime lifecycle/reuse evidence still must pass the
+  candidate-only runtime rejection-samples and runtime serial-semantics schemas above.
 - `obelisk.resource-handle-serial-scan.v1` is now gated for that exact internal candidate
   shape: consume requires coherent `flag_rejection_candidate_samples`, a required
   `binary_sha256`, verified `core_sha256` bytes, required `scan_limit` matching

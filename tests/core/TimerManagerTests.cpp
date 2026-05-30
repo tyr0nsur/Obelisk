@@ -41,6 +41,11 @@ namespace
         throw std::runtime_error("timer callback failure");
     }
 
+    void ThrowingUnknownCallback(uint64_t, void*)
+    {
+        throw 7;
+    }
+
     struct SelfUnregisterState
     {
         std::mutex Mutex;
@@ -180,6 +185,21 @@ namespace
                 "timer worker stopped after callback exception");
     }
 
+    void TestUnknownCallbackExceptionDoesNotStopWorker()
+    {
+        int throwingOwner = 0;
+        int owner = 0;
+        CounterState state;
+        Require(TimerManager::Get().Register(&throwingOwner, 5, 0, false, ThrowingUnknownCallback, nullptr) != 0,
+                "unknown-throwing timer registration failed");
+        Require(TimerManager::Get().Register(&owner, 10, 0, false, CountCallback, &state) != 0,
+                "post-unknown-throw timer registration failed");
+
+        std::unique_lock<std::mutex> lock(state.Mutex);
+        Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&]() { return state.Count == 1; }),
+                "timer worker stopped after unknown callback exception");
+    }
+
     void TestOwnerCleanupWaitsForInFlightCallback()
     {
         int owner = 0;
@@ -261,6 +281,7 @@ int main()
     TestWrongOwnerCannotUnregister();
     TestSelfUnregisterDoesNotDeadlock();
     TestCallbackExceptionDoesNotStopWorker();
+    TestUnknownCallbackExceptionDoesNotStopWorker();
     TestOwnerCleanupWaitsForInFlightCallback();
     TestOwnerCleanupWaitsForExplicitlyUnregisteredInFlightCallback();
     return 0;

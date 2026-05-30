@@ -852,6 +852,20 @@ namespace
                 invocation);
             Require(result.Status == ReadStatus::Implausible, "wrong item int property class FName was accepted");
         }
+        {
+            ItemFixture fixture;
+            BuildUseItemOntoItem(fixture);
+            WriteAt(fixture.PropertyB, 0x28, fixture.PropertyA.data());
+
+            ItemReflection::ItemInvocation invocation;
+            ReadResult result = ItemReflection::TryIdentifyItemInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "cyclic item property chain was accepted");
+        }
     }
 
     void TestGateRejectsBeforeReading()
