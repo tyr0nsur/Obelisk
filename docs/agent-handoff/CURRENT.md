@@ -193,20 +193,15 @@ for the current checkpoint.
   and ArkApi portability as design backlogs until their own public surfaces are promoted.
   Keep the clone out of repo and use it only as a names/demand dictionary.
 - Artifact-pack contributor onboarding now has `docs/OFFLINE_ARTIFACT_PACKS.md` as the
-  concise contributor runbook. It documents normalize/check, consume gate, strict
-  target-set coverage, second-source compare, pack-shape expectations, and non-claims.
-  Use `--manifest` for structured JSON reports and artifact-pack manifests; keep
-  normalizer stdout summaries outside the pack; legacy
-  `obelisk.artifact_pack.manifest.v1` spelling and in-pack zero-byte normalizer summaries
-  fail closed.
-  The default release gate and `check_rc_layout_evidence_smoke.sh` are aligned on the four
-  public RC UFunction target sets, including `item-return-only-policy-slice`; the combined
-  RC UFunction root helper now requires `--item-return-root` and assembles 12 snapshots.
+  concise runbook. UFunction regeneration requires complete artifact identity or an
+  evidence-pack manifest; ScriptStruct regeneration tests selected FName/GObjects labels.
+  The default release gate and RC layout smoke are aligned on the four public RC
+  UFunction target sets, including `item-return-only-policy-slice`.
 - Runtime/plugin lifecycle audit found no P1 blocker. `EventManager` granular raw
   ProcessEvent unregister now avoids waiting behind unrelated in-flight callbacks and
-  checks active ids before invoking snapshotted callbacks; owner cleanup still waits as
-  the plugin unload barrier. Treat broader raw snapshot/in-flight cleanup design as v1
-  debt, not a current unload blocker.
+  validates snapshotted callbacks by id plus callback pointer within the same family;
+  owner cleanup still waits as the plugin unload barrier. Treat a full generational
+  callback-id redesign as v1 debt, not a current unload blocker.
 - Any future live/player validation requires a new approved live-ops brief and beta-test
   notice through the configured local webhook variable when players are involved.
 

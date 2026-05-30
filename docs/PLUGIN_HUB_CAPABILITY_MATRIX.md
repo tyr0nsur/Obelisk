@@ -52,7 +52,8 @@ it does not promise ArkApi plugin compatibility.
 | 8 | Homes, teleport, safe zones, area policy | blocked | Needs location/area data, identity, combat/enemy restrictions, and safe mutation/enforcement contracts |
 | 9 | Structure counts, placement, ownership, collision policy | blocked except experimental auditing | Only narrow copied policy observer examples are experimental; census, ownership, placement denial, collision control, and mutation are not public surfaces |
 | 10 | Dino colors, carry rules, spawn/cosmetic policy | blocked | Needs dino/player identity, classification, interaction events, and safe mutation/enforcement |
-| 11 | Engrams, inventory, item give/remove flows | blocked | Needs player/inventory/item identity, progression or item mutation APIs, rollback, and privacy policy |
+| 11 | Tribe MOTD, tribe-facing notices, and tribe policy | blocked | Needs tribe/player identity, privacy policy, send-chat/broadcast or command surface, and moderation/visibility rules |
+| 12 | Engrams, inventory, item give/remove flows | blocked | Needs player/inventory/item identity, progression or item mutation APIs, rollback, and privacy policy |
 
 `production seed available` means an Obelisk-native plugin can be written and documented
 as a supported Plugin Hub seed against the stated current public ABI slice. `experimental

@@ -105,6 +105,29 @@ class SendDiscordEmbedTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("forbidden phrase", result.stderr)
 
+    def test_rejects_forbidden_text_in_content(self) -> None:
+        result = self.run_dry(
+            "--channel",
+            "community",
+            "--title",
+            "Obelisk update",
+            "--description",
+            "Public update for plugin authors.",
+            "--status",
+            "Blocked",
+            "--scope",
+            "Guardrail",
+            "--content",
+            "contains token value",
+            "--field",
+            "A=B",
+            "--field",
+            "C=D",
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("forbidden phrase", result.stderr)
+
     def test_rejects_reserved_custom_field_names(self) -> None:
         result = self.run_dry(
             "--channel",

@@ -59,6 +59,7 @@ class RegenerateScriptStructSnapshotsTests(unittest.TestCase):
         core: Path,
         fname_root_slot: int,
         gobjects: int,
+        extra_fname_root: bool = False,
         extra_gobjects: bool = False,
         binary_sha: str = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
         evidence_status: dict[str, object] | None = None,
@@ -90,6 +91,14 @@ class RegenerateScriptStructSnapshotsTests(unittest.TestCase):
                 }
             ],
         }
+        if extra_fname_root:
+            manifest["fname_root_slots"].insert(  # type: ignore[index]
+                0,
+                {
+                    "label": "alternate_fname_root_slot",
+                    "address": hex(fname_root_slot + 0x1000),
+                },
+            )
         if extra_gobjects:
             manifest["gobjects_candidates"].append(  # type: ignore[index]
                 {
@@ -560,6 +569,56 @@ class RegenerateScriptStructSnapshotsTests(unittest.TestCase):
         self.assertEqual(payload["evidence"]["artifact_sha256"], core_sha)
         self.assertEqual(payload["evidence"]["capture_id"], "second-core")
         self.assertEqual(payload["evidence"]["evidence_pack_id"], "second-pack")
+
+    def test_evidence_pack_manifest_uses_selected_labels(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "second-core"
+            manifest = root / "manifest.json"
+            evidence_pack = root / "second-pack" / "manifest.json"
+            output_root = root / "out"
+            output = output_root / "7e7ded49e0c6" / "sdk_test" / "Script.ShooterGame.ARKTributeDino.snapshot.json"
+            addrs = build_core_fixture(core)
+            self.write_manifest(manifest)
+            self.write_evidence_pack_manifest(
+                evidence_pack,
+                core=core,
+                fname_root_slot=addrs["fname_root_slot"],
+                gobjects=addrs["gobjects"],
+                extra_fname_root=True,
+                extra_gobjects=True,
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "regenerate_scriptstruct_snapshots.py"),
+                    "--core",
+                    str(core),
+                    "--manifest",
+                    str(manifest),
+                    "--output-root",
+                    str(output_root),
+                    "--obelisk-commit",
+                    "abcdef1",
+                    "--evidence-pack-manifest",
+                    str(evidence_pack),
+                    "--evidence-pack-fname-root-label",
+                    "verified_fname_root_slot",
+                    "--evidence-pack-gobjects-label",
+                    "verified_gobjects",
+                    "--write",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            payload = json.loads(output.read_text(encoding="utf-8"))
+
+        self.assertIn("wrote", result.stdout)
+        self.assertEqual(payload["evidence"]["capture_id"], "second-core")
+        self.assertEqual(payload["targets"][0]["target"]["name"], "ARKTributeDino")
 
     def test_evidence_pack_manifest_rejects_conflicting_identity(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -386,17 +386,30 @@ def main() -> int:
     artifact_sha256 = optional_sha256(args.artifact_sha256, "artifact-sha256")
     capture_id = optional_safe_text(args.capture_id, "capture-id")
     evidence_pack_id = optional_safe_text(args.evidence_pack_id, "evidence-pack-id")
+    artifact_identity_fields = (artifact_kind, artifact_sha256, capture_id, evidence_pack_id)
     artifact_identity_supplied = any(
         value is not None
-        for value in (artifact_kind, artifact_sha256, capture_id, evidence_pack_id)
+        for value in artifact_identity_fields
     )
     if artifact_identity_supplied and not all(
         value is not None
-        for value in (artifact_kind, artifact_sha256, capture_id, evidence_pack_id)
+        for value in artifact_identity_fields
     ):
         raise SystemExit(
             "artifact identity must include --artifact-kind, --artifact-sha256, "
             "--capture-id, and --evidence-pack-id together"
+        )
+    if args.check_layout and not artifact_identity_supplied:
+        raise SystemExit(
+            "--check-layout is reserved for second-source layout validation and requires "
+            "--artifact-kind, --artifact-sha256, --capture-id, --evidence-pack-id, "
+            "and --fname-root-slot"
+        )
+    if not artifact_identity_supplied:
+        raise SystemExit(
+            "snapshot regeneration requires complete evidence metadata: "
+            "--artifact-kind, --artifact-sha256, --capture-id, and --evidence-pack-id "
+            "or --evidence-pack-manifest"
         )
     if artifact_identity_supplied and args.fname_root_slot is None:
         raise SystemExit(
@@ -412,12 +425,6 @@ def main() -> int:
         raise SystemExit(
             "--fname-root-slot is required; derive or import a FName root for this artifact "
             "instead of using the primary-core default"
-        )
-    if args.check_layout and not artifact_identity_supplied:
-        raise SystemExit(
-            "--check-layout is reserved for second-source layout validation and requires "
-            "--artifact-kind, --artifact-sha256, --capture-id, --evidence-pack-id, "
-            "and --fname-root-slot"
         )
     fname_root_slot = args.fname_root_slot
     gobjects = args.gobjects if args.gobjects is not None else inspector.uobjects.DEFAULT_GOBJECTS

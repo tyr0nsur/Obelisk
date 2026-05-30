@@ -130,6 +130,7 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
                     hex(addrs["fname_root_slot"]),
                     "--obelisk-commit",
                     "abcdef1",
+                    *self.SECOND_SOURCE_ARGS,
                 ],
                 check=True,
                 capture_output=True,
@@ -209,6 +210,7 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
                     "0x1",
                     "--fname-root-slot",
                     "0x2",
+                    *self.SECOND_SOURCE_ARGS,
                 ],
                 capture_output=True,
                 text=True,
@@ -239,6 +241,7 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
                     "0x1",
                     "--fname-root-slot",
                     "0x2",
+                    *self.SECOND_SOURCE_ARGS,
                 ],
                 capture_output=True,
                 text=True,
@@ -267,6 +270,7 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
                     "0x1",
                     "--fname-root-slot",
                     "0x2",
+                    *self.SECOND_SOURCE_ARGS,
                 ],
                 capture_output=True,
                 text=True,
@@ -301,6 +305,7 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
                     hex(addrs["fname_root_slot"]),
                     "--target-set",
                     "minimal-second-source-intake",
+                    *self.SECOND_SOURCE_ARGS,
                 ],
                 capture_output=True,
                 text=True,
@@ -340,6 +345,7 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
                     "PrimalStructure.AllowStructureAccess",
                     "--target",
                     "PrimalStructure.MissingTarget",
+                    *self.SECOND_SOURCE_ARGS,
                     "--write",
                 ],
                 capture_output=True,
@@ -433,6 +439,7 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
                     hex(addrs["fname_root_slot"]),
                     "--obelisk-commit",
                     "abcdef1",
+                    *self.SECOND_SOURCE_ARGS,
                     "--check",
                 ],
                 capture_output=True,
@@ -482,7 +489,7 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("--fname-root-slot is required when recording artifact identity", result.stderr)
 
-    def test_fname_root_slot_is_required_without_artifact_identity(self) -> None:
+    def test_fname_root_slot_is_required_with_artifact_identity(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             core = root / "core"
@@ -505,13 +512,47 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
                     hex(addrs["gobjects"]),
                     "--obelisk-commit",
                     "abcdef1",
+                    *self.SECOND_SOURCE_ARGS,
                 ],
                 capture_output=True,
                 text=True,
             )
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("--fname-root-slot is required; derive or import a FName root", result.stderr)
+        self.assertIn("--fname-root-slot is required when recording artifact identity", result.stderr)
+
+    def test_snapshot_regeneration_requires_complete_evidence_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            manifest = root / "manifest.json"
+            output_root = root / "out"
+            addrs = build_core_fixture(core)
+            self.write_manifest(manifest)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "regenerate_ufunction_snapshots.py"),
+                    "--core",
+                    str(core),
+                    "--manifest",
+                    str(manifest),
+                    "--output-root",
+                    str(output_root),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--obelisk-commit",
+                    "abcdef1",
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("snapshot regeneration requires complete evidence metadata", result.stderr)
 
     def test_artifact_identity_requires_all_fields_together(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -897,7 +938,7 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
             ]
 
             subprocess.run(
-                [*common_args, "--obelisk-commit", "abcdef1", "--write"],
+                [*common_args, "--obelisk-commit", "abcdef1", *self.SECOND_SOURCE_ARGS, "--write"],
                 check=True,
                 capture_output=True,
                 text=True,
@@ -924,7 +965,7 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
                 text=True,
             )
             full = subprocess.run(
-                [*common_args, "--obelisk-commit", "1234567", "--check"],
+                [*common_args, "--obelisk-commit", "1234567", *self.SECOND_SOURCE_ARGS, "--check"],
                 check=False,
                 capture_output=True,
                 text=True,
@@ -961,7 +1002,7 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
                 "abcdef1",
             ]
 
-            subprocess.run([*common_args, "--write"], check=True, capture_output=True, text=True)
+            subprocess.run([*common_args, *self.SECOND_SOURCE_ARGS, "--write"], check=True, capture_output=True, text=True)
             payload = json.loads(output.read_text(encoding="utf-8"))
             payload["targets"][0]["property_chain"]["properties"][0]["offset_internal"] = 4  # type: ignore[index]
             output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -1003,7 +1044,7 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
                 "abcdef1",
             ]
 
-            subprocess.run([*common_args, "--write"], check=True, capture_output=True, text=True)
+            subprocess.run([*common_args, *self.SECOND_SOURCE_ARGS, "--write"], check=True, capture_output=True, text=True)
             payload = json.loads(output.read_text(encoding="utf-8"))
             payload["targets"][0]["membership"]["target"] = "missing"  # type: ignore[index]
             payload["targets"][0]["reject_reasons"] = ["target_not_in_gobjects"]  # type: ignore[index]
@@ -1114,6 +1155,7 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
                     hex(addrs["fname_root_slot"]),
                     "--obelisk-commit",
                     "abcdef1",
+                    *self.SECOND_SOURCE_ARGS,
                     "--write",
                 ],
                 capture_output=True,
@@ -1147,6 +1189,7 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
                     hex(addrs["fname_root_slot"]),
                     "--obelisk-commit",
                     "abcdef1",
+                    *self.SECOND_SOURCE_ARGS,
                     "--write",
                 ],
                 capture_output=True,

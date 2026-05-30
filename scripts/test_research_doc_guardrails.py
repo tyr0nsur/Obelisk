@@ -4,11 +4,16 @@
 from __future__ import annotations
 
 import re
+import sys
 import unittest
 from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPT_DIR))
+
+import evaluate_resource_handle_revalidation as resourcehandle_evaluator  # noqa: E402
 
 
 class ResearchDocGuardrailTests(unittest.TestCase):
@@ -131,6 +136,81 @@ class ResearchDocGuardrailTests(unittest.TestCase):
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, interpretation)
+
+    def test_resourcehandle_blocker_interpretation_matches_evaluator_blockers(self) -> None:
+        note = REPO_ROOT / "docs/research/2026-05-30-post-rc-offline-resourcehandle-priority.md"
+        text = note.read_text(encoding="utf-8")
+        section = text.split("## Current No-Scan Checkpoint", 1)[1].split(
+            "## Next Repo-Local Improvement", 1
+        )[0]
+
+        expected_evaluator_blockers = set(resourcehandle_evaluator.RESOURCE_HANDLE_LIFETIME_BLOCKERS)
+        expected_evaluator_blockers.add(resourcehandle_evaluator.BLOCKER_UOBJECT_FLAGS)
+
+        still_required_blockers = [
+            line.strip("- `")
+            for line in section.split("Still-required ResourceHandle promotion blockers:", 1)[1]
+            .split("Historical evaluator blockers", 1)[0]
+            .splitlines()
+            if line.startswith("- `")
+        ]
+        historical_blockers = [
+            line.strip("- `")
+            for line in section.split("Historical evaluator blockers to retain as provenance", 1)[1]
+            .split("Blocker interpretation checkpoint:", 1)[0]
+            .splitlines()
+            if line.startswith("- `")
+        ]
+
+        interpretation = section.split("Blocker interpretation checkpoint:", 1)[1].split(
+            "Do not convert any row in this table", 1
+        )[0]
+        table_blockers: list[str] = []
+        for line in interpretation.splitlines():
+            if not line.startswith("| `"):
+                continue
+            first_cell = line.split("|", 2)[1]
+            table_blockers.extend(re.findall(r"`([^`]+)`", first_cell))
+
+        documented_blockers = still_required_blockers + historical_blockers
+        self.assertEqual(set(documented_blockers), expected_evaluator_blockers)
+        self.assertEqual(set(table_blockers), expected_evaluator_blockers)
+        self.assertEqual(len(table_blockers), len(expected_evaluator_blockers))
+
+        payload = resourcehandle_evaluator.build_evaluation(
+            [
+                {
+                    "schema": resourcehandle_evaluator.GOBJECTS_RECONCILIATION_SCHEMA,
+                    "samples": [
+                        {
+                            "status": "candidate-uobject",
+                            "item_dword_0x8": 17,
+                            "membership": {"passes": True},
+                        }
+                    ],
+                    "summary": {
+                        "sample_count": 1,
+                        "accepted_count": 1,
+                        "rejected_count": 0,
+                        "membership_pass_count": 1,
+                    },
+                }
+            ],
+            {
+                "schema": resourcehandle_evaluator.STATIC_GLOBAL_EVIDENCE_SCHEMA,
+                "candidates": [
+                    {
+                        "kind": "gobjects",
+                        "static_contract": {
+                            "satisfied": True,
+                            "blockers": [],
+                            "coherent_window": {"redacted_fixture": True},
+                        },
+                    }
+                ],
+            },
+        )
+        self.assertTrue(expected_evaluator_blockers.issubset(set(payload["blockers"])))
 
     def test_no_obsolete_theisland_second_core_runbook_references(self) -> None:
         forbidden = [

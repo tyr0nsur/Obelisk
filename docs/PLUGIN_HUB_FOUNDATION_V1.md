@@ -15,6 +15,13 @@ published `v0.1.0-rc.2` tag. It explains what small native examples can honestly
 while module lanes such as commands, permissions, inventory, structures, players,
 missions, and transfers remain planning-only until separately promoted.
 
+Post-RC production-supported seed work is limited to lifecycle/config/logging skeletons,
+descriptor/catalog consumers, and process-local timer utilities that use the current C ABI
+with fail-closed capability checks. Copied `ChatMessageEvent` parsing and copied
+`GameplayPolicyEvent` auditing remain experimental seed patterns only; they are not
+production Plugin Hub modules, command/chat SDKs, policy-enforcement SDKs, or evidence of
+a new ABI.
+
 ## Public Surface
 
 Foundation V1 contains only the public ABI already exposed by `ObeliskApi.h`:
@@ -98,9 +105,11 @@ Foundation V1 is enough for small, honest Plugin Hub seeds:
   a command SDK;
 - process-local timer utilities.
 
-These examples may demonstrate patterns, but they are not promises for complete economy,
-permissions, homes, kits, shops, RCON, inventory, item, dino, tribe, mission, transfer, or
-structure modules.
+Only lifecycle/config/logging, descriptor/catalog, and process-local timer examples are
+production-supported seeds after the RC. Copied chat parsers and copied policy auditors
+may demonstrate patterns, but they remain experimental and are not promises for complete
+economy, permissions, homes, kits, shops, RCON, inventory, item, dino, tribe, mission,
+transfer, or structure modules.
 
 ## Fastest Honest Creator Path
 

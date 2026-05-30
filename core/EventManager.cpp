@@ -206,6 +206,14 @@ namespace Obelisk::Core
     {
         std::vector<CallbackSnapshot> callbacks;
         std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
+        const auto isSnapshotActive = [this](const CallbackSnapshot& snapshot) {
+            return snapshot.id != 0 &&
+                std::any_of(m_PreProcessEventCallbacks.begin(),
+                            m_PreProcessEventCallbacks.end(),
+                            [&snapshot](const CallbackRegistration& item) {
+                                return item.id == snapshot.id && item.callback == snapshot.callback;
+                            });
+        };
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
             for (const auto& item : m_PreProcessEventCallbacks)
@@ -218,7 +226,7 @@ namespace Obelisk::Core
                 continue;
             {
                 std::lock_guard<std::mutex> lock(m_Mutex);
-                if (!IsRegistrationActive(snapshot.id))
+                if (!isSnapshotActive(snapshot))
                     continue;
             }
 
@@ -250,6 +258,14 @@ namespace Obelisk::Core
 
         std::vector<CallbackSnapshot> callbacks;
         std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
+        const auto isSnapshotActive = [this](const CallbackSnapshot& snapshot) {
+            return snapshot.id != 0 &&
+                std::any_of(m_FilteredPreProcessEventCallbacks.begin(),
+                            m_FilteredPreProcessEventCallbacks.end(),
+                            [&snapshot](const CallbackRegistration& item) {
+                                return item.id == snapshot.id && item.callback == snapshot.callback;
+                            });
+        };
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
             for (const auto& item : m_FilteredPreProcessEventCallbacks)
@@ -265,7 +281,7 @@ namespace Obelisk::Core
                 continue;
             {
                 std::lock_guard<std::mutex> lock(m_Mutex);
-                if (!IsRegistrationActive(snapshot.id))
+                if (!isSnapshotActive(snapshot))
                     continue;
             }
 
@@ -294,6 +310,14 @@ namespace Obelisk::Core
     {
         std::vector<CallbackSnapshot> callbacks;
         std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
+        const auto isSnapshotActive = [this](const CallbackSnapshot& snapshot) {
+            return snapshot.id != 0 &&
+                std::any_of(m_PostProcessEventCallbacks.begin(),
+                            m_PostProcessEventCallbacks.end(),
+                            [&snapshot](const CallbackRegistration& item) {
+                                return item.id == snapshot.id && item.callback == snapshot.callback;
+                            });
+        };
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
             for (const auto& item : m_PostProcessEventCallbacks)
@@ -306,7 +330,7 @@ namespace Obelisk::Core
                 continue;
             {
                 std::lock_guard<std::mutex> lock(m_Mutex);
-                if (!IsRegistrationActive(snapshot.id))
+                if (!isSnapshotActive(snapshot))
                     continue;
             }
 
@@ -331,6 +355,14 @@ namespace Obelisk::Core
 
         std::vector<CallbackSnapshot> callbacks;
         std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
+        const auto isSnapshotActive = [this](const CallbackSnapshot& snapshot) {
+            return snapshot.id != 0 &&
+                std::any_of(m_FilteredPostProcessEventCallbacks.begin(),
+                            m_FilteredPostProcessEventCallbacks.end(),
+                            [&snapshot](const CallbackRegistration& item) {
+                                return item.id == snapshot.id && item.callback == snapshot.callback;
+                            });
+        };
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
             for (const auto& item : m_FilteredPostProcessEventCallbacks)
@@ -346,7 +378,7 @@ namespace Obelisk::Core
                 continue;
             {
                 std::lock_guard<std::mutex> lock(m_Mutex);
-                if (!IsRegistrationActive(snapshot.id))
+                if (!isSnapshotActive(snapshot))
                     continue;
             }
 

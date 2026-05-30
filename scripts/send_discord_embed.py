@@ -75,7 +75,7 @@ def reject_forbidden_text(parts: list[str]) -> None:
 
 def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     reject_forbidden_text(
-        [args.title, args.description, args.status, args.scope]
+        [args.title, args.description, args.status, args.scope, args.content]
         + [f"{field['name']}={field['value']}" for field in args.field]
     )
     if not (2 <= len(args.field) <= 5):

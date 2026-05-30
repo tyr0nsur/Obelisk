@@ -41,6 +41,19 @@ namespace
 
     ReentrantUnregisterState* g_ReentrantUnregisterState = nullptr;
 
+    struct ReusedSnapshotIdState {
+        Obelisk::Core::EventManager* events = nullptr;
+        void* owner = nullptr;
+        uint64_t stale_id = 0;
+        uint64_t replacement_id = 0;
+        int mode = 0;
+        int first_calls = 0;
+        int stale_calls = 0;
+        int replacement_calls = 0;
+    };
+
+    ReusedSnapshotIdState* g_ReusedSnapshotIdState = nullptr;
+
     struct BlockingCallbackState {
         std::mutex mutex;
         std::condition_variable cv;
@@ -201,6 +214,57 @@ namespace
     {
         Require(g_ReentrantUnregisterState != nullptr, "reentrant unregister second callback has no state");
         ++g_ReentrantUnregisterState->second_calls;
+        return true;
+    }
+
+    bool ReusedSnapshotReplacement(void*, void*, void*)
+    {
+        Require(g_ReusedSnapshotIdState != nullptr, "reused snapshot replacement callback has no state");
+        ++g_ReusedSnapshotIdState->replacement_calls;
+        return true;
+    }
+
+    bool ReusedSnapshotStale(void*, void*, void*)
+    {
+        Require(g_ReusedSnapshotIdState != nullptr, "reused snapshot stale callback has no state");
+        ++g_ReusedSnapshotIdState->stale_calls;
+        return true;
+    }
+
+    bool ReusedSnapshotFirst(void*, void*, void*)
+    {
+        Require(g_ReusedSnapshotIdState != nullptr, "reused snapshot first callback has no state");
+        auto* state = g_ReusedSnapshotIdState;
+        Require(state->events != nullptr, "reused snapshot first callback has no event manager");
+        ++state->first_calls;
+        Require(state->events->UnregisterCallbackForOwner(state->owner, state->stale_id),
+                "reused snapshot first callback could not unregister stale callback");
+        state->events->SetNextRegistrationIdForTesting(state->stale_id);
+
+        switch (state->mode)
+        {
+            case 0:
+                state->replacement_id =
+                    state->events->RegisterPreProcessEventOwned(state->owner, ReusedSnapshotReplacement);
+                break;
+            case 1:
+                state->replacement_id =
+                    state->events->RegisterPreProcessEventForNameIndexOwned(state->owner, 42, ReusedSnapshotReplacement);
+                break;
+            case 2:
+                state->replacement_id =
+                    state->events->RegisterPostProcessEventOwned(state->owner, ReusedSnapshotReplacement);
+                break;
+            case 3:
+                state->replacement_id =
+                    state->events->RegisterPostProcessEventForNameIndexOwned(state->owner, 42, ReusedSnapshotReplacement);
+                break;
+            default:
+                Require(false, "reused snapshot test mode is invalid");
+        }
+
+        Require(state->replacement_id == state->stale_id,
+                "reused snapshot replacement did not reuse the stale registration id");
         return true;
     }
 
@@ -551,6 +615,93 @@ namespace
             "filtered post reentrant unregister registrations failed");
     }
 
+    void TestReusedRawRegistrationIdDoesNotReactivateStaleSnapshot()
+    {
+        auto run = [](int mode, auto register_first, auto register_stale, auto trigger, const char* scope) {
+            Obelisk::Core::EventManager events;
+            int owner = 0;
+            ReusedSnapshotIdState state;
+            state.events = &events;
+            state.owner = &owner;
+            state.mode = mode;
+            g_ReusedSnapshotIdState = &state;
+
+            const uint64_t firstId = register_first(events, &owner);
+            state.stale_id = register_stale(events, &owner);
+            Require(firstId != 0 && state.stale_id != 0, scope);
+
+            trigger(events);
+            Require(state.first_calls == 1, "reused-id first callback did not run");
+            Require(state.stale_calls == 0, "stale raw callback ran after its id was reused");
+            Require(state.replacement_calls == 0, "replacement raw callback ran from the old dispatch snapshot");
+            Require(state.replacement_id == state.stale_id, "replacement raw callback did not reuse stale id");
+
+            Require(events.UnregisterCallbackForOwner(&owner, firstId),
+                    "reused-id first callback could not unregister after dispatch");
+            trigger(events);
+            Require(state.replacement_calls == 1, "replacement raw callback did not run in a later dispatch");
+            Require(state.stale_calls == 0, "stale raw callback ran after replacement dispatch");
+
+            Require(events.UnregisterCallbackForOwner(&owner, state.replacement_id),
+                    "reused-id replacement callback could not unregister");
+            g_ReusedSnapshotIdState = nullptr;
+        };
+
+        run(
+            0,
+            [](Obelisk::Core::EventManager& events, void* owner) {
+                return events.RegisterPreProcessEventOwned(owner, ReusedSnapshotFirst);
+            },
+            [](Obelisk::Core::EventManager& events, void* owner) {
+                return events.RegisterPreProcessEventOwned(owner, ReusedSnapshotStale);
+            },
+            [](Obelisk::Core::EventManager& events) {
+                Require(events.TriggerPreProcessEvent(nullptr, nullptr, nullptr),
+                        "global pre reused-id dispatch was blocked");
+            },
+            "global pre reused-id registrations failed");
+
+        run(
+            1,
+            [](Obelisk::Core::EventManager& events, void* owner) {
+                return events.RegisterPreProcessEventForNameIndexOwned(owner, 42, ReusedSnapshotFirst);
+            },
+            [](Obelisk::Core::EventManager& events, void* owner) {
+                return events.RegisterPreProcessEventForNameIndexOwned(owner, 42, ReusedSnapshotStale);
+            },
+            [](Obelisk::Core::EventManager& events) {
+                Require(events.TriggerPreProcessEvent(42, nullptr, nullptr, nullptr),
+                        "filtered pre reused-id dispatch was blocked");
+            },
+            "filtered pre reused-id registrations failed");
+
+        run(
+            2,
+            [](Obelisk::Core::EventManager& events, void* owner) {
+                return events.RegisterPostProcessEventOwned(owner, ReusedSnapshotFirst);
+            },
+            [](Obelisk::Core::EventManager& events, void* owner) {
+                return events.RegisterPostProcessEventOwned(owner, ReusedSnapshotStale);
+            },
+            [](Obelisk::Core::EventManager& events) {
+                events.TriggerPostProcessEvent(nullptr, nullptr, nullptr);
+            },
+            "global post reused-id registrations failed");
+
+        run(
+            3,
+            [](Obelisk::Core::EventManager& events, void* owner) {
+                return events.RegisterPostProcessEventForNameIndexOwned(owner, 42, ReusedSnapshotFirst);
+            },
+            [](Obelisk::Core::EventManager& events, void* owner) {
+                return events.RegisterPostProcessEventForNameIndexOwned(owner, 42, ReusedSnapshotStale);
+            },
+            [](Obelisk::Core::EventManager& events) {
+                events.TriggerPostProcessEvent(42, nullptr, nullptr, nullptr);
+            },
+            "filtered post reused-id registrations failed");
+    }
+
     void TestOwnerCleanupWaitsForInFlightFilteredPreCallback()
     {
         ResetCounters();
@@ -846,6 +997,7 @@ int main()
     TestNullCallbacksAreIgnored();
     TestCallbackCanUnregisterItself();
     TestReentrantUnregisterSkipsLaterRawCallbackSnapshots();
+    TestReusedRawRegistrationIdDoesNotReactivateStaleSnapshot();
     TestOwnerCleanupWaitsForInFlightFilteredPreCallback();
     TestOwnerCleanupWaitsForInFlightGlobalPreCallback();
     TestOwnerCleanupWaitsForInFlightPostCallback();

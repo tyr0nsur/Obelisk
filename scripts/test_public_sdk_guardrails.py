@@ -917,6 +917,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         compact = normalized(foundation)
 
         required = (
+            "post-RC contributor seed for the current ABI, not a change to the published `v0.1.0-rc.2` tag",
+            "Post-RC production-supported seed work is limited to lifecycle/config/logging skeletons",
+            "Copied `ChatMessageEvent` parsing and copied `GameplayPolicyEvent` auditing remain experimental seed patterns only",
+            "not production Plugin Hub modules, command/chat SDKs, policy-enforcement SDKs, or evidence of a new ABI",
             "does not add public symbols, structs, callbacks, capabilities, or gameplay modules",
             "raw `ProcessEvent` callbacks only as debug-gated runtime plumbing, not as Plugin Hub API",
             "optional calls require the capability bit, sufficient `struct_size`, and a non-null function pointer",
@@ -959,6 +963,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             (foundation, "Add passive copied chat parsing"),
             (foundation, "Add process-local timers"),
             (foundation, "Add copied policy auditors"),
+            (foundation, "Only lifecycle/config/logging, descriptor/catalog, and process-local timer examples are\nproduction-supported seeds after the RC"),
+            (foundation, "Copied chat parsers and copied policy auditors\nmay demonstrate patterns, but they remain experimental"),
             (matrix, "## Post-v0.1 Creator Ladder"),
             (matrix, "Descriptor consumers"),
             (matrix, "Passive chat text parsers"),
@@ -2906,6 +2912,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "Homes, teleport, safe zones",
             "Structure counts, placement, ownership",
             "Dino colors, carry rules",
+            "Tribe MOTD, tribe-facing notices",
             "Engrams, inventory, item give/remove flows",
             "Commands, permissions, economy, kits, shops, RCON",
             "Players, tribes, dinos, missions, transfers",
@@ -2933,6 +2940,52 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "triage must not turn those lanes into the Plugin Hub center",
             compact,
         )
+
+    def test_plugin_hub_support_tiers_match_nextgen_demand_snapshot(self) -> None:
+        matrix = (REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md").read_text(
+            encoding="utf-8"
+        )
+        compact = normalized(matrix)
+        rows: dict[str, str] = {}
+        in_snapshot_table = False
+        for line in matrix.splitlines():
+            if line.startswith("| Priority | Category | Post-RC support tier | Safe interpretation |"):
+                in_snapshot_table = True
+                continue
+            if in_snapshot_table and not line.startswith("|"):
+                break
+            if not in_snapshot_table:
+                continue
+            columns = [column.strip() for column in line.strip().strip("|").split("|")]
+            if len(columns) != 4 or columns[0] == "---":
+                continue
+            rows[columns[1]] = columns[2]
+
+        expected_tiers = {
+            "Lifecycle, descriptors, logging, config, local timers": "production seed available",
+            "Passive chat parsing and plugin-local text routing": "experimental seed only",
+            "Copied structure/item policy auditing": "experimental seed only",
+            "Timed notices and chat broadcasts": "blocked",
+            "Permissions/admin groups": "blocked",
+            "RCON/operator I/O and Unicode text": "blocked",
+            "Economy, shops, kits, rewards, stats": "blocked",
+            "Homes, teleport, safe zones, area policy": "blocked",
+            "Structure counts, placement, ownership, collision policy": (
+                "blocked except experimental auditing"
+            ),
+            "Dino colors, carry rules, spawn/cosmetic policy": "blocked",
+            "Tribe MOTD, tribe-facing notices, and tribe policy": "blocked",
+            "Engrams, inventory, item give/remove flows": "blocked",
+        }
+
+        self.assertEqual(rows, expected_tiers)
+        for required in (
+            "it does not promise ArkApi plugin compatibility",
+            "Neither tier means the corresponding ArkApi plugin family can be ported",
+            "not as portable behavior, source, ABI, constants, schemas, command parsers, or implementation patterns",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, compact)
 
     def test_mission_plugin_hub_boundary_stays_planning_only(self) -> None:
         foundation = (REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md").read_text(

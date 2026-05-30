@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Hardened raw `EventManager` snapshot dispatch so reused registration ids do not
+  reactivate stale raw callbacks unless the same id and callback pointer are still present
+  in the same callback family.
+- Hardened snapshot regeneration and evidence guardrails: UFunction regeneration now
+  requires complete artifact identity or an evidence-pack manifest, ScriptStruct
+  regeneration tests verify selected evidence-pack labels, and ResourceHandle blocker
+  interpretation is checked against evaluator constants.
+- Hardened Discord embed sending so forbidden secret/webhook/player-text phrases are
+  rejected from both embed fields and top-level content.
 - Clarified post-RC Plugin Hub terminology so production-supported seeds are limited to
   lifecycle/config/logging, descriptor/catalog, and process-local timer examples, while
   copied chat and copied policy examples remain experimental seed patterns.
