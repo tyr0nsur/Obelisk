@@ -109,6 +109,11 @@ sequence.
   ArkServerApi/AseApi remains a names and behavior dictionary only; it is not a porting
   target or copying source. Do not copy offsets, layouts, ABI assumptions, wrappers, raw
   UE pointer APIs, or algorithmic implementations.
+- The durable Item return-only policy slice is preserved at
+  `/home/flowcommunity-ark/obelisk-artifacts/item-return-only-policy-slice-20260530T072255Z/`.
+  It is evidence-only: consume mode accepts it, promote mode blocks it, and it does not
+  authorize public Items/Inventory SDK, runtime hook wiring, markers/env, mutation, return
+  override, identity, lookup, or `ResourceHandle`.
 - Do not rerun broad FName, GObjects, or core scans for ResourceHandle unless the binary
   hash changes or evidence contradicts current roots/candidates. The next ResourceHandle
   work should use the durable flag-policy refresh as internal static input and focus on

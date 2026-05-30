@@ -42,7 +42,9 @@ and public SDK exposure.
 
 ```bash
 python3 scripts/test_build_redacted_ufunction_signatures.py
-python3 scripts/build_redacted_ufunction_signatures.py --item-return-only-policy-slice --json
+python3 scripts/build_redacted_ufunction_signatures.py \
+  --item-return-only-policy-slice \
+  --json > /tmp/obelisk-item-slice.json
 python3 scripts/validate_offline_artifact_gate.py \
   --root /tmp \
   --manifest /tmp/obelisk-item-slice.json \
@@ -54,9 +56,9 @@ python3 scripts/validate_offline_artifact_gate.py \
 Expected policy report result:
 
 - schema: `obelisk.item-return-only-policy-slice.v1`
-- copied bool count: `3`
+- copied return bool count: `3`
 - excluded field count: `5`
-- promotion ready: `false`
+- policy status: `evidence-only`
 - copied fields:
   - `PrimalItem.AllowEquipItem.ReturnValue`
   - `PrimalItem.CanRepair.ReturnValue`
@@ -84,6 +86,35 @@ observation contains the approved `ReturnValue` bool, rejects non-canonical bool
 greater than `1`, and returns false for disabled, budget-exhausted, non-item, rejected,
 metadata-only, or recognition-only item attempts. It does not authorize public Items SDK,
 runtime hook wiring, dispatcher work, mutation, or return override.
+
+Follow-up hardening added explicit wrapper coverage for
+`TryObserveInvocation`: disabled gates, non-item FNames, and zero-budget windows do not
+read memory, do not reserve observation budget, clear the observation number, and leave no
+copied output path. Matching item FNames may reserve bounded budget before metadata reads
+so throwing readers fail closed inside the capped observation window. This keeps the helper
+test-only and preserves the no-read/no-budget rule for rejected preconditions.
+
+The policy slice artifact and gates were then preserved under:
+
+```text
+/home/flowcommunity-ark/obelisk-artifacts/item-return-only-policy-slice-20260530T072255Z
+```
+
+Preserved result:
+
+- `item-return-only-policy-slice.json`
+  (`sha256=53ac249aa107eb059ee420de8e939cc4117fb3590d651025a0bb6286625b1849`)
+- `copied_return_bools=3`
+- `excluded_fields=5`
+- `coverage.status=complete`
+- consume gate: `accepted`
+- promote gate: `blocked` with `promote_mode_item_return_policy_slice_evidence_only`
+  and `promote_mode_manifest_has_non_claims`
+
+The canonical item compact redacted-signature source remains
+`/servidor/ark/workspace-offline/item-compact-redacted-signatures-strict-20260530T013606Z/signatures.json`;
+older item compact redacted-signature packs without strict target-set coverage are
+historical inputs only.
 
 ## Non-Claims
 

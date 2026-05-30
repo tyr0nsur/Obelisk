@@ -177,9 +177,15 @@ priorities, and do not use history files as the active source of truth.
   identity, mutation, return override, or `ResourceHandle`. Use the dated research notes
   such as `docs/research/2026-05-29-item-compact-second-source-readiness.md`,
   `docs/research/2026-05-29-item-return-only-policy-bridge-plan.md`,
+  `docs/research/2026-05-30-item-return-only-policy-slice.md`,
   `docs/research/2026-05-29-inventory-action-redacted-signature-readiness.md`, and
   `/servidor/ark/workspace-offline/redacted-ufunction-signatures-rollup-20260529T101249Z`
   instead of copying artifact detail into handoff.
+  The durable Item return-only policy slice is preserved at
+  `/home/flowcommunity-ark/obelisk-artifacts/item-return-only-policy-slice-20260530T072255Z/`;
+  consume mode is accepted and promote mode is blocked with evidence-only/non-claim
+  blockers. It copies only `AllowEquipItem.ReturnValue`, `CanRepair.ReturnValue`, and
+  `UseItemOntoItem.ReturnValue`.
   The strict RC `minimal-second-source-intake` redacted signature pack with complete
   target-set coverage is preserved at
   `/home/flowcommunity-ark/obelisk-artifacts/rc-minimal-redacted-signatures-strict-20260530T000000Z/`;

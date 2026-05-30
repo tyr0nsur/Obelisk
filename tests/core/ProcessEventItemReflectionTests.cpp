@@ -254,6 +254,60 @@ namespace
         Require(context.Calls == 0, "non-item name read memory");
     }
 
+    void TestObserveDisabledNonItemAndZeroBudgetDoNotReadOrReserve()
+    {
+        ReaderContext context;
+        MemoryReader reader{CountingReader, &context};
+        std::atomic<uint64_t> counter{0};
+        uint64_t observationNumber = 99;
+
+        Attempt disabled = TryObserveInvocation(
+            {},
+            kCanRepairNameIndex,
+            reader,
+            reinterpret_cast<void*>(0x1000),
+            reinterpret_cast<void*>(0x2000),
+            counter,
+            1,
+            observationNumber);
+        Require(disabled.Status == AttemptStatus::Disabled, "disabled item observation attempted read");
+        Require(observationNumber == 0, "disabled item observation left observation number set");
+        Require(counter.load() == 0, "disabled item observation reserved budget");
+        Require(context.Calls == 0, "disabled item observation read memory");
+
+        observationNumber = 99;
+        Attempt nonItem = TryObserveInvocation(
+            EnabledGate(),
+            9999,
+            reader,
+            reinterpret_cast<void*>(0x1000),
+            reinterpret_cast<void*>(0x2000),
+            counter,
+            1,
+            observationNumber);
+        Require(nonItem.Status == AttemptStatus::NonItemFunction,
+                "non-item observation was not rejected before budget");
+        Require(observationNumber == 0, "non-item observation left observation number set");
+        Require(counter.load() == 0, "non-item observation reserved budget");
+        Require(context.Calls == 0, "non-item observation read memory");
+
+        observationNumber = 99;
+        Attempt zeroBudget = TryObserveInvocation(
+            EnabledGate(),
+            kCanRepairNameIndex,
+            reader,
+            reinterpret_cast<void*>(0x1000),
+            reinterpret_cast<void*>(0x2000),
+            counter,
+            0,
+            observationNumber);
+        Require(zeroBudget.Status == AttemptStatus::BudgetExhausted,
+                "zero-budget item observation did not fail closed before read");
+        Require(observationNumber == 0, "zero-budget item observation left observation number set");
+        Require(counter.load() == 0, "zero-budget item observation reserved budget");
+        Require(context.Calls == 0, "zero-budget item observation read memory");
+    }
+
     void TestIdentifyContainsReaderExceptions()
     {
         MemoryReader reader{ThrowingReader, nullptr};
@@ -801,6 +855,7 @@ int main()
     TestGateEvaluation();
     TestObservationBudgetAndFilter();
     TestDisabledAndNonItemDoNotRead();
+    TestObserveDisabledNonItemAndZeroBudgetDoNotReadOrReserve();
     TestIdentifyContainsReaderExceptions();
     TestBuildsCopiedItemObservations();
     TestCopiedItemObservationAbiShape();
