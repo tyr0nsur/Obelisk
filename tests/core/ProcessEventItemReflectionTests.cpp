@@ -1,6 +1,7 @@
 #include "hooks/ProcessEventItemReflection.h"
 
 #include <atomic>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
@@ -383,6 +384,41 @@ namespace
                 "copied item observation bool storage changed unexpectedly");
     }
 
+    void TestBuildDoesNotMutateItemParams()
+    {
+        std::array<uint8_t, 16> params{};
+        params[0x00] = 1;
+        params[0x01] = 0;
+        const std::array<uint8_t, 16> before = params;
+
+        Obelisk::UE::ItemReflection::ItemInvocation invocation;
+        invocation.Function = Obelisk::UE::ItemReflection::ItemFunction::CanRepair;
+        invocation.FunctionNameIndex = kCanRepairNameIndex;
+        invocation.OuterNameIndex = kPrimalItemNameIndex;
+        invocation.HasParameterRanges = true;
+        invocation.Fields.push_back(MakeField(
+            Obelisk::UE::ItemReflection::ItemField::BIgnoreInventoryRequirement,
+            kBIgnoreInventoryRequirementNameIndex,
+            0x00,
+            sizeof(uint8_t),
+            true,
+            params.data() + 0x00,
+            sizeof(uint8_t)));
+        invocation.Fields.push_back(MakeField(Obelisk::UE::ItemReflection::ItemField::ReturnValue,
+                                              kReturnValueNameIndex,
+                                              0x01,
+                                              sizeof(uint8_t),
+                                              true,
+                                              params.data() + 0x01,
+                                              sizeof(uint8_t)));
+
+        CopiedItemObservation observation;
+        Require(TryBuildCopiedItemObservation(invocation, observation),
+                "CanRepair copied item observation was rejected");
+        RequireReturnOnlyPayload(observation, false, "CanRepair return-only payload mismatch");
+        Require(params == before, "copied item observation mutated parameter bytes");
+    }
+
     void TestRejectsMalformedReturnOnlyShapes()
     {
         uint8_t returnValue = 1;
@@ -688,6 +724,7 @@ int main()
     TestIdentifyContainsReaderExceptions();
     TestBuildsCopiedItemObservations();
     TestCopiedItemObservationAbiShape();
+    TestBuildDoesNotMutateItemParams();
     TestRejectsMalformedReturnOnlyShapes();
     TestRejectsPartialCanRepairShape();
     TestRejectsMissingOrForbiddenRanges();
