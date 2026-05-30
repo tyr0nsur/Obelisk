@@ -39,6 +39,25 @@ REDACTED_SCRIPTSTRUCT_TARGET_SET_COVERAGE_SCHEMA = "obelisk.redacted-scriptstruc
 SCRIPTSTRUCT_INVENTORY_PACK_SCHEMA = "obelisk.scriptstruct-inventory-pack.v1"
 ARTIFACT_PACK_MANIFEST_SCHEMA = "obelisk.artifact-pack.manifest.v1"
 TRANSFER_SCRIPTSTRUCT_TARGET_SET = "transfer-scriptstruct"
+TRANSFER_SCRIPTSTRUCT_REQUIRED_BLOCKERS = {
+    "no_public_transfer_sdk",
+    "transfer_scriptstruct_payload_decode_blocked",
+}
+TRANSFER_SCRIPTSTRUCT_SCALAR_PROPERTY_CLASSES = {
+    "BoolProperty",
+    "ByteProperty",
+    "DoubleProperty",
+    "EnumProperty",
+    "FloatProperty",
+    "Int16Property",
+    "Int64Property",
+    "Int8Property",
+    "IntProperty",
+    "NameProperty",
+    "UInt16Property",
+    "UInt32Property",
+    "UInt64Property",
+}
 TRANSFER_SCRIPTSTRUCT_BOOL_TAIL_CONTRACT = {
     "PrimalLocalProfile.ArkTributePlayerData": {
         "bWasAllowDPCUpload": {
@@ -66,6 +85,9 @@ TRANSFER_SCRIPTSTRUCT_BOOL_TAIL_CONTRACT = {
             "native_bool": False,
         },
     }
+}
+TRANSFER_SCRIPTSTRUCT_TARGETS = set(TRANSFER_SCRIPTSTRUCT_BOOL_TAIL_CONTRACT) | {
+    "PrimalLocalProfile.ARKTributeDino",
 }
 TARGET_SET_COVERAGE_SCHEMA = "obelisk.redacted-ufunction-target-set-coverage.v1"
 REDACTED_UFUNCTION_ARTIFACT_HYGIENE_SCHEMA = "obelisk.redacted-ufunction-artifact-hygiene.v1"
@@ -2629,6 +2651,7 @@ def validate_redacted_scriptstruct_signature_manifest(
         blockers.append({"reason": "scriptstruct_signature_signatures_not_list", "label": f"{source_label}:$.signatures"})
     elif target_sets_include_transfer(payload):
         blockers.extend(validate_transfer_redacted_scriptstruct_target_set_coverage(payload, source_label=source_label))
+        blockers.extend(validate_transfer_redacted_scriptstruct_payload_boundary(payload, source_label=source_label))
         blockers.extend(validate_transfer_redacted_scriptstruct_bool_tail_contract(payload, source_label=source_label))
     return blockers
 
@@ -2640,9 +2663,8 @@ def target_sets_include_transfer(payload: dict[str, Any]) -> bool:
             return True
     signatures = payload.get("signatures")
     if isinstance(signatures, list):
-        transfer_targets = set(TRANSFER_SCRIPTSTRUCT_BOOL_TAIL_CONTRACT)
         for signature in signatures:
-            if isinstance(signature, dict) and signature.get("target") in transfer_targets:
+            if isinstance(signature, dict) and signature.get("target") in TRANSFER_SCRIPTSTRUCT_TARGETS:
                 return True
     return False
 
@@ -2715,12 +2737,12 @@ def validate_transfer_redacted_scriptstruct_target_set_coverage(
         )
     expected_targets = coverage.get("expected_targets")
     observed_targets = coverage.get("observed_targets")
-    if not isinstance(expected_targets, list) or not set(TRANSFER_SCRIPTSTRUCT_BOOL_TAIL_CONTRACT).issubset(set(expected_targets)):
+    if not isinstance(expected_targets, list) or not TRANSFER_SCRIPTSTRUCT_TARGETS.issubset(set(expected_targets)):
         blockers.append(
             {
                 "reason": "scriptstruct_signature_transfer_target_set_coverage_expected_targets_incomplete",
                 "label": f"{source_label}:$.target_set_coverage.expected_targets",
-                "expected": sorted(TRANSFER_SCRIPTSTRUCT_BOOL_TAIL_CONTRACT),
+                "expected": sorted(TRANSFER_SCRIPTSTRUCT_TARGETS),
                 "recorded": expected_targets,
             }
         )
@@ -2733,6 +2755,102 @@ def validate_transfer_redacted_scriptstruct_target_set_coverage(
                 "recorded": observed_targets,
             }
         )
+    return blockers
+
+
+def validate_transfer_redacted_scriptstruct_payload_boundary(
+    payload: dict[str, Any],
+    *,
+    source_label: str,
+) -> list[dict[str, Any]]:
+    blockers: list[dict[str, Any]] = []
+    safety_summary = payload.get("safety_summary")
+    if isinstance(safety_summary, dict):
+        if safety_summary.get("copied_scalar_count_total") != 0:
+            blockers.append(
+                {
+                    "reason": "scriptstruct_signature_transfer_copied_scalar_count_nonzero",
+                    "label": f"{source_label}:$.safety_summary.copied_scalar_count_total",
+                    "expected": 0,
+                    "recorded": safety_summary.get("copied_scalar_count_total"),
+                }
+            )
+        if safety_summary.get("copied_scalar_by_kind") != {}:
+            blockers.append(
+                {
+                    "reason": "scriptstruct_signature_transfer_copied_scalar_by_kind_nonempty",
+                    "label": f"{source_label}:$.safety_summary.copied_scalar_by_kind",
+                    "expected": {},
+                    "recorded": safety_summary.get("copied_scalar_by_kind"),
+                }
+            )
+
+    signatures = payload.get("signatures")
+    if not isinstance(signatures, list):
+        return blockers
+    for signature_index, signature in enumerate(signatures):
+        if not isinstance(signature, dict) or signature.get("target") not in TRANSFER_SCRIPTSTRUCT_TARGETS:
+            continue
+        signature_label = f"{source_label}:$.signatures[{signature_index}]"
+        promotion_blockers = signature.get("promotion_blockers")
+        if (
+            not isinstance(promotion_blockers, list)
+            or not TRANSFER_SCRIPTSTRUCT_REQUIRED_BLOCKERS.issubset(set(promotion_blockers))
+        ):
+            blockers.append(
+                {
+                    "reason": "scriptstruct_signature_transfer_promotion_blockers_missing",
+                    "label": f"{signature_label}.promotion_blockers",
+                    "expected": sorted(TRANSFER_SCRIPTSTRUCT_REQUIRED_BLOCKERS),
+                    "recorded": promotion_blockers,
+                }
+            )
+        fields = signature.get("fields")
+        if not isinstance(fields, list):
+            continue
+        for field_index, field in enumerate(fields):
+            if not isinstance(field, dict):
+                continue
+            field_label = f"{signature_label}.fields[{field_index}]"
+            type_name = field.get("type")
+            if isinstance(type_name, str) and copied_scalar_kind(type_name) is not None:
+                blockers.append(
+                    {
+                        "reason": "scriptstruct_signature_transfer_copied_scalar_field_claim",
+                        "label": f"{field_label}.type",
+                        "recorded": type_name,
+                    }
+                )
+            source_property_class = field.get("source_property_class")
+            if source_property_class not in TRANSFER_SCRIPTSTRUCT_SCALAR_PROPERTY_CLASSES:
+                continue
+            expected_type = (
+                "redacted_transfer_payload_bool"
+                if source_property_class == "BoolProperty"
+                else "redacted_transfer_payload_scalar"
+            )
+            if type_name != expected_type:
+                blockers.append(
+                    {
+                        "reason": "scriptstruct_signature_transfer_scalar_type_not_redacted_payload",
+                        "label": f"{field_label}.type",
+                        "expected": expected_type,
+                        "recorded": type_name,
+                    }
+                )
+            field_blockers = field.get("promotion_blockers")
+            if (
+                not isinstance(field_blockers, list)
+                or not TRANSFER_SCRIPTSTRUCT_REQUIRED_BLOCKERS.issubset(set(field_blockers))
+            ):
+                blockers.append(
+                    {
+                        "reason": "scriptstruct_signature_transfer_field_blockers_missing",
+                        "label": f"{field_label}.promotion_blockers",
+                        "expected": sorted(TRANSFER_SCRIPTSTRUCT_REQUIRED_BLOCKERS),
+                        "recorded": field_blockers,
+                    }
+                )
     return blockers
 
 

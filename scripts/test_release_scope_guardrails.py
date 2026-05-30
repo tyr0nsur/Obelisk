@@ -1046,7 +1046,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             compact = normalized(text)
             lower = compact.lower()
             with self.subTest(file=path, item="published rc baseline"):
-                self.assertRegex(text, r"0\.1\.0-rc\.[12]")
+                self.assertRegex(text, r"0\.1\.0-rc\.2")
             with self.subTest(file=path, item="public api scope"):
                 self.assertRcPublicScopeClaim(path, text)
 

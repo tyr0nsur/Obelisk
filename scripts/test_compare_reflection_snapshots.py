@@ -2020,7 +2020,13 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         )
         self.assertEqual(report["evidence_scope"], "second_source_layout_evidence_only")
         self.assertIn("public_sdk", report["not_promoted_surfaces"])
+        self.assertIn("inventory_sdk", report["not_promoted_surfaces"])
+        self.assertIn("items_sdk", report["not_promoted_surfaces"])
         self.assertIn("resource_handle", report["not_promoted_surfaces"])
+        self.assertTrue(
+            any("Inventory SDK, Items SDK" in claim for claim in report["non_claims"]),
+            report["non_claims"],
+        )
 
     def test_assemble_rc_root_rejects_partial_evidence_identity_before_gate_use(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

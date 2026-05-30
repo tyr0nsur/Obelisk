@@ -2151,20 +2151,24 @@ def redacted_scriptstruct_signature_manifest() -> dict:
     def transfer_bool_field(name: str, offset: int) -> dict:
         return {
             "name": name,
-            "type": "bool",
+            "type": "redacted_transfer_payload_bool",
             "source_property_class": "BoolProperty",
             "offset": offset,
             "element_size": 1,
             "array_dim": 1,
             "status": "candidate",
-            "redaction": "copied scalar candidate",
+            "redaction": "Transfer ScriptStruct bool-tail metadata only; payload bool not promoted",
             "property_flags": "0x10001040002200",
             "bool_field_size": 1,
             "bool_byte_offset": 0,
             "byte_mask": "0x01",
             "field_mask": "0xff",
             "native_bool": False,
-            "promotion_blockers": ["scriptstruct_payload_not_runtime_observed"],
+            "promotion_blockers": [
+                "no_public_transfer_sdk",
+                "scriptstruct_payload_not_runtime_observed",
+                "transfer_scriptstruct_payload_decode_blocked",
+            ],
         }
 
     return {
@@ -2204,10 +2208,10 @@ def redacted_scriptstruct_signature_manifest() -> dict:
             "promotion_ready": False,
             "intended_use": "offline_review_only",
             "field_count_total": 4,
-            "copied_scalar_count_total": 3,
-            "copied_scalar_by_kind": {"bool": 3},
-            "redacted_count_total": 1,
-            "redacted_by_reason": {"text": 1},
+            "copied_scalar_count_total": 0,
+            "copied_scalar_by_kind": {},
+            "redacted_count_total": 4,
+            "redacted_by_reason": {"text": 1, "transfer_payload_bool": 3},
             "promotion_blocker_count_total": 0,
             "promotion_blockers_by_reason": {},
             "not_promoted_surfaces": sorted(gate.REQUIRED_REDACTED_SCRIPTSTRUCT_NOT_PROMOTED_SURFACES),
@@ -2216,11 +2220,21 @@ def redacted_scriptstruct_signature_manifest() -> dict:
             {
                 "target": "PrimalLocalProfile.ARKTributeDino",
                 "property_count": 1,
+                "promotion_blockers": [
+                    "no_public_transfer_sdk",
+                    "scriptstruct_layout_candidate_only",
+                    "transfer_scriptstruct_payload_decode_blocked",
+                ],
                 "fields": [{"name": "DinoClassName", "type": "redacted_text"}],
             },
             {
                 "target": "PrimalLocalProfile.ArkTributePlayerData",
                 "property_count": 3,
+                "promotion_blockers": [
+                    "no_public_transfer_sdk",
+                    "scriptstruct_layout_candidate_only",
+                    "transfer_scriptstruct_payload_decode_blocked",
+                ],
                 "fields": [
                     transfer_bool_field("bWasAllowDPCUpload", 272),
                     transfer_bool_field("bWithItems", 273),
@@ -2426,6 +2440,29 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertEqual(result["status"], "accepted")
         self.assertEqual([], result["blockers"])
 
+    def test_blocks_redacted_transfer_scriptstruct_copied_scalar_claim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "scriptstruct-signatures" / "manifest.json"
+            payload = redacted_scriptstruct_signature_manifest()
+            field = payload["signatures"][1]["fields"][0]
+            field["type"] = "bool"
+            field["redaction"] = "copied scalar candidate"
+            field["promotion_blockers"] = ["scriptstruct_payload_not_runtime_observed"]
+            payload["safety_summary"]["copied_scalar_count_total"] = 1
+            payload["safety_summary"]["copied_scalar_by_kind"] = {"bool": 1}
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("scriptstruct_signature_transfer_copied_scalar_count_nonzero", reasons)
+        self.assertIn("scriptstruct_signature_transfer_copied_scalar_by_kind_nonempty", reasons)
+        self.assertIn("scriptstruct_signature_transfer_copied_scalar_field_claim", reasons)
+        self.assertIn("scriptstruct_signature_transfer_scalar_type_not_redacted_payload", reasons)
+        self.assertIn("scriptstruct_signature_transfer_field_blockers_missing", reasons)
+
     def test_blocks_redacted_transfer_scriptstruct_missing_expected_bool(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"
@@ -2510,7 +2547,13 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
             payload = redacted_scriptstruct_signature_manifest()
             payload["target_sets"] = ["mission-scriptstruct"]
             payload["source_target_sets"] = []
-            payload["signatures"] = payload["signatures"][:1]
+            payload["signatures"] = [
+                {
+                    "target": "MissionType.MissionRewardEntry",
+                    "property_count": 1,
+                    "fields": [{"name": "RewardName", "type": "redacted_text"}],
+                }
+            ]
             payload["signature_count"] = 1
             write_json(manifest, payload)
 
@@ -2518,6 +2561,27 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
 
         self.assertEqual(result["status"], "accepted")
         self.assertEqual([], result["blockers"])
+
+    def test_blocks_redacted_transfer_scriptstruct_dino_only_even_without_target_set_label(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "scriptstruct-signatures" / "manifest.json"
+            payload = redacted_scriptstruct_signature_manifest()
+            payload["target_sets"] = []
+            payload["source_target_sets"] = []
+            payload["signatures"] = payload["signatures"][:1]
+            payload["signature_count"] = 1
+            payload["target_set_coverage"]["declared_target_sets"] = []
+            payload["target_set_coverage"]["expected_targets"] = ["PrimalLocalProfile.ARKTributeDino"]
+            payload["target_set_coverage"]["observed_targets"] = ["PrimalLocalProfile.ARKTributeDino"]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("scriptstruct_signature_transfer_target_set_coverage_expected_targets_incomplete", reasons)
+        self.assertIn("scriptstruct_signature_transfer_struct_missing", reasons)
 
     def test_blocks_redacted_scriptstruct_signatures_in_promote_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

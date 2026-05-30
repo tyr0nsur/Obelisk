@@ -2315,6 +2315,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                     self.assertIsInstance(event_kind.get("field_mask"), list)
                     self.assertGreater(len(event_kind["field_mask"]), 0)
                 self.assertIn("not promoted", event.get("inventory_sdk", ""))
+                self.assertIn("not promoted", event.get("item_module_sdk", ""))
                 target_set_evidence = event.get("target_set_evidence")
                 self.assertIsInstance(
                     target_set_evidence,
@@ -2441,6 +2442,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                         V010_GAMEPLAY_POLICY_EVENT_KIND_MASKS,
                     )
                     self.assertIn("not promoted", event.get("inventory_sdk", ""))
+                    self.assertIn("not promoted", event.get("item_module_sdk", ""))
 
     def test_public_gameplay_policy_manifest_redacts_structure_and_inventory_backing_identity_and_authority(self) -> None:
         manifest = json.loads(PUBLIC_GAMEPLAY_EVENTS_MANIFEST.read_text(encoding="utf-8"))
@@ -2462,6 +2464,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertIn("no persistent handle", normalized(resource_contract))
         self.assertEqual(gameplay_policy.get("payload"), "copied POD scalar fields only")
         self.assertIn("not promoted", gameplay_policy.get("inventory_sdk", ""))
+        self.assertIn("not promoted", gameplay_policy.get("item_module_sdk", ""))
 
         redacted_fields = gameplay_policy.get("redacted_fields")
         self.assertIsInstance(redacted_fields, list)

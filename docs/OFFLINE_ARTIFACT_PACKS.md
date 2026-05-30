@@ -25,6 +25,8 @@ cross-binary portability.
   static-tool smoke binaries, and core paths referenced by snapshot evidence packs must
   be real files. Use copies or hardlinks in the offline workspace; symlinks fail closed
   even when they currently resolve inside the workspace.
+- Core inspection inputs such as `scripts/inspect_core_ufunctions.py --core` follow the
+  same rule: pass the copied or hardlinked core file itself, not a symlink to it.
 - Root outputs must be named exactly `artifact-pack.manifest.json` and `SHA256SUMS`.
 - Manifest schema must be `obelisk.artifact-pack.manifest.v1`.
 - Legacy spellings such as `obelisk.artifact_pack.manifest.v1` are unsupported and fail

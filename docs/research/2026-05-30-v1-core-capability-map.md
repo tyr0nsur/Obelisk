@@ -48,7 +48,7 @@ identity, lookup, mutation, return override, or handle contract.
 - Public ABI remains C/POD, append-only, owner-token scoped, and capability-discovered.
 - Stable APIs expose copied Obelisk-owned data, not `UObject*`, `UFunction*`, `FString`,
   raw params, FName/GObjects indices, or memory-derived handles.
-- ArkServerApi/AseApi is a compatibility dictionary only. Use its names and behavior
+- ArkServerApi/AseApi is a demand dictionary only. Use its public names and demand
   taxonomy to seed candidate discovery, then rederive every `UFunction`/`UProperty`
   through Obelisk reflection snapshots, second-source gates, and Linux ProcessEvent copied
   data. Do not copy its offsets, vtables, layouts, MSVC conventions, Windows libraries, or
@@ -56,8 +56,9 @@ identity, lookup, mutation, return override, or handle contract.
 - Each module promotion needs accepted target-set evidence, second-source/static support,
   lifecycle cleanup, privacy rules, and tests that prove no mutation or return override is
   implied unless explicitly promoted.
-- ArkApi compatibility should be rebuilt as plugins and module APIs on top of Obelisk
-  primitives, not by cloning unsafe raw UE pointer surfaces.
+- ArkApi-style demand should be met, where feasible, by Obelisk-native plugins and
+  module APIs on top of Obelisk primitives; this is not ArkApi source, ABI, or behavior
+  compatibility, and must not clone unsafe raw UE pointer surfaces.
 
 ## Next Work
 

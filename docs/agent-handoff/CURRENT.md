@@ -2,8 +2,7 @@
 
 This file is an active routing table only. Durable evidence belongs in `docs/research/`,
 resume facts in `COMPACT_CONTEXT.md`, and old detail in `HISTORY-*.md`. Historical
-recovery context is not active routing for the current head; use `git log --oneline -1`
-for the current checkpoint.
+recovery context is not active routing; use `git log --oneline -1` for the checkpoint.
 
 ## Active Objective
 
@@ -66,8 +65,9 @@ for the current checkpoint.
   params, identity, lookup, mutation, return override, pincode/player text publication, or
   broad module SDK claim.
 - Plugin unload/init-failure cleanup skips `dlclose` when callback cleanup cannot be
-  proven complete, retains the plugin for retry when possible, does not repeat plugin shutdown,
-  and leaves the library mapped if retention tracking also fails.
+  proven complete, retains the plugin for retry, does not repeat plugin shutdown, leaves
+  mapped on retention failure, and keeps cleanup/retention injection hooks out of
+  production `libobelisk.so`.
 - `oProcessTimer` is the first process-local timer example. Timer ids are process-local,
   not cluster state, UE identity, gameplay/module timer abstractions, or persistent
   handles, or shared scheduler state; owner-token timers require explicit unregister.
@@ -140,8 +140,8 @@ for the current checkpoint.
   debug target, gates, window, rollback, artifacts, and posture checks. Do not replace
   this with another broad offline FName/GObjects scan.
 - Transfer ScriptStruct bool-tail evidence has a refreshed local root; old 20260529
-  transfer roots are stale. Transfer scalar/bool fields are redacted payload metadata
-  only, not copied-scalar candidates.
+  transfer roots are stale. Transfer scalar/bool fields are redacted metadata only; gates
+  detect Transfer structs without labels and require `no_public_transfer_sdk` blockers.
 - `validate_offline_artifact_gate.py` consumes `obelisk.artifact-pack.manifest.v1`
   containers with current-content checksums, symlink fail-closed checks, child-manifest
   blockers, container-only promote blocking, protected-root checks, and duplicate target
@@ -150,8 +150,8 @@ for the current checkpoint.
   `release_readiness`, `planning_only`, or `internal_layout_only`; promotion accepts only
   explicit release-readiness sets, rejects explicit `--target` widening outside named
   target sets, and reports internal/layout-only gaps as `target_set_not_release_readiness`.
-- Offline artifact JSON manifests, provenance sidecars, and artifact checksum reads use
-  no-symlink regular-file opens after protected-path prechecks.
+- Offline artifact JSON manifests, provenance sidecars, artifact checksum reads, and
+  core inspector inputs use no-symlink regular-file opens after protected-path prechecks.
 - `scripts/check_static_tooling.py` records optional radare2/rizin/Ghidra availability and
   runs smoke checks only on approved offline binaries/output roots.
 - `APrimalStructure.IsAllowedToBuild` is second-wave only: no committed snapshot,

@@ -50,7 +50,9 @@ READINESS_NOT_PROMOTED_SURFACES = {
     "class_identity",
     "cross_binary_portability",
     "inventory_identity",
+    "inventory_sdk",
     "item_identity",
+    "items_sdk",
     "lookup",
     "mutation",
     "object_identity",
@@ -62,7 +64,7 @@ READINESS_NOT_PROMOTED_SURFACES = {
 }
 READINESS_NON_CLAIMS = [
     "accepted second-source readiness is layout evidence only",
-    "does not promote public SDK, object identity, lookup, mutation, return override, ResourceHandle, or runtime hooks",
+    "does not promote public SDK, Inventory SDK, Items SDK, object identity, lookup, mutation, return override, ResourceHandle, or runtime hooks",
 ]
 MISSION_COPIED_BOOL_POLICY_ARTIFACT = (
     "/home/flowcommunity-ark/obelisk-artifacts/"

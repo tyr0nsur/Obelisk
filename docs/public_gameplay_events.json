@@ -303,6 +303,7 @@
         "pinCode"
       ],
       "inventory_sdk": "not promoted; inventory-backed policy signals are exposed only through GameplayPolicyEvent",
+      "item_module_sdk": "not promoted; item-return-backed policy signals are exposed only through GameplayPolicyEvent",
       "second_source_ready": true,
       "copied_obelisk_owned_payload": true,
       "no_ue_internals_in_public_abi": true,

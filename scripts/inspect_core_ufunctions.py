@@ -19,7 +19,7 @@ from typing import Callable, Iterable
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 import enumerate_core_uobjects as uobjects  # noqa: E402
-from snapshot_evidence_pack import reject_protected_input_path  # noqa: E402
+from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component  # noqa: E402
 
 
 DEFAULT_WINDOW_SIZE = 0xC0
@@ -1340,6 +1340,7 @@ def main() -> int:
         validate_snapshot_evidence_args(args)
         validate_snapshot_focus_args(args)
 
+    reject_symlink_component(args.core, "--core")
     core_path = reject_protected_input_path(args.core, "--core")
     reject_evidence_pack_manifest_core(core_path)
     try:

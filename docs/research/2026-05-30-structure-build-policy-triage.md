@@ -9,7 +9,7 @@ structure reflection target after the accepted `structure-observer-intake` lane.
 
 ## Inputs
 
-- Local compatibility dictionary: `/home/flowcommunity-ark/NextGenPlugins`
+- Local demand dictionary: `/home/flowcommunity-ark/NextGenPlugins`
 - Existing structure inventory:
   `docs/research/2026-05-27-primalstructure-function-inventory.md`
 - Existing committed fixtures: `tests/fixtures/ufunction_snapshots`
@@ -22,7 +22,7 @@ change, Discord update, or `/servidor/ark` write was used for this triage.
 
 The local ArkApi plugin-source clone shows repeated build-policy demand for
 `APrimalStructure.IsAllowedToBuild` in structure-limit, safe-zone, and no-collision style
-plugins. Use this only as a names and behavior dictionary. Do not copy ArkApi offsets,
+plugins. Use this only as a names and demand dictionary. Do not copy ArkApi offsets,
 layouts, wrappers, MSVC ABI, direct UE pointer access, or implementation.
 
 Dictionary seed names to resolve through Obelisk reflection only:

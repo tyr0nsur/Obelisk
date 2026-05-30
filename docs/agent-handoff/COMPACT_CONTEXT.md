@@ -37,7 +37,7 @@ priorities, and do not use history files as the active source of truth.
   or agent status. Explicit current-turn approval is required for every Discord send;
   publication approval does not imply Discord approval. Always dry-run the embed first and
   verify a public-safe title, description, status/scope, and 2-5 useful fields.
-- `ArkServerApi/AseApi` may be used only as a names and behavior dictionary for familiar
+- `ArkServerApi/AseApi` may be used only as a names and demand dictionary for familiar
   ArkApi-style plugin concepts. Do not import offsets, vtables, layouts, `.lib`
   artifacts, MSVC/Windows ABI assumptions, direct `GetNativePointerField`/`NativeCall`
   wrappers, raw UE pointer APIs, or algorithmic implementations; all access must be

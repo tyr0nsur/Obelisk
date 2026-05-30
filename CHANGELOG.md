@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Kept `PluginManager` cleanup-failure injection hooks out of production shared-library
+  builds while preserving the test-only retry coverage.
 - Hardened raw `EventManager` snapshot setup-failure handling so a global callback
   snapshot failure also suppresses the filtered callback phase for that hook dispatch, and
   kept the injection hook out of the production shared-library surface.

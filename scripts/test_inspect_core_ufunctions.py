@@ -1939,6 +1939,33 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
         self.assertEqual(payload["targets"][0]["object_summary"]["name"], "ServerChat")
         self.assertEqual(payload["targets"][0]["pointer_window"][2]["label"], "uobject.class")
 
+    def test_cli_rejects_symlinked_core_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            core = Path(temp_dir) / "core"
+            addrs = build_core_fixture(core)
+            linked_core = Path(temp_dir) / "linked-core"
+            linked_core.symlink_to(core)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "inspect_core_ufunctions.py"),
+                    "--core",
+                    str(linked_core),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--index",
+                    "7",
+                    "--json",
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--core must not be a symlink", result.stderr)
+
     def test_fixture_snapshot_omits_addresses_and_keeps_property_shape(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             core = Path(temp_dir) / "core"
@@ -2642,7 +2669,10 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
                 )
 
                 self.assertEqual(result.returncode, 1)
-                self.assertIn("--core must not read from protected server root", result.stderr)
+                if core_arg is None:
+                    self.assertIn("--core must not be a symlink", result.stderr)
+                else:
+                    self.assertIn("--core must not read from protected server root", result.stderr)
 
     def test_cli_rejects_evidence_pack_manifest_as_core(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

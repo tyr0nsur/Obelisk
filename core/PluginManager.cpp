@@ -1,3 +1,7 @@
+#if !defined(obelisk_EXPORTS)
+#define OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
+#endif
+
 #include "PluginManager.h"
 #include "EventManager.h"
 #include "InventoryPolicyEventDispatcher.h"
@@ -31,8 +35,10 @@ namespace Obelisk::Core
     {
         thread_local void* g_CurrentPluginOwner = nullptr;
         std::atomic<uint64_t> g_ApiCapabilities{OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS};
+#ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
         std::atomic_bool g_ForcePluginCallbackCleanupFailureForTesting{false};
         std::atomic_bool g_ForcePluginRetentionFailureForTesting{false};
+#endif
 
         struct GameplayPolicyRegistration
         {
@@ -2127,6 +2133,7 @@ namespace Obelisk::Core
         return *instance;
     }
 
+#ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
     void SetPluginCallbackCleanupFailureForTesting(bool enabled)
     {
         g_ForcePluginCallbackCleanupFailureForTesting.store(enabled, std::memory_order_release);
@@ -2147,6 +2154,7 @@ namespace Obelisk::Core
             PluginOwnerTokens().erase(token);
         PluginOwnerApiStates().erase(owner);
     }
+#endif
 
     PluginManager::PluginManager()
         : PluginManager(DefaultLoader(), ChatEventDispatcher::Get())
@@ -2233,8 +2241,10 @@ namespace Obelisk::Core
         const auto cleanupFamily = [&](const char* label, auto cleanup) -> size_t {
             try
             {
+#ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
                 if (g_ForcePluginCallbackCleanupFailureForTesting.load(std::memory_order_acquire))
                     throw std::runtime_error("injected plugin callback cleanup failure");
+#endif
                 return cleanup();
             }
             catch (const std::exception& e)
@@ -2559,8 +2569,10 @@ namespace Obelisk::Core
                         initializingOwnerCleanup.Dismiss();
                         try
                         {
+#ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
                             if (g_ForcePluginRetentionFailureForTesting.load(std::memory_order_acquire))
                                 throw std::runtime_error("injected plugin retention failure");
+#endif
                             m_LoadedPlugins.push_back({
                                 pluginName,
                                 metadata.plugin_id,
