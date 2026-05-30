@@ -85,7 +85,13 @@ def resolve_fname(memory: CoreMemory, table: int | None, index: int | None, numb
     return FNameValue(index=index, number=number or 0, text=text)
 
 
-def read_uobject(memory: CoreMemory, object_address: int, fname_table: int | None) -> dict[str, object] | None:
+def read_uobject(
+    memory: CoreMemory,
+    object_address: int,
+    fname_table: int | None,
+    *,
+    resolve_names: bool = True,
+) -> dict[str, object] | None:
     flags = read_u32(memory, object_address + UOBJECT_FLAGS_OFFSET)
     internal_index = read_i32(memory, object_address + UOBJECT_INTERNAL_INDEX_OFFSET)
     class_address = memory.read_ptr(object_address + UOBJECT_CLASS_OFFSET)
@@ -95,9 +101,9 @@ def read_uobject(memory: CoreMemory, object_address: int, fname_table: int | Non
     if flags is None or internal_index is None or class_address is None or name_index is None:
         return None
 
-    name = resolve_fname(memory, fname_table, name_index, name_number)
+    name = resolve_fname(memory, fname_table, name_index, name_number) if resolve_names else None
     class_name: FNameValue | None = None
-    if class_address:
+    if resolve_names and class_address:
         class_name_index = read_i32(memory, class_address + UOBJECT_NAME_INDEX_OFFSET)
         class_name_number = read_i32(memory, class_address + UOBJECT_NAME_NUMBER_OFFSET)
         class_name = resolve_fname(memory, fname_table, class_name_index, class_name_number)
@@ -107,9 +113,9 @@ def read_uobject(memory: CoreMemory, object_address: int, fname_table: int | Non
         "flags": flags,
         "internal_index": internal_index,
         "class": f"0x{class_address:x}" if class_address else None,
-        "name_index": name.index,
-        "name_number": name.number,
-        "name": name.text,
+        "name_index": name.index if name else name_index,
+        "name_number": name.number if name else name_number,
+        "name": name.text if name else None,
         "outer": f"0x{outer:x}" if outer else None,
         "class_name": class_name.text if class_name else None,
     }
@@ -122,6 +128,7 @@ def iter_uobjects(
     max_objects: int,
     name_contains: str | None = None,
     class_contains: str | None = None,
+    resolve_names: bool = True,
 ) -> tuple[dict[str, object], list[dict[str, object]]]:
     chunks = memory.read_ptr(gobjects + GOBJECTS_CHUNKS_OFFSET)
     object_count = read_i32(memory, gobjects + GOBJECTS_COUNT_OFFSET)
@@ -134,7 +141,10 @@ def iter_uobjects(
         "chunks": f"0x{chunks:x}" if chunks else None,
         "object_count": object_count,
         "max_objects": max_objects,
+        "name_resolution": "enabled" if resolve_names else "disabled",
     }
+    if not resolve_names and (name_contains or class_contains):
+        raise ValueError("name/class filters require name resolution")
     if not chunks or object_count is None or object_count <= 0:
         return metadata, []
 
@@ -158,7 +168,7 @@ def iter_uobjects(
         item_qword_0x8 = memory.read_ptr(item_address + 0x8)
         item_dword_0x8 = read_u32(memory, item_address + 0x8)
         item_dword_0xC = read_i32(memory, item_address + 0xC)
-        uobject = read_uobject(memory, object_address, fname_table)
+        uobject = read_uobject(memory, object_address, fname_table, resolve_names=resolve_names)
         if uobject is None:
             continue
 
@@ -212,6 +222,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-objects", type=int, default=DEFAULT_MAX_OBJECTS)
     parser.add_argument("--name-contains")
     parser.add_argument("--class-contains")
+    parser.add_argument(
+        "--skip-name-resolution",
+        action="store_true",
+        help="Do not resolve FName text/class names; useful for fast flag/serial scans.",
+    )
     parser.add_argument("--json", action="store_true")
     return parser.parse_args()
 
@@ -231,6 +246,7 @@ def main() -> int:
             max_objects=args.max_objects,
             name_contains=args.name_contains,
             class_contains=args.class_contains,
+            resolve_names=not args.skip_name_resolution,
         )
     finally:
         memory.close()

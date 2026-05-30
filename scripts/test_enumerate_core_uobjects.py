@@ -137,6 +137,50 @@ class EnumerateCoreUObjectsTests(unittest.TestCase):
         self.assertEqual(objects[0]["name"], "ServerChat")
         self.assertEqual(objects[0]["class_name"], "Function")
 
+    def test_can_skip_name_resolution_for_fast_flag_serial_scans(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            core = Path(temp_dir) / "core"
+            addrs = build_core_fixture(core)
+
+            memory = enum.CoreMemory(core)
+            try:
+                metadata, objects = enum.iter_uobjects(
+                    memory,
+                    gobjects=addrs["gobjects"],
+                    fname_root_slot=addrs["fname_root_slot"],
+                    max_objects=8,
+                    resolve_names=False,
+                )
+            finally:
+                memory.close()
+
+        self.assertEqual(metadata["name_resolution"], "disabled")
+        self.assertEqual([item["name"] for item in objects], [None, None])
+        self.assertEqual([item["class_name"] for item in objects], [None, None])
+        self.assertEqual([item["name_index"] for item in objects], [3, 4])
+        self.assertEqual(objects[1]["item_dword_0x8"], 101)
+        self.assertTrue(objects[1]["internal_index_matches"])
+
+    def test_name_filters_require_name_resolution(self) -> None:
+        for filter_kwargs in ({"name_contains": "chat"}, {"class_contains": "func"}):
+            with self.subTest(filter_kwargs=filter_kwargs), tempfile.TemporaryDirectory() as temp_dir:
+                core = Path(temp_dir) / "core"
+                addrs = build_core_fixture(core)
+
+                memory = enum.CoreMemory(core)
+                try:
+                    with self.assertRaisesRegex(ValueError, "filters require name resolution"):
+                        enum.iter_uobjects(
+                            memory,
+                            gobjects=addrs["gobjects"],
+                            fname_root_slot=addrs["fname_root_slot"],
+                            max_objects=8,
+                            resolve_names=False,
+                            **filter_kwargs,
+                        )
+                finally:
+                    memory.close()
+
     def test_cli_json_output(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             core = Path(temp_dir) / "core"

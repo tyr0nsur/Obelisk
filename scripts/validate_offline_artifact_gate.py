@@ -359,6 +359,15 @@ REQUIRED_WEAK_HELPER_POLARITY_CALLER_MODE_NON_CLAIMS = {
     "return override",
     "UE lifecycle flag names",
 }
+REQUIRED_GOBJECTS_TWO_CORE_BLOCKED_CONTRACTS = {
+    "runtime-stable object identity",
+    "ResourceHandle",
+    "raw UObject exposure",
+    "lookup API",
+    "mutation",
+    "return override",
+    "serial reuse/invalidation semantics",
+}
 
 
 def is_historical_missing_target_set_coverage_marker(payload: dict[str, Any]) -> bool:
@@ -1800,6 +1809,86 @@ def validate_claims(payload: dict[str, Any], *, label: str, mode: str) -> list[d
             blockers.append({"reason": "promote_mode_manifest_has_non_claims", "label": label})
         if isinstance(blocked_contracts, list) and blocked_contracts:
             blockers.append({"reason": "promote_mode_manifest_has_blocked_contracts", "label": label})
+    return blockers
+
+
+def validate_gobjects_two_core_manifest(payload: dict[str, Any], *, label: str, mode: str) -> list[dict[str, Any]]:
+    if payload.get("schema") != GOBJECTS_TWO_CORE_MANIFEST_SCHEMA:
+        return []
+
+    blockers: list[dict[str, Any]] = []
+    core_count = payload.get("core_count")
+    cores = payload.get("cores")
+    sample_set = payload.get("sample_set")
+    blocked_contracts = payload.get("blocked_contracts")
+    non_claims = payload.get("non_claims")
+
+    if not is_json_int(core_count) or core_count < 2:
+        blockers.append({"reason": "gobjects_two_core_manifest_core_count_invalid", "label": label})
+    if not isinstance(cores, list) or not cores:
+        blockers.append({"reason": "gobjects_two_core_manifest_missing_cores", "label": label})
+        cores = []
+    elif isinstance(core_count, int) and not isinstance(core_count, bool) and len(cores) != core_count:
+        blockers.append({"reason": "gobjects_two_core_manifest_core_count_mismatch", "label": label})
+
+    if not isinstance(sample_set, list) or not sample_set:
+        blockers.append({"reason": "gobjects_two_core_manifest_missing_sample_set", "label": label})
+        expected_sample_count = None
+    else:
+        expected_sample_count = len(sample_set)
+        for index, sample in enumerate(sample_set):
+            if not isinstance(sample, dict) or not isinstance(sample.get("label"), str) or not is_json_int(sample.get("index")):
+                blockers.append(
+                    {
+                        "reason": "gobjects_two_core_manifest_sample_set_entry_invalid",
+                        "label": f"{label}:$.sample_set[{index}]",
+                    }
+                )
+
+    seen_roles: set[str] = set()
+    for index, core in enumerate(cores):
+        core_label = f"{label}:$.cores[{index}]"
+        if not isinstance(core, dict):
+            blockers.append({"reason": "gobjects_two_core_manifest_core_entry_invalid", "label": core_label})
+            continue
+        role = core.get("role")
+        if not isinstance(role, str) or not role:
+            blockers.append({"reason": "gobjects_two_core_manifest_core_role_invalid", "label": core_label})
+        elif role in seen_roles:
+            blockers.append({"reason": "gobjects_two_core_manifest_duplicate_core_role", "label": core_label})
+        else:
+            seen_roles.add(role)
+        if expected_sample_count is not None:
+            expected_values = {
+                "sample_count": expected_sample_count,
+                "accepted_count": expected_sample_count,
+                "membership_pass_count": expected_sample_count,
+                "rejected_count": 0,
+            }
+            for key, expected in expected_values.items():
+                if core.get(key) != expected:
+                    blockers.append(
+                        {
+                            "reason": "gobjects_two_core_manifest_core_summary_mismatch",
+                            "label": f"{core_label}.{key}",
+                            "expected": expected,
+                            "observed": core.get(key),
+                        }
+                    )
+
+    if payload.get("offline_only") is not True:
+        blockers.append({"reason": "gobjects_two_core_manifest_not_offline_only", "label": label})
+    if payload.get("ufunction_inventory_input_ready") is not True:
+        blockers.append({"reason": "gobjects_two_core_manifest_not_input_ready", "label": label})
+    if payload.get("public_gobjects_promotion_ready") is not False:
+        blockers.append({"reason": "gobjects_two_core_manifest_public_promotion_not_false", "label": label})
+    if not isinstance(blocked_contracts, list) or not REQUIRED_GOBJECTS_TWO_CORE_BLOCKED_CONTRACTS.issubset(set(blocked_contracts)):
+        blockers.append({"reason": "gobjects_two_core_manifest_missing_blocked_contracts", "label": label})
+    if not isinstance(non_claims, list) or len(non_claims) < 3:
+        blockers.append({"reason": "gobjects_two_core_manifest_missing_non_claims", "label": label})
+    if mode == "promote":
+        blockers.append({"reason": "gobjects_two_core_manifest_promote_mode_blocked", "label": label})
+
     return blockers
 
 
@@ -3475,6 +3564,7 @@ def validate_manifest(
         )
     )
     blockers.extend(validate_readiness_report_manifest(payload, label=str(resolved), mode=mode))
+    blockers.extend(validate_gobjects_two_core_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_static_global_promotion_evidence_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_resource_handle_revalidation_evaluator_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(

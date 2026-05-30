@@ -797,6 +797,42 @@ def write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
+def gobjects_two_core_manifest() -> dict:
+    sample_set = [
+        {"label": "package", "index": 0},
+        {"label": "server_chat", "index": 25447},
+    ]
+    core_summary = {
+        "schema": "obelisk.gobjects-sample-reconciliation.v1",
+        "sample_count": len(sample_set),
+        "accepted_count": len(sample_set),
+        "rejected_count": 0,
+        "membership_pass_count": len(sample_set),
+        "promotion_status": "internal-only-single-artifact",
+    }
+    return {
+        "schema": gate.GOBJECTS_TWO_CORE_MANIFEST_SCHEMA,
+        "binary_sha256": BINARY_SHA,
+        "gobjects_candidate": "0x595b7e0",
+        "fname_root_slot": "0x5956f30",
+        "sample_set": sample_set,
+        "core_count": 2,
+        "cores": [
+            {"role": "primary", **core_summary},
+            {"role": "second", **core_summary},
+        ],
+        "offline_only": True,
+        "ufunction_inventory_input_ready": True,
+        "public_gobjects_promotion_ready": False,
+        "blocked_contracts": sorted(gate.REQUIRED_GOBJECTS_TWO_CORE_BLOCKED_CONTRACTS),
+        "non_claims": [
+            "This manifest is an offline input readiness artifact.",
+            "It does not promote GObjects/GUObjectArray as runtime-stable.",
+            "It does not expose UObject pointers, raw params, object identity, mutation, or return overrides.",
+        ],
+    }
+
+
 def args(
     *,
     root: Path,
@@ -1125,6 +1161,51 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         reasons = {blocker["reason"] for blocker in result["blockers"]}
         self.assertIn("public_gobjects_promotion_overclaim", reasons)
         self.assertIn("promotion_ready_with_blockers", reasons)
+
+    def test_accepts_gobjects_two_core_manifest_as_candidate_input_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "pack" / "manifest.json"
+            write_json(manifest, gobjects_two_core_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual("accepted", result["status"])
+        self.assertEqual([], result["blockers"])
+
+    def test_blocks_gobjects_two_core_manifest_weak_reconciliation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "pack" / "manifest.json"
+            payload = gobjects_two_core_manifest()
+            payload["core_count"] = 1
+            payload["cores"][1]["accepted_count"] = 1
+            payload["blocked_contracts"] = ["ResourceHandle"]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("gobjects_two_core_manifest_core_count_invalid", reasons)
+        self.assertIn("gobjects_two_core_manifest_core_count_mismatch", reasons)
+        self.assertIn("gobjects_two_core_manifest_core_summary_mismatch", reasons)
+        self.assertIn("gobjects_two_core_manifest_missing_blocked_contracts", reasons)
+
+    def test_blocks_gobjects_two_core_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "pack" / "manifest.json"
+            write_json(manifest, gobjects_two_core_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("gobjects_two_core_manifest_promote_mode_blocked", reasons)
+        self.assertIn("promote_mode_manifest_has_non_claims", reasons)
+        self.assertIn("promote_mode_manifest_has_blocked_contracts", reasons)
 
     def test_blocks_signature_manifest_unredacted_snapshot_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
