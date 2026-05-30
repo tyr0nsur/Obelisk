@@ -225,6 +225,14 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         sets = {item["name"]: item["targets"] for item in report["target_sets"]}
         self.assertIn("minimal-second-source-intake", sets)
         self.assertEqual(
+            sets["structure-nonpin-copied-scalar-policy-slice"],
+            [
+                "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.SetVariant",
+                "obelisk.ufunction-chain.snapshot.v1:PrimalStructureItemContainer.AllowToggleActivation",
+                "obelisk.ufunction-chain.snapshot.v1:PrimalStructureSeating.CanSeat",
+            ],
+        )
+        self.assertEqual(
             sets["minimal-second-source-intake"],
             [
                 "obelisk.ufunction-chain.snapshot.v1:PrimalItem.CanUse",
@@ -1697,6 +1705,7 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             "chat-message-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 1),
             "minimal-second-source-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 4),
             "structure-observer-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 6),
+            "structure-nonpin-copied-scalar-policy-slice": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 3),
             "buff-compact-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 3),
             "buff-breadth-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 3),
             "dino-compact-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 2),

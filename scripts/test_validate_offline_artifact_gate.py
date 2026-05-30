@@ -765,6 +765,124 @@ def structure_return_only_policy_slice_manifest(
     }
 
 
+def structure_nonpin_copied_scalar_policy_slice_manifest(
+    *,
+    policy_status: str = "evidence-only",
+    promotion_ready: bool = False,
+    copied_scalar_count: int = 6,
+    redacted_field_count: int = 3,
+    missing_targets: list[str] | None = None,
+    non_claims: list[str] | None = None,
+) -> dict:
+    copied_fields = [
+        "PrimalStructure.SetVariant.VariantIndex",
+        "PrimalStructure.SetVariant.bForceSet",
+        "PrimalStructure.SetVariant.ReturnValue",
+        "PrimalStructureItemContainer.AllowToggleActivation.ReturnValue",
+        "PrimalStructureSeating.CanSeat.bForce",
+        "PrimalStructureSeating.CanSeat.ReturnValue",
+    ]
+    redacted_fields = [
+        "PrimalStructureItemContainer.AllowToggleActivation.ForPC",
+        "PrimalStructureSeating.CanSeat.ForPC",
+        "PrimalStructureSeating.CanSeat.forCharacter",
+    ]
+    if missing_targets is None:
+        missing_targets = []
+    if non_claims is None:
+        non_claims = sorted(gate.REQUIRED_STRUCTURE_NONPIN_NON_CLAIMS)
+    input_snapshots = [
+        {"id": f"snapshot-{index:04d}", "sha256": f"{index}" * 64, "target": target}
+        for index, target in enumerate(sorted(gate.REQUIRED_STRUCTURE_NONPIN_INPUT_TARGETS), start=1)
+    ]
+    source_by_target = {snapshot["target"]: snapshot for snapshot in input_snapshots}
+    copied_shapes = {
+        "PrimalStructure.SetVariant.VariantIndex": {"field": "VariantIndex", "direction": "in", "type": "int32", "property_class": "IntProperty", "offset": "0x0", "offset_internal": 0, "element_size": 4},
+        "PrimalStructure.SetVariant.bForceSet": {"field": "bForceSet", "direction": "in", "type": "bool", "property_class": "BoolProperty", "offset": "0x4", "offset_internal": 4, "element_size": 1},
+        "PrimalStructure.SetVariant.ReturnValue": {"field": "ReturnValue", "direction": "return", "type": "bool", "property_class": "BoolProperty", "offset": "0x5", "offset_internal": 5, "element_size": 1},
+        "PrimalStructureItemContainer.AllowToggleActivation.ReturnValue": {"field": "ReturnValue", "direction": "return", "type": "bool", "property_class": "BoolProperty", "offset": "0x8", "offset_internal": 8, "element_size": 1},
+        "PrimalStructureSeating.CanSeat.bForce": {"field": "bForce", "direction": "in", "type": "bool", "property_class": "BoolProperty", "offset": "0x10", "offset_internal": 16, "element_size": 1},
+        "PrimalStructureSeating.CanSeat.ReturnValue": {"field": "ReturnValue", "direction": "return", "type": "bool", "property_class": "BoolProperty", "offset": "0x11", "offset_internal": 17, "element_size": 1},
+    }
+    target_shapes = {
+        "PrimalStructure.SetVariant": {"function_flags": "0x4020401", "num_parms": 3, "parms_size": 6, "return_value_offset": "0x5"},
+        "PrimalStructureItemContainer.AllowToggleActivation": {"function_flags": "0x4020401", "num_parms": 2, "parms_size": 9, "return_value_offset": "0x8"},
+        "PrimalStructureSeating.CanSeat": {"function_flags": "0x4020400", "num_parms": 4, "parms_size": 18, "return_value_offset": "0x11"},
+    }
+    redacted_shapes = {
+        "PrimalStructureItemContainer.AllowToggleActivation.ForPC": {"field": "ForPC", "offset": "0x0", "offset_internal": 0},
+        "PrimalStructureSeating.CanSeat.ForPC": {"field": "ForPC", "offset": "0x0", "offset_internal": 0},
+        "PrimalStructureSeating.CanSeat.forCharacter": {"field": "forCharacter", "offset": "0x8", "offset_internal": 8},
+    }
+    return {
+        "schema": gate.STRUCTURE_NONPIN_COPIED_SCALAR_POLICY_SLICE_SCHEMA,
+        "snapshot_root": "redacted",
+        "input_target_set": "structure-nonpin-copied-scalar-policy-slice",
+        "output_target_set": "structure-nonpin-copied-scalar-policy-slice",
+        "policy_status": policy_status,
+        "missing_targets": missing_targets,
+        "generated_from": {"snapshot_schema": SNAPSHOT_SCHEMA, "input_snapshots": input_snapshots},
+        "coverage": {
+            "status": "complete",
+            "copied_fields": copied_fields,
+            "copied_targets": sorted(gate.REQUIRED_STRUCTURE_NONPIN_INPUT_TARGETS),
+            "redacted_fields": redacted_fields,
+            "input_targets": sorted(gate.REQUIRED_STRUCTURE_NONPIN_INPUT_TARGETS),
+        },
+        "copied_scalars": [
+            {
+                "target": field.rsplit(".", 1)[0],
+                "copied_field": field,
+                "array_dim": 1,
+                "property_flags": "0x1040000780" if field.endswith("ReturnValue") else "0x1040000280",
+                "evidence_status": "copied-structure-nonpin-scalar-only",
+                "source_snapshot": source_by_target[field.rsplit(".", 1)[0]]["id"],
+                "source_snapshot_sha256": source_by_target[field.rsplit(".", 1)[0]]["sha256"],
+                **target_shapes[field.rsplit(".", 1)[0]],
+                **copied_shapes[field],
+                **(
+                    {
+                        "bool_field_size": 1,
+                        "bool_byte_offset": 0,
+                        "byte_mask": "0x01",
+                        "field_mask": "0xff",
+                        "native_bool": False,
+                    }
+                    if copied_shapes[field]["type"] == "bool"
+                    else {}
+                ),
+            }
+            for field in copied_fields
+        ],
+        "redacted_structure_fields": [
+            {
+                "target": field.rsplit(".", 1)[0],
+                "redacted_field": field,
+                "reason": "unit_test_redacted",
+                "property_class": "ObjectProperty",
+                "element_size": 8,
+                "array_dim": 1,
+                "property_flags": "0x1040000280",
+                "evidence_status": "recognition-only-redacted",
+                "source_snapshot": source_by_target[field.rsplit(".", 1)[0]]["id"],
+                "source_snapshot_sha256": source_by_target[field.rsplit(".", 1)[0]]["sha256"],
+                **target_shapes[field.rsplit(".", 1)[0]],
+                **redacted_shapes[field],
+            }
+            for field in redacted_fields
+        ],
+        "non_claims": non_claims,
+        "safety_summary": {
+            "artifact_status": "evidence_only",
+            "intended_use": "offline_review_only",
+            "promotion_ready": promotion_ready,
+            "copied_scalar_count": copied_scalar_count,
+            "redacted_field_count": redacted_field_count,
+            "explicitly_excluded": sorted(gate.REQUIRED_STRUCTURE_NONPIN_EXPLICIT_EXCLUSIONS),
+        },
+    }
+
+
 def rc_ufunction_second_source_root_manifest(root: Path) -> dict:
     expected_sources = gate.expected_rc_ufunction_target_sources()
     assert expected_sources is not None
@@ -3279,6 +3397,89 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("structure_return_policy_public_overclaim_runtime_ready", reasons)
         self.assertIn("structure_return_policy_input_target_set_mismatch", reasons)
         self.assertIn("structure_return_policy_input_snapshot_count_mismatch", reasons)
+
+    def test_accepts_structure_nonpin_copied_scalar_policy_slice_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "structure-nonpin-policy.json"
+            write_json(manifest, structure_nonpin_copied_scalar_policy_slice_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual(result["blockers"], [])
+
+    def test_blocks_structure_nonpin_copied_scalar_policy_slice_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "structure-nonpin-policy.json"
+            write_json(manifest, structure_nonpin_copied_scalar_policy_slice_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("promote_mode_structure_nonpin_copied_scalar_policy_slice_evidence_only", reasons)
+
+    def test_blocks_structure_nonpin_copied_scalar_policy_slice_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "structure-nonpin-policy.json"
+            payload = structure_nonpin_copied_scalar_policy_slice_manifest(
+                policy_status="accepted",
+                promotion_ready=True,
+                copied_scalar_count=5,
+                redacted_field_count=2,
+                missing_targets=["PrimalStructureItemContainer.VerifyPinCode"],
+                non_claims=["does not copy ForPC"],
+            )
+            payload["copied_scalars"][0]["offset"] = "0x4"
+            payload["copied_scalars"][1]["byte_mask"] = "0x02"
+            payload["copied_scalars"][1]["source_snapshot_sha256"] = "7" * 64
+            payload["copied_scalars"] = payload["copied_scalars"][:-1]
+            payload["redacted_structure_fields"] = payload["redacted_structure_fields"][:-1]
+            payload["coverage"]["copied_fields"] = payload["coverage"]["copied_fields"][:-1]
+            payload["coverage"]["redacted_fields"] = payload["coverage"]["redacted_fields"][:-1]
+            payload["coverage"]["input_targets"] = ["PrimalStructure.SetVariant"]
+            payload["coverage"]["copied_targets"] = ["PrimalStructure.SetVariant"]
+            payload["safety_summary"]["explicitly_excluded"] = ["ForPC"]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("structure_nonpin_policy_status_not_evidence_only", reasons)
+        self.assertIn("structure_nonpin_policy_missing_targets_present", reasons)
+        self.assertIn("structure_nonpin_policy_promotion_ready_not_false", reasons)
+        self.assertIn("structure_nonpin_policy_copied_scalar_count_mismatch", reasons)
+        self.assertIn("structure_nonpin_policy_redacted_field_count_mismatch", reasons)
+        self.assertIn("structure_nonpin_policy_copied_scalars_count_mismatch", reasons)
+        self.assertIn("structure_nonpin_policy_redacted_fields_count_mismatch", reasons)
+        self.assertIn("structure_nonpin_policy_coverage_input_targets_mismatch", reasons)
+        self.assertIn("structure_nonpin_policy_coverage_copied_targets_mismatch", reasons)
+        self.assertIn("structure_nonpin_policy_coverage_copied_fields_mismatch", reasons)
+        self.assertIn("structure_nonpin_policy_coverage_redacted_fields_mismatch", reasons)
+        self.assertIn("structure_nonpin_policy_non_claims_missing_required_boundaries", reasons)
+        self.assertIn("structure_nonpin_policy_explicit_exclusions_missing_internal_boundaries", reasons)
+
+    def test_blocks_structure_nonpin_copied_scalar_policy_slice_verify_pin_payload(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "structure-nonpin-policy.json"
+            payload = structure_nonpin_copied_scalar_policy_slice_manifest()
+            payload["coverage"]["input_targets"].append("PrimalStructureItemContainer.VerifyPinCode")
+            payload["runtime_ready"] = True
+            payload["claim"] = "public StructureEvents ready"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("structure_nonpin_policy_contains_verify_pin_code_payload", reasons)
+        self.assertIn("structure_nonpin_policy_readiness_overclaim", reasons)
+        self.assertIn("structure_nonpin_policy_public_overclaim_public_structure_events", reasons)
 
     def test_accepts_static_global_promotion_evidence_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

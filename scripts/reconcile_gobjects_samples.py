@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import re
 import struct
 import sys
 from pathlib import Path
@@ -20,10 +22,13 @@ from snapshot_evidence_pack import (  # noqa: E402
 
 
 REPORT_SCHEMA = "obelisk.gobjects-sample-reconciliation.v1"
+DEFAULT_CAPTURE_ID = "unspecified-capture"
+DEFAULT_EVIDENCE_PACK_ID = "unspecified-evidence-pack"
 STATUS_CANDIDATE_UOBJECT = "candidate-uobject"
 STATUS_NOT_IN_GOBJECTS = "not-in-gobjects"
 STATUS_NULL = "null"
 STATIC_HANDLE_WINDOW = "0x1d56970..0x1d56eb0"
+SAFE_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
 
 def parse_int(value: str) -> int:
@@ -46,6 +51,33 @@ def parse_sample_index(value: str) -> tuple[str, int]:
     if index < 0:
         raise argparse.ArgumentTypeError("--sample-index must be non-negative")
     return label, index
+
+
+def validate_safe_id(value: str, field_name: str) -> str:
+    if not value:
+        raise argparse.ArgumentTypeError(f"{field_name} must not be empty")
+    if ".." in value:
+        raise argparse.ArgumentTypeError(f"{field_name} must not contain '..'")
+    if "/" in value or "\\" in value:
+        raise argparse.ArgumentTypeError(f"{field_name} must not contain path separators")
+    if not SAFE_ID_PATTERN.fullmatch(value):
+        raise argparse.ArgumentTypeError(
+            f"{field_name} must be 1-128 characters of ASCII letters, digits, '.', '_', or '-' "
+            "and start with a letter or digit"
+        )
+    return value
+
+
+def parse_safe_artifact_kind(value: str) -> str:
+    return validate_safe_id(value, "--artifact-kind")
+
+
+def parse_safe_capture_id(value: str) -> str:
+    return validate_safe_id(value, "--capture-id")
+
+
+def parse_safe_evidence_pack_id(value: str) -> str:
+    return validate_safe_id(value, "--evidence-pack-id")
 
 
 def hex_or_none(value: int | None) -> str | None:
@@ -170,6 +202,32 @@ def static_handle_reconciliation(item_dword_0x8: int | None, item_dword_0xc: int
     }
 
 
+def canonical_json_bytes(value: object) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+
+
+def build_artifact_identity(
+    *,
+    artifact_kind: str,
+    capture_id: str,
+    evidence_pack_id: str,
+    canonical_report: dict[str, object],
+) -> dict[str, str]:
+    identity_without_hash = {
+        "artifact_kind": validate_safe_id(artifact_kind, "artifact_kind"),
+        "capture_id": validate_safe_id(capture_id, "capture_id"),
+        "evidence_pack_id": validate_safe_id(evidence_pack_id, "evidence_pack_id"),
+    }
+    canonical_material = {
+        "artifact_identity": identity_without_hash,
+        "report": canonical_report,
+    }
+    return {
+        **identity_without_hash,
+        "artifact_sha256": hashlib.sha256(canonical_json_bytes(canonical_material)).hexdigest(),
+    }
+
+
 def sample_index(
     memory: uobjects.CoreMemory,
     *,
@@ -257,7 +315,14 @@ def build_report(
     gobjects: int,
     fname_root_slot: int,
     sample_indices: list[tuple[str, int]],
+    artifact_kind: str = REPORT_SCHEMA,
+    capture_id: str = DEFAULT_CAPTURE_ID,
+    evidence_pack_id: str = DEFAULT_EVIDENCE_PACK_ID,
 ) -> dict[str, object]:
+    artifact_kind = validate_safe_id(artifact_kind, "artifact_kind")
+    capture_id = validate_safe_id(capture_id, "capture_id")
+    evidence_pack_id = validate_safe_id(evidence_pack_id, "evidence_pack_id")
+
     memory = uobjects.CoreMemory(core)
     try:
         chunks = memory.read_ptr(gobjects + uobjects.GOBJECTS_CHUNKS_OFFSET)
@@ -277,7 +342,7 @@ def build_report(
     finally:
         memory.close()
 
-    return {
+    report = {
         "schema": REPORT_SCHEMA,
         "status": "offline-reconciliation",
         "core": str(core),
@@ -315,6 +380,15 @@ def build_report(
             "promotion_status": "internal-only-single-artifact",
         },
     }
+    return {
+        "artifact_identity": build_artifact_identity(
+            artifact_kind=artifact_kind,
+            capture_id=capture_id,
+            evidence_pack_id=evidence_pack_id,
+            canonical_report=report,
+        ),
+        **report,
+    }
 
 
 def parse_args() -> argparse.Namespace:
@@ -322,6 +396,24 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--core", required=True, type=Path, help="Path to an existing offline ELF core dump.")
     parser.add_argument("--fname-root-slot", required=True, type=parse_int, help="Artifact-specific FName root slot.")
     parser.add_argument("--gobjects-candidate", required=True, type=parse_int, help="Direct GUObjectArray candidate.")
+    parser.add_argument(
+        "--artifact-kind",
+        type=parse_safe_artifact_kind,
+        default=REPORT_SCHEMA,
+        help="Safe artifact kind identifier to include in artifact_identity.",
+    )
+    parser.add_argument(
+        "--capture-id",
+        type=parse_safe_capture_id,
+        default=DEFAULT_CAPTURE_ID,
+        help="Safe capture identifier to include in artifact_identity.",
+    )
+    parser.add_argument(
+        "--evidence-pack-id",
+        type=parse_safe_evidence_pack_id,
+        default=DEFAULT_EVIDENCE_PACK_ID,
+        help="Safe evidence pack identifier to include in artifact_identity.",
+    )
     parser.add_argument(
         "--sample-index",
         action="append",
@@ -347,6 +439,9 @@ def main() -> int:
         gobjects=args.gobjects_candidate,
         fname_root_slot=args.fname_root_slot,
         sample_indices=list(args.sample_index),
+        artifact_kind=args.artifact_kind,
+        capture_id=args.capture_id,
+        evidence_pack_id=args.evidence_pack_id,
     )
     text = json.dumps(report, indent=2, sort_keys=True)
     if output:

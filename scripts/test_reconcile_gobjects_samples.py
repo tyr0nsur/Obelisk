@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import struct
 import subprocess
@@ -101,6 +102,22 @@ def build_core_fixture(path: Path) -> dict[str, int]:
     return addrs
 
 
+def recompute_artifact_sha256(report: dict[str, object]) -> str:
+    canonical_report = dict(report)
+    identity = dict(canonical_report.pop("artifact_identity"))
+    identity_without_hash = {
+        "artifact_kind": identity["artifact_kind"],
+        "capture_id": identity["capture_id"],
+        "evidence_pack_id": identity["evidence_pack_id"],
+    }
+    canonical_material = {
+        "artifact_identity": identity_without_hash,
+        "report": canonical_report,
+    }
+    payload = json.dumps(canonical_material, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
 class ReconcileGObjectsSamplesTests(unittest.TestCase):
     def test_build_report_resolves_membership_and_static_reconciliation(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -115,6 +132,15 @@ class ReconcileGObjectsSamplesTests(unittest.TestCase):
             )
 
         self.assertEqual(report["schema"], reconcile.REPORT_SCHEMA)
+        self.assertEqual(
+            report["artifact_identity"],
+            {
+                "artifact_kind": reconcile.REPORT_SCHEMA,
+                "capture_id": reconcile.DEFAULT_CAPTURE_ID,
+                "evidence_pack_id": reconcile.DEFAULT_EVIDENCE_PACK_ID,
+                "artifact_sha256": recompute_artifact_sha256(report),
+            },
+        )
         self.assertEqual(report["summary"]["accepted_count"], 1)
         sample = report["samples"][0]
         self.assertEqual(sample["status"], "candidate-uobject")
@@ -205,6 +231,71 @@ class ReconcileGObjectsSamplesTests(unittest.TestCase):
 
         self.assertEqual(payload["inputs"]["sample_indices"], [{"label": "chat", "index": 4}])
         self.assertEqual(payload["summary"]["membership_pass_count"], 1)
+
+    def test_cli_identity_hash_is_stable_across_output_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            output_a = root / "report-a.json"
+            output_b = root / "nested" / "report-b.json"
+            addrs = build_core_fixture(core)
+            base_args = [
+                sys.executable,
+                str(SCRIPT_DIR / "reconcile_gobjects_samples.py"),
+                "--core",
+                str(core),
+                "--gobjects-candidate",
+                hex(addrs["gobjects"]),
+                "--fname-root-slot",
+                hex(addrs["fname_root_slot"]),
+                "--artifact-kind",
+                "obelisk.gobjects-sample-reconciliation.v1",
+                "--capture-id",
+                "capture_2026-05-30",
+                "--evidence-pack-id",
+                "evidence-pack.alpha_1",
+                "--sample-index",
+                "chat=4",
+            ]
+
+            subprocess.run([*base_args, "--output", str(output_a)], check=True, capture_output=True, text=True)
+            subprocess.run([*base_args, "--output", str(output_b)], check=True, capture_output=True, text=True)
+
+            payload_a = json.loads(output_a.read_text(encoding="utf-8"))
+            payload_b = json.loads(output_b.read_text(encoding="utf-8"))
+
+        self.assertEqual(payload_a["artifact_identity"]["capture_id"], "capture_2026-05-30")
+        self.assertEqual(payload_a["artifact_identity"]["evidence_pack_id"], "evidence-pack.alpha_1")
+        self.assertEqual(payload_a["artifact_identity"]["artifact_sha256"], recompute_artifact_sha256(payload_a))
+        self.assertEqual(payload_b["artifact_identity"]["artifact_sha256"], recompute_artifact_sha256(payload_b))
+        self.assertEqual(
+            payload_a["artifact_identity"]["artifact_sha256"],
+            payload_b["artifact_identity"]["artifact_sha256"],
+        )
+
+    def test_cli_rejects_unsafe_identity_ids(self) -> None:
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPT_DIR / "reconcile_gobjects_samples.py"),
+                "--core",
+                "/tmp/nonexistent-core",
+                "--gobjects-candidate",
+                "0x595b7e0",
+                "--fname-root-slot",
+                "0x5956f30",
+                "--capture-id",
+                "../bad",
+                "--sample-index",
+                "0",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--capture-id must not contain '..'", result.stderr)
 
     def test_cli_rejects_protected_core_path(self) -> None:
         result = subprocess.run(

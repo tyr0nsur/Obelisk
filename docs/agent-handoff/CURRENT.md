@@ -165,11 +165,12 @@ sequence.
   consume mode, and blocks promote mode. No public `StructureEvents`, identity, lookup,
   mutation, return override, `ResourceHandle`, hook wiring, dispatcher wiring, or runtime
   observation is promoted.
-  A separate `structure-nonpin-copied-scalar-policy-slice` is the highest-ROI next
-  offline target if it excludes `VerifyPinCode` and copies only:
+  `structure-nonpin-copied-scalar-policy-slice` now exists as an offline evidence-only
+  builder/gate path. It excludes `VerifyPinCode`, copies only
   `SetVariant.{VariantIndex,bForceSet,ReturnValue}`,
-  `AllowToggleActivation.ReturnValue`, and `CanSeat.{bForce,ReturnValue}`. Promote mode
-  must block with `promote_mode_structure_nonpin_copied_scalar_policy_slice_evidence_only`.
+  `AllowToggleActivation.ReturnValue`, and `CanSeat.{bForce,ReturnValue}`, accepts consume
+  mode, and blocks promote mode with
+  `promote_mode_structure_nonpin_copied_scalar_policy_slice_evidence_only`.
 - Do not rerun broad FName, GObjects, or core scans for ResourceHandle unless the binary
   hash changes or evidence contradicts current roots/candidates. Do not relax
   `evaluate_resource_handle_revalidation.py` to infer artifact identity from bare hashes.

@@ -616,6 +616,101 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         finally:
             sys.argv = original_argv
 
+    def test_structure_nonpin_copied_scalar_policy_slice_is_evidence_only(self) -> None:
+        fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
+
+        report = tool.build_structure_nonpin_copied_scalar_policy_slice(snapshot_root=fixture_root)
+
+        self.assertEqual(tool.STRUCTURE_NONPIN_COPIED_SCALAR_POLICY_SCHEMA, report["schema"])
+        self.assertEqual("structure-nonpin-copied-scalar-policy-slice", report["input_target_set"])
+        self.assertEqual("structure-nonpin-copied-scalar-policy-slice", report["output_target_set"])
+        self.assertEqual(3, len(report["generated_from"]["input_snapshots"]))
+        self.assertEqual(
+            [
+                "PrimalStructure.SetVariant",
+                "PrimalStructureItemContainer.AllowToggleActivation",
+                "PrimalStructureSeating.CanSeat",
+            ],
+            report["coverage"]["input_targets"],
+        )
+        self.assertEqual(
+            [
+                "PrimalStructure.SetVariant.VariantIndex",
+                "PrimalStructure.SetVariant.bForceSet",
+                "PrimalStructure.SetVariant.ReturnValue",
+                "PrimalStructureItemContainer.AllowToggleActivation.ReturnValue",
+                "PrimalStructureSeating.CanSeat.bForce",
+                "PrimalStructureSeating.CanSeat.ReturnValue",
+            ],
+            [entry["copied_field"] for entry in report["copied_scalars"]],
+        )
+        self.assertEqual(
+            [
+                "PrimalStructureItemContainer.AllowToggleActivation.ForPC",
+                "PrimalStructureSeating.CanSeat.ForPC",
+                "PrimalStructureSeating.CanSeat.forCharacter",
+            ],
+            [entry["redacted_field"] for entry in report["redacted_structure_fields"]],
+        )
+        self.assertEqual(6, report["safety_summary"]["copied_scalar_count"])
+        self.assertEqual(3, report["safety_summary"]["redacted_field_count"])
+        self.assertIs(False, report["safety_summary"]["promotion_ready"])
+        self.assertIn("VerifyPinCode", report["safety_summary"]["explicitly_excluded"])
+
+        copied_by_field = {entry["copied_field"]: entry for entry in report["copied_scalars"]}
+        self.assertEqual("int32", copied_by_field["PrimalStructure.SetVariant.VariantIndex"]["type"])
+        self.assertEqual("0x0", copied_by_field["PrimalStructure.SetVariant.VariantIndex"]["offset"])
+        self.assertEqual(4, copied_by_field["PrimalStructure.SetVariant.VariantIndex"]["element_size"])
+        self.assertEqual("in", copied_by_field["PrimalStructure.SetVariant.bForceSet"]["direction"])
+        self.assertEqual("return", copied_by_field["PrimalStructure.SetVariant.ReturnValue"]["direction"])
+        self.assertEqual("0x10", copied_by_field["PrimalStructureSeating.CanSeat.bForce"]["offset"])
+        self.assertEqual("0x11", copied_by_field["PrimalStructureSeating.CanSeat.ReturnValue"]["offset"])
+        bool_entries = [entry for entry in report["copied_scalars"] if entry["type"] == "bool"]
+        self.assertEqual(5, len(bool_entries))
+        self.assertTrue(all(entry["byte_mask"] == "0x01" for entry in bool_entries))
+        self.assertTrue(all(entry["field_mask"] == "0xff" for entry in bool_entries))
+        self.assertTrue(all(entry["native_bool"] is False for entry in bool_entries))
+
+        serialized = json.dumps(report)
+        self.assertNotIn(str(fixture_root), serialized)
+        self.assertNotIn("tests/fixtures/ufunction_snapshots", serialized)
+        payload_without_boundaries = json.dumps(
+            {
+                key: value
+                for key, value in report.items()
+                if key not in {"non_claims", "safety_summary"}
+            }
+        )
+        self.assertNotIn("VerifyPinCode", payload_without_boundaries)
+
+    def test_structure_nonpin_target_set_excludes_verify_pin_code(self) -> None:
+        from reflection_target_sets import TARGET_SETS
+
+        targets = TARGET_SETS["structure-nonpin-copied-scalar-policy-slice"]
+        self.assertEqual(
+            (
+                "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.SetVariant",
+                "obelisk.ufunction-chain.snapshot.v1:PrimalStructureItemContainer.AllowToggleActivation",
+                "obelisk.ufunction-chain.snapshot.v1:PrimalStructureSeating.CanSeat",
+            ),
+            targets,
+        )
+        self.assertNotIn("VerifyPinCode", json.dumps(targets))
+
+    def test_structure_nonpin_cli_mode_returns_success(self) -> None:
+        original_argv = sys.argv
+        try:
+            sys.argv = [
+                "build_redacted_ufunction_signatures.py",
+                "--structure-nonpin-copied-scalar-policy-slice",
+                "--json",
+            ]
+            with contextlib.redirect_stdout(io.StringIO()) as stdout:
+                self.assertEqual(0, tool.main())
+            self.assertIn(tool.STRUCTURE_NONPIN_COPIED_SCALAR_POLICY_SCHEMA, stdout.getvalue())
+        finally:
+            sys.argv = original_argv
+
     def test_inventory_action_compact_target_set_stays_candidate_only_and_redacted(self) -> None:
         fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
 

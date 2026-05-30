@@ -24,6 +24,7 @@ ITEM_RETURN_ONLY_POLICY_SCHEMA = "obelisk.item-return-only-policy-slice.v1"
 TRANSFER_BACCEPT_ONLY_POLICY_SCHEMA = "obelisk.transfer-baccept-only-policy-slice.v1"
 MISSION_COPIED_BOOL_POLICY_SCHEMA = "obelisk.mission-copied-bool-policy-slice.v1"
 STRUCTURE_RETURN_ONLY_POLICY_SCHEMA = "obelisk.structure-return-only-policy-slice.v1"
+STRUCTURE_NONPIN_COPIED_SCALAR_POLICY_SCHEMA = "obelisk.structure-nonpin-copied-scalar-policy-slice.v1"
 PROTECTED_SERVER_ROOT = Path("/servidor/ark")
 APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
 
@@ -50,6 +51,8 @@ MISSION_COPIED_BOOL_INPUT_TARGET_SET = "mission-compact-intake"
 MISSION_COPIED_BOOL_OUTPUT_TARGET_SET = "mission-copied-bool-policy-slice"
 STRUCTURE_RETURN_ONLY_INPUT_TARGET_SET = "structure-observer-intake"
 STRUCTURE_RETURN_ONLY_OUTPUT_TARGET_SET = "structure-return-only-policy-slice"
+STRUCTURE_NONPIN_COPIED_SCALAR_INPUT_TARGET_SET = "structure-nonpin-copied-scalar-policy-slice"
+STRUCTURE_NONPIN_COPIED_SCALAR_OUTPUT_TARGET_SET = "structure-nonpin-copied-scalar-policy-slice"
 
 ITEM_RETURN_ONLY_EXPECTED_SHAPES: dict[str, dict[str, Any]] = {
     "PrimalItem.AllowEquipItem": {
@@ -275,6 +278,21 @@ STRUCTURE_RETURN_ONLY_DEFERRED_REASONS = {
     "PrimalStructureSeating.CanSeat": "seating_policy_deferred",
 }
 
+STRUCTURE_NONPIN_COPIED_SCALAR_FIELDS = (
+    "PrimalStructure.SetVariant.VariantIndex",
+    "PrimalStructure.SetVariant.bForceSet",
+    "PrimalStructure.SetVariant.ReturnValue",
+    "PrimalStructureItemContainer.AllowToggleActivation.ReturnValue",
+    "PrimalStructureSeating.CanSeat.bForce",
+    "PrimalStructureSeating.CanSeat.ReturnValue",
+)
+
+STRUCTURE_NONPIN_REDACTED_FIELD_REASONS = {
+    "PrimalStructureItemContainer.AllowToggleActivation.ForPC": "player_controller_ref_excluded",
+    "PrimalStructureSeating.CanSeat.ForPC": "player_controller_ref_excluded",
+    "PrimalStructureSeating.CanSeat.forCharacter": "character_ref_excluded",
+}
+
 SCALAR_TYPE_BY_CLASS = {
     "BoolProperty": "bool",
     "ByteProperty": "byte_or_enum",
@@ -441,6 +459,14 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Emit a focused evidence-only structure policy slice that validates "
             "structure-observer-intake and copies only approved ReturnValue bools."
+        ),
+    )
+    parser.add_argument(
+        "--structure-nonpin-copied-scalar-policy-slice",
+        action="store_true",
+        help=(
+            "Emit a focused evidence-only structure policy slice that validates "
+            "non-PIN structure targets and copies only approved scalar fields."
         ),
     )
     return parser.parse_args()
@@ -1668,6 +1694,129 @@ def require_structure_return_only_shape(
     return copied, redacted, deferred
 
 
+def require_structure_nonpin_copied_scalar_shape(
+    target_payload: dict[str, Any],
+    source_snapshot: dict[str, str],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    target_identity = target_payload.get("target")
+    property_chain = target_payload.get("property_chain")
+    if not isinstance(target_identity, dict) or not isinstance(property_chain, dict):
+        raise SystemExit("structure non-PIN policy snapshot missing target identity or property chain")
+    target = target_name(target_identity)
+    expected = STRUCTURE_RETURN_ONLY_EXPECTED_SHAPES.get(target)
+    if expected is None or target == "PrimalStructureItemContainer.VerifyPinCode":
+        raise SystemExit(f"unexpected structure non-PIN policy target: {target}")
+    if target_payload.get("status") != "candidate":
+        raise SystemExit(f"{target} is not a candidate UFunction snapshot")
+    if target_payload.get("inspection_mode") != "ufunction":
+        raise SystemExit(f"{target} is not a UFunction inspection snapshot")
+
+    if require_int_field(target_payload, "function_flags", target) != expected["function_flags"]:
+        raise SystemExit(f"{target} FunctionFlags drifted")
+    if require_int_field(target_payload, "num_parms", target) != expected["num_parms"]:
+        raise SystemExit(f"{target} NumParms drifted")
+    if require_int_field(target_payload, "parms_size", target) != expected["parms_size"]:
+        raise SystemExit(f"{target} ParmsSize drifted")
+    return_value_offset = require_int_field(target_payload, "return_value_offset", target)
+    if return_value_offset != expected["return_value_offset"]:
+        raise SystemExit(f"{target} ReturnValueOffset drifted")
+
+    properties = property_chain.get("properties")
+    if not isinstance(properties, list):
+        raise SystemExit(f"{target} property_chain.properties is not a list")
+    if parse_int_value(property_chain.get("expected_count")) != len(expected["properties"]):
+        raise SystemExit(f"{target} expected property count drifted")
+    if parse_int_value(property_chain.get("observed_count")) != len(expected["properties"]):
+        raise SystemExit(f"{target} observed property count drifted")
+    if len(properties) != len(expected["properties"]):
+        raise SystemExit(f"{target} property list length drifted")
+
+    copied: list[dict[str, Any]] = []
+    redacted: list[dict[str, Any]] = []
+    for prop, (expected_name, expected_class) in zip(properties, expected["properties"], strict=True):
+        if not isinstance(prop, dict):
+            raise SystemExit(f"{target} property entry is not an object")
+        name = prop.get("name")
+        class_name = prop.get("class_name")
+        if name != expected_name or class_name != expected_class:
+            raise SystemExit(f"{target} property shape drifted: expected {expected_name}:{expected_class}")
+        if prop.get("status") != "candidate":
+            raise SystemExit(f"{target}.{expected_name} is not a candidate property")
+        require_candidate_membership(prop, target, expected_name)
+        field_key = f"{target}.{expected_name}"
+
+        common = {
+            "target": target,
+            "field": expected_name,
+            "offset": format_hex(require_int_field(prop, "offset_internal", field_key)),
+            "offset_internal": require_int_field(prop, "offset_internal", field_key),
+            "element_size": require_int_field(prop, "element_size", field_key),
+            "array_dim": require_int_field(prop, "array_dim", field_key),
+            "property_flags": format_hex(property_flags(prop) or 0),
+            "property_class": expected_class,
+            "function_flags": format_hex(require_int_field(target_payload, "function_flags", target)),
+            "num_parms": require_int_field(target_payload, "num_parms", target),
+            "parms_size": require_int_field(target_payload, "parms_size", target),
+            "return_value_offset": format_hex(return_value_offset),
+            "source_snapshot": source_snapshot["id"],
+            "source_snapshot_sha256": source_snapshot["sha256"],
+        }
+        if field_key in STRUCTURE_NONPIN_COPIED_SCALAR_FIELDS:
+            field = classify_property(prop, return_value_offset)
+            if expected_class == "BoolProperty":
+                bool_field_size, bool_byte_offset = require_bool_tail(prop, field_key)
+                masks = field.get("bool_masks")
+                if (
+                    field["type"] != "bool"
+                    or field["direction"] not in {"in", "return"}
+                    or bool_field_size != 1
+                    or bool_byte_offset != 0
+                    or not isinstance(masks, dict)
+                    or masks.get("byte_mask") != "0x01"
+                    or masks.get("field_mask") != "0xff"
+                    or prop.get("native_bool") is not False
+                ):
+                    raise SystemExit(f"{field_key} copied bool shape drifted")
+                copied.append(
+                    {
+                        **common,
+                        "copied_field": field_key,
+                        "direction": field["direction"],
+                        "type": "bool",
+                        "bool_field_size": bool_field_size,
+                        "bool_byte_offset": bool_byte_offset,
+                        "byte_mask": masks["byte_mask"],
+                        "field_mask": masks["field_mask"],
+                        "native_bool": False,
+                        "evidence_status": "copied-structure-nonpin-scalar-only",
+                    }
+                )
+            else:
+                if field["type"] != "int32" or field["direction"] != "in" or common["element_size"] != 4:
+                    raise SystemExit(f"{field_key} copied scalar shape drifted")
+                copied.append(
+                    {
+                        **common,
+                        "copied_field": field_key,
+                        "direction": "in",
+                        "type": "int32",
+                        "evidence_status": "copied-structure-nonpin-scalar-only",
+                    }
+                )
+        elif field_key in STRUCTURE_NONPIN_REDACTED_FIELD_REASONS:
+            redacted.append(
+                {
+                    **common,
+                    "redacted_field": field_key,
+                    "reason": STRUCTURE_NONPIN_REDACTED_FIELD_REASONS[field_key],
+                    "evidence_status": "recognition-only-redacted",
+                }
+            )
+        else:
+            raise SystemExit(f"{field_key} has no structure non-PIN redaction or copy policy")
+    return copied, redacted
+
+
 def build_item_return_only_policy_slice(*, snapshot_root: Path = DEFAULT_SNAPSHOT_ROOT) -> dict[str, Any]:
     paths, missing_targets = snapshot_paths_from_target_sets(snapshot_root, [ITEM_RETURN_ONLY_INPUT_TARGET_SET])
     if missing_targets:
@@ -2123,6 +2272,109 @@ def build_structure_return_only_policy_slice(*, snapshot_root: Path = DEFAULT_SN
     }
 
 
+def build_structure_nonpin_copied_scalar_policy_slice(*, snapshot_root: Path = DEFAULT_SNAPSHOT_ROOT) -> dict[str, Any]:
+    paths, missing_targets = snapshot_paths_from_target_sets(snapshot_root, [STRUCTURE_NONPIN_COPIED_SCALAR_INPUT_TARGET_SET])
+    if missing_targets:
+        raise SystemExit("structure non-PIN copied-scalar policy manifest missing targets: " + ",".join(missing_targets))
+
+    input_snapshots = []
+    copied: list[dict[str, Any]] = []
+    redacted: list[dict[str, Any]] = []
+    seen_targets: set[str] = set()
+    for index, path in enumerate(paths, start=1):
+        source_snapshot = {"id": f"snapshot-{index:04d}", "sha256": file_sha256(path)}
+        payload = load_json_file("snapshot", path)
+        targets = require_snapshot_payload(payload, path)
+        for target_payload in targets:
+            target_identity = target_payload.get("target")
+            if not isinstance(target_identity, dict):
+                raise SystemExit(f"snapshot missing target identity: {path}")
+            target = target_name(target_identity)
+            if target in seen_targets:
+                raise SystemExit(f"duplicate structure non-PIN policy target: {target}")
+            seen_targets.add(target)
+            source_snapshot["target"] = target
+            input_snapshots.append(source_snapshot)
+            target_copied, target_redacted = require_structure_nonpin_copied_scalar_shape(
+                target_payload,
+                source_snapshot,
+            )
+            copied.extend(target_copied)
+            redacted.extend(target_redacted)
+
+    expected_targets = expand_ufunction_targets([STRUCTURE_NONPIN_COPIED_SCALAR_INPUT_TARGET_SET])
+    emitted_copied_fields = [entry["copied_field"] for entry in copied]
+    emitted_redacted_fields = [entry["redacted_field"] for entry in redacted]
+    missing_input_targets = [target for target in expected_targets if target not in seen_targets]
+    unexpected_input_targets = [target for target in seen_targets if target not in expected_targets]
+    missing_copied_fields = [field for field in STRUCTURE_NONPIN_COPIED_SCALAR_FIELDS if field not in emitted_copied_fields]
+    unexpected_copied_fields = [field for field in emitted_copied_fields if field not in STRUCTURE_NONPIN_COPIED_SCALAR_FIELDS]
+    missing_redacted_fields = [
+        field for field in STRUCTURE_NONPIN_REDACTED_FIELD_REASONS if field not in emitted_redacted_fields
+    ]
+    unexpected_redacted_fields = [
+        field for field in emitted_redacted_fields if field not in STRUCTURE_NONPIN_REDACTED_FIELD_REASONS
+    ]
+    blockers = [
+        *[f"missing_input_target:{target}" for target in missing_input_targets],
+        *[f"unexpected_input_target:{target}" for target in unexpected_input_targets],
+        *[f"missing_copied_field:{field}" for field in missing_copied_fields],
+        *[f"unexpected_copied_field:{field}" for field in unexpected_copied_fields],
+        *[f"missing_redacted_field:{field}" for field in missing_redacted_fields],
+        *[f"unexpected_redacted_field:{field}" for field in unexpected_redacted_fields],
+    ]
+    if blockers:
+        raise SystemExit("structure non-PIN copied-scalar policy slice failed closed: " + ",".join(blockers))
+
+    return {
+        "schema": STRUCTURE_NONPIN_COPIED_SCALAR_POLICY_SCHEMA,
+        "generated_from": {
+            "snapshot_schema": SUPPORTED_SNAPSHOT_SCHEMA,
+            "input_snapshots": input_snapshots,
+        },
+        "snapshot_root": "redacted",
+        "input_target_set": STRUCTURE_NONPIN_COPIED_SCALAR_INPUT_TARGET_SET,
+        "output_target_set": STRUCTURE_NONPIN_COPIED_SCALAR_OUTPUT_TARGET_SET,
+        "policy_status": "evidence-only",
+        "missing_targets": [],
+        "coverage": {
+            "status": "complete",
+            "input_targets": expected_targets,
+            "copied_targets": expected_targets,
+            "copied_fields": list(STRUCTURE_NONPIN_COPIED_SCALAR_FIELDS),
+            "redacted_fields": list(STRUCTURE_NONPIN_REDACTED_FIELD_REASONS),
+        },
+        "copied_scalars": copied,
+        "redacted_structure_fields": redacted,
+        "safety_summary": {
+            "artifact_status": "evidence_only",
+            "promotion_ready": False,
+            "intended_use": "offline_review_only",
+            "copied_scalar_count": len(copied),
+            "redacted_field_count": len(redacted),
+            "explicitly_excluded": [
+                "ForPC",
+                "VerifyPinCode",
+                "forCharacter",
+                "identity",
+                "lookup",
+                "mutation",
+                "object_refs",
+                "pinCode",
+                "public_sdk",
+                "resource_handle",
+                "return_override",
+            ],
+        },
+        "non_claims": [
+            "does not expose UE pointers, object identity, class identity, raw params, mutation, or return overrides",
+            "does not promote public SDK callbacks or public metadata helpers",
+            "does not promote StructureEvents, identity, lookup, ResourceHandle, mutation, or return override",
+            "does not copy ForPC, forCharacter, VerifyPinCode, pin codes, object refs, or structure identity",
+        ],
+    }
+
+
 def print_text(report: dict[str, Any]) -> None:
     for signature in report["signatures"]:
         print(
@@ -2157,6 +2409,7 @@ def main() -> int:
         args.transfer_baccept_only_policy_slice,
         args.mission_copied_bool_policy_slice,
         args.structure_return_only_policy_slice,
+        args.structure_nonpin_copied_scalar_policy_slice,
     ]
     if sum(1 for enabled in policy_modes if enabled) > 1:
         raise SystemExit("policy-slice modes cannot be combined")
@@ -2176,6 +2429,10 @@ def main() -> int:
         if args.target_set or args.source_target_set or args.snapshot:
             raise SystemExit("--structure-return-only-policy-slice cannot be combined with target-set or snapshot inputs")
         report = build_structure_return_only_policy_slice(snapshot_root=args.snapshot_root)
+    elif args.structure_nonpin_copied_scalar_policy_slice:
+        if args.target_set or args.source_target_set or args.snapshot:
+            raise SystemExit("--structure-nonpin-copied-scalar-policy-slice cannot be combined with target-set or snapshot inputs")
+        report = build_structure_nonpin_copied_scalar_policy_slice(snapshot_root=args.snapshot_root)
     else:
         report = build_report(
             snapshot_root=args.snapshot_root,
