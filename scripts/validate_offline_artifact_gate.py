@@ -23,6 +23,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
 from snapshot_evidence_pack import SHA256_RE, SERVER_ROOT, sha256_file  # noqa: E402
+import normalize_artifact_pack as artifact_pack  # noqa: E402
 
 
 SCHEMA = "obelisk.offline-artifact-gate-result.v1"
@@ -33,6 +34,7 @@ REDACTED_UFUNCTION_SIGNATURE_SCHEMA = "obelisk.redacted-ufunction-signatures.v1"
 REDACTED_SCRIPTSTRUCT_SIGNATURE_SCHEMA = "obelisk.redacted-scriptstruct-signatures.v1"
 REDACTED_SCRIPTSTRUCT_TARGET_SET_COVERAGE_SCHEMA = "obelisk.redacted-scriptstruct-target-set-coverage.v1"
 SCRIPTSTRUCT_INVENTORY_PACK_SCHEMA = "obelisk.scriptstruct-inventory-pack.v1"
+ARTIFACT_PACK_MANIFEST_SCHEMA = "obelisk.artifact-pack.manifest.v1"
 TRANSFER_SCRIPTSTRUCT_TARGET_SET = "transfer-scriptstruct"
 TRANSFER_SCRIPTSTRUCT_BOOL_TAIL_CONTRACT = {
     "PrimalLocalProfile.ArkTributePlayerData": {
@@ -91,6 +93,7 @@ SUPPORTED_MANIFEST_SCHEMAS = {
     REDACTED_UFUNCTION_SIGNATURE_SCHEMA,
     REDACTED_SCRIPTSTRUCT_SIGNATURE_SCHEMA,
     SCRIPTSTRUCT_INVENTORY_PACK_SCHEMA,
+    ARTIFACT_PACK_MANIFEST_SCHEMA,
     RC_UFUNCTION_SECOND_SOURCE_ROOT_SCHEMA,
     WEAK_HELPER_CALLER_MODE_SCHEMA,
     STATIC_GLOBAL_PROMOTION_EVIDENCE_SCHEMA,
@@ -6422,6 +6425,74 @@ def validate_artifact(
     return record, provenance_blockers
 
 
+def artifact_pack_blocker_reason(detail: str) -> str:
+    lowered = detail.casefold()
+    if artifact_pack.SHA256SUMS_NAME.casefold() in lowered and "does not exist" in lowered:
+        return "artifact_pack_missing_sha256sums"
+    if "symlink" in lowered:
+        return "artifact_pack_symlinked_entry"
+    if "not normalized" in lowered:
+        return "artifact_pack_not_normalized"
+    if "unsupported schema" in lowered:
+        return "artifact_pack_schema_mismatch"
+    if "unsafe pack-relative path" in lowered or "empty pack-relative path" in lowered:
+        return "artifact_pack_relative_path_invalid"
+    return "artifact_pack_invalid"
+
+
+def validate_artifact_pack_manifest(
+    payload: dict[str, Any],
+    *,
+    label: str,
+    manifest_path: Path,
+    workspace_root: Path,
+    protected_root: Path,
+    mode: str,
+    strict_target_set_coverage: bool,
+    expected_binary_sha256: str | None,
+) -> list[dict[str, Any]]:
+    if payload.get("schema") != ARTIFACT_PACK_MANIFEST_SCHEMA:
+        return []
+
+    blockers: list[dict[str, Any]] = []
+    if manifest_path.name != artifact_pack.MANIFEST_NAME:
+        blockers.append({"reason": "artifact_pack_manifest_filename_mismatch", "label": label})
+
+    artifact_id = payload.get("artifact_id") if isinstance(payload.get("artifact_id"), str) else None
+    generated_utc = payload.get("generated_utc") if isinstance(payload.get("generated_utc"), str) else None
+    try:
+        artifact_pack.check_pack(manifest_path.parent, artifact_id, generated_utc)
+    except SystemExit as exc:
+        detail = str(exc)
+        blockers.append({"reason": artifact_pack_blocker_reason(detail), "label": label, "detail": detail})
+        return blockers
+
+    for entry in payload.get("files", []):
+        if not isinstance(entry, dict) or not isinstance(entry.get("path"), str):
+            continue
+        child_path = manifest_path.parent / entry["path"]
+        child_payload, child_load_blockers = load_json(child_path)
+        if child_payload is None:
+            if child_path.suffix == ".json":
+                blockers.extend(child_load_blockers)
+            continue
+        child_schema = child_payload.get("schema")
+        if child_schema not in SUPPORTED_MANIFEST_SCHEMAS or child_schema == ARTIFACT_PACK_MANIFEST_SCHEMA:
+            continue
+        _, child_blockers = validate_manifest(
+            child_path,
+            workspace_root=workspace_root,
+            protected_root=protected_root,
+            mode=mode,
+            strict_target_set_coverage=strict_target_set_coverage,
+            expected_binary_sha256=expected_binary_sha256,
+        )
+        blockers.extend(child_blockers)
+    if mode == "promote":
+        blockers.append({"reason": "promote_mode_artifact_pack_manifest_container_only", "label": label})
+    return blockers
+
+
 def validate_manifest(
     path: Path,
     *,
@@ -6488,6 +6559,18 @@ def validate_manifest(
             workspace_root=workspace_root,
             protected_root=protected_root,
             mode=mode,
+            expected_binary_sha256=expected_binary_sha256,
+        )
+    )
+    blockers.extend(
+        validate_artifact_pack_manifest(
+            payload,
+            label=str(resolved),
+            manifest_path=resolved,
+            workspace_root=workspace_root,
+            protected_root=protected_root,
+            mode=mode,
+            strict_target_set_coverage=strict_target_set_coverage,
             expected_binary_sha256=expected_binary_sha256,
         )
     )

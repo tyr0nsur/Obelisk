@@ -111,6 +111,10 @@ for the current checkpoint.
 - Transfer ScriptStruct bool-tail evidence has a refreshed local root; older
   `/servidor/ark/workspace-offline/...20260529...` transfer roots are stale under current
   bool-tail strictness.
+- `validate_offline_artifact_gate.py` now consumes `obelisk.artifact-pack.manifest.v1`
+  containers: the pack manifest and relative `SHA256SUMS` must match current contents,
+  symlinked pack entries fail closed, supported child manifests keep their own
+  consume/promote blockers, and `promote` mode blocks the pack as container-only.
 - `APrimalStructure.IsAllowedToBuild` is a high-demand build-policy dictionary seed, but it
   is second-wave only: no committed snapshot, no second-source comparison, no target-set
   promotion, no public StructureEvents/build-policy SDK, no mutation, and no return
@@ -125,9 +129,6 @@ for the current checkpoint.
   `ProcessEventHook.cpp` logic into `ProcessEventItemReflection` helpers. Test
   post-original-only dispatch, CraftBlueprint rejection, exact `ReturnValue` scalar scope,
   and no identity/mutation/return-override leakage.
-- Next evidence-tooling hardening: make `validate_offline_artifact_gate.py` consume
-  `obelisk.artifact-pack.manifest.v1` and verify normalized pack contents plus
-  `SHA256SUMS` at consumption time.
 - Structure second-wave next step is offline-only candidate metadata/redaction review for
   `PrimalStructure.IsAllowedToBuild`; do not add it to release target sets, ABI enums,
   descriptors, dispatchers, public docs, or runtime gates.

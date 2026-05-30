@@ -14,6 +14,7 @@ from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import validate_offline_artifact_gate as gate
+import normalize_artifact_pack as artifact_pack
 
 
 BINARY_SHA = "a" * 64
@@ -2501,6 +2502,92 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
 
         reasons = {blocker["reason"] for blocker in result["blockers"]}
         self.assertIn("unsupported_manifest_schema", reasons)
+
+    def test_accepts_normalized_artifact_pack_manifest_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            pack = workspace / "item-return-only-policy-slice-20260530T072255Z"
+            pack.mkdir(parents=True)
+            (pack / "consume-gate.json").write_text('{"status":"accepted"}\n', encoding="utf-8")
+            (pack / "report.json").write_text('{"schema":"fixture"}\n', encoding="utf-8")
+            artifact_pack.normalize_pack(pack, pack.name, "2026-05-30T07:22:55Z")
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[pack / artifact_pack.MANIFEST_NAME]))
+
+        self.assertEqual("accepted", result["status"])
+        self.assertEqual([], result["blockers"])
+        self.assertEqual(gate.ARTIFACT_PACK_MANIFEST_SCHEMA, result["manifests"][0]["schema"])
+
+    def test_blocks_artifact_pack_manifest_when_payload_drifts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            pack = workspace / "artifact-pack-20260530T072255Z"
+            pack.mkdir(parents=True)
+            payload = pack / "report.json"
+            payload.write_text('{"before":true}\n', encoding="utf-8")
+            artifact_pack.normalize_pack(pack, pack.name, "2026-05-30T07:22:55Z")
+            payload.write_text('{"after":true}\n', encoding="utf-8")
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[pack / artifact_pack.MANIFEST_NAME]))
+
+        self.assertIn("artifact_pack_not_normalized", {blocker["reason"] for blocker in result["blockers"]})
+
+    def test_blocks_artifact_pack_manifest_with_missing_sha256sums(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            pack = workspace / "artifact-pack-20260530T072255Z"
+            pack.mkdir(parents=True)
+            (pack / "report.json").write_text('{"schema":"fixture"}\n', encoding="utf-8")
+            artifact_pack.normalize_pack(pack, pack.name, "2026-05-30T07:22:55Z")
+            (pack / artifact_pack.SHA256SUMS_NAME).unlink()
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[pack / artifact_pack.MANIFEST_NAME]))
+
+        self.assertIn("artifact_pack_missing_sha256sums", {blocker["reason"] for blocker in result["blockers"]})
+
+    def test_blocks_artifact_pack_manifest_with_symlinked_content(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            pack = workspace / "artifact-pack-20260530T072255Z"
+            pack.mkdir(parents=True)
+            target = workspace / "outside-report.json"
+            target.write_text("{}\n", encoding="utf-8")
+            (pack / "report.json").symlink_to(target)
+            write_json(
+                pack / artifact_pack.MANIFEST_NAME,
+                {
+                    "schema": gate.ARTIFACT_PACK_MANIFEST_SCHEMA,
+                    "artifact_id": pack.name,
+                    "generated_utc": "2026-05-30T07:22:55Z",
+                    "files": [],
+                },
+            )
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[pack / artifact_pack.MANIFEST_NAME]))
+
+        self.assertIn("artifact_pack_symlinked_entry", {blocker["reason"] for blocker in result["blockers"]})
+
+    def test_artifact_pack_preserves_child_promote_mode_blockers(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            pack = workspace / "gobjects-pack-20260530T072255Z"
+            pack.mkdir(parents=True)
+            write_json(pack / "gobjects-two-core.json", gobjects_two_core_manifest())
+            artifact_pack.normalize_pack(pack, pack.name, "2026-05-30T07:22:55Z")
+
+            result = gate.build_result(
+                args(root=workspace, protected_root=protected, manifests=[pack / artifact_pack.MANIFEST_NAME], mode="promote")
+            )
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("promote_mode_artifact_pack_manifest_container_only", reasons)
+        self.assertIn("gobjects_two_core_manifest_promote_mode_blocked", reasons)
+        self.assertIn("promote_mode_manifest_has_non_claims", reasons)
 
     def test_accepts_rc_ufunction_second_source_root_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

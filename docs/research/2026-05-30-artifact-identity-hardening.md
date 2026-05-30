@@ -61,7 +61,10 @@ mutation, and return override remain blocked.
 Keep strict fail-closed compatibility for stale manifests. Do not infer identity from bare
 hashes. Regenerate current static-global or UObject flag-policy manifests through the
 current producers when a gate requires complete `artifact_identity`; older durable packs
-remain historical evidence unless normalized.
+remain historical evidence unless normalized. Normalization means a pack has a current
+`artifact-pack.manifest.json` and matching relative `SHA256SUMS`; it proves container
+integrity only and does not repair incomplete `artifact_identity`, promote candidate-only
+evidence, or weaken per-schema consume/promote gates.
 
 ## Plugin Compatibility Direction
 

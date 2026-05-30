@@ -116,6 +116,85 @@ class NormalizeArtifactPackTests(unittest.TestCase):
             self.assertNotEqual(0, result.returncode)
             self.assertIn("artifact-pack.manifest.json is not normalized", result.stderr)
 
+    def test_check_mode_rejects_sha256sums_drift_without_rewriting(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            pack = Path(temp_dir) / "transfer-baccept-only-policy-slice"
+            pack.mkdir()
+            (pack / "transfer-baccept-only-policy-slice.json").write_text('{"before":true}\n', encoding="utf-8")
+            self.run_tool(
+                str(pack),
+                "--artifact-id",
+                "transfer-baccept-only-policy-slice",
+                "--generated-utc",
+                "2026-05-30T07:33:08Z",
+            )
+            sha256sums = pack / tool.SHA256SUMS_NAME
+            original = sha256sums.read_text(encoding="utf-8")
+            sha256sums.write_text(original + "0" * 64 + "  extra.json\n", encoding="utf-8")
+
+            result = self.run_tool(str(pack), "--check", check=False)
+
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn("SHA256SUMS is not normalized", result.stderr)
+
+    def test_rejects_symlinked_pack_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            real_pack = root / "real-pack"
+            real_pack.mkdir()
+            link = root / "pack-link"
+            link.symlink_to(real_pack)
+
+            result = self.run_tool(str(link), check=False)
+
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn("--pack-root must not be a symlink", result.stderr)
+
+    def test_check_mode_rejects_bad_manifest_shape(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            pack = Path(temp_dir) / "pack"
+            pack.mkdir()
+            manifest = pack / tool.MANIFEST_NAME
+
+            manifest.write_text("[]\n", encoding="utf-8")
+            result = self.run_tool(str(pack), "--check", check=False)
+            self.assertIn("must contain a JSON object", result.stderr)
+
+            manifest.write_text(json.dumps({"schema": "wrong"}) + "\n", encoding="utf-8")
+            result = self.run_tool(str(pack), "--check", check=False)
+            self.assertIn("unsupported schema", result.stderr)
+
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "schema": tool.SCHEMA,
+                        "artifact_id": "../bad",
+                        "generated_utc": "2026-05-30T07:33:08Z",
+                        "files": [],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            result = self.run_tool(str(pack), "--check", check=False)
+            self.assertIn("unsafe", result.stderr)
+            self.assertIn("artifact_id", result.stderr)
+
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "schema": tool.SCHEMA,
+                        "artifact_id": "pack",
+                        "generated_utc": "2026-99-30T07:33:08Z",
+                        "files": [],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            result = self.run_tool(str(pack), "--check", check=False)
+            self.assertIn("must be a real UTC timestamp", result.stderr)
+
     def test_rejects_symlinked_output(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

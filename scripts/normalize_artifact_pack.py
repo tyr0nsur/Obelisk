@@ -44,6 +44,10 @@ def sha256_file(path: Path) -> str:
 def validate_generated_utc(value: str, label: str) -> str:
     if GENERATED_UTC_RE.fullmatch(value) is None:
         raise SystemExit(f"{label} must be UTC in YYYY-MM-DDTHH:MM:SSZ form: {value}")
+    try:
+        datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    except ValueError as exc:
+        raise SystemExit(f"{label} must be a real UTC timestamp: {value}") from exc
     return value
 
 
@@ -58,8 +62,10 @@ def generated_utc_from_artifact_id(artifact_id: str) -> str:
 def validate_relative_pack_path(path: str) -> str:
     if path.startswith("/") or path.startswith("../") or "/../" in path or path == "..":
         raise SystemExit(f"refusing unsafe pack-relative path: {path}")
-    if "\n" in path or "\r" in path:
-        raise SystemExit(f"refusing pack path with newline characters: {path!r}")
+    if "\\" in path:
+        raise SystemExit(f"refusing pack path with backslash characters: {path!r}")
+    if any(ord(char) < 32 for char in path):
+        raise SystemExit(f"refusing pack path with control characters: {path!r}")
     if path in {"", "."}:
         raise SystemExit("refusing empty pack-relative path")
     return path
@@ -144,6 +150,7 @@ def load_existing_manifest(path: Path) -> dict[str, Any]:
         raise SystemExit(f"{path} has unsupported schema: {payload.get('schema')}")
     if not isinstance(payload.get("artifact_id"), str) or not payload["artifact_id"]:
         raise SystemExit(f"{path} missing artifact_id")
+    safe_component(payload["artifact_id"], f"{path}: artifact_id")
     if not isinstance(payload.get("generated_utc"), str):
         raise SystemExit(f"{path} missing generated_utc")
     validate_generated_utc(payload["generated_utc"], f"{path}: generated_utc")
