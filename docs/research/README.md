@@ -51,6 +51,7 @@ Current post-RC research lane:
 
 - [2026-05-30-v1-core-capability-map.md](2026-05-30-v1-core-capability-map.md)
 - [2026-05-30-aseapi-reference-scan.md](2026-05-30-aseapi-reference-scan.md)
+- [2026-05-30-nextgenplugins-reference-inventory.md](2026-05-30-nextgenplugins-reference-inventory.md)
 - [2026-05-30-chat-command-helper-roadmap.md](2026-05-30-chat-command-helper-roadmap.md)
 - [2026-05-30-chat-audit-plugin-plan.md](2026-05-30-chat-audit-plugin-plan.md)
 - [2026-05-29-module-surface-roadmap.md](2026-05-29-module-surface-roadmap.md)

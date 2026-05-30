@@ -106,6 +106,7 @@ namespace Obelisk::Hooks
     static std::atomic<uint64_t> s_ReflectedInventoryCalls{0};
     static std::atomic<uint64_t> s_ReflectedInventoryRejects{0};
     static std::atomic<uint64_t> s_ReflectedInventoryDispatches{0};
+    static std::atomic<uint64_t> s_ReflectedItemReturnRejects{0};
     static std::atomic<uint64_t> s_ReflectedItemReturnDispatches{0};
     static std::atomic<uint64_t> s_ReflectedStructureCalls{0};
     static std::atomic<uint64_t> s_ReflectedStructureDispatches{0};
@@ -866,6 +867,16 @@ namespace Obelisk::Hooks
         return limit;
     }
 
+    static uint64_t GetItemReturnEventLogLimit()
+    {
+        static uint64_t limit = [] {
+            const char* env = std::getenv("OBELISK_ITEM_RETURN_EVENTS_LOG_LIMIT");
+            if (!env || env[0] == '\0') return uint64_t{0};
+            return static_cast<uint64_t>(std::strtoull(env, nullptr, 10));
+        }();
+        return limit;
+    }
+
     static bool IsStructureObservationActive()
     {
         const uint64_t logLimit = GetStructureReflectionLogLimit();
@@ -1036,6 +1047,23 @@ namespace Obelisk::Hooks
         return "Unknown";
     }
 
+    static const char* ItemFunctionName(Obelisk::UE::ItemReflection::ItemFunction function)
+    {
+        using Obelisk::UE::ItemReflection::ItemFunction;
+        switch (function)
+        {
+        case ItemFunction::AllowEquipItem:
+            return "AllowEquipItem";
+        case ItemFunction::CanRepair:
+            return "CanRepair";
+        case ItemFunction::CraftBlueprint:
+            return "CraftBlueprint";
+        case ItemFunction::UseItemOntoItem:
+            return "UseItemOntoItem";
+        }
+        return "Unknown";
+    }
+
     static bool TryMapItemReturnKind(Obelisk::UE::ItemReflection::ItemFunction function,
                                      Core::ItemReturnEventKind& out)
     {
@@ -1112,6 +1140,18 @@ namespace Obelisk::Hooks
         Obelisk::UE::RuntimeReflection::MemoryReader reader{RuntimeReflectionReader, nullptr};
         ProcessEventItemReflection::Attempt attempt =
             ProcessEventItemReflection::TryIdentifyInvocation(gate, nameIndex, reader, function, params);
+        const uint64_t logLimit = GetItemReturnEventLogLimit();
+        if (attempt.Status == ProcessEventItemReflection::AttemptStatus::Rejected)
+        {
+            const uint64_t rejectNumber = ++s_ReflectedItemReturnRejects;
+            if (ProcessEventItemReflection::ShouldLogObservation(rejectNumber, logLimit))
+            {
+                OBELISK_INFO("Reflected item return rejected #{} fname_index={} reason={}",
+                             rejectNumber,
+                             nameIndex,
+                             attempt.Result.Reason);
+            }
+        }
 
         uint64_t dispatchNumber = 0;
         ProcessEventItemReflection::CopiedItemObservation observation;
@@ -1130,7 +1170,16 @@ namespace Obelisk::Hooks
         if (!TryBuildItemReturnEventView(observation, scalarStorage, event))
             return 0;
 
-        return Core::ItemReturnEventDispatcher::Get().Dispatch(event);
+        const size_t dispatched = Core::ItemReturnEventDispatcher::Get().Dispatch(event);
+        if (ProcessEventItemReflection::ShouldLogObservation(dispatchNumber, logLimit))
+        {
+            OBELISK_INFO("Reflected item return dispatched #{} function={} fname_index={} callbacks={} field_mask=ReturnValue",
+                         dispatchNumber,
+                         ItemFunctionName(observation.Function),
+                         observation.FunctionNameIndex,
+                         dispatched);
+        }
+        return dispatched;
     }
 
     static void TraceReflectedChatInvocation(int32_t nameIndex, void* function, void* params)

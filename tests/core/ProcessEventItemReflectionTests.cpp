@@ -280,6 +280,7 @@ namespace
         Require(!HasObservationBudgetRemaining(counter, 1), "exhausted item budget reported remaining");
         Require(!TryReserveObservationBudget(counter, 1, observationNumber), "reserved exhausted item budget");
         Require(observationNumber == 0, "exhausted item budget left observation number set");
+        Require(!ShouldLogObservation(1, 0), "zero item observation log limit should disable logs");
         Require(ShouldLogObservation(1, 1), "first item observation should log");
         Require(!ShouldLogObservation(2, 1), "over-limit item observation should not log");
     }

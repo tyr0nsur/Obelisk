@@ -1489,6 +1489,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "enable-item-return-events",
             "OBELISK_ITEM_RETURN_EVENTS_BINARY_SHA256",
             "OBELISK_ITEM_RETURN_EVENTS_DISPATCH_LIMIT",
+            "OBELISK_ITEM_RETURN_EVENTS_LOG_LIMIT",
             "MissingObserverDebugProfile",
             "MissingObserverDebugWindow",
             "TryBuildAndReserveItemReturnObservationForMatchedAttempt",
