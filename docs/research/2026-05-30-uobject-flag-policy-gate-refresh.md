@@ -66,3 +66,43 @@ not promote `ResourceHandle`, public GObjects, post-callback lookup, lifecycle n
 mutation, return override, or any public SDK surface. Do not rerun broad
 `scan_resource_handle_serials.py`, ReflectionScanner, ptrace/gcore, native exec probes,
 server marker changes, or runtime observation for this refresh.
+
+## 2026-05-30 Provenance Triage
+
+The shortest refresh path is still viable with small existing inputs, but current disk
+state cannot produce a consume-accepted artifact without inventing provenance. The raw
+inputs below have useful evidence, yet lack verified sibling provenance sidecars with
+matching `artifact_sha256` and `binary_sha256`.
+
+Weak-helper caller-row inputs:
+
+```text
+/servidor/ark/workspace-offline/weak-helper-caller-mode-20260529T104655Z/raw/ghidra-headless.stdout
+/servidor/ark/workspace-offline/weak-helper-caller-mode-20260529T104655Z/raw/r2-weak-helper-caller-modes.txt
+/servidor/ark/workspace-offline/weak-helper-caller-mode-20260529T104655Z/raw/direct-call-counts.txt
+```
+
+UObject policy window inputs:
+
+```text
+/servidor/ark/workspace-offline/uobject-flag-policy-static-negative-20260529T143705Z/raw/weak-helper-c70.objdump.txt
+/servidor/ark/workspace-offline/uobject-flag-policy-static-negative-20260529T143705Z/raw/gobjects-4000-skip.objdump.txt
+/servidor/ark/workspace-offline/uobject-flag-policy-static-negative-20260529T143705Z/raw/gobjects-100-gc-pass.objdump.txt
+```
+
+Required sidecars before expecting consume acceptance:
+
+```text
+ghidra-headless.stdout.provenance.json
+r2-weak-helper-caller-modes.txt.provenance.json
+direct-call-counts.txt.provenance.json
+weak-helper-c70.objdump.txt.provenance.json
+gobjects-4000-skip.objdump.txt.provenance.json
+gobjects-100-gc-pass.objdump.txt.provenance.json
+```
+
+The historical `weak-helper-provenance-bundle` does not clear this blocker because its
+checked sidecars are not verified or do not correspond to the current converter inputs.
+Next work should regenerate or verify sidecars from the original commands/tool versions,
+then run the existing converter, policy builder, and offline artifact gate. Promote mode
+must remain blocked with the candidate-only reason even after consume mode is accepted.

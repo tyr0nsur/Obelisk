@@ -1216,6 +1216,54 @@ namespace
             MissionFixture fixture;
             BuildAddPlayerToMission(fixture);
             fixture.Params[0x08] = 1;
+            fixture.Params[0x09] = 1;
+            Attempt attempt = Identify(fixture, kAddPlayerToMissionNameIndex);
+
+            attempt.Invocation.Fields[1].Range = {fixture.PropertyA.data(), 1};
+
+            CopiedMissionObservation observation;
+            PoisonObservation(observation);
+            Require(!TryBuildCopiedMissionObservation(attempt.Invocation, observation),
+                    "forged copied mission bool range outside params was accepted");
+            RequireObservationCleared(observation,
+                                      "forged copied mission bool range outside params did not clear output");
+        }
+        {
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+            fixture.Params[0x08] = 1;
+            fixture.Params[0x09] = 1;
+            Attempt attempt = Identify(fixture, kAddPlayerToMissionNameIndex);
+
+            attempt.Invocation.Fields[1].Range = {fixture.Params.data() + 0x09, 1};
+
+            CopiedMissionObservation observation;
+            PoisonObservation(observation);
+            Require(!TryBuildCopiedMissionObservation(attempt.Invocation, observation),
+                    "forged copied mission bool range with wrong offset was accepted");
+            RequireObservationCleared(observation,
+                                      "forged copied mission bool range with wrong offset did not clear output");
+        }
+        {
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+            fixture.Params[0x08] = 1;
+            fixture.Params[0x09] = 1;
+            Attempt attempt = Identify(fixture, kAddPlayerToMissionNameIndex);
+
+            attempt.Invocation.ParameterData = nullptr;
+
+            CopiedMissionObservation observation;
+            PoisonObservation(observation);
+            Require(!TryBuildCopiedMissionObservation(attempt.Invocation, observation),
+                    "copied mission bool range without params provenance was accepted");
+            RequireObservationCleared(observation,
+                                      "copied mission bool range without params provenance did not clear output");
+        }
+        {
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+            fixture.Params[0x08] = 1;
             Attempt attempt = Identify(fixture, kAddPlayerToMissionNameIndex);
 
             attempt.Invocation.Fields[2].Range = {};

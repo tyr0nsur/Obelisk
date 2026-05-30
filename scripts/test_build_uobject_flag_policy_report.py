@@ -3,8 +3,9 @@
 
 from __future__ import annotations
 
-import json
+import argparse
 import hashlib
+import json
 import os
 import subprocess
 import sys
@@ -17,11 +18,102 @@ import validate_offline_artifact_gate as gate
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 SCRIPT = SCRIPT_DIR / "build_uobject_flag_policy_report.py"
+CONVERTER = SCRIPT_DIR / "convert_weak_helper_caller_modes.py"
 BINARY_SHA256 = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 
 
 def sha256_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def write_source_provenance(path: Path) -> None:
+    path.with_name(path.name + ".provenance.json").write_text(
+        json.dumps(
+            {
+                "schema": "obelisk.offline-artifact-provenance.v1",
+                "verified": True,
+                "binary_sha256": BINARY_SHA256,
+                "artifact_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def weak_helper_ghidra_fixture() -> str:
+    c70_callers = "\n".join(
+        f"""
+=== caller_1d56c70_{caller} 00{caller[2:]}..00{caller[2:]} ===
+value = helper_get_maybe_pending_candidate(ptr,1);
+MOV ESI,0x1
+CALL 0x01d56c70
+TEST RAX,RAX
+"""
+        for caller in ("83a340", "83a720", "83cde0", "9f80f0", "1d299b0", "1d29a20")
+    )
+    b60_callers = "\n".join(
+        f"""
+=== caller_1d56b60_{caller} 00{caller[2:]}..00{caller[2:]} ===
+cVar1 = helper_is_stale_like_candidate();
+cVar2 = helper_is_stale_like_candidate();
+MOV ESI,0x0
+MOV EDX,0x1
+CALL 0x01d56b60
+CMP AL,BL
+"""
+        for caller in ("2355acc", "2355b5c")
+    )
+    return f"""
+=== helper_is_stale_like_candidate 01d56b60..01d56bf4 ===
+decompile_completed=true
+if ((flags & 0x100) != 0) return true;
+if ((param_2 != 0) && ((flags & 0x4000) != 0)) return true;
+if (param_3 != 0) return comparison;
+01d56b99: TEST AH,0x40
+=== helper_get_maybe_pending_candidate 01d56c70..01d56cf4 ===
+decompile_completed=true
+if ((flags & 0x100) != 0) return 0;
+if ((sil == 0) && ((flags & 0x4000) != 0)) return 0;
+{c70_callers}
+{b60_callers}
+"""
+
+
+def weak_helper_r2_fixture() -> str:
+    c70_windows = "\n".join(
+        f"""
+=== caller_1d56c70_{caller} ===
+mov esi, 0x1
+call 0x01d56c70
+test rax, rax
+"""
+        for caller in ("83a340", "83a720", "83cde0", "9f80f0", "1d299b0", "1d29a20")
+    )
+    b60_windows = "\n".join(
+        f"""
+=== caller_1d56b60_{caller} ===
+mov esi, 0x0
+mov edx, 0x1
+call 0x01d56b60
+cmp al, bl
+"""
+        for caller in ("2355acc", "2355b5c")
+    )
+    return f"""
+0x01d56b60 test ah, 1
+0x01d56b70 test ah, 0x40
+0x01d56c70 test ah, 1
+0x01d56ce3 test dh, 0x40
+{c70_windows}
+{b60_windows}
+"""
+
+
+def weak_helper_counts_fixture() -> str:
+    return """
+0x1d56b60: 4 direct calls
+0x1d56c70: 6 direct calls
+"""
 
 
 def weak_helper_address_sha(address: str) -> str:
@@ -142,6 +234,15 @@ class BuildUObjectFlagPolicyReportTests(unittest.TestCase):
             stderr=subprocess.PIPE,
         )
 
+    def run_converter(self, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [sys.executable, str(CONVERTER), *args],
+            check=check,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
     def write_inputs(
         self,
         root: Path,
@@ -149,6 +250,7 @@ class BuildUObjectFlagPolicyReportTests(unittest.TestCase):
         windows: dict[str, str] | None = None,
         write_provenance: bool = True,
     ) -> tuple[Path, dict[str, Path]]:
+        root.mkdir(parents=True, exist_ok=True)
         weak_helper = root / "weak-helper.json"
         weak_helper.write_text(json.dumps(weak_helper_report()), encoding="utf-8")
         paths: dict[str, Path] = {}
@@ -178,6 +280,18 @@ class BuildUObjectFlagPolicyReportTests(unittest.TestCase):
         for name, path in windows.items():
             args.extend(["--window", f"{name}={path}"])
         return args
+
+    def gate_args(self, *, root: Path, protected_root: Path, manifest: Path, mode: str = "consume") -> argparse.Namespace:
+        return argparse.Namespace(
+            root=root,
+            protected_root=protected_root,
+            manifest=[manifest],
+            artifact=[],
+            expected_binary_sha256=BINARY_SHA256,
+            mode=mode,
+            strict_target_set_coverage=False,
+            json=True,
+        )
 
     def test_emits_redacted_static_negative_candidate_report(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -228,6 +342,64 @@ class BuildUObjectFlagPolicyReportTests(unittest.TestCase):
         self.assertNotIn("pending-kill", json.dumps(payload).lower())
         for address in ("0x83a340", "0x83a720", "0x83cde0", "0x9f80f0", "0x1d299b0", "0x1d29a20", "0x1d56c70"):
             self.assertNotIn(address, json.dumps(payload))
+
+    def test_converter_builder_output_is_consumable_candidate_and_promote_blocked(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            protected = Path(temp_dir) / "server"
+            workspace = protected / "workspace-offline"
+            source_root = workspace / "sources"
+            source_root.mkdir(parents=True)
+            ghidra = source_root / "ghidra.txt"
+            r2 = source_root / "r2.txt"
+            counts = source_root / "counts.txt"
+            ghidra.write_text(weak_helper_ghidra_fixture(), encoding="utf-8")
+            r2.write_text(weak_helper_r2_fixture(), encoding="utf-8")
+            counts.write_text(weak_helper_counts_fixture(), encoding="utf-8")
+            for path in (ghidra, r2, counts):
+                write_source_provenance(path)
+
+            weak_helper = workspace / "weak-helper-caller-mode.json"
+            self.run_converter(
+                "--ghidra-stdout",
+                str(ghidra),
+                "--r2-windows",
+                str(r2),
+                "--direct-call-counts",
+                str(counts),
+                "--binary-sha256",
+                BINARY_SHA256,
+                "--output",
+                str(weak_helper),
+            )
+            _, windows = self.write_inputs(workspace / "windows")
+            report = workspace / "uobject-flag-policy.redacted.json"
+            self.run_builder(*self.builder_args(weak_helper, windows, report))
+
+            consume = gate.build_result(
+                self.gate_args(root=workspace, protected_root=protected, manifest=report)
+            )
+            promote = gate.build_result(
+                self.gate_args(root=workspace, protected_root=protected, manifest=report, mode="promote")
+            )
+            payload = json.loads(report.read_text(encoding="utf-8"))
+
+        self.assertEqual("accepted", consume["status"])
+        self.assertEqual([], consume["blockers"])
+        self.assertEqual("blocked", promote["status"])
+        self.assertIn(
+            "promote_mode_uobject_flag_policy_candidate_only",
+            {blocker["reason"] for blocker in promote["blockers"]},
+        )
+        self.assertEqual(payload["status"], "candidate_blocked")
+        self.assertIs(payload["promotion_ready"], False)
+        self.assertIs(payload["post_callback_resource_handle_ready"], False)
+        self.assertIn("does_not_promote_resourcehandle", payload["non_claims"])
+        self.assertIn("public_resourcehandle_policy_missing", payload["remaining_blockers"])
+        self.assertEqual(
+            payload["weak_helper_caller_mode"]["caller_rows_source"]["source_artifact_sha256"],
+            payload["weak_helper_caller_mode"]["artifact_sha256"],
+        )
+        self.assertNotIn("0x1d56c70", json.dumps(payload))
 
     def test_fails_closed_when_required_window_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

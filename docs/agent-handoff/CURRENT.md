@@ -49,8 +49,10 @@ sequence.
   `OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL` for public modder-facing milestones and
   `OBELISK_BETA_TEST_WEBHOOK_URL` for approved in-game test windows. Send professional
   Discord embeds only; never expose raw URLs, player text, secrets, routine validation
-  logs, or speculative reversing notes. Prefer `scripts/send_discord_embed.py --dry-run`
-  before any approved send.
+  logs, or speculative reversing notes. Use `community` only for stable modder-facing
+  milestones, `beta-test` only for approved player action windows, and no Discord for
+  internal rounds or agent status. Prefer `scripts/send_discord_embed.py --dry-run` before
+  any approved send.
 
 ## Current Routing Facts
 
@@ -85,18 +87,25 @@ sequence.
 - Preserve RC scope while moving toward `v1.0`: reduce architecture debt, improve evidence
   tooling, and promote only copied module APIs with strict gates.
 - Current post-RC focus: Item return-only policy, Mission copied-bool observer, then
-  Transfer `bAccept`. This is no RC public SDK/API promotion. Item return-only is now
-  validated as an internal/test-only copied-bool slice; continue Mission copied-bool
-  observer hardening next. Keep both free of `ResourceHandle`, identity, mutation, return
-  override, public Inventory SDK, public Mission SDK, hook wiring, marker/env, or runtime
-  logs until promoted. ResourceHandle semantic work still needs helper evidence, mutation-window
-  rejection, and a fail-closed contract. Commands/chat routing waits on player context,
-  permissions, and safe response semantics. ArkServerApi/AseApi remains names/behavior
-  reference only.
+  Transfer `bAccept`. This is no RC public SDK/API promotion. Item return-only is
+  validated as an internal/test-only copied-bool slice, and Mission copied-bool
+  observer hardening now includes recognizer-side canonical-bool rejection plus
+  hook-side `params + offset` provenance checks. Keep Item and Mission free of
+  `ResourceHandle`, identity, mutation, return override, public Inventory SDK, public
+  Mission SDK, hook wiring, marker/env, or runtime logs unless a future separate promotion
+  gate changes scope. After local validation, Transfer `bAccept` is only the next
+  internal/test-only copied-bool candidate when a scoped task explicitly selects it; this
+  handoff does not authorize Transfer runtime work. ResourceHandle semantic work still
+  needs helper evidence, mutation-window rejection, and a fail-closed contract.
+  Commands/chat routing waits on player context, permissions, and safe response semantics.
+  ArkServerApi/AseApi remains names/behavior reference only.
 - Regenerate the blocked UObject flag-policy artifact with current provenance/caller-row
   requirements before spending more ResourceHandle effort. Do not rerun broad FName,
   GObjects, or core scans unless the binary hash changes or evidence contradicts current
-  roots/candidates.
+  roots/candidates. Current shortest path is blocked only by missing verified provenance
+  sidecars for the small weak-helper caller-mode and UObject policy window inputs listed
+  in `docs/research/2026-05-30-uobject-flag-policy-gate-refresh.md`; do not fabricate
+  sidecars.
 - Any future live/player validation requires a new approved live-ops brief and, when
   players are involved, a beta-test notice through the configured local webhook variable.
 

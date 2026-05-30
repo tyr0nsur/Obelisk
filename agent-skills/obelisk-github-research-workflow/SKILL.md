@@ -187,6 +187,15 @@ Use variable names only in repo files, handoff notes, and prompts:
   when players need to perform a bounded action in game, such as testing chat delivery or
   another copied public event on a named server window.
 
+Decision rule:
+
+- If the message is for mod authors and server owners to understand a stable Obelisk
+  milestone they can act on, use `--channel community`.
+- If the message asks players/testers to perform an in-game action during an approved
+  bounded window, use `--channel beta-test`.
+- If the message is only an internal round, validation result, agent status, speculative
+  finding, or private live-ops detail, do not send Discord.
+
 Never use Discord for routine validation logs, internal agent status, private server
 details, raw player text, secrets, hashes that are not part of a public artifact, or
 speculative reverse-engineering notes. Prefer one professional Discord embed per update:

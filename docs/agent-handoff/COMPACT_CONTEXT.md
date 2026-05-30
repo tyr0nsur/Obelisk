@@ -35,7 +35,9 @@ priorities, and do not use history files as the active source of truth.
   local secrets in `local/discord-webhooks.env`; use only
   `OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL` or `OBELISK_BETA_TEST_WEBHOOK_URL` by variable
   name, and send concise professional embeds without raw logs, player text, secrets, or
-  speculative reversing notes.
+  speculative reversing notes. Use `community` only for stable modder-facing milestones,
+  `beta-test` only for approved player action windows, and no Discord for internal rounds
+  or agent status.
 - `ArkServerApi/AseApi` may be used only as an algorithmic/name dictionary for
   ArkApi-style compatibility research. Do not import offsets, vtables, layouts, `.lib`
   artifacts, MSVC/Windows ABI assumptions, direct `GetNativePointerField`/`NativeCall`
@@ -293,11 +295,11 @@ priorities, and do not use history files as the active source of truth.
 - If internal recognizer work resumes, keep it test-only. The current internal recognizer
   order is Item return-only policy, Mission copied-bool observer, then Transfer
   `bAccept`; this is not RC public SDK/API scope and does not change the RC public API.
-  None of these promote
-  public Mission/Items/Transfer SDKs, public callbacks, ABI, markers/env, runtime logs,
-  hook wiring, mutation, return override, object identity, lookup, or `ResourceHandle`.
-  Start from the dated research notes, not public API docs, until a separate promotion
-  gate approves runtime observation, dispatcher lifecycle, ABI, and SDK policy.
+  None of these promote public Mission/Items/Transfer SDKs, public callbacks, ABI,
+  markers/env, runtime logs, hook wiring, mutation, return override, object identity,
+  lookup, or `ResourceHandle`, and this handoff does not authorize Transfer runtime work.
+  Start from the dated research notes, not public API docs; any live observation,
+  dispatcher lifecycle, ABI, or SDK policy decision needs a separate scoped gate.
 - Runtime dispatcher hardening: hook-called Chat, Structure, and Inventory dispatchers
   must fail closed on setup/internal errors instead of rethrowing into `ProcessEvent`.
   Chat dispatch snapshots registration ids, skips callbacks removed during the same

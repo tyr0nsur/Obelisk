@@ -60,7 +60,7 @@ class SendDiscordEmbedTests(unittest.TestCase):
             "--status",
             "Beta activa",
             "--scope",
-            "arkserver ventana aprobada",
+            "instancia nombrada en brief aprobado",
             "--field",
             "Accion=Enviar mensajes de chat global",
             "--field",
@@ -73,13 +73,14 @@ class SendDiscordEmbedTests(unittest.TestCase):
         self.assertIn("in-game test", embed["footer"]["text"])
 
     def test_rejects_webhook_text_in_embed(self) -> None:
+        webhook_text = "https://" + "discord.com/" + "api/webhooks" + "/123/secret"
         result = self.run_dry(
             "--channel",
             "community",
             "--title",
             "Bad",
             "--description",
-            "https://discord.com/api/webhooks/123/secret",
+            webhook_text,
             "--status",
             "Blocked",
             "--scope",
@@ -92,6 +93,11 @@ class SendDiscordEmbedTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("forbidden phrase", result.stderr)
+
+    def test_test_fixtures_do_not_store_webhook_endpoint_literals(self) -> None:
+        source = Path(__file__).read_text(encoding="utf-8")
+        self.assertNotIn("discord.com/" + "api/webhooks", source)
+        self.assertNotIn("discordapp.com/" + "api/webhooks", source)
 
 
 if __name__ == "__main__":

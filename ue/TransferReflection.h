@@ -33,6 +33,8 @@ namespace Obelisk::UE::TransferReflection
         int32_t FunctionNameIndex = -1;
         int32_t OuterNameIndex = -1;
         bool HasParameterRanges = false;
+        const uint8_t* ParameterData = nullptr;
+        size_t ParameterSize = 0;
         RuntimeReflection::FixedVector<TransferFieldRange, 1> Fields;
     };
 

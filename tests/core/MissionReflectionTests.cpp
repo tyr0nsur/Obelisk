@@ -431,6 +431,9 @@ namespace
         Require(static_cast<bool>(result), result.Reason.c_str());
         Require(invocation.Function == MissionReflection::MissionFunction::AddPlayerToMission,
                 "AddPlayerToMission kind mismatch");
+        Require(invocation.HasParameterRanges, "AddPlayerToMission did not record params presence");
+        Require(invocation.ParameterData == fixture.Params.data(), "AddPlayerToMission params source mismatch");
+        Require(invocation.ParameterSize == 0x0a, "AddPlayerToMission params size mismatch");
         Require(invocation.Fields.size() == 3, "AddPlayerToMission field count mismatch");
         RequireFieldShape(invocation.Fields[0],
                           MissionReflection::MissionField::PlayerCharacter,
@@ -1017,6 +1020,8 @@ namespace
         Require(invocation.FunctionNameIndex == -1, "rejected mission invocation left stale function name");
         Require(invocation.OuterNameIndex == -1, "rejected mission invocation left stale outer name");
         Require(!invocation.HasParameterRanges, "rejected mission invocation left stale range state");
+        Require(invocation.ParameterData == nullptr, "rejected mission invocation left stale params data");
+        Require(invocation.ParameterSize == 0, "rejected mission invocation left stale params size");
         Require(invocation.Fields.empty(), "rejected mission invocation left stale fields");
     }
 }

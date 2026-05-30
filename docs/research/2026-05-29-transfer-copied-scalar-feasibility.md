@@ -61,6 +61,16 @@ identity. The tests still expose only a one-byte parameter range for the matched
 They do not add runtime hook wiring, a dispatcher, mutation, return override, public ABI,
 or server observation.
 
+## 2026-05-30 Parameter Provenance Hardening
+
+The internal/test-only recognizer now records borrowed parameter provenance for matched
+invocations: `ParameterData=params` and `ParameterSize=ParmsSize`. Fixture tests verify
+that `bAccept` resolves to `params + 0` with one byte, that metadata-only recognition does
+not expose a range, and that disabled/unsupported/rejected paths clear stale provenance
+without reading memory before the gate. The borrowed pointer exists only for immediate
+internal validation; it must not be persisted, logged, exposed to plugins, used as object
+identity, or treated as authorization for a Transfer hook or SDK.
+
 ## Non-Claims
 
 This note does not promote transfer to the RC, does not promote any public transfer API,

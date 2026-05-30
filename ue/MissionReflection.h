@@ -45,6 +45,8 @@ namespace Obelisk::UE::MissionReflection
         int32_t FunctionNameIndex = -1;
         int32_t OuterNameIndex = -1;
         bool HasParameterRanges = false;
+        const uint8_t* ParameterData = nullptr;
+        size_t ParameterSize = 0;
         RuntimeReflection::FixedVector<MissionFieldRange, 4> Fields;
     };
 

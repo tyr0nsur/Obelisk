@@ -260,6 +260,30 @@ namespace Obelisk::Hooks::ProcessEventMissionReflection
                    field.ExposesRange == expected.ExposesRange;
         }
 
+        bool MatchesExpectedParamRange(
+            const Obelisk::UE::MissionReflection::MissionInvocation& invocation,
+            const Obelisk::UE::MissionReflection::MissionFieldRange& field,
+            const ExpectedMissionField& expected)
+        {
+            if (!invocation.HasParameterRanges ||
+                !invocation.ParameterData ||
+                expected.Offset < 0 ||
+                expected.Size > invocation.ParameterSize)
+            {
+                return false;
+            }
+
+            const size_t offset = static_cast<size_t>(expected.Offset);
+            if (offset > invocation.ParameterSize ||
+                expected.Size > invocation.ParameterSize - offset)
+            {
+                return false;
+            }
+
+            return field.Range.Data == invocation.ParameterData + offset &&
+                   field.Range.Size == expected.Size;
+        }
+
         bool TryCopyBool(const Obelisk::UE::MissionReflection::MissionFieldRange& field,
                          MissionBoolObservation& out)
         {
@@ -421,6 +445,12 @@ namespace Obelisk::Hooks::ProcessEventMissionReflection
                     return false;
                 }
                 continue;
+            }
+
+            if (!MatchesExpectedParamRange(invocation, field, expectedField))
+            {
+                out = {};
+                return false;
             }
 
             MissionBoolObservation copiedBool;

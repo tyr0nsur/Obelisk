@@ -124,6 +124,13 @@ malformed bool bytes out of both the recognizer output and the hook-side copied 
 builder. The change remains internal/test-only: no hook wiring, marker/env, public Mission
 SDK, identity, mutation, or return override is promoted.
 
+The internal hook-side copied observation builder now also requires each copied bool range
+to point back to the original `params + offset` within the validated `ParmsSize` range.
+Forged ranges outside `params`, ranges at the wrong offset, and invocations without
+parameter provenance are rejected and clear stale copied output. `ParameterData` is a
+borrowed internal pointer for immediate builder validation only; it must not be persisted,
+logged, exposed to plugins, or treated as object identity.
+
 Rejected metadata, disabled gates, non-mission FName values, unsupported SHA values,
 unreadable params, malformed bool bytes, and exhausted budgets should not emit per-event
 value logs. If counters are added later, they must be aggregate-only and must not include
@@ -131,8 +138,10 @@ redacted payload values.
 
 ## Gates
 
-This plan is not approval to add or enable gates. If a later implementation review
-approves runtime wiring, the minimum gate set is:
+This plan is not approval to add or enable gates. Implementation review can only decide
+whether a code path is eligible for a later operator-scoped run; it does not authorize
+server access, Discord notices, marker/env changes, restarts, or live observation. If a
+later implementation review approves runtime wiring, the minimum gate set is:
 
 - `OBELISK_ENABLE_MISSION_REFLECTION=1`;
 - supported `ShooterGameServer` SHA256 equals

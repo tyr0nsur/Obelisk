@@ -16,6 +16,14 @@ COMPACT_CONTEXT = HANDOFF_DIR / "COMPACT_CONTEXT.md"
 GITHUB_WORKFLOW_SKILL = REPO_ROOT / "agent-skills" / "obelisk-github-research-workflow" / "SKILL.md"
 MAX_CURRENT_LINES = 220
 MAX_SKILL_LINES = 260
+SCOPED_GUARDRAIL_FILES = [
+    CURRENT,
+    COMPACT_CONTEXT,
+    REPO_ROOT / "docs" / "research" / "2026-05-30-mission-copied-bool-observer-plan.md",
+    REPO_ROOT / "scripts" / "test_release_scope_guardrails.py",
+    REPO_ROOT / "scripts" / "test_agent_handoff_guardrails.py",
+    REPO_ROOT / "scripts" / "test_send_discord_embed.py",
+]
 
 
 class AgentHandoffGuardrailsTests(unittest.TestCase):
@@ -123,8 +131,8 @@ class AgentHandoffGuardrailsTests(unittest.TestCase):
             with self.subTest(file=path, item="webhook variables only"):
                 self.assertIn("OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL", text)
                 self.assertIn("OBELISK_BETA_TEST_WEBHOOK_URL", text)
-                self.assertNotIn("discord.com/api/webhooks", text)
-                self.assertNotIn("discordapp.com/api/webhooks", text)
+                self.assertNotIn("discord.com/" + "api/webhooks", text)
+                self.assertNotIn("discordapp.com/" + "api/webhooks", text)
             with self.subTest(file=path, item="approval scope"):
                 self.assertIn("approved", text)
                 self.assertIn("public", text)
@@ -141,6 +149,37 @@ class AgentHandoffGuardrailsTests(unittest.TestCase):
         self.assertIn("prefer the guarded helper instead of hand-written", workflow_skill)
         self.assertIn("python3 scripts/send_discord_embed.py --channel community", workflow_skill)
         self.assertIn("Run with `--dry-run` first", workflow_skill)
+
+    def test_scoped_guardrail_files_do_not_store_secret_webhook_urls(self) -> None:
+        forbidden_literals = [
+            "discord.com/" + "api/webhooks",
+            "discordapp.com/" + "api/webhooks",
+            "https://" + "discord.com",
+            "https://" + "discordapp.com",
+            "OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL" + "=",
+            "OBELISK_BETA_TEST_WEBHOOK_URL" + "=",
+        ]
+
+        for path in SCOPED_GUARDRAIL_FILES:
+            text = path.read_text(encoding="utf-8")
+            for literal in forbidden_literals:
+                with self.subTest(file=str(path.relative_to(REPO_ROOT)), literal=literal):
+                    self.assertNotIn(literal, text)
+
+    def test_scoped_guardrail_files_do_not_authorize_real_servers_or_discord(self) -> None:
+        current = CURRENT.read_text(encoding="utf-8")
+        compact = COMPACT_CONTEXT.read_text(encoding="utf-8")
+        mission_plan = (REPO_ROOT / "docs" / "research" / "2026-05-30-mission-copied-bool-observer-plan.md").read_text(
+            encoding="utf-8"
+        )
+        send_discord_tests = (REPO_ROOT / "scripts" / "test_send_discord_embed.py").read_text(encoding="utf-8")
+
+        self.assertIn("No server target\n  has standing approval", current)
+        self.assertIn("no Discord for internal rounds or agent status", " ".join(current.split()))
+        self.assertIn("No standing operator approval", compact)
+        self.assertIn("No run is approved by this note", mission_plan)
+        self.assertIn("This plan is not approval to add or enable gates", mission_plan)
+        self.assertNotIn("arkserver " + "ventana aprobada", send_discord_tests)
 
     def test_learning_skill_keeps_adopted_knowledge_compact(self) -> None:
         skill = (REPO_ROOT / "agent-skills/obelisk-continuous-learning/SKILL.md").read_text(

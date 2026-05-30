@@ -443,6 +443,11 @@ namespace Obelisk::UE::MissionReflection
         value.FunctionNameIndex = spec->NameIndex;
         value.OuterNameIndex = spec->OuterNameIndex;
         value.HasParameterRanges = params != nullptr;
+        if (value.HasParameterRanges)
+        {
+            value.ParameterData = static_cast<const uint8_t*>(params);
+            value.ParameterSize = reflectedFunction.ParmsSize;
+        }
         if (spec->FieldCount > value.Fields.capacity())
             return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::OutOfBounds,
                                                        "mission field count exceeds storage capacity");

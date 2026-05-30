@@ -38,11 +38,13 @@ namespace
     struct ReaderContext
     {
         std::vector<Region> Regions;
+        size_t ReadCalls = 0;
     };
 
     bool RegionReader(const void* address, size_t size, void* context)
     {
         auto* reader = static_cast<ReaderContext*>(context);
+        ++reader->ReadCalls;
         const auto* ptr = static_cast<const uint8_t*>(address);
         for (const Region& region : reader->Regions)
         {
@@ -205,12 +207,18 @@ namespace
         if (params)
         {
             Require(invocation.HasParameterRanges, "transfer params should be recorded as present");
-            Require(invocation.Fields[0].Range.Data == fixture.Params.data(), "transfer bAccept range data mismatch");
+            Require(invocation.ParameterData == fixture.Params.data(), "transfer parameter provenance data mismatch");
+            Require(invocation.ParameterSize == 0x01, "transfer parameter provenance size mismatch");
+            Require(invocation.Fields[0].Range.Data ==
+                        invocation.ParameterData + static_cast<size_t>(invocation.Fields[0].Offset),
+                    "transfer bAccept range data mismatch");
             Require(invocation.Fields[0].Range.Size == 1, "transfer bAccept range must stay one byte");
         }
         else
         {
             Require(!invocation.HasParameterRanges, "metadata-only transfer recognition reported parameter ranges");
+            Require(invocation.ParameterData == nullptr, "metadata-only transfer recorded parameter data");
+            Require(invocation.ParameterSize == 0, "metadata-only transfer recorded parameter size");
             Require(invocation.Fields[0].Range.Data == nullptr, "metadata-only transfer range exposed data");
             Require(invocation.Fields[0].Range.Size == 0, "metadata-only transfer range exposed size");
         }
@@ -688,23 +696,33 @@ namespace
 
         TransferReflection::TransferInvocation invocation;
         ReadOptions disabled = MakeReadOptionsForBinary(kSupportedShooterGameServerSha256, false);
+        MemoryReader reader = fixture.Reader();
         ReadResult result = TransferReflection::TryIdentifyTransferInvocation(
-            fixture.Reader(),
+            reader,
             disabled,
-            fixture.Function.data(),
-            fixture.Params.data(),
+            reinterpret_cast<const void*>(0x44440000),
+            reinterpret_cast<const void*>(0x55550000),
             invocation);
         Require(result.Status == ReadStatus::Disabled, "disabled transfer reflection was accepted");
+        Require(fixture.Context.ReadCalls == 0, "disabled transfer reflection read memory before gate rejection");
+        Require(invocation.FunctionNameIndex == -1, "disabled transfer reflection left stale function name");
+        Require(invocation.ParameterData == nullptr, "disabled transfer reflection recorded parameter data");
+        Require(invocation.ParameterSize == 0, "disabled transfer reflection recorded parameter size");
 
         ReadOptions unsupported = MakeReadOptionsForBinary("not-this-binary", true);
+        fixture.Context.ReadCalls = 0;
+        reader = fixture.Reader();
         result = TransferReflection::TryIdentifyTransferInvocation(
-            fixture.Reader(),
+            reader,
             unsupported,
             reinterpret_cast<const void*>(0x44440000),
             reinterpret_cast<const void*>(0x55550000),
             invocation);
         Require(result.Status == ReadStatus::UnsupportedLayout,
                 "unsupported transfer reflection read memory before failing closed");
+        Require(fixture.Context.ReadCalls == 0, "unsupported transfer reflection read memory before gate rejection");
+        Require(invocation.ParameterData == nullptr, "unsupported transfer reflection recorded parameter data");
+        Require(invocation.ParameterSize == 0, "unsupported transfer reflection recorded parameter size");
     }
 
     void TestRejectsNullAndUnreadableParams()
@@ -763,6 +781,8 @@ namespace
         Require(invocation.FunctionNameIndex == -1, "rejected transfer invocation left stale function name");
         Require(invocation.OuterNameIndex == -1, "rejected transfer invocation left stale outer name");
         Require(!invocation.HasParameterRanges, "rejected transfer invocation left stale range state");
+        Require(invocation.ParameterData == nullptr, "rejected transfer invocation left stale parameter data");
+        Require(invocation.ParameterSize == 0, "rejected transfer invocation left stale parameter size");
         Require(invocation.Fields.empty(), "rejected transfer invocation left stale fields");
     }
 }

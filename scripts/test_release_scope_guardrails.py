@@ -745,6 +745,13 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
                 self.assertRegex(normalized(text), r"no RC public SDK/API|not RC public SDK/API|does not change the RC public API")
 
         for path, text in (
+            ("docs/agent-handoff/COMPACT_CONTEXT.md", compact),
+            ("docs/agent-handoff/CURRENT.md", current),
+        ):
+            with self.subTest(file=path, item="no transfer runtime authorization"):
+                self.assertIn("does not authorize Transfer runtime work", normalized(text))
+
+        for path, text in (
             ("docs/research/2026-05-29-rc-checkpoint-slicing-plan.md", plan),
             ("docs/agent-handoff/COMPACT_CONTEXT.md", compact),
             ("docs/agent-handoff/CURRENT.md", current),
@@ -805,6 +812,92 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
                 self.assertIn("public Inventory SDK", compact)
                 self.assertIn("mutation", compact)
                 self.assertIn("return override", compact)
+
+    def test_mission_copied_bool_observer_stays_internal_and_non_authoritative(self) -> None:
+        mission_plan = read("docs/research/2026-05-30-mission-copied-bool-observer-plan.md")
+        current = read("docs/agent-handoff/CURRENT.md")
+        status = read("docs/STATUS.md")
+
+        compact_plan = normalized(mission_plan)
+        for item in [
+            "MissionType.AddPlayerToMission.bForceAdd",
+            "MissionType.AddPlayerToMission.ReturnValue",
+            "MissionType.BPAllowPlayerToLeaveMission.ReturnValue",
+            "MissionType.BPOnPlayerRemovedFromMission.bFromMissionCompleteEvent",
+            "MissionType.BPOnPlayerRemovedFromMission.bLastPhaseSuccess",
+        ]:
+            with self.subTest(file="docs/research/2026-05-30-mission-copied-bool-observer-plan.md", item=item):
+                self.assertIn(item, mission_plan)
+
+        for item in [
+            "internal/test-only",
+            "no hook wiring",
+            "marker/env",
+            "public Mission SDK",
+            "identity",
+            "mutation",
+            "return override",
+            "ResourceHandle",
+            "does not authorize public Mission SDK/API/runtime wiring",
+            "must never dispatch plugin callbacks",
+            "This plan is not approval to add or enable gates",
+            "does not authorize server access, Discord notices, marker/env changes, restarts, or live observation",
+            "No run is approved by this note",
+        ]:
+            with self.subTest(file="docs/research/2026-05-30-mission-copied-bool-observer-plan.md", item=item):
+                self.assertIn(normalized(item), compact_plan)
+
+        for path, text in (
+            ("docs/agent-handoff/CURRENT.md", current),
+            ("docs/STATUS.md", status),
+        ):
+            compact = normalized(text)
+            with self.subTest(file=path, item="post-RC order and RC boundary"):
+                self.assertIn("Item return-only policy, Mission copied-bool observer, then Transfer `bAccept`", compact)
+                self.assertRegex(compact, r"no RC public SDK/API|not RC public SDK/API|does not change the RC public API")
+            with self.subTest(file=path, item="mission blockers"):
+                self.assertRegex(compact, r"public Mission SDK|missions.*public.*SDK|public module SDK")
+                self.assertIn("ResourceHandle", compact)
+                self.assertIn("identity", compact)
+                self.assertIn("mutation", compact)
+                self.assertIn("return override", compact)
+
+    def test_uobject_flag_policy_current_blockers_stay_explicit(self) -> None:
+        current = read("docs/agent-handoff/CURRENT.md")
+        status = read("docs/STATUS.md")
+        research = read("docs/research/2026-05-30-uobject-flag-policy-gate-refresh.md")
+
+        compact_current = normalized(current)
+        compact_status = normalized(status)
+        compact_research = normalized(research)
+
+        for item in [
+            "ResourceHandle/public GObjects remain blocked",
+            "blocked by old artifact vocabulary and missing provenance/caller rows",
+            "Regenerate the blocked UObject flag-policy artifact with current provenance/caller-row requirements",
+            "before spending more ResourceHandle effort",
+        ]:
+            with self.subTest(file="docs/agent-handoff/CURRENT.md", item=item):
+                self.assertIn(normalized(item), compact_current)
+
+        for item in [
+            "UObject flag validity policy | Not ready",
+            "candidate-only evidence",
+            "do not unlock `ResourceHandle`, object lookup, GObjects promotion",
+        ]:
+            with self.subTest(file="docs/STATUS.md", item=item):
+                self.assertIn(normalized(item), compact_status)
+
+        for item in [
+            "old labels",
+            "missing provenance",
+            "caller",
+            "consume",
+            "promote",
+            "ResourceHandle",
+        ]:
+            with self.subTest(file="docs/research/2026-05-30-uobject-flag-policy-gate-refresh.md", item=item):
+                self.assertIn(normalized(item), compact_research)
 
     def test_historical_checkpoint_zero_stays_guardrail_only(self) -> None:
         plan = read("docs/research/2026-05-29-rc-checkpoint-slicing-plan.md")
