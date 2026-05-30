@@ -24,6 +24,8 @@ namespace
     using BoolProbeFn = bool (*)();
     using ScheduledCallbackFn = void (*)(uint64_t, void*);
 
+    constexpr size_t kOBaseEventsMaxLocalCommandBytes = 1024;
+
     int g_RegisterCount = 0;
     int g_UnregisterCount = 0;
     int g_GameplayPolicyRegisterCount = 0;
@@ -237,6 +239,23 @@ namespace
         g_RegisteredChatMessageCallback(&event, g_RegisteredChatMessageUserData);
     }
 
+    void DispatchChatMessageEventWithTextAndSize(const char* message, size_t size)
+    {
+        Require(g_RegisteredChatMessageCallback != nullptr, "missing chat message callback");
+        Require(g_RegisteredChatMessageUserData != nullptr, "missing chat message user data");
+        Require(message != nullptr, "chat message text was null");
+
+        ObeliskChatMessageEvent event{};
+        event.abi_version = OBELISK_CHAT_MESSAGE_EVENT_ABI_VERSION;
+        event.struct_size = sizeof(ObeliskChatMessageEvent);
+        event.send_mode = OBELISK_CHAT_SEND_MODE_GLOBAL;
+        event.flags = OBELISK_CHAT_MESSAGE_EVENT_FLAG_COPIED_PAYLOAD;
+        event.sequence = 43;
+        event.message = {message, size};
+
+        g_RegisteredChatMessageCallback(&event, g_RegisteredChatMessageUserData);
+    }
+
     void DispatchValidTimer()
     {
         Require(g_RegisteredTimerCallback != nullptr, "missing timer callback");
@@ -409,8 +428,8 @@ namespace
     },
     "chat_command_helper": {
         "enabled": true,
-        "prefix": "!",
-        "log_limit": 2
+        "prefix": "/",
+        "log_limit": 8
     }
 })json";
 
@@ -1011,12 +1030,31 @@ int main(int argc, char** argv)
             Require(g_ChatMessageUnregisterCount == 0,
                 "chat command helper unregistered chat callback before shutdown");
             DispatchValidChatMessageEventWithText("hello");
-            Require(!HasLogContaining(g_InfoLogs, "Local chat command matched"),
-                "chat command helper matched a message without prefix");
             DispatchValidChatMessageEventWithText("!help");
+            Require(!HasLogContaining(g_InfoLogs, "Local chat command matched"),
+                "chat command helper matched a message without configured prefix");
+            DispatchValidChatMessageEventWithText("/help raw-secret");
             Require(HasLogContaining(g_InfoLogs, "Local chat command matched principal=unknown command=help"),
                 "chat command helper did not accept local help command");
+            DispatchValidChatMessageEventWithText("/dance raw-secret");
+            Require(HasLogContaining(g_InfoLogs,
+                    "Local chat command rejected reason=unknown-command principal=unknown command=dance"),
+                "chat command helper did not reject unknown local command");
+            DispatchValidChatMessageEventWithText("/bad$name raw-secret");
+            Require(HasLogContaining(g_ErrorLogs, "Local chat command rejected reason=invalid-command-name"),
+                "chat command helper did not reject invalid local command name");
+            DispatchChatMessageEventWithTextAndSize(
+                "/help oversize-secret",
+                kOBaseEventsMaxLocalCommandBytes + 1);
+            Require(HasLogContaining(g_ErrorLogs, "Local chat command rejected reason=malformed-event"),
+                "chat command helper did not reject oversized chat message event");
             Require(!HasLogContaining(g_InfoLogs, "hello"), "chat command helper logged raw non-command chat text");
+            Require(!HasLogContaining(g_InfoLogs, "raw-secret") &&
+                    !HasLogContaining(g_ErrorLogs, "raw-secret"),
+                "chat command helper logged raw command arguments");
+            Require(!HasLogContaining(g_InfoLogs, "oversize-secret") &&
+                    !HasLogContaining(g_ErrorLogs, "oversize-secret"),
+                "chat command helper logged raw oversized chat text");
         }
         api = {};
         if (shutdown)

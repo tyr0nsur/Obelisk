@@ -52,6 +52,20 @@ def write_static_artifact_provenance(path: Path, binary: Path) -> None:
     Path(f"{path}.provenance.json").write_text(json.dumps(provenance), encoding="utf-8")
 
 
+def recompute_artifact_sha256(payload: dict[str, object]) -> str:
+    identity = dict(payload["artifact_identity"])
+    identity_without_hash = {
+        "artifact_kind": identity["artifact_kind"],
+        "capture_id": identity["capture_id"],
+        "evidence_pack_id": identity["evidence_pack_id"],
+    }
+    material = {
+        "artifact_identity": identity_without_hash,
+        "report": build_static_global_promotion_evidence.canonical_static_report(payload),
+    }
+    return hashlib.sha256(build_static_global_promotion_evidence.canonical_json_bytes(material)).hexdigest()
+
+
 def write_minimal_static_inputs(root: Path) -> tuple[Path, Path, Path, Path]:
     binary = root / "ShooterGameServer"
     binary.write_bytes(b"static evidence binary")
@@ -226,6 +240,17 @@ class StaticGlobalPromotionEvidenceTests(unittest.TestCase):
             self.assertIn("generated_at_utc", payload)
             self.assertIn("obelisk_commit", payload)
             self.assertEqual(manifest["binary"]["sha256"], payload["binary"]["sha256"])
+            self.assertEqual(manifest["artifact_identity"], payload["artifact_identity"])
+            self.assertEqual(
+                payload["artifact_identity"],
+                {
+                    "artifact_kind": "obelisk.static-global-promotion-evidence.v1",
+                    "capture_id": build_static_global_promotion_evidence.DEFAULT_CAPTURE_ID,
+                    "evidence_pack_id": build_static_global_promotion_evidence.DEFAULT_EVIDENCE_PACK_ID,
+                    "artifact_sha256": recompute_artifact_sha256(payload),
+                },
+            )
+            self.assertEqual(payload["static_xrefs_sha256"], sha256_file(output_dir / "static-global-xrefs.json"))
             self.assertEqual(
                 payload["commands"]["readelf_programs"]["source_sha256"],
                 payload["commands"]["readelf_programs"]["copied_sha256"],
@@ -445,6 +470,98 @@ class StaticGlobalPromotionEvidenceTests(unittest.TestCase):
             self.assertTrue(payload["commands"]["readelf_sections"]["provenance"]["verified"])
             self.assertTrue(payload["commands"]["objdump"]["provenance"]["verified"])
             self.assertTrue(payload["candidates"][0]["static_contract"]["satisfied"])
+
+    def test_artifact_identity_is_stable_across_output_paths_and_time(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            binary, programs, sections, objdump = write_minimal_static_inputs(root)
+            for artifact in (programs, sections, objdump):
+                write_static_artifact_provenance(artifact, binary)
+
+            base_args = [
+                "--binary",
+                str(binary),
+                "--candidate",
+                "gobjects=0x595b7e0",
+                "--readelf-programs",
+                str(programs),
+                "--readelf-sections",
+                str(sections),
+                "--objdump",
+                str(objdump),
+                "--capture-id",
+                "static-capture.alpha",
+                "--evidence-pack-id",
+                "static-pack.alpha",
+                "--json",
+            ]
+            first = self.run_script(*base_args, "--output-dir", str(root / "pack-a"))
+            second = self.run_script(*base_args, "--output-dir", str(root / "nested" / "pack-b"))
+
+            payload_a = json.loads(first.stdout)
+            payload_b = json.loads(second.stdout)
+
+        self.assertNotEqual(payload_a["artifacts"]["static_xrefs"], payload_b["artifacts"]["static_xrefs"])
+        self.assertEqual(payload_a["artifact_identity"], payload_b["artifact_identity"])
+        self.assertEqual(payload_a["artifact_identity"]["artifact_sha256"], recompute_artifact_sha256(payload_a))
+        self.assertEqual(payload_b["artifact_identity"]["artifact_sha256"], recompute_artifact_sha256(payload_b))
+
+    def test_artifact_identity_changes_when_candidate_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            binary, programs, sections, objdump = write_minimal_static_inputs(root)
+            for artifact in (programs, sections, objdump):
+                write_static_artifact_provenance(artifact, binary)
+            common = [
+                "--binary",
+                str(binary),
+                "--readelf-programs",
+                str(programs),
+                "--readelf-sections",
+                str(sections),
+                "--objdump",
+                str(objdump),
+                "--capture-id",
+                "static-capture.alpha",
+                "--evidence-pack-id",
+                "static-pack.alpha",
+                "--json",
+            ]
+            first = self.run_script(*common, "--candidate", "gobjects=0x595b7e0", "--output-dir", str(root / "pack-a"))
+            second = self.run_script(*common, "--candidate", "gobjects=0x595b7f0", "--output-dir", str(root / "pack-b"))
+
+            payload_a = json.loads(first.stdout)
+            payload_b = json.loads(second.stdout)
+
+        self.assertNotEqual(
+            payload_a["artifact_identity"]["artifact_sha256"],
+            payload_b["artifact_identity"]["artifact_sha256"],
+        )
+
+    def test_cli_rejects_unsafe_artifact_identity_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            binary, programs, sections, objdump = write_minimal_static_inputs(root)
+            result = self.run_script(
+                "--binary",
+                str(binary),
+                "--candidate",
+                "gobjects=0x595b7e0",
+                "--output-dir",
+                str(root / "pack"),
+                "--readelf-programs",
+                str(programs),
+                "--readelf-sections",
+                str(sections),
+                "--objdump",
+                str(objdump),
+                "--capture-id",
+                "../bad",
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--capture-id must not contain '..'", result.stderr)
 
     def test_copied_static_artifact_provenance_requires_verified_true(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

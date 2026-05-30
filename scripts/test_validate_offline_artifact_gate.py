@@ -917,14 +917,23 @@ def rc_ufunction_second_source_root_manifest(root: Path) -> dict:
 
 
 def static_global_promotion_evidence_manifest(*, ready: bool = False) -> dict:
-    return {
+    payload = {
         "schema": gate.STATIC_GLOBAL_PROMOTION_EVIDENCE_SCHEMA,
         "binary": {
             "sha256": "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
         },
+        "static_xrefs_sha256": "8" * 64,
         "commands": {
             "objdump": {
-                "provenance": {"verified": True},
+                "stdout_sha256": "9" * 64,
+                "returncode": 0,
+                "provenance": {
+                    "verified": True,
+                    "reason": "generated_from_binary",
+                    "binary_sha256": "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                    "artifact_sha256": "9" * 64,
+                    "tool": "objdump",
+                },
             },
         },
         "artifacts": {
@@ -959,6 +968,12 @@ def static_global_promotion_evidence_manifest(*, ready: bool = False) -> dict:
         "remaining_blockers": [] if ready else ["static_only_evidence"],
         "non_claims": ["static_only_evidence"],
     }
+    payload["artifact_identity"] = gate.static_global_artifact_identity(
+        payload,
+        capture_id="static-global-test-capture",
+        evidence_pack_id="static-global-test-pack",
+    )
+    return payload
 
 
 def resource_handle_revalidation_evaluator_manifest(*, ready: bool = False) -> dict:
@@ -3531,6 +3546,81 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
 
         reasons = {blocker["reason"] for blocker in result["blockers"]}
         self.assertIn("static_global_gobjects_missing_field_window_status", reasons)
+
+    def test_blocks_static_global_promotion_evidence_missing_or_bad_identity(self) -> None:
+        cases = {
+            "missing": (None, "static_global_missing_artifact_identity"),
+            "partial": ({"artifact_kind": gate.STATIC_GLOBAL_PROMOTION_EVIDENCE_SCHEMA}, "static_global_artifact_identity_fields_mismatch"),
+            "bad_capture": (
+                {
+                    "artifact_kind": gate.STATIC_GLOBAL_PROMOTION_EVIDENCE_SCHEMA,
+                    "artifact_sha256": "a" * 64,
+                    "capture_id": "../bad",
+                    "evidence_pack_id": "static-global-test-pack",
+                },
+                "static_global_artifact_identity_capture_id_invalid",
+            ),
+            "bad_hash": (
+                {
+                    "artifact_kind": gate.STATIC_GLOBAL_PROMOTION_EVIDENCE_SCHEMA,
+                    "artifact_sha256": "not-a-sha",
+                    "capture_id": "static-global-test-capture",
+                    "evidence_pack_id": "static-global-test-pack",
+                },
+                "static_global_artifact_identity_sha_invalid",
+            ),
+        }
+        for name, (identity, expected_reason) in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp:
+                protected = Path(tmp) / "server"
+                workspace = protected / "workspace-offline"
+                manifest = workspace / "static-global.json"
+                payload = static_global_promotion_evidence_manifest()
+                if identity is None:
+                    payload.pop("artifact_identity")
+                else:
+                    payload["artifact_identity"] = identity
+                write_json(manifest, payload)
+
+                result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+                reasons = {blocker["reason"] for blocker in result["blockers"]}
+                self.assertIn(expected_reason, reasons)
+
+    def test_blocks_static_global_promotion_evidence_identity_hash_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "static-global.json"
+            payload = static_global_promotion_evidence_manifest()
+            payload["candidates"][0]["address"] = "0x595b7f0"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("static_global_artifact_identity_hash_mismatch", reasons)
+
+    def test_static_global_identity_ignores_paths_and_timestamps(self) -> None:
+        payload_a = static_global_promotion_evidence_manifest()
+        payload_b = static_global_promotion_evidence_manifest()
+        payload_b["generated_at_utc"] = "2099-01-01T00:00:00Z"
+        payload_b["binary"] = {**payload_b["binary"], "path": "/tmp/other/ShooterGameServer"}
+        payload_b["commands"]["objdump"]["output_provenance"] = "/tmp/other/objdump.provenance.json"
+        payload_b["artifacts"]["static_xrefs"] = "/tmp/other/static-global-xrefs.json"
+
+        self.assertEqual(
+            gate.static_global_artifact_identity(
+                payload_a,
+                capture_id=payload_a["artifact_identity"]["capture_id"],
+                evidence_pack_id=payload_a["artifact_identity"]["evidence_pack_id"],
+            ),
+            gate.static_global_artifact_identity(
+                payload_b,
+                capture_id=payload_b["artifact_identity"]["capture_id"],
+                evidence_pack_id=payload_b["artifact_identity"]["evidence_pack_id"],
+            ),
+        )
 
     def test_blocks_static_global_promotion_evidence_in_promote_mode_when_static_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

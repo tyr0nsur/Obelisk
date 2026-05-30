@@ -60,10 +60,12 @@ priorities, and do not use history files as the active source of truth.
 - Stable plugin loading requires safe `OBELISK_INSTANCE_ID` plus real non-symlink plugin,
   config, log, and state roots.
 - `ObeliskApi` v1 is append-only for `v0.1.0`; ABI v2 requires an explicit migration plan.
-- Post-RC timers are the first non-UE-dependent v1 primitive: owner-token scoped,
-  process-local, zero-failure handles, one-shot/repeating callbacks, explicit unregister,
-  and unload/init-failure cleanup. Timer ids are not shared config, cluster state, UE
-  identity, or persistent handles. `oProcessTimer` is the first-party timer example.
+- Post-RC/v1 timers are the first non-UE-dependent core primitive, not part of the
+  `v0.1.0-rc.1` public surface: owner-token scoped, process-local, zero-failure handles,
+  one-shot/repeating callbacks, explicit unregister, and unload/init-failure cleanup.
+  Timer ids are not shared config, cluster state, UE identity, gameplay/module timer
+  abstractions, shared scheduler state, or persistent handles. `oProcessTimer` is the
+  first-party process-local timer example.
 - EventManager owner cleanup is expected to wait for in-flight callbacks before plugin
   unload; tests cover debug-gated filtered pre-ProcessEvent and post-ProcessEvent callback
   paths.
@@ -166,6 +168,17 @@ priorities, and do not use history files as the active source of truth.
   `docs/research/2026-05-29-buff-compact-second-source-result.md`, and
   `docs/research/2026-05-29-next-targetset-discovery.md` for exact target counts and
   blockers.
+- Structure non-PIN copied-scalar evidence is preserved at
+  `/home/flowcommunity-ark/obelisk-artifacts/structure-nonpin-copied-scalar-policy-slice-20260530T100717Z/`.
+  It excludes `VerifyPinCode`, copies only `SetVariant.{VariantIndex,bForceSet,ReturnValue}`,
+  `AllowToggleActivation.ReturnValue`, and `CanSeat.{bForce,ReturnValue}`, accepts consume
+  mode, and blocks promote mode with
+  `promote_mode_structure_nonpin_copied_scalar_policy_slice_evidence_only` plus non-claim
+  blockers. `artifact-pack.manifest.json` SHA256 is
+  `90a7e51f6cb491bd56ef4f7c0445b0e61265982dadc7f7316139a0ffd43189a3`; `SHA256SUMS` SHA256
+  is `9334831106ce31818a64ed762baf95aadc01eeec4470c77ea5d7f47759e67209`. This does not
+  promote public `StructureEvents`, SDK callbacks, identity, lookup, mutation, return
+  override, dispatcher/hook wiring, `ResourceHandle`, runtime observation, or probing.
 - `ue/MissionReflection.*` is an internal fixture-backed recognizer for
   `mission-compact-intake`: copied bool ranges only, object refs and `OutItemIDs` arrays
   recognition-only, no hook/runtime dispatcher/public Mission SDK.
@@ -323,8 +336,11 @@ priorities, and do not use history files as the active source of truth.
   `compare_reflection_snapshots.py --readiness-report --fail-on-readiness-gaps` against
   that assembled root. The helper manifest is path-redacted; do not preserve or publish
   older `/tmp` manifests that contain absolute source roots.
-- Static-only global evidence uses `scripts/build_static_global_promotion_evidence.py`;
-  `promotion_gate.ready` remains false for static global candidates.
+- Static-only global evidence uses `scripts/build_static_global_promotion_evidence.py`,
+  now with complete top-level `artifact_identity` and gate-side canonical hash
+  validation. `promotion_gate.ready` remains false for static global candidates, and this
+  still does not promote public GObjects, ResourceHandle, identity, lookup, mutation, or
+  return override.
 - Weak-helper evidence archives use `scripts/build_weak_helper_provenance_bundle.py`.
   Missing or invalid source sidecars are preserved as blockers and keep
   `promotion_ready=false`; the current bundle is valid archival material but blocked by

@@ -73,14 +73,15 @@ sequence.
   `CallProcessEvent`, ProcessEvent blocking, broad tracing, ReflectionScanner, debug
   control, and observers unless an exact approved debug window enables the matching
   env+marker pair.
-- Current post-RC core primitive: owner-token process-local timers. They are core runtime
-  utilities only, not gameplay/module timer abstractions or shared scheduler state. They
-  are ABI append-only, zero-failure handles, one-shot/repeating, explicit unregister, and
-  cleaned on plugin init failure/unload. Timer ids are not shared config, cluster state,
-  UE identity, or persistent handles. `oProcessTimer` is the first-party process-local timer
-  example and has SDK consumer coverage for disabled config, active one-shot callback,
-  missing capability, short API, zero owner token, registration failure, post-registration
-  init-failure cleanup, idempotent shutdown, and shutdown unregister.
+- Current post-RC/v1 core primitive: owner-token process-local timers. They are not part
+  of the `v0.1.0-rc.1` public surface, gameplay/module timer abstractions, or shared
+  scheduler state. They are ABI append-only, zero-failure handles, one-shot/repeating,
+  explicit unregister, and cleaned on plugin init failure/unload. Timer ids are not shared
+  config, cluster state, UE identity, or persistent handles. `oProcessTimer` is the
+  first-party process-local timer example and has SDK consumer coverage for disabled
+  config, active one-shot callback, missing capability, short API, zero owner token,
+  registration failure, post-registration init-failure cleanup, idempotent shutdown, and
+  shutdown unregister.
 - Internal bridges only: `StructureEventDispatcher`, `InventoryPolicyEventDispatcher`,
   Item/Mission/Transfer recognizers, weak-helper artifacts, GObjects evidence, and route
   observers are planning/evidence inputs until a separate promotion gate changes scope.
@@ -170,13 +171,20 @@ sequence.
   `SetVariant.{VariantIndex,bForceSet,ReturnValue}`,
   `AllowToggleActivation.ReturnValue`, and `CanSeat.{bForce,ReturnValue}`, accepts consume
   mode, and blocks promote mode with
-  `promote_mode_structure_nonpin_copied_scalar_policy_slice_evidence_only`.
+  `promote_mode_structure_nonpin_copied_scalar_policy_slice_evidence_only`. The durable
+  pack is
+  `/home/flowcommunity-ark/obelisk-artifacts/structure-nonpin-copied-scalar-policy-slice-20260530T100717Z/`
+  with `artifact-pack.manifest.json`
+  (`sha256=90a7e51f6cb491bd56ef4f7c0445b0e61265982dadc7f7316139a0ffd43189a3`)
+  and `SHA256SUMS`
+  (`sha256=9334831106ce31818a64ed762baf95aadc01eeec4470c77ea5d7f47759e67209`).
 - Do not rerun broad FName, GObjects, or core scans for ResourceHandle unless the binary
   hash changes or evidence contradicts current roots/candidates. Do not relax
   `evaluate_resource_handle_revalidation.py` to infer artifact identity from bare hashes.
-  The correct strict-mode path is complete top-level `artifact_identity` from producers
-  (`reconcile_gobjects_samples.py`, `build_static_global_promotion_evidence.py`) and
-  regenerated offline artifacts. Keep `InternalUObjectRevalidationCandidate` internal:
+  The correct strict-mode path is complete top-level `artifact_identity` from producers.
+  `reconcile_gobjects_samples.py` and `build_static_global_promotion_evidence.py` now
+  emit it; the next producer gap is `build_uobject_flag_policy_report.py` plus strict
+  evaluator consumption. Keep `InternalUObjectRevalidationCandidate` internal:
   no public ResourceHandle, GObjects, identity, lookup, lifecycle names, mutation, return
   override, object indices, serials, or UE pointers. ResourceHandle semantic work still
   needs helper evidence, mutation-window rejection, runtime negative samples, and a

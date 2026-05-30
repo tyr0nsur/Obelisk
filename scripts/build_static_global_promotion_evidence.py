@@ -22,6 +22,8 @@ import build_core_dump_evidence_pack as core_pack  # noqa: E402
 SCHEMA = "obelisk.static-global-promotion-evidence.v1"
 STATIC_ARTIFACT_PROVENANCE_SCHEMA = "obelisk.static-artifact-provenance.v1"
 FUOBJECTARRAY_FIELD_WINDOW_SCHEMA = "obelisk.fuobjectarray-field-window-redacted.v1"
+DEFAULT_CAPTURE_ID = "static-global-default-capture"
+DEFAULT_EVIDENCE_PACK_ID = "static-global-default-pack"
 PROVENANCE_PRODUCER = Path(__file__).name
 PROTECTED_SERVER_ROOT = Path("/servidor/ark")
 APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
@@ -50,6 +52,34 @@ SEMANTIC_ROLE_KEYWORDS = (
 GOBJECTS_FIELD_NAMES = {"root", "chunks", "count", "serial"}
 FIELD_WINDOW_BLOCKER = "missing_gobjects_coherent_field_window"
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+SAFE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+
+
+def validate_safe_id(value: str, field_name: str) -> str:
+    if not value:
+        raise argparse.ArgumentTypeError(f"{field_name} must not be empty")
+    if ".." in value:
+        raise argparse.ArgumentTypeError(f"{field_name} must not contain '..'")
+    if "/" in value or "\\" in value:
+        raise argparse.ArgumentTypeError(f"{field_name} must not contain path separators")
+    if SAFE_ID_RE.fullmatch(value) is None:
+        raise argparse.ArgumentTypeError(
+            f"{field_name} must be 1-128 characters of ASCII letters, digits, '.', '_', or '-' "
+            "and start with a letter or digit"
+        )
+    return value
+
+
+def parse_capture_id(value: str) -> str:
+    return validate_safe_id(value, "--capture-id")
+
+
+def parse_evidence_pack_id(value: str) -> str:
+    return validate_safe_id(value, "--evidence-pack-id")
+
+
+def canonical_json_bytes(value: object) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
 
 
 def is_relative_to(path: Path, parent: Path) -> bool:
@@ -947,6 +977,82 @@ def candidate_address_sha256(binary_sha256: str, candidate: int) -> str:
     return hashlib.sha256(material.encode("ascii")).hexdigest()
 
 
+def canonical_command_record(record: dict[str, object]) -> dict[str, object]:
+    provenance = record.get("provenance")
+    provenance_summary: dict[str, object] = {}
+    if isinstance(provenance, dict):
+        for key in (
+            "verified",
+            "reason",
+            "artifact_kind",
+            "binary_sha256",
+            "artifact_sha256",
+            "source_artifact_sha256",
+            "tool",
+        ):
+            if key in provenance:
+                provenance_summary[key] = provenance[key]
+    return {
+        "source_sha256": record.get("source_sha256"),
+        "copied_sha256": record.get("copied_sha256"),
+        "stdout_sha256": record.get("stdout_sha256"),
+        "returncode": record.get("returncode"),
+        "provenance": provenance_summary,
+    }
+
+
+def sanitize_static_identity_value(value: object) -> object:
+    if isinstance(value, dict):
+        return {
+            key: sanitize_static_identity_value(child)
+            for key, child in sorted(value.items())
+            if key not in {"path", "source", "copied_to", "output_provenance"}
+        }
+    if isinstance(value, list):
+        return [sanitize_static_identity_value(item) for item in value]
+    return value
+
+
+def canonical_static_report(report: dict[str, object]) -> dict[str, object]:
+    binary = report.get("binary")
+    commands = report.get("commands")
+    return {
+        "schema": report.get("schema"),
+        "binary_sha256": binary.get("sha256") if isinstance(binary, dict) else None,
+        "static_xrefs_sha256": report.get("static_xrefs_sha256"),
+        "commands": {
+            name: canonical_command_record(record)
+            for name, record in sorted((commands or {}).items())
+            if isinstance(name, str) and isinstance(record, dict)
+        }
+        if isinstance(commands, dict)
+        else {},
+        "candidates": sanitize_static_identity_value(report.get("candidates")),
+        "promotion_gate": report.get("promotion_gate"),
+    }
+
+
+def build_artifact_identity(
+    *,
+    capture_id: str,
+    evidence_pack_id: str,
+    report: dict[str, object],
+) -> dict[str, str]:
+    identity_without_hash = {
+        "artifact_kind": SCHEMA,
+        "capture_id": validate_safe_id(capture_id, "capture_id"),
+        "evidence_pack_id": validate_safe_id(evidence_pack_id, "evidence_pack_id"),
+    }
+    material = {
+        "artifact_identity": identity_without_hash,
+        "report": canonical_static_report(report),
+    }
+    return {
+        **identity_without_hash,
+        "artifact_sha256": hashlib.sha256(canonical_json_bytes(material)).hexdigest(),
+    }
+
+
 def load_fuobjectarray_field_window_evidence(path: Path, binary_sha256: str) -> tuple[str, dict[str, object]]:
     reject_protected_path(path, "--fuobjectarray-field-window-evidence")
     payload = json.loads(path.read_text(encoding="utf-8"))
@@ -1093,6 +1199,7 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     )
     xrefs_path = output_dir / "static-global-xrefs.json"
     xrefs_path.write_text(json.dumps(xrefs_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    static_xrefs_sha256 = core_pack.sha256_file(xrefs_path)
 
     candidate_records = [
         candidate_payload(
@@ -1108,7 +1215,7 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         for label, address in candidates
     ]
 
-    return {
+    report: dict[str, object] = {
         "schema": SCHEMA,
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "obelisk_commit": core_pack.detect_obelisk_commit(Path(__file__).resolve().parents[1]),
@@ -1123,8 +1230,17 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             "objdump": str(output_dir / "ShooterGameServer.objdump"),
             "static_xrefs": str(xrefs_path),
         },
+        "static_xrefs_sha256": static_xrefs_sha256,
         "candidates": candidate_records,
         "promotion_gate": promotion_gate(candidate_records, commands),
+    }
+    return {
+        "artifact_identity": build_artifact_identity(
+            capture_id=args.capture_id,
+            evidence_pack_id=args.evidence_pack_id,
+            report=report,
+        ),
+        **report,
     }
 
 
@@ -1147,6 +1263,18 @@ def parse_args() -> argparse.Namespace:
         action="append",
         type=Path,
         help="Redacted FUObjectArray field-window evidence JSON to consume for internal static research.",
+    )
+    parser.add_argument(
+        "--capture-id",
+        type=parse_capture_id,
+        default=DEFAULT_CAPTURE_ID,
+        help="Safe capture identifier to include in artifact_identity.",
+    )
+    parser.add_argument(
+        "--evidence-pack-id",
+        type=parse_evidence_pack_id,
+        default=DEFAULT_EVIDENCE_PACK_ID,
+        help="Safe evidence pack identifier to include in artifact_identity.",
     )
     parser.add_argument("--json", action="store_true", help="Print manifest JSON to stdout.")
     return parser.parse_args()

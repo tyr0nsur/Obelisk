@@ -479,6 +479,7 @@ REQUIRED_UOBJECT_FLAG_POLICY_CANDIDATES = {
 UOBJECT_FLAG_POLICY_ALLOWED_HEX_STRINGS = {"0x100", "0x4000"}
 STATIC_GLOBAL_CANDIDATE_KINDS = {"gobjects", "fname_root"}
 STATIC_GLOBAL_GOBJECTS_FIELD_WINDOW_BLOCKER = "missing_gobjects_coherent_field_window"
+STATIC_GLOBAL_SAFE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 UOBJECT_FLAG_POLICY_PUBLIC_FORBIDDEN_KEY_RE = re.compile(r"(?:^|_)(address|index|indices|serial|pointer|ptr)(?:_|$)", re.IGNORECASE)
 UOBJECT_FLAG_POLICY_PUBLIC_FORBIDDEN_VALUE_RE = re.compile(r"(?:^|[_\W])(address|index|indices|serial|pointer|ptr)(?:[_\W]|$)", re.IGNORECASE)
 UOBJECT_FLAG_POLICY_PUBLIC_ADDRESS_RE = re.compile(r"\b0x[0-9a-f]{5,}\b", re.IGNORECASE)
@@ -506,6 +507,85 @@ REQUIRED_UOBJECT_FLAG_TRANSITION_WINDOWS = {
     "gobjects_4000_skip_mark_2982920_2982b60",
     "holder_4000_skip_mark_11ee120_11ee270",
 }
+
+
+def canonical_json_bytes(value: object) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+
+
+def static_global_safe_id(value: object) -> bool:
+    return isinstance(value, str) and ".." not in value and "/" not in value and "\\" not in value and STATIC_GLOBAL_SAFE_ID_RE.fullmatch(value) is not None
+
+
+def static_global_canonical_command_record(record: dict[str, Any]) -> dict[str, Any]:
+    provenance = record.get("provenance")
+    provenance_summary: dict[str, Any] = {}
+    if isinstance(provenance, dict):
+        for key in (
+            "verified",
+            "reason",
+            "artifact_kind",
+            "binary_sha256",
+            "artifact_sha256",
+            "source_artifact_sha256",
+            "tool",
+        ):
+            if key in provenance:
+                provenance_summary[key] = provenance[key]
+    return {
+        "source_sha256": record.get("source_sha256"),
+        "copied_sha256": record.get("copied_sha256"),
+        "stdout_sha256": record.get("stdout_sha256"),
+        "returncode": record.get("returncode"),
+        "provenance": provenance_summary,
+    }
+
+
+def static_global_sanitize_identity_value(value: object) -> object:
+    if isinstance(value, dict):
+        return {
+            key: static_global_sanitize_identity_value(child)
+            for key, child in sorted(value.items())
+            if key not in {"path", "source", "copied_to", "output_provenance"}
+        }
+    if isinstance(value, list):
+        return [static_global_sanitize_identity_value(item) for item in value]
+    return value
+
+
+def static_global_canonical_report(payload: dict[str, Any]) -> dict[str, Any]:
+    binary = payload.get("binary")
+    commands = payload.get("commands")
+    return {
+        "schema": payload.get("schema"),
+        "binary_sha256": binary.get("sha256") if isinstance(binary, dict) else None,
+        "static_xrefs_sha256": payload.get("static_xrefs_sha256"),
+        "commands": {
+            name: static_global_canonical_command_record(record)
+            for name, record in sorted((commands or {}).items())
+            if isinstance(name, str) and isinstance(record, dict)
+        }
+        if isinstance(commands, dict)
+        else {},
+        "candidates": static_global_sanitize_identity_value(payload.get("candidates")),
+        "promotion_gate": payload.get("promotion_gate"),
+    }
+
+
+def static_global_artifact_identity(payload: dict[str, Any], *, capture_id: str, evidence_pack_id: str) -> dict[str, str]:
+    identity_without_hash = {
+        "artifact_kind": STATIC_GLOBAL_PROMOTION_EVIDENCE_SCHEMA,
+        "capture_id": capture_id,
+        "evidence_pack_id": evidence_pack_id,
+    }
+    material = {
+        "artifact_identity": identity_without_hash,
+        "report": static_global_canonical_report(payload),
+    }
+    return {
+        **identity_without_hash,
+        "artifact_sha256": hashlib.sha256(canonical_json_bytes(material)).hexdigest(),
+    }
 OPTIONAL_UOBJECT_FLAG_TRANSITION_WINDOWS = {
     "uobject_100_clear_1d637c8_1d63888",
     "uobject_4000_set_call_clear_251f970_251f986",
@@ -3668,9 +3748,55 @@ def validate_static_global_promotion_evidence_manifest(
         blockers.append({"reason": "static_global_missing_promotion_gate", "label": f"{label}:$.promotion_gate"})
         return blockers
 
+    artifact_identity = payload.get("artifact_identity")
+    identity_ready_for_hash = False
+    if not isinstance(artifact_identity, dict):
+        blockers.append({"reason": "static_global_missing_artifact_identity", "label": f"{label}:$.artifact_identity"})
+    else:
+        expected_keys = {"artifact_kind", "artifact_sha256", "capture_id", "evidence_pack_id"}
+        if set(artifact_identity) != expected_keys:
+            blockers.append({"reason": "static_global_artifact_identity_fields_mismatch", "label": f"{label}:$.artifact_identity"})
+        if artifact_identity.get("artifact_kind") != STATIC_GLOBAL_PROMOTION_EVIDENCE_SCHEMA:
+            blockers.append({"reason": "static_global_artifact_identity_kind_mismatch", "label": f"{label}:$.artifact_identity.artifact_kind"})
+        artifact_sha256 = artifact_identity.get("artifact_sha256")
+        if not isinstance(artifact_sha256, str) or SHA256_RE.fullmatch(artifact_sha256) is None:
+            blockers.append({"reason": "static_global_artifact_identity_sha_invalid", "label": f"{label}:$.artifact_identity.artifact_sha256"})
+        capture_id = artifact_identity.get("capture_id")
+        evidence_pack_id = artifact_identity.get("evidence_pack_id")
+        if not static_global_safe_id(capture_id):
+            blockers.append({"reason": "static_global_artifact_identity_capture_id_invalid", "label": f"{label}:$.artifact_identity.capture_id"})
+        if not static_global_safe_id(evidence_pack_id):
+            blockers.append({"reason": "static_global_artifact_identity_evidence_pack_id_invalid", "label": f"{label}:$.artifact_identity.evidence_pack_id"})
+        identity_ready_for_hash = (
+            artifact_identity.get("artifact_kind") == STATIC_GLOBAL_PROMOTION_EVIDENCE_SCHEMA
+            and isinstance(artifact_sha256, str)
+            and SHA256_RE.fullmatch(artifact_sha256) is not None
+            and static_global_safe_id(capture_id)
+            and static_global_safe_id(evidence_pack_id)
+        )
+
     binary = payload.get("binary")
     if not isinstance(binary, dict) or not isinstance(binary.get("sha256"), str) or SHA256_RE.fullmatch(binary["sha256"]) is None:
         blockers.append({"reason": "static_global_missing_binary_sha256", "label": f"{label}:$.binary.sha256"})
+
+    static_xrefs_sha256 = payload.get("static_xrefs_sha256")
+    if not isinstance(static_xrefs_sha256, str) or SHA256_RE.fullmatch(static_xrefs_sha256) is None:
+        blockers.append({"reason": "static_global_static_xrefs_sha256_invalid", "label": f"{label}:$.static_xrefs_sha256"})
+    elif identity_ready_for_hash and isinstance(artifact_identity, dict):
+        expected_identity = static_global_artifact_identity(
+            payload,
+            capture_id=str(artifact_identity["capture_id"]),
+            evidence_pack_id=str(artifact_identity["evidence_pack_id"]),
+        )
+        if artifact_identity.get("artifact_sha256") != expected_identity["artifact_sha256"]:
+            blockers.append(
+                {
+                    "reason": "static_global_artifact_identity_hash_mismatch",
+                    "label": f"{label}:$.artifact_identity.artifact_sha256",
+                    "expected": expected_identity["artifact_sha256"],
+                    "recorded": artifact_identity.get("artifact_sha256"),
+                }
+            )
 
     commands = payload.get("commands")
     if not isinstance(commands, dict) or not commands:
@@ -3737,6 +3863,11 @@ def validate_static_global_promotion_evidence_manifest(
             blockers.append({"reason": "promote_mode_static_global_has_remaining_blockers", "label": f"{label}:$.remaining_blockers"})
         if any("static_only_evidence" in value for value in claims):
             blockers.append({"reason": "promote_mode_static_global_static_only_evidence", "label": label})
+    for trail, _, reason in collect_candidate_public_overclaims(
+        payload,
+        allowed_prefixes=(),
+    ):
+        blockers.append({"reason": f"static_global_public_overclaim_{reason}", "label": f"{label}:{trail}"})
     return blockers
 
 
