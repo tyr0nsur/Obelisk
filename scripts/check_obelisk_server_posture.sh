@@ -271,6 +271,10 @@ if [[ "${EXPECT_STABLE}" == "1" ]]; then
     forbid_env OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256
     forbid_env OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT
     forbid_env OBELISK_STRUCTURE_REFLECTION_DISPATCH_LIMIT
+    forbid_env OBELISK_ENABLE_ITEM_RETURN_EVENTS
+    forbid_env OBELISK_ITEM_RETURN_EVENTS_BINARY_SHA256
+    forbid_env OBELISK_ITEM_RETURN_EVENTS_DISPATCH_LIMIT
+    forbid_env OBELISK_ITEM_RETURN_EVENTS_LOG_LIMIT
 
     forbid_env OBELISK_ENABLE_REFLECTION_SCANNER
     forbid_env OBELISK_REFLECTION_STATIC_FNAME_ROOTS
@@ -291,6 +295,7 @@ if [[ "${EXPECT_STABLE}" == "1" ]]; then
     forbid_marker enable-chat-route-observer
     forbid_marker enable-inventory-reflection
     forbid_marker enable-structure-reflection
+    forbid_marker enable-item-return-events
     forbid_marker enable-reflection-scanner
     forbid_marker request-static-fname-probe
 fi

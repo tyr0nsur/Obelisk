@@ -185,6 +185,7 @@ V010_GAMEPLAY_POLICY_EVENT_PAYLOAD_FIELDS = [
 V010_GAMEPLAY_POLICY_TARGET_SETS = [
     "structure-observer-intake",
     "minimal-second-source-intake",
+    "item-return-only-policy-slice",
 ]
 V010_GAMEPLAY_POLICY_RESOURCE_KINDS = [
     "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE",
@@ -1720,6 +1721,11 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                         "docs/research/2026-05-29-structure-observer-intake-refresh.md",
                         event.get("second_source_reports", []),
                     )
+                    self.assertEqual(event.get("item_return_backing_target_set"), "item-return-only-policy-slice")
+                    self.assertIn(
+                        "docs/research/2026-05-30-item-return-only-policy-slice.md",
+                        event.get("second_source_reports", []),
+                    )
                     for sdk_path in (
                         "tests/sdk_installed_consumer/consumer_plugin.cpp",
                         "tests/sdk_installed_consumer/consumer_fixture.cpp",
@@ -1740,6 +1746,19 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                             "no standalone",
                             "module-specific",
                             "inventory",
+                        ):
+                            self.assertIn(required_scope_term, scope)
+                    if target_set == "item-return-only-policy-slice":
+                        scope = item["scope"]
+                        for required_scope_term in (
+                            "ReturnValue-only",
+                            "AllowEquipItem",
+                            "CanRepair",
+                            "UseItemOntoItem",
+                            "no standalone item or inventory module surface",
+                            "no identity",
+                            "no mutation",
+                            "no return override",
                         ):
                             self.assertIn(required_scope_term, scope)
                     reports = item.get("reports")

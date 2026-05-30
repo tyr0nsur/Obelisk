@@ -28,6 +28,11 @@ SAFE_DETAIL_KEYS = {
     "chat": {
         "ServerSendChatMessage": {"send_mode", "send_mode_name", "send_mode_known"},
     },
+    "item_return": {
+        "AllowEquipItem": {"callbacks", "field_mask"},
+        "CanRepair": {"callbacks", "field_mask"},
+        "UseItemOntoItem": {"callbacks", "field_mask"},
+    },
 }
 PROMOTION_ONLY_BLOCKERS = {"runtime_observer_evidence_only"}
 
@@ -35,6 +40,11 @@ PROMOTION_ONLY_BLOCKERS = {"runtime_observer_evidence_only"}
 GATE_RE = re.compile(
     LOG_PREFIX
     + r"Experimental (?P<module>[A-Za-z0-9_]+) reflection enabled for ShooterGameServer "
+    r"SHA256 (?P<sha256>[a-fA-F0-9]{64})\.?"
+)
+ITEM_RETURN_GATE_RE = re.compile(
+    LOG_PREFIX
+    + r"Experimental item return event producer enabled for ShooterGameServer "
     r"SHA256 (?P<sha256>[a-fA-F0-9]{64})\.?"
 )
 PROCESS_EVENT_RE = re.compile(
@@ -56,6 +66,17 @@ REJECT_RE = re.compile(
     + r"Reflected (?P<module>[A-Za-z0-9_]+) rejected #(?P<sequence>\d+) "
     r"fname_index=(?P<fname_index>-?\d+)"
     r"(?: function=(?P<function>\S+))? reason=(?P<reason>.+)"
+)
+ITEM_RETURN_REJECT_RE = re.compile(
+    LOG_PREFIX
+    + r"Reflected item return rejected #(?P<sequence>\d+) "
+    r"fname_index=(?P<fname_index>-?\d+) reason=(?P<reason>.+)"
+)
+ITEM_RETURN_DISPATCH_RE = re.compile(
+    LOG_PREFIX
+    + r"Reflected item return dispatched #(?P<sequence>\d+) "
+    r"function=(?P<function>\S+) fname_index=(?P<fname_index>-?\d+) "
+    r"callbacks=(?P<callbacks>\d+) field_mask=(?P<field_mask>\S+)"
 )
 DETAIL_RE = re.compile(
     LOG_PREFIX + r"Reflected (?P<module>[A-Za-z0-9_]+) (?P<function>\S+) (?P<rest>.+)"
@@ -330,6 +351,14 @@ def analyze_source_lines(sources: list[list[str]], *, source_merge_explicit: boo
             add_unique(modules[module]["gate_sha256"], match.group("sha256").lower())
             continue
 
+        if match := ITEM_RETURN_GATE_RE.fullmatch(stripped):
+            module = "item_return"
+            close_active_context(source_index, module)
+            add_source_index(modules[module], source_index)
+            modules[module]["source_merge_explicit"] = source_merge_explicit
+            add_unique(modules[module]["gate_sha256"], match.group("sha256").lower())
+            continue
+
         if match := PROCESS_EVENT_RE.fullmatch(stripped):
             module = match.group("module")
             function = match.group("function")
@@ -418,6 +447,39 @@ def analyze_source_lines(sources: list[list[str]], *, source_merge_explicit: boo
             reason = match.group("reason")
             record["reject_reasons"].setdefault(reason, 0)
             record["reject_reasons"][reason] += 1
+            continue
+
+        if match := ITEM_RETURN_REJECT_RE.fullmatch(stripped):
+            module = "item_return"
+            record = modules[module]
+            record["source_merge_explicit"] = source_merge_explicit
+            add_source_index(record, source_index)
+            record["rejected_count"] += 1
+            close_active_context(source_index, module)
+            reason = match.group("reason")
+            record["reject_reasons"].setdefault(reason, 0)
+            record["reject_reasons"][reason] += 1
+            continue
+
+        if match := ITEM_RETURN_DISPATCH_RE.fullmatch(stripped):
+            module = "item_return"
+            function = match.group("function")
+            close_active_context(source_index, module)
+            record = modules[module]
+            record["source_merge_explicit"] = source_merge_explicit
+            add_source_index(record, source_index)
+            record["accepted_count"] += 1
+            functions = record["functions"]
+            functions.setdefault(function, function_record())
+            function_data = functions[function]
+            function_data["accepted"] += 1
+            add_unique(function_data["fname_indices"], int(match.group("fname_index")))
+            for key in ("callbacks", "field_mask"):
+                raw_value = match.group(key)
+                if key not in safe_detail_keys(module, function):
+                    record["redacted_detail_keys"][key] += 1
+                    continue
+                add_unique(function_data["details"][key], int_or_text(raw_value))
             continue
 
         if match := DETAIL_RE.fullmatch(stripped):

@@ -31,6 +31,7 @@ FORBIDDEN_STABLE_MARKERS = frozenset(
         "enable-chat-route-observer",
         "enable-inventory-reflection",
         "enable-structure-reflection",
+        "enable-item-return-events",
         "enable-reflection-scanner",
         "request-static-fname-probe",
     )

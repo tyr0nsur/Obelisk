@@ -127,11 +127,13 @@ recovery context is not active routing for the current head; use
   `docs/research/` for artifact paths, manifests, hashes, and target lists.
 - Item return-only policy now has three append-only public `GameplayPolicyEvent` kinds for
   `AllowEquipItem`, `CanRepair`, and `UseItemOntoItem`, all copied `ReturnValue` only and
-  `inventory_item` category only. The private `ItemReturnEventDispatcher`, hook producer,
-  broader item/inventory decoding, runtime validation, identity, lookup, mutation, return
-  override, `ResourceHandle`, public Inventory SDK, and public Items SDK remain absent.
-  Do not reuse `INVENTORY_USE_CHECK` or map `CanRepair.bIgnoreInventoryRequirement` to
-  `IGNORE_COOLDOWN`.
+  `inventory_item` category only. The private `ItemReturnEventDispatcher` and gated hook
+  producer exist, but runtime validation, broader item/inventory decoding, identity,
+  lookup, mutation, return override, `ResourceHandle`, public Inventory SDK, and public
+  Items SDK remain absent. Stable wrapper/posture tooling now treats
+  `enable-item-return-events` and `OBELISK_ITEM_RETURN_EVENTS_*` as experimental and
+  forbidden in stable posture. Do not reuse `INVENTORY_USE_CHECK` or map
+  `CanRepair.bIgnoreInventoryRequirement` to `IGNORE_COOLDOWN`.
 - `ChatMessageEvent` is sufficient for plugin-local command parsing/handlers in the next
   RC scope when described as copied chat input only, not a command SDK: no identity,
   permissions, replies, send-chat API, blocking, mutation, or return override. Before an
@@ -198,7 +200,10 @@ recovery context is not active routing for the current head; use
   fail-closed observer gates and post-original copied payloads for the already-promoted
   three `GameplayPolicyEvent` kinds. Do not route it through
   `InventoryPolicyEventKind::CanUse`, and do not expand into an Items SDK or Inventory SDK
-  without a separate promotion gate.
+  without a separate promotion gate. Before requesting `arkserver2`, keep evidence offline:
+  `analyze_runtime_observer_log.py` recognizes sanitized item-return enabled/rejected/
+  dispatched lines, but the current comparison tooling still needs a reproducible
+  second-source refresh or normalization with full bool-tail semantics.
 - Secondary evidence-only lanes may continue for structure non-pin copied scalars and Buff
   breadth, but they must not imply runtime work, marker/env changes, public SDK expansion,
   or RC surface changes.

@@ -292,9 +292,18 @@ scalar field (`ReturnValue` bool). The dispatcher mirrors existing owner-scoped 
 lifecycle behavior, copies payload storage for callback duration, contains callback
 exceptions, and defers user-data cleanup safely when a callback unregisters itself.
 
-This is still internal plumbing. The hook producer is default-off and gated by
+The hook producer remains internal plumbing. It is default-off and gated by
 `OBELISK_ENABLE_ITEM_RETURN_EVENTS`, observer debug profile/window markers, binary SHA, and
-dispatch budget before it builds or dispatches copied observations. It does not add public
-`GameplayPolicyEvent` mapping, ABI values, plugin callback registration, live-server
-validation, mutation, blocking, return override, object identity, `ResourceHandle`, or an
-Items SDK.
+dispatch budget before it builds or dispatches copied observations.
+
+Post-RC HEAD promotes only the three copied `ReturnValue` checks as append-only
+`GameplayPolicyEvent` kinds:
+
+- `OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_ALLOW_EQUIP_ITEM_CHECK`
+- `OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_CAN_REPAIR_CHECK`
+- `OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK`
+
+That promotion does not add a public Items SDK, public Inventory SDK, live-server
+validation claim, mutation, blocking, return override, object identity, `ResourceHandle`,
+or any UE internal exposure. Runtime producer validation is still a separate gated
+debug-window task.

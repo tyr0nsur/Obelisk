@@ -122,6 +122,10 @@ assert_not_contains "${capture_no_marker}" '^OBELISK_ENABLE_INVENTORY_REFLECTION
 assert_not_contains "${capture_no_marker}" '^OBELISK_INVENTORY_REFLECTION_BINARY_SHA256='
 assert_not_contains "${capture_no_marker}" '^OBELISK_INVENTORY_REFLECTION_LOG_LIMIT='
 assert_not_contains "${capture_no_marker}" '^OBELISK_INVENTORY_REFLECTION_DISPATCH_LIMIT='
+assert_not_contains "${capture_no_marker}" '^OBELISK_ENABLE_ITEM_RETURN_EVENTS='
+assert_not_contains "${capture_no_marker}" '^OBELISK_ITEM_RETURN_EVENTS_BINARY_SHA256='
+assert_not_contains "${capture_no_marker}" '^OBELISK_ITEM_RETURN_EVENTS_DISPATCH_LIMIT='
+assert_not_contains "${capture_no_marker}" '^OBELISK_ITEM_RETURN_EVENTS_LOG_LIMIT='
 
 root_marker="${TMP_DIR}/root-marker"
 capture_marker="${TMP_DIR}/marker.env"
@@ -165,6 +169,7 @@ assert_contains "${capture_marker}" '^OBELISK_ENABLE_STRUCTURE_REFLECTION=1$'
 assert_contains "${capture_marker}" '^OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520$'
 assert_contains "${capture_marker}" '^OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT=0$'
 assert_contains "${capture_marker}" '^OBELISK_STRUCTURE_REFLECTION_DISPATCH_LIMIT=0$'
+assert_not_contains "${capture_marker}" '^OBELISK_ENABLE_ITEM_RETURN_EVENTS='
 
 root_chat_events="${TMP_DIR}/root-chat-events"
 capture_chat_events="${TMP_DIR}/chat-events.env"
@@ -218,6 +223,61 @@ assert_contains "${capture_chat_events}" '^OBELISK_CHAT_EVENTS_DISPATCH_LIMIT=1$
 assert_not_contains "${capture_chat_events}" '^OBELISK_ENABLE_CHAT_REFLECTION='
 assert_not_contains "${capture_chat_events}" '^OBELISK_CHAT_REFLECTION_BINARY_SHA256='
 assert_not_contains "${capture_chat_events}" '^OBELISK_CHAT_REFLECTION_LOG_LIMIT='
+
+root_item_return="${TMP_DIR}/root-item-return"
+capture_item_return="${TMP_DIR}/item-return.env"
+prepare_root "${root_item_return}"
+: > "${root_item_return}/state/instances/arkserver2/allow-observer-debug-window"
+: > "${root_item_return}/state/instances/arkserver2/allow-experimental-observers"
+: > "${root_item_return}/state/instances/arkserver2/enable-item-return-events"
+expect_wrapper_failure item-return-marker-stable-profile env \
+    OBELISK_ROOT="${root_item_return}" \
+    OBELISK_WRAPPER_CAPTURE="${TMP_DIR}/item-return-marker-stable-profile.env" \
+    "${WRAPPER}" TheIsland?listen
+expect_wrapper_failure item-return-marker-without-explicit-budget env \
+    OBELISK_ROOT="${root_item_return}" \
+    OBELISK_WRAPPER_CAPTURE="${TMP_DIR}/item-return-marker-without-explicit-budget.env" \
+    OBELISK_WRAPPER_PROFILE=observer-debug \
+    "${WRAPPER}" TheIsland?listen
+expect_wrapper_failure item-return-marker-with-zero-budget env \
+    OBELISK_ROOT="${root_item_return}" \
+    OBELISK_WRAPPER_CAPTURE="${TMP_DIR}/item-return-marker-with-zero-budget.env" \
+    OBELISK_WRAPPER_PROFILE=observer-debug \
+    OBELISK_ITEM_RETURN_EVENTS_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
+    OBELISK_ITEM_RETURN_EVENTS_DISPATCH_LIMIT=0 \
+    "${WRAPPER}" TheIsland?listen
+expect_wrapper_failure item-return-marker-with-invalid-sha env \
+    OBELISK_ROOT="${root_item_return}" \
+    OBELISK_WRAPPER_CAPTURE="${TMP_DIR}/item-return-marker-with-invalid-sha.env" \
+    OBELISK_WRAPPER_PROFILE=observer-debug \
+    OBELISK_ITEM_RETURN_EVENTS_BINARY_SHA256=bad-item-return-sha \
+    OBELISK_ITEM_RETURN_EVENTS_DISPATCH_LIMIT=1 \
+    "${WRAPPER}" TheIsland?listen
+expect_wrapper_failure item-return-marker-with-invalid-log-limit env \
+    OBELISK_ROOT="${root_item_return}" \
+    OBELISK_WRAPPER_CAPTURE="${TMP_DIR}/item-return-marker-with-invalid-log-limit.env" \
+    OBELISK_WRAPPER_PROFILE=observer-debug \
+    OBELISK_ITEM_RETURN_EVENTS_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
+    OBELISK_ITEM_RETURN_EVENTS_DISPATCH_LIMIT=1 \
+    OBELISK_ITEM_RETURN_EVENTS_LOG_LIMIT=bad-log-limit \
+    "${WRAPPER}" TheIsland?listen
+(
+    cd "${RUN_CWD}"
+    OBELISK_ROOT="${root_item_return}" \
+    OBELISK_WRAPPER_CAPTURE="${capture_item_return}" \
+    OBELISK_WRAPPER_PROFILE=observer-debug \
+    OBELISK_ITEM_RETURN_EVENTS_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
+    OBELISK_ITEM_RETURN_EVENTS_DISPATCH_LIMIT=2 \
+    OBELISK_ITEM_RETURN_EVENTS_LOG_LIMIT=1 \
+    "${WRAPPER}" TheIsland?listen
+)
+
+assert_contains "${capture_item_return}" '^OBELISK_ENABLE_ITEM_RETURN_EVENTS=1$'
+assert_contains "${capture_item_return}" '^OBELISK_ITEM_RETURN_EVENTS_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520$'
+assert_contains "${capture_item_return}" '^OBELISK_ITEM_RETURN_EVENTS_DISPATCH_LIMIT=2$'
+assert_contains "${capture_item_return}" '^OBELISK_ITEM_RETURN_EVENTS_LOG_LIMIT=1$'
+assert_not_contains "${capture_item_return}" '^OBELISK_ENABLE_CHAT_EVENTS='
+assert_not_contains "${capture_item_return}" '^OBELISK_ENABLE_INVENTORY_REFLECTION='
 
 root_chat_route="${TMP_DIR}/root-chat-route"
 capture_chat_route="${TMP_DIR}/chat-route.env"
@@ -295,6 +355,7 @@ mkdir -p "${root_ragnarok_stale}/state/instances/arkserver"
 : > "${root_ragnarok_stale}/state/instances/arkserver/enable-chat-reflection"
 : > "${root_ragnarok_stale}/state/instances/arkserver/enable-inventory-reflection"
 : > "${root_ragnarok_stale}/state/instances/arkserver/enable-structure-reflection"
+: > "${root_ragnarok_stale}/state/instances/arkserver/enable-item-return-events"
 expect_wrapper_failure ragnarok-stale-observer-markers env \
     OBELISK_ROOT="${root_ragnarok_stale}" \
     OBELISK_WRAPPER_CAPTURE="${capture_ragnarok_stale}" \
@@ -402,6 +463,10 @@ prepare_root "${root_inherited}"
     OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256=bad-structure-sha \
     OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT=77 \
     OBELISK_STRUCTURE_REFLECTION_DISPATCH_LIMIT=66 \
+    OBELISK_ENABLE_ITEM_RETURN_EVENTS=1 \
+    OBELISK_ITEM_RETURN_EVENTS_BINARY_SHA256=bad-item-return-sha \
+    OBELISK_ITEM_RETURN_EVENTS_DISPATCH_LIMIT=22 \
+    OBELISK_ITEM_RETURN_EVENTS_LOG_LIMIT=11 \
     "${WRAPPER}" Ragnarok?listen
 )
 
@@ -441,6 +506,10 @@ assert_not_contains "${capture_inherited}" '^OBELISK_ENABLE_STRUCTURE_REFLECTION
 assert_not_contains "${capture_inherited}" '^OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256='
 assert_not_contains "${capture_inherited}" '^OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT='
 assert_not_contains "${capture_inherited}" '^OBELISK_STRUCTURE_REFLECTION_DISPATCH_LIMIT='
+assert_not_contains "${capture_inherited}" '^OBELISK_ENABLE_ITEM_RETURN_EVENTS='
+assert_not_contains "${capture_inherited}" '^OBELISK_ITEM_RETURN_EVENTS_BINARY_SHA256='
+assert_not_contains "${capture_inherited}" '^OBELISK_ITEM_RETURN_EVENTS_DISPATCH_LIMIT='
+assert_not_contains "${capture_inherited}" '^OBELISK_ITEM_RETURN_EVENTS_LOG_LIMIT='
 
 capture_symlink_instance="${TMP_DIR}/symlink-instance.env"
 root_symlink_instance="${TMP_DIR}/root-symlink-instance"

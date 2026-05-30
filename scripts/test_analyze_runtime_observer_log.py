@@ -171,6 +171,36 @@ class RuntimeObserverLogAnalyzerTests(unittest.TestCase):
         self.assertEqual(structure["fields"]["pinCode"]["has_range"], {"false": 1})
         self.assertEqual(structure["reject_reasons"], {"bad_parms_size": 1})
 
+    def test_summarizes_item_return_event_producer(self) -> None:
+        result = self.run_analyzer(
+            [
+                "[warning] Experimental item return event producer enabled for ShooterGameServer SHA256 "
+                "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520.",
+                "[info] Reflected item return dispatched #1 function=AllowEquipItem "
+                "fname_index=6250 callbacks=1 field_mask=ReturnValue",
+                "[info] Reflected item return dispatched #2 function=CanRepair "
+                "fname_index=6251 callbacks=2 field_mask=ReturnValue",
+                "[info] Reflected item return rejected #1 fname_index=9999 reason=non-item function",
+            ]
+        )
+
+        item_return = result["modules"]["item_return"]
+        self.assertEqual(item_return["accepted_count"], 2)
+        self.assertEqual(item_return["rejected_count"], 1)
+        self.assertEqual(item_return["blockers"], ["runtime_observer_evidence_only"])
+        self.assertEqual(
+            item_return["gate_sha256"],
+            ["7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"],
+        )
+        self.assertEqual(item_return["functions"]["AllowEquipItem"]["fname_indices"], [6250])
+        self.assertEqual(item_return["functions"]["AllowEquipItem"]["details"]["callbacks"], [1])
+        self.assertEqual(
+            item_return["functions"]["AllowEquipItem"]["details"]["field_mask"],
+            ["ReturnValue"],
+        )
+        self.assertEqual(item_return["functions"]["CanRepair"]["details"]["callbacks"], [2])
+        self.assertEqual(item_return["reject_reasons"], {"non-item function": 1})
+
     def test_keeps_same_field_name_layouts_separate_by_function(self) -> None:
         result = self.run_analyzer(
             [

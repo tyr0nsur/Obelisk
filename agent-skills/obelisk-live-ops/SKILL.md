@@ -111,6 +111,7 @@ scripts/check_obelisk_server_posture.sh --expect-stable \
   - `enable-chat-route-observer`
   - `enable-structure-reflection`
   - `enable-inventory-reflection`
+  - `enable-item-return-events`
 - Runtime debug/scanner gates also require both env and instance markers:
   - `allow-ptrace`
   - `enable-debug-control`
@@ -148,6 +149,10 @@ Use named profiles instead of ad hoc env mixes:
   window.
 - Plugin capture: scanner off, only the target plugin installed, plugin config backed up,
   short run, then return to stable dev.
+- Item-return copied-event capture: current-turn operator-approved debug window only,
+  named instance, plugin/subscriber plan explicit, `enable-item-return-events` gated by
+  observer-debug markers, positive dispatch budget, optional bounded log budget, copied
+  logs analyzed offline, then return to stable dev.
 
 After any scanner/plugin capture, run the posture check for the same current-turn approved
 debug target:

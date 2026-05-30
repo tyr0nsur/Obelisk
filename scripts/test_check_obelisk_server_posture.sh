@@ -139,6 +139,18 @@ expect_failure chat-events-forbidden-for-stable \
 expect_failure chat-events-forbidden-for-stable-legacy-flag \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 109 --expect-stable --forbid-chat-reflection --instance arkserver
 
+write_proc_fixture 116 "${stable_maps}" \
+    "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
+    "OBELISK_INSTANCE_ID=arkserver" \
+    "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
+    "OBELISK_DISABLE_PLUGINS=1" \
+    "OBELISK_ENABLE_ITEM_RETURN_EVENTS=1" \
+    "OBELISK_ITEM_RETURN_EVENTS_BINARY_SHA256=abc123" \
+    "OBELISK_ITEM_RETURN_EVENTS_DISPATCH_LIMIT=25" \
+    "OBELISK_ITEM_RETURN_EVENTS_LOG_LIMIT=5"
+expect_failure item-return-events-forbidden-for-stable \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 116 --expect-stable --instance arkserver
+
 write_proc_fixture 121 "${stable_maps}" \
     "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
     "OBELISK_INSTANCE_ID=arkserver" \
@@ -337,6 +349,7 @@ for marker in \
     enable-chat-route-observer \
     enable-inventory-reflection \
     enable-structure-reflection \
+    enable-item-return-events \
     enable-reflection-scanner
 do
     : > "${TEST_OBELISK_ROOT}/state/instances/arkserver/${marker}"
@@ -367,6 +380,11 @@ expect_failure chat-events-marker-forbidden-for-stable \
 expect_failure chat-events-marker-forbidden-for-stable-legacy-flag \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable --forbid-chat-reflection --instance arkserver
 rm -f "${TEST_OBELISK_ROOT}/state/instances/arkserver/enable-chat-events"
+
+: > "${TEST_OBELISK_ROOT}/state/instances/arkserver/enable-item-return-events"
+expect_failure item-return-events-marker-forbidden-for-stable \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable --instance arkserver
+rm -f "${TEST_OBELISK_ROOT}/state/instances/arkserver/enable-item-return-events"
 
 : > "${TMP_DIR}/external-chat-route-marker"
 ln -s "${TMP_DIR}/external-chat-route-marker" \

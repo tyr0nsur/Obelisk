@@ -203,6 +203,7 @@ state/instances/<instance-id>/enable-chat-events  # experimental ChatMessageEven
 state/instances/<instance-id>/enable-chat-reflection  # experimental
 state/instances/<instance-id>/enable-inventory-reflection  # experimental, metadata-only
 state/instances/<instance-id>/enable-structure-reflection  # experimental, metadata-only
+state/instances/<instance-id>/enable-item-return-events  # experimental, copied ReturnValue-only
 ```
 
 `disable-plugins` is a supported LinuxGSM wrapper marker, not an independent runtime
@@ -277,6 +278,24 @@ Inventory reflection may feed copied, redacted inventory-backed `GameplayPolicyE
 signals when dispatch is explicitly budgeted and subscribed. It must not expose item ids,
 contents, player identity, gameplay-authoritative overrides, a public Inventory or Items
 SDK, `ResourceHandle`, lookup, mutation, raw UE pointers/params, or return override.
+
+`enable-item-return-events` follows the stricter copied event policy for the three
+promoted item return-only `GameplayPolicyEvent` kinds:
+
+```text
+OBELISK_ENABLE_ITEM_RETURN_EVENTS=1
+OBELISK_ITEM_RETURN_EVENTS_BINARY_SHA256=<supported ARK SHA256>
+OBELISK_ITEM_RETURN_EVENTS_DISPATCH_LIMIT=<positive dispatch budget>
+OBELISK_ITEM_RETURN_EVENTS_LOG_LIMIT=0
+```
+
+The marker is accepted only in an approved `observer-debug` window with
+`allow-observer-debug-window` and `allow-experimental-observers`. Dispatch budget must be
+explicitly positive; log budget defaults to `0`. The producer copies only `ReturnValue`
+for `AllowEquipItem`, `CanRepair`, and `UseItemOntoItem`. It must not expose item ids,
+inventory identity, player identity, lookup, mutation, raw UE pointers/params, or return
+override. Stable posture checks reject this marker and all `OBELISK_ITEM_RETURN_EVENTS_*`
+variables.
 
 Decoded chat text logging is not enabled by the marker. It requires an additional explicit
 environment gate:

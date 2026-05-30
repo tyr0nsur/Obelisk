@@ -59,6 +59,9 @@ inherited_inventory_reflection_dispatch_limit="${OBELISK_INVENTORY_REFLECTION_DI
 inherited_structure_reflection_binary_sha256="${OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256:-}"
 inherited_structure_reflection_log_limit="${OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT:-}"
 inherited_structure_reflection_dispatch_limit="${OBELISK_STRUCTURE_REFLECTION_DISPATCH_LIMIT:-}"
+inherited_item_return_events_binary_sha256="${OBELISK_ITEM_RETURN_EVENTS_BINARY_SHA256:-}"
+inherited_item_return_events_dispatch_limit="${OBELISK_ITEM_RETURN_EVENTS_DISPATCH_LIMIT:-}"
+inherited_item_return_events_log_limit="${OBELISK_ITEM_RETURN_EVENTS_LOG_LIMIT:-}"
 
 unset OBELISK_ENABLE_PROCESS_EVENT_HOOK
 unset OBELISK_DISABLE_PLUGINS
@@ -89,6 +92,10 @@ unset OBELISK_ENABLE_STRUCTURE_REFLECTION
 unset OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256
 unset OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT
 unset OBELISK_STRUCTURE_REFLECTION_DISPATCH_LIMIT
+unset OBELISK_ENABLE_ITEM_RETURN_EVENTS
+unset OBELISK_ITEM_RETURN_EVENTS_BINARY_SHA256
+unset OBELISK_ITEM_RETURN_EVENTS_DISPATCH_LIMIT
+unset OBELISK_ITEM_RETURN_EVENTS_LOG_LIMIT
 
 enable_marker() {
     local feature="$1"
@@ -147,6 +154,16 @@ require_positive_integer() {
     fi
 }
 
+require_nonnegative_integer() {
+    local name="$1"
+    local value="$2"
+
+    if [[ ! "${value}" =~ ^[0-9]+$ ]]; then
+        echo "${name} must be an explicit non-negative integer for observer-debug observer gates." >&2
+        exit 1
+    fi
+}
+
 validate_observer_wrapper_profile() {
     local profile="${OBELISK_WRAPPER_PROFILE:-stable}"
 
@@ -160,7 +177,8 @@ validate_observer_wrapper_profile() {
                 enable-chat-reflection \
                 enable-chat-route-observer \
                 enable-inventory-reflection \
-                enable-structure-reflection
+                enable-structure-reflection \
+                enable-item-return-events
             do
                 if marker_entry_exists "${marker}"; then
                     echo "Experimental observer marker ${marker} is present for ${OBELISK_INSTANCE_ID}; refusing stable wrapper launch." >&2
@@ -247,6 +265,22 @@ configure_inventory_reflection() {
     export OBELISK_INVENTORY_REFLECTION_DISPATCH_LIMIT="${inherited_inventory_reflection_dispatch_limit:-0}"
 }
 
+configure_item_return_events() {
+    [[ "${OBELISK_WRAPPER_PROFILE:-stable}" == "observer-debug" ]] || return 0
+    enable_marker "allow-observer-debug-window" || return 0
+    enable_marker "allow-experimental-observers" || return 0
+    enable_marker "enable-item-return-events" || return 0
+
+    require_sha256_hex "OBELISK_ITEM_RETURN_EVENTS_BINARY_SHA256" "${inherited_item_return_events_binary_sha256}"
+    require_positive_integer "OBELISK_ITEM_RETURN_EVENTS_DISPATCH_LIMIT" "${inherited_item_return_events_dispatch_limit}"
+    require_nonnegative_integer "OBELISK_ITEM_RETURN_EVENTS_LOG_LIMIT" "${inherited_item_return_events_log_limit:-0}"
+
+    export OBELISK_ENABLE_ITEM_RETURN_EVENTS=1
+    export OBELISK_ITEM_RETURN_EVENTS_BINARY_SHA256="${inherited_item_return_events_binary_sha256}"
+    export OBELISK_ITEM_RETURN_EVENTS_DISPATCH_LIMIT="${inherited_item_return_events_dispatch_limit}"
+    export OBELISK_ITEM_RETURN_EVENTS_LOG_LIMIT="${inherited_item_return_events_log_limit:-0}"
+}
+
 case "${1:-}" in
     Ragnarok*)
         export OBELISK_INSTANCE_ID="${OBELISK_INSTANCE_ID:-arkserver}"
@@ -262,6 +296,7 @@ case "${1:-}" in
         configure_chat_reflection
         configure_inventory_reflection
         configure_structure_reflection
+        configure_item_return_events
         ;;
     TheIsland*)
         export OBELISK_INSTANCE_ID="${OBELISK_INSTANCE_ID:-arkserver2}"
@@ -277,6 +312,7 @@ case "${1:-}" in
         configure_chat_reflection
         configure_inventory_reflection
         configure_structure_reflection
+        configure_item_return_events
         ;;
 esac
 

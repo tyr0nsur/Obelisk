@@ -52,5 +52,6 @@ python3 scripts/compare_reflection_snapshots.py \
   --readiness-report \
   --target-set structure-observer-intake \
   --target-set minimal-second-source-intake \
+  --target-set item-return-only-policy-slice \
   --target-set chat-message-intake \
   --fail-on-readiness-gaps

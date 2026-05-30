@@ -150,6 +150,7 @@
       "unregister": "UnregisterGameplayPolicyEventWithOwnerToken",
       "backing_target_set": "structure-observer-intake",
       "inventory_backing_target_set": "minimal-second-source-intake",
+      "item_return_backing_target_set": "item-return-only-policy-slice",
       "resource_contract": "kind-only, no identity, no lookup, no persistent handle, no cross-event correlation",
       "payload": "copied POD scalar fields only",
       "public_fields": [
@@ -312,13 +313,15 @@
       "plugin_owner_cleanup": true,
       "target_sets": [
         "structure-observer-intake",
-        "minimal-second-source-intake"
+        "minimal-second-source-intake",
+        "item-return-only-policy-slice"
       ],
       "second_source_reports": [
         "docs/research/2026-05-28-second-source-reversing-gap-matrix.md",
         "docs/research/2026-05-28-second-source-core-intake-runbook.md",
         "docs/research/2026-05-29-structure-observer-intake-refresh.md",
-        "docs/research/2026-05-29-minimal-second-source-readiness.md"
+        "docs/research/2026-05-29-minimal-second-source-readiness.md",
+        "docs/research/2026-05-30-item-return-only-policy-slice.md"
       ],
       "target_set_evidence": [
         {
@@ -335,6 +338,13 @@
             "docs/research/2026-05-29-minimal-second-source-readiness.md"
           ],
           "scope": "layout-only compact inventory/structure backing; no standalone module-specific inventory or structure surface"
+        },
+        {
+          "target_set": "item-return-only-policy-slice",
+          "reports": [
+            "docs/research/2026-05-30-item-return-only-policy-slice.md"
+          ],
+          "scope": "second-source accepted copied ReturnValue-only item backing for AllowEquipItem, CanRepair, and UseItemOntoItem; no standalone item or inventory module surface, no identity, no lookup, no mutation, no return override, and no ResourceHandle"
         }
       ],
       "excluded_target_sets": [
