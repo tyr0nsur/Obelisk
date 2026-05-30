@@ -115,7 +115,8 @@ class VersioningGuardrailTests(unittest.TestCase):
         text = (REPO_ROOT / "docs/RELEASE.md").read_text(encoding="utf-8")
 
         self.assertIn("not ready for a production-stable release", text)
-        self.assertRegex(text, re.compile(r"git tag -a v0\.1\.0", re.M))
+        self.assertIn("git tag -a <stable-tag>", text)
+        self.assertIn("Only after explicit release-manager approval", text)
 
 
 if __name__ == "__main__":

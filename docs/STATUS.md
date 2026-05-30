@@ -8,10 +8,11 @@ Current published release-candidate baseline is core-first `v0.1.0-rc.1`; see
 [VERSIONING.md](VERSIONING.md). This is not a production-stable `v1.0` release claim.
 
 Current RC validation checkpoint as of 2026-05-30: the published tag was checked against
-the intended release ref after the canonical release gate, including second-source
-readiness for the documented RC target sets. See
+the intended release ref with exact tag/ref verification after the canonical release gate,
+including second-source readiness for the documented RC target sets. This was a clean
+release gate for the intended ref. See
 [`2026-05-30-rc-second-source-release-gate-check.md`](research/2026-05-30-rc-second-source-release-gate-check.md)
-for the exact command and artifact root. This only validates the public RC scope below:
+for the exact command and artifact root. RC public scope remains limited to
 `GameplayPolicyEvent`, the minimal copied `ChatMessageEvent`, `DescribeResourceKind`, and
 `DescribeGameplayPolicyEventKind`. It does not promote a public Inventory/Items SDK,
 `ResourceHandle`, identity, lookup, mutation, return override, or live-server claim.

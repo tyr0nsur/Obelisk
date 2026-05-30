@@ -248,7 +248,7 @@ is post-RC planning only and does not promote a public SDK/API surface.
 
 ## Review Artifacts
 
-Runtime-observer log summaries are review artifacts, not release gates and not
+Runtime-observer log summaries are review artifacts, not a release gate and not
 second-source promotion evidence. Use them only on copied or sanitized logs when reviewing
 an approved observer capture:
 

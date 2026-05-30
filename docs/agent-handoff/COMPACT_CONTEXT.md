@@ -230,7 +230,13 @@ priorities, and do not use history files as the active source of truth.
   blockers. It copies only `AllowEquipItem.ReturnValue`, `CanRepair.ReturnValue`, and
   `UseItemOntoItem.ReturnValue`. Its internal helper can build-and-reserve the copied
   return observation in one operation and clears output on invalid attempts or exhausted
-  budget; it remains internal/test-only.
+  budget; it remains internal/test-only. The pack now includes relative `SHA256SUMS`
+  (`sha256=ccd33e42337fd5b1ae3c51333c73ec17aeadef29d3c203b6680bb3be49c7a046`) and
+  `artifact-pack.manifest.json`
+  (`sha256=89e9b4af96472314055614824a2b2fce4a0b4343832ae38a2495d77411a5671a`).
+  A local public-shape dry run accepted consume mode and kept promote mode blocked; the
+  nearest future shape is only post-original copied bool observation through
+  `GameplayPolicyEvent`, not an Inventory SDK or return override.
   Chat command ergonomics should start as a plugin-local parser/helper over the existing
   copied `ChatMessageEvent`, not as a new ABI. Keep output callback-scope only and keep
   player identity, permissions, targeting, chat send/reply, moderation/blocking, mutation,

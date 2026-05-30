@@ -143,6 +143,13 @@ sequence.
   It is evidence-only: consume mode accepts it, promote mode blocks it, and it does not
   authorize public Items/Inventory SDK, runtime hook wiring, markers/env, mutation, return
   override, identity, lookup, or `ResourceHandle`.
+  It now includes relative `SHA256SUMS`
+  (`sha256=ccd33e42337fd5b1ae3c51333c73ec17aeadef29d3c203b6680bb3be49c7a046`)
+  and `artifact-pack.manifest.json`
+  (`sha256=89e9b4af96472314055614824a2b2fce4a0b4343832ae38a2495d77411a5671a`).
+  A local public-shape dry run accepted consume mode and kept promote mode blocked; the
+  nearest future shape is only post-original copied bool observation through
+  `GameplayPolicyEvent`, not an Inventory SDK or return override.
   The internal item helper can build-and-reserve a copied return-only observation in one
   operation and clears output on invalid attempts or exhausted budget; this remains
   test-only/internal and does not authorize public callbacks or runtime wiring.

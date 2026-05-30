@@ -104,12 +104,19 @@ Preserved result:
 
 - `item-return-only-policy-slice.json`
   (`sha256=53ac249aa107eb059ee420de8e939cc4117fb3590d651025a0bb6286625b1849`)
+- `artifact-pack.manifest.json`
+  (`sha256=89e9b4af96472314055614824a2b2fce4a0b4343832ae38a2495d77411a5671a`)
+- `SHA256SUMS`
+  (`sha256=ccd33e42337fd5b1ae3c51333c73ec17aeadef29d3c203b6680bb3be49c7a046`)
 - `copied_return_bools=3`
 - `excluded_fields=5`
 - `coverage.status=complete`
 - consume gate: `accepted`
 - promote gate: `blocked` with `promote_mode_item_return_policy_slice_evidence_only`
   and `promote_mode_manifest_has_non_claims`
+
+The artifact root now has relative checksums plus a pack manifest. The historical gate
+JSON files still preserve their original absolute labels; do not rewrite them by hand.
 
 The canonical item compact redacted-signature source remains
 `/servidor/ark/workspace-offline/item-compact-redacted-signatures-strict-20260530T013606Z/signatures.json`;
@@ -121,3 +128,43 @@ historical inputs only.
 This does not promote an Items SDK, Inventory SDK, public callback, public metadata helper,
 object identity, item identity, inventory identity, object lookup, `ResourceHandle`,
 mutation, blocking, return override, runtime hook, or live-server validation.
+
+## Public Shape Dry Run
+
+A focused offline dry run projected the current slice into a possible future public shape
+without changing ABI or promoting it:
+
+```text
+schema=obelisk.item-return-only-public-shape-dry-run.v1
+api_lane=GameplayPolicyEvent copied-scalar observation
+dispatch_phase=post-original-observation-only
+promotion_ready=false
+```
+
+Command shape:
+
+```bash
+OUT=/tmp/obelisk-item-public-shape-dry-run-<stamp>
+python3 scripts/build_redacted_ufunction_signatures.py \
+  --item-return-only-policy-slice \
+  --json > "$OUT/item-return-only-policy-slice.json"
+python3 scripts/validate_offline_artifact_gate.py \
+  --root "$OUT" \
+  --manifest "$OUT/item-return-only-policy-slice.json" \
+  --expected-binary-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
+  --mode consume \
+  --json > "$OUT/consume-gate.json"
+```
+
+Result from the local rehearsal:
+
+- consume gate accepted: `59f95f3cb12e95997c1cb90d53c3d98701e178155251c6bc353f69841e9f581c`
+- promote gate blocked: `bd51c2a3a36192308c3fb5b0319dfe38b7a1961eab0bf62a7fe72054aeb161c3`
+- public-shape dry-run manifest: `6c85e3013cd7a4482ed0208017d1fbaee47dfae137196fbdfde8c2a42f49f87b`
+
+This confirms the nearest future API shape is not an Inventory SDK: it is at most three
+post-original copied bool observations, likely as append-only `GameplayPolicyEvent` kinds.
+Promotion remains blocked by missing target-specific second-source/static acceptance,
+public ABI design, descriptor updates, SDK consumer tests, and callback lifecycle review.
+Return override remains explicitly blocked even though the copied field name is
+`ReturnValue`.
