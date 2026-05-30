@@ -480,6 +480,7 @@ UOBJECT_FLAG_POLICY_ALLOWED_HEX_STRINGS = {"0x100", "0x4000"}
 STATIC_GLOBAL_CANDIDATE_KINDS = {"gobjects", "fname_root"}
 STATIC_GLOBAL_GOBJECTS_FIELD_WINDOW_BLOCKER = "missing_gobjects_coherent_field_window"
 STATIC_GLOBAL_SAFE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+PLACEHOLDER_ARTIFACT_ID_PREFIXES = ("unspecified-", "static-global-default-")
 UOBJECT_FLAG_POLICY_PUBLIC_FORBIDDEN_KEY_RE = re.compile(r"(?:^|_)(address|index|indices|serial|pointer|ptr)(?:_|$)", re.IGNORECASE)
 UOBJECT_FLAG_POLICY_PUBLIC_FORBIDDEN_VALUE_RE = re.compile(r"(?:^|[_\W])(address|index|indices|serial|pointer|ptr)(?:[_\W]|$)", re.IGNORECASE)
 UOBJECT_FLAG_POLICY_PUBLIC_ADDRESS_RE = re.compile(r"\b0x[0-9a-f]{5,}\b", re.IGNORECASE)
@@ -514,7 +515,65 @@ def canonical_json_bytes(value: object) -> bytes:
 
 
 def static_global_safe_id(value: object) -> bool:
-    return isinstance(value, str) and ".." not in value and "/" not in value and "\\" not in value and STATIC_GLOBAL_SAFE_ID_RE.fullmatch(value) is not None
+    return (
+        isinstance(value, str)
+        and ".." not in value
+        and "/" not in value
+        and "\\" not in value
+        and not value.casefold().startswith(PLACEHOLDER_ARTIFACT_ID_PREFIXES)
+        and STATIC_GLOBAL_SAFE_ID_RE.fullmatch(value) is not None
+    )
+
+
+def artifact_identity_placeholder_fields(identity: object) -> list[str]:
+    placeholders: list[str] = []
+    if isinstance(identity, dict):
+        for key, value in identity.items():
+            child_paths = artifact_identity_placeholder_fields(value)
+            placeholders.extend(f"{key}.{path}" if path else str(key) for path in child_paths)
+    elif isinstance(identity, list):
+        for index, value in enumerate(identity):
+            child_paths = artifact_identity_placeholder_fields(value)
+            placeholders.extend(f"[{index}].{path}" if path else f"[{index}]" for path in child_paths)
+    elif isinstance(identity, str) and identity.casefold().startswith(PLACEHOLDER_ARTIFACT_ID_PREFIXES):
+        placeholders.append("")
+    return placeholders
+
+
+def validate_strict_artifact_identity_shape(
+    artifact_identity: object,
+    *,
+    label: str,
+    reason_prefix: str,
+    expected_artifact_kind: str,
+) -> tuple[list[dict[str, Any]], bool]:
+    blockers: list[dict[str, Any]] = []
+    identity_ready_for_hash = False
+    if not isinstance(artifact_identity, dict):
+        return ([{"reason": f"{reason_prefix}_missing_artifact_identity", "label": f"{label}:$.artifact_identity"}], False)
+
+    expected_keys = {"artifact_kind", "artifact_sha256", "capture_id", "evidence_pack_id"}
+    if set(artifact_identity) != expected_keys:
+        blockers.append({"reason": f"{reason_prefix}_artifact_identity_fields_mismatch", "label": f"{label}:$.artifact_identity"})
+    if artifact_identity.get("artifact_kind") != expected_artifact_kind:
+        blockers.append({"reason": f"{reason_prefix}_artifact_identity_kind_mismatch", "label": f"{label}:$.artifact_identity.artifact_kind"})
+    artifact_sha256 = artifact_identity.get("artifact_sha256")
+    if not isinstance(artifact_sha256, str) or SHA256_RE.fullmatch(artifact_sha256) is None:
+        blockers.append({"reason": f"{reason_prefix}_artifact_identity_sha_invalid", "label": f"{label}:$.artifact_identity.artifact_sha256"})
+    capture_id = artifact_identity.get("capture_id")
+    evidence_pack_id = artifact_identity.get("evidence_pack_id")
+    if not static_global_safe_id(capture_id):
+        blockers.append({"reason": f"{reason_prefix}_artifact_identity_capture_id_invalid", "label": f"{label}:$.artifact_identity.capture_id"})
+    if not static_global_safe_id(evidence_pack_id):
+        blockers.append({"reason": f"{reason_prefix}_artifact_identity_evidence_pack_id_invalid", "label": f"{label}:$.artifact_identity.evidence_pack_id"})
+    identity_ready_for_hash = (
+        artifact_identity.get("artifact_kind") == expected_artifact_kind
+        and isinstance(artifact_sha256, str)
+        and SHA256_RE.fullmatch(artifact_sha256) is not None
+        and static_global_safe_id(capture_id)
+        and static_global_safe_id(evidence_pack_id)
+    )
+    return blockers, identity_ready_for_hash
 
 
 def static_global_canonical_command_record(record: dict[str, Any]) -> dict[str, Any]:
@@ -2497,6 +2556,14 @@ def validate_gobjects_two_core_manifest(payload: dict[str, Any], *, label: str, 
     blocked_contracts = payload.get("blocked_contracts")
     non_claims = payload.get("non_claims")
 
+    identity_blockers, _identity_ready_for_hash = validate_strict_artifact_identity_shape(
+        payload.get("artifact_identity"),
+        label=label,
+        reason_prefix="gobjects_two_core_manifest",
+        expected_artifact_kind=GOBJECTS_TWO_CORE_MANIFEST_SCHEMA,
+    )
+    blockers.extend(identity_blockers)
+
     if not is_json_int(core_count) or core_count < 2:
         blockers.append({"reason": "gobjects_two_core_manifest_core_count_invalid", "label": label})
     if not isinstance(cores, list) or not cores:
@@ -3921,6 +3988,46 @@ def validate_resource_handle_revalidation_evaluator_manifest(
         return []
 
     blockers: list[dict[str, Any]] = []
+    artifact_identity = payload.get("artifact_identity")
+    if not isinstance(artifact_identity, dict):
+        blockers.append({"reason": "resource_handle_revalidation_missing_artifact_identity", "label": f"{label}:$.artifact_identity"})
+    else:
+        for field in artifact_identity_placeholder_fields(artifact_identity):
+            blockers.append(
+                {
+                    "reason": "resource_handle_revalidation_artifact_identity_placeholder_id",
+                    "label": f"{label}:$.artifact_identity.{field}",
+                }
+            )
+        if artifact_identity.get("required") is not True:
+            blockers.append(
+                {
+                    "reason": "resource_handle_revalidation_artifact_identity_not_required",
+                    "label": f"{label}:$.artifact_identity.required",
+                }
+            )
+        hash_count = artifact_identity.get("hash_count")
+        hashes = artifact_identity.get("hashes")
+        if not is_json_int(hash_count) or hash_count < 0:
+            blockers.append({"reason": "resource_handle_revalidation_artifact_identity_hash_count_invalid", "label": f"{label}:$.artifact_identity.hash_count"})
+        if not isinstance(hashes, list) or any(not isinstance(item, str) or SHA256_RE.fullmatch(item) is None for item in hashes):
+            blockers.append({"reason": "resource_handle_revalidation_artifact_identity_hashes_invalid", "label": f"{label}:$.artifact_identity.hashes"})
+        elif is_json_int(hash_count) and hash_count != len(hashes):
+            blockers.append({"reason": "resource_handle_revalidation_artifact_identity_hash_count_mismatch", "label": f"{label}:$.artifact_identity.hash_count"})
+        complete_count = artifact_identity.get("complete_input_count")
+        missing_count = artifact_identity.get("missing_or_partial_input_count")
+        invalid_count = artifact_identity.get("invalid_input_count")
+        for key, value in (
+            ("complete_input_count", complete_count),
+            ("missing_or_partial_input_count", missing_count),
+            ("invalid_input_count", invalid_count),
+        ):
+            if not is_json_int(value) or value < 0:
+                blockers.append({"reason": "resource_handle_revalidation_artifact_identity_input_count_invalid", "label": f"{label}:$.artifact_identity.{key}"})
+        if is_json_int(missing_count) and missing_count > 0:
+            blockers.append({"reason": "resource_handle_revalidation_artifact_identity_missing_or_partial_inputs", "label": f"{label}:$.artifact_identity.missing_or_partial_input_count"})
+        if is_json_int(invalid_count) and invalid_count > 0:
+            blockers.append({"reason": "resource_handle_revalidation_artifact_identity_invalid_inputs", "label": f"{label}:$.artifact_identity.invalid_input_count"})
     if mode != "promote":
         return blockers
 

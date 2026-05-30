@@ -1053,6 +1053,20 @@ def build_artifact_identity(
     }
 
 
+def require_explicit_artifact_identity(capture_id: str, evidence_pack_id: str) -> None:
+    missing = []
+    if capture_id == DEFAULT_CAPTURE_ID:
+        missing.append("--capture-id")
+    if evidence_pack_id == DEFAULT_EVIDENCE_PACK_ID:
+        missing.append("--evidence-pack-id")
+    if missing:
+        raise SystemExit(
+            "--strict-artifact-identity requires explicit "
+            + " and ".join(missing)
+            + "; placeholder artifact identity is not valid reusable evidence"
+        )
+
+
 def load_fuobjectarray_field_window_evidence(path: Path, binary_sha256: str) -> tuple[str, dict[str, object]]:
     reject_protected_path(path, "--fuobjectarray-field-window-evidence")
     payload = json.loads(path.read_text(encoding="utf-8"))
@@ -1276,12 +1290,19 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_EVIDENCE_PACK_ID,
         help="Safe evidence pack identifier to include in artifact_identity.",
     )
+    parser.add_argument(
+        "--strict-artifact-identity",
+        action="store_true",
+        help="Require explicit non-default capture/evidence ids for reusable evidence.",
+    )
     parser.add_argument("--json", action="store_true", help="Print manifest JSON to stdout.")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
+    if args.strict_artifact_identity:
+        require_explicit_artifact_identity(args.capture_id, args.evidence_pack_id)
     if not shutil.which("readelf") and (not args.readelf_programs or not args.readelf_sections):
         raise SystemExit("readelf is required unless --readelf-programs and --readelf-sections are provided")
     if not shutil.which("objdump") and not args.objdump:

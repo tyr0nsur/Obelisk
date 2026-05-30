@@ -224,6 +224,32 @@ class RunUObjectFlagPolicyRefreshTests(unittest.TestCase):
             result.stderr,
         )
 
+    def test_strict_artifact_identity_rejects_unspecified_placeholders(self) -> None:
+        for flag, value in (
+            ("--capture-id", "unspecified-capture-from-old-producer"),
+            ("--evidence-pack-id", "unspecified-evidence-pack-from-old-producer"),
+        ):
+            with self.subTest(flag=flag), tempfile.TemporaryDirectory() as tmp:
+                input_root = Path(tmp) / "input"
+                output_root = Path(tmp) / "output"
+                write_refresh_inputs(input_root)
+                args = [
+                    "--artifact-kind",
+                    UOBJECT_FLAG_POLICY_ARTIFACT_KIND,
+                    "--capture-id",
+                    "capture_2026-05-30",
+                    "--evidence-pack-id",
+                    "evidence-pack.alpha_1",
+                    flag,
+                    value,
+                    "--strict-artifact-identity",
+                ]
+
+                result = self.run_refresh(input_root, output_root, args)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("placeholder artifact identity is not valid reusable evidence", result.stderr)
+
     def test_strict_artifact_identity_verifies_generated_policy_identity(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)

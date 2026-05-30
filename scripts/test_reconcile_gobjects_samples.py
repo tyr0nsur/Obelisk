@@ -386,6 +386,33 @@ class ReconcileGObjectsSamplesTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("requires explicit --capture-id", result.stderr)
 
+    def test_cli_strict_artifact_identity_rejects_unspecified_capture_id(self) -> None:
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPT_DIR / "reconcile_gobjects_samples.py"),
+                "--core",
+                "/tmp/nonexistent-core",
+                "--gobjects-candidate",
+                "0x595b7e0",
+                "--fname-root-slot",
+                "0x5956f30",
+                "--capture-id",
+                "unspecified-capture-from-old-producer",
+                "--evidence-pack-id",
+                "evidence-pack.alpha_1",
+                "--strict-artifact-identity",
+                "--sample-index",
+                "0",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("requires explicit --capture-id", result.stderr)
+
     def test_cli_strict_artifact_identity_requires_evidence_pack_id(self) -> None:
         result = subprocess.run(
             [
@@ -399,6 +426,33 @@ class ReconcileGObjectsSamplesTests(unittest.TestCase):
                 "0x5956f30",
                 "--capture-id",
                 "capture_2026-05-30",
+                "--strict-artifact-identity",
+                "--sample-index",
+                "0",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("requires explicit --evidence-pack-id", result.stderr)
+
+    def test_cli_strict_artifact_identity_rejects_unspecified_evidence_pack_id(self) -> None:
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPT_DIR / "reconcile_gobjects_samples.py"),
+                "--core",
+                "/tmp/nonexistent-core",
+                "--gobjects-candidate",
+                "0x595b7e0",
+                "--fname-root-slot",
+                "0x5956f30",
+                "--capture-id",
+                "capture_2026-05-30",
+                "--evidence-pack-id",
+                "unspecified-evidence-pack-from-old-producer",
                 "--strict-artifact-identity",
                 "--sample-index",
                 "0",

@@ -40,8 +40,9 @@ claims from a stripped Linux server binary.
 - Reusable strict evidence for static-global, UObject flag-policy, GObjects
   reconciliation, and ResourceHandle revalidation must carry complete top-level
   `artifact_identity`. Do not infer identity from bare hashes. Reject partial identity,
-  mismatched canonical hashes, or placeholder ids such as `unspecified-*`; regenerate with
-  current producers and `--strict-artifact-identity` when that mode exists.
+  mismatched canonical hashes, or placeholder/default ids such as `unspecified-*` and
+  producer defaults like `static-global-default-*`; regenerate with current producers and
+  `--strict-artifact-identity` when that mode exists.
 - New manifest schemas must be added to the gate's supported-schema allowlist with
   schema-specific validation before consume/promote acceptance. Unknown schemas are
   blockers even when generic path/claim scans look clean.

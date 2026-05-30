@@ -979,6 +979,14 @@ def static_global_promotion_evidence_manifest(*, ready: bool = False) -> dict:
 def resource_handle_revalidation_evaluator_manifest(*, ready: bool = False) -> dict:
     return {
         "schema": gate.RESOURCE_HANDLE_REVALIDATION_EVALUATOR_SCHEMA,
+        "artifact_identity": {
+            "required": True,
+            "hash_count": 2,
+            "hashes": ["a" * 64, "b" * 64],
+            "complete_input_count": 2,
+            "missing_or_partial_input_count": 0,
+            "invalid_input_count": 0,
+        },
         "accepted_sample_count": 32,
         "post_callback_resource_handle_ready": ready,
         "uobject_flags_validity_semantics_proven": ready,
@@ -1535,6 +1543,12 @@ def gobjects_two_core_manifest() -> dict:
     }
     return {
         "schema": gate.GOBJECTS_TWO_CORE_MANIFEST_SCHEMA,
+        "artifact_identity": {
+            "artifact_kind": gate.GOBJECTS_TWO_CORE_MANIFEST_SCHEMA,
+            "artifact_sha256": "c" * 64,
+            "capture_id": "gobjects-two-core-capture",
+            "evidence_pack_id": "gobjects-two-core-pack",
+        },
         "binary_sha256": BINARY_SHA,
         "gobjects_candidate": "0x595b7e0",
         "fname_root_slot": "0x5956f30",
@@ -2142,6 +2156,22 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
 
         self.assertEqual("accepted", result["status"])
         self.assertEqual([], result["blockers"])
+
+    def test_blocks_gobjects_two_core_manifest_placeholder_artifact_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "pack" / "manifest.json"
+            payload = gobjects_two_core_manifest()
+            payload["artifact_identity"]["capture_id"] = "unspecified-capture"
+            payload["artifact_identity"]["evidence_pack_id"] = "unspecified-evidence-pack"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("gobjects_two_core_manifest_artifact_identity_capture_id_invalid", reasons)
+        self.assertIn("gobjects_two_core_manifest_artifact_identity_evidence_pack_id_invalid", reasons)
 
     def test_blocks_gobjects_two_core_manifest_weak_reconciliation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -3577,6 +3607,42 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
                 },
                 "static_global_artifact_identity_sha_invalid",
             ),
+            "placeholder_capture": (
+                {
+                    "artifact_kind": gate.STATIC_GLOBAL_PROMOTION_EVIDENCE_SCHEMA,
+                    "artifact_sha256": "a" * 64,
+                    "capture_id": "unspecified-capture",
+                    "evidence_pack_id": "static-global-test-pack",
+                },
+                "static_global_artifact_identity_capture_id_invalid",
+            ),
+            "placeholder_pack": (
+                {
+                    "artifact_kind": gate.STATIC_GLOBAL_PROMOTION_EVIDENCE_SCHEMA,
+                    "artifact_sha256": "a" * 64,
+                    "capture_id": "static-global-test-capture",
+                    "evidence_pack_id": "unspecified-evidence-pack",
+                },
+                "static_global_artifact_identity_evidence_pack_id_invalid",
+            ),
+            "default_capture": (
+                {
+                    "artifact_kind": gate.STATIC_GLOBAL_PROMOTION_EVIDENCE_SCHEMA,
+                    "artifact_sha256": "a" * 64,
+                    "capture_id": "static-global-default-capture",
+                    "evidence_pack_id": "static-global-test-pack",
+                },
+                "static_global_artifact_identity_capture_id_invalid",
+            ),
+            "default_pack": (
+                {
+                    "artifact_kind": gate.STATIC_GLOBAL_PROMOTION_EVIDENCE_SCHEMA,
+                    "artifact_sha256": "a" * 64,
+                    "capture_id": "static-global-test-capture",
+                    "evidence_pack_id": "static-global-default-pack",
+                },
+                "static_global_artifact_identity_evidence_pack_id_invalid",
+            ),
         }
         for name, (identity, expected_reason) in cases.items():
             with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp:
@@ -3671,6 +3737,23 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("promote_mode_resource_handle_manifest_has_blockers", reasons)
         self.assertIn("promote_mode_resource_handle_promotion_gate_not_ready", reasons)
         self.assertIn("promote_mode_resource_handle_promotion_gate_has_blockers", reasons)
+
+    def test_blocks_resource_handle_revalidation_placeholder_artifact_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle.json"
+            payload = resource_handle_revalidation_evaluator_manifest()
+            payload["artifact_identity"]["hashes"].append("unspecified-input")
+            payload["artifact_identity"]["hash_count"] = 3
+            payload["artifact_identity"]["invalid_input_count"] = 1
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("resource_handle_revalidation_artifact_identity_placeholder_id", reasons)
+        self.assertIn("resource_handle_revalidation_artifact_identity_invalid_inputs", reasons)
 
     def test_accepts_resource_handle_serial_scan_with_rejection_candidate_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -4367,6 +4450,22 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
             "uobject_flag_policy_artifact_identity_evidence_pack_id_invalid",
             {blocker["reason"] for blocker in result["blockers"]},
         )
+
+    def test_blocks_uobject_flag_policy_placeholder_artifact_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flags.json"
+            payload = uobject_flag_policy_report_manifest()
+            payload["artifact_identity"]["capture_id"] = "unspecified-capture"
+            payload["artifact_identity"]["evidence_pack_id"] = "unspecified-evidence-pack"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("uobject_flag_policy_artifact_identity_capture_id_invalid", reasons)
+        self.assertIn("uobject_flag_policy_artifact_identity_evidence_pack_id_invalid", reasons)
 
     def test_blocks_uobject_flag_policy_artifact_identity_hash_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

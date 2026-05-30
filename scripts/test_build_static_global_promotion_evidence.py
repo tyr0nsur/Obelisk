@@ -563,6 +563,77 @@ class StaticGlobalPromotionEvidenceTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("--capture-id must not contain '..'", result.stderr)
 
+    def test_cli_strict_artifact_identity_rejects_default_ids(self) -> None:
+        for flag, explicit_args, expected in (
+            (
+                "--capture-id",
+                ["--evidence-pack-id", "static-pack.alpha"],
+                "--strict-artifact-identity requires explicit --capture-id",
+            ),
+            (
+                "--evidence-pack-id",
+                ["--capture-id", "static-capture.alpha"],
+                "--strict-artifact-identity requires explicit --evidence-pack-id",
+            ),
+        ):
+            with self.subTest(flag=flag), tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                binary, programs, sections, objdump = write_minimal_static_inputs(root)
+                result = self.run_script(
+                    "--binary",
+                    str(binary),
+                    "--candidate",
+                    "gobjects=0x595b7e0",
+                    "--output-dir",
+                    str(root / "pack"),
+                    "--readelf-programs",
+                    str(programs),
+                    "--readelf-sections",
+                    str(sections),
+                    "--objdump",
+                    str(objdump),
+                    *explicit_args,
+                    "--strict-artifact-identity",
+                    check=False,
+                )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(expected, result.stderr)
+            self.assertIn("placeholder artifact identity is not valid reusable evidence", result.stderr)
+
+    def test_cli_strict_artifact_identity_allows_explicit_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            binary, programs, sections, objdump = write_minimal_static_inputs(root)
+            for artifact in (programs, sections, objdump):
+                write_static_artifact_provenance(artifact, binary)
+
+            result = self.run_script(
+                "--binary",
+                str(binary),
+                "--candidate",
+                "gobjects=0x595b7e0",
+                "--output-dir",
+                str(root / "pack"),
+                "--readelf-programs",
+                str(programs),
+                "--readelf-sections",
+                str(sections),
+                "--objdump",
+                str(objdump),
+                "--capture-id",
+                "static-capture.alpha",
+                "--evidence-pack-id",
+                "static-pack.alpha",
+                "--strict-artifact-identity",
+                "--json",
+            )
+
+            payload = json.loads(result.stdout)
+
+        self.assertEqual(payload["artifact_identity"]["capture_id"], "static-capture.alpha")
+        self.assertEqual(payload["artifact_identity"]["evidence_pack_id"], "static-pack.alpha")
+
     def test_copied_static_artifact_provenance_requires_verified_true(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
