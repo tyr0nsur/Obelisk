@@ -745,7 +745,7 @@ namespace
         g_BlockingPostState = nullptr;
     }
 
-    void TestGranularOwnerUnregisterCurrentlyWaitsBehindInFlightCallback()
+    void TestGranularOwnerUnregisterReturnsDuringInFlightCallback()
     {
         ResetCounters();
         Obelisk::Core::EventManager events;
@@ -779,8 +779,9 @@ namespace
         });
 
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        Require(!unregisterReturned.load(),
-                "granular owner unregister returned while another callback was in flight");
+        Require(unregisterReturned.load(),
+                "granular owner unregister waited for an unrelated in-flight callback");
+        Require(unregistered, "granular owner unregister failed while dispatch was in flight");
 
         {
             std::lock_guard<std::mutex> lock(state.mutex);
@@ -791,10 +792,8 @@ namespace
         dispatchThread.join();
         unregisterThread.join();
 
-        Require(unregisterReturned.load(), "granular owner unregister did not return after dispatch");
-        Require(unregistered, "granular owner unregister failed after waiting for dispatch");
-        Require(g_Counters.global_post == 1,
-                "target callback did not run from the snapshot before delayed unregister took effect");
+        Require(g_Counters.global_post == 0,
+                "target callback ran from a stale snapshot after granular owner unregister");
 
         ResetCounters();
         events.TriggerPostProcessEvent(nullptr, nullptr, nullptr);
@@ -851,7 +850,7 @@ int main()
     TestOwnerCleanupWaitsForInFlightGlobalPreCallback();
     TestOwnerCleanupWaitsForInFlightPostCallback();
     TestOwnerCleanupWaitsForInFlightFilteredPostCallback();
-    TestGranularOwnerUnregisterCurrentlyWaitsBehindInFlightCallback();
+    TestGranularOwnerUnregisterReturnsDuringInFlightCallback();
     TestRegistrationIdsSkipZeroAfterWrap();
 
     Obelisk::Logger::Shutdown();

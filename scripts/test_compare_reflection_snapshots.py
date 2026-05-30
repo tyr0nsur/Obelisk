@@ -497,7 +497,16 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertIn("public_mission_sdk_blocked", mission["why_blocked"])
         self.assertIn("Mission SDK", mission["non_claim"])
         self.assertIn("mission payload decoding", mission["non_claim"])
-        self.assertIn("consume the focused mission copied-bool policy artifact", mission["next_offline_input"])
+        self.assertIn("consume existing offline artifact", mission["next_offline_input"])
+        self.assertIn(
+            "/home/flowcommunity-ark/obelisk-artifacts/mission-copied-bool-tail-policy-slice-20260530T090211Z/",
+            mission["next_offline_input"],
+        )
+        self.assertIn("pack_sha256=f56a191aaecbd52d042efd81423d4a86f4e5a29674660aab9d65bbf496416945", mission["next_offline_input"])
+        self.assertIn(
+            "manifest_sha256=b47f0497c92ae3e8f9a006fb5be87cfbcc1d1dd5f15d78267ad186073e4c26fb",
+            mission["next_offline_input"],
+        )
         self.assertIn(
             "require AddPlayerToMission, BPAllowPlayerToLeaveMission, and BPOnPlayerRemovedFromMission layouts to be comparable",
             mission["snapshot_prep_checks"],
@@ -508,6 +517,10 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         )
         self.assertIn(
             "keep player/controller/character object refs, item arrays, mission payload identity, and raw params redacted or recognition-only",
+            mission["snapshot_prep_checks"],
+        )
+        self.assertIn(
+            "consume-only means offline artifact or sanitized snapshot reads; do not substitute runtime probes, live /servidor/ark inputs, or public SDK layouts",
             mission["snapshot_prep_checks"],
         )
         self.assertIn(

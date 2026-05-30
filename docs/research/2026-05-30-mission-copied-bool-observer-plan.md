@@ -48,6 +48,27 @@ This closes the Mission compact bool second-source gap for observer planning onl
 does not close runtime observer, dispatcher lifecycle, callback ABI, public SDK, identity,
 array payload, mutation, return override, or server-validation gates.
 
+## Consume-Only Offline Input
+
+Consume-only means a future worker may read the existing focused policy artifact above as
+offline evidence for internal planning or tests. It does not mean generating new evidence
+from a running server, public SDK headers, ArkServerApi layouts, live `/servidor/ark`
+paths, wrapper state, Discord coordination, or runtime probes.
+
+The next offline input is the current durable pack:
+
+- path:
+  `/home/flowcommunity-ark/obelisk-artifacts/mission-copied-bool-tail-policy-slice-20260530T090211Z/`
+- pack SHA256:
+  `f56a191aaecbd52d042efd81423d4a86f4e5a29674660aab9d65bbf496416945`
+- manifest SHA256:
+  `b47f0497c92ae3e8f9a006fb5be87cfbcc1d1dd5f15d78267ad186073e4c26fb`
+
+If that pack is unavailable to an offline worker, the fallback input is a refreshed pair
+of sanitized Mission UFunction snapshots from distinct non-protected copied/offline
+artifacts with complete artifact identity. The fallback is still consume-only planning
+evidence and must not be sourced from runtime observation or public SDK definitions.
+
 ## 2026-05-30 Second-Source Guidance Audit
 
 Decision: `mission-copied-bool-policy-slice` has enough consume-side guidance to be the

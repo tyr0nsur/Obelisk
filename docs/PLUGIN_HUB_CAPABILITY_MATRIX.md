@@ -59,6 +59,7 @@ dependencies can be simulated through raw game access.
 | Commands, permissions, economy, kits, shops, RCON | No public Obelisk SDK yet | Not ready | ArkApi compatibility, player identity, reply/send-chat, database service, or operator command lifecycle |
 | Inventory/item identity and mutation | No public Obelisk SDK yet | Not ready | `ResourceHandle`, `ItemNetID`, inventory lookup, item mutation, give/remove item, or return override |
 | Players, tribes, dinos, missions, transfers | No public Obelisk SDK yet | Not ready | Public identity, ownership lookup, mutation, teleport/spawn APIs, transfer payload decoding, or cross-map correlation |
+| Mission planning and mission demand | Demand/research notes only | Planning-only | Production Plugin Hub mission module, ArkApi mission compatibility, command SDK dependency, mission identity, mission state mutation, or reward/transfer authority |
 | Structure census/proximity | No public Obelisk SDK yet | Not ready | Public GObjects traversal, structure handles, exact coordinates, ownership lookup, linked-structure traversal, or mutation |
 | Structure build placement policy | No public Obelisk SDK yet | Not ready | `APrimalStructure.IsAllowedToBuild` compatibility, placement denial, no-collision behavior, structure identity, location disclosure, mutation, or return override |
 

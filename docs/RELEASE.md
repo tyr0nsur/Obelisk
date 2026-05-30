@@ -256,8 +256,11 @@ sets: `minimal-second-source-intake`, `structure-observer-intake`,
 review aids only, not RC scope. Transfer target sets such as `transfer-ufunction-intake`
 are also not part of the default gate. ScriptStruct promotion, including transfer structs,
 is not part of the default gate and must be opted in explicitly.
-Planning/guidance-only target sets such as `players-identity-lifecycle-intake` are not
-promotable release target sets and are rejected by `scripts/check_release_readiness.sh`.
+Planning/guidance-only target sets such as `players-identity-lifecycle-intake` and
+`mission-copied-bool-policy-slice` are not promotable release target sets and are rejected by `scripts/check_release_readiness.sh`.
+The Mission copied-bool lane is a planning-only/internal observer lane, not a public
+Mission SDK, runtime hook, mutation, return override, identity, lookup, or release/public
+promotion evidence.
 NextGen/Plugin Hub planning target sets are also guidance-only demand signals, not
 release/public promotion evidence; replace guidance-only lanes with a separately promoted
 release/public target set after the SDK and second-source gates are satisfied.

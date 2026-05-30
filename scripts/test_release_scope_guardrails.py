@@ -660,7 +660,11 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "Transfer target sets such as `transfer-ufunction-intake` are also not part of the default gate",
             normalized(release),
         )
-        self.assertIn("Planning/guidance-only target sets such as `players-identity-lifecycle-intake`", release)
+        self.assertIn(
+            "Planning/guidance-only target sets such as `players-identity-lifecycle-intake` and",
+            release,
+        )
+        self.assertIn("`mission-copied-bool-policy-slice`", release)
         self.assertIn("NextGen/Plugin Hub planning target sets", release)
         self.assertIn("rejected by `scripts/check_release_readiness.sh`", release)
         self.assertIn("not part of the default gate", release)
@@ -677,14 +681,15 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("--scriptstruct-second-source-root requires at least one --scriptstruct-second-source-target-set", script)
         self.assertNotIn('SCRIPTSTRUCT_SECOND_SOURCE_TARGET_SETS=("transfer-scriptstruct")', script)
         self.assertEqual(
-            shell_array_values(script, "GUIDANCE_ONLY_SECOND_SOURCE_TARGET_SETS"),
+            shell_array_values(script, "PLANNING_ONLY_SECOND_SOURCE_TARGET_SETS"),
             [
                 "players-identity-lifecycle-intake",
+                "mission-copied-bool-policy-slice",
                 "nextgen-plugin-hub-planning",
                 "plugin-hub-planning",
             ],
         )
-        self.assertIn("reject_guidance_only_second_source_target_set", script)
+        self.assertIn("reject_planning_only_second_source_target_set", script)
         self.assertIn("add_scriptstruct_second_source_target_set", script)
         self.assertIn("planning/guidance-only", script)
         self.assertIn("name every promoted target set", pr_template)
@@ -723,6 +728,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
     def test_release_gate_rejects_guidance_only_target_sets_before_build(self) -> None:
         blocked_cases = [
             ("--ufunction-second-source-target-set", "players-identity-lifecycle-intake", "UFunction"),
+            ("--ufunction-second-source-target-set", "mission-copied-bool-policy-slice", "UFunction"),
             ("--ufunction-second-source-target-set", "nextgen-plugin-hub-planning", "UFunction"),
             ("--scriptstruct-second-source-target-set", "plugin-hub-planning", "ScriptStruct"),
         ]

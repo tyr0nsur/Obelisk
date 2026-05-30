@@ -58,6 +58,16 @@ READINESS_NON_CLAIMS = [
     "accepted second-source readiness is layout evidence only",
     "does not promote public SDK, object identity, lookup, mutation, return override, ResourceHandle, or runtime hooks",
 ]
+MISSION_COPIED_BOOL_POLICY_ARTIFACT = (
+    "/home/flowcommunity-ark/obelisk-artifacts/"
+    "mission-copied-bool-tail-policy-slice-20260530T090211Z/"
+)
+MISSION_COPIED_BOOL_POLICY_ARTIFACT_SHA256 = (
+    "f56a191aaecbd52d042efd81423d4a86f4e5a29674660aab9d65bbf496416945"
+)
+MISSION_COPIED_BOOL_POLICY_MANIFEST_SHA256 = (
+    "b47f0497c92ae3e8f9a006fb5be87cfbcc1d1dd5f15d78267ad186073e4c26fb"
+)
 TARGET_BLOCKER_GUIDANCE = {
     "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild": {
         "classification": "second_wave_structure_build_policy_candidate",
@@ -150,9 +160,12 @@ TARGET_SET_BLOCKER_GUIDANCE = {
             "runtime_observation_requires_separate_approval",
         ],
         "next_offline_input": (
-            "consume the focused mission copied-bool policy artifact or refresh sanitized "
-            "mission UFunction snapshots from distinct non-protected copied/offline artifacts "
-            "with complete artifact identity"
+            "consume existing offline artifact "
+            f"{MISSION_COPIED_BOOL_POLICY_ARTIFACT} "
+            f"(pack_sha256={MISSION_COPIED_BOOL_POLICY_ARTIFACT_SHA256}, "
+            f"manifest_sha256={MISSION_COPIED_BOOL_POLICY_MANIFEST_SHA256}) "
+            "or refresh sanitized mission UFunction snapshots from distinct non-protected "
+            "copied/offline artifacts with complete artifact identity"
         ),
         "snapshot_prep_checks": [
             "compare schema-qualified targets through --target-set mission-copied-bool-policy-slice",
@@ -160,6 +173,7 @@ TARGET_SET_BLOCKER_GUIDANCE = {
             "keep GetPlayerUsableItems in mission-compact-intake as recognition-only; do not add it to the copied-bool policy slice",
             "keep player/controller/character object refs, item arrays, mission payload identity, and raw params redacted or recognition-only",
             "require distinct artifact identity before any second-source readiness claim",
+            "consume-only means offline artifact or sanitized snapshot reads; do not substitute runtime probes, live /servidor/ark inputs, or public SDK layouts",
             "do not use this target set for release/readiness or public SDK promotion gates",
         ],
         "non_claim": (

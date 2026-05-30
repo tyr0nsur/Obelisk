@@ -119,7 +119,6 @@ namespace Obelisk::Core
         if (registrationId == 0)
             return false;
 
-        std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
         std::lock_guard<std::mutex> lock(m_Mutex);
 
         auto removeForId = [registrationId](auto& callbacks) -> bool {
@@ -143,7 +142,6 @@ namespace Obelisk::Core
         if (!owner || registrationId == 0)
             return false;
 
-        std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
         std::lock_guard<std::mutex> lock(m_Mutex);
 
         auto removeForOwnerAndId = [owner, registrationId](auto& callbacks) -> bool {

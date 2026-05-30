@@ -115,7 +115,19 @@ paths, with explicit FName root, GObjects, binary hash, and artifact identity.
 
 When a scoped offline core/snapshot task is approved, first generate a sanitized
 candidate snapshot for the exact target only. Because this target is not in the current
-fixture manifest, use the ad hoc inspection path before adding any target set:
+fixture manifest, use the ad hoc inspection path before adding any target set.
+
+`scripts/inspect_core_ufunctions.py` currently takes an offline core via `--core`; do not
+pass an evidence-pack manifest to `--core`. If the approved input is a complete
+evidence-pack manifest instead of a copied core, use the snapshot regeneration consumer
+for that manifest and keep the resulting target exact and ad hoc.
+
+The command contract below was checked against the inspector CLI on 2026-05-30:
+`--outer-exact`, `--name-exact`, `--inspection-mode ufunction`, `--snapshot-json`, and
+the listed `--evidence-*` metadata flags are supported. The regression test
+`test_cli_documented_structure_snapshot_flags_stay_supported` keeps the same flag family
+covered with a synthetic offline fixture so future doc edits do not drift into a broken
+command.
 
 ```bash
 python3 scripts/inspect_core_ufunctions.py \

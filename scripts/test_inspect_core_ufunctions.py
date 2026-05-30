@@ -2095,6 +2095,56 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
         self.assertNotIn(hex(addrs["gobjects"]), result.stdout)
         self.assertNotIn(hex(addrs["fname_table"]), result.stdout)
 
+    def test_cli_documented_structure_snapshot_flags_stay_supported(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            core = Path(temp_dir) / "core"
+            addrs = build_core_fixture(core)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "inspect_core_ufunctions.py"),
+                    "--core",
+                    str(core),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--outer-exact",
+                    "PrimalStructure",
+                    "--name-exact",
+                    "AllowStructureAccess",
+                    "--inspection-mode",
+                    "ufunction",
+                    "--snapshot-json",
+                    "--evidence-ark-sha256",
+                    "1" * 64,
+                    "--evidence-artifact-sha256",
+                    "2" * 64,
+                    "--evidence-artifact-kind",
+                    "offline_core",
+                    "--evidence-capture-id",
+                    "fixture-structure-capture",
+                    "--evidence-pack-id",
+                    "fixture-structure-pack",
+                    "--evidence-obelisk-commit",
+                    "fixture-commit",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["schema"], "obelisk.ufunction-chain.snapshot.v1")
+        self.assertEqual(payload["evidence"]["artifact_kind"], "offline_core")
+        self.assertEqual(payload["evidence"]["ark_binary_sha256"], "1" * 64)
+        self.assertEqual(payload["evidence"]["artifact_sha256"], "2" * 64)
+        self.assertEqual(payload["targets"][0]["target"]["outer_name"], "PrimalStructure")
+        self.assertEqual(payload["targets"][0]["target"]["name"], "AllowStructureAccess")
+        self.assertEqual(payload["targets"][0]["inspection_mode"], "ufunction")
+        self.assertNotIn(str(core), result.stdout)
+        self.assertNotIn(hex(addrs["allow_structure_access_function"]), result.stdout)
+
     def test_cli_script_struct_mode_emits_script_struct_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             core = Path(temp_dir) / "core"

@@ -492,6 +492,11 @@ Current strict promote blockers:
 - `promote_mode_serial_policy_candidate_only`
 - `promote_mode_manifest_has_non_claims`
 
+Historical `obelisk.resource-handle-serial-scan.v1` consume-gate support remains for
+auditing already-produced artifacts only. It is not a request or next step to create a
+fresh serial sweep for the current binary hash; new evidence should start from the
+canonical inputs above and target the two semantic runtime artifacts below.
+
 Still-required ResourceHandle promotion blockers:
 
 - `public_resourcehandle_policy_missing`

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Reduced raw `EventManager` granular unregister blocking so a targeted unregister can
+  take effect while an unrelated ProcessEvent callback is in flight, while owner cleanup
+  still waits as the plugin unload barrier.
+- Clarified Mission, Structure, and ResourceHandle offline evidence routing: Mission
+  copied-bool stays consume-only/planning-only, Structure build-policy uses focused
+  snapshot inputs instead of evidence-pack manifests, and ResourceHandle remains a
+  semantic blocker rather than another broad scan target.
+- Hardened release/public guardrails so planning-only Mission lanes cannot back release
+  target-set promotion, public SDK docs, or Plugin Hub production claims.
 - Hardened plugin init-failure cleanup so a callback-cleanup failure still avoids
   `dlclose` if retry-retention tracking itself fails.
 - Fixed experimental `oChatLogger` safe-disabled initialization so it reads config before

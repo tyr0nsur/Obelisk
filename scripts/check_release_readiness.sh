@@ -24,8 +24,9 @@ PUBLIC_RC_UFUNCTION_SECOND_SOURCE_TARGET_SETS=(
     "item-return-only-policy-slice"
     "chat-message-intake"
 )
-GUIDANCE_ONLY_SECOND_SOURCE_TARGET_SETS=(
+PLANNING_ONLY_SECOND_SOURCE_TARGET_SETS=(
     "players-identity-lifecycle-intake"
+    "mission-copied-bool-policy-slice"
     "nextgen-plugin-hub-planning"
     "plugin-hub-planning"
 )
@@ -71,14 +72,14 @@ reject_protected_path() {
     fi
 }
 
-reject_guidance_only_second_source_target_set() {
+reject_planning_only_second_source_target_set() {
     local target_set="$1"
     local label="$2"
-    local guidance_only_target_set
+    local planning_only_target_set
     local normalized_target_set
 
-    for guidance_only_target_set in "${GUIDANCE_ONLY_SECOND_SOURCE_TARGET_SETS[@]}"; do
-        if [[ "${target_set}" == "${guidance_only_target_set}" ]]; then
+    for planning_only_target_set in "${PLANNING_ONLY_SECOND_SOURCE_TARGET_SETS[@]}"; do
+        if [[ "${target_set}" == "${planning_only_target_set}" ]]; then
             printf '%s is planning/guidance-only and cannot be used as a release readiness %s target set.\n' \
                 "${target_set}" "${label}" >&2
             printf 'Promote a separate release/public target set through the documented SDK and second-source gates instead.\n' >&2
@@ -100,14 +101,14 @@ reject_guidance_only_second_source_target_set() {
 add_ufunction_second_source_target_set() {
     local target_set="$1"
 
-    reject_guidance_only_second_source_target_set "${target_set}" "UFunction"
+    reject_planning_only_second_source_target_set "${target_set}" "UFunction"
     UFUNCTION_SECOND_SOURCE_TARGET_SETS+=("${target_set}")
 }
 
 add_scriptstruct_second_source_target_set() {
     local target_set="$1"
 
-    reject_guidance_only_second_source_target_set "${target_set}" "ScriptStruct"
+    reject_planning_only_second_source_target_set "${target_set}" "ScriptStruct"
     SCRIPTSTRUCT_SECOND_SOURCE_TARGET_SETS+=("${target_set}")
 }
 

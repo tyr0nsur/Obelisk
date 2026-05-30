@@ -2931,6 +2931,67 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             compact,
         )
 
+    def test_mission_plugin_hub_boundary_stays_planning_only(self) -> None:
+        foundation = (REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md").read_text(
+            encoding="utf-8"
+        )
+        matrix = (REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md").read_text(
+            encoding="utf-8"
+        )
+        inventory = (
+            REPO_ROOT / "docs" / "research" / "2026-05-30-nextgenplugins-reference-inventory.md"
+        ).read_text(encoding="utf-8")
+        compact_foundation = normalized(foundation)
+        compact_matrix = normalized(matrix)
+        compact_inventory = normalized(inventory)
+
+        for required in (
+            "Mission planning and mission demand",
+            "Demand/research notes only",
+            "Planning-only",
+            "Production Plugin Hub mission module",
+            "ArkApi mission compatibility",
+            "command SDK dependency",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, compact_matrix)
+
+        for text, required in (
+            (compact_foundation, "mission, transfer, or structure modules"),
+            (compact_foundation, "public Inventory SDK, Items SDK, StructureEvents SDK, command SDK"),
+            (compact_inventory, "transfers, and missions remain investigation/internal unless"),
+            (compact_inventory, "This list is not a v1 delivery sequence, compatibility plan, or Plugin Hub roadmap."),
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, text)
+
+        forbidden_positive_claims = (
+            r"\bproduction\s+Plugin\s+Hub\s+mission\s+module\b",
+            r"\bArkApi\s+mission\s+compatibility\b",
+            r"\bmission\s+(?:command\s+)?SDK\b",
+        )
+        negated_or_boundary_context = re.compile(
+            r"\b(?:do\s+not|does\s+not|must\s+not|not|no|never|without|blocked|planning-only|"
+            r"demand/research\s+notes\s+only)\b",
+            re.IGNORECASE,
+        )
+        offenders: list[str] = []
+        for name, text in (
+            ("docs/PLUGIN_HUB_FOUNDATION_V1.md", foundation),
+            ("docs/PLUGIN_HUB_CAPABILITY_MATRIX.md", matrix),
+            ("docs/research/2026-05-30-nextgenplugins-reference-inventory.md", inventory),
+        ):
+            for line_no, line in enumerate(text.splitlines(), start=1):
+                for pattern in forbidden_positive_claims:
+                    if re.search(
+                        pattern,
+                        line,
+                        flags=re.IGNORECASE,
+                    ) and not negated_or_boundary_context.search(line):
+                        offenders.append(f"{name}:{line_no}: {line.strip()}")
+
+        self.assertEqual(offenders, [])
+
     def test_v1_modding_route_keeps_broad_surface_without_sdk_promise(self) -> None:
         v1_map = (
             REPO_ROOT / "docs" / "research" / "2026-05-30-v1-core-capability-map.md"
@@ -3148,6 +3209,34 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         for path in (v1_map_path, readme_path):
             with self.subTest(file=path.relative_to(REPO_ROOT).as_posix()):
                 self.assertIn(plan_path.name, path.read_text(encoding="utf-8"))
+
+    def test_planning_only_target_sets_do_not_back_public_sdk_surface(self) -> None:
+        manifest = json.loads(PUBLIC_GAMEPLAY_EVENTS_MANIFEST.read_text(encoding="utf-8"))
+        public_manifest_sets = {
+            target_set
+            for section in ("promoted_events", "rc_events")
+            for event in manifest.get(section, [])
+            for target_set in event.get("target_sets", [])
+        }
+        public_target_sets = set(V010_GAMEPLAY_POLICY_TARGET_SETS + V010_CHAT_MESSAGE_TARGET_SETS)
+
+        self.assertIn("mission-copied-bool-policy-slice", PLANNING_ONLY_TARGET_SETS)
+        self.assertEqual(sorted(set(PLANNING_ONLY_TARGET_SETS) & public_manifest_sets), [])
+        self.assertEqual(sorted(set(PLANNING_ONLY_TARGET_SETS) & public_target_sets), [])
+
+        mention_context_re = re.compile(
+            r"\b(?:blocked|candidate-only|guidance-only|internal|not\s+(?:a\s+)?public|planning-only|rejected)\b",
+            re.IGNORECASE,
+        )
+        offenders: list[str] = []
+        for path in PUBLIC_SDK_GUIDANCE_DOC_FILES:
+            for paragraph in re.split(r"\n\s*\n", path.read_text(encoding="utf-8")):
+                if "mission-copied-bool-policy-slice" not in paragraph:
+                    continue
+                if not mention_context_re.search(normalized(paragraph)):
+                    offenders.append(f"{path.relative_to(REPO_ROOT)}: {normalized(paragraph)}")
+
+        self.assertEqual(offenders, [])
 
     def test_scalar_candidate_tooling_is_not_public_sdk_promotion(self) -> None:
         fixture_readme = (REPO_ROOT / "tests/fixtures/ufunction_snapshots/README.md").read_text(

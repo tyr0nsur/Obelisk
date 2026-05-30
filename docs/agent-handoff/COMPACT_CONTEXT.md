@@ -70,9 +70,10 @@ priorities, and do not use history files as the active source of truth.
   Timer ids are not shared config, cluster state, UE identity, gameplay/module timer
   abstractions, shared scheduler state, or persistent handles. `oProcessTimer` is the
   first-party process-local timer example.
-- EventManager owner cleanup is expected to wait for in-flight callbacks before plugin
-  unload; tests cover debug-gated filtered pre-ProcessEvent and post-ProcessEvent callback
-  paths.
+- EventManager granular raw ProcessEvent unregister avoids waiting behind unrelated
+  in-flight callbacks and active-id checks skip unregistered callbacks from stale
+  snapshots; owner cleanup still waits before plugin unload. Tests cover debug-gated
+  filtered pre-ProcessEvent and post-ProcessEvent callback paths.
 - PluginManager unload must not `dlclose` if any plugin-owned callback cleanup family
   fails. The current runtime retains the plugin mapped for a later `UnloadAll()` retry
   and records that shutdown was already called so retry cleanup/close does not invoke

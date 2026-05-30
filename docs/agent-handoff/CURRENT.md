@@ -202,10 +202,11 @@ for the current checkpoint.
   The default release gate and `check_rc_layout_evidence_smoke.sh` are aligned on the four
   public RC UFunction target sets, including `item-return-only-policy-slice`; the combined
   RC UFunction root helper now requires `--item-return-root` and assembles 12 snapshots.
-- Runtime/plugin lifecycle audit found no P1 blocker, but `EventManager` raw ProcessEvent
-  unregister still waits behind dispatch callbacks and can deliver already-snapshotted
-  callbacks before delayed unregister takes effect. Treat snapshot/in-flight cleanup for
-  raw callbacks as v1 debt; current owner cleanup remains the unload barrier.
+- Runtime/plugin lifecycle audit found no P1 blocker. `EventManager` granular raw
+  ProcessEvent unregister now avoids waiting behind unrelated in-flight callbacks and
+  checks active ids before invoking snapshotted callbacks; owner cleanup still waits as
+  the plugin unload barrier. Treat broader raw snapshot/in-flight cleanup design as v1
+  debt, not a current unload blocker.
 - Any future live/player validation requires a new approved live-ops brief and beta-test
   notice through the configured local webhook variable when players are involved.
 
