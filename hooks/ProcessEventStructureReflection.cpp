@@ -64,6 +64,14 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
                HasObservationBudgetRemaining(dispatchCounter, dispatchLimit);
     }
 
+    bool ShouldAttemptDispatchObservation(const std::atomic<uint64_t>& dispatchCounter,
+                                          uint64_t dispatchLimit,
+                                          size_t subscriptionCount)
+    {
+        return subscriptionCount != 0 &&
+               HasObservationBudgetRemaining(dispatchCounter, dispatchLimit);
+    }
+
     bool ShouldAttemptNameObservation(int32_t nameIndex, uint64_t limit)
     {
         return ShouldAttemptObservation(limit) && IsReflectedStructureNameIndex(nameIndex);
@@ -116,12 +124,35 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
             return false;
         }
         CopiedStructureEvent event;
-        if (!TryBuildCopiedStructureEvent(attempt.Invocation, event))
+        return TryBuildAndReserveDispatchBudgetForMatchedAttempt(
+            attempt, counter, limit, observationNumber, event);
+    }
+
+    bool TryBuildAndReserveDispatchBudgetForMatchedAttempt(const Attempt& attempt,
+                                                           std::atomic<uint64_t>& counter,
+                                                           uint64_t limit,
+                                                           uint64_t& observationNumber,
+                                                           CopiedStructureEvent& out)
+    {
+        if (attempt.Status != AttemptStatus::Matched)
+        {
+            observationNumber = 0;
+            out = {};
+            return false;
+        }
+
+        if (!TryBuildCopiedStructureEvent(attempt.Invocation, out))
         {
             observationNumber = 0;
             return false;
         }
-        return TryReserveObservationBudget(counter, limit, observationNumber);
+
+        if (!TryReserveObservationBudget(counter, limit, observationNumber))
+        {
+            out = {};
+            return false;
+        }
+        return true;
     }
 
     namespace
@@ -184,6 +215,8 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
                 return false;
             if (!field.ExposesRange || !field.Range.Data)
                 return false;
+            if (field.Range.Size != field.Size)
+                return false;
 
             out.Field = scalarField;
             if (field.Size == sizeof(int32_t))
@@ -233,9 +266,20 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
             Obelisk::UE::RuntimeReflection::MakeReadOptionsForBinary(gate.BinarySha256, true);
 
         Obelisk::UE::StructureReflection::StructureInvocation invocation;
-        Obelisk::UE::RuntimeReflection::ReadResult result =
-            Obelisk::UE::StructureReflection::TryIdentifyStructureInvocation(
+        Obelisk::UE::RuntimeReflection::ReadResult result;
+        try
+        {
+            result = Obelisk::UE::StructureReflection::TryIdentifyStructureInvocation(
                 reader, options, function, params, invocation);
+        }
+        catch (...)
+        {
+            return {
+                AttemptStatus::Rejected,
+                {Obelisk::UE::RuntimeReflection::ReadStatus::Implausible, {}},
+                {},
+            };
+        }
         if (!result)
             return {AttemptStatus::Rejected, std::move(result), {}};
 
@@ -278,13 +322,32 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
 
     namespace
     {
+        bool IsSelfContainedCopiedEvent(const CopiedStructureEvent& event)
+        {
+            if (event.ScalarCount > event.ScalarStorage.size())
+                return false;
+            if (event.View.Scalars.size() != event.ScalarCount)
+                return false;
+            if (event.ScalarCount == 0)
+                return event.View.Scalars.empty();
+            return event.View.Scalars.data() == event.ScalarStorage.data();
+        }
+
+        size_t DispatchCopiedStructureEvent(const CopiedStructureEvent& event)
+        {
+            if (!IsSelfContainedCopiedEvent(event))
+                return 0;
+
+            return Obelisk::Core::StructureEventDispatcher::Get().Dispatch(event.View);
+        }
+
         size_t DispatchCopiedStructureEvent(const Obelisk::UE::StructureReflection::StructureInvocation& invocation)
         {
             CopiedStructureEvent event;
             if (!TryBuildCopiedStructureEvent(invocation, event))
                 return 0;
 
-            return Obelisk::Core::StructureEventDispatcher::Get().Dispatch(event.View);
+            return DispatchCopiedStructureEvent(event);
         }
     }
 
@@ -296,5 +359,15 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
             return 0;
 
         return DispatchCopiedStructureEvent(invocation);
+    }
+
+    size_t MaybeDispatchCopiedStructureEventAfterOriginal(
+        bool originalWasCalled,
+        const CopiedStructureEvent& event)
+    {
+        if (!originalWasCalled)
+            return 0;
+
+        return DispatchCopiedStructureEvent(event);
     }
 }

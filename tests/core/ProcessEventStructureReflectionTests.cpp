@@ -12,6 +12,7 @@
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 namespace fs = std::filesystem;
@@ -89,6 +90,11 @@ namespace
                 return true;
         }
         return false;
+    }
+
+    bool ThrowingReader(const void*, size_t, void*)
+    {
+        throw std::runtime_error("expected structure reflection reader exception");
     }
 
     void Require(bool condition, const char* message)
@@ -429,6 +435,10 @@ namespace
                 "zero atomic log and dispatch budgets reported active structure observation");
         Require(ShouldAttemptRuntimeObservation(logCounter, 0, dispatchCounter, 1),
                 "atomic dispatch budget did not activate structure observation");
+        Require(!ShouldAttemptDispatchObservation(dispatchCounter, 1, 0),
+                "structure dispatch observation activated without subscribers");
+        Require(ShouldAttemptDispatchObservation(dispatchCounter, 1, 1),
+                "structure dispatch observation did not activate with subscribers");
 
         Attempt rejectedAttempt;
         rejectedAttempt.Status = AttemptStatus::Rejected;
@@ -457,6 +467,8 @@ namespace
         Require(observationNumber == 0, "exhausted matched dispatch budget did not clear observation number");
         Require(!ShouldAttemptRuntimeObservation(logCounter, 0, dispatchCounter, 1),
                 "exhausted atomic dispatch budget still activated structure observation");
+        Require(!ShouldAttemptDispatchObservation(dispatchCounter, 1, 1),
+                "exhausted structure dispatch observation reported active with subscribers");
     }
 
     void TestReflectedStructureNameFilter()
@@ -498,6 +510,22 @@ namespace
 
         Require(attempt.Status == AttemptStatus::NonStructureFunction, "non-structure name did not short-circuit");
         Require(context.Calls == 0, "non-structure name touched UFunction memory");
+    }
+
+    void TestIdentifyContainsReaderExceptions()
+    {
+        MemoryReader reader{ThrowingReader, nullptr};
+        Attempt attempt = TryIdentifyInvocation(
+            EnabledGate(),
+            kVerifyPinCodeNameIndex,
+            reader,
+            reinterpret_cast<void*>(0x10000),
+            reinterpret_cast<void*>(0x20000));
+
+        Require(attempt.Status == AttemptStatus::Rejected,
+                "reader exception escaped structure recognition as a non-rejection");
+        Require(attempt.Result.Status == ReadStatus::Implausible,
+                "reader exception did not fail closed as an implausible read");
     }
 
     void TestIdentifiesVerifyPinCodeWithoutPinRange()
@@ -777,6 +805,122 @@ namespace
         Require(captured.empty(), "non-canonical SetVariant reached structure callback");
     }
 
+    void TestRejectsShortStructureScalarRangeWithoutDispatchBudget()
+    {
+        StructureFixture fixture;
+        BuildSetVariant(fixture);
+        const int32_t variant = 11;
+        WriteAt(fixture.Params, 0x00, variant);
+        fixture.Params[0x04] = 1;
+        fixture.Params[0x05] = 1;
+
+        Attempt attempt = TryIdentifyInvocation(
+            EnabledGate(),
+            kSetVariantNameIndex,
+            fixture.Reader(),
+            fixture.Function.data(),
+            fixture.Params.data());
+        Require(attempt.Status == AttemptStatus::Matched, attempt.Result.Reason.c_str());
+        attempt.Invocation.Fields[0].Range.Size = 1;
+
+        CopiedStructureEvent event;
+        Require(!TryBuildCopiedStructureEvent(attempt.Invocation, event),
+                "copied SetVariant event accepted a short int32 scalar range");
+        Require(event.View.Scalars.empty(), "failed short-range SetVariant left copied scalar span");
+
+        std::atomic<uint64_t> dispatchCounter{0};
+        uint64_t observationNumber = 99;
+        Require(!TryReserveDispatchBudgetForMatchedAttempt(attempt, dispatchCounter, 1, observationNumber),
+                "short-range SetVariant consumed structure dispatch budget");
+        Require(observationNumber == 0, "short-range SetVariant did not clear dispatch observation number");
+        Require(dispatchCounter.load() == 0, "short-range SetVariant changed dispatch counter");
+    }
+
+    void TestCopiedStructureEventRebindsScalarSpanOnCopyAndMove()
+    {
+        StructureFixture fixture;
+        BuildSetVariant(fixture);
+        const int32_t variant = 11;
+        WriteAt(fixture.Params, 0x00, variant);
+        fixture.Params[0x04] = 1;
+        fixture.Params[0x05] = 0;
+
+        Attempt attempt = TryIdentifyInvocation(
+            EnabledGate(),
+            kSetVariantNameIndex,
+            fixture.Reader(),
+            fixture.Function.data(),
+            fixture.Params.data());
+        Require(attempt.Status == AttemptStatus::Matched, attempt.Result.Reason.c_str());
+
+        CopiedStructureEvent event;
+        Require(TryBuildCopiedStructureEvent(attempt.Invocation, event),
+                "failed to build copied SetVariant event for copy test");
+
+        CopiedStructureEvent copied = event;
+        Require(copied.View.Scalars.data() == copied.ScalarStorage.data(),
+                "copied structure event scalar span points to source storage");
+        Require(copied.View.Scalars.size() == event.View.Scalars.size(),
+                "copied structure event scalar span size mismatch");
+
+        CopiedStructureEvent assigned;
+        assigned = event;
+        Require(assigned.View.Scalars.data() == assigned.ScalarStorage.data(),
+                "assigned structure event scalar span points to source storage");
+
+        CopiedStructureEvent moved = std::move(copied);
+        Require(moved.View.Scalars.data() == moved.ScalarStorage.data(),
+                "moved structure event scalar span points to source storage");
+    }
+
+    void TestDispatchUsesReservedCopiedStructureEvent()
+    {
+        StructureFixture fixture;
+        BuildSetVariant(fixture);
+        const int32_t originalVariant = 11;
+        WriteAt(fixture.Params, 0x00, originalVariant);
+        fixture.Params[0x04] = 1;
+        fixture.Params[0x05] = 0;
+
+        Attempt attempt = TryIdentifyInvocation(
+            EnabledGate(),
+            kSetVariantNameIndex,
+            fixture.Reader(),
+            fixture.Function.data(),
+            fixture.Params.data());
+        Require(attempt.Status == AttemptStatus::Matched, attempt.Result.Reason.c_str());
+
+        std::atomic<uint64_t> dispatchCounter{0};
+        uint64_t observationNumber = 99;
+        CopiedStructureEvent event;
+        Require(TryBuildAndReserveDispatchBudgetForMatchedAttempt(
+                    attempt, dispatchCounter, 1, observationNumber, event),
+                "valid SetVariant did not reserve dispatch budget with copied event");
+        const int32_t mutatedVariant = 99;
+        WriteAt(fixture.Params, 0x00, mutatedVariant);
+        fixture.Params[0x04] = 0;
+        fixture.Params[0x05] = 1;
+
+        int owner = 0;
+        std::vector<CapturedStructureEvent> captured;
+        const uint64_t registrationId = Obelisk::Core::StructureEventDispatcher::Get().Register(
+            &owner,
+            Obelisk::Core::StructureEventSubscription{CaptureStructureEvent, &captured});
+        Require(registrationId != 0, "failed to register structure event callback");
+        Require(MaybeDispatchCopiedStructureEventAfterOriginal(true, event) == 1,
+                "copied reserved SetVariant did not dispatch");
+        Obelisk::Core::StructureEventDispatcher::Get().UnregisterCallbacksForOwner(&owner);
+
+        Require(captured.size() == 1, "copied reserved SetVariant dispatch count mismatch");
+        Require(captured[0].Scalars.size() == 3, "copied reserved SetVariant scalar count mismatch");
+        Require(captured[0].Scalars[0].Int32Value == originalVariant,
+                "copied reserved SetVariant read mutated params");
+        Require(captured[0].Scalars[1].BoolValue,
+                "copied reserved SetVariant bForceSet read mutated params");
+        Require(!captured[0].Scalars[2].BoolValue,
+                "copied reserved SetVariant ReturnValue read mutated params");
+    }
+
     void TestDispatchesCopiedStructureEventThroughInternalDispatcher()
     {
         StructureFixture fixture;
@@ -921,12 +1065,16 @@ int main()
     TestReflectedStructureNameFilter();
     TestDisabledGateDoesNotRead();
     TestNonStructureNameDoesNotRead();
+    TestIdentifyContainsReaderExceptions();
     TestIdentifiesVerifyPinCodeWithoutPinRange();
     TestIdentifiesAllStructureHookTargets();
     TestRejectsStructureHookWrongOuter();
     TestBuildsCopiedStructureEventWithoutBorrowedObjectOrSensitiveFields();
     TestBuildsCopiedStructureEventForScalarStructureTargets();
     TestRejectsNonCanonicalStructureBoolWithoutDispatchBudget();
+    TestRejectsShortStructureScalarRangeWithoutDispatchBudget();
+    TestCopiedStructureEventRebindsScalarSpanOnCopyAndMove();
+    TestDispatchUsesReservedCopiedStructureEvent();
     TestDispatchesCopiedStructureEventThroughInternalDispatcher();
     TestCopiedStructureDispatchRequiresOriginalProcessEvent();
     TestBlockedPreCallbackPreventsIntegratedStructureDispatch();

@@ -248,6 +248,21 @@ CHAT_MESSAGE_EVENT_RELATION_BREAKERS = {
     "whereas",
     "while",
 }
+GAMEPLAY_POLICY_SCOPE_FORBIDDEN_RE = re.compile(
+    r"\bInventory\s+SDKs?\b|"
+    r"\bStructureEvents?\s+SDKs?\b|"
+    r"\bResourceHandle\b|"
+    r"\b(?:object|resource|player|inventory|item|structure)\s+identity\b|"
+    r"\bidentity\b|"
+    r"\bmutation\b|"
+    r"\breturn[- ]overrides?\b",
+    re.IGNORECASE,
+)
+GAMEPLAY_POLICY_SCOPE_NEGATORS_RE = re.compile(
+    r"\b(?:blocked|does\s+not|do\s+not|excluded|excludes|keep|keeps|must\s+not|never|no|not|"
+    r"outside|redacted|remain|remains|without)\b",
+    re.IGNORECASE,
+)
 TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9]*(?:[-_][A-Za-z0-9]+)*")
 UNPROMOTED_GAMEPLAY_SURFACES = (
     "Player",
@@ -628,6 +643,22 @@ def positive_chat_message_event_claims(text: str, relative_path: str) -> list[st
     return offenders
 
 
+def json_string_values(value: object, path: str) -> list[tuple[str, str]]:
+    if isinstance(value, dict):
+        values: list[tuple[str, str]] = []
+        for key, child in value.items():
+            values.extend(json_string_values(child, f"{path}.{key}"))
+        return values
+    if isinstance(value, list):
+        values = []
+        for index, child in enumerate(value):
+            values.extend(json_string_values(child, f"{path}[{index}]"))
+        return values
+    if isinstance(value, str):
+        return [(path, value)]
+    return []
+
+
 class PublicSdkGuardrailTests(unittest.TestCase):
     def test_public_gameplay_event_manifest_contains_no_server_paths(self) -> None:
         manifest = json.loads(PUBLIC_GAMEPLAY_EVENTS_MANIFEST.read_text(encoding="utf-8"))
@@ -700,6 +731,36 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                     offenders.append(f"{path}: {pattern}")
 
         visit(manifest, "manifest")
+        self.assertEqual(offenders, [])
+
+    def test_gameplay_policy_structure_inventory_claims_do_not_become_module_sdks_or_authority(self) -> None:
+        manifest = json.loads(PUBLIC_GAMEPLAY_EVENTS_MANIFEST.read_text(encoding="utf-8"))
+        sources: list[tuple[str, str]] = []
+
+        for path, value in json_string_values(manifest, "manifest"):
+            sources.append((f"{PUBLIC_GAMEPLAY_EVENTS_MANIFEST.relative_to(REPO_ROOT)}:{path}", value))
+        for path in PUBLIC_DOC_FILES:
+            text = path.read_text(encoding="utf-8")
+            relative = path.relative_to(REPO_ROOT)
+            for line, segment in sentence_like_segments(text):
+                sources.append((f"{relative}:{line}", segment))
+
+        offenders: list[str] = []
+        for source, segment in sources:
+            if "GameplayPolicyEvent" not in segment:
+                continue
+            if not re.search(
+                r"\b(?:inventory|inventory-backed|structure|structure-backed|StructureEvents?)\b",
+                segment,
+                flags=re.IGNORECASE,
+            ):
+                continue
+            if not GAMEPLAY_POLICY_SCOPE_FORBIDDEN_RE.search(segment):
+                continue
+            if GAMEPLAY_POLICY_SCOPE_NEGATORS_RE.search(segment):
+                continue
+            offenders.append(f"{source}: {normalized(segment)}")
+
         self.assertEqual(offenders, [])
 
     def test_public_manifest_does_not_use_static_resource_or_command_evidence_for_rc_surfaces(self) -> None:

@@ -88,6 +88,7 @@ namespace Obelisk::Core
         std::lock_guard<std::mutex> lock(m_Mutex);
         const uint64_t id = AllocateRegistrationId();
         m_Registrations.push_back({id, owner, subscription});
+        m_SubscriptionCount.store(m_Registrations.size());
         return id;
     }
 
@@ -140,6 +141,7 @@ namespace Obelisk::Core
                                           });
             m_Registrations.erase(keepEnd, m_Registrations.end());
             after = m_Registrations.size();
+            m_SubscriptionCount.store(after);
             if (QueueOrDestroyRemovedSubscriptions(removed, lock))
                 m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
             else if (!IsInsideAnyGameplayCallback() && !IsDispatchCleanupComplete())
@@ -171,6 +173,7 @@ namespace Obelisk::Core
                                           });
             m_Registrations.erase(keepEnd, m_Registrations.end());
             after = m_Registrations.size();
+            m_SubscriptionCount.store(after);
             if (QueueOrDestroyRemovedSubscriptions(removed, lock))
                 m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
             else if (!IsInsideAnyGameplayCallback() && !IsDispatchCleanupComplete())
@@ -202,6 +205,7 @@ namespace Obelisk::Core
                                           });
             m_Registrations.erase(keepEnd, m_Registrations.end());
             after = m_Registrations.size();
+            m_SubscriptionCount.store(after);
             if (QueueOrDestroyRemovedSubscriptions(removed, lock))
                 m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
             else if (!IsInsideAnyGameplayCallback() && !IsDispatchCleanupComplete())
@@ -354,7 +358,6 @@ namespace Obelisk::Core
 
     size_t StructureEventDispatcher::SubscriptionCount() const
     {
-        std::lock_guard<std::mutex> lock(m_Mutex);
-        return m_Registrations.size();
+        return m_SubscriptionCount.load();
     }
 }

@@ -111,6 +111,11 @@ priorities, and do not use history files as the active source of truth.
   depth/deferred-destroy state, not the subscriber mirror. Copied inventory payloads
   rebind scalar spans on copy/move so dispatch-time values own their storage, and failed
   budget reservation clears stale payloads.
+- Structure copied-policy dispatch now follows the same safety pattern: dispatch budget
+  requires live subscribers, matched attempts reserve with one self-contained copied event,
+  copied scalar spans rebind on copy/move, exposed scalar range sizes are validated, and
+  reader exceptions fail closed. This remains internal infrastructure, not a public
+  StructureEvents SDK or structure identity surface.
 - Public `GameplayPolicyEvent` and `ChatMessageEvent` plugin callbacks are caught at the
   bridge to prevent C++ plugin exceptions from escaping into dispatcher/hook code.
 - Release scope wording separates copied RC plugin events from debug-gated raw

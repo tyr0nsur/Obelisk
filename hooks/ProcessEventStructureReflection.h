@@ -8,6 +8,7 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <span>
 #include <string>
 
 namespace Obelisk::Hooks::ProcessEventStructureReflection
@@ -54,6 +55,54 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
         Obelisk::Core::StructureEventView View;
         std::array<Obelisk::Core::StructureScalarValue, 6> ScalarStorage{};
         size_t ScalarCount = 0;
+
+        CopiedStructureEvent() = default;
+
+        CopiedStructureEvent(const CopiedStructureEvent& other)
+            : View(other.View),
+              ScalarStorage(other.ScalarStorage),
+              ScalarCount(other.ScalarCount)
+        {
+            RebindScalarSpan();
+        }
+
+        CopiedStructureEvent& operator=(const CopiedStructureEvent& other)
+        {
+            if (this != &other)
+            {
+                View = other.View;
+                ScalarStorage = other.ScalarStorage;
+                ScalarCount = other.ScalarCount;
+                RebindScalarSpan();
+            }
+            return *this;
+        }
+
+        CopiedStructureEvent(CopiedStructureEvent&& other) noexcept
+            : View(other.View),
+              ScalarStorage(other.ScalarStorage),
+              ScalarCount(other.ScalarCount)
+        {
+            RebindScalarSpan();
+        }
+
+        CopiedStructureEvent& operator=(CopiedStructureEvent&& other) noexcept
+        {
+            if (this != &other)
+            {
+                View = other.View;
+                ScalarStorage = other.ScalarStorage;
+                ScalarCount = other.ScalarCount;
+                RebindScalarSpan();
+            }
+            return *this;
+        }
+
+        void RebindScalarSpan()
+        {
+            View.Scalars = std::span<const Obelisk::Core::StructureScalarValue>(
+                ScalarStorage.data(), ScalarCount);
+        }
     };
 
     Gate EvaluateGate(const char* enableStructureReflection,
@@ -68,6 +117,9 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
                                          uint64_t logLimit,
                                          const std::atomic<uint64_t>& dispatchCounter,
                                          uint64_t dispatchLimit);
+    bool ShouldAttemptDispatchObservation(const std::atomic<uint64_t>& dispatchCounter,
+                                          uint64_t dispatchLimit,
+                                          size_t subscriptionCount);
     bool ShouldAttemptNameObservation(int32_t nameIndex, uint64_t limit);
     bool ShouldAttemptNameObservation(int32_t nameIndex, uint64_t logLimit, uint64_t dispatchLimit);
     bool ShouldLogObservation(uint64_t observationNumber, uint64_t limit);
@@ -77,6 +129,11 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
                                                    std::atomic<uint64_t>& counter,
                                                    uint64_t limit,
                                                    uint64_t& observationNumber);
+    bool TryBuildAndReserveDispatchBudgetForMatchedAttempt(const Attempt& attempt,
+                                                           std::atomic<uint64_t>& counter,
+                                                           uint64_t limit,
+                                                           uint64_t& observationNumber,
+                                                           CopiedStructureEvent& out);
 
     Attempt TryIdentifyInvocation(const Gate& gate,
                                   int32_t nameIndex,
@@ -88,4 +145,7 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
     size_t MaybeDispatchCopiedStructureEventAfterOriginal(
         bool originalWasCalled,
         const Obelisk::UE::StructureReflection::StructureInvocation& invocation);
+    size_t MaybeDispatchCopiedStructureEventAfterOriginal(
+        bool originalWasCalled,
+        const CopiedStructureEvent& event);
 }

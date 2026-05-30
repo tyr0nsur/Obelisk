@@ -1157,18 +1157,27 @@ namespace Obelisk::Hooks
             return;
         const uint64_t logLimit = GetStructureReflectionLogLimit();
         const uint64_t dispatchLimit = GetStructureReflectionDispatchLimit();
-        if (!ProcessEventStructureReflection::ShouldAttemptNameObservation(nameIndex, logLimit, dispatchLimit))
+        if (!ProcessEventStructureReflection::IsReflectedStructureNameIndex(nameIndex))
             return;
-        if (!ProcessEventStructureReflection::HasObservationBudgetRemaining(s_ReflectedStructureCalls, logLimit) &&
-            !ProcessEventStructureReflection::HasObservationBudgetRemaining(s_ReflectedStructureDispatches, dispatchLimit))
-        {
+        const bool hasDispatchSubscriber =
+            Core::StructureEventDispatcher::Get().SubscriptionCount() > 0;
+        const bool hasLogBudget =
+            ProcessEventStructureReflection::HasObservationBudgetRemaining(s_ReflectedStructureCalls, logLimit);
+        const bool hasDispatchBudget =
+            ProcessEventStructureReflection::ShouldAttemptDispatchObservation(
+                s_ReflectedStructureDispatches,
+                dispatchLimit,
+                hasDispatchSubscriber ? 1 : 0);
+        if (!hasLogBudget && !hasDispatchBudget)
             return;
-        }
         uint64_t logObservationNumber = 0;
         const bool logReserved = ProcessEventStructureReflection::TryReserveObservationBudget(
             s_ReflectedStructureCalls, logLimit, logObservationNumber);
         if (!logReserved &&
-            !ProcessEventStructureReflection::HasObservationBudgetRemaining(s_ReflectedStructureDispatches, dispatchLimit))
+            !ProcessEventStructureReflection::ShouldAttemptDispatchObservation(
+                s_ReflectedStructureDispatches,
+                dispatchLimit,
+                hasDispatchSubscriber ? 1 : 0))
             return;
 
         Obelisk::UE::RuntimeReflection::MemoryReader reader{RuntimeReflectionReader, nullptr};
@@ -1193,13 +1202,15 @@ namespace Obelisk::Hooks
         const Obelisk::UE::StructureReflection::StructureInvocation& invocation = attempt.Invocation;
         size_t dispatched = 0;
         uint64_t dispatchObservationNumber = 0;
-        const bool dispatchReserved = ProcessEventStructureReflection::TryReserveDispatchBudgetForMatchedAttempt(
-            attempt, s_ReflectedStructureDispatches, dispatchLimit, dispatchObservationNumber);
+        ProcessEventStructureReflection::CopiedStructureEvent copiedEvent;
+        const bool dispatchReserved = hasDispatchSubscriber &&
+            ProcessEventStructureReflection::TryBuildAndReserveDispatchBudgetForMatchedAttempt(
+                attempt, s_ReflectedStructureDispatches, dispatchLimit, dispatchObservationNumber, copiedEvent);
         if (dispatchReserved)
         {
             dispatched = ProcessEventStructureReflection::MaybeDispatchCopiedStructureEventAfterOriginal(
                 originalWasCalled,
-                invocation);
+                copiedEvent);
         }
 
         if (!logReserved || !ProcessEventStructureReflection::ShouldLogObservation(logObservationNumber, logLimit))

@@ -84,6 +84,12 @@ sequence.
 - Internal bridges only: `StructureEventDispatcher`, `InventoryPolicyEventDispatcher`,
   Item/Mission/Transfer recognizers, weak-helper artifacts, GObjects evidence, and route
   observers are planning/evidence inputs until a separate promotion gate changes scope.
+- Structure copied-event dispatch has been hardened to match the Inventory copied-event
+  safety pattern: dispatch budget requires a live subscriber, matched invocations build
+  one self-contained copied payload before reservation, copy/move rebinding keeps scalar
+  spans owned, scalar range sizes are validated, and reader exceptions fail closed. This
+  remains internal copied-scalar infrastructure only; it does not promote public
+  StructureEvents, identity, lookup, mutation, return override, or `ResourceHandle`.
 - ResourceHandle/public GObjects remain blocked. The old flag-policy artifact is obsolete;
   the durable rich-provenance refresh is preserved at
   `/home/flowcommunity-ark/obelisk-artifacts/uobject-flag-policy-refresh-20260530T071436Z/`.
