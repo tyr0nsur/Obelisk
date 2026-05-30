@@ -87,6 +87,18 @@ permissions group management, structure build policy, dino carry/color/reward ho
 RCON/operator utilities. These names are useful as candidate seeds only; every promoted
 Obelisk equivalent still needs native Linux reflection/runtime evidence.
 
+Quick local scan result: the cloned plugin area currently exposes 570
+source/header/readme-like files. High-frequency ArkApi surfaces include chat, console,
+and RCON command registration; timer callbacks; direct hooks; world/actor traversal;
+chat/server messages; permissions; and save/respawn/build/damage-style gameplay hooks.
+`StructuresLimit`, `SafeZone`, and `NoCollision` reinforce demand for a future structure
+build-placement policy lane, but they do not promote `APrimalStructure.IsAllowedToBuild`
+or any return-code semantics today.
+
+Use this clone as a demand-map and dictionary source, not as source code to port. Do not
+trust `DECLARE_HOOK` declarations as Linux ABI, direct UE pointer wrappers as safe public
+API shape, or ArkApi return constants as accepted Linux ARK behavior.
+
 ## Constraints
 
 - Keep the current Obelisk core route first: copied events, stable C ABI, owner-token
@@ -115,6 +127,16 @@ family creates demand for a public Transfer surface and the Obelisk promotion ga
 met. The current high-demand families are permissions/admin, economy/shop/rewards, chat
 commands, homes/teleport/safe-zone, RCON/operator integration, structures, dinos, tribes,
 and lifecycle/crash handling.
+
+When a plugin family reveals a promising surface, create an Obelisk-native lane:
+
+1. Name candidate functions/properties from the dictionary source.
+2. Resolve exact Linux owner/name through reflection or offline analysis.
+3. Capture sanitized evidence with SHA256, Obelisk commit, and artifact metadata.
+4. Add fixture and second-source comparison.
+5. Design a copied C ABI surface with explicit ownership, redaction, lifecycle cleanup,
+   and plugin tests.
+6. Only then expose it to Plugin Hub examples or public docs.
 
 Recommended v1 ordering from this demand inventory:
 

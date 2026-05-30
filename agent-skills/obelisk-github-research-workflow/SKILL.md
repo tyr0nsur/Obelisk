@@ -18,8 +18,9 @@ reversing evidence, and public SDK promotion gates. Treat chat, inventory, struc
 buffs, dinos, tribes, missions, transfers, and admin surfaces as module areas on top of
 the same core, not as the center of the project.
 
-Compatibility research may consult ArkServerApi/AseApi only as a names and behavior
-dictionary for familiar ARK plugin concepts. Obelisk must not copy ArkServerApi/AseApi
+Compatibility research may consult ArkServerApi/AseApi and local NextGenPlugins clones
+only as names, demand signals, and behavior dictionaries for familiar ARK plugin
+concepts. Obelisk must not copy ArkServerApi/AseApi, NextGenPlugins, or other ArkApi plugin
 offsets, vtables, layouts, `.lib` artifacts, MSVC/Windows ABI assumptions, direct
 `GetNativePointerField`/`NativeCall` wrappers, raw UE pointer APIs, or algorithmic
 implementations; Linux support is rebuilt from Obelisk reflection and ProcessEvent

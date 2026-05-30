@@ -307,6 +307,64 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             sets["transfer-ufunction-intake"],
         )
 
+    def test_structure_build_policy_targets_stay_out_of_rc_compact_sets_with_missing_base_gap(self) -> None:
+        result = run_compare_raw("--list-target-sets", "--json")
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        sets = {item["name"]: item["targets"] for item in report["target_sets"]}
+        forbidden_targets = {
+            "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild",
+            "obelisk.ufunction-chain.snapshot.v1:APrimalStructure.IsAllowedToBuild",
+        }
+        guarded_target_sets = {
+            "minimal-second-source-intake",
+            "structure-observer-intake",
+            "chat-message-intake",
+            "buff-compact-intake",
+            "dino-compact-intake",
+            "item-compact-intake",
+            "inventory-action-compact-intake",
+            "mission-compact-intake",
+            "tribe-compact-intake",
+        }
+        self.assertTrue(guarded_target_sets.issubset(set(sets)))
+        for target_set in guarded_target_sets:
+            with self.subTest(target_set=target_set):
+                self.assertTrue(forbidden_targets.isdisjoint(set(sets[target_set])))
+
+        result = run_compare_raw(
+            "--base-root",
+            str(REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"),
+            "--readiness-report",
+            "--target",
+            "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild",
+            "--target",
+            "obelisk.ufunction-chain.snapshot.v1:APrimalStructure.IsAllowedToBuild",
+            "--fail-on-base-readiness-gaps",
+            "--json",
+        )
+
+        self.assertEqual(result.returncode, 1, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["gate_mode"], "base_fixture_readiness")
+        self.assertEqual(report["totals"]["targets"], 2)
+        self.assertEqual(report["totals"]["comparable"], 0)
+        self.assertEqual(report["totals"]["blocked"], 2)
+        missing_module = next(module for module in report["modules"] if module["module"] == "<missing>")
+        self.assertEqual(missing_module["block_reasons"], {"missing_base_snapshot": 2})
+        self.assertEqual(
+            {detail["target"]: detail["block_reasons"] for detail in missing_module["target_details"]},
+            {
+                "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild": ["missing_base_snapshot"],
+                "obelisk.ufunction-chain.snapshot.v1:APrimalStructure.IsAllowedToBuild": ["missing_base_snapshot"],
+            },
+        )
+        self.assertIs(report["promotion_gate"]["ready"], False)
+        self.assertIs(report["promotion_gate"]["layout_ready"], False)
+        self.assertIs(report["promotion_gate"]["promotion_ready"], False)
+        self.assertEqual(report["promotion_gate"]["ready_scope"], "not_ready")
+
     def test_requires_base_root_unless_listing_target_sets(self) -> None:
         result = run_compare_raw("--readiness-report")
 

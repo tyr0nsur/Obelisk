@@ -908,6 +908,38 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             r"--ufunction-second-source-root\s+/servidor/ark/workspace-offline/[^\\\n]*minimal[^\\\n]*/ufunction-snapshots",
         )
 
+    def test_structure_build_policy_target_is_not_release_scope(self) -> None:
+        forbidden_terms = [
+            "PrimalStructure.IsAllowedToBuild",
+            "APrimalStructure.IsAllowedToBuild",
+        ]
+        release_scope_files = [
+            "docs/RELEASE.md",
+            "docs/STATUS.md",
+            "CHANGELOG.md",
+            "scripts/check_release_readiness.sh",
+            "scripts/check_rc_layout_evidence_smoke.sh",
+            "scripts/reflection_target_sets.py",
+            "scripts/assemble_rc_ufunction_second_source_root.py",
+        ]
+
+        for path in release_scope_files:
+            text = read(path)
+            for term in forbidden_terms:
+                with self.subTest(file=path, term=term):
+                    self.assertNotIn(term, text)
+
+        triage = read("docs/research/2026-05-30-structure-build-policy-triage.md")
+        for expected in [
+            "second-wave structure build-policy candidate",
+            "Do not add it to `structure-observer-intake`",
+            "No committed sanitized snapshot currently exists",
+            "Return override/build denial is a separate mutation/authority feature",
+            "This triage does not promote a public Structure SDK",
+        ]:
+            with self.subTest(expected=expected):
+                self.assertIn(expected, triage)
+
     def test_rc_ufunction_root_helper_is_documented_as_copy_only(self) -> None:
         plan = read("docs/research/2026-05-29-rc-checkpoint-slicing-plan.md")
         compact = read("docs/agent-handoff/COMPACT_CONTEXT.md")

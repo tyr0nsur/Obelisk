@@ -247,6 +247,18 @@ recovery context is not active routing for the current head; use
 - Secondary evidence-only lanes may continue for structure non-pin copied scalars and Buff
   breadth, but they must not imply runtime work, marker/env changes, public SDK expansion,
   or RC surface changes.
+- `APrimalStructure.IsAllowedToBuild` is now recorded as a high-demand build-policy
+  dictionary seed from NextGenPlugins, but current Obelisk evidence keeps it second-wave:
+  no committed snapshot, no second-source comparison, no target-set promotion, no public
+  StructureEvents/build-policy SDK, no mutation, and no return override. See
+  `docs/research/2026-05-30-structure-build-policy-triage.md` before assigning further
+  structure build-policy work.
+- `/home/flowcommunity-ark/NextGenPlugins` is accepted as a local Plugin Hub demand map
+  and names/behavior dictionary only. Use
+  `docs/research/2026-05-30-nextgenplugins-reference-inventory.md` and
+  `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md` for future planning; do not copy code, offsets,
+  vtables, Windows ABI assumptions, raw UE pointer access, or ArkApi implementation
+  patterns.
 - Any future live/player validation requires a new approved live-ops brief and, when
   players are involved, a beta-test notice through the configured local webhook variable.
 
