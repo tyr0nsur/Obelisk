@@ -289,6 +289,36 @@ namespace
                       }});
     }
 
+    void RequireFieldShape(const MissionReflection::MissionFieldRange& field,
+                           MissionReflection::MissionField expectedField,
+                           int32_t expectedNameIndex,
+                           int32_t expectedOffset,
+                           size_t expectedSize,
+                           bool expectedExposesRange)
+    {
+        Require(field.Field == expectedField, "mission field semantic mismatch");
+        Require(field.PropertyNameIndex == expectedNameIndex, "mission field property name mismatch");
+        Require(field.Offset == expectedOffset, "mission field offset mismatch");
+        Require(field.Size == expectedSize, "mission field size mismatch");
+        Require(field.ExposesRange == expectedExposesRange, "mission field range exposure mismatch");
+    }
+
+    void RequireNoRange(const MissionReflection::MissionFieldRange& field, const char* message)
+    {
+        Require(!field.ExposesRange, message);
+        Require(field.Range.Data == nullptr, "recognition-only mission range exposed data");
+        Require(field.Range.Size == 0, "recognition-only mission range exposed size");
+    }
+
+    void RequireOneByteRange(const MissionReflection::MissionFieldRange& field,
+                             const uint8_t* expectedData,
+                             const char* message)
+    {
+        Require(field.ExposesRange, message);
+        Require(field.Range.Data == expectedData, "mission bool range data mismatch");
+        Require(field.Range.Size == 1, "mission bool range must stay one byte");
+    }
+
     void TestRecognizesGetPlayerUsableItemsWithoutObjectOrArrayRanges()
     {
         MissionFixture fixture;
@@ -306,14 +336,54 @@ namespace
         Require(invocation.Function == MissionReflection::MissionFunction::GetPlayerUsableItems,
                 "GetPlayerUsableItems kind mismatch");
         Require(invocation.Fields.size() == 2, "GetPlayerUsableItems field count mismatch");
-        Require(invocation.Fields[0].Field == MissionReflection::MissionField::Character,
-                "Character field mismatch");
-        Require(invocation.Fields[1].Field == MissionReflection::MissionField::OutItemIDs,
-                "OutItemIDs field mismatch");
-        Require(!invocation.Fields[0].ExposesRange, "Character should be recognition-only");
-        Require(!invocation.Fields[1].ExposesRange, "OutItemIDs should be recognition-only");
-        Require(invocation.Fields[0].Range.Data == nullptr, "Character range should not be exposed");
-        Require(invocation.Fields[1].Range.Data == nullptr, "OutItemIDs range should not be exposed");
+        RequireFieldShape(invocation.Fields[0],
+                          MissionReflection::MissionField::Character,
+                          kCharacterNameIndex,
+                          0x00,
+                          0x08,
+                          false);
+        RequireFieldShape(invocation.Fields[1],
+                          MissionReflection::MissionField::OutItemIDs,
+                          kOutItemIDsNameIndex,
+                          0x08,
+                          0x10,
+                          false);
+        RequireNoRange(invocation.Fields[0], "Character should be recognition-only");
+        RequireNoRange(invocation.Fields[1], "OutItemIDs should be recognition-only");
+    }
+
+    void TestRecognitionOnlyMissionFieldsDoNotReadParams()
+    {
+        MissionFixture fixture;
+        BuildGetPlayerUsableItems(fixture);
+
+        MissionReflection::MissionInvocation invocation;
+        ReadResult result = MissionReflection::TryIdentifyMissionInvocation(
+            fixture.Reader(),
+            Options(),
+            fixture.Function.data(),
+            reinterpret_cast<const void*>(0x22220000),
+            invocation);
+
+        Require(static_cast<bool>(result), result.Reason.c_str());
+        Require(invocation.Function == MissionReflection::MissionFunction::GetPlayerUsableItems,
+                "GetPlayerUsableItems kind mismatch with unreadable params");
+        Require(invocation.HasParameterRanges, "non-null params should be recorded as present");
+        Require(invocation.Fields.size() == 2, "recognition-only field count mismatch");
+        RequireFieldShape(invocation.Fields[0],
+                          MissionReflection::MissionField::Character,
+                          kCharacterNameIndex,
+                          0x00,
+                          0x08,
+                          false);
+        RequireFieldShape(invocation.Fields[1],
+                          MissionReflection::MissionField::OutItemIDs,
+                          kOutItemIDsNameIndex,
+                          0x08,
+                          0x10,
+                          false);
+        RequireNoRange(invocation.Fields[0], "Character should stay recognition-only");
+        RequireNoRange(invocation.Fields[1], "OutItemIDs should stay recognition-only");
     }
 
     void TestRecognizesAddPlayerToMissionBoolRangesOnly()
@@ -335,12 +405,45 @@ namespace
         Require(invocation.Function == MissionReflection::MissionFunction::AddPlayerToMission,
                 "AddPlayerToMission kind mismatch");
         Require(invocation.Fields.size() == 3, "AddPlayerToMission field count mismatch");
-        Require(invocation.Fields[0].Range.Data == nullptr, "PlayerCharacter range should not be exposed");
-        Require(invocation.Fields[1].Range.Data == fixture.Params.data() + 0x08,
-                "bForceAdd range mismatch");
-        Require(invocation.Fields[1].Range.Size == 1, "bForceAdd range size mismatch");
-        Require(invocation.Fields[2].Range.Data == fixture.Params.data() + 0x09,
-                "AddPlayerToMission ReturnValue range mismatch");
+        RequireFieldShape(invocation.Fields[0],
+                          MissionReflection::MissionField::PlayerCharacter,
+                          kPlayerCharacterNameIndex,
+                          0x00,
+                          0x08,
+                          false);
+        RequireFieldShape(invocation.Fields[1],
+                          MissionReflection::MissionField::BForceAdd,
+                          kBForceAddNameIndex,
+                          0x08,
+                          0x01,
+                          true);
+        RequireFieldShape(invocation.Fields[2],
+                          MissionReflection::MissionField::ReturnValue,
+                          kReturnValueNameIndex,
+                          0x09,
+                          0x01,
+                          true);
+        RequireNoRange(invocation.Fields[0], "PlayerCharacter range should not be exposed");
+        RequireOneByteRange(invocation.Fields[1], fixture.Params.data() + 0x08, "bForceAdd should expose a bool range");
+        RequireOneByteRange(invocation.Fields[2],
+                            fixture.Params.data() + 0x09,
+                            "AddPlayerToMission ReturnValue should expose a bool range");
+    }
+
+    void TestUnreadableBoolRangeFailsClosed()
+    {
+        MissionFixture fixture;
+        BuildAddPlayerToMission(fixture);
+
+        MissionReflection::MissionInvocation invocation;
+        ReadResult result = MissionReflection::TryIdentifyMissionInvocation(
+            fixture.Reader(),
+            Options(),
+            fixture.Function.data(),
+            reinterpret_cast<const void*>(0x33330000),
+            invocation);
+
+        Require(!result, "mission bool range was accepted from unreadable params");
     }
 
     void TestRecognizesLeaveAndRemovedMissionBoolRangesOnly()
@@ -361,9 +464,23 @@ namespace
             Require(static_cast<bool>(result), result.Reason.c_str());
             Require(invocation.Function == MissionReflection::MissionFunction::BPAllowPlayerToLeaveMission,
                     "BPAllowPlayerToLeaveMission kind mismatch");
-            Require(invocation.Fields[0].Range.Data == nullptr, "PlayerPawn range should not be exposed");
-            Require(invocation.Fields[1].Range.Data == fixture.Params.data() + 0x08,
-                    "BPAllowPlayerToLeaveMission ReturnValue range mismatch");
+            Require(invocation.Fields.size() == 2, "BPAllowPlayerToLeaveMission field count mismatch");
+            RequireFieldShape(invocation.Fields[0],
+                              MissionReflection::MissionField::PlayerPawn,
+                              kPlayerPawnNameIndex,
+                              0x00,
+                              0x08,
+                              false);
+            RequireFieldShape(invocation.Fields[1],
+                              MissionReflection::MissionField::ReturnValue,
+                              kReturnValueNameIndex,
+                              0x08,
+                              0x01,
+                              true);
+            RequireNoRange(invocation.Fields[0], "PlayerPawn range should not be exposed");
+            RequireOneByteRange(invocation.Fields[1],
+                                fixture.Params.data() + 0x08,
+                                "BPAllowPlayerToLeaveMission ReturnValue should expose a bool range");
         }
         {
             MissionFixture fixture;
@@ -382,12 +499,39 @@ namespace
             Require(static_cast<bool>(result), result.Reason.c_str());
             Require(invocation.Function == MissionReflection::MissionFunction::BPOnPlayerRemovedFromMission,
                     "BPOnPlayerRemovedFromMission kind mismatch");
-            Require(invocation.Fields[0].Range.Data == nullptr, "Player range should not be exposed");
-            Require(invocation.Fields[1].Range.Data == nullptr, "Controller range should not be exposed");
-            Require(invocation.Fields[2].Range.Data == fixture.Params.data() + 0x10,
-                    "bFromMissionCompleteEvent range mismatch");
-            Require(invocation.Fields[3].Range.Data == fixture.Params.data() + 0x11,
-                    "bLastPhaseSuccess range mismatch");
+            Require(invocation.Fields.size() == 4, "BPOnPlayerRemovedFromMission field count mismatch");
+            RequireFieldShape(invocation.Fields[0],
+                              MissionReflection::MissionField::Player,
+                              kPlayerNameIndex,
+                              0x00,
+                              0x08,
+                              false);
+            RequireFieldShape(invocation.Fields[1],
+                              MissionReflection::MissionField::Controller,
+                              kControllerNameIndex,
+                              0x08,
+                              0x08,
+                              false);
+            RequireFieldShape(invocation.Fields[2],
+                              MissionReflection::MissionField::BFromMissionCompleteEvent,
+                              kBFromMissionCompleteEventNameIndex,
+                              0x10,
+                              0x01,
+                              true);
+            RequireFieldShape(invocation.Fields[3],
+                              MissionReflection::MissionField::BLastPhaseSuccess,
+                              kBLastPhaseSuccessNameIndex,
+                              0x11,
+                              0x01,
+                              true);
+            RequireNoRange(invocation.Fields[0], "Player range should not be exposed");
+            RequireNoRange(invocation.Fields[1], "Controller range should not be exposed");
+            RequireOneByteRange(invocation.Fields[2],
+                                fixture.Params.data() + 0x10,
+                                "bFromMissionCompleteEvent should expose a bool range");
+            RequireOneByteRange(invocation.Fields[3],
+                                fixture.Params.data() + 0x11,
+                                "bLastPhaseSuccess should expose a bool range");
         }
     }
 
@@ -574,6 +718,72 @@ namespace
         }
     }
 
+    void TestRejectsWrongPropertyNameClassAndChain()
+    {
+        {
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+            const FNameValue wrongName{kReturnValueNameIndex, 0};
+            WriteAt(fixture.PropertyB, 0x18, wrongName);
+
+            MissionReflection::MissionInvocation invocation;
+            ReadResult result = MissionReflection::TryIdentifyMissionInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "wrong mission property name was accepted");
+        }
+        {
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+            WriteObject(fixture.BoolPropertyClass,
+                        kBoolPropertyClassNameIndex,
+                        kBoolPropertyClassObjectIndex,
+                        nullptr,
+                        nullptr,
+                        1);
+
+            MissionReflection::MissionInvocation invocation;
+            ReadResult result = MissionReflection::TryIdentifyMissionInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "numbered mission property class was accepted");
+        }
+        {
+            MissionFixture fixture;
+            BuildBPOnPlayerRemovedFromMission(fixture);
+            WriteAt(fixture.PropertyB, 0x28, static_cast<const void*>(nullptr));
+
+            MissionReflection::MissionInvocation invocation;
+            ReadResult result = MissionReflection::TryIdentifyMissionInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "truncated mission property chain was accepted");
+        }
+        {
+            MissionFixture fixture;
+            BuildGetPlayerUsableItems(fixture);
+            WriteAt(fixture.PropertyB, 0x28, fixture.PropertyC.data());
+
+            MissionReflection::MissionInvocation invocation;
+            ReadResult result = MissionReflection::TryIdentifyMissionInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "overlong mission property chain was accepted");
+        }
+    }
+
     void TestAcceptsPropertyClassSemanticNamesWithoutStableInternalIndices()
     {
         MissionFixture fixture;
@@ -631,20 +841,46 @@ namespace
             fixture.Params.data(),
             invocation);
         Require(result.Status == ReadStatus::UnsupportedLayout, "unsupported mission reflection was accepted");
+
+        result = MissionReflection::TryIdentifyMissionInvocation(
+            fixture.Reader(),
+            unsupported,
+            reinterpret_cast<const void*>(0x44440000),
+            reinterpret_cast<const void*>(0x55550000),
+            invocation);
+        Require(result.Status == ReadStatus::UnsupportedLayout,
+                "unsupported mission reflection read memory before failing closed");
+    }
+
+    void TestRejectsNullFunction()
+    {
+        MissionFixture fixture;
+        MissionReflection::MissionInvocation invocation;
+        ReadResult result = MissionReflection::TryIdentifyMissionInvocation(
+            fixture.Reader(),
+            Options(),
+            nullptr,
+            fixture.Params.data(),
+            invocation);
+        Require(result.Status == ReadStatus::InvalidArgument, "null mission UFunction pointer was accepted");
     }
 }
 
 int main()
 {
     TestRecognizesGetPlayerUsableItemsWithoutObjectOrArrayRanges();
+    TestRecognitionOnlyMissionFieldsDoNotReadParams();
     TestRecognizesAddPlayerToMissionBoolRangesOnly();
+    TestUnreadableBoolRangeFailsClosed();
     TestRecognizesLeaveAndRemovedMissionBoolRangesOnly();
     TestAcceptsMetadataOnlyRecognition();
     TestRejectsWrongOuterNameNumberAndClass();
     TestRejectsWrongShape();
+    TestRejectsWrongPropertyNameClassAndChain();
     TestAcceptsPropertyClassSemanticNamesWithoutStableInternalIndices();
     TestRejectsUnsupportedTarget();
     TestGateRejectsBeforeReading();
+    TestRejectsNullFunction();
 
     std::cout << "MissionReflectionTests passed\n";
     return 0;

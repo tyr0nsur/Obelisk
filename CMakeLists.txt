@@ -274,6 +274,16 @@ target_include_directories(mission_reflection_tests PRIVATE ${CMAKE_CURRENT_SOUR
 
 add_test(NAME MissionReflectionTests COMMAND mission_reflection_tests)
 
+add_executable(process_event_mission_reflection_tests
+    tests/core/ProcessEventMissionReflectionTests.cpp
+    hooks/ProcessEventMissionReflection.cpp
+    ue/MissionReflection.cpp
+    ue/RuntimeReflection.cpp
+)
+target_include_directories(process_event_mission_reflection_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_test(NAME ProcessEventMissionReflectionTests COMMAND process_event_mission_reflection_tests)
+
 add_executable(structure_reflection_tests
     tests/core/StructureReflectionTests.cpp
     ue/StructureReflection.cpp
@@ -291,6 +301,25 @@ add_executable(inventory_reflection_tests
 target_include_directories(inventory_reflection_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_test(NAME InventoryReflectionTests COMMAND inventory_reflection_tests)
+
+add_executable(item_reflection_tests
+    tests/core/ItemReflectionTests.cpp
+    ue/ItemReflection.cpp
+    ue/RuntimeReflection.cpp
+)
+target_include_directories(item_reflection_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_test(NAME ItemReflectionTests COMMAND item_reflection_tests)
+
+add_executable(process_event_item_reflection_tests
+    tests/core/ProcessEventItemReflectionTests.cpp
+    hooks/ProcessEventItemReflection.cpp
+    ue/ItemReflection.cpp
+    ue/RuntimeReflection.cpp
+)
+target_include_directories(process_event_item_reflection_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_test(NAME ProcessEventItemReflectionTests COMMAND process_event_item_reflection_tests)
 
 add_executable(process_event_chat_reflection_tests
     tests/core/ProcessEventChatReflectionTests.cpp

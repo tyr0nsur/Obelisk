@@ -570,6 +570,72 @@ namespace
         }
     }
 
+    void TestRejectsNullFunction()
+    {
+        DinoFixture fixture;
+        BuildAddPassenger(fixture);
+
+        DinoReflection::DinoInvocation invocation;
+        ReadResult result = DinoReflection::TryIdentifyDinoInvocation(
+            fixture.Reader(),
+            Options(),
+            nullptr,
+            fixture.Params.data(),
+            invocation);
+
+        Require(result.Status == ReadStatus::InvalidArgument, "null dino UFunction was accepted");
+    }
+
+    void TestRejectsUnreadableScalarRange()
+    {
+        DinoFixture fixture;
+        BuildAddPassenger(fixture);
+        MemoryReader reader = fixture.Reader();
+        fixture.Context.Regions.back().Size = 0x08;
+
+        DinoReflection::DinoInvocation invocation;
+        ReadResult result = DinoReflection::TryIdentifyDinoInvocation(
+            reader,
+            Options(),
+            fixture.Function.data(),
+            fixture.Params.data(),
+            invocation);
+
+        Require(result.Status == ReadStatus::Unreadable, "unreadable dino scalar range was accepted");
+    }
+
+    void TestRejectsTruncatedAndOverlongPropertyChains()
+    {
+        {
+            DinoFixture fixture;
+            BuildAddPassenger(fixture);
+            WriteAt(fixture.PropertyC, 0x28, static_cast<const void*>(nullptr));
+
+            DinoReflection::DinoInvocation invocation;
+            ReadResult result = DinoReflection::TryIdentifyDinoInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "truncated dino property chain was accepted");
+        }
+        {
+            DinoFixture fixture;
+            BuildAddPassenger(fixture);
+            WriteAt(fixture.PropertyF, 0x28, static_cast<const void*>(fixture.PropertyA.data()));
+
+            DinoReflection::DinoInvocation invocation;
+            ReadResult result = DinoReflection::TryIdentifyDinoInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "overlong dino property chain was accepted");
+        }
+    }
+
     void TestGateRejectsBeforeReading()
     {
         DinoFixture fixture;
@@ -605,6 +671,9 @@ int main()
     TestRejectsWrongOuterNameNumberAndClass();
     TestAcceptsSemanticClassNamesWithDifferentInternalIndices();
     TestRejectsWrongShape();
+    TestRejectsNullFunction();
+    TestRejectsUnreadableScalarRange();
+    TestRejectsTruncatedAndOverlongPropertyChains();
     TestGateRejectsBeforeReading();
 
     std::cout << "DinoReflectionTests passed\n";
