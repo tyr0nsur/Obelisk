@@ -8,6 +8,10 @@
   tail metadata for the five approved copied bools before exposing parameter ranges.
 - Fixed experimental `oChatAudit` safe-disabled initialization so it does not require chat
   or timer capabilities until its config actually enables audit registration.
+- Tightened offline evidence gates so GObjects two-core manifests must carry a canonical
+  artifact identity hash and ScriptStruct inventory packs must preserve bool-tail metadata.
+- Added EventManager owner-cleanup coverage for in-flight global pre and filtered post
+  callbacks.
 
 ## 0.1.0-rc.2
 

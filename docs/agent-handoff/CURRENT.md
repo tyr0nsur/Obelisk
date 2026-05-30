@@ -137,6 +137,16 @@ recovery context is not active routing for the current head; use
   Buff SDK/runtime promotion and does not authorize hooks, callbacks, object/class
   exposure, mutation, return override, raw params, `ResourceHandle`, or gameplay
   semantics.
+- GObjects two-core strict consume tooling can rebuild a complete artifact-identity
+  manifest from the existing offline reports. The local gate now rejects mismatched
+  `artifact_identity.artifact_sha256`; durable `/servidor/ark/workspace-offline`
+  regeneration remains a separate explicit offline write step and still does not promote
+  public GObjects, `ResourceHandle`, lookup, identity, mutation, or return override.
+- Transfer ScriptStruct fixtures already preserve `ArkTributePlayerData` bool-tail
+  metadata for `bWasAllowDPCUpload`, `bWithItems`, and `bForServerTransfer`. The current
+  stale second-source/inventory artifacts under `/servidor/ark/workspace-offline` should
+  not be reused until regenerated; local inventory tooling now preserves and gates
+  `bool_field_size`/`bool_byte_offset`.
 
 ## ResourceHandle Blockers
 
@@ -164,6 +174,9 @@ recovery context is not active routing for the current head; use
   refresh Transfer ScriptStruct bool-tail second-source evidence before any Transfer
   payload/redaction work. This is no RC public SDK/API promotion and does not authorize
   Transfer runtime work.
+- Runtime lifecycle debt to address later: `PluginManager` should not `dlclose` a plugin
+  after callback cleanup fails; design a no-ABI-change failure path with tests before
+  touching unload semantics.
 - Next Item runtime round, if pursued, should wire only the private dispatcher behind
   fail-closed observer gates and post-original copied payloads. Public Item promotion must
   be a later deliberate ABI round: append event/mask constants, descriptors, C/C++ ABI

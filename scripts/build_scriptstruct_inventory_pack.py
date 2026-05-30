@@ -192,9 +192,17 @@ def redact_property(prop: dict[str, object]) -> dict[str, object]:
             "outer": prop.get("outer_membership_status"),
         },
     }
-    for key in ("byte_mask", "field_mask", "native_bool"):
+    for key in ("bool_field_size", "bool_byte_offset", "byte_mask", "field_mask", "native_bool"):
         if key in prop:
             row[key] = prop.get(key)
+    semantics = prop.get("bool_property_semantics")
+    if isinstance(semantics, dict):
+        row["bool_property_semantics"] = {
+            "status": semantics.get("status"),
+            "reject_reasons": semantics.get("reject_reasons", []),
+            "bool_field_size": semantics.get("bool_field_size"),
+            "bool_byte_offset": semantics.get("bool_byte_offset"),
+        }
     array_inner = prop.get("array_inner_candidate")
     if isinstance(array_inner, dict):
         inner = array_inner.get("inner_property")

@@ -413,6 +413,14 @@ priorities, and do not use history files as the active source of truth.
   lookup, or `ResourceHandle`, and this handoff does not authorize Transfer runtime work.
   Start from the dated research notes, not public API docs; any live observation,
   dispatcher lifecycle, ABI, or SDK policy decision needs a separate scoped gate.
+- Local offline evidence tooling now rejects GObjects two-core manifest artifact identity
+  hash drift and ScriptStruct inventory bool-tail gaps. The known Transfer ScriptStruct
+  durable artifacts under `/servidor/ark/workspace-offline` are stale until regenerated
+  with `bool_field_size` and `bool_byte_offset`; do not cite the old readiness report as
+  current acceptance.
+- Runtime lifecycle debt remains open: if PluginManager callback cleanup fails, a later
+  no-ABI-change patch should prevent `dlclose` and leave the plugin mapped for retry
+  rather than risking callbacks into an unloaded library.
 - Runtime dispatcher hardening: hook-called Chat, Structure, and Inventory dispatchers
   must fail closed on setup/internal errors instead of rethrowing into `ProcessEvent`.
   Chat dispatch snapshots registration ids, skips callbacks removed during the same

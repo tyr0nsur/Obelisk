@@ -225,6 +225,43 @@ class ScriptStructSnapshotFixtureTests(unittest.TestCase):
                     if prop.get("status") == "candidate":
                         self.assertLessEqual(offset + (size * array_dim), properties_size)
 
+    def test_ark_tribute_player_data_bool_tail_contract(self) -> None:
+        path = (
+            FIXTURE_ROOT
+            / EXPECTED_ARK_SHA[:12]
+            / "sdk_transfers"
+            / "PrimalLocalProfile.ArkTributePlayerData.snapshot.json"
+        )
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        target = payload["targets"][0]
+        properties = target["property_chain"]["properties"]
+        bools = {prop["name"]: prop for prop in properties if prop.get("class_name") == "BoolProperty"}
+
+        expected_offsets = {
+            "bWasAllowDPCUpload": 272,
+            "bWithItems": 273,
+            "bForServerTransfer": 280,
+        }
+        self.assertEqual(set(bools), set(expected_offsets))
+        for name, expected_offset in expected_offsets.items():
+            with self.subTest(field=name):
+                prop = bools[name]
+                self.assertEqual(prop.get("offset_internal"), expected_offset)
+                self.assertEqual(prop.get("element_size"), 1)
+                self.assertEqual(prop.get("array_dim"), 1)
+                self.assertEqual(prop.get("bool_field_size"), 1)
+                self.assertEqual(prop.get("bool_byte_offset"), 0)
+                self.assertEqual(int(prop.get("byte_mask"), 16), 0x01)
+                self.assertEqual(int(prop.get("field_mask"), 16), 0xff)
+                self.assertIs(prop.get("native_bool"), False)
+
+                semantics = prop.get("bool_property_semantics")
+                self.assertIsInstance(semantics, dict)
+                self.assertEqual(semantics.get("status"), "candidate")
+                self.assertEqual(semantics.get("reject_reasons"), [])
+                self.assertEqual(semantics.get("bool_field_size"), 1)
+                self.assertEqual(semantics.get("bool_byte_offset"), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

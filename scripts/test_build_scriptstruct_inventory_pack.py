@@ -13,6 +13,7 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
+import build_scriptstruct_inventory_pack as pack  # noqa: E402
 from test_inspect_core_ufunctions import build_core_fixture  # noqa: E402
 
 
@@ -74,6 +75,50 @@ class BuildScriptStructInventoryPackTests(unittest.TestCase):
         self.assertNotIn("0x27400", serialized)
         self.assertNotIn("pointer_window", serialized)
         self.assertNotIn("integer_window", serialized)
+
+    def test_redacted_bool_property_preserves_tail_metadata(self) -> None:
+        row = pack.redact_property(
+            {
+                "depth": 6,
+                "name": "bWasAllowDPCUpload",
+                "class_name": "BoolProperty",
+                "offset_internal": 272,
+                "element_size": 1,
+                "array_dim": 1,
+                "property_flags": "0x10001040002200",
+                "status": "candidate",
+                "reject_reasons": [],
+                "membership_status": "candidate-uobject",
+                "class_membership_status": "candidate-uobject",
+                "outer_membership_status": "candidate-uobject",
+                "bool_field_size": 1,
+                "bool_byte_offset": 0,
+                "byte_mask": "0x1",
+                "field_mask": "0xff",
+                "native_bool": False,
+                "bool_property_semantics": {
+                    "status": "candidate",
+                    "reject_reasons": [],
+                    "bool_field_size": 1,
+                    "bool_byte_offset": 0,
+                },
+            }
+        )
+
+        self.assertEqual(row["bool_field_size"], 1)
+        self.assertEqual(row["bool_byte_offset"], 0)
+        self.assertEqual(int(row["byte_mask"], 16), 0x01)
+        self.assertEqual(int(row["field_mask"], 16), 0xff)
+        self.assertIs(row["native_bool"], False)
+        self.assertEqual(
+            row["bool_property_semantics"],
+            {
+                "status": "candidate",
+                "reject_reasons": [],
+                "bool_field_size": 1,
+                "bool_byte_offset": 0,
+            },
+        )
 
     def test_direct_core_requires_explicit_addresses(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

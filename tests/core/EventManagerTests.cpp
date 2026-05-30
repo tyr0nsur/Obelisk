@@ -572,6 +572,55 @@ namespace
         g_BlockingPreState = nullptr;
     }
 
+    void TestOwnerCleanupWaitsForInFlightGlobalPreCallback()
+    {
+        ResetCounters();
+        Obelisk::Core::EventManager events;
+        int owner = 0;
+        BlockingCallbackState state;
+        g_BlockingPreState = &state;
+
+        const uint64_t id = events.RegisterPreProcessEventOwned(&owner, BlockingPre);
+        Require(id != 0, "blocking global pre registration id was zero");
+
+        std::thread dispatchThread([&events] {
+            Require(events.TriggerPreProcessEvent(nullptr, nullptr, nullptr),
+                    "blocking global pre callback blocked dispatch");
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.mutex);
+            Require(state.cv.wait_for(lock, std::chrono::seconds(2), [&state] {
+                        return state.entered;
+                    }),
+                    "blocking global pre callback did not enter");
+        }
+
+        std::atomic_bool cleanupReturned = false;
+        size_t removed = 0;
+        std::thread cleanupThread([&] {
+            removed = events.UnregisterCallbacksForOwner(&owner);
+            cleanupReturned.store(true);
+        });
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        Require(!cleanupReturned.load(), "owner cleanup returned while global pre callback was in flight");
+
+        {
+            std::lock_guard<std::mutex> lock(state.mutex);
+            state.release = true;
+        }
+        state.cv.notify_all();
+
+        cleanupThread.join();
+        dispatchThread.join();
+
+        Require(cleanupReturned.load(), "owner cleanup did not return after global pre callback exit");
+        Require(removed == 1, "owner cleanup removed wrong count after global pre dispatch");
+        Require(!events.HasPreProcessEventCallbacks(), "global pre callback survived owner cleanup");
+        g_BlockingPreState = nullptr;
+    }
+
     void TestOwnerCleanupWaitsForInFlightPostCallback()
     {
         ResetCounters();
@@ -620,6 +669,54 @@ namespace
         g_BlockingPostState = nullptr;
     }
 
+    void TestOwnerCleanupWaitsForInFlightFilteredPostCallback()
+    {
+        ResetCounters();
+        Obelisk::Core::EventManager events;
+        int owner = 0;
+        BlockingCallbackState state;
+        g_BlockingPostState = &state;
+
+        const uint64_t id = events.RegisterPostProcessEventForNameIndexOwned(&owner, 42, BlockingPost);
+        Require(id != 0, "blocking filtered post registration id was zero");
+
+        std::thread dispatchThread([&events] {
+            events.TriggerPostProcessEvent(42, nullptr, nullptr, nullptr);
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.mutex);
+            Require(state.cv.wait_for(lock, std::chrono::seconds(2), [&state] {
+                        return state.entered;
+                    }),
+                    "blocking filtered post callback did not enter");
+        }
+
+        std::atomic_bool cleanupReturned = false;
+        size_t removed = 0;
+        std::thread cleanupThread([&] {
+            removed = events.UnregisterCallbacksForOwner(&owner);
+            cleanupReturned.store(true);
+        });
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        Require(!cleanupReturned.load(), "owner cleanup returned while filtered post callback was in flight");
+
+        {
+            std::lock_guard<std::mutex> lock(state.mutex);
+            state.release = true;
+        }
+        state.cv.notify_all();
+
+        cleanupThread.join();
+        dispatchThread.join();
+
+        Require(cleanupReturned.load(), "owner cleanup did not return after filtered post callback exit");
+        Require(removed == 1, "owner cleanup removed wrong count after filtered post dispatch");
+        Require(!events.HasPostProcessEventCallbacks(), "filtered post callback survived owner cleanup");
+        g_BlockingPostState = nullptr;
+    }
+
     void TestRegistrationIdsSkipZeroAfterWrap()
     {
         ResetCounters();
@@ -663,7 +760,9 @@ int main()
     TestCallbackCanUnregisterItself();
     TestReentrantUnregisterSkipsLaterRawCallbackSnapshots();
     TestOwnerCleanupWaitsForInFlightFilteredPreCallback();
+    TestOwnerCleanupWaitsForInFlightGlobalPreCallback();
     TestOwnerCleanupWaitsForInFlightPostCallback();
+    TestOwnerCleanupWaitsForInFlightFilteredPostCallback();
     TestRegistrationIdsSkipZeroAfterWrap();
 
     Obelisk::Logger::Shutdown();

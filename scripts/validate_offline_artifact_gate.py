@@ -558,6 +558,47 @@ def validate_strict_artifact_identity_shape(
     return blockers, normalized is not None
 
 
+def gobjects_two_core_canonical_manifest(payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: payload.get(key)
+        for key in (
+            "schema",
+            "binary_sha256",
+            "gobjects_candidate",
+            "fname_root_slot",
+            "sample_set",
+            "core_count",
+            "cores",
+            "offline_only",
+            "ufunction_inventory_input_ready",
+            "public_gobjects_promotion_ready",
+            "blocked_contracts",
+            "non_claims",
+        )
+    }
+
+
+def gobjects_two_core_artifact_identity(
+    payload: dict[str, Any],
+    *,
+    capture_id: str,
+    evidence_pack_id: str,
+) -> dict[str, str]:
+    identity_without_hash = {
+        "artifact_kind": GOBJECTS_TWO_CORE_MANIFEST_SCHEMA,
+        "capture_id": capture_id,
+        "evidence_pack_id": evidence_pack_id,
+    }
+    material = {
+        "artifact_identity": identity_without_hash,
+        "report": gobjects_two_core_canonical_manifest(payload),
+    }
+    return {
+        **identity_without_hash,
+        "artifact_sha256": hashlib.sha256(canonical_json_bytes(material)).hexdigest(),
+    }
+
+
 def static_global_canonical_command_record(record: dict[str, Any]) -> dict[str, Any]:
     provenance = record.get("provenance")
     provenance_summary: dict[str, Any] = {}
@@ -2441,6 +2482,101 @@ def validate_scriptstruct_inventory_child_artifact(
                     "recorded": summary.get("scriptstruct_count") if isinstance(summary, dict) else None,
                 }
             )
+        blockers.extend(validate_scriptstruct_inventory_bool_tail(child_payload, artifact_label=artifact_label))
+    return blockers
+
+
+def validate_scriptstruct_inventory_bool_tail(
+    child_payload: dict[str, Any],
+    *,
+    artifact_label: str,
+) -> list[dict[str, Any]]:
+    blockers: list[dict[str, Any]] = []
+    scriptstructs = child_payload.get("scriptstructs")
+    if scriptstructs is None:
+        return blockers
+    if not isinstance(scriptstructs, list):
+        return [{"reason": "scriptstruct_inventory_scriptstructs_invalid", "label": f"{artifact_label}.scriptstructs"}]
+
+    for struct_index, struct in enumerate(scriptstructs):
+        if not isinstance(struct, dict):
+            blockers.append(
+                {
+                    "reason": "scriptstruct_inventory_scriptstruct_entry_invalid",
+                    "label": f"{artifact_label}.scriptstructs[{struct_index}]",
+                }
+            )
+            continue
+        properties = struct.get("properties")
+        if not isinstance(properties, list):
+            continue
+        for prop_index, prop in enumerate(properties):
+            if not isinstance(prop, dict) or prop.get("class_name") != "BoolProperty":
+                continue
+            prop_label = f"{artifact_label}.scriptstructs[{struct_index}].properties[{prop_index}]"
+            expected_values: dict[str, object] = {
+                "bool_field_size": 1,
+                "bool_byte_offset": 0,
+                "native_bool": False,
+            }
+            for key, expected in expected_values.items():
+                if prop.get(key) != expected:
+                    blockers.append(
+                        {
+                            "reason": f"scriptstruct_inventory_bool_{key}_mismatch",
+                            "label": f"{prop_label}.{key}",
+                            "expected": expected,
+                            "recorded": prop.get(key),
+                        }
+                    )
+            for key, expected in (("byte_mask", 0x01), ("field_mask", 0xff)):
+                mask = prop.get(key)
+                try:
+                    observed = int(mask, 16) if isinstance(mask, str) else None
+                except ValueError:
+                    observed = None
+                if observed != expected:
+                    blockers.append(
+                        {
+                            "reason": f"scriptstruct_inventory_bool_{key}_mismatch",
+                            "label": f"{prop_label}.{key}",
+                            "expected": f"0x{expected:x}",
+                            "recorded": mask,
+                        }
+                    )
+            semantics = prop.get("bool_property_semantics")
+            if not isinstance(semantics, dict):
+                blockers.append(
+                    {
+                        "reason": "scriptstruct_inventory_bool_property_semantics_missing",
+                        "label": f"{prop_label}.bool_property_semantics",
+                    }
+                )
+                continue
+            if semantics.get("status") != "candidate":
+                blockers.append(
+                    {
+                        "reason": "scriptstruct_inventory_bool_property_semantics_status_mismatch",
+                        "label": f"{prop_label}.bool_property_semantics.status",
+                    }
+                )
+            if semantics.get("reject_reasons", []) != []:
+                blockers.append(
+                    {
+                        "reason": "scriptstruct_inventory_bool_property_semantics_has_reject_reasons",
+                        "label": f"{prop_label}.bool_property_semantics.reject_reasons",
+                    }
+                )
+            for key, expected in (("bool_field_size", 1), ("bool_byte_offset", 0)):
+                if semantics.get(key) != expected:
+                    blockers.append(
+                        {
+                            "reason": f"scriptstruct_inventory_bool_property_semantics_{key}_mismatch",
+                            "label": f"{prop_label}.bool_property_semantics.{key}",
+                            "expected": expected,
+                            "recorded": semantics.get(key),
+                        }
+                    )
     return blockers
 
 
@@ -2538,13 +2674,29 @@ def validate_gobjects_two_core_manifest(payload: dict[str, Any], *, label: str, 
     blocked_contracts = payload.get("blocked_contracts")
     non_claims = payload.get("non_claims")
 
-    identity_blockers, _identity_ready_for_hash = validate_strict_artifact_identity_shape(
+    artifact_identity = payload.get("artifact_identity")
+    identity_blockers, identity_ready_for_hash = validate_strict_artifact_identity_shape(
         payload.get("artifact_identity"),
         label=label,
         reason_prefix="gobjects_two_core_manifest",
         expected_artifact_kind=GOBJECTS_TWO_CORE_MANIFEST_SCHEMA,
     )
     blockers.extend(identity_blockers)
+    if identity_ready_for_hash and isinstance(artifact_identity, dict):
+        expected_identity = gobjects_two_core_artifact_identity(
+            payload,
+            capture_id=str(artifact_identity["capture_id"]),
+            evidence_pack_id=str(artifact_identity["evidence_pack_id"]),
+        )
+        if artifact_identity.get("artifact_sha256") != expected_identity["artifact_sha256"]:
+            blockers.append(
+                {
+                    "reason": "gobjects_two_core_manifest_artifact_identity_hash_mismatch",
+                    "label": f"{label}:$.artifact_identity.artifact_sha256",
+                    "expected": expected_identity["artifact_sha256"],
+                    "recorded": artifact_identity.get("artifact_sha256"),
+                }
+            )
 
     if not is_json_int(core_count) or core_count < 2:
         blockers.append({"reason": "gobjects_two_core_manifest_core_count_invalid", "label": label})
