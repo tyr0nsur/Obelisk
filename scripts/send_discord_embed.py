@@ -30,8 +30,8 @@ CHANNELS = {
 }
 
 FORBIDDEN_TEXT = (
-    "discord.com/api/webhooks",
-    "discordapp.com/api/webhooks",
+    "discord.com/" + "api/webhooks",
+    "discordapp.com/" + "api/webhooks",
     "raw log",
     "player text",
     "token",

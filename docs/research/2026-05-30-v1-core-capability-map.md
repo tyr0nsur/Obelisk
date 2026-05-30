@@ -49,16 +49,18 @@ UE lookup, or `ResourceHandle` APIs.
 
 ## Next Work
 
-1. Harden the target-set evidence contract so accepted readiness reports are explicitly
-   `gate_mode=second_source_promotion`, name at least one target set, and remain
-   layout-only with `promotion_ready=false` until a separate API/runtime promotion gate
-   exists.
-2. Continue focused UE4 reflection extraction for GObjects coherent-field-window evidence
-   and Item return-only policy modeling first, with Mission copied-bool and Transfer
-   `bAccept` kept as internal/test-only follow-up candidates.
-3. Validate the first non-UE-dependent core service end to end: owner-token
+1. Do not spend time on broad FName/GObjects/UFunction scans for the current ARK binary
+   hash while the accepted root/target-set evidence remains coherent. Use closed target
+   sets and small provenance-gated artifacts instead.
+2. Clear the highest-value blocker for future identity/lookup work: regenerate or verify
+   the small UObject flag-policy provenance sidecars needed for consume-mode indexing,
+   while keeping `ResourceHandle`, public GObjects, mutation, and return override blocked.
+3. Keep Item return-only, Mission copied-bool, and Transfer `bAccept` as internal/test-only
+   copied-scalar slices until separate runtime, dispatcher lifecycle, ABI, and privacy
+   gates exist.
+4. Validate the first non-UE-dependent core service end to end: owner-token
    process-local timers now have ABI, runtime, and unload cleanup tests; next work is
    plugin-facing documentation/example usage before identity, permissions, and command
    routing.
-4. Keep server-backed validation behind explicit live-ops windows; prefer offline
+5. Keep server-backed validation behind explicit live-ops windows; prefer offline
    artifacts and fixture-backed tests until a concrete runtime signal is required.

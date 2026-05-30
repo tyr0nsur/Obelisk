@@ -106,3 +106,34 @@ checked sidecars are not verified or do not correspond to the current converter 
 Next work should regenerate or verify sidecars from the original commands/tool versions,
 then run the existing converter, policy builder, and offline artifact gate. Promote mode
 must remain blocked with the candidate-only reason even after consume mode is accepted.
+
+Follow-up audit found a complete hash-matched sidecar set under
+`/tmp/obelisk-uobject-flag-policy-refresh-check`, but those sidecars are minimal. They
+prove `verified=true`, the expected binary hash, and artifact hash equality only; they do
+not record command lines, source paths, start/stop ranges, or tool versions. Treat them as
+mechanical consume-gate material, not as full reproducible provenance.
+
+Tool versions observed in surrounding logs/manifests are Ghidra 12.1 PUBLIC, OpenJDK
+21.0.10, radare2 5.5.0, and GNU objdump/binutils 2.42. Of the six required inputs, only
+the `gobjects-4000-skip` window currently has a located richer sidecar with objdump
+command and start/stop range. A production-quality refresh should regenerate or enrich the
+other five inputs with command/range/tool provenance before treating the artifact as
+durable evidence for future `ResourceHandle` work.
+
+Before running the converter/builder path, use the repo-local preflight below to check that
+all required inputs have verified sidecars. The command is read-only and should block when
+sidecars are missing, unverifiable, hash-mismatched, or path-tainted:
+
+```bash
+python3 scripts/validate_uobject_flag_policy_provenance_inputs.py \
+  --root <offline-root> \
+  --expected-binary-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
+  --ghidra-stdout <offline-root>/weak/ghidra-headless.stdout \
+  --r2-windows <offline-root>/weak/r2-weak-helper-caller-modes.txt \
+  --direct-call-counts <offline-root>/weak/direct-call-counts.txt \
+  --window weak_helper_reject_0x100=<offline-root>/windows/weak-helper-c70.objdump.txt \
+  --window strict_0x4000_behavior=<offline-root>/windows/weak-helper-c70.objdump.txt \
+  --window gobjects_backed_0x4000_skip=<offline-root>/windows/gobjects-4000-skip.objdump.txt \
+  --window gc_static_0x100_support=<offline-root>/windows/gobjects-100-gc-pass.objdump.txt \
+  --json
+```

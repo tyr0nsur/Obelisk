@@ -399,6 +399,12 @@ during an approved operator-selected window after an operator-approved notice;
 `enable-chat-reflection` is only the historical observer path and does not prove
 `ChatMessageEvent` delivery.
 
+A plugin may layer a private parser over the copied text for local command-like workflows,
+but that parser must keep `principal=unknown`, use only global plugin config for
+enable/disable decisions, and avoid chat responses or per-player permission claims. See
+[research/2026-05-30-chat-command-helper-roadmap.md](research/2026-05-30-chat-command-helper-roadmap.md)
+for the non-ABI helper roadmap.
+
 ## HTTP And Security
 
 HTTP-capable plugins are two systems: an Obelisk plugin and a network service.

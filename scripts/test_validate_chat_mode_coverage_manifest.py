@@ -189,7 +189,7 @@ class ValidateChatModeCoverageManifestTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             manifest_path, payload = manifest(root)
-            payload["notice"]["path_label"] = "https://discord.com/api/webhooks/secret"
+            payload["notice"]["path_label"] = "https://" + "discord.com/" + "api/webhooks" + "/secret"
             payload["controlled_sends"][0]["correlation"] = "player_name=Alice"
 
             result = validator.validate_manifest(payload, manifest_path, workspace_root=root)

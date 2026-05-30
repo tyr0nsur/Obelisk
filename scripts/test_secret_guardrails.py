@@ -10,9 +10,11 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+WEBHOOK_HOST_PATTERN = r"discord(?:app)?\.com/" + "api/webhooks"
 DISCORD_WEBHOOK_RE = re.compile(
-    r"https://(?:canary\.|ptb\.)?discord(?:app)?\.com/api/webhooks/\d+/[A-Za-z0-9_\-]+"
+    r"https://(?:canary\.|ptb\.)?" + WEBHOOK_HOST_PATTERN + r"/\d+/[A-Za-z0-9_\-]+"
 )
+DISCORD_WEBHOOK_LITERAL_RE = re.compile(r"discord(?:app)?\.com/" + "api/webhooks")
 
 
 def tracked_text_files() -> list[Path]:
@@ -40,6 +42,15 @@ class SecretGuardrailTests(unittest.TestCase):
         for path in tracked_text_files():
             text = path.read_text(encoding="utf-8", errors="replace")
             if DISCORD_WEBHOOK_RE.search(text):
+                offenders.append(str(path.relative_to(REPO_ROOT)))
+
+        self.assertEqual(offenders, [])
+
+    def test_no_discord_webhook_literal_patterns_are_committed(self) -> None:
+        offenders: list[str] = []
+        for path in tracked_text_files():
+            text = path.read_text(encoding="utf-8", errors="replace")
+            if DISCORD_WEBHOOK_LITERAL_RE.search(text):
                 offenders.append(str(path.relative_to(REPO_ROOT)))
 
         self.assertEqual(offenders, [])
