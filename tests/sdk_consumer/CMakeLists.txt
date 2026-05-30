@@ -110,6 +110,16 @@ add_test(
 )
 
 add_test(
+    NAME SdkConsumerFixtureOBaseEventsChatCommandHelper
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oBaseEvents>" oBaseEvents active-chat-command-helper
+)
+
+add_test(
+    NAME SdkConsumerFixtureOBaseEventsChatCommandHelperNoCapability
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oBaseEvents>" oBaseEvents active-chat-command-helper-no-chat-capability
+)
+
+add_test(
     NAME SdkConsumerFixtureOBaseEventsCallbackNoThrow
     COMMAND sdk_consumer_fixture "$<TARGET_FILE:oBaseEvents>" oBaseEvents callback-throw-log
 )
@@ -132,6 +142,11 @@ add_test(
 add_test(
     NAME SdkConsumerFixtureOBaseEventsRejectsInvalidProcessEventConfig
     COMMAND sdk_consumer_fixture "$<TARGET_FILE:oBaseEvents>" oBaseEvents invalid-process-event-config
+)
+
+add_test(
+    NAME SdkConsumerFixtureOBaseEventsRejectsInvalidChatCommandConfig
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oBaseEvents>" oBaseEvents invalid-chat-command-config
 )
 
 add_test(

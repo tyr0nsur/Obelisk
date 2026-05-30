@@ -342,6 +342,16 @@ target_include_directories(process_event_item_reflection_tests PRIVATE ${CMAKE_C
 
 add_test(NAME ProcessEventItemReflectionTests COMMAND process_event_item_reflection_tests)
 
+add_executable(process_event_buff_reflection_tests
+    tests/core/ProcessEventBuffReflectionTests.cpp
+    hooks/ProcessEventBuffReflection.cpp
+    ue/BuffReflection.cpp
+    ue/RuntimeReflection.cpp
+)
+target_include_directories(process_event_buff_reflection_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_test(NAME ProcessEventBuffReflectionTests COMMAND process_event_buff_reflection_tests)
+
 add_executable(process_event_chat_reflection_tests
     tests/core/ProcessEventChatReflectionTests.cpp
     hooks/ProcessEventChatReflection.cpp

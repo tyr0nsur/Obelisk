@@ -15,10 +15,13 @@ It demonstrates:
 - `ObeliskPlugin_GetInfo` metadata and `ObeliskPluginInitContext` config paths.
 - A filtered raw `ProcessEvent` callback when the runtime explicitly advertises the
   filtered debug capability.
+- An optional plugin-local chat command helper layered on copied `ChatMessageEvent`
+  bytes, disabled by default.
 - Handle-returning callback registration plus explicit unregister during shutdown when the
   runtime advertises `OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS`,
   `OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS`, and
-  `OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES`.
+  `OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES` for the raw ProcessEvent
+  example, or `OBELISK_API_CAPABILITY_CHAT_EVENTS` for the chat helper.
 - Optional `ObeliskPlugin_Shutdown()`.
 
 `oBaseEvents` does not start background workers, open sockets, run HTTP listeners/clients,
@@ -40,7 +43,8 @@ A plugin-local helper should:
   and non-null chat register/unregister function pointers;
 - reject malformed events unless `event`, `event->struct_size >= sizeof(ObeliskChatMessageEvent)`,
   `event->abi_version == OBELISK_CHAT_MESSAGE_EVENT_ABI_VERSION`,
-  `event->send_mode <= OBELISK_CHAT_SEND_MODE_MAX`, and
+  `event->send_mode <= OBELISK_CHAT_SEND_MODE_MAX`,
+  `(event->flags & OBELISK_CHAT_MESSAGE_EVENT_FLAG_COPIED_PAYLOAD) != 0`, and
   `event->message.data != nullptr || event->message.size == 0` are all valid;
 - treat empty messages and messages without a configured command prefix as local no-match
   cases, not authorization failures;
@@ -56,6 +60,13 @@ player identity, permissions, targeted replies, chat send, moderation, blocking,
 return override, UE lookup, `FString`, `UObject`, raw params, or FName/GObjects indices.
 `sequence` is process-local diagnostic ordering only and must not be persisted or used as
 identity across server processes.
+
+`oBaseEvents` includes a deliberately inert helper example behind
+`chat_command_helper.enabled`. When enabled, it subscribes to `ChatMessageEvent`, copies at
+most 1024 callback-scope message bytes into plugin-owned memory, matches one configured
+printable prefix, and recognizes only the local `help` command. The handler does not reply,
+send chat, mutate game state, block chat, resolve identity, or authorize a sender; it only
+logs sanitized command metadata with `principal=unknown`.
 
 ## Build
 
@@ -108,6 +119,11 @@ Default generated config:
         "enabled": false,
         "filtered_function_index": -1,
         "log_limit": 5
+    },
+    "chat_command_helper": {
+        "enabled": false,
+        "prefix": "!",
+        "log_limit": 5
     }
 }
 ```
@@ -116,6 +132,12 @@ The callback stays disabled unless both `enabled` and `process_event.enabled` ar
 and `process_event.filtered_function_index` is a validated non-negative `FName` index.
 When enabled on more than one server instance, each ARK process receives its own callback
 registration handle and unregisters that process-local handle during plugin shutdown.
+
+The chat helper separately stays disabled unless both `enabled` and
+`chat_command_helper.enabled` are `true`, the instance is allowed, and the runtime
+advertises `OBELISK_API_CAPABILITY_CHAT_EVENTS` with the owner-token chat registration
+functions. Its prefix is local plugin config only; it is not a public command router or
+permission model.
 
 Do not treat observed ARK indices as stable API contracts. They must come from a validated
 reflection capture or future reflected function lookup.

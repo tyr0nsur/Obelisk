@@ -3,6 +3,8 @@
 
 #include <atomic>
 #include <cctype>
+#include <cstddef>
+#include <cstdio>
 #include <cstdint>
 #include <exception>
 #include <filesystem>
@@ -21,9 +23,18 @@ namespace
     bool g_ProcessEventEnabled = false;
     int32_t g_FilteredFunctionIndex = -1;
     int g_LogLimit = 5;
+    bool g_ChatCommandHelperEnabled = false;
+    std::string g_ChatCommandPrefix = "!";
+    int g_ChatCommandLogLimit = 5;
     uint64_t g_OwnerToken = 0;
     uint64_t g_ProcessEventRegistrationId = 0;
+    uint64_t g_ChatCommandRegistrationId = 0;
+    uint64_t g_ChatCommandUserData = 0xC0BACE;
     std::atomic<int> g_LoggedEvents{0};
+    std::atomic<int> g_LoggedChatCommands{0};
+
+    constexpr size_t kMaxLocalCommandBytes = 1024;
+    constexpr size_t kMaxLocalCommandNameBytes = 32;
 
     constexpr const char* kDefaultConfig = R"json({
     "enabled": false,
@@ -33,6 +44,11 @@ namespace
     "process_event": {
         "enabled": false,
         "filtered_function_index": -1,
+        "log_limit": 5
+    },
+    "chat_command_helper": {
+        "enabled": false,
+        "prefix": "!",
         "log_limit": 5
     }
 })json";
@@ -75,6 +91,35 @@ namespace
         {
             if (!IsSafeInstanceId(entry.get<std::string>()))
                 return false;
+        }
+
+        return true;
+    }
+
+    bool IsSafeCommandPrefix(const std::string& value)
+    {
+        if (value.empty() || value.size() > 8)
+            return false;
+
+        for (const unsigned char ch : value)
+        {
+            if (std::isspace(ch) || std::iscntrl(ch))
+                return false;
+        }
+
+        return true;
+    }
+
+    bool IsSafeCommandName(const std::string& value)
+    {
+        if (value.empty() || value.size() > kMaxLocalCommandNameBytes)
+            return false;
+
+        for (const unsigned char ch : value)
+        {
+            if (std::isalnum(ch) || ch == '_' || ch == '-')
+                continue;
+            return false;
         }
 
         return true;
@@ -221,6 +266,8 @@ namespace
         if (!InstanceAllowed(config, context->instance_id))
         {
             g_Enabled = false;
+            g_ProcessEventEnabled = false;
+            g_ChatCommandHelperEnabled = false;
             return true;
         }
 
@@ -254,6 +301,33 @@ namespace
         if (g_LogLimit < 0)
             g_LogLimit = 0;
 
+        const json chatCommandHelper = config.value("chat_command_helper", json::object());
+        if (!chatCommandHelper.is_object())
+        {
+            SafeLogError("[oBaseEvents] Config field chat_command_helper must be an object.");
+            return false;
+        }
+
+        if ((chatCommandHelper.contains("enabled") && !chatCommandHelper["enabled"].is_boolean()) ||
+            (chatCommandHelper.contains("prefix") && !chatCommandHelper["prefix"].is_string()) ||
+            (chatCommandHelper.contains("log_limit") && !chatCommandHelper["log_limit"].is_number_integer()))
+        {
+            SafeLogError("[oBaseEvents] chat_command_helper fields have invalid types.");
+            return false;
+        }
+
+        g_ChatCommandHelperEnabled = chatCommandHelper.value("enabled", false);
+        g_ChatCommandPrefix = chatCommandHelper.value("prefix", std::string("!"));
+        g_ChatCommandLogLimit = chatCommandHelper.value("log_limit", 5);
+        if (g_ChatCommandLogLimit < 0)
+            g_ChatCommandLogLimit = 0;
+
+        if (g_ChatCommandHelperEnabled && !IsSafeCommandPrefix(g_ChatCommandPrefix))
+        {
+            SafeLogError("[oBaseEvents] chat_command_helper.prefix must be a non-empty printable token.");
+            return false;
+        }
+
         return true;
     }
 
@@ -270,6 +344,133 @@ namespace
         return true;
     }
 
+    bool HasChatMessageEventApi(const ObeliskApi* api)
+    {
+        return api &&
+            (api->capabilities & OBELISK_API_CAPABILITY_CHAT_EVENTS) != 0 &&
+            api->struct_size >= offsetof(ObeliskApi, UnregisterChatMessageEventWithOwnerToken) +
+                sizeof(api->UnregisterChatMessageEventWithOwnerToken) &&
+            api->RegisterChatMessageEventWithOwnerTokenHandle &&
+            api->UnregisterChatMessageEventWithOwnerToken;
+    }
+
+    bool IsValidChatMessageEvent(const ObeliskChatMessageEvent* event)
+    {
+        return event &&
+            event->abi_version == OBELISK_CHAT_MESSAGE_EVENT_ABI_VERSION &&
+            event->struct_size >= sizeof(ObeliskChatMessageEvent) &&
+            event->send_mode <= OBELISK_CHAT_SEND_MODE_MAX &&
+            (event->flags & OBELISK_CHAT_MESSAGE_EVENT_FLAG_COPIED_PAYLOAD) != 0 &&
+            (event->message.data != nullptr || event->message.size == 0) &&
+            event->message.size <= kMaxLocalCommandBytes;
+    }
+
+    bool ShouldLogChatCommand()
+    {
+        if (g_ChatCommandLogLimit <= 0)
+            return false;
+
+        return g_LoggedChatCommands.fetch_add(1) < g_ChatCommandLogLimit;
+    }
+
+    void LogLocalCommand(const char* status,
+                         const std::string& command,
+                         uint32_t sendMode,
+                         uint64_t sequence) noexcept
+    {
+        if (!ShouldLogChatCommand())
+            return;
+
+        char buffer[240];
+        std::snprintf(buffer,
+                      sizeof(buffer),
+                      "[oBaseEvents] Local chat command %s principal=unknown command=%s send_mode=%u sequence=%llu.",
+                      status,
+                      command.c_str(),
+                      sendMode,
+                      static_cast<unsigned long long>(sequence));
+        SafeLogInfo(buffer);
+    }
+
+    void OnChatMessageEvent(const ObeliskChatMessageEvent* event, void* userData) noexcept
+    {
+        try
+        {
+            if (userData != &g_ChatCommandUserData || !IsValidChatMessageEvent(event))
+            {
+                if (ShouldLogChatCommand())
+                    SafeLogError("[oBaseEvents] Local chat command rejected reason=malformed-event.");
+                return;
+            }
+
+            if (event->message.size == 0)
+                return;
+
+            const std::string text(event->message.data, event->message.size);
+            if (text.rfind(g_ChatCommandPrefix, 0) != 0)
+                return;
+
+            size_t cursor = g_ChatCommandPrefix.size();
+            while (cursor < text.size() && std::isspace(static_cast<unsigned char>(text[cursor])))
+                ++cursor;
+
+            const size_t commandStart = cursor;
+            while (cursor < text.size() && !std::isspace(static_cast<unsigned char>(text[cursor])))
+                ++cursor;
+
+            const std::string command = text.substr(commandStart, cursor - commandStart);
+            if (!IsSafeCommandName(command))
+            {
+                if (ShouldLogChatCommand())
+                    SafeLogError("[oBaseEvents] Local chat command rejected reason=invalid-command-name.");
+                return;
+            }
+
+            if (command != "help")
+            {
+                LogLocalCommand("rejected reason=unknown-command", command, event->send_mode, event->sequence);
+                return;
+            }
+
+            LogLocalCommand("matched", command, event->send_mode, event->sequence);
+        }
+        catch (...)
+        {
+            if (ShouldLogChatCommand())
+                SafeLogError("[oBaseEvents] Local chat command rejected reason=exception.");
+        }
+    }
+
+    void UnregisterProcessEvent() noexcept
+    {
+        try
+        {
+            if (g_HasApi && g_ProcessEventRegistrationId != 0 && g_Api.UnregisterProcessEventCallbackWithOwnerToken)
+            {
+                g_Api.UnregisterProcessEventCallbackWithOwnerToken(g_OwnerToken, g_ProcessEventRegistrationId);
+                g_ProcessEventRegistrationId = 0;
+            }
+        }
+        catch (...)
+        {
+        }
+    }
+
+    void UnregisterChatCommand() noexcept
+    {
+        try
+        {
+            if (g_HasApi && g_ChatCommandRegistrationId != 0 && g_Api.UnregisterChatMessageEventWithOwnerToken)
+            {
+                g_Api.UnregisterChatMessageEventWithOwnerToken(g_OwnerToken, g_ChatCommandRegistrationId);
+                g_ChatCommandRegistrationId = 0;
+            }
+        }
+        catch (...)
+        {
+        }
+    }
+
     void ResetState()
     {
         g_Api = {};
@@ -278,9 +479,14 @@ namespace
         g_ProcessEventEnabled = false;
         g_FilteredFunctionIndex = -1;
         g_LogLimit = 5;
+        g_ChatCommandHelperEnabled = false;
+        g_ChatCommandPrefix = "!";
+        g_ChatCommandLogLimit = 5;
         g_OwnerToken = 0;
         g_ProcessEventRegistrationId = 0;
+        g_ChatCommandRegistrationId = 0;
         g_LoggedEvents.store(0);
+        g_LoggedChatCommands.store(0);
     }
 }
 
@@ -326,6 +532,7 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(Obelis
         g_HasApi = true;
         g_OwnerToken = context->plugin_owner_token;
         g_LoggedEvents.store(0);
+        g_LoggedChatCommands.store(0);
 
         if (!LoadConfig(context))
         {
@@ -376,17 +583,50 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(Obelis
             api->LogInfo("[oBaseEvents] ProcessEvent example disabled by config.");
         }
 
+        if (g_ChatCommandHelperEnabled)
+        {
+            if (!HasChatMessageEventApi(api) || context->plugin_owner_token == 0)
+            {
+                api->LogError("[oBaseEvents] Chat command helper requires ChatMessageEvent capability and owner-token callback handle API.");
+                UnregisterProcessEvent();
+                ResetState();
+                return false;
+            }
+
+            g_ChatCommandRegistrationId = api->RegisterChatMessageEventWithOwnerTokenHandle(
+                context->plugin_owner_token,
+                OnChatMessageEvent,
+                &g_ChatCommandUserData);
+            if (g_ChatCommandRegistrationId == 0)
+            {
+                api->LogError("[oBaseEvents] Failed to register ChatMessageEvent callback.");
+                UnregisterProcessEvent();
+                ResetState();
+                return false;
+            }
+
+            api->LogInfo("[oBaseEvents] Registered plugin-local chat command helper.");
+        }
+        else
+        {
+            api->LogInfo("[oBaseEvents] Chat command helper disabled by config.");
+        }
+
         return true;
     }
     catch (const std::exception& e)
     {
         SafeLogError(api, (std::string("[oBaseEvents] Init failed: ") + e.what()).c_str());
+        UnregisterChatCommand();
+        UnregisterProcessEvent();
         ResetState();
         return false;
     }
     catch (...)
     {
         SafeLogError(api, "[oBaseEvents] Init failed with unknown exception.");
+        UnregisterChatCommand();
+        UnregisterProcessEvent();
         ResetState();
         return false;
     }
@@ -396,11 +636,8 @@ extern "C" __attribute__((visibility("default"))) void ObeliskPlugin_Shutdown()
 {
     try
     {
-        if (g_HasApi && g_ProcessEventRegistrationId != 0 && g_Api.UnregisterProcessEventCallbackWithOwnerToken)
-        {
-            g_Api.UnregisterProcessEventCallbackWithOwnerToken(g_OwnerToken, g_ProcessEventRegistrationId);
-            g_ProcessEventRegistrationId = 0;
-        }
+        UnregisterChatCommand();
+        UnregisterProcessEvent();
 
         SafeLogInfo("[oBaseEvents] Shutdown.");
     }

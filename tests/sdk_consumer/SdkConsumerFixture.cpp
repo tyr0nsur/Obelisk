@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <vector>
 #include <stdexcept>
 #include <string>
 
@@ -36,6 +37,8 @@ namespace
     bool g_FailChatMessageRegistration = false;
     bool g_FailTimerRegistration = false;
     bool g_ThrowLogAfterTimerRegistration = false;
+    std::vector<std::string> g_InfoLogs;
+    std::vector<std::string> g_ErrorLogs;
     OnProcessEventCallback g_RegisteredCallback = nullptr;
     ObeliskGameplayPolicyEventCallback g_RegisteredGameplayPolicyCallback = nullptr;
     void* g_RegisteredGameplayPolicyUserData = nullptr;
@@ -50,10 +53,35 @@ namespace
             throw std::runtime_error(message);
     }
 
-    void NoOpLog(const char*)
+    void NoOpLog(const char* message)
     {
         if (g_ThrowLog)
             throw std::runtime_error("injected log callback failure");
+        (void)message;
+    }
+
+    void CaptureInfoLog(const char* message)
+    {
+        NoOpLog(message);
+        if (message)
+            g_InfoLogs.emplace_back(message);
+    }
+
+    void CaptureErrorLog(const char* message)
+    {
+        NoOpLog(message);
+        if (message)
+            g_ErrorLogs.emplace_back(message);
+    }
+
+    bool HasLogContaining(const std::vector<std::string>& logs, const char* needle)
+    {
+        for (const std::string& log : logs)
+        {
+            if (log.find(needle) != std::string::npos)
+                return true;
+        }
+        return false;
     }
 
     void RegisterProcessEvent(OnProcessEventCallback)
@@ -188,6 +216,23 @@ namespace
         event.flags = OBELISK_CHAT_MESSAGE_EVENT_FLAG_COPIED_PAYLOAD;
         event.sequence = 42;
         event.message = {message, sizeof(message) - 1};
+
+        g_RegisteredChatMessageCallback(&event, g_RegisteredChatMessageUserData);
+    }
+
+    void DispatchValidChatMessageEventWithText(const char* message)
+    {
+        Require(g_RegisteredChatMessageCallback != nullptr, "missing chat message callback");
+        Require(g_RegisteredChatMessageUserData != nullptr, "missing chat message user data");
+        Require(message != nullptr, "chat message text was null");
+
+        ObeliskChatMessageEvent event{};
+        event.abi_version = OBELISK_CHAT_MESSAGE_EVENT_ABI_VERSION;
+        event.struct_size = sizeof(ObeliskChatMessageEvent);
+        event.send_mode = OBELISK_CHAT_SEND_MODE_GLOBAL;
+        event.flags = OBELISK_CHAT_MESSAGE_EVENT_FLAG_COPIED_PAYLOAD;
+        event.sequence = 42;
+        event.message = {message, std::strlen(message)};
 
         g_RegisteredChatMessageCallback(&event, g_RegisteredChatMessageUserData);
     }
@@ -352,6 +397,40 @@ namespace
     }
 })json";
 
+    constexpr const char* kActiveOBaseEventsChatCommandConfig = R"json({
+    "enabled": true,
+    "log_level": "info",
+    "allow_all_instances": false,
+    "instance_allowlist": ["sdk-consumer-test"],
+    "process_event": {
+        "enabled": false,
+        "filtered_function_index": -1,
+        "log_limit": 1
+    },
+    "chat_command_helper": {
+        "enabled": true,
+        "prefix": "!",
+        "log_limit": 2
+    }
+})json";
+
+    constexpr const char* kInvalidChatCommandConfig = R"json({
+    "enabled": true,
+    "log_level": "info",
+    "allow_all_instances": false,
+    "instance_allowlist": ["sdk-consumer-test"],
+    "process_event": {
+        "enabled": false,
+        "filtered_function_index": -1,
+        "log_limit": 1
+    },
+    "chat_command_helper": {
+        "enabled": true,
+        "prefix": "",
+        "log_limit": 1
+    }
+})json";
+
     constexpr const char* kUnsupportedMapAllowlistConfig = R"json({
     "enabled": true,
     "log_level": "info",
@@ -479,7 +558,6 @@ int main(int argc, char** argv)
             timerSeen = ResolveOptional<BoolProbeFn>(handle, "OProcessTimer_TimerSeen");
         if (!timerAccepted)
             timerAccepted = ResolveOptional<BoolProbeFn>(handle, "OProcessTimer_TimerAccepted");
-
         ObeliskPluginMetadata metadata{};
         Require(getInfo(&metadata), "ObeliskPlugin_GetInfo failed");
         Require(metadata.abi_version == OBELISK_PLUGIN_METADATA_ABI_VERSION, "metadata ABI mismatch");
@@ -490,6 +568,9 @@ int main(int argc, char** argv)
         const char* configJson = metadata.default_config_json;
         if (mode == "active-process-event" || mode == "callback-throw-log")
             configJson = kActiveOBaseEventsConfig;
+        else if (mode == "active-chat-command-helper" ||
+            mode == "active-chat-command-helper-no-chat-capability")
+            configJson = kActiveOBaseEventsChatCommandConfig;
         else if (mode == "active-timer" ||
             mode == "active-timer-double-shutdown" ||
             mode == "throw-log-after-timer-registration" ||
@@ -503,6 +584,8 @@ int main(int argc, char** argv)
             configJson = kUnsupportedMapAllowlistConfig;
         else if (mode == "invalid-process-event-config")
             configJson = kInvalidProcessEventConfig;
+        else if (mode == "invalid-chat-command-config")
+            configJson = kInvalidChatCommandConfig;
         else if (mode == "unsafe-instance-allowlist")
             configJson = kUnsafeInstanceAllowlistConfig;
         std::filesystem::path configDir = CreateConfigDir(configJson);
@@ -512,9 +595,9 @@ int main(int argc, char** argv)
         };
 
         ObeliskApi api{};
-        api.LogInfo = NoOpLog;
+        api.LogInfo = CaptureInfoLog;
         api.LogWarn = NoOpLog;
-        api.LogError = NoOpLog;
+        api.LogError = CaptureErrorLog;
         api.RegisterPreProcessEvent = RegisterProcessEvent;
         api.RegisterPostProcessEvent = RegisterProcessEvent;
         api.RegisterPreProcessEventForNameIndex = RegisterNamedProcessEvent;
@@ -542,7 +625,8 @@ int main(int argc, char** argv)
             api.DescribeResourceKind = DescribeResourceKind;
             api.DescribeGameplayPolicyEventKind = DescribeGameplayPolicyEventKind;
         }
-        if (mode != "no-chat-message-capability")
+        if (mode != "no-chat-message-capability" &&
+            mode != "active-chat-command-helper-no-chat-capability")
         {
             api.capabilities |= OBELISK_API_CAPABILITY_CHAT_EVENTS;
             api.RegisterChatMessageEventWithOwnerTokenHandle =
@@ -773,6 +857,28 @@ int main(int argc, char** argv)
             closeHandle();
             return 0;
         }
+        if (mode == "invalid-chat-command-config")
+        {
+            Require(!initSucceeded, "oBaseEvents accepted invalid chat command helper config");
+            Require(g_ChatMessageRegisterCount == 0,
+                "rejected oBaseEvents unexpectedly registered a chat message callback");
+            Require(g_ChatMessageUnregisterCount == 0,
+                "rejected oBaseEvents unexpectedly unregistered a chat message callback");
+            cleanupConfigDir();
+            closeHandle();
+            return 0;
+        }
+        if (mode == "active-chat-command-helper-no-chat-capability")
+        {
+            Require(!initSucceeded, "oBaseEvents accepted active chat command helper without chat capability");
+            Require(g_ChatMessageRegisterCount == 0,
+                "chat command helper registered without chat capability");
+            Require(g_ChatMessageUnregisterCount == 0,
+                "chat command helper unregistered without chat capability");
+            cleanupConfigDir();
+            closeHandle();
+            return 0;
+        }
         if (mode == "unsafe-instance-allowlist")
         {
             Require(!initSucceeded, "oBaseEvents accepted unsafe instance_allowlist entry");
@@ -896,6 +1002,22 @@ int main(int argc, char** argv)
             Require(g_RegisteredCallback(nullptr, nullptr, nullptr), "callback returned false");
             g_ThrowLog = false;
         }
+        if (mode == "active-chat-command-helper")
+        {
+            Require(g_RegisterCount == 0, "chat command helper unexpectedly registered ProcessEvent callback");
+            Require(g_UnregisterCount == 0, "chat command helper unexpectedly unregistered ProcessEvent callback");
+            Require(g_ChatMessageRegisterCount == 1,
+                "chat command helper did not register one chat message callback");
+            Require(g_ChatMessageUnregisterCount == 0,
+                "chat command helper unregistered chat callback before shutdown");
+            DispatchValidChatMessageEventWithText("hello");
+            Require(!HasLogContaining(g_InfoLogs, "Local chat command matched"),
+                "chat command helper matched a message without prefix");
+            DispatchValidChatMessageEventWithText("!help");
+            Require(HasLogContaining(g_InfoLogs, "Local chat command matched principal=unknown command=help"),
+                "chat command helper did not accept local help command");
+            Require(!HasLogContaining(g_InfoLogs, "hello"), "chat command helper logged raw non-command chat text");
+        }
         api = {};
         if (shutdown)
             shutdown();
@@ -906,6 +1028,17 @@ int main(int argc, char** argv)
             Require(g_RegisterCount == 1, "active plugin did not register one callback");
             Require(g_UnregisterCount == 1, "active plugin did not unregister one callback");
             Require(g_RegisteredCallback == nullptr, "active plugin callback survived shutdown unregister");
+        }
+        if (mode == "active-chat-command-helper")
+        {
+            Require(g_ChatMessageRegisterCount == 1,
+                "chat command helper did not register one chat message callback");
+            Require(g_ChatMessageUnregisterCount == 1,
+                "chat command helper did not unregister one chat message callback");
+            Require(g_RegisteredChatMessageCallback == nullptr,
+                "chat command helper callback survived shutdown unregister");
+            Require(g_RegisteredChatMessageUserData == nullptr,
+                "chat command helper user data survived shutdown unregister");
         }
         if (hasGameplayPolicyProbe && mode == "short-api-before-gameplay-policy")
         {
