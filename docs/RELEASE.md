@@ -42,6 +42,9 @@ Included:
   privacy blockers; historical `enable-chat-reflection` observer logs do not satisfy that
   gate.
 
+RC public scope remains limited to `GameplayPolicyEvent`, the minimal copied
+`ChatMessageEvent`, `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`.
+
 Excluded:
 
 - Stable gameplay module interception APIs.
@@ -118,9 +121,13 @@ scripts/check_release_readiness.sh --require-second-source-readiness
 
 An existing local or unpublished RC tag is not proof that the current validated
 head is tagged. It may point behind the current validated head after later
-release-prep fixes. Before any release-manager tag/push, verify that the RC tag
-commit, if it already exists, is exactly the intended validated release ref; if
-it is not, stop and resolve the stale tag state instead of reusing or pushing it.
+release-prep fixes. Before any release-manager tag/push, perform exact tag/ref
+verification: verify that the RC tag commit, if it already exists, is exactly the
+intended validated release ref; if it is not, stop and resolve the stale tag state
+instead of reusing or pushing it.
+As observed on 2026-05-30, the local `v0.1.0-rc.1` tag dereferences to stale commit
+`22f41d9` behind later release-prep commits; that tag is not publicable and must not be
+pushed.
 
 The promotion check always includes the public RC UFunction target sets:
 `minimal-second-source-intake`, `structure-observer-intake`, and `chat-message-intake`.
@@ -304,6 +311,8 @@ scripts/check_obelisk_server_posture.sh --expect-stable --map <map> --instance <
 11. For a release candidate, tag the validated candidate first. Release tags and release
     ref pushes are release-manager/lead-only; contributors should not tag or push release
     refs from ordinary development branches.
+    No tag or release-ref push is authorized without explicit release-manager/lead
+    authorization for the current turn.
     If `v0.1.0-rc.1` already exists locally, verify it points exactly at the intended
     validated ref; if it points elsewhere, recreate it only after rerunning the gate on
     that ref. Do not push a stale tag.

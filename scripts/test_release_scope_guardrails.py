@@ -448,7 +448,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("--require-second-source-readiness", release)
         self.assertIn("An existing local or unpublished RC tag is not proof", release)
         self.assertIn("may point behind the current validated head", release)
-        self.assertIn("verified against that intended validated release ref", status)
+        self.assertIn("verified against that intended validated release ref", normalized(status))
         self.assertIn("--require-second-source-readiness", pr_template)
         self.assertIn("--require-second-source-readiness", script)
         self.assertIn("--ufunction-second-source-root", release)
@@ -574,6 +574,47 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
                         offenders.append(f"{path}: missing {label}: {compact}")
 
         self.assertEqual(offenders, [])
+
+    def test_current_handoff_stays_compact(self) -> None:
+        current_lines = read("docs/agent-handoff/CURRENT.md").splitlines()
+
+        self.assertLessEqual(len(current_lines), 220)
+
+    def test_rc_publication_guardrails_are_consistent(self) -> None:
+        required_phrase = (
+            "RC public scope remains limited to `GameplayPolicyEvent`, the minimal copied "
+            "`ChatMessageEvent`, `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`."
+        )
+        authorization_phrase = (
+            "No tag or release-ref push is authorized without explicit release-manager/lead "
+            "authorization for the current turn."
+        )
+
+        docs = {
+            "docs/RELEASE.md": read("docs/RELEASE.md"),
+            "docs/STATUS.md": read("docs/STATUS.md"),
+            "docs/agent-handoff/CURRENT.md": read("docs/agent-handoff/CURRENT.md"),
+            "docs/agent-handoff/COMPACT_CONTEXT.md": read("docs/agent-handoff/COMPACT_CONTEXT.md"),
+        }
+
+        for path, text in docs.items():
+            compact = normalized(text)
+            lower = compact.lower()
+            with self.subTest(file=path, item="stale local tag target"):
+                self.assertIn("v0.1.0-rc.1", text)
+                self.assertIn("22f41d9", text)
+                self.assertIn("stale", lower)
+            with self.subTest(file=path, item="stale tag not publicable"):
+                self.assertRegex(lower, r"(not publicable|do not publish|must not be reused|must not be .*pushed)")
+            with self.subTest(file=path, item="clean intended-ref gate"):
+                self.assertRegex(lower, r"intended (?:release )?ref")
+                self.assertRegex(lower, r"(clean (?:release )?gate|clean worktree|without `--allow-dirty`)")
+            with self.subTest(file=path, item="tag/ref verification"):
+                self.assertIn("tag/ref verification", lower)
+            with self.subTest(file=path, item="no unauthorized push"):
+                self.assertIn(authorization_phrase, compact)
+            with self.subTest(file=path, item="public api scope"):
+                self.assertIn(required_phrase, compact)
 
     def test_disable_plugins_marker_is_documented_as_wrapper_input_not_runtime_gate(self) -> None:
         install = read("docs/INSTALL.md")

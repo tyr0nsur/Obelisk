@@ -8,9 +8,10 @@ This active routing table keeps only next-round facts; put durable evidence in
 ## Active Objective
 
 - `v0.1.0-rc.1` is not published and must not be treated as closed on the current
-  `HEAD`. A stale local tag may exist behind the current release-prep commits; any
-  future publication requires a clean release gate on the intended ref and an exact
-  tag/ref verification before tag push. Continue from the core-first RC baseline:
+  `HEAD`. The local tag currently dereferences to stale commit `22f41d9` behind the
+  current release-prep commits; do not publish, reuse, or push it. Any future publication
+  requires a clean release gate on the intended ref and an exact tag/ref verification
+  before tag push. Continue from the core-first RC baseline:
   Linux runtime, ProcessEvent hook infrastructure, plugin lifecycle, central install
   layout, `oBaseEvents`, `GameplayPolicyEvent`, minimal copied `ChatMessageEvent`,
   `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`.
@@ -23,7 +24,9 @@ This active routing table keeps only next-round facts; put durable evidence in
 ## Hard Overrides
 
 - GitHub work may be delegated only for an evidenced, stable milestone. Keep commits
-  minimized; no routine push/checkpoint unless selected for validated publication.
+  minimized; no routine push/checkpoint unless selected for validated publication. No tag
+  or release-ref push is authorized without explicit release-manager/lead authorization
+  for the current turn.
 - Any server-backed debug or beta work requires an approved live-ops brief for that turn:
   target instance/map, feature gates, marker/env changes, restart/start/stop window,
   notice path when players are involved, evidence capture, and rollback. No server target
@@ -42,6 +45,8 @@ This active routing table keeps only next-round facts; put durable evidence in
 
 - ABI/API: `ObeliskApi` v1 stays append-only for `v0.1.0`; public gameplay SDK surfaces
   require accepted second-source evidence, copied-data ownership, and lifecycle gates.
+- RC public scope remains limited to `GameplayPolicyEvent`, the minimal copied
+  `ChatMessageEvent`, `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`.
 - Promoted gameplay surface: `GameplayPolicyEvent` is the only public gameplay policy
   event, backed by `docs/public_gameplay_events.json` and
   `docs/research/2026-05-29-public-gameplay-event-readiness-audit.md`. Its structure and

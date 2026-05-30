@@ -195,6 +195,8 @@ class BuildUObjectFlagPolicyReportTests(unittest.TestCase):
         self.assertIs(payload["post_callback_resource_handle_ready"], False)
         self.assertEqual(payload["status"], "candidate_blocked")
         self.assertEqual(len(payload["windows_summary"]["observed"]), 4)
+        self.assertEqual(payload["weak_helper_caller_mode"]["direct_call_coverage"]["weak_helper_flag_policy_candidate"], {"expected": 6, "observed": 6})
+        self.assertEqual(payload["weak_helper_caller_mode"]["caller_rows_summary"]["helper"], "weak_helper_flag_policy_candidate")
         self.assertEqual(payload["weak_helper_caller_mode"]["caller_rows_summary"]["row_count"], 6)
         self.assertEqual(payload["weak_helper_caller_mode"]["caller_rows_summary"]["unique_caller_hash_count"], 6)
         self.assertRegex(payload["weak_helper_caller_mode"]["caller_rows_summary"]["caller_rows_sha256"], r"^[0-9a-f]{64}$")
@@ -221,9 +223,10 @@ class BuildUObjectFlagPolicyReportTests(unittest.TestCase):
             self.assertRegex(window["provenance"]["sidecar_sha256"], r"^[0-9a-f]{64}$")
         self.assertIn("does_not_promote_resourcehandle", payload["non_claims"])
         self.assertIn("no_rejected_runtime_object_samples", payload["remaining_blockers"])
+        self.assertEqual(payload["redaction"]["addresses"], "redacted")
         self.assertNotIn(str(root), json.dumps(payload))
         self.assertNotIn("pending-kill", json.dumps(payload).lower())
-        for address in ("0x83a340", "0x83a720", "0x83cde0", "0x9f80f0", "0x1d299b0", "0x1d29a20"):
+        for address in ("0x83a340", "0x83a720", "0x83cde0", "0x9f80f0", "0x1d299b0", "0x1d29a20", "0x1d56c70"):
             self.assertNotIn(address, json.dumps(payload))
 
     def test_fails_closed_when_required_window_is_missing(self) -> None:
@@ -348,6 +351,38 @@ but it is not a connected objdump instruction window.
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("weak_helper_caller_row_unexpected_fields", result.stderr)
+        self.assertFalse(output.exists())
+
+    def test_fails_closed_on_legacy_redacted_weak_helper_aggregate(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            _, windows = self.write_inputs(root)
+            weak_helper = root / "weak-helper-legacy.json"
+            payload = weak_helper_report()
+            del payload["caller_rows"]
+            payload["callers"] = [
+                {
+                    "helper": "0x1d56c70",
+                    "caller_window_count": 6,
+                    "mode_args": {"sil": {"source": "const", "value": 1}},
+                    "return_use": {"register": "rax", "nonzero_path": "kept_or_valid"},
+                },
+                {
+                    "helper": "0x1d56b60",
+                    "caller_window_count": 2,
+                    "mode_args": {"sil": {"source": "const", "value": 0}, "dl": {"source": "const", "value": 1}},
+                    "return_use": {"kind": "pairwise_boolean_comparison"},
+                },
+            ]
+            for source in payload["sources"].values():
+                source.pop("provenance")
+            weak_helper.write_text(json.dumps(payload), encoding="utf-8")
+            output = root / "report.json"
+            result = self.run_builder(*self.builder_args(weak_helper, windows, output), check=False)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("weak_helper_source_provenance_missing:direct_call_counts", result.stderr)
+        self.assertIn("weak_helper_caller_rows_count_mismatch", result.stderr)
         self.assertFalse(output.exists())
 
     def test_fails_closed_on_unknown_window_name(self) -> None:

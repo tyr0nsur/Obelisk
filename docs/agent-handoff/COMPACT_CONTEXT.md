@@ -16,7 +16,8 @@ priorities, and do not use history files as the active source of truth.
 ## Active Overrides
 
 - GitHub work may be delegated only for an evidenced, stable milestone; routine local
-  rounds are not publication events.
+  rounds are not publication events. No tag or release-ref push is authorized without
+  explicit release-manager/lead authorization for the current turn.
 - No server restart/start/stop, `/servidor/ark` edit, marker change, ReflectionScanner,
   ptrace/gcore, broad ProcessEvent tracing, or runtime observation unless the current
   operator turn names an approved debug/beta scope or separately approved exact run.
@@ -37,9 +38,10 @@ priorities, and do not use history files as the active source of truth.
 - Central Obelisk root: `/servidor/ark/obelisk`
 - Current release baseline: the small core-first RC gate has local clean-tree evidence,
   but `v0.1.0-rc.1` is not published and must not be assumed to point at current `HEAD`.
-  A stale local tag may exist behind release-prep commits. Post-RC work stays
-  internal/offline unless a separate promotion gate changes scope, and publication
-  requires rerunning the gate on the intended ref plus exact tag/ref verification.
+  The local tag currently dereferences to stale commit `22f41d9` behind release-prep
+  commits; do not publish, reuse, or push it. Post-RC work stays internal/offline unless a
+  separate promotion gate changes scope, and publication requires rerunning the clean gate
+  on the intended ref plus exact tag/ref verification.
 - Stable plugin loading requires safe `OBELISK_INSTANCE_ID` plus real non-symlink plugin,
   config, log, and state roots.
 - `ObeliskApi` v1 is append-only for `v0.1.0`; ABI v2 requires an explicit migration plan.
@@ -65,6 +67,8 @@ priorities, and do not use history files as the active source of truth.
   `docs/research/2026-05-29-public-gameplay-event-readiness-audit.md`. The separate
   minimal `ChatMessageEvent` RC surface is a copied chat notification contract, not a
   gameplay policy/module SDK.
+- RC public scope remains limited to `GameplayPolicyEvent`, the minimal copied
+  `ChatMessageEvent`, `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`.
 - `GameplayPolicyEvent` excludes mutation, raw UE pointer exposure, public
   callback-by-name APIs, public `StructureEvents`, public Inventory/etc. module APIs,
   richer chat APIs beyond minimal `ChatMessageEvent`, HTTP/threads/file-reader plugin
@@ -235,9 +239,10 @@ priorities, and do not use history files as the active source of truth.
 - `plugins/oPolicyAudit` is experimental and excluded from the default build/release
   scope unless `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`.
 - Historical dirty/offline release-gate runs are smoke evidence only. A later
-  2026-05-30 gate passed from a tracked-clean checkpoint, but it does not validate any
-  stale local RC tag. A real published RC requires focused checkpoints and the release
-  gate without `--allow-dirty` on the intended release ref.
+  2026-05-30 gate passed from a tracked-clean checkpoint, but it does not validate the
+  stale local RC tag at `22f41d9`. A real published RC requires focused checkpoints, the
+  release gate without `--allow-dirty` on the intended release ref, exact tag/ref
+  verification, and explicit authorization before any tag or release-ref push.
 - Use `docs/research/2026-05-29-rc-checkpoint-slicing-plan.md` for slicing. Handoff docs
   should be refreshed separately from runtime, release/public docs, offline tooling, and
   research-evidence slices.

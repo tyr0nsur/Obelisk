@@ -614,6 +614,26 @@ namespace
         }
     }
 
+    void TestRejectsNonCanonicalCopiedBoolParams()
+    {
+        TransferFixture fixture;
+        BuildConfirmationResult(fixture);
+        fixture.Params[0] = 2;
+
+        TransferReflection::TransferInvocation invocation;
+        ReadResult result = TransferReflection::TryIdentifyTransferInvocation(
+            fixture.Reader(),
+            Options(),
+            fixture.Function.data(),
+            fixture.Params.data(),
+            invocation);
+        Require(result.Status == ReadStatus::Implausible, "non-canonical transfer bool parameter was accepted");
+        Require(invocation.FunctionNameIndex == -1, "rejected transfer bool left stale function name");
+        Require(invocation.OuterNameIndex == -1, "rejected transfer bool left stale outer name");
+        Require(!invocation.HasParameterRanges, "rejected transfer bool left stale parameter range state");
+        Require(invocation.Fields.empty(), "rejected transfer bool left stale fields");
+    }
+
     void TestRejectsPropertyChainDrift()
     {
         {
@@ -755,6 +775,7 @@ int main()
     TestRejectsWrongShape();
     TestRejectsWrongPropertyShape();
     TestRejectsWrongBoolPropertyMetadata();
+    TestRejectsNonCanonicalCopiedBoolParams();
     TestRejectsPropertyChainDrift();
     TestRejectsUnsupportedTarget();
     TestGateRejectsBeforeReading();

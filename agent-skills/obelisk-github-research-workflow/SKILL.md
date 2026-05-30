@@ -152,6 +152,9 @@ Skip the build only for docs-only or skills-only commits, and say so in the fina
 - When release-scope behavior changes, keep `docs/RELEASE.md`, `docs/STATUS.md`,
   `CHANGELOG.md`, `.github/pull_request_template.md`, and release-scope guardrail tests in
   agreement.
+- A local or unpublished RC tag does not validate publication. Before pushing a release
+  tag, rerun the release gate on the intended ref and verify the tag dereferences exactly
+  to that ref; resolve stale local tags instead of reusing or pushing them.
 - Do not duplicate moving commit hashes as "latest checkpoint" facts in
   `docs/agent-handoff/CURRENT.md`; use `git log --oneline -1` for the current head and
   reserve handoff entries for stable facts, risks, and next steps.

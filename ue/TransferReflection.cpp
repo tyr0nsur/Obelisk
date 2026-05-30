@@ -312,6 +312,20 @@ namespace Obelisk::UE::TransferReflection
             return RuntimeReflection::ReadResult::Ok();
         }
 
+        RuntimeReflection::ReadResult ValidateCanonicalCopiedBool(const RuntimeReflection::ParamRange& range)
+        {
+            if (!range.Data || range.Size != kBoolPropertySize)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::InvalidArgument,
+                                                           "transfer copied bool parameter range is invalid");
+
+            uint8_t value = 0;
+            std::memcpy(&value, range.Data, sizeof(value));
+            if (value > 1)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                           "transfer copied bool parameter is not canonical");
+            return RuntimeReflection::ReadResult::Ok();
+        }
+
         RuntimeReflection::ReadResult ValidateProperty(const RuntimeReflection::MemoryReader& reader,
                                                        const RuntimeReflection::FieldLayout& layout,
                                                        const RuntimeReflection::UPropertyView& property,
@@ -436,6 +450,8 @@ namespace Obelisk::UE::TransferReflection
                 {
                     return result;
                 }
+                if (RuntimeReflection::ReadResult result = ValidateCanonicalCopiedBool(field.Range); !result)
+                    return result;
             }
 
             value.Fields.push_back(field);

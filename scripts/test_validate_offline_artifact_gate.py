@@ -447,7 +447,7 @@ def uobject_flag_policy_report_manifest(*, promotion_ready: bool = False) -> dic
             "artifact_sha256": "e" * 64,
             "promotion_gate_ready": False,
             "direct_call_coverage": {
-                "0x1d56c70": {
+                gate.UOBJECT_FLAG_POLICY_PUBLIC_HELPER_ID: {
                     "expected": 6,
                     "observed": 6,
                 },
@@ -457,7 +457,7 @@ def uobject_flag_policy_report_manifest(*, promotion_ready: bool = False) -> dic
                 {"mask": "0x4000", "result": "null_when_sil_zero"},
             ],
             "caller_rows_summary": {
-                "helper": "0x1d56c70",
+                "helper": gate.UOBJECT_FLAG_POLICY_PUBLIC_HELPER_ID,
                 "row_count": 6,
                 "unique_caller_hash_count": 6,
                 "mode_args": {"sil": {"source": "const", "value": 1}},
@@ -481,9 +481,55 @@ def uobject_flag_policy_report_manifest(*, promotion_ready: bool = False) -> dic
                 "path_redacted": True,
             },
         },
+        "policy_candidates": [
+            {
+                "mask": "0x100",
+                "candidate": "hard_invalid_static_negative_equivalent",
+                "support": sorted(gate.REQUIRED_UOBJECT_FLAG_POLICY_CANDIDATES["0x100"]["support"]),
+                "ue_lifecycle_name": "not_promoted",
+            },
+            {
+                "mask": "0x4000",
+                "candidate": "strict_invalid_static_negative_equivalent",
+                "support": sorted(gate.REQUIRED_UOBJECT_FLAG_POLICY_CANDIDATES["0x4000"]["support"]),
+                "ue_lifecycle_name": "not_promoted",
+            },
+        ],
         "remaining_blockers": sorted(gate.REQUIRED_UOBJECT_FLAG_POLICY_BLOCKERS),
         "non_claims": sorted(gate.REQUIRED_UOBJECT_FLAG_POLICY_NON_CLAIMS),
     }
+
+
+def uobject_flag_policy_report_manifest_with_legacy_caller_mode() -> dict:
+    payload = uobject_flag_policy_report_manifest()
+    weak_helper = payload["weak_helper_caller_mode"]
+    weak_helper.pop("caller_rows_summary")
+    weak_helper.pop("caller_rows_source")
+    weak_helper["caller_mode_summary"] = {
+        "helper": gate.UOBJECT_FLAG_POLICY_PUBLIC_HELPER_ID,
+        "source_detail": "legacy_redacted_aggregate",
+        "row_count": 6,
+        "mode_args": {"sil": {"source": "const", "value": 1}},
+        "return_use": {"register": "rax", "nonzero_path": "kept_or_valid"},
+        "source_count": 2,
+        "evidence": ["ghidra", "radare2"],
+        "policy_observation": {
+            "0x100": "null_always",
+            "0x4000": "not_rejected_in_observed_sil_1_callers",
+        },
+        "claim_level": "internal_static_caller_mode_candidate",
+        "lifecycle_names": "not_promoted",
+        "path_redacted": True,
+        "aggregate_source_sha256": "f" * 64,
+    }
+    weak_helper["caller_mode_source"] = {
+        "schema": gate.WEAK_HELPER_CALLER_MODE_SCHEMA,
+        "source_artifact_sha256": "e" * 64,
+        "binary_sha256": BINARY_SHA,
+        "aggregate_source_sha256": "f" * 64,
+        "path_redacted": True,
+    }
+    return payload
 
 
 def uobject_flag_transition_matrix_manifest(*, promotion_ready: bool = False) -> dict:
@@ -2895,6 +2941,19 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
 
         self.assertEqual(result["blockers"], [])
 
+    def test_blocks_uobject_flag_policy_legacy_redacted_caller_mode_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flags.json"
+            write_json(manifest, uobject_flag_policy_report_manifest_with_legacy_caller_mode())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("uobject_flag_policy_legacy_caller_mode_not_consume_ready", reasons)
+        self.assertIn("uobject_flag_policy_caller_rows_summary_missing", reasons)
+
     def test_blocks_uobject_flag_policy_candidate_in_promote_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"
@@ -3007,6 +3066,43 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
 
         self.assertIn(
             "uobject_flag_policy_missing_weak_helper_caller_mode",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_uobject_flag_policy_public_identifier_leaks(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flags.json"
+            payload = uobject_flag_policy_report_manifest()
+            payload["weak_helper_caller_mode"]["caller_rows_summary"]["helper"] = "0x1d56c70"
+            payload["weak_helper_caller_mode"]["direct_call_coverage"] = {"0x1d56c70": {"expected": 6, "observed": 6}}
+            payload["policy_candidates"][0]["source_index"] = 7
+            payload["policy_candidates"][1]["support"].append("raw_pointer_window")
+            payload["note"] = "serial evidence remains private"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("uobject_flag_policy_public_address_string_leak", reasons)
+        self.assertIn("uobject_flag_policy_public_identifier_key_leak", reasons)
+        self.assertIn("uobject_flag_policy_public_identifier_string_leak", reasons)
+        self.assertIn("uobject_flag_policy_direct_call_coverage_mismatch", reasons)
+
+    def test_blocks_uobject_flag_policy_missing_candidate_matrix(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flags.json"
+            payload = uobject_flag_policy_report_manifest()
+            del payload["policy_candidates"]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "uobject_flag_policy_candidates_missing",
             {blocker["reason"] for blocker in result["blockers"]},
         )
 

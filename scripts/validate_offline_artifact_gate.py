@@ -214,6 +214,28 @@ UOBJECT_FLAG_POLICY_CALLER_ROWS_SOURCE_KEYS = {
     "caller_rows_sha256",
     "path_redacted",
 }
+UOBJECT_FLAG_POLICY_PUBLIC_HELPER_ID = "weak_helper_flag_policy_candidate"
+REQUIRED_UOBJECT_FLAG_POLICY_CANDIDATES = {
+    "0x100": {
+        "candidate": "hard_invalid_static_negative_equivalent",
+        "support": {
+            "weak_helper_flag_policy_candidate_null_always",
+            "gc_static_0x100_support",
+        },
+    },
+    "0x4000": {
+        "candidate": "strict_invalid_static_negative_equivalent",
+        "support": {
+            "weak_helper_flag_policy_candidate_null_when_mode_zero",
+            "strict_0x4000_behavior",
+            "gobjects_backed_0x4000_skip",
+        },
+    },
+}
+UOBJECT_FLAG_POLICY_ALLOWED_HEX_STRINGS = {"0x100", "0x4000"}
+UOBJECT_FLAG_POLICY_PUBLIC_FORBIDDEN_KEY_RE = re.compile(r"(?:^|_)(address|index|indices|serial|pointer|ptr)(?:_|$)", re.IGNORECASE)
+UOBJECT_FLAG_POLICY_PUBLIC_FORBIDDEN_VALUE_RE = re.compile(r"(?:^|[_\W])(address|index|indices|serial|pointer|ptr)(?:[_\W]|$)", re.IGNORECASE)
+UOBJECT_FLAG_POLICY_PUBLIC_ADDRESS_RE = re.compile(r"\b0x[0-9a-f]{5,}\b", re.IGNORECASE)
 REQUIRED_UOBJECT_FLAG_TRANSITION_WINDOWS = {
     "weak_publish_from_uobject_1d56970_1d56a30",
     "weak_validity_mode_a30_1d56a30_1d56ae0",
@@ -529,6 +551,21 @@ def collect_string_fields(value: object, *, trail: str = "$") -> list[tuple[str,
                 found.append((child_trail, child))
             elif isinstance(child, (dict, list)):
                 found.extend(collect_string_fields(child, trail=child_trail))
+    return found
+
+
+def collect_key_names(value: object, *, trail: str = "$") -> list[tuple[str, str]]:
+    found: list[tuple[str, str]] = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_trail = f"{trail}.{key}"
+            found.append((child_trail, str(key)))
+            if isinstance(child, (dict, list)):
+                found.extend(collect_key_names(child, trail=child_trail))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            if isinstance(child, (dict, list)):
+                found.extend(collect_key_names(child, trail=f"{trail}[{index}]"))
     return found
 
 
@@ -2450,6 +2487,37 @@ def validate_resource_handle_serial_scan_manifest(
     return blockers
 
 
+def validate_uobject_flag_policy_public_redaction(payload: dict[str, Any], *, label: str) -> list[dict[str, Any]]:
+    blockers: list[dict[str, Any]] = []
+    for trail, key in collect_key_names(payload):
+        if UOBJECT_FLAG_POLICY_PUBLIC_FORBIDDEN_KEY_RE.search(key):
+            blockers.append(
+                {
+                    "reason": "uobject_flag_policy_public_identifier_key_leak",
+                    "label": f"{label}:{trail}",
+                    "key": key,
+                }
+            )
+    for trail, raw_value in collect_string_fields(payload):
+        if raw_value in UOBJECT_FLAG_POLICY_ALLOWED_HEX_STRINGS:
+            continue
+        if UOBJECT_FLAG_POLICY_PUBLIC_ADDRESS_RE.search(raw_value):
+            blockers.append(
+                {
+                    "reason": "uobject_flag_policy_public_address_string_leak",
+                    "label": f"{label}:{trail}",
+                }
+            )
+        if UOBJECT_FLAG_POLICY_PUBLIC_FORBIDDEN_VALUE_RE.search(raw_value):
+            blockers.append(
+                {
+                    "reason": "uobject_flag_policy_public_identifier_string_leak",
+                    "label": f"{label}:{trail}",
+                }
+            )
+    return blockers
+
+
 def validate_uobject_flag_policy_report_manifest(
     payload: dict[str, Any],
     *,
@@ -2461,6 +2529,7 @@ def validate_uobject_flag_policy_report_manifest(
         return []
 
     blockers: list[dict[str, Any]] = []
+    blockers.extend(validate_uobject_flag_policy_public_redaction(payload, label=label))
     if payload.get("evidence_kind") != "static_negative_equivalent_candidate":
         blockers.append({"reason": "uobject_flag_policy_evidence_kind_mismatch", "label": f"{label}:$.evidence_kind"})
     if payload.get("status") != "candidate_blocked":
@@ -2504,16 +2573,31 @@ def validate_uobject_flag_policy_report_manifest(
         blockers.append({"reason": "uobject_flag_policy_missing_weak_helper_caller_mode", "label": f"{label}:$.weak_helper_caller_mode"})
     else:
         artifact_sha = weak_helper.get("artifact_sha256")
+        coverage = weak_helper.get("direct_call_coverage")
+        coverage_entry = coverage.get(UOBJECT_FLAG_POLICY_PUBLIC_HELPER_ID) if isinstance(coverage, dict) else None
+        if not isinstance(coverage_entry, dict) or coverage_entry.get("expected") != 6 or coverage_entry.get("observed") != 6:
+            blockers.append(
+                {
+                    "reason": "uobject_flag_policy_direct_call_coverage_mismatch",
+                    "label": f"{label}:$.weak_helper_caller_mode.direct_call_coverage",
+                }
+            )
         summary = weak_helper.get("caller_rows_summary")
         source = weak_helper.get("caller_rows_source")
-        if not isinstance(summary, dict):
-            blockers.append({"reason": "uobject_flag_policy_caller_rows_summary_missing", "label": f"{label}:$.weak_helper_caller_mode.caller_rows_summary"})
-        else:
+        mode_summary = weak_helper.get("caller_mode_summary")
+        mode_source = weak_helper.get("caller_mode_source")
+        has_rows_summary = isinstance(summary, dict)
+        has_mode_summary = isinstance(mode_summary, dict)
+        if has_mode_summary or mode_source is not None:
+            blockers.append({"reason": "uobject_flag_policy_legacy_caller_mode_not_consume_ready", "label": f"{label}:$.weak_helper_caller_mode"})
+        if not has_rows_summary:
+            blockers.append({"reason": "uobject_flag_policy_caller_rows_summary_missing", "label": f"{label}:$.weak_helper_caller_mode"})
+        if has_rows_summary:
             summary_label = f"{label}:$.weak_helper_caller_mode.caller_rows_summary"
             if set(summary) != UOBJECT_FLAG_POLICY_CALLER_ROWS_SUMMARY_KEYS:
                 blockers.append({"reason": "uobject_flag_policy_caller_rows_summary_unexpected_fields", "label": summary_label})
             expected_summary = {
-                "helper": "0x1d56c70",
+                "helper": UOBJECT_FLAG_POLICY_PUBLIC_HELPER_ID,
                 "row_count": 6,
                 "unique_caller_hash_count": 6,
                 "mode_args": {"sil": {"source": "const", "value": 1}},
@@ -2535,9 +2619,9 @@ def validate_uobject_flag_policy_report_manifest(
                 blockers.append({"reason": "uobject_flag_policy_caller_rows_summary_sha256_invalid", "label": f"{summary_label}.caller_rows_sha256"})
             for trail, _, reason in collect_candidate_public_overclaims(summary):
                 blockers.append({"reason": f"uobject_flag_policy_caller_rows_summary_public_overclaim_{reason}", "label": f"{summary_label}:{trail}"})
-        if not isinstance(source, dict):
+        if has_rows_summary and not isinstance(source, dict):
             blockers.append({"reason": "uobject_flag_policy_caller_rows_source_missing", "label": f"{label}:$.weak_helper_caller_mode.caller_rows_source"})
-        else:
+        elif has_rows_summary:
             source_label = f"{label}:$.weak_helper_caller_mode.caller_rows_source"
             if set(source) != UOBJECT_FLAG_POLICY_CALLER_ROWS_SOURCE_KEYS:
                 blockers.append({"reason": "uobject_flag_policy_caller_rows_source_unexpected_fields", "label": source_label})
@@ -2555,6 +2639,46 @@ def validate_uobject_flag_policy_report_manifest(
                 blockers.append({"reason": "uobject_flag_policy_caller_rows_source_path_not_redacted", "label": f"{source_label}.path_redacted"})
             for trail, _, reason in collect_candidate_public_overclaims(source):
                 blockers.append({"reason": f"uobject_flag_policy_caller_rows_source_public_overclaim_{reason}", "label": f"{source_label}:{trail}"})
+    candidates = payload.get("policy_candidates")
+    if not isinstance(candidates, list):
+        blockers.append({"reason": "uobject_flag_policy_candidates_missing", "label": f"{label}:$.policy_candidates"})
+    else:
+        observed_masks: set[str] = set()
+        for index, candidate in enumerate(candidates):
+            candidate_label = f"{label}:$.policy_candidates[{index}]"
+            if not isinstance(candidate, dict):
+                blockers.append({"reason": "uobject_flag_policy_candidate_not_object", "label": candidate_label})
+                continue
+            mask = candidate.get("mask")
+            if isinstance(mask, str):
+                observed_masks.add(mask)
+            expected = REQUIRED_UOBJECT_FLAG_POLICY_CANDIDATES.get(mask) if isinstance(mask, str) else None
+            if expected is None:
+                blockers.append({"reason": "uobject_flag_policy_candidate_mask_unexpected", "label": f"{candidate_label}.mask"})
+                continue
+            if candidate.get("candidate") != expected["candidate"]:
+                blockers.append({"reason": "uobject_flag_policy_candidate_kind_mismatch", "label": f"{candidate_label}.candidate"})
+            support = candidate.get("support")
+            if not isinstance(support, list) or set(support) != expected["support"]:
+                blockers.append(
+                    {
+                        "reason": "uobject_flag_policy_candidate_support_mismatch",
+                        "label": f"{candidate_label}.support",
+                        "expected": sorted(expected["support"]),
+                        "recorded": support,
+                    }
+                )
+            if candidate.get("ue_lifecycle_name") != "not_promoted":
+                blockers.append({"reason": "uobject_flag_policy_candidate_lifecycle_name_mismatch", "label": f"{candidate_label}.ue_lifecycle_name"})
+        if observed_masks != set(REQUIRED_UOBJECT_FLAG_POLICY_CANDIDATES):
+            blockers.append(
+                {
+                    "reason": "uobject_flag_policy_candidate_masks_mismatch",
+                    "label": f"{label}:$.policy_candidates",
+                    "expected": sorted(REQUIRED_UOBJECT_FLAG_POLICY_CANDIDATES),
+                    "recorded": sorted(observed_masks),
+                }
+            )
 
     windows = payload.get("windows_summary")
     if not isinstance(windows, dict):

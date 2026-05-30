@@ -42,6 +42,8 @@ REQUIRED_WINDOWS = (
     "gc_static_0x100_support",
 )
 
+PUBLIC_HELPER_ID = "weak_helper_flag_policy_candidate"
+
 WINDOW_ALIASES = {
     "weak_helper_0x100_reject": "weak_helper_reject_0x100",
     "weak_helper_reject_0x100_window": "weak_helper_reject_0x100",
@@ -398,7 +400,7 @@ def validate_weak_helper_report(payload: dict[str, Any], binary_sha256: str) -> 
             ).encode("utf-8")
         ).hexdigest()
         caller_rows_summary = {
-            "helper": "0x1d56c70",
+            "helper": PUBLIC_HELPER_ID,
             "row_count": len(caller_rows),
             "unique_caller_hash_count": len(caller_hashes),
             "mode_args": {"sil": {"source": "const", "value": 1}},
@@ -423,7 +425,7 @@ def validate_weak_helper_report(payload: dict[str, Any], binary_sha256: str) -> 
         "artifact_sha256": None,
         "promotion_gate_ready": False,
         "direct_call_coverage": {
-            "0x1d56c70": {
+            PUBLIC_HELPER_ID: {
                 "expected": c70_expected,
                 "observed": c70_observed,
             },
@@ -536,7 +538,7 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
                 "mask": "0x100",
                 "candidate": "hard_invalid_static_negative_equivalent",
                 "support": [
-                    "weak_helper_1d56c70_null_always",
+                    "weak_helper_flag_policy_candidate_null_always",
                     "gc_static_0x100_support",
                 ],
                 "ue_lifecycle_name": "not_promoted",
@@ -545,7 +547,7 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
                 "mask": "0x4000",
                 "candidate": "strict_invalid_static_negative_equivalent",
                 "support": [
-                    "weak_helper_1d56c70_null_when_sil_zero",
+                    "weak_helper_flag_policy_candidate_null_when_mode_zero",
                     "strict_0x4000_behavior",
                     "gobjects_backed_0x4000_skip",
                 ],
@@ -556,7 +558,7 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         "non_claims": list(NON_CLAIMS),
         "redaction": {
             "paths": "redacted",
-            "addresses": "source_snippets_only",
+            "addresses": "redacted",
             "raw_snippets": "omitted",
         },
     }

@@ -56,3 +56,26 @@ This does not promote:
 
 If the consume gate fails, treat the artifact as invalid evidence rather than partially
 accepted.
+
+## 2026-05-30 Follow-Up Result
+
+A first pass against the existing redacted weak-helper artifact failed closed because the
+artifact did not embed caller rows or source provenance. The raw sidecars already existed
+under the offline workspace, so the weak-helper report was regenerated in `/tmp` with
+provenance and six caller rows, then consumed by a fresh `uobject-flag-policy-report.v1`
+also written under `/tmp`.
+
+Result:
+
+- consume gate: accepted
+- promote gate: blocked as expected
+- promote blockers: `promote_mode_uobject_flag_policy_candidate_only` and
+  `promote_mode_manifest_has_non_claims`
+- public helper identifier: `weak_helper_flag_policy_candidate`
+- public output: no raw helper addresses, raw UE lifecycle names, object indices, serials,
+  pointers, or local paths
+
+This is useful internal ResourceHandle evidence because it narrows the lifecycle/flag
+policy blocker, but it remains candidate-only. It still does not promote public
+`ResourceHandle`, object lookup, identity, mutation, return override, or named UE lifecycle
+semantics.
