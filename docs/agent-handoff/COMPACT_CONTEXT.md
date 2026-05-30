@@ -51,7 +51,7 @@ priorities, and do not use history files as the active source of truth.
 - Repo: `/home/flowcommunity-ark/Obelisk`
 - Remote: `git@github.com:tyr0nsur/Obelisk.git`
 - Central Obelisk root: `/servidor/ark/obelisk`
-- Current release baseline: `v0.1.0-rc.1` is published as the frozen core-first RC
+- Current release baseline: `v0.1.0-rc.2` is published as the frozen core-first RC
   baseline after a clean release gate and exact tag/ref verification. It is not a
   production-stable `v1.0` claim. Post-RC work should move toward a broader `v1.0`
   production core through architecture hardening, UE4 reflection evidence, copied-data
@@ -60,8 +60,8 @@ priorities, and do not use history files as the active source of truth.
 - Stable plugin loading requires safe `OBELISK_INSTANCE_ID` plus real non-symlink plugin,
   config, log, and state roots.
 - `ObeliskApi` v1 is append-only for `v0.1.0`; ABI v2 requires an explicit migration plan.
-- First-stable `v0.1.0` timers are the first non-UE-dependent core primitive, not part
-  of the `v0.1.0-rc.1` public surface: owner-token scoped, process-local, zero-failure
+- First-stable `v0.1.0` timers are the first non-UE-dependent core primitive and are part
+  of the current `v0.1.0-rc.2` public surface: owner-token scoped, process-local, zero-failure
   handles, one-shot/repeating callbacks, explicit unregister, and unload/init-failure
   cleanup.
   Timer ids are not shared config, cluster state, UE identity, gameplay/module timer
@@ -88,9 +88,11 @@ priorities, and do not use history files as the active source of truth.
   `GameplayPolicyEvent`. Promotion scope and exclusions are recorded in
   `docs/research/2026-05-29-public-gameplay-event-readiness-audit.md`. The separate
   minimal `ChatMessageEvent` RC surface is a copied chat notification contract, not a
-  gameplay policy/module SDK.
-- RC public scope remains limited to `GameplayPolicyEvent`, the minimal copied
-  `ChatMessageEvent`, `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`.
+  command or moderation API. RC public scope remains limited to `GameplayPolicyEvent`,
+  the minimal copied `ChatMessageEvent`, `DescribeResourceKind`, and
+  `DescribeGameplayPolicyEventKind`. `v0.1.0-rc.2` additionally includes process-local
+  owner-token timers as core runtime API without promoting gameplay/module timers or a
+  broader gameplay policy/module SDK.
 - Post-RC dictionary research against `/tmp/aseapi-inspect` confirms AseApi/ArkServerApi
   is useful only for names and concept grouping. The nearest stable plugin-facing path is
   still copied `GameplayPolicyEvent` structure/inventory, especially `PrimalItem.CanUse`
@@ -362,11 +364,12 @@ priorities, and do not use history files as the active source of truth.
 - Published RC baseline is core-first: `ObeliskApi` v1 is frozen around Linux runtime,
   ProcessEvent hook infrastructure, plugin lifecycle, central install layout,
   `oBaseEvents`, `GameplayPolicyEvent`, minimal copied `ChatMessageEvent`,
-  `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`.
+  `DescribeResourceKind`, `DescribeGameplayPolicyEventKind`, and process-local
+  owner-token timers.
 - `plugins/oPolicyAudit` is experimental and excluded from the default build/release
   scope unless `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`.
 - Historical dirty/offline release-gate runs are smoke evidence only. The published
-  `v0.1.0-rc.1` baseline was tagged only after the release gate without `--allow-dirty`
+  `v0.1.0-rc.2` baseline was tagged only after the release gate without `--allow-dirty`
   and exact tag/ref verification. Do not keep reworking that RC unless a critical fix
   requires a new RC tag.
 - `docs/research/2026-05-29-rc-checkpoint-slicing-plan.md` is historical recovery
@@ -393,7 +396,7 @@ priorities, and do not use history files as the active source of truth.
   approved offline workspace; promote remains blocked. Use
   `scripts/scan_resource_handle_serials.py --gate-ready` only for post-RC/internal
   consume-mode scans, not as a public RC gate.
-- Do not retroactively promote post-RC work into `v0.1.0-rc.1`: ResourceHandle,
+- Do not retroactively promote post-RC work into `v0.1.0-rc.2`: ResourceHandle,
   GNames/GObjects promotion, full UE4 reflection, public Inventory SDK, public
   StructureEvents, chat APIs beyond minimal copied `ChatMessageEvent`,
   player/tribe/dino/buff/transfer APIs, mutation, return overrides, public

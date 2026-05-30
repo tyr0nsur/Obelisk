@@ -1,6 +1,6 @@
 # Release Process
 
-This project is not ready for a production-stable release yet. `v0.1.0-rc.1` is the
+This project is not ready for a production-stable release yet. `v0.1.0-rc.2` is the
 published core-first RC baseline. Use this checklist for future RC/stable candidates and
 the eventual first public stable `0.1.0` tag. Version labels and pre-release rules are
 defined in [VERSIONING.md](VERSIONING.md).
@@ -55,8 +55,8 @@ Included:
 
 RC public scope remains limited to `GameplayPolicyEvent`, the minimal copied
 `ChatMessageEvent`, `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`.
-The future first-stable `v0.1.0` scope additionally includes process-local owner-token
-timers after the timer release-prep gate passes on the intended ref.
+`v0.1.0-rc.2` additionally includes the process-local owner-token timer primitive as core
+runtime API, without changing the copied gameplay/chat boundary.
 
 Excluded:
 
@@ -122,11 +122,11 @@ scripts/check_rc_layout_evidence_smoke.sh \
 
 For future RC/stable publication, the final local candidate gate is the canonical release
 readiness script with second-source readiness enabled and the accepted target-set
-UFunction snapshot root configured. The published `v0.1.0-rc.1` checkpoint passed this
-gate with the historical root recorded in
-[`2026-05-30-rc-second-source-release-gate-check.md`](research/2026-05-30-rc-second-source-release-gate-check.md).
-That root is historical evidence for the published RC only; do not reuse it as the final
-root for HEAD or any later candidate. Refresh the second-source root for the intended
+UFunction snapshot root configured. The published `v0.1.0-rc.2` checkpoint passed this
+gate with the refreshed root recorded in
+[`2026-05-30-head-rc-second-source-refresh-gap.md`](research/2026-05-30-head-rc-second-source-refresh-gap.md).
+That root is evidence for the published `v0.1.0-rc.2` tag only; do not reuse it as the
+final root for any later candidate. Regenerate the second-source root for the intended
 release ref, including current bool-tail metadata, then rerun the same gate immediately
 before any release-manager tag/push:
 
@@ -145,9 +145,9 @@ or unpublished RC tag is not proof that the intended validated head is tagged. I
 point behind the current validated head after later release-prep fixes. Before any
 release-manager tag/push, perform exact tag/ref verification: verify that the RC tag
 commit, if it already exists, is exactly the intended validated release ref; if it is not,
-stop and resolve the stale tag state instead of reusing or pushing it. Do not recreate the
-published `v0.1.0-rc.1` tag unless explicitly recovering a release error, and do not push a
-stale tag.
+stop and resolve the stale tag state instead of reusing or pushing it. Do not recreate a
+published release-candidate tag unless explicitly recovering a release error, and do not
+push a stale tag.
 
 The promotion check always includes the public RC UFunction target sets:
 `minimal-second-source-intake`, `structure-observer-intake`, and `chat-message-intake`.
@@ -335,8 +335,8 @@ scripts/check_obelisk_server_posture.sh --expect-stable --map <map> --instance <
     release refs from ordinary development branches.
     No tag or release-ref push is authorized without explicit release-manager/lead
     authorization for the current turn.
-    Replace `<rc-tag>` with the new release tag. Do not recreate the published
-    `v0.1.0-rc.1` tag unless explicitly recovering a release error. If the target tag
+    Replace `<rc-tag>` with the new release tag. Do not recreate a published
+    release-candidate tag unless explicitly recovering a release error. If the target tag
     already exists locally, verify it points exactly at the intended validated ref; if it
     points elsewhere, recreate it only after rerunning the gate on that ref. Do not push a
     stale tag. Use the tag/ref checker before pushing the tag.

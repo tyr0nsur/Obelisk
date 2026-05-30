@@ -4,14 +4,13 @@ Date: 2026-05-30
 
 ## Summary
 
-The historical `v0.1.0-rc.1` second-source UFunction root is valid only for the
-published RC baseline. It must not be reused as final evidence for current `HEAD` or a
-later candidate because current comparison gates require preserved BoolProperty tail
-metadata.
+The historical `v0.1.0-rc.1` second-source UFunction root is valid only for that published
+RC baseline. It must not be reused as final evidence for `v0.1.0-rc.2` or a later
+candidate because current comparison gates require preserved BoolProperty tail metadata.
 
-This is a release-evidence gap, not a runtime blocker. The chat target still compares, but
-the inventory and structure RC targets need refreshed second-source snapshots generated
-with the current tooling.
+This was a release-evidence gap, not a runtime blocker. The gap was closed for
+`v0.1.0-rc.2` by regenerating the second-source root from the existing independent
+offline core with current tooling.
 
 ## Checked Roots
 
@@ -56,10 +55,10 @@ inconclusive because the second-source snapshots predate the preserved bool-tail
 - `PrimalStructureItemContainer.VerifyPinCode`
 - `PrimalStructureSeating.CanSeat`
 
-## Required Artifact
+## Resolution Artifact
 
-Create a refreshed second-source UFunction snapshot root for the eight targets above with
-the current snapshot schema, including these fields on every accepted BoolProperty:
+A refreshed second-source UFunction snapshot root was created for the eight targets above
+with the current snapshot schema, including these fields on every accepted BoolProperty:
 
 - `bool_field_size`
 - `bool_byte_offset`
@@ -80,6 +79,15 @@ promotion_gate ready=true blockers=none
 ufunction:sdk_chat targets=1 comparable=1 blocked=0 second_source=accepted:1,rejected:0,inconclusive:0,missing:0
 ufunction:sdk_inventory targets=2 comparable=2 blocked=0 second_source=accepted:2,rejected:0,inconclusive:0,missing:0
 ufunction:sdk_structures targets=6 comparable=6 blocked=0 second_source=accepted:6,rejected:0,inconclusive:0,missing:0
+```
+
+The published `v0.1.0-rc.2` tag used the same regeneration path for commit `1a7cd98`:
+
+```text
+root=/tmp/obelisk-head-rc-ufunction-second-source-root-1a7cd98
+release-report-dir=/tmp/obelisk-rc-second-source-1a7cd98
+tag=v0.1.0-rc.2
+ref=1a7cd9816c8002846a40274d873a3ecc6ad742c0
 ```
 
 Source identity used for the refreshed inventory/structure snapshots:
@@ -111,14 +119,14 @@ python3 scripts/inspect_core_ufunctions.py \
   --evidence-status candidate-only
 ```
 
-The root must then pass:
+For future release candidates, the refreshed root must pass:
 
 ```bash
 scripts/check_rc_layout_evidence_smoke.sh \
   --candidate-root <refreshed-second-source-ufunction-root>
 ```
 
-After that, rerun the full release gate on a clean intended ref:
+Then rerun the full release gate on a clean intended ref:
 
 ```bash
 rm -rf /tmp/obelisk-rc-second-source
@@ -134,6 +142,8 @@ scripts/check_release_readiness.sh \
 ## Non-Claims
 
 - This does not invalidate the already published `v0.1.0-rc.1` evidence.
+- This records the `v0.1.0-rc.2` publication evidence state; it is not standing evidence
+  for later release refs.
 - This does not promote Inventory, Items, Structures, ResourceHandle, lookup, mutation,
   return override, raw params, or public module SDKs.
 - Do not satisfy this gap by copying bool-tail fields from committed fixtures into old

@@ -2,10 +2,18 @@
 
 ## Unreleased
 
-- Promoted the owner-token timer API as the first non-UE-dependent v0.1 core primitive:
-  process-local one-shot/repeating callbacks, zero-failure handles, explicit owner-scoped
-  unregister, plugin init-failure/unload cleanup, and ABI/layout tests. Timer handles are
-  not persistent, shared-cluster state, UE identity, lookup, mutation, or command routing.
+## 0.1.0-rc.2
+
+- Published a refreshed core-first release candidate with the same public copied-data API
+  boundary as `v0.1.0-rc.1`.
+- Added owner-token process-local timers and the `oProcessTimer` first-party example as a
+  v0.1 core primitive without UE/gameplay timer, identity, persistence, or command
+  semantics.
+- Refreshed the RC UFunction second-source evidence for the intended ref: all nine public
+  RC targets across chat, inventory, and structures compare as accepted with preserved
+  BoolProperty tail metadata.
+- Preserved explicit snapshot artifact identity in the UFunction inspector CLI so future
+  second-source roots can satisfy strict readiness gates.
 
 ## 0.1.0-rc.1
 
@@ -21,6 +29,11 @@ Active development toward a future `v0.1.0`. This is not a release tag and does 
 stable plugin or reflection compatibility yet. See `docs/VERSIONING.md`.
 
 Current baseline:
+
+- Promoted the owner-token timer API as the first non-UE-dependent v0.1 core primitive:
+  process-local one-shot/repeating callbacks, zero-failure handles, explicit owner-scoped
+  unregister, plugin init-failure/unload cleanup, and ABI/layout tests. Timer handles are
+  not persistent, shared-cluster state, UE identity, lookup, mutation, or command routing.
 
 - Linux `LD_PRELOAD` runtime bootstrap validated through the ARK: Survival Evolved
   dedicated server debug harness.

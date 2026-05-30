@@ -9,11 +9,11 @@ promises until a tag is explicitly cut.
 Current published release-candidate line:
 
 ```text
-0.1.0-rc.1
+0.1.0-rc.2
 ```
 
-This means the first public release candidate exists for the future stable line, but no
-production-stable `v0.1.0` release is promised yet. The RC freezes the documented public
+This means a public release candidate exists for the future stable line, but no
+production-stable `v0.1.0` release is promised yet. The RC line freezes the documented public
 runtime/SDK scope, while post-RC reflection research stays internal unless a later
 promotion gate changes it.
 In other words, no `v0.1.0` release is published until the stable release checklist and
@@ -107,7 +107,7 @@ contains enough tests, docs, gates, and rollback posture to reproduce the claim.
 
 ## Suggested Milestones
 
-`0.1.0-rc.1` is published and frozen for the documented core-first RC scope. Do not
+`0.1.0-rc.2` is published and frozen for the documented core-first RC scope. Do not
 retroactively add post-RC research or v1.0 module work to that tag. A future RC or stable
 tag should be considered only after these remain true for the intended ref:
 

@@ -21,7 +21,7 @@ navigation aid, not an exhaustive inventory of every evidence note; unlisted not
 still preserve durable evidence and should not be deleted only because they are absent
 from this index.
 
-Published RC baseline evidence lane:
+Published RC baseline evidence lane (current published tag: `v0.1.0-rc.2` at `1a7cd98`):
 
 - [2026-05-28-reversing-objective-map.md](2026-05-28-reversing-objective-map.md)
 - [2026-05-28-second-source-reversing-gap-matrix.md](2026-05-28-second-source-reversing-gap-matrix.md)
@@ -37,7 +37,7 @@ Current reflection evidence lane:
 | Area | Current status | Primary notes |
 | --- | --- | --- |
 | FName | Binary-scoped clues accepted for current artifacts; broad table scans should reuse the reviewed root slot unless a new binary/hash contradicts it. | [2026-05-28-second-source-reversing-gap-matrix.md](2026-05-28-second-source-reversing-gap-matrix.md) |
-| GObjects | Strong internal/offline `GUObjectArray` candidate for enumeration and fixture generation; no public/runtime identity or lookup contract. | [2026-05-29-gobjects-cross-manifest-comparison.md](2026-05-29-gobjects-cross-manifest-comparison.md) |
+| GObjects | Strong internal/offline `GUObjectArray` candidate for enumeration and fixture generation; current strict consume evidence needs durable recapture before reuse; no public/runtime identity or lookup contract. | [2026-05-29-gobjects-cross-manifest-comparison.md](2026-05-29-gobjects-cross-manifest-comparison.md), [2026-05-30-gobjects-strict-consume-recapture-needed.md](2026-05-30-gobjects-strict-consume-recapture-needed.md) |
 | UObject | Object fields and flags remain evidence for candidate classification; public lifecycle/validity semantics are not proven. | [2026-05-29-uobject-flags-validity-blocker.md](2026-05-29-uobject-flags-validity-blocker.md) |
 | UFunction layout | Accepted only per named target set after fixture and second-source comparison; RC target sets cover the current public copied surfaces. | [2026-05-30-rc-ufunction-layout-evidence-audit.md](2026-05-30-rc-ufunction-layout-evidence-audit.md) |
 | ResourceHandle | Post-RC/internal and blocked until lifecycle, validity, reuse, lookup privacy, and fail-closed semantics are proven. | [2026-05-30-post-rc-offline-resourcehandle-priority.md](2026-05-30-post-rc-offline-resourcehandle-priority.md) |
@@ -52,6 +52,7 @@ Current post-RC research lane:
 - [2026-05-30-v1-core-capability-map.md](2026-05-30-v1-core-capability-map.md)
 - [2026-05-30-aseapi-reference-scan.md](2026-05-30-aseapi-reference-scan.md)
 - [2026-05-30-chat-command-helper-roadmap.md](2026-05-30-chat-command-helper-roadmap.md)
+- [2026-05-30-chat-audit-plugin-plan.md](2026-05-30-chat-audit-plugin-plan.md)
 - [2026-05-29-module-surface-roadmap.md](2026-05-29-module-surface-roadmap.md)
 - [2026-05-29-next-targetset-discovery.md](2026-05-29-next-targetset-discovery.md)
 - [2026-05-29-mission-reflection-internal-readiness.md](2026-05-29-mission-reflection-internal-readiness.md)
@@ -67,6 +68,7 @@ Current post-RC research lane:
 - [2026-05-30-structure-nonpin-copied-scalar-policy-slice.md](2026-05-30-structure-nonpin-copied-scalar-policy-slice.md)
 - [2026-05-28-fname-index-manifest-plan.md](2026-05-28-fname-index-manifest-plan.md)
 - [2026-05-29-ghidra-fuobjectarray-field-window-probe.md](2026-05-29-ghidra-fuobjectarray-field-window-probe.md)
+- [2026-05-30-gobjects-strict-consume-recapture-needed.md](2026-05-30-gobjects-strict-consume-recapture-needed.md)
 - [2026-05-29-resource-handle-revalidation-evaluator.md](2026-05-29-resource-handle-revalidation-evaluator.md)
 - [2026-05-29-resource-handle-nonzero-revalidation.md](2026-05-29-resource-handle-nonzero-revalidation.md)
 - [2026-05-29-uobject-flags-fullscan.md](2026-05-29-uobject-flags-fullscan.md)

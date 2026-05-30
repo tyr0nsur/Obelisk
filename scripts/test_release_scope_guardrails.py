@@ -403,8 +403,8 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("Quick contributor loop", readme)
         self.assertIn("scripts/check_release_readiness.sh", release)
         self.assertIn("--ufunction-second-source-root <second-source-ufunction-snapshots>", release)
-        self.assertIn("historical root recorded in", release)
-        self.assertIn("do not reuse it as the final\nroot for HEAD", release)
+        self.assertIn("refreshed root recorded in", release)
+        self.assertIn("do not reuse it as the\nfinal root for any later candidate", release)
         self.assertIn("including current bool-tail metadata", release)
         self.assertIn("--second-source-report-dir /tmp/obelisk-rc-second-source", release)
         self.assertIn("`oPolicyAudit`", release)
@@ -462,7 +462,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("--require-second-source-readiness", release)
         self.assertIn("an existing local\nor unpublished RC tag is not proof", release)
         self.assertIn("may point behind the current validated head", normalized(release))
-        self.assertIn("published tag was checked against the intended release ref", normalized(status))
+        self.assertIn("tag was checked against the intended release ref", normalized(status))
         self.assertIn("exact tag/ref verification", normalized(status))
         self.assertIn("--require-second-source-readiness", pr_template)
         self.assertIn("--require-second-source-readiness", script)
@@ -571,9 +571,9 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             compact = normalized(text)
             lower = compact.lower()
             with self.subTest(file=path, item="published baseline"):
-                self.assertIn("v0.1.0-rc.1", text)
+                self.assertIn("v0.1.0-rc.2", text)
                 self.assertIn("published", lower)
-                self.assertIn("frozen core-first rc baseline", lower)
+                self.assertRegex(lower, r"(frozen|current published) core-first rc baseline")
             with self.subTest(file=path, item="clean gate and tag verification"):
                 self.assertRegex(lower, r"clean (?:release )?gate|without `--allow-dirty`")
                 self.assertIn("tag/ref verification", lower)
@@ -642,10 +642,10 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         changelog = normalized(docs["CHANGELOG.md"])
 
         self.assertIn("First-stable `v0.1.0` timers are the first non-UE-dependent core primitive", compact_context)
-        self.assertIn("not part of the `v0.1.0-rc.1` public surface", compact_context)
+        self.assertIn("part of the current `v0.1.0-rc.2` public surface", compact_context)
         self.assertIn("RC public scope remains limited to `GameplayPolicyEvent`, the minimal copied", release)
-        self.assertIn("future first-stable `v0.1.0` scope additionally includes process-local owner-token timers", release)
-        self.assertIn("Promoted the owner-token timer API as the first non-UE-dependent v0.1 core primitive", changelog)
+        self.assertIn("process-local owner-token timer primitive", release)
+        self.assertIn("Added owner-token process-local timers", changelog)
 
     def test_arkapi_reference_is_names_behavior_only_not_porting_or_copying(self) -> None:
         docs = {
@@ -682,8 +682,8 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "authorization for the current turn."
         )
         published_pattern = (
-            r"`?v?0\.1\.0-rc\.1`? is (?:the )?published|"
-            r"published release-candidate baseline is core-first `v0\.1\.0-rc\.1`|"
+            r"`?v?0\.1\.0-rc\.2`? is (?:the )?(?:current )?published|"
+            r"published release-candidate baseline is core-first `v0\.1\.0-rc\.2`|"
             r"published release candidate"
         )
 
@@ -699,7 +699,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             compact = normalized(text)
             lower = compact.lower()
             with self.subTest(file=path, item="published rc baseline"):
-                self.assertIn("0.1.0-rc.1", text)
+                self.assertRegex(text, r"0\.1\.0-rc\.[12]")
             with self.subTest(file=path, item="public api scope"):
                 self.assertIn(required_phrase, compact)
 

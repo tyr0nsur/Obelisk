@@ -4,23 +4,21 @@ This matrix separates the stable baseline from experimental work. It is a
 contributor-facing summary for the Obelisk runtime/API/SDK, not a replacement
 for detailed research notes.
 
-Current published release-candidate baseline is core-first `v0.1.0-rc.1`; see
+Current published release-candidate baseline is core-first `v0.1.0-rc.2` at `1a7cd98`; see
 [VERSIONING.md](VERSIONING.md). This is not a production-stable `v1.0` release claim.
 
-Current RC validation checkpoint as of 2026-05-30: the published tag was checked against
-the intended release ref with exact tag/ref verification after the canonical release gate,
-including second-source readiness for the documented RC target sets. This was a clean
-release gate for the intended ref. See
-[`2026-05-30-rc-second-source-release-gate-check.md`](research/2026-05-30-rc-second-source-release-gate-check.md)
-for the exact command and artifact root. RC public scope remains limited to
+Current RC validation checkpoint as of 2026-05-30: the published `v0.1.0-rc.2` tag was
+checked against the intended release ref with exact tag/ref verification after the
+canonical release gate, including refreshed second-source readiness for the documented RC
+target sets. This was a clean release gate for the intended ref. See
+[`2026-05-30-head-rc-second-source-refresh-gap.md`](research/2026-05-30-head-rc-second-source-refresh-gap.md)
+for the refreshed RC evidence root and gate result. RC public scope remains limited to
 `GameplayPolicyEvent`, the minimal copied `ChatMessageEvent`, `DescribeResourceKind`, and
 `DescribeGameplayPolicyEventKind`. It does not promote a public Inventory/Items SDK,
 `ResourceHandle`, identity, lookup, mutation, return override, or live-server claim.
-The historical RC second-source root is the publication baseline only; refresh the RC
-UFunction second-source root for current `HEAD` before any `v0.1.0-rc.2` or stable
-`v0.1.0` candidate.
-Post-RC development promotes process-local owner-token timers as a first-stable v0.1 core
-primitive while still targeting the broader `v1.0` core-stability track: general
+`v0.1.0-rc.2` also includes process-local owner-token timers as core runtime API without
+promoting gameplay/module timers.
+Post-RC development continues toward the broader `v1.0` core-stability track: general
 reflection evidence, copied-data module APIs, operator lifecycle safety, and ArkApi-style
 plugin replacement capacity without retroactively expanding the published RC tag.
 

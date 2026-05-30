@@ -9,12 +9,14 @@ recovery context is not active routing for the current head; use
 
 ## Active Objective
 
-- `v0.1.0-rc.1` is the published frozen core-first RC baseline: Linux runtime,
+- `v0.1.0-rc.2` is the current published core-first RC baseline: Linux runtime,
   ProcessEvent hook infrastructure, plugin lifecycle, central install layout,
   `oBaseEvents`, `GameplayPolicyEvent`, minimal copied `ChatMessageEvent`,
-  `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`.
+  `DescribeResourceKind`, `DescribeGameplayPolicyEventKind`, process-local owner-token
+  timers, and refreshed RC UFunction second-source evidence.
 - RC publication passed a clean release gate on the intended ref with exact tag/ref
-  verification. Do not expand, retag, or reinterpret the RC for routine post-RC work.
+  verification. Do not expand, retag, or reinterpret published RC tags for routine
+  post-RC work.
 - Post-RC work moves toward a broader `v1.0` production-stable core: UE4 reflection,
   copied-data module APIs, lifecycle-safe plugins, operator lifecycle tooling, and a
   Linux-native compatibility surface for familiar ARK plugin concepts.
@@ -56,8 +58,10 @@ recovery context is not active routing for the current head; use
 - RC public scope remains limited to `GameplayPolicyEvent`, the minimal copied
   `ChatMessageEvent`, `DescribeResourceKind`, and
   `DescribeGameplayPolicyEventKind`. It is not a production-stable `v1.0` claim and must
-  not be expanded retroactively. Post-RC internal modeling does not change the RC public
-  API; accepted RC UFunction second-source root evidence remains the publication baseline.
+  not be expanded retroactively. `v0.1.0-rc.2` additionally includes process-local
+  owner-token timers as core runtime API without promoting gameplay/module timers.
+  Post-RC internal modeling does not change the RC public API; accepted RC UFunction
+  second-source root evidence remains the publication baseline.
 - `ObeliskApi` v1 remains append-only. New public surfaces require copied-data ownership,
   explicit capability/`struct_size` gates, lifecycle cleanup, privacy rules, and accepted
   second-source/static evidence.
@@ -101,12 +105,11 @@ recovery context is not active routing for the current head; use
   structure/inventory lane. Consume gates are accepted, `promotion_ready=false`, and it
   does not authorize Inventory SDK, StructureEvents, identity, lookup, mutation, return
   override, or raw UE internals.
-- Current `HEAD` cannot reuse the historical `v0.1.0-rc.1` UFunction second-source root as
-  final release evidence. The diagnostic combined root
-  `/tmp/obelisk-rc-ufunction-second-source-root-20260530T000000Z` compares all nine RC
-  targets, but eight inventory/structure targets are inconclusive because their
-  second-source snapshots predate preserved bool-tail fields. Refresh those eight
-  snapshots with current tooling before any `v0.1.0-rc.2` or `v0.1.0` tag. See
+- `v0.1.0-rc.2` was published from `1a7cd98` after refreshing the RC UFunction
+  second-source root for the intended ref and passing the release gate with all nine
+  public RC targets accepted. The historical `v0.1.0-rc.1` root remains evidence for that
+  tag only; future RC/stable candidates must regenerate a root for their exact intended
+  ref. See
   `docs/research/2026-05-30-head-rc-second-source-refresh-gap.md`.
 - Item return-only, Mission copied-bool, Transfer `bAccept`, Structure return-only,
   Structure non-pin copied-scalar, and Buff breadth packages are evidence-only/internal.
