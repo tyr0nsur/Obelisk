@@ -80,11 +80,11 @@ The copied observation is intentionally return-only for the existing generic
 
 - `AllowEquipItem.ReturnValue`
 - `CanRepair.ReturnValue`, while `bIgnoreInventoryRequirement` is validated but not copied
-  into a public-compatible observation
+  into a future copied observation candidate
 - `UseItemOntoItem.ReturnValue`
 
-`CraftBlueprint.bConsumeResources` has no public field and does not produce a
-public-compatible copied observation.
+`CraftBlueprint.bConsumeResources` has no approved copied field and does not produce a
+future copied observation candidate.
 
 ## Minimum Test Requirements Before Runtime Wiring
 

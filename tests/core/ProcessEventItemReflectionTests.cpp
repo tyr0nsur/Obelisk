@@ -401,7 +401,7 @@ namespace
 
             CopiedItemObservation observation;
             Require(!TryBuildCopiedItemObservation(invocation, observation),
-                    "CraftBlueprint produced a public-compatible copied item observation");
+                    "CraftBlueprint produced a copied item observation");
         }
 
         {

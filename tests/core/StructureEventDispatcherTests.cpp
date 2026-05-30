@@ -185,7 +185,7 @@ namespace
                             });
         pinCode.Scalars = wrongPinCode;
         Require(dispatcher.Dispatch(pinCode) == 0,
-                "pin-code event accepted fields outside its public descriptor");
+                "pin-code event accepted fields outside its allowed promoted field mask");
 
         std::vector<Obelisk::Core::StructureScalarValue> scalars = MakeScalars();
         Obelisk::Core::StructureEventView setVariant = MakeEvent(scalars);

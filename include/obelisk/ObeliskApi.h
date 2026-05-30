@@ -240,8 +240,9 @@ typedef struct ObeliskApi {
     void (*LogError)(const char* message);
 
     // Raw ProcessEvent callback registration. These callbacks expose borrowed UE4
-    // pointers and raw parameter buffers; stable plugin code should prefer copied
-    // Obelisk-level event APIs. Filtered registrations are rejected unless
+    // pointers and raw parameter buffers; stable plugin code should prefer currently
+    // promoted copied APIs such as GameplayPolicyEvent and minimal ChatMessageEvent.
+    // Filtered registrations are rejected unless
     // OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS is advertised.
     void (*RegisterPreProcessEvent)(OnProcessEventCallback callback);
     void (*RegisterPostProcessEvent)(OnProcessEventCallback callback);

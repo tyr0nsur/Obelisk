@@ -243,6 +243,10 @@ priorities, and do not use history files as the active source of truth.
   A local public-shape dry run accepted consume mode and kept promote mode blocked; the
   nearest future shape is only post-original copied bool observation through
   `GameplayPolicyEvent`, not an Inventory SDK or return override.
+  A target-specific second-source pack is preserved at
+  `/home/flowcommunity-ark/obelisk-artifacts/item-return-only-second-source-20260530T084918Z/`;
+  it accepts 3/3 copied return-bool targets at `layout_only` scope while promote mode
+  remains blocked.
   Chat command ergonomics should start as a plugin-local parser/helper over the existing
   copied `ChatMessageEvent`, not as a new ABI. Keep output callback-scope only and keep
   player identity, permissions, targeting, chat send/reply, moderation/blocking, mutation,

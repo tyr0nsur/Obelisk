@@ -168,3 +168,60 @@ Promotion remains blocked by missing target-specific second-source/static accept
 public ABI design, descriptor updates, SDK consumer tests, and callback lifecycle review.
 Return override remains explicitly blocked even though the copied field name is
 `ReturnValue`.
+
+## Target-Specific Second Source
+
+A distinct sanitized local second-source root exists for this target set:
+
+```text
+/servidor/ark/workspace-offline/item-compact-intake-second-source-20260529T141900Z/ufunction-snapshots
+```
+
+Focused comparison against the committed fixture root accepted all three copied return bool
+targets:
+
+```bash
+python3 scripts/compare_reflection_snapshots.py \
+  --base-root tests/fixtures/ufunction_snapshots \
+  --candidate-root /servidor/ark/workspace-offline/item-compact-intake-second-source-20260529T141900Z/ufunction-snapshots \
+  --readiness-report \
+  --target-set item-return-only-policy-slice \
+  --fail-on-readiness-gaps \
+  --json
+```
+
+Preserved evidence pack:
+
+```text
+/home/flowcommunity-ark/obelisk-artifacts/item-return-only-second-source-20260530T084918Z
+```
+
+Pack checksums:
+
+- `item-return-only-second-source-readiness.json`
+  (`sha256=ed05f564352bb63f2d57226fd8d190229af61cc71bdd478782dda31994a609d7`)
+- `item-return-only-policy-slice.json`
+  (`sha256=53ac249aa107eb059ee420de8e939cc4117fb3590d651025a0bb6286625b1849`)
+- `consume-gate.json`
+  (`sha256=3aec3d0da5efa8b21291c7b3c29096c46766bed37c7f4ded2286de40bb7407de`)
+- `promote-gate.json`
+  (`sha256=7044fa956c750c1c6668d812df416065e4ab47a022eb62d01a88b14e8b5b55db`)
+- `artifact-pack.manifest.json`
+  (`sha256=f513bb3d764b16097cd5c645c02cd602808f6af4e1162ae377163f12579c13b2`)
+- relative `SHA256SUMS`
+  (`sha256=f89cea383474f8137948f3d5d2687be301b3e08d3ac3bc230f63f455ec20d413`)
+
+Readiness result:
+
+- `targets=3`
+- `comparable=3`
+- `second_source_accepted=3`
+- `promotion_gate.ready=true`
+- `promotion_gate.ready_scope=layout_only`
+- `promotion_ready=false`
+
+The consume gate accepts the policy slice in this pack. The promote gate still blocks with
+`promote_mode_item_return_policy_slice_evidence_only` and
+`promote_mode_manifest_has_non_claims`. This closes the target-specific layout
+second-source gap for Item return-only, but it does not promote public API, runtime wiring,
+identity, mutation, return override, or an Inventory/Items SDK.

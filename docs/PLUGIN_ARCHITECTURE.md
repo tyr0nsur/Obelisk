@@ -11,12 +11,14 @@ Keep plugin source code split by maturity:
 plugins/
   README.md
   oBaseEvents/
+  oProcessTimer/
   oPolicyAudit/
   oChatLogger/
 ```
 
-`oBaseEvents` is the first official plugin planned for release. Keep it small and focused
-on teaching the plugin model.
+`oBaseEvents` and `oProcessTimer` are official reference plugins. Keep them small and
+focused on teaching one stable plugin model each: copied events/config/lifecycle for
+`oBaseEvents`, and process-local owner-token timers for `oProcessTimer`.
 
 `oPolicyAudit` is an experimental first-party example for `GameplayPolicyEvent`
 descriptors and callbacks. `oChatLogger` is an experimental first-party smoke test for
@@ -29,6 +31,7 @@ excluded from the default build and release scope unless
 | Category | Purpose | Build policy | Runtime policy |
 | --- | --- | --- | --- |
 | `oBaseEvents` | Official reference plugin for event/config/lifecycle patterns. | Built by default. | Published with `scripts/install_obelisk_plugin.sh`; activation remains config and instance gated. |
+| `oProcessTimer` | Official reference plugin for process-local owner-token timers. | Built by default. | Published with `scripts/install_obelisk_plugin.sh`; demonstrates one-shot timer lifecycle only, not gameplay timers or shared cluster state. |
 | `oPolicyAudit` | Experimental example for copied `GameplayPolicyEvent` auditing. | Excluded unless `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`. | Do not publish as part of the first release; install only for isolated tests. |
 | `oChatLogger` | Experimental example for copied `ChatMessageEvent` smoke validation. | Excluded unless `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`. | Log metadata and copied message size only; do not log player identity or raw chat text during validation. |
 | research branches | Probes and prototype integrations. | Excluded from top-level build by default. | Do not install into `plugins/` except isolated tests. |
@@ -136,14 +139,15 @@ valid in another server process that happens to load the same plugin binary.
 
 Timer handles follow the same process-local rule. Plugins may use
 `OBELISK_API_CAPABILITY_TIMERS` for owner-token one-shot or repeating callbacks after
-checking `struct_size` and non-null function pointers. A `0` timer id means registration
-was rejected. One-shot timers use `delayMs > 0`, `intervalMs == 0`, and `flags == 0`;
-repeating timers use `delayMs > 0`, `intervalMs > 0`, and
-`OBELISK_TIMER_FLAG_REPEATING`. Reserved flags are rejected. Timer callbacks run on an
-Obelisk worker thread, must return quickly, must not throw across the C ABI, and must not
-call unsafe UE4 functions. Unregister timers explicitly during shutdown while callback code
-and state are still valid; runtime owner cleanup on init failure/unload is only the
-backstop and waits for in-flight callbacks before `dlclose`.
+checking `struct_size`, a non-zero `plugin_owner_token`, and non-null function pointers. A
+`0` timer id means registration was rejected. One-shot timers use `delayMs > 0`,
+`intervalMs == 0`, and `flags == 0`; repeating timers use `delayMs > 0`,
+`intervalMs > 0`, and `OBELISK_TIMER_FLAG_REPEATING`. Reserved flags are rejected. Timer
+callbacks run on an Obelisk worker thread, must return quickly, must not throw across the
+C ABI, and must not call unsafe UE4 functions. A timer may unregister its own handle from
+inside its callback, but plugins should still unregister outstanding timers during
+shutdown while callback code and state are valid; runtime owner cleanup on init
+failure/unload is only the backstop and waits for in-flight callbacks before `dlclose`.
 
 ## Build And Drop-In Model
 
@@ -248,11 +252,13 @@ this shutdown path.
 ## ProcessEvent Policy
 
 `ProcessEvent` is a hot path. Raw callbacks expose borrowed UE pointers and raw parameter
-buffers, so copied Obelisk-level events are the stable plugin path.
+buffers, so the stable public path is the currently promoted copied surfaces.
 
 Rules:
 
-- Prefer `GameplayPolicyEvent`, `ChatMessageEvent`, or another copied Obelisk-level API.
+- Prefer `GameplayPolicyEvent` for promoted gameplay policy data.
+- Prefer minimal `ChatMessageEvent` only for copied chat notifications.
+- Prefer any later copied Obelisk-level API only after its own promotion gate.
 - Filtered callbacks are rejected by default. They require both
   `OBELISK_ALLOW_FILTERED_PROCESS_EVENT_CALLBACKS=1` and the per-instance marker
   `allow-filtered-process-event-callbacks`; only then does the runtime advertise
@@ -338,9 +344,9 @@ For inventory-backed policy checks, `inventory_item` means only "this copied pol
 came from the promoted inventory-item-backed category." A plugin can use
 `resource_kind=inventory_item` with the event descriptor's `event_kind` and supported
 `field_mask` to decide whether to audit, count, or log sanitized policy decisions. That
-triple is the stable v0.1.x shape; it does not carry item identity, inventory identity,
-player identity, lookup authority, mutation authority, return override authority, or a
-`ResourceHandle`.
+triple is the stable v0.1.x metadata/routing shape for the promoted `GameplayPolicyEvent`
+family; it does not carry item identity, inventory identity, player identity, lookup
+authority, mutation authority, return override authority, or a `ResourceHandle`.
 
 `GameplayPolicyEvent` exposes only approved scalar fields through `field_mask`,
 `bool_values`, and `int32_values`: return values, variant index, force-set, force,
@@ -394,11 +400,10 @@ duration. The event does not expose sender/player identity, resource identity, r
 `FString`, `UObject`, `UFunction`, raw parameter buffers, FName/GObjects indices, chat
 send/moderation/blocking authority, command registration/routing, mutation, or return
 override. Plugins that want commands must parse the copied text locally; Obelisk v0.1 does
-not ship a separate command SDK. Registration/API support and the gated producer path are
-in v0.1-rc scope, and copied plugin-facing delivery has accepted beta evidence for the
-known send modes. Operational use still requires the `enable-chat-events` producer path
-during a current-turn operator-approved exact window after a current-turn operator-approved
-notice;
+not ship a separate command SDK. The ABI slots are in v0.1-rc scope; delivery remains gated
+to the approved `enable-chat-events` producer path, and copied plugin-facing delivery has
+accepted beta evidence for the known send modes. Operational use still requires a
+current-turn operator-approved exact window after a current-turn operator-approved notice;
 `enable-chat-reflection` is only the historical observer path and does not prove
 `ChatMessageEvent` delivery.
 

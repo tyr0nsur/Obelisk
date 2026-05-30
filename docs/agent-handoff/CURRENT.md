@@ -150,6 +150,10 @@ sequence.
   A local public-shape dry run accepted consume mode and kept promote mode blocked; the
   nearest future shape is only post-original copied bool observation through
   `GameplayPolicyEvent`, not an Inventory SDK or return override.
+  A target-specific second-source pack is preserved at
+  `/home/flowcommunity-ark/obelisk-artifacts/item-return-only-second-source-20260530T084918Z/`;
+  readiness accepts 3/3 copied return-bool targets at `layout_only` scope, consume gate
+  accepts, and promote gate remains blocked by evidence-only/non-claim blockers.
   The internal item helper can build-and-reserve a copied return-only observation in one
   operation and clears output on invalid attempts or exhausted budget; this remains
   test-only/internal and does not authorize public callbacks or runtime wiring.

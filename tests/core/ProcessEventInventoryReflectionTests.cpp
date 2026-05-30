@@ -880,7 +880,7 @@ namespace
                 "metadata-only ServerRequestInventoryUseItemWithActor dispatched policy event");
 
         Obelisk::Core::InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(&owner);
-        Require(captured.empty(), "metadata-only inventory action reached internal/public event callbacks");
+        Require(captured.empty(), "metadata-only inventory action reached internal bridge or promoted policy callback");
     }
 
     void TestRejectsDispatchWhenExpectedScalarsAreMissing()

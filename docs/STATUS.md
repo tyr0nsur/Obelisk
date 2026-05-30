@@ -16,7 +16,7 @@ for the exact command and artifact root. RC public scope remains limited to
 `GameplayPolicyEvent`, the minimal copied `ChatMessageEvent`, `DescribeResourceKind`, and
 `DescribeGameplayPolicyEventKind`. It does not promote a public Inventory/Items SDK,
 `ResourceHandle`, identity, lookup, mutation, return override, or live-server claim.
-Post-RC development targets a broader `v1.0` production core: general reflection evidence,
+Post-RC development targets a broader `v1.0` core-stability track: general reflection evidence,
 copied-data module APIs, operator lifecycle safety, and ArkApi-style plugin replacement
 capacity without retroactively expanding the RC.
 
