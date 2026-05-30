@@ -309,7 +309,7 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_GetInfo(Obe
         out->struct_size = sizeof(ObeliskPluginMetadata);
         out->plugin_id = "install_layout_consumer";
         out->name = "Install Layout Consumer";
-        out->version = "0.1.0-dev";
+        out->version = "0.1.0-rc.1";
         out->config_file = "config.json";
         out->default_config_json = kDefaultConfig;
         return true;

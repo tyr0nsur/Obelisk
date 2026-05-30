@@ -22,13 +22,11 @@ live-server claim. Remaining `v0.1.0-rc.1` release work is release-manager
 confirmation on the intended release ref, CI/clean-tree review, and tag/push when
 explicitly authorized. Existing local or unpublished RC tags must be verified against that
 intended validated release ref because they may point behind the current validated head
-after later release-prep fixes. As currently observed on 2026-05-30, the local
-`v0.1.0-rc.1` tag dereferences to stale commit `22f41d9` behind later release-prep
-commits; it is not publicable and must not be reused, pushed, or treated as validated.
-Publication requires rerunning the gate without `--allow-dirty` on the intended release
-ref plus exact tag/ref verification before recreating or verifying the tag there. No tag
-or release-ref push is authorized without explicit release-manager/lead authorization for
-the current turn.
+after later release-prep fixes. A stale local `v0.1.0-rc.1` tag is not publicable and
+must not be reused, pushed, or treated as validated. Publication requires rerunning the
+gate without `--allow-dirty` on the intended release ref plus exact tag/ref verification
+before recreating or verifying the tag there. No tag or release-ref push is authorized
+without explicit release-manager/lead authorization for the current turn.
 
 The current ARK server setup is a validation adapter used to check Obelisk in a
 real UE4 Linux process. Adapter operations are documented here only when they

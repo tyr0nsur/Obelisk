@@ -6,15 +6,18 @@ promises until a tag is explicitly cut.
 
 ## Current Line
 
-Current development line:
+Current release-candidate line:
 
 ```text
-0.1.0-dev
+0.1.0-rc.1
 ```
 
-This means the repository is moving toward a future `v0.1.0`, but no `v0.1.0` release is
-promised yet. The current tree may break plugin ABI, install layout, scanner output, or
-debug-harness assumptions when that is the correct engineering tradeoff.
+This means the repository is preparing the first public release candidate for the future
+stable line, but no production-stable `v0.1.0` release is promised yet. The RC freezes
+the documented public runtime/SDK scope, while post-RC reflection research stays internal
+unless a later promotion gate changes it.
+In other words, no `v0.1.0` release is published until the stable release checklist and
+tag are complete.
 
 The CMake package version is intentionally numeric during this line:
 
@@ -104,7 +107,7 @@ contains enough tests, docs, gates, and rollback posture to reproduce the claim.
 
 ## Suggested Milestones
 
-`0.1.0-dev` should remain active until these are true:
+`0.1.0-rc.1` should remain active until these are true:
 
 - Runtime/SDK tests cover PluginManager, EventManager, ABI layout, plugin config, and a
   minimal external SDK consumer.

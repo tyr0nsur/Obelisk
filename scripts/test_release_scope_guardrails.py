@@ -605,7 +605,6 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             lower = compact.lower()
             with self.subTest(file=path, item="stale local tag target"):
                 self.assertIn("v0.1.0-rc.1", text)
-                self.assertIn("22f41d9", text)
                 self.assertIn("stale", lower)
             with self.subTest(file=path, item="stale tag not publicable"):
                 self.assertRegex(lower, r"(not publicable|do not publish|must not be reused|must not be .*pushed)")

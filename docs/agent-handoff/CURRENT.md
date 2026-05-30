@@ -7,11 +7,11 @@ This active routing table keeps only next-round facts; put durable evidence in
 
 ## Active Objective
 
-- `v0.1.0-rc.1` is not published and must not be treated as closed on the current
-  `HEAD`. The local tag currently dereferences to stale commit `22f41d9` behind the
-  current release-prep commits; do not publish, reuse, or push it. Any future publication
-  requires a clean release gate on the intended ref and an exact tag/ref verification
-  before tag push. Continue from the core-first RC baseline:
+- `v0.1.0-rc.1` is not published and must not be treated as closed until the current
+  intended release ref has passed a clean release gate and exact tag/ref verification.
+  Rerun the clean release gate on the intended ref before publication. A stale local or
+  unpublished RC tag must not be reused or pushed. Continue from the core-first RC
+  baseline:
   Linux runtime, ProcessEvent hook infrastructure, plugin lifecycle, central install
   layout, `oBaseEvents`, `GameplayPolicyEvent`, minimal copied `ChatMessageEvent`,
   `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`.

@@ -249,6 +249,31 @@ validate_build_artifacts() {
     require_file "${BUILD_DIR}/ObeliskConfigVersion.cmake"
 }
 
+sdk_package_files() {
+    printf '%s\n' \
+        "include/obelisk/ObeliskApi.h" \
+        "lib/cmake/Obelisk/ObeliskConfig.cmake" \
+        "lib/cmake/Obelisk/ObeliskConfigVersion.cmake" \
+        "lib/cmake/Obelisk/ObeliskTargets.cmake"
+}
+
+stage_sdk_package() {
+    run rm -rf "${SDK_STAGE_ROOT}"
+    if ! run cmake --install "${BUILD_DIR}" --prefix "${SDK_STAGE_ROOT}" --component SDK; then
+        return 1
+    fi
+
+    local relative
+    if [[ "${DRY_RUN}" != "1" ]]; then
+        while IFS= read -r relative; do
+            if [[ ! -f "${SDK_STAGE_ROOT}/${relative}" ]]; then
+                echo "Required staged SDK artifact not found: ${SDK_STAGE_ROOT}/${relative}" >&2
+                return 1
+            fi
+        done < <(sdk_package_files)
+    fi
+}
+
 install_runtime_package() {
     run rm -rf "${STAGE_ROOT}"
     run cmake --install "${BUILD_DIR}" --prefix "${STAGE_ROOT}" --component Runtime
@@ -274,45 +299,25 @@ install_runtime_package() {
     run rm -rf "${STAGE_ROOT}"
 }
 
-install_sdk_package() {
-    local sdk_files=(
-        "include/obelisk/ObeliskApi.h"
-        "lib/cmake/Obelisk/ObeliskConfig.cmake"
-        "lib/cmake/Obelisk/ObeliskConfigVersion.cmake"
-        "lib/cmake/Obelisk/ObeliskTargets.cmake"
-    )
-    run rm -rf "${SDK_STAGE_ROOT}"
-    if ! run cmake --install "${BUILD_DIR}" --prefix "${SDK_STAGE_ROOT}" --component SDK; then
-        return 1
-    fi
-
-    local relative
-    if [[ "${DRY_RUN}" != "1" ]]; then
-        for relative in "${sdk_files[@]}"; do
-            if [[ ! -f "${SDK_STAGE_ROOT}/${relative}" ]]; then
-                echo "Required staged SDK artifact not found: ${SDK_STAGE_ROOT}/${relative}" >&2
-                return 1
-            fi
-        done
-    fi
-
+publish_staged_sdk_package() {
     run mkdir -p "${ROOT}/include/obelisk" "${ROOT}/lib/cmake/Obelisk"
 
+    local relative
     if [[ "${DRY_RUN}" == "1" ]]; then
-        for relative in "${sdk_files[@]}"; do
+        while IFS= read -r relative; do
             run install -m 644 "${SDK_STAGE_ROOT}/${relative}" "${ROOT}/${relative}.incoming.$$"
             run mv -f "${ROOT}/${relative}.incoming.$$" "${ROOT}/${relative}"
-        done
+        done < <(sdk_package_files)
     else
-        for relative in "${sdk_files[@]}"; do
+        while IFS= read -r relative; do
             snapshot_sdk_destination "${ROOT}/${relative}"
-        done
-        for relative in "${sdk_files[@]}"; do
+        done < <(sdk_package_files)
+        while IFS= read -r relative; do
             if ! publish_sdk_file "${SDK_STAGE_ROOT}/${relative}" "${ROOT}/${relative}"; then
                 rollback_sdk_publish
                 return 1
             fi
-        done
+        done < <(sdk_package_files)
     fi
 
     run rm -rf "${SDK_STAGE_ROOT}"
@@ -341,8 +346,9 @@ run mkdir -p \
     "${ROOT}/state/instances"
 
 validate_build_artifacts
+stage_sdk_package
 install_runtime_package
-if ! install_sdk_package; then
+if ! publish_staged_sdk_package; then
     if [[ "${DRY_RUN}" != "1" ]]; then
         rollback_runtime_publish
     fi

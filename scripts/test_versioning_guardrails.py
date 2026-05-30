@@ -35,7 +35,7 @@ class VersioningGuardrailTests(unittest.TestCase):
     def test_versioning_policy_keeps_current_line_dev(self) -> None:
         text = (REPO_ROOT / "docs/VERSIONING.md").read_text(encoding="utf-8")
 
-        self.assertIn("0.1.0-dev", text)
+        self.assertIn("0.1.0-rc.1", text)
         self.assertIn("no `v0.1.0` release is", text)
         self.assertIn("numeric package", text)
         self.assertIn("not a release claim", text)
@@ -67,7 +67,7 @@ class VersioningGuardrailTests(unittest.TestCase):
                 self.assertIn(token, installed_consumer_cmake)
                 self.assertIn(token, versioning)
 
-    def test_official_examples_use_development_version_until_stable_tag(self) -> None:
+    def test_official_examples_use_release_candidate_version_until_stable_tag(self) -> None:
         readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
         plugin_sources = [
             REPO_ROOT / "plugins/oBaseEvents/oBaseEvents.cpp",
@@ -79,11 +79,11 @@ class VersioningGuardrailTests(unittest.TestCase):
             REPO_ROOT / "tests/sdk_installed_consumer/c_abi_plugin.c",
         ]
 
-        self.assertIn('out->version = "0.1.0-dev";', readme)
+        self.assertIn('out->version = "0.1.0-rc.1";', readme)
         for path in plugin_sources:
             with self.subTest(path=path.relative_to(REPO_ROOT)):
                 text = path.read_text(encoding="utf-8")
-                self.assertIn('out->version = "0.1.0-dev";', text)
+                self.assertIn('out->version = "0.1.0-rc.1";', text)
                 self.assertNotIn('out->version = "0.1.0";', text)
 
     def test_cmake_exported_abi_versions_match_public_sdk_header(self) -> None:

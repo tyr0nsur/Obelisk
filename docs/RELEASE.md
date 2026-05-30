@@ -131,9 +131,7 @@ release-prep fixes. Before any release-manager tag/push, perform exact tag/ref
 verification: verify that the RC tag commit, if it already exists, is exactly the
 intended validated release ref; if it is not, stop and resolve the stale tag state
 instead of reusing or pushing it.
-As observed on 2026-05-30, the local `v0.1.0-rc.1` tag dereferences to stale commit
-`22f41d9` behind later release-prep commits; that tag is not publicable and must not be
-pushed.
+A stale local `v0.1.0-rc.1` tag is not publicable and must not be pushed.
 
 The promotion check always includes the public RC UFunction target sets:
 `minimal-second-source-intake`, `structure-observer-intake`, and `chat-message-intake`.
@@ -321,10 +319,12 @@ scripts/check_obelisk_server_posture.sh --expect-stable --map <map> --instance <
     authorization for the current turn.
     If `v0.1.0-rc.1` already exists locally, verify it points exactly at the intended
     validated ref; if it points elsewhere, recreate it only after rerunning the gate on
-    that ref. Do not push a stale tag.
+    that ref. Do not push a stale tag. Use the tag/ref checker before pushing the tag.
 
 ```bash
+python3 scripts/check_release_tag_state.py --tag v0.1.0-rc.1 --ref HEAD --allow-missing
 git tag -a v0.1.0-rc.1 -m "Obelisk 0.1.0-rc.1"
+python3 scripts/check_release_tag_state.py --tag v0.1.0-rc.1 --ref HEAD
 # Only after the explicit release-manager/lead authorization above:
 # git push origin v0.1.0-rc.1
 ```

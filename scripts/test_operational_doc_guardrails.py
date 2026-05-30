@@ -48,6 +48,7 @@ FORBIDDEN_STALE_PHRASES = [
     "`arkserver` / Ragnarok is now available as the Obelisk",
     "keep `arkserver2` stopped for RAM",
     "while RAM is constrained",
+    "development instances need to be restored quickly",
 ]
 RESEARCH_RUNBOOK_MARKERS = [
     "Historical/superseded",

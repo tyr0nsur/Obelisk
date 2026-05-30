@@ -19,7 +19,6 @@ namespace
     bool g_ChatMessageEventSeen = false;
     bool g_ChatMessageEventAccepted = false;
     ObeliskGameplayPolicyEvent g_GameplayPolicyEventCopy{};
-    ObeliskChatMessageEvent g_ChatMessageEventCopy{};
 
     constexpr const char* kDefaultConfig = R"json({
     "enabled": false,
@@ -122,7 +121,6 @@ namespace
     {
         g_ChatMessageEventSeen = true;
         g_ChatMessageEventAccepted = false;
-        g_ChatMessageEventCopy = {};
 
         if (!event ||
             event->abi_version != OBELISK_CHAT_MESSAGE_EVENT_ABI_VERSION ||
@@ -137,7 +135,6 @@ namespace
             return;
         }
 
-        g_ChatMessageEventCopy = *event;
         g_ChatMessageEventAccepted =
             event->message.data[0] == 'h' &&
             event->message.data[1] == 'e' &&
@@ -230,7 +227,6 @@ namespace
         g_ChatMessageEventSeen = false;
         g_ChatMessageEventAccepted = false;
         g_GameplayPolicyEventCopy = {};
-        g_ChatMessageEventCopy = {};
     }
 }
 
@@ -245,7 +241,7 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_GetInfo(Obe
         out->struct_size = sizeof(ObeliskPluginMetadata);
         out->plugin_id = "sdk_consumer_minimal";
         out->name = "SDK Consumer Minimal";
-        out->version = "0.1.0-dev";
+        out->version = "0.1.0-rc.1";
         out->config_file = "config.json";
         out->default_config_json = kDefaultConfig;
         return true;

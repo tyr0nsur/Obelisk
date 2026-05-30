@@ -485,7 +485,7 @@ check_clean_tree() {
 }
 
 check_clean_tree
-run_step cmake -S . -B "${BUILD_DIR}" -DCMAKE_BUILD_TYPE=RelWithDebInfo
+run_step cmake -S . -B "${BUILD_DIR}" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DOBELISK_BUILD_EXPERIMENTAL_PLUGINS=OFF
 run_step cmake --build "${BUILD_DIR}" -j"${JOBS}"
 run_step ctest --test-dir "${BUILD_DIR}" --output-on-failure
 run_step scripts/run_script_tests.sh

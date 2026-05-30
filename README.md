@@ -220,7 +220,7 @@ bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out)
         out->struct_size = sizeof(ObeliskPluginMetadata);
         out->plugin_id = "example";
         out->name = "Example Plugin";
-        out->version = "0.1.0-dev";
+        out->version = "0.1.0-rc.1";
         out->config_file = "config.json";
         out->default_config_json =
             "{\"enabled\":false,\"allow_all_instances\":false,\"instance_allowlist\":[]}\n";

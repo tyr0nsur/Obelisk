@@ -1,7 +1,7 @@
 # ARK Server Restore Notes
 
 Use this when SteamCMD, LinuxGSM, or the ARK app install rewrites server files and the two
-development instances need to be restored quickly.
+LinuxGSM instances need to be restored quickly.
 
 ## Current Instances
 

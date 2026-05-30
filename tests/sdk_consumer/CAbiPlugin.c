@@ -447,7 +447,7 @@ __attribute__((visibility("default"))) bool ObeliskPlugin_GetInfo(ObeliskPluginM
     out->struct_size = sizeof(ObeliskPluginMetadata);
     out->plugin_id = "c_abi_minimal";
     out->name = "C ABI Minimal";
-    out->version = "0.1.0-dev";
+    out->version = "0.1.0-rc.1";
     out->config_file = "config.json";
     out->default_config_json = kDefaultConfig;
     return true;
