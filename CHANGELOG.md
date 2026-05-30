@@ -33,6 +33,10 @@ Current baseline:
 - `GameplayPolicyEvent` as the promoted v0.1 gameplay policy callback family, exposing
   copied POD scalar policy signals through owner-token handle registration without
   resource identity, lookup, mutation, or return override authority.
+- Internal inventory policy recognizers for `PrimalItem.CanUse` and
+  `PrimalItem.AllowRemoteAddToInventory` now fail closed on exact UFunction class,
+  outer object index, property class object index, and property flag mismatches before
+  feeding copied scalar policy events.
 - `DescribeResourceKind` as metadata-only descriptors for known resource categories,
   explicitly not `ResourceHandle`, object identity, lookup, or cross-event correlation.
 - `DescribeGameplayPolicyEventKind` as metadata-only descriptors for promoted
