@@ -36,7 +36,9 @@ logs; timer ids are process-local runtime handles only.
 
 ## Runtime Behavior
 
-When enabled, the plugin validates the timer capability and owner token, registers one
+On init, the plugin reads its safe-disabled config before requiring the optional timer API
+slots, so discovery/config-preparation can succeed on instances where the timer feature is
+not active. When enabled, it validates the timer capability and owner token, registers one
 one-shot timer with a 1000 ms delay, logs a fixed message when the callback fires, and
 unregisters the handle on shutdown. Shutdown is idempotent, and an init failure after an
 accepted timer registration unregisters the process-local handle before state is reset.

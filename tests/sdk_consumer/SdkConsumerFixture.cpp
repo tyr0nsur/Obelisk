@@ -765,6 +765,8 @@ int main(int argc, char** argv)
             configJson = kActiveOBaseEventsChatCommandConfig;
         else if (mode == "active-timer" ||
             mode == "active-timer-double-shutdown" ||
+            mode == "active-timer-no-timer-capability" ||
+            mode == "active-timer-short-api-before-timer-slots" ||
             mode == "throw-log-after-timer-registration" ||
             (mode == "fail-timer-registration" && std::strcmp(expectedPluginId, "oProcessTimer") == 0))
             configJson = R"json({
@@ -855,6 +857,7 @@ int main(int argc, char** argv)
                 UnregisterChatMessageEventWithOwnerToken;
         }
         if (mode != "no-timer-capability" &&
+            mode != "active-timer-no-timer-capability" &&
             mode != "disabled-no-timer-capability")
         {
             api.capabilities |= OBELISK_API_CAPABILITY_TIMERS;
@@ -876,6 +879,12 @@ int main(int argc, char** argv)
             api.struct_size = offsetof(ObeliskApi, DescribeResourceKind);
             api.DescribeResourceKind = nullptr;
             api.DescribeGameplayPolicyEventKind = nullptr;
+        }
+        if (mode == "active-timer-short-api-before-timer-slots")
+        {
+            api.struct_size = offsetof(ObeliskApi, RegisterTimerWithOwnerTokenHandle);
+            api.RegisterTimerWithOwnerTokenHandle = nullptr;
+            api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken) = nullptr;
         }
         if (mode == "fail-gameplay-policy-registration")
             g_FailGameplayPolicyRegistration = true;
@@ -1008,9 +1017,9 @@ int main(int argc, char** argv)
             return 0;
         }
         if (std::strcmp(expectedPluginId, "oProcessTimer") == 0 &&
-            (mode == "no-timer-capability" || mode == "short-api-before-gameplay-policy"))
+            (mode == "active-timer-no-timer-capability" || mode == "active-timer-short-api-before-timer-slots"))
         {
-            Require(!initSucceeded, "timer example accepted missing or too-short timer API");
+            Require(!initSucceeded, "active timer example accepted missing or too-short timer API");
             Require(g_TimerRegisterCount == 0, "timer example unexpectedly registered with unavailable timer API");
             Require(g_TimerUnregisterCount == 0, "timer example unexpectedly unregistered with unavailable timer API");
             cleanupConfigDir();

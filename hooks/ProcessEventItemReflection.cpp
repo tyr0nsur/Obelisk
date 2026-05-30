@@ -43,6 +43,13 @@ namespace Obelisk::Hooks::ProcessEventItemReflection
             nameIndex == 6346;
     }
 
+    bool IsReflectedItemReturnNameIndex(int32_t nameIndex)
+    {
+        return nameIndex == 6235 ||
+            nameIndex == 6250 ||
+            nameIndex == 6346;
+    }
+
     bool ShouldAttemptObservation(uint64_t observationLimit)
     {
         return observationLimit != 0;

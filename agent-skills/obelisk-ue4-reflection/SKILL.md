@@ -156,11 +156,11 @@ Do not skip steps because a single core, log line, or recognizer test looks conv
   raw param storage. Public plugins must receive only `field_mask`, `bool_values`, and
   `int32_values`; `pinCode`, player identity, object identity, FName/GObjects indices, and
   UE pointers stay redacted.
-- Item return-only observations use a private `core/ItemReturnEventDispatcher` before any
-  public SDK promotion. Its hook producer is default-off and observer/SHA/budget-gated; it
-  is post-original, copied `ReturnValue` bool only, and must not be routed through
-  `InventoryPolicyEventKind::CanUse` or public ABI/docs until a separate append-only
-  `GameplayPolicyEvent` promotion is designed and tested.
+- Item return-only observations have three append-only `GameplayPolicyEvent` kinds:
+  `AllowEquipItem`, `CanRepair`, and `UseItemOntoItem`. They remain copied
+  `ReturnValue` bool only, with no public Items/Inventory SDK, identity, mutation, or
+  return override. The runtime producer stays default-off, observer/SHA/budget-gated,
+  post-original, and live validation still requires a separate live-ops brief.
 - Use snapshot fixtures and `compare_reflection_snapshots.py` before promoting any
   UFunction or ScriptStruct shape beyond candidate-only.
 - `compare_reflection_snapshots.py --target <Outer.Name>` is offline. It compares

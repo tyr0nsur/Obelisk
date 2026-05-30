@@ -185,6 +185,16 @@ add_test(
 )
 
 add_test(
+    NAME SdkConsumerFixtureOProcessTimerActiveNoTimerCapability
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oProcessTimer>" oProcessTimer active-timer-no-timer-capability
+)
+
+add_test(
+    NAME SdkConsumerFixtureOProcessTimerActiveShortApiBeforeTimerSlots
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oProcessTimer>" oProcessTimer active-timer-short-api-before-timer-slots
+)
+
+add_test(
     NAME SdkConsumerFixtureOProcessTimerRejectsZeroOwnerToken
     COMMAND sdk_consumer_fixture "$<TARGET_FILE:oProcessTimer>" oProcessTimer zero-owner-token
 )

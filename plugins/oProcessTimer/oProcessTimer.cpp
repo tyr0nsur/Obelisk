@@ -46,6 +46,25 @@ namespace
         g_HasApi = true;
     }
 
+    bool HasBaseApiPrefix(const ObeliskApi* api)
+    {
+        return api &&
+            api->abi_version == OBELISK_API_ABI_VERSION &&
+            api->struct_size >= offsetof(ObeliskApi, capabilities) + sizeof(api->capabilities);
+    }
+
+    bool HasTimerApi(const ObeliskApi* api, const ObeliskPluginInitContext* context)
+    {
+        return HasBaseApiPrefix(api) &&
+            api->struct_size >= offsetof(ObeliskApi, UnregisterTimerWithOwnerToken) +
+                sizeof(api->UnregisterTimerWithOwnerToken) &&
+            (api->capabilities & OBELISK_API_CAPABILITY_TIMERS) != 0 &&
+            context &&
+            context->plugin_owner_token != 0 &&
+            api->RegisterTimerWithOwnerTokenHandle &&
+            api->UnregisterTimerWithOwnerToken;
+    }
+
     bool IsStringArray(const json& value)
     {
         if (!value.is_array())
@@ -250,21 +269,16 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
     {
         if (!api || !context)
             return false;
-        if (api->abi_version != OBELISK_API_ABI_VERSION ||
-            api->struct_size < offsetof(ObeliskApi, UnregisterTimerWithOwnerToken) +
-                sizeof(api->UnregisterTimerWithOwnerToken) ||
+        if (!HasBaseApiPrefix(api) ||
             context->abi_version != OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION ||
             context->struct_size < sizeof(ObeliskPluginInitContext))
         {
             SafeLogError(api, "[oProcessTimer] Incompatible Obelisk API.");
             return false;
         }
-        if ((api->capabilities & OBELISK_API_CAPABILITY_TIMERS) == 0 ||
-            context->plugin_owner_token == 0 ||
-            !api->RegisterTimerWithOwnerTokenHandle ||
-            !api->UnregisterTimerWithOwnerToken)
+        if (context->plugin_owner_token == 0)
         {
-            SafeLogError(api, "[oProcessTimer] Timer API is not available.");
+            SafeLogError(api, "[oProcessTimer] Owner token is not available.");
             return false;
         }
 
@@ -287,6 +301,12 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
         {
             api->LogInfo("[oProcessTimer] Disabled by config.");
             return true;
+        }
+        if (!HasTimerApi(api, context))
+        {
+            SafeLogError(api, "[oProcessTimer] Timer API is not available.");
+            ResetState();
+            return false;
         }
 
         const uint64_t timerId = api->RegisterTimerWithOwnerTokenHandle(

@@ -67,6 +67,9 @@ for the current checkpoint.
 - `oProcessTimer` is the first process-local timer example. Timer ids are process-local,
   not cluster state, UE identity, gameplay/module timer abstractions, or persistent
   handles, or shared scheduler state; owner-token timers require explicit unregister.
+  Safe-disabled discovery/config prep succeeds without optional timer capability, while
+  active timer config still fails closed if timer capability, owner token, or appended
+  timer slots are unavailable.
 - `oPolicyAudit` now unregisters its `GameplayPolicyEvent` owner-token handle if init
   fails after callback registration. The SDK fixture covers injected post-registration log
   failure cleanup.
@@ -126,12 +129,15 @@ for the current checkpoint.
   promoting only copied module APIs through strict gates.
 - Item return-only bridge hardening now keeps copied dispatch construction in
   `ProcessEventItemReflection` helpers, with unit coverage for the three supported event
-  kinds, `CraftBlueprint` rejection, exact `ReturnValue` scalar scope, and no
-  identity/mutation/return-override leakage. Next item-return work should target
-  dispatcher hot-path allocation/budget policy only if profiling or a live-ops brief
-  justifies it.
+  kinds, `CraftBlueprint` rejection before runtime item-return reflection, exact
+  `ReturnValue` scalar scope, attempt-budgeted runtime reads, and no
+  identity/mutation/return-override leakage. Dispatcher hot-path allocation has a local
+  benchmark gate for no-subscriber and <=4-subscriber snapshots; do not expand it unless
+  profiling justifies a larger callback snapshot strategy.
 - Structure second-wave next step is offline-only candidate metadata/redaction review for
-  `PrimalStructure.IsAllowedToBuild`; do not add it to release target sets, ABI enums,
+  `PrimalStructure.IsAllowedToBuild`. First useful action is a sanitized focused snapshot
+  for `PrimalStructure.IsAllowedToBuild` from an approved offline artifact, then a
+  distinct second-source compare. Do not add it to release target sets, ABI enums,
   descriptors, dispatchers, public docs, or runtime gates.
 - Plugin Hub planning order from current demand map and local `NextGenPlugins` inventory:
   hub foundation first, then copied-chat command ergonomics, privacy-safe

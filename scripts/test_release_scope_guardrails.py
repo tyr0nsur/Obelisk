@@ -1524,7 +1524,9 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "OBELISK_ITEM_RETURN_EVENTS_LOG_LIMIT",
             "MissingObserverDebugProfile",
             "MissingObserverDebugWindow",
-            "TryBuildAndReserveItemReturnObservationForMatchedAttempt",
+            "IsReflectedItemReturnNameIndex",
+            "TryReserveObservationBudget",
+            "TryBuildCopiedItemReturnObservationForMatchedAttempt",
         ]:
             with self.subTest(file="hooks/ProcessEventHook.cpp", token=token):
                 self.assertIn(token, process_event_hook)

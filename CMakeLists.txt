@@ -415,6 +415,14 @@ add_executable(chat_reflection_benchmark EXCLUDE_FROM_ALL
 )
 target_include_directories(chat_reflection_benchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
+add_executable(item_return_event_dispatcher_benchmark EXCLUDE_FROM_ALL
+    tests/perf/ItemReturnEventDispatcherBenchmark.cpp
+    core/ItemReturnEventDispatcher.cpp
+    runtime/Logger.cpp
+)
+target_include_directories(item_return_event_dispatcher_benchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(item_return_event_dispatcher_benchmark PRIVATE fmt::fmt spdlog::spdlog)
+
 install(TARGETS obelisk
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     COMPONENT Runtime

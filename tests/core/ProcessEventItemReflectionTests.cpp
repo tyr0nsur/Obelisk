@@ -278,6 +278,16 @@ namespace
         Require(IsReflectedItemNameIndex(kCraftBlueprintNameIndex), "CraftBlueprint name should be recognized");
         Require(IsReflectedItemNameIndex(kUseItemOntoItemNameIndex), "UseItemOntoItem name should be recognized");
         Require(!IsReflectedItemNameIndex(9999), "unknown item name should not be recognized");
+        Require(IsReflectedItemReturnNameIndex(kAllowEquipItemNameIndex),
+                "AllowEquipItem name should be recognized for item-return producer");
+        Require(IsReflectedItemReturnNameIndex(kCanRepairNameIndex),
+                "CanRepair name should be recognized for item-return producer");
+        Require(!IsReflectedItemReturnNameIndex(kCraftBlueprintNameIndex),
+                "CraftBlueprint name should not be recognized for item-return producer");
+        Require(IsReflectedItemReturnNameIndex(kUseItemOntoItemNameIndex),
+                "UseItemOntoItem name should be recognized for item-return producer");
+        Require(!IsReflectedItemReturnNameIndex(9999),
+                "unknown item name should not be recognized for item-return producer");
 
         Require(!ShouldAttemptObservation(0), "zero item observation limit should disable observation");
         Require(ShouldAttemptObservation(1), "non-zero item observation limit should enable observation");

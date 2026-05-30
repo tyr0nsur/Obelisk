@@ -158,8 +158,10 @@ scope.
 - `ResourceHandle` is not blocked by lack of FName/UFunction discovery. It is blocked by
   `uobject_flags_validity_semantics_unproven`, lack of rejected object samples, and no
   accepted lifetime/revalidation contract across hook callbacks and possible object reuse.
-- Missing accepted second-source comparison roots for transfer, admin, broader non-compact
-  target sets, and any broader module target set. The accepted minimal
+- Missing accepted second-source comparison roots for admin, broader non-compact
+  target sets, and any broader module target set. Transfer UFunction and ScriptStruct
+  layout-only second-source evidence is now accepted for its exact documented targets, but
+  does not promote Transfer runtime work or public SDKs. The accepted minimal
   inventory/structure evidence is limited to four compact `UFunction` layouts, and the
   accepted buff/dino/mission/tribe compact evidence is limited to their exact compact
   target sets.

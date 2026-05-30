@@ -271,6 +271,7 @@ namespace Obelisk::Core
             return 0;
 
         size_t dispatched = 0;
+        constexpr size_t kStackCallbackCapacity = 4;
         try
         {
             std::array<ItemReturnScalarValue, 1> scalarCopies{};
@@ -280,17 +281,31 @@ namespace Obelisk::Core
                 .Scalars = std::span<const ItemReturnScalarValue>(scalarCopies.data(), event.Scalars.size()),
             };
 
-            std::vector<DispatchRegistration> callbacks;
+            std::array<DispatchRegistration, kStackCallbackCapacity> stackCallbacks{};
+            size_t stackCallbackCount = 0;
+            std::vector<DispatchRegistration> heapCallbacks;
             try
             {
                 {
                     std::lock_guard<std::mutex> lock(m_Mutex);
                     ++m_DispatchDepth;
-                    m_PendingDestroy.reserve(m_PendingDestroy.size() + m_Registrations.size());
-                    callbacks.reserve(m_Registrations.size());
-                    for (const Registration& item : m_Registrations)
-                        callbacks.push_back({item.Id, item.Subscription});
+                    if (m_Registrations.size() <= stackCallbacks.size())
+                    {
+                        for (const Registration& item : m_Registrations)
+                            stackCallbacks[stackCallbackCount++] = {item.Id, item.Subscription};
+                    }
+                    else
+                    {
+                        heapCallbacks.reserve(m_Registrations.size());
+                        for (const Registration& item : m_Registrations)
+                            heapCallbacks.push_back({item.Id, item.Subscription});
+                    }
                 }
+
+                const std::span<const DispatchRegistration> callbacks =
+                    heapCallbacks.empty()
+                        ? std::span<const DispatchRegistration>(stackCallbacks.data(), stackCallbackCount)
+                        : std::span<const DispatchRegistration>(heapCallbacks.data(), heapCallbacks.size());
 
                 for (const DispatchRegistration& item : callbacks)
                 {

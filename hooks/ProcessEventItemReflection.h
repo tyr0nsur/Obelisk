@@ -73,6 +73,7 @@ namespace Obelisk::Hooks::ProcessEventItemReflection
                       bool instanceMarkerEnabled,
                       const char* binarySha256);
     bool IsReflectedItemNameIndex(int32_t nameIndex);
+    bool IsReflectedItemReturnNameIndex(int32_t nameIndex);
     bool ShouldAttemptObservation(uint64_t observationLimit);
     bool ShouldAttemptRuntimeObservation(uint64_t observationLimit);
     bool ShouldAttemptRuntimeObservation(const std::atomic<uint64_t>& observationCounter,

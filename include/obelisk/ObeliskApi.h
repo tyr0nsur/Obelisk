@@ -278,15 +278,16 @@ typedef struct ObeliskApi {
     uint64_t capabilities;
 
     // Owner-token callback registration for callbacks whose function pointer does not
-    // live in the plugin shared object. Plugins must check struct_size and
-    // OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS before using these fields.
+    // live in the plugin shared object. Plugins must check struct_size,
+    // OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS, and plugin_owner_token != 0 before
+    // using these fields.
     void (*RegisterPreProcessEventWithOwnerToken)(uint64_t ownerToken, OnProcessEventCallback callback);
     void (*RegisterPostProcessEventWithOwnerToken)(uint64_t ownerToken, OnProcessEventCallback callback);
     void (*RegisterPreProcessEventForNameIndexWithOwnerToken)(uint64_t ownerToken, int32_t nameIndex, OnProcessEventCallback callback);
     void (*RegisterPostProcessEventForNameIndexWithOwnerToken)(uint64_t ownerToken, int32_t nameIndex, OnProcessEventCallback callback);
 
     // Handle-returning ProcessEvent callback registration. Plugins must check struct_size,
-    // OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS and
+    // OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS, plugin_owner_token != 0, and
     // OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES before using these fields.
     // Name-index-filtered variants also require
     // OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS. Global variants require
@@ -302,9 +303,9 @@ typedef struct ObeliskApi {
     bool (*UnregisterProcessEventCallbackWithOwnerToken)(uint64_t ownerToken, uint64_t registrationId);
 
     // Copied gameplay policy events. Plugins must check struct_size,
-    // OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS, and these function pointers
-    // before use. A return value of 0 means registration was rejected. Non-zero
-    // handles are process-local and must be unregistered with the same owner token.
+    // OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS, plugin_owner_token != 0, and these
+    // function pointers before use. A return value of 0 means registration was rejected.
+    // Non-zero handles are process-local and must be unregistered with the same owner token.
     uint64_t (*RegisterGameplayPolicyEventWithOwnerTokenHandle)(
         uint64_t ownerToken,
         uint64_t eventKindMask,
@@ -328,9 +329,10 @@ typedef struct ObeliskApi {
     bool (*DescribeGameplayPolicyEventKind)(uint32_t eventKind, ObeliskGameplayPolicyEventDescriptor* out);
 
     // Copied chat message notifications for plugins that parse text locally. Plugins must
-    // check struct_size, OBELISK_API_CAPABILITY_CHAT_EVENTS, and these function pointers
-    // before use. A return value of 0 means registration was rejected. Non-zero handles are
-    // process-local and must be unregistered with the same owner token.
+    // check struct_size, OBELISK_API_CAPABILITY_CHAT_EVENTS, plugin_owner_token != 0, and
+    // these function pointers before use. A return value of 0 means registration was
+    // rejected. Non-zero handles are process-local and must be unregistered with the same
+    // owner token.
     uint64_t (*RegisterChatMessageEventWithOwnerTokenHandle)(
         uint64_t ownerToken,
         ObeliskChatMessageEventCallback callback,
@@ -338,13 +340,13 @@ typedef struct ObeliskApi {
     bool (*UnregisterChatMessageEventWithOwnerToken)(uint64_t ownerToken, uint64_t registrationId);
 
     // Process-local owner-token timers. Plugins must check struct_size,
-    // OBELISK_API_CAPABILITY_TIMERS, and these function pointers before use. A return
-    // value of 0 means registration was rejected. Non-zero handles are process-local,
-    // owned by the registering plugin, cleaned up on plugin unload/init failure, and must
-    // not be persisted to shared config or reused across ARK server processes. delayMs
-    // must be non-zero. One-shot timers require intervalMs=0 and flags=0. Repeating
-    // timers require OBELISK_TIMER_FLAG_REPEATING and non-zero intervalMs. Reserved flags
-    // are rejected.
+    // OBELISK_API_CAPABILITY_TIMERS, plugin_owner_token != 0, and these function pointers
+    // before use. A return value of 0 means registration was rejected. Non-zero handles
+    // are process-local, owned by the registering plugin, cleaned up on plugin unload/init
+    // failure, and must not be persisted to shared config or reused across ARK server
+    // processes. delayMs must be non-zero. One-shot timers require intervalMs=0 and
+    // flags=0. Repeating timers require OBELISK_TIMER_FLAG_REPEATING and non-zero
+    // intervalMs. Reserved flags are rejected.
     uint64_t (*RegisterTimerWithOwnerTokenHandle)(
         uint64_t ownerToken,
         uint64_t delayMs,

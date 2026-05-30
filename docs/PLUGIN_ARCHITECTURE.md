@@ -200,6 +200,12 @@ Runtime activation still requires `enabled=true` and either a matching
 `instance_allowlist` or explicit `allow_all_instances=true`. Plugins that should not even
 be discovered must stay outside the plugin directory.
 
+Plugins with optional capabilities should follow the same ordering: validate enough of the
+base ABI and init context to read config, decide whether the feature is active for the
+current instance, and only then require optional capability bits, appended API slots, or
+owner-token resources. A safe-disabled plugin should be discoverable and able to prepare
+default config even when an optional feature capability is unavailable.
+
 ## Lifecycle
 
 Every non-trivial plugin should be designed around these phases:

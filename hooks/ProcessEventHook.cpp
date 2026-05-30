@@ -107,6 +107,7 @@ namespace Obelisk::Hooks
     static std::atomic<uint64_t> s_ReflectedInventoryRejects{0};
     static std::atomic<uint64_t> s_ReflectedInventoryDispatches{0};
     static std::atomic<uint64_t> s_ReflectedItemReturnRejects{0};
+    static std::atomic<uint64_t> s_ReflectedItemReturnAttempts{0};
     static std::atomic<uint64_t> s_ReflectedItemReturnDispatches{0};
     static std::atomic<uint64_t> s_ReflectedStructureCalls{0};
     static std::atomic<uint64_t> s_ReflectedStructureDispatches{0};
@@ -910,7 +911,7 @@ namespace Obelisk::Hooks
         const uint64_t dispatchLimit = GetItemReturnEventDispatchLimit();
         return IsItemReturnEventProducerEnabled() &&
                ProcessEventItemReflection::ShouldAttemptRuntimeObservation(
-                   s_ReflectedItemReturnDispatches,
+                   s_ReflectedItemReturnAttempts,
                    dispatchLimit) &&
                Core::ItemReturnEventDispatcher::Get().SubscriptionCount() > 0;
     }
@@ -1076,15 +1077,17 @@ namespace Obelisk::Hooks
         const ProcessEventItemReflection::Gate& gate = GetItemReturnEventGate();
         if (!gate.Enabled())
             return 0;
-        if (!ProcessEventItemReflection::IsReflectedItemNameIndex(nameIndex))
+        if (!ProcessEventItemReflection::IsReflectedItemReturnNameIndex(nameIndex))
             return 0;
         if (Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 0)
             return 0;
 
         const uint64_t dispatchLimit = GetItemReturnEventDispatchLimit();
-        if (!ProcessEventItemReflection::ShouldAttemptRuntimeObservation(
-                s_ReflectedItemReturnDispatches,
-                dispatchLimit))
+        uint64_t attemptNumber = 0;
+        if (!ProcessEventItemReflection::TryReserveObservationBudget(
+                s_ReflectedItemReturnAttempts,
+                dispatchLimit,
+                attemptNumber))
         {
             return 0;
         }
@@ -1105,13 +1108,9 @@ namespace Obelisk::Hooks
             }
         }
 
-        uint64_t dispatchNumber = 0;
         ProcessEventItemReflection::CopiedItemObservation observation;
-        if (!ProcessEventItemReflection::TryBuildAndReserveItemReturnObservationForMatchedAttempt(
+        if (!ProcessEventItemReflection::TryBuildCopiedItemReturnObservationForMatchedAttempt(
                 attempt,
-                s_ReflectedItemReturnDispatches,
-                dispatchLimit,
-                dispatchNumber,
                 observation))
         {
             return 0;
@@ -1123,10 +1122,11 @@ namespace Obelisk::Hooks
             return 0;
 
         const size_t dispatched = Core::ItemReturnEventDispatcher::Get().Dispatch(event);
-        if (ProcessEventItemReflection::ShouldLogObservation(dispatchNumber, logLimit))
+        ++s_ReflectedItemReturnDispatches;
+        if (ProcessEventItemReflection::ShouldLogObservation(attemptNumber, logLimit))
         {
-            OBELISK_INFO("Reflected item return dispatched #{} function={} fname_index={} callbacks={} field_mask=ReturnValue",
-                         dispatchNumber,
+            OBELISK_INFO("Reflected item return dispatched attempt #{} function={} fname_index={} callbacks={} field_mask=ReturnValue",
+                         attemptNumber,
                          ItemFunctionName(observation.Function),
                          observation.FunctionNameIndex,
                          dispatched);
