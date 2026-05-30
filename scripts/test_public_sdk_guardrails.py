@@ -883,6 +883,50 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             with self.subTest(file="consumer_fixture.cpp", required_field_or_resource=token):
                 self.assertIn(token, fixture)
 
+    def test_public_abi_layout_freeze_tests_cover_repo_and_installed_consumers(self) -> None:
+        root_cmake = (REPO_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+        c_layout = (REPO_ROOT / "tests" / "abi" / "CAbiLayoutTests.c").read_text(encoding="utf-8")
+        cpp_layout = (REPO_ROOT / "tests" / "abi" / "AbiLayoutTests.cpp").read_text(encoding="utf-8")
+        installed_c_consumer = (
+            REPO_ROOT / "tests" / "sdk_installed_consumer" / "c_abi_plugin.c"
+        ).read_text(encoding="utf-8")
+
+        for test_name in ("AbiLayoutTests", "CAbiLayoutTests"):
+            with self.subTest(cmake_test=test_name):
+                self.assertIn(f"add_test(NAME {test_name}", root_cmake)
+
+        required_layout_tokens = (
+            "ASSERT_SIZE(ObeliskApi, 216)",
+            "ASSERT_OFFSET(ObeliskApi, RegisterTimerWithOwnerTokenHandle, 200)",
+            "ASSERT_OFFSET(ObeliskApi, UnregisterTimerWithOwnerToken, 208)",
+            "ASSERT_SIZE(ObeliskPluginMetadata, 48)",
+            "ASSERT_SIZE(ObeliskPluginInitContext, 40)",
+            "ASSERT_SIZE(ObeliskGameplayPolicyEvent, 64)",
+            "ASSERT_SIZE(ObeliskChatMessageEvent, 48)",
+            "ASSERT_SIZE(ObeliskResourceKindDescriptor, 136)",
+            "ASSERT_SIZE(ObeliskGameplayPolicyEventDescriptor, 152)",
+        )
+        for token in required_layout_tokens:
+            with self.subTest(file="tests/abi/CAbiLayoutTests.c", token=token):
+                self.assertIn(token, c_layout)
+            installed_token = token
+            if token == "ASSERT_OFFSET(ObeliskApi, RegisterTimerWithOwnerTokenHandle, 200)":
+                installed_token = "ASSERT_OFFSET(ObeliskApi, OBELISK_CONCAT(Register, TimerWithOwnerTokenHandle), 200)"
+            elif token == "ASSERT_OFFSET(ObeliskApi, UnregisterTimerWithOwnerToken, 208)":
+                installed_token = "ASSERT_OFFSET(ObeliskApi, OBELISK_CONCAT(Unregister, TimerWithOwnerToken), 208)"
+            with self.subTest(file="tests/sdk_installed_consumer/c_abi_plugin.c", token=installed_token):
+                self.assertIn(installed_token, installed_c_consumer)
+
+        for token in (
+            "static_assert(sizeof(ObeliskApi) == 216)",
+            "static_assert(offsetof(ObeliskApi, RegisterTimerWithOwnerTokenHandle) == 200)",
+            "static_assert(offsetof(ObeliskApi, UnregisterTimerWithOwnerToken) == 208)",
+            "AssertAbiType<ObeliskGameplayPolicyEvent>()",
+            "AssertAbiType<ObeliskChatMessageEvent>()",
+        ):
+            with self.subTest(file="tests/abi/AbiLayoutTests.cpp", token=token):
+                self.assertIn(token, cpp_layout)
+
     def test_rc_layout_smoke_tracks_public_rc_target_sets(self) -> None:
         smoke = (REPO_ROOT / "scripts" / "check_rc_layout_evidence_smoke.sh").read_text(encoding="utf-8")
         self.assertIn("--candidate-root", smoke)

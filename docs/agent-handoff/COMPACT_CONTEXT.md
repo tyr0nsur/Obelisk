@@ -88,6 +88,11 @@ priorities, and do not use history files as the active source of truth.
   gameplay policy/module SDK.
 - RC public scope remains limited to `GameplayPolicyEvent`, the minimal copied
   `ChatMessageEvent`, `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`.
+- Post-RC dictionary research against `/tmp/aseapi-inspect` confirms AseApi/ArkServerApi
+  is useful only for names and concept grouping. The nearest stable plugin-facing path is
+  still copied `GameplayPolicyEvent` structure/inventory, especially `PrimalItem.CanUse`
+  and `PrimalItem.AllowRemoteAddToInventory`; item/dino/buff/mission/tribe/transfer stay
+  internal or layout-only until copied-data, lifecycle, privacy, and promotion gates pass.
 - `GameplayPolicyEvent` excludes mutation, raw UE pointer exposure, public
   callback-by-name APIs, public `StructureEvents`, public Inventory/etc. module APIs,
   richer chat APIs beyond minimal `ChatMessageEvent`, HTTP/threads/file-reader plugin

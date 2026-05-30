@@ -98,6 +98,11 @@ sequence.
 
 - Preserve RC scope while moving toward `v1.0`: reduce architecture debt, improve evidence
   tooling, and promote only copied module APIs with strict gates.
+- ArkServerApi/AseApi dictionary review confirms the fastest stable plugin-facing route
+  remains copied `GameplayPolicyEvent` structure/inventory, especially the existing
+  `PrimalItem.CanUse` and `PrimalItem.AllowRemoteAddToInventory` backing. Use AseApi only
+  for names and familiar concept grouping. Do not copy offsets, layouts, wrappers,
+  Windows ABI assumptions, raw pointer APIs, or implementation logic.
 - Current post-RC focus: Item return-only policy, Mission copied-bool observer,
   then Transfer `bAccept`. This is no RC public SDK/API promotion. Item return-only and
   Mission copied-bool now have internal/test-only consume-mode policy slices, and Mission

@@ -7,6 +7,110 @@
 
 #define OBELISK_CONCAT_INNER(a, b) a##b
 #define OBELISK_CONCAT(a, b) OBELISK_CONCAT_INNER(a, b)
+#define ASSERT_SIZE(type, expected) _Static_assert(sizeof(type) == (expected), #type " size changed")
+#define ASSERT_ALIGN(type, expected) _Static_assert(_Alignof(type) == (expected), #type " alignment changed")
+#define ASSERT_OFFSET(type, field, expected) \
+    _Static_assert(offsetof(type, field) == (expected), #type "." #field " offset changed")
+
+ASSERT_SIZE(ObeliskStringView, 16);
+ASSERT_ALIGN(ObeliskStringView, 8);
+ASSERT_OFFSET(ObeliskStringView, data, 0);
+ASSERT_OFFSET(ObeliskStringView, size, 8);
+
+ASSERT_SIZE(ObeliskChatMessageEvent, 48);
+ASSERT_ALIGN(ObeliskChatMessageEvent, 8);
+ASSERT_OFFSET(ObeliskChatMessageEvent, abi_version, 0);
+ASSERT_OFFSET(ObeliskChatMessageEvent, struct_size, 4);
+ASSERT_OFFSET(ObeliskChatMessageEvent, send_mode, 8);
+ASSERT_OFFSET(ObeliskChatMessageEvent, reserved0, 12);
+ASSERT_OFFSET(ObeliskChatMessageEvent, flags, 16);
+ASSERT_OFFSET(ObeliskChatMessageEvent, sequence, 24);
+ASSERT_OFFSET(ObeliskChatMessageEvent, message, 32);
+
+ASSERT_SIZE(ObeliskGameplayPolicyEvent, 64);
+ASSERT_ALIGN(ObeliskGameplayPolicyEvent, 8);
+ASSERT_OFFSET(ObeliskGameplayPolicyEvent, abi_version, 0);
+ASSERT_OFFSET(ObeliskGameplayPolicyEvent, struct_size, 4);
+ASSERT_OFFSET(ObeliskGameplayPolicyEvent, event_kind, 8);
+ASSERT_OFFSET(ObeliskGameplayPolicyEvent, resource_kind, 12);
+ASSERT_OFFSET(ObeliskGameplayPolicyEvent, flags, 16);
+ASSERT_OFFSET(ObeliskGameplayPolicyEvent, field_mask, 24);
+ASSERT_OFFSET(ObeliskGameplayPolicyEvent, bool_values, 32);
+ASSERT_OFFSET(ObeliskGameplayPolicyEvent, int32_values, 40);
+
+ASSERT_SIZE(ObeliskResourceKindDescriptor, 136);
+ASSERT_ALIGN(ObeliskResourceKindDescriptor, 8);
+ASSERT_OFFSET(ObeliskResourceKindDescriptor, abi_version, 0);
+ASSERT_OFFSET(ObeliskResourceKindDescriptor, struct_size, 4);
+ASSERT_OFFSET(ObeliskResourceKindDescriptor, resource_kind, 8);
+ASSERT_OFFSET(ObeliskResourceKindDescriptor, reserved0, 12);
+ASSERT_OFFSET(ObeliskResourceKindDescriptor, flags, 16);
+ASSERT_OFFSET(ObeliskResourceKindDescriptor, supported_gameplay_policy_event_mask, 24);
+ASSERT_OFFSET(ObeliskResourceKindDescriptor, supported_gameplay_policy_field_mask, 32);
+ASSERT_OFFSET(ObeliskResourceKindDescriptor, stable_name, 40);
+ASSERT_OFFSET(ObeliskResourceKindDescriptor, display_name, 72);
+
+ASSERT_SIZE(ObeliskGameplayPolicyEventDescriptor, 152);
+ASSERT_ALIGN(ObeliskGameplayPolicyEventDescriptor, 8);
+ASSERT_OFFSET(ObeliskGameplayPolicyEventDescriptor, abi_version, 0);
+ASSERT_OFFSET(ObeliskGameplayPolicyEventDescriptor, struct_size, 4);
+ASSERT_OFFSET(ObeliskGameplayPolicyEventDescriptor, event_kind, 8);
+ASSERT_OFFSET(ObeliskGameplayPolicyEventDescriptor, resource_kind, 12);
+ASSERT_OFFSET(ObeliskGameplayPolicyEventDescriptor, flags, 16);
+ASSERT_OFFSET(ObeliskGameplayPolicyEventDescriptor, event_kind_mask, 24);
+ASSERT_OFFSET(ObeliskGameplayPolicyEventDescriptor, field_mask, 32);
+ASSERT_OFFSET(ObeliskGameplayPolicyEventDescriptor, stable_name, 40);
+ASSERT_OFFSET(ObeliskGameplayPolicyEventDescriptor, display_name, 88);
+
+ASSERT_SIZE(ObeliskPluginMetadata, 48);
+ASSERT_ALIGN(ObeliskPluginMetadata, 8);
+ASSERT_OFFSET(ObeliskPluginMetadata, abi_version, 0);
+ASSERT_OFFSET(ObeliskPluginMetadata, struct_size, 4);
+ASSERT_OFFSET(ObeliskPluginMetadata, plugin_id, 8);
+ASSERT_OFFSET(ObeliskPluginMetadata, name, 16);
+ASSERT_OFFSET(ObeliskPluginMetadata, version, 24);
+ASSERT_OFFSET(ObeliskPluginMetadata, config_file, 32);
+ASSERT_OFFSET(ObeliskPluginMetadata, default_config_json, 40);
+
+ASSERT_SIZE(ObeliskPluginInitContext, 40);
+ASSERT_ALIGN(ObeliskPluginInitContext, 8);
+ASSERT_OFFSET(ObeliskPluginInitContext, abi_version, 0);
+ASSERT_OFFSET(ObeliskPluginInitContext, struct_size, 4);
+ASSERT_OFFSET(ObeliskPluginInitContext, config_dir, 8);
+ASSERT_OFFSET(ObeliskPluginInitContext, config_path, 16);
+ASSERT_OFFSET(ObeliskPluginInitContext, instance_id, 24);
+ASSERT_OFFSET(ObeliskPluginInitContext, plugin_owner_token, 32);
+
+ASSERT_SIZE(ObeliskApi, 216);
+ASSERT_ALIGN(ObeliskApi, 8);
+ASSERT_OFFSET(ObeliskApi, LogInfo, 0);
+ASSERT_OFFSET(ObeliskApi, LogWarn, 8);
+ASSERT_OFFSET(ObeliskApi, LogError, 16);
+ASSERT_OFFSET(ObeliskApi, RegisterPreProcessEvent, 24);
+ASSERT_OFFSET(ObeliskApi, RegisterPostProcessEvent, 32);
+ASSERT_OFFSET(ObeliskApi, RegisterPreProcessEventForNameIndex, 40);
+ASSERT_OFFSET(ObeliskApi, RegisterPostProcessEventForNameIndex, 48);
+ASSERT_OFFSET(ObeliskApi, CallProcessEvent, 56);
+ASSERT_OFFSET(ObeliskApi, abi_version, 64);
+ASSERT_OFFSET(ObeliskApi, struct_size, 68);
+ASSERT_OFFSET(ObeliskApi, capabilities, 72);
+ASSERT_OFFSET(ObeliskApi, RegisterPreProcessEventWithOwnerToken, 80);
+ASSERT_OFFSET(ObeliskApi, RegisterPostProcessEventWithOwnerToken, 88);
+ASSERT_OFFSET(ObeliskApi, RegisterPreProcessEventForNameIndexWithOwnerToken, 96);
+ASSERT_OFFSET(ObeliskApi, RegisterPostProcessEventForNameIndexWithOwnerToken, 104);
+ASSERT_OFFSET(ObeliskApi, RegisterPreProcessEventWithOwnerTokenHandle, 112);
+ASSERT_OFFSET(ObeliskApi, RegisterPostProcessEventWithOwnerTokenHandle, 120);
+ASSERT_OFFSET(ObeliskApi, RegisterPreProcessEventForNameIndexWithOwnerTokenHandle, 128);
+ASSERT_OFFSET(ObeliskApi, RegisterPostProcessEventForNameIndexWithOwnerTokenHandle, 136);
+ASSERT_OFFSET(ObeliskApi, UnregisterProcessEventCallbackWithOwnerToken, 144);
+ASSERT_OFFSET(ObeliskApi, RegisterGameplayPolicyEventWithOwnerTokenHandle, 152);
+ASSERT_OFFSET(ObeliskApi, UnregisterGameplayPolicyEventWithOwnerToken, 160);
+ASSERT_OFFSET(ObeliskApi, DescribeResourceKind, 168);
+ASSERT_OFFSET(ObeliskApi, DescribeGameplayPolicyEventKind, 176);
+ASSERT_OFFSET(ObeliskApi, RegisterChatMessageEventWithOwnerTokenHandle, 184);
+ASSERT_OFFSET(ObeliskApi, UnregisterChatMessageEventWithOwnerToken, 192);
+ASSERT_OFFSET(ObeliskApi, OBELISK_CONCAT(Register, TimerWithOwnerTokenHandle), 200);
+ASSERT_OFFSET(ObeliskApi, OBELISK_CONCAT(Unregister, TimerWithOwnerToken), 208);
 
 static const char* kDefaultConfig = "{\n"
     "  \"enabled\": false,\n"
