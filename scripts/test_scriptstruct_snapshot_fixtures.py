@@ -61,6 +61,10 @@ class ScriptStructSnapshotFixtureTests(unittest.TestCase):
         self.assertIsInstance(semantics, dict)
         self.assertEqual(semantics.get("status"), "candidate")
         self.assertEqual(semantics.get("reject_reasons"), [])
+        self.assertEqual(semantics.get("bool_field_size"), 1)
+        self.assertEqual(semantics.get("bool_byte_offset"), 0)
+        self.assertEqual(prop.get("bool_field_size"), 1)
+        self.assertEqual(prop.get("bool_byte_offset"), 0)
         self.assertIsInstance(prop.get("native_bool"), bool)
         for mask_key in ("byte_mask", "field_mask"):
             mask = prop.get(mask_key)

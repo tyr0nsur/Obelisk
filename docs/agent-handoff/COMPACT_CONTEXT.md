@@ -178,11 +178,12 @@ priorities, and do not use history files as the active source of truth.
   `/servidor/ark/workspace-offline/mission-compact-intake-bool-semantics-refresh-20260530T020021Z/pack/redacted-signatures.json`
   with SHA256 `09074e71666f755801802e5d796361cf4f84d3e7d8c00663801d84f981a1cc13`.
   The durable focused Mission policy slice is preserved at
-  `/home/flowcommunity-ark/obelisk-artifacts/mission-copied-bool-policy-slice-20260530T072912Z/`
-  with `artifact-pack.manifest.json`
-  SHA256 `22e5b79dd42395e32df444375ffd526b1e02985253d8847f0568522ff9a53f63`
+  `/home/flowcommunity-ark/obelisk-artifacts/mission-copied-bool-tail-policy-slice-20260530T090211Z/`
+  with exact bool-tail evidence (`bool_field_size=1`, `bool_byte_offset=0`,
+  `byte_mask=0x01`, `field_mask=0xff`, `native_bool=false`), `artifact-pack.manifest.json`
+  SHA256 `b47f0497c92ae3e8f9a006fb5be87cfbcc1d1dd5f15d78267ad186073e4c26fb`
   and `SHA256SUMS` SHA256
-  `f63b69302bf7996ce38d1e02a4acdc4ca88904cb92cb8bb59e7de4b6a5611766`;
+  `9dc277b8e3dddeed66d140a12654e4d5f7e7dc13b8b9aca75d96446c53069545`;
   consume mode accepts it and promote mode remains blocked.
 - `ue/TransferReflection.*` is an internal/test-only recognizer for the
   `ServerTransferredPlayerConfirmationResult.bAccept` copied bool. It validates exact

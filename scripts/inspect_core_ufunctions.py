@@ -921,8 +921,10 @@ def build_fixture_snapshot(
                 property_payload["bool_property_semantics"] = {
                     "status": bool_semantics.get("status"),
                     "reject_reasons": bool_semantics.get("reject_reasons", []),
+                    "bool_field_size": bool_semantics.get("bool_field_size"),
+                    "bool_byte_offset": bool_semantics.get("bool_byte_offset"),
                 }
-            for key in ("byte_mask", "field_mask", "native_bool"):
+            for key in ("bool_field_size", "bool_byte_offset", "byte_mask", "field_mask", "native_bool"):
                 if key in prop:
                     property_payload[key] = prop.get(key)
             properties.append(property_payload)

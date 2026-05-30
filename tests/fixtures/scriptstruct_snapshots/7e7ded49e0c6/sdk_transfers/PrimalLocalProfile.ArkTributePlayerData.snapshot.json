@@ -155,7 +155,11 @@
           },
           {
             "array_dim": 1,
+            "bool_byte_offset": 0,
+            "bool_field_size": 1,
             "bool_property_semantics": {
+              "bool_byte_offset": 0,
+              "bool_field_size": 1,
               "reject_reasons": [],
               "status": "candidate"
             },
@@ -180,7 +184,11 @@
           },
           {
             "array_dim": 1,
+            "bool_byte_offset": 0,
+            "bool_field_size": 1,
             "bool_property_semantics": {
+              "bool_byte_offset": 0,
+              "bool_field_size": 1,
               "reject_reasons": [],
               "status": "candidate"
             },
@@ -223,7 +231,11 @@
           },
           {
             "array_dim": 1,
+            "bool_byte_offset": 0,
+            "bool_field_size": 1,
             "bool_property_semantics": {
+              "bool_byte_offset": 0,
+              "bool_field_size": 1,
               "reject_reasons": [],
               "status": "candidate"
             },

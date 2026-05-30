@@ -1111,6 +1111,22 @@ def require_bool_input_field(target: str, prop: dict[str, Any], expected_name: s
     return field
 
 
+def require_bool_tail(prop: dict[str, Any], field_key: str) -> tuple[int, int]:
+    field_size = parse_int_value(prop.get("bool_field_size"))
+    byte_offset = parse_int_value(prop.get("bool_byte_offset"))
+    semantics = prop.get("bool_property_semantics")
+    if field_size is None or byte_offset is None:
+        raise SystemExit(f"{field_key} bool tail evidence missing")
+    if isinstance(semantics, dict):
+        semantic_field_size = parse_int_value(semantics.get("bool_field_size"))
+        semantic_byte_offset = parse_int_value(semantics.get("bool_byte_offset"))
+        if semantic_field_size is None or semantic_byte_offset is None:
+            raise SystemExit(f"{field_key} bool_property_semantics tail evidence missing")
+        if field_size != semantic_field_size or byte_offset != semantic_byte_offset:
+            raise SystemExit(f"{field_key} bool tail evidence is inconsistent")
+    return field_size, byte_offset
+
+
 def require_item_return_only_shape(target_payload: dict[str, Any], source_snapshot: dict[str, str]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     target_identity = target_payload.get("target")
     property_chain = target_payload.get("property_chain")
@@ -1387,11 +1403,14 @@ def require_mission_copied_bool_shape(target_payload: dict[str, Any], source_sna
             "source_snapshot_sha256": source_snapshot["sha256"],
         }
         if field_key in MISSION_COPIED_BOOL_FIELDS:
+            bool_field_size, bool_byte_offset = require_bool_tail(prop, field_key)
             field = classify_property(prop, return_value_offset)
             masks = field.get("bool_masks")
             if (
                 field["type"] != "bool"
                 or field["direction"] not in {"in", "return"}
+                or bool_field_size != 1
+                or bool_byte_offset != 0
                 or not isinstance(masks, dict)
                 or masks.get("byte_mask") != "0x01"
                 or masks.get("field_mask") != "0xff"
@@ -1404,6 +1423,8 @@ def require_mission_copied_bool_shape(target_payload: dict[str, Any], source_sna
                     "copied_field": field_key,
                     "direction": field["direction"],
                     "type": "bool",
+                    "bool_field_size": bool_field_size,
+                    "bool_byte_offset": bool_byte_offset,
                     "byte_mask": masks["byte_mask"],
                     "field_mask": masks["field_mask"],
                     "native_bool": False,

@@ -158,11 +158,13 @@ sequence.
   operation and clears output on invalid attempts or exhausted budget; this remains
   test-only/internal and does not authorize public callbacks or runtime wiring.
 - The durable Mission copied-bool policy slice is preserved at
-  `/home/flowcommunity-ark/obelisk-artifacts/mission-copied-bool-policy-slice-20260530T072912Z/`.
-  It now includes `artifact-pack.manifest.json`
-  (`sha256=22e5b79dd42395e32df444375ffd526b1e02985253d8847f0568522ff9a53f63`)
+  `/home/flowcommunity-ark/obelisk-artifacts/mission-copied-bool-tail-policy-slice-20260530T090211Z/`.
+  It includes exact bool-tail evidence for each copied bool: `bool_field_size=1`,
+  `bool_byte_offset=0`, `byte_mask=0x01`, `field_mask=0xff`, and `native_bool=false`.
+  Its `artifact-pack.manifest.json` SHA256 is
+  `b47f0497c92ae3e8f9a006fb5be87cfbcc1d1dd5f15d78267ad186073e4c26fb`
   and relative `SHA256SUMS`
-  (`sha256=f63b69302bf7996ce38d1e02a4acdc4ca88904cb92cb8bb59e7de4b6a5611766`);
+  (`sha256=9dc277b8e3dddeed66d140a12654e4d5f7e7dc13b8b9aca75d96446c53069545`);
   consume mode accepts it, and promote mode blocks it with evidence-only/non-claim
   blockers. It copies only the five frozen Mission bool fields and keeps object refs plus
   `OutItemIDs` recognition-only.

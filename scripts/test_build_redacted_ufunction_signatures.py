@@ -7,6 +7,7 @@ import json
 import hashlib
 import contextlib
 import io
+import shutil
 import sys
 import tempfile
 import unittest
@@ -418,6 +419,8 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         self.assertIn("resource_handle", report["safety_summary"]["explicitly_excluded"])
         self.assertIn("return_override", report["safety_summary"]["explicitly_excluded"])
         self.assertTrue(all(entry["type"] == "bool" for entry in report["copied_bools"]))
+        self.assertTrue(all(entry["bool_field_size"] == 1 for entry in report["copied_bools"]))
+        self.assertTrue(all(entry["bool_byte_offset"] == 0 for entry in report["copied_bools"]))
         self.assertTrue(all(entry["byte_mask"] == "0x01" for entry in report["copied_bools"]))
         self.assertTrue(all(entry["field_mask"] == "0xff" for entry in report["copied_bools"]))
 
@@ -445,6 +448,26 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         self.assertNotIn("PlayerCharacter", copied_serialized)
         self.assertNotIn("PlayerPawn", copied_serialized)
         self.assertNotIn("OutItemIDs", copied_serialized)
+
+    def test_mission_copied_bool_policy_slice_rejects_bool_tail_drift(self) -> None:
+        fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            copied_root = Path(temp_dir) / "ufunction_snapshots"
+            shutil.copytree(fixture_root, copied_root)
+            snapshot = (
+                copied_root
+                / "7e7ded49e0c6"
+                / "sdk_missions"
+                / "MissionType.AddPlayerToMission.snapshot.json"
+            )
+            payload = json.loads(snapshot.read_text(encoding="utf-8"))
+            prop = payload["targets"][0]["property_chain"]["properties"][1]
+            prop["bool_byte_offset"] = 1
+            prop["bool_property_semantics"]["bool_byte_offset"] = 1
+            write_json(snapshot, payload)
+
+            with self.assertRaisesRegex(SystemExit, "copied bool shape drifted"):
+                tool.build_mission_copied_bool_policy_slice(snapshot_root=copied_root)
 
     def test_mission_copied_bool_target_set_excludes_metadata_only_target(self) -> None:
         from reflection_target_sets import TARGET_SETS

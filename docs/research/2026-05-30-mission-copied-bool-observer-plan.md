@@ -24,18 +24,25 @@ The current evidence source is
 - Focused policy artifact schema: `obelisk.mission-copied-bool-policy-slice.v1`
 - Focused policy artifact status: `evidence-only`, consume-mode accepted,
   promote-mode blocked
-- Durable focused policy artifact:
-  `/home/flowcommunity-ark/obelisk-artifacts/mission-copied-bool-policy-slice-20260530T072912Z/`
-- Durable focused policy artifact SHA256:
-  `94e3a09a92006e1726aa425045af9581bf0b5ec508fa29691065fe7048b0bea2`
+- Current durable focused policy artifact with exact bool-tail evidence:
+  `/home/flowcommunity-ark/obelisk-artifacts/mission-copied-bool-tail-policy-slice-20260530T090211Z/`
+- Current durable focused policy artifact SHA256:
+  `f56a191aaecbd52d042efd81423d4a86f4e5a29674660aab9d65bbf496416945`
 - `artifact-pack.manifest.json` SHA256:
-  `22e5b79dd42395e32df444375ffd526b1e02985253d8847f0568522ff9a53f63`
+  `b47f0497c92ae3e8f9a006fb5be87cfbcc1d1dd5f15d78267ad186073e4c26fb`
 - Relative `SHA256SUMS` SHA256:
-  `f63b69302bf7996ce38d1e02a4acdc4ca88904cb92cb8bb59e7de4b6a5611766`
+  `9dc277b8e3dddeed66d140a12654e4d5f7e7dc13b8b9aca75d96446c53069545`
 - Consume gate: `accepted`
 - Promotion ready: `false`
 - Copied scalar count: `5` bool fields
 - Redacted field count: `6` object/container fields
+- Bool-tail contract for each copied bool: `bool_field_size=1`, `bool_byte_offset=0`,
+  `byte_mask=0x01`, `field_mask=0xff`, `native_bool=false`.
+
+The older
+`/home/flowcommunity-ark/obelisk-artifacts/mission-copied-bool-policy-slice-20260530T072912Z/`
+pack is historical after bool-tail hardening because it predates the preserved
+`bool_field_size` and `bool_byte_offset` fields and now fails the consume gate.
 
 This closes the Mission compact bool second-source gap for observer planning only. It
 does not close runtime observer, dispatcher lifecycle, callback ABI, public SDK, identity,

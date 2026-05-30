@@ -225,3 +225,53 @@ The consume gate accepts the policy slice in this pack. The promote gate still b
 `promote_mode_manifest_has_non_claims`. This closes the target-specific layout
 second-source gap for Item return-only, but it does not promote public API, runtime wiring,
 identity, mutation, return override, or an Inventory/Items SDK.
+
+## Candidate-Only Descriptor Shape
+
+The next descriptor shape, if this slice is ever promoted, should be three distinct
+`GameplayPolicyEvent` event-kind descriptors rather than a reuse of
+`OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK`. The current public
+`INVENTORY_USE_CHECK` descriptor includes `OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN`;
+these item observations prove only `ReturnValue`, so reusing that kind would overclaim the
+payload and blur `CanRepair.bIgnoreInventoryRequirement` into an unrelated cooldown field.
+
+This is a planning shape only. It must not be copied into `include/obelisk/ObeliskApi.h`,
+`docs/public_gameplay_events.json`, runtime dispatcher tables, public SDK fixtures, or
+plugin callbacks until a deliberate ABI promotion adds append-only enum values, masks,
+descriptor coverage, SDK consumer tests, and callback lifecycle review.
+
+Common candidate descriptor fields:
+
+- `resource_kind`: `OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM`
+- `flags`: `OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD |
+  OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED`
+- `field_mask`: `OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE`
+- `payload`: `bool_values[OBELISK_GAMEPLAY_POLICY_FIELD_RETURN_VALUE]` only
+- `int32_values`: no copied fields
+- `dispatch_phase`: post-original observation only
+- `event_kind` and `event_kind_mask`: unassigned candidate slots; future public values must
+  be appended and ABI-tested if promoted
+
+Candidate event descriptors:
+
+| Source UFunction | Candidate stable name | Candidate display name | Copied field |
+| --- | --- | --- | --- |
+| `PrimalItem.AllowEquipItem` | `inventory_item.allow_equip_check` | `Inventory item allow equip check` | `ReturnValue` bool |
+| `PrimalItem.CanRepair` | `inventory_item.can_repair_check` | `Inventory item can repair check` | `ReturnValue` bool |
+| `PrimalItem.UseItemOntoItem` | `inventory_item.use_onto_item_check` | `Inventory item use onto item check` | `ReturnValue` bool |
+
+Candidate non-claims:
+
+- no `CraftBlueprint` event descriptor;
+- no `bIgnoreInventoryRequirement`, `bConsumeResources`, `toInventory`, `DestinationItem`,
+  or `AdditionalData` payload fields;
+- no item identity, inventory identity, object lookup, stable handle, `ResourceHandle`,
+  coordinates, owner/player/tribe identity, mutation, blocking, return override, or UE
+  pointer exposure;
+- no new capability bit, callback registration function, unregister function, marker/env
+  gate, runtime dispatch, or live-server validation.
+
+Promotion gates remain explicit: append-only ABI design, numeric event/mask allocation,
+descriptor tests, C and installed-SDK consumer coverage, owner-token lifecycle cleanup
+coverage, and a public manifest update are all required before these names become more
+than candidate metadata.

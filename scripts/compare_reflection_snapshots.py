@@ -275,6 +275,8 @@ def property_layout(prop: dict[str, Any], *, strict_identity_indices: bool) -> d
         "element_size": prop.get("element_size"),
         "array_dim": prop.get("array_dim"),
         "property_flags": prop.get("property_flags"),
+        "bool_field_size": prop.get("bool_field_size"),
+        "bool_byte_offset": prop.get("bool_byte_offset"),
         "native_bool": prop.get("native_bool"),
         "byte_mask": prop.get("byte_mask"),
         "field_mask": prop.get("field_mask"),
@@ -334,6 +336,18 @@ def property_block_reasons(prop: dict[str, Any], *, index: int) -> list[str]:
                 reasons.append(f"{prefix}_bool_property_semantics_status_{bool_semantics.get('status')}")
             if bool_semantics.get("reject_reasons", []):
                 reasons.append(f"{prefix}_bool_property_semantics_has_reject_reasons")
+            for tail_key in ("bool_field_size", "bool_byte_offset"):
+                if not isinstance(bool_semantics.get(tail_key), int):
+                    reasons.append(f"{prefix}_bool_property_semantics_{tail_key}_missing")
+        for tail_key in ("bool_field_size", "bool_byte_offset"):
+            if not isinstance(prop.get(tail_key), int):
+                reasons.append(f"{prefix}_{tail_key}_missing")
+            elif (
+                isinstance(bool_semantics, dict)
+                and isinstance(bool_semantics.get(tail_key), int)
+                and prop.get(tail_key) != bool_semantics.get(tail_key)
+            ):
+                reasons.append(f"{prefix}_{tail_key}_mismatches_bool_property_semantics")
         if prop.get("native_bool") not in (True, False):
             reasons.append(f"{prefix}_native_bool_missing")
         for mask_key in ("byte_mask", "field_mask"):

@@ -599,6 +599,8 @@ def mission_copied_bool_policy_slice_manifest(
                 "copied_field": field,
                 "type": "bool",
                 "property_class": "BoolProperty",
+                "bool_field_size": 1,
+                "bool_byte_offset": 0,
                 "element_size": 1,
                 "array_dim": 1,
                 "byte_mask": "0x01",
@@ -2987,6 +2989,7 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
             manifest = workspace / "mission-copied-bool-policy.json"
             payload = mission_copied_bool_policy_slice_manifest()
             payload["copied_bools"][0]["property_flags"] = "0x80"
+            payload["copied_bools"][0]["bool_byte_offset"] = 1
             payload["copied_bools"][0]["source_snapshot_sha256"] = "7" * 64
             payload["redacted_mission_fields"][0]["offset"] = "0x40"
             payload["redacted_mission_fields"][1]["source_snapshot"] = payload["copied_bools"][0]["source_snapshot"]

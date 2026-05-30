@@ -77,7 +77,14 @@ def base_snapshot() -> dict[str, object]:
                             "element_size": 1,
                             "array_dim": 1,
                             "property_flags": "0x80",
-                            "bool_property_semantics": {"status": "candidate", "reject_reasons": []},
+                            "bool_property_semantics": {
+                                "status": "candidate",
+                                "reject_reasons": [],
+                                "bool_field_size": 1,
+                                "bool_byte_offset": 0,
+                            },
+                            "bool_field_size": 1,
+                            "bool_byte_offset": 0,
                             "native_bool": True,
                             "byte_mask": "0xff",
                             "field_mask": "0xff",
@@ -99,7 +106,14 @@ def base_snapshot() -> dict[str, object]:
                             "element_size": 1,
                             "array_dim": 1,
                             "property_flags": "0x80",
-                            "bool_property_semantics": {"status": "candidate", "reject_reasons": []},
+                            "bool_property_semantics": {
+                                "status": "candidate",
+                                "reject_reasons": [],
+                                "bool_field_size": 1,
+                                "bool_byte_offset": 0,
+                            },
+                            "bool_field_size": 1,
+                            "bool_byte_offset": 0,
                             "native_bool": True,
                             "byte_mask": "0xff",
                             "field_mask": "0xff",
@@ -862,6 +876,30 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         reasons = report["results"][0]["reasons"]
         self.assertIn("base:property[0]_bool_property_semantics_status_rejected", reasons)
         self.assertIn("candidate:property[0]_bool_property_semantics_status_rejected", reasons)
+
+    def test_missing_bool_tail_blocks_comparison_even_when_both_sides_match(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            left = base_snapshot()
+            right = deepcopy(left)
+            for payload in (left, right):
+                prop = payload["targets"][0]["property_chain"]["properties"][0]  # type: ignore[index]
+                prop.pop("bool_field_size", None)
+                prop["bool_property_semantics"].pop("bool_field_size", None)  # type: ignore[index]
+            write_snapshot(base, left)
+            write_snapshot(candidate, right)
+
+            result = run_compare(base, candidate, "--json")
+
+        self.assertEqual(result.returncode, 2)
+        report = json.loads(result.stdout)
+        reasons = report["results"][0]["reasons"]
+        self.assertIn("base:property[0]_bool_field_size_missing", reasons)
+        self.assertIn("candidate:property[0]_bool_property_semantics_bool_field_size_missing", reasons)
 
     def test_weak_property_membership_blocks_comparison_even_when_both_sides_match(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
