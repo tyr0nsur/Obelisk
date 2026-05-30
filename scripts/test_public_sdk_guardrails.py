@@ -33,6 +33,12 @@ PUBLIC_RELEASE_SCOPE_DOC_FILES = [
     REPO_ROOT / "docs" / "RELEASE.md",
     REPO_ROOT / "docs" / "STATUS.md",
 ]
+NEXTGEN_DEMAND_BOUNDARY_FILES = [
+    REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md",
+    REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md",
+    REPO_ROOT / "docs" / "research" / "2026-05-30-nextgenplugins-reference-inventory.md",
+    REPO_ROOT / "plugins" / "README.md",
+]
 V010_CORE_API_CAPABILITY_ALLOWLIST = [
     "OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS",
     "OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS",
@@ -2577,6 +2583,37 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                     context = text[max(0, match.start() - 80):match.start()]
                     if not negated_claim_context.search(context):
                         offenders.append(f"{path.relative_to(REPO_ROOT)}: {pattern}")
+
+        self.assertEqual(offenders, [])
+
+    def test_nextgen_demand_inventory_stays_non_roadmap_and_non_compatibility(self) -> None:
+        offenders: list[str] = []
+        forbidden_phrases = (
+            "Recommended v1 ordering",
+            "NextGenPlugins compatibility",
+        )
+        required_research_phrases = (
+            "Non-roadmap candidate pressure order",
+            "This list is not a v1 delivery sequence, compatibility plan, or Plugin Hub roadmap.",
+            "without claiming a command, moderation, or reply/send-chat SDK",
+            "remain investigation/internal unless",
+        )
+
+        for path in NEXTGEN_DEMAND_BOUNDARY_FILES:
+            text = path.read_text(encoding="utf-8")
+            for phrase in forbidden_phrases:
+                if phrase in text:
+                    offenders.append(f"{path.relative_to(REPO_ROOT)}: {phrase}")
+
+        research_note = (
+            REPO_ROOT / "docs" / "research" / "2026-05-30-nextgenplugins-reference-inventory.md"
+        ).read_text(encoding="utf-8")
+        for phrase in required_research_phrases:
+            if phrase not in research_note:
+                offenders.append(
+                    "docs/research/2026-05-30-nextgenplugins-reference-inventory.md: "
+                    f"missing {phrase}"
+                )
 
         self.assertEqual(offenders, [])
 

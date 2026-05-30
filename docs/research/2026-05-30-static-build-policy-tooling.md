@@ -1,0 +1,123 @@
+# Static Build-Policy Offline Tooling Audit
+
+Date: 2026-05-30
+Obelisk commit: 9913132
+
+## Objective
+
+Audit currently available offline, non-protected tooling and artifacts that can support
+`IsAllowedToBuild` and static build-policy research. This pass did not use server
+instances, did not read or write `/servidor/ark`, and did not promote any candidate.
+
+## Commands
+
+- `git -C /home/flowcommunity-ark/Obelisk rev-parse --short HEAD`
+- `git -C /home/flowcommunity-ark/Obelisk status --short`
+- `command -v radare2`
+- `radare2 -v`
+- `command -v analyzeHeadless`
+- `analyzeHeadless 2>&1 | head -40`
+- `analyzeHeadless -version 2>&1 | head -20`
+- `java -version 2>&1 | head -3`
+- `readlink -f /usr/local/bin/analyzeHeadless`
+- `find /home/flowcommunity-ark/obelisk-artifacts ...`
+- `readlink -f` path hygiene scan for artifacts under `/home/flowcommunity-ark/obelisk-artifacts`
+- `sha256sum /home/flowcommunity-ark/obelisk-artifacts/offline-binaries/7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520/ShooterGameServer`
+- `file /home/flowcommunity-ark/obelisk-artifacts/offline-binaries/7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520/ShooterGameServer`
+
+## Tooling
+
+- `radare2`: `/usr/bin/radare2`, version `5.5.0`.
+- `analyzeHeadless`: `/usr/local/bin/analyzeHeadless`, resolves to
+  `/opt/ghidra/ghidra_12.1_PUBLIC/support/analyzeHeadless`.
+- Java used by Ghidra headless: OpenJDK `21.0.10`.
+
+## Offline Artifact Availability
+
+Root: `/home/flowcommunity-ark/obelisk-artifacts`
+
+Inventory count from the offline root:
+
+- Files: 272
+- Directories: 62
+- Symlinks: 1
+
+Path hygiene result:
+
+- No listed artifact path resolved to `/servidor/ark`.
+- No listed artifact path resolved to `/servidor/ark/workspace-offline`.
+- The only symlink is
+  `/home/flowcommunity-ark/obelisk-artifacts/uobject-flag-policy-rich-inputs-20260530T071436Z/bin/ShooterGameServer`,
+  pointing to the offline binary path under `/home/flowcommunity-ark/obelisk-artifacts/offline-binaries/...`.
+
+Offline binary:
+
+- `/home/flowcommunity-ark/obelisk-artifacts/offline-binaries/7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520/ShooterGameServer`
+- SHA256: `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`
+- File type: ELF 64-bit LSB x86-64 executable, dynamically linked, stripped.
+
+Static-global baseline artifacts:
+
+- `/home/flowcommunity-ark/obelisk-artifacts/static-global-preflight-20260529/ShooterGameServer.objdump`
+- `/home/flowcommunity-ark/obelisk-artifacts/static-global-preflight-20260529/ShooterGameServer.objdump.provenance.json`
+- `/home/flowcommunity-ark/obelisk-artifacts/static-global-preflight-20260529/ShooterGameServer.readelf-sections.txt`
+- `/home/flowcommunity-ark/obelisk-artifacts/static-global-preflight-20260529/ShooterGameServer.readelf-sections.txt.provenance.json`
+- `/home/flowcommunity-ark/obelisk-artifacts/static-global-preflight-20260529/ShooterGameServer.readelf-programs.txt`
+- `/home/flowcommunity-ark/obelisk-artifacts/static-global-preflight-20260529/ShooterGameServer.readelf-programs.txt.provenance.json`
+- `/home/flowcommunity-ark/obelisk-artifacts/static-global-preflight-20260529/static-global-xrefs.json`
+- `/home/flowcommunity-ark/obelisk-artifacts/static-global-preflight-20260529/static-global-evidence.json`
+- `/home/flowcommunity-ark/obelisk-artifacts/static-global-preflight-20260529/manifest.json`
+
+Build-policy and structure-related artifacts:
+
+- `/home/flowcommunity-ark/obelisk-artifacts/structure-return-only-policy-slice-20260530T093002Z/structure-return-only-policy-slice.json`
+- `/home/flowcommunity-ark/obelisk-artifacts/structure-return-only-policy-slice-20260530T093002Z/structure-return-only-policy-slice.consume-gate.json`
+- `/home/flowcommunity-ark/obelisk-artifacts/structure-return-only-policy-slice-20260530T093002Z/structure-return-only-policy-slice.promote-gate.json`
+- `/home/flowcommunity-ark/obelisk-artifacts/structure-nonpin-copied-scalar-policy-slice-20260530T100717Z/structure-nonpin-copied-scalar-policy-slice.json`
+- `/home/flowcommunity-ark/obelisk-artifacts/structure-nonpin-copied-scalar-policy-slice-20260530T100717Z/structure-nonpin-copied-scalar-policy-slice.consume-gate.json`
+- `/home/flowcommunity-ark/obelisk-artifacts/structure-nonpin-copied-scalar-policy-slice-20260530T100717Z/structure-nonpin-copied-scalar-policy-slice.promote-gate.json`
+- `/home/flowcommunity-ark/obelisk-artifacts/item-return-only-policy-slice-20260530T072255Z/item-return-only-policy-slice.json`
+- `/home/flowcommunity-ark/obelisk-artifacts/item-return-only-second-source-20260530T084918Z/item-return-only-policy-slice.json`
+- `/home/flowcommunity-ark/obelisk-artifacts/item-return-only-second-source-20260530T084918Z/item-return-only-second-source-readiness.json`
+- `/home/flowcommunity-ark/obelisk-artifacts/item-return-only-bool-tail-refresh-20260530T172552Z/compare-readiness.json`
+
+Adjacent static-policy artifacts that may help blocker accounting but are not
+`IsAllowedToBuild` promotions by themselves:
+
+- `/home/flowcommunity-ark/obelisk-artifacts/uobject-flag-policy-refresh-20260530T071436Z/uobject-flag-policy.redacted.json`
+- `/home/flowcommunity-ark/obelisk-artifacts/uobject-flag-policy-refresh-20260530T071436Z/rich-provenance-preflight.json`
+- `/home/flowcommunity-ark/obelisk-artifacts/uobject-flag-policy-rich-inputs-20260530T071436Z/weak/r2-weak-helper-caller-modes.txt`
+- `/home/flowcommunity-ark/obelisk-artifacts/uobject-flag-policy-rich-inputs-20260530T071436Z/weak/ghidra-headless.stdout`
+- `/home/flowcommunity-ark/obelisk-artifacts/uobject-flag-policy-rich-inputs-20260530T071436Z/windows/gobjects-100-gc-pass.objdump.txt`
+- `/home/flowcommunity-ark/obelisk-artifacts/uobject-flag-policy-rich-inputs-20260530T071436Z/windows/gobjects-4000-skip.objdump.txt`
+- `/home/flowcommunity-ark/obelisk-artifacts/uobject-flag-policy-rich-inputs-20260530T071436Z/windows/weak-helper-c70.objdump.txt`
+- `/home/flowcommunity-ark/obelisk-artifacts/resourcehandle-post-callback-contract-20260530T171910Z/post-callback-contract.json`
+- `/home/flowcommunity-ark/obelisk-artifacts/resourcehandle-identity-complete-failclosed-20260530T165521Z/resourcehandle-revalidation.json`
+
+Second-source and signature artifacts:
+
+- `/home/flowcommunity-ark/obelisk-artifacts/minimal-second-source-intake-offline-20260530T075501Z/redacted-minimal/signatures.json`
+- `/home/flowcommunity-ark/obelisk-artifacts/minimal-second-source-intake-offline-20260530T075501Z/snapshot-comparison/readiness-report.json`
+- `/home/flowcommunity-ark/obelisk-artifacts/rc-minimal-redacted-signatures-strict-20260530T000000Z/signatures.json`
+- `/home/flowcommunity-ark/obelisk-artifacts/transfer-scriptstruct-bool-tail-refresh-20260530T163945Z/transfer-scriptstruct-readiness.json`
+- `/home/flowcommunity-ark/obelisk-artifacts/transfer-scriptstruct-bool-tail-refresh-20260530T163945Z/inventory-pack/scriptstruct-inventory.json`
+
+## Blockers And Caveats
+
+- This was an availability audit only. It did not inspect, rerun, or accept gate results.
+- No `IsAllowedToBuild` static candidate is promoted by this note.
+- Existing `objdump` and `readelf` artifacts remain usable only if their provenance
+  sidecars pass the fail-closed rules before contributor-facing claims.
+- `/home/flowcommunity-ark/obelisk-artifacts/structure-return-only-policy-slice-20260530T093002Z/normalize-artifact-pack.json`
+  is zero bytes and should be treated as unavailable until regenerated.
+- Ghidra/radare outputs under `uobject-flag-policy-rich-inputs-*` are offline-available,
+  but they remain internal static evidence unless paired with the applicable gate,
+  provenance, and promotion contract.
+
+## Result
+
+The local machine has the expected offline static tooling (`radare2` and Ghidra
+`analyzeHeadless`) plus a non-protected offline binary and multiple static-policy artifact
+packs relevant to build-policy triage. The next useful offline step is to validate the
+specific candidate artifact pack for `IsAllowedToBuild` through the repository's
+fail-closed offline gate before using it as reusable evidence.

@@ -292,3 +292,47 @@ wraparound, and slot reuse without a freshly proven serial all fail closed, whil
 `promotion_ready=false`, `public_resource_handle_ready=false`, and
 `post_callback_resource_handle_ready=false`. Do not rerun broad FName/GObjects/core scans
 for this step.
+
+## Serial Reuse/Wraparound Candidate Policy
+
+The offline builder for the next candidate-only step is:
+
+```bash
+python3 scripts/build_resource_handle_serial_policy.py \
+  --revalidation <identity-complete-resourcehandle-revalidation.json> \
+  --capture-id <safe-capture-id> \
+  --evidence-pack-id <safe-evidence-pack-id> \
+  --output <tmp-or-approved-offline-root>/serial-policy.json
+```
+
+It emits:
+
+```text
+obelisk.internal-uobject-revalidation-serial-policy.v1
+```
+
+This artifact is a policy contract, not runtime proof. The builder requires an
+identity-complete fail-closed evaluator source, accepted internal candidate evidence,
+nonzero serial candidates, no zero or missing serial candidates, and no pre-existing
+serial reuse/wraparound overclaim in the source. It does not read cores, rerun scanners,
+or use server paths.
+
+The emitted policy is deliberately strict:
+
+- zero serial: reject
+- missing serial: reject
+- serial mismatch: reject
+- unknown wraparound: reject
+- slot reuse without a freshly proven serial for the current slot: reject
+- post-callback or cross-frame use: reject
+
+Only a fresh nonzero serial match in the same hook/callback frame can reach
+`allow_candidate_frame_local_only`, and that still produces copied bool/reason or
+Obelisk-owned copied data only. The report keeps `promotion_ready=false`,
+`public_resource_handle_ready=false`, `post_callback_resource_handle_ready=false`, and
+`promotion_gate.ready=false`.
+
+Remaining non-claims are unchanged for public `ResourceHandle`, public GObjects lookup,
+object identity, mutation, return override, persistent handles, and public SDK exposure.
+The policy narrows the serial reuse/wraparound design gap but does not prove runtime
+reuse semantics or public lookup safety.

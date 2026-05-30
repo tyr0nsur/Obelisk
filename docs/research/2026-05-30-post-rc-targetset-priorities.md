@@ -46,13 +46,36 @@ not invalidate the preserved accepted evidence in the dated research notes.
 1. **Mission copied-bool internal bridge**
 
    Best next fit after item-return because the copied payload can stay scalar-only and
-   avoid object identity. Start with internal recognizer and fixture tests. Keep
-   `GetPlayerUsableItems` arrays recognition-only.
+   avoid object identity. The current compact Mission evidence now has accepted
+   second-source layout plus refreshed bool semantics for all four compact targets, and
+   the existing test-only helper coverage already exercises the five-field copied bool
+   surface. Keep the next cut internal: preserve the fixture-backed copied-bool bridge
+   and make the following review about lifecycle/runtime-observation approval, not about
+   adding public SDK, hook wiring, dispatcher integration, or new Mission identity.
+   `GetPlayerUsableItems` arrays remain recognition-only.
 
 2. **Dino compact recognizer**
 
-   Useful for future ride/carry policy signals. Keep object fields redacted and do not add
-   public Dino SDK, identity, lookup, mutation, or return override.
+   Useful for future ride/carry policy signals and already backed by compact recognizer
+   tests for the two accepted shapes. Keep this second behind Mission because the compact
+   Dino payload still includes object fields needed for recognition and a future copied
+   builder would need a fresh redaction review. Keep object fields redacted and do not add
+   public Dino SDK, identity, lookup, mutation, return override, hook wiring, or a copied
+   event bridge in the same cut.
+
+## 2026-05-30 Mission-vs-Dino Audit Decision
+
+Decision: choose **Mission copied-bool internal bridge** as the next post-RC planning
+thread. It is the smaller and better-gated slice because its copied payload is exactly
+five canonical one-byte bools and no object, array, player, mission, or item identity has
+to cross the internal boundary. The current allowed follow-up is documentation and
+test-only hardening around that bridge; runtime hooks, public ABI, dispatcher ownership,
+server observation, mutation, and return override remain outside scope.
+
+`Dino compact recognizer` stays the follow-up track. Its two accepted targets are good
+internal recognizer evidence, but passenger/carry semantics depend on redacted object
+fields for exact recognition and should not drive a copied internal event bridge until
+Mission's simpler copied-bool lifecycle review is complete.
 
 3. **Buff compact/breadth documentation and recognizer hardening**
 

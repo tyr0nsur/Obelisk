@@ -144,20 +144,23 @@ When a plugin family reveals a promising surface, create an Obelisk-native lane:
    and plugin tests.
 6. Only then expose it to Plugin Hub examples or public docs.
 
-Recommended v1 ordering from this demand inventory:
+Non-roadmap candidate pressure order from this demand inventory:
+
+This list is not a v1 delivery sequence, compatibility plan, or Plugin Hub roadmap. It is a
+demand-ranked dependency sketch for future design reviews after the promotion gates above.
 
 1. Hub foundation: lifecycle, descriptors, timers, config/logging, reload posture, and
    multi-instance-safe packaging.
-2. Chat commands on top of copied `ChatMessageEvent`, without claiming a moderation or
-   reply/send-chat SDK yet.
-3. Permissions/admin with copied identity and privacy-safe grants/checks; do not use
+2. Passive chat parsing and command-like local routing on top of copied `ChatMessageEvent`,
+   without claiming a command, moderation, or reply/send-chat SDK.
+3. Permissions/admin only after copied identity and privacy-safe grants/checks; do not use
    public `ResourceHandle` or UE pointers.
-4. RCON/operator I/O and secret-safe configuration.
-5. Basic economy/rewards that depend on commands, permissions, identity, and persistence,
-   before any give-item or mutation surface.
-6. Homes/safe zones/structures after location, ownership, enforcement, and mutation
-   contracts are promoted.
-7. Items, inventory, dinos, transfers, and missions remain investigation/internal until
+4. RCON/operator I/O only after secret-safe ingress, audit policy, and lifecycle rules.
+5. Basic economy/rewards only after command-like routing, permissions, identity, and
+   persistence are promoted, and still before any give-item or mutation surface.
+6. Homes/safe zones/structures only after location, ownership, enforcement, and mutation
+   contracts have their own evidence and promotion records.
+7. Items, inventory, dinos, transfers, and missions remain investigation/internal unless
    copied-data, lifecycle, identity/privacy, and promotion gates are complete.
 
 ## Prioritized Demand Map

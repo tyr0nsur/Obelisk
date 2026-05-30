@@ -170,6 +170,20 @@ as the validation floor. The next step is a separate runtime-observation/lifecyc
 no live hook wiring, dispatcher, API surface, marker/env gate, or runtime log claim should
 be added from this readiness note alone.
 
+## Post-RC Mission-vs-Dino Planning Audit
+
+Decision on 2026-05-30: Mission remains the preferred next planning thread over Dino for
+an internal-only copied-data bridge. The reason is scope, not public readiness: the compact
+Mission surface can stay at five canonical copied bools, while all object, controller,
+player, character, item-array, mission identity, and raw-param fields remain redacted or
+recognition-only.
+
+The next cut is therefore a lifecycle/runtime-observation review for the existing
+test-only copied-bool helper, not new runtime wiring. Do not add `ProcessEventHook.cpp`
+integration, shared-library runtime inclusion, dispatchers, public headers, SDK consumer
+fixtures, marker/env claims, server validation, mutation, or return override from this
+note.
+
 ## Test-Only Hardening Follow-Up
 
 A later local test-only slice widened `tests/core/ProcessEventMissionReflectionTests.cpp`

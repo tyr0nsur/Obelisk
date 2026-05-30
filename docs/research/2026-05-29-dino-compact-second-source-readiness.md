@@ -165,3 +165,16 @@ capability documentation, and explicit operator-facing capability guidance.
 The accepted offline layout artifact is valuable internal module evidence. It is not a
 plugin boundary contract, and it does not change the separate
 `minimal-second-source-intake` status.
+
+## Post-RC Mission-vs-Dino Planning Audit
+
+Decision on 2026-05-30: keep Dino behind Mission for the immediate post-RC internal bridge
+thread. Dino has accepted compact second-source evidence and fixture-backed recognizer
+coverage for `AddPassenger` and `AllowCarryCharacter`, but the compact shape still relies
+on object parameters for exact recognition. Those object fields must remain redacted, and
+no copied Dino event bridge should be introduced until a separate redaction/lifecycle
+review defines the scalar-only payload and rejection behavior.
+
+The safe Dino follow-up is still offline/test-only recognizer hardening. Do not add hook
+wiring, public Dino SDK, identity, lookup, raw UE pointer exposure, mutation, return
+override, server observation, or compatibility claims from this note.
