@@ -914,6 +914,35 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
                 self.assertIn("mutation", compact)
                 self.assertIn("return override", compact)
 
+    def test_mission_copied_bool_tail_contract_stays_documented_and_candidate_only(self) -> None:
+        mission_plan = read("docs/research/2026-05-30-mission-copied-bool-observer-plan.md")
+        current = read("docs/agent-handoff/CURRENT.md")
+
+        compact_plan = normalized(mission_plan)
+        compact_current = normalized(current)
+        bool_tail_contract = (
+            r"`bool_field_size=1`, `bool_byte_offset=0`, `byte_mask=0x01`, "
+            r"`field_mask=0xff`, (?:and )?`native_bool=false`"
+        )
+
+        for path, compact in (
+            ("docs/research/2026-05-30-mission-copied-bool-observer-plan.md", compact_plan),
+            ("docs/agent-handoff/CURRENT.md", compact_current),
+        ):
+            with self.subTest(file=path, item="exact bool-tail evidence"):
+                self.assertRegex(compact, bool_tail_contract)
+            with self.subTest(file=path, item="consume-only non-promotion"):
+                self.assertRegex(compact, r"consume mode accepts?|Consume gate: `accepted`")
+                self.assertRegex(compact, r"promote mode blocks?|Promotion ready: `false`")
+
+        for item in [
+            "older `/home/flowcommunity-ark/obelisk-artifacts/mission-copied-bool-policy-slice-20260530T072912Z/` pack is historical",
+            "predates the preserved `bool_field_size` and `bool_byte_offset` fields",
+            "now fails the consume gate",
+        ]:
+            with self.subTest(file="docs/research/2026-05-30-mission-copied-bool-observer-plan.md", item=item):
+                self.assertIn(normalized(item), compact_plan)
+
     def test_uobject_flag_policy_current_blockers_stay_explicit(self) -> None:
         current = read("docs/agent-handoff/CURRENT.md")
         status = read("docs/STATUS.md")

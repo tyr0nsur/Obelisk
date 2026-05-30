@@ -35,6 +35,18 @@ namespace
     constexpr const char* kDefaultConfig =
         R"({"enabled":false,"allow_all_instances":false,"instance_allowlist":["arkserver"]})";
 
+    struct TimerFenceState
+    {
+        std::mutex Mutex;
+        std::condition_variable Cv;
+        int Calls = 0;
+        int Completed = 0;
+        bool Release = false;
+        bool ShutdownEntered = false;
+        bool CloseEntered = false;
+        bool UnloadReturned = false;
+    };
+
     struct FakePlugin {
         std::string filename;
         std::string pluginId = "fake_plugin";
@@ -65,6 +77,7 @@ namespace
         bool captureApi = false;
         bool mutateApiInInit = false;
         std::atomic<bool>* closeObserved = nullptr;
+        TimerFenceState* timerFence = nullptr;
         int getInfoCalls = 0;
         int initCalls = 0;
         int shutdownCalls = 0;
@@ -134,6 +147,25 @@ namespace
     {
         auto* plugin = static_cast<FakePlugin*>(userData);
         ++plugin->timerEventCalls;
+    }
+
+    void CountingTimerCallback(uint64_t, void* userData)
+    {
+        auto* state = static_cast<TimerFenceState*>(userData);
+        std::lock_guard<std::mutex> lock(state->Mutex);
+        ++state->Calls;
+        state->Cv.notify_all();
+    }
+
+    void BlockingTimerCallback(uint64_t, void* userData)
+    {
+        auto* state = static_cast<TimerFenceState*>(userData);
+        std::unique_lock<std::mutex> lock(state->Mutex);
+        ++state->Calls;
+        state->Cv.notify_all();
+        state->Cv.wait(lock, [state]() { return state->Release; });
+        ++state->Completed;
+        state->Cv.notify_all();
     }
 
     void FakeInventoryPolicyCallback(const Obelisk::Core::InventoryPolicyEventView&, void*)
@@ -697,6 +729,12 @@ namespace
         g_CurrentFakePlugin->structureSubscriptionsAtShutdown =
             Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount();
         ++g_CurrentFakePlugin->shutdownCalls;
+        if (g_CurrentFakePlugin->timerFence)
+        {
+            std::lock_guard<std::mutex> lock(g_CurrentFakePlugin->timerFence->Mutex);
+            g_CurrentFakePlugin->timerFence->ShutdownEntered = true;
+            g_CurrentFakePlugin->timerFence->Cv.notify_all();
+        }
         if (g_CurrentFakePlugin->registerOwnerTokenCallbackInShutdown)
         {
             g_CurrentFakePlugin->shutdownRegistrationId =
@@ -771,6 +809,12 @@ namespace
             ++plugin->closeCalls;
             if (plugin->closeObserved)
                 plugin->closeObserved->store(true, std::memory_order_release);
+            if (plugin->timerFence)
+            {
+                std::lock_guard<std::mutex> lock(plugin->timerFence->Mutex);
+                plugin->timerFence->CloseEntered = true;
+                plugin->timerFence->Cv.notify_all();
+            }
             if (plugin->orderLog)
                 plugin->orderLog->push_back("close:" + plugin->filename);
             if (plugin->throwOnClose)
@@ -1979,6 +2023,168 @@ namespace
 
         CleanupPlugin(plugin);
         CleanupPlugin(otherPlugin);
+        fs::remove_all(root);
+    }
+
+    void TestPublicRepeatingTimerFiresAndStopsAfterUnregister()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_repeating_timer_unregister");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "repeating_timer_unregister.so",
+            .pluginId = "repeating_timer_unregister",
+            .captureApi = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "repeating timer plugin was not initialized");
+        Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle != nullptr,
+                "timer registration function was not exposed");
+        Require(plugin.capturedApi.UnregisterTimerWithOwnerToken != nullptr,
+                "timer unregister function was not exposed");
+
+        TimerFenceState state;
+        const uint64_t timerId = plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
+            plugin.initOwnerToken,
+            1,
+            1,
+            OBELISK_TIMER_FLAG_REPEATING,
+            CountingTimerCallback,
+            &state);
+        Require(timerId != 0, "public repeating timer registration returned zero");
+
+        int callsAtUnregister = 0;
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
+                        return state.Calls >= 2;
+                    }),
+                    "public repeating timer did not fire twice");
+            callsAtUnregister = state.Calls;
+        }
+
+        Require(plugin.capturedApi.UnregisterTimerWithOwnerToken(plugin.initOwnerToken, timerId),
+                "public repeating timer unregister failed");
+
+        bool firedAfterUnregister = false;
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            firedAfterUnregister = state.Cv.wait_for(lock, std::chrono::milliseconds(100), [&state, callsAtUnregister]() {
+                return state.Calls > callsAtUnregister;
+            });
+        }
+        Require(!firedAfterUnregister, "public repeating timer fired after unregister returned");
+
+        manager.UnloadAll();
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestUnloadAllWaitsForInFlightPluginTimerBeforeClose()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_timer_unload_in_flight");
+        ConfigureEnvironment(root);
+
+        TimerFenceState state;
+        FakePlugin plugin{
+            .filename = "timer_unload_in_flight.so",
+            .pluginId = "timer_unload_in_flight",
+            .captureApi = true,
+            .timerFence = &state,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "timer unload fence plugin was not initialized");
+        Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle != nullptr,
+                "timer registration function was not exposed");
+
+        const uint64_t timerId = plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
+            plugin.initOwnerToken,
+            1,
+            0,
+            0,
+            BlockingTimerCallback,
+            &state);
+        Require(timerId != 0, "blocking plugin-owned timer registration returned zero");
+
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
+                        return state.Calls == 1;
+                    }),
+                    "blocking plugin-owned timer callback did not enter");
+        }
+
+        std::thread unloadThread([&]() {
+            manager.UnloadAll();
+            {
+                std::lock_guard<std::mutex> lock(state.Mutex);
+                state.UnloadReturned = true;
+            }
+            state.Cv.notify_all();
+        });
+
+        bool shutdownEntered = false;
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            shutdownEntered = state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
+                return state.ShutdownEntered;
+            });
+        }
+
+        if (!shutdownEntered)
+        {
+            {
+                std::lock_guard<std::mutex> lock(state.Mutex);
+                state.Release = true;
+            }
+            state.Cv.notify_all();
+            unloadThread.join();
+            Require(false, "UnloadAll did not reach plugin shutdown while timer callback was in flight");
+        }
+
+        bool closedWhileCallbackInFlight = false;
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            closedWhileCallbackInFlight =
+                state.Cv.wait_for(lock, std::chrono::milliseconds(100), [&state]() {
+                    return state.CloseEntered || state.UnloadReturned;
+                });
+            state.Release = true;
+        }
+        state.Cv.notify_all();
+
+        bool callbackCompleted = false;
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            callbackCompleted = state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
+                return state.Completed == 1;
+            });
+        }
+
+        unloadThread.join();
+
+        Require(!closedWhileCallbackInFlight,
+                "UnloadAll closed plugin while plugin-owned timer callback was in flight");
+        Require(callbackCompleted, "plugin-owned timer callback did not complete after release");
+        Require(plugin.closeCalls == 1, "timer unload fence plugin was not closed once");
+        Require(Obelisk::Core::TimerManager::Get().UnregisterCallbacksForOwner(plugin.owner) == 0,
+                "plugin-owned timer survived unload after in-flight callback completed");
+
+        CleanupPlugin(plugin);
         fs::remove_all(root);
     }
 
@@ -4107,6 +4313,8 @@ int main()
     TestOwnerTokenGameplayPolicyEventRegistrationCanUnregister();
     TestOwnerTokenChatMessageEventRegistrationCanUnregister();
     TestOwnerTokenTimerRegistrationCanUnregisterAndUnload();
+    TestPublicRepeatingTimerFiresAndStopsAfterUnregister();
+    TestUnloadAllWaitsForInFlightPluginTimerBeforeClose();
     TestTimerCallbackCleansOnInitFailure();
     TestChatMessageRegistrationRejectedWhenCapabilityWasNotAdvertised();
     TestChatMessageCallbackExceptionDoesNotEscapeDispatch();

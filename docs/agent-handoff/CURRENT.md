@@ -178,6 +178,14 @@ sequence.
   blockers. It copies only `ShooterPlayerController.ServerTransferredPlayerConfirmationResult.bAccept`
   and keeps transfer payloads, ids, object/class refs, mutation, return override, hook
   wiring, dispatcher wiring, and public Transfer SDK blocked.
+- Buff breadth now has accepted offline second-source layout evidence at
+  `/servidor/ark/workspace-offline/buff-breadth-intake-second-source-20260530T091014Z/`.
+  The target set is exactly `PrimalBuff.BuffOverrideInventoryAccessInput`,
+  `PrimalBuff.BPCustomAllowAddBuff`, and `PrimalBuff.BPPreventAddingOtherBuff`; readiness
+  accepts 3/3 comparable targets at layout-only scope and consume gate accepts the report.
+  This is not a public Buff SDK/runtime promotion and does not authorize hooks, callbacks,
+  object/class exposure, mutation, return override, raw params, `ResourceHandle`, or
+  gameplay semantics.
 - Do not rerun broad FName, GObjects, or core scans for ResourceHandle unless the binary
   hash changes or evidence contradicts current roots/candidates. The next ResourceHandle
   work should use the durable flag-policy refresh as internal static input and focus on

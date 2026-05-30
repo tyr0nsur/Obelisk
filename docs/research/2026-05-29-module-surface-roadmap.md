@@ -39,6 +39,15 @@ evidence:
   `PrimalBuff.AllowPostProcessEffect`, `PrimalBuff.BPBuffPreventUploading`, and
   `PrimalBuff.BP_OnBuffLifetimeUpdated`. This is internal layout evidence only,
   not public Buff SDK/runtime promotion.
+- `buff-breadth-intake`: accepted offline layout evidence from
+  `/servidor/ark/workspace-offline/buff-breadth-intake-second-source-20260530T091014Z`;
+  `3/3` accepted, `gate_mode=second_source_promotion`,
+  `promotion_gate.ready=true`, `promotion_gate.ready_scope=layout_only`, and
+  `promotion_gate.promotion_ready=false` for
+  `PrimalBuff.BuffOverrideInventoryAccessInput`, `PrimalBuff.BPCustomAllowAddBuff`, and
+  `PrimalBuff.BPPreventAddingOtherBuff`. This broadens internal Buff layout evidence only;
+  it does not promote public Buff SDK/runtime hooks, class/object exposure, mutation,
+  return override, raw params, `ResourceHandle`, or gameplay semantics.
 - `dino-compact-intake`: accepted offline layout evidence from
   `/servidor/ark/workspace-offline/fuobjectitem-dino-reconcile-20260529T120000Z`;
   `2/2` accepted, `gate_mode=second_source_promotion`,
@@ -101,9 +110,10 @@ scope.
    layout evidence and are useful internal recognizer inputs after inventory. They remain
    blocked from public payloads because raw actor identity, object lifetime, resource
    handles, taming, attack, mutation, and return-override semantics are unresolved.
-7. `sdk.buffs`: good reflection coverage for bool-return and zero-param shapes; poorer
-   product candidate until buff semantics, object/class redaction, and no-override policy
-   are explicit.
+7. `sdk.buffs`: good reflection coverage for bool-return, bool-input, class-ref, and
+   zero-param shapes after compact plus breadth second-source evidence; poorer product
+   candidate until buff semantics, object/class redaction, and no-override policy are
+   explicit.
 8. `sdk.tribes`: accepted permission and membership layout evidence is valuable, but public
    usefulness is identity-sensitive and array/string targets remain blocked.
 9. `sdk.transfers`: broad fixture coverage and layout-only second-source evidence exist,
@@ -180,7 +190,7 @@ scope.
    RC; mission remains internal recognizer work after item return-only evidence.
 6. Treat the accepted dino compact pair as internal layout evidence for later recognizer
    design only; do not build a public Dino SDK or runtime observer from it yet.
-7. Keep buff compact as accepted internal layout evidence only; any further buff work
-   should be fixture/offline expansion or copied-payload design, not runtime hooks.
+7. Keep buff compact and breadth target sets as accepted internal layout evidence only;
+   any further buff work should be copied-payload/redaction design, not runtime hooks.
 8. Keep tribe, transfer, and admin surfaces blocked from public ABI until identity,
    payload ownership, and permission policy are designed.
