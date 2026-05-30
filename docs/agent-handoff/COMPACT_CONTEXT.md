@@ -152,6 +152,13 @@ priorities, and do not use history files as the active source of truth.
   test-only `ProcessEventMissionReflection` helper scaffold exists, but it has no live
   hook path, dispatcher, public ABI, server marker/env, or runtime logs. Any next Mission
   slice needs a separate runtime-observation/lifecycle review.
+  The canonical offline Mission refresh input is
+  `/servidor/ark/workspace-offline/mission-compact-intake-bool-semantics-refresh-20260530T020021Z/pack/redacted-signatures.json`
+  with SHA256 `09074e71666f755801802e5d796361cf4f84d3e7d8c00663801d84f981a1cc13`.
+  The durable focused Mission policy slice is preserved at
+  `/home/flowcommunity-ark/obelisk-artifacts/mission-copied-bool-policy-slice-20260530T072912Z/`
+  with manifest SHA256 `94e3a09a92006e1726aa425045af9581bf0b5ec508fa29691065fe7048b0bea2`;
+  consume mode accepts it and promote mode remains blocked.
 - ResourceHandle remains post-RC/internal and blocked by
   `uobject_flags_validity_semantics_unproven`; see the ResourceHandle/UObject flag
   research notes for evidence. Do not reopen broad FName/GObjects discovery or create

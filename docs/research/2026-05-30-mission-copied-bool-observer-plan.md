@@ -24,6 +24,10 @@ The current evidence source is
 - Focused policy artifact schema: `obelisk.mission-copied-bool-policy-slice.v1`
 - Focused policy artifact status: `evidence-only`, consume-mode accepted,
   promote-mode blocked
+- Durable focused policy artifact:
+  `/home/flowcommunity-ark/obelisk-artifacts/mission-copied-bool-policy-slice-20260530T072912Z/`
+- Durable focused policy artifact SHA256:
+  `94e3a09a92006e1726aa425045af9581bf0b5ec508fa29691065fe7048b0bea2`
 - Consume gate: `accepted`
 - Promotion ready: `false`
 - Copied scalar count: `5` bool fields
@@ -86,8 +90,10 @@ The runtime recognizer, if later approved, must:
   `ReturnValueOffset`, property classes, property names, offsets, sizes, bool masks, and
   SHA-scoped internal class/outer identities before copying bool bytes;
 - reject non-canonical bool bytes greater than `1`;
-- reserve observation sequence and consume log budget only after the exact prefilter and
-  recognizer acceptance;
+- reserve observation sequence and consume log budget only after the exact gate and FName
+  prefilter, before reflected metadata reads, so disabled gates, non-mission names, and
+  exhausted budgets do not read memory; rejected metadata may consume budget without
+  emitting value logs;
 - run only after the original `ProcessEvent` returns for return-bool fields;
 - copy only the five frozen bool fields into Obelisk-owned memory;
 - clear copied output on every rejection path;
@@ -134,6 +140,10 @@ parameter provenance are rejected and clear stale copied output. `ParameterData`
 borrowed internal pointer for immediate builder validation only; it must not be persisted,
 logged, exposed to plugins, or treated as object identity.
 
+The current test-only recognizer does not yet validate Unreal native-bool mask metadata
+such as byte mask, byte offset, or field mask at runtime. Those mask semantics remain a
+promotion blocker for any future runtime/public Mission path.
+
 Rejected metadata, disabled gates, non-mission FName values, unsupported SHA values,
 unreadable params, malformed bool bytes, and exhausted budgets should not emit per-event
 value logs. If counters are added later, they must be aggregate-only and must not include
@@ -154,7 +164,8 @@ later implementation review approves runtime wiring, the minimum gate set is:
 - active observer debug window marker for the instance;
 - active `enable-mission-reflection` instance marker;
 - exact Mission FName prefilter index set `7702`, `7649`, `1211`, `1582`;
-- exact `MissionReflection` metadata recognizer acceptance before budget reservation.
+- budget reservation before metadata reads and exact `MissionReflection` metadata
+  recognizer acceptance before any copied value log.
 
 Stable wrapper/profile launches must scrub or ignore the Mission observer env family and
 fail closed if an experimental Mission marker is present. A zero or missing log limit,

@@ -114,6 +114,13 @@ sequence.
   It is evidence-only: consume mode accepts it, promote mode blocks it, and it does not
   authorize public Items/Inventory SDK, runtime hook wiring, markers/env, mutation, return
   override, identity, lookup, or `ResourceHandle`.
+- The durable Mission copied-bool policy slice is preserved at
+  `/home/flowcommunity-ark/obelisk-artifacts/mission-copied-bool-policy-slice-20260530T072912Z/`.
+  Its manifest SHA256 is
+  `94e3a09a92006e1726aa425045af9581bf0b5ec508fa29691065fe7048b0bea2`; consume mode
+  accepts it, and promote mode blocks it with evidence-only/non-claim blockers. It copies
+  only the five frozen Mission bool fields and keeps object refs plus `OutItemIDs`
+  recognition-only.
 - Do not rerun broad FName, GObjects, or core scans for ResourceHandle unless the binary
   hash changes or evidence contradicts current roots/candidates. The next ResourceHandle
   work should use the durable flag-policy refresh as internal static input and focus on
