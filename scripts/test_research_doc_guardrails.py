@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 import unittest
 from pathlib import Path
 
@@ -11,6 +12,43 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 class ResearchDocGuardrailTests(unittest.TestCase):
+    def test_resourcehandle_research_and_handoff_do_not_claim_readiness(self) -> None:
+        scanned_paths = [
+            REPO_ROOT / "docs" / "agent-handoff" / "CURRENT.md",
+            *sorted((REPO_ROOT / "docs" / "research").glob("*resource*handle*.md")),
+            *sorted((REPO_ROOT / "docs" / "research").glob("*uobject*flag*.md")),
+        ]
+        forbidden_literals = (
+            "public_resource_handle_ready=true",
+            "resource_handle_ready=true",
+            "post_callback_resource_handle_ready=true",
+            "uobject_flags_validity_semantics_proven=true",
+        )
+        forbidden_positive_claims = (
+            r"\b(?:public|promoted|supported|available|included)\s+ResourceHandle\s+(?:SDKs?|APIs?|surfaces?|lookup|contract)\b",
+            r"\bResourceHandle\s+(?:SDKs?|APIs?|surfaces?|lookup|contract)\s+(?:is|are)\s+(?:public|promoted|supported|available|included|ready)\b",
+            r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported)\s+(?:a\s+)?(?:public\s+)?ResourceHandle\s+(?:SDKs?|APIs?|surfaces?|lookup|contract)\b",
+        )
+        negated_claim_context = re.compile(
+            r"\b(?:does\s+not|do\s+not|must\s+not|not|no|never|without|blocked|blocks|excludes?|outside|candidate-only|internal|until|separate)\b",
+            re.IGNORECASE,
+        )
+
+        offenders: list[str] = []
+        for path in scanned_paths:
+            text = path.read_text(encoding="utf-8")
+            compact = " ".join(text.split())
+            for literal in forbidden_literals:
+                if literal in compact:
+                    offenders.append(f"{path.relative_to(REPO_ROOT)}: {literal}")
+            for pattern in forbidden_positive_claims:
+                for match in re.finditer(pattern, text, flags=re.IGNORECASE):
+                    context = text[max(0, match.start() - 100):match.start()]
+                    if not negated_claim_context.search(context):
+                        offenders.append(f"{path.relative_to(REPO_ROOT)}: {pattern}")
+
+        self.assertEqual(offenders, [])
+
     def test_no_obsolete_theisland_second_core_runbook_references(self) -> None:
         forbidden = [
             "theisland-second-core",

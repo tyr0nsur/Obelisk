@@ -208,9 +208,12 @@ priorities, and do not use history files as the active source of truth.
   vocabulary/provenance. The durable rich-provenance refresh is preserved at
   `/home/flowcommunity-ark/obelisk-artifacts/uobject-flag-policy-refresh-20260530T071436Z/`;
   consume mode is accepted and promote mode is blocked with candidate-only/non-claim
-  blockers. This is internal static evidence only and does not promote public GObjects,
-  lookup, identity, lifecycle, `ResourceHandle`, mutation, return override, or SDK
-  surfaces.
+  blockers. The pack now includes `artifact-pack.manifest.json`
+  (`sha256=1f678c05461131055e4b18fd68862de431a27bbf49609297030ac62bf6f5478d`)
+  and `SHA256SUMS`
+  (`sha256=cf76ee33a8ea640233af7eff4de78171254a5ee5fa11de714259b27f2731a87a`).
+  This is internal static evidence only and does not promote public GObjects, lookup,
+  identity, lifecycle, `ResourceHandle`, mutation, return override, or SDK surfaces.
 - Post-RC offline tooling added candidate-only UObject flag, weak-helper, and GObjects
   evidence builders. They are consume-mode internal/offline indexing tools only and do not
   promote public GObjects, lookup, identity, lifecycle, `ResourceHandle`, mutation, return

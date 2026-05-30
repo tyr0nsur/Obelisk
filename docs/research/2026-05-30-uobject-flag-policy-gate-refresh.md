@@ -195,3 +195,34 @@ than calling only the offline artifact gate. The direct consume gate accepts can
 reports with minimal verified sidecars for mechanical indexing, while the driver requires
 the richer preflight (`command`, `tool`, `tool_version`, `source_path`, and address ranges)
 that makes this refresh reproducible enough for ongoing ResourceHandle research.
+
+## Durable Pack Manifest
+
+The durable refresh now includes a pack manifest and checksums in the artifact root:
+
+```text
+/home/flowcommunity-ark/obelisk-artifacts/uobject-flag-policy-refresh-20260530T071436Z/artifact-pack.manifest.json
+/home/flowcommunity-ark/obelisk-artifacts/uobject-flag-policy-refresh-20260530T071436Z/SHA256SUMS
+```
+
+Pack hashes:
+
+- `artifact-pack.manifest.json`:
+  `1f678c05461131055e4b18fd68862de431a27bbf49609297030ac62bf6f5478d`
+- `SHA256SUMS`:
+  `cf76ee33a8ea640233af7eff4de78171254a5ee5fa11de714259b27f2731a87a`
+- `uobject-flag-policy.redacted.json`:
+  `836723c1c88314a5d8c52b3a67b0dcac455708e4fc577d449740c2a6ba33d758`
+- `weak-helper-caller-mode.redacted.json`:
+  `4513dc8d7a78ced360748cffb92004c8dee152bb48e6d1be5045b00b39c9a486`
+- `rich-provenance-preflight.json`:
+  `122df02aac82f0d72fb5440b81e7dab1fc1dac6bda67054cd52cb6b2ff4fe9d8`
+- `uobject-flag-policy.consume-gate.json`:
+  `026122e801317b5a3b8761480d4f47fde99dcacbf7c80a117546bf9f87ff668e`
+- `uobject-flag-policy.promote-gate.json`:
+  `d57dcd2c6f8b83c8cf70bc392fb812d32d051f251c846d98c24ca74476fddab8`
+
+The manifest keeps `promotion_ready=false`, `public_resource_handle_ready=false`, and
+`post_callback_resource_handle_ready=false`. Treat this pack as canonical internal
+static evidence for the current binary hash, not as a public ResourceHandle, GObjects,
+identity, lookup, lifecycle, mutation, return-override, or SDK promotion.

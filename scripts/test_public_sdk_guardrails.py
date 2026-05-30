@@ -1155,6 +1155,62 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             self.assertIn(excluded, resource_surface.get("not_promoted", []))
 
+    def test_describe_resource_kind_runtime_impl_stays_category_only_no_identity_no_lookup(self) -> None:
+        source = strip_c_comments((REPO_ROOT / "core" / "PluginManager.cpp").read_text(encoding="utf-8"))
+        match = re.search(
+            r"bool\s+DescribeResourceKind\s*\([^)]*\)\s*\{(?P<body>.*?)\n\s*bool\s+DescribeGameplayPolicyEventKind",
+            source,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(match, "DescribeResourceKind implementation not found")
+        body = match.group("body")
+
+        for flag in (
+            "OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_CATEGORY_ONLY",
+            "OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY",
+            "OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP",
+        ):
+            self.assertIn(flag, body)
+        for forbidden in (
+            "ObeliskResourceHandle",
+            "GetResource",
+            "ResolveResource",
+            "GObjects",
+            "GUObjectArray",
+        ):
+            self.assertNotIn(forbidden, body)
+
+    def test_no_real_resourcehandle_lookup_symbols_outside_guardrails_or_docs(self) -> None:
+        scanned_roots = [
+            REPO_ROOT / "include",
+            REPO_ROOT / "core",
+            REPO_ROOT / "ue",
+            REPO_ROOT / "hooks",
+        ]
+        forbidden = (
+            "ObeliskResourceHandle",
+            "GetResource",
+            "ResolveResource",
+            "RegisterResourceHandle",
+            "ResolveUObjectHandle",
+        )
+        offenders: list[str] = []
+
+        for root in scanned_roots:
+            for path in root.rglob("*"):
+                if not path.is_file() or path.suffix not in {".c", ".cpp", ".h", ".hpp"}:
+                    continue
+                text = strip_c_comments(path.read_text(encoding="utf-8"))
+                literals = "\n".join(c_like_string_literals(text))
+                text_without_literals = re.sub(r'"(?:\\.|[^"\\])*"', '""', text, flags=re.DOTALL)
+                for token in forbidden:
+                    if token in text_without_literals:
+                        offenders.append(f"{path.relative_to(REPO_ROOT)}: {token}")
+                    if token in literals and path.relative_to(REPO_ROOT).as_posix() != "include/obelisk/ObeliskApi.h":
+                        offenders.append(f"{path.relative_to(REPO_ROOT)} string: {token}")
+
+        self.assertEqual(offenders, [])
+
     def test_public_metadata_manifest_declares_gameplay_policy_event_descriptor_surface(self) -> None:
         manifest = json.loads(PUBLIC_GAMEPLAY_EVENTS_MANIFEST.read_text(encoding="utf-8"))
         header = (REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h").read_text(encoding="utf-8")

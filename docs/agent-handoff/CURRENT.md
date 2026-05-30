@@ -87,6 +87,10 @@ sequence.
 - ResourceHandle/public GObjects remain blocked. The old flag-policy artifact is obsolete;
   the durable rich-provenance refresh is preserved at
   `/home/flowcommunity-ark/obelisk-artifacts/uobject-flag-policy-refresh-20260530T071436Z/`.
+  It now includes `artifact-pack.manifest.json`
+  (`sha256=1f678c05461131055e4b18fd68862de431a27bbf49609297030ac62bf6f5478d`)
+  and `SHA256SUMS`
+  (`sha256=cf76ee33a8ea640233af7eff4de78171254a5ee5fa11de714259b27f2731a87a`).
   Consume mode accepts it and promote mode stays blocked with candidate-only/non-claim
   blockers; see `docs/research/2026-05-30-uobject-flag-policy-gate-refresh.md`.
 
@@ -133,6 +137,9 @@ sequence.
   hash changes or evidence contradicts current roots/candidates. The next ResourceHandle
   work should use the durable flag-policy refresh as internal static input and focus on
   mutation-window rejection, runtime negative samples, and a fail-closed lookup contract.
+  Keep the internal label `InternalUObjectRevalidationCandidate`; do not expose
+  ResourceHandle, GObjects, identity, lookup, lifecycle names, mutation, return override,
+  object indices, serials, or UE pointers to plugins.
 - Any future live/player validation requires a new approved live-ops brief and, when
   players are involved, a beta-test notice through the configured local webhook variable.
 
