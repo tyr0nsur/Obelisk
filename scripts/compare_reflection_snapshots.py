@@ -17,6 +17,7 @@ from reflection_target_sets import (
     PLANNING_ONLY_TARGET_SETS,
     RELEASE_READINESS_TARGET_SETS,
     TARGET_SETS,
+    target_set_readiness_classification,
 )
 
 
@@ -89,11 +90,15 @@ TARGET_BLOCKER_GUIDANCE = {
         ],
         "next_offline_input": (
             "approved non-protected copied/offline core or complete core evidence-pack manifest "
-            "with FName root, GObjects, binary hash, and artifact identity; do not repeat "
-            "fixture-only missing_base_snapshot checks as discovery"
+            "with FName root, GObjects, binary hash, and artifact identity; use core inputs "
+            "with inspect_core_ufunctions.py --snapshot-json, but route evidence-pack manifests "
+            "through the snapshot regeneration consumer instead of passing a manifest to --core; "
+            "do not repeat fixture-only missing_base_snapshot checks as discovery"
         ),
         "snapshot_prep_checks": [
             "emit exact schema-qualified target obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild",
+            "generate one sanitized candidate snapshot for this exact target only before adding any target set",
+            "never pass an evidence-pack manifest path to inspect_core_ufunctions.py --core",
             "record distinct offline artifact identity fields: artifact_sha256, capture_id, evidence_pack_id",
             "require target, class, outer, every property, and nested struct/array candidates to be candidate-uobject",
             "keep placement structs, location vectors, player/controller context, object refs, arrays, and raw params redacted or recognition-only",
@@ -115,12 +120,16 @@ TARGET_BLOCKER_GUIDANCE = {
         ],
         "next_offline_input": (
             "approved non-protected copied/offline core or complete core evidence-pack manifest "
-            "that proves whether APrimalStructure is a reflected owner; do not repeat "
-            "fixture-only missing_base_snapshot checks as discovery"
+            "that proves whether APrimalStructure is a reflected owner; use core inputs with "
+            "inspect_core_ufunctions.py --snapshot-json, but route evidence-pack manifests "
+            "through the snapshot regeneration consumer instead of passing a manifest to --core; "
+            "do not repeat fixture-only missing_base_snapshot checks as discovery"
         ),
         "snapshot_prep_checks": [
             "treat APrimalStructure as an ArkApi dictionary seed until a sanitized snapshot proves the reflected owner",
             "emit exact schema-qualified target obelisk.ufunction-chain.snapshot.v1:APrimalStructure.IsAllowedToBuild only if that owner is observed",
+            "generate one sanitized candidate snapshot for this exact target only before adding any target set",
+            "never pass an evidence-pack manifest path to inspect_core_ufunctions.py --core",
             "record distinct offline artifact identity fields: artifact_sha256, capture_id, evidence_pack_id",
             "require target, class, outer, every property, and nested struct/array candidates to be candidate-uobject",
             "keep placement structs, location vectors, player/controller context, object refs, arrays, and raw params redacted or recognition-only",
@@ -393,7 +402,12 @@ def target_set_report() -> dict[str, Any]:
     return {
         "schema": "obelisk.reflection-snapshot-target-sets.v1",
         "target_sets": [
-            {"name": name, "targets": list(targets)}
+            {
+                "name": name,
+                "readiness_classification": target_set_readiness_classification(name),
+                "release_readiness": name in RELEASE_READINESS_TARGET_SETS,
+                "targets": list(targets),
+            }
             for name, targets in sorted(TARGET_SETS.items())
         ],
     }
@@ -1138,7 +1152,7 @@ def readiness_report(
 def print_text(report: dict[str, Any]) -> None:
     if report["schema"] == "obelisk.reflection-snapshot-target-sets.v1":
         for item in report["target_sets"]:
-            print(f"{item['name']}:")
+            print(f"{item['name']}: readiness_classification={item['readiness_classification']}")
             for target in item["targets"]:
                 print(f"  {target}")
         return

@@ -316,6 +316,16 @@ namespace Obelisk::UE::MissionReflection
             return a > std::numeric_limits<size_t>::max() - b;
         }
 
+        bool HasCopiedParameterRange(const MissionFunctionSpec& spec)
+        {
+            for (size_t i = 0; i < spec.FieldCount; ++i)
+            {
+                if (spec.Fields[i].ExposesRange)
+                    return true;
+            }
+            return false;
+        }
+
         RuntimeReflection::ReadResult ReadByteAt(const RuntimeReflection::MemoryReader& reader,
                                                  const void* base,
                                                  size_t offset,
@@ -610,7 +620,7 @@ namespace Obelisk::UE::MissionReflection
         value.Function = spec->Function;
         value.FunctionNameIndex = spec->NameIndex;
         value.OuterNameIndex = spec->OuterNameIndex;
-        value.HasParameterRanges = params != nullptr;
+        value.HasParameterRanges = params != nullptr && HasCopiedParameterRange(*spec);
         if (value.HasParameterRanges)
         {
             value.ParameterData = static_cast<const uint8_t*>(params);

@@ -48,6 +48,10 @@ The installed package also exports:
 - `Obelisk_API_ABI_VERSION`
 - `Obelisk_PLUGIN_METADATA_ABI_VERSION`
 - `Obelisk_PLUGIN_INIT_CONTEXT_ABI_VERSION`
+- `Obelisk_GAMEPLAY_POLICY_EVENT_ABI_VERSION`
+- `Obelisk_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION`
+- `Obelisk_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION`
+- `Obelisk_CHAT_MESSAGE_EVENT_ABI_VERSION`
 
 Consumers can inspect those CMake variables when they need to distinguish a dev package
 from a tagged release or pin against a specific public C ABI.
@@ -58,6 +62,10 @@ source should continue to use the public header macros:
 - `OBELISK_API_ABI_VERSION`
 - `OBELISK_PLUGIN_METADATA_ABI_VERSION`
 - `OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION`
+- `OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION`
+- `OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION`
+- `OBELISK_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION`
+- `OBELISK_CHAT_MESSAGE_EVENT_ABI_VERSION`
 
 The `Obelisk_*` CMake variables mirror the `OBELISK_*` header macros so installed SDK
 consumers can validate both package metadata and compiled ABI expectations without

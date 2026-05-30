@@ -202,9 +202,10 @@ def write_target_set_root(root: Path, target_set: str) -> None:
     target_dir = root / "sha" / "sdk_test"
     target_dir.mkdir(parents=True, exist_ok=True)
     for target in compare.TARGET_SETS[target_set]:
-        _, _, short_key = target.partition(":")
+        schema, _, short_key = target.partition(":")
         outer, _, name = short_key.partition(".")
-        payload = rename_target(base_snapshot(), outer=outer, name=name)
+        payload = scriptstruct_snapshot() if schema == "obelisk.scriptstruct-chain.snapshot.v1" else base_snapshot()
+        payload = rename_target(payload, outer=outer, name=name)
         write_snapshot(target_dir, payload, f"{outer}.{name}.snapshot.json")
 
 
@@ -235,7 +236,17 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         report = json.loads(result.stdout)
         self.assertEqual(report["schema"], "obelisk.reflection-snapshot-target-sets.v1")
         sets = {item["name"]: item["targets"] for item in report["target_sets"]}
+        classifications = {item["name"]: item["readiness_classification"] for item in report["target_sets"]}
+        release_flags = {item["name"]: item["release_readiness"] for item in report["target_sets"]}
         self.assertIn("minimal-second-source-intake", sets)
+        self.assertEqual(classifications["minimal-second-source-intake"], "release_readiness")
+        self.assertIs(release_flags["minimal-second-source-intake"], True)
+        self.assertEqual(classifications["buff-compact-intake"], "internal_layout_only")
+        self.assertIs(release_flags["buff-compact-intake"], False)
+        self.assertEqual(classifications["mission-copied-bool-policy-slice"], "planning_only")
+        self.assertIs(release_flags["mission-copied-bool-policy-slice"], False)
+        self.assertEqual(classifications["transfer-scriptstruct"], "internal_layout_only")
+        self.assertIs(release_flags["transfer-scriptstruct"], False)
         self.assertEqual(
             sets["structure-nonpin-copied-scalar-policy-slice"],
             [
@@ -399,6 +410,14 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             primal_guidance["snapshot_prep_checks"],
         )
         self.assertIn(
+            "generate one sanitized candidate snapshot for this exact target only before adding any target set",
+            primal_guidance["snapshot_prep_checks"],
+        )
+        self.assertIn(
+            "never pass an evidence-pack manifest path to inspect_core_ufunctions.py --core",
+            primal_guidance["snapshot_prep_checks"],
+        )
+        self.assertIn(
             "keep placement structs, location vectors, player/controller context, object refs, arrays, and raw params redacted or recognition-only",
             primal_guidance["snapshot_prep_checks"],
         )
@@ -409,6 +428,12 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         )
         self.assertIn(
             "treat APrimalStructure as an ArkApi dictionary seed until a sanitized snapshot proves the reflected owner",
+            details["obelisk.ufunction-chain.snapshot.v1:APrimalStructure.IsAllowedToBuild"]["guidance"][
+                "snapshot_prep_checks"
+            ],
+        )
+        self.assertIn(
+            "never pass an evidence-pack manifest path to inspect_core_ufunctions.py --core",
             details["obelisk.ufunction-chain.snapshot.v1:APrimalStructure.IsAllowedToBuild"]["guidance"][
                 "snapshot_prep_checks"
             ],
@@ -432,7 +457,7 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             text_result.stdout,
         )
         self.assertIn("next_offline_input=approved non-protected copied/offline core", text_result.stdout)
-        self.assertIn("snapshot_prep_checks=5", text_result.stdout)
+        self.assertIn("snapshot_prep_checks=7", text_result.stdout)
         self.assertIn(
             "non_claim=does not promote StructureEvents, build-policy SDK, identity, lookup, mutation",
             text_result.stdout,
@@ -460,7 +485,15 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(guidance["classification"], "second_wave_structure_build_policy_candidate")
         self.assertIn("missing_committed_sanitized_snapshot", guidance["why_blocked"])
         self.assertIn("approved non-protected copied/offline core", guidance["next_offline_input"])
-        self.assertEqual(len(guidance["snapshot_prep_checks"]), 5)
+        self.assertEqual(len(guidance["snapshot_prep_checks"]), 7)
+        self.assertIn(
+            "generate one sanitized candidate snapshot for this exact target only before adding any target set",
+            guidance["snapshot_prep_checks"],
+        )
+        self.assertIn(
+            "never pass an evidence-pack manifest path to inspect_core_ufunctions.py --core",
+            guidance["snapshot_prep_checks"],
+        )
         self.assertIn(
             "compare only against a distinct sanitized second-source snapshot before any readiness claim",
             guidance["snapshot_prep_checks"],
@@ -475,7 +508,7 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             "target=obelisk.ufunction-chain.snapshot.v1:APrimalStructure.IsAllowedToBuild",
             text_result.stdout,
         )
-        self.assertIn("snapshot_prep_checks=5", text_result.stdout)
+        self.assertIn("snapshot_prep_checks=7", text_result.stdout)
 
     def test_mission_transfer_target_set_guidance_can_be_listed_without_snapshots(self) -> None:
         result = run_compare_raw(
@@ -2178,20 +2211,8 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             },
         )
 
-    def test_readiness_report_blocks_internal_general_v1_target_set_promotion_gates(self) -> None:
-        internal_target_sets = (
-            "buff-compact-intake",
-            "buff-breadth-intake",
-            "dino-compact-intake",
-            "inventory-action-compact-intake",
-            "item-compact-intake",
-            "mission-compact-intake",
-            "structure-nonpin-copied-scalar-policy-slice",
-            "structure-return-only-policy-slice",
-            "transfer-ufunction-intake",
-            "tribe-compact-intake",
-        )
-        self.assertTrue(set(internal_target_sets).issubset(compare.INTERNAL_LAYOUT_ONLY_TARGET_SETS))
+    def test_readiness_report_blocks_all_internal_target_set_promotion_gates(self) -> None:
+        internal_target_sets = sorted(compare.INTERNAL_LAYOUT_ONLY_TARGET_SETS)
 
         for target_set in internal_target_sets:
             with self.subTest(target_set=target_set), tempfile.TemporaryDirectory() as temp_dir:
@@ -2215,11 +2236,16 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
                 self.assertEqual(report["target_sets"], [target_set])
                 self.assertEqual(report["totals"]["targets"], len(compare.TARGET_SETS[target_set]))
                 self.assertEqual(report["totals"]["second_source_accepted"], len(compare.TARGET_SETS[target_set]))
+                expected_scope = (
+                    "planning_only"
+                    if target_set in (compare.PLANNING_ONLY_TARGET_SETS | compare.MISSION_CONSUME_ONLY_TARGET_SETS)
+                    else "internal_layout_only"
+                )
                 self.assertEqual(
                     report["promotion_gate"],
                     {
                         "ready": False,
-                        "ready_scope": "internal_layout_only",
+                        "ready_scope": expected_scope,
                         "layout_ready": True,
                         "promotion_ready": False,
                         "blockers": [{"reason": "target_set_not_release_readiness", "count": 1}],

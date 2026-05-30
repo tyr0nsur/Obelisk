@@ -153,6 +153,10 @@ namespace Obelisk::Core
         using InitFunc = bool(*)(ObeliskApi*, const ObeliskPluginInitContext*);
         using ShutdownFunc = void(*)();
 
+        void SafeLogInfoNoThrow(const char* message, const std::string& detail) noexcept;
+        void SafeLogWarnNoThrow(const char* message, const char* detail = nullptr) noexcept;
+        void SafeLogErrorNoThrow(const char* message, const char* detail = nullptr) noexcept;
+
         class DlopenLibraryLoader final : public PluginManager::LibraryLoader
         {
         public:
@@ -338,13 +342,13 @@ namespace Obelisk::Core
             void* owner = ResolvePluginOwnerTokenLocked(token);
             if (!owner)
             {
-                OBELISK_WARN("{} rejected callback because the owner token is invalid.", apiName);
+                SafeLogWarnNoThrow(apiName, "rejected callback because the owner token is invalid.");
                 return nullptr;
             }
 
             if (IsUnloadingPluginOwnerLocked(owner))
             {
-                OBELISK_WARN("{} rejected callback because the plugin owner is unloading.", apiName);
+                SafeLogWarnNoThrow(apiName, "rejected callback because the plugin owner is unloading.");
                 return nullptr;
             }
 
@@ -353,7 +357,7 @@ namespace Obelisk::Core
 
             if (!IsLoadedPluginOwnerLocked(owner))
             {
-                OBELISK_WARN("{} rejected callback because the owner token does not map to a loaded Obelisk plugin.", apiName);
+                SafeLogWarnNoThrow(apiName, "rejected callback because the owner token does not map to a loaded Obelisk plugin.");
                 return nullptr;
             }
 
@@ -366,7 +370,7 @@ namespace Obelisk::Core
             void* owner = ResolvePluginOwnerTokenLocked(token);
             if (!owner)
             {
-                OBELISK_WARN("{} rejected callback unregister because the owner token is invalid.", apiName);
+                SafeLogWarnNoThrow(apiName, "rejected callback unregister because the owner token is invalid.");
                 return nullptr;
             }
 
@@ -378,7 +382,7 @@ namespace Obelisk::Core
                 return owner;
             }
 
-            OBELISK_WARN("{} rejected callback unregister because the owner token does not map to an Obelisk plugin lifecycle owner.", apiName);
+            SafeLogWarnNoThrow(apiName, "rejected callback unregister because the owner token does not map to an Obelisk plugin lifecycle owner.");
             return nullptr;
         }
 
@@ -388,7 +392,7 @@ namespace Obelisk::Core
             {
                 if (IsUnloadingPluginOwnerLocked(g_CurrentPluginOwner))
                 {
-                    OBELISK_WARN("{} rejected callback because the plugin owner is unloading.", apiName);
+                    SafeLogWarnNoThrow(apiName, "rejected callback because the plugin owner is unloading.");
                     return nullptr;
                 }
                 return g_CurrentPluginOwner;
@@ -400,20 +404,20 @@ namespace Obelisk::Core
             Dl_info info{};
             if (dladdr(reinterpret_cast<void*>(callback), &info) == 0)
             {
-                OBELISK_WARN("{} rejected callback because its owning shared object could not be resolved.", apiName);
+                SafeLogWarnNoThrow(apiName, "rejected callback because its owning shared object could not be resolved.");
                 return nullptr;
             }
 
             void* owner = info.dli_fbase;
             if (IsUnloadingPluginOwnerLocked(owner))
             {
-                OBELISK_WARN("{} rejected callback because the plugin owner is unloading.", apiName);
+                SafeLogWarnNoThrow(apiName, "rejected callback because the plugin owner is unloading.");
                 return nullptr;
             }
 
             if (!IsLoadedPluginOwnerLocked(owner))
             {
-                OBELISK_WARN("{} rejected callback because its owner is not a loaded Obelisk plugin.", apiName);
+                SafeLogWarnNoThrow(apiName, "rejected callback because its owner is not a loaded Obelisk plugin.");
                 return nullptr;
             }
 
@@ -441,10 +445,6 @@ namespace Obelisk::Core
                 return 0;
             return registerFn(owner);
         }
-
-        void SafeLogInfoNoThrow(const char* message, const std::string& detail) noexcept;
-        void SafeLogWarnNoThrow(const char* message, const char* detail = nullptr) noexcept;
-        void SafeLogErrorNoThrow(const char* message, const char* detail = nullptr) noexcept;
 
         ShutdownFunc ResolveShutdownFunc(PluginManager::LibraryLoader& loader, void* handle, const std::string& pluginName)
         {
@@ -757,7 +757,9 @@ namespace Obelisk::Core
             if (IsGlobalProcessEventCallbackCapabilityEnabledForOwnerLocked(owner))
                 return true;
 
-            OBELISK_WARN("{} rejected. Use a filtered ProcessEvent callback or enable allow-global-process-event-callbacks for a controlled debug window.", apiName);
+            SafeLogWarnNoThrow(
+                apiName,
+                "rejected. Use a filtered ProcessEvent callback or enable allow-global-process-event-callbacks for a controlled debug window.");
             return false;
         }
 
@@ -772,7 +774,9 @@ namespace Obelisk::Core
             if (IsFilteredProcessEventCallbackCapabilityEnabledForOwnerLocked(owner))
                 return true;
 
-            OBELISK_WARN("{} rejected. Filtered ProcessEvent callbacks expose raw UE pointers and require allow-filtered-process-event-callbacks for a controlled debug window.", apiName);
+            SafeLogWarnNoThrow(
+                apiName,
+                "rejected. Filtered ProcessEvent callbacks expose raw UE pointers and require allow-filtered-process-event-callbacks for a controlled debug window.");
             return false;
         }
 
@@ -792,7 +796,7 @@ namespace Obelisk::Core
             if (callback)
                 return true;
 
-            OBELISK_WARN("{} rejected null callback.", apiName);
+            SafeLogWarnNoThrow(apiName, "rejected null callback.");
             return false;
         }
 
@@ -805,7 +809,7 @@ namespace Obelisk::Core
             if (nameIndex >= 0)
                 return true;
 
-            OBELISK_WARN("{} rejected invalid negative FName index {}.", apiName, nameIndex);
+            SafeLogWarnNoThrow(apiName, "rejected invalid negative FName index.");
             return false;
         }
 
@@ -815,7 +819,7 @@ namespace Obelisk::Core
             if (callback)
                 return true;
 
-            OBELISK_WARN("{} rejected null callback.", apiName);
+            SafeLogWarnNoThrow(apiName, "rejected null callback.");
             return false;
         }
 
@@ -825,7 +829,7 @@ namespace Obelisk::Core
             if (callback)
                 return true;
 
-            OBELISK_WARN("{} rejected null callback.", apiName);
+            SafeLogWarnNoThrow(apiName, "rejected null callback.");
             return false;
         }
 
@@ -834,7 +838,7 @@ namespace Obelisk::Core
             if (callback)
                 return true;
 
-            OBELISK_WARN("{} rejected null callback.", apiName);
+            SafeLogWarnNoThrow(apiName, "rejected null callback.");
             return false;
         }
 
@@ -1903,12 +1907,12 @@ namespace Obelisk::Core
                 return 0;
             if ((eventKindMask & OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL) == 0)
             {
-                OBELISK_WARN("RegisterGameplayPolicyEventWithOwnerTokenHandle rejected empty gameplay policy event mask.");
+                SafeLogWarnNoThrow("RegisterGameplayPolicyEventWithOwnerTokenHandle rejected empty gameplay policy event mask.");
                 return 0;
             }
             if ((eventKindMask & ~OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL) != 0)
             {
-                OBELISK_WARN("RegisterGameplayPolicyEventWithOwnerTokenHandle rejected reserved gameplay policy event mask bits.");
+                SafeLogWarnNoThrow("RegisterGameplayPolicyEventWithOwnerTokenHandle rejected reserved gameplay policy event mask bits.");
                 return 0;
             }
 
@@ -2012,23 +2016,23 @@ namespace Obelisk::Core
                 return 0;
             if ((flags & ~OBELISK_TIMER_FLAG_REPEATING) != 0)
             {
-                OBELISK_WARN("RegisterTimerWithOwnerTokenHandle rejected reserved timer flags.");
+                SafeLogWarnNoThrow("RegisterTimerWithOwnerTokenHandle rejected reserved timer flags.");
                 return 0;
             }
             if (delayMs == 0)
             {
-                OBELISK_WARN("RegisterTimerWithOwnerTokenHandle rejected zero delay.");
+                SafeLogWarnNoThrow("RegisterTimerWithOwnerTokenHandle rejected zero delay.");
                 return 0;
             }
             const bool repeating = (flags & OBELISK_TIMER_FLAG_REPEATING) != 0;
             if (repeating && intervalMs == 0)
             {
-                OBELISK_WARN("RegisterTimerWithOwnerTokenHandle rejected repeating timer with zero interval.");
+                SafeLogWarnNoThrow("RegisterTimerWithOwnerTokenHandle rejected repeating timer with zero interval.");
                 return 0;
             }
             if (!repeating && intervalMs != 0)
             {
-                OBELISK_WARN("RegisterTimerWithOwnerTokenHandle rejected one-shot timer with non-zero interval.");
+                SafeLogWarnNoThrow("RegisterTimerWithOwnerTokenHandle rejected one-shot timer with non-zero interval.");
                 return 0;
             }
 
@@ -2080,15 +2084,16 @@ namespace Obelisk::Core
             return DescribeGameplayPolicyEventKind(eventKind, out);
         }
         void PluginCallProcessEvent(void* caller, void* function, void* parms) {
-            if ((g_ApiCapabilities.load(std::memory_order_acquire) &
-                 OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT) == 0 ||
-                !IsCallProcessEventAllowed())
-            {
-                OBELISK_WARN("CallProcessEvent rejected. Enable allow-call-process-event only for a controlled debug window.");
-                return;
-            }
             try
             {
+                if ((g_ApiCapabilities.load(std::memory_order_acquire) &
+                     OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT) == 0 ||
+                    !IsCallProcessEventAllowed())
+                {
+                    SafeLogWarnNoThrow(
+                        "CallProcessEvent rejected. Enable allow-call-process-event only for a controlled debug window.");
+                    return;
+                }
                 Hooks::ProcessEventHook::CallOriginalProcessEvent(caller, function, parms);
             }
             catch (const std::exception& e)

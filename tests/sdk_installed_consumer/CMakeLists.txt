@@ -25,9 +25,32 @@ endif()
 if(NOT Obelisk_PLUGIN_INIT_CONTEXT_ABI_VERSION EQUAL 1)
     message(FATAL_ERROR "Unexpected Obelisk plugin init context ABI version: ${Obelisk_PLUGIN_INIT_CONTEXT_ABI_VERSION}")
 endif()
+if(NOT Obelisk_GAMEPLAY_POLICY_EVENT_ABI_VERSION EQUAL 1)
+    message(FATAL_ERROR "Unexpected Obelisk gameplay policy event ABI version: ${Obelisk_GAMEPLAY_POLICY_EVENT_ABI_VERSION}")
+endif()
+if(NOT Obelisk_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION EQUAL 1)
+    message(FATAL_ERROR "Unexpected Obelisk resource kind descriptor ABI version: ${Obelisk_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION}")
+endif()
+if(NOT Obelisk_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION EQUAL 1)
+    message(FATAL_ERROR "Unexpected Obelisk gameplay policy event descriptor ABI version: ${Obelisk_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION}")
+endif()
+if(NOT Obelisk_CHAT_MESSAGE_EVENT_ABI_VERSION EQUAL 1)
+    message(FATAL_ERROR "Unexpected Obelisk chat message event ABI version: ${Obelisk_CHAT_MESSAGE_EVENT_ABI_VERSION}")
+endif()
+
+set(OBELISK_INSTALLED_PACKAGE_ABI_DEFINITIONS
+    OBELISK_CMAKE_API_ABI_VERSION=${Obelisk_API_ABI_VERSION}
+    OBELISK_CMAKE_PLUGIN_METADATA_ABI_VERSION=${Obelisk_PLUGIN_METADATA_ABI_VERSION}
+    OBELISK_CMAKE_PLUGIN_INIT_CONTEXT_ABI_VERSION=${Obelisk_PLUGIN_INIT_CONTEXT_ABI_VERSION}
+    OBELISK_CMAKE_GAMEPLAY_POLICY_EVENT_ABI_VERSION=${Obelisk_GAMEPLAY_POLICY_EVENT_ABI_VERSION}
+    OBELISK_CMAKE_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION=${Obelisk_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION}
+    OBELISK_CMAKE_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION=${Obelisk_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION}
+    OBELISK_CMAKE_CHAT_MESSAGE_EVENT_ABI_VERSION=${Obelisk_CHAT_MESSAGE_EVENT_ABI_VERSION}
+)
 
 add_library(install_layout_consumer SHARED consumer_plugin.cpp)
 target_link_libraries(install_layout_consumer PRIVATE Obelisk::obelisk_sdk)
+target_compile_definitions(install_layout_consumer PRIVATE ${OBELISK_INSTALLED_PACKAGE_ABI_DEFINITIONS})
 set_target_properties(install_layout_consumer PROPERTIES
     PREFIX ""
     OUTPUT_NAME "install_layout_consumer"
@@ -38,6 +61,7 @@ set_target_properties(install_layout_consumer PROPERTIES
 
 add_library(install_layout_c_abi_consumer SHARED c_abi_plugin.c)
 target_link_libraries(install_layout_c_abi_consumer PRIVATE Obelisk::obelisk_sdk)
+target_compile_definitions(install_layout_c_abi_consumer PRIVATE ${OBELISK_INSTALLED_PACKAGE_ABI_DEFINITIONS})
 set_target_properties(install_layout_c_abi_consumer PROPERTIES
     PREFIX ""
     OUTPUT_NAME "install_layout_c_abi_consumer"

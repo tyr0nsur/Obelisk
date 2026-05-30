@@ -34,6 +34,19 @@ Every higher-level demand category below remains planning-only until its own cop
 payload, identity/privacy policy, lifecycle cleanup, persistence or ingress design where
 needed, SDK consumer tests, and second-source/runtime evidence gate are promoted.
 
+## Support Tier Legend
+
+- `production seed available`: supported for narrow Obelisk-native examples that use only
+  the current public C ABI, fail-closed capability checks, safe-disabled config, and
+  process-local ownership.
+- `experimental seed only`: allowed for explicitly labeled pattern examples that teach
+  copied-data callback handling, but not supported as production Plugin Hub modules or as
+  general chat, command, policy, structure, inventory, identity, mutation, or enforcement
+  SDKs.
+- `blocked` and `blocked except experimental auditing`: backlog demand only. These lanes
+  need their own copied-data ABI design, privacy/lifecycle rules, consumer tests, and
+  evidence gates before plugin authors should build public examples around them.
+
 ## NextGenPlugins Demand Snapshot
 
 The local dictionary currently points to these high-demand Plugin Hub categories. The

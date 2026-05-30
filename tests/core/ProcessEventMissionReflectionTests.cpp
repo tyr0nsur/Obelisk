@@ -636,6 +636,12 @@ namespace
             Attempt attempt = Identify(fixture, kGetPlayerUsableItemsNameIndex);
             Require(attempt.Invocation.Function == MissionReflection::MissionFunction::GetPlayerUsableItems,
                     "GetPlayerUsableItems function mismatch");
+            Require(!attempt.Invocation.HasParameterRanges,
+                    "GetPlayerUsableItems retained recognition-only parameter ranges");
+            Require(attempt.Invocation.ParameterData == nullptr,
+                    "GetPlayerUsableItems retained recognition-only parameter data");
+            Require(attempt.Invocation.ParameterSize == 0,
+                    "GetPlayerUsableItems retained recognition-only parameter size");
             Require(fixture.Context.Calls > 0, "accepted GetPlayerUsableItems did not read metadata");
         }
         {

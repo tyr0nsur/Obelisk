@@ -136,6 +136,16 @@ RELEASE_READINESS_TARGET_SETS = frozenset(
 INTERNAL_LAYOUT_ONLY_TARGET_SETS = frozenset(TARGET_SETS) - RELEASE_READINESS_TARGET_SETS
 
 
+def target_set_readiness_classification(target_set: str) -> str:
+    if target_set in RELEASE_READINESS_TARGET_SETS:
+        return "release_readiness"
+    if target_set in PLANNING_ONLY_TARGET_SETS:
+        return "planning_only"
+    if target_set in INTERNAL_LAYOUT_ONLY_TARGET_SETS:
+        return "internal_layout_only"
+    raise KeyError(target_set)
+
+
 def schema_targets(target_set: str, schema: str) -> set[str]:
     targets = set()
     for target in TARGET_SETS[target_set]:

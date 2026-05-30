@@ -176,6 +176,16 @@ class PluginManagerGuardrailTests(unittest.TestCase):
             with self.subTest(catch_body=catch_body.strip()[:80]):
                 self.assertNotIn("OBELISK_ERROR", catch_body)
 
+    def test_plugin_api_rejection_paths_use_no_throw_warnings(self) -> None:
+        text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+        boundary_prefix = text[: text.index("void PluginManager::LoadPlugins")]
+
+        self.assertNotIn("OBELISK_WARN", boundary_prefix)
+        self.assertIn("SafeLogWarnNoThrow", boundary_prefix)
+
+        call_process_event = extract_function_body(text, r"void PluginCallProcessEvent\(.*?\)")
+        self.assertLess(call_process_event.index("try"), call_process_event.index("IsCallProcessEventAllowed()"))
+
 
 if __name__ == "__main__":
     unittest.main()

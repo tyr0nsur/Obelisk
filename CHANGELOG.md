@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Hardened installed SDK package metadata so CMake exports all public ABI version macros
+  and installed consumers verify package/header ABI parity.
+- Hardened plugin API rejection paths so no-throw warning logging is used across callback
+  validation, debug-gated registration rejection, timer/chat/gameplay registration
+  rejection, and `CallProcessEvent` gating.
+- Hardened internal Mission copied-bool recognition so recognition-only
+  `GetPlayerUsableItems` no longer retains raw parameter pointers or sizes.
+- Clarified UFunction target-set listing and Structure build-policy guidance so
+  release-readiness target sets, internal/layout-only sets, and planning-only sets are
+  machine-readable and exact snapshot inputs stay separate from evidence-pack manifests.
+- Clarified Plugin Hub support tiers so production-supported seeds, experimental examples,
+  and blocked/backlog lanes are explicit for plugin authors.
 - Hardened `EventManager` owned callback registration so null raw ProcessEvent callbacks
   fail closed without creating inert handles or owner-cleanup state.
 - Hardened UFunction reflection promotion gates so internal/layout-only target sets cannot

@@ -203,6 +203,13 @@ parameter provenance are rejected and clear stale copied output. `ParameterData`
 borrowed internal pointer for immediate builder validation only; it must not be persisted,
 logged, exposed to plugins, or treated as object identity.
 
+The base recognizer now records `ParameterData` only for targets with approved copied bool
+ranges. Recognition-only `GetPlayerUsableItems` matches continue to expose field metadata,
+but even with non-null params they do not retain a raw parameter pointer or size. This keeps
+the object/array-only target out of the copied-bool provenance path while preserving the
+bool-bearing validation path for `AddPlayerToMission`, `BPAllowPlayerToLeaveMission`, and
+`BPOnPlayerRemovedFromMission`.
+
 These mask semantics are now covered in test-only recognizer and hook-helper fixtures, but
 Mission still remains internal and non-promoted until runtime observation, dispatcher
 lifecycle, public ABI, identity/privacy, and SDK policy gates are handled separately.

@@ -62,8 +62,8 @@ for the current checkpoint.
   second-source/static evidence.
 - SDK packaging publishes only `include/obelisk/ObeliskApi.h`; more public headers require
   explicit install layout/test updates and ABI review.
-- Installed `Obelisk_*` CMake variables mirror public C header `OBELISK_*` ABI macros;
-  plugin source uses the header macros, installed SDK consumers may validate both.
+- Installed `Obelisk_*` CMake variables mirror all public C header `OBELISK_*` ABI macros;
+  installed SDK consumers verify package/header parity.
 - Promoted copied events are observational and non-authoritative: no UE pointers, raw
   params, identity, lookup, mutation, return override, pincode/player text publication, or
   broad module SDK claim.
@@ -148,17 +148,19 @@ for the current checkpoint.
   containers with current-content checksums, symlink fail-closed checks, child-manifest
   blockers, container-only promote blocking, protected-root checks, and duplicate target
   guidance rejection.
-- UFunction target-set promotion mode accepts only explicit release-readiness target sets;
-  internal/layout-only sets still compare/list guidance, but readiness gaps report
+- UFunction target-set listing is machine-classified as `release_readiness`,
+  `planning_only`, or `internal_layout_only`. Promotion mode accepts only explicit
+  release-readiness target sets; internal/layout-only gaps report
   `target_set_not_release_readiness` until explicit promotion.
 - Offline artifact JSON manifests, provenance sidecars, and artifact checksum reads use
   no-symlink regular-file opens after protected-path prechecks.
 - `scripts/check_static_tooling.py` records optional radare2/rizin/Ghidra availability and
   runs smoke checks only on approved offline binaries/output roots.
-- `APrimalStructure.IsAllowedToBuild` is a high-demand build-policy dictionary seed, but it
-  is second-wave only: no committed snapshot, no second-source comparison, no target-set
-  promotion, no public StructureEvents/build-policy SDK, no mutation, and no return
-  override.
+- `APrimalStructure.IsAllowedToBuild` is second-wave only: no committed snapshot,
+  second-source comparison, target-set promotion, public StructureEvents/build-policy SDK,
+  mutation, or return override. Guidance now requires one exact sanitized candidate
+  snapshot before any target set and keeps evidence-pack manifests out of
+  `inspect_core_ufunctions.py --core`.
 - `players-identity-lifecycle-intake` is a guidance-only target set backed by
   `docs/research/2026-05-30-player-identity-lifecycle-plan.md`; it stays out of RC/public
   target sets, is release-gate rejected, and does not promote identity, lookup, runtime
@@ -192,7 +194,8 @@ for the current checkpoint.
 - Plugin Hub planning starts from `docs/PLUGIN_HUB_FOUNDATION_V1.md` and
   `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`: production seeds are lifecycle/config/logging,
   descriptor/catalog, and process-local timers; copied chat/policy examples remain
-  experimental, and ArkApi/NextGen inputs stay names/demand dictionaries only.
+  experimental, support tiers are explicit, and ArkApi/NextGen inputs stay names/demand
+  dictionaries only.
 - Artifact-pack contributor onboarding now has `docs/OFFLINE_ARTIFACT_PACKS.md` as the
   concise runbook. UFunction regeneration and RC root assembly require complete
   `offline_core` artifact identity, sanitized capture/pack IDs, and current bool-tail
@@ -200,8 +203,9 @@ for the current checkpoint.
   release gate preflights the four public RC target sets before build work.
 - Runtime/plugin lifecycle audit found no P1 blocker. `EventManager` granular unregister
   skips unrelated in-flight callbacks, validates snapshotted callbacks by id/generation/
-  pointer/family, and rejects null owned callbacks with handle `0`; owner cleanup remains
-  the unload barrier.
+  pointer/family, and rejects null owned callbacks with handle `0`; plugin API rejection
+  paths use no-throw warning logging and `CallProcessEvent` gating stays inside its catch
+  boundary.
 - Any future live/player validation requires a new approved live-ops brief and beta-test
   notice through the configured local webhook variable when players are involved.
 

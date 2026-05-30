@@ -1723,6 +1723,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         installed_consumer_cmake = (
             REPO_ROOT / "tests" / "sdk_installed_consumer" / "CMakeLists.txt"
         ).read_text(encoding="utf-8")
+        root_cmake = (REPO_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+        package_config = (REPO_ROOT / "cmake" / "ObeliskConfig.cmake.in").read_text(encoding="utf-8")
         header = PUBLIC_API_HEADER.read_text(encoding="utf-8")
 
         self.assertIn("installed CMake package variables", versioning)
@@ -1733,9 +1735,18 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             ("Obelisk_API_ABI_VERSION", "OBELISK_API_ABI_VERSION"),
             ("Obelisk_PLUGIN_METADATA_ABI_VERSION", "OBELISK_PLUGIN_METADATA_ABI_VERSION"),
             ("Obelisk_PLUGIN_INIT_CONTEXT_ABI_VERSION", "OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION"),
+            ("Obelisk_GAMEPLAY_POLICY_EVENT_ABI_VERSION", "OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION"),
+            ("Obelisk_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION", "OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION"),
+            (
+                "Obelisk_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION",
+                "OBELISK_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION",
+            ),
+            ("Obelisk_CHAT_MESSAGE_EVENT_ABI_VERSION", "OBELISK_CHAT_MESSAGE_EVENT_ABI_VERSION"),
         ):
             with self.subTest(cmake_variable=cmake_variable, c_macro=c_macro):
                 self.assertIn(cmake_variable, versioning)
+                self.assertIn(cmake_variable.replace("Obelisk_", "OBELISK_"), root_cmake)
+                self.assertIn(cmake_variable, package_config)
                 self.assertIn(cmake_variable, installed_consumer_cmake)
                 self.assertIn(c_macro, versioning)
                 self.assertRegex(header, re.compile(rf"^#define\s+{re.escape(c_macro)}\s+1u$", re.M))
@@ -3182,6 +3193,11 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         self.assertEqual(rows, expected_tiers)
         for required in (
+            "## Support Tier Legend",
+            "`production seed available`: supported for narrow Obelisk-native examples",
+            "`experimental seed only`: allowed for explicitly labeled pattern examples",
+            "not supported as production Plugin Hub modules or as general chat, command, policy, structure, inventory, identity, mutation, or enforcement SDKs",
+            "`blocked` and `blocked except experimental auditing`: backlog demand only",
             "it does not promise ArkApi plugin compatibility",
             "Neither tier means the corresponding ArkApi plugin family can be ported",
             "not as portable behavior, source, ABI, constants, schemas, command parsers, or implementation patterns",

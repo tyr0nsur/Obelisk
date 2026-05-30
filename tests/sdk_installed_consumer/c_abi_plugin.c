@@ -12,6 +12,26 @@
 #define ASSERT_OFFSET(type, field, expected) \
     _Static_assert(offsetof(type, field) == (expected), #type "." #field " offset changed")
 
+#ifndef OBELISK_CMAKE_CHAT_MESSAGE_EVENT_ABI_VERSION
+#error "Installed Obelisk CMake ABI variables were not passed to the C consumer build"
+#endif
+
+_Static_assert(OBELISK_CMAKE_API_ABI_VERSION == OBELISK_API_ABI_VERSION,
+               "Obelisk CMake API ABI version does not match the public header");
+_Static_assert(OBELISK_CMAKE_PLUGIN_METADATA_ABI_VERSION == OBELISK_PLUGIN_METADATA_ABI_VERSION,
+               "Obelisk CMake plugin metadata ABI version does not match the public header");
+_Static_assert(OBELISK_CMAKE_PLUGIN_INIT_CONTEXT_ABI_VERSION == OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION,
+               "Obelisk CMake plugin init context ABI version does not match the public header");
+_Static_assert(OBELISK_CMAKE_GAMEPLAY_POLICY_EVENT_ABI_VERSION == OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION,
+               "Obelisk CMake gameplay policy event ABI version does not match the public header");
+_Static_assert(OBELISK_CMAKE_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION == OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION,
+               "Obelisk CMake resource kind descriptor ABI version does not match the public header");
+_Static_assert(OBELISK_CMAKE_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION ==
+                   OBELISK_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION,
+               "Obelisk CMake gameplay policy event descriptor ABI version does not match the public header");
+_Static_assert(OBELISK_CMAKE_CHAT_MESSAGE_EVENT_ABI_VERSION == OBELISK_CHAT_MESSAGE_EVENT_ABI_VERSION,
+               "Obelisk CMake chat message event ABI version does not match the public header");
+
 ASSERT_SIZE(ObeliskStringView, 16);
 ASSERT_ALIGN(ObeliskStringView, 8);
 ASSERT_OFFSET(ObeliskStringView, data, 0);

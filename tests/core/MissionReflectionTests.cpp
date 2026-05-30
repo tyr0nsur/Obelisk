@@ -412,7 +412,9 @@ namespace
         Require(static_cast<bool>(result), result.Reason.c_str());
         Require(invocation.Function == MissionReflection::MissionFunction::GetPlayerUsableItems,
                 "GetPlayerUsableItems kind mismatch with unreadable params");
-        Require(invocation.HasParameterRanges, "non-null params should be recorded as present");
+        Require(!invocation.HasParameterRanges, "recognition-only mission retained parameter ranges");
+        Require(invocation.ParameterData == nullptr, "recognition-only mission retained parameter data");
+        Require(invocation.ParameterSize == 0, "recognition-only mission retained parameter size");
         Require(invocation.Fields.size() == 2, "recognition-only field count mismatch");
         RequireFieldShape(invocation.Fields[0],
                           MissionReflection::MissionField::Character,
