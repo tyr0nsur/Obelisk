@@ -729,6 +729,19 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertNotIn('out->version = "0.2.0-dev";', timer_source)
         self.assertNotIn('out->version = "0.1.0-rc.1";', timer_source)
 
+    def test_reference_plugins_copy_only_advertised_api_prefix(self) -> None:
+        for relative in (
+            "plugins/oBaseEvents/oBaseEvents.cpp",
+            "plugins/oProcessTimer/oProcessTimer.cpp",
+            "plugins/oDescriptorCatalog/oDescriptorCatalog.cpp",
+        ):
+            source = read(relative)
+            with self.subTest(file=relative):
+                self.assertIn("CopyApiPrefix", source)
+                self.assertIn("std::memcpy(&g_Api, api, copySize);", source)
+                self.assertIn("api->struct_size < sizeof(g_Api)", source)
+                self.assertNotIn("g_Api = *api;", source)
+
     def test_core_timer_release_scope_separates_published_rc_from_future_v0_1(self) -> None:
         docs = {
             "docs/agent-handoff/COMPACT_CONTEXT.md": read("docs/agent-handoff/COMPACT_CONTEXT.md"),

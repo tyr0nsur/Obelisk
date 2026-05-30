@@ -146,6 +146,10 @@ scripts/check_release_readiness.sh \
   --second-source-report-dir /tmp/obelisk-rc-second-source
 ```
 
+The gate rejects second-source snapshot roots whose `evidence.obelisk_commit` does not
+match the current validated `HEAD`. Use `--allow-cross-ref-second-source-root` only for an
+explicit historical tag recovery after review; do not use it for a new release candidate.
+
 For future release candidates or explicit recovery of a published tag, an existing local
 or unpublished RC tag is not proof that the intended validated head is tagged. It may
 point behind the current validated head after later release-prep fixes. Before any

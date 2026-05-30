@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstdint>
+#include <cstring>
 #include <exception>
 #include <filesystem>
 #include <fstream>
@@ -35,6 +36,7 @@ namespace
 
     constexpr size_t kMaxLocalCommandBytes = 1024;
     constexpr size_t kMaxLocalCommandNameBytes = 32;
+    constexpr size_t kRequiredBaseApiSize = offsetof(ObeliskApi, capabilities) + sizeof(ObeliskApi::capabilities);
 
     constexpr const char* kDefaultConfig = R"json({
     "enabled": false,
@@ -354,6 +356,20 @@ namespace
             api->UnregisterChatMessageEventWithOwnerToken;
     }
 
+    void CopyApiPrefix(const ObeliskApi* api)
+    {
+        g_Api = {};
+        if (!api)
+        {
+            g_HasApi = false;
+            return;
+        }
+
+        const size_t copySize = api->struct_size < sizeof(g_Api) ? api->struct_size : sizeof(g_Api);
+        std::memcpy(&g_Api, api, copySize);
+        g_HasApi = true;
+    }
+
     bool IsValidChatMessageEvent(const ObeliskChatMessageEvent* event)
     {
         return event &&
@@ -520,7 +536,7 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(Obelis
             return false;
 
         if (api->abi_version != OBELISK_API_ABI_VERSION ||
-            api->struct_size < sizeof(ObeliskApi) ||
+            api->struct_size < kRequiredBaseApiSize ||
             context->abi_version != OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION ||
             context->struct_size < sizeof(ObeliskPluginInitContext))
         {
@@ -528,8 +544,7 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(Obelis
             return false;
         }
 
-        g_Api = *api;
-        g_HasApi = true;
+        CopyApiPrefix(api);
         g_OwnerToken = context->plugin_owner_token;
         g_LoggedEvents.store(0);
         g_LoggedChatCommands.store(0);

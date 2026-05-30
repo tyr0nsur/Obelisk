@@ -90,6 +90,9 @@ tag=v0.1.0-rc.2
 ref=1a7cd9816c8002846a40274d873a3ecc6ad742c0
 ```
 
+Both concrete `/tmp` roots above are reproduction records only. They are not durable
+workspace artifacts and must not be reused as final evidence for a later release ref.
+
 Source identity used for the refreshed inventory/structure snapshots:
 
 - Core path: `/servidor/ark/workspace-offline/second-source-arkserver2-TheIsland-20260529T011227Z/raw/core`
@@ -119,7 +122,8 @@ python3 scripts/inspect_core_ufunctions.py \
   --evidence-status candidate-only
 ```
 
-For future release candidates, the refreshed root must pass:
+For future release candidates, a newly regenerated second-source root for the intended
+release ref, not either concrete `/tmp` root recorded above, must pass:
 
 ```bash
 scripts/check_rc_layout_evidence_smoke.sh \

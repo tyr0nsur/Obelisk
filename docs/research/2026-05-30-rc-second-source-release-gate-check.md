@@ -3,7 +3,15 @@
 ## Summary
 
 On 2026-05-30, the local core-first RC release gate passed from a tracked-clean
-worktree using the assembled RC UFunction second-source root.
+worktree using the then-current assembled RC UFunction second-source root.
+
+This note is historical evidence for that validation pass. Do not reuse the literal
+`/tmp/obelisk-rc-ufunction-second-source-root` path as final evidence for later commits:
+local `/tmp` roots are disposable and may predate current snapshot metadata requirements.
+For `v0.1.0-rc.2` and later candidate refs, use the refreshed-root workflow recorded in
+[`2026-05-30-head-rc-second-source-refresh-gap.md`](2026-05-30-head-rc-second-source-refresh-gap.md)
+and rerun `scripts/check_release_readiness.sh --require-second-source-readiness` against a
+root regenerated for the intended ref.
 
 This check proves the current core-first RC gate for the documented public scope:
 `GameplayPolicyEvent`, resource/event descriptors, and minimal `ChatMessageEvent`.

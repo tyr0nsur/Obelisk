@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <exception>
 #include <filesystem>
 #include <fstream>
@@ -225,6 +226,20 @@ namespace
                api->DescribeGameplayPolicyEventKind;
     }
 
+    void CopyApiPrefix(const ObeliskApi* api)
+    {
+        g_Api = {};
+        if (!api)
+        {
+            g_HasApi = false;
+            return;
+        }
+
+        const size_t copySize = api->struct_size < sizeof(g_Api) ? api->struct_size : sizeof(g_Api);
+        std::memcpy(&g_Api, api, copySize);
+        g_HasApi = true;
+    }
+
     bool DescribeResource(const ObeliskApi* api, uint32_t resourceKind, ObeliskResourceKindDescriptor& out)
     {
         out = {};
@@ -396,11 +411,7 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
 
         {
             std::lock_guard<std::mutex> lock(g_StateMutex);
-            if (api)
-            {
-                g_Api = *api;
-                g_HasApi = true;
-            }
+            CopyApiPrefix(api);
         }
 
         if (!g_Enabled)

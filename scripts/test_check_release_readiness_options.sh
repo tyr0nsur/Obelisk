@@ -36,6 +36,7 @@ done
 
 for expected in \
     "--require-second-source-readiness" \
+    "--allow-cross-ref-second-source-root" \
     "--ufunction-second-source-root" \
     "--scriptstruct-second-source-root" \
     "--ufunction-second-source-target-set" \
@@ -225,6 +226,46 @@ if [[ -z "${protected_path_helpers}" ]]; then
     exit 1
 fi
 eval "${protected_path_helpers}"
+
+assert_second_source_root_commit_validation() {
+    local candidate_root="${TEST_TEMP_ROOT}/cross-ref-ufunction-root"
+    local output
+
+    mkdir -p "${candidate_root}/7e7ded49e0c6/sdk_chat"
+    cp \
+        "tests/fixtures/ufunction_snapshots/7e7ded49e0c6/sdk_chat/ShooterPlayerController.ServerSendChatMessage.snapshot.json" \
+        "${candidate_root}/7e7ded49e0c6/sdk_chat/ShooterPlayerController.ServerSendChatMessage.snapshot.json"
+    python3 - "${candidate_root}/7e7ded49e0c6/sdk_chat/ShooterPlayerController.ServerSendChatMessage.snapshot.json" <<'PY'
+import json
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
+payload["evidence"]["obelisk_commit"] = "0000000"
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+
+    ALLOW_CROSS_REF_SECOND_SOURCE_ROOT=0
+    set +e
+    output="$(validate_second_source_root_commit "--ufunction-second-source-root" "${candidate_root}" 2>&1)"
+    status=$?
+    set -e
+    if [[ "${status}" -ne 2 ]]; then
+        printf 'expected cross-ref second-source root rejection, got %s\n%s\n' \
+            "${status}" "${output}" >&2
+        exit 1
+    fi
+    if ! grep -Fq -- "--allow-cross-ref-second-source-root" <<<"${output}"; then
+        printf 'missing cross-ref override guidance\n%s\n' "${output}" >&2
+        exit 1
+    fi
+
+    ALLOW_CROSS_REF_SECOND_SOURCE_ROOT=1
+    validate_second_source_root_commit "--ufunction-second-source-root" "${candidate_root}"
+}
+
+assert_second_source_root_commit_validation
 
 assert_merged_status() {
     local current="$1"

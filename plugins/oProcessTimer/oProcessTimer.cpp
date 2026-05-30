@@ -5,6 +5,7 @@
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <exception>
 #include <filesystem>
 #include <fstream>
@@ -30,6 +31,20 @@ namespace
     "allow_all_instances": false,
     "instance_allowlist": []
 })json";
+
+    void CopyApiPrefix(const ObeliskApi* api)
+    {
+        g_Api = {};
+        if (!api)
+        {
+            g_HasApi = false;
+            return;
+        }
+
+        const size_t copySize = api->struct_size < sizeof(g_Api) ? api->struct_size : sizeof(g_Api);
+        std::memcpy(&g_Api, api, copySize);
+        g_HasApi = true;
+    }
 
     bool IsStringArray(const json& value)
     {
@@ -255,8 +270,7 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
 
         {
             std::lock_guard<std::mutex> lock(g_StateMutex);
-            g_Api = *api;
-            g_HasApi = true;
+            CopyApiPrefix(api);
             g_OwnerToken = context->plugin_owner_token;
         }
         g_TimerSeen.store(false);

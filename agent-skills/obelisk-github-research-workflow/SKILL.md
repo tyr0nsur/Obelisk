@@ -157,6 +157,10 @@ verification.
 - Treat `scripts/check_release_readiness.sh` as the single core-first release gate. CI may
   keep fast build/test jobs, but install/package validation should not drift into separate
   ad hoc CI commands with different defaults.
+- For release gates that require second-source UFunction evidence, never trust a reused
+  `/tmp` root by name. Smoke or regenerate the second-source root for the intended ref with
+  current snapshot metadata, then pass that exact root to
+  `scripts/check_release_readiness.sh --require-second-source-readiness`.
 - When release-scope behavior changes, keep `docs/RELEASE.md`, `docs/STATUS.md`,
   `CHANGELOG.md`, `.github/pull_request_template.md`, and release-scope guardrail tests in
   agreement.

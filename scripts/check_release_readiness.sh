@@ -11,6 +11,7 @@ JOBS="${OBELISK_BUILD_JOBS:-$(nproc)}"
 RELEASE_CHECK_ROOT=""
 LAYOUT_CHECK_ROOT=""
 ALLOW_DIRTY=0
+ALLOW_CROSS_REF_SECOND_SOURCE_ROOT=0
 REQUIRE_SECOND_SOURCE_READINESS=0
 UFUNCTION_SECOND_SOURCE_ROOT="${OBELISK_UFUNCTION_SECOND_SOURCE_ROOT:-}"
 SCRIPTSTRUCT_SECOND_SOURCE_ROOT="${OBELISK_SCRIPTSTRUCT_SECOND_SOURCE_ROOT:-}"
@@ -91,15 +92,73 @@ validate_second_source_report_dir() {
     fi
 }
 
+validate_second_source_root_commit() {
+    local label="$1"
+    local root="$2"
+
+    if [[ "${ALLOW_CROSS_REF_SECOND_SOURCE_ROOT}" == "1" || -z "${root}" ]]; then
+        return
+    fi
+
+    local head
+    head="$(git rev-parse HEAD)"
+
+    python3 - "${label}" "${root}" "${head}" <<'PY'
+import json
+import pathlib
+import sys
+
+label, root_text, head = sys.argv[1:4]
+root = pathlib.Path(root_text)
+paths = [root] if root.is_file() else sorted(path for path in root.rglob("*.snapshot.json") if path.is_file())
+errors = []
+
+if not paths:
+    errors.append(f"{label} contains no *.snapshot.json files: {root}")
+
+for path in paths:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        errors.append(f"{path}: cannot load snapshot JSON: {exc}")
+        continue
+
+    evidence = payload.get("evidence")
+    commit = evidence.get("obelisk_commit") if isinstance(evidence, dict) else None
+    if not isinstance(commit, str) or len(commit) < 7:
+        errors.append(f"{path}: evidence.obelisk_commit must be a commit prefix")
+        continue
+    if not head.startswith(commit):
+        errors.append(f"{path}: evidence.obelisk_commit {commit!r} does not match current HEAD {head[:12]}")
+
+if errors:
+    print(
+        f"{label} must be regenerated for the current validated HEAD, or rerun with "
+        "--allow-cross-ref-second-source-root for explicit historical tag recovery.",
+        file=sys.stderr,
+    )
+    for error in errors[:8]:
+        print(error, file=sys.stderr)
+    if len(errors) > 8:
+        print(f"... {len(errors) - 8} more error(s)", file=sys.stderr)
+    raise SystemExit(2)
+PY
+}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --allow-dirty)
             ALLOW_DIRTY=1
             shift
             ;;
+        --allow-cross-ref-second-source-root)
+            ALLOW_CROSS_REF_SECOND_SOURCE_ROOT=1
+            shift
+            ;;
         -h|--help)
             cat <<'EOF'
 Usage: scripts/check_release_readiness.sh [--allow-dirty] [--require-second-source-readiness]
+                                          [--allow-cross-ref-second-source-root]
                                           [--ufunction-second-source-root <path>]
                                           [--scriptstruct-second-source-root <path>]
                                           [--ufunction-second-source-target-set <name>]
@@ -113,6 +172,10 @@ directories are allowed. Gameplay/module second-source promotion gates run only 
 
 Options:
   --allow-dirty                     Permit a dirty worktree while developing the release gate itself.
+  --allow-cross-ref-second-source-root
+                                    Permit second-source snapshots whose evidence.obelisk_commit
+                                    does not match the current validated HEAD. Intended only for
+                                    explicit historical tag recovery.
   --require-second-source-readiness Fail if focused reflection promotion target sets lack complete
                                     second-source evidence.
   --ufunction-second-source-root    Candidate UFunction snapshot root for second-source promotion.
@@ -202,9 +265,11 @@ fi
 
 if [[ -n "${UFUNCTION_SECOND_SOURCE_ROOT}" ]]; then
     reject_protected_path "--ufunction-second-source-root" "read from" "${UFUNCTION_SECOND_SOURCE_ROOT}"
+    validate_second_source_root_commit "--ufunction-second-source-root" "${UFUNCTION_SECOND_SOURCE_ROOT}"
 fi
 if [[ -n "${SCRIPTSTRUCT_SECOND_SOURCE_ROOT}" ]]; then
     reject_protected_path "--scriptstruct-second-source-root" "read from" "${SCRIPTSTRUCT_SECOND_SOURCE_ROOT}"
+    validate_second_source_root_commit "--scriptstruct-second-source-root" "${SCRIPTSTRUCT_SECOND_SOURCE_ROOT}"
 fi
 if [[ -n "${SECOND_SOURCE_REPORT_DIR}" ]]; then
     validate_second_source_report_dir "${SECOND_SOURCE_REPORT_DIR}"
