@@ -36,6 +36,7 @@ Post-RC/research candidates:
 - [2026-05-29-module-surface-roadmap.md](2026-05-29-module-surface-roadmap.md)
 - [2026-05-29-next-targetset-discovery.md](2026-05-29-next-targetset-discovery.md)
 - [2026-05-29-mission-reflection-internal-readiness.md](2026-05-29-mission-reflection-internal-readiness.md)
+- [2026-05-30-mission-copied-bool-observer-plan.md](2026-05-30-mission-copied-bool-observer-plan.md)
 - [2026-05-29-item-compact-second-source-readiness.md](2026-05-29-item-compact-second-source-readiness.md)
 - [2026-05-29-item-return-only-policy-bridge-plan.md](2026-05-29-item-return-only-policy-bridge-plan.md)
 - [2026-05-30-item-return-only-policy-slice.md](2026-05-30-item-return-only-policy-slice.md)
@@ -120,6 +121,7 @@ when a task explicitly targets that module.
 | [2026-05-29-module-surface-roadmap.md](2026-05-29-module-surface-roadmap.md) | Module surface roadmap | Ranks current module surfaces and keeps accepted compact target sets separate from public SDK promotion. |
 | [2026-05-29-next-targetset-discovery.md](2026-05-29-next-targetset-discovery.md) | Next target-set discovery | Records accepted second-source layout evidence for mission and tribe compact target sets and ranks mission as the cleaner next module candidate. |
 | [2026-05-29-mission-reflection-internal-readiness.md](2026-05-29-mission-reflection-internal-readiness.md) | Mission reflection internal readiness | Reviews the expanded `MissionReflectionTests` coverage and limits mission readiness to an internal recognizer/copy-readiness pack without public SDK, hook, dispatcher, identity, mutation, or return override promotion. |
+| [2026-05-30-mission-copied-bool-observer-plan.md](2026-05-30-mission-copied-bool-observer-plan.md) | Mission copied-bool observer plan | Freezes the docs-only internal observer model for exactly four Mission functions, five copied bool fields, six redacted object/container fields, log grammar, gates, rollback, and non-goals without runtime or public SDK promotion. |
 | [2026-05-29-reflection-inventory-pack-smoke.md](2026-05-29-reflection-inventory-pack-smoke.md) | Reflection inventory pack smoke | Validates the redacted candidate-only inventory pack builder on offline core evidence, with FName root ready and 8/8 requested target-set functions present. |
 | [2026-05-29-gobjects-cross-manifest-comparison.md](2026-05-29-gobjects-cross-manifest-comparison.md) | GObjects cross-manifest comparison | Compares existing gobjects-sampling manifests across two copied cores, reinforcing `0x595b7e0` for internal offline work while keeping public GObjects, ResourceHandle, identity, lookup, mutation, and return override blocked. |
 | [2026-05-29-ghidra-fuobjectarray-field-window-probe.md](2026-05-29-ghidra-fuobjectarray-field-window-probe.md) | Bounded Ghidra/r2 FUObjectArray probe | Records redacted internal evidence that the static GObjects candidate and serial accessors share one coherent field-window hypothesis for the current ARK binary hash. |

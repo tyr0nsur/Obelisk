@@ -103,8 +103,13 @@ scripts/check_rc_layout_evidence_smoke.sh \
   --candidate-root /tmp/obelisk-rc-ufunction-second-source-root
 ```
 
-When a release or preview promotes reflected gameplay module surfaces beyond the
-core-first API, run the stricter promotion gate:
+For `v0.1.0-rc.1`, the final local candidate gate is the canonical release
+readiness script with second-source readiness enabled and the accepted RC
+UFunction snapshot root configured. The 2026-05-30 local checkpoint passed this
+gate with `/tmp/obelisk-rc-ufunction-second-source-root`; see
+[`2026-05-30-rc-second-source-release-gate-check.md`](research/2026-05-30-rc-second-source-release-gate-check.md).
+Rerun the same gate on the intended release ref immediately before any
+release-manager tag/push:
 
 ```bash
 scripts/check_release_readiness.sh --require-second-source-readiness

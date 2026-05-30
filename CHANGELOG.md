@@ -54,8 +54,9 @@ Current baseline:
   listeners/clients, long-lived file readers, and other external ingress unless a future
   plugin passes explicit shutdown, unregister, drain, join, and close gates.
 - Read-only operator CLI for install, instance, and plugin state inspection.
-- Release readiness script covering build, CTest, script tests, installed SDK layout,
-  read-only CLI status, installer dry-runs, and whitespace checks.
+- Release readiness script covering build, CTest, script tests, second-source readiness
+  when required, install layout validation, installed SDK consumer builds, read-only CLI
+  status, installer dry-runs, and whitespace/clean-tree checks.
 - Offline reflection capture analyzer, shared target-set snapshot comparison/regeneration,
   evidence-pack tooling, and dry-run UFunction target-set regeneration planning for
   second-source reflection research. The refreshed default `minimal-second-source-intake`
