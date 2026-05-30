@@ -30,6 +30,7 @@ Published RC baseline evidence lane:
 - [2026-05-29-public-gameplay-event-readiness-audit.md](2026-05-29-public-gameplay-event-readiness-audit.md)
 - [2026-05-29-chat-message-second-source-readiness.md](2026-05-29-chat-message-second-source-readiness.md)
 - [2026-05-30-rc-second-source-release-gate-check.md](2026-05-30-rc-second-source-release-gate-check.md)
+- [2026-05-30-head-rc-second-source-refresh-gap.md](2026-05-30-head-rc-second-source-refresh-gap.md)
 
 Current reflection evidence lane:
 

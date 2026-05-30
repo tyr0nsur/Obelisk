@@ -101,6 +101,13 @@ recovery context is not active routing for the current head; use
   structure/inventory lane. Consume gates are accepted, `promotion_ready=false`, and it
   does not authorize Inventory SDK, StructureEvents, identity, lookup, mutation, return
   override, or raw UE internals.
+- Current `HEAD` cannot reuse the historical `v0.1.0-rc.1` UFunction second-source root as
+  final release evidence. The diagnostic combined root
+  `/tmp/obelisk-rc-ufunction-second-source-root-20260530T000000Z` compares all nine RC
+  targets, but eight inventory/structure targets are inconclusive because their
+  second-source snapshots predate preserved bool-tail fields. Refresh those eight
+  snapshots with current tooling before any `v0.1.0-rc.2` or `v0.1.0` tag. See
+  `docs/research/2026-05-30-head-rc-second-source-refresh-gap.md`.
 - Item return-only, Mission copied-bool, Transfer `bAccept`, Structure return-only,
   Structure non-pin copied-scalar, and Buff breadth packages are evidence-only/internal.
   Consume mode accepts the relevant slices where documented, while promote mode remains

@@ -15,12 +15,24 @@ count_temp_roots() {
 
 before_help_roots="$(count_temp_roots)"
 help_output="$(scripts/check_release_readiness.sh --help)"
+rc_smoke_help_output="$(scripts/check_rc_layout_evidence_smoke.sh --help 2>&1)"
 after_help_roots="$(count_temp_roots)"
 if [[ "${before_help_roots}" != "${after_help_roots}" ]]; then
     printf 'help path leaked release temp roots: before=%s after=%s\n' \
         "${before_help_roots}" "${after_help_roots}" >&2
     exit 1
 fi
+
+for expected in \
+    "freshly assembled for the intended HEAD" \
+    "bool-tail metadata" \
+    "do not reuse the historical v0.1.0-rc.1 root"; do
+    if ! grep -Fq -- "${expected}" <<<"${rc_smoke_help_output}"; then
+        printf 'missing RC layout smoke stale-root help text: %s\n%s\n' \
+            "${expected}" "${rc_smoke_help_output}" >&2
+        exit 1
+    fi
+done
 
 for expected in \
     "--require-second-source-readiness" \

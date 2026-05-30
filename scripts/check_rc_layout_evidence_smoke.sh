@@ -10,7 +10,9 @@ Usage: scripts/check_rc_layout_evidence_smoke.sh --candidate-root PATH
 
 Validates the fixed RC layout-only target sets against a copied second-source
 candidate root. This is not a base-fixture smoke; it must compare a distinct
-candidate root and fail on readiness gaps.
+candidate root and fail on readiness gaps. Final RC/stable gates need a
+second-source root freshly assembled for the intended HEAD, including current
+bool-tail metadata; do not reuse the historical v0.1.0-rc.1 root.
 EOF
 }
 

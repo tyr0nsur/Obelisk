@@ -125,8 +125,10 @@ readiness script with second-source readiness enabled and the accepted target-se
 UFunction snapshot root configured. The published `v0.1.0-rc.1` checkpoint passed this
 gate with the historical root recorded in
 [`2026-05-30-rc-second-source-release-gate-check.md`](research/2026-05-30-rc-second-source-release-gate-check.md).
-Rerun the same gate on the intended release ref immediately before any
-release-manager tag/push:
+That root is historical evidence for the published RC only; do not reuse it as the final
+root for HEAD or any later candidate. Refresh the second-source root for the intended
+release ref, including current bool-tail metadata, then rerun the same gate immediately
+before any release-manager tag/push:
 
 ```bash
 scripts/check_release_readiness.sh \
