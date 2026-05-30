@@ -301,12 +301,25 @@ UNPROMOTED_SDK_CONSUMER_API_TOKENS = (
     "ResolveResource",
     "GetInventory",
     "ResolveInventory",
+    "GetItem",
+    "ResolveItem",
+    "ObeliskInventoryId",
+    "ObeliskItemId",
+    "ObeliskResourceId",
+    "inventory_id",
+    "item_id",
+    "resource_id",
+    "object_id",
     "ObeliskMutation",
     "ObeliskMutationContext",
     "MutateResource",
     "MutateInventory",
+    "MutateItem",
     "SetResource",
     "SetInventory",
+    "SetItem",
+    "OverrideInventory",
+    "OverrideItem",
     "OverrideReturn",
     "ReturnOverride",
     "ObeliskReturnOverride",
@@ -1245,6 +1258,54 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                         V010_GAMEPLAY_POLICY_EVENT_KIND_MASKS,
                     )
                     self.assertIn("not promoted", event.get("inventory_sdk", ""))
+
+    def test_public_gameplay_policy_manifest_redacts_inventory_backing_identity_and_authority(self) -> None:
+        manifest = json.loads(PUBLIC_GAMEPLAY_EVENTS_MANIFEST.read_text(encoding="utf-8"))
+        gameplay_policy = next(
+            (
+                event for event in manifest.get("promoted_events", [])
+                if isinstance(event, dict) and event.get("event_id") == "obelisk.gameplay_policy.v1"
+            ),
+            None,
+        )
+        self.assertIsNotNone(gameplay_policy)
+
+        self.assertEqual(
+            gameplay_policy.get("resource_contract"),
+            "kind-only, no identity, no lookup, no persistent handle",
+        )
+        self.assertEqual(gameplay_policy.get("payload"), "copied POD scalar fields only")
+        self.assertIn("not promoted", gameplay_policy.get("inventory_sdk", ""))
+
+        redacted_fields = gameplay_policy.get("redacted_fields")
+        self.assertIsInstance(redacted_fields, list)
+        for redacted in (
+            "UObject pointers",
+            "UFunction pointers",
+            "FName/GObjects indices",
+            "raw parameter buffers",
+            "player identity",
+            "inventory object identity",
+            "item identity",
+            "mutation or return override authority",
+            "pinCode",
+        ):
+            self.assertIn(redacted, redacted_fields)
+
+        target_set_evidence = gameplay_policy.get("target_set_evidence")
+        self.assertIsInstance(target_set_evidence, list)
+        minimal_intake = next(
+            (
+                evidence for evidence in target_set_evidence
+                if isinstance(evidence, dict) and evidence.get("target_set") == "minimal-second-source-intake"
+            ),
+            None,
+        )
+        self.assertIsNotNone(minimal_intake)
+        minimal_scope = minimal_intake.get("scope", "")
+        self.assertIn("layout-only", minimal_scope)
+        self.assertIn("no standalone", minimal_scope)
+        self.assertIn("inventory", minimal_scope)
 
     def test_obasevents_documents_binary_scoped_fname_resolution(self) -> None:
         text = (REPO_ROOT / "docs/oBaseEvents.md").read_text(encoding="utf-8")
