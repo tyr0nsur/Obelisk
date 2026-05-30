@@ -85,6 +85,12 @@ recovery context is not active routing for the current head; use
   live-subscriber dispatch budget, self-contained copied payload before reservation,
   copy/move rebinding for owned scalar spans, scalar range validation, fail-closed reader
   exceptions, exact descriptor field/type matching, and hot-path subscriber checks.
+- Structure non-PIN copied-scalar dispatch now has explicit internal helpers for
+  `SetVariant`, `AllowToggleActivation`, and `CanSeat`. The general structure recognizer
+  still accepts the six historical structure targets; use the non-PIN helpers only where
+  PIN/access/demolish targets must be rejected before event build or dispatch budget.
+  This remains evidence-only internal plumbing, not public `StructureEvents`, runtime
+  observation, mutation, return override, or server-test authorization.
 - ArkServerApi/AseApi may be used only as a dictionary for names and behavior / familiar
   concept grouping. It is not a porting target or copying source. Do not copy offsets,
   layouts, ABI assumptions, wrappers, raw UE pointer APIs, `.lib` artifacts, or

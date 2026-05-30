@@ -85,3 +85,21 @@ This slice is internal evidence only. It does not authorize public SDK callbacks
 metadata helpers, `ResourceHandle`, player/controller/character identity, structure
 identity, object lookup, mutation, return override, dispatcher wiring, hook wiring, runtime
 observation, or server-side probing.
+
+## Internal Runtime Follow-Up
+
+The structure reflection runtime now has an explicit internal non-PIN copied-scalar
+boundary for this target set. The general structure recognizer still accepts the existing
+six structure targets, including historical `VerifyPinCode`, `AllowStructureAccess`, and
+`IsAllowedToDemolish` paths. New non-PIN helpers accept only:
+
+```text
+SetVariant
+AllowToggleActivation
+CanSeat
+```
+
+Use the non-PIN helpers when a path must reject PIN/access/demolish targets before
+building a copied event or reserving dispatch budget. This is still internal plumbing
+only: it does not promote public `StructureEvents`, add ABI, enable runtime observation,
+or authorize server tests.

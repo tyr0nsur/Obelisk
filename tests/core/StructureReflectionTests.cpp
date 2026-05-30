@@ -513,6 +513,43 @@ namespace
             invocation);
         Require(result.Status == ReadStatus::UnsupportedLayout, "unsupported structure reflection was accepted");
     }
+
+    void TestNonPinCopiedScalarFilterIsExact()
+    {
+        Require(StructureReflection::IsNonPinCopiedScalarFunction(
+                    StructureReflection::StructureFunction::SetVariant),
+                "SetVariant function was rejected by non-pin copied-scalar filter");
+        Require(StructureReflection::IsNonPinCopiedScalarFunction(
+                    StructureReflection::StructureFunction::AllowToggleActivation),
+                "AllowToggleActivation function was rejected by non-pin copied-scalar filter");
+        Require(StructureReflection::IsNonPinCopiedScalarFunction(
+                    StructureReflection::StructureFunction::CanSeat),
+                "CanSeat function was rejected by non-pin copied-scalar filter");
+        Require(!StructureReflection::IsNonPinCopiedScalarFunction(
+                    StructureReflection::StructureFunction::VerifyPinCode),
+                "VerifyPinCode function was accepted by non-pin copied-scalar filter");
+        Require(!StructureReflection::IsNonPinCopiedScalarFunction(
+                    StructureReflection::StructureFunction::AllowStructureAccess),
+                "AllowStructureAccess function was accepted by non-pin copied-scalar filter");
+        Require(!StructureReflection::IsNonPinCopiedScalarFunction(
+                    StructureReflection::StructureFunction::IsAllowedToDemolish),
+                "IsAllowedToDemolish function was accepted by non-pin copied-scalar filter");
+
+        Require(!StructureReflection::IsNonPinCopiedScalarFunctionNameIndex(kAllowStructureAccessNameIndex),
+                "AllowStructureAccess FName was accepted by non-pin copied-scalar filter");
+        Require(!StructureReflection::IsNonPinCopiedScalarFunctionNameIndex(kIsAllowedToDemolishNameIndex),
+                "IsAllowedToDemolish FName was accepted by non-pin copied-scalar filter");
+        Require(StructureReflection::IsNonPinCopiedScalarFunctionNameIndex(kSetVariantNameIndex),
+                "SetVariant FName was rejected by non-pin copied-scalar filter");
+        Require(StructureReflection::IsNonPinCopiedScalarFunctionNameIndex(kAllowToggleActivationNameIndex),
+                "AllowToggleActivation FName was rejected by non-pin copied-scalar filter");
+        Require(!StructureReflection::IsNonPinCopiedScalarFunctionNameIndex(kVerifyPinCodeNameIndex),
+                "VerifyPinCode FName was accepted by non-pin copied-scalar filter");
+        Require(StructureReflection::IsNonPinCopiedScalarFunctionNameIndex(kCanSeatNameIndex),
+                "CanSeat FName was rejected by non-pin copied-scalar filter");
+        Require(!StructureReflection::IsNonPinCopiedScalarFunctionNameIndex(42),
+                "unrelated FName was accepted by non-pin copied-scalar filter");
+    }
 }
 
 int main()
@@ -523,6 +560,7 @@ int main()
     TestRejectsPartialNameCollisionByOuter();
     TestRejectsWrongShapeAndUnsupportedProperty();
     TestGateRejectsBeforeReading();
+    TestNonPinCopiedScalarFilterIsExact();
 
     std::cout << "StructureReflectionTests passed\n";
     return 0;

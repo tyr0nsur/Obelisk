@@ -35,6 +35,11 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
         return {GateStatus::Enabled, binarySha256};
     }
 
+    bool IsNonPinCopiedScalarStructureNameIndex(int32_t nameIndex)
+    {
+        return Obelisk::UE::StructureReflection::IsNonPinCopiedScalarFunctionNameIndex(nameIndex);
+    }
+
     bool IsReflectedStructureNameIndex(int32_t nameIndex)
     {
         return nameIndex == 7541 ||
@@ -153,6 +158,24 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
             return false;
         }
         return true;
+    }
+
+    bool TryBuildAndReserveDispatchBudgetForNonPinMatchedAttempt(const Attempt& attempt,
+                                                                 std::atomic<uint64_t>& counter,
+                                                                 uint64_t limit,
+                                                                 uint64_t& observationNumber,
+                                                                 CopiedStructureEvent& out)
+    {
+        if (attempt.Status != AttemptStatus::Matched ||
+            !Obelisk::UE::StructureReflection::IsNonPinCopiedScalarFunction(attempt.Invocation.Function))
+        {
+            observationNumber = 0;
+            out = {};
+            return false;
+        }
+
+        return TryBuildAndReserveDispatchBudgetForMatchedAttempt(
+            attempt, counter, limit, observationNumber, out);
     }
 
     namespace
@@ -320,6 +343,19 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
         return true;
     }
 
+    bool TryBuildNonPinCopiedStructureEvent(
+        const Obelisk::UE::StructureReflection::StructureInvocation& invocation,
+        CopiedStructureEvent& out)
+    {
+        if (!Obelisk::UE::StructureReflection::IsNonPinCopiedScalarFunction(invocation.Function))
+        {
+            out = {};
+            return false;
+        }
+
+        return TryBuildCopiedStructureEvent(invocation, out);
+    }
+
     namespace
     {
         bool IsSelfContainedCopiedEvent(const CopiedStructureEvent& event)
@@ -366,6 +402,23 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
         const CopiedStructureEvent& event)
     {
         if (!originalWasCalled)
+            return 0;
+
+        return DispatchCopiedStructureEvent(event);
+    }
+
+    size_t MaybeDispatchNonPinCopiedStructureEventAfterOriginal(
+        bool originalWasCalled,
+        const Obelisk::UE::StructureReflection::StructureInvocation& invocation)
+    {
+        if (!originalWasCalled ||
+            !Obelisk::UE::StructureReflection::IsNonPinCopiedScalarFunction(invocation.Function))
+        {
+            return 0;
+        }
+
+        CopiedStructureEvent event;
+        if (!TryBuildNonPinCopiedStructureEvent(invocation, event))
             return 0;
 
         return DispatchCopiedStructureEvent(event);

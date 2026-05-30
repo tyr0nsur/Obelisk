@@ -110,6 +110,7 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
                       bool observerDebugWindowEnabled,
                       bool instanceMarkerEnabled,
                       const char* binarySha256);
+    bool IsNonPinCopiedScalarStructureNameIndex(int32_t nameIndex);
     bool IsReflectedStructureNameIndex(int32_t nameIndex);
     bool ShouldAttemptObservation(uint64_t limit);
     bool ShouldAttemptRuntimeObservation(uint64_t logLimit, uint64_t dispatchLimit);
@@ -134,6 +135,11 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
                                                            uint64_t limit,
                                                            uint64_t& observationNumber,
                                                            CopiedStructureEvent& out);
+    bool TryBuildAndReserveDispatchBudgetForNonPinMatchedAttempt(const Attempt& attempt,
+                                                                 std::atomic<uint64_t>& counter,
+                                                                 uint64_t limit,
+                                                                 uint64_t& observationNumber,
+                                                                 CopiedStructureEvent& out);
 
     Attempt TryIdentifyInvocation(const Gate& gate,
                                   int32_t nameIndex,
@@ -142,10 +148,16 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
                                   void* params);
     bool TryBuildCopiedStructureEvent(const Obelisk::UE::StructureReflection::StructureInvocation& invocation,
                                       CopiedStructureEvent& out);
+    bool TryBuildNonPinCopiedStructureEvent(
+        const Obelisk::UE::StructureReflection::StructureInvocation& invocation,
+        CopiedStructureEvent& out);
     size_t MaybeDispatchCopiedStructureEventAfterOriginal(
         bool originalWasCalled,
         const Obelisk::UE::StructureReflection::StructureInvocation& invocation);
     size_t MaybeDispatchCopiedStructureEventAfterOriginal(
         bool originalWasCalled,
         const CopiedStructureEvent& event);
+    size_t MaybeDispatchNonPinCopiedStructureEventAfterOriginal(
+        bool originalWasCalled,
+        const Obelisk::UE::StructureReflection::StructureInvocation& invocation);
 }

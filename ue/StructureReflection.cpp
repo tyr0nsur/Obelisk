@@ -354,6 +354,35 @@ namespace Obelisk::UE::StructureReflection
         }
     }
 
+    bool IsNonPinCopiedScalarFunction(StructureFunction function)
+    {
+        switch (function)
+        {
+        case StructureFunction::SetVariant:
+        case StructureFunction::AllowToggleActivation:
+        case StructureFunction::CanSeat:
+            return true;
+        case StructureFunction::VerifyPinCode:
+        case StructureFunction::AllowStructureAccess:
+        case StructureFunction::IsAllowedToDemolish:
+            return false;
+        }
+        return false;
+    }
+
+    bool IsNonPinCopiedScalarFunctionNameIndex(int32_t nameIndex)
+    {
+        switch (nameIndex)
+        {
+        case kSetVariantNameIndex:
+        case kAllowToggleActivationNameIndex:
+        case kCanSeatNameIndex:
+            return true;
+        default:
+            return false;
+        }
+    }
+
     RuntimeReflection::ReadResult TryIdentifyStructureInvocation(const RuntimeReflection::MemoryReader& reader,
                                                                  const RuntimeReflection::ReadOptions& options,
                                                                  const void* function,

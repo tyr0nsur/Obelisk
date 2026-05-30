@@ -395,14 +395,18 @@ namespace
                 "non-zero log limit should allow runtime observation");
         Require(ShouldAttemptRuntimeObservation(0, 1),
                 "non-zero dispatch limit should allow runtime observation");
-        Require(!ShouldAttemptNameObservation(kVerifyPinCodeNameIndex, 0),
+        Require(!ShouldAttemptNameObservation(kSetVariantNameIndex, 0),
                 "zero limit should skip exact structure FName observation");
+        Require(ShouldAttemptNameObservation(kSetVariantNameIndex, 1),
+                "exact non-pin structure FName should pass observation filter with non-zero limit");
         Require(ShouldAttemptNameObservation(kVerifyPinCodeNameIndex, 1),
-                "exact structure FName should pass observation filter with non-zero limit");
+                "VerifyPinCode should still pass the general structure observation filter");
         Require(!ShouldAttemptNameObservation(42, 1),
                 "non-structure FName should not pass observation filter");
+        Require(ShouldAttemptNameObservation(kSetVariantNameIndex, 0, 1),
+                "dispatch-only non-pin structure FName should pass observation filter");
         Require(ShouldAttemptNameObservation(kVerifyPinCodeNameIndex, 0, 1),
-                "dispatch-only structure FName should pass observation filter");
+                "dispatch-only VerifyPinCode FName should still pass the general observation filter");
         Require(!ShouldAttemptNameObservation(42, 0, 1),
                 "dispatch-only non-structure FName should not pass observation filter");
         Require(!ShouldLogObservation(0, 25), "zero observation number should not log");
@@ -449,11 +453,14 @@ namespace
         Require(dispatchCounter.load() == 0, "rejected structure attempt changed dispatch counter");
 
         StructureFixture fixture;
-        BuildVerifyPinCode(fixture);
-        fixture.Params[4] = 1;
+        BuildSetVariant(fixture);
+        const int32_t variant = 7;
+        WriteAt(fixture.Params, 0x00, variant);
+        fixture.Params[0x04] = 1;
+        fixture.Params[0x05] = 1;
         Attempt matchedAttempt = TryIdentifyInvocation(
             EnabledGate(),
-            kVerifyPinCodeNameIndex,
+            kSetVariantNameIndex,
             fixture.Reader(),
             fixture.Function.data(),
             fixture.Params.data());
@@ -473,6 +480,17 @@ namespace
 
     void TestReflectedStructureNameFilter()
     {
+        Require(!IsNonPinCopiedScalarStructureNameIndex(7541),
+                "AllowStructureAccess FName was accepted by non-pin filter");
+        Require(!IsNonPinCopiedScalarStructureNameIndex(7574),
+                "IsAllowedToDemolish FName was accepted by non-pin filter");
+        Require(IsNonPinCopiedScalarStructureNameIndex(7605), "SetVariant FName was not accepted");
+        Require(IsNonPinCopiedScalarStructureNameIndex(7620), "AllowToggleActivation FName was not accepted");
+        Require(!IsNonPinCopiedScalarStructureNameIndex(7636),
+                "VerifyPinCode FName was accepted by non-pin filter");
+        Require(IsNonPinCopiedScalarStructureNameIndex(8481), "CanSeat FName was not accepted");
+        Require(!IsNonPinCopiedScalarStructureNameIndex(42), "unrelated FName was accepted");
+
         Require(IsReflectedStructureNameIndex(7541), "AllowStructureAccess FName was not accepted");
         Require(IsReflectedStructureNameIndex(7574), "IsAllowedToDemolish FName was not accepted");
         Require(IsReflectedStructureNameIndex(7605), "SetVariant FName was not accepted");
@@ -517,7 +535,7 @@ namespace
         MemoryReader reader{ThrowingReader, nullptr};
         Attempt attempt = TryIdentifyInvocation(
             EnabledGate(),
-            kVerifyPinCodeNameIndex,
+            kSetVariantNameIndex,
             reader,
             reinterpret_cast<void*>(0x10000),
             reinterpret_cast<void*>(0x20000));
@@ -528,7 +546,7 @@ namespace
                 "reader exception did not fail closed as an implausible read");
     }
 
-    void TestIdentifiesVerifyPinCodeWithoutPinRange()
+    void TestGeneralIdentifyStillRecognizesVerifyPinCode()
     {
         StructureFixture fixture;
         BuildVerifyPinCode(fixture);
@@ -541,14 +559,10 @@ namespace
             fixture.Function.data(),
             fixture.Params.data());
 
-        Require(attempt.Status == AttemptStatus::Matched, attempt.Result.Reason.c_str());
+        Require(attempt.Status == AttemptStatus::Matched,
+                "VerifyPinCode was rejected by general ProcessEvent structure path");
         Require(attempt.Invocation.Function == StructureReflection::StructureFunction::VerifyPinCode,
                 "VerifyPinCode function mismatch");
-        Require(attempt.Invocation.Fields.size() == 2, "VerifyPinCode field count mismatch");
-        Require(attempt.Invocation.Fields[0].Sensitive, "pinCode should be sensitive");
-        Require(attempt.Invocation.Fields[0].Range.Data == nullptr, "pinCode range was exposed");
-        Require(attempt.Invocation.Fields[1].Range.Data == fixture.Params.data() + 4,
-                "ReturnValue range mismatch");
     }
 
     void RequireScalarRange(const StructureReflection::StructureFieldRange& field,
@@ -569,28 +583,22 @@ namespace
 
     void TestIdentifiesAllStructureHookTargets()
     {
-        for (const auto [nameIndex, expected] : {
-                 std::pair{kAllowStructureAccessNameIndex, StructureReflection::StructureFunction::AllowStructureAccess},
-                 std::pair{kIsAllowedToDemolishNameIndex, StructureReflection::StructureFunction::IsAllowedToDemolish},
-                 std::pair{kAllowToggleActivationNameIndex, StructureReflection::StructureFunction::AllowToggleActivation},
-             })
         {
             StructureFixture fixture;
-            BuildFunction(fixture, nameIndex, nameIndex == kAllowToggleActivationNameIndex
-                              ? kPrimalStructureItemContainerNameIndex
-                              : kPrimalStructureNameIndex,
+            BuildFunction(fixture, kAllowToggleActivationNameIndex, kPrimalStructureItemContainerNameIndex,
                           2, 0x09, 0x08, ForPCReturnFields(fixture));
 
             Attempt attempt = TryIdentifyInvocation(
                 EnabledGate(),
-                nameIndex,
+                kAllowToggleActivationNameIndex,
                 fixture.Reader(),
                 fixture.Function.data(),
                 fixture.Params.data());
 
             Require(attempt.Status == AttemptStatus::Matched, attempt.Result.Reason.c_str());
-            Require(attempt.Invocation.Function == expected, "structure access target mismatch");
-            Require(attempt.Invocation.Fields.size() == 2, "structure access field count mismatch");
+            Require(attempt.Invocation.Function == StructureReflection::StructureFunction::AllowToggleActivation,
+                    "AllowToggleActivation target mismatch");
+            Require(attempt.Invocation.Fields.size() == 2, "AllowToggleActivation field count mismatch");
             RequireObjectRangeHidden(attempt.Invocation.Fields[0], "ForPC object range was exposed");
             RequireScalarRange(attempt.Invocation.Fields[1], fixture.Params.data() + 0x08, 1,
                                "return value range mismatch");
@@ -643,20 +651,72 @@ namespace
         }
     }
 
+    void TestNonPinExcludedTargetsDoNotReserveDispatchBudget()
+    {
+        for (const int32_t nameIndex : {
+                 kVerifyPinCodeNameIndex,
+                 kAllowStructureAccessNameIndex,
+                 kIsAllowedToDemolishNameIndex,
+             })
+        {
+            StructureFixture fixture;
+            if (nameIndex == kVerifyPinCodeNameIndex)
+            {
+                BuildVerifyPinCode(fixture);
+            }
+            else
+            {
+                BuildFunction(fixture,
+                              nameIndex,
+                              kPrimalStructureNameIndex,
+                              2,
+                              0x09,
+                              0x08,
+                              ForPCReturnFields(fixture));
+            }
+
+            Attempt attempt = TryIdentifyInvocation(
+                EnabledGate(),
+                nameIndex,
+                fixture.Reader(),
+                fixture.Function.data(),
+                fixture.Params.data());
+
+            Require(attempt.Status == AttemptStatus::Matched,
+                    "general structure path rejected a supported target");
+
+            std::atomic<uint64_t> dispatchCounter{0};
+            uint64_t observationNumber = 99;
+            CopiedStructureEvent event;
+            Require(!TryBuildAndReserveDispatchBudgetForNonPinMatchedAttempt(
+                        attempt, dispatchCounter, 1, observationNumber, event),
+                    "non-pin excluded structure target consumed dispatch budget");
+            Require(observationNumber == 0,
+                    "non-pin excluded structure target did not clear dispatch observation number");
+            Require(dispatchCounter.load() == 0,
+                    "non-pin excluded structure target changed dispatch counter");
+        }
+    }
+
     void TestRejectsStructureHookWrongOuter()
     {
         StructureFixture fixture;
         BuildFunction(fixture,
-                      kAllowStructureAccessNameIndex,
+                      kSetVariantNameIndex,
                       kPrimalStructureItemContainerNameIndex,
-                      2,
-                      0x09,
-                      0x08,
-                      ForPCReturnFields(fixture));
+                      3,
+                      0x06,
+                      0x05,
+                      {{
+                          {kVariantIndexNameIndex, 0x00, 0x04, fixture.IntPropertyClass.data()},
+                          {kBForceSetNameIndex, 0x04, 0x01, fixture.BoolPropertyClass.data()},
+                          {kReturnValueNameIndex, 0x05, 0x01, fixture.BoolPropertyClass.data()},
+                          {},
+                      }});
 
         Attempt attempt = TryIdentifyInvocation(
             EnabledGate(),
-            kAllowStructureAccessNameIndex,
+            kSetVariantNameIndex,
             fixture.Reader(),
             fixture.Function.data(),
             fixture.Params.data());
@@ -664,7 +724,7 @@ namespace
         Require(attempt.Status == AttemptStatus::Rejected, "wrong structure outer was accepted");
     }
 
-    void TestBuildsCopiedStructureEventWithoutBorrowedObjectOrSensitiveFields()
+    void TestRejectsPinCodeCopiedStructureEventWithoutDispatchBudget()
     {
         StructureFixture fixture;
         BuildVerifyPinCode(fixture);
@@ -674,29 +734,34 @@ namespace
         fixture.Params[3] = 4;
         fixture.Params[4] = 1;
 
-        Attempt attempt = TryIdentifyInvocation(
-            EnabledGate(),
-            kVerifyPinCodeNameIndex,
+        StructureReflection::StructureInvocation invocation;
+        ReadResult result = StructureReflection::TryIdentifyStructureInvocation(
             fixture.Reader(),
+            MakeReadOptionsForBinary(kSupportedShooterGameServerSha256, true),
             fixture.Function.data(),
-            fixture.Params.data());
-        Require(attempt.Status == AttemptStatus::Matched, attempt.Result.Reason.c_str());
+            fixture.Params.data(),
+            invocation);
+        Require(static_cast<bool>(result), result.Reason.c_str());
+        Require(invocation.Function == StructureReflection::StructureFunction::VerifyPinCode,
+                "baseline VerifyPinCode recognizer did not match");
 
         CopiedStructureEvent event;
-        Require(TryBuildCopiedStructureEvent(attempt.Invocation, event),
-                "failed to build copied VerifyPinCode event");
-        Require(event.View.Kind == Obelisk::Core::StructureEventKind::VerifyPinCode,
-                "VerifyPinCode event kind mismatch");
-        Require(event.View.FunctionNameIndex == kVerifyPinCodeNameIndex,
-                "VerifyPinCode event function index mismatch");
-        Require(event.View.OuterNameIndex == kPrimalStructureItemContainerNameIndex,
-                "VerifyPinCode event outer index mismatch");
-        Require(event.View.Scalars.size() == 1, "VerifyPinCode copied sensitive pin code");
-        Require(event.View.Scalars[0].Field == Obelisk::Core::StructureScalarField::ReturnValue,
-                "VerifyPinCode return scalar field mismatch");
-        Require(event.View.Scalars[0].Type == Obelisk::Core::StructureScalarType::Bool,
-                "VerifyPinCode return scalar type mismatch");
-        Require(event.View.Scalars[0].BoolValue, "VerifyPinCode return scalar value mismatch");
+        Require(!TryBuildNonPinCopiedStructureEvent(invocation, event),
+                "copied non-pin path accepted VerifyPinCode");
+        Require(event.View.Scalars.empty(), "failed VerifyPinCode copy left copied scalar span");
+
+        Attempt matchedAttempt;
+        matchedAttempt.Status = AttemptStatus::Matched;
+        matchedAttempt.Result = ReadResult::Ok();
+        matchedAttempt.Invocation = invocation;
+
+        std::atomic<uint64_t> dispatchCounter{0};
+        uint64_t observationNumber = 99;
+        Require(!TryBuildAndReserveDispatchBudgetForNonPinMatchedAttempt(
+                    matchedAttempt, dispatchCounter, 1, observationNumber, event),
+                "VerifyPinCode consumed non-pin structure dispatch budget");
+        Require(observationNumber == 0, "VerifyPinCode did not clear dispatch observation number");
+        Require(dispatchCounter.load() == 0, "VerifyPinCode changed dispatch counter");
     }
 
     void TestBuildsCopiedStructureEventForScalarStructureTargets()
@@ -924,16 +989,15 @@ namespace
     void TestDispatchesCopiedStructureEventThroughInternalDispatcher()
     {
         StructureFixture fixture;
-        BuildVerifyPinCode(fixture);
-        fixture.Params[0] = 1;
-        fixture.Params[1] = 2;
-        fixture.Params[2] = 3;
-        fixture.Params[3] = 4;
-        fixture.Params[4] = 1;
+        BuildSetVariant(fixture);
+        const int32_t variant = 11;
+        WriteAt(fixture.Params, 0x00, variant);
+        fixture.Params[0x04] = 1;
+        fixture.Params[0x05] = 0;
 
         Attempt attempt = TryIdentifyInvocation(
             EnabledGate(),
-            kVerifyPinCodeNameIndex,
+            kSetVariantNameIndex,
             fixture.Reader(),
             fixture.Function.data(),
             fixture.Params.data());
@@ -951,31 +1015,36 @@ namespace
 
         Require(dispatched == 1, "copied structure event was not dispatched");
         Require(captured.size() == 1, "captured structure event count mismatch");
-        Require(captured[0].Kind == Obelisk::Core::StructureEventKind::VerifyPinCode,
-                "dispatched VerifyPinCode kind mismatch");
-        Require(captured[0].FunctionNameIndex == kVerifyPinCodeNameIndex,
-                "dispatched VerifyPinCode function index mismatch");
-        Require(captured[0].OuterNameIndex == kPrimalStructureItemContainerNameIndex,
-                "dispatched VerifyPinCode outer index mismatch");
-        Require(captured[0].Scalars.size() == 1,
-                "dispatched VerifyPinCode exposed pin code or object fields");
-        Require(captured[0].Scalars[0].Field == Obelisk::Core::StructureScalarField::ReturnValue,
-                "dispatched VerifyPinCode return field mismatch");
-        Require(captured[0].Scalars[0].Type == Obelisk::Core::StructureScalarType::Bool,
-                "dispatched VerifyPinCode return type mismatch");
-        Require(captured[0].Scalars[0].BoolValue,
-                "dispatched VerifyPinCode return value mismatch");
+        Require(captured[0].Kind == Obelisk::Core::StructureEventKind::SetVariant,
+                "dispatched SetVariant kind mismatch");
+        Require(captured[0].FunctionNameIndex == kSetVariantNameIndex,
+                "dispatched SetVariant function index mismatch");
+        Require(captured[0].OuterNameIndex == kPrimalStructureNameIndex,
+                "dispatched SetVariant outer index mismatch");
+        Require(captured[0].Scalars.size() == 3, "dispatched SetVariant scalar count mismatch");
+        Require(captured[0].Scalars[0].Field == Obelisk::Core::StructureScalarField::VariantIndex,
+                "dispatched SetVariant variant field mismatch");
+        Require(captured[0].Scalars[0].Int32Value == variant, "dispatched SetVariant variant value mismatch");
+        Require(captured[0].Scalars[1].Field == Obelisk::Core::StructureScalarField::BForceSet,
+                "dispatched SetVariant bForceSet field mismatch");
+        Require(captured[0].Scalars[1].BoolValue, "dispatched SetVariant bForceSet value mismatch");
+        Require(captured[0].Scalars[2].Field == Obelisk::Core::StructureScalarField::ReturnValue,
+                "dispatched SetVariant return field mismatch");
+        Require(!captured[0].Scalars[2].BoolValue, "dispatched SetVariant return value mismatch");
     }
 
     void TestCopiedStructureDispatchRequiresOriginalProcessEvent()
     {
         StructureFixture fixture;
-        BuildVerifyPinCode(fixture);
-        fixture.Params[4] = 1;
+        BuildSetVariant(fixture);
+        const int32_t variant = 11;
+        WriteAt(fixture.Params, 0x00, variant);
+        fixture.Params[0x04] = 1;
+        fixture.Params[0x05] = 0;
 
         Attempt attempt = TryIdentifyInvocation(
             EnabledGate(),
-            kVerifyPinCodeNameIndex,
+            kSetVariantNameIndex,
             fixture.Reader(),
             fixture.Function.data(),
             fixture.Params.data());
@@ -996,8 +1065,8 @@ namespace
         Obelisk::Core::StructureEventDispatcher::Get().UnregisterCallbacksForOwner(&owner);
 
         Require(captured.size() == 1, "post-original structure event dispatch count mismatch");
-        Require(captured[0].Kind == Obelisk::Core::StructureEventKind::VerifyPinCode,
-                "post-original VerifyPinCode kind mismatch");
+        Require(captured[0].Kind == Obelisk::Core::StructureEventKind::SetVariant,
+                "post-original SetVariant kind mismatch");
     }
 
     void TestBlockedPreCallbackPreventsIntegratedStructureDispatch()
@@ -1009,12 +1078,15 @@ namespace
         EnableProcessEventBlockingGate(root);
 
         StructureFixture fixture;
-        BuildVerifyPinCode(fixture);
-        fixture.Params[4] = 1;
+        BuildSetVariant(fixture);
+        const int32_t variant = 11;
+        WriteAt(fixture.Params, 0x00, variant);
+        fixture.Params[0x04] = 1;
+        fixture.Params[0x05] = 0;
 
         Attempt attempt = TryIdentifyInvocation(
             EnabledGate(),
-            kVerifyPinCodeNameIndex,
+            kSetVariantNameIndex,
             fixture.Reader(),
             fixture.Function.data(),
             fixture.Params.data());
@@ -1026,7 +1098,7 @@ namespace
         auto& eventManager = Obelisk::Core::EventManager::Get();
         const uint64_t preRegistrationId = eventManager.RegisterPreProcessEventForNameIndexOwned(
             &preOwner,
-            kVerifyPinCodeNameIndex,
+            kSetVariantNameIndex,
             BlockingPreCallback);
         const uint64_t structureRegistrationId = Obelisk::Core::StructureEventDispatcher::Get().Register(
             &structureOwner,
@@ -1035,7 +1107,7 @@ namespace
         Require(structureRegistrationId != 0, "failed to register structure event callback");
 
         const bool originalWasCalled = Obelisk::Hooks::DispatchProcessEventCallbacks(
-            kVerifyPinCodeNameIndex,
+            kSetVariantNameIndex,
             reinterpret_cast<void*>(0x1),
             fixture.Function.data(),
             fixture.Params.data(),
@@ -1066,10 +1138,11 @@ int main()
     TestDisabledGateDoesNotRead();
     TestNonStructureNameDoesNotRead();
     TestIdentifyContainsReaderExceptions();
-    TestIdentifiesVerifyPinCodeWithoutPinRange();
+    TestGeneralIdentifyStillRecognizesVerifyPinCode();
     TestIdentifiesAllStructureHookTargets();
+    TestNonPinExcludedTargetsDoNotReserveDispatchBudget();
     TestRejectsStructureHookWrongOuter();
-    TestBuildsCopiedStructureEventWithoutBorrowedObjectOrSensitiveFields();
+    TestRejectsPinCodeCopiedStructureEventWithoutDispatchBudget();
     TestBuildsCopiedStructureEventForScalarStructureTargets();
     TestRejectsNonCanonicalStructureBoolWithoutDispatchBudget();
     TestRejectsShortStructureScalarRangeWithoutDispatchBudget();

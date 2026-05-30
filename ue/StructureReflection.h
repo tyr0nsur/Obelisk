@@ -48,6 +48,9 @@ namespace Obelisk::UE::StructureReflection
         RuntimeReflection::FixedVector<StructureFieldRange, 6> Fields;
     };
 
+    bool IsNonPinCopiedScalarFunction(StructureFunction function);
+    bool IsNonPinCopiedScalarFunctionNameIndex(int32_t nameIndex);
+
     RuntimeReflection::ReadResult TryIdentifyStructureInvocation(const RuntimeReflection::MemoryReader& reader,
                                                                  const RuntimeReflection::ReadOptions& options,
                                                                  const void* function,
