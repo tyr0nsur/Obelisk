@@ -30,6 +30,16 @@ RC required path:
 - [2026-05-29-public-gameplay-event-readiness-audit.md](2026-05-29-public-gameplay-event-readiness-audit.md)
 - [2026-05-29-chat-message-second-source-readiness.md](2026-05-29-chat-message-second-source-readiness.md)
 
+Current UE4 reflection evidence ledger:
+
+| Area | Current status | Primary notes |
+| --- | --- | --- |
+| FName | Binary-scoped clues accepted for current artifacts; broad table scans should reuse the reviewed root slot unless a new binary/hash contradicts it. | [2026-05-28-second-source-reversing-gap-matrix.md](2026-05-28-second-source-reversing-gap-matrix.md) |
+| GObjects | Strong internal/offline `GUObjectArray` candidate for enumeration and fixture generation; no public/runtime identity or lookup contract. | [2026-05-29-gobjects-cross-manifest-comparison.md](2026-05-29-gobjects-cross-manifest-comparison.md) |
+| UObject | Object fields and flags remain evidence for candidate classification; public lifecycle/validity semantics are not proven. | [2026-05-29-uobject-flags-validity-blocker.md](2026-05-29-uobject-flags-validity-blocker.md) |
+| UFunction layout | Accepted only per named target set after fixture and second-source comparison; RC target sets cover the current public copied surfaces. | [2026-05-30-rc-ufunction-layout-evidence-audit.md](2026-05-30-rc-ufunction-layout-evidence-audit.md) |
+| ResourceHandle | Post-RC/internal and blocked until lifecycle, validity, reuse, lookup privacy, and fail-closed semantics are proven. | [2026-05-30-post-rc-offline-resourcehandle-priority.md](2026-05-30-post-rc-offline-resourcehandle-priority.md) |
+
 Historical recovery reference:
 
 - [2026-05-29-rc-checkpoint-slicing-plan.md](2026-05-29-rc-checkpoint-slicing-plan.md)

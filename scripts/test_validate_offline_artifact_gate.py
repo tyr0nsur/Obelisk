@@ -301,6 +301,39 @@ def rc_ufunction_second_source_root_manifest(root: Path) -> dict:
 def static_global_promotion_evidence_manifest(*, ready: bool = False) -> dict:
     return {
         "schema": gate.STATIC_GLOBAL_PROMOTION_EVIDENCE_SCHEMA,
+        "binary": {
+            "sha256": "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+        },
+        "commands": {
+            "objdump": {
+                "provenance": {"verified": True},
+            },
+        },
+        "artifacts": {
+            "static_xrefs": "static-global-xrefs.json",
+        },
+        "candidates": [
+            {
+                "label": "gobjects",
+                "kind": "gobjects",
+                "address": "0x595b7e0",
+                "static_contract": {
+                    "satisfied": False,
+                    "blockers": ["missing_gobjects_coherent_field_window"],
+                    "coherent_window": None,
+                    "redacted_field_window_evidence": None,
+                },
+            },
+            {
+                "label": "fname_root",
+                "kind": "fname_root",
+                "address": "0x5956f30",
+                "static_contract": {
+                    "satisfied": True,
+                    "blockers": [],
+                },
+            },
+        ],
         "promotion_gate": {
             "ready": ready,
             "blockers": [] if ready else ["static_only_evidence"],
@@ -2280,6 +2313,46 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
             result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
 
         self.assertEqual(result["blockers"], [])
+
+    def test_blocks_static_global_promotion_evidence_with_skeletal_consume_shape(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "static-global.json"
+            write_json(
+                manifest,
+                {
+                    "schema": gate.STATIC_GLOBAL_PROMOTION_EVIDENCE_SCHEMA,
+                    "promotion_gate": {
+                        "ready": False,
+                        "blockers": ["static_only_evidence"],
+                    },
+                    "remaining_blockers": ["static_only_evidence"],
+                    "non_claims": ["static_only_evidence"],
+                },
+            )
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("static_global_missing_binary_sha256", reasons)
+        self.assertIn("static_global_missing_commands", reasons)
+        self.assertIn("static_global_missing_artifacts", reasons)
+        self.assertIn("static_global_missing_candidates", reasons)
+
+    def test_blocks_static_global_gobjects_without_field_window_status(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "static-global.json"
+            payload = static_global_promotion_evidence_manifest()
+            payload["candidates"][0]["static_contract"]["blockers"] = ["missing_rip_relative_xref"]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("static_global_gobjects_missing_field_window_status", reasons)
 
     def test_blocks_static_global_promotion_evidence_in_promote_mode_when_static_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

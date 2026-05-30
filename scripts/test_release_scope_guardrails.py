@@ -398,6 +398,8 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         workflow_skill = read("agent-skills/obelisk-github-research-workflow/SKILL.md")
 
         self.assertIn("scripts/check_release_readiness.sh", release)
+        self.assertIn("--ufunction-second-source-root /tmp/obelisk-rc-ufunction-second-source-root", release)
+        self.assertIn("--second-source-report-dir /tmp/obelisk-rc-second-source", release)
         self.assertIn("`oPolicyAudit`", release)
         self.assertIn("Verify the ABI v1 freeze artifacts before tagging", release)
         self.assertIn("Obelisk freezes the\n   current append-only `ObeliskApi` ABI v1", release)
@@ -904,17 +906,17 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
                 self.assertNotIn(forbidden_checkpoint_zero_b_include, checkpoint_zero_b_include_text)
 
         compact_text = normalized(compact)
+        compact_lower = compact_text.lower()
         self.assertIn("historical recovery context", compact_text)
-        self.assertIn("not active routing after checkpoint `b2f6a2b`", compact_text)
+        self.assertIn("not active routing for the current head", compact_text)
+        self.assertIn("use `git log --oneline -1` for the current head", compact_lower)
         self.assertIn("rather than by the old 0-pre/0a/0b slicing sequence", compact_text)
         current_text = normalized(current)
+        current_lower = current_text.lower()
         self.assertIn("historical recovery context", current_text)
         self.assertIn("not active routing", current_text)
-        self.assertIn("checkpointed after `b2f6a2b`", current_text)
-        self.assertIn(
-            "Current RC blocker focus after `b2f6a2b`",
-            current_text,
-        )
+        self.assertIn("use `git log --oneline -1` for the current head", current_lower)
+        self.assertIn("Current RC focus:", current_text)
         self.assertIn("accepted RC UFunction second-source root", current_text)
 
     def test_experimental_plugins_stay_out_of_release_scope(self) -> None:

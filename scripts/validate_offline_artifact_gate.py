@@ -233,6 +233,8 @@ REQUIRED_UOBJECT_FLAG_POLICY_CANDIDATES = {
     },
 }
 UOBJECT_FLAG_POLICY_ALLOWED_HEX_STRINGS = {"0x100", "0x4000"}
+STATIC_GLOBAL_CANDIDATE_KINDS = {"gobjects", "fname_root"}
+STATIC_GLOBAL_GOBJECTS_FIELD_WINDOW_BLOCKER = "missing_gobjects_coherent_field_window"
 UOBJECT_FLAG_POLICY_PUBLIC_FORBIDDEN_KEY_RE = re.compile(r"(?:^|_)(address|index|indices|serial|pointer|ptr)(?:_|$)", re.IGNORECASE)
 UOBJECT_FLAG_POLICY_PUBLIC_FORBIDDEN_VALUE_RE = re.compile(r"(?:^|[_\W])(address|index|indices|serial|pointer|ptr)(?:[_\W]|$)", re.IGNORECASE)
 UOBJECT_FLAG_POLICY_PUBLIC_ADDRESS_RE = re.compile(r"\b0x[0-9a-f]{5,}\b", re.IGNORECASE)
@@ -2221,6 +2223,65 @@ def validate_static_global_promotion_evidence_manifest(
         blockers.append({"reason": "static_global_missing_promotion_gate", "label": f"{label}:$.promotion_gate"})
         return blockers
 
+    binary = payload.get("binary")
+    if not isinstance(binary, dict) or not isinstance(binary.get("sha256"), str) or SHA256_RE.fullmatch(binary["sha256"]) is None:
+        blockers.append({"reason": "static_global_missing_binary_sha256", "label": f"{label}:$.binary.sha256"})
+
+    commands = payload.get("commands")
+    if not isinstance(commands, dict) or not commands:
+        blockers.append({"reason": "static_global_missing_commands", "label": f"{label}:$.commands"})
+
+    artifacts = payload.get("artifacts")
+    if not isinstance(artifacts, dict) or not artifacts:
+        blockers.append({"reason": "static_global_missing_artifacts", "label": f"{label}:$.artifacts"})
+
+    if mode != "promote" and promotion_gate.get("ready") is not False:
+        blockers.append({"reason": "static_global_consume_promotion_gate_not_false", "label": f"{label}:$.promotion_gate.ready"})
+
+    claims = [value.casefold() for _, value in collect_string_fields(payload)]
+    if not any("static_only_evidence" in value for value in claims):
+        blockers.append({"reason": "static_global_missing_static_only_evidence_claim", "label": label})
+
+    candidates = payload.get("candidates")
+    if not isinstance(candidates, list) or not candidates:
+        blockers.append({"reason": "static_global_missing_candidates", "label": f"{label}:$.candidates"})
+    else:
+        for index, candidate in enumerate(candidates):
+            candidate_label = f"{label}:$.candidates[{index}]"
+            if not isinstance(candidate, dict):
+                blockers.append({"reason": "static_global_candidate_invalid", "label": candidate_label})
+                continue
+            kind = candidate.get("kind")
+            if kind not in STATIC_GLOBAL_CANDIDATE_KINDS:
+                blockers.append({"reason": "static_global_candidate_kind_invalid", "label": f"{candidate_label}.kind"})
+            address = candidate.get("address")
+            if not isinstance(address, str) or re.fullmatch(r"0x[0-9a-f]+", address) is None:
+                blockers.append({"reason": "static_global_candidate_address_invalid", "label": f"{candidate_label}.address"})
+            static_contract = candidate.get("static_contract")
+            if not isinstance(static_contract, dict):
+                blockers.append({"reason": "static_global_candidate_missing_static_contract", "label": f"{candidate_label}.static_contract"})
+                continue
+            if kind == "gobjects":
+                contract_blockers = static_contract.get("blockers")
+                has_field_window_blocker = (
+                    isinstance(contract_blockers, list)
+                    and STATIC_GLOBAL_GOBJECTS_FIELD_WINDOW_BLOCKER in contract_blockers
+                )
+                has_coherent_window = isinstance(static_contract.get("coherent_window"), dict)
+                redacted_evidence = static_contract.get("redacted_field_window_evidence")
+                has_redacted_evidence = (
+                    isinstance(redacted_evidence, dict)
+                    and redacted_evidence.get("status") == "accepted_internal_static_evidence"
+                    and redacted_evidence.get("clears_blocker") == STATIC_GLOBAL_GOBJECTS_FIELD_WINDOW_BLOCKER
+                )
+                if not (has_coherent_window or has_field_window_blocker or has_redacted_evidence):
+                    blockers.append(
+                        {
+                            "reason": "static_global_gobjects_missing_field_window_status",
+                            "label": f"{candidate_label}.static_contract",
+                        }
+                    )
+
     if mode == "promote":
         if promotion_gate.get("ready") is not True:
             blockers.append({"reason": "promote_mode_static_global_promotion_gate_not_ready", "label": f"{label}:$.promotion_gate.ready"})
@@ -2229,7 +2290,6 @@ def validate_static_global_promotion_evidence_manifest(
         remaining_blockers = payload.get("remaining_blockers")
         if isinstance(remaining_blockers, list) and remaining_blockers:
             blockers.append({"reason": "promote_mode_static_global_has_remaining_blockers", "label": f"{label}:$.remaining_blockers"})
-        claims = [value.casefold() for _, value in collect_string_fields(payload)]
         if any("static_only_evidence" in value for value in claims):
             blockers.append({"reason": "promote_mode_static_global_static_only_evidence", "label": label})
     return blockers

@@ -169,10 +169,10 @@ priorities, and do not use history files as the active source of truth.
   strict-pattern artifact is accepted for consume-mode indexing only; it is not
   ResourceHandle promotion evidence, and promote mode remains blocked by
   candidate-only/non-claims.
-- Post-RC offline tooling checkpoint `8e76d3c` added candidate-only UObject flag,
-  weak-helper, and GObjects evidence builders. They are consume-mode internal/offline
-  indexing tools only and do not promote public GObjects, lookup, identity, lifecycle,
-  `ResourceHandle`, mutation, return override, or SDK surfaces.
+- Post-RC offline tooling added candidate-only UObject flag, weak-helper, and GObjects
+  evidence builders. They are consume-mode internal/offline indexing tools only and do not
+  promote public GObjects, lookup, identity, lifecycle, `ResourceHandle`, mutation, return
+  override, or SDK surfaces.
 - `scripts/build_uobject_flag_sample_report.py` produces
   `obelisk.uobject-flag-sample-report.v1` from the transition-matrix plus regenerated
   policy artifacts. Each `--input` must be paired with a `--consume-gate` in the same
@@ -244,7 +244,8 @@ priorities, and do not use history files as the active source of truth.
   release gate without `--allow-dirty` on the intended release ref, exact tag/ref
   verification, and explicit authorization before any tag or release-ref push.
 - `docs/research/2026-05-29-rc-checkpoint-slicing-plan.md` is historical recovery
-  context, not active routing after checkpoint `b2f6a2b`. Use `CURRENT.md` for current
+  context, not active routing for the current head. Use `git log --oneline -1` for the
+  current head, use `CURRENT.md` for current
   blockers and keep future changes focused by subsystem rather than by the old 0-pre/0a/0b
   slicing sequence.
 - Current ResourceHandle flag-policy pointer:
@@ -311,7 +312,7 @@ priorities, and do not use history files as the active source of truth.
 - `docs/PLUGIN_ARCHITECTURE.md`: plugin lifecycle and promotion rules.
 - `docs/research/README.md`: canonical research-note format.
 - `docs/research/2026-05-29-rc-checkpoint-slicing-plan.md`: historical dirty-tree
-  recovery reference, not active routing after `b2f6a2b`.
+  recovery reference, not active routing for the current head.
 - `docs/research/2026-05-29-public-gameplay-event-readiness-audit.md`: promoted
   `GameplayPolicyEvent` boundary.
 - `docs/research/2026-05-29-minimal-second-source-readiness.md`: accepted minimal

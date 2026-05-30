@@ -116,7 +116,13 @@ Rerun the same gate on the intended release ref immediately before any
 release-manager tag/push:
 
 ```bash
-scripts/check_release_readiness.sh --require-second-source-readiness
+scripts/check_release_readiness.sh \
+  --require-second-source-readiness \
+  --ufunction-second-source-root /tmp/obelisk-rc-ufunction-second-source-root \
+  --ufunction-second-source-target-set minimal-second-source-intake \
+  --ufunction-second-source-target-set structure-observer-intake \
+  --ufunction-second-source-target-set chat-message-intake \
+  --second-source-report-dir /tmp/obelisk-rc-second-source
 ```
 
 An existing local or unpublished RC tag is not proof that the current validated
@@ -319,7 +325,8 @@ scripts/check_obelisk_server_posture.sh --expect-stable --map <map> --instance <
 
 ```bash
 git tag -a v0.1.0-rc.1 -m "Obelisk 0.1.0-rc.1"
-git push origin v0.1.0-rc.1
+# Only after the explicit release-manager/lead authorization above:
+# git push origin v0.1.0-rc.1
 ```
 
 After the release candidate is validated and no RC blockers remain, tag the stable

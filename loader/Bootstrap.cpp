@@ -203,6 +203,28 @@ static void StopDebugControlThread()
         g_DebugControlThread.join();
 }
 
+static bool RemoveHookBeforePluginUnload()
+{
+    if (Obelisk::Hooks::ProcessEventHook::Remove())
+        return true;
+
+    OBELISK_CRITICAL(
+        "ProcessEvent hook removal failed; preserving plugins and logger to avoid unloading code while detour frames may still be active.");
+    return false;
+}
+
+static bool ShutdownRuntimeAfterHookRemoval()
+{
+    StopDebugControlThread();
+    if (!RemoveHookBeforePluginUnload())
+        return false;
+
+    Obelisk::Core::PluginManager::Get().UnloadAll();
+    Obelisk::Logger::Shutdown();
+    g_ObeliskStarted = false;
+    return true;
+}
+
 // The constructor attribute ensures this function runs as soon as the shared library 
 // is loaded into the target process via LD_PRELOAD.
 __attribute__((constructor))
@@ -254,10 +276,8 @@ void Obelisk_Init()
         if (Obelisk::Logger::IsInitialized())
         {
             OBELISK_CRITICAL("Obelisk bootstrap failed: {}", e.what());
-            StopDebugControlThread();
-            Obelisk::Hooks::ProcessEventHook::Remove();
-            Obelisk::Core::PluginManager::Get().UnloadAll();
-            Obelisk::Logger::Shutdown();
+            if (!ShutdownRuntimeAfterHookRemoval())
+                return;
         }
         g_ObeliskStarted = false;
     }
@@ -266,10 +286,8 @@ void Obelisk_Init()
         if (Obelisk::Logger::IsInitialized())
         {
             OBELISK_CRITICAL("Obelisk bootstrap failed with unknown exception.");
-            StopDebugControlThread();
-            Obelisk::Hooks::ProcessEventHook::Remove();
-            Obelisk::Core::PluginManager::Get().UnloadAll();
-            Obelisk::Logger::Shutdown();
+            if (!ShutdownRuntimeAfterHookRemoval())
+                return;
         }
         g_ObeliskStarted = false;
     }
@@ -282,9 +300,5 @@ void Obelisk_Shutdown()
         return;
 
     OBELISK_INFO("Obelisk Runtime Shutting Down...");
-    StopDebugControlThread();
-    Obelisk::Hooks::ProcessEventHook::Remove();
-    Obelisk::Core::PluginManager::Get().UnloadAll();
-    Obelisk::Logger::Shutdown();
-    g_ObeliskStarted = false;
+    ShutdownRuntimeAfterHookRemoval();
 }

@@ -139,8 +139,9 @@ This active routing table keeps only next-round facts; put durable evidence in
   logs.
 - `docs/research/2026-05-29-rc-checkpoint-slicing-plan.md` is now historical recovery
   context for the broad pre-RC worktree, not active routing. The current tracked tree is
-  checkpointed after `b2f6a2b`; continue with focused RC blockers and post-RC research
-  notes instead of restarting the old slicing sequence.
+  past that recovery slice; use `git log --oneline -1` for the current head and continue
+  with focused RC publication review and post-RC research notes instead of restarting the
+  old slicing sequence.
 
 ## Priority Next Steps
 
@@ -149,10 +150,10 @@ This active routing table keeps only next-round facts; put durable evidence in
   standalone public Inventory SDK, public StructureEvents SDK, dino, buff, mission, tribe,
   transfer, richer chat, command, player, admin, mutation, return override, and public
   `CallProcessEvent` surfaces out of RC.
-- Current RC blocker focus after `b2f6a2b`: keep the public scope frozen, finish
-  release-safety blockers such as ProcessEvent hook removal, keep Inventory copied-bool
-  hardening inside `GameplayPolicyEvent`, and rerun the full release gate with the
-  accepted RC UFunction second-source root before any publication request.
+- Current RC focus: keep the public scope frozen, preserve the ProcessEvent hook-removal
+  and Inventory copied-bool hardening already validated, and rerun the full release gate
+  with the accepted RC UFunction second-source root immediately before any publication
+  request.
 - Treat the latest `ChatMessageEvent` beta window as closed and preserved. Copied-log
   evidence under `/servidor/ark/workspace-offline` validates plugin-facing delivery for
   `send_mode=0,1,2,3` with no raw text/identity leaks. Any future live chat evidence must
@@ -182,11 +183,10 @@ This active routing table keeps only next-round facts; put durable evidence in
   is no RC public SDK/API promotion. It does not promote public module SDKs, callbacks,
   ABI, marker/env, runtime logs, hook wiring, mutation, return override, object identity,
   lookup, or `ResourceHandle`; keep detailed test coverage in dated research notes.
-- Post-RC offline tooling checkpoint `8e76d3c` added candidate-only UObject flag,
-  weak-helper, and GObjects evidence builders plus gate tests. These tools are for
-  consume-mode internal/offline indexing only. They do not promote public GObjects,
-  lookup, identity, lifecycle, `ResourceHandle`, mutation, return override, or SDK
-  surfaces.
+- Post-RC offline tooling added candidate-only UObject flag, weak-helper, and GObjects
+  evidence builders plus gate tests. These tools are for consume-mode internal/offline
+  indexing only. They do not promote public GObjects, lookup, identity, lifecycle,
+  `ResourceHandle`, mutation, return override, or SDK surfaces.
 - Keep redacted UFunction signatures, offline manifests, item compact intake,
   inventory-action compact intake, and BoolProperty gates candidate/layout-only unless the
   exact target set passes promote-mode artifact gates plus second-source/static evidence.

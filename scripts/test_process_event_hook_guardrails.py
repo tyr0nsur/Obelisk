@@ -42,6 +42,26 @@ class ProcessEventHookGuardrailTests(unittest.TestCase):
         )
         self.assertIn("s_RemovingProcessEventHook.store(false, std::memory_order_release);", pre_wait)
 
+    def test_bootstrap_does_not_unload_plugins_after_failed_hook_removal(self) -> None:
+        source = (REPO_ROOT / "loader/Bootstrap.cpp").read_text(encoding="utf-8")
+        helper_start = source.index("static bool ShutdownRuntimeAfterHookRemoval")
+        helper_end = source.index("// The constructor attribute", helper_start)
+        helper_body = source[helper_start:helper_end]
+
+        self.assertRegex(
+            helper_body,
+            r"if \(!RemoveHookBeforePluginUnload\(\)\)\s*return false;",
+        )
+        self.assertLess(
+            helper_body.index("return false;"),
+            helper_body.index("Obelisk::Core::PluginManager::Get().UnloadAll();"),
+        )
+        self.assertLess(
+            helper_body.index("return false;"),
+            helper_body.index("Obelisk::Logger::Shutdown();"),
+        )
+        self.assertIn("ShutdownRuntimeAfterHookRemoval();", source)
+
 
 if __name__ == "__main__":
     unittest.main()
