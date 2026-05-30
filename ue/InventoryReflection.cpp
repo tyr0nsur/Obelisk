@@ -10,9 +10,13 @@ namespace Obelisk::UE::InventoryReflection
         constexpr int32_t kAllowRemoteAddToInventoryNameIndex = 6236;
         constexpr int32_t kCanUseNameIndex = 6252;
         constexpr int32_t kPrimalItemNameIndex = 6231;
+        constexpr int32_t kPrimalItemObjectIndex = 17;
 
         constexpr int32_t kBoolPropertyClassNameIndex = 3;
+        constexpr int32_t kFunctionClassNameIndex = 10650;
         constexpr int32_t kObjectPropertyClassNameIndex = 5;
+        constexpr int32_t kBoolPropertyClassObjectIndex = 532;
+        constexpr int32_t kFunctionClassObjectIndex = 518;
         constexpr int32_t kObjectPropertyClassObjectIndex = 534;
 
         constexpr int32_t kInvCompNameIndex = 18798;
@@ -25,7 +29,11 @@ namespace Obelisk::UE::InventoryReflection
         constexpr uint32_t kCanUseFunctionFlags = 0x54020400;
         constexpr size_t kObjectPropertySize = 0x8;
         constexpr size_t kBoolPropertySize = 0x1;
-        constexpr int32_t kAnyObjectIndex = -1;
+
+        constexpr uint64_t kBoolInputPropertyFlags = 0x1040000280;
+        constexpr uint64_t kBoolReturnPropertyFlags = 0x1040000780;
+        constexpr uint64_t kRemoteAddInventoryComponentPropertyFlags = 0x1044080280;
+        constexpr uint64_t kObjectInputPropertyFlags = 0x1040000280;
 
         struct InventoryFieldSpec
         {
@@ -35,6 +43,7 @@ namespace Obelisk::UE::InventoryReflection
             size_t Size;
             int32_t ClassNameIndex;
             int32_t ClassObjectIndex;
+            uint64_t PropertyFlags;
             bool ExposesRange;
         };
 
@@ -43,6 +52,7 @@ namespace Obelisk::UE::InventoryReflection
             InventoryFunction Function;
             int32_t NameIndex;
             int32_t OuterNameIndex;
+            int32_t OuterObjectIndex;
             uint32_t FunctionFlags;
             uint16_t NumParms;
             uint16_t ParmsSize;
@@ -58,6 +68,7 @@ namespace Obelisk::UE::InventoryReflection
              kObjectPropertySize,
              kObjectPropertyClassNameIndex,
              kObjectPropertyClassObjectIndex,
+             kRemoteAddInventoryComponentPropertyFlags,
              false},
             {InventoryField::ByPC,
              kByPCNameIndex,
@@ -65,20 +76,23 @@ namespace Obelisk::UE::InventoryReflection
              kObjectPropertySize,
              kObjectPropertyClassNameIndex,
              kObjectPropertyClassObjectIndex,
+             kObjectInputPropertyFlags,
              false},
             {InventoryField::BRequestedByPlayer,
              kBRequestedByPlayerNameIndex,
              0x10,
              kBoolPropertySize,
              kBoolPropertyClassNameIndex,
-             kAnyObjectIndex,
+             kBoolPropertyClassObjectIndex,
+             kBoolInputPropertyFlags,
              true},
             {InventoryField::ReturnValue,
              kReturnValueNameIndex,
              0x11,
              kBoolPropertySize,
              kBoolPropertyClassNameIndex,
-             kAnyObjectIndex,
+             kBoolPropertyClassObjectIndex,
+             kBoolReturnPropertyFlags,
              true},
         }};
 
@@ -88,14 +102,16 @@ namespace Obelisk::UE::InventoryReflection
              0x00,
              kBoolPropertySize,
              kBoolPropertyClassNameIndex,
-             kAnyObjectIndex,
+             kBoolPropertyClassObjectIndex,
+             kBoolInputPropertyFlags,
              true},
             {InventoryField::ReturnValue,
              kReturnValueNameIndex,
              0x01,
              kBoolPropertySize,
              kBoolPropertyClassNameIndex,
-             kAnyObjectIndex,
+             kBoolPropertyClassObjectIndex,
+             kBoolReturnPropertyFlags,
              true},
         }};
 
@@ -103,6 +119,7 @@ namespace Obelisk::UE::InventoryReflection
             InventoryFunction::AllowRemoteAddToInventory,
             kAllowRemoteAddToInventoryNameIndex,
             kPrimalItemNameIndex,
+            kPrimalItemObjectIndex,
             kAllowRemoteAddToInventoryFunctionFlags,
             4,
             0x12,
@@ -115,6 +132,7 @@ namespace Obelisk::UE::InventoryReflection
             InventoryFunction::CanUse,
             kCanUseNameIndex,
             kPrimalItemNameIndex,
+            kPrimalItemObjectIndex,
             kCanUseFunctionFlags,
             2,
             0x02,
@@ -144,9 +162,35 @@ namespace Obelisk::UE::InventoryReflection
             if (!options.Layout)
                 return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::UnsupportedLayout,
                                                            "no supported layout for inventory reflection");
-            if (options.Layout->BinarySha256 != RuntimeReflection::kSupportedShooterGameServerSha256)
+            const RuntimeReflection::FieldLayout* supportedLayout =
+                RuntimeReflection::FindSupportedLayout(RuntimeReflection::kSupportedShooterGameServerSha256);
+            if (options.Layout != supportedLayout)
                 return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::UnsupportedLayout,
                                                            "inventory reflection constants do not match binary layout");
+            return RuntimeReflection::ReadResult::Ok();
+        }
+
+        RuntimeReflection::ReadResult ValidateFunctionClass(const RuntimeReflection::MemoryReader& reader,
+                                                            const RuntimeReflection::FieldLayout& layout,
+                                                            const RuntimeReflection::UFunctionView& function)
+        {
+            if (!function.Object.ClassPrivate)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                           "inventory UFunction has null class");
+
+            RuntimeReflection::UObjectView functionClass;
+            RuntimeReflection::ReadResult result =
+                RuntimeReflection::TryReadUObject(reader, layout, function.Object.ClassPrivate, functionClass);
+            if (!result)
+                return result;
+
+            if (functionClass.NamePrivate.ComparisonIndex != kFunctionClassNameIndex ||
+                functionClass.NamePrivate.Number != 0)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                           "inventory UFunction class FName mismatch");
+            if (functionClass.InternalIndex != kFunctionClassObjectIndex)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                           "inventory UFunction class object index mismatch");
             return RuntimeReflection::ReadResult::Ok();
         }
 
@@ -194,6 +238,9 @@ namespace Obelisk::UE::InventoryReflection
                 outer.NamePrivate.Number != 0)
                 return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
                                                            "inventory UFunction outer FName mismatch");
+            if (outer.InternalIndex != spec.OuterObjectIndex)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                           "inventory UFunction outer object index mismatch");
             return RuntimeReflection::ReadResult::Ok();
         }
 
@@ -216,8 +263,7 @@ namespace Obelisk::UE::InventoryReflection
                 propertyClass.NamePrivate.Number != 0)
                 return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
                                                            "inventory property class FName mismatch");
-            if (spec.ClassObjectIndex != kAnyObjectIndex &&
-                propertyClass.InternalIndex != spec.ClassObjectIndex)
+            if (propertyClass.InternalIndex != spec.ClassObjectIndex)
                 return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
                                                            "inventory property class object index mismatch");
             return RuntimeReflection::ReadResult::Ok();
@@ -244,6 +290,9 @@ namespace Obelisk::UE::InventoryReflection
             if (property.ArrayDim != 1)
                 return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
                                                            "inventory property ArrayDim mismatch");
+            if (property.PropertyFlags != spec.PropertyFlags)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                           "inventory property flags mismatch");
 
             return ValidatePropertyClass(reader, layout, property, spec);
         }
@@ -281,6 +330,12 @@ namespace Obelisk::UE::InventoryReflection
         {
             return result;
         }
+        if (RuntimeReflection::ReadResult result =
+                ValidateFunctionClass(reader, *options.Layout, reflectedFunction);
+            !result)
+        {
+            return result;
+        }
         if (RuntimeReflection::ReadResult result = ValidateFunctionShape(reflectedFunction, *spec); !result)
             return result;
         if (RuntimeReflection::ReadResult result =
@@ -295,6 +350,9 @@ namespace Obelisk::UE::InventoryReflection
         value.FunctionNameIndex = spec->NameIndex;
         value.OuterNameIndex = spec->OuterNameIndex;
         value.HasParameterRanges = params != nullptr;
+        if (spec->FieldCount > value.Fields.capacity())
+            return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::OutOfBounds,
+                                                       "inventory field count exceeds storage capacity");
         value.Fields.reserve(spec->FieldCount);
 
         for (size_t i = 0; i < spec->FieldCount; ++i)
@@ -311,6 +369,9 @@ namespace Obelisk::UE::InventoryReflection
             InventoryFieldRange field;
             field.Field = fieldSpec.Field;
             field.PropertyNameIndex = fieldSpec.NameIndex;
+            field.PropertyClassNameIndex = fieldSpec.ClassNameIndex;
+            field.PropertyClassObjectIndex = fieldSpec.ClassObjectIndex;
+            field.PropertyFlags = fieldSpec.PropertyFlags;
             field.Offset = fieldSpec.Offset;
             field.Size = fieldSpec.Size;
             field.ExposesRange = fieldSpec.ExposesRange;

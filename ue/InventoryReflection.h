@@ -11,12 +11,18 @@ namespace Obelisk::UE::InventoryReflection
     {
         AllowRemoteAddToInventory,
         CanUse,
+        ServerRequestInventoryUseItem,
+        ServerRequestInventoryUseItemWithActor,
     };
 
     enum class InventoryField
     {
         InventoryComponent,
+        Actor,
         ByPC,
+        RedactedItemId,
+        RedactedItemId1,
+        AdditionalData,
         BRequestedByPlayer,
         BIgnoreCooldown,
         ReturnValue,
@@ -26,6 +32,9 @@ namespace Obelisk::UE::InventoryReflection
     {
         InventoryField Field = InventoryField::ReturnValue;
         int32_t PropertyNameIndex = -1;
+        int32_t PropertyClassNameIndex = -1;
+        int32_t PropertyClassObjectIndex = -1;
+        uint64_t PropertyFlags = 0;
         int32_t Offset = -1;
         size_t Size = 0;
         bool ExposesRange = false;

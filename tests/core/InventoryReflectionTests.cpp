@@ -16,8 +16,12 @@ namespace
     constexpr int32_t kAllowRemoteAddToInventoryNameIndex = 6236;
     constexpr int32_t kCanUseNameIndex = 6252;
     constexpr int32_t kPrimalItemNameIndex = 6231;
+    constexpr int32_t kPrimalItemObjectIndex = 17;
     constexpr int32_t kBoolPropertyClassNameIndex = 3;
+    constexpr int32_t kFunctionClassNameIndex = 10650;
     constexpr int32_t kObjectPropertyClassNameIndex = 5;
+    constexpr int32_t kBoolPropertyClassObjectIndex = 532;
+    constexpr int32_t kFunctionClassObjectIndex = 518;
     constexpr int32_t kObjectPropertyClassObjectIndex = 534;
     constexpr int32_t kInvCompNameIndex = 18798;
     constexpr int32_t kByPCNameIndex = 18797;
@@ -26,6 +30,10 @@ namespace
     constexpr int32_t kBIgnoreCooldownNameIndex = 18814;
     constexpr uint32_t kAllowRemoteAddToInventoryFunctionFlags = 0x04020400;
     constexpr uint32_t kCanUseFunctionFlags = 0x54020400;
+    constexpr uint64_t kBoolInputPropertyFlags = 0x1040000280;
+    constexpr uint64_t kBoolReturnPropertyFlags = 0x1040000780;
+    constexpr uint64_t kRemoteAddInventoryComponentPropertyFlags = 0x1044080280;
+    constexpr uint64_t kObjectInputPropertyFlags = 0x1040000280;
 
     struct Region
     {
@@ -93,12 +101,12 @@ namespace
                        const void* klass,
                        int32_t nameIndex,
                        int32_t offset,
-                       int32_t elementSize)
+                       int32_t elementSize,
+                       uint64_t propertyFlags)
     {
         WriteObject(buffer, nameIndex, nameIndex, klass, owner);
 
         const int32_t arrayDim = 1;
-        const uint64_t propertyFlags = 0x80;
         WriteAt(buffer, 0x28, next);
         WriteAt(buffer, 0x30, arrayDim);
         WriteAt(buffer, 0x34, elementSize);
@@ -112,6 +120,7 @@ namespace
         int32_t Offset = -1;
         int32_t ElementSize = 0;
         const void* Class = nullptr;
+        uint64_t PropertyFlags = 0;
     };
 
     struct InventoryFixture
@@ -123,6 +132,7 @@ namespace
         std::array<uint8_t, 0x80> PropertyD{};
         std::array<uint8_t, 0x40> ObjectPropertyClass{};
         std::array<uint8_t, 0x40> BoolPropertyClass{};
+        std::array<uint8_t, 0x40> FunctionClass{};
         std::array<uint8_t, 0x40> Outer{};
         std::array<uint8_t, 0x20> Params{};
         ReaderContext Context;
@@ -137,6 +147,7 @@ namespace
             Context.Regions.push_back({PropertyD.data(), PropertyD.size()});
             Context.Regions.push_back({ObjectPropertyClass.data(), ObjectPropertyClass.size()});
             Context.Regions.push_back({BoolPropertyClass.data(), BoolPropertyClass.size()});
+            Context.Regions.push_back({FunctionClass.data(), FunctionClass.size()});
             Context.Regions.push_back({Outer.data(), Outer.size()});
             Context.Regions.push_back({Params.data(), Params.size()});
             return {RegionReader, &Context};
@@ -157,13 +168,15 @@ namespace
                     nullptr);
         WriteObject(fixture.BoolPropertyClass,
                     kBoolPropertyClassNameIndex,
-                    kBoolPropertyClassNameIndex,
+                    kBoolPropertyClassObjectIndex,
                     nullptr,
                     nullptr);
+        WriteObject(fixture.FunctionClass, kFunctionClassNameIndex, kFunctionClassObjectIndex, nullptr, nullptr);
     }
 
     void BuildFunction(InventoryFixture& fixture,
                        int32_t functionNameIndex,
+                       int32_t outerNameIndex,
                        uint32_t functionFlags,
                        uint16_t numParms,
                        uint16_t parmsSize,
@@ -171,11 +184,11 @@ namespace
                        const std::array<FieldDef, 4>& fields)
     {
         InitClasses(fixture);
-        WriteObject(fixture.Outer, kPrimalItemNameIndex, kPrimalItemNameIndex, nullptr, nullptr);
+        WriteObject(fixture.Outer, outerNameIndex, kPrimalItemObjectIndex, nullptr, nullptr);
         WriteObject(fixture.Function,
                     functionNameIndex,
                     functionNameIndex,
-                    reinterpret_cast<const void*>(0x20000),
+                    fixture.FunctionClass.data(),
                     fixture.Outer.data());
 
         std::array<std::array<uint8_t, 0x80>*, 4> properties{
@@ -193,7 +206,8 @@ namespace
                           fields[i].Class,
                           fields[i].NameIndex,
                           fields[i].Offset,
-                          fields[i].ElementSize);
+                          fields[i].ElementSize,
+                          fields[i].PropertyFlags);
         }
 
         WriteAt(fixture.Function, 0x38, fixture.PropertyA.data());
@@ -207,13 +221,22 @@ namespace
     {
         BuildFunction(fixture,
                       kCanUseNameIndex,
+                      kPrimalItemNameIndex,
                       kCanUseFunctionFlags,
                       2,
                       0x02,
                       0x01,
                       {{
-                          {kBIgnoreCooldownNameIndex, 0x00, 0x01, fixture.BoolPropertyClass.data()},
-                          {kReturnValueNameIndex, 0x01, 0x01, fixture.BoolPropertyClass.data()},
+                          {kBIgnoreCooldownNameIndex,
+                           0x00,
+                           0x01,
+                           fixture.BoolPropertyClass.data(),
+                           kBoolInputPropertyFlags},
+                          {kReturnValueNameIndex,
+                           0x01,
+                           0x01,
+                           fixture.BoolPropertyClass.data(),
+                           kBoolReturnPropertyFlags},
                           {},
                           {},
                       }});
@@ -223,27 +246,47 @@ namespace
     {
         BuildFunction(fixture,
                       kAllowRemoteAddToInventoryNameIndex,
+                      kPrimalItemNameIndex,
                       kAllowRemoteAddToInventoryFunctionFlags,
                       4,
                       0x12,
                       0x11,
                       {{
-                          {kInvCompNameIndex, 0x00, 0x08, fixture.ObjectPropertyClass.data()},
-                          {kByPCNameIndex, 0x08, 0x08, fixture.ObjectPropertyClass.data()},
-                          {kBRequestedByPlayerNameIndex, 0x10, 0x01, fixture.BoolPropertyClass.data()},
-                          {kReturnValueNameIndex, 0x11, 0x01, fixture.BoolPropertyClass.data()},
+                          {kInvCompNameIndex,
+                           0x00,
+                           0x08,
+                           fixture.ObjectPropertyClass.data(),
+                           kRemoteAddInventoryComponentPropertyFlags},
+                          {kByPCNameIndex, 0x08, 0x08, fixture.ObjectPropertyClass.data(), kObjectInputPropertyFlags},
+                          {kBRequestedByPlayerNameIndex,
+                           0x10,
+                           0x01,
+                           fixture.BoolPropertyClass.data(),
+                           kBoolInputPropertyFlags},
+                          {kReturnValueNameIndex,
+                           0x11,
+                           0x01,
+                           fixture.BoolPropertyClass.data(),
+                           kBoolReturnPropertyFlags},
                       }});
     }
 
     void RequireFieldMetadata(const InventoryReflection::InventoryFieldRange& field,
                               InventoryReflection::InventoryField expectedField,
                               int32_t expectedNameIndex,
+                              int32_t expectedClassNameIndex,
+                              int32_t expectedClassObjectIndex,
+                              uint64_t expectedPropertyFlags,
                               int32_t expectedOffset,
                               size_t expectedSize,
                               bool expectedExposesRange)
     {
         Require(field.Field == expectedField, "inventory field kind mismatch");
         Require(field.PropertyNameIndex == expectedNameIndex, "inventory field FName mismatch");
+        Require(field.PropertyClassNameIndex == expectedClassNameIndex, "inventory field class FName mismatch");
+        Require(field.PropertyClassObjectIndex == expectedClassObjectIndex,
+                "inventory field class object index mismatch");
+        Require(field.PropertyFlags == expectedPropertyFlags, "inventory field property flags mismatch");
         Require(field.Offset == expectedOffset, "inventory field offset mismatch");
         Require(field.Size == expectedSize, "inventory field size mismatch");
         Require(field.ExposesRange == expectedExposesRange, "inventory field exposure mismatch");
@@ -270,6 +313,9 @@ namespace
         RequireFieldMetadata(invocation.Fields[0],
                              InventoryReflection::InventoryField::BIgnoreCooldown,
                              kBIgnoreCooldownNameIndex,
+                             kBoolPropertyClassNameIndex,
+                             kBoolPropertyClassObjectIndex,
+                             kBoolInputPropertyFlags,
                              0x00,
                              0x01,
                              true);
@@ -278,6 +324,9 @@ namespace
         RequireFieldMetadata(invocation.Fields[1],
                              InventoryReflection::InventoryField::ReturnValue,
                              kReturnValueNameIndex,
+                             kBoolPropertyClassNameIndex,
+                             kBoolPropertyClassObjectIndex,
+                             kBoolReturnPropertyFlags,
                              0x01,
                              0x01,
                              true);
@@ -307,6 +356,9 @@ namespace
         RequireFieldMetadata(invocation.Fields[0],
                              InventoryReflection::InventoryField::InventoryComponent,
                              kInvCompNameIndex,
+                             kObjectPropertyClassNameIndex,
+                             kObjectPropertyClassObjectIndex,
+                             kRemoteAddInventoryComponentPropertyFlags,
                              0x00,
                              0x08,
                              false);
@@ -314,6 +366,9 @@ namespace
         RequireFieldMetadata(invocation.Fields[1],
                              InventoryReflection::InventoryField::ByPC,
                              kByPCNameIndex,
+                             kObjectPropertyClassNameIndex,
+                             kObjectPropertyClassObjectIndex,
+                             kObjectInputPropertyFlags,
                              0x08,
                              0x08,
                              false);
@@ -321,6 +376,9 @@ namespace
         RequireFieldMetadata(invocation.Fields[2],
                              InventoryReflection::InventoryField::BRequestedByPlayer,
                              kBRequestedByPlayerNameIndex,
+                             kBoolPropertyClassNameIndex,
+                             kBoolPropertyClassObjectIndex,
+                             kBoolInputPropertyFlags,
                              0x10,
                              0x01,
                              true);
@@ -330,6 +388,9 @@ namespace
         RequireFieldMetadata(invocation.Fields[3],
                              InventoryReflection::InventoryField::ReturnValue,
                              kReturnValueNameIndex,
+                             kBoolPropertyClassNameIndex,
+                             kBoolPropertyClassObjectIndex,
+                             kBoolReturnPropertyFlags,
                              0x11,
                              0x01,
                              true);
@@ -374,7 +435,7 @@ namespace
             WriteObject(fixture.Function,
                         kCanUseNameIndex,
                         kCanUseNameIndex,
-                        reinterpret_cast<const void*>(0x20000),
+                        fixture.FunctionClass.data(),
                         fixture.Outer.data(),
                         1);
 
@@ -386,6 +447,79 @@ namespace
                 fixture.Params.data(),
                 invocation);
             Require(result.Status == ReadStatus::Implausible, "numbered function FName was accepted");
+        }
+    }
+
+    void TestRejectsWrongFunctionClass()
+    {
+        {
+            InventoryFixture fixture;
+            BuildCanUse(fixture);
+            WriteObject(fixture.Function,
+                        kCanUseNameIndex,
+                        kCanUseNameIndex,
+                        nullptr,
+                        fixture.Outer.data());
+
+            InventoryReflection::InventoryInvocation invocation;
+            ReadResult result = InventoryReflection::TryIdentifyInventoryInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "null function class was accepted");
+        }
+        {
+            InventoryFixture fixture;
+            BuildCanUse(fixture);
+            WriteObject(fixture.Function,
+                        kCanUseNameIndex,
+                        kCanUseNameIndex,
+                        reinterpret_cast<const void*>(0x20000),
+                        fixture.Outer.data());
+
+            InventoryReflection::InventoryInvocation invocation;
+            ReadResult result = InventoryReflection::TryIdentifyInventoryInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Unreadable, "unreadable function class was accepted");
+        }
+        {
+            InventoryFixture fixture;
+            BuildCanUse(fixture);
+            WriteObject(fixture.FunctionClass, 9999, kFunctionClassObjectIndex, nullptr, nullptr);
+
+            InventoryReflection::InventoryInvocation invocation;
+            ReadResult result = InventoryReflection::TryIdentifyInventoryInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "wrong function class FName was accepted");
+        }
+        {
+            InventoryFixture fixture;
+            BuildCanUse(fixture);
+            WriteObject(fixture.FunctionClass,
+                        kFunctionClassNameIndex,
+                        kFunctionClassObjectIndex,
+                        nullptr,
+                        nullptr,
+                        1);
+
+            InventoryReflection::InventoryInvocation invocation;
+            ReadResult result = InventoryReflection::TryIdentifyInventoryInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "numbered Function class FName was accepted");
         }
     }
 
@@ -404,6 +538,21 @@ namespace
                 fixture.Params.data(),
                 invocation);
             Require(result.Status == ReadStatus::Implausible, "wrong FunctionFlags were accepted");
+        }
+        {
+            InventoryFixture fixture;
+            BuildAllowRemoteAdd(fixture);
+            WriteAt(fixture.Function, 0x90, uint32_t{kAllowRemoteAddToInventoryFunctionFlags ^ 0x400});
+
+            InventoryReflection::InventoryInvocation invocation;
+            ReadResult result = InventoryReflection::TryIdentifyInventoryInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible,
+                    "wrong AllowRemoteAddToInventory FunctionFlags were accepted");
         }
         {
             InventoryFixture fixture;
@@ -436,13 +585,28 @@ namespace
         {
             InventoryFixture fixture;
             BuildCanUse(fixture);
+            WriteAt(fixture.Function, 0x9a, uint16_t{0x00});
+
+            InventoryReflection::InventoryInvocation invocation;
+            ReadResult result = InventoryReflection::TryIdentifyInventoryInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "wrong ReturnValueOffset was accepted");
+        }
+        {
+            InventoryFixture fixture;
+            BuildCanUse(fixture);
             WriteProperty(fixture.PropertyA,
                           fixture.PropertyB.data(),
                           fixture.Function.data(),
                           fixture.BoolPropertyClass.data(),
                           kReturnValueNameIndex,
                           0x00,
-                          0x01);
+                          0x01,
+                          kBoolInputPropertyFlags);
 
             InventoryReflection::InventoryInvocation invocation;
             ReadResult result = InventoryReflection::TryIdentifyInventoryInvocation(
@@ -456,13 +620,44 @@ namespace
         {
             InventoryFixture fixture;
             BuildAllowRemoteAdd(fixture);
+            WriteProperty(fixture.PropertyC,
+                          fixture.PropertyD.data(),
+                          fixture.Function.data(),
+                          fixture.BoolPropertyClass.data(),
+                          kReturnValueNameIndex,
+                          0x10,
+                          0x01,
+                          kBoolReturnPropertyFlags);
+            WriteProperty(fixture.PropertyD,
+                          nullptr,
+                          fixture.Function.data(),
+                          fixture.BoolPropertyClass.data(),
+                          kBRequestedByPlayerNameIndex,
+                          0x11,
+                          0x01,
+                          kBoolInputPropertyFlags);
+
+            InventoryReflection::InventoryInvocation invocation;
+            ReadResult result = InventoryReflection::TryIdentifyInventoryInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible,
+                    "reordered AllowRemoteAddToInventory bool fields were accepted");
+        }
+        {
+            InventoryFixture fixture;
+            BuildAllowRemoteAdd(fixture);
             WriteProperty(fixture.PropertyA,
                           fixture.PropertyB.data(),
                           fixture.Function.data(),
                           fixture.BoolPropertyClass.data(),
                           kInvCompNameIndex,
                           0x00,
-                          0x01);
+                          0x01,
+                          kBoolInputPropertyFlags);
 
             InventoryReflection::InventoryInvocation invocation;
             ReadResult result = InventoryReflection::TryIdentifyInventoryInvocation(
@@ -472,6 +667,67 @@ namespace
                 fixture.Params.data(),
                 invocation);
             Require(result.Status == ReadStatus::Implausible, "wrong object property class was accepted");
+        }
+    }
+
+    void TestRejectsWrongPropertyMetadata()
+    {
+        {
+            InventoryFixture fixture;
+            BuildCanUse(fixture);
+            WriteAt(fixture.PropertyA, 0x38, uint64_t{kBoolInputPropertyFlags ^ 0x400});
+
+            InventoryReflection::InventoryInvocation invocation;
+            ReadResult result = InventoryReflection::TryIdentifyInventoryInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "wrong CanUse bool property flags were accepted");
+        }
+        {
+            InventoryFixture fixture;
+            BuildCanUse(fixture);
+            WriteAt(fixture.PropertyB, 0x38, uint64_t{kBoolInputPropertyFlags});
+
+            InventoryReflection::InventoryInvocation invocation;
+            ReadResult result = InventoryReflection::TryIdentifyInventoryInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "wrong CanUse return property flags were accepted");
+        }
+        {
+            InventoryFixture fixture;
+            BuildAllowRemoteAdd(fixture);
+            WriteAt(fixture.PropertyA, 0x38, uint64_t{kObjectInputPropertyFlags});
+
+            InventoryReflection::InventoryInvocation invocation;
+            ReadResult result = InventoryReflection::TryIdentifyInventoryInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible,
+                    "wrong AllowRemoteAddToInventory invComp property flags were accepted");
+        }
+        {
+            InventoryFixture fixture;
+            BuildCanUse(fixture);
+            WriteObject(fixture.BoolPropertyClass, kBoolPropertyClassNameIndex, 3, nullptr, nullptr);
+
+            InventoryReflection::InventoryInvocation invocation;
+            ReadResult result = InventoryReflection::TryIdentifyInventoryInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "wrong BoolProperty class object index was accepted");
         }
     }
 
@@ -506,7 +762,9 @@ int main()
     TestRecognizesCanUseScalarShape();
     TestRecognizesAllowRemoteAddWithoutObjectRanges();
     TestRejectsWrongOuterAndNameNumber();
+    TestRejectsWrongFunctionClass();
     TestRejectsWrongShape();
+    TestRejectsWrongPropertyMetadata();
     TestGateRejectsBeforeReading();
 
     std::cout << "InventoryReflectionTests passed\n";
