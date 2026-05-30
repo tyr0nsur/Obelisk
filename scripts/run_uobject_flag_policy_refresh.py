@@ -63,6 +63,11 @@ def reject_protected_output(path: Path) -> None:
         raise SystemExit(f"--output-root must not resolve under protected server root: {state['resolved']}")
 
 
+def reject_output_file(path: Path) -> None:
+    reject_repo_output(path)
+    reject_protected_output(path)
+
+
 def run_json(command: list[str], *, output: Path | None = None, allowed_returncodes: set[int] | None = None) -> dict[str, Any]:
     allowed = allowed_returncodes or {0}
     result = subprocess.run(
@@ -76,6 +81,7 @@ def run_json(command: list[str], *, output: Path | None = None, allowed_returnco
         detail = result.stderr.strip() or result.stdout.strip()
         raise SystemExit(f"command failed ({result.returncode}): {' '.join(command)}\n{detail}")
     if output is not None:
+        reject_output_file(output)
         output.write_text(result.stdout, encoding="utf-8")
     try:
         return json.loads(result.stdout)
@@ -88,6 +94,11 @@ def run_command(command: list[str]) -> None:
     if result.returncode != 0:
         detail = result.stderr.strip() or result.stdout.strip()
         raise SystemExit(f"command failed ({result.returncode}): {' '.join(command)}\n{detail}")
+
+
+def assert_safe_output_files(paths: list[Path]) -> None:
+    for path in paths:
+        reject_output_file(path)
 
 
 def build_result(args: argparse.Namespace) -> dict[str, Any]:
@@ -106,6 +117,15 @@ def build_result(args: argparse.Namespace) -> dict[str, Any]:
     policy_output = output_root / "uobject-flag-policy.redacted.json"
     consume_output = output_root / "uobject-flag-policy.consume-gate.json"
     promote_output = output_root / "uobject-flag-policy.promote-gate.json"
+    assert_safe_output_files(
+        [
+            preflight_output,
+            weak_helper_output,
+            policy_output,
+            consume_output,
+            promote_output,
+        ]
+    )
 
     preflight_command = [
         sys.executable,

@@ -66,6 +66,9 @@ TARGET_SETS = {
         "obelisk.ufunction-chain.snapshot.v1:ShooterGameState.AllowDownloadDino",
         "obelisk.ufunction-chain.snapshot.v1:PrimalDinoCharacter.IsAllowedToTransfer",
     ),
+    "transfer-baccept-only-policy-slice": (
+        "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerTransferredPlayerConfirmationResult",
+    ),
     "tribe-compact-intake": (
         "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerRequestTribeLog",
         "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.AllowTribeGroupPermission",

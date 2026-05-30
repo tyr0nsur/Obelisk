@@ -262,6 +262,95 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         finally:
             sys.argv = original_argv
 
+    def test_transfer_baccept_only_policy_slice_emits_only_allowed_input_bool(self) -> None:
+        fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
+
+        report = tool.build_transfer_baccept_only_policy_slice(snapshot_root=fixture_root)
+
+        self.assertEqual(tool.TRANSFER_BACCEPT_ONLY_POLICY_SCHEMA, report["schema"])
+        self.assertEqual("redacted", report["snapshot_root"])
+        self.assertEqual("transfer-ufunction-intake", report["input_target_set"])
+        self.assertEqual("transfer-baccept-only-policy-slice", report["output_target_set"])
+        self.assertEqual("complete", report["coverage"]["status"])
+        self.assertEqual(
+            "ShooterPlayerController.ServerTransferredPlayerConfirmationResult.bAccept",
+            report["copied_bool"]["copied_field"],
+        )
+        copied = report["copied_bool"]
+        self.assertEqual("in", copied["direction"])
+        self.assertEqual("bool", copied["type"])
+        self.assertEqual("0x0", copied["offset"])
+        self.assertEqual(0, copied["offset_internal"])
+        self.assertEqual(1, copied["element_size"])
+        self.assertEqual(1, copied["array_dim"])
+        self.assertEqual("0x01", copied["byte_mask"])
+        self.assertEqual("0xff", copied["field_mask"])
+        self.assertIs(False, copied["native_bool"])
+        self.assertEqual("0x220cc0", copied["function_flags"])
+        self.assertEqual(1, copied["num_parms"])
+        self.assertEqual(1, copied["parms_size"])
+        self.assertEqual("0xffff", copied["return_value_offset"])
+        self.assertEqual("0x1040000280", copied["property_flags"])
+        self.assertEqual("BoolProperty", copied["property_class"])
+        self.assertEqual("copied-bool-only", copied["evidence_status"])
+
+        self.assertEqual(1, report["safety_summary"]["copied_bool_count"])
+        self.assertEqual(10, report["safety_summary"]["forbidden_field_count"])
+        self.assertIs(False, report["safety_summary"]["promotion_ready"])
+        self.assertIn("runtime_hook_wiring", report["safety_summary"]["explicitly_excluded"])
+        self.assertIn("dispatcher_wiring", report["safety_summary"]["explicitly_excluded"])
+        self.assertIn("ARKTributeDino", report["safety_summary"]["explicitly_excluded"])
+        self.assertIn("public_sdk", report["safety_summary"]["explicitly_excluded"])
+
+        self.assertEqual(
+            [
+                "PrimalDinoCharacter.IsAllowedToTransfer.ReturnValue",
+                "PrimalDinoCharacter.IsAllowedToTransfer.WorldContextObject",
+                "ShooterGameState.AllowDownloadDino.ReturnValue",
+                "ShooterGameState.AllowDownloadDino.TheDinoClass",
+                "ShooterPlayerController.ServerDownloadTransferredPlayer.SpawnPointID",
+                "ShooterPlayerController.ServerDownloadTransferredPlayer.spawnPointRegionIndex",
+                "ShooterPlayerController.ServerUploadCurrentCharacterAndItems.InventoryComp",
+                "ShooterPlayerController.ServerUploadDino.DownloadedDino",
+                "ShooterPlayerState.ServerRequestSpawnPointsForDownloadedCharacters.IgnoreBedID",
+                "ShooterPlayerState.ServerRequestSpawnPointsForDownloadedCharacters.PlayerDataID",
+            ],
+            sorted(entry["forbidden_field"] for entry in report["forbidden_transfer_fields"]),
+        )
+
+        serialized = json.dumps(report)
+        self.assertNotIn(str(fixture_root), serialized)
+        self.assertNotIn("tests/fixtures/ufunction_snapshots", serialized)
+        copied_serialized = json.dumps(report["copied_bool"])
+        self.assertNotIn("SpawnPointID", copied_serialized)
+        self.assertNotIn("PlayerDataID", copied_serialized)
+        self.assertNotIn("DownloadedDino", copied_serialized)
+        self.assertNotIn("ReturnValue", copied_serialized)
+
+    def test_transfer_baccept_only_target_set_contains_single_confirmation_target(self) -> None:
+        from reflection_target_sets import TARGET_SETS
+
+        self.assertEqual(
+            (
+                "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerTransferredPlayerConfirmationResult",
+            ),
+            TARGET_SETS["transfer-baccept-only-policy-slice"],
+        )
+
+    def test_transfer_baccept_only_cli_mode_returns_success(self) -> None:
+        original_argv = sys.argv
+        try:
+            sys.argv = [
+                "build_redacted_ufunction_signatures.py",
+                "--transfer-baccept-only-policy-slice",
+                "--json",
+            ]
+            with contextlib.redirect_stdout(io.StringIO()) as stdout:
+                self.assertEqual(0, tool.main())
+            self.assertIn(tool.TRANSFER_BACCEPT_ONLY_POLICY_SCHEMA, stdout.getvalue())
+        finally:
+            sys.argv = original_argv
+
     def test_inventory_action_compact_target_set_stays_candidate_only_and_redacted(self) -> None:
         fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
 

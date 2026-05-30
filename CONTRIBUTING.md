@@ -149,11 +149,11 @@ Harden reflected event parameter decoding
 
 ## Current Priorities
 
-1. Hold the core-first `v0.1.0-rc` surface stable through release confirmation:
+1. Hold the published core-first `v0.1.0-rc.1` surface stable after release confirmation:
    stable runtime hooks, marker gates, plugin lifecycle, C ABI behavior,
    `GameplayPolicyEvent`, minimal `ChatMessageEvent`, and metadata helpers
    `DescribeResourceKind` and `DescribeGameplayPolicyEventKind`. Accept only
-   release-blocker fixes or explicitly scoped follow-up work before publication.
+   release-blocker fixes or explicitly scoped post-RC follow-up work.
 2. Keep additional gameplay/module APIs out of public scope until their copied
    payloads, callback lifetime, SDK consumer coverage, and explicitly named
    second-source gates are complete.

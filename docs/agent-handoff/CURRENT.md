@@ -21,9 +21,9 @@ sequence.
   copied-data module APIs, lifecycle-safe plugins, operator lifecycle tooling, and enough
   compatibility surface for familiar ARK plugin concepts on Linux.
 - Treat chat, inventory, structures, players, tribes, dinos, buffs, missions, transfers,
-  commands, permissions, timers, economy/database integrations, and admin tooling as
-  module areas above the core. Promote each only through copied-data ABI, privacy,
-  lifecycle, and second-source/static evidence gates.
+  commands, permissions, gameplay/module timer abstractions, economy/database
+  integrations, and admin tooling as module areas above the core. Promote each only
+  through copied-data ABI, privacy, lifecycle, and second-source/static evidence gates.
 
 ## Hard Overrides
 

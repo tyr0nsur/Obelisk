@@ -35,5 +35,6 @@ When enabled, the plugin validates the timer capability and owner token, registe
 one-shot timer with a 1000 ms delay, logs a fixed message when the callback fires, and
 unregisters the handle on shutdown. Shutdown is idempotent, and an init failure after an
 accepted timer registration unregisters the process-local handle before state is reset.
+Timer callbacks use stable process-local user data and do not read borrowed init context.
 
 Callbacks must return quickly and must not call into UE/gameplay state.

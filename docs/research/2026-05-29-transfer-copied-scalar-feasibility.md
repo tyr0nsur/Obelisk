@@ -89,6 +89,41 @@ return bools, object refs, class refs, tribute structs, arrays, strings, ids, mu
 return override, dispatcher wiring, runtime hook wiring, and public SDK promotion. The
 artifact should remain `promotion_ready=false`.
 
+## 2026-05-30 Offline Artifact Gate
+
+Implemented the consume-only schema
+`obelisk.transfer-baccept-only-policy-slice.v1` in
+`scripts/validate_offline_artifact_gate.py`. The gate accepts only
+`transfer-baccept-only-policy-slice` manifests derived from `transfer-ufunction-intake`
+and pins one copied field:
+
+- `ShooterPlayerController.ServerTransferredPlayerConfirmationResult.bAccept`
+
+The manifest must keep `policy_status=evidence-only`, `snapshot_root=redacted`,
+`promotion_ready=false`, exactly one input snapshot, and the exact copied bool shape:
+`FunctionFlags=0x220cc0`, `NumParms=1`, `ParmsSize=1`,
+`ReturnValueOffset=0xffff`, `BoolProperty`, offset `0`, `ElementSize=1`,
+`ArrayDim=1`, byte mask `0x01`, field mask `0xff`, and `native_bool=false`.
+
+The gate also pins forbidden transfer fields so consume-mode evidence cannot silently
+broaden into spawn-point, identity, return-bool, object-ref, or class-ref surfaces:
+
+- `ShooterPlayerController.ServerDownloadTransferredPlayer.SpawnPointID`
+- `ShooterPlayerController.ServerDownloadTransferredPlayer.spawnPointRegionIndex`
+- `ShooterPlayerController.ServerRequestSpawnPointsForDownloadedCharacters.PlayerDataID`
+- `ShooterPlayerController.ServerRequestSpawnPointsForDownloadedCharacters.IgnoreBedID`
+- `PrimalDinoCharacter.IsAllowedToTransfer.WorldContextObject`
+- `PrimalDinoCharacter.IsAllowedToTransfer.ReturnValue`
+- `ShooterGameState.AllowDownloadDino.TheDinoClass`
+- `ShooterGameState.AllowDownloadDino.ReturnValue`
+- `ShooterPlayerController.ServerUploadCurrentCharacterAndItems.InventoryComp`
+- `ShooterPlayerController.ServerUploadDino.DownloadedDino`
+
+Promotion mode is always blocked for this schema. Public/runtime overclaims are rejected
+outside the required non-claims and explicit exclusions. The explicit exclusions include
+tribute structs, arrays, strings, ids, object/class refs, mutation, return override,
+dispatcher wiring, runtime hook wiring, and public SDK promotion.
+
 ## Non-Claims
 
 This note does not promote transfer to the RC, does not promote any public transfer API,

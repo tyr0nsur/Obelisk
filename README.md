@@ -3,9 +3,9 @@
 Obelisk is a Linux-native modding runtime, C API, and SDK foundation for Unreal
 Engine dedicated server processes.
 
-It aims to bring an ArkApi/DarkApi-style developer experience to Linux without
-porting Windows assumptions: runtime injection, UE event hooks, a stable plugin
-ABI, reflection-driven research tooling, and eventually reusable gameplay APIs.
+It aims to bring familiar ARK plugin concepts to Linux without porting Windows
+assumptions: runtime injection, UE event hooks, a stable plugin ABI,
+reflection-driven research tooling, and eventually reusable gameplay APIs.
 
 ARK: Survival Evolved is currently the debug harness used to validate Obelisk
 inside a real stripped UE4 Linux server. ARK/LinuxGSM details are validation
@@ -57,7 +57,8 @@ Not ready:
 
 - Public gameplay module APIs beyond `GameplayPolicyEvent` and the minimal
   `ChatMessageEvent`: players, richer chat, tribes, inventory, items, dinos, full
-  structure/resources APIs, missions, transfers, permissions, timers, admin, and commands.
+  structure/resources APIs, missions, transfers, permissions, gameplay/module timer
+  abstractions, admin, and commands.
 - Production-ready gameplay SDK.
 
 See [docs/STATUS.md](docs/STATUS.md) for the current stability matrix and
@@ -492,7 +493,8 @@ Near-term engineering:
 Later:
 
 - Public module APIs for players, richer chat, tribes, inventory, items, dinos,
-  structures, missions, transfers, permissions, timers, admin, and commands.
+  structures, missions, transfers, permissions, gameplay/module timer abstractions,
+  admin, and commands.
 
 ## Contributing
 

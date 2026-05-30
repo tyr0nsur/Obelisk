@@ -365,6 +365,86 @@ def item_return_only_policy_slice_manifest(
     }
 
 
+def transfer_baccept_only_policy_slice_manifest(
+    *,
+    policy_status: str = "evidence-only",
+    promotion_ready: bool = False,
+    copied_bool_count: int = 1,
+    forbidden_field_count: int | None = None,
+    missing_targets: list[str] | None = None,
+    non_claims: list[str] | None = None,
+) -> dict:
+    copied_field = gate.REQUIRED_TRANSFER_BACCEPT_ONLY_COPIED_FIELD
+    forbidden_fields = sorted(gate.REQUIRED_TRANSFER_BACCEPT_ONLY_FORBIDDEN_FIELDS)
+    if forbidden_field_count is None:
+        forbidden_field_count = len(forbidden_fields)
+    if missing_targets is None:
+        missing_targets = []
+    if non_claims is None:
+        non_claims = sorted(gate.REQUIRED_TRANSFER_BACCEPT_ONLY_NON_CLAIMS) + [
+            "does not copy spawn point ids, region indexes, player data ids, bed ids, return bools, object refs, class refs, tribute structs, arrays, strings, or ids"
+        ]
+    return {
+        "schema": gate.TRANSFER_BACCEPT_ONLY_POLICY_SLICE_SCHEMA,
+        "snapshot_root": "redacted",
+        "input_target_set": "transfer-ufunction-intake",
+        "output_target_set": "transfer-baccept-only-policy-slice",
+        "policy_status": policy_status,
+        "missing_targets": missing_targets,
+        "generated_from": {
+            "snapshot_schema": SNAPSHOT_SCHEMA,
+            "input_snapshots": [{"id": "snapshot-0001", "sha256": "1" * 64}],
+        },
+        "coverage": {
+            "status": "complete",
+            "copied_fields": [copied_field],
+            "copied_targets": [gate.REQUIRED_TRANSFER_BACCEPT_ONLY_TARGET],
+            "forbidden_fields": forbidden_fields,
+            "input_targets": sorted(gate.REQUIRED_TRANSFER_BACCEPT_ONLY_INPUT_TARGETS),
+        },
+        "copied_bool": {
+            "target": gate.REQUIRED_TRANSFER_BACCEPT_ONLY_TARGET,
+            "field": "bAccept",
+            "copied_field": copied_field,
+            "direction": "in",
+            "type": "bool",
+            "function_flags": "0x220cc0",
+            "num_parms": 1,
+            "parms_size": 1,
+            "return_value_offset": "0xffff",
+            "property_class": "BoolProperty",
+            "offset_internal": 0,
+            "element_size": 1,
+            "array_dim": 1,
+            "byte_mask": "0x01",
+            "field_mask": "0xff",
+            "native_bool": False,
+            "evidence_status": "copied-bool-only",
+            "source_snapshot": "snapshot-0001",
+            "source_snapshot_sha256": "1" * 64,
+        },
+        "forbidden_transfer_fields": [
+            {
+                "target": field.rsplit(".", 1)[0],
+                "field": field.rsplit(".", 1)[1],
+                "forbidden_field": field,
+                "reason": "not_in_baccept_only_slice",
+                "source_snapshot": "snapshot-0001",
+            }
+            for field in forbidden_fields
+        ],
+        "non_claims": non_claims,
+        "safety_summary": {
+            "artifact_status": "evidence_only",
+            "intended_use": "offline_review_only",
+            "promotion_ready": promotion_ready,
+            "copied_bool_count": copied_bool_count,
+            "forbidden_field_count": forbidden_field_count,
+            "explicitly_excluded": sorted(gate.REQUIRED_TRANSFER_BACCEPT_ONLY_EXPLICIT_EXCLUSIONS),
+        },
+    }
+
+
 def rc_ufunction_second_source_root_manifest(root: Path) -> dict:
     expected_sources = gate.expected_rc_ufunction_target_sources()
     assert expected_sources is not None
@@ -2517,6 +2597,101 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("item_return_policy_coverage_input_targets_mismatch", reasons)
         self.assertIn("item_return_policy_input_snapshot_count_mismatch", reasons)
         self.assertIn("item_return_policy_copied_bool_target_mismatch", reasons)
+
+    def test_accepts_transfer_baccept_only_policy_slice_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "transfer-baccept-policy.json"
+            write_json(manifest, transfer_baccept_only_policy_slice_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual(result["blockers"], [])
+
+    def test_blocks_transfer_baccept_only_policy_slice_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "transfer-baccept-policy.json"
+            write_json(manifest, transfer_baccept_only_policy_slice_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("promote_mode_transfer_baccept_policy_slice_evidence_only", reasons)
+
+    def test_blocks_transfer_baccept_only_policy_slice_with_bad_counts_or_boundaries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "transfer-baccept-policy.json"
+            payload = transfer_baccept_only_policy_slice_manifest(
+                policy_status="accepted",
+                promotion_ready=True,
+                copied_bool_count=2,
+                forbidden_field_count=1,
+                missing_targets=[gate.REQUIRED_TRANSFER_BACCEPT_ONLY_TARGET],
+                non_claims=["does not copy other transfer fields"],
+            )
+            payload["copied_bool"]["copied_field"] = "ShooterPlayerController.ServerTransferredPlayerConfirmationResult.ReturnValue"
+            payload["copied_bool"]["target"] = "ShooterPlayerController.ServerDownloadTransferredPlayer"
+            payload["copied_bool"]["direction"] = "return"
+            payload["copied_bool"]["function_flags"] = "0x0"
+            payload["copied_bool"]["native_bool"] = True
+            payload["forbidden_transfer_fields"] = payload["forbidden_transfer_fields"][:-1]
+            payload["coverage"]["copied_fields"] = []
+            payload["coverage"]["copied_targets"] = []
+            payload["coverage"]["forbidden_fields"] = payload["coverage"]["forbidden_fields"][:-1]
+            payload["coverage"]["input_targets"] = [gate.REQUIRED_TRANSFER_BACCEPT_ONLY_TARGET]
+            payload["safety_summary"]["explicitly_excluded"] = ["mutation"]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("transfer_baccept_policy_status_not_evidence_only", reasons)
+        self.assertIn("transfer_baccept_policy_missing_targets_present", reasons)
+        self.assertIn("transfer_baccept_policy_promotion_ready_not_false", reasons)
+        self.assertIn("transfer_baccept_policy_copied_bool_count_not_one", reasons)
+        self.assertIn("transfer_baccept_policy_forbidden_field_count_mismatch", reasons)
+        self.assertIn("transfer_baccept_policy_copied_field_mismatch", reasons)
+        self.assertIn("transfer_baccept_policy_copied_bool_target_mismatch", reasons)
+        self.assertIn("transfer_baccept_policy_copied_bool_not_input_bool", reasons)
+        self.assertIn("transfer_baccept_policy_copied_bool_shape_mismatch", reasons)
+        self.assertIn("transfer_baccept_policy_forbidden_fields_count_mismatch", reasons)
+        self.assertIn("transfer_baccept_policy_coverage_copied_fields_mismatch", reasons)
+        self.assertIn("transfer_baccept_policy_coverage_copied_targets_mismatch", reasons)
+        self.assertIn("transfer_baccept_policy_coverage_forbidden_fields_mismatch", reasons)
+        self.assertIn("transfer_baccept_policy_coverage_input_targets_mismatch", reasons)
+        self.assertIn("transfer_baccept_policy_non_claims_missing_required_boundaries", reasons)
+        self.assertIn("transfer_baccept_policy_explicit_exclusions_missing_internal_boundaries", reasons)
+
+    def test_blocks_transfer_baccept_only_policy_slice_public_runtime_overclaim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "transfer-baccept-policy.json"
+            payload = transfer_baccept_only_policy_slice_manifest()
+            payload["runtime_ready"] = True
+            payload["public_sdk_ready"] = True
+            payload["claim"] = "public SDK ready"
+            payload["runtime_claim"] = "runtime ready"
+            payload["input_target_set"] = "transfer-public-sdk-intake"
+            payload["generated_from"]["input_snapshots"] = [
+                {"id": "snapshot-0001", "sha256": "1" * 64},
+                {"id": "snapshot-0002", "sha256": "2" * 64},
+            ]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("transfer_baccept_policy_readiness_overclaim", reasons)
+        self.assertIn("transfer_baccept_policy_public_overclaim_public_sdk", reasons)
+        self.assertIn("transfer_baccept_policy_public_overclaim_runtime_ready", reasons)
+        self.assertIn("transfer_baccept_policy_input_target_set_mismatch", reasons)
+        self.assertIn("transfer_baccept_policy_input_snapshot_count_mismatch", reasons)
 
     def test_accepts_static_global_promotion_evidence_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

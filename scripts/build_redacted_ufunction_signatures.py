@@ -21,6 +21,7 @@ SUPPORTED_SNAPSHOT_SCHEMA = "obelisk.ufunction-chain.snapshot.v1"
 OUTPUT_SCHEMA = "obelisk.redacted-ufunction-signatures.v1"
 TARGET_SET_COVERAGE_SCHEMA = "obelisk.redacted-ufunction-target-set-coverage.v1"
 ITEM_RETURN_ONLY_POLICY_SCHEMA = "obelisk.item-return-only-policy-slice.v1"
+TRANSFER_BACCEPT_ONLY_POLICY_SCHEMA = "obelisk.transfer-baccept-only-policy-slice.v1"
 PROTECTED_SERVER_ROOT = Path("/servidor/ark")
 APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
 
@@ -41,6 +42,8 @@ KNOWN_PROPERTY_FLAG_BITS = (
 CANDIDATE_UOBJECT_STATUS = "candidate-uobject"
 ITEM_RETURN_ONLY_INPUT_TARGET_SET = "item-compact-intake"
 ITEM_RETURN_ONLY_OUTPUT_TARGET_SET = "item-return-only-policy-slice"
+TRANSFER_BACCEPT_ONLY_INPUT_TARGET_SET = "transfer-ufunction-intake"
+TRANSFER_BACCEPT_ONLY_OUTPUT_TARGET_SET = "transfer-baccept-only-policy-slice"
 
 ITEM_RETURN_ONLY_EXPECTED_SHAPES: dict[str, dict[str, Any]] = {
     "PrimalItem.AllowEquipItem": {
@@ -91,6 +94,33 @@ ITEM_RETURN_ONLY_EXCLUDED_REASONS = {
     "PrimalItem.CraftBlueprint.bConsumeResources": "craftblueprint_excluded",
     "PrimalItem.UseItemOntoItem.DestinationItem": "object_ref_excluded",
     "PrimalItem.UseItemOntoItem.AdditionalData": "non_return_scalar_excluded",
+}
+
+TRANSFER_BACCEPT_ONLY_EXPECTED_SHAPES: dict[str, dict[str, Any]] = {
+    "ShooterPlayerController.ServerTransferredPlayerConfirmationResult": {
+        "function_flags": 0x220CC0,
+        "num_parms": 1,
+        "parms_size": 1,
+        "return_value_offset": 0xFFFF,
+        "properties": (("bAccept", "BoolProperty"),),
+    },
+}
+
+TRANSFER_BACCEPT_ONLY_COPIED_FIELDS = (
+    "ShooterPlayerController.ServerTransferredPlayerConfirmationResult.bAccept",
+)
+
+TRANSFER_BACCEPT_ONLY_EXCLUDED_REASONS = {
+    "PrimalDinoCharacter.IsAllowedToTransfer.WorldContextObject": "object_ref_excluded",
+    "PrimalDinoCharacter.IsAllowedToTransfer.ReturnValue": "return_bool_excluded",
+    "ShooterGameState.AllowDownloadDino.TheDinoClass": "class_ref_excluded",
+    "ShooterGameState.AllowDownloadDino.ReturnValue": "return_bool_excluded",
+    "ShooterPlayerController.ServerDownloadTransferredPlayer.SpawnPointID": "spawn_point_id_excluded",
+    "ShooterPlayerController.ServerDownloadTransferredPlayer.spawnPointRegionIndex": "region_index_excluded",
+    "ShooterPlayerState.ServerRequestSpawnPointsForDownloadedCharacters.IgnoreBedID": "bed_id_excluded",
+    "ShooterPlayerState.ServerRequestSpawnPointsForDownloadedCharacters.PlayerDataID": "player_data_id_excluded",
+    "ShooterPlayerController.ServerUploadCurrentCharacterAndItems.InventoryComp": "object_ref_excluded",
+    "ShooterPlayerController.ServerUploadDino.DownloadedDino": "object_ref_excluded",
 }
 
 SCALAR_TYPE_BY_CLASS = {
@@ -235,6 +265,14 @@ def parse_args() -> argparse.Namespace:
             "Emit a focused evidence-only item policy slice that validates "
             "item-compact-intake and copies only AllowEquipItem/CanRepair/"
             "UseItemOntoItem ReturnValue bools."
+        ),
+    )
+    parser.add_argument(
+        "--transfer-baccept-only-policy-slice",
+        action="store_true",
+        help=(
+            "Emit a focused evidence-only transfer policy slice that validates "
+            "transfer-ufunction-intake and copies only ServerTransferredPlayerConfirmationResult.bAccept."
         ),
     )
     return parser.parse_args()
@@ -975,6 +1013,30 @@ def require_bool_return_field(target: str, prop: dict[str, Any], return_value_of
     return field
 
 
+def require_bool_input_field(target: str, prop: dict[str, Any], expected_name: str) -> dict[str, Any]:
+    offset = require_int_field(prop, "offset_internal", f"{target}.{expected_name}")
+    element_size = require_int_field(prop, "element_size", f"{target}.{expected_name}")
+    array_dim = require_int_field(prop, "array_dim", f"{target}.{expected_name}")
+    flags = property_flags(prop)
+    if offset != 0:
+        raise SystemExit(f"{target}.{expected_name} offset drifted")
+    if element_size != 1:
+        raise SystemExit(f"{target}.{expected_name} is not a one-byte bool")
+    if array_dim != 1:
+        raise SystemExit(f"{target}.{expected_name} array_dim drifted")
+    if flags != 0x1040000280:
+        raise SystemExit(f"{target}.{expected_name} property_flags drifted")
+    if prop.get("native_bool") is not False:
+        raise SystemExit(f"{target}.{expected_name} native_bool marker drifted")
+    field = classify_property(prop, 0xFFFF)
+    if field["direction"] != "in" or field["type"] != "bool":
+        raise SystemExit(f"{target}.{expected_name} is not a copied input bool")
+    masks = field.get("bool_masks")
+    if not isinstance(masks, dict) or masks.get("byte_mask") != "0x01" or masks.get("field_mask") != "0xff":
+        raise SystemExit(f"{target}.{expected_name} bool masks drifted")
+    return field
+
+
 def require_item_return_only_shape(target_payload: dict[str, Any], source_snapshot: dict[str, str]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     target_identity = target_payload.get("target")
     property_chain = target_payload.get("property_chain")
@@ -1052,6 +1114,83 @@ def require_item_return_only_shape(target_payload: dict[str, Any], source_snapsh
                 }
             )
     return copied, excluded
+
+
+def require_transfer_baccept_only_shape(target_payload: dict[str, Any], source_snapshot: dict[str, str]) -> list[dict[str, Any]]:
+    target_identity = target_payload.get("target")
+    property_chain = target_payload.get("property_chain")
+    if not isinstance(target_identity, dict) or not isinstance(property_chain, dict):
+        raise SystemExit("transfer policy snapshot missing target identity or property chain")
+    target = target_name(target_identity)
+    expected = TRANSFER_BACCEPT_ONLY_EXPECTED_SHAPES.get(target)
+    if expected is None:
+        raise SystemExit(f"unexpected transfer policy target: {target}")
+    if target_payload.get("status") != "candidate":
+        raise SystemExit(f"{target} is not a candidate UFunction snapshot")
+    if target_payload.get("inspection_mode") != "ufunction":
+        raise SystemExit(f"{target} is not a UFunction inspection snapshot")
+
+    if require_int_field(target_payload, "function_flags", target) != expected["function_flags"]:
+        raise SystemExit(f"{target} FunctionFlags drifted")
+    if require_int_field(target_payload, "num_parms", target) != expected["num_parms"]:
+        raise SystemExit(f"{target} NumParms drifted")
+    if require_int_field(target_payload, "parms_size", target) != expected["parms_size"]:
+        raise SystemExit(f"{target} ParmsSize drifted")
+    return_value_offset = require_int_field(target_payload, "return_value_offset", target)
+    if return_value_offset != expected["return_value_offset"]:
+        raise SystemExit(f"{target} ReturnValueOffset drifted")
+
+    properties = property_chain.get("properties")
+    if not isinstance(properties, list):
+        raise SystemExit(f"{target} property_chain.properties is not a list")
+    if parse_int_value(property_chain.get("expected_count")) != len(expected["properties"]):
+        raise SystemExit(f"{target} expected property count drifted")
+    if parse_int_value(property_chain.get("observed_count")) != len(expected["properties"]):
+        raise SystemExit(f"{target} observed property count drifted")
+    if len(properties) != len(expected["properties"]):
+        raise SystemExit(f"{target} property list length drifted")
+
+    copied: list[dict[str, Any]] = []
+    for prop, (expected_name, expected_class) in zip(properties, expected["properties"], strict=True):
+        if not isinstance(prop, dict):
+            raise SystemExit(f"{target} property entry is not an object")
+        name = prop.get("name")
+        class_name = prop.get("class_name")
+        if name != expected_name or class_name != expected_class:
+            raise SystemExit(f"{target} property shape drifted: expected {expected_name}:{expected_class}")
+        if prop.get("status") != "candidate":
+            raise SystemExit(f"{target}.{expected_name} is not a candidate property")
+        require_candidate_membership(prop, target, expected_name)
+        field_key = f"{target}.{expected_name}"
+        if field_key not in TRANSFER_BACCEPT_ONLY_COPIED_FIELDS:
+            raise SystemExit(f"{field_key} has no transfer copied-field policy")
+        field = require_bool_input_field(target, prop, expected_name)
+        copied.append(
+            {
+                "target": target,
+                "field": expected_name,
+                "copied_field": field_key,
+                "direction": "in",
+                "type": "bool",
+                "offset": format_hex(require_int_field(prop, "offset_internal", field_key)),
+                "offset_internal": require_int_field(prop, "offset_internal", field_key),
+                "element_size": require_int_field(prop, "element_size", field_key),
+                "array_dim": require_int_field(prop, "array_dim", field_key),
+                "byte_mask": field["bool_masks"]["byte_mask"],
+                "field_mask": field["bool_masks"]["field_mask"],
+                "native_bool": False,
+                "function_flags": format_hex(require_int_field(target_payload, "function_flags", target)),
+                "num_parms": require_int_field(target_payload, "num_parms", target),
+                "parms_size": require_int_field(target_payload, "parms_size", target),
+                "return_value_offset": format_hex(return_value_offset),
+                "property_flags": format_hex(property_flags(prop) or 0),
+                "property_class": expected_class,
+                "source_snapshot": source_snapshot["id"],
+                "source_snapshot_sha256": source_snapshot["sha256"],
+                "evidence_status": "copied-bool-only",
+            }
+        )
+    return copied
 
 
 def build_item_return_only_policy_slice(*, snapshot_root: Path = DEFAULT_SNAPSHOT_ROOT) -> dict[str, Any]:
@@ -1158,6 +1297,121 @@ def build_item_return_only_policy_slice(*, snapshot_root: Path = DEFAULT_SNAPSHO
     }
 
 
+def build_transfer_baccept_only_policy_slice(*, snapshot_root: Path = DEFAULT_SNAPSHOT_ROOT) -> dict[str, Any]:
+    paths, missing_targets = snapshot_paths_from_target_sets(snapshot_root, [TRANSFER_BACCEPT_ONLY_OUTPUT_TARGET_SET])
+    if missing_targets:
+        raise SystemExit("transfer bAccept policy manifest missing targets: " + ",".join(missing_targets))
+
+    input_snapshots = [
+        {"id": f"snapshot-{index:04d}", "sha256": file_sha256(path)}
+        for index, path in enumerate(paths, start=1)
+    ]
+    copied: list[dict[str, Any]] = []
+    seen_targets: set[str] = set()
+    for path, source_snapshot in zip(paths, input_snapshots, strict=True):
+        payload = load_json_file("snapshot", path)
+        targets = require_snapshot_payload(payload, path)
+        for target_payload in targets:
+            target_identity = target_payload.get("target")
+            if not isinstance(target_identity, dict):
+                raise SystemExit(f"snapshot missing target identity: {path}")
+            target = target_name(target_identity)
+            if target in seen_targets:
+                raise SystemExit(f"duplicate transfer policy target: {target}")
+            seen_targets.add(target)
+            copied.extend(require_transfer_baccept_only_shape(target_payload, source_snapshot))
+
+    expected_input_targets = expand_ufunction_targets([TRANSFER_BACCEPT_ONLY_INPUT_TARGET_SET])
+    expected_output_targets = expand_ufunction_targets([TRANSFER_BACCEPT_ONLY_OUTPUT_TARGET_SET])
+    emitted_copied_fields = [entry["copied_field"] for entry in copied]
+    missing_copied_fields = [
+        field for field in TRANSFER_BACCEPT_ONLY_COPIED_FIELDS if field not in emitted_copied_fields
+    ]
+    unexpected_copied_fields = [
+        field for field in emitted_copied_fields if field not in TRANSFER_BACCEPT_ONLY_COPIED_FIELDS
+    ]
+    output_targets = [entry["target"] for entry in copied]
+    missing_output_targets = [target for target in expected_output_targets if target not in output_targets]
+    unexpected_output_targets = [target for target in output_targets if target not in expected_output_targets]
+    blockers = [
+        *[f"missing_copied_field:{field}" for field in missing_copied_fields],
+        *[f"unexpected_copied_field:{field}" for field in unexpected_copied_fields],
+        *[f"missing_output_target:{target}" for target in missing_output_targets],
+        *[f"unexpected_output_target:{target}" for target in unexpected_output_targets],
+    ]
+    if blockers:
+        raise SystemExit("transfer bAccept policy slice failed closed: " + ",".join(blockers))
+
+    return {
+        "schema": TRANSFER_BACCEPT_ONLY_POLICY_SCHEMA,
+        "generated_from": {
+            "snapshot_schema": SUPPORTED_SNAPSHOT_SCHEMA,
+            "input_snapshots": input_snapshots,
+        },
+        "snapshot_root": "redacted",
+        "input_target_set": TRANSFER_BACCEPT_ONLY_INPUT_TARGET_SET,
+        "output_target_set": TRANSFER_BACCEPT_ONLY_OUTPUT_TARGET_SET,
+        "policy_status": "evidence-only",
+        "missing_targets": [],
+        "coverage": {
+            "status": "complete",
+            "input_targets": expected_input_targets,
+            "copied_targets": expected_output_targets,
+            "copied_fields": list(TRANSFER_BACCEPT_ONLY_COPIED_FIELDS),
+            "forbidden_fields": list(TRANSFER_BACCEPT_ONLY_EXCLUDED_REASONS),
+        },
+        "copied_bool": copied[0],
+        "forbidden_transfer_fields": [
+            {
+                "target": field.rsplit(".", 1)[0],
+                "field": field.rsplit(".", 1)[1],
+                "forbidden_field": field,
+                "reason": reason,
+                "source_snapshot": "snapshot-0001",
+            }
+            for field, reason in TRANSFER_BACCEPT_ONLY_EXCLUDED_REASONS.items()
+        ],
+        "safety_summary": {
+            "artifact_status": "evidence_only",
+            "promotion_ready": False,
+            "intended_use": "offline_review_only",
+            "copied_bool_count": len(copied),
+            "forbidden_field_count": len(TRANSFER_BACCEPT_ONLY_EXCLUDED_REASONS),
+            "explicitly_excluded": [
+                "ARKTributeDino",
+                "ArkTributePlayerData",
+                "AllowDownloadDino.ReturnValue",
+                "DownloadedDino",
+                "InventoryComp",
+                "IsAllowedToTransfer.ReturnValue",
+                "ServerDownloadTransferredPlayer.SpawnPointID",
+                "ServerDownloadTransferredPlayer.spawnPointRegionIndex",
+                "ServerRequestSpawnPointsForDownloadedCharacters.IgnoreBedID",
+                "ServerRequestSpawnPointsForDownloadedCharacters.PlayerDataID",
+                "TheDinoClass",
+                "WorldContextObject",
+                "arrays",
+                "class_refs",
+                "dispatcher_wiring",
+                "ids",
+                "mutation",
+                "object_refs",
+                "public_sdk",
+                "return_override",
+                "runtime_hook_wiring",
+                "strings",
+                "tribute_structs",
+            ],
+        },
+        "non_claims": [
+            "does not promote public SDK callbacks or public metadata helpers",
+            "does not expose UE pointers, object identity, class identity, raw params, mutation, or return overrides",
+            "does not promote runtime hook wiring, dispatcher wiring, transfer payload decoding, or public Transfer SDK",
+            "does not copy spawn point ids, region indexes, player data ids, bed ids, return bools, object refs, class refs, tribute structs, arrays, strings, or ids",
+        ],
+    }
+
+
 def print_text(report: dict[str, Any]) -> None:
     for signature in report["signatures"]:
         print(
@@ -1187,10 +1441,20 @@ def print_text(report: dict[str, Any]) -> None:
 
 def main() -> int:
     args = parse_args()
+    policy_modes = [
+        args.item_return_only_policy_slice,
+        args.transfer_baccept_only_policy_slice,
+    ]
+    if sum(1 for enabled in policy_modes if enabled) > 1:
+        raise SystemExit("policy-slice modes cannot be combined")
     if args.item_return_only_policy_slice:
         if args.target_set or args.source_target_set or args.snapshot:
             raise SystemExit("--item-return-only-policy-slice cannot be combined with target-set or snapshot inputs")
         report = build_item_return_only_policy_slice(snapshot_root=args.snapshot_root)
+    elif args.transfer_baccept_only_policy_slice:
+        if args.target_set or args.source_target_set or args.snapshot:
+            raise SystemExit("--transfer-baccept-only-policy-slice cannot be combined with target-set or snapshot inputs")
+        report = build_transfer_baccept_only_policy_slice(snapshot_root=args.snapshot_root)
     else:
         report = build_report(
             snapshot_root=args.snapshot_root,

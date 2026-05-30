@@ -129,8 +129,8 @@ Preferred core-first direction:
 2. Keep runtime observation exact, bounded, gated, and non-mutating.
 3. Promote only copied-data ABI surfaces with owner-token lifecycle coverage.
 4. Document every public surface in the release and SDK guardrails.
-5. Treat chat, players, inventory, tribes, dinos, timers, and other gameplay areas as
-   module-after-gates work, not as the core architecture.
+5. Treat chat, players, inventory, tribes, dinos, gameplay/module timer abstractions, and
+   other gameplay areas as module-after-gates work, not as the core architecture.
 
 ## Experimental Components
 

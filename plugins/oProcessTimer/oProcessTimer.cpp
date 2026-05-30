@@ -17,10 +17,11 @@ namespace
 {
     ObeliskApi g_Api{};
     bool g_HasApi = false;
-    std::mutex g_ConfigMutex;
+    std::mutex g_StateMutex;
     bool g_Enabled = false;
     uint64_t g_OwnerToken = 0;
-    uint64_t g_TimerId = 0;
+    std::atomic<uint64_t> g_TimerId{0};
+    uint64_t g_TimerUserData = 0x710E;
     std::atomic<bool> g_TimerSeen{false};
     std::atomic<bool> g_TimerAccepted{false};
 
@@ -71,8 +72,14 @@ namespace
     {
         try
         {
-            if (g_HasApi && g_Api.LogInfo)
-                g_Api.LogInfo(message);
+            void (*logInfo)(const char*) = nullptr;
+            {
+                std::lock_guard<std::mutex> lock(g_StateMutex);
+                if (g_HasApi)
+                    logInfo = g_Api.LogInfo;
+            }
+            if (logInfo)
+                logInfo(message);
         }
         catch (...)
         {
@@ -136,7 +143,7 @@ namespace
         }
 
         const std::filesystem::path path = context->config_path;
-        std::lock_guard<std::mutex> lock(g_ConfigMutex);
+        std::lock_guard<std::mutex> lock(g_StateMutex);
 
         json config;
         if (!LoadConfigDocument(path, config))
@@ -155,18 +162,19 @@ namespace
     void OnTimer(uint64_t timerId, void* userData) noexcept
     {
         g_TimerSeen.store(true);
-        if (userData == &g_TimerId && timerId == g_TimerId)
+        if (userData == &g_TimerUserData && timerId == g_TimerId.load())
             g_TimerAccepted.store(true);
         SafeLogInfo("[oProcessTimer] Process-local timer fired.");
     }
 
     void ResetState()
     {
+        std::lock_guard<std::mutex> lock(g_StateMutex);
         g_Api = {};
         g_HasApi = false;
         g_Enabled = false;
         g_OwnerToken = 0;
-        g_TimerId = 0;
+        g_TimerId.store(0);
         g_TimerSeen.store(false);
         g_TimerAccepted.store(false);
     }
@@ -175,10 +183,21 @@ namespace
     {
         try
         {
-            if (g_HasApi && g_TimerId != 0 && g_Api.UnregisterTimerWithOwnerToken)
+            bool (*unregisterTimer)(uint64_t, uint64_t) = nullptr;
+            uint64_t ownerToken = 0;
+            uint64_t timerId = 0;
             {
-                g_Api.UnregisterTimerWithOwnerToken(g_OwnerToken, g_TimerId);
-                g_TimerId = 0;
+                std::lock_guard<std::mutex> lock(g_StateMutex);
+                timerId = g_TimerId.exchange(0);
+                if (g_HasApi && timerId != 0)
+                {
+                    unregisterTimer = g_Api.UnregisterTimerWithOwnerToken;
+                    ownerToken = g_OwnerToken;
+                }
+            }
+            if (unregisterTimer)
+            {
+                unregisterTimer(ownerToken, timerId);
             }
         }
         catch (...)
@@ -234,9 +253,12 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
             return false;
         }
 
-        g_Api = *api;
-        g_HasApi = true;
-        g_OwnerToken = context->plugin_owner_token;
+        {
+            std::lock_guard<std::mutex> lock(g_StateMutex);
+            g_Api = *api;
+            g_HasApi = true;
+            g_OwnerToken = context->plugin_owner_token;
+        }
         g_TimerSeen.store(false);
         g_TimerAccepted.store(false);
 
@@ -253,8 +275,15 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
             return true;
         }
 
-        g_TimerId = api->RegisterTimerWithOwnerTokenHandle(g_OwnerToken, 1000, 0, 0, OnTimer, &g_TimerId);
-        if (g_TimerId == 0)
+        const uint64_t timerId = api->RegisterTimerWithOwnerTokenHandle(
+            g_OwnerToken,
+            1000,
+            0,
+            0,
+            OnTimer,
+            &g_TimerUserData);
+        g_TimerId.store(timerId);
+        if (timerId == 0)
         {
             SafeLogError(api, "[oProcessTimer] Failed to register process-local timer.");
             ResetState();

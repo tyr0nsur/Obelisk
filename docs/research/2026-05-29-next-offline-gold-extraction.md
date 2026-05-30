@@ -215,8 +215,8 @@ This supports the current cautious model:
 
 ## Follow-Up Focused Reconciliation
 
-A later read-only agent round generated the narrow dino-only JSON reconciliation that this
-note recommended, using no live server, no `gcore`, no scanner, and no broad scan:
+A later read-only offline reconciliation generated the narrow dino-only JSON artifact that
+this note recommended, using no live server, no `gcore`, no scanner, and no broad scan:
 
 ```bash
 python3 scripts/reconcile_gobjects_samples.py \

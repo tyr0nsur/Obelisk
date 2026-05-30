@@ -168,6 +168,28 @@ class RunUObjectFlagPolicyRefreshTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("must not read under protected server root", result.stderr)
 
+    @unittest.skipUnless(hasattr(os, "symlink"), "symlink support required")
+    def test_refuses_preexisting_output_leaf_symlink_into_repository(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            input_root = base / "input"
+            output_root = base / "output"
+            write_refresh_inputs(input_root)
+            output_root.mkdir()
+            repo_target = REPO_ROOT / "tmp-uobject-refresh-leaf-target.json"
+            repo_target.unlink(missing_ok=True)
+            leaf = output_root / "rich-provenance-preflight.json"
+            try:
+                leaf.symlink_to(repo_target)
+
+                result = self.run_refresh(input_root, output_root)
+            finally:
+                leaf.unlink(missing_ok=True)
+                repo_target.unlink(missing_ok=True)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("must not be inside the repository", result.stderr)
+
     def test_refuses_output_under_protected_server_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             input_root = Path(tmp) / "input"
