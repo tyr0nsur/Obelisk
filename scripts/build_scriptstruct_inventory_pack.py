@@ -392,6 +392,8 @@ def target_set_regeneration_plan(
     gobjects: int,
     fname_root_slot: int,
     evidence_pack_manifest: Path | None,
+    evidence_pack_fname_root_label: str | None,
+    evidence_pack_gobjects_label: str | None,
 ) -> dict[str, object]:
     commands: list[dict[str, object]] = []
     for target in scriptstruct_targets(target_sets):
@@ -407,6 +409,10 @@ def target_set_regeneration_plan(
             command.extend(["--manifest", str(snapshot_manifest)])
         if evidence_pack_manifest is not None:
             command.extend(["--evidence-pack-manifest", str(evidence_pack_manifest)])
+            if evidence_pack_fname_root_label is not None:
+                command.extend(["--evidence-pack-fname-root-label", evidence_pack_fname_root_label])
+            if evidence_pack_gobjects_label is not None:
+                command.extend(["--evidence-pack-gobjects-label", evidence_pack_gobjects_label])
         else:
             command.extend(["--gobjects", hex(gobjects), "--fname-root-slot", hex(fname_root_slot)])
         commands.append({"target": target, "argv": command})
@@ -416,6 +422,8 @@ def target_set_regeneration_plan(
         "snapshot_manifest": str(snapshot_manifest) if snapshot_manifest else None,
         "core": str(core),
         "evidence_pack_manifest": str(evidence_pack_manifest) if evidence_pack_manifest else None,
+        "evidence_pack_fname_root_label": evidence_pack_fname_root_label,
+        "evidence_pack_gobjects_label": evidence_pack_gobjects_label,
         "gobjects": hex(gobjects),
         "fname_root_slot": hex(fname_root_slot),
         "requested_count": len(commands),
@@ -511,6 +519,8 @@ def main() -> int:
             gobjects=gobjects,
             fname_root_slot=fname_root_slot,
             evidence_pack_manifest=evidence_pack_manifest,
+            evidence_pack_fname_root_label=args.evidence_pack_fname_root_label,
+            evidence_pack_gobjects_label=args.evidence_pack_gobjects_label,
         )
     if args.include_structs:
         inventory_payload["scriptstructs"] = rows
@@ -566,10 +576,7 @@ def main() -> int:
             "max_objects": args.max_objects,
             "fname_indices": [{"label": label, "index": index} for label, index in indices],
         },
-        "artifacts": {
-            "scriptstruct_inventory": "scriptstruct-inventory.json",
-            "fname_root_validation": "fname-root-validation.json",
-        },
+        "artifacts": {},
         "summary": summary,
         "blockers": blockers,
         "non_claims": [
@@ -582,8 +589,20 @@ def main() -> int:
         ],
     }
 
-    write_json(output_dir / "scriptstruct-inventory.json", inventory_payload)
-    write_json(output_dir / "fname-root-validation.json", fname_payload)
+    inventory_artifact = output_dir / "scriptstruct-inventory.json"
+    fname_artifact = output_dir / "fname-root-validation.json"
+    write_json(inventory_artifact, inventory_payload)
+    write_json(fname_artifact, fname_payload)
+    manifest_payload["artifacts"] = {
+        "scriptstruct_inventory": {
+            "path": "scriptstruct-inventory.json",
+            "sha256": sha256_file(inventory_artifact),
+        },
+        "fname_root_validation": {
+            "path": "fname-root-validation.json",
+            "sha256": sha256_file(fname_artifact),
+        },
+    }
     write_json(output_dir / "manifest.json", manifest_payload)
     print(json.dumps(manifest_payload, indent=2, sort_keys=True))
     return 0

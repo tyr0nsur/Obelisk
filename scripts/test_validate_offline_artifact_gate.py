@@ -833,7 +833,60 @@ def gobjects_two_core_manifest() -> dict:
     }
 
 
-def scriptstruct_inventory_pack_manifest(workspace: Path) -> dict:
+def scriptstruct_inventory_child_payload(count: int = 2) -> dict:
+    return {
+        "schema": "obelisk.scriptstruct-inventory.v1",
+        "status": "offline-inventory",
+        "source": "offline_core",
+        "promotion_status": "not_promoted_candidate_only",
+        "metadata": {"object_count": 30000, "max_object_scan": 30000},
+        "filters": {"target_sets": ["transfer-scriptstruct"], "targets": []},
+        "summary": {
+            "scriptstruct_count": count,
+            "candidate_count": count,
+            "rejected_count": 0,
+            "top_outers": [{"outer": "PrimalLocalProfile", "count": count}],
+            "top_property_classes": [],
+        },
+        "target_set_coverage": {
+            "schema": "obelisk.scriptstruct-inventory-target-set-coverage.v1",
+            "target_sets": ["transfer-scriptstruct"],
+            "requested_count": count,
+            "matched_count": count,
+            "missing_count": 0,
+            "missing_targets": [],
+            "ambiguous_count": 0,
+            "ambiguous_targets": [],
+            "matched_targets": {},
+        },
+    }
+
+
+def fname_root_validation_child_payload() -> dict:
+    return {
+        "schema": "obelisk.core-fname-root-validation.v1",
+        "requested_indices": [{"label": "None", "index": 0}],
+        "root_validation": [],
+        "manifest_readiness": {
+            "ready": True,
+            "requested_count": 1,
+            "exact_match_count": 1,
+            "failed_indices": [],
+            "blockers": [],
+        },
+        "candidate_manifest": {"path": None, "schema": None, "evidence_status": None, "name_count": 0},
+    }
+
+
+def write_scriptstruct_inventory_children(root: Path, *, count: int = 2) -> tuple[str, str]:
+    inventory = root / "scriptstruct-inventory.json"
+    fname = root / "fname-root-validation.json"
+    write_json(inventory, scriptstruct_inventory_child_payload(count))
+    write_json(fname, fname_root_validation_child_payload())
+    return gate.sha256_file(inventory), gate.sha256_file(fname)
+
+
+def scriptstruct_inventory_pack_manifest(workspace: Path, *, inventory_sha: str, fname_sha: str) -> dict:
     return {
         "schema": gate.SCRIPTSTRUCT_INVENTORY_PACK_SCHEMA,
         "source": "offline_core",
@@ -860,8 +913,14 @@ def scriptstruct_inventory_pack_manifest(workspace: Path) -> dict:
             "fname_indices": [{"label": "None", "index": 0}],
         },
         "artifacts": {
-            "scriptstruct_inventory": "scriptstruct-inventory.json",
-            "fname_root_validation": "fname-root-validation.json",
+            "scriptstruct_inventory": {
+                "path": "scriptstruct-inventory.json",
+                "sha256": inventory_sha,
+            },
+            "fname_root_validation": {
+                "path": "fname-root-validation.json",
+                "sha256": fname_sha,
+            },
         },
         "summary": {
             "scriptstruct_count": 2,
@@ -945,7 +1004,8 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
             protected = Path(tmp) / "server"
             workspace = protected / "workspace-offline"
             manifest = workspace / "scriptstruct-pack" / "manifest.json"
-            write_json(manifest, scriptstruct_inventory_pack_manifest(workspace))
+            inventory_sha, fname_sha = write_scriptstruct_inventory_children(manifest.parent)
+            write_json(manifest, scriptstruct_inventory_pack_manifest(workspace, inventory_sha=inventory_sha, fname_sha=fname_sha))
 
             result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
 
@@ -957,12 +1017,66 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
             protected = Path(tmp) / "server"
             workspace = protected / "workspace-offline"
             manifest = workspace / "scriptstruct-pack" / "manifest.json"
-            write_json(manifest, scriptstruct_inventory_pack_manifest(workspace))
+            inventory_sha, fname_sha = write_scriptstruct_inventory_children(manifest.parent)
+            write_json(manifest, scriptstruct_inventory_pack_manifest(workspace, inventory_sha=inventory_sha, fname_sha=fname_sha))
 
             result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
 
         reasons = {blocker["reason"] for blocker in result["blockers"]}
         self.assertIn("promote_mode_scriptstruct_inventory_candidate_only", reasons)
+
+    def test_blocks_scriptstruct_inventory_pack_binary_sha_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "scriptstruct-pack" / "manifest.json"
+            inventory_sha, fname_sha = write_scriptstruct_inventory_children(manifest.parent)
+            write_json(manifest, scriptstruct_inventory_pack_manifest(workspace, inventory_sha=inventory_sha, fname_sha=fname_sha))
+
+            result = gate.build_result(
+                args(
+                    root=workspace,
+                    protected_root=protected,
+                    manifests=[manifest],
+                    expected_binary_sha256="f" * 64,
+                )
+            )
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("scriptstruct_inventory_binary_sha256_mismatch", reasons)
+
+    def test_blocks_scriptstruct_inventory_pack_missing_child_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "scriptstruct-pack" / "manifest.json"
+            inventory_sha, fname_sha = write_scriptstruct_inventory_children(manifest.parent)
+            (manifest.parent / "scriptstruct-inventory.json").unlink()
+            write_json(manifest, scriptstruct_inventory_pack_manifest(workspace, inventory_sha=inventory_sha, fname_sha=fname_sha))
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("scriptstruct_inventory_artifact_not_file", reasons)
+
+    def test_blocks_scriptstruct_inventory_pack_child_schema_and_summary_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "scriptstruct-pack" / "manifest.json"
+            inventory_sha, fname_sha = write_scriptstruct_inventory_children(manifest.parent, count=1)
+            payload = scriptstruct_inventory_pack_manifest(workspace, inventory_sha=inventory_sha, fname_sha=fname_sha)
+            child = json.loads((manifest.parent / "scriptstruct-inventory.json").read_text(encoding="utf-8"))
+            child["schema"] = "wrong.schema"
+            write_json(manifest.parent / "scriptstruct-inventory.json", child)
+            payload["artifacts"]["scriptstruct_inventory"]["sha256"] = gate.sha256_file(manifest.parent / "scriptstruct-inventory.json")
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("scriptstruct_inventory_artifact_schema_mismatch", reasons)
+        self.assertIn("scriptstruct_inventory_artifact_summary_mismatch", reasons)
 
     def test_accepts_redacted_scriptstruct_signatures_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

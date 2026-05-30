@@ -1896,7 +1896,99 @@ def validate_claims(payload: dict[str, Any], *, label: str, mode: str) -> list[d
     return blockers
 
 
-def validate_scriptstruct_inventory_pack_manifest(payload: dict[str, Any], *, label: str, mode: str) -> list[dict[str, Any]]:
+def validate_scriptstruct_inventory_child_artifact(
+    artifacts: dict[str, Any],
+    key: str,
+    *,
+    label: str,
+    manifest_path: Path,
+    workspace_root: Path,
+    protected_root: Path,
+    expected_schema: str,
+    summary_count: int | None = None,
+) -> list[dict[str, Any]]:
+    blockers: list[dict[str, Any]] = []
+    artifact = artifacts.get(key)
+    artifact_label = f"{label}:$.artifacts.{key}"
+    if not isinstance(artifact, dict):
+        return [{"reason": "scriptstruct_inventory_artifact_entry_invalid", "label": artifact_label}]
+    relative_path = artifact.get("path")
+    expected_sha256 = artifact.get("sha256")
+    if not isinstance(relative_path, str) or not relative_path or PurePosixPath(relative_path).is_absolute() or ".." in PurePosixPath(relative_path).parts:
+        blockers.append({"reason": "scriptstruct_inventory_artifact_path_invalid", "label": f"{artifact_label}.path"})
+        return blockers
+    if not isinstance(expected_sha256, str) or SHA256_RE.fullmatch(expected_sha256) is None:
+        blockers.append({"reason": "scriptstruct_inventory_artifact_sha256_invalid", "label": f"{artifact_label}.sha256"})
+    path = manifest_path.parent / relative_path
+    blockers.extend(path_blockers(path, label=artifact_label, workspace_root=workspace_root, protected_root=protected_root, require_workspace=True))
+    if blockers:
+        return blockers
+    if not path.is_file():
+        blockers.append({"reason": "scriptstruct_inventory_artifact_not_file", "label": artifact_label, "path": str(path)})
+        return blockers
+    observed_sha256 = sha256_file(path)
+    if isinstance(expected_sha256, str) and observed_sha256 != expected_sha256:
+        blockers.append(
+            {
+                "reason": "scriptstruct_inventory_artifact_sha256_mismatch",
+                "label": f"{artifact_label}.sha256",
+                "expected": expected_sha256,
+                "observed": observed_sha256,
+            }
+        )
+    child_payload, load_blockers = load_json(path)
+    if child_payload is None:
+        blockers.extend(load_blockers)
+        return blockers
+    blockers.extend(
+        validate_json_path_fields(
+            child_payload,
+            source_label=str(path),
+            workspace_root=workspace_root,
+            protected_root=protected_root,
+        )
+    )
+    blockers.extend(
+        validate_json_protected_root_strings(
+            child_payload,
+            source_label=str(path),
+            workspace_root=workspace_root,
+            protected_root=protected_root,
+        )
+    )
+    if child_payload.get("schema") != expected_schema:
+        blockers.append(
+            {
+                "reason": "scriptstruct_inventory_artifact_schema_mismatch",
+                "label": f"{artifact_label}.schema",
+                "expected": expected_schema,
+                "recorded": child_payload.get("schema"),
+            }
+        )
+    if summary_count is not None and key == "scriptstruct_inventory":
+        summary = child_payload.get("summary")
+        if not isinstance(summary, dict) or summary.get("scriptstruct_count") != summary_count:
+            blockers.append(
+                {
+                    "reason": "scriptstruct_inventory_artifact_summary_mismatch",
+                    "label": f"{artifact_label}.summary.scriptstruct_count",
+                    "expected": summary_count,
+                    "recorded": summary.get("scriptstruct_count") if isinstance(summary, dict) else None,
+                }
+            )
+    return blockers
+
+
+def validate_scriptstruct_inventory_pack_manifest(
+    payload: dict[str, Any],
+    *,
+    label: str,
+    manifest_path: Path,
+    workspace_root: Path,
+    protected_root: Path,
+    mode: str,
+    expected_binary_sha256: str | None,
+) -> list[dict[str, Any]]:
     if payload.get("schema") != SCRIPTSTRUCT_INVENTORY_PACK_SCHEMA:
         return []
     blockers: list[dict[str, Any]] = []
@@ -1907,6 +1999,15 @@ def validate_scriptstruct_inventory_pack_manifest(payload: dict[str, Any], *, la
     binary = payload.get("binary")
     if not isinstance(binary, dict) or not isinstance(binary.get("sha256"), str) or SHA256_RE.fullmatch(binary["sha256"]) is None:
         blockers.append({"reason": "scriptstruct_inventory_binary_sha256_invalid", "label": f"{label}:$.binary.sha256"})
+    elif expected_binary_sha256 is not None and binary["sha256"] != expected_binary_sha256:
+        blockers.append(
+            {
+                "reason": "scriptstruct_inventory_binary_sha256_mismatch",
+                "label": f"{label}:$.binary.sha256",
+                "expected": expected_binary_sha256,
+                "recorded": binary["sha256"],
+            }
+        )
     core = payload.get("core")
     if not isinstance(core, dict) or not isinstance(core.get("sha256"), str) or SHA256_RE.fullmatch(core["sha256"]) is None:
         blockers.append({"reason": "scriptstruct_inventory_core_sha256_invalid", "label": f"{label}:$.core.sha256"})
@@ -1914,11 +2015,38 @@ def validate_scriptstruct_inventory_pack_manifest(payload: dict[str, Any], *, la
     if not isinstance(artifact_identity, dict) or artifact_identity.get("artifact_sha256") != (core or {}).get("sha256"):
         blockers.append({"reason": "scriptstruct_inventory_artifact_identity_mismatch", "label": f"{label}:$.artifact_identity"})
     artifacts = payload.get("artifacts")
-    if not isinstance(artifacts, dict) or artifacts.get("scriptstruct_inventory") != "scriptstruct-inventory.json":
-        blockers.append({"reason": "scriptstruct_inventory_artifact_missing", "label": f"{label}:$.artifacts.scriptstruct_inventory"})
     summary = payload.get("summary")
     if not isinstance(summary, dict) or not is_json_int(summary.get("scriptstruct_count")):
         blockers.append({"reason": "scriptstruct_inventory_summary_invalid", "label": f"{label}:$.summary.scriptstruct_count"})
+        summary_count = None
+    else:
+        summary_count = int(summary["scriptstruct_count"])
+    if not isinstance(artifacts, dict):
+        blockers.append({"reason": "scriptstruct_inventory_artifacts_missing", "label": f"{label}:$.artifacts"})
+    else:
+        blockers.extend(
+            validate_scriptstruct_inventory_child_artifact(
+                artifacts,
+                "scriptstruct_inventory",
+                label=label,
+                manifest_path=manifest_path,
+                workspace_root=workspace_root,
+                protected_root=protected_root,
+                expected_schema="obelisk.scriptstruct-inventory.v1",
+                summary_count=summary_count,
+            )
+        )
+        blockers.extend(
+            validate_scriptstruct_inventory_child_artifact(
+                artifacts,
+                "fname_root_validation",
+                label=label,
+                manifest_path=manifest_path,
+                workspace_root=workspace_root,
+                protected_root=protected_root,
+                expected_schema="obelisk.core-fname-root-validation.v1",
+            )
+        )
     non_claims = payload.get("non_claims")
     if not isinstance(non_claims, list) or not REQUIRED_SCRIPTSTRUCT_INVENTORY_NON_CLAIMS.issubset(set(non_claims)):
         blockers.append(
@@ -3667,7 +3795,17 @@ def validate_manifest(
         )
     )
     blockers.extend(validate_redacted_scriptstruct_signature_manifest(payload, source_label=str(resolved), mode=mode))
-    blockers.extend(validate_scriptstruct_inventory_pack_manifest(payload, label=str(resolved), mode=mode))
+    blockers.extend(
+        validate_scriptstruct_inventory_pack_manifest(
+            payload,
+            label=str(resolved),
+            manifest_path=resolved,
+            workspace_root=workspace_root,
+            protected_root=protected_root,
+            mode=mode,
+            expected_binary_sha256=expected_binary_sha256,
+        )
+    )
     blockers.extend(
         validate_rc_ufunction_second_source_root_manifest(
             payload,

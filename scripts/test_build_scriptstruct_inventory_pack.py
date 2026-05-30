@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 import sys
@@ -244,6 +245,68 @@ class BuildScriptStructInventoryPackTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("do not pass overrides", result.stderr)
         self.assertNotIn("does not exist", result.stderr)
+
+    def test_plan_regeneration_preserves_evidence_pack_labels(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            addrs = build_core_fixture(core)
+            output_dir = root / "out"
+            pack_manifest = root / "pack-with-labels" / "manifest.json"
+            pack_manifest.parent.mkdir()
+            core_sha = hashlib.sha256(core.read_bytes()).hexdigest()
+            pack_manifest.write_text(
+                json.dumps(
+                    {
+                        "binary": {
+                            "sha256": "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                        },
+                        "core": {
+                            "path": str(core),
+                            "sha256": core_sha,
+                        },
+                        "evidence_status": {"status": "complete", "gdb_core_failed": False},
+                        "fname_root_slots": [
+                            {"label": "wrong-root", "address": "0x1"},
+                            {"label": "selected-root", "address": hex(addrs["fname_root_slot"])},
+                        ],
+                        "gobjects_candidates": [
+                            {"label": "wrong-gobjects", "address": "0x2"},
+                            {"label": "selected-gobjects", "address": hex(addrs["gobjects"])},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            self.run_builder(
+                [
+                    "--evidence-pack-manifest",
+                    str(pack_manifest),
+                    "--evidence-pack-fname-root-label",
+                    "selected-root",
+                    "--evidence-pack-gobjects-label",
+                    "selected-gobjects",
+                    "--target-set",
+                    "transfer-scriptstruct",
+                    "--plan-regeneration",
+                    "--fname-index",
+                    "None=0",
+                    "--output-dir",
+                    str(output_dir),
+                ]
+            )
+
+            inventory = json.loads((output_dir / "scriptstruct-inventory.json").read_text(encoding="utf-8"))
+
+        plan = inventory["target_set_regeneration_plan"]
+        command = plan["regenerate_commands"][0]["argv"]
+        self.assertEqual(plan["evidence_pack_fname_root_label"], "selected-root")
+        self.assertEqual(plan["evidence_pack_gobjects_label"], "selected-gobjects")
+        self.assertIn("--evidence-pack-fname-root-label", command)
+        self.assertEqual(command[command.index("--evidence-pack-fname-root-label") + 1], "selected-root")
+        self.assertIn("--evidence-pack-gobjects-label", command)
+        self.assertEqual(command[command.index("--evidence-pack-gobjects-label") + 1], "selected-gobjects")
 
     def test_rejects_ufunction_only_target_set(self) -> None:
         result = self.run_builder(
