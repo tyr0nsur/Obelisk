@@ -165,3 +165,76 @@ snapshot and a distinct second source both exist.
 This triage does not promote a public Structure SDK, build-policy API, `StructureEvents`,
 runtime hook, callback, identity/lookup surface, mutation, return override, safe-zone API,
 no-collision compatibility, or ArkApi port.
+
+## Offline Follow-up: Existing Artifact Check
+
+Date: 2026-05-30
+
+Scope: read-only repo and `/home/flowcommunity-ark/obelisk-artifacts` inspection only.
+No server process, runtime observation, ptrace/gcore/scanner, code edit, commit, push,
+tag, Discord update, or `/servidor/ark` read/write was used.
+
+Commands run:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/compare_reflection_snapshots.py \
+  --base-root tests/fixtures/ufunction_snapshots \
+  --readiness-report \
+  --target obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild \
+  --json
+
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/compare_reflection_snapshots.py \
+  --base-root tests/fixtures/ufunction_snapshots \
+  --readiness-report \
+  --target obelisk.ufunction-chain.snapshot.v1:APrimalStructure.IsAllowedToBuild \
+  --json
+
+find /home/flowcommunity-ark/obelisk-artifacts -type f -size +100M -printf '%s %p\n' | sort -nr
+
+strings -a /home/flowcommunity-ark/obelisk-artifacts/offline-binaries/\
+7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520/\
+ShooterGameServer | rg -i \
+'allowedtobuild|placementdata|dontadjust|maxrange|finalplacement|player.*view.*rotation|atlocation|atrotation|primalstructure'
+```
+
+Results:
+
+- Both exact target checks still report `missing_base_snapshot`,
+  `layout_ready=false`, and `promotion_ready=false`.
+- `scripts/reflection_target_sets.py` still has no
+  `PrimalStructure.IsAllowedToBuild` or `APrimalStructure.IsAllowedToBuild` entry.
+- The committed UFunction fixture manifest still has no build-policy target; current
+  structure fixtures remain the six `structure-observer-intake` entries only.
+- `/home/flowcommunity-ark/obelisk-artifacts` currently contains the offline
+  `ShooterGameServer` binary and derived artifact packs, but no obvious raw core file
+  suitable for `inspect_core_ufunctions.py`. The only file larger than 100 MB found in
+  that tree was the static objdump text.
+- Static strings from the offline binary show weak adjacent seeds such as
+  `BPIsAllowedToBuild` and `BPIsAllowedToBuildEx`, but not an exact
+  `IsAllowedToBuild` or `APrimalStructure.IsAllowedToBuild` UFunction snapshot. Treat
+  these strings as discovery hints only; they do not prove owner, `ParmsSize`, property
+  chain, return offset, placement struct layout, or copy/redaction policy.
+
+Useful existing artifacts:
+
+- Offline binary:
+  `/home/flowcommunity-ark/obelisk-artifacts/offline-binaries/7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520/ShooterGameServer`
+- Static-global preflight:
+  `/home/flowcommunity-ark/obelisk-artifacts/static-global-preflight-20260529/manifest.json`
+  records the same binary SHA, the reviewed FName root slot candidate, and the
+  `GUObjectArray` research-candidate. This is useful provenance for future offline
+  core snapshot regeneration, but static evidence alone cannot enumerate this UFunction
+  metadata.
+- Minimal second-source structure evidence:
+  `/home/flowcommunity-ark/obelisk-artifacts/minimal-second-source-intake-offline-20260530T075501Z/snapshot-comparison/readiness-report.json`
+  accepts `PrimalStructure.AllowStructureAccess` and
+  `PrimalStructure.IsAllowedToDemolish` layout-only evidence, but it does not cover
+  build placement policy.
+
+Minimum artifact still needed:
+
+An approved copied/offline core or evidence-pack manifest outside protected server paths,
+from the same binary hash or a properly documented second source, with usable FName root
+slot and GObjects inputs. The minimum snapshot command remains the ad hoc
+`inspect_core_ufunctions.py --snapshot-json` command above, targeting only
+`--outer-exact PrimalStructure --name-exact IsAllowedToBuild`.

@@ -19,6 +19,25 @@ The detailed local inventory lives in
 demand analysis only; it is not license clearance, runtime evidence, an ArkApi
 compatibility target, or an ABI reference.
 
+## NextGenPlugins Demand Snapshot
+
+The local dictionary currently points to these high-demand Plugin Hub categories. The
+status below describes only what Obelisk can expose safely today or after promotion gates;
+it does not promise ArkApi plugin compatibility.
+
+| Priority | Category | Obelisk status | Safe interpretation |
+| --- | --- | --- | --- |
+| 1 | Lifecycle, descriptors, logging, config, local timers | available | Build native examples around current core primitives; process restart/crash management is not public SDK surface |
+| 2 | Passive chat parsing and command-like routing | available | Use copied `ChatMessageEvent` for local parsing only; no sender identity, replies, blocking, or moderation contract |
+| 3 | Timed notices and chat broadcasts | blocked | Owner-token timers exist, but public send-chat/broadcast policy is not promoted |
+| 4 | Permissions/admin groups | blocked | Needs identity, persistence, privacy-safe grants/checks, and operator reload policy |
+| 5 | RCON/operator I/O and Unicode text | blocked | Needs secret-safe ingress, audit policy, encoding rules, and command lifecycle |
+| 6 | Economy, shops, kits, rewards, stats | blocked | Needs commands, identity, permissions, persistence, item mutation, and event evidence |
+| 7 | Homes, teleport, safe zones, area policy | blocked | Needs location/area data, identity, combat/enemy restrictions, and safe mutation/enforcement contracts |
+| 8 | Structure counts, placement, ownership, collision policy | experimental | Copied policy observers can support narrow audits; census, ownership, placement denial, and mutation are not public surfaces |
+| 9 | Dino colors, carry rules, spawn/cosmetic policy | blocked | Needs dino/player identity, classification, interaction events, and safe mutation/enforcement |
+| 10 | Engrams, inventory, item give/remove flows | blocked | Needs player/inventory/item identity, progression or item mutation APIs, rollback, and privacy policy |
+
 | Modder intent | Use now | Status | Must not imply |
 | --- | --- | --- | --- |
 | Load a Linux-native plugin | `ObeliskPlugin_GetInfo`, `ObeliskPlugin_Init`, optional `ObeliskPlugin_Shutdown` | Stable baseline | Hot reload of Obelisk itself, detached workers, or background ingress without shutdown proof |

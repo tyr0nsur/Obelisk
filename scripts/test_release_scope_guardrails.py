@@ -9,6 +9,12 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+PUBLIC_RC_UFUNCTION_TARGET_SETS = [
+    "minimal-second-source-intake",
+    "structure-observer-intake",
+    "item-return-only-policy-slice",
+    "chat-message-intake",
+]
 
 
 def read(relative: str) -> str:
@@ -523,13 +529,14 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertNotIn("scripts/test_install_obelisk_layout.sh /tmp/obelisk-ci-layout", ci)
         self.assertIn("Reflection base readiness", ci)
         self.assertIn("--fail-on-base-readiness-gaps", ci)
-        for target_set in (
-            "minimal-second-source-intake",
-            "structure-observer-intake",
-            "item-return-only-policy-slice",
-            "chat-message-intake",
-        ):
+        for target_set in PUBLIC_RC_UFUNCTION_TARGET_SETS:
             self.assertIn(f"--target-set {target_set}", ci)
+        self.assertEqual(re.findall(r"--target-set ([A-Za-z0-9_-]+)", ci), PUBLIC_RC_UFUNCTION_TARGET_SETS)
+        self.assertIn("Check committed public RC UFunction target sets", ci)
+        self.assertNotIn("tests/fixtures/scriptstruct_snapshots", ci)
+        self.assertNotIn("Check committed ScriptStruct promotion target sets", ci)
+        self.assertIn("all 12 public\n  RC snapshots across the four public target sets", changelog)
+        self.assertNotIn("all nine public\n  RC targets", changelog)
         self.assertRegex(
             ci,
             re.compile(
@@ -1280,7 +1287,9 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "durable rich-provenance refresh is preserved",
             "Consume mode accepts it and promote mode stays blocked",
             "Do not rerun broad FName, GObjects, or core scans for ResourceHandle",
-            "mutation-window rejection, runtime negative samples, and a fail-closed lookup contract",
+            "post-callback rejection contract is preserved as candidate-only",
+            "next offline ResourceHandle work is a strict serial reuse/wraparound policy artifact",
+            "runtime negative samples and public lookup/identity blocked",
         ]:
             with self.subTest(file="docs/agent-handoff/CURRENT.md", item=item):
                 self.assertIn(normalized(item), compact_current)

@@ -163,6 +163,49 @@ namespace
         Require(dispatcher.Dispatch(MakeMessage()) == 0, "self-unregistered callback ran twice");
     }
 
+    struct SelfUnregisterDestroyCapture
+    {
+        Obelisk::Core::ChatEventDispatcher* dispatcher = nullptr;
+        uint64_t registrationId = 0;
+        int calls = 0;
+        int destroyed = 0;
+    };
+
+    void SelfUnregisterWithDestroyCallback(const Obelisk::Core::ChatMessageView&, void* userData)
+    {
+        auto* capture = static_cast<SelfUnregisterDestroyCapture*>(userData);
+        ++capture->calls;
+        Require(capture->destroyed == 0, "chat user data was destroyed before callback body");
+        Require(capture->dispatcher != nullptr, "self-unregister destroy callback had no dispatcher");
+        Require(capture->dispatcher->Unregister(capture->registrationId),
+                "self-unregister with destroy from chat callback failed");
+        Require(capture->destroyed == 0, "chat user data was destroyed before callback returned");
+    }
+
+    void CountSelfUnregisterDestroyed(void* userData)
+    {
+        auto* capture = static_cast<SelfUnregisterDestroyCapture*>(userData);
+        ++capture->destroyed;
+    }
+
+    void TestSelfUnregisterDefersUserDataDestroyUntilCallbackReturns()
+    {
+        Obelisk::Core::ChatEventDispatcher dispatcher;
+        int owner = 0;
+        SelfUnregisterDestroyCapture capture{&dispatcher, 0, 0, 0};
+
+        capture.registrationId = dispatcher.Register(
+            &owner,
+            {SelfUnregisterWithDestroyCallback, &capture, CountSelfUnregisterDestroyed});
+        Require(capture.registrationId != 0, "self-unregister destroy registration id was not assigned");
+        Require(dispatcher.Dispatch(MakeMessage()) == 1,
+                "self-unregister destroy chat callback did not run");
+        Require(capture.calls == 1, "self-unregister destroy chat callback ran wrong number of times");
+        Require(capture.destroyed == 1, "chat user data was not destroyed after callback returned");
+        Require(dispatcher.SubscriptionCount() == 0,
+                "self-unregister destroy chat callback remained registered");
+    }
+
     struct UnregisterOtherCapture
     {
         Obelisk::Core::ChatEventDispatcher* dispatcher = nullptr;
@@ -555,6 +598,7 @@ int main()
     TestUnregisterIsIdempotent();
     TestRegistrationIdsSkipZeroAndLiveIdsAfterWrap();
     TestCallbackCanUnregisterItself();
+    TestSelfUnregisterDefersUserDataDestroyUntilCallbackReturns();
     TestReentrantUnregisterSkipsRemovedSnapshotCallback();
     TestOwnerCleanupWaitsForInFlightDispatch();
     TestCrossFamilyCallbackSuppressesDeferredCleanupWait();

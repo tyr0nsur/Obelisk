@@ -138,7 +138,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Check committed UFunction promotion target sets
+      - name: Check committed public RC UFunction target sets
         run: |
           python3 scripts/compare_reflection_snapshots.py \
             --base-root tests/fixtures/ufunction_snapshots \
@@ -147,17 +147,4 @@ jobs:
             --target-set minimal-second-source-intake \
             --target-set structure-observer-intake \
             --target-set item-return-only-policy-slice \
-            --target-set chat-message-intake \
-            --target-set buff-compact-intake \
-            --target-set dino-compact-intake \
-            --target-set mission-compact-intake \
-            --target-set tribe-compact-intake \
-            --target-set transfer-ufunction-intake
-
-      - name: Check committed ScriptStruct promotion target sets
-        run: |
-          python3 scripts/compare_reflection_snapshots.py \
-            --base-root tests/fixtures/scriptstruct_snapshots \
-            --readiness-report \
-            --fail-on-base-readiness-gaps \
-            --target-set transfer-scriptstruct
+            --target-set chat-message-intake

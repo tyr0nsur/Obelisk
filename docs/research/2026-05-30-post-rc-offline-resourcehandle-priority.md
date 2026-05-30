@@ -267,3 +267,28 @@ is frame-local and that post-callback lookup/use must fail closed. It does not c
 runtime object samples, serial reuse/wraparound, public lifecycle names, public
 `ResourceHandle`, object identity, GObjects lookup, mutation, return override, or Plugin
 Hub identity requirements.
+
+## 2026-05-30 Audit Update
+
+Current blocker map after the post-callback contract:
+
+- `GObjects`/`FUObjectArray` is strong internal offline evidence for the reviewed binary
+  hash, with strict static field-window support and identity-complete evaluator inputs,
+  but remains non-public and static/core-evidence-only.
+- `FUObjectItem+0x8` is the favored serial-backed dword; `FUObjectItem+0xc` remains
+  unknown and must be recorded neutrally.
+- `0x100` and `0x4000` remain internal flag-policy candidates only. The policy rejects
+  `0x100` and rejects `0x4000` by default unless a reviewed helper mode proves otherwise.
+- The post-callback rejection contract proves only frame-local/internal fail-closed
+  behavior. It does not create public lookup, public identity, or post-callback handles.
+- Remaining blockers are serial reuse/wraparound policy, rejected runtime object samples,
+  public lifecycle-name correlation, public lookup/privacy policy, and promotion-mode
+  ABI/SDK/lifecycle guardrails.
+
+Next offline action: produce a candidate-only serial reuse/wraparound policy artifact
+from the bounded weak-helper assign/validate paths and existing identity-complete
+evaluator inputs. The artifact should state that zero serials, serial mismatches, unknown
+wraparound, and slot reuse without a freshly proven serial all fail closed, while keeping
+`promotion_ready=false`, `public_resource_handle_ready=false`, and
+`post_callback_resource_handle_ready=false`. Do not rerun broad FName/GObjects/core scans
+for this step.

@@ -159,3 +159,43 @@ Recommended v1 ordering from this demand inventory:
    contracts are promoted.
 7. Items, inventory, dinos, transfers, and missions remain investigation/internal until
    copied-data, lifecycle, identity/privacy, and promotion gates are complete.
+
+## Prioritized Demand Map
+
+This table is a safe demand dictionary from visible plugin names and `PluginInfo.json`
+descriptions only. It does not use plugin implementation, offsets, layouts, wrappers,
+Windows ABI assumptions, or algorithms.
+
+Status labels:
+
+- `available`: a narrow Obelisk-native variant can be built from current public surfaces.
+- `experimental`: Obelisk has partial/debug/promoted observer plumbing, but not a complete
+  Plugin Hub category contract.
+- `blocked`: requires new copied-data evidence, ABI design, privacy/lifecycle policy, and
+  promotion gates before a public Plugin Hub surface.
+
+| Priority | Demand category | Seen in local dictionary | Obelisk capability needed | Status |
+| --- | --- | --- | --- | --- |
+| 1 | Plugin lifecycle, descriptors, logging, config, local timers | `PluginCrashManager`, common config files | Existing plugin lifecycle, descriptor metadata, logging, owner-token timers, packaging guidance; restart/crash supervision remains future work | available |
+| 2 | Chat text parsing and command-like routing | `CustomChat`, `AlternativeCommands` | Copied `ChatMessageEvent`, owner-token callbacks, process-local parsing, command registry design; replies, blocking, identity, and moderation remain future work | available |
+| 3 | Timed broadcasts and notices | `ArkAdvert`, `TribeMotd` | Owner-token timers plus a future send-chat/broadcast surface and message policy | blocked |
+| 4 | Permissions and admin groups | `Permissions`, `AdminsPermissions` | Stable player/admin identity, group/grant persistence, privacy-safe checks, operator reload policy | blocked |
+| 5 | RCON/operator command I/O and Unicode-safe text | `ExtendedRcon`, `UnicodeRcon` | Secret-safe operator ingress, command lifecycle, encoding policy, audit logging | blocked |
+| 6 | Economy, points, shops, and kits | `ArkShop`, `AtlasShop` | Commands, identity, permissions, persistence, item mutation/give flows, transaction-safe storage | blocked |
+| 7 | Kill rewards and stats | `ShopRewards` | Copied kill/damage/death events, identity, dino/player classification, persistence | blocked |
+| 8 | Homes and teleport | `ArkHomes` | Copied location/identity, cooldowns, permission checks, safe teleport mutation, combat/enemy restrictions | blocked |
+| 9 | Safe zones and area policy | `SafeZone` | Bounded location/area model, entry/exit observation, damage/build/use enforcement contracts | blocked |
+| 10 | Structure counts and limits | `StructuresLimit` | Promoted copied structure policy/census data, ownership/tribe identity, bounded counts; enforcement remains future work | experimental |
+| 11 | Build placement and collision policy | `NoCollision` | Build-placement policy evidence, explicit deny/allow semantics, admin identity, no raw structure handles | blocked |
+| 12 | Personal or tribe ownership cleanup | `PersonalOwnership` | Ownership identity, structure lookup/census, safe mutation/cleanup contract | blocked |
+| 13 | Engram learning/unlock utilities | `AllEngrams` | Player identity, progression state, unlock mutation API, privacy and rollback policy | blocked |
+| 14 | Dino cosmetics and spawn/color policy | `DinoColors` | Dino identity/classification, spawn/tame observation, safe cosmetic mutation | blocked |
+| 15 | Flyer carry restrictions | `AntiFlyerCarry` | Mount/carry interaction events, player/dino/team identity, enforcement return path | blocked |
+| 16 | Inventory and item grant/remove flows | shop/kits families | Inventory/item identity, copied item descriptors, give/remove mutation, failure and rollback semantics | blocked |
+| 17 | Persistence-backed plugin data | shop, permissions, tribe/admin families | Secret-safe DB/config patterns, migrations, lifecycle cleanup, multi-instance boundaries; plugin-local files can exist without a shared service | blocked |
+| 18 | Structure/item policy auditing | structure/shop/safe-zone families | Existing copied `GameplayPolicyEvent` observers and descriptor metadata; identity, mutation, and return override remain future work | available |
+
+Near-term Plugin Hub demand should therefore start with foundation examples, passive chat
+parsers, descriptor/timer utilities, and copied policy auditors. High-demand ArkApi-style
+features are valuable prioritization signals, but most require identity, mutation,
+persistence, operator ingress, and enforcement contracts that Obelisk has not promoted.

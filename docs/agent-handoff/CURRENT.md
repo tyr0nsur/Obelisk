@@ -108,9 +108,10 @@ for the current checkpoint.
 - ResourceHandle/public GObjects remain blocked; old flag-policy artifact is obsolete and
   durable rich-provenance refresh is preserved. Consume mode accepts it and promote mode
   stays blocked. Do not rerun broad FName, GObjects, or core scans for ResourceHandle
-  unless the binary hash changes or evidence is contradicted. Next useful ResourceHandle
-  work is semantic helper evidence, mutation-window rejection, runtime negative samples,
-  and a fail-closed lookup contract.
+  unless the binary hash changes or evidence is contradicted. The semantic blockers remain:
+  the post-callback rejection contract is preserved as candidate-only and fail-closed;
+  next offline ResourceHandle work is a strict serial reuse/wraparound policy artifact
+  that keeps runtime negative samples and public lookup/identity blocked.
 - Transfer ScriptStruct bool-tail evidence has a refreshed local root; older
   `/servidor/ark/workspace-offline/...20260529...` transfer roots are stale under current
   bool-tail strictness.

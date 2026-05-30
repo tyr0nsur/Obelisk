@@ -28,8 +28,8 @@
 - Added owner-token process-local timers and the `oProcessTimer` first-party example as a
   v0.1 core primitive without UE/gameplay timer, identity, persistence, or command
   semantics.
-- Refreshed the RC UFunction second-source evidence for the intended ref: all nine public
-  RC targets across chat, inventory, and structures compare as accepted with preserved
+- Refreshed the RC UFunction second-source evidence for the intended ref: all 12 public
+  RC snapshots across the four public target sets compare as accepted with preserved
   BoolProperty tail metadata.
 - Preserved explicit snapshot artifact identity in the UFunction inspector CLI so future
   second-source roots can satisfy strict readiness gates.
