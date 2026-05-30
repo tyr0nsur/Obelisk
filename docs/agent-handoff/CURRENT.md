@@ -154,8 +154,8 @@ for the current checkpoint.
   override.
 - `players-identity-lifecycle-intake` is a guidance-only target set backed by
   `docs/research/2026-05-30-player-identity-lifecycle-plan.md`; it stays out of RC/public
-  target sets and does not promote identity, lookup, runtime work, mutation, or return
-  override.
+  target sets, is release-gate rejected, and does not promote identity, lookup, runtime
+  work, mutation, or return override.
 
 ## Priority Next Steps
 

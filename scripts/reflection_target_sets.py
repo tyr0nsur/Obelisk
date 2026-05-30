@@ -114,6 +114,13 @@ TARGET_SETS = {
 }
 
 
+PLANNING_ONLY_TARGET_SETS = frozenset(
+    (
+        "players-identity-lifecycle-intake",
+    )
+)
+
+
 def schema_targets(target_set: str, schema: str) -> set[str]:
     targets = set()
     for target in TARGET_SETS[target_set]:

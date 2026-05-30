@@ -11,7 +11,9 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-TARGET_SETS = runpy.run_path(str(REPO_ROOT / "scripts" / "reflection_target_sets.py"))["TARGET_SETS"]
+REFLECTION_TARGET_SET_VARS = runpy.run_path(str(REPO_ROOT / "scripts" / "reflection_target_sets.py"))
+TARGET_SETS = REFLECTION_TARGET_SET_VARS["TARGET_SETS"]
+PLANNING_ONLY_TARGET_SETS = REFLECTION_TARGET_SET_VARS["PLANNING_ONLY_TARGET_SETS"]
 PUBLIC_GAMEPLAY_EVENTS_MANIFEST = REPO_ROOT / "docs" / "public_gameplay_events.json"
 PUBLIC_API_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
 PUBLIC_DOC_FILES = [
@@ -950,6 +952,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             (matrix, "Passive chat text parsers"),
             (matrix, "Timer utilities"),
             (matrix, "Copied policy auditors"),
+            (matrix, "Those three are seed examples only, not production Plugin Hub modules"),
         ):
             with self.subTest(required=required):
                 self.assertIn(required, text)
@@ -986,6 +989,67 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             with self.subTest(policy_forbidden=forbidden):
                 self.assertNotIn(forbidden, policy_source)
+
+    def test_experimental_plugin_targets_and_tests_stay_flag_gated(self) -> None:
+        root_cmake = (REPO_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+        sdk_consumer_cmake = (REPO_ROOT / "tests" / "sdk_consumer" / "CMakeLists.txt").read_text(
+            encoding="utf-8"
+        )
+        experimental_plugins = {
+            "oPolicyAudit": "plugins/oPolicyAudit",
+            "oChatLogger": "plugins/oChatLogger",
+            "oChatAudit": "plugins/oChatAudit",
+        }
+
+        self.assertRegex(
+            root_cmake,
+            r"option\s*\(\s*OBELISK_BUILD_EXPERIMENTAL_PLUGINS\b[^\)]*\bOFF\s*\)",
+        )
+        root_block_match = re.search(
+            r"if\s*\(\s*OBELISK_BUILD_EXPERIMENTAL_PLUGINS\s*\)(?P<body>.*?)endif\s*\(\s*\)",
+            root_cmake,
+            flags=re.DOTALL,
+        )
+        self.assertIsNotNone(root_block_match)
+        if root_block_match is None:
+            return
+
+        root_block = root_block_match.group("body")
+        root_without_experimental_block = (
+            root_cmake[: root_block_match.start()] + root_cmake[root_block_match.end() :]
+        )
+        sdk_consumer_index = root_cmake.index("add_subdirectory(tests/sdk_consumer)")
+        for target, path in experimental_plugins.items():
+            add_subdirectory = f"add_subdirectory({path})"
+            with self.subTest(target=target, cmake="root"):
+                self.assertEqual(root_cmake.count(add_subdirectory), 1)
+                self.assertIn(add_subdirectory, root_block)
+                self.assertLess(root_cmake.index(add_subdirectory), sdk_consumer_index)
+                self.assertNotIn(add_subdirectory, root_without_experimental_block)
+                self.assertIsNone(
+                    re.search(rf"install\s*\(\s*TARGETS[^\)]*\b{re.escape(target)}\b", root_cmake, re.DOTALL)
+                )
+
+        sdk_without_experimental_blocks = sdk_consumer_cmake
+        for target in experimental_plugins:
+            block_match = re.search(
+                rf"if\s*\(\s*TARGET\s+{re.escape(target)}\s*\)(?P<body>.*?)endif\s*\(\s*\)",
+                sdk_without_experimental_blocks,
+                flags=re.DOTALL,
+            )
+            with self.subTest(target=target, cmake="sdk_consumer"):
+                self.assertIsNotNone(block_match)
+                if block_match is None:
+                    continue
+                self.assertIn(f"$<TARGET_FILE:{target}>", block_match.group("body"))
+            sdk_without_experimental_blocks = (
+                sdk_without_experimental_blocks[: block_match.start()]
+                + sdk_without_experimental_blocks[block_match.end() :]
+            )
+
+        for target in experimental_plugins:
+            with self.subTest(target=target, cmake="sdk_consumer_default"):
+                self.assertNotIn(target, sdk_without_experimental_blocks)
 
     def test_nextgenplugins_absolute_path_stays_out_of_public_docs_and_skills(self) -> None:
         offenders: list[str] = []
@@ -2681,6 +2745,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "Non-roadmap candidate pressure order",
             "This list is not a v1 delivery sequence, compatibility plan, or Plugin Hub roadmap.",
             "without claiming a command, moderation, or reply/send-chat SDK",
+            "`oChatLogger`, `oChatAudit`, and `oPolicyAudit` may teach\n  copied chat/policy audit patterns, but they are not production Plugin Hub modules",
             "remain investigation/internal unless",
             "The capability matrix is the single public-facing status table",
         )
@@ -2925,6 +2990,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 self.assertIn(target, plan)
 
         self.assertIn(target_set_name, TARGET_SETS)
+        self.assertIn(target_set_name, PLANNING_ONLY_TARGET_SETS)
         self.assertEqual(
             target_set,
             (

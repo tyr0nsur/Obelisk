@@ -255,9 +255,13 @@ sets: `minimal-second-source-intake`, `structure-observer-intake`,
 `mission-compact-intake` are not part of that gate, and scalar-candidate summaries are
 review aids only, not RC scope. Transfer target sets such as `transfer-ufunction-intake`
 are also not part of the default gate. ScriptStruct promotion, including transfer structs,
-is not part of the default gate and must be opted in explicitly. A release or PR that
-promotes another reflected module family must name each promoted target set explicitly;
-those named sets are added to the public RC target sets:
+is not part of the default gate and must be opted in explicitly.
+Planning/guidance-only target sets such as `players-identity-lifecycle-intake` are not
+promotable release target sets and are rejected by `scripts/check_release_readiness.sh`;
+replace them with a separately promoted release/public target set after the SDK and
+second-source gates are satisfied.
+A release or PR that promotes another reflected module family must name each promoted
+target set explicitly; those named sets are added to the public RC target sets:
 
 ```bash
 scripts/check_release_readiness.sh \

@@ -4,11 +4,13 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
@@ -88,6 +90,24 @@ class CheckStaticToolingTests(unittest.TestCase):
         self.assertNotEqual(0, result.returncode)
         self.assertIn("--binary must not read from protected server root", result.stderr)
 
+    def test_rejects_protected_smoke_output_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            binary = Path(temp_dir) / "ShooterGameServer"
+            binary.write_bytes(b"not really an elf")
+
+            result = self.run_tool(
+                "--binary",
+                str(binary),
+                "--output-root",
+                "/servidor/ark/obelisk/static-tooling-smoke",
+                "--run-smoke",
+                "--json",
+                check=False,
+            )
+
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("--output-root must not write under protected server root", result.stderr)
+
     def test_rejects_symlinked_smoke_output_file(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -100,6 +120,39 @@ class CheckStaticToolingTests(unittest.TestCase):
                 tool.write_text(link, "after\n")
 
             self.assertEqual("before\n", target.read_text(encoding="utf-8"))
+
+    def test_rejects_symlinked_smoke_output_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            binary = root / "ShooterGameServer"
+            output = root / "out"
+            target = root / "target"
+            smoke_link = output / "radare2-smoke"
+            binary.write_bytes(b"not really an elf")
+            output.mkdir()
+            target.mkdir()
+            smoke_link.symlink_to(target, target_is_directory=True)
+
+            with self.assertRaises(SystemExit):
+                tool.run_radare2_smoke(
+                    {"available": True, "path": "/bin/true"},
+                    binary,
+                    output,
+                    timeout_sec=1,
+                )
+
+    def test_analyze_headless_version_rc_one_is_available_probe(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            executable = Path(temp_dir) / "analyzeHeadless"
+            executable.write_text("#!/bin/sh\nprintf 'Headless Analyzer Usage\\n'\nexit 1\n", encoding="utf-8")
+            executable.chmod(0o755)
+
+            with mock.patch.dict(os.environ, {"PATH": temp_dir}):
+                report = tool.tool_report("analyzeHeadless", timeout_sec=1)
+
+        self.assertTrue(report["available"])
+        self.assertEqual(1, report["version_probe"]["returncode"])
+        self.assertEqual("ok", report["version_probe"]["status"])
 
     def test_smoke_records_skips_when_tools_missing_or_results_when_present(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -520,6 +520,47 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertIn("does not promote Mission SDK", text_result.stdout)
         self.assertIn("does not promote Transfer SDK", text_result.stdout)
 
+    def test_player_identity_lifecycle_guidance_can_be_listed_without_snapshots(self) -> None:
+        result = run_compare_raw(
+            "--list-target-guidance",
+            "--target-set",
+            "players-identity-lifecycle-intake",
+            "--json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["schema"], "obelisk.reflection-target-guidance.v1")
+        self.assertEqual(report["guidance_scope"], "offline_planning_only")
+        self.assertEqual(report["target_sets"], ["players-identity-lifecycle-intake"])
+        self.assertEqual(report["targets"], [])
+        self.assertEqual(len(report["target_set_guidance"]), 1)
+        guidance = report["target_set_guidance"][0]
+        self.assertEqual(guidance["target_set"], "players-identity-lifecycle-intake")
+        self.assertEqual(guidance["classification"], "players_identity_lifecycle_guidance_only_candidate")
+        self.assertIn("planning_guidance_only", guidance["why_blocked"])
+        self.assertIn("not_release_readiness_target", guidance["why_blocked"])
+        self.assertIn("public_player_sdk_blocked", guidance["why_blocked"])
+        self.assertIn("public player identity", guidance["non_claim"])
+        self.assertIn("release readiness", guidance["non_claim"])
+        self.assertIn(
+            "do not use this target set for release/readiness or public SDK promotion gates",
+            guidance["snapshot_prep_checks"],
+        )
+        self.assertIn("public_sdk", report["not_promoted_surfaces"])
+        self.assertIn("resource_handle", report["not_promoted_surfaces"])
+
+        text_result = run_compare_raw(
+            "--list-target-guidance",
+            "--target-set",
+            "players-identity-lifecycle-intake",
+        )
+        self.assertEqual(text_result.returncode, 0, text_result.stderr + text_result.stdout)
+        self.assertIn("target_guidance count=0 scope=offline_planning_only target_set_guidance=1", text_result.stdout)
+        self.assertIn("target_set=players-identity-lifecycle-intake", text_result.stdout)
+        self.assertIn("not_release_readiness_target", text_result.stdout)
+        self.assertIn("does not promote Player Identity/Lifecycle SDK", text_result.stdout)
+
     def test_target_set_guidance_rejects_duplicate_target_set_filter(self) -> None:
         result = run_compare_raw(
             "--list-target-guidance",
@@ -1864,6 +1905,49 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(report["evidence_scope"], "second_source_layout_evidence_only")
         self.assertIn("public_sdk", report["not_promoted_surfaces"])
         self.assertIn("resource_handle", report["not_promoted_surfaces"])
+
+    def test_readiness_report_blocks_player_identity_lifecycle_promotion_gate(self) -> None:
+        target_set = "players-identity-lifecycle-intake"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base_dir = root / "base" / "sha" / "sdk_players"
+            candidate_dir = root / "candidate" / "sha" / "sdk_players"
+            base_dir.mkdir(parents=True)
+            candidate_dir.mkdir(parents=True)
+            for target in compare.TARGET_SETS[target_set]:
+                _, _, short_key = target.partition(":")
+                outer, _, name = short_key.partition(".")
+                base_payload = rename_target(base_snapshot(), outer=outer, name=name)
+                candidate_payload = deepcopy(base_payload)
+                write_snapshot(base_dir, base_payload, f"{outer}.{name}.snapshot.json")
+                write_snapshot(candidate_dir, candidate_payload, f"{outer}.{name}.snapshot.json")
+
+            result = run_compare(
+                root / "base",
+                root / "candidate",
+                "--readiness-report",
+                "--target-set",
+                target_set,
+                "--fail-on-readiness-gaps",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 1)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["gate_mode"], "second_source_promotion")
+        self.assertEqual(report["target_sets"], [target_set])
+        self.assertEqual(report["totals"]["targets"], len(compare.TARGET_SETS[target_set]))
+        self.assertEqual(report["totals"]["second_source_accepted"], len(compare.TARGET_SETS[target_set]))
+        self.assertEqual(
+            report["promotion_gate"],
+            {
+                "ready": False,
+                "ready_scope": "planning_only",
+                "layout_ready": True,
+                "promotion_ready": False,
+                "blockers": [{"reason": "target_set_not_release_readiness", "count": 1}],
+            },
+        )
 
     def test_readiness_report_target_set_rejected_second_source_exits_one(self) -> None:
         def reject_one(payload: dict[str, object], _outer: str, name: str) -> None:

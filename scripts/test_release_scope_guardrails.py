@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import re
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -659,6 +660,8 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "Transfer target sets such as `transfer-ufunction-intake` are also not part of the default gate",
             normalized(release),
         )
+        self.assertIn("Planning/guidance-only target sets such as `players-identity-lifecycle-intake`", release)
+        self.assertIn("rejected by `scripts/check_release_readiness.sh`", release)
         self.assertIn("not part of the default gate", release)
         self.assertIn("scalar-candidate summaries are review aids only, not RC scope", normalized(release))
         self.assertIn("remaining item producer/runtime validation", normalized(release))
@@ -672,6 +675,12 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("ScriptStruct promotion requires explicit opt-in", script)
         self.assertIn("--scriptstruct-second-source-root requires at least one --scriptstruct-second-source-target-set", script)
         self.assertNotIn('SCRIPTSTRUCT_SECOND_SOURCE_TARGET_SETS=("transfer-scriptstruct")', script)
+        self.assertEqual(
+            shell_array_values(script, "GUIDANCE_ONLY_UFUNCTION_SECOND_SOURCE_TARGET_SETS"),
+            ["players-identity-lifecycle-intake"],
+        )
+        self.assertIn("reject_guidance_only_ufunction_target_set", script)
+        self.assertIn("planning/guidance-only", script)
         self.assertIn("name every promoted target set", pr_template)
         self.assertIn(
             "pass `--scriptstruct-second-source-root` only when a ScriptStruct target set is explicitly named",
@@ -704,6 +713,25 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("runtime_observer_observational_only", release)
         self.assertNotIn("--map Ragnarok --instance arkserver", release)
         self.assertIn("--map <map> --instance <instance-id>", release)
+
+    def test_release_gate_rejects_guidance_only_target_sets_before_build(self) -> None:
+        result = subprocess.run(
+            [
+                str(REPO_ROOT / "scripts/check_release_readiness.sh"),
+                "--require-second-source-readiness",
+                "--ufunction-second-source-target-set",
+                "players-identity-lifecycle-intake",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 2, result.stderr + result.stdout)
+        self.assertIn("players-identity-lifecycle-intake is planning/guidance-only", result.stderr)
+        self.assertIn("Promote a separate release/public target set", result.stderr)
+        self.assertNotIn("cmake -S", result.stdout)
 
     def test_active_handoff_rc_tag_mentions_track_published_baseline(self) -> None:
         for path in ("docs/agent-handoff/CURRENT.md", "docs/agent-handoff/COMPACT_CONTEXT.md"):
@@ -1575,7 +1603,9 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("Excluded unless `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`", architecture)
         self.assertIn("not published by `scripts/check_release_readiness.sh`", status)
         self.assertNotIn("OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON", script)
-        self.assertNotIn("oPolicyAudit.so", script)
+        for experimental_plugin in ("oPolicyAudit", "oChatLogger", "oChatAudit"):
+            with self.subTest(experimental_plugin=experimental_plugin):
+                self.assertNotIn(f"{experimental_plugin}.so", script)
 
     def test_post_rc_observers_stay_out_of_runtime_and_public_abi(self) -> None:
         cmake = read("CMakeLists.txt")

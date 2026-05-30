@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -23,6 +25,7 @@ TOOL_COMMANDS = {
     "analyzeHeadless": {
         "which": "analyzeHeadless",
         "version_args": ["-version"],
+        "version_ok_returncodes": {0, 1},
     },
     "radare2": {
         "which": "radare2",
@@ -60,7 +63,14 @@ def text_excerpt(value: str | bytes, limit: int = 4000) -> str:
     return value[:limit] + "\n[truncated]\n"
 
 
-def run_command(command: list[str], *, timeout_sec: int) -> dict[str, Any]:
+def run_command(
+    command: list[str],
+    *,
+    timeout_sec: int,
+    ok_returncodes: set[int] | None = None,
+) -> dict[str, Any]:
+    if ok_returncodes is None:
+        ok_returncodes = {0}
     try:
         completed = subprocess.run(
             command,
@@ -86,7 +96,7 @@ def run_command(command: list[str], *, timeout_sec: int) -> dict[str, Any]:
         }
     return {
         "argv": command,
-        "status": "ok" if completed.returncode == 0 else "failed",
+        "status": "ok" if completed.returncode in ok_returncodes else "failed",
         "returncode": completed.returncode,
         "stdout_excerpt": text_excerpt(completed.stdout),
         "stderr_excerpt": text_excerpt(completed.stderr),
@@ -102,13 +112,27 @@ def tool_report(name: str, *, timeout_sec: int) -> dict[str, Any]:
         "path": executable,
     }
     if executable is not None:
-        report["version_probe"] = run_command([executable, *spec["version_args"]], timeout_sec=timeout_sec)
+        report["version_probe"] = run_command(
+            [executable, *spec["version_args"]],
+            timeout_sec=timeout_sec,
+            ok_returncodes=spec.get("version_ok_returncodes"),
+        )
     return report
 
 
 def reject_symlink(path: Path, label: str) -> None:
     if path.is_symlink():
         raise SystemExit(f"{label} must not be a symlink: {path}")
+
+
+def ensure_real_directory(path: Path, label: str) -> None:
+    reject_symlink(path, label)
+    if path.exists() and not path.is_dir():
+        raise SystemExit(f"{label} must be a directory: {path}")
+    path.mkdir(parents=True, exist_ok=True)
+    reject_symlink(path, label)
+    if not path.is_dir():
+        raise SystemExit(f"{label} must be a directory: {path}")
 
 
 def resolve_input_binary(path: Path) -> Path:
@@ -130,15 +154,36 @@ def resolve_output_root(path: Path) -> Path:
 
 def write_text(path: Path, value: str) -> None:
     reject_symlink(path, "smoke output file")
-    path.write_text(value, encoding="utf-8")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+
+    parent_fd: int | None = None
+    file_fd: int | None = None
+    try:
+        parent_flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+        if hasattr(os, "O_NOFOLLOW"):
+            parent_flags |= os.O_NOFOLLOW
+        parent_fd = os.open(path.parent, parent_flags)
+        file_fd = os.open(path.name, flags, 0o644, dir_fd=parent_fd)
+    except OSError as exc:
+        if exc.errno in {errno.ELOOP, errno.ENOTDIR}:
+            raise SystemExit(f"smoke output file must not be a symlink: {path}") from exc
+        raise
+    finally:
+        if parent_fd is not None:
+            os.close(parent_fd)
+
+    with os.fdopen(file_fd, "w", encoding="utf-8") as handle:
+        file_fd = None
+        handle.write(value)
 
 
 def run_radare2_smoke(tool: dict[str, Any], binary: Path, output_root: Path, *, timeout_sec: int) -> dict[str, Any]:
     if not tool["available"]:
         return {"tool": "radare2", "status": "skipped", "reason": "tool_missing"}
     smoke_root = output_root / "radare2-smoke"
-    reject_symlink(smoke_root, "radare2 smoke output")
-    smoke_root.mkdir(parents=True, exist_ok=True)
+    ensure_real_directory(smoke_root, "radare2 smoke output")
     command = [tool["path"], "-q", "-c", "iI;q", str(binary)]
     result = run_command(command, timeout_sec=timeout_sec)
     stdout = smoke_root / "radare2-smoke.stdout"
@@ -160,9 +205,8 @@ def run_ghidra_smoke(tool: dict[str, Any], binary: Path, output_root: Path, *, t
         return {"tool": "analyzeHeadless", "status": "skipped", "reason": "tool_missing"}
     smoke_root = output_root / "ghidra-smoke"
     project_root = smoke_root / "project"
-    for label, path in (("Ghidra smoke output", smoke_root), ("Ghidra project root", project_root)):
-        reject_symlink(path, label)
-    smoke_root.mkdir(parents=True, exist_ok=True)
+    ensure_real_directory(smoke_root, "Ghidra smoke output")
+    reject_symlink(project_root, "Ghidra project root")
     command = [
         tool["path"],
         str(project_root),

@@ -24,6 +24,9 @@ PUBLIC_RC_UFUNCTION_SECOND_SOURCE_TARGET_SETS=(
     "item-return-only-policy-slice"
     "chat-message-intake"
 )
+GUIDANCE_ONLY_UFUNCTION_SECOND_SOURCE_TARGET_SETS=(
+    "players-identity-lifecycle-intake"
+)
 
 is_under_path() {
     local path="$1"
@@ -64,6 +67,27 @@ reject_protected_path() {
             "${label}" "${action}" "${SERVER_ROOT}" "${resolved_path}" >&2
         exit 2
     fi
+}
+
+reject_guidance_only_ufunction_target_set() {
+    local target_set="$1"
+    local guidance_only_target_set
+
+    for guidance_only_target_set in "${GUIDANCE_ONLY_UFUNCTION_SECOND_SOURCE_TARGET_SETS[@]}"; do
+        if [[ "${target_set}" == "${guidance_only_target_set}" ]]; then
+            printf '%s is planning/guidance-only and cannot be used as a release readiness UFunction target set.\n' \
+                "${target_set}" >&2
+            printf 'Promote a separate release/public target set through the documented SDK and second-source gates instead.\n' >&2
+            exit 2
+        fi
+    done
+}
+
+add_ufunction_second_source_target_set() {
+    local target_set="$1"
+
+    reject_guidance_only_ufunction_target_set "${target_set}"
+    UFUNCTION_SECOND_SOURCE_TARGET_SETS+=("${target_set}")
 }
 
 validate_second_source_report_dir() {
@@ -218,7 +242,7 @@ EOF
             shift 2
             ;;
         --ufunction-second-source-target-set)
-            UFUNCTION_SECOND_SOURCE_TARGET_SETS+=("${2:?--ufunction-second-source-target-set requires a name}")
+            add_ufunction_second_source_target_set "${2:?--ufunction-second-source-target-set requires a name}"
             shift 2
             ;;
         --scriptstruct-second-source-target-set)

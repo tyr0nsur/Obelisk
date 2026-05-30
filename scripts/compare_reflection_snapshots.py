@@ -12,7 +12,7 @@ import re
 
 from artifact_identity import ARTIFACT_IDENTITY_KEYS, is_safe_artifact_id, is_sha256
 import protected_paths
-from reflection_target_sets import TARGET_SETS
+from reflection_target_sets import PLANNING_ONLY_TARGET_SETS, TARGET_SETS
 
 
 SUPPORTED_SCHEMAS = {
@@ -110,6 +110,32 @@ TARGET_BLOCKER_GUIDANCE = {
     },
 }
 TARGET_SET_BLOCKER_GUIDANCE = {
+    "players-identity-lifecycle-intake": {
+        "classification": "players_identity_lifecycle_guidance_only_candidate",
+        "why_blocked": [
+            "planning_guidance_only",
+            "not_release_readiness_target",
+            "identity_privacy_policy_unproven",
+            "lifecycle_cleanup_policy_unproven",
+            "public_player_sdk_blocked",
+            "runtime_observation_requires_separate_approval",
+        ],
+        "next_offline_input": (
+            "docs-only review or sanitized offline snapshots from distinct non-protected "
+            "artifacts with complete artifact identity"
+        ),
+        "snapshot_prep_checks": [
+            "compare schema-qualified targets through --target-set players-identity-lifecycle-intake for coverage review only",
+            "keep player ids, platform ids, names, IPs, tribe ids, transfer ids, online-list values, object refs, arrays, strings, raw params, and UE pointers redacted",
+            "classify copied-scalar candidates separately from redacted identity and lifecycle risks",
+            "require distinct artifact identity before any second-source layout claim",
+            "do not use this target set for release/readiness or public SDK promotion gates",
+        ],
+        "non_claim": (
+            "does not promote Player Identity/Lifecycle SDK, public player identity, lookup, "
+            "ResourceHandle, mutation, return override, runtime hooks, or release readiness"
+        ),
+    },
     "mission-copied-bool-policy-slice": {
         "classification": "internal_mission_copied_bool_policy_candidate",
         "why_blocked": [
@@ -1156,6 +1182,24 @@ def require_target_set_for_promotion(report: dict[str, Any], target_sets: list[s
         blockers.append({"reason": "promotion_requires_target_set", "count": 1})
 
 
+def block_planning_only_target_set_promotion(report: dict[str, Any], target_sets: list[str]) -> None:
+    if report.get("schema") != "obelisk.reflection-snapshot-readiness.v1":
+        return
+    if report.get("gate_mode") != "second_source_promotion":
+        return
+    planning_only = sorted(set(target_sets) & PLANNING_ONLY_TARGET_SETS)
+    if not planning_only:
+        return
+    promotion_gate = report.get("promotion_gate")
+    if not isinstance(promotion_gate, dict):
+        return
+    promotion_gate["ready"] = False
+    promotion_gate["ready_scope"] = "planning_only"
+    blockers = promotion_gate.setdefault("blockers", [])
+    if isinstance(blockers, list):
+        blockers.append({"reason": "target_set_not_release_readiness", "count": len(planning_only)})
+
+
 def main() -> int:
     args = parse_args()
     if args.list_target_sets:
@@ -1208,6 +1252,7 @@ def main() -> int:
             report["gate_mode"] = "informational_gap_report"
         apply_readiness_gate_mode(report)
         require_target_set_for_promotion(report, args.target_set)
+        block_planning_only_target_set_promotion(report, args.target_set)
     else:
         if candidate is None:
             raise SystemExit("--candidate-root is required unless --readiness-report is used")

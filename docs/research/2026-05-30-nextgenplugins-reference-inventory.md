@@ -130,9 +130,12 @@ current safe seed classes, not another demand category from this inventory.
 For v1 planning, split work into two lanes:
 
 - Production Plugin Hub lane: lifecycle/config/logging, descriptor readers,
-  process-local timers, passive copied chat parsing, and copied policy audit examples.
-  This lane can improve docs, examples, packaging, capability checks, fail-closed config,
-  shutdown cleanup, and multi-instance-safe file layout without adding new SDK symbols.
+  and process-local timers. This lane can improve docs, examples, packaging, capability
+  checks, fail-closed config, shutdown cleanup, and multi-instance-safe file layout
+  without adding new SDK symbols.
+- Experimental seed lane: `oChatLogger`, `oChatAudit`, and `oPolicyAudit` may teach
+  copied chat/policy audit patterns, but they are not production Plugin Hub modules and
+  do not promise that copied chat or policy auditing is generally available.
 - Evidence/design backlog: permissions/admin, RCON, economy, homes/safe zones, broadcasts,
   structure enforcement, inventory/items, dinos, tribes, transfers, and persistence-backed
   services. These remain design notes until copied identity, privacy, storage or ingress,
@@ -141,9 +144,9 @@ For v1 planning, split work into two lanes:
 The first release-facing clarification should define acceptance boundaries for a passive
 chat parser/auditor: copied text is callback-scope and local; it does not include sender
 identity, command SDK guarantees, replies or send-chat, moderation or blocking,
-permissions, operator ingress, or durable cross-event identity. That gives Plugin Hub a
-production-quality v1 seed while keeping player identity and other dependency work in the
-core evidence backlog rather than turning it into a public API promise.
+permissions, operator ingress, or durable cross-event identity. That can define an honest
+release-candidate seed boundary while keeping player identity and other dependency work in
+the core evidence backlog rather than turning it into a public API promise.
 
 ## Recommendation
 
