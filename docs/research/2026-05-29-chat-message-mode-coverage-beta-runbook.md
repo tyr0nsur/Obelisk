@@ -2,26 +2,29 @@
 
 ## Objective
 
-Reusable operator-approved runbook for future regression/revalidation windows proving
+Reusable approval-required runbook for future regression/revalidation windows proving
 copied plugin-facing `ChatMessageEvent` delivery across chat send modes without logging
 raw chat text, player identity, UE pointers, or live-server paths. Initial all-mode copied
 plugin-facing validation is recorded in
 `2026-05-29-chat-message-second-source-readiness.md`.
 
-This runbook is not standing approval. Execute it only after an operator approves the exact
-window and the beta-test notice is sent through the operator-approved notice path.
+This runbook is not standing approval. Execute it only after an operator gives explicit
+current-turn approval for the exact beta window, marker/env deltas, restart expectation,
+rollback, evidence capture, and notice path, and after the beta-test notice is sent through
+that current-turn approved path.
 
 ## Preconditions
 
-- Target: `arkserver` / Ragnarok, only during the approved beta window.
-- Operator approval names the exact beta window start/end, expected restart behavior,
-  plugin posture delta, rollback delta, and the operator-approved beta-test notice path.
+- Target: `arkserver` / Ragnarok, only during the current-turn approved beta window.
+- Current-turn operator approval names the exact beta window start/end, expected restart
+  behavior, plugin posture delta, rollback delta, evidence capture, and beta-test notice
+  path.
 - Record a beta preflight note before marker/env changes:
 
 ```text
 run_id=<YYYYMMDDThhmmssZ-chat-mode-coverage>
 target=arkserver/Ragnarok
-approval=operator-approved beta window, not standing approval
+approval=current-turn operator-approved beta window, not standing approval
 window_start_utc=<approved-start>
 window_end_utc=<approved-end>
 expected_marker_delta=+allow-observer-debug-window,+allow-experimental-observers,+enable-chat-events,-disable-plugins
@@ -36,7 +39,7 @@ baseline_plugin_snapshot=oChatLogger only candidate; no other plugin loadable
 
 ```text
 notice_sent=true
-notice_path=<operator-approved channel/path label only; no endpoint, webhook, token, or message URL>
+notice_path=<current-turn operator-approved channel/path label only; no endpoint, webhook, token, or message URL>
 notice_time_utc=<timestamp>
 notice_digest_sha256=<sha256 of sanitized local notice text or sanitized screenshot/export>
 ```
@@ -66,14 +69,15 @@ scripts/check_obelisk_server_posture.sh --expect-stable --map Ragnarok --instanc
 - Keep the internal route observer off for the plugin-delivery acceptance phase:
   `OBELISK_ENABLE_CHAT_ROUTE_OBSERVER`, `OBELISK_CHAT_ROUTE_OBSERVER_*`, and
   `state/instances/arkserver/enable-chat-route-observer` must be absent unless a separate
-  route-only diagnostic phase is explicitly approved and labeled.
+  route-only diagnostic phase is explicitly current-turn approved and labeled.
 - Do not treat route-observer evidence as plugin delivery evidence.
 
 ## Go/No-Go Checklist
 
 Go only if all of the following are true before activation:
 
-- Operator approves instance, UTC start/end, restart expectation, rollback, and notice path.
+- Operator gives current-turn approval for instance, UTC start/end, restart expectation,
+  rollback, evidence capture, and notice path.
 - Notice artifact is recorded without endpoint, webhook, token, message URL, raw player
   text, or player identity.
 - Stable posture pre-check passes.
@@ -85,7 +89,7 @@ Go only if all of the following are true before activation:
   native exec, ptrace/gcore, broad ProcessEvent tracing, global callbacks, public
   `CallProcessEvent`, ProcessEvent blocking, and unrelated observer env/markers.
 - Each claimed send mode has a recorded in-game precondition and controlled-send record.
-- Rollback can be applied inside the approved window.
+- Rollback can be applied inside the current-turn approved window.
 
 No-go if any privacy blocker appears, another plugin can load, pre/post posture fails, the
 server SHA differs, a required mode precondition is absent for a full-coverage claim, chat
@@ -93,7 +97,7 @@ ambient noise prevents correlation, or rollback is not defined.
 
 ## Exact Feature Gates
 
-Use only the minimal copied delivery path:
+Use only the minimal copied delivery path named by the current-turn approval:
 
 ```text
 OBELISK_WRAPPER_PROFILE=observer-debug
@@ -184,10 +188,10 @@ rollback_completed=true|false
 controlled_send_records_complete=true|false
 ```
 
-The copied log and manifest must show the full approved window: pre-check context before
-activation, producer/plugin activation, all controlled sends attempted, rollback, and
-post-check context through `actual_capture_end_utc`. A cropped delivery-only excerpt is
-useful for review but is not sufficient evidence for the runbook.
+The copied log and manifest must show the full current-turn approved window: pre-check
+context before activation, producer/plugin activation, all controlled sends attempted,
+rollback, and post-check context through `actual_capture_end_utc`. A cropped
+delivery-only excerpt is useful for review but is not sufficient evidence for the runbook.
 
 Validate the manifest with `scripts/validate_chat_mode_coverage_manifest.py` before
 treating analyzer success as accepted evidence. Analyzer success alone is not enough for a

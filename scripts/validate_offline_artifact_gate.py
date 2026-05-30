@@ -2515,6 +2515,7 @@ def validate_transfer_baccept_only_policy_slice_manifest(payload: dict[str, Any]
     if payload.get("missing_targets") != []:
         blockers.append({"reason": "transfer_baccept_policy_missing_targets_present", "label": f"{label}:$.missing_targets"})
 
+    input_snapshot_sources: dict[str, dict[str, str]] = {}
     generated_from = payload.get("generated_from")
     if not isinstance(generated_from, dict):
         blockers.append({"reason": "transfer_baccept_policy_generated_from_missing", "label": f"{label}:$.generated_from"})
@@ -2522,19 +2523,31 @@ def validate_transfer_baccept_only_policy_slice_manifest(payload: dict[str, Any]
         if generated_from.get("snapshot_schema") != RC_UFUNCTION_SNAPSHOT_SCHEMA:
             blockers.append({"reason": "transfer_baccept_policy_snapshot_schema_mismatch", "label": f"{label}:$.generated_from.snapshot_schema"})
         input_snapshots = generated_from.get("input_snapshots")
-        if not isinstance(input_snapshots, list) or len(input_snapshots) != 1:
+        if not isinstance(input_snapshots, list) or len(input_snapshots) != len(REQUIRED_TRANSFER_BACCEPT_ONLY_INPUT_TARGETS):
             blockers.append({"reason": "transfer_baccept_policy_input_snapshot_count_mismatch", "label": f"{label}:$.generated_from.input_snapshots"})
         else:
-            snapshot = input_snapshots[0]
-            if not isinstance(snapshot, dict):
-                blockers.append({"reason": "transfer_baccept_policy_input_snapshot_entry_invalid", "label": f"{label}:$.generated_from.input_snapshots[0]"})
-            else:
+            for index, snapshot in enumerate(input_snapshots):
+                snapshot_label = f"{label}:$.generated_from.input_snapshots[{index}]"
+                if not isinstance(snapshot, dict):
+                    blockers.append({"reason": "transfer_baccept_policy_input_snapshot_entry_invalid", "label": snapshot_label})
+                    continue
                 snapshot_id = snapshot.get("id")
                 snapshot_sha256 = snapshot.get("sha256")
                 if not isinstance(snapshot_id, str) or not snapshot_id:
-                    blockers.append({"reason": "transfer_baccept_policy_input_snapshot_id_invalid", "label": f"{label}:$.generated_from.input_snapshots[0].id"})
+                    blockers.append({"reason": "transfer_baccept_policy_input_snapshot_id_invalid", "label": f"{snapshot_label}.id"})
+                    continue
+                if snapshot_id in input_snapshot_sources:
+                    blockers.append({"reason": "transfer_baccept_policy_input_snapshot_id_duplicate", "label": f"{snapshot_label}.id"})
                 if not isinstance(snapshot_sha256, str) or SHA256_RE.fullmatch(snapshot_sha256) is None:
-                    blockers.append({"reason": "transfer_baccept_policy_input_snapshot_sha256_invalid", "label": f"{label}:$.generated_from.input_snapshots[0].sha256"})
+                    blockers.append({"reason": "transfer_baccept_policy_input_snapshot_sha256_invalid", "label": f"{snapshot_label}.sha256"})
+                    continue
+                snapshot_target = snapshot.get("target")
+                if not isinstance(snapshot_target, str) or snapshot_target not in REQUIRED_TRANSFER_BACCEPT_ONLY_INPUT_TARGETS:
+                    blockers.append({"reason": "transfer_baccept_policy_input_snapshot_target_invalid", "label": f"{snapshot_label}.target"})
+                    continue
+                input_snapshot_sources[snapshot_id] = {"sha256": snapshot_sha256, "target": snapshot_target}
+            if {entry["target"] for entry in input_snapshot_sources.values()} != REQUIRED_TRANSFER_BACCEPT_ONLY_INPUT_TARGETS:
+                blockers.append({"reason": "transfer_baccept_policy_input_snapshot_targets_mismatch", "label": f"{label}:$.generated_from.input_snapshots"})
 
     if safety_summary.get("artifact_status") != "evidence_only":
         blockers.append({"reason": "transfer_baccept_policy_artifact_status_not_evidence_only", "label": f"{label}:$.safety_summary.artifact_status"})
@@ -2573,12 +2586,14 @@ def validate_transfer_baccept_only_policy_slice_manifest(payload: dict[str, Any]
             "parms_size": 1,
             "return_value_offset": "0xffff",
             "property_class": "BoolProperty",
+            "offset": "0x0",
             "offset_internal": 0,
             "element_size": 1,
             "array_dim": 1,
             "byte_mask": "0x01",
             "field_mask": "0xff",
             "native_bool": False,
+            "property_flags": "0x1040000280",
         }
         for key, expected in expected_shape.items():
             if copied_bool.get(key) != expected:
@@ -2590,6 +2605,21 @@ def validate_transfer_baccept_only_policy_slice_manifest(payload: dict[str, Any]
                         "recorded": copied_bool.get(key),
                     }
                 )
+        source_snapshot = copied_bool.get("source_snapshot")
+        source_snapshot_sha256 = copied_bool.get("source_snapshot_sha256")
+        if not isinstance(source_snapshot, str) or source_snapshot not in input_snapshot_sources:
+            blockers.append({"reason": "transfer_baccept_policy_copied_bool_source_snapshot_unknown", "label": f"{label}:$.copied_bool.source_snapshot"})
+        elif source_snapshot_sha256 != input_snapshot_sources[source_snapshot]["sha256"]:
+            blockers.append(
+                {
+                    "reason": "transfer_baccept_policy_copied_bool_source_snapshot_sha256_mismatch",
+                    "label": f"{label}:$.copied_bool.source_snapshot_sha256",
+                    "expected": input_snapshot_sources[source_snapshot]["sha256"],
+                    "recorded": source_snapshot_sha256,
+                }
+            )
+        elif copied_bool.get("target") != input_snapshot_sources[source_snapshot]["target"]:
+            blockers.append({"reason": "transfer_baccept_policy_copied_bool_source_snapshot_target_mismatch", "label": f"{label}:$.copied_bool.source_snapshot"})
 
     forbidden_entries = payload.get("forbidden_transfer_fields")
     if not isinstance(forbidden_entries, list) or len(forbidden_entries) != len(REQUIRED_TRANSFER_BACCEPT_ONLY_FORBIDDEN_FIELDS):
@@ -2606,6 +2636,134 @@ def validate_transfer_baccept_only_policy_slice_manifest(payload: dict[str, Any]
                     "recorded": sorted(field for field in forbidden_fields if isinstance(field, str)),
                 }
             )
+        for index, entry in enumerate(forbidden_entries):
+            entry_label = f"{label}:$.forbidden_transfer_fields[{index}]"
+            if not isinstance(entry, dict):
+                blockers.append({"reason": "transfer_baccept_policy_forbidden_field_entry_invalid", "label": entry_label})
+                continue
+            forbidden_field = entry.get("forbidden_field")
+            target = entry.get("target")
+            field = entry.get("field")
+            if (
+                not isinstance(forbidden_field, str)
+                or forbidden_field not in REQUIRED_TRANSFER_BACCEPT_ONLY_FORBIDDEN_FIELDS
+                or not isinstance(target, str)
+                or not isinstance(field, str)
+                or forbidden_field != f"{target}.{field}"
+            ):
+                blockers.append({"reason": "transfer_baccept_policy_forbidden_field_identity_mismatch", "label": entry_label})
+            if not isinstance(entry.get("reason"), str) or not entry.get("reason"):
+                blockers.append({"reason": "transfer_baccept_policy_forbidden_field_reason_invalid", "label": f"{entry_label}.reason"})
+            forbidden_expected_shape = {
+                "PrimalDinoCharacter.IsAllowedToTransfer.WorldContextObject": {
+                    "property_class": "ObjectProperty",
+                    "offset": "0x0",
+                    "offset_internal": 0,
+                    "element_size": 8,
+                    "array_dim": 1,
+                    "property_flags": "0x1040000280",
+                },
+                "PrimalDinoCharacter.IsAllowedToTransfer.ReturnValue": {
+                    "property_class": "BoolProperty",
+                    "offset": "0x8",
+                    "offset_internal": 8,
+                    "element_size": 1,
+                    "array_dim": 1,
+                    "property_flags": "0x1040000780",
+                },
+                "ShooterGameState.AllowDownloadDino.TheDinoClass": {
+                    "property_class": "ClassProperty",
+                    "offset": "0x0",
+                    "offset_internal": 0,
+                    "element_size": 8,
+                    "array_dim": 1,
+                    "property_flags": "0x1040000280",
+                },
+                "ShooterGameState.AllowDownloadDino.ReturnValue": {
+                    "property_class": "BoolProperty",
+                    "offset": "0x8",
+                    "offset_internal": 8,
+                    "element_size": 1,
+                    "array_dim": 1,
+                    "property_flags": "0x1040000780",
+                },
+                "ShooterPlayerController.ServerDownloadTransferredPlayer.SpawnPointID": {
+                    "property_class": "IntProperty",
+                    "offset": "0x0",
+                    "offset_internal": 0,
+                    "element_size": 4,
+                    "array_dim": 1,
+                    "property_flags": "0x1040000280",
+                },
+                "ShooterPlayerController.ServerDownloadTransferredPlayer.spawnPointRegionIndex": {
+                    "property_class": "IntProperty",
+                    "offset": "0x4",
+                    "offset_internal": 4,
+                    "element_size": 4,
+                    "array_dim": 1,
+                    "property_flags": "0x1040000280",
+                },
+                "ShooterPlayerState.ServerRequestSpawnPointsForDownloadedCharacters.IgnoreBedID": {
+                    "property_class": "IntProperty",
+                    "offset": "0x8",
+                    "offset_internal": 8,
+                    "element_size": 4,
+                    "array_dim": 1,
+                    "property_flags": "0x1040000280",
+                },
+                "ShooterPlayerState.ServerRequestSpawnPointsForDownloadedCharacters.PlayerDataID": {
+                    "property_class": "UInt64Property",
+                    "offset": "0x0",
+                    "offset_internal": 0,
+                    "element_size": 8,
+                    "array_dim": 1,
+                    "property_flags": "0x1040000280",
+                },
+                "ShooterPlayerController.ServerUploadCurrentCharacterAndItems.InventoryComp": {
+                    "property_class": "ObjectProperty",
+                    "offset": "0x0",
+                    "offset_internal": 0,
+                    "element_size": 8,
+                    "array_dim": 1,
+                    "property_flags": "0x1044080280",
+                },
+                "ShooterPlayerController.ServerUploadDino.DownloadedDino": {
+                    "property_class": "ObjectProperty",
+                    "offset": "0x0",
+                    "offset_internal": 0,
+                    "element_size": 8,
+                    "array_dim": 1,
+                    "property_flags": "0x1040000280",
+                },
+            }.get(forbidden_field)
+            if forbidden_expected_shape is None:
+                blockers.append({"reason": "transfer_baccept_policy_forbidden_field_shape_unknown", "label": entry_label})
+            else:
+                for key, expected in forbidden_expected_shape.items():
+                    if entry.get(key) != expected:
+                        blockers.append(
+                            {
+                                "reason": "transfer_baccept_policy_forbidden_field_shape_mismatch",
+                                "label": f"{entry_label}.{key}",
+                                "expected": expected,
+                                "recorded": entry.get(key),
+                            }
+                        )
+            source_snapshot = entry.get("source_snapshot")
+            source_snapshot_sha256 = entry.get("source_snapshot_sha256")
+            if not isinstance(source_snapshot, str) or source_snapshot not in input_snapshot_sources:
+                blockers.append({"reason": "transfer_baccept_policy_forbidden_field_source_snapshot_unknown", "label": f"{entry_label}.source_snapshot"})
+            elif source_snapshot_sha256 != input_snapshot_sources[source_snapshot]["sha256"]:
+                blockers.append(
+                    {
+                        "reason": "transfer_baccept_policy_forbidden_field_source_snapshot_sha256_mismatch",
+                        "label": f"{entry_label}.source_snapshot_sha256",
+                        "expected": input_snapshot_sources[source_snapshot]["sha256"],
+                        "recorded": source_snapshot_sha256,
+                    }
+                )
+            elif target != input_snapshot_sources[source_snapshot]["target"]:
+                blockers.append({"reason": "transfer_baccept_policy_forbidden_field_source_snapshot_target_mismatch", "label": f"{entry_label}.source_snapshot"})
 
     coverage = payload.get("coverage")
     if not isinstance(coverage, dict):

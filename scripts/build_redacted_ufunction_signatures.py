@@ -1193,6 +1193,61 @@ def require_transfer_baccept_only_shape(target_payload: dict[str, Any], source_s
     return copied
 
 
+def require_transfer_forbidden_fields(target_payload: dict[str, Any], source_snapshot: dict[str, str]) -> list[dict[str, Any]]:
+    target_identity = target_payload.get("target")
+    property_chain = target_payload.get("property_chain")
+    if not isinstance(target_identity, dict) or not isinstance(property_chain, dict):
+        raise SystemExit("transfer forbidden-field snapshot missing target identity or property chain")
+    target = target_name(target_identity)
+    if target_payload.get("status") != "candidate":
+        raise SystemExit(f"{target} is not a candidate UFunction snapshot")
+    if target_payload.get("inspection_mode") != "ufunction":
+        raise SystemExit(f"{target} is not a UFunction inspection snapshot")
+
+    properties = property_chain.get("properties")
+    if not isinstance(properties, list):
+        raise SystemExit(f"{target} property_chain.properties is not a list")
+    observed_count = parse_int_value(property_chain.get("observed_count"))
+    expected_count = parse_int_value(property_chain.get("expected_count"))
+    if observed_count is None or expected_count is None or observed_count != expected_count:
+        raise SystemExit(f"{target} property chain count drifted")
+    if observed_count != len(properties):
+        raise SystemExit(f"{target} property list length drifted")
+
+    forbidden: list[dict[str, Any]] = []
+    for prop in properties:
+        if not isinstance(prop, dict):
+            raise SystemExit(f"{target} property entry is not an object")
+        name = prop.get("name")
+        class_name = prop.get("class_name")
+        if not isinstance(name, str) or not name or not isinstance(class_name, str) or not class_name:
+            raise SystemExit(f"{target} property identity drifted")
+        if prop.get("status") != "candidate":
+            raise SystemExit(f"{target}.{name} is not a candidate property")
+        require_candidate_membership(prop, target, name)
+        field_key = f"{target}.{name}"
+        reason = TRANSFER_BACCEPT_ONLY_EXCLUDED_REASONS.get(field_key)
+        if reason is None:
+            raise SystemExit(f"{field_key} has no transfer forbidden-field policy")
+        forbidden.append(
+            {
+                "target": target,
+                "field": name,
+                "forbidden_field": field_key,
+                "reason": reason,
+                "property_class": class_name,
+                "offset": format_hex(require_int_field(prop, "offset_internal", field_key)),
+                "offset_internal": require_int_field(prop, "offset_internal", field_key),
+                "element_size": require_int_field(prop, "element_size", field_key),
+                "array_dim": require_int_field(prop, "array_dim", field_key),
+                "property_flags": format_hex(property_flags(prop) or 0),
+                "source_snapshot": source_snapshot["id"],
+                "source_snapshot_sha256": source_snapshot["sha256"],
+            }
+        )
+    return forbidden
+
+
 def build_item_return_only_policy_slice(*, snapshot_root: Path = DEFAULT_SNAPSHOT_ROOT) -> dict[str, Any]:
     paths, missing_targets = snapshot_paths_from_target_sets(snapshot_root, [ITEM_RETURN_ONLY_INPUT_TARGET_SET])
     if missing_targets:
@@ -1298,17 +1353,16 @@ def build_item_return_only_policy_slice(*, snapshot_root: Path = DEFAULT_SNAPSHO
 
 
 def build_transfer_baccept_only_policy_slice(*, snapshot_root: Path = DEFAULT_SNAPSHOT_ROOT) -> dict[str, Any]:
-    paths, missing_targets = snapshot_paths_from_target_sets(snapshot_root, [TRANSFER_BACCEPT_ONLY_OUTPUT_TARGET_SET])
+    paths, missing_targets = snapshot_paths_from_target_sets(snapshot_root, [TRANSFER_BACCEPT_ONLY_INPUT_TARGET_SET])
     if missing_targets:
         raise SystemExit("transfer bAccept policy manifest missing targets: " + ",".join(missing_targets))
 
-    input_snapshots = [
-        {"id": f"snapshot-{index:04d}", "sha256": file_sha256(path)}
-        for index, path in enumerate(paths, start=1)
-    ]
+    input_snapshots = []
     copied: list[dict[str, Any]] = []
+    forbidden: list[dict[str, Any]] = []
     seen_targets: set[str] = set()
-    for path, source_snapshot in zip(paths, input_snapshots, strict=True):
+    for index, path in enumerate(paths, start=1):
+        source_snapshot = {"id": f"snapshot-{index:04d}", "sha256": file_sha256(path)}
         payload = load_json_file("snapshot", path)
         targets = require_snapshot_payload(payload, path)
         for target_payload in targets:
@@ -1319,11 +1373,19 @@ def build_transfer_baccept_only_policy_slice(*, snapshot_root: Path = DEFAULT_SN
             if target in seen_targets:
                 raise SystemExit(f"duplicate transfer policy target: {target}")
             seen_targets.add(target)
-            copied.extend(require_transfer_baccept_only_shape(target_payload, source_snapshot))
+            source_snapshot["target"] = target
+            input_snapshots.append(source_snapshot)
+            if target in TRANSFER_BACCEPT_ONLY_EXPECTED_SHAPES:
+                copied.extend(require_transfer_baccept_only_shape(target_payload, source_snapshot))
+            else:
+                forbidden.extend(require_transfer_forbidden_fields(target_payload, source_snapshot))
 
     expected_input_targets = expand_ufunction_targets([TRANSFER_BACCEPT_ONLY_INPUT_TARGET_SET])
     expected_output_targets = expand_ufunction_targets([TRANSFER_BACCEPT_ONLY_OUTPUT_TARGET_SET])
     emitted_copied_fields = [entry["copied_field"] for entry in copied]
+    emitted_forbidden_fields = [entry["forbidden_field"] for entry in forbidden]
+    missing_input_targets = [target for target in expected_input_targets if target not in seen_targets]
+    unexpected_input_targets = [target for target in seen_targets if target not in expected_input_targets]
     missing_copied_fields = [
         field for field in TRANSFER_BACCEPT_ONLY_COPIED_FIELDS if field not in emitted_copied_fields
     ]
@@ -1333,9 +1395,19 @@ def build_transfer_baccept_only_policy_slice(*, snapshot_root: Path = DEFAULT_SN
     output_targets = [entry["target"] for entry in copied]
     missing_output_targets = [target for target in expected_output_targets if target not in output_targets]
     unexpected_output_targets = [target for target in output_targets if target not in expected_output_targets]
+    missing_forbidden_fields = [
+        field for field in TRANSFER_BACCEPT_ONLY_EXCLUDED_REASONS if field not in emitted_forbidden_fields
+    ]
+    unexpected_forbidden_fields = [
+        field for field in emitted_forbidden_fields if field not in TRANSFER_BACCEPT_ONLY_EXCLUDED_REASONS
+    ]
     blockers = [
+        *[f"missing_input_target:{target}" for target in missing_input_targets],
+        *[f"unexpected_input_target:{target}" for target in unexpected_input_targets],
         *[f"missing_copied_field:{field}" for field in missing_copied_fields],
         *[f"unexpected_copied_field:{field}" for field in unexpected_copied_fields],
+        *[f"missing_forbidden_field:{field}" for field in missing_forbidden_fields],
+        *[f"unexpected_forbidden_field:{field}" for field in unexpected_forbidden_fields],
         *[f"missing_output_target:{target}" for target in missing_output_targets],
         *[f"unexpected_output_target:{target}" for target in unexpected_output_targets],
     ]
@@ -1361,22 +1433,13 @@ def build_transfer_baccept_only_policy_slice(*, snapshot_root: Path = DEFAULT_SN
             "forbidden_fields": list(TRANSFER_BACCEPT_ONLY_EXCLUDED_REASONS),
         },
         "copied_bool": copied[0],
-        "forbidden_transfer_fields": [
-            {
-                "target": field.rsplit(".", 1)[0],
-                "field": field.rsplit(".", 1)[1],
-                "forbidden_field": field,
-                "reason": reason,
-                "source_snapshot": "snapshot-0001",
-            }
-            for field, reason in TRANSFER_BACCEPT_ONLY_EXCLUDED_REASONS.items()
-        ],
+        "forbidden_transfer_fields": forbidden,
         "safety_summary": {
             "artifact_status": "evidence_only",
             "promotion_ready": False,
             "intended_use": "offline_review_only",
             "copied_bool_count": len(copied),
-            "forbidden_field_count": len(TRANSFER_BACCEPT_ONLY_EXCLUDED_REASONS),
+            "forbidden_field_count": len(forbidden),
             "explicitly_excluded": [
                 "ARKTributeDino",
                 "ArkTributePlayerData",

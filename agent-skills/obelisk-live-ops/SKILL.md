@@ -41,35 +41,35 @@ Convenience log links may live under:
 ```
 
 Current instance posture belongs in `docs/agent-handoff/CURRENT.md`, not in this durable
-skill. Before server-backed validation, read that file. If the operator grants a named
-instance for scoped debug/development or beta testing, agents may use only that approved
-target and must record markers, restart expectations, rollback, and evidence capture. Other
-instances still require explicit operator approval for the target instance, marker changes,
-restart window, rollback plan, and whether the server must be shut down afterward.
-ReflectionScanner, native exec probes, ptrace/gcore, broad ProcessEvent tracing, and
-text/gameplay-payload logging must still have a written scoped run plan before activation.
-Do not write or execute an operational runbook unless the exact instance, marker/env
-gates, restart window, rollback, evidence paths, and shutdown/posture expectation are
-named.
+skill. Before server-backed validation, read that file for context only; it is never
+standing approval. Marker edits, start/stop/restart commands, runtime observation,
+ReflectionScanner, native exec probes, ptrace/gcore, broad ProcessEvent tracing,
+text/gameplay-payload logging, beta/community notices, and player-facing validation all
+require explicit current-turn operator approval for the exact scoped run. Approval must
+name the target instance, marker/env gates, start/stop/restart window, rollback plan,
+evidence paths, notice path when applicable, and shutdown/posture expectation. Agents may
+use only that current-turn approved scope. Do not write or execute an operational runbook
+unless those details are named for the current turn.
 
 ## Production Baseline
 
 Keep production/shared baselines simple: ProcessEvent hook enabled only when intended,
 plugins disabled unless a maintenance window explicitly scopes a plugin test,
-scanner/native-exec/broad tracing off, and no restarts or marker edits without approval.
-Server restarts are never implied by research progress: require explicit operator approval
-for the exact instance and restart window, and only request it when new runtime logs are
-needed after a concrete offline/code advance.
+scanner/native-exec/broad tracing off, and no restarts or marker edits without
+current-turn approval for the exact scoped run. Server restarts are never implied by
+research progress: require explicit current-turn operator approval for the exact instance
+and restart window, and only request it when new runtime logs are needed after a concrete
+offline/code advance.
 Offline config preparation tools must not read `ShooterGameServer` directly from
 `/servidor/ark`; use a copied offline binary artifact or an explicit, recorded SHA256.
 Offline evidence-pack and release-readiness report tools must not write under protected
 live-server paths or historical dump subdirectories. `/servidor/ark/workspace-offline` is
 the only approved under-`/servidor/ark` offline workspace; otherwise use `/tmp` or another
-operator-approved offline artifact workspace.
+current-turn operator-approved offline artifact workspace.
 
 ```bash
-# Only run marker/start/stop commands when that change is part of an approved
-# debug/development instance test window:
+# Only run marker/start/stop commands when that exact change is part of a
+# current-turn operator-approved debug/development instance test window:
 # mkdir -p /servidor/ark/obelisk/state/instances/arkserver2
 # touch /servidor/ark/obelisk/state/instances/arkserver2/enable-process-event-hook
 # touch /servidor/ark/obelisk/state/instances/arkserver2/disable-plugins
@@ -83,8 +83,9 @@ Expected logs:
 - plugin loading disabled
 - server remains joinable
 
-Post-checks after an approved runtime experiment should use the same approved target and
-should reject experimental observers unless the maintenance plan explicitly says otherwise:
+Post-checks after a current-turn approved runtime experiment should use the same exact
+target and should reject experimental observers unless the current-turn maintenance plan
+explicitly says otherwise:
 
 ```bash
 scripts/check_obelisk_server_posture.sh --expect-stable \
@@ -115,22 +116,23 @@ scripts/check_obelisk_server_posture.sh --expect-stable \
   - `enable-debug-control`
   - `enable-reflection-scanner`
   - `enable-native-exec-probes`
-- Never enable native exec probes without explicit approval for the named debug run.
+- Never enable native exec probes without explicit current-turn operator approval for the
+  named debug run.
 - Do not set `OBELISK_DEBUG_ALLOW_PTRACE=1` by default in debug wrappers. Ptrace requires
-  an approved isolated run plus the `allow-ptrace` marker.
+  a current-turn approved isolated run plus the `allow-ptrace` marker.
 - Never enable `ReflectionScanner` on a player-facing instance while users are active.
   When the operator explicitly selects a live/beta instance for in-game function testing,
-  keep the window narrow: announce the test through the operator-approved notice path for
-  that turn before activation, enable only the markers required by the exact feature under
-  test, preserve copied-log evidence, avoid raw player text/identity logging, and make
-  marker/env rollback explicit.
+  keep the window narrow: announce the test through the current-turn operator-approved
+  notice path before activation, enable only the markers required by the exact feature
+  under test, preserve copied-log evidence, avoid raw player text/identity logging, and
+  make marker/env rollback explicit.
 - Never persist `OBELISK_WRAPPER_PROFILE=observer-debug` in a normal service environment.
   It is a per-launch debug-window profile for the normal wrapper.
-- Keep `OBELISK_PE_TRACE_LIMIT=0` by default; use short trace windows only for approved
-  evidence windows on `arkserver2`.
+- Keep `OBELISK_PE_TRACE_LIMIT=0` by default; use short trace windows only for
+  current-turn approved exact evidence windows.
 - Do not move debug instrumentation to player-facing `arkserver` / Ragnarok until the same
-  posture is proven on `arkserver2` and the operator approves a privacy-bounded player
-  signal window.
+  posture is proven on `arkserver2` and the operator gives current-turn approval for an
+  exact privacy-bounded player signal window.
 
 ## Debug Profiles
 
@@ -140,21 +142,24 @@ Use named profiles instead of ad hoc env mixes:
 - Runtime debug control: plugins disabled, scanner/native exec off,
   `enable-debug-control` marker enabled only for a short window, request marker consumed,
   then immediate restart back to stable dev.
-- Scanner capture: operator-approved debug window only, named instance, plugins disabled,
-  native exec off, one scanner env family enabled, copied logs analyzed offline, then
-  immediate restart back to stable dev inside the same approved window.
+- Scanner capture: current-turn operator-approved debug window only, named instance,
+  plugins disabled, native exec off, one scanner env family enabled, copied logs analyzed
+  offline, then immediate restart back to stable dev inside the same current-turn approved
+  window.
 - Plugin capture: scanner off, only the target plugin installed, plugin config backed up,
   short run, then return to stable dev.
 
-After any scanner/plugin capture, run the posture check for the same approved debug target:
+After any scanner/plugin capture, run the posture check for the same current-turn approved
+debug target:
 
 ```bash
 scripts/check_obelisk_server_posture.sh --expect-stable \
   --map <map> --instance <instance-id>
 ```
 
-Use the matching explicit `--map` and `--instance` for the approved debug target. That
-check must pass before launching another agent round that assumes a stable server.
+Use the matching explicit `--map` and `--instance` for the current-turn approved debug
+target. That check must pass before launching another agent round that assumes a stable
+server.
 In `--expect-stable` mode it must fail closed if `libobelisk.so` is not mapped, if a
 deleted `libobelisk` mapping remains after redeploy, if `LD_PRELOAD` does not include the
 central `${OBELISK_ROOT}/lib/libobelisk.so`, if scanner/native-exec variables are still
@@ -224,7 +229,7 @@ as part of config recovery.
 
 ## Operational Checks
 
-Before restart:
+Before a current-turn approved restart, these checks are read-only context:
 
 ```bash
 git -C /home/flowcommunity-ark/Obelisk status --short
@@ -234,8 +239,8 @@ ls -la /servidor/ark/obelisk/lib /servidor/ark/obelisk/plugins
 ls -la /servidor/ark/obelisk/state
 ```
 
-After a maintenance-window restart on a protected live-like instance, use that instance's
-approved profile and explicit map/instance values:
+After a current-turn approved maintenance-window restart on a protected live-like
+instance, use the profile named for that exact run and explicit map/instance values:
 
 ```bash
 pgrep -af '^./ShooterGameServer'
@@ -246,11 +251,12 @@ scripts/check_obelisk_server_posture.sh --expect-stable \
   --map <map> --instance <instance-id>
 ```
 
-Current server-backed debug target comes from `docs/agent-handoff/CURRENT.md`. It may be a
-dedicated debug instance or an explicitly approved beta-test instance. For powered-off
-debug instances, start only for the scoped test, restore stable posture, then shut down
-when no longer needed. For player-facing beta instances, do not assume shutdown; follow the
-approved maintenance/beta window:
+Current server-backed debug target context comes from `docs/agent-handoff/CURRENT.md`, but
+that file does not grant approval. The target may be a dedicated debug instance or a
+current-turn approved beta-test instance. For powered-off debug instances, start only for
+the exact scoped test, restore stable posture, then shut down when the current-turn run
+plan requires it. For player-facing beta instances, do not assume shutdown; follow the
+current-turn approved maintenance/beta window:
 
 ```bash
 tail -n 100 /servidor/ark/obelisk/logs/<instance-id>/Obelisk.log
@@ -262,10 +268,10 @@ scripts/check_obelisk_server_posture.sh --expect-stable \
 
 ## Rollback
 
-If an approved target crashes after an Obelisk change, preserve logs/core files first.
-For a powered-off debug target, stop it at the end of the test or rollback window. For a
-player-facing beta target, restore the approved stable markers/config and restart only if
-the maintenance plan requires it:
+If a current-turn approved target crashes after an Obelisk change, preserve logs/core
+files first. For a powered-off debug target, stop it at the end of the exact test or
+rollback window. For a player-facing beta target, restore the current-turn approved stable
+markers/config and restart only if the maintenance plan requires it:
 
 ```bash
 # Preserve evidence first.

@@ -14,8 +14,9 @@ fixture-backed compact functions while keeping public SDK and gameplay mutation 
 - Obelisk baseline:
   `016778a Add transfer ScriptStruct snapshot fixtures`
 - Runtime target for future validation:
-  `arkserver2` / TheIsland only during an approved debug window, or a dedicated debug
-  instance if available.
+  `arkserver2` / TheIsland only during a current-turn operator-approved exact debug
+  window, or a dedicated debug instance if available and current-turn approved for that
+  exact run.
 
 ## Candidate Targets
 
@@ -62,8 +63,8 @@ Future validation must use the existing filtered `ProcessEvent` path and the deb
 instance policy:
 
 1. Do not run on Ragnarok while player testing is active.
-2. Use `arkserver2` / TheIsland only in an approved window, with plugins disabled unless
-   the test explicitly needs a minimal observer plugin.
+2. Use `arkserver2` / TheIsland only in a current-turn operator-approved exact window,
+   with plugins disabled unless that approval explicitly names a minimal observer plugin.
 3. Resolve exact `Outer.Function` identity before accepting a hit; do not use
    `name-contains` filters because aliases such as `BPOverrideAllowStructureAccess` can
    collide with the intended target family.
@@ -99,7 +100,8 @@ OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT=25
 OBELISK_STRUCTURE_REFLECTION_DISPATCH_LIMIT=0
 ```
 
-The runtime now requires the instance marker as well as env/SHA/budget. Log and
+The command block is a gate template, not approval. The runtime now requires the instance
+marker as well as env/SHA/budget. Log and
 internal-dispatch limits are separate budgets; both absent or `0` keeps structure
 observation inactive. It is not deployed, not enabled by default, and not a public SDK or
 mutation API.
@@ -110,7 +112,8 @@ mutation API.
    fixture-backed.
 2. Add an operator runbook for the disabled-by-default structure observation gate.
 3. Schedule controlled debug/development validation only after the recognizer and negative
-   gates pass locally and the operator approves the target window.
+   gates pass locally and the operator gives current-turn approval for the exact target
+   window, marker/env deltas, start/restart/stop, rollback, and evidence capture.
 4. Keep `StructureEvents` internal-only until `structure-observer-intake` has accepted
    second-source evidence and the copied-data ownership gate is reflected in tests and
    release docs.

@@ -4,8 +4,9 @@
 
 Prepare the next safe `arkserver2` / TheIsland runtime confirmation window for the case
 where offline evidence proves a runtime-only question remains. This document is a plan
-only. It does not authorize a run by itself, and it does not require changing
-`arkserver` / Ragnarok.
+only. It does not authorize a run by itself, and it does not authorize marker edits,
+start/stop/restart, runtime observation, beta/community notice, or changing `arkserver` /
+Ragnarok.
 
 Current default: do not run the server. Prefer offline cores, static evidence, fixtures,
 and copied logs until they leave a specific runtime-only gap.
@@ -22,7 +23,9 @@ Run only when all of these are true:
   data ownership have passed.
 - The question cannot be answered from staged offline cores, static xrefs, snapshot
   comparison, or copied historical logs.
-- The lead accepts the shutdown-after-test posture for this window.
+- The operator gives explicit current-turn approval for the exact scoped run, including the
+  target, marker/env deltas, start/restart command, rollback, evidence capture, and
+  shutdown-after-test posture.
 
 Do not include ReflectionScanner, native exec probes, ptrace, `gcore`, broad
 ProcessEvent tracing, chat text logging, or Ragnarok validation in this plan.
@@ -68,15 +71,17 @@ cd /home/flowcommunity-ark/Obelisk
 scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance arkserver2
 ```
 
-The command blocks below assume the normal starting point: `arkserver2` is powered off.
-If preflight proves it is already running in stable posture, use `./arkserver2 restart`
-instead of `./arkserver2 start` in the selected observer block so the per-launch
-`observer-debug` profile and budget variables take effect exactly once.
+The command blocks below are templates for a current-turn approved exact run. They assume
+the normal starting point: `arkserver2` is powered off. If preflight proves it is already
+running in stable posture, use `./arkserver2 restart` instead of `./arkserver2 start` only
+when the current-turn approval names that restart, so the per-launch `observer-debug`
+profile and budget variables take effect exactly once.
 
 ## Metadata-Only Observer Window
 
-Use one module family per window. The default confirmation is metadata-only: non-zero log
-budget, zero dispatch budget, plugins disabled, and `OBELISK_PE_TRACE_LIMIT=0`.
+Use one module family per current-turn approved window. The default confirmation is
+metadata-only: non-zero log budget, zero dispatch budget, plugins disabled, and
+`OBELISK_PE_TRACE_LIMIT=0`.
 
 Structure metadata-only window:
 
@@ -127,8 +132,10 @@ copy logs and analyze first.
 ## Dispatch-Budget Variant
 
 Use this variant only when offline evidence asks for the internal copied dispatch path,
-not just metadata. Keep only one observer marker enabled and keep plugins disabled unless
-a separate plugin-capture plan explicitly names the minimal plugin and rollback.
+not just metadata, and the operator gives current-turn approval for that exact dispatch
+scope. Keep only one observer marker enabled and keep plugins disabled unless a separate
+current-turn approved plugin-capture plan explicitly names the minimal plugin and
+rollback.
 
 Structure dispatch-budget confirmation:
 
@@ -202,7 +209,7 @@ params.
 ## Rollback And Shutdown
 
 Rollback removes observer markers, restarts once into stable posture, verifies it, then
-shuts TheIsland down:
+shuts TheIsland down only when those actions are part of the current-turn approved run:
 
 ```bash
 cd /servidor/ark
@@ -224,17 +231,20 @@ cd /servidor/ark
 env -u TMUX ./arkserver2 stop
 ```
 
-If the observer start crashes, preserve copied logs and any core/evidence first, then
-remove the observer markers, keep `enable-process-event-hook` and `disable-plugins`, and
-stop `arkserver2`. Do not rebuild, redeploy, or change markers again until copied evidence
-has been reviewed offline.
+If the observer start crashes during a current-turn approved run, preserve copied logs and
+any core/evidence first, then remove the observer markers, keep
+`enable-process-event-hook` and `disable-plugins`, and stop `arkserver2` only as approved
+by the current-turn approval for that exact rollback. Do not rebuild, redeploy, or change
+markers again until copied evidence has been reviewed offline and a new current-turn
+approval exists.
 
 ## Acceptance Criteria
 
 Accept the run only if all of these hold:
 
 - No commands targeted `arkserver` / Ragnarok.
-- Plugins were disabled unless a separate approved plugin-capture plan existed.
+- Plugins were disabled unless a separate current-turn approved plugin-capture plan
+  existed.
 - Only one observer family was enabled.
 - `OBELISK_WRAPPER_PROFILE=observer-debug` was per-launch only.
 - Log and dispatch budgets were explicit and small.

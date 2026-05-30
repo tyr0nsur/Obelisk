@@ -73,10 +73,11 @@ sequence.
   `CallProcessEvent`, ProcessEvent blocking, broad tracing, ReflectionScanner, debug
   control, and observers unless an exact approved debug window enables the matching
   env+marker pair.
-- Current post-RC core primitive: owner-token process-local timers. They are ABI
-  append-only, zero-failure handles, one-shot/repeating, explicit unregister, and cleaned
-  on plugin init failure/unload. Timer ids are not shared config, cluster state, UE
-  identity, or persistent handles. `oProcessTimer` is the first-party process-local timer
+- Current post-RC core primitive: owner-token process-local timers. They are core runtime
+  utilities only, not gameplay/module timer abstractions or shared scheduler state. They
+  are ABI append-only, zero-failure handles, one-shot/repeating, explicit unregister, and
+  cleaned on plugin init failure/unload. Timer ids are not shared config, cluster state,
+  UE identity, or persistent handles. `oProcessTimer` is the first-party process-local timer
   example and has SDK consumer coverage for disabled config, active one-shot callback,
   missing capability, short API, zero owner token, registration failure, post-registration
   init-failure cleanup, idempotent shutdown, and shutdown unregister.
@@ -106,9 +107,9 @@ sequence.
   handoff does not authorize Transfer runtime work. ResourceHandle semantic work still
   needs helper evidence, mutation-window rejection, and a fail-closed contract.
   Commands/chat routing waits on player context, permissions, and safe response semantics.
-  ArkServerApi/AseApi remains a names/behavior reference only; do not copy offsets,
-  layouts, ABI assumptions, wrappers, raw UE pointer APIs, or algorithmic
-  implementations.
+  ArkServerApi/AseApi remains a names and behavior dictionary only; it is not a porting
+  target or copying source. Do not copy offsets, layouts, ABI assumptions, wrappers, raw
+  UE pointer APIs, or algorithmic implementations.
 - Regenerate the blocked UObject flag-policy artifact with current provenance/caller-row
   requirements before spending more ResourceHandle effort. Do not rerun broad FName,
   GObjects, or core scans unless the binary hash changes or evidence contradicts current

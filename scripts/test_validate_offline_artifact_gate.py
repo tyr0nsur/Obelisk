@@ -384,6 +384,97 @@ def transfer_baccept_only_policy_slice_manifest(
         non_claims = sorted(gate.REQUIRED_TRANSFER_BACCEPT_ONLY_NON_CLAIMS) + [
             "does not copy spawn point ids, region indexes, player data ids, bed ids, return bools, object refs, class refs, tribute structs, arrays, strings, or ids"
         ]
+    input_snapshots = [
+        {"id": f"snapshot-{index:04d}", "sha256": f"{index}" * 64, "target": target}
+        for index, target in enumerate(sorted(gate.REQUIRED_TRANSFER_BACCEPT_ONLY_INPUT_TARGETS), start=1)
+    ]
+    source_by_target = {
+        snapshot["target"]: snapshot
+        for snapshot in input_snapshots
+    }
+    forbidden_shapes = {
+        "PrimalDinoCharacter.IsAllowedToTransfer.WorldContextObject": {
+            "property_class": "ObjectProperty",
+            "offset": "0x0",
+            "offset_internal": 0,
+            "element_size": 8,
+            "array_dim": 1,
+            "property_flags": "0x1040000280",
+        },
+        "PrimalDinoCharacter.IsAllowedToTransfer.ReturnValue": {
+            "property_class": "BoolProperty",
+            "offset": "0x8",
+            "offset_internal": 8,
+            "element_size": 1,
+            "array_dim": 1,
+            "property_flags": "0x1040000780",
+        },
+        "ShooterGameState.AllowDownloadDino.TheDinoClass": {
+            "property_class": "ClassProperty",
+            "offset": "0x0",
+            "offset_internal": 0,
+            "element_size": 8,
+            "array_dim": 1,
+            "property_flags": "0x1040000280",
+        },
+        "ShooterGameState.AllowDownloadDino.ReturnValue": {
+            "property_class": "BoolProperty",
+            "offset": "0x8",
+            "offset_internal": 8,
+            "element_size": 1,
+            "array_dim": 1,
+            "property_flags": "0x1040000780",
+        },
+        "ShooterPlayerController.ServerDownloadTransferredPlayer.SpawnPointID": {
+            "property_class": "IntProperty",
+            "offset": "0x0",
+            "offset_internal": 0,
+            "element_size": 4,
+            "array_dim": 1,
+            "property_flags": "0x1040000280",
+        },
+        "ShooterPlayerController.ServerDownloadTransferredPlayer.spawnPointRegionIndex": {
+            "property_class": "IntProperty",
+            "offset": "0x4",
+            "offset_internal": 4,
+            "element_size": 4,
+            "array_dim": 1,
+            "property_flags": "0x1040000280",
+        },
+        "ShooterPlayerState.ServerRequestSpawnPointsForDownloadedCharacters.IgnoreBedID": {
+            "property_class": "IntProperty",
+            "offset": "0x8",
+            "offset_internal": 8,
+            "element_size": 4,
+            "array_dim": 1,
+            "property_flags": "0x1040000280",
+        },
+        "ShooterPlayerState.ServerRequestSpawnPointsForDownloadedCharacters.PlayerDataID": {
+            "property_class": "UInt64Property",
+            "offset": "0x0",
+            "offset_internal": 0,
+            "element_size": 8,
+            "array_dim": 1,
+            "property_flags": "0x1040000280",
+        },
+        "ShooterPlayerController.ServerUploadCurrentCharacterAndItems.InventoryComp": {
+            "property_class": "ObjectProperty",
+            "offset": "0x0",
+            "offset_internal": 0,
+            "element_size": 8,
+            "array_dim": 1,
+            "property_flags": "0x1044080280",
+        },
+        "ShooterPlayerController.ServerUploadDino.DownloadedDino": {
+            "property_class": "ObjectProperty",
+            "offset": "0x0",
+            "offset_internal": 0,
+            "element_size": 8,
+            "array_dim": 1,
+            "property_flags": "0x1040000280",
+        },
+    }
+    copied_source = source_by_target[gate.REQUIRED_TRANSFER_BACCEPT_ONLY_TARGET]
     return {
         "schema": gate.TRANSFER_BACCEPT_ONLY_POLICY_SLICE_SCHEMA,
         "snapshot_root": "redacted",
@@ -393,7 +484,7 @@ def transfer_baccept_only_policy_slice_manifest(
         "missing_targets": missing_targets,
         "generated_from": {
             "snapshot_schema": SNAPSHOT_SCHEMA,
-            "input_snapshots": [{"id": "snapshot-0001", "sha256": "1" * 64}],
+            "input_snapshots": input_snapshots,
         },
         "coverage": {
             "status": "complete",
@@ -413,15 +504,17 @@ def transfer_baccept_only_policy_slice_manifest(
             "parms_size": 1,
             "return_value_offset": "0xffff",
             "property_class": "BoolProperty",
+            "offset": "0x0",
             "offset_internal": 0,
             "element_size": 1,
             "array_dim": 1,
             "byte_mask": "0x01",
             "field_mask": "0xff",
             "native_bool": False,
+            "property_flags": "0x1040000280",
             "evidence_status": "copied-bool-only",
-            "source_snapshot": "snapshot-0001",
-            "source_snapshot_sha256": "1" * 64,
+            "source_snapshot": copied_source["id"],
+            "source_snapshot_sha256": copied_source["sha256"],
         },
         "forbidden_transfer_fields": [
             {
@@ -429,7 +522,9 @@ def transfer_baccept_only_policy_slice_manifest(
                 "field": field.rsplit(".", 1)[1],
                 "forbidden_field": field,
                 "reason": "not_in_baccept_only_slice",
-                "source_snapshot": "snapshot-0001",
+                **forbidden_shapes[field],
+                "source_snapshot": source_by_target[field.rsplit(".", 1)[0]]["id"],
+                "source_snapshot_sha256": source_by_target[field.rsplit(".", 1)[0]]["sha256"],
             }
             for field in forbidden_fields
         ],
@@ -2666,6 +2761,38 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("transfer_baccept_policy_coverage_input_targets_mismatch", reasons)
         self.assertIn("transfer_baccept_policy_non_claims_missing_required_boundaries", reasons)
         self.assertIn("transfer_baccept_policy_explicit_exclusions_missing_internal_boundaries", reasons)
+
+    def test_blocks_transfer_baccept_only_policy_slice_with_tampered_shape_or_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "transfer-baccept-policy.json"
+            payload = transfer_baccept_only_policy_slice_manifest()
+            payload["copied_bool"]["property_flags"] = "0x80"
+            payload["copied_bool"]["offset"] = "0x4"
+            payload["copied_bool"]["source_snapshot_sha256"] = "7" * 64
+            payload["generated_from"]["input_snapshots"][0]["target"] = "ShooterPlayerController.ServerDownloadTransferredPlayer"
+            payload["forbidden_transfer_fields"][0]["source_snapshot"] = "unknown-snapshot"
+            payload["forbidden_transfer_fields"][1]["source_snapshot_sha256"] = "8" * 64
+            payload["forbidden_transfer_fields"][2]["offset"] = "0x40"
+            payload["forbidden_transfer_fields"][3]["source_snapshot"] = payload["copied_bool"]["source_snapshot"]
+            payload["forbidden_transfer_fields"][3]["source_snapshot_sha256"] = next(
+                snapshot["sha256"]
+                for snapshot in payload["generated_from"]["input_snapshots"]
+                if snapshot["id"] == payload["copied_bool"]["source_snapshot"]
+            )
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("transfer_baccept_policy_copied_bool_shape_mismatch", reasons)
+        self.assertIn("transfer_baccept_policy_copied_bool_source_snapshot_sha256_mismatch", reasons)
+        self.assertIn("transfer_baccept_policy_input_snapshot_targets_mismatch", reasons)
+        self.assertIn("transfer_baccept_policy_forbidden_field_source_snapshot_unknown", reasons)
+        self.assertIn("transfer_baccept_policy_forbidden_field_source_snapshot_sha256_mismatch", reasons)
+        self.assertIn("transfer_baccept_policy_forbidden_field_shape_mismatch", reasons)
+        self.assertIn("transfer_baccept_policy_forbidden_field_source_snapshot_target_mismatch", reasons)
 
     def test_blocks_transfer_baccept_only_policy_slice_public_runtime_overclaim(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

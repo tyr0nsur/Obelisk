@@ -41,12 +41,12 @@ object-array scans.
 `post_callback_resource_handle_ready` remains `false`. ResourceHandle, object identity,
 mutation, and return override surfaces remain unpromoted.
 
-## 2026-05-30 Fail-Closed Evaluator Direction
+## 2026-05-30 Fail-Closed Evaluator Extension
 
-The next ResourceHandle evaluator should keep measuring the blocker instead of promoting a
-handle. A future `obelisk.resource-handle-lifetime-blocker-evaluator.v1` artifact should
-remain internal and emit `promotion_ready=false`, `public_resource_handle_ready=false`,
-and `post_callback_resource_handle_ready=false`.
+`scripts/evaluate_resource_handle_revalidation.py` now keeps measuring the blocker
+instead of promoting a handle. The current extension remains internal/offline and emits
+`promotion_ready=false`, `public_resource_handle_ready=false`, and
+`post_callback_resource_handle_ready=false`.
 
 Required non-claims should include:
 
@@ -71,6 +71,14 @@ Required blockers should include:
 Even strong serial/GObjects evidence may set only internal measurement booleans. It must
 not flip public or post-callback readiness until lifecycle, reuse/wraparound, lookup
 privacy, and post-callback validity contracts are separately proven.
+
+The evaluator adds those blockers both to the top-level `blockers` set and to
+`lifetime_blocker_summary.blockers`. Existing dynamic evidence blockers such as
+`zero_or_missing_fuobjectitem_serial_candidates`,
+`missing_gobjects_coherent_field_window`, and
+`uobject_flags_validity_semantics_unproven` remain measurable and may change with
+stronger offline inputs, but the required lifetime blockers remain until a separate
+public ResourceHandle contract is designed and validated.
 
 ## Validation
 

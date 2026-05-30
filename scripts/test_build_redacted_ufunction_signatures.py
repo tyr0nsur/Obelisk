@@ -272,6 +272,7 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         self.assertEqual("transfer-ufunction-intake", report["input_target_set"])
         self.assertEqual("transfer-baccept-only-policy-slice", report["output_target_set"])
         self.assertEqual("complete", report["coverage"]["status"])
+        self.assertEqual(7, len(report["generated_from"]["input_snapshots"]))
         self.assertEqual(
             "ShooterPlayerController.ServerTransferredPlayerConfirmationResult.bAccept",
             report["copied_bool"]["copied_field"],
@@ -293,6 +294,15 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         self.assertEqual("0x1040000280", copied["property_flags"])
         self.assertEqual("BoolProperty", copied["property_class"])
         self.assertEqual("copied-bool-only", copied["evidence_status"])
+        input_snapshots = {
+            snapshot["id"]: snapshot["sha256"]
+            for snapshot in report["generated_from"]["input_snapshots"]
+        }
+        self.assertEqual(
+            sorted(report["coverage"]["input_targets"]),
+            sorted(snapshot["target"] for snapshot in report["generated_from"]["input_snapshots"]),
+        )
+        self.assertEqual(input_snapshots[copied["source_snapshot"]], copied["source_snapshot_sha256"])
 
         self.assertEqual(1, report["safety_summary"]["copied_bool_count"])
         self.assertEqual(10, report["safety_summary"]["forbidden_field_count"])
@@ -316,6 +326,24 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
                 "ShooterPlayerState.ServerRequestSpawnPointsForDownloadedCharacters.PlayerDataID",
             ],
             sorted(entry["forbidden_field"] for entry in report["forbidden_transfer_fields"]),
+        )
+        self.assertTrue(
+            all(
+                entry["source_snapshot"] in input_snapshots
+                and input_snapshots[entry["source_snapshot"]] == entry["source_snapshot_sha256"]
+                and isinstance(entry["property_flags"], str)
+                and isinstance(entry["offset"], str)
+                and isinstance(entry["offset_internal"], int)
+                and isinstance(entry["element_size"], int)
+                and isinstance(entry["array_dim"], int)
+                for entry in report["forbidden_transfer_fields"]
+            )
+        )
+        self.assertEqual(
+            sorted(report["coverage"]["input_targets"]),
+            sorted({entry["target"] for entry in report["forbidden_transfer_fields"]} | {
+                "ShooterPlayerController.ServerTransferredPlayerConfirmationResult"
+            }),
         )
 
         serialized = json.dumps(report)

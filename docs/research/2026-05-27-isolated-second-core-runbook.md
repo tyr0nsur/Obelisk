@@ -6,9 +6,10 @@ Define the next safe second-source core capture for Obelisk reflection research 
 using `arkserver` / Ragnarok.
 
 This is a historical debug runbook template only. It does not authorize restarts, marker
-changes, ptrace/gcore, text logging, runtime observation, or server launches outside a
-fresh written scoped run plan. `arkserver2` / TheIsland is an isolated fallback target, not
-a standing approval.
+changes, ptrace/gcore, text logging, runtime observation, tracing, scanner use,
+beta/community notices, or server launches outside explicit current-turn operator approval
+for the exact scoped run. `arkserver2` / TheIsland is an isolated fallback target, not a
+standing approval.
 
 ## Target Priority
 
@@ -19,8 +20,9 @@ Preferred target:
 
 Fallback target:
 
-- `arkserver2` / TheIsland under a fresh scoped debug approval. Preserve evidence, restore
-  stable posture, and shut it down afterward when that scoped run requires it.
+- `arkserver2` / TheIsland under fresh current-turn scoped debug approval. Preserve
+  evidence, restore stable posture, and shut it down afterward only when that scoped run
+  requires it.
 
 Protected target:
 
@@ -48,9 +50,10 @@ Before core capture, the dedicated instance should have:
 
 ## Preconditions
 
-- The written run plan names the exact target, capture objective, allowed marker changes,
-  rollback, external artifact workspace, and shutdown expectation. A new
-  `arkserver-obelisk-debug` instance still needs separate approval until provisioned.
+- The current-turn written run plan names the exact target, capture objective, allowed
+  marker changes, start/restart/stop commands, ptrace/gcore command, rollback, external
+  artifact workspace, and shutdown expectation. A new `arkserver-obelisk-debug` instance
+  still needs separate current-turn approval until provisioned.
 - Ragnarok is not touched.
 - The target starts from quiet debug posture:
   - ProcessEvent hook enabled;
@@ -93,27 +96,29 @@ Abort if:
 
 ## Enable Temporary Ptrace
 
-For dedicated debug, use only that instance's marker/env path:
+For dedicated debug, use only that instance's marker/env path after current-turn approval
+names the exact ptrace/gcore run:
 
 ```bash
 touch /servidor/ark/obelisk/state/instances/arkserver-obelisk-debug/allow-ptrace
-# restart only arkserver-obelisk-debug through its approved control script
+# restart only arkserver-obelisk-debug through the control script named in current-turn approval
 ```
 
-For TheIsland fallback only:
+For TheIsland fallback only, and only when current-turn approval names this exact marker
+edit and restart:
 
 ```bash
 touch /servidor/ark/obelisk/state/instances/arkserver2/allow-ptrace
 /servidor/ark/arkserver2 restart
 ```
 
-After restart, confirm the PID belongs to the approved target. This is a debug posture, not
-stable production posture.
+After restart, confirm the PID belongs to the current-turn approved exact target. This is a
+debug posture, not stable production posture.
 
 ## Capture
 
 Use a timestamped target-specific output directory outside `/servidor/ark` and outside the
-repository:
+repository only for the current-turn approved exact capture:
 
 ```bash
 stamp=$(date -u +%Y%m%dT%H%M%SZ)
@@ -125,7 +130,7 @@ chmod 700 "${out}"
 cp /servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer "${out}/raw/ShooterGameServer"
 sha256sum "${out}/raw/ShooterGameServer" | tee "${out}/raw/ShooterGameServer.sha256.txt"
 
-pid=<single approved target pid>
+pid=<single current-turn approved target pid>
 timeout 20m gcore -o "${out}/raw/${target}-${stamp}" "${pid}" 2>&1 | tee "${out}/raw/gcore.txt"
 core_file="${out}/raw/${target}-${stamp}.${pid}"
 test -s "${core_file}"
@@ -138,14 +143,14 @@ Do not use `kill -ABRT`. Do not retry repeatedly after a failed attach.
 
 ## Rollback
 
-Remove ptrace posture and restart/stop only the approved target:
+Remove ptrace posture and restart/stop only the current-turn approved exact target:
 
 ```bash
 rm -f /servidor/ark/obelisk/state/instances/arkserver-obelisk-debug/allow-ptrace
-# restart or stop only arkserver-obelisk-debug through its approved control script
+# restart or stop only arkserver-obelisk-debug through the control script named in current-turn approval
 ```
 
-For TheIsland fallback:
+For TheIsland fallback, only when current-turn rollback approval names these actions:
 
 ```bash
 rm -f /servidor/ark/obelisk/state/instances/arkserver2/allow-ptrace

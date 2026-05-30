@@ -157,6 +157,9 @@ Harden reflected event parameter decoding
 2. Keep additional gameplay/module APIs out of public scope until their copied
    payloads, callback lifetime, SDK consumer coverage, and explicitly named
    second-source gates are complete.
+   process-local core timer callbacks may evolve as owner-token core runtime utilities
+   with explicit unregister only; do not describe them as gameplay/module timer APIs,
+   shared scheduler state, UE identity, or persistent handles.
 3. Expand offline snapshot tooling and second-source comparison before promoting
    public SDK module APIs.
 4. Build the general UE4 reflection pipeline (`FName`, `GNames`, `GObjects`,
@@ -164,6 +167,10 @@ Harden reflected event parameter decoding
    work unless a scoped RC task requires it.
 5. Add safe plugin examples only after the relevant promotion gates are met.
 6. Reduce operational and documentation debt that can mislead new contributors.
+
+ArkServerApi/AseApi may be consulted only as a names and behavior dictionary for familiar
+ARK plugin concepts. It is not a porting target or copying source for offsets, layouts,
+ABI assumptions, wrappers, raw UE pointer APIs, or implementations.
 
 Use [docs/STATUS.md](docs/STATUS.md) before changing runtime behavior. It
 defines which pieces are stable baseline, experimental, or not ready.

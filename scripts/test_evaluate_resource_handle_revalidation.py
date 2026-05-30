@@ -16,6 +16,21 @@ sys.path.insert(0, str(SCRIPT_DIR))
 import evaluate_resource_handle_revalidation as evaluator
 
 
+def assert_fail_closed_resource_handle_contract(testcase: unittest.TestCase, payload: dict[str, object]) -> None:
+    testcase.assertIs(payload["promotion_ready"], False)
+    testcase.assertIs(payload["public_resource_handle_ready"], False)
+    testcase.assertIs(payload["post_callback_resource_handle_ready"], False)
+    testcase.assertIs(payload["uobject_flags_validity_semantics_proven"], False)
+    testcase.assertEqual(payload["non_claims"], list(evaluator.RESOURCE_HANDLE_NON_CLAIMS))
+    testcase.assertEqual(
+        payload["lifetime_blocker_summary"]["blockers"],
+        list(evaluator.RESOURCE_HANDLE_LIFETIME_BLOCKERS),
+    )
+    testcase.assertTrue(set(evaluator.RESOURCE_HANDLE_LIFETIME_BLOCKERS).issubset(set(payload["blockers"])))
+    testcase.assertEqual(payload["promotion_gate"]["ready"], False)
+    testcase.assertEqual(payload["promotion_gate"]["blockers"], payload["blockers"])
+
+
 def write_json(path: Path, payload: object) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
@@ -119,7 +134,7 @@ class ResourceHandleRevalidationEvaluatorTests(unittest.TestCase):
 
         payload = evaluator.build_evaluation([report], None)
 
-        self.assertFalse(payload["post_callback_resource_handle_ready"])
+        assert_fail_closed_resource_handle_contract(self, payload)
         self.assertEqual(payload["reconciliation_summary"]["accepted_sample_count"], 3)
         self.assertEqual(payload["reconciliation_summary"]["serial_candidate_zero_count"], 3)
         self.assertEqual(payload["reconciliation_summary"]["serial_candidate_nonzero_count"], 0)
@@ -138,7 +153,7 @@ class ResourceHandleRevalidationEvaluatorTests(unittest.TestCase):
             require_artifact_identity=True,
         )
 
-        self.assertFalse(payload["post_callback_resource_handle_ready"])
+        assert_fail_closed_resource_handle_contract(self, payload)
         self.assertFalse(payload["evidence_checks"]["evidence_without_lifetime_flags_ready"])
         self.assertTrue(payload["artifact_identity"]["required"])
         self.assertEqual(payload["artifact_identity"]["hash_count"], 0)
@@ -154,7 +169,7 @@ class ResourceHandleRevalidationEvaluatorTests(unittest.TestCase):
             require_artifact_identity=True,
         )
 
-        self.assertFalse(payload["post_callback_resource_handle_ready"])
+        assert_fail_closed_resource_handle_contract(self, payload)
         self.assertFalse(payload["evidence_checks"]["evidence_without_lifetime_flags_ready"])
         self.assertEqual(payload["artifact_identity"]["hash_count"], 2)
         self.assertEqual(payload["artifact_identity"]["complete_input_count"], 0)
@@ -196,14 +211,14 @@ class ResourceHandleRevalidationEvaluatorTests(unittest.TestCase):
             require_artifact_identity=True,
         )
 
-        self.assertFalse(payload["post_callback_resource_handle_ready"])
+        assert_fail_closed_resource_handle_contract(self, payload)
         self.assertTrue(payload["evidence_checks"]["evidence_without_lifetime_flags_ready"])
         self.assertEqual(payload["artifact_identity"]["hash_count"], 2)
         self.assertEqual(payload["artifact_identity"]["complete_input_count"], 2)
         self.assertEqual(payload["artifact_identity"]["missing_or_partial_input_count"], 0)
         self.assertEqual(payload["artifact_identity"]["invalid_input_count"], 0)
         self.assertNotIn(evaluator.BLOCKER_MISSING_ARTIFACT_IDENTITY, payload["blockers"])
-        self.assertEqual(payload["blockers"], [evaluator.BLOCKER_UOBJECT_FLAGS])
+        self.assertIn(evaluator.BLOCKER_UOBJECT_FLAGS, payload["blockers"])
 
     def test_cli_output_is_redacted_and_keeps_only_counts_and_hashes(self) -> None:
         artifact_hash = "a" * 64
@@ -237,6 +252,7 @@ class ResourceHandleRevalidationEvaluatorTests(unittest.TestCase):
             payload = json.loads(text)
 
         self.assertEqual(payload["artifact_identity"]["hashes"], [artifact_hash, binary_hash])
+        assert_fail_closed_resource_handle_contract(self, payload)
         self.assertTrue(payload["artifact_identity"]["required"])
         self.assertEqual(payload["artifact_identity"]["complete_input_count"], 2)
         self.assertEqual(payload["artifact_identity"]["missing_or_partial_input_count"], 0)
@@ -276,11 +292,12 @@ class ResourceHandleRevalidationEvaluatorTests(unittest.TestCase):
         report = reconciliation_report(serial_values=[17, 23])
         payload = evaluator.build_evaluation([report], static_evidence(coherent=True))
 
-        self.assertFalse(payload["post_callback_resource_handle_ready"])
+        assert_fail_closed_resource_handle_contract(self, payload)
         self.assertTrue(payload["evidence_checks"]["evidence_without_lifetime_flags_ready"])
         self.assertNotIn(evaluator.BLOCKER_ZERO_OR_MISSING_SERIAL, payload["blockers"])
         self.assertNotIn(evaluator.BLOCKER_MISSING_COHERENT_WINDOW, payload["blockers"])
-        self.assertEqual(payload["blockers"], [evaluator.BLOCKER_UOBJECT_FLAGS])
+        self.assertIn(evaluator.BLOCKER_UOBJECT_FLAGS, payload["blockers"])
+        self.assertTrue(set(evaluator.RESOURCE_HANDLE_LIFETIME_BLOCKERS).issubset(set(payload["blockers"])))
 
 
 if __name__ == "__main__":

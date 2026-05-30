@@ -27,6 +27,24 @@ BLOCKER_UOBJECT_FLAGS = "uobject_flags_validity_semantics_unproven"
 BLOCKER_MISSING_COHERENT_WINDOW = "missing_gobjects_coherent_field_window"
 BLOCKER_MISSING_ARTIFACT_IDENTITY = "missing_or_partial_artifact_identity"
 BLOCKER_INVALID_ARTIFACT_IDENTITY = "invalid_artifact_identity"
+RESOURCE_HANDLE_NON_CLAIMS = (
+    "does_not_unlock_resource_handle",
+    "does_not_promote_gobjects_lookup",
+    "does_not_promote_public_object_identity",
+    "does_not_claim_post_callback_lookup",
+    "does_not_name_ue_lifecycle_flags_publicly",
+    "does_not_allow_mutation_or_return_override",
+    "does_not_replace_rejected_runtime_object_samples",
+)
+RESOURCE_HANDLE_LIFETIME_BLOCKERS = (
+    "no_public_resource_handle_contract",
+    "public_resourcehandle_policy_missing",
+    "no_post_callback_lifetime_contract",
+    "post_callback_lifetime_policy_unproven",
+    "no_serial_reuse_or_wraparound_policy",
+    "no_version_matched_source_decompiler_correlation_for_public_lifecycle_names",
+    "no_rejected_runtime_object_samples",
+)
 
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 SAFE_ARTIFACT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
@@ -256,6 +274,7 @@ def build_evaluation(
         blockers.append(BLOCKER_MISSING_ARTIFACT_IDENTITY)
     if require_artifact_identity and invalid_artifact_identity_report_count:
         blockers.append(BLOCKER_INVALID_ARTIFACT_IDENTITY)
+    blockers.extend(RESOURCE_HANDLE_LIFETIME_BLOCKERS)
     blockers = sorted(set(blockers))
 
     required_artifact_identity_present = (
@@ -289,6 +308,13 @@ def build_evaluation(
         ),
         "gobjects_coherent_field_window_proven": coherent_window_proven,
         "uobject_flags_validity_semantics_proven": False,
+        "public_resource_handle_contract_present": False,
+        "public_resourcehandle_policy_present": False,
+        "post_callback_lifetime_contract_present": False,
+        "post_callback_lifetime_policy_proven": False,
+        "serial_reuse_or_wraparound_policy_present": False,
+        "version_matched_source_decompiler_correlation_for_public_lifecycle_names_present": False,
+        "rejected_runtime_object_samples_present": False,
         "evidence_without_lifetime_flags_ready": evidence_without_lifetime_flags_ready,
     }
     if require_artifact_identity:
@@ -319,8 +345,23 @@ def build_evaluation(
             "coherent_field_window_proven": coherent_window_proven,
         },
         "evidence_checks": evidence_checks,
+        "lifetime_blocker_summary": {
+            "blockers": list(RESOURCE_HANDLE_LIFETIME_BLOCKERS),
+            "public_contract_present": False,
+            "post_callback_contract_present": False,
+            "serial_reuse_or_wraparound_policy_present": False,
+            "rejected_runtime_object_samples_present": False,
+        },
+        "non_claims": list(RESOURCE_HANDLE_NON_CLAIMS),
         "blockers": blockers,
+        "promotion_ready": False,
+        "public_resource_handle_ready": False,
         "post_callback_resource_handle_ready": False,
+        "uobject_flags_validity_semantics_proven": False,
+        "promotion_gate": {
+            "ready": False,
+            "blockers": blockers,
+        },
     }
 
 

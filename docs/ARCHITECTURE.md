@@ -119,6 +119,11 @@ gates, not the baseline SDK. They require explicit evidence, copied-data ABI des
 lifecycle tests, documentation, and operator-safe runtime validation before they can
 be described as public.
 
+Process-local core timer callbacks belong to this layer only as owner-token runtime
+utilities with explicit unregister and plugin lifecycle cleanup. They do not define
+gameplay/module timer APIs, shared scheduler state, UE identity, persistent handles, or
+cluster coordination.
+
 ## Research Strategy
 
 Long term, Obelisk should avoid raw memory scanning in plugins.
@@ -131,6 +136,10 @@ Preferred core-first direction:
 4. Document every public surface in the release and SDK guardrails.
 5. Treat chat, players, inventory, tribes, dinos, gameplay/module timer abstractions, and
    other gameplay areas as module-after-gates work, not as the core architecture.
+
+Compatibility references such as ArkServerApi/AseApi are dictionaries for familiar names
+and behavior only. They are not a porting target or copying source for offsets, layouts,
+ABI assumptions, wrappers, raw UE pointer APIs, or implementations.
 
 ## Experimental Components
 

@@ -59,8 +59,8 @@ libraries before replacement. If runtime or SDK publication fails, temporary
 installer cleanup trap, and any already-published runtime or SDK files are restored.
 
 Rollback should restore `libobelisk.so` and `libsubhook.so` as a compatible pair from the
-same backup timestamp, then restart only the approved target instance and re-run the stable
-posture check.
+same backup timestamp, then restart only the target instance named by explicit
+current-turn operator approval and re-run the stable posture check.
 
 External plugins can consume the installed SDK through the exported CMake package:
 
@@ -122,10 +122,11 @@ Then configure LinuxGSM:
 executable="./ObeliskRun.sh"
 ```
 
-Do not restart, change markers, or run Obelisk tests on shared or player-facing instances
-without explicit operator approval for the target, rollback plan, and shutdown
-expectations. Keep current instance posture in operator-owned deployment notes outside the
-public SDK docs.
+Do not restart, change markers, run runtime observations, send beta/community notices, or
+run Obelisk tests on shared or player-facing instances without explicit current-turn
+operator approval for the exact target, marker/env delta, restart expectation, rollback
+plan, evidence capture, notice path when applicable, and shutdown expectations. Keep
+current instance posture in operator-owned deployment notes outside the public SDK docs.
 
 ## Instance Identity
 
@@ -179,16 +180,18 @@ discovery.
 Instance marker files are preferred for production operations:
 
 ```bash
-# Approved debug window only. Do not run from an ordinary install or debug run.
-# mkdir -p <obelisk-root>/state/instances/<approved-instance-id>
-# touch <obelisk-root>/state/instances/<approved-instance-id>/<approved-marker>
+# Current-turn approved exact debug window only. Do not run from an ordinary install or
+# debug run.
+# mkdir -p <obelisk-root>/state/instances/<current-turn-approved-instance-id>
+# touch <obelisk-root>/state/instances/<current-turn-approved-instance-id>/<current-turn-approved-marker>
 ```
 
 Do not create, remove, or refresh markers on shared or player-facing instances from
 ordinary install or debug rounds. Treat the live marker list as observed baseline unless
 the operator opens an explicit maintenance window for that instance in the current turn.
-Experimental module markers, scanners, ptrace/gcore, broad tracing, and restarts require
-explicit run-window approval.
+Experimental module markers, scanners, ReflectionScanner, ptrace/gcore, broad tracing,
+runtime observation, beta/community notices, and restarts require explicit current-turn
+operator approval for the exact scoped run.
 
 Useful flags:
 
@@ -207,12 +210,12 @@ gate. The wrapper translates it into `OBELISK_DISABLE_PLUGINS=1`; custom launche
 set that environment variable themselves when plugin loading should be disabled.
 
 The normal LinuxGSM wrapper is protected by default. If any experimental observer marker is
-present for the selected instance, it refuses to launch unless the approved debug window
-uses `OBELISK_WRAPPER_PROFILE=observer-debug` and the same instance has
+present for the selected instance, it refuses to launch unless the current-turn approved
+debug window uses `OBELISK_WRAPPER_PROFILE=observer-debug` and the same instance has
 `allow-observer-debug-window`. Experimental observer markers still do nothing unless
 `allow-experimental-observers` is also present for the same instance. Use those markers
-only inside an approved debug window and remove them before returning the instance to
-stable posture.
+only inside a current-turn approved exact debug window and remove them before returning
+the instance to stable posture.
 
 `enable-chat-events` makes the wrapper set the minimal copied `ChatMessageEvent`
 producer:
@@ -225,8 +228,9 @@ OBELISK_CHAT_EVENTS_DISPATCH_LIMIT=<positive dispatch budget>
 
 This is the marker/env path for the copied `ChatMessageEvent` producer. Copied
 plugin-facing delivery for all four known chat send modes has accepted copied-log
-validation; use this path only for newly approved regression/beta windows, after an
-operator-approved notice, with a short observer-debug window and explicit rollback.
+validation; use this path only for current-turn approved exact regression/beta windows,
+after a current-turn operator-approved notice, with a short observer-debug window and
+explicit rollback.
 Do not use `enable-chat-reflection` as delivery evidence.
 
 `enable-chat-reflection` makes the wrapper set the historical chat observer:
@@ -238,8 +242,8 @@ OBELISK_CHAT_REFLECTION_LOG_LIMIT=0
 ```
 
 The chat log limit is also the observation budget and defaults to `0`, matching the other
-experimental observers. A short debug window must set an explicit non-zero budget before
-chat reflection reads or logs fields.
+experimental observers. A current-turn approved short debug window must set an explicit
+non-zero budget before chat reflection reads or logs fields.
 
 `enable-structure-reflection` makes the wrapper set:
 
@@ -252,8 +256,8 @@ OBELISK_STRUCTURE_REFLECTION_DISPATCH_LIMIT=0
 
 Structure log and internal-dispatch budgets are separate and both default to `0`, so the
 marker alone does not read reflected structure fields or dispatch copied internal events.
-A short debug window must set an explicit non-zero budget for the intended path, and stable
-posture checks reject these variables.
+A current-turn approved short debug window must set an explicit non-zero budget for the
+intended path, and stable posture checks reject these variables.
 
 `enable-inventory-reflection` follows the same policy:
 
@@ -266,8 +270,8 @@ OBELISK_INVENTORY_REFLECTION_DISPATCH_LIMIT=0
 
 Inventory log and inventory-backed `GameplayPolicyEvent` dispatch budgets are separate and
 both default to `0`, so the marker alone does not read reflected inventory fields or
-dispatch copied internal events. A short debug or beta window must set an explicit
-non-zero budget for the intended path.
+dispatch copied internal events. A current-turn approved short debug or beta window must
+set an explicit non-zero budget for the intended path.
 
 Inventory reflection may feed copied, redacted inventory-backed `GameplayPolicyEvent`
 signals when dispatch is explicitly budgeted and subscribed. It must not expose item ids,
@@ -281,9 +285,10 @@ environment gate:
 OBELISK_CHAT_REFLECTION_LOG_TEXT=1
 ```
 
-Rollback is removing the observer/debug-window markers and restarting the instance. The
-stable production posture is still process-event hook enabled, plugin loading disabled
-through `OBELISK_DISABLE_PLUGINS=1`, and all experimental observers off.
+Rollback is removing the observer/debug-window markers and restarting the instance only
+when those actions are named by the current-turn approval. The stable production posture is
+still process-event hook enabled, plugin loading disabled through
+`OBELISK_DISABLE_PLUGINS=1`, and all experimental observers off.
 
 Map markers such as `enable-process-event-hook-ragnarok` are obsolete and are not read by
 the release wrapper.
@@ -320,10 +325,11 @@ supported LinuxGSM wrapper is used. The runtime itself disables plugin loading o
 that sets that environment variable.
 
 Keep current instance names, maps, beta-test routing, and debug-instance startup/shutdown
-rules in operator-owned deployment notes, not in public SDK install docs. For any approved
-server-side feature window, announce before activation, enable only
-the required markers, avoid raw player text or identity logging, preserve copied logs, and
-remove experimental markers before returning to stable posture.
+rules in operator-owned deployment notes, not in public SDK install docs. For any
+current-turn approved exact server-side feature window, announce before activation through
+the current-turn approved notice path when applicable, enable only the required markers,
+avoid raw player text or identity logging, preserve copied logs, and remove experimental
+markers before returning to stable posture.
 
 Stable production posture also requires no forbidden experimental marker entries for the
 instance, including observer, scanner, debug-control, native-exec, ptrace, global callback,

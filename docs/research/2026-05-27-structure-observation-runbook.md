@@ -3,8 +3,8 @@
 ## Objective
 
 Define the safe operator path for the disabled-by-default `sdk.structures` observation
-gate. This runbook is preparation only; it does not authorize a server restart or runtime
-capture.
+gate. This runbook is preparation only; it does not authorize marker edits, server
+start/stop/restart, runtime capture, tracing, scanner use, or beta/community notices.
 
 ## Scope
 
@@ -25,15 +25,16 @@ player identity, or mutate return values.
 
 - Do not use `arkserver` / Ragnarok while player performance testing is active.
 - Prefer a dedicated `arkserver-obelisk-debug` instance.
-- Use `arkserver2` / TheIsland only with explicit operator approval for a short debug
-  window.
+- Use `arkserver2` / TheIsland only with explicit current-turn operator approval for the
+  exact short debug window, including marker/env deltas, start/restart/stop, rollback, and
+  evidence capture.
 - Instance-scoped marker gates are required:
   `/servidor/ark/obelisk/state/instances/<instance>/allow-experimental-observers`
   plus
   `/servidor/ark/obelisk/state/instances/<instance>/enable-structure-reflection`.
   Env-only activation or observer-marker-only activation is rejected by the runtime gate
   and should be treated as a posture error on production-like hosts.
-- ProcessEvent hook is enabled for the approved instance.
+- ProcessEvent hook is enabled only for the current-turn approved exact instance.
 - Plugins are disabled unless the window explicitly tests one minimal observer plugin.
 - Scanner, native exec probes, and broad trace are off.
 - The current ARK binary SHA is:
@@ -42,7 +43,7 @@ player identity, or mutate return values.
 ## Gate
 
 Use the global observer allow marker, the structure marker, and all three
-structure-specific variables together:
+structure-specific variables together only inside the current-turn approved exact run:
 
 ```bash
 touch /servidor/ark/obelisk/state/instances/<instance>/allow-experimental-observers
@@ -60,7 +61,7 @@ are absent or `0`, structure observation does not read `UFunction` names or refl
 fields. Keep both budgets small for debug windows and leave dispatch at `0` unless the
 window explicitly needs internal copied-event dispatch.
 
-Keep these unset unless the debug window is active:
+Keep these unset unless the current-turn approved exact debug window is active:
 
 ```bash
 unset OBELISK_ENABLE_NATIVE_EXEC_PROBES
@@ -94,7 +95,7 @@ Abort the window and return to stable posture if any of these occur:
 
 ## Rollback
 
-Unset the structure gate and restore the approved instance only:
+Unset the structure gate and restore only the current-turn approved exact instance:
 
 ```bash
 unset OBELISK_ENABLE_STRUCTURE_REFLECTION

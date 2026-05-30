@@ -1,9 +1,12 @@
 # arkserver2 Debug Pivot
 
 > Historical/superseded as of 2026-05-28: do not execute these `arkserver2` /
-> TheIsland commands unless the operator explicitly approves a scoped test window.
+> TheIsland commands unless the operator gives explicit current-turn approval for the
+> exact scoped test window, including marker edits, start/restart/stop, rollback, and
+> shutdown expectation.
 > Current operator direction protects `arkserver` / Ragnarok while users are active;
-> start `arkserver2` only for the approved test and shut it down afterward.
+> start `arkserver2` only for that current-turn approved test and shut it down afterward
+> only when the same approval requires it.
 
 ## Objective
 
@@ -27,11 +30,15 @@ debug/development target for future runtime validation and research.
 work must not use it for experiments while that testing is active.
 
 Future runtime validation and research that needs an ARK server harness should target
-`arkserver2` / TheIsland instead.
+`arkserver2` / TheIsland instead, but this historical target preference is not approval to
+start, stop, restart, edit markers, observe runtime behavior, trace, scan, attach, dump, or
+send beta/community notices.
 
 ## Safety Rules
 
-Allowed on `arkserver2` after normal maintainer review:
+Allowed categories on `arkserver2` only after explicit current-turn operator approval for
+the exact scoped run; routine code review is not enough for marker edits,
+start/stop/restart, or runtime observation:
 
 - controlled runtime validation;
 - plugin lifecycle/debug checks;
@@ -40,7 +47,7 @@ Allowed on `arkserver2` after normal maintainer review:
 - stable posture verification with `scripts/check_obelisk_server_posture.sh --expect-stable
   --map TheIsland --instance arkserver2`.
 
-Still requires a specific operator-approved run window:
+Still requires explicit current-turn operator approval for the exact run window:
 
 - `ReflectionScanner`;
 - `OBELISK_ENABLE_NATIVE_EXEC_PROBES=1`;
@@ -61,7 +68,8 @@ Forbidden on `arkserver` / Ragnarok during player performance testing:
 
 ## Standard TheIsland Debug Baseline
 
-When an approved TheIsland debug window exists, start from the quiet stable posture:
+When a current-turn approved exact TheIsland debug window exists, start from the quiet
+stable posture:
 
 ```bash
 mkdir -p /servidor/ark/obelisk/state/instances/arkserver2
@@ -81,11 +89,11 @@ scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instan
 
 ## Rollback
 
-For any TheIsland debug run:
+For any current-turn approved exact TheIsland debug run:
 
 1. Remove the experiment marker or env.
 2. Keep `disable-plugins`.
-3. Restart only `arkserver2`.
+3. Restart only `arkserver2` if the current-turn approval names that restart.
 4. Run stable posture check with `--map TheIsland --instance arkserver2`.
 5. Preserve copied logs outside Git and summarize only the evidence.
 
@@ -98,6 +106,7 @@ Ragnarok performance testing.
 ## Next Steps
 
 - Audit scripts/docs for remaining Ragnarok-default commands before any runtime operation.
-- If a higher-risk scanner capture is needed, request an explicit TheIsland debug window
-  or create the cleaner `arkserver-obelisk-debug` instance.
+- If a higher-risk scanner capture is needed, request explicit current-turn approval for
+  the exact TheIsland debug window or for provisioning the cleaner
+  `arkserver-obelisk-debug` instance.
 - Continue offline SDK/runtime work while players are testing Ragnarok performance.

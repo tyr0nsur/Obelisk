@@ -65,11 +65,13 @@ message.
 ## Next Steps
 
 Superseded: later `arkserver` copied-log evidence validated plugin-facing delivery for
-send modes `0,1,2,3`. Keep this runbook command only for future regression/revalidation
-windows.
+send modes `0,1,2,3`. Keep this runbook command only as a historical template for future
+regression/revalidation windows; it is not standing approval.
 
-- Run one approved `arkserver` / Ragnarok beta-test mode-coverage window after sending the
-  operator-approved beta notice. Use the `enable-chat-events` marker,
+- Run one current-turn operator-approved `arkserver` / Ragnarok beta-test mode-coverage
+  window after sending the current-turn operator-approved beta notice. The approval must
+  name exact marker/env deltas, restart behavior, rollback, evidence capture, and notice
+  path. Use the `enable-chat-events` marker,
   `OBELISK_WRAPPER_PROFILE=observer-debug`, `allow-observer-debug-window`,
   `allow-experimental-observers`, `OBELISK_CHAT_EVENTS_BINARY_SHA256` set to the supported
   ARK hash, `OBELISK_CHAT_EVENTS_DISPATCH_LIMIT` positive, `enable-process-event-hook`,
@@ -104,4 +106,4 @@ scripts/analyze_chat_delivery_log.py \
   `enable-chat-reflection` logs are historical observer evidence and do not prove
   plugin-facing `ChatMessageEvent` delivery.
 - Preserve copied log evidence, then restore stable markers and safe-disabled plugin
-  config.
+  config exactly as named by the current-turn rollback approval.

@@ -572,6 +572,56 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
 
         self.assertLessEqual(len(current_lines), 220)
 
+    def test_core_timers_stay_distinct_from_gameplay_module_timer_apis(self) -> None:
+        docs = {
+            "README.md": read("README.md"),
+            "docs/ARCHITECTURE.md": read("docs/ARCHITECTURE.md"),
+            "CONTRIBUTING.md": read("CONTRIBUTING.md"),
+            "docs/agent-handoff/CURRENT.md": read("docs/agent-handoff/CURRENT.md"),
+        }
+        required = [
+            "process-local",
+            "core",
+            "timer",
+            "owner-token",
+            "explicit unregister",
+            "gameplay/module timer",
+            "shared scheduler state",
+            "UE identity",
+            "persistent handles",
+        ]
+
+        for path, text in docs.items():
+            compact = normalized(text)
+            with self.subTest(file=path):
+                for item in required:
+                    self.assertIn(item, compact)
+
+    def test_arkapi_reference_is_names_behavior_only_not_porting_or_copying(self) -> None:
+        docs = {
+            "README.md": read("README.md"),
+            "docs/ARCHITECTURE.md": read("docs/ARCHITECTURE.md"),
+            "CONTRIBUTING.md": read("CONTRIBUTING.md"),
+            "docs/agent-handoff/CURRENT.md": read("docs/agent-handoff/CURRENT.md"),
+        }
+        required = [
+            "ArkServerApi/AseApi",
+            "names and behavior",
+            "not a porting target or copying source",
+            "offsets",
+            "layouts",
+            "ABI assumptions",
+            "wrappers",
+            "raw UE pointer APIs",
+            "implementations",
+        ]
+
+        for path, text in docs.items():
+            compact = normalized(text)
+            with self.subTest(file=path):
+                for item in required:
+                    self.assertIn(item, compact)
+
     def test_rc_publication_guardrails_are_consistent(self) -> None:
         required_phrase = (
             "RC public scope remains limited to `GameplayPolicyEvent`, the minimal copied "
