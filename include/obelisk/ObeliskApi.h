@@ -18,10 +18,12 @@
 #define OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS (1ull << 8)
 #define OBELISK_API_CAPABILITY_CHAT_EVENTS (1ull << 9)
 #define OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS (1ull << 10)
+#define OBELISK_API_CAPABILITY_TIMERS (1ull << 11)
 #define OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION 1u
 #define OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION 1u
 #define OBELISK_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION 1u
 #define OBELISK_CHAT_MESSAGE_EVENT_ABI_VERSION 1u
+#define OBELISK_TIMER_FLAG_REPEATING (1ull << 0)
 #define OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD (1ull << 0)
 #define OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED (1ull << 1)
 #define OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED (1ull << 2)
@@ -200,6 +202,11 @@ typedef void (*ObeliskGameplayPolicyEventCallback)(const ObeliskGameplayPolicyEv
 // message storage, command routing, or authoritative sender/resource identity.
 typedef void (*ObeliskChatMessageEventCallback)(const ObeliskChatMessageEvent* event, void* user_data);
 
+// Process-local timer callback. Timer ids are runtime handles only: they are not stable
+// across process restarts, maps, cluster instances, or plugin reloads. Callback code must
+// return quickly and must not throw across the C ABI boundary.
+typedef void (*ObeliskTimerCallback)(uint64_t timer_id, void* user_data);
+
 typedef struct ObeliskPluginMetadata {
     uint32_t abi_version;
     uint32_t struct_size;
@@ -319,6 +326,20 @@ typedef struct ObeliskApi {
         ObeliskChatMessageEventCallback callback,
         void* userData);
     bool (*UnregisterChatMessageEventWithOwnerToken)(uint64_t ownerToken, uint64_t registrationId);
+
+    // Process-local owner-token timers. Plugins must check struct_size,
+    // OBELISK_API_CAPABILITY_TIMERS, and these function pointers before use. A return
+    // value of 0 means registration was rejected. Non-zero handles are process-local,
+    // owned by the registering plugin, cleaned up on plugin unload/init failure, and must
+    // not be persisted to shared config or reused across ARK server processes.
+    uint64_t (*RegisterTimerWithOwnerTokenHandle)(
+        uint64_t ownerToken,
+        uint64_t delayMs,
+        uint64_t intervalMs,
+        uint64_t flags,
+        ObeliskTimerCallback callback,
+        void* userData);
+    bool (*UnregisterTimerWithOwnerToken)(uint64_t ownerToken, uint64_t timerId);
 } ObeliskApi;
 
 // Plugins must export these functions to be loaded by Obelisk.

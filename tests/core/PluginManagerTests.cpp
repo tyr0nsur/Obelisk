@@ -3,6 +3,7 @@
 #include "core/InventoryPolicyEventDispatcher.h"
 #include "core/PluginManager.h"
 #include "core/StructureEventDispatcher.h"
+#include "core/TimerManager.h"
 #include "runtime/Logger.h"
 
 #include <atomic>
@@ -53,6 +54,7 @@ namespace
         bool registerInventoryPolicyCallback = false;
         bool registerStructureCallback = false;
         bool registerGameplayPolicyCallback = false;
+        bool registerTimerCallback = false;
         bool callProcessEventInInit = false;
         bool registerOwnerTokenCallbackInShutdown = false;
         bool unregisterOwnerTokenCallbackInShutdown = false;
@@ -76,6 +78,8 @@ namespace
         bool gameplayPolicySelfUnregisterResult = false;
         uint64_t chatMessageRegistrationId = 0;
         bool chatMessageSelfUnregisterResult = false;
+        uint64_t timerRegistrationId = 0;
+        int timerEventCalls = 0;
         uint64_t shutdownRegistrationId = 0;
         bool shutdownUnregisterResult = false;
         void* owner = this;
@@ -124,6 +128,12 @@ namespace
 
     void FakeChatCallback(const Obelisk::Core::ChatMessageView&, void*)
     {
+    }
+
+    void FakeTimerCallback(uint64_t, void* userData)
+    {
+        auto* plugin = static_cast<FakePlugin*>(userData);
+        ++plugin->timerEventCalls;
     }
 
     void FakeInventoryPolicyCallback(const Obelisk::Core::InventoryPolicyEventView&, void*)
@@ -558,6 +568,8 @@ namespace
                 "plugin init received API without owned callback capability");
         Require((api->capabilities & OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS) != 0,
                 "plugin init received API without owner-token callback capability");
+        Require((api->capabilities & OBELISK_API_CAPABILITY_TIMERS) != 0,
+                "plugin init received API without timer capability");
         Require(context->plugin_owner_token != 0, "plugin init received empty owner token");
 
         if (g_CurrentFakePlugin->captureApi)
@@ -634,6 +646,23 @@ namespace
                     g_CurrentFakePlugin);
             Require(g_CurrentFakePlugin->gameplayPolicyRegistrationId != 0,
                     "fake gameplay policy callback registration failed");
+        }
+
+        if (g_CurrentFakePlugin->registerTimerCallback)
+        {
+            Require(api->RegisterTimerWithOwnerTokenHandle != nullptr,
+                    "fake plugin requested timer callback without registration API");
+            Require(api->UnregisterTimerWithOwnerToken != nullptr,
+                    "fake plugin requested timer callback without unregister API");
+            g_CurrentFakePlugin->timerRegistrationId =
+                api->RegisterTimerWithOwnerTokenHandle(
+                    context->plugin_owner_token,
+                    1000,
+                    0,
+                    0,
+                    FakeTimerCallback,
+                    g_CurrentFakePlugin);
+            Require(g_CurrentFakePlugin->timerRegistrationId != 0, "fake timer callback registration failed");
         }
 
         if (g_CurrentFakePlugin->callProcessEventInInit)
@@ -1837,6 +1866,116 @@ namespace
         manager.UnloadAll();
         Require(chatDispatcher.SubscriptionCount() == 0,
                 "chat message callback survived plugin unload");
+
+        CleanupPlugin(plugin);
+        CleanupPlugin(otherPlugin);
+        fs::remove_all(root);
+    }
+
+    void TestOwnerTokenTimerRegistrationCanUnregisterAndUnload()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_owner_token_timer");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "owner_token_timer_a.so",
+            .pluginId = "owner_token_timer_a",
+            .captureApi = true,
+        };
+        FakePlugin otherPlugin{
+            .filename = "owner_token_timer_b.so",
+            .pluginId = "owner_token_timer_b",
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        loader.Add(otherPlugin);
+        TouchPlugin(root, plugin.filename);
+        TouchPlugin(root, otherPlugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+        WritePluginConfig(root, otherPlugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        Require((manager.ApiCapabilitiesForTesting() & OBELISK_API_CAPABILITY_TIMERS) != 0,
+                "timer capability was not advertised");
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "owner-token timer plugin was not initialized");
+        Require(otherPlugin.initCalls == 1, "second owner-token timer plugin was not initialized");
+        Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle != nullptr,
+                "timer registration function was not exposed");
+        Require(plugin.capturedApi.UnregisterTimerWithOwnerToken != nullptr,
+                "timer unregister function was not exposed");
+
+        Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
+                    plugin.initOwnerToken + 1000,
+                    10,
+                    0,
+                    0,
+                    FakeTimerCallback,
+                    &plugin) == 0,
+                "invalid owner token registered a timer");
+        Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    10,
+                    0,
+                    0,
+                    nullptr,
+                    &plugin) == 0,
+                "null timer callback was registered");
+        Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    0,
+                    0,
+                    0,
+                    FakeTimerCallback,
+                    &plugin) == 0,
+                "zero-delay timer was registered");
+        Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    10,
+                    0,
+                    OBELISK_TIMER_FLAG_REPEATING,
+                    FakeTimerCallback,
+                    &plugin) == 0,
+                "repeating timer with zero interval was registered");
+        Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    10,
+                    0,
+                    OBELISK_TIMER_FLAG_REPEATING << 1,
+                    FakeTimerCallback,
+                    &plugin) == 0,
+                "timer with reserved flags was registered");
+
+        const uint64_t timerId = plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
+            plugin.initOwnerToken,
+            1000,
+            0,
+            0,
+            FakeTimerCallback,
+            &plugin);
+        Require(timerId != 0, "owner-token timer registration returned zero");
+        Require(!plugin.capturedApi.UnregisterTimerWithOwnerToken(otherPlugin.initOwnerToken, timerId),
+                "wrong owner token unregistered timer");
+        Require(plugin.capturedApi.UnregisterTimerWithOwnerToken(plugin.initOwnerToken, timerId),
+                "timer unregister failed");
+        Require(!plugin.capturedApi.UnregisterTimerWithOwnerToken(plugin.initOwnerToken, timerId),
+                "timer unregister succeeded twice");
+        Require(!plugin.capturedApi.UnregisterTimerWithOwnerToken(plugin.initOwnerToken, 0),
+                "zero timer handle unregistered timer");
+
+        const uint64_t unloadTimerId = plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
+            plugin.initOwnerToken,
+            1000,
+            0,
+            0,
+            FakeTimerCallback,
+            &plugin);
+        Require(unloadTimerId != 0, "timer could not re-register before unload");
+        manager.UnloadAll();
+        Require(Obelisk::Core::TimerManager::Get().UnregisterCallbacksForOwner(plugin.owner) == 0,
+                "timer survived plugin unload");
+        Require(plugin.timerEventCalls == 0, "long-delay timer fired before unload cleanup");
 
         CleanupPlugin(plugin);
         CleanupPlugin(otherPlugin);
@@ -3937,6 +4076,7 @@ int main()
     TestOwnerTokenHandleRegistrationCanUnregister();
     TestOwnerTokenGameplayPolicyEventRegistrationCanUnregister();
     TestOwnerTokenChatMessageEventRegistrationCanUnregister();
+    TestOwnerTokenTimerRegistrationCanUnregisterAndUnload();
     TestChatMessageRegistrationRejectedWhenCapabilityWasNotAdvertised();
     TestChatMessageCallbackExceptionDoesNotEscapeDispatch();
     TestChatMessageRegistrationUsesOwnerCapabilitySnapshotAcrossManagers();

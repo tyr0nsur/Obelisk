@@ -31,7 +31,11 @@ priorities, and do not use history files as the active source of truth.
   restart/start window, notice path when players are involved, evidence capture, and
   rollback.
 - Community updates are for major public modder-facing milestones only; beta-test
-  activation notices are separate operational live-ops messages.
+  activation notices are separate operational live-ops messages. Discord URLs are ignored
+  local secrets in `local/discord-webhooks.env`; use only
+  `OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL` or `OBELISK_BETA_TEST_WEBHOOK_URL` by variable
+  name, and send concise professional embeds without raw logs, player text, secrets, or
+  speculative reversing notes.
 - `ArkServerApi/AseApi` may be used only as an algorithmic/name dictionary for
   ArkApi-style compatibility research. Do not import offsets, vtables, layouts, `.lib`
   artifacts, MSVC/Windows ABI assumptions, direct `GetNativePointerField`/`NativeCall`
@@ -51,6 +55,10 @@ priorities, and do not use history files as the active source of truth.
 - Stable plugin loading requires safe `OBELISK_INSTANCE_ID` plus real non-symlink plugin,
   config, log, and state roots.
 - `ObeliskApi` v1 is append-only for `v0.1.0`; ABI v2 requires an explicit migration plan.
+- Post-RC timers are the first non-UE-dependent v1 primitive: owner-token scoped,
+  process-local, zero-failure handles, one-shot/repeating callbacks, explicit unregister,
+  and unload/init-failure cleanup. Timer ids are not shared config, cluster state, UE
+  identity, or persistent handles.
 - EventManager owner cleanup is expected to wait for in-flight callbacks before plugin
   unload; tests cover debug-gated filtered pre-ProcessEvent and post-ProcessEvent callback
   paths.

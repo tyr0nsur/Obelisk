@@ -40,6 +40,11 @@ Active routing only: durable evidence belongs in `docs/research/`, resume facts 
   prompts, and handoff notes.
 - Community updates are lead-only for major public modder-facing milestones, previews,
   migrations, or releases; beta-test activation notices are separate live-ops messages.
+  Webhook URLs live only in ignored `local/discord-webhooks.env`: use
+  `OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL` for public modder-facing milestones and
+  `OBELISK_BETA_TEST_WEBHOOK_URL` for approved in-game test windows. Send professional
+  Discord embeds only; never expose raw URLs, player text, secrets, routine validation
+  logs, or speculative reversing notes.
 
 ## Current Routing Facts
 
@@ -90,14 +95,8 @@ Active routing only: durable evidence belongs in `docs/research/`, resume facts 
   without `--allow-dirty` using the accepted RC UFunction second-source root and after
   exact tag/ref verification. Treat this as a published RC baseline only, not a
   production-stable `v1.0` claim.
-- Offline/module evidence stays in dated research notes. Use
-  `docs/research/2026-05-29-minimal-second-source-readiness.md`,
-  `docs/research/2026-05-29-dino-compact-second-source-readiness.md`,
-  `docs/research/2026-05-29-buff-compact-second-source-result.md`,
-  `docs/research/2026-05-29-item-compact-second-source-readiness.md`,
-  `docs/research/2026-05-29-inventory-action-redacted-signature-readiness.md`, and
-  `docs/research/2026-05-29-mission-reflection-internal-readiness.md` for exact target
-  counts, blockers, and accepted/rejected promotion claims.
+- Offline/module evidence stays in dated research notes; keep exact target counts,
+  blockers, and accepted/rejected promotion claims out of this current handoff.
 - Canonical offline roots for post-RC modules: Mission compact refresh `20260530T020021Z`;
   Item `20260529T141900Z`/`20260530T013606Z`; Transfer `20260529T154200Z`.
 - Transfer second-source evidence is accepted as layout-only. No public Transfer SDK,
@@ -137,11 +136,8 @@ Active routing only: durable evidence belongs in `docs/research/`, resume facts 
   `observer-debug` requires the scoped markers, exact supported SHA, and a positive limit.
   Route observations must not expand public delivery claims without copied plugin delivery
   logs.
-- `docs/research/2026-05-29-rc-checkpoint-slicing-plan.md` is now historical recovery
-  context for the broad pre-RC worktree, not active routing. The current tracked tree is
-  past that recovery slice; use `git log --oneline -1` for the current head and continue
-  with focused RC publication review and post-RC research notes instead of restarting the
-  old slicing sequence.
+- `docs/research/2026-05-29-rc-checkpoint-slicing-plan.md` is historical recovery
+  context only; continue from current `main` instead of restarting old slicing.
 
 ## Priority Next Steps
 
@@ -179,10 +175,11 @@ Active routing only: durable evidence belongs in `docs/research/`, resume facts 
   SDK. Freeze broader Inventory target sets for now; `CraftBlueprint`,
   `InventoryCustomFilter` arrays, and `ServerRequestInventoryUseItemWithTransform` stay
   out of scope.
-- For the first non-UE-dependent v1 core service, prefer owner-token process-local timers
-  before identity, permissions, and command routing. Timers still need append-only ABI,
-  capability bits, zero-is-failure handles, owner cleanup on init failure/unload,
-  idempotent unregister, and in-flight callback shutdown tests before implementation.
+- The first non-UE-dependent v1 core service is in post-RC development: owner-token
+  process-local timers with append-only ABI, `OBELISK_API_CAPABILITY_TIMERS`,
+  zero-is-failure handles, explicit unregister, owner cleanup on init failure/unload, and
+  in-flight callback cleanup tests. Treat timer handles as process-local only; do not
+  persist them, share them across clustered ARK processes, or imply UE/game identity.
 - InventoryReflection hardening now validates snapshot-backed class object indices,
   outer object indices, and per-property flags before copied bool dispatch. This is
   internal-only `GameplayPolicyEvent` hardening, not a public Inventory SDK or ABI change.
@@ -215,6 +212,5 @@ Active routing only: durable evidence belongs in `docs/research/`, resume facts 
 
 ## Agent Protocol
 
-- Lead owns server safety; use `obelisk-github-research-workflow` for delegation, GitHub,
-  and stale-agent cleanup.
-- Sub-agent prompts need scoped objective, safety baseline, paths, skills, expert role, and expected decision; pass only needed skills and close completed agents.
+- Lead owns server safety, GitHub, and stale-agent cleanup. Sub-agent prompts need scoped
+  objective, safety baseline, paths, skills, expert role, and expected decision.

@@ -176,6 +176,25 @@ turn. In-game beta-test activation notices are live-ops messages, not routine de
 updates; require an operator-approved notice path for that turn and never store secret
 endpoints in repo files or sub-agent prompts.
 
+Discord webhook endpoints are operator secrets stored only in
+`/home/flowcommunity-ark/Obelisk/local/discord-webhooks.env` under ignored `local/`.
+Use variable names only in repo files, handoff notes, and prompts:
+
+- `OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL`: major public, modder-facing Obelisk milestones
+  only. Examples: release/RC publication, new stable public plugin surface, important SDK
+  migration, or a documented compatibility breakthrough that plugin authors can act on.
+- `OBELISK_BETA_TEST_WEBHOOK_URL`: operator-approved in-game test windows only. Use this
+  when players need to perform a bounded action in game, such as testing chat delivery or
+  another copied public event on a named server window.
+
+Never use Discord for routine validation logs, internal agent status, private server
+details, raw player text, secrets, hashes that are not part of a public artifact, or
+speculative reverse-engineering notes. Prefer one professional Discord embed per update:
+clear title, concise description, 2-5 short fields, explicit status/scope, no raw logs,
+timestamp, and a restrained color (`0x2ecc71` release/success, `0x3498db` beta/info,
+`0xf1c40f` caution). Plain content should be empty or a short label; put the substantive
+message in the embed.
+
 ## Research Notes
 
 Use `docs/research/YYYY-MM-DD-topic.md` for non-trivial investigation.

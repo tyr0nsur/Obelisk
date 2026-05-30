@@ -3,6 +3,7 @@
 #include "InventoryPolicyEventDispatcher.h"
 #include "PluginConfig.h"
 #include "StructureEventDispatcher.h"
+#include "TimerManager.h"
 #include "hooks/ProcessEventHook.h"
 #include "runtime/Logger.h"
 #include "runtime/RuntimeMarkers.h"
@@ -437,13 +438,19 @@ namespace Obelisk::Core
             return registerFn(owner);
         }
 
+        void SafeLogInfoNoThrow(const char* message, const std::string& detail) noexcept;
+        void SafeLogWarnNoThrow(const char* message, const char* detail = nullptr) noexcept;
+        void SafeLogErrorNoThrow(const char* message, const char* detail = nullptr) noexcept;
+
         ShutdownFunc ResolveShutdownFunc(PluginManager::LibraryLoader& loader, void* handle, const std::string& pluginName)
         {
             std::string error;
             ShutdownFunc shutdownFunc = reinterpret_cast<ShutdownFunc>(loader.Resolve(handle, "ObeliskPlugin_Shutdown", error));
             if (!shutdownFunc)
             {
-                OBELISK_INFO("Plugin {} does not export ObeliskPlugin_Shutdown; unload will use callback owner cleanup only.", pluginName);
+                SafeLogInfoNoThrow(
+                    "Plugin does not export ObeliskPlugin_Shutdown; unload will use callback owner cleanup only: ",
+                    pluginName);
                 return nullptr;
             }
 
@@ -458,15 +465,15 @@ namespace Obelisk::Core
             try
             {
                 shutdownFunc();
-                OBELISK_INFO("Plugin {} shutdown completed.", pluginName);
+                SafeLogInfoNoThrow("Plugin shutdown completed: ", pluginName);
             }
             catch (const std::exception& e)
             {
-                OBELISK_ERROR("Plugin {} threw during shutdown: {}", pluginName, e.what());
+                SafeLogErrorNoThrow(("Plugin " + pluginName + " threw during shutdown").c_str(), e.what());
             }
             catch (...)
             {
-                OBELISK_ERROR("Plugin {} threw an unknown exception during shutdown.", pluginName);
+                SafeLogErrorNoThrow(("Plugin " + pluginName + " threw an unknown exception during shutdown").c_str());
             }
         }
 
@@ -481,11 +488,11 @@ namespace Obelisk::Core
             }
             catch (const std::exception& e)
             {
-                OBELISK_ERROR("Plugin {} threw while closing library handle: {}", pluginName, e.what());
+                SafeLogErrorNoThrow(("Plugin " + pluginName + " threw while closing library handle").c_str(), e.what());
             }
             catch (...)
             {
-                OBELISK_ERROR("Plugin {} threw an unknown exception while closing library handle.", pluginName);
+                SafeLogErrorNoThrow(("Plugin " + pluginName + " threw an unknown exception while closing library handle").c_str());
             }
         }
 
@@ -530,7 +537,8 @@ namespace Obelisk::Core
                 OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS |
                 OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS |
                 OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS |
-                OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS;
+                OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS |
+                OBELISK_API_CAPABILITY_TIMERS;
             if (AreGlobalProcessEventCallbacksAllowed())
                 capabilities |= OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS |
                     OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES;
@@ -780,6 +788,15 @@ namespace Obelisk::Core
 
         bool ValidateChatMessageEventCallback(const char* apiName,
                                               ObeliskChatMessageEventCallback callback)
+        {
+            if (callback)
+                return true;
+
+            OBELISK_WARN("{} rejected null callback.", apiName);
+            return false;
+        }
+
+        bool ValidateTimerCallback(const char* apiName, ObeliskTimerCallback callback)
         {
             if (callback)
                 return true;
@@ -1379,7 +1396,24 @@ namespace Obelisk::Core
             }
         }
 
-        void SafeLogErrorNoThrow(const char* message, const char* detail = nullptr) noexcept
+        void SafeLogWarnNoThrow(const char* message, const char* detail) noexcept
+        {
+            try
+            {
+                if (!Logger::IsInitialized())
+                    return;
+
+                if (detail)
+                    Logger::Get()->warn("{}: {}", message ? message : "", detail);
+                else
+                    Logger::Get()->warn("{}", message ? message : "");
+            }
+            catch (...)
+            {
+            }
+        }
+
+        void SafeLogErrorNoThrow(const char* message, const char* detail) noexcept
         {
             try
             {
@@ -1446,9 +1480,9 @@ namespace Obelisk::Core
 
     // C-API Wrappers for Plugins
     extern "C" {
-        void PluginLogInfo(const char* message) { OBELISK_INFO("[Plugin] {}", message ? message : ""); }
-        void PluginLogWarn(const char* message) { OBELISK_WARN("[Plugin] {}", message ? message : ""); }
-        void PluginLogError(const char* message) { OBELISK_ERROR("[Plugin] {}", message ? message : ""); }
+        void PluginLogInfo(const char* message) { SafeLogInfoNoThrow("[Plugin] ", message ? message : ""); }
+        void PluginLogWarn(const char* message) { SafeLogWarnNoThrow("[Plugin]", message ? message : ""); }
+        void PluginLogError(const char* message) { SafeLogErrorNoThrow("[Plugin]", message ? message : ""); }
 
         void PluginRegisterPreProcessEvent(OnProcessEventCallback callback) {
             if (!ValidateProcessEventCallback("RegisterPreProcessEvent", callback))
@@ -1800,6 +1834,78 @@ namespace Obelisk::Core
                 return false;
             }
         }
+        uint64_t PluginRegisterTimerWithOwnerTokenHandle(
+            uint64_t ownerToken,
+            uint64_t delayMs,
+            uint64_t intervalMs,
+            uint64_t flags,
+            ObeliskTimerCallback callback,
+            void* userData) {
+            if (!ValidateTimerCallback("RegisterTimerWithOwnerTokenHandle", callback))
+                return 0;
+            if ((flags & ~OBELISK_TIMER_FLAG_REPEATING) != 0)
+            {
+                OBELISK_WARN("RegisterTimerWithOwnerTokenHandle rejected reserved timer flags.");
+                return 0;
+            }
+            if (delayMs == 0)
+            {
+                OBELISK_WARN("RegisterTimerWithOwnerTokenHandle rejected zero delay.");
+                return 0;
+            }
+            const bool repeating = (flags & OBELISK_TIMER_FLAG_REPEATING) != 0;
+            if (repeating && intervalMs == 0)
+            {
+                OBELISK_WARN("RegisterTimerWithOwnerTokenHandle rejected repeating timer with zero interval.");
+                return 0;
+            }
+            if (!repeating && intervalMs != 0)
+            {
+                OBELISK_WARN("RegisterTimerWithOwnerTokenHandle rejected one-shot timer with non-zero interval.");
+                return 0;
+            }
+
+            try
+            {
+                return RegisterProcessEventCallbackForOwnerToken(
+                    "RegisterTimerWithOwnerTokenHandle",
+                    ownerToken,
+                    [delayMs, intervalMs, repeating, callback, userData](void* owner) {
+                        if (!PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_TIMERS))
+                            return uint64_t{0};
+                        return TimerManager::Get().Register(owner, delayMs, intervalMs, repeating, callback, userData);
+                    });
+            }
+            catch (const std::exception& e)
+            {
+                OBELISK_ERROR("RegisterTimerWithOwnerTokenHandle rejected callback after exception: {}", e.what());
+                return 0;
+            }
+            catch (...)
+            {
+                OBELISK_ERROR("RegisterTimerWithOwnerTokenHandle rejected callback after unknown exception.");
+                return 0;
+            }
+        }
+        bool PluginUnregisterTimerWithOwnerToken(uint64_t ownerToken, uint64_t timerId) {
+            try
+            {
+                void* owner = ResolveOwnerTokenForUnregister("UnregisterTimerWithOwnerToken", ownerToken);
+                if (!owner)
+                    return false;
+                return TimerManager::Get().Unregister(owner, timerId);
+            }
+            catch (const std::exception& e)
+            {
+                OBELISK_ERROR("UnregisterTimerWithOwnerToken failed after exception: {}", e.what());
+                return false;
+            }
+            catch (...)
+            {
+                OBELISK_ERROR("UnregisterTimerWithOwnerToken failed after unknown exception.");
+                return false;
+            }
+        }
         bool PluginDescribeResourceKind(uint32_t resourceKind, ObeliskResourceKindDescriptor* out) {
             return DescribeResourceKind(resourceKind, out);
         }
@@ -1864,6 +1970,8 @@ namespace Obelisk::Core
         m_Api.DescribeGameplayPolicyEventKind = PluginDescribeGameplayPolicyEventKind;
         m_Api.RegisterChatMessageEventWithOwnerTokenHandle = PluginRegisterChatMessageEventWithOwnerTokenHandle;
         m_Api.UnregisterChatMessageEventWithOwnerToken = PluginUnregisterChatMessageEventWithOwnerToken;
+        m_Api.RegisterTimerWithOwnerTokenHandle = PluginRegisterTimerWithOwnerTokenHandle;
+        m_Api.UnregisterTimerWithOwnerToken = PluginUnregisterTimerWithOwnerToken;
         g_ApiCapabilities.store(m_Api.capabilities, std::memory_order_release);
         EventManager::SetProcessEventBlockingCapabilityAdvertised(
             (m_Api.capabilities & OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING) != 0);
@@ -1903,25 +2011,61 @@ namespace Obelisk::Core
 
     void PluginManager::UnregisterPluginCallbacks(const std::string& pluginName, void* owner, const char* reason)
     {
-        const size_t gameplayPolicyRemoved = UnregisterGameplayPolicyRegistrationsForOwner(owner);
-        const size_t eventRemoved = EventManager::Get().UnregisterCallbacksForOwner(owner);
-        const size_t publicChatRemoved = UnregisterChatMessageRegistrationsForOwner(owner);
-        const size_t chatRemoved = m_ChatDispatcher->UnregisterCallbacksForOwner(owner);
-        const size_t structureRemoved = StructureEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
-        const size_t inventoryRemoved = InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
+        const auto cleanupFamily = [&](const char* label, auto cleanup) -> size_t {
+            try
+            {
+                return cleanup();
+            }
+            catch (const std::exception& e)
+            {
+                SafeLogErrorNoThrow((std::string("Failed to remove ") + label + " callbacks for plugin " + pluginName).c_str(),
+                                    e.what());
+                return 0;
+            }
+            catch (...)
+            {
+                SafeLogErrorNoThrow((std::string("Failed to remove ") + label + " callbacks for plugin " + pluginName +
+                                    " with unknown exception").c_str());
+                return 0;
+            }
+        };
 
-        if (gameplayPolicyRemoved > 0)
-            OBELISK_INFO("Removed {} gameplay policy callback(s) registered by plugin {} {}.", gameplayPolicyRemoved, pluginName, reason);
-        if (eventRemoved > 0)
-            OBELISK_INFO("Removed {} ProcessEvent callback(s) registered by plugin {} {}.", eventRemoved, pluginName, reason);
-        if (publicChatRemoved > 0)
-            OBELISK_INFO("Removed {} public chat callback(s) registered by plugin {} {}.", publicChatRemoved, pluginName, reason);
-        if (chatRemoved > 0)
-            OBELISK_INFO("Removed {} chat callback(s) registered by plugin {} {}.", chatRemoved, pluginName, reason);
-        if (structureRemoved > 0)
-            OBELISK_INFO("Removed {} structure callback(s) registered by plugin {} {}.", structureRemoved, pluginName, reason);
-        if (inventoryRemoved > 0)
-            OBELISK_INFO("Removed {} inventory policy callback(s) registered by plugin {} {}.", inventoryRemoved, pluginName, reason);
+        const size_t gameplayPolicyRemoved = cleanupFamily("gameplay policy", [&]() {
+            return UnregisterGameplayPolicyRegistrationsForOwner(owner);
+        });
+        const size_t eventRemoved = cleanupFamily("ProcessEvent", [&]() {
+            return EventManager::Get().UnregisterCallbacksForOwner(owner);
+        });
+        const size_t publicChatRemoved = cleanupFamily("public chat", [&]() {
+            return UnregisterChatMessageRegistrationsForOwner(owner);
+        });
+        const size_t timerRemoved = cleanupFamily("timer", [&]() {
+            return TimerManager::Get().UnregisterCallbacksForOwner(owner);
+        });
+        const size_t chatRemoved = cleanupFamily("chat", [&]() {
+            return m_ChatDispatcher->UnregisterCallbacksForOwner(owner);
+        });
+        const size_t structureRemoved = cleanupFamily("structure", [&]() {
+            return StructureEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
+        });
+        const size_t inventoryRemoved = cleanupFamily("inventory policy", [&]() {
+            return InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
+        });
+
+        const auto logRemoved = [&](size_t count, const char* label) {
+            if (count == 0)
+                return;
+            SafeLogInfoNoThrow("Removed plugin callback(s): ",
+                               std::to_string(count) + " " + label + " " + pluginName + " " + (reason ? reason : ""));
+        };
+
+        logRemoved(gameplayPolicyRemoved, "gameplay policy");
+        logRemoved(eventRemoved, "ProcessEvent");
+        logRemoved(publicChatRemoved, "public chat");
+        logRemoved(timerRemoved, "timer");
+        logRemoved(chatRemoved, "chat");
+        logRemoved(structureRemoved, "structure");
+        logRemoved(inventoryRemoved, "inventory policy");
     }
 
     bool PluginManager::IsPluginIdLoaded(const std::string& pluginId) const

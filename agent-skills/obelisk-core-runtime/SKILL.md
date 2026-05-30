@@ -15,6 +15,7 @@ Own these areas:
 - `hooks/ProcessEventHook.*`
 - `core/EventManager.*`
 - `core/PluginManager.*`
+- `core/TimerManager.*`
 - `include/obelisk/ObeliskApi.h`
 - `runtime/Logger.*`
 - `scripts/install_obelisk.sh`
@@ -77,6 +78,11 @@ Own these areas:
   observer/debug-window markers and observer env.
 - Treat callback ownership as runtime-critical: callbacks registered by a plugin must be
   unregistered if init fails, before unload, and before `dlclose`.
+- `TimerManager` is a process-lifetime runtime service for plugin-owned delayed/repeating
+  callbacks. Keep it owner-token scoped through `PluginManager`, zero-failure handle
+  based, process-local only, and independent of UE4/server state. Plugin unload/init
+  failure must remove owner timers before `dlclose` and wait for in-flight callbacks from
+  other threads.
 - Reject plugin callback registrations that cannot be attributed to the currently
   initializing plugin or an already-loaded plugin owner. Do not allow ownerless callbacks
   through the public plugin API.

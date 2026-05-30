@@ -12,6 +12,30 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 PLUGIN_MANAGER = REPO_ROOT / "core" / "PluginManager.cpp"
 
 
+def extract_braced_body(text: str, match: re.Match[str]) -> str:
+    start = text.find("{", match.end())
+    if start == -1:
+        raise AssertionError("matched function has no body")
+
+    depth = 0
+    for index in range(start, len(text)):
+        char = text[index]
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start + 1:index]
+    raise AssertionError("matched function body is not balanced")
+
+
+def extract_function_body(text: str, pattern: str) -> str:
+    match = re.search(pattern, text, re.S)
+    if match is None:
+        raise AssertionError(f"function pattern not found: {pattern}")
+    return extract_braced_body(text, match)
+
+
 class PluginManagerGuardrailTests(unittest.TestCase):
     def test_scoped_cleanup_guard_is_noexcept_and_catches(self) -> None:
         text = PLUGIN_MANAGER.read_text(encoding="utf-8")
@@ -33,17 +57,41 @@ class PluginManagerGuardrailTests(unittest.TestCase):
 
     def test_no_throw_logging_helper_never_uses_logging_macros(self) -> None:
         text = PLUGIN_MANAGER.read_text(encoding="utf-8")
-        match = re.search(
-            r"void SafeLogErrorNoThrow\(.*?\)\s+noexcept(?P<body>.*?)"
-            r"template <typename Fn>\s+class NoThrowScopeExit",
+        body = extract_function_body(
             text,
-            re.S,
+            r"void SafeLogErrorNoThrow\(const char\* message, const char\* detail\)\s+noexcept",
         )
-        self.assertIsNotNone(match)
-        body = match.group("body")
         self.assertIn("Logger::IsInitialized()", body)
         self.assertIn("catch (...)", body)
         self.assertNotIn("OBELISK_ERROR", body)
+
+    def test_plugin_log_api_uses_no_throw_logging(self) -> None:
+        text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+        for function_name, helper_name, forbidden_macro in (
+            ("PluginLogInfo", "SafeLogInfoNoThrow", "OBELISK_INFO"),
+            ("PluginLogWarn", "SafeLogWarnNoThrow", "OBELISK_WARN"),
+            ("PluginLogError", "SafeLogErrorNoThrow", "OBELISK_ERROR"),
+        ):
+            with self.subTest(function_name=function_name):
+                body = extract_function_body(
+                    text,
+                    rf"void {function_name}\(const char\* message\)",
+                )
+                self.assertIn(helper_name, body)
+                self.assertNotIn(forbidden_macro, body)
+
+    def test_shutdown_and_library_close_use_no_throw_logging(self) -> None:
+        text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+        for function_name in ("CallPluginShutdown", "SafeCloseLibrary"):
+            with self.subTest(function_name=function_name):
+                body = extract_function_body(
+                    text,
+                    rf"void {function_name}\(.*?\)",
+                )
+                self.assertIn("SafeLog", body)
+                self.assertNotIn("OBELISK_INFO", body)
+                self.assertNotIn("OBELISK_WARN", body)
+                self.assertNotIn("OBELISK_ERROR", body)
 
     def test_make_scope_exit_uses_no_throw_guard(self) -> None:
         text = PLUGIN_MANAGER.read_text(encoding="utf-8")
@@ -99,6 +147,20 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                 self.assertIn("try", preceding)
                 self.assertIn("catch", following)
                 self.assertIn("SafeLogErrorNoThrow", following)
+
+    def test_unregister_plugin_callbacks_is_per_family_and_cleans_timers(self) -> None:
+        text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+        body = extract_function_body(
+            text,
+            r"void PluginManager::UnregisterPluginCallbacks\(.*?\)",
+        )
+
+        self.assertIn("cleanupFamily", body)
+        self.assertIn("TimerManager::Get().UnregisterCallbacksForOwner(owner)", body)
+        self.assertIn("EventManager::Get().UnregisterCallbacksForOwner(owner)", body)
+        self.assertIn("SafeLogErrorNoThrow", body)
+        self.assertNotIn("OBELISK_ERROR", body)
+        self.assertGreaterEqual(body.count("cleanupFamily("), 5)
 
 
 if __name__ == "__main__":

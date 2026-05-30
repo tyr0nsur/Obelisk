@@ -36,6 +36,8 @@ namespace
         volatile std::uint64_t chatEventsCapability = OBELISK_API_CAPABILITY_CHAT_EVENTS;
         volatile std::uint64_t filteredCallbacksCapability =
             OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS;
+        volatile std::uint64_t timersCapability = OBELISK_API_CAPABILITY_TIMERS;
+        volatile std::uint64_t repeatingTimerFlag = OBELISK_TIMER_FLAG_REPEATING;
         volatile std::uint32_t gameplayPolicyEventVersion = OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION;
         volatile std::uint32_t resourceKindDescriptorVersion = OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION;
         volatile std::uint32_t gameplayPolicyEventDescriptorVersion =
@@ -108,10 +110,12 @@ int main()
     static_assert(OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS == (1ull << 8));
     static_assert(OBELISK_API_CAPABILITY_CHAT_EVENTS == (1ull << 9));
     static_assert(OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS == (1ull << 10));
+    static_assert(OBELISK_API_CAPABILITY_TIMERS == (1ull << 11));
     static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION == 1u);
     static_assert(OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION == 1u);
     static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION == 1u);
     static_assert(OBELISK_CHAT_MESSAGE_EVENT_ABI_VERSION == 1u);
+    static_assert(OBELISK_TIMER_FLAG_REPEATING == (1ull << 0));
     static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD == (1ull << 0));
     static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED == (1ull << 1));
     static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED == (1ull << 2));
@@ -257,7 +261,7 @@ int main()
 
     AssertAbiType<ObeliskApi>();
     static_assert(alignof(ObeliskApi) == 8);
-    static_assert(sizeof(ObeliskApi) == 200);
+    static_assert(sizeof(ObeliskApi) == 216);
     static_assert(offsetof(ObeliskApi, LogInfo) == 0);
     static_assert(offsetof(ObeliskApi, LogWarn) == 8);
     static_assert(offsetof(ObeliskApi, LogError) == 16);
@@ -284,6 +288,8 @@ int main()
     static_assert(offsetof(ObeliskApi, DescribeGameplayPolicyEventKind) == 176);
     static_assert(offsetof(ObeliskApi, RegisterChatMessageEventWithOwnerTokenHandle) == 184);
     static_assert(offsetof(ObeliskApi, UnregisterChatMessageEventWithOwnerToken) == 192);
+    static_assert(offsetof(ObeliskApi, RegisterTimerWithOwnerTokenHandle) == 200);
+    static_assert(offsetof(ObeliskApi, UnregisterTimerWithOwnerToken) == 208);
 
     static_assert(offsetof(ObeliskApi, abi_version) > offsetof(ObeliskApi, CallProcessEvent));
     static_assert(offsetof(ObeliskApi, struct_size) > offsetof(ObeliskApi, abi_version));
@@ -303,8 +309,10 @@ int main()
     static_assert(offsetof(ObeliskApi, DescribeGameplayPolicyEventKind) > offsetof(ObeliskApi, DescribeResourceKind));
     static_assert(offsetof(ObeliskApi, RegisterChatMessageEventWithOwnerTokenHandle) > offsetof(ObeliskApi, DescribeGameplayPolicyEventKind));
     static_assert(offsetof(ObeliskApi, UnregisterChatMessageEventWithOwnerToken) > offsetof(ObeliskApi, RegisterChatMessageEventWithOwnerTokenHandle));
-    static_assert(offsetof(ObeliskApi, UnregisterChatMessageEventWithOwnerToken) +
-        sizeof(ObeliskApi::UnregisterChatMessageEventWithOwnerToken) == sizeof(ObeliskApi));
+    static_assert(offsetof(ObeliskApi, RegisterTimerWithOwnerTokenHandle) > offsetof(ObeliskApi, UnregisterChatMessageEventWithOwnerToken));
+    static_assert(offsetof(ObeliskApi, UnregisterTimerWithOwnerToken) > offsetof(ObeliskApi, RegisterTimerWithOwnerTokenHandle));
+    static_assert(offsetof(ObeliskApi, UnregisterTimerWithOwnerToken) +
+        sizeof(ObeliskApi::UnregisterTimerWithOwnerToken) == sizeof(ObeliskApi));
 
     RuntimeNoOp();
     return 0;

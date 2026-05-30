@@ -27,7 +27,7 @@ UE lookup, or `ResourceHandle` APIs.
 | Dinos | No public dino API. | Keep out of the core until identity/lifecycle evidence is stronger. | Breeding, limits, tracking. |
 | Items and inventory | Inventory-backed policy checks through `GameplayPolicyEvent`; no item identity or mutation. | Continue copied policy events and descriptors; keep item identity, `ItemNetID`, arrays, mutation, and `ResourceHandle` blocked. | Kits, shops, stacks, inventory tools. |
 | Structures | Structure-backed policy checks through `GameplayPolicyEvent`; no structure identity or lookup. | Consolidate copied policy events and descriptors; defer full structure identity, coordinates, health, inventory, and mutation. | Protection, limits, logging, decay. |
-| Timers | No public scheduler. | Add a process-local scheduler with owner-token handles, unregister on unload, and no shared-cluster handle persistence. | Timed plugin tasks, cron-like plugins. |
+| Timers | Process-local owner-token scheduler with zero-failure handles, one-shot/repeating callbacks, explicit unregister, and unload/init-failure cleanup. | Harden examples/docs and keep timers independent of UE4, identity, and shared-cluster state. | Timed plugin tasks, cron-like plugins. |
 | Admin | No gameplay admin API. | Keep core to operator/config/logging primitives until player identity and authority model exist. | Kick/ban/broadcast panels and automation. |
 | Economy/database | No core surface. | Do not include in v1 core unless a generic storage abstraction is separately designed and lifecycle-tested. | Economy, shop, rewards, MySQL-backed plugins. |
 
@@ -56,7 +56,9 @@ UE lookup, or `ResourceHandle` APIs.
 2. Continue focused UE4 reflection extraction for GObjects coherent-field-window evidence
    and Item return-only policy modeling first, with Mission copied-bool and Transfer
    `bAccept` kept as internal/test-only follow-up candidates.
-3. Design the first non-UE-dependent core service: an owner-token process-local scheduler
-   with unload cleanup tests, before identity, permissions, and command routing.
+3. Validate the first non-UE-dependent core service end to end: owner-token
+   process-local timers now have ABI, runtime, and unload cleanup tests; next work is
+   plugin-facing documentation/example usage before identity, permissions, and command
+   routing.
 4. Keep server-backed validation behind explicit live-ops windows; prefer offline
    artifacts and fixture-backed tests until a concrete runtime signal is required.

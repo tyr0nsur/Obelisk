@@ -142,6 +142,12 @@ Validation rules:
 - `ChatMessageEvent` is an RC ABI surface but must pass through the internal
   `core/ChatEventDispatcher` ownership layer. Do not dispatch plugin-facing chat callbacks
   directly from the `ProcessEvent` hook.
+- `OBELISK_API_CAPABILITY_TIMERS` exposes process-local owner-token timer handles through
+  appended `RegisterTimerWithOwnerTokenHandle` / `UnregisterTimerWithOwnerToken`.
+  Plugins must check `struct_size`, the capability bit, and non-null function pointers.
+  Timer ids are zero-failure, owner-scoped, cleaned on init failure/unload, and must not
+  be persisted or shared across ARK server processes. Repeating timers require
+  `OBELISK_TIMER_FLAG_REPEATING` and a non-zero interval; one-shot timers use interval 0.
 - Public event registration must require both the advertised API capability bit captured
   in the plugin's `ObeliskApi` table and the live runtime gate. Do not let a later env or
   marker change widen capabilities for a plugin that loaded before that capability was
@@ -160,6 +166,10 @@ Validation rules:
   cross-thread owner cleanup must still wait until in-flight dispatch finishes.
 - Keep tests for both self-unregister and cross-thread owner cleanup waiting before
   exposing any chat callback registration through the public SDK.
+- Timer callbacks must obey the same lifecycle rule: self-unregister must not deadlock,
+  plugin unload/init-failure owner cleanup must wait for in-flight timer callbacks unless
+  cleanup is initiated by that same owner callback, and callback exceptions must be caught
+  before crossing the runtime/plugin boundary.
 - Prefer opaque `uint64_t` registration ids plus explicit unregister for new event APIs.
   Keep owner-token cleanup on init failure/unload as the backstop, and include `user_data`
   in callback subscriptions instead of asking plugins to capture global state.

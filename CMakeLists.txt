@@ -77,6 +77,7 @@ add_library(obelisk SHARED
     core/ChatEventDispatcher.cpp
     core/InventoryPolicyEventDispatcher.cpp
     core/StructureEventDispatcher.cpp
+    core/TimerManager.cpp
     core/EventManager.cpp
     core/PluginConfig.cpp
     core/PluginManager.cpp
@@ -177,6 +178,7 @@ add_executable(plugin_manager_tests
     core/ChatEventDispatcher.cpp
     core/InventoryPolicyEventDispatcher.cpp
     core/StructureEventDispatcher.cpp
+    core/TimerManager.cpp
     core/EventManager.cpp
     core/PluginConfig.cpp
     core/PluginManager.cpp
@@ -188,6 +190,16 @@ target_include_directories(plugin_manager_tests PRIVATE ${CMAKE_CURRENT_SOURCE_D
 target_link_libraries(plugin_manager_tests PRIVATE obelisk_sdk fmt::fmt spdlog::spdlog dl stdc++fs)
 
 add_test(NAME PluginManagerTests COMMAND plugin_manager_tests)
+
+add_executable(timer_manager_tests
+    tests/core/TimerManagerTests.cpp
+    core/TimerManager.cpp
+    runtime/Logger.cpp
+)
+target_include_directories(timer_manager_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(timer_manager_tests PRIVATE fmt::fmt spdlog::spdlog)
+
+add_test(NAME TimerManagerTests COMMAND timer_manager_tests)
 
 add_executable(abi_layout_tests
     tests/abi/AbiLayoutTests.cpp
