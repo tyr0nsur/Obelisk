@@ -65,6 +65,14 @@ Own these areas:
   SDKs, object identity, mutation, return overrides, raw params, or `ResourceHandle`.
   Current module routing belongs in `docs/agent-handoff/CURRENT.md` and dated research
   notes.
+- Strict redacted-signature artifacts and consume-gate acceptance are planning inputs
+  only unless a separate promotion gate says otherwise.
+- Copied `BoolProperty` observations must reject non-canonical bytes greater than `1`;
+  do not normalize arbitrary nonzero bytes to `true`.
+- Observer/helper gates must prove "no read, no budget" for disabled gates, missing
+  profile/window/marker/SHA, unsupported SHA, zero budget, and non-target `fname_index`.
+  Rejection paths must clear copied output, and recognition-only object/array fields must
+  reject forged copied ranges.
 - `ue/MissionReflection.*` implements the first internal mission recognizer for those
   four mission targets. It is SHA-gated and fixture-backed, exposes copied bool ranges
   only, and keeps player/controller/character object refs plus `OutItemIDs` arrays

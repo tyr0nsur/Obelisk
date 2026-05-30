@@ -23,6 +23,10 @@ def sentences(text: str) -> list[str]:
     return [part.strip() for part in re.split(r"(?<=[.!?|\n])\s+", text) if part.strip()]
 
 
+def paragraphs(text: str) -> list[str]:
+    return [part.strip() for part in re.split(r"\n\s*\n", text) if part.strip()]
+
+
 def cmake_targets(cmake: str) -> list[tuple[str, str, str]]:
     return [
         (match.group("kind"), match.group("name"), match.group("body"))
@@ -545,6 +549,31 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("runtime_observer_observational_only", release)
         self.assertNotIn("--map Ragnarok --instance arkserver", release)
         self.assertIn("--map <map> --instance <instance-id>", release)
+
+    def test_active_handoff_rc_tag_mentions_require_stale_ref_rerun_guardrails(self) -> None:
+        required_patterns = {
+            "stale tag risk": r"\bstale\b",
+            "rerun or clean intended-ref gate": (
+                r"\bre-?run(?:ning)?\b.*\bgate\b|\bgate\b.*\bre-?run(?:ning)?\b|"
+                r"\bclean release gate\b.*\bintended ref\b"
+            ),
+            "tag/ref verification": (
+                r"\btag/ref verification\b|\bref verification\b.*\btag\b|\btag\b.*\bref verification\b"
+            ),
+        }
+        offenders: list[str] = []
+
+        for path in ("docs/agent-handoff/CURRENT.md", "docs/agent-handoff/COMPACT_CONTEXT.md"):
+            for paragraph in paragraphs(read(path)):
+                if "v0.1.0-rc.1" not in paragraph:
+                    continue
+                compact = normalized(paragraph)
+                compact_lower = compact.lower()
+                for label, pattern in required_patterns.items():
+                    if not re.search(pattern, compact_lower):
+                        offenders.append(f"{path}: missing {label}: {compact}")
+
+        self.assertEqual(offenders, [])
 
     def test_disable_plugins_marker_is_documented_as_wrapper_input_not_runtime_gate(self) -> None:
         install = read("docs/INSTALL.md")

@@ -1,6 +1,6 @@
 # Compact Context Snapshot
 
-Updated: 2026-05-29
+Updated: 2026-05-30
 
 Use this file after conversation compaction or when resuming Obelisk from repository
 state. Current routing table only: read `docs/agent-handoff/CURRENT.md` for active
@@ -35,9 +35,11 @@ priorities, and do not use history files as the active source of truth.
 - Repo: `/home/flowcommunity-ark/Obelisk`
 - Remote: `git@github.com:tyr0nsur/Obelisk.git`
 - Central Obelisk root: `/servidor/ark/obelisk`
-- Current release baseline: local tag `v0.1.0-rc.1` exists as the small core-first RC
-  checkpoint. Post-RC work stays internal/offline unless a separate promotion gate
-  changes scope.
+- Current release baseline: the small core-first RC gate has local clean-tree evidence,
+  but `v0.1.0-rc.1` is not published and must not be assumed to point at current `HEAD`.
+  A stale local tag may exist behind release-prep commits. Post-RC work stays
+  internal/offline unless a separate promotion gate changes scope, and publication
+  requires rerunning the gate on the intended ref plus exact tag/ref verification.
 - Stable plugin loading requires safe `OBELISK_INSTANCE_ID` plus real non-symlink plugin,
   config, log, and state roots.
 - `ObeliskApi` v1 is append-only for `v0.1.0`; ABI v2 requires an explicit migration plan.
@@ -232,8 +234,10 @@ priorities, and do not use history files as the active source of truth.
   `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`.
 - `plugins/oPolicyAudit` is experimental and excluded from the default build/release
   scope unless `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`.
-- Historical dirty/offline release-gate runs are smoke evidence only. A real RC requires
-  focused checkpoints and the release gate without `--allow-dirty`.
+- Historical dirty/offline release-gate runs are smoke evidence only. A later
+  2026-05-30 gate passed from a tracked-clean checkpoint, but it does not validate any
+  stale local RC tag. A real published RC requires focused checkpoints and the release
+  gate without `--allow-dirty` on the intended release ref.
 - Use `docs/research/2026-05-29-rc-checkpoint-slicing-plan.md` for slicing. Handoff docs
   should be refreshed separately from runtime, release/public docs, offline tooling, and
   research-evidence slices.

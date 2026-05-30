@@ -30,6 +30,10 @@ namespace
     constexpr uint64_t kIntInputPropertyFlags = 0x1040000280;
     constexpr uint64_t kBoolInputPropertyFlags = 0x1040000280;
     constexpr uint64_t kBoolReturnPropertyFlags = 0x1040000780;
+    constexpr uint8_t kDinoBoolFieldSize = 0x01;
+    constexpr uint8_t kDinoBoolByteOffset = 0x00;
+    constexpr uint8_t kDinoBoolByteMask = 0x01;
+    constexpr uint8_t kDinoBoolFieldMask = 0xff;
     constexpr int32_t kACharacterNameIndex = 4044;
     constexpr int32_t kReturnValueNameIndex = 17716;
     constexpr int32_t kBSkipLineTraceNameIndex = 25580;
@@ -115,6 +119,10 @@ namespace
         WriteAt(buffer, 0x34, elementSize);
         WriteAt(buffer, 0x38, propertyFlags);
         WriteAt(buffer, 0x4c, offset);
+        WriteAt(buffer, 0x70, kDinoBoolFieldSize);
+        WriteAt(buffer, 0x71, kDinoBoolByteOffset);
+        WriteAt(buffer, 0x72, kDinoBoolByteMask);
+        WriteAt(buffer, 0x73, kDinoBoolFieldMask);
     }
 
     struct FieldDef
@@ -688,6 +696,116 @@ namespace
         }
     }
 
+    void TestRejectsWrongBoolPropertyMetadata()
+    {
+        {
+            DinoFixture fixture;
+            BuildAddPassenger(fixture);
+            WriteAt(fixture.PropertyC, 0x70, uint8_t{2});
+
+            DinoReflection::DinoInvocation invocation;
+            ReadResult result = DinoReflection::TryIdentifyDinoInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "wrong dino bool field size was accepted");
+        }
+        {
+            DinoFixture fixture;
+            BuildAddPassenger(fixture);
+            WriteAt(fixture.PropertyC, 0x71, uint8_t{1});
+
+            DinoReflection::DinoInvocation invocation;
+            ReadResult result = DinoReflection::TryIdentifyDinoInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "wrong dino bool byte offset was accepted");
+        }
+        {
+            DinoFixture fixture;
+            BuildAddPassenger(fixture);
+            WriteAt(fixture.PropertyC, 0x72, uint8_t{0xff});
+
+            DinoReflection::DinoInvocation invocation;
+            ReadResult result = DinoReflection::TryIdentifyDinoInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "native dino bool marker was accepted");
+        }
+        {
+            DinoFixture fixture;
+            BuildAddPassenger(fixture);
+            WriteAt(fixture.PropertyC, 0x72, uint8_t{0x02});
+
+            DinoReflection::DinoInvocation invocation;
+            ReadResult result = DinoReflection::TryIdentifyDinoInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "wrong dino bool byte mask was accepted");
+        }
+        {
+            DinoFixture fixture;
+            BuildAddPassenger(fixture);
+            WriteAt(fixture.PropertyC, 0x73, uint8_t{0x01});
+
+            DinoReflection::DinoInvocation invocation;
+            ReadResult result = DinoReflection::TryIdentifyDinoInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "wrong dino bool field mask was accepted");
+        }
+    }
+
+    void TestRejectsNonCanonicalCopiedBoolParams()
+    {
+        {
+            DinoFixture fixture;
+            BuildAddPassenger(fixture);
+            fixture.Params[0x08] = 7;
+            fixture.Params[0x0c] = 2;
+
+            DinoReflection::DinoInvocation invocation;
+            ReadResult result = DinoReflection::TryIdentifyDinoInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible,
+                    "non-canonical AddPassenger copied bool was accepted");
+            Require(invocation.Fields.empty(), "rejected AddPassenger copied bool left stale fields");
+        }
+        {
+            DinoFixture fixture;
+            BuildAllowCarryCharacter(fixture);
+            fixture.Params[0x08] = 0xff;
+
+            DinoReflection::DinoInvocation invocation;
+            ReadResult result = DinoReflection::TryIdentifyDinoInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible,
+                    "non-canonical AllowCarryCharacter ReturnValue was accepted");
+        }
+    }
+
     void TestRejectsNullFunction()
     {
         DinoFixture fixture;
@@ -773,10 +891,43 @@ namespace
         result = DinoReflection::TryIdentifyDinoInvocation(
             fixture.Reader(),
             unsupported,
+            reinterpret_cast<const void*>(0x44440000),
+            reinterpret_cast<const void*>(0x55550000),
+            invocation);
+        Require(result.Status == ReadStatus::UnsupportedLayout, "unsupported dino reflection was accepted");
+    }
+
+    void TestRejectsClearStaleInvocation()
+    {
+        DinoFixture fixture;
+        BuildAddPassenger(fixture);
+        fixture.Params[0x08] = 7;
+        fixture.Params[0x0c] = 1;
+
+        DinoReflection::DinoInvocation invocation;
+        ReadResult result = DinoReflection::TryIdentifyDinoInvocation(
+            fixture.Reader(),
+            Options(),
             fixture.Function.data(),
             fixture.Params.data(),
             invocation);
-        Require(result.Status == ReadStatus::UnsupportedLayout, "unsupported dino reflection was accepted");
+        Require(static_cast<bool>(result), result.Reason.c_str());
+        Require(invocation.FunctionNameIndex == kAddPassengerNameIndex,
+                "valid dino invocation did not populate stale source");
+        Require(invocation.Fields.size() == 6, "valid dino invocation did not populate fields");
+
+        WriteAt(fixture.Function, 0x98, uint16_t{0x11});
+        result = DinoReflection::TryIdentifyDinoInvocation(
+            fixture.Reader(),
+            Options(),
+            fixture.Function.data(),
+            fixture.Params.data(),
+            invocation);
+        Require(result.Status == ReadStatus::Implausible, "invalid dino invocation was accepted");
+        Require(invocation.FunctionNameIndex == -1, "rejected dino invocation left stale function name");
+        Require(invocation.OuterNameIndex == -1, "rejected dino invocation left stale outer name");
+        Require(!invocation.HasParameterRanges, "rejected dino invocation left stale range state");
+        Require(invocation.Fields.empty(), "rejected dino invocation left stale fields");
     }
 }
 
@@ -790,10 +941,13 @@ int main()
     TestRejectsClassObjectsWithWrongInternalIndices();
     TestRejectsWrongShape();
     TestRejectsWrongPropertyFlags();
+    TestRejectsWrongBoolPropertyMetadata();
+    TestRejectsNonCanonicalCopiedBoolParams();
     TestRejectsNullFunction();
     TestRejectsUnreadableScalarRange();
     TestRejectsTruncatedAndOverlongPropertyChains();
     TestGateRejectsBeforeReading();
+    TestRejectsClearStaleInvocation();
 
     std::cout << "DinoReflectionTests passed\n";
     return 0;

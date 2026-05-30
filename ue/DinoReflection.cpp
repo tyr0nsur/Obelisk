@@ -1,6 +1,8 @@
 #include "DinoReflection.h"
 
 #include <array>
+#include <cstring>
+#include <limits>
 #include <utility>
 
 namespace Obelisk::UE::DinoReflection
@@ -35,6 +37,10 @@ namespace Obelisk::UE::DinoReflection
         constexpr uint64_t kIntInputPropertyFlags = 0x1040000280;
         constexpr uint64_t kBoolInputPropertyFlags = 0x1040000280;
         constexpr uint64_t kBoolReturnPropertyFlags = 0x1040000780;
+        constexpr size_t kBoolPropertyFieldSizeOffset = 0x70;
+        constexpr size_t kBoolPropertyByteOffsetOffset = 0x71;
+        constexpr size_t kBoolPropertyByteMaskOffset = 0x72;
+        constexpr size_t kBoolPropertyFieldMaskOffset = 0x73;
 
         struct DinoFieldSpec
         {
@@ -45,6 +51,11 @@ namespace Obelisk::UE::DinoReflection
             int32_t ClassNameIndex;
             int32_t ClassObjectIndex;
             uint64_t PropertyFlags;
+            uint8_t BoolFieldSize;
+            uint8_t BoolByteOffset;
+            uint8_t BoolByteMask;
+            uint8_t BoolFieldMask;
+            bool NativeBool;
             bool ExposesRange;
         };
 
@@ -61,6 +72,14 @@ namespace Obelisk::UE::DinoReflection
             size_t FieldCount;
         };
 
+        struct BoolPropertyMetadata
+        {
+            uint8_t FieldSize = 0;
+            uint8_t ByteOffset = 0;
+            uint8_t ByteMask = 0;
+            uint8_t FieldMask = 0;
+        };
+
         constexpr std::array<DinoFieldSpec, 6> kAddPassengerFields{{
             {DinoField::ACharacter,
              kACharacterNameIndex,
@@ -69,6 +88,11 @@ namespace Obelisk::UE::DinoReflection
              kObjectPropertyClassNameIndex,
              kObjectPropertyClassObjectIndex,
              kObjectInputPropertyFlags,
+             0x00,
+             0x00,
+             0x00,
+             0x00,
+             false,
              false},
             {DinoField::PassengerSeatIndex,
              kPassengerSeatIndexNameIndex,
@@ -77,6 +101,11 @@ namespace Obelisk::UE::DinoReflection
              kIntPropertyClassNameIndex,
              kIntPropertyClassObjectIndex,
              kIntInputPropertyFlags,
+             0x00,
+             0x00,
+             0x00,
+             0x00,
+             false,
              true},
             {DinoField::BForcePassenger,
              kBForcePassengerNameIndex,
@@ -85,6 +114,11 @@ namespace Obelisk::UE::DinoReflection
              kBoolPropertyClassNameIndex,
              kBoolPropertyClassObjectIndex,
              kBoolInputPropertyFlags,
+             0x01,
+             0x00,
+             0x01,
+             0xff,
+             false,
              true},
             {DinoField::BAllowFlyersAndWaterDinos,
              kBAllowFlyersAndWaterDinosNameIndex,
@@ -93,6 +127,11 @@ namespace Obelisk::UE::DinoReflection
              kBoolPropertyClassNameIndex,
              kBoolPropertyClassObjectIndex,
              kBoolInputPropertyFlags,
+             0x01,
+             0x00,
+             0x01,
+             0xff,
+             false,
              true},
             {DinoField::BSkipLineTrace,
              kBSkipLineTraceNameIndex,
@@ -101,6 +140,11 @@ namespace Obelisk::UE::DinoReflection
              kBoolPropertyClassNameIndex,
              kBoolPropertyClassObjectIndex,
              kBoolInputPropertyFlags,
+             0x01,
+             0x00,
+             0x01,
+             0xff,
+             false,
              true},
             {DinoField::ReturnValue,
              kReturnValueNameIndex,
@@ -109,6 +153,11 @@ namespace Obelisk::UE::DinoReflection
              kBoolPropertyClassNameIndex,
              kBoolPropertyClassObjectIndex,
              kBoolReturnPropertyFlags,
+             0x01,
+             0x00,
+             0x01,
+             0xff,
+             false,
              true},
         }};
 
@@ -120,6 +169,11 @@ namespace Obelisk::UE::DinoReflection
              kObjectPropertyClassNameIndex,
              kObjectPropertyClassObjectIndex,
              kObjectInputPropertyFlags,
+             0x00,
+             0x00,
+             0x00,
+             0x00,
+             false,
              false},
             {DinoField::ReturnValue,
              kReturnValueNameIndex,
@@ -128,6 +182,11 @@ namespace Obelisk::UE::DinoReflection
              kBoolPropertyClassNameIndex,
              kBoolPropertyClassObjectIndex,
              kBoolReturnPropertyFlags,
+             0x01,
+             0x00,
+             0x01,
+             0xff,
+             false,
              true},
         }};
 
@@ -166,6 +225,66 @@ namespace Obelisk::UE::DinoReflection
             default:
                 return nullptr;
             }
+        }
+
+        bool AddWouldOverflow(size_t a, size_t b)
+        {
+            return a > std::numeric_limits<size_t>::max() - b;
+        }
+
+        RuntimeReflection::ReadResult ReadByteAt(const RuntimeReflection::MemoryReader& reader,
+                                                 const void* base,
+                                                 size_t offset,
+                                                 uint8_t& out)
+        {
+            if (!base)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::InvalidArgument,
+                                                           "null dino bool property pointer");
+            if (AddWouldOverflow(reinterpret_cast<size_t>(base), offset))
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::OutOfBounds,
+                                                           "dino bool property metadata address overflow");
+
+            const auto* address = reinterpret_cast<const uint8_t*>(base) + offset;
+            if (!reader.CanRead(address, sizeof(out)))
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Unreadable,
+                                                           "dino bool property metadata is unreadable");
+
+            std::memcpy(&out, address, sizeof(out));
+            return RuntimeReflection::ReadResult::Ok();
+        }
+
+        RuntimeReflection::ReadResult ReadBoolPropertyMetadata(const RuntimeReflection::MemoryReader& reader,
+                                                               const RuntimeReflection::UPropertyView& property,
+                                                               BoolPropertyMetadata& out)
+        {
+            BoolPropertyMetadata value;
+            if (RuntimeReflection::ReadResult result =
+                    ReadByteAt(reader, property.Address, kBoolPropertyFieldSizeOffset, value.FieldSize);
+                !result)
+            {
+                return result;
+            }
+            if (RuntimeReflection::ReadResult result =
+                    ReadByteAt(reader, property.Address, kBoolPropertyByteOffsetOffset, value.ByteOffset);
+                !result)
+            {
+                return result;
+            }
+            if (RuntimeReflection::ReadResult result =
+                    ReadByteAt(reader, property.Address, kBoolPropertyByteMaskOffset, value.ByteMask);
+                !result)
+            {
+                return result;
+            }
+            if (RuntimeReflection::ReadResult result =
+                    ReadByteAt(reader, property.Address, kBoolPropertyFieldMaskOffset, value.FieldMask);
+                !result)
+            {
+                return result;
+            }
+
+            out = value;
+            return RuntimeReflection::ReadResult::Ok();
         }
 
         RuntimeReflection::ReadResult ValidateGate(const RuntimeReflection::ReadOptions& options)
@@ -274,6 +393,53 @@ namespace Obelisk::UE::DinoReflection
             return RuntimeReflection::ReadResult::Ok();
         }
 
+        RuntimeReflection::ReadResult ValidateBoolPropertyMetadata(const RuntimeReflection::MemoryReader& reader,
+                                                                   const RuntimeReflection::UPropertyView& property,
+                                                                   const DinoFieldSpec& spec)
+        {
+            if (spec.ClassNameIndex != kBoolPropertyClassNameIndex)
+                return RuntimeReflection::ReadResult::Ok();
+
+            BoolPropertyMetadata metadata;
+            if (RuntimeReflection::ReadResult result = ReadBoolPropertyMetadata(reader, property, metadata); !result)
+                return result;
+
+            if (metadata.FieldSize != spec.BoolFieldSize)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                           "dino bool property field size mismatch");
+            if (metadata.ByteOffset != spec.BoolByteOffset)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                           "dino bool property byte offset mismatch");
+            if (metadata.ByteMask != spec.BoolByteMask)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                           "dino bool property byte mask mismatch");
+            if (metadata.FieldMask != spec.BoolFieldMask)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                           "dino bool property field mask mismatch");
+
+            const bool nativeBool = metadata.FieldSize == 0x01 &&
+                                    metadata.ByteMask == 0xff &&
+                                    metadata.FieldMask == 0xff;
+            if (nativeBool != spec.NativeBool)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                           "dino bool property native-bool marker mismatch");
+            return RuntimeReflection::ReadResult::Ok();
+        }
+
+        RuntimeReflection::ReadResult ValidateCanonicalCopiedBool(const RuntimeReflection::ParamRange& range)
+        {
+            if (range.Size != kBoolPropertySize || !range.Data)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::InvalidArgument,
+                                                           "invalid dino copied bool range");
+
+            uint8_t value = 0;
+            std::memcpy(&value, range.Data, sizeof(value));
+            if (value > 1)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                           "dino copied bool parameter is not canonical");
+            return RuntimeReflection::ReadResult::Ok();
+        }
+
         RuntimeReflection::ReadResult ValidateProperty(const RuntimeReflection::MemoryReader& reader,
                                                        const RuntimeReflection::FieldLayout& layout,
                                                        const RuntimeReflection::UPropertyView& property,
@@ -299,7 +465,9 @@ namespace Obelisk::UE::DinoReflection
                 return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
                                                            "dino property ArrayDim mismatch");
 
-            return ValidatePropertyClass(reader, layout, property, spec);
+            if (RuntimeReflection::ReadResult result = ValidatePropertyClass(reader, layout, property, spec); !result)
+                return result;
+            return ValidateBoolPropertyMetadata(reader, property, spec);
         }
     }
 
@@ -309,6 +477,8 @@ namespace Obelisk::UE::DinoReflection
                                                             const void* params,
                                                             DinoInvocation& out)
     {
+        out = {};
+
         if (RuntimeReflection::ReadResult gate = ValidateGate(options); !gate)
             return gate;
         if (!function)
@@ -390,6 +560,12 @@ namespace Obelisk::UE::DinoReflection
                     !result)
                 {
                     return result;
+                }
+
+                if (fieldSpec.ClassNameIndex == kBoolPropertyClassNameIndex)
+                {
+                    if (RuntimeReflection::ReadResult result = ValidateCanonicalCopiedBool(field.Range); !result)
+                        return result;
                 }
             }
 

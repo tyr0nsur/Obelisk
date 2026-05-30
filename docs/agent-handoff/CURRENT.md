@@ -7,7 +7,10 @@ This active routing table keeps only next-round facts; put durable evidence in
 
 ## Active Objective
 
-- `v0.1.0-rc.1` is closed as a local tag. Continue from that core-first baseline:
+- `v0.1.0-rc.1` is not published and must not be treated as closed on the current
+  `HEAD`. A stale local tag may exist behind the current release-prep commits; any
+  future publication requires a clean release gate on the intended ref and an exact
+  tag/ref verification before tag push. Continue from the core-first RC baseline:
   Linux runtime, ProcessEvent hook infrastructure, plugin lifecycle, central install
   layout, `oBaseEvents`, `GameplayPolicyEvent`, minimal copied `ChatMessageEvent`,
   `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`.
@@ -79,7 +82,9 @@ This active routing table keeps only next-round facts; put durable evidence in
 - `plugins/oPolicyAudit` is an experimental `GameplayPolicyEvent` example, outside first
   release scope, built only with `-DOBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`.
 - Release readiness must rerun clean through `scripts/check_release_readiness.sh` without
-  `--allow-dirty` before publication; the prior dirty run is smoke evidence only.
+  `--allow-dirty` before publication. The 2026-05-30 gate passed from a tracked-clean
+  checkpoint, but it does not validate any stale local RC tag; publication still requires
+  a clean rerun on the intended release ref and exact tag/ref verification.
 - Offline/module evidence stays in dated research notes. Use
   `docs/research/2026-05-29-minimal-second-source-readiness.md`,
   `docs/research/2026-05-29-dino-compact-second-source-readiness.md`,
@@ -131,26 +136,6 @@ This active routing table keeps only next-round facts; put durable evidence in
   do not stage by path proximity. Ignored local build/pycache artifacts, logs, reports,
   cores, dumps, and server config should remain unstaged.
 
-## Checkpoint Groups If Commits Reopen
-
-- Start with checkpoint 0-pre from
-  `docs/research/2026-05-29-rc-checkpoint-slicing-plan.md`: staged-path helper only.
-  Then 0a is artifact-gate scanner/gate only, and 0b is release-gate options only; broad
-  release/public guardrails run with the release docs/guardrails slice because they read
-  API/docs/handoff/skills and post-RC routing.
-- RC API and public-scope docs: public ABI, copied policy event payload, resource metadata,
-  SDK consumers, `docs/public_gameplay_events.json`, release docs, and public guardrails.
-- Runtime observer safety: ProcessEvent hook infrastructure, exact-target internal
-  observers, dispatcher tests, and runtime lifecycle tests.
-- Script harness prelude: `scripts/run_script_tests.sh` and
-  `scripts/test_run_script_tests.sh` before script-heavy validation.
-- Offline evidence tooling: FName manifests, second-source intake, snapshot regeneration,
-  static global evidence, ResourceHandle evaluator, protected-path guards, and matching
-  tests. Current `scan_resource_handle_serials.py` and artifact-gate validation remain
-  checkpoint 0a; this group is for later offline evidence tooling.
-- Research and handoff cleanup: dated research notes for evidence; handoff files only for
-  immediate routing; skills only when a repeatable rule changes.
-
 ## Priority Next Steps
 
 - Freeze the RC public API around `GameplayPolicyEvent`, the minimal copied
@@ -159,10 +144,11 @@ This active routing table keeps only next-round facts; put durable evidence in
   transfer, richer chat, command, player, admin, mutation, return override, and public
   `CallProcessEvent` surfaces out of RC.
 - Checkpoint order now starts with 0-pre staged-path helper, then 0a artifact-gate
-  scanner/gate, then 0b release-gate options. The current worktree has no staged
-  checkpoint; rerun the focused tests and exact cached path checks with
-  `scripts/check_staged_paths.py` before any staging/publication decision. Next release
-  slice after isolated 0-pre/0a/0b is RC API/public-scope review.
+  scanner/gate, then 0b release-gate options. Start with checkpoint 0-pre staged-path
+  helper only; 0a is artifact-gate scanner/gate only; 0b is release-gate options only.
+  The current worktree has no staged checkpoint; rerun focused tests and
+  `scripts/check_staged_paths.py`; broad release/public guardrails run with the release
+  docs/guardrails slice.
 - Treat the latest `ChatMessageEvent` beta window as closed and preserved. Copied-log
   evidence under `/servidor/ark/workspace-offline` validates plugin-facing delivery for
   `send_mode=0,1,2,3` with no raw text/identity leaks. Any future live chat evidence must

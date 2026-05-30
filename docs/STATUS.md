@@ -21,6 +21,9 @@ confirmation on the intended release ref, CI/clean-tree review, and tag/push
 when explicitly authorized. Existing local or unpublished RC tags must be
 verified against that intended validated release ref because they may point
 behind the current validated head after later release-prep fixes.
+As currently observed, the local `v0.1.0-rc.1` tag is stale and must not be reused or
+pushed; publication requires rerunning the gate on the intended release ref and recreating
+or verifying the tag there.
 
 The current ARK server setup is a validation adapter used to check Obelisk in a
 real UE4 Linux process. Adapter operations are documented here only when they

@@ -2,7 +2,7 @@
 
 ## Summary
 
-On 2026-05-30, the local `v0.1.0-rc.1` release gate passed from a tracked-clean
+On 2026-05-30, the local core-first RC release gate passed from a tracked-clean
 worktree using the assembled RC UFunction second-source root.
 
 This check proves the current core-first RC gate for the documented public scope:
@@ -100,5 +100,8 @@ and `scripts/__pycache__/`.
 - Do not tag or push until the operator approves publication.
 - If publication is approved, rerun the release gate immediately before tagging so the
   evidence matches the published commit.
+- Do not reuse an existing local/unpublished `v0.1.0-rc.1` tag unless it dereferences
+  exactly to the intended validated release ref; stale local tags must be resolved before
+  any tag push.
 - Keep post-RC discovery separate from this scope: Mission copied-bool observer, Item
   return-only policy, and Transfer `bAccept` remain candidate/internal work.

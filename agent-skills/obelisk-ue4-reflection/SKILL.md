@@ -163,6 +163,13 @@ Do not skip steps because a single core, log line, or recognizer test looks conv
 - Treat mutation and return override as separate promotions after read-only copied-scalar
   callbacks; neither is implied by layout acceptance, runtime observation, or internal
   event support.
+- Copied `BoolProperty` values must be canonical: copy only bytes `0` or `1`; reject
+  bytes greater than `1` instead of normalizing them to `true`.
+- Observer/helper gates must prove fail-closed behavior before runtime wiring: disabled
+  gates, missing profile/window/marker/SHA, unsupported SHA, zero budget, and non-target
+  `fname_index` must not read metadata/params or reserve sequence/log budget.
+- Rejection paths must clear copied output, and recognition-only object/array fields must
+  reject forged copied ranges.
 - Reserve runtime observation budgets only after cheap exact prefilters pass.
 - On live servers, keep plugin discovery off unless testing a known safe build.
 - Current operator direction in `docs/agent-handoff/CURRENT.md` selects the server-backed

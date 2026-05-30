@@ -304,6 +304,9 @@ scripts/check_obelisk_server_posture.sh --expect-stable --map <map> --instance <
 11. For a release candidate, tag the validated candidate first. Release tags and release
     ref pushes are release-manager/lead-only; contributors should not tag or push release
     refs from ordinary development branches.
+    If `v0.1.0-rc.1` already exists locally, verify it points exactly at the intended
+    validated ref; if it points elsewhere, recreate it only after rerunning the gate on
+    that ref. Do not push a stale tag.
 
 ```bash
 git tag -a v0.1.0-rc.1 -m "Obelisk 0.1.0-rc.1"
