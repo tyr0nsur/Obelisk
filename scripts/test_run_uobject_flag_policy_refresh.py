@@ -19,6 +19,7 @@ import test_build_uobject_flag_policy_report as fixtures
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "run_uobject_flag_policy_refresh.py"
 BINARY_SHA256 = fixtures.BINARY_SHA256
+UOBJECT_FLAG_POLICY_ARTIFACT_KIND = "obelisk.uobject-flag-policy-report.v1"
 
 
 def write_text(path: Path, text: str) -> None:
@@ -174,9 +175,10 @@ class RunUObjectFlagPolicyRefreshTests(unittest.TestCase):
                         input_root=base / "input",
                         output_root=base / "output",
                         expected_binary_sha256=BINARY_SHA256,
-                        artifact_kind="offline_core",
+                        artifact_kind=UOBJECT_FLAG_POLICY_ARTIFACT_KIND,
                         capture_id="capture_2026-05-30",
                         evidence_pack_id="evidence-pack.alpha_1",
+                        strict_artifact_identity=False,
                         tool_version=[],
                     )
                 )
@@ -190,7 +192,7 @@ class RunUObjectFlagPolicyRefreshTests(unittest.TestCase):
         self.assertIn("--artifact-kind", builder_command)
         self.assertIn("--capture-id", builder_command)
         self.assertIn("--evidence-pack-id", builder_command)
-        self.assertEqual(builder_command[builder_command.index("--artifact-kind") + 1], "offline_core")
+        self.assertEqual(builder_command[builder_command.index("--artifact-kind") + 1], UOBJECT_FLAG_POLICY_ARTIFACT_KIND)
         self.assertEqual(
             builder_command[builder_command.index("--capture-id") + 1],
             "capture_2026-05-30",
@@ -202,11 +204,259 @@ class RunUObjectFlagPolicyRefreshTests(unittest.TestCase):
         self.assertEqual(
             payload["artifact_identity"],
             {
-                "artifact_kind": "offline_core",
+                "artifact_kind": UOBJECT_FLAG_POLICY_ARTIFACT_KIND,
                 "capture_id": "capture_2026-05-30",
                 "evidence_pack_id": "evidence-pack.alpha_1",
             },
         )
+
+    def test_strict_artifact_identity_requires_explicit_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            input_root = Path(tmp) / "input"
+            output_root = Path(tmp) / "output"
+            write_refresh_inputs(input_root)
+
+            result = self.run_refresh(input_root, output_root, ["--strict-artifact-identity"])
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "--strict-artifact-identity requires --artifact-kind, --capture-id, and --evidence-pack-id",
+            result.stderr,
+        )
+
+    def test_strict_artifact_identity_verifies_generated_policy_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            commands: list[list[str]] = []
+            original_run_json = refresh.run_json
+            original_run_command = refresh.run_command
+
+            def fake_run_json(
+                command: list[str],
+                *,
+                output: Path | None = None,
+                allowed_returncodes: set[int] | None = None,
+            ) -> dict[str, object]:
+                commands.append(command)
+                if output is not None:
+                    output.write_text("{}\n", encoding="utf-8")
+                if "--mode" in command:
+                    mode = command[command.index("--mode") + 1]
+                    if mode == "consume":
+                        return {"status": "accepted"}
+                    return {
+                        "status": "blocked",
+                        "blockers": [{"reason": "promote_mode_uobject_flag_policy_candidate_only"}],
+                    }
+                return {"status": "accepted"}
+
+            def fake_run_command(command: list[str]) -> None:
+                commands.append(command)
+                if command[1].endswith("build_uobject_flag_policy_report.py"):
+                    output_path = Path(command[command.index("--output") + 1])
+                    output_path.write_text(
+                        json.dumps(
+                            {
+                                "schema": "obelisk.uobject-flag-policy-report.v1",
+                                "artifact_identity": {
+                                    "artifact_kind": UOBJECT_FLAG_POLICY_ARTIFACT_KIND,
+                                    "artifact_sha256": "f" * 64,
+                                    "capture_id": "capture_2026-05-30",
+                                    "evidence_pack_id": "evidence-pack.alpha_1",
+                                },
+                            }
+                        )
+                        + "\n",
+                        encoding="utf-8",
+                    )
+
+            refresh.run_json = fake_run_json
+            refresh.run_command = fake_run_command
+            try:
+                payload = refresh.build_result(
+                    Namespace(
+                        input_root=base / "input",
+                        output_root=base / "output",
+                        expected_binary_sha256=BINARY_SHA256,
+                        artifact_kind=UOBJECT_FLAG_POLICY_ARTIFACT_KIND,
+                        capture_id="capture_2026-05-30",
+                        evidence_pack_id="evidence-pack.alpha_1",
+                        strict_artifact_identity=True,
+                        tool_version=[],
+                    )
+                )
+            finally:
+                refresh.run_json = original_run_json
+                refresh.run_command = original_run_command
+
+        self.assertEqual(
+            payload["output_artifact_identity"],
+            {
+                "artifact_kind": UOBJECT_FLAG_POLICY_ARTIFACT_KIND,
+                "artifact_sha256": "f" * 64,
+                "capture_id": "capture_2026-05-30",
+                "evidence_pack_id": "evidence-pack.alpha_1",
+            },
+        )
+
+    def test_strict_artifact_identity_rejects_missing_generated_policy_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            original_run_json = refresh.run_json
+            original_run_command = refresh.run_command
+
+            def fake_run_json(
+                command: list[str],
+                *,
+                output: Path | None = None,
+                allowed_returncodes: set[int] | None = None,
+            ) -> dict[str, object]:
+                if output is not None:
+                    output.write_text("{}\n", encoding="utf-8")
+                if "--mode" in command:
+                    return {"status": "accepted"}
+                return {"status": "accepted"}
+
+            def fake_run_command(command: list[str]) -> None:
+                if command[1].endswith("build_uobject_flag_policy_report.py"):
+                    output_path = Path(command[command.index("--output") + 1])
+                    output_path.write_text(
+                        json.dumps({"schema": "obelisk.uobject-flag-policy-report.v1"}) + "\n",
+                        encoding="utf-8",
+                    )
+
+            refresh.run_json = fake_run_json
+            refresh.run_command = fake_run_command
+            try:
+                with self.assertRaisesRegex(SystemExit, "missing top-level artifact_identity"):
+                    refresh.build_result(
+                        Namespace(
+                            input_root=base / "input",
+                            output_root=base / "output",
+                            expected_binary_sha256=BINARY_SHA256,
+                            artifact_kind=UOBJECT_FLAG_POLICY_ARTIFACT_KIND,
+                            capture_id="capture_2026-05-30",
+                            evidence_pack_id="evidence-pack.alpha_1",
+                            strict_artifact_identity=True,
+                            tool_version=[],
+                        )
+                    )
+            finally:
+                refresh.run_json = original_run_json
+                refresh.run_command = original_run_command
+
+    def test_strict_artifact_identity_rejects_incomplete_generated_policy_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            original_run_json = refresh.run_json
+            original_run_command = refresh.run_command
+
+            def fake_run_json(
+                command: list[str],
+                *,
+                output: Path | None = None,
+                allowed_returncodes: set[int] | None = None,
+            ) -> dict[str, object]:
+                if output is not None:
+                    output.write_text("{}\n", encoding="utf-8")
+                if "--mode" in command:
+                    return {"status": "accepted"}
+                return {"status": "accepted"}
+
+            def fake_run_command(command: list[str]) -> None:
+                if command[1].endswith("build_uobject_flag_policy_report.py"):
+                    output_path = Path(command[command.index("--output") + 1])
+                    output_path.write_text(
+                        json.dumps(
+                            {
+                                "schema": "obelisk.uobject-flag-policy-report.v1",
+                                "artifact_identity": {
+                                    "artifact_kind": UOBJECT_FLAG_POLICY_ARTIFACT_KIND,
+                                    "capture_id": "capture_2026-05-30",
+                                    "evidence_pack_id": "evidence-pack.alpha_1",
+                                },
+                            }
+                        )
+                        + "\n",
+                        encoding="utf-8",
+                    )
+
+            refresh.run_json = fake_run_json
+            refresh.run_command = fake_run_command
+            try:
+                with self.assertRaisesRegex(SystemExit, "incomplete artifact_identity artifact_sha256"):
+                    refresh.build_result(
+                        Namespace(
+                            input_root=base / "input",
+                            output_root=base / "output",
+                            expected_binary_sha256=BINARY_SHA256,
+                            artifact_kind=UOBJECT_FLAG_POLICY_ARTIFACT_KIND,
+                            capture_id="capture_2026-05-30",
+                            evidence_pack_id="evidence-pack.alpha_1",
+                            strict_artifact_identity=True,
+                            tool_version=[],
+                        )
+                    )
+            finally:
+                refresh.run_json = original_run_json
+                refresh.run_command = original_run_command
+
+    def test_strict_artifact_identity_rejects_generated_identity_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            original_run_json = refresh.run_json
+            original_run_command = refresh.run_command
+
+            def fake_run_json(
+                command: list[str],
+                *,
+                output: Path | None = None,
+                allowed_returncodes: set[int] | None = None,
+            ) -> dict[str, object]:
+                if output is not None:
+                    output.write_text("{}\n", encoding="utf-8")
+                if "--mode" in command:
+                    return {"status": "accepted"}
+                return {"status": "accepted"}
+
+            def fake_run_command(command: list[str]) -> None:
+                if command[1].endswith("build_uobject_flag_policy_report.py"):
+                    output_path = Path(command[command.index("--output") + 1])
+                    output_path.write_text(
+                        json.dumps(
+                            {
+                                "schema": "obelisk.uobject-flag-policy-report.v1",
+                                "artifact_identity": {
+                                    "artifact_kind": UOBJECT_FLAG_POLICY_ARTIFACT_KIND,
+                                    "artifact_sha256": "f" * 64,
+                                    "capture_id": "wrong-capture",
+                                    "evidence_pack_id": "evidence-pack.alpha_1",
+                                },
+                            }
+                        )
+                        + "\n",
+                        encoding="utf-8",
+                    )
+
+            refresh.run_json = fake_run_json
+            refresh.run_command = fake_run_command
+            try:
+                with self.assertRaisesRegex(SystemExit, "artifact_identity.capture_id mismatch"):
+                    refresh.build_result(
+                        Namespace(
+                            input_root=base / "input",
+                            output_root=base / "output",
+                            expected_binary_sha256=BINARY_SHA256,
+                            artifact_kind=UOBJECT_FLAG_POLICY_ARTIFACT_KIND,
+                            capture_id="capture_2026-05-30",
+                            evidence_pack_id="evidence-pack.alpha_1",
+                            strict_artifact_identity=True,
+                            tool_version=[],
+                        )
+                    )
+            finally:
+                refresh.run_json = original_run_json
+                refresh.run_command = original_run_command
 
     def test_requires_complete_artifact_identity(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -80,6 +80,15 @@ def artifact_identity(args: argparse.Namespace) -> dict[str, str] | None:
     return {key: value for key, value in values.items() if value is not None}
 
 
+def require_strict_artifact_identity(args: argparse.Namespace) -> dict[str, str]:
+    identity = artifact_identity(args)
+    if identity is None:
+        raise SystemExit(
+            "--strict-artifact-identity requires --artifact-kind, --capture-id, and --evidence-pack-id"
+        )
+    return identity
+
+
 def append_artifact_identity_args(command: list[str], identity: dict[str, str] | None) -> None:
     if identity is None:
         return
@@ -153,13 +162,37 @@ def run_command(command: list[str]) -> None:
         raise SystemExit(f"command failed ({result.returncode}): {' '.join(command)}\n{detail}")
 
 
+def require_complete_output_artifact_identity(path: Path, expected: dict[str, str]) -> dict[str, str]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"failed to read generated policy artifact for identity check: {path}: {exc}") from exc
+
+    identity = payload.get("artifact_identity")
+    if not isinstance(identity, dict):
+        raise SystemExit(f"generated policy artifact is missing top-level artifact_identity: {path}")
+
+    required_keys = ("artifact_kind", "artifact_sha256", "capture_id", "evidence_pack_id")
+    missing = [key for key in required_keys if not isinstance(identity.get(key), str) or not identity.get(key)]
+    if missing:
+        raise SystemExit(
+            f"generated policy artifact has incomplete artifact_identity {','.join(missing)}: {path}"
+        )
+    for key, value in expected.items():
+        if identity.get(key) != value:
+            raise SystemExit(
+                f"generated policy artifact artifact_identity.{key} mismatch: expected {value}, got {identity.get(key)}"
+            )
+    return {key: identity[key] for key in required_keys}
+
+
 def assert_safe_output_files(paths: list[Path]) -> None:
     for path in paths:
         reject_output_file(path)
 
 
 def build_result(args: argparse.Namespace) -> dict[str, Any]:
-    identity = artifact_identity(args)
+    identity = require_strict_artifact_identity(args) if args.strict_artifact_identity else artifact_identity(args)
     input_root = args.input_root.expanduser().resolve(strict=False)
     output_root = args.output_root.expanduser().resolve(strict=False)
     reject_protected_input_root(args.input_root)
@@ -240,6 +273,9 @@ def build_result(args: argparse.Namespace) -> dict[str, Any]:
     for label, path in window_paths.items():
         builder_command.extend(["--window", f"{label}={path}"])
     run_command(builder_command)
+    output_identity = None
+    if args.strict_artifact_identity:
+        output_identity = require_complete_output_artifact_identity(policy_output, identity or {})
 
     consume = run_json(
         [
@@ -308,6 +344,8 @@ def build_result(args: argparse.Namespace) -> dict[str, Any]:
     }
     if identity is not None:
         result["artifact_identity"] = identity
+    if output_identity is not None:
+        result["output_artifact_identity"] = output_identity
     return result
 
 
@@ -319,6 +357,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--artifact-kind", type=parse_artifact_kind)
     parser.add_argument("--capture-id", type=parse_capture_id)
     parser.add_argument("--evidence-pack-id", type=parse_evidence_pack_id)
+    parser.add_argument(
+        "--strict-artifact-identity",
+        action="store_true",
+        help="Require complete explicit artifact identity and verify the generated policy report carries it.",
+    )
     parser.add_argument("--tool-version", action="append", default=[])
     parser.add_argument("--json", action="store_true")
     return parser.parse_args()
