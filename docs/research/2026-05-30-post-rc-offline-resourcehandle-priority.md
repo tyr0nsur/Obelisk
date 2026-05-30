@@ -465,6 +465,36 @@ artifact only defines fail-closed policy and explicitly does not prove runtime r
 safety, public lookup safety, persistent handles, identity, mutation, return overrides,
 or public `ResourceHandle`.
 
+## Next Repo-Local Improvement
+
+After serial-policy artifact acceptance, the smallest useful repo-local improvement is a
+schema/test-plan clarification for the two future runtime artifacts, not a new scan,
+runtime observer, or promotion note. The goal is to define what a later approved run must
+redact and what the offline consume gate must reject.
+
+Candidate fixture scope:
+
+- `obelisk.internal-uobject-revalidation-runtime-rejection-samples.v1` should require a
+  redacted run identity, source serial-policy artifact identity, at least one rejected
+  object-present row, canonical reject reason, `FUObjectItem+0x8` match status only, and
+  `UObject+0x8` candidate reject bits as booleans only.
+- `obelisk.internal-uobject-revalidation-runtime-serial-semantics.v1` should require a
+  redacted run identity, source serial-policy artifact identity, at least one same-frame
+  fresh nonzero match result, at least one zero/missing/mismatch rejection result, and
+  `unknown_wraparound_reject=true` unless a separate written plan proves otherwise.
+
+Negative fixture scope:
+
+- reject raw UE pointers, object indices, serial values, class/name/outer paths, player or
+  gameplay payloads, persistent lookup tokens, `/servidor/ark` paths, `FUObjectItem+0xc`
+  treated as serial, `promotion_ready=true`, `public_resource_handle_ready=true`,
+  `post_callback_resource_handle_ready=true`, cross-frame acceptance, broad tracing
+  evidence, or promote-mode readiness.
+
+Keep this as offline schema/gate planning only. It should not add C++ observer code,
+server markers, live-ops instructions, ReflectionScanner usage, public SDK fields,
+identity lookup, mutation, return override, or a `ResourceHandle` promotion claim.
+
 ## Future Runtime Observation Plan
 
 This section is a planning artifact only. It does not approve server operations, marker

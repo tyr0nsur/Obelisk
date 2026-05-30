@@ -637,6 +637,38 @@ namespace
         }
     }
 
+    void TestRejectsPropertyChainDrift()
+    {
+        {
+            BuffFixture fixture;
+            BuildBuffOverrideInventoryAccessInput(fixture);
+            WriteAt(fixture.PropertyB, 0x28, static_cast<const void*>(nullptr));
+
+            BuffReflection::BuffInvocation invocation;
+            ReadResult result = BuffReflection::TryIdentifyBuffInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "truncated buff property chain was accepted");
+        }
+        {
+            BuffFixture fixture;
+            BuildBuffOverrideInventoryAccessInput(fixture);
+            WriteAt(fixture.PropertyC, 0x28, fixture.PropertyA.data());
+
+            BuffReflection::BuffInvocation invocation;
+            ReadResult result = BuffReflection::TryIdentifyBuffInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "cyclic buff property chain was accepted");
+        }
+    }
+
     void TestRejectsNonCanonicalCopiedBoolsAndClearsOutput()
     {
         BuffFixture fixture;
@@ -711,6 +743,7 @@ int main()
     TestRecognizesObjectAndClassTargetsWithoutPointerRanges();
     TestRejectsWrongOuterAndNameNumber();
     TestRejectsWrongShape();
+    TestRejectsPropertyChainDrift();
     TestRejectsNonCanonicalCopiedBoolsAndClearsOutput();
     TestRejectsUnsupportedTarget();
     TestGateRejectsBeforeReading();

@@ -80,10 +80,11 @@ for the current checkpoint.
 - `oBaseEvents` has a disabled-by-default plugin-local chat command helper over copied
   `ChatMessageEvent` bytes; no command ABI/router, identity, replies, moderation, send-chat
   API, mutation, or extra exported plugin symbols.
-- ArkServerApi/AseApi and local `NextGenPlugins` clones are names and behavior dictionaries
-  plus demand signals only, not a porting target or copying source. Do not copy code,
-  offsets, layouts, vtables, ABI assumptions, wrappers, raw UE pointer APIs, `.lib`
-  artifacts, return constants, or implementations.
+- ArkServerApi/AseApi remain names and behavior dictionaries for familiar ARK plugin
+  concepts. Local `NextGenPlugins` clones are names/demand dictionaries only, not a
+  porting target or copying source. Do not copy code, offsets, layouts, vtables, ABI
+  assumptions, wrappers, raw UE pointer APIs, `.lib` artifacts, constants, schemas,
+  control flow, command parsers, return constants, or implementations.
 
 ## Evidence Routing
 
@@ -156,7 +157,7 @@ for the current checkpoint.
   binary-scoped `0x5956f30` FName root slot and `0x595b7e0` GObjects candidate, then a
   distinct second-source compare. Do not add either key to release target sets, ABI enums,
   descriptors, dispatchers, public docs, or runtime gates.
-- Plugin Hub planning order from current demand map and local `NextGenPlugins` inventory:
+- Plugin Hub planning order from current demand map and local `NextGenPlugins` dictionary:
   `docs/PLUGIN_HUB_FOUNDATION_V1.md` is now the contributor-facing foundation boundary,
   backed by `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`. The fastest honest creator path after
   `v0.1` is small Obelisk-native examples for lifecycle/config/logging, descriptor reads,
@@ -164,7 +165,7 @@ for the current checkpoint.
   permissions, RCON, economy, homes/safe zones, structure enforcement, dinos, tribes,
   transfers, inventory, item mutation, identity, lookup, replies, send-chat, moderation,
   and ArkApi portability as design backlogs until their own public surfaces are promoted.
-  Keep the clone out of repo and use it only as a dictionary/demand signal.
+  Keep the clone out of repo and use it only as a names/demand dictionary.
 - Artifact-pack contributor onboarding now has `docs/OFFLINE_ARTIFACT_PACKS.md` as the
   concise contributor runbook. It documents normalize/check, consume gate, strict
   target-set coverage, second-source compare, pack-shape expectations, and non-claims.

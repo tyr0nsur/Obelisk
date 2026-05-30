@@ -10,10 +10,11 @@ not a replacement for promotion gates. If a row says "not ready", plugins must n
 around the gap with raw UE pointers, `ProcessEvent` mutation, object lookup, or copied
 ArkApi implementation patterns.
 
-The local `NextGenPlugins` clones are useful as a demand map for future Plugin Hub
-categories, not as portable implementation source. Treat their plugin families as evidence
-of operator needs, then rebuild every promoted surface through Obelisk reflection,
-second-source fixtures, copied C ABI contracts, and runtime safety gates.
+The local `NextGenPlugins` clones are a names and demand dictionary for future Plugin Hub
+categories only. Treat their plugin families as evidence of operator needs, not as
+portable behavior, source, ABI, constants, schemas, command parsers, or implementation
+patterns. Rebuild every promoted surface through Obelisk reflection, second-source
+fixtures, copied C ABI contracts, and runtime safety gates.
 The detailed local inventory lives in
 `docs/research/2026-05-30-nextgenplugins-reference-inventory.md` and records provenance for
 demand analysis only; it is not license clearance, runtime evidence, an ArkApi

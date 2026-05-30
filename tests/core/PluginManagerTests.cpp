@@ -81,6 +81,7 @@ namespace
         bool registerStructureCallback = false;
         bool registerGameplayPolicyCallback = false;
         bool registerTimerCallback = false;
+        bool registerBlockingTimerCallback = false;
         bool callProcessEventInInit = false;
         bool registerOwnerTokenCallbackInShutdown = false;
         bool unregisterOwnerTokenCallbackInShutdown = false;
@@ -751,6 +752,31 @@ namespace
                     FakeTimerCallback,
                     g_CurrentFakePlugin);
             Require(g_CurrentFakePlugin->timerRegistrationId != 0, "fake timer callback registration failed");
+        }
+
+        if (g_CurrentFakePlugin->registerBlockingTimerCallback)
+        {
+            Require(g_CurrentFakePlugin->timerFence != nullptr,
+                    "fake plugin requested blocking timer callback without fence");
+            Require(api->RegisterTimerWithOwnerTokenHandle != nullptr,
+                    "fake plugin requested blocking timer callback without registration API");
+            g_CurrentFakePlugin->timerRegistrationId =
+                api->RegisterTimerWithOwnerTokenHandle(
+                    context->plugin_owner_token,
+                    1,
+                    0,
+                    0,
+                    BlockingTimerCallback,
+                    g_CurrentFakePlugin->timerFence);
+            Require(g_CurrentFakePlugin->timerRegistrationId != 0,
+                    "fake blocking timer callback registration failed");
+
+            std::unique_lock<std::mutex> lock(g_CurrentFakePlugin->timerFence->Mutex);
+            Require(g_CurrentFakePlugin->timerFence->Cv.wait_for(
+                        lock,
+                        std::chrono::seconds(2),
+                        [&]() { return g_CurrentFakePlugin->timerFence->Calls == 1; }),
+                    "fake blocking timer callback did not enter during init");
         }
 
         if (g_CurrentFakePlugin->callProcessEventInInit)
@@ -2394,6 +2420,85 @@ namespace
         Require(Obelisk::Core::TimerManager::Get().UnregisterCallbacksForOwner(plugin.owner) == 0,
                 "timer survived plugin init failure");
         Require(plugin.timerEventCalls == 0, "long-delay timer fired before init-failure cleanup");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestInitFailureWaitsForInFlightPluginTimerBeforeClose()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_timer_init_fail_in_flight");
+        ConfigureEnvironment(root);
+
+        TimerFenceState state;
+        FakePlugin plugin{
+            .filename = "timer_init_fail_in_flight.so",
+            .pluginId = "timer_init_fail_in_flight",
+            .initResult = false,
+            .registerBlockingTimerCallback = true,
+            .timerFence = &state,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        std::atomic<bool> loadReturned{false};
+        std::thread loadThread([&]() {
+            manager.LoadPlugins((root / "plugins").string());
+            loadReturned.store(true, std::memory_order_release);
+            state.Cv.notify_all();
+        });
+
+        bool shutdownEntered = false;
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            shutdownEntered = state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
+                return state.ShutdownEntered;
+            });
+        }
+
+        if (!shutdownEntered)
+        {
+            {
+                std::lock_guard<std::mutex> lock(state.Mutex);
+                state.Release = true;
+            }
+            state.Cv.notify_all();
+            loadThread.join();
+            Require(false, "init-failure cleanup did not call plugin shutdown while timer callback was in flight");
+        }
+
+        bool closedWhileCallbackInFlight = false;
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            closedWhileCallbackInFlight =
+                state.Cv.wait_for(lock, std::chrono::milliseconds(100), [&]() {
+                    return state.CloseEntered || loadReturned.load(std::memory_order_acquire);
+                });
+            state.Release = true;
+        }
+        state.Cv.notify_all();
+
+        bool callbackCompleted = false;
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            callbackCompleted = state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
+                return state.Completed == 1;
+            });
+        }
+
+        loadThread.join();
+
+        Require(plugin.initCalls == 1, "in-flight timer init-fail plugin Init was not called");
+        Require(plugin.shutdownCalls == 1, "in-flight timer init-fail plugin shutdown was not called");
+        Require(!closedWhileCallbackInFlight,
+                "init-failure cleanup closed plugin while plugin-owned timer callback was in flight");
+        Require(callbackCompleted, "plugin-owned timer callback did not complete after release");
+        Require(plugin.closeCalls == 1, "in-flight timer init-fail plugin was not closed once");
+        Require(Obelisk::Core::TimerManager::Get().UnregisterCallbacksForOwner(plugin.owner) == 0,
+                "in-flight timer survived init-failure cleanup");
 
         CleanupPlugin(plugin);
         fs::remove_all(root);
@@ -4830,6 +4935,7 @@ int main()
     TestPublicRepeatingTimerFiresAndStopsAfterUnregister();
     TestUnloadAllWaitsForInFlightPluginTimerBeforeClose();
     TestTimerCallbackCleansOnInitFailure();
+    TestInitFailureWaitsForInFlightPluginTimerBeforeClose();
     TestOwnerTokenTimerRegistrationRejectedDuringShutdown();
     TestOwnerTokenTimerRegistrationRejectedDuringInitFailureShutdown();
     TestOwnerTokenTimerUnregisterAllowedDuringShutdown();

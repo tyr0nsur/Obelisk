@@ -346,7 +346,9 @@ typedef struct ObeliskApi {
     // failure, and must not be persisted to shared config or reused across ARK server
     // processes. delayMs must be non-zero. One-shot timers require intervalMs=0 and
     // flags=0. Repeating timers require OBELISK_TIMER_FLAG_REPEATING and non-zero
-    // intervalMs. Reserved flags are rejected.
+    // intervalMs. Reserved flags are rejected. UnregisterTimerWithOwnerToken cancels
+    // future delivery for one handle; plugin unload/init-failure owner cleanup is the
+    // quiescence barrier before plugin code and owner state are released.
     uint64_t (*RegisterTimerWithOwnerTokenHandle)(
         uint64_t ownerToken,
         uint64_t delayMs,

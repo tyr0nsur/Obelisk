@@ -804,7 +804,8 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         required = [
             "ArkServerApi/AseApi",
             "names and behavior",
-            "not a porting target or copying source",
+            "not a porting",
+            "copying source",
             "offsets",
             "layouts",
             "ABI assumptions",

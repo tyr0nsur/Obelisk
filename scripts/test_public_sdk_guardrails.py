@@ -841,21 +841,21 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         for text, required in (
             (foundation, "does not promise ArkApi/AseApi\ncompatibility"),
             (foundation, "demand dictionaries only"),
-            (foundation, "rebuilt through Obelisk reflection"),
-            (matrix, "not as portable implementation source"),
-            (matrix, "rebuild every promoted surface through Obelisk reflection"),
+            (foundation, "rebuilt through Obelisk\nreflection"),
+            (matrix, "not as\nportable behavior, source, ABI, constants, schemas, command parsers, or implementation\npatterns"),
+            (matrix, "Rebuild every promoted surface through Obelisk reflection"),
             (matrix, "provenance for\n"
              "demand analysis only"),
             (matrix, "not license clearance, runtime evidence, an ArkApi\n"
              "compatibility target, or an ABI reference"),
-            (inventory, "Use this clone as a demand-map and dictionary source"),
+            (inventory, "Use this clone as a names/demand dictionary"),
             (inventory, "not as source code to port"),
             (inventory, "Do not trust `DECLARE_HOOK` declarations as Linux ABI"),
             (inventory, "not runtime evidence and do not authorize copied implementation"),
-            (workflow_skill, "only as names, demand signals, and behavior dictionaries"),
-            (workflow_skill, "must not copy ArkServerApi/AseApi, NextGenPlugins"),
-            (current_handoff, "names and behavior dictionaries\n  plus demand signals only"),
-            (current_handoff, "Do not copy code,\n  offsets, layouts, vtables, ABI assumptions"),
+            (workflow_skill, "Local NextGenPlugins clones are names and demand\nsignals only"),
+            (workflow_skill, "Obelisk must not copy ArkServerApi/AseApi,\nNextGenPlugins"),
+            (current_handoff, "Local `NextGenPlugins` clones are names/demand dictionaries only"),
+            (current_handoff, "Do not copy code, offsets, layouts, vtables, ABI\n  assumptions"),
         ):
             with self.subTest(required=required):
                 self.assertIn(required, text)

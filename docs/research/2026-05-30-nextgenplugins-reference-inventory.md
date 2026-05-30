@@ -7,9 +7,9 @@ Date: 2026-05-30
 `/home/flowcommunity-ark/NextGenPlugins` is an operator-provided local clone of popular
 ArkApi/Windows plugin sources for future Obelisk Plugin Hub planning.
 
-Use this material only as a behavior and feature-priority reference. Do not copy Windows
-ArkApi code, offsets, MSVC ABI assumptions, vtables, memory layouts, direct UE pointer API
-patterns, or implementation details into Obelisk.
+Use this material only as a names and demand dictionary. Do not copy Windows ArkApi code,
+offsets, MSVC ABI assumptions, vtables, memory layouts, direct UE pointer API patterns,
+constants, schemas, control flow, command parsers, or implementation details into Obelisk.
 
 This note intentionally records demand categories and visible plugin-family names only.
 It is not a source-mining checklist: do not use the clone to import signatures, constants,
@@ -107,7 +107,7 @@ chat/server messages; permissions; and save/respawn/build/damage-style gameplay 
 build-placement policy lane, but they do not promote `APrimalStructure.IsAllowedToBuild`
 or any return-code semantics today.
 
-Use this clone as a demand-map and dictionary source, not as source code to port.
+Use this clone as a names/demand dictionary, not as source code to port.
 Do not trust `DECLARE_HOOK` declarations as Linux ABI, direct UE pointer wrappers as safe
 public API shape, or ArkApi return constants as accepted Linux ARK behavior.
 

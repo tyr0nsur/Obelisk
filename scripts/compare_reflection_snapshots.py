@@ -58,6 +58,43 @@ READINESS_NON_CLAIMS = [
     "accepted second-source readiness is layout evidence only",
     "does not promote public SDK, object identity, lookup, mutation, return override, ResourceHandle, or runtime hooks",
 ]
+TARGET_BLOCKER_GUIDANCE = {
+    "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild": {
+        "classification": "second_wave_structure_build_policy_candidate",
+        "why_blocked": [
+            "missing_committed_sanitized_snapshot",
+            "missing_distinct_second_source_layout",
+            "placement_struct_redaction_policy_unproven",
+            "build_denial_return_override_policy_blocked",
+        ],
+        "next_offline_input": (
+            "approved non-protected copied/offline core or complete core evidence-pack manifest "
+            "with FName root, GObjects, binary hash, and artifact identity"
+        ),
+        "non_claim": (
+            "does not promote StructureEvents, build-policy SDK, identity, lookup, mutation, "
+            "return override, runtime hooks, or target-set coverage"
+        ),
+    },
+    "obelisk.ufunction-chain.snapshot.v1:APrimalStructure.IsAllowedToBuild": {
+        "classification": "second_wave_structure_build_policy_candidate",
+        "why_blocked": [
+            "missing_committed_sanitized_snapshot",
+            "missing_distinct_second_source_layout",
+            "reflected_owner_unproven",
+            "placement_struct_redaction_policy_unproven",
+            "build_denial_return_override_policy_blocked",
+        ],
+        "next_offline_input": (
+            "approved non-protected copied/offline core or complete core evidence-pack manifest "
+            "that proves whether APrimalStructure is a reflected owner"
+        ),
+        "non_claim": (
+            "does not promote StructureEvents, build-policy SDK, identity, lookup, mutation, "
+            "return override, runtime hooks, or target-set coverage"
+        ),
+    },
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -171,6 +208,16 @@ def target_set_report() -> dict[str, Any]:
             for name, targets in sorted(TARGET_SETS.items())
         ],
     }
+
+
+def target_blocker_guidance(target: str) -> dict[str, Any] | None:
+    guidance = TARGET_BLOCKER_GUIDANCE.get(target)
+    if guidance is None:
+        return None
+    copied: dict[str, Any] = {}
+    for key, value in guidance.items():
+        copied[key] = list(value) if isinstance(value, list) else value
+    return copied
 
 
 def snapshot_paths(root: Path) -> list[Path]:
@@ -729,6 +776,9 @@ def readiness_report(
                 "block_reasons": ["missing_base_snapshot"],
                 "second_source_status": "not_applicable",
             }
+            guidance = target_blocker_guidance(key)
+            if guidance is not None:
+                target_detail["guidance"] = guidance
             bucket["targets"] += 1
             bucket["blocked"] += 1
             bucket["block_reasons"]["missing_base_snapshot"] = (
@@ -755,6 +805,9 @@ def readiness_report(
             "block_reasons": reasons,
             "second_source_status": "missing",
         }
+        guidance = target_blocker_guidance(key)
+        if guidance is not None:
+            target_detail["guidance"] = guidance
         if reasons:
             bucket["blocked"] += 1
             totals["blocked"] += 1
@@ -855,6 +908,14 @@ def print_text(report: dict[str, Any]) -> None:
                 second_source_reasons = detail.get("second_source_reasons", [])
                 if second_source_reasons:
                     parts.append(f"second_source_reasons={','.join(second_source_reasons)}")
+                guidance = detail.get("guidance")
+                if isinstance(guidance, dict):
+                    classification = guidance.get("classification")
+                    why_blocked = guidance.get("why_blocked")
+                    if isinstance(classification, str) and classification:
+                        parts.append(f"guidance={classification}")
+                    if isinstance(why_blocked, list) and why_blocked:
+                        parts.append(f"why_blocked={','.join(str(reason) for reason in why_blocked)}")
                 if "first_diff" in detail:
                     parts.append(f"first_diff={detail['first_diff']}")
                 print(f"  {' '.join(parts)}")

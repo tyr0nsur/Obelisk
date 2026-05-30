@@ -108,6 +108,26 @@ definition, emitted targets must match the signatures, and missing or unexpected
 must be recorded as empty. Historical missing-coverage markers can allow old consume
 checks, but strict mode still blocks them.
 
+## Build-Policy Gap Checks
+
+For deferred structure build-policy targets, contributors can check the current fixture
+blocker without server paths:
+
+```sh
+python3 scripts/compare_reflection_snapshots.py \
+  --base-root tests/fixtures/ufunction_snapshots \
+  --readiness-report \
+  --target obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild
+```
+
+The expected blocked state is `missing_base_snapshot` with candidate-only guidance. For
+`PrimalStructure.IsAllowedToBuild` and `APrimalStructure.IsAllowedToBuild`, the report
+also records why the target remains second-wave: no committed sanitized snapshot, no
+distinct second-source layout, unproven placement-struct redaction policy, and blocked
+build-denial/return-override policy. This guidance does not add target-set coverage or
+promote `StructureEvents`, a build-policy SDK, identity, lookup, mutation, return
+override, runtime hooks, or public API.
+
 ## Second-Source Compare
 
 Reflection inventory packs need a distinct second source before they can support

@@ -6,9 +6,9 @@ Obelisk plugins that consume `include/obelisk/ObeliskApi.h`.
 It is a boundary document, not a roadmap freeze. It does not add public symbols, structs,
 callbacks, capabilities, or gameplay modules. It does not promise ArkApi/AseApi
 compatibility, Windows/MSVC portability, source parity, or behavior parity. ArkApi,
-AseApi, and local popular-plugin clones are demand dictionaries only; every Obelisk
-surface must be rebuilt through Obelisk reflection, copied C ABI contracts, second-source
-fixtures, and runtime safety gates.
+AseApi, and local popular-plugin clones are names and demand dictionaries only, not
+porting or copying sources; every Obelisk surface must be rebuilt through Obelisk
+reflection, copied C ABI contracts, second-source fixtures, and runtime safety gates.
 
 ## Public Surface
 

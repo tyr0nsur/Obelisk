@@ -360,10 +360,37 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
                 "obelisk.ufunction-chain.snapshot.v1:APrimalStructure.IsAllowedToBuild": ["missing_base_snapshot"],
             },
         )
+        details = {detail["target"]: detail for detail in missing_module["target_details"]}
+        primal_guidance = details[
+            "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild"
+        ]["guidance"]
+        self.assertEqual(primal_guidance["classification"], "second_wave_structure_build_policy_candidate")
+        self.assertIn("missing_committed_sanitized_snapshot", primal_guidance["why_blocked"])
+        self.assertIn("missing_distinct_second_source_layout", primal_guidance["why_blocked"])
+        self.assertIn("approved non-protected copied/offline core", primal_guidance["next_offline_input"])
+        self.assertIn("does not promote StructureEvents", primal_guidance["non_claim"])
+        self.assertIn(
+            "reflected_owner_unproven",
+            details["obelisk.ufunction-chain.snapshot.v1:APrimalStructure.IsAllowedToBuild"]["guidance"]["why_blocked"],
+        )
         self.assertIs(report["promotion_gate"]["ready"], False)
         self.assertIs(report["promotion_gate"]["layout_ready"], False)
         self.assertIs(report["promotion_gate"]["promotion_ready"], False)
         self.assertEqual(report["promotion_gate"]["ready_scope"], "not_ready")
+
+        text_result = run_compare_raw(
+            "--base-root",
+            str(REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"),
+            "--readiness-report",
+            "--target",
+            "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild",
+        )
+        self.assertEqual(text_result.returncode, 0, text_result.stderr + text_result.stdout)
+        self.assertIn("guidance=second_wave_structure_build_policy_candidate", text_result.stdout)
+        self.assertIn(
+            "why_blocked=missing_committed_sanitized_snapshot,missing_distinct_second_source_layout",
+            text_result.stdout,
+        )
 
     def test_requires_base_root_unless_listing_target_sets(self) -> None:
         result = run_compare_raw("--readiness-report")
