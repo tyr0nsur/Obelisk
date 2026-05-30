@@ -145,6 +145,9 @@ jobs:
             --readiness-report \
             --fail-on-base-readiness-gaps \
             --target-set minimal-second-source-intake \
+            --target-set structure-observer-intake \
+            --target-set item-return-only-policy-slice \
+            --target-set chat-message-intake \
             --target-set buff-compact-intake \
             --target-set dino-compact-intake \
             --target-set mission-compact-intake \

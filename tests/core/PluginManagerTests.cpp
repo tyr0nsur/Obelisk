@@ -77,6 +77,7 @@ namespace
         bool registerOwnerTokenFromInitThread = false;
         bool registerChatCallback = false;
         bool registerInventoryPolicyCallback = false;
+        bool registerItemReturnCallback = false;
         bool registerStructureCallback = false;
         bool registerGameplayPolicyCallback = false;
         bool registerTimerCallback = false;
@@ -117,6 +118,8 @@ namespace
         size_t chatSubscriptionsAtClose = 0;
         size_t inventoryPolicySubscriptionsAtShutdown = 0;
         size_t inventoryPolicySubscriptionsAtClose = 0;
+        size_t itemReturnSubscriptionsAtShutdown = 0;
+        size_t itemReturnSubscriptionsAtClose = 0;
         int gameplayPolicyEventCalls = 0;
         uint32_t gameplayPolicyEventKind = 0;
         uint32_t gameplayPolicyResourceKind = 0;
@@ -184,6 +187,10 @@ namespace
     }
 
     void FakeInventoryPolicyCallback(const Obelisk::Core::InventoryPolicyEventView&, void*)
+    {
+    }
+
+    void FakeItemReturnCallback(const Obelisk::Core::ItemReturnEventView&, void*)
     {
     }
 
@@ -693,6 +700,14 @@ namespace
             Require(registrationId != 0, "fake inventory policy callback registration failed");
         }
 
+        if (g_CurrentFakePlugin->registerItemReturnCallback)
+        {
+            const uint64_t registrationId = Obelisk::Core::ItemReturnEventDispatcher::Get().Register(
+                g_CurrentFakePlugin->owner,
+                Obelisk::Core::ItemReturnEventSubscription{FakeItemReturnCallback, g_CurrentFakePlugin});
+            Require(registrationId != 0, "fake item-return callback registration failed");
+        }
+
         if (g_CurrentFakePlugin->registerStructureCallback)
         {
             const uint64_t registrationId = Obelisk::Core::StructureEventDispatcher::Get().Register(
@@ -761,6 +776,8 @@ namespace
                 g_CurrentFakePlugin->chatDispatcher->SubscriptionCount();
         g_CurrentFakePlugin->inventoryPolicySubscriptionsAtShutdown =
             Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount();
+        g_CurrentFakePlugin->itemReturnSubscriptionsAtShutdown =
+            Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount();
         g_CurrentFakePlugin->structureSubscriptionsAtShutdown =
             Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount();
         ++g_CurrentFakePlugin->shutdownCalls;
@@ -839,6 +856,8 @@ namespace
                 plugin->chatSubscriptionsAtClose = plugin->chatDispatcher->SubscriptionCount();
             plugin->inventoryPolicySubscriptionsAtClose =
                 Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount();
+            plugin->itemReturnSubscriptionsAtClose =
+                Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount();
             plugin->structureSubscriptionsAtClose =
                 Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount();
             ++plugin->closeCalls;
@@ -913,6 +932,7 @@ namespace
         if (plugin.chatDispatcher)
             plugin.chatDispatcher->UnregisterCallbacksForOwner(plugin.owner);
         Obelisk::Core::InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(plugin.owner);
+        Obelisk::Core::ItemReturnEventDispatcher::Get().UnregisterCallbacksForOwner(plugin.owner);
         Obelisk::Core::StructureEventDispatcher::Get().UnregisterCallbacksForOwner(plugin.owner);
         g_CurrentFakePlugin = nullptr;
     }
@@ -1030,6 +1050,7 @@ namespace
         Obelisk::Core::ChatEventDispatcher chatDispatcher;
         plugin.registerChatCallback = true;
         plugin.registerInventoryPolicyCallback = true;
+        plugin.registerItemReturnCallback = true;
         plugin.registerStructureCallback = true;
         plugin.chatDispatcher = &chatDispatcher;
         FakeLoader loader;
@@ -1051,6 +1072,8 @@ namespace
                 "owned chat callback was not registered during plugin init");
         Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 1,
                 "owned inventory policy callback was not registered during plugin init");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 1,
+                "owned item-return callback was not registered during plugin init");
         Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 1,
                 "owned structure callback was not registered during plugin init");
 
@@ -1063,18 +1086,24 @@ namespace
                 "chat callback was removed before plugin shutdown");
         Require(plugin.inventoryPolicySubscriptionsAtShutdown == 1,
                 "inventory policy callback was removed before plugin shutdown");
+        Require(plugin.itemReturnSubscriptionsAtShutdown == 1,
+                "item-return callback was removed before plugin shutdown");
         Require(plugin.structureSubscriptionsAtShutdown == 1,
                 "structure callback was removed before plugin shutdown");
         Require(plugin.closeCalls == 1, "valid plugin was not closed during unload");
         Require(plugin.chatSubscriptionsAtClose == 0, "chat callback was still registered at dlclose");
         Require(plugin.inventoryPolicySubscriptionsAtClose == 0,
                 "inventory policy callback was still registered at dlclose");
+        Require(plugin.itemReturnSubscriptionsAtClose == 0,
+                "item-return callback was still registered at dlclose");
         Require(plugin.structureSubscriptionsAtClose == 0, "structure callback was still registered at dlclose");
         Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
                 "owned callback survived plugin unload");
         Require(chatDispatcher.SubscriptionCount() == 0, "owned chat callback survived plugin unload");
         Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
                 "owned inventory policy callback survived plugin unload");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 0,
+                "owned item-return callback survived plugin unload");
         Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
                 "owned structure callback survived plugin unload");
 
@@ -4163,6 +4192,7 @@ namespace
         Obelisk::Core::ChatEventDispatcher chatDispatcher;
         plugin.registerChatCallback = true;
         plugin.registerInventoryPolicyCallback = true;
+        plugin.registerItemReturnCallback = true;
         plugin.registerStructureCallback = true;
         plugin.chatDispatcher = &chatDispatcher;
         FakeLoader loader;
@@ -4182,12 +4212,16 @@ namespace
                 "init-failing plugin chat callback was not present during shutdown");
         Require(plugin.inventoryPolicySubscriptionsAtShutdown == 1,
                 "init-failing plugin inventory policy callback was not present during shutdown");
+        Require(plugin.itemReturnSubscriptionsAtShutdown == 1,
+                "init-failing plugin item-return callback was not present during shutdown");
         Require(plugin.structureSubscriptionsAtShutdown == 1,
                 "init-failing plugin structure callback was not present during shutdown");
         Require(plugin.closeCalls == 1, "init-failing plugin was not closed");
         Require(plugin.chatSubscriptionsAtClose == 0, "failed plugin chat callback was still registered at dlclose");
         Require(plugin.inventoryPolicySubscriptionsAtClose == 0,
                 "failed plugin inventory policy callback was still registered at dlclose");
+        Require(plugin.itemReturnSubscriptionsAtClose == 0,
+                "failed plugin item-return callback was still registered at dlclose");
         Require(plugin.structureSubscriptionsAtClose == 0,
                 "failed plugin structure callback was still registered at dlclose");
         Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
@@ -4196,6 +4230,8 @@ namespace
                 "chat callback registered by failed plugin survived load failure");
         Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
                 "inventory policy callback registered by failed plugin survived load failure");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 0,
+                "item-return callback registered by failed plugin survived load failure");
         Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
                 "structure callback registered by failed plugin survived load failure");
 
@@ -4217,6 +4253,7 @@ namespace
         Obelisk::Core::ChatEventDispatcher chatDispatcher;
         plugin.registerChatCallback = true;
         plugin.registerInventoryPolicyCallback = true;
+        plugin.registerItemReturnCallback = true;
         plugin.registerStructureCallback = true;
         plugin.chatDispatcher = &chatDispatcher;
         FakeLoader loader;
@@ -4236,12 +4273,16 @@ namespace
                 "init-throw plugin chat callback was not present during shutdown");
         Require(plugin.inventoryPolicySubscriptionsAtShutdown == 1,
                 "init-throw plugin inventory policy callback was not present during shutdown");
+        Require(plugin.itemReturnSubscriptionsAtShutdown == 1,
+                "init-throw plugin item-return callback was not present during shutdown");
         Require(plugin.structureSubscriptionsAtShutdown == 1,
                 "init-throw plugin structure callback was not present during shutdown");
         Require(plugin.closeCalls == 1, "init-throw plugin was not closed");
         Require(plugin.chatSubscriptionsAtClose == 0, "init-throw plugin chat callback was still registered at dlclose");
         Require(plugin.inventoryPolicySubscriptionsAtClose == 0,
                 "init-throw plugin inventory policy callback was still registered at dlclose");
+        Require(plugin.itemReturnSubscriptionsAtClose == 0,
+                "init-throw plugin item-return callback was still registered at dlclose");
         Require(plugin.structureSubscriptionsAtClose == 0,
                 "init-throw plugin structure callback was still registered at dlclose");
         Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
@@ -4250,6 +4291,8 @@ namespace
                 "chat callback registered by throwing plugin survived load failure");
         Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
                 "inventory policy callback registered by throwing plugin survived load failure");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 0,
+                "item-return callback registered by throwing plugin survived load failure");
         Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
                 "structure callback registered by throwing plugin survived load failure");
 
@@ -4375,6 +4418,7 @@ namespace
             .registerOwnerTokenFromInitThread = true,
             .registerChatCallback = true,
             .registerInventoryPolicyCallback = true,
+            .registerItemReturnCallback = true,
             .registerStructureCallback = true,
             .throwOnShutdown = true,
         };
@@ -4395,6 +4439,8 @@ namespace
                 "shutdown-throw plugin chat callback was not registered");
         Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 1,
                 "shutdown-throw plugin inventory policy callback was not registered");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 1,
+                "shutdown-throw plugin item-return callback was not registered");
         Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 1,
                 "shutdown-throw plugin structure callback was not registered");
 
@@ -4408,6 +4454,8 @@ namespace
                 "shutdown-throw plugin chat callback was not present during shutdown");
         Require(plugin.inventoryPolicySubscriptionsAtShutdown == 1,
                 "shutdown-throw plugin inventory policy callback was not present during shutdown");
+        Require(plugin.itemReturnSubscriptionsAtShutdown == 1,
+                "shutdown-throw plugin item-return callback was not present during shutdown");
         Require(plugin.structureSubscriptionsAtShutdown == 1,
                 "shutdown-throw plugin structure callback was not present during shutdown");
         Require(plugin.closeCalls == 1, "shutdown-throw plugin was not closed once");
@@ -4415,6 +4463,8 @@ namespace
                 "shutdown-throw plugin chat callback was still registered at dlclose");
         Require(plugin.inventoryPolicySubscriptionsAtClose == 0,
                 "shutdown-throw plugin inventory policy callback was still registered at dlclose");
+        Require(plugin.itemReturnSubscriptionsAtClose == 0,
+                "shutdown-throw plugin item-return callback was still registered at dlclose");
         Require(plugin.structureSubscriptionsAtClose == 0,
                 "shutdown-throw plugin structure callback was still registered at dlclose");
         Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
@@ -4423,6 +4473,8 @@ namespace
                 "shutdown-throw plugin chat callback survived unload");
         Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
                 "shutdown-throw plugin inventory policy callback survived unload");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 0,
+                "shutdown-throw plugin item-return callback survived unload");
         Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
                 "shutdown-throw plugin structure callback survived unload");
 

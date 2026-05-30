@@ -523,6 +523,13 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertNotIn("scripts/test_install_obelisk_layout.sh /tmp/obelisk-ci-layout", ci)
         self.assertIn("Reflection base readiness", ci)
         self.assertIn("--fail-on-base-readiness-gaps", ci)
+        for target_set in (
+            "minimal-second-source-intake",
+            "structure-observer-intake",
+            "item-return-only-policy-slice",
+            "chat-message-intake",
+        ):
+            self.assertIn(f"--target-set {target_set}", ci)
         self.assertRegex(
             ci,
             re.compile(
@@ -917,7 +924,8 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         required = (
             "This runbook is for contributors who receive or prepare already-captured offline evidence packs",
             "The pack container is evidence packaging, not a promotion result",
-            "unsupported JSON is only covered by the container checksum",
+            "Child JSON is always scanned for generic hygiene blockers",
+            "unknown `obelisk.*` schemas fail closed",
             "Promote mode is not a pack-container approval path",
             "Strict coverage requires `target_set_coverage` to be complete and internally consistent",
             "does not replace per-target readiness reports",
@@ -1102,13 +1110,15 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
 
         compact_slice = normalized(slice_note)
         with self.subTest(file="docs/research/2026-05-30-item-return-only-policy-slice.md", item="descriptor-only preflight"):
+            self.assertIn("Promotion Update", slice_note)
+            self.assertIn("append-only public `GameplayPolicyEvent` kinds", compact_slice)
             self.assertIn("Descriptor-Only Preflight", slice_note)
             self.assertIn("inventory_item.allow_equip_check", slice_note)
             self.assertIn("inventory_item.can_repair_check", slice_note)
             self.assertIn("inventory_item.use_onto_item_check", slice_note)
             self.assertIn("promotion_ready=false", compact_slice)
             self.assertIn("OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE` only", slice_note)
-            self.assertIn("event_kind` and `event_kind_mask`: unassigned candidate slots", slice_note)
+            self.assertIn("historical descriptor-only preflight", compact_slice)
             self.assertIn("docs/public_gameplay_events.json", slice_note)
             self.assertIn("include/obelisk/ObeliskApi.h", slice_note)
             self.assertIn("runtime dispatcher tables", compact_slice)

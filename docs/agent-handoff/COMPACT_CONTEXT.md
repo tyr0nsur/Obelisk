@@ -101,8 +101,11 @@ priorities, and do not use history files as the active source of truth.
 - Post-RC dictionary research against `/tmp/aseapi-inspect` confirms AseApi/ArkServerApi
   is useful only for names and concept grouping. The nearest stable plugin-facing path is
   still copied `GameplayPolicyEvent` structure/inventory, especially `PrimalItem.CanUse`
-  and `PrimalItem.AllowRemoteAddToInventory`; item/dino/buff/mission/tribe/transfer stay
-  internal or layout-only until copied-data, lifecycle, privacy, and promotion gates pass.
+  and `PrimalItem.AllowRemoteAddToInventory`. The three ReturnValue-only item-return
+  checks are now append-only public `GameplayPolicyEvent` kinds, but their artifact
+  promote mode remains blocked and they do not promote an Items SDK, Inventory SDK,
+  identity, mutation, or return override. Dino/buff/mission/tribe/transfer stay internal
+  or layout-only until copied-data, lifecycle, privacy, and promotion gates pass.
 - `GameplayPolicyEvent` excludes mutation, raw UE pointer exposure, public
   callback-by-name APIs, public `StructureEvents`, public Inventory/etc. module APIs,
   richer chat APIs beyond minimal `ChatMessageEvent`, HTTP/threads/file-reader plugin
@@ -270,9 +273,9 @@ priorities, and do not use history files as the active source of truth.
   (`sha256=ccd33e42337fd5b1ae3c51333c73ec17aeadef29d3c203b6680bb3be49c7a046`) and
   `artifact-pack.manifest.json`
   (`sha256=89e9b4af96472314055614824a2b2fce4a0b4343832ae38a2495d77411a5671a`).
-  A local public-shape dry run accepted consume mode and kept promote mode blocked; the
-  nearest future shape is only post-original copied bool observation through
-  `GameplayPolicyEvent`, not an Inventory SDK or return override.
+  The public shape is now limited to three post-original copied bool observations through
+  `GameplayPolicyEvent`, not an Inventory SDK or return override; artifact promote mode
+  remains blocked.
   A target-specific second-source pack is preserved at
   `/home/flowcommunity-ark/obelisk-artifacts/item-return-only-second-source-20260530T084918Z/`;
   it accepts 3/3 copied return-bool targets at `layout_only` scope while promote mode

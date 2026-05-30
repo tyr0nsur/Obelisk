@@ -28,8 +28,9 @@ cross-binary portability.
 - Every recorded file path must be pack-relative, not absolute, not empty, and not
   traversing upward.
 - `SHA256SUMS` must include the current manifest hash plus every payload file hash.
-- Child JSON with a supported schema is revalidated by the consume gate; unsupported JSON
-  is only covered by the container checksum.
+- Child JSON is always scanned for generic hygiene blockers such as protected-root
+  strings and promotion overclaims. Child JSON with a supported schema is additionally
+  revalidated by the consume gate; unknown `obelisk.*` schemas fail closed.
 
 ## Normalize And Check
 

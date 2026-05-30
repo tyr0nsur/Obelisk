@@ -2519,6 +2519,74 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertEqual([], result["blockers"])
         self.assertEqual(gate.ARTIFACT_PACK_MANIFEST_SCHEMA, result["manifests"][0]["schema"])
 
+    def test_artifact_pack_scans_unsupported_child_json_for_generic_blockers(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            pack = workspace / "artifact-pack-20260530T072255Z"
+            pack.mkdir(parents=True)
+            write_json(
+                pack / "unsupported.json",
+                {
+                    "schema": "fixture",
+                    "promotion_ready": True,
+                    "notes": str(protected / "live" / "core"),
+                },
+            )
+            artifact_pack.normalize_pack(pack, pack.name, "2026-05-30T07:22:55Z")
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[pack / artifact_pack.MANIFEST_NAME]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("promotion_ready_overclaim", reasons)
+        self.assertIn("manifest_string_under_protected_root", reasons)
+
+    def test_artifact_pack_blocks_unknown_obelisk_child_schema(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            pack = workspace / "artifact-pack-20260530T072255Z"
+            pack.mkdir(parents=True)
+            write_json(pack / "future.json", {"schema": "obelisk.future-unreviewed-artifact.v1"})
+            artifact_pack.normalize_pack(pack, pack.name, "2026-05-30T07:22:55Z")
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[pack / artifact_pack.MANIFEST_NAME]))
+
+        self.assertIn("unsupported_manifest_schema", {blocker["reason"] for blocker in result["blockers"]})
+
+    def test_protected_root_string_workspace_exception_is_component_aware(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            allowed = workspace / "pack" / "allowed.json"
+            blocked = workspace / "pack" / "blocked.json"
+            write_json(
+                allowed,
+                {
+                    "schema": "obelisk.core-dump-evidence-pack.v1",
+                    "binary": {"sha256": BINARY_SHA},
+                    "evidence_status": {"status": "complete", "gdb_core_failed": False},
+                    "core": {"path": str(workspace / "core"), "sha256": "c" * 64},
+                    "note": str(workspace / "core"),
+                },
+            )
+            write_json(
+                blocked,
+                {
+                    "schema": "obelisk.core-dump-evidence-pack.v1",
+                    "binary": {"sha256": BINARY_SHA},
+                    "evidence_status": {"status": "complete", "gdb_core_failed": False},
+                    "core": {"path": str(workspace / "core"), "sha256": "c" * 64},
+                    "note": str(protected / "workspace-offline-old" / "core"),
+                },
+            )
+
+            allowed_result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[allowed]))
+            blocked_result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[blocked]))
+
+        self.assertEqual("accepted", allowed_result["status"])
+        self.assertIn("manifest_string_under_protected_root", {blocker["reason"] for blocker in blocked_result["blockers"]})
+
     def test_blocks_artifact_pack_manifest_when_payload_drifts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"

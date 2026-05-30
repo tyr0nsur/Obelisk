@@ -221,8 +221,10 @@ registration, owner-scoped unregister, plugin-owner cleanup on init failure and 
 ABI layout tests, installed SDK consumer tests, and release docs naming each promoted
 target set. Runtime-observer summaries do not satisfy this SDK contract gate. The first
 promoted event family is `GameplayPolicyEvent`, backed by the accepted
-`structure-observer-intake` evidence plus the accepted compact inventory/structure layouts
-from `minimal-second-source-intake`, and declared in `docs/public_gameplay_events.json`.
+`structure-observer-intake` evidence, the accepted ReturnValue-only
+`item-return-only-policy-slice` evidence, plus the accepted compact inventory/structure
+layouts from `minimal-second-source-intake`, and declared in
+`docs/public_gameplay_events.json`.
 The fresh structure-backed evidence is
 [`2026-05-29-structure-observer-intake-refresh.md`](research/2026-05-29-structure-observer-intake-refresh.md)
 and is layout-only support for copied/redacted policy backing.

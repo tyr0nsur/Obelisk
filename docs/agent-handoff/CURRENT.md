@@ -156,8 +156,9 @@ for the current checkpoint.
   RC UFunction root helper now requires `--item-return-root` and assembles 12 snapshots.
 - Runtime/plugin lifecycle audit found no P1 blocker. Documented guardrail: individual
   timer unregister cancels future delivery but is not a general quiescence barrier; owner
-  cleanup during unload is the final barrier. Future test debt: add PluginManager
-  lifecycle coverage for item-return owner cleanup.
+  cleanup during unload is the final barrier. PluginManager lifecycle coverage now asserts
+  direct item-return callbacks remain available during plugin shutdown and are removed
+  before close on normal unload, init failure, init exception, and shutdown exception.
 - Any future live/player validation requires a new approved live-ops brief and beta-test
   notice through the configured local webhook variable when players are involved.
 

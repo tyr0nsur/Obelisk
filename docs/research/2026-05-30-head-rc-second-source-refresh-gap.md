@@ -12,6 +12,12 @@ This was a release-evidence gap, not a runtime blocker. The gap was closed for
 `v0.1.0-rc.2` by regenerating the second-source root from the existing independent
 offline core with current tooling.
 
+This note records the pre-item-return three-target-set RC refresh. For current
+post-item-return checks, assemble all four public RC target sets:
+`minimal-second-source-intake`, `structure-observer-intake`,
+`item-return-only-policy-slice`, and `chat-message-intake`. The current helper requires
+`--item-return-root` and produces 12 snapshots.
+
 ## Checked Roots
 
 - Historical combined root: `/tmp/obelisk-rc-ufunction-second-source-root`
@@ -139,6 +145,7 @@ scripts/check_release_readiness.sh \
   --ufunction-second-source-root <refreshed-second-source-ufunction-root> \
   --ufunction-second-source-target-set minimal-second-source-intake \
   --ufunction-second-source-target-set structure-observer-intake \
+  --ufunction-second-source-target-set item-return-only-policy-slice \
   --ufunction-second-source-target-set chat-message-intake \
   --second-source-report-dir /tmp/obelisk-rc-second-source
 ```

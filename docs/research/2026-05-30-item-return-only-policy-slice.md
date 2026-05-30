@@ -123,11 +123,30 @@ The canonical item compact redacted-signature source remains
 older item compact redacted-signature packs without strict target-set coverage are
 historical inputs only.
 
+## Promotion Update
+
+Post-RC hardening promoted this slice into exactly three append-only public
+`GameplayPolicyEvent` kinds:
+
+- `inventory_item.allow_equip_check`
+- `inventory_item.can_repair_check`
+- `inventory_item.use_onto_item_check`
+
+Each public kind exposes only `OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE` on the
+`INVENTORY_ITEM` resource category. The implementation keeps copied post-original
+observation semantics only; artifact promote mode for the broader slice remains blocked,
+and this does not create an Items SDK, Inventory SDK, identity surface, mutation path, or
+return override.
+The current public shape is represented through append-only entries in
+`include/obelisk/ObeliskApi.h`, `docs/public_gameplay_events.json`, runtime dispatcher
+tables, public SDK fixtures, and plugin callbacks for the narrow copied
+`GameplayPolicyEvent` lane only.
+
 ## Non-Claims
 
-This does not promote an Items SDK, Inventory SDK, public callback, public metadata helper,
-object identity, item identity, inventory identity, object lookup, `ResourceHandle`,
-mutation, blocking, return override, runtime hook, or live-server validation.
+This does not promote an Items SDK, Inventory SDK, object identity, item identity,
+inventory identity, object lookup, `ResourceHandle`, mutation, blocking, return override,
+runtime hook, or live-server validation.
 
 ## Public Shape Dry Run
 
@@ -291,12 +310,11 @@ The next descriptor shape, if this slice is ever promoted, should be three disti
 these item observations prove only `ReturnValue`, so reusing that kind would overclaim the
 payload and blur `CanRepair.bIgnoreInventoryRequirement` into an unrelated cooldown field.
 
-This is a descriptor-only preflight and planning shape only:
-`promotion_ready=false`. It must not be copied into
-`include/obelisk/ObeliskApi.h`, `docs/public_gameplay_events.json`, runtime dispatcher
-tables, public SDK fixtures, or plugin callbacks until a deliberate ABI promotion adds
-append-only enum values, masks, descriptor coverage, SDK consumer tests, and callback
-lifecycle review.
+This section is a historical descriptor-only preflight for the public shape above. The
+deliberate ABI promotion has since added append-only enum values, masks, descriptor
+coverage, SDK consumer tests, and callback lifecycle review for the three ReturnValue-only
+`GameplayPolicyEvent` kinds. Do not reuse the historical candidate-slot guidance for any
+new item, inventory, identity, mutation, or return-override surface.
 
 Common candidate descriptor fields:
 

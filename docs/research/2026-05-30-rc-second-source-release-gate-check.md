@@ -13,8 +13,12 @@ For `v0.1.0-rc.2` and later candidate refs, use the refreshed-root workflow reco
 and rerun `scripts/check_release_readiness.sh --require-second-source-readiness` against a
 root regenerated for the intended ref.
 
-This check proves the current core-first RC gate for the documented public scope:
-`GameplayPolicyEvent`, resource/event descriptors, and minimal `ChatMessageEvent`.
+This check is a historical pre-item-return evidence record. It proved the then-current
+core-first RC gate for the documented public scope: `GameplayPolicyEvent`,
+resource/event descriptors, and minimal `ChatMessageEvent`. It must not be cited as the
+current four-target-set RC evidence record; current checks require
+`item-return-only-policy-slice` as the fourth public RC UFunction target set and assemble
+12 snapshots.
 It does not promote Inventory or Items SDKs, `ResourceHandle`, object identity, lookup,
 mutation, return override, GObjects promotion, or additional gameplay module APIs.
 
@@ -113,5 +117,7 @@ and `scripts/__pycache__/`.
 - Do not reuse an existing local/unpublished `v0.1.0-rc.1` tag unless it dereferences
   exactly to the intended validated release ref; stale local tags must be resolved before
   any tag push.
-- Keep post-RC discovery separate from this scope: Item return-only policy, Mission
-  copied-bool observer, and Transfer `bAccept` remain candidate/internal work.
+- Keep post-RC discovery separate from this scope: Mission copied-bool observer and
+  Transfer `bAccept` remain candidate/internal work. Item return-only has since been
+  promoted only as three ReturnValue-only public `GameplayPolicyEvent` kinds; it still
+  does not promote an Items SDK, Inventory SDK, identity, mutation, or return override.

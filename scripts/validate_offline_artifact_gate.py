@@ -1183,11 +1183,20 @@ def validate_json_protected_root_strings(
     blockers: list[dict[str, Any]] = []
     protected_text = str(protected_root)
     workspace_texts = {str(workspace_root), str(DEFAULT_WORKSPACE_ROOT)}
+    def is_workspace_occurrence(raw_value: str, offset: int) -> bool:
+        for workspace_text in workspace_texts:
+            if not raw_value.startswith(workspace_text, offset):
+                continue
+            end = offset + len(workspace_text)
+            if end == len(raw_value) or raw_value[end] == "/":
+                return True
+        return False
+
     for trail, raw_value in collect_string_fields(payload):
         protected_offsets = [match.start() for match in re.finditer(re.escape(protected_text), raw_value)]
         if not protected_offsets:
             continue
-        if all(any(raw_value.startswith(workspace_text, offset) for workspace_text in workspace_texts) for offset in protected_offsets):
+        if all(is_workspace_occurrence(raw_value, offset) for offset in protected_offsets):
             continue
         blockers.append(
             {
@@ -6477,7 +6486,33 @@ def validate_artifact_pack_manifest(
             if child_path.suffix == ".json":
                 blockers.extend(child_load_blockers)
             continue
+        blockers.extend(
+            validate_json_path_fields(
+                child_payload,
+                source_label=str(child_path),
+                workspace_root=workspace_root,
+                protected_root=protected_root,
+            )
+        )
+        blockers.extend(
+            validate_json_protected_root_strings(
+                child_payload,
+                source_label=str(child_path),
+                workspace_root=workspace_root,
+                protected_root=protected_root,
+            )
+        )
+        blockers.extend(validate_claims(child_payload, label=str(child_path), mode=mode))
         child_schema = child_payload.get("schema")
+        if isinstance(child_schema, str) and child_schema.startswith("obelisk.") and child_schema not in SUPPORTED_MANIFEST_SCHEMAS:
+            blockers.append(
+                {
+                    "reason": "unsupported_manifest_schema",
+                    "label": f"{child_path}:$.schema",
+                    "recorded_schema": child_schema,
+                    "supported_schemas": sorted(SUPPORTED_MANIFEST_SCHEMAS),
+                }
+            )
         if child_schema not in SUPPORTED_MANIFEST_SCHEMAS or child_schema == ARTIFACT_PACK_MANIFEST_SCHEMA:
             continue
         _, child_blockers = validate_manifest(
