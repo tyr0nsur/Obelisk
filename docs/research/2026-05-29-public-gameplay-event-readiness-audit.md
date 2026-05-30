@@ -97,6 +97,7 @@ Second-source evidence:
 
 - `docs/research/2026-05-28-second-source-reversing-gap-matrix.md`
 - `docs/research/2026-05-28-second-source-core-intake-runbook.md`
+- `docs/research/2026-05-29-structure-observer-intake-refresh.md`
 - `docs/research/2026-05-29-minimal-second-source-readiness.md`
 
 Runtime/ABI coverage:
