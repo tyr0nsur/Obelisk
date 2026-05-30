@@ -215,6 +215,22 @@ class ResearchDocGuardrailTests(unittest.TestCase):
         self.assertIn("build_static_global_promotion_evidence.py", text)
         self.assertIn("writes verified sidecars", text)
 
+    def test_optional_static_tools_remain_optional_and_offline_only(self) -> None:
+        skill = (REPO_ROOT / "agent-skills/obelisk-static-binary-analysis/SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        packs = (REPO_ROOT / "docs/OFFLINE_ARTIFACT_PACKS.md").read_text(encoding="utf-8")
+        research = (REPO_ROOT / "docs/research/README.md").read_text(encoding="utf-8")
+        combined = "\n".join((skill, packs, research))
+
+        self.assertIn("optional evidence enrichment", skill)
+        self.assertIn("not required to run pack normalization, consume gates, or repository tests", packs)
+        self.assertIn("tests must not require those tools", research)
+        self.assertIn("record `command -v`", combined)
+        self.assertIn("version output when available", combined)
+        self.assertIn("Direct or symlink-resolved reads from a protected server root", packs)
+        self.assertIn("direct or symlink-resolved protected `/servidor/ark` paths", research)
+
     def test_fname_manifest_plan_keeps_indices_binary_scoped(self) -> None:
         note = REPO_ROOT / "docs/research/2026-05-28-fname-index-manifest-plan.md"
         text = note.read_text(encoding="utf-8")

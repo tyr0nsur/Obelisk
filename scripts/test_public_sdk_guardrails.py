@@ -828,6 +828,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
     def test_plugin_hub_planning_uses_arkapi_sources_as_demand_dictionary_only(self) -> None:
         foundation = (REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md").read_text(encoding="utf-8")
         matrix = (REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md").read_text(encoding="utf-8")
+        plugins_readme = (REPO_ROOT / "plugins" / "README.md").read_text(encoding="utf-8")
         inventory = (
             REPO_ROOT / "docs" / "research" / "2026-05-30-nextgenplugins-reference-inventory.md"
         ).read_text(encoding="utf-8")
@@ -848,6 +849,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
              "demand analysis only"),
             (matrix, "not license clearance, runtime evidence, an ArkApi\n"
              "compatibility target, or an ABI reference"),
+            (plugins_readme, "names/demand signals only"),
+            (plugins_readme, "not a\n"
+             "compatibility target, source reference, ABI reference, schema, command parser, or\n"
+             "implementation pattern"),
             (inventory, "Use this clone as a names/demand dictionary"),
             (inventory, "not as source code to port"),
             (inventory, "Do not trust `DECLARE_HOOK` declarations as Linux ABI"),
@@ -879,6 +884,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         for name, text in (
             ("docs/PLUGIN_HUB_FOUNDATION_V1.md", foundation),
             ("docs/PLUGIN_HUB_CAPABILITY_MATRIX.md", matrix),
+            ("plugins/README.md", plugins_readme),
             ("docs/research/2026-05-30-nextgenplugins-reference-inventory.md", inventory),
             ("agent-skills/obelisk-github-research-workflow/SKILL.md", workflow_skill),
             ("docs/agent-handoff/CURRENT.md", current_handoff),
@@ -2663,11 +2669,18 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "Recommended v1 ordering",
             "NextGenPlugins compatibility",
         )
+        research_only_forbidden_phrases = (
+            "## Prioritized Demand Map",
+            "Status labels:",
+            "| Priority | Demand category | Seen in local dictionary | Obelisk capability needed | Status |",
+            "`available`: a narrow Obelisk-native variant can be built from current public surfaces.",
+        )
         required_research_phrases = (
             "Non-roadmap candidate pressure order",
             "This list is not a v1 delivery sequence, compatibility plan, or Plugin Hub roadmap.",
             "without claiming a command, moderation, or reply/send-chat SDK",
             "remain investigation/internal unless",
+            "The capability matrix is the single public-facing status table",
         )
 
         for path in NEXTGEN_DEMAND_BOUNDARY_FILES:
@@ -2679,6 +2692,12 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         research_note = (
             REPO_ROOT / "docs" / "research" / "2026-05-30-nextgenplugins-reference-inventory.md"
         ).read_text(encoding="utf-8")
+        for phrase in research_only_forbidden_phrases:
+            if phrase in research_note:
+                offenders.append(
+                    "docs/research/2026-05-30-nextgenplugins-reference-inventory.md: "
+                    f"research note must not duplicate matrix status table phrase {phrase}"
+                )
         for phrase in required_research_phrases:
             if phrase not in research_note:
                 offenders.append(

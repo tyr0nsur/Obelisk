@@ -47,6 +47,21 @@ Historical recovery reference:
 
 - [2026-05-29-rc-checkpoint-slicing-plan.md](2026-05-29-rc-checkpoint-slicing-plan.md)
 
+## Tool Availability Guardrail
+
+Research notes may record that optional static tools such as `radare2`, `rizin`, or
+Ghidra headless are installed for a specific investigation, but contributor workflows and
+tests must not require those tools just to validate documentation or offline artifact
+hygiene. A note that uses one of them should capture `command -v`, version output when
+available, exact command lines, input/output artifact hashes, and the protected-path
+check result.
+
+Optional analyzer output remains offline static evidence only. Keep projects and output
+files in `/tmp`, `/servidor/ark/workspace-offline`, or another documented non-protected
+artifact root; do not cite direct or symlink-resolved protected `/servidor/ark` paths.
+If an optional tool is absent, record the absence and continue with baseline
+`readelf`/`objdump` or existing provenance-gated artifacts instead of weakening tests.
+
 Current post-RC research lane:
 
 - [2026-05-30-v1-core-capability-map.md](2026-05-30-v1-core-capability-map.md)

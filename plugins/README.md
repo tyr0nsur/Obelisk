@@ -41,6 +41,11 @@ The current tree already has examples for those categories. Treat new first-part
 a promotion or refinement of the existing examples unless a separate copied-data surface
 has passed the capability-matrix evidence gate.
 
+If an example request is motivated by ArkApi, AseApi, NextGenPlugins, or another
+popular-plugin family, treat that input as names/demand signals only. It is not a
+compatibility target, source reference, ABI reference, schema, command parser, or
+implementation pattern.
+
 Do not add a first-party example that implies commands, permissions, economy, homes, RCON,
 inventory/item mutation, dino tools, tribe tools, transfer handling, structure placement
 enforcement, identity, lookup, replies, send-chat, moderation, or ArkApi portability until

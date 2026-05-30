@@ -191,65 +191,22 @@ demand-ranked dependency sketch for future design reviews after the promotion ga
 7. Items, inventory, dinos, transfers, and missions remain investigation/internal unless
    copied-data, lifecycle, identity/privacy, and promotion gates are complete.
 
-## Prioritized Demand Map
+## Boundary Audit
 
-This table is a safe demand dictionary from visible plugin names and `PluginInfo.json`
-descriptions only. It does not use plugin implementation, offsets, layouts, wrappers,
-Windows ABI assumptions, or algorithms.
+Audit note on 2026-05-30: this note should stay a provenance and demand-pressure record,
+not a second status matrix. The capability matrix is the single public-facing status table
+for NextGen/AseApi demand categories:
+`docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`.
 
-Status labels:
+The Plugin Hub docs now give enough contributor guidance for post-`v0.1` seed examples
+because the allowed seed classes, non-goals, and evidence gates are explicit in
+`docs/PLUGIN_HUB_FOUNDATION_V1.md`, `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`, and
+`plugins/README.md`. The current first-party plugin tree already covers the safe
+current-ABI classes: release examples for lifecycle, timers, and descriptors, plus
+experimental examples for copied chat and copied policy auditing.
 
-- `available`: a narrow Obelisk-native variant can be built from current public surfaces.
-- `experimental`: Obelisk has partial/debug/promoted observer plumbing, but not a complete
-  Plugin Hub category contract.
-- `blocked`: requires new copied-data evidence, ABI design, privacy/lifecycle policy, and
-  promotion gates before a public Plugin Hub surface.
-
-| Priority | Demand category | Seen in local dictionary | Obelisk capability needed | Status |
-| --- | --- | --- | --- | --- |
-| 1 | Plugin lifecycle, descriptors, logging, config, local timers | `PluginCrashManager`, common config files | Existing plugin lifecycle, descriptor metadata, logging, owner-token timers, packaging guidance; restart/crash supervision remains future work | available |
-| 2 | Chat text parsing and command-like routing | `CustomChat`, `AlternativeCommands` | Copied `ChatMessageEvent`, owner-token callbacks, process-local parsing, command registry design; replies, blocking, identity, and moderation remain future work | available |
-| 3 | Timed broadcasts and notices | `ArkAdvert`, `TribeMotd` | Owner-token timers plus a future send-chat/broadcast surface and message policy | blocked |
-| 4 | Permissions and admin groups | `Permissions`, `AdminsPermissions` | Stable player/admin identity, group/grant persistence, privacy-safe checks, operator reload policy | blocked |
-| 5 | RCON/operator command I/O and Unicode-safe text | `ExtendedRcon`, `UnicodeRcon` | Secret-safe operator ingress, command lifecycle, encoding policy, audit logging | blocked |
-| 6 | Economy, points, shops, and kits | `ArkShop`, `AtlasShop` | Commands, identity, permissions, persistence, item mutation/give flows, transaction-safe storage | blocked |
-| 7 | Kill rewards and stats | `ShopRewards` | Copied kill/damage/death events, identity, dino/player classification, persistence | blocked |
-| 8 | Homes and teleport | `ArkHomes` | Copied location/identity, cooldowns, permission checks, safe teleport mutation, combat/enemy restrictions | blocked |
-| 9 | Safe zones and area policy | `SafeZone` | Bounded location/area model, entry/exit observation, damage/build/use enforcement contracts | blocked |
-| 10 | Structure counts and limits | `StructuresLimit` | Promoted copied structure policy/census data, ownership/tribe identity, bounded counts; enforcement remains future work | experimental |
-| 11 | Build placement and collision policy | `NoCollision` | Build-placement policy evidence, explicit deny/allow semantics, admin identity, no raw structure handles | blocked |
-| 12 | Personal or tribe ownership cleanup | `PersonalOwnership` | Ownership identity, structure lookup/census, safe mutation/cleanup contract | blocked |
-| 13 | Engram learning/unlock utilities | `AllEngrams` | Player identity, progression state, unlock mutation API, privacy and rollback policy | blocked |
-| 14 | Dino cosmetics and spawn/color policy | `DinoColors` | Dino identity/classification, spawn/tame observation, safe cosmetic mutation | blocked |
-| 15 | Flyer carry restrictions | `AntiFlyerCarry` | Mount/carry interaction events, player/dino/team identity, enforcement return path | blocked |
-| 16 | Inventory and item grant/remove flows | shop/kits families | Inventory/item identity, copied item descriptors, give/remove mutation, failure and rollback semantics | blocked |
-| 17 | Persistence-backed plugin data | shop, permissions, tribe/admin families | Secret-safe DB/config patterns, migrations, lifecycle cleanup, multi-instance boundaries; plugin-local files can exist without a shared service | blocked |
-| 18 | Structure/item policy auditing | structure/shop/safe-zone families | Existing copied `GameplayPolicyEvent` observers and descriptor metadata; identity, mutation, and return override remain future work | available |
-
-Near-term Plugin Hub demand should therefore start with foundation examples, passive chat
-parsers, descriptor/timer utilities, and copied policy auditors. High-demand ArkApi-style
-features are valuable prioritization signals, but most require identity, mutation,
-persistence, operator ingress, and enforcement contracts that Obelisk has not promoted.
-
-Fastest honest post-`v0.1` path for plugin creators:
-
-1. Publish or refine small examples for lifecycle/config/logging, descriptors, timers,
-   passive copied chat parsing, and copied policy auditing.
-2. Keep command-like chat routing local and non-authoritative until identity, replies,
-   moderation, and send-chat are promoted.
-3. Treat permissions, RCON, economy, homes/safe zones, structures, dinos, tribes,
-   transfers, inventory, and item mutation as design backlogs, not public examples.
-4. When a backlog category is ready, start with an Obelisk-native design note and evidence
-   plan before adding SDK symbols or first-party plugin examples.
-
-Audit note on 2026-05-30: the Plugin Hub docs now give enough contributor guidance for
-post-`v0.1` seed examples because the allowed seed classes, non-goals, and evidence gates
-are explicit in `docs/PLUGIN_HUB_FOUNDATION_V1.md`,
-`docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`, and `plugins/README.md`. The current first-party
-plugin tree already covers every safe current-ABI class: release examples for lifecycle,
-timers, and descriptors, plus experimental examples for copied chat and copied policy
-auditing. Therefore the next honest first-party category is not permissions, economy,
-RCON, homes, inventory, dinos, tribes, transfers, structure enforcement, broadcasts, or
-item mutation. If counting only release-scope examples, graduate passive copied-chat
-audit/parser guidance next; if counting experimental examples too, the honest answer is
-that no new category is ready until a new copied-data surface is promoted.
+Therefore the next honest first-party category is not permissions, economy, RCON, homes,
+inventory, dinos, tribes, transfers, structure enforcement, broadcasts, or item mutation.
+If counting only release-scope examples, graduate passive copied-chat audit/parser
+guidance next; if counting experimental examples too, the honest answer is that no new
+category is ready until a new copied-data surface is promoted.

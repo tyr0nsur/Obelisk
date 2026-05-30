@@ -71,6 +71,13 @@ TARGET_BLOCKER_GUIDANCE = {
             "approved non-protected copied/offline core or complete core evidence-pack manifest "
             "with FName root, GObjects, binary hash, and artifact identity"
         ),
+        "snapshot_prep_checks": [
+            "emit exact schema-qualified target obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild",
+            "record distinct offline artifact identity fields: artifact_sha256, capture_id, evidence_pack_id",
+            "require target, class, outer, every property, and nested struct/array candidates to be candidate-uobject",
+            "keep placement structs, location vectors, player/controller context, object refs, arrays, and raw params redacted or recognition-only",
+            "compare only against a distinct sanitized second-source snapshot before any readiness claim",
+        ],
         "non_claim": (
             "does not promote StructureEvents, build-policy SDK, identity, lookup, mutation, "
             "return override, runtime hooks, or target-set coverage"
@@ -89,6 +96,13 @@ TARGET_BLOCKER_GUIDANCE = {
             "approved non-protected copied/offline core or complete core evidence-pack manifest "
             "that proves whether APrimalStructure is a reflected owner"
         ),
+        "snapshot_prep_checks": [
+            "treat APrimalStructure as an ArkApi dictionary seed until a sanitized snapshot proves the reflected owner",
+            "emit exact schema-qualified target obelisk.ufunction-chain.snapshot.v1:APrimalStructure.IsAllowedToBuild only if that owner is observed",
+            "record distinct offline artifact identity fields: artifact_sha256, capture_id, evidence_pack_id",
+            "require target, class, outer, every property, and nested struct/array candidates to be candidate-uobject",
+            "keep placement structs, location vectors, player/controller context, object refs, arrays, and raw params redacted or recognition-only",
+        ],
         "non_claim": (
             "does not promote StructureEvents, build-policy SDK, identity, lookup, mutation, "
             "return override, runtime hooks, or target-set coverage"
@@ -909,6 +923,9 @@ def print_text(report: dict[str, Any]) -> None:
             next_offline_input = item.get("next_offline_input")
             if isinstance(next_offline_input, str) and next_offline_input:
                 parts.append(f"next_offline_input={next_offline_input}")
+            snapshot_prep_checks = item.get("snapshot_prep_checks")
+            if isinstance(snapshot_prep_checks, list) and snapshot_prep_checks:
+                parts.append(f"snapshot_prep_checks={len(snapshot_prep_checks)}")
             non_claim = item.get("non_claim")
             if isinstance(non_claim, str) and non_claim:
                 parts.append(f"non_claim={non_claim}")
@@ -977,6 +994,9 @@ def print_text(report: dict[str, Any]) -> None:
                     next_offline_input = guidance.get("next_offline_input")
                     if isinstance(next_offline_input, str) and next_offline_input:
                         parts.append(f"next_offline_input={next_offline_input}")
+                    snapshot_prep_checks = guidance.get("snapshot_prep_checks")
+                    if isinstance(snapshot_prep_checks, list) and snapshot_prep_checks:
+                        parts.append(f"snapshot_prep_checks={len(snapshot_prep_checks)}")
                     non_claim = guidance.get("non_claim")
                     if isinstance(non_claim, str) and non_claim:
                         parts.append(f"non_claim={non_claim}")

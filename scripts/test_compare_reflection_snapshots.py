@@ -368,10 +368,24 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertIn("missing_committed_sanitized_snapshot", primal_guidance["why_blocked"])
         self.assertIn("missing_distinct_second_source_layout", primal_guidance["why_blocked"])
         self.assertIn("approved non-protected copied/offline core", primal_guidance["next_offline_input"])
+        self.assertIn(
+            "emit exact schema-qualified target obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild",
+            primal_guidance["snapshot_prep_checks"],
+        )
+        self.assertIn(
+            "keep placement structs, location vectors, player/controller context, object refs, arrays, and raw params redacted or recognition-only",
+            primal_guidance["snapshot_prep_checks"],
+        )
         self.assertIn("does not promote StructureEvents", primal_guidance["non_claim"])
         self.assertIn(
             "reflected_owner_unproven",
             details["obelisk.ufunction-chain.snapshot.v1:APrimalStructure.IsAllowedToBuild"]["guidance"]["why_blocked"],
+        )
+        self.assertIn(
+            "treat APrimalStructure as an ArkApi dictionary seed until a sanitized snapshot proves the reflected owner",
+            details["obelisk.ufunction-chain.snapshot.v1:APrimalStructure.IsAllowedToBuild"]["guidance"][
+                "snapshot_prep_checks"
+            ],
         )
         self.assertIs(report["promotion_gate"]["ready"], False)
         self.assertIs(report["promotion_gate"]["layout_ready"], False)
@@ -392,6 +406,7 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             text_result.stdout,
         )
         self.assertIn("next_offline_input=approved non-protected copied/offline core", text_result.stdout)
+        self.assertIn("snapshot_prep_checks=5", text_result.stdout)
         self.assertIn(
             "non_claim=does not promote StructureEvents, build-policy SDK, identity, lookup, mutation",
             text_result.stdout,
@@ -419,6 +434,11 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(guidance["classification"], "second_wave_structure_build_policy_candidate")
         self.assertIn("missing_committed_sanitized_snapshot", guidance["why_blocked"])
         self.assertIn("approved non-protected copied/offline core", guidance["next_offline_input"])
+        self.assertEqual(len(guidance["snapshot_prep_checks"]), 5)
+        self.assertIn(
+            "compare only against a distinct sanitized second-source snapshot before any readiness claim",
+            guidance["snapshot_prep_checks"],
+        )
         self.assertIn("return override", guidance["non_claim"])
         self.assertIn("runtime_hooks", report["not_promoted_surfaces"])
 
@@ -429,6 +449,7 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             "target=obelisk.ufunction-chain.snapshot.v1:APrimalStructure.IsAllowedToBuild",
             text_result.stdout,
         )
+        self.assertIn("snapshot_prep_checks=5", text_result.stdout)
 
     def test_structure_build_policy_guidance_rejects_unmatched_explicit_target(self) -> None:
         result = run_compare_raw(

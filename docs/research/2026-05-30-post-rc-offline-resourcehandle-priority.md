@@ -487,9 +487,8 @@ Negative fixture scope:
 
 - reject raw UE pointers, object indices, serial values, class/name/outer paths, player or
   gameplay payloads, persistent lookup tokens, `/servidor/ark` paths, `FUObjectItem+0xc`
-  treated as serial, `promotion_ready=true`, `public_resource_handle_ready=true`,
-  `post_callback_resource_handle_ready=true`, cross-frame acceptance, broad tracing
-  evidence, or promote-mode readiness.
+  treated as serial, any enabled promotion/public/post-callback readiness flag,
+  cross-frame acceptance, broad tracing evidence, or promote-mode readiness.
 
 Keep this as offline schema/gate planning only. It should not add C++ observer code,
 server markers, live-ops instructions, ReflectionScanner usage, public SDK fields,

@@ -881,6 +881,28 @@ RUNTIME_PRIVACY_REQUIRED_FALSE = {
     "broad_tracing_evidence",
     "fuobjectitem_0xC_as_serial",
 }
+RUNTIME_SCHEMA_COMMON_ALLOWED_KEYS = {
+    "schema",
+    "evidence_kind",
+    "status",
+    "redacted_run_identity",
+    "source_artifacts",
+    "binary_sha256",
+    "rows",
+    "summary",
+    "privacy",
+    "remaining_blockers",
+    "non_claims",
+    "promotion_ready",
+    "public_resource_handle_ready",
+    "post_callback_resource_handle_ready",
+    "promotion_gate",
+    "output_artifact_identity",
+}
+RUNTIME_REJECTION_SAMPLE_ALLOWED_TOP_LEVEL_KEYS = RUNTIME_SCHEMA_COMMON_ALLOWED_KEYS
+RUNTIME_SERIAL_SEMANTICS_ALLOWED_TOP_LEVEL_KEYS = RUNTIME_SCHEMA_COMMON_ALLOWED_KEYS | {
+    "serial_semantics",
+}
 RUNTIME_REJECTION_SAMPLE_ALLOWED_ROW_KEYS = {
     "row_id",
     "allowlist_label",
@@ -5248,8 +5270,18 @@ def validate_runtime_schema_common(
     required_non_claims: set[str],
     canonical_report: dict[str, Any],
     promotion_blocker: str,
+    allowed_top_level_keys: set[str],
 ) -> list[dict[str, Any]]:
     blockers: list[dict[str, Any]] = []
+    unexpected_top_level = sorted(set(payload) - allowed_top_level_keys)
+    if unexpected_top_level:
+        blockers.append(
+            {
+                "reason": f"{reason_prefix}_unexpected_top_level_field",
+                "label": label,
+                "fields": unexpected_top_level,
+            }
+        )
     blockers.extend(
         validate_output_artifact_identity_for_canonical_report(
             payload,
@@ -5343,6 +5375,7 @@ def validate_internal_uobject_runtime_rejection_samples_manifest(
         required_non_claims=REQUIRED_RUNTIME_REJECTION_SAMPLE_NON_CLAIMS,
         canonical_report=internal_uobject_runtime_rejection_samples_canonical_report(payload),
         promotion_blocker="candidate_only_runtime_rejection_samples",
+        allowed_top_level_keys=RUNTIME_REJECTION_SAMPLE_ALLOWED_TOP_LEVEL_KEYS,
     )
 
     if payload.get("evidence_kind") != "internal_runtime_rejection_samples_candidate":
@@ -5424,6 +5457,7 @@ def validate_internal_uobject_runtime_serial_semantics_manifest(
         required_non_claims=REQUIRED_RUNTIME_SERIAL_SEMANTICS_NON_CLAIMS,
         canonical_report=internal_uobject_runtime_serial_semantics_canonical_report(payload),
         promotion_blocker="candidate_only_runtime_serial_semantics",
+        allowed_top_level_keys=RUNTIME_SERIAL_SEMANTICS_ALLOWED_TOP_LEVEL_KEYS,
     )
 
     if payload.get("evidence_kind") != "internal_runtime_serial_semantics_candidate":

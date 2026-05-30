@@ -125,6 +125,14 @@ rizin -A -q -c 'iz; afl; q' ShooterGameServer
 radare2 -A -q -c 'iz; afl; q' ShooterGameServer
 ```
 
+These analyzer tools are optional evidence enrichment. Workflow docs, tests, and gates
+must skip or degrade cleanly when `rizin`, `radare2`, or Ghidra headless is absent; do
+not make static-artifact hygiene depend on local tool installation. When one is used,
+record `command -v`, version output when available, the exact command, and the copied or
+offline input path. Keep Ghidra projects and radare/rizin outputs under `/tmp`, an
+approved offline workspace, or the local artifact root, never direct or symlink-resolved
+protected server paths.
+
 Use Ghidra for manual decompilation/xref confirmation when command-line evidence is
 ambiguous. Save conclusions in `docs/research/`, not screenshots.
 

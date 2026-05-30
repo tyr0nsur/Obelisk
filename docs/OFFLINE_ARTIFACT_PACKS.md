@@ -63,6 +63,22 @@ python3 scripts/normalize_artifact_pack.py "$PACK" --check --json
 
 Check mode fails if any payload, manifest, or checksum file drifted after normalization.
 
+## Optional Static Tooling
+
+`radare2`, `rizin`, and Ghidra headless outputs may strengthen an offline evidence pack,
+but they are not required to run pack normalization, consume gates, or repository tests.
+Treat availability as an environmental fact: record `command -v`, version output when
+available, exact commands, and the binary/artifact SHA only when the tool was actually
+used.
+
+Do not let optional-tool availability bypass path hygiene. Inputs, Ghidra project
+directories, and radare/rizin/Ghidra text outputs must live under `/tmp`, an approved
+offline workspace such as `<approved-offline-workspace>`, or another documented
+non-protected artifact root. Direct or symlink-resolved reads from a protected server root
+outside the approved offline workspace remain blockers, even if the tool is installed.
+Existing analyzer text is reusable only when its provenance sidecar and child manifest
+pass the same fail-closed consume gate as any other static artifact.
+
 ## Consume Gate
 
 Run the offline gate against the container manifest, not an arbitrary file in the pack:
@@ -100,10 +116,12 @@ They must redact run identity, reference an accepted strict serial-policy source
 artifact, expose only copied or aggregate reason/status fields, keep privacy flags false
 for raw UE pointers, object indices, serial values, player/gameplay payloads, persistent
 lookup tokens, protected paths, broad tracing, ReflectionScanner, ptrace/gcore, and
-`FUObjectItem+0xc` serial claims, and keep promotion/public readiness flags false.
-Promote mode remains blocked. Passing these manifests does not approve a runtime
-observation window and does not promote `ResourceHandle`, object identity, lookup,
-post-callback handles, mutation, return override, GObjects, or public SDK surface.
+`FUObjectItem+0xc` serial claims, keep promotion/public readiness flags false, and use
+only the schema's canonical top-level fields. Unknown top-level extension fields fail
+closed because they are outside the output identity's canonical report. Promote mode
+remains blocked. Passing these manifests does not approve a runtime observation window
+and does not promote `ResourceHandle`, object identity, lookup, post-callback handles,
+mutation, return override, GObjects, or public SDK surface.
 
 ## Strict Target-Set Coverage
 
@@ -141,6 +159,14 @@ Guidance filters use exact `Outer.Name` or `schema:Outer.Name` targets. An expli
 returning an empty success report. A `--target-set` filter may return zero guidance
 entries; that only means the set has no deferred-target guidance recorded here, not that
 the set is promoted or that build-policy coverage exists.
+
+The JSON guidance for deferred build-policy targets includes `snapshot_prep_checks`.
+Use those checks as an offline intake checklist when preparing a sanitized
+`PrimalStructure.IsAllowedToBuild` snapshot: exact schema-qualified target naming,
+distinct artifact identity, candidate-uobject membership for the target/property chain,
+redaction or recognition-only handling for placement/player/context/raw params, and a
+distinct sanitized second-source comparison before any readiness claim. These checks are
+planning guidance only and do not add target-set coverage.
 
 For deferred structure build-policy targets, contributors can check the current fixture
 blocker without server paths:
