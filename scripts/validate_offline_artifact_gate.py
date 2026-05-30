@@ -12,6 +12,13 @@ from collections import Counter
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from artifact_identity import (
+    artifact_identity_placeholder_fields,
+    canonical_json_bytes,
+    complete_artifact_identity,
+    is_safe_artifact_id,
+)
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
@@ -479,8 +486,6 @@ REQUIRED_UOBJECT_FLAG_POLICY_CANDIDATES = {
 UOBJECT_FLAG_POLICY_ALLOWED_HEX_STRINGS = {"0x100", "0x4000"}
 STATIC_GLOBAL_CANDIDATE_KINDS = {"gobjects", "fname_root"}
 STATIC_GLOBAL_GOBJECTS_FIELD_WINDOW_BLOCKER = "missing_gobjects_coherent_field_window"
-STATIC_GLOBAL_SAFE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
-PLACEHOLDER_ARTIFACT_ID_PREFIXES = ("unspecified-", "static-global-default-")
 UOBJECT_FLAG_POLICY_PUBLIC_FORBIDDEN_KEY_RE = re.compile(r"(?:^|_)(address|index|indices|serial|pointer|ptr)(?:_|$)", re.IGNORECASE)
 UOBJECT_FLAG_POLICY_PUBLIC_FORBIDDEN_VALUE_RE = re.compile(r"(?:^|[_\W])(address|index|indices|serial|pointer|ptr)(?:[_\W]|$)", re.IGNORECASE)
 UOBJECT_FLAG_POLICY_PUBLIC_ADDRESS_RE = re.compile(r"\b0x[0-9a-f]{5,}\b", re.IGNORECASE)
@@ -510,34 +515,8 @@ REQUIRED_UOBJECT_FLAG_TRANSITION_WINDOWS = {
 }
 
 
-def canonical_json_bytes(value: object) -> bytes:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
-
-
 def static_global_safe_id(value: object) -> bool:
-    return (
-        isinstance(value, str)
-        and ".." not in value
-        and "/" not in value
-        and "\\" not in value
-        and not value.casefold().startswith(PLACEHOLDER_ARTIFACT_ID_PREFIXES)
-        and STATIC_GLOBAL_SAFE_ID_RE.fullmatch(value) is not None
-    )
-
-
-def artifact_identity_placeholder_fields(identity: object) -> list[str]:
-    placeholders: list[str] = []
-    if isinstance(identity, dict):
-        for key, value in identity.items():
-            child_paths = artifact_identity_placeholder_fields(value)
-            placeholders.extend(f"{key}.{path}" if path else str(key) for path in child_paths)
-    elif isinstance(identity, list):
-        for index, value in enumerate(identity):
-            child_paths = artifact_identity_placeholder_fields(value)
-            placeholders.extend(f"[{index}].{path}" if path else f"[{index}]" for path in child_paths)
-    elif isinstance(identity, str) and identity.casefold().startswith(PLACEHOLDER_ARTIFACT_ID_PREFIXES):
-        placeholders.append("")
-    return placeholders
+    return is_safe_artifact_id(value)
 
 
 def validate_strict_artifact_identity_shape(
@@ -552,28 +531,31 @@ def validate_strict_artifact_identity_shape(
     if not isinstance(artifact_identity, dict):
         return ([{"reason": f"{reason_prefix}_missing_artifact_identity", "label": f"{label}:$.artifact_identity"}], False)
 
-    expected_keys = {"artifact_kind", "artifact_sha256", "capture_id", "evidence_pack_id"}
-    if set(artifact_identity) != expected_keys:
-        blockers.append({"reason": f"{reason_prefix}_artifact_identity_fields_mismatch", "label": f"{label}:$.artifact_identity"})
-    if artifact_identity.get("artifact_kind") != expected_artifact_kind:
-        blockers.append({"reason": f"{reason_prefix}_artifact_identity_kind_mismatch", "label": f"{label}:$.artifact_identity.artifact_kind"})
-    artifact_sha256 = artifact_identity.get("artifact_sha256")
-    if not isinstance(artifact_sha256, str) or SHA256_RE.fullmatch(artifact_sha256) is None:
-        blockers.append({"reason": f"{reason_prefix}_artifact_identity_sha_invalid", "label": f"{label}:$.artifact_identity.artifact_sha256"})
-    capture_id = artifact_identity.get("capture_id")
-    evidence_pack_id = artifact_identity.get("evidence_pack_id")
-    if not static_global_safe_id(capture_id):
-        blockers.append({"reason": f"{reason_prefix}_artifact_identity_capture_id_invalid", "label": f"{label}:$.artifact_identity.capture_id"})
-    if not static_global_safe_id(evidence_pack_id):
-        blockers.append({"reason": f"{reason_prefix}_artifact_identity_evidence_pack_id_invalid", "label": f"{label}:$.artifact_identity.evidence_pack_id"})
-    identity_ready_for_hash = (
-        artifact_identity.get("artifact_kind") == expected_artifact_kind
-        and isinstance(artifact_sha256, str)
-        and SHA256_RE.fullmatch(artifact_sha256) is not None
-        and static_global_safe_id(capture_id)
-        and static_global_safe_id(evidence_pack_id)
+    normalized, errors = complete_artifact_identity(
+        artifact_identity,
+        container_key=None,
+        expected_artifact_kind=expected_artifact_kind,
     )
-    return blockers, identity_ready_for_hash
+    for error in errors:
+        reason_by_error = {
+            "artifact_identity_fields_mismatch": f"{reason_prefix}_artifact_identity_fields_mismatch",
+            "artifact_kind_invalid": f"{reason_prefix}_artifact_identity_kind_mismatch",
+            "artifact_sha256_invalid": f"{reason_prefix}_artifact_identity_sha_invalid",
+            "capture_id_invalid": f"{reason_prefix}_artifact_identity_capture_id_invalid",
+            "evidence_pack_id_invalid": f"{reason_prefix}_artifact_identity_evidence_pack_id_invalid",
+        }
+        label_by_error = {
+            "artifact_identity_fields_mismatch": f"{label}:$.artifact_identity",
+            "artifact_kind_invalid": f"{label}:$.artifact_identity.artifact_kind",
+            "artifact_sha256_invalid": f"{label}:$.artifact_identity.artifact_sha256",
+            "capture_id_invalid": f"{label}:$.artifact_identity.capture_id",
+            "evidence_pack_id_invalid": f"{label}:$.artifact_identity.evidence_pack_id",
+        }
+        blockers.append({
+            "reason": reason_by_error.get(error, f"{reason_prefix}_{error}"),
+            "label": label_by_error.get(error, f"{label}:$.artifact_identity"),
+        })
+    return blockers, normalized is not None
 
 
 def static_global_canonical_command_record(record: dict[str, Any]) -> dict[str, Any]:

@@ -1185,6 +1185,31 @@ class RunSecondSourceCoreIntakeTests(unittest.TestCase):
 
         self.assertIn("missing evidence artifact identity: capture_id", str(raised.exception))
 
+    def test_rejects_snapshot_with_placeholder_artifact_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_snapshot_identities(
+                root / "base",
+                artifact_sha256="1" * 64,
+                capture_id="primary-core",
+                evidence_pack_id="primary-pack",
+            )
+            write_snapshot_identities(
+                root / "candidate",
+                artifact_sha256="2" * 64,
+                capture_id="unspecified-capture",
+                evidence_pack_id="static-global-default-pack",
+            )
+
+            with self.assertRaises(intake.ReadinessReportError) as raised:
+                intake.require_distinct_snapshot_artifact_identities(
+                    root / "base",
+                    root / "candidate",
+                    target_set=intake.DEFAULT_TARGET_SET,
+                )
+
+        self.assertIn("invalid capture_id", str(raised.exception))
+
     def test_rejects_snapshot_that_reuses_base_artifact_identity_field(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

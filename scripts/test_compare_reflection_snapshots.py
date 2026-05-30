@@ -777,6 +777,29 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertIn("candidate:invalid_capture_id", report["results"][0]["reasons"])
         self.assertIn("candidate:invalid_evidence_pack_id", report["results"][0]["reasons"])
 
+    def test_marks_placeholder_evidence_identity_inconclusive(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "second"
+            base.mkdir()
+            candidate.mkdir()
+            left = base_snapshot()
+            right = deepcopy(left)
+            right["evidence"]["artifact_sha256"] = "2" * 64  # type: ignore[index]
+            right["evidence"]["capture_id"] = "unspecified-capture"  # type: ignore[index]
+            right["evidence"]["evidence_pack_id"] = "static-global-default-pack"  # type: ignore[index]
+            write_snapshot(base, left)
+            write_snapshot(candidate, right)
+
+            result = run_compare(base, candidate, "--json")
+
+        self.assertEqual(result.returncode, 2)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["counts"]["inconclusive"], 1)
+        self.assertIn("candidate:invalid_capture_id", report["results"][0]["reasons"])
+        self.assertIn("candidate:invalid_evidence_pack_id", report["results"][0]["reasons"])
+
     def test_marks_malformed_ark_sha_inconclusive(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

@@ -11,6 +11,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from artifact_identity import ARTIFACT_IDENTITY_KEYS, is_safe_artifact_id, is_sha256
 from reflection_target_sets import TARGET_SETS, schema_targets
 
 
@@ -47,15 +48,7 @@ REQUIRED_READINESS_NON_PROMOTED_SURFACES = {
     "return_override",
     "runtime_hooks",
 }
-ARTIFACT_IDENTITY_KEYS = (
-    "artifact_kind",
-    "artifact_sha256",
-    "capture_id",
-    "evidence_pack_id",
-)
 ALLOWED_ARTIFACT_KINDS = {"offline_core"}
-SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
-SAFE_ARTIFACT_ID_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 
 
 class ReadinessReportError(ValueError):
@@ -670,10 +663,10 @@ def snapshot_artifact_identity(payload: dict[str, object], path: Path, label: st
     if artifact_kind not in ALLOWED_ARTIFACT_KINDS:
         raise ReadinessReportError(f"{label} {path}: invalid artifact_kind {artifact_kind!r}")
     artifact_sha256 = identity["artifact_sha256"]
-    if SHA256_RE.fullmatch(artifact_sha256) is None:
+    if not is_sha256(artifact_sha256):
         raise ReadinessReportError(f"{label} {path}: invalid artifact_sha256")
     for key in ("capture_id", "evidence_pack_id"):
-        if SAFE_ARTIFACT_ID_RE.fullmatch(identity[key]) is None or ".." in identity[key]:
+        if not is_safe_artifact_id(identity[key]):
             raise ReadinessReportError(f"{label} {path}: invalid {key}")
     return identity
 

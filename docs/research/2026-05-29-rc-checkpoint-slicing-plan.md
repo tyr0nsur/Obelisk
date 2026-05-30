@@ -465,7 +465,7 @@ Post-RC internal recognizer work, if reopened after the RC, should proceed in th
 Item return-only policy, Mission copied-bool observer, then Transfer `bAccept`. That sequence
 is an internal planning order only; it does not change the RC public API or release gate.
 
-## Historical Final RC Validation Recipe
+## Final RC Validation (Historical Recipe)
 
 The commands below document the old final validation recipe. They are preserved as
 historical audit context only; do not treat them as current authorization to assemble,
@@ -473,10 +473,11 @@ stage, tag, or publish an RC. The later accepted release-gate result is recorded
 `docs/research/2026-05-30-rc-second-source-release-gate-check.md`.
 
 The recipe assembled the UFunction second-source root from the accepted per-target-set
-roots before running the final release gate. The helper copied existing sanitized
-snapshots only and did not regenerate evidence. The valid manifest for that final flow
-was the fresh path-redacted manifest written by the helper; older `/tmp` manifests that
-captured absolute source roots or other non-redacted input paths were not reusable:
+roots before running the final release gate. The helper copies existing sanitized
+snapshots only and does not regenerate evidence. The valid manifest for that final flow
+was the fresh
+path-redacted manifest written by the helper; do not reuse or publish older `/tmp`
+manifests that captured absolute source roots or other non-redacted input paths:
 
 ```bash
 python3 scripts/assemble_rc_ufunction_second_source_root.py \
@@ -506,6 +507,7 @@ generated artifacts staged, and a public scope limited to `GameplayPolicyEvent`,
 copied `ChatMessageEvent`, `DescribeResourceKind`, and
 `DescribeGameplayPolicyEventKind` as RC public callback/metadata surfaces.
 `DescribeGameplayPolicyEventKind` remained metadata-only: no module SDK, UE lookup,
-mutation, identity, or return override. The final UFunction second-source root had to
-contain the candidate snapshots for all three public RC target sets; a minimal-only root
-was not valid for the structure and chat gates.
+mutation, identity, or return override. In short: no module SDK, UE lookup, mutation,
+identity, or return override. This means no module SDK, UE lookup, mutation, identity, or return override.
+The final UFunction second-source root must contain the candidate snapshots for all three
+public RC target sets; a minimal-only root was not valid for the structure and chat gates.

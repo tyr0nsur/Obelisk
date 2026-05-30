@@ -108,8 +108,8 @@ recovery context is not active routing for the current head; use
   blocked. See `docs/research/` for artifact paths, manifests, hashes, and target lists.
 - Item return-only policy remains internal and non-authoritative. It now has a private
   `ItemReturnEventDispatcher` for copied `ReturnValue` bool observations, but still has no
-  public Inventory/Items SDK, hook wiring, markers/env, runtime logs, identity, lookup,
-  mutation, return override, or ResourceHandle.
+  public Inventory SDK, public Items SDK, hook wiring, markers/env, runtime logs, identity,
+  lookup, mutation, return override, or ResourceHandle.
 - Item return-only now has internal post-original copied-payload helper coverage. Public
   promotion should be a future append-only `GameplayPolicyEvent` expansion with three
   distinct inventory-item event kinds for `AllowEquipItem`, `CanRepair`, and
