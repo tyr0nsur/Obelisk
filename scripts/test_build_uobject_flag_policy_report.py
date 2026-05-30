@@ -337,6 +337,20 @@ class BuildUObjectFlagPolicyReportTests(unittest.TestCase):
             self.assertRegex(window["provenance"]["sidecar_sha256"], r"^[0-9a-f]{64}$")
         self.assertIn("does_not_promote_resourcehandle", payload["non_claims"])
         self.assertIn("no_rejected_runtime_object_samples", payload["remaining_blockers"])
+        self.assertEqual(
+            payload["internal_revalidation_contract"],
+            {
+                "name": "InternalUObjectRevalidationCandidate",
+                "lifetime": "frame_local_only",
+                "post_callback_lookup": "rejected",
+                "flag_policy": {
+                    "0x100": "reject",
+                    "0x4000": "reject_by_default",
+                },
+                "output": "copied_bool_or_obelisk_owned_data_only",
+                "public_api": "not_promoted",
+            },
+        )
         self.assertEqual(payload["redaction"]["addresses"], "redacted")
         self.assertNotIn(str(root), json.dumps(payload))
         self.assertNotIn("pending-kill", json.dumps(payload).lower())

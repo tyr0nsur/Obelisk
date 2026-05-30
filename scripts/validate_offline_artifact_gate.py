@@ -381,6 +381,17 @@ STATIC_GLOBAL_GOBJECTS_FIELD_WINDOW_BLOCKER = "missing_gobjects_coherent_field_w
 UOBJECT_FLAG_POLICY_PUBLIC_FORBIDDEN_KEY_RE = re.compile(r"(?:^|_)(address|index|indices|serial|pointer|ptr)(?:_|$)", re.IGNORECASE)
 UOBJECT_FLAG_POLICY_PUBLIC_FORBIDDEN_VALUE_RE = re.compile(r"(?:^|[_\W])(address|index|indices|serial|pointer|ptr)(?:[_\W]|$)", re.IGNORECASE)
 UOBJECT_FLAG_POLICY_PUBLIC_ADDRESS_RE = re.compile(r"\b0x[0-9a-f]{5,}\b", re.IGNORECASE)
+REQUIRED_UOBJECT_FLAG_POLICY_INTERNAL_REVALIDATION_CONTRACT = {
+    "name": "InternalUObjectRevalidationCandidate",
+    "lifetime": "frame_local_only",
+    "post_callback_lookup": "rejected",
+    "flag_policy": {
+        "0x100": "reject",
+        "0x4000": "reject_by_default",
+    },
+    "output": "copied_bool_or_obelisk_owned_data_only",
+    "public_api": "not_promoted",
+}
 REQUIRED_UOBJECT_FLAG_TRANSITION_WINDOWS = {
     "weak_publish_from_uobject_1d56970_1d56a30",
     "weak_validity_mode_a30_1d56a30_1d56ae0",
@@ -3642,6 +3653,22 @@ def validate_uobject_flag_policy_report_manifest(
                     "recorded": sorted(observed_masks),
                 }
             )
+
+    contract = payload.get("internal_revalidation_contract")
+    if not isinstance(contract, dict):
+        blockers.append(
+            {
+                "reason": "uobject_flag_policy_internal_revalidation_contract_missing",
+                "label": f"{label}:$.internal_revalidation_contract",
+            }
+        )
+    elif contract != REQUIRED_UOBJECT_FLAG_POLICY_INTERNAL_REVALIDATION_CONTRACT:
+        blockers.append(
+            {
+                "reason": "uobject_flag_policy_internal_revalidation_contract_mismatch",
+                "label": f"{label}:$.internal_revalidation_contract",
+            }
+        )
 
     windows = payload.get("windows_summary")
     if not isinstance(windows, dict):

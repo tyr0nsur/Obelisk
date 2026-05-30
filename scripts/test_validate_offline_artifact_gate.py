@@ -898,6 +898,9 @@ def uobject_flag_policy_report_manifest(*, promotion_ready: bool = False) -> dic
                 "ue_lifecycle_name": "not_promoted",
             },
         ],
+        "internal_revalidation_contract": json.loads(
+            json.dumps(gate.REQUIRED_UOBJECT_FLAG_POLICY_INTERNAL_REVALIDATION_CONTRACT)
+        ),
         "remaining_blockers": sorted(gate.REQUIRED_UOBJECT_FLAG_POLICY_BLOCKERS),
         "non_claims": sorted(gate.REQUIRED_UOBJECT_FLAG_POLICY_NON_CLAIMS),
     }
@@ -3898,6 +3901,23 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
 
         self.assertIn(
             "uobject_flag_policy_candidates_missing",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_uobject_flag_policy_relaxed_internal_revalidation_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flags.json"
+            payload = uobject_flag_policy_report_manifest()
+            payload["internal_revalidation_contract"]["post_callback_lookup"] = "allowed"
+            payload["internal_revalidation_contract"]["flag_policy"]["0x4000"] = "allow_by_default"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "uobject_flag_policy_internal_revalidation_contract_mismatch",
             {blocker["reason"] for blocker in result["blockers"]},
         )
 

@@ -201,6 +201,10 @@ priorities, and do not use history files as the active source of truth.
   `/home/flowcommunity-ark/obelisk-artifacts/resource-handle-flag4000-reconciliation-primary-20260530T000000Z/`.
   This is internal lifecycle/blocker evidence only, not public `ResourceHandle`, lookup,
   identity, mutation, return override, or lifetime promotion.
+  Current offline flag-policy tooling requires the internal label
+  `InternalUObjectRevalidationCandidate` with frame-local lifetime only, post-callback
+  lookup rejected, `0x100` rejected, `0x4000` rejected by default, and output limited to
+  copied bool/reason or Obelisk-owned copied data.
 - Static GObjects/FUObjectItem evidence is internal offline input only. `0x595b7e0`
   supports target-set enumeration across current copied-core evidence, but not public
   GObjects, identity, lookup, `ResourceHandle`, mutation, or return override. Evidence:

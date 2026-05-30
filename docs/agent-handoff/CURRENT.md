@@ -168,6 +168,10 @@ sequence.
   Keep the internal label `InternalUObjectRevalidationCandidate`; do not expose
   ResourceHandle, GObjects, identity, lookup, lifecycle names, mutation, return override,
   object indices, serials, or UE pointers to plugins.
+  The offline flag-policy report/gate now requires an explicit internal revalidation
+  contract: frame-local only, post-callback lookup rejected, `0x100` rejected, `0x4000`
+  rejected by default, output limited to copied bool/reason or Obelisk-owned copied data,
+  and public API not promoted.
 - Any future live/player validation requires a new approved live-ops brief and, when
   players are involved, a beta-test notice through the configured local webhook variable.
 

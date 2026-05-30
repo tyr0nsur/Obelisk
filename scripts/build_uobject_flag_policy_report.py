@@ -554,6 +554,17 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
                 "ue_lifecycle_name": "not_promoted",
             },
         ],
+        "internal_revalidation_contract": {
+            "name": "InternalUObjectRevalidationCandidate",
+            "lifetime": "frame_local_only",
+            "post_callback_lookup": "rejected",
+            "flag_policy": {
+                "0x100": "reject",
+                "0x4000": "reject_by_default",
+            },
+            "output": "copied_bool_or_obelisk_owned_data_only",
+            "public_api": "not_promoted",
+        },
         "remaining_blockers": list(REMAINING_BLOCKERS),
         "non_claims": list(NON_CLAIMS),
         "redaction": {
