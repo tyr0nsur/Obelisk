@@ -773,6 +773,123 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         finally:
             sys.argv = original_argv
 
+    def test_dino_compact_descriptor_preflight_copies_exact_fixture_scalars(self) -> None:
+        fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
+
+        report = tool.build_report(snapshot_root=fixture_root, target_sets=["dino-compact-intake"])
+        preflight = report["descriptor_preflight"]
+
+        self.assertEqual("internal-evidence-only", preflight["status"])
+        self.assertEqual("dino-compact-intake", preflight["scope"])
+        self.assertEqual("dino_character_recognition_only", preflight["resource_scope"])
+        self.assertEqual("recognition_only_object_refs_excluded", preflight["resource_backing"])
+        self.assertEqual("copied_scalar_descriptor_only", preflight["payload_policy"])
+        self.assertIsNone(preflight["assigned_resource_kind"])
+        self.assertIs(False, preflight["return_value_only"])
+        self.assertEqual(2, preflight["descriptor_count"])
+        self.assertEqual(
+            [
+                "dino_character.add_passenger",
+                "dino_character.allow_carry_character",
+            ],
+            [entry["descriptor"] for entry in preflight["descriptors"]],
+        )
+        self.assertEqual(
+            [
+                "PrimalDinoCharacter.AddPassenger",
+                "PrimalDinoCharacter.AllowCarryCharacter",
+            ],
+            [entry["target"] for entry in preflight["descriptors"]],
+        )
+        self.assertEqual(
+            [
+                "PrimalDinoCharacter.AddPassenger.PassengerSeatIndex",
+                "PrimalDinoCharacter.AddPassenger.bForcePassenger",
+                "PrimalDinoCharacter.AddPassenger.bAllowFlyersAndWaterDinos",
+                "PrimalDinoCharacter.AddPassenger.bSkipLineTrace",
+                "PrimalDinoCharacter.AddPassenger.ReturnValue",
+                "PrimalDinoCharacter.AllowCarryCharacter.ReturnValue",
+            ],
+            [entry["copied_field"] for entry in preflight["copied_scalars"]],
+        )
+        self.assertEqual(
+            [
+                "PrimalDinoCharacter.AddPassenger.PassengerSeatIndex",
+                "PrimalDinoCharacter.AddPassenger.bForcePassenger",
+                "PrimalDinoCharacter.AddPassenger.bAllowFlyersAndWaterDinos",
+                "PrimalDinoCharacter.AddPassenger.bSkipLineTrace",
+                "PrimalDinoCharacter.AddPassenger.ReturnValue",
+            ],
+            preflight["descriptors"][0]["copied_fields"],
+        )
+        self.assertEqual(
+            ["PrimalDinoCharacter.AllowCarryCharacter.ReturnValue"],
+            preflight["descriptors"][1]["copied_fields"],
+        )
+
+        copied_by_field = {entry["copied_field"]: entry for entry in preflight["copied_scalars"]}
+        self.assertEqual("int32", copied_by_field["PrimalDinoCharacter.AddPassenger.PassengerSeatIndex"]["type"])
+        self.assertEqual("in", copied_by_field["PrimalDinoCharacter.AddPassenger.PassengerSeatIndex"]["direction"])
+        self.assertEqual(4, copied_by_field["PrimalDinoCharacter.AddPassenger.PassengerSeatIndex"]["element_size"])
+        bool_entries = [entry for entry in preflight["copied_scalars"] if entry["type"] == "bool"]
+        self.assertEqual(5, len(bool_entries))
+        self.assertTrue(all(entry["byte_mask"] == "0x01" for entry in bool_entries))
+        self.assertTrue(all(entry["field_mask"] == "0xff" for entry in bool_entries))
+        self.assertTrue(all(entry["native_bool"] is False for entry in bool_entries))
+        self.assertEqual("return", copied_by_field["PrimalDinoCharacter.AddPassenger.ReturnValue"]["direction"])
+        self.assertEqual("return", copied_by_field["PrimalDinoCharacter.AllowCarryCharacter.ReturnValue"]["direction"])
+
+    def test_dino_compact_descriptor_preflight_excludes_refs_and_is_not_promoted(self) -> None:
+        fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
+
+        report = tool.build_report(snapshot_root=fixture_root, target_sets=["dino-compact-intake"])
+        preflight = report["descriptor_preflight"]
+
+        self.assertEqual(
+            [
+                "PrimalDinoCharacter.AddPassenger.ACharacter",
+                "PrimalDinoCharacter.AllowCarryCharacter.CanCarryPawn",
+            ],
+            [entry["excluded_field"] for entry in preflight["excluded_object_refs"]],
+        )
+        self.assertEqual(
+            ["PrimalDinoCharacter.AddPassenger.ACharacter"],
+            preflight["descriptors"][0]["excluded_object_refs"],
+        )
+        self.assertEqual(
+            ["PrimalDinoCharacter.AllowCarryCharacter.CanCarryPawn"],
+            preflight["descriptors"][1]["excluded_object_refs"],
+        )
+        self.assertTrue(
+            all(
+                entry["evidence_status"] == "recognition-only-object-ref-excluded"
+                for entry in preflight["excluded_object_refs"]
+            )
+        )
+        self.assertIsNone(preflight["assigned_event_kind"])
+        self.assertIsNone(preflight["assigned_event_kind_mask"])
+        self.assertIs(False, preflight["promotion_ready"])
+        self.assertIs(False, preflight["public_promotion"])
+        self.assertIs(False, preflight["public_surface"])
+        self.assertIs(False, report["safety_summary"]["promotion_ready"])
+        self.assertEqual("candidate_only", report["safety_summary"]["artifact_status"])
+        self.assertIn("event_kind", preflight["explicitly_not_assigned"])
+        self.assertIn("event_kind_mask", preflight["explicitly_not_assigned"])
+        self.assertIn("resource_kind", preflight["explicitly_not_assigned"])
+        self.assertIn("resource_handle", preflight["explicitly_not_assigned"])
+        self.assertIn("identity", preflight["explicitly_not_assigned"])
+        self.assertIn("public_sdk", preflight["safety_summary"]["explicitly_excluded"])
+        self.assertIn("return_override", preflight["safety_summary"]["explicitly_excluded"])
+        self.assertIn("ue_function_calls", preflight["safety_summary"]["explicitly_excluded"])
+
+        serialized = json.dumps(preflight)
+        self.assertNotIn("OBELISK_GAMEPLAY_POLICY_EVENT_KIND", serialized)
+        self.assertNotIn("OBELISK_GAMEPLAY_POLICY_FIELD_MASK", serialized)
+        self.assertNotIn("ResourceHandle", serialized)
+        self.assertNotIn("Dino SDK", serialized)
+        self.assertNotIn("ACharacter", json.dumps(preflight["copied_scalars"]))
+        self.assertNotIn("CanCarryPawn", json.dumps(preflight["copied_scalars"]))
+
     def test_inventory_action_compact_target_set_stays_candidate_only_and_redacted(self) -> None:
         fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
 

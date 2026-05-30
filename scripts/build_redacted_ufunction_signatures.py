@@ -53,6 +53,7 @@ STRUCTURE_RETURN_ONLY_INPUT_TARGET_SET = "structure-observer-intake"
 STRUCTURE_RETURN_ONLY_OUTPUT_TARGET_SET = "structure-return-only-policy-slice"
 STRUCTURE_NONPIN_COPIED_SCALAR_INPUT_TARGET_SET = "structure-nonpin-copied-scalar-policy-slice"
 STRUCTURE_NONPIN_COPIED_SCALAR_OUTPUT_TARGET_SET = "structure-nonpin-copied-scalar-policy-slice"
+DINO_COMPACT_DESCRIPTOR_INPUT_TARGET_SET = "dino-compact-intake"
 
 ITEM_RETURN_ONLY_EXPECTED_SHAPES: dict[str, dict[str, Any]] = {
     "PrimalItem.AllowEquipItem": {
@@ -116,6 +117,57 @@ ITEM_RETURN_ONLY_EXCLUDED_REASONS = {
     "PrimalItem.UseItemOntoItem.DestinationItem": "object_ref_excluded",
     "PrimalItem.UseItemOntoItem.AdditionalData": "non_return_scalar_excluded",
 }
+
+DINO_COMPACT_DESCRIPTOR_EXPECTED_SHAPES: dict[str, dict[str, Any]] = {
+    "PrimalDinoCharacter.AddPassenger": {
+        "function_flags": 0x4020401,
+        "num_parms": 6,
+        "parms_size": 16,
+        "return_value_offset": 0xF,
+        "properties": (
+            ("ACharacter", "ObjectProperty"),
+            ("PassengerSeatIndex", "IntProperty"),
+            ("bForcePassenger", "BoolProperty"),
+            ("bAllowFlyersAndWaterDinos", "BoolProperty"),
+            ("bSkipLineTrace", "BoolProperty"),
+            ("ReturnValue", "BoolProperty"),
+        ),
+    },
+    "PrimalDinoCharacter.AllowCarryCharacter": {
+        "function_flags": 0x4020400,
+        "num_parms": 2,
+        "parms_size": 9,
+        "return_value_offset": 0x8,
+        "properties": (
+            ("CanCarryPawn", "ObjectProperty"),
+            ("ReturnValue", "BoolProperty"),
+        ),
+    },
+}
+
+DINO_COMPACT_COPIED_SCALAR_FIELDS = (
+    "PrimalDinoCharacter.AddPassenger.PassengerSeatIndex",
+    "PrimalDinoCharacter.AddPassenger.bForcePassenger",
+    "PrimalDinoCharacter.AddPassenger.bAllowFlyersAndWaterDinos",
+    "PrimalDinoCharacter.AddPassenger.bSkipLineTrace",
+    "PrimalDinoCharacter.AddPassenger.ReturnValue",
+    "PrimalDinoCharacter.AllowCarryCharacter.ReturnValue",
+)
+
+DINO_COMPACT_EXCLUDED_REASONS = {
+    "PrimalDinoCharacter.AddPassenger.ACharacter": "passenger_object_ref_excluded",
+    "PrimalDinoCharacter.AllowCarryCharacter.CanCarryPawn": "carry_pawn_object_ref_excluded",
+}
+
+DINO_COMPACT_DESCRIPTOR_BY_TARGET = {
+    "PrimalDinoCharacter.AddPassenger": "dino_character.add_passenger",
+    "PrimalDinoCharacter.AllowCarryCharacter": "dino_character.allow_carry_character",
+}
+
+DINO_COMPACT_EXPECTED_DESCRIPTORS = (
+    "dino_character.add_passenger",
+    "dino_character.allow_carry_character",
+)
 
 TRANSFER_BACCEPT_ONLY_EXPECTED_SHAPES: dict[str, dict[str, Any]] = {
     "ShooterPlayerController.ServerTransferredPlayerConfirmationResult": {
@@ -1155,8 +1207,11 @@ def build_report(
         emitted_targets=emitted_targets,
     )
     all_target_sets = [*target_sets, *source_target_sets]
+    descriptor_preflight = None
+    if DINO_COMPACT_DESCRIPTOR_INPUT_TARGET_SET in all_target_sets:
+        descriptor_preflight = build_dino_compact_descriptor_preflight_from_inputs(all_paths, input_snapshots)
 
-    return {
+    report = {
         "schema": OUTPUT_SCHEMA,
         "generated_from": {
             "snapshot_schema": SUPPORTED_SNAPSHOT_SCHEMA,
@@ -1182,6 +1237,9 @@ def build_report(
             "does not expose UE pointers, object identity, class identity, raw params, mutation, or return overrides",
         ],
     }
+    if descriptor_preflight is not None:
+        report["descriptor_preflight"] = descriptor_preflight
+    return report
 
 
 def format_hex(value: int) -> str:
@@ -1402,6 +1460,284 @@ def build_item_return_only_descriptor_preflight(copied: list[dict[str, Any]]) ->
             "public_metadata_json",
             "runtime_dispatcher_tables",
             "plugin_callbacks",
+        ],
+    }
+
+
+def require_dino_compact_descriptor_shape(
+    target_payload: dict[str, Any],
+    source_snapshot: dict[str, str],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    target_identity = target_payload.get("target")
+    property_chain = target_payload.get("property_chain")
+    if not isinstance(target_identity, dict) or not isinstance(property_chain, dict):
+        raise SystemExit("dino compact descriptor snapshot missing target identity or property chain")
+    target = target_name(target_identity)
+    expected = DINO_COMPACT_DESCRIPTOR_EXPECTED_SHAPES.get(target)
+    if expected is None:
+        raise SystemExit(f"unexpected dino compact descriptor target: {target}")
+    if target_payload.get("status") != "candidate":
+        raise SystemExit(f"{target} is not a candidate UFunction snapshot")
+    if target_payload.get("inspection_mode") != "ufunction":
+        raise SystemExit(f"{target} is not a UFunction inspection snapshot")
+
+    if require_int_field(target_payload, "function_flags", target) != expected["function_flags"]:
+        raise SystemExit(f"{target} FunctionFlags drifted")
+    if require_int_field(target_payload, "num_parms", target) != expected["num_parms"]:
+        raise SystemExit(f"{target} NumParms drifted")
+    if require_int_field(target_payload, "parms_size", target) != expected["parms_size"]:
+        raise SystemExit(f"{target} ParmsSize drifted")
+    return_value_offset = require_int_field(target_payload, "return_value_offset", target)
+    if return_value_offset != expected["return_value_offset"]:
+        raise SystemExit(f"{target} ReturnValueOffset drifted")
+
+    properties = property_chain.get("properties")
+    if not isinstance(properties, list):
+        raise SystemExit(f"{target} property_chain.properties is not a list")
+    if parse_int_value(property_chain.get("expected_count")) != len(expected["properties"]):
+        raise SystemExit(f"{target} expected property count drifted")
+    if parse_int_value(property_chain.get("observed_count")) != len(expected["properties"]):
+        raise SystemExit(f"{target} observed property count drifted")
+    if len(properties) != len(expected["properties"]):
+        raise SystemExit(f"{target} property list length drifted")
+
+    copied: list[dict[str, Any]] = []
+    excluded: list[dict[str, Any]] = []
+    for prop, (expected_name, expected_class) in zip(properties, expected["properties"], strict=True):
+        if not isinstance(prop, dict):
+            raise SystemExit(f"{target} property entry is not an object")
+        name = prop.get("name")
+        class_name = prop.get("class_name")
+        if name != expected_name or class_name != expected_class:
+            raise SystemExit(f"{target} property shape drifted: expected {expected_name}:{expected_class}")
+        if prop.get("status") != "candidate":
+            raise SystemExit(f"{target}.{expected_name} is not a candidate property")
+        require_candidate_membership(prop, target, expected_name)
+
+        field_key = f"{target}.{expected_name}"
+        common = {
+            "target": target,
+            "field": expected_name,
+            "offset": format_hex(require_int_field(prop, "offset_internal", field_key)),
+            "offset_internal": require_int_field(prop, "offset_internal", field_key),
+            "element_size": require_int_field(prop, "element_size", field_key),
+            "array_dim": require_int_field(prop, "array_dim", field_key),
+            "property_flags": format_hex(property_flags(prop) or 0),
+            "property_class": expected_class,
+            "function_flags": format_hex(require_int_field(target_payload, "function_flags", target)),
+            "num_parms": require_int_field(target_payload, "num_parms", target),
+            "parms_size": require_int_field(target_payload, "parms_size", target),
+            "return_value_offset": format_hex(return_value_offset),
+            "source_snapshot": source_snapshot["id"],
+            "source_snapshot_sha256": source_snapshot["sha256"],
+        }
+        if field_key in DINO_COMPACT_COPIED_SCALAR_FIELDS:
+            field = classify_property(prop, return_value_offset)
+            if expected_class == "IntProperty":
+                if field["type"] != "int32" or field["direction"] != "in" or common["element_size"] != 4:
+                    raise SystemExit(f"{field_key} copied int32 shape drifted")
+                copied.append(
+                    {
+                        **common,
+                        "copied_field": field_key,
+                        "direction": "in",
+                        "type": "int32",
+                        "descriptor": DINO_COMPACT_DESCRIPTOR_BY_TARGET[target],
+                        "evidence_status": "descriptor-preflight-copied-scalar-only",
+                    }
+                )
+            elif expected_class == "BoolProperty":
+                bool_field_size, bool_byte_offset = require_bool_tail(prop, field_key)
+                masks = field.get("bool_masks")
+                if (
+                    field["type"] != "bool"
+                    or field["direction"] not in {"in", "return"}
+                    or bool_field_size != 1
+                    or bool_byte_offset != 0
+                    or not isinstance(masks, dict)
+                    or masks.get("byte_mask") != "0x01"
+                    or masks.get("field_mask") != "0xff"
+                    or prop.get("native_bool") is not False
+                ):
+                    raise SystemExit(f"{field_key} copied bool shape drifted")
+                copied.append(
+                    {
+                        **common,
+                        "copied_field": field_key,
+                        "direction": field["direction"],
+                        "type": "bool",
+                        "bool_field_size": bool_field_size,
+                        "bool_byte_offset": bool_byte_offset,
+                        "byte_mask": masks["byte_mask"],
+                        "field_mask": masks["field_mask"],
+                        "native_bool": False,
+                        "descriptor": DINO_COMPACT_DESCRIPTOR_BY_TARGET[target],
+                        "evidence_status": "descriptor-preflight-copied-scalar-only",
+                    }
+                )
+            else:
+                raise SystemExit(f"{field_key} copied scalar class drifted")
+        elif field_key in DINO_COMPACT_EXCLUDED_REASONS:
+            excluded.append(
+                {
+                    **common,
+                    "excluded_field": field_key,
+                    "reason": DINO_COMPACT_EXCLUDED_REASONS[field_key],
+                    "descriptor": DINO_COMPACT_DESCRIPTOR_BY_TARGET[target],
+                    "evidence_status": "recognition-only-object-ref-excluded",
+                }
+            )
+        else:
+            raise SystemExit(f"{field_key} has no dino compact copy or exclusion policy")
+    return copied, excluded
+
+
+def build_dino_compact_descriptor_preflight_from_inputs(
+    paths: list[Path],
+    input_snapshots: list[dict[str, str]],
+) -> dict[str, Any]:
+    copied: list[dict[str, Any]] = []
+    excluded: list[dict[str, Any]] = []
+    seen_targets: set[str] = set()
+    expected_targets = expand_ufunction_targets([DINO_COMPACT_DESCRIPTOR_INPUT_TARGET_SET])
+    expected_target_set = set(expected_targets)
+    for path, source_snapshot in zip(paths, input_snapshots, strict=True):
+        payload = load_json_file("snapshot", path)
+        for target_payload in require_snapshot_payload(payload, path):
+            target_identity = target_payload.get("target")
+            if not isinstance(target_identity, dict):
+                raise SystemExit(f"snapshot missing target identity: {path}")
+            target = target_name(target_identity)
+            if target not in expected_target_set:
+                continue
+            if target in seen_targets:
+                raise SystemExit(f"duplicate dino compact descriptor target: {target}")
+            seen_targets.add(target)
+            target_copied, target_excluded = require_dino_compact_descriptor_shape(
+                target_payload,
+                source_snapshot,
+            )
+            copied.extend(target_copied)
+            excluded.extend(target_excluded)
+
+    emitted_copied_fields = [entry["copied_field"] for entry in copied]
+    emitted_excluded_fields = [entry["excluded_field"] for entry in excluded]
+    missing_targets = [target for target in expected_targets if target not in seen_targets]
+    unexpected_targets = [target for target in seen_targets if target not in expected_target_set]
+    missing_copied_fields = [
+        field for field in DINO_COMPACT_COPIED_SCALAR_FIELDS if field not in emitted_copied_fields
+    ]
+    unexpected_copied_fields = [
+        field for field in emitted_copied_fields if field not in DINO_COMPACT_COPIED_SCALAR_FIELDS
+    ]
+    missing_excluded_fields = [
+        field for field in DINO_COMPACT_EXCLUDED_REASONS if field not in emitted_excluded_fields
+    ]
+    unexpected_excluded_fields = [
+        field for field in emitted_excluded_fields if field not in DINO_COMPACT_EXCLUDED_REASONS
+    ]
+    blockers = [
+        *[f"missing_target:{target}" for target in missing_targets],
+        *[f"unexpected_target:{target}" for target in unexpected_targets],
+        *[f"missing_copied_field:{field}" for field in missing_copied_fields],
+        *[f"unexpected_copied_field:{field}" for field in unexpected_copied_fields],
+        *[f"missing_excluded_field:{field}" for field in missing_excluded_fields],
+        *[f"unexpected_excluded_field:{field}" for field in unexpected_excluded_fields],
+    ]
+    if blockers:
+        raise SystemExit("dino compact descriptor preflight failed closed: " + ",".join(blockers))
+
+    descriptors: list[dict[str, Any]] = []
+    for target in expected_targets:
+        descriptor = DINO_COMPACT_DESCRIPTOR_BY_TARGET.get(target)
+        if descriptor is None:
+            raise SystemExit(f"dino compact descriptor preflight has no descriptor for target: {target}")
+        target_copied = [entry for entry in copied if entry["target"] == target]
+        target_excluded = [entry for entry in excluded if entry["target"] == target]
+        descriptors.append(
+            {
+                "descriptor": descriptor,
+                "target": target,
+                "copied_fields": [entry["copied_field"] for entry in target_copied],
+                "excluded_object_refs": [entry["excluded_field"] for entry in target_excluded],
+                "resource_scope": "dino_character_recognition_only",
+                "resource_backing": "recognition_only_object_refs_excluded",
+                "payload_policy": "copied_scalar_descriptor_only",
+                "assigned_resource_kind": None,
+                "assigned_event_kind": None,
+                "assigned_event_kind_mask": None,
+                "promotion_ready": False,
+                "public_promotion": False,
+                "public_surface": False,
+                "evidence_status": "descriptor-preflight-only",
+            }
+        )
+
+    emitted_descriptors = [entry["descriptor"] for entry in descriptors]
+    missing_descriptors = [
+        descriptor for descriptor in DINO_COMPACT_EXPECTED_DESCRIPTORS if descriptor not in emitted_descriptors
+    ]
+    unexpected_descriptors = [
+        descriptor for descriptor in emitted_descriptors if descriptor not in DINO_COMPACT_EXPECTED_DESCRIPTORS
+    ]
+    if missing_descriptors or unexpected_descriptors:
+        raise SystemExit(
+            "dino compact descriptor preflight failed closed: "
+            + ",".join(
+                [
+                    *[f"missing_descriptor:{descriptor}" for descriptor in missing_descriptors],
+                    *[f"unexpected_descriptor:{descriptor}" for descriptor in unexpected_descriptors],
+                ]
+            )
+        )
+
+    return {
+        "status": "internal-evidence-only",
+        "scope": DINO_COMPACT_DESCRIPTOR_INPUT_TARGET_SET,
+        "descriptor_count": len(descriptors),
+        "resource_scope": "dino_character_recognition_only",
+        "resource_backing": "recognition_only_object_refs_excluded",
+        "payload_policy": "copied_scalar_descriptor_only",
+        "assigned_resource_kind": None,
+        "return_value_only": False,
+        "assigned_event_kind": None,
+        "assigned_event_kind_mask": None,
+        "promotion_ready": False,
+        "public_promotion": False,
+        "public_surface": False,
+        "descriptors": descriptors,
+        "copied_scalars": copied,
+        "excluded_object_refs": excluded,
+        "safety_summary": {
+            "artifact_status": "internal_evidence_only",
+            "promotion_ready": False,
+            "public_surface": False,
+            "copied_scalar_count": len(copied),
+            "excluded_object_ref_count": len(excluded),
+            "explicitly_excluded": [
+                "event_kind_assignment",
+                "event_kind_mask_assignment",
+                "identity",
+                "lookup",
+                "mutation",
+                "object_refs",
+                "public_sdk",
+                "raw_params",
+                "resource_handle",
+                "return_override",
+                "ue_function_calls",
+            ],
+        },
+        "explicitly_not_assigned": [
+            "event_kind",
+            "event_kind_mask",
+            "resource_kind",
+            "public_metadata_json",
+            "runtime_dispatcher_tables",
+            "plugin_callbacks",
+            "resource_handle",
+            "identity",
+            "lookup",
         ],
     }
 
