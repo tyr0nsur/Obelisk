@@ -141,12 +141,12 @@ assert_ufunction_target_sets_after_defaults() {
 assert_ufunction_target_sets_after_defaults \
     "minimal-second-source-intake,structure-observer-intake,item-return-only-policy-slice,chat-message-intake"
 assert_ufunction_target_sets_after_defaults \
-    "buff-compact-intake,minimal-second-source-intake,structure-observer-intake,item-return-only-policy-slice,chat-message-intake" \
-    "buff-compact-intake"
+    "chat-message-intake,minimal-second-source-intake,structure-observer-intake,item-return-only-policy-slice" \
+    "chat-message-intake"
 assert_ufunction_target_sets_after_defaults \
-    "minimal-second-source-intake,dino-compact-intake,structure-observer-intake,item-return-only-policy-slice,chat-message-intake" \
+    "minimal-second-source-intake,item-return-only-policy-slice,structure-observer-intake,chat-message-intake" \
     "minimal-second-source-intake" \
-    "dino-compact-intake"
+    "item-return-only-policy-slice"
 
 merge_function="$(sed -n '/^merge_second_source_status()/,/^}/p' scripts/check_release_readiness.sh)"
 if [[ -z "${merge_function}" ]]; then
@@ -1110,7 +1110,7 @@ fi
 set +e
 target_set_error_output="$(
     scripts/check_release_readiness.sh \
-        --ufunction-second-source-target-set buff-compact-intake 2>&1
+        --ufunction-second-source-target-set minimal-second-source-intake 2>&1
 )"
 status=$?
 set -e

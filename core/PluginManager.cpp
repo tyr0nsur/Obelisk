@@ -1658,7 +1658,10 @@ namespace Obelisk::Core
                     [callback](void* owner) {
                         if (!ValidateGlobalProcessEventCallbackCapabilityForOwnerLocked("RegisterPreProcessEvent", owner))
                             return uint64_t{0};
-                        return EventManager::Get().RegisterPreProcessEventOwned(owner, callback);
+                        return EventManager::Get().RegisterPreProcessEventOwned(
+                            owner,
+                            callback,
+                            PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING));
                     });
             }
             catch (const std::exception& e)
@@ -1708,7 +1711,11 @@ namespace Obelisk::Core
                         {
                             return uint64_t{0};
                         }
-                        return EventManager::Get().RegisterPreProcessEventForNameIndexOwned(owner, nameIndex, callback);
+                        return EventManager::Get().RegisterPreProcessEventForNameIndexOwned(
+                            owner,
+                            nameIndex,
+                            callback,
+                            PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING));
                     });
             }
             catch (const std::exception& e)
@@ -1762,7 +1769,10 @@ namespace Obelisk::Core
                         {
                             return uint64_t{0};
                         }
-                        return EventManager::Get().RegisterPreProcessEventOwned(owner, callback);
+                        return EventManager::Get().RegisterPreProcessEventOwned(
+                            owner,
+                            callback,
+                            PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING));
                     });
             }
             catch (const std::exception& e)
@@ -1820,7 +1830,11 @@ namespace Obelisk::Core
                         {
                             return uint64_t{0};
                         }
-                        return EventManager::Get().RegisterPreProcessEventForNameIndexOwned(owner, nameIndex, callback);
+                        return EventManager::Get().RegisterPreProcessEventForNameIndexOwned(
+                            owner,
+                            nameIndex,
+                            callback,
+                            PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING));
                     });
             }
             catch (const std::exception& e)

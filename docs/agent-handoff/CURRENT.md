@@ -1,7 +1,5 @@
 # Current Agent Handoff
 
-Updated: 2026-05-30
-
 This file is an active routing table only. Durable evidence belongs in `docs/research/`,
 resume facts in `COMPACT_CONTEXT.md`, and old detail in `HISTORY-*.md`. Historical
 recovery context is not active routing for the current head; use `git log --oneline -1`
@@ -141,16 +139,16 @@ for the current checkpoint.
   execution is still blocked until an operator-approved live-ops brief names the exact
   debug target, gates, window, rollback, artifacts, and posture checks. Do not replace
   this with another broad offline FName/GObjects scan.
-- Transfer ScriptStruct bool-tail evidence has a refreshed local root; older
-  `/servidor/ark/workspace-offline/...20260529...` transfer roots are stale under current
-  bool-tail strictness.
+- Transfer ScriptStruct bool-tail evidence has a refreshed local root; old 20260529
+  transfer roots are stale. Transfer scalar/bool fields are redacted payload metadata
+  only, not copied-scalar candidates.
 - `validate_offline_artifact_gate.py` consumes `obelisk.artifact-pack.manifest.v1`
   containers with current-content checksums, symlink fail-closed checks, child-manifest
   blockers, container-only promote blocking, protected-root checks, and duplicate target
   guidance rejection.
-- UFunction target-set listing is machine-classified as `release_readiness`,
-  `planning_only`, or `internal_layout_only`. Promotion mode accepts only explicit
-  release-readiness target sets; internal/layout-only gaps report
+- UFunction target-set listing and release-gate option parsing are classified as
+  `release_readiness`, `planning_only`, or `internal_layout_only`; promotion accepts only
+  explicit release-readiness sets, and internal/layout-only gaps report
   `target_set_not_release_readiness` until explicit promotion.
 - Offline artifact JSON manifests, provenance sidecars, and artifact checksum reads use
   no-symlink regular-file opens after protected-path prechecks.
@@ -202,10 +200,11 @@ for the current checkpoint.
   metadata; `--snapshot-json` is exact/direct single-target candidate-only output. The
   release gate preflights the four public RC target sets before build work.
 - Runtime/plugin lifecycle audit found no P1 blocker. `EventManager` granular unregister
-  skips unrelated in-flight callbacks, validates snapshotted callbacks by id/generation/
-  pointer/family, and rejects null owned callbacks with handle `0`; plugin API rejection
-  paths use no-throw warning logging and `CallProcessEvent` gating stays inside its catch
-  boundary.
+  skips unrelated in-flight callbacks, validates snapshots by id/generation/pointer/
+  family, rejects null owned callbacks with handle `0`, and lets raw `ProcessEvent`
+  pre-callbacks block only when the owner snapshot had blocking capability and the live
+  gate remains enabled; plugin API rejection paths use no-throw warning logging and
+  `CallProcessEvent` gating stays inside its catch boundary.
 - Any future live/player validation requires a new approved live-ops brief and beta-test
   notice through the configured local webhook variable when players are involved.
 

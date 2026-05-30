@@ -21,9 +21,14 @@ namespace Obelisk::Core
         void RegisterPostProcessEvent(OnProcessEventCallback callback);
         void RegisterPreProcessEventForNameIndex(int32_t nameIndex, OnProcessEventCallback callback);
         void RegisterPostProcessEventForNameIndex(int32_t nameIndex, OnProcessEventCallback callback);
-        uint64_t RegisterPreProcessEventOwned(void* owner, OnProcessEventCallback callback);
+        uint64_t RegisterPreProcessEventOwned(void* owner,
+                                              OnProcessEventCallback callback,
+                                              bool allowProcessEventBlocking = true);
         uint64_t RegisterPostProcessEventOwned(void* owner, OnProcessEventCallback callback);
-        uint64_t RegisterPreProcessEventForNameIndexOwned(void* owner, int32_t nameIndex, OnProcessEventCallback callback);
+        uint64_t RegisterPreProcessEventForNameIndexOwned(void* owner,
+                                                          int32_t nameIndex,
+                                                          OnProcessEventCallback callback,
+                                                          bool allowProcessEventBlocking = true);
         uint64_t RegisterPostProcessEventForNameIndexOwned(void* owner, int32_t nameIndex, OnProcessEventCallback callback);
         bool UnregisterCallback(uint64_t registrationId);
         bool UnregisterCallbackForOwner(void* owner, uint64_t registrationId);
@@ -48,12 +53,14 @@ namespace Obelisk::Core
             int32_t nameIndex;
             OnProcessEventCallback callback;
             void* owner;
+            bool allowProcessEventBlocking;
         };
 
         struct CallbackSnapshot {
             uint64_t id;
             uint64_t generation;
             OnProcessEventCallback callback;
+            bool allowProcessEventBlocking;
         };
 
         uint64_t AllocateRegistrationId();

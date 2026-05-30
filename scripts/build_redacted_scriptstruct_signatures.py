@@ -19,6 +19,16 @@ TARGET_SET_COVERAGE_SCHEMA = "obelisk.redacted-scriptstruct-target-set-coverage.
 PROTECTED_SERVER_ROOT = Path("/servidor/ark")
 APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
 CANDIDATE_UOBJECT_STATUS = "candidate-uobject"
+TRANSFER_SCRIPTSTRUCT_TARGETS = frozenset(
+    {
+        "PrimalLocalProfile.ARKTributeDino",
+        "PrimalLocalProfile.ArkTributePlayerData",
+    }
+)
+TRANSFER_SCRIPTSTRUCT_BLOCKERS = (
+    "no_public_transfer_sdk",
+    "transfer_scriptstruct_payload_decode_blocked",
+)
 
 SCALAR_TYPE_BY_CLASS = {
     "BoolProperty": "bool",
@@ -294,8 +304,10 @@ def append_nested_membership_blockers(blockers: list[str], prop: dict[str, Any],
         blockers.append(f"{key}_membership_not_candidate_uobject")
 
 
-def promotion_blockers_for_property(prop: dict[str, Any]) -> list[str]:
+def promotion_blockers_for_property(prop: dict[str, Any], target: str | None = None) -> list[str]:
     blockers: list[str] = ["scriptstruct_payload_not_runtime_observed"]
+    if target in TRANSFER_SCRIPTSTRUCT_TARGETS:
+        blockers.extend(TRANSFER_SCRIPTSTRUCT_BLOCKERS)
     if property_flags(prop) is None:
         blockers.append("property_flags_missing")
     append_membership_blocker(blockers, prop, "membership_status")
@@ -308,13 +320,28 @@ def promotion_blockers_for_property(prop: dict[str, Any]) -> list[str]:
     return sorted(set(blockers))
 
 
-def redacted_type(prop: dict[str, Any]) -> tuple[str, str]:
+def redacted_type(prop: dict[str, Any], target: str | None = None) -> tuple[str, str]:
     class_name = prop.get("class_name")
     name = prop.get("name")
     if not isinstance(class_name, str) or not class_name:
         return "blocked_unknown", "missing property class"
     if not isinstance(name, str) or not name:
         return "blocked_unknown", "missing property name"
+    if target in TRANSFER_SCRIPTSTRUCT_TARGETS and class_name in SCALAR_TYPE_BY_CLASS:
+        if class_name == "BoolProperty":
+            return (
+                "redacted_transfer_payload_bool",
+                "Transfer ScriptStruct bool-tail metadata only; payload bool not promoted",
+            )
+        if is_sensitive_scalar_name(name):
+            return (
+                "redacted_transfer_payload_scalar",
+                "Transfer ScriptStruct identity-like scalar payload redacted; not copied-data candidate",
+            )
+        return (
+            "redacted_transfer_payload_scalar",
+            "Transfer ScriptStruct scalar payload redacted; not copied-data candidate",
+        )
     if class_name in SCALAR_TYPE_BY_CLASS and is_sensitive_scalar_name(name):
         return "redacted_sensitive_scalar", "identity-like scalar redacted by name"
     if class_name in SCALAR_TYPE_BY_CLASS:
@@ -326,7 +353,7 @@ def redacted_type(prop: dict[str, Any]) -> tuple[str, str]:
     return "blocked_unknown", f"unsupported property class: {class_name}"
 
 
-def classify_property(prop: dict[str, Any]) -> dict[str, Any]:
+def classify_property(prop: dict[str, Any], target: str | None = None) -> dict[str, Any]:
     name = prop.get("name")
     class_name = prop.get("class_name")
     if not isinstance(name, str) or not name:
@@ -335,7 +362,7 @@ def classify_property(prop: dict[str, Any]) -> dict[str, Any]:
         raise SystemExit(f"invalid property class for {name}: {prop!r}")
 
     flags = property_flags(prop)
-    type_name, reason = redacted_type(prop)
+    type_name, reason = redacted_type(prop, target)
     field: dict[str, Any] = {
         "name": name,
         "type": type_name,
@@ -372,7 +399,7 @@ def classify_property(prop: dict[str, Any]) -> dict[str, Any]:
                 "redaction": "struct type identity redacted",
             }
 
-    blockers = promotion_blockers_for_property(prop)
+    blockers = promotion_blockers_for_property(prop, target)
     if blockers:
         field["promotion_blockers"] = blockers
     return field
@@ -410,9 +437,17 @@ def build_target_signature(
     if not isinstance(properties, list):
         raise SystemExit(f"snapshot property_chain.properties must be a list: {path}")
 
-    fields = [classify_property(prop) for prop in properties if isinstance(prop, dict)]
+    target = target_name(target_identity)
+    fields = [classify_property(prop, target) for prop in properties if isinstance(prop, dict)]
+    promotion_blockers = {
+        "scriptstruct_layout_candidate_only",
+        "no_runtime_payload_ownership_policy",
+        "no_public_scriptstruct_sdk",
+    }
+    if target in TRANSFER_SCRIPTSTRUCT_TARGETS:
+        promotion_blockers.update(TRANSFER_SCRIPTSTRUCT_BLOCKERS)
     signature: dict[str, Any] = {
-        "target": target_name(target_identity),
+        "target": target,
         "outer_name": target_identity.get("outer_name"),
         "name": target_identity.get("name"),
         "properties_size": target_payload.get("properties_size"),
@@ -420,13 +455,7 @@ def build_target_signature(
         "property_count": len(fields),
         "property_chain_status": property_chain.get("status"),
         "fields": fields,
-        "promotion_blockers": sorted(
-            {
-                "scriptstruct_layout_candidate_only",
-                "no_runtime_payload_ownership_policy",
-                "no_public_scriptstruct_sdk",
-            }
-        ),
+        "promotion_blockers": sorted(promotion_blockers),
     }
     if source_snapshot:
         signature.update(source_snapshot)

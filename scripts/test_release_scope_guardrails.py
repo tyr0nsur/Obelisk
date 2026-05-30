@@ -681,25 +681,25 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("Mission copied-bool observer, and Transfer `bAccept` lanes stay internal", normalized(release))
         self.assertIn("three item return-only checks are public only as copied `GameplayPolicyEvent`", normalized(release))
         self.assertIn("do not create an Inventory SDK, Items SDK", normalized(release))
-        self.assertNormalizedIn("Explicit `--ufunction-second-source-target-set` values add module target sets", release)
+        self.assertNormalizedIn(
+            "Explicit `--ufunction-second-source-target-set` values add promoted release-readiness module target sets",
+            release,
+        )
         self.assertIn("they do not replace or omit the public RC gate", release)
         self.assertIn("--ufunction-second-source-target-set minimal-second-source-intake", release)
-        self.assertIn("ScriptStruct promotion, including transfer structs, is not part of the default gate", normalized(release))
+        self.assertIn(
+            "ScriptStruct target sets such as `transfer-scriptstruct` are internal/layout-only",
+            normalized(release),
+        )
         self.assertIn("ScriptStruct promotion requires explicit opt-in", script)
         self.assertIn("--scriptstruct-second-source-root requires at least one --scriptstruct-second-source-target-set", script)
         self.assertNotIn('SCRIPTSTRUCT_SECOND_SOURCE_TARGET_SETS=("transfer-scriptstruct")', script)
-        self.assertEqual(
-            shell_array_values(script, "PLANNING_ONLY_SECOND_SOURCE_TARGET_SETS"),
-            [
-                "players-identity-lifecycle-intake",
-                "mission-copied-bool-policy-slice",
-                "nextgen-plugin-hub-planning",
-                "plugin-hub-planning",
-            ],
-        )
-        self.assertIn("reject_planning_only_second_source_target_set", script)
+        self.assertIn("target_set_readiness_classification", script)
+        self.assertIn("release_readiness", script)
+        self.assertIn("reject_non_release_second_source_target_set", script)
         self.assertIn("add_scriptstruct_second_source_target_set", script)
         self.assertIn("planning/guidance-only", script)
+        self.assertIn("internal/layout-only", script)
         self.assertIn("name every promoted target set", pr_template)
         self.assertIn(
             "pass `--scriptstruct-second-source-root` only when a ScriptStruct target set is explicitly named",
@@ -737,6 +737,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         blocked_cases = [
             ("--ufunction-second-source-target-set", "players-identity-lifecycle-intake", "UFunction"),
             ("--ufunction-second-source-target-set", "mission-copied-bool-policy-slice", "UFunction"),
+            ("--ufunction-second-source-target-set", "transfer-baccept-only-policy-slice", "UFunction"),
             ("--ufunction-second-source-target-set", "nextgen-plugin-hub-planning", "UFunction"),
             ("--scriptstruct-second-source-target-set", "plugin-hub-planning", "ScriptStruct"),
         ]
@@ -758,6 +759,34 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
 
                 self.assertEqual(result.returncode, 2, result.stderr + result.stdout)
                 self.assertIn(f"{target_set} is planning/guidance-only", result.stderr)
+                self.assertIn(f"release readiness {label} target set", result.stderr)
+                self.assertIn("Promote a separate release/public target set", result.stderr)
+                self.assertNotIn("cmake -S", result.stdout)
+
+    def test_release_gate_rejects_internal_layout_only_target_sets_before_build(self) -> None:
+        blocked_cases = [
+            ("--ufunction-second-source-target-set", "buff-compact-intake", "UFunction"),
+            ("--ufunction-second-source-target-set", "transfer-ufunction-intake", "UFunction"),
+            ("--scriptstruct-second-source-target-set", "transfer-scriptstruct", "ScriptStruct"),
+        ]
+
+        for option, target_set, label in blocked_cases:
+            with self.subTest(target_set=target_set):
+                result = subprocess.run(
+                    [
+                        str(REPO_ROOT / "scripts/check_release_readiness.sh"),
+                        "--require-second-source-readiness",
+                        option,
+                        target_set,
+                    ],
+                    cwd=REPO_ROOT,
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+
+                self.assertEqual(result.returncode, 2, result.stderr + result.stdout)
+                self.assertIn(f"{target_set} is internal/layout-only", result.stderr)
                 self.assertIn(f"release readiness {label} target set", result.stderr)
                 self.assertIn("Promote a separate release/public target set", result.stderr)
                 self.assertNotIn("cmake -S", result.stdout)

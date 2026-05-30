@@ -47,6 +47,15 @@ needed, SDK consumer tests, and second-source/runtime evidence gate are promoted
   need their own copied-data ABI design, privacy/lifecycle rules, consumer tests, and
   evidence gates before plugin authors should build public examples around them.
 
+## Contributor Triage Rule
+
+When selecting a Plugin Hub seed, start only from rows marked `production seed available`.
+Rows marked `experimental seed only` may be used for clearly labeled pattern examples, not
+production modules. Rows marked `blocked` or `blocked except experimental auditing` should
+produce design notes, evidence plans, or guardrail tests only; do not start first-party
+examples, SDK wrappers, compatibility shims, or public docs that imply those backlog
+modules are supported.
+
 ## NextGenPlugins Demand Snapshot
 
 The local dictionary currently points to these high-demand Plugin Hub categories. The

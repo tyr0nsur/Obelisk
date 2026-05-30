@@ -24,12 +24,6 @@ PUBLIC_RC_UFUNCTION_SECOND_SOURCE_TARGET_SETS=(
     "item-return-only-policy-slice"
     "chat-message-intake"
 )
-PLANNING_ONLY_SECOND_SOURCE_TARGET_SETS=(
-    "players-identity-lifecycle-intake"
-    "mission-copied-bool-policy-slice"
-    "nextgen-plugin-hub-planning"
-    "plugin-hub-planning"
-)
 
 is_under_path() {
     local path="$1"
@@ -72,20 +66,12 @@ reject_protected_path() {
     fi
 }
 
-reject_planning_only_second_source_target_set() {
+reject_non_release_second_source_target_set() {
     local target_set="$1"
     local label="$2"
-    local planning_only_target_set
     local normalized_target_set
-
-    for planning_only_target_set in "${PLANNING_ONLY_SECOND_SOURCE_TARGET_SETS[@]}"; do
-        if [[ "${target_set}" == "${planning_only_target_set}" ]]; then
-            printf '%s is planning/guidance-only and cannot be used as a release readiness %s target set.\n' \
-                "${target_set}" "${label}" >&2
-            printf 'Promote a separate release/public target set through the documented SDK and second-source gates instead.\n' >&2
-            exit 2
-        fi
-    done
+    local classification
+    local classification_status
 
     normalized_target_set="${target_set,,}"
     if [[ "${normalized_target_set}" == *nextgen* || "${normalized_target_set}" == *plugin-hub* ]]; then
@@ -96,19 +82,62 @@ reject_planning_only_second_source_target_set() {
             exit 2
         fi
     fi
+
+    set +e
+    classification="$(
+        python3 - "${target_set}" <<'PY'
+import pathlib
+import sys
+
+repo_root = pathlib.Path.cwd()
+sys.path.insert(0, str(repo_root / "scripts"))
+
+from reflection_target_sets import target_set_readiness_classification
+
+try:
+    print(target_set_readiness_classification(sys.argv[1]))
+except KeyError:
+    raise SystemExit(3)
+PY
+    )"
+    classification_status=$?
+    set -e
+
+    if [[ "${classification_status}" -ne 0 ]]; then
+        printf '%s is not a known %s target set.\n' "${target_set}" "${label}" >&2
+        printf 'Use scripts/compare_reflection_snapshots.py --list-target-sets to inspect the classified target sets.\n' >&2
+        exit 2
+    fi
+
+    if [[ "${classification}" == "release_readiness" ]]; then
+        return
+    fi
+
+    if [[ "${classification}" == "planning_only" ]]; then
+        printf '%s is planning/guidance-only and cannot be used as a release readiness %s target set.\n' \
+            "${target_set}" "${label}" >&2
+    elif [[ "${classification}" == "internal_layout_only" ]]; then
+        printf '%s is internal/layout-only and cannot be used as a release readiness %s target set.\n' \
+            "${target_set}" "${label}" >&2
+    else
+        printf '%s is %s and cannot be used as a release readiness %s target set.\n' \
+            "${target_set}" "${classification}" "${label}" >&2
+    fi
+    printf 'Promote a separate release/public target set through the documented SDK and second-source gates instead.\n' >&2
+    exit 2
 }
 
 add_ufunction_second_source_target_set() {
     local target_set="$1"
 
-    reject_planning_only_second_source_target_set "${target_set}" "UFunction"
+    reject_non_release_second_source_target_set "${target_set}" "UFunction"
     UFUNCTION_SECOND_SOURCE_TARGET_SETS+=("${target_set}")
 }
 
 add_scriptstruct_second_source_target_set() {
     local target_set="$1"
 
-    reject_planning_only_second_source_target_set "${target_set}" "ScriptStruct"
+    reject_non_release_second_source_target_set "${target_set}" "ScriptStruct"
     SCRIPTSTRUCT_SECOND_SOURCE_TARGET_SETS+=("${target_set}")
 }
 

@@ -146,6 +146,12 @@ when `target_sets/source_target_sets` omit `transfer-scriptstruct`, requires com
 drop any of the three exact bool-tail fields. This prevents stale or hand-edited
 signature reports from bypassing the Transfer contract by losing the label.
 
+The redacted ScriptStruct signature builder also treats both Transfer structs as payload
+metadata only. Scalar and bool fields in `PrimalLocalProfile.ARKTributeDino` and
+`PrimalLocalProfile.ArkTributePlayerData` are emitted as redacted Transfer payload fields,
+not copied-scalar candidates, while retaining the exact bool-tail metadata needed for
+offline review.
+
 Gate result:
 
 ```text

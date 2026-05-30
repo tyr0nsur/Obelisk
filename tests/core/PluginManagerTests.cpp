@@ -172,6 +172,11 @@ namespace
         return true;
     }
 
+    bool FakeBlockingCallback(void*, void*, void*)
+    {
+        return false;
+    }
+
     void FakeChatCallback(const Obelisk::Core::ChatMessageView&, void*)
     {
     }
@@ -1032,6 +1037,14 @@ namespace
         fs::create_directories(root / "state" / "instances" / "arkserver");
         std::ofstream marker(root / "state" / "instances" / "arkserver" / "allow-filtered-process-event-callbacks");
         Require(marker.is_open(), "failed to create filtered ProcessEvent callback marker");
+    }
+
+    void EnableProcessEventBlocking(const fs::path& root)
+    {
+        setenv("OBELISK_ALLOW_PROCESS_EVENT_BLOCKING", "1", 1);
+        fs::create_directories(root / "state" / "instances" / "arkserver");
+        std::ofstream marker(root / "state" / "instances" / "arkserver" / "allow-process-event-blocking");
+        Require(marker.is_open(), "failed to create ProcessEvent blocking marker");
     }
 
     void CleanupPlugin(FakePlugin& plugin)
@@ -4365,6 +4378,57 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestProcessEventBlockingUsesOwnerCapabilitySnapshotAcrossManagers()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_blocking_cross_manager_capability_snapshot");
+        ConfigureEnvironment(root);
+        EnableFilteredProcessEventCallbacks(root);
+
+        FakePlugin pluginA{
+            .filename = "blocking_cross_manager_a.so",
+            .pluginId = "blocking_cross_manager_a",
+            .captureApi = true,
+        };
+        FakeLoader loaderA;
+        loaderA.Add(pluginA);
+        TouchPlugin(root, pluginA.filename);
+        WritePluginConfig(root, pluginA.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager managerA(loaderA);
+        Require((managerA.ApiCapabilitiesForTesting() & OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS) != 0,
+                "first manager did not advertise filtered callbacks");
+        Require((managerA.ApiCapabilitiesForTesting() & OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING) == 0,
+                "first manager advertised ProcessEvent blocking before the gate was enabled");
+        managerA.LoadPlugins((root / "plugins").string());
+        Require(pluginA.initCalls == 1, "blocking cross-manager plugin A was not initialized");
+        Require((pluginA.capturedApi.capabilities & OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING) == 0,
+                "plugin A captured ProcessEvent blocking capability despite disabled gate");
+
+        EnableProcessEventBlocking(root);
+        FakeLoader loaderB;
+        Obelisk::Core::PluginManager managerB(loaderB);
+        Require((managerB.ApiCapabilitiesForTesting() & OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING) != 0,
+                "second manager did not advertise ProcessEvent blocking after the gate was enabled");
+
+        const uint64_t registrationId =
+            pluginA.capturedApi.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle(
+                pluginA.initOwnerToken,
+                42,
+                FakeBlockingCallback);
+        Require(registrationId != 0,
+                "plugin A could not register a filtered callback with its captured filtered capability");
+        Require(Obelisk::Core::EventManager::Get().TriggerPreProcessEvent(42, nullptr, nullptr, nullptr),
+                "plugin A blocked ProcessEvent after a later manager widened the blocking capability");
+
+        managerB.UnloadAll();
+        managerA.UnloadAll();
+        CleanupPlugin(pluginA);
+        unsetenv("OBELISK_ALLOW_FILTERED_PROCESS_EVENT_CALLBACKS");
+        unsetenv("OBELISK_ALLOW_PROCESS_EVENT_BLOCKING");
+        Obelisk::Core::EventManager::SetProcessEventBlockingCapabilityAdvertised(false);
+        fs::remove_all(root);
+    }
+
     void TestCallProcessEventRejectedByDefault()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_call_process_event_denied");
@@ -5360,6 +5424,7 @@ int main()
     TestGlobalProcessEventCallbackAllowedWithGate();
     TestGlobalProcessEventCallbackRejectedAfterGateRevoked();
     TestGlobalProcessEventRegistrationUsesOwnerCapabilitySnapshotAcrossManagers();
+    TestProcessEventBlockingUsesOwnerCapabilitySnapshotAcrossManagers();
     TestCallProcessEventRejectedByDefault();
     TestCallProcessEventAllowedWithGate();
     TestCallProcessEventRejectedAfterGateRevoked();

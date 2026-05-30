@@ -890,6 +890,24 @@ namespace
 
     void TestCopiedObservationRejectsForgedObjectAndArrayRanges()
     {
+        auto poison = [](CopiedMissionObservation& observation) {
+            observation.Function = MissionReflection::MissionFunction::BPOnPlayerRemovedFromMission;
+            observation.FunctionNameIndex = 123456;
+            observation.OuterNameIndex = 654321;
+            observation.BoolStorage[0].Field = MissionReflection::MissionField::BLastPhaseSuccess;
+            observation.BoolStorage[0].Value = true;
+            observation.BoolStorage[1].Field = MissionReflection::MissionField::BFromMissionCompleteEvent;
+            observation.BoolStorage[1].Value = true;
+            observation.BoolCount = observation.BoolStorage.size();
+        };
+        auto requireCleared = [](const CopiedMissionObservation& observation, const char* message) {
+            Require(observation.Function == MissionReflection::MissionFunction::GetPlayerUsableItems, message);
+            Require(observation.FunctionNameIndex == -1, message);
+            Require(observation.OuterNameIndex == -1, message);
+            Require(observation.BoolCount == 0, message);
+            Require(!observation.BoolStorage[0].Value && !observation.BoolStorage[1].Value, message);
+        };
+
         {
             MissionFixture fixture;
             BuildGetPlayerUsableItems(fixture);
@@ -898,8 +916,10 @@ namespace
             attempt.Invocation.Fields[0].Range = {fixture.Params.data(), 0x08};
 
             CopiedMissionObservation observation;
+            poison(observation);
             Require(!TryBuildCopiedMissionObservation(attempt.Invocation, observation),
                     "forged Character object range was accepted");
+            requireCleared(observation, "forged Character object range did not clear copied output");
         }
         {
             MissionFixture fixture;
@@ -909,8 +929,10 @@ namespace
             attempt.Invocation.Fields[1].Range = {fixture.Params.data() + 0x08, 0x10};
 
             CopiedMissionObservation observation;
+            poison(observation);
             Require(!TryBuildCopiedMissionObservation(attempt.Invocation, observation),
                     "forged OutItemIDs array range was accepted");
+            requireCleared(observation, "forged OutItemIDs array range did not clear copied output");
         }
         {
             MissionFixture fixture;
@@ -922,8 +944,10 @@ namespace
             attempt.Invocation.Fields[0].Range = {fixture.Params.data(), 0x08};
 
             CopiedMissionObservation observation;
+            poison(observation);
             Require(!TryBuildCopiedMissionObservation(attempt.Invocation, observation),
                     "forged PlayerCharacter object range was accepted");
+            requireCleared(observation, "forged PlayerCharacter object range did not clear copied output");
         }
         {
             MissionFixture fixture;
@@ -934,8 +958,10 @@ namespace
             attempt.Invocation.Fields[0].Range = {fixture.Params.data(), 0x08};
 
             CopiedMissionObservation observation;
+            poison(observation);
             Require(!TryBuildCopiedMissionObservation(attempt.Invocation, observation),
                     "forged PlayerPawn object range was accepted");
+            requireCleared(observation, "forged PlayerPawn object range did not clear copied output");
         }
         {
             MissionFixture fixture;
@@ -947,8 +973,10 @@ namespace
             attempt.Invocation.Fields[0].Range = {fixture.Params.data(), 0x08};
 
             CopiedMissionObservation observation;
+            poison(observation);
             Require(!TryBuildCopiedMissionObservation(attempt.Invocation, observation),
                     "forged Player object range was accepted");
+            requireCleared(observation, "forged Player object range did not clear copied output");
         }
         {
             MissionFixture fixture;
@@ -960,8 +988,10 @@ namespace
             attempt.Invocation.Fields[1].Range = {fixture.Params.data() + 0x08, 0x08};
 
             CopiedMissionObservation observation;
+            poison(observation);
             Require(!TryBuildCopiedMissionObservation(attempt.Invocation, observation),
                     "forged Controller object range was accepted");
+            requireCleared(observation, "forged Controller object range did not clear copied output");
         }
     }
 

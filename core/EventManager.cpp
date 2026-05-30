@@ -90,14 +90,23 @@ namespace Obelisk::Core
         return registrationId != 0 && HasRegistrationId(registrationId);
     }
 
-    uint64_t EventManager::RegisterPreProcessEventOwned(void* owner, OnProcessEventCallback callback)
+    uint64_t EventManager::RegisterPreProcessEventOwned(void* owner,
+                                                        OnProcessEventCallback callback,
+                                                        bool allowProcessEventBlocking)
     {
         if (!callback)
             return 0;
 
         std::lock_guard<std::mutex> lock(m_Mutex);
         const uint64_t id = AllocateRegistrationId();
-        m_PreProcessEventCallbacks.push_back({id, AllocateRegistrationGeneration(), -1, callback, owner});
+        m_PreProcessEventCallbacks.push_back({
+            id,
+            AllocateRegistrationGeneration(),
+            -1,
+            callback,
+            owner,
+            allowProcessEventBlocking,
+        });
         return id;
     }
 
@@ -108,18 +117,28 @@ namespace Obelisk::Core
 
         std::lock_guard<std::mutex> lock(m_Mutex);
         const uint64_t id = AllocateRegistrationId();
-        m_PostProcessEventCallbacks.push_back({id, AllocateRegistrationGeneration(), -1, callback, owner});
+        m_PostProcessEventCallbacks.push_back({id, AllocateRegistrationGeneration(), -1, callback, owner, false});
         return id;
     }
 
-    uint64_t EventManager::RegisterPreProcessEventForNameIndexOwned(void* owner, int32_t nameIndex, OnProcessEventCallback callback)
+    uint64_t EventManager::RegisterPreProcessEventForNameIndexOwned(void* owner,
+                                                                    int32_t nameIndex,
+                                                                    OnProcessEventCallback callback,
+                                                                    bool allowProcessEventBlocking)
     {
         if (!callback)
             return 0;
 
         std::lock_guard<std::mutex> lock(m_Mutex);
         const uint64_t id = AllocateRegistrationId();
-        m_FilteredPreProcessEventCallbacks.push_back({id, AllocateRegistrationGeneration(), nameIndex, callback, owner});
+        m_FilteredPreProcessEventCallbacks.push_back({
+            id,
+            AllocateRegistrationGeneration(),
+            nameIndex,
+            callback,
+            owner,
+            allowProcessEventBlocking,
+        });
         return id;
     }
 
@@ -130,7 +149,14 @@ namespace Obelisk::Core
 
         std::lock_guard<std::mutex> lock(m_Mutex);
         const uint64_t id = AllocateRegistrationId();
-        m_FilteredPostProcessEventCallbacks.push_back({id, AllocateRegistrationGeneration(), nameIndex, callback, owner});
+        m_FilteredPostProcessEventCallbacks.push_back({
+            id,
+            AllocateRegistrationGeneration(),
+            nameIndex,
+            callback,
+            owner,
+            false,
+        });
         return id;
     }
 
@@ -239,7 +265,7 @@ namespace Obelisk::Core
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
             for (const auto& item : m_PreProcessEventCallbacks)
-                callbacks.push_back({item.id, item.generation, item.callback});
+                callbacks.push_back({item.id, item.generation, item.callback, item.allowProcessEventBlocking});
         }
 
         for (const auto& snapshot : callbacks)
@@ -256,7 +282,7 @@ namespace Obelisk::Core
             {
                 if (!snapshot.callback(caller, function, parms))
                 {
-                    if (IsProcessEventBlockingAllowed())
+                    if (snapshot.allowProcessEventBlocking && IsProcessEventBlockingAllowed())
                         return false;
                     OBELISK_WARN("PreProcessEvent callback returned false, but ProcessEvent blocking is disabled; continuing original event.");
                 }
@@ -295,7 +321,7 @@ namespace Obelisk::Core
             for (const auto& item : m_FilteredPreProcessEventCallbacks)
             {
                 if (item.nameIndex == nameIndex)
-                    callbacks.push_back({item.id, item.generation, item.callback});
+                    callbacks.push_back({item.id, item.generation, item.callback, item.allowProcessEventBlocking});
             }
         }
 
@@ -313,7 +339,7 @@ namespace Obelisk::Core
             {
                 if (!snapshot.callback(caller, function, parms))
                 {
-                    if (IsProcessEventBlockingAllowed())
+                    if (snapshot.allowProcessEventBlocking && IsProcessEventBlockingAllowed())
                         return false;
                     OBELISK_WARN("Filtered PreProcessEvent callback returned false, but ProcessEvent blocking is disabled; continuing original event.");
                 }
@@ -347,7 +373,7 @@ namespace Obelisk::Core
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
             for (const auto& item : m_PostProcessEventCallbacks)
-                callbacks.push_back({item.id, item.generation, item.callback});
+                callbacks.push_back({item.id, item.generation, item.callback, false});
         }
 
         for (const auto& snapshot : callbacks)
@@ -396,7 +422,7 @@ namespace Obelisk::Core
             for (const auto& item : m_FilteredPostProcessEventCallbacks)
             {
                 if (item.nameIndex == nameIndex)
-                    callbacks.push_back({item.id, item.generation, item.callback});
+                    callbacks.push_back({item.id, item.generation, item.callback, false});
             }
         }
 

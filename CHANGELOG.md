@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Hardened raw ProcessEvent blocking so plugin pre-callbacks can block only when that
+  plugin owner's init-time capability snapshot advertised ProcessEvent blocking and the
+  live debug gate remains enabled.
+- Hardened release readiness and offline evidence guardrails so non-release target sets
+  are rejected through the shared classifier, Transfer ScriptStruct payload fields stay
+  redacted-only, ResourceHandle reports its missing runtime artifact schemas explicitly,
+  and rejected Mission copied observations prove stale output is cleared.
 - Hardened installed SDK package metadata so CMake exports all public ABI version macros
   and installed consumers verify package/header ABI parity.
 - Hardened plugin API rejection paths so no-throw warning logging is used across callback

@@ -27,6 +27,13 @@ def assert_fail_closed_resource_handle_contract(testcase: unittest.TestCase, pay
         payload["lifetime_blocker_summary"]["blockers"],
         list(evaluator.RESOURCE_HANDLE_LIFETIME_BLOCKERS),
     )
+    testcase.assertEqual(
+        payload["lifetime_blocker_summary"]["required_runtime_artifact_schemas"],
+        list(evaluator.RESOURCE_HANDLE_RUNTIME_EVIDENCE_REQUIREMENTS),
+    )
+    testcase.assertIs(payload["evidence_checks"]["runtime_rejection_samples_present"], False)
+    testcase.assertIs(payload["evidence_checks"]["runtime_serial_semantics_present"], False)
+    testcase.assertIs(payload["evidence_checks"]["runtime_resourcehandle_promotion_evidence_complete"], False)
     testcase.assertTrue(set(evaluator.RESOURCE_HANDLE_LIFETIME_BLOCKERS).issubset(set(payload["blockers"])))
     testcase.assertEqual(payload["promotion_gate"]["ready"], False)
     testcase.assertEqual(payload["promotion_gate"]["blockers"], payload["blockers"])
@@ -820,6 +827,38 @@ class ResourceHandleRevalidationEvaluatorTests(unittest.TestCase):
         self.assertNotIn(evaluator.BLOCKER_MISSING_COHERENT_WINDOW, payload["blockers"])
         self.assertIn(evaluator.BLOCKER_UOBJECT_FLAGS, payload["blockers"])
         self.assertTrue(set(evaluator.RESOURCE_HANDLE_LIFETIME_BLOCKERS).issubset(set(payload["blockers"])))
+
+    def test_runtime_artifact_requirements_keep_offline_serial_policy_from_unblocking_resourcehandle(self) -> None:
+        payload = evaluator.build_evaluation(
+            [reconciliation_report(serial_values=[17], artifact_identity_sha256="a" * 64)],
+            static_evidence(coherent=True, artifact_identity_sha256="b" * 64),
+            require_artifact_identity=True,
+            uobject_flag_policy=uobject_flag_policy_report(artifact_identity_sha256="c" * 64),
+        )
+
+        assert_fail_closed_resource_handle_contract(self, payload)
+        self.assertTrue(payload["evidence_checks"]["evidence_without_lifetime_flags_ready"])
+        self.assertTrue(payload["evidence_checks"]["internal_uobject_revalidation_candidate_present"])
+        self.assertFalse(payload["evidence_checks"]["runtime_rejection_samples_present"])
+        self.assertFalse(payload["evidence_checks"]["runtime_serial_semantics_present"])
+        self.assertFalse(payload["evidence_checks"]["runtime_resourcehandle_promotion_evidence_complete"])
+        self.assertIn("no_rejected_runtime_object_samples", payload["blockers"])
+        self.assertIn("no_serial_reuse_or_wraparound_policy", payload["blockers"])
+        self.assertEqual(
+            payload["lifetime_blocker_summary"]["required_runtime_artifact_schemas"],
+            [
+                {
+                    "schema": evaluator.RUNTIME_REJECTION_SAMPLES_SCHEMA,
+                    "blocker": "no_rejected_runtime_object_samples",
+                    "present": False,
+                },
+                {
+                    "schema": evaluator.RUNTIME_SERIAL_SEMANTICS_SCHEMA,
+                    "blocker": "no_serial_reuse_or_wraparound_policy",
+                    "present": False,
+                },
+            ],
+        )
 
 
 if __name__ == "__main__":

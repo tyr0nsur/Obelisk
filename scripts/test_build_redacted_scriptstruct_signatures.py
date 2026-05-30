@@ -118,7 +118,7 @@ class BuildRedactedScriptStructSignaturesTest(unittest.TestCase):
         self.assertEqual(3, signature["property_count"])
 
         fields = signature["fields"]
-        self.assertEqual("redacted_sensitive_scalar", fields[0]["type"])
+        self.assertEqual("redacted_transfer_payload_scalar", fields[0]["type"])
         self.assertNotIn("PlayerDataID", fields[0]["type"])
         self.assertEqual("redacted_array", fields[1]["type"])
         self.assertEqual(
@@ -128,23 +128,30 @@ class BuildRedactedScriptStructSignaturesTest(unittest.TestCase):
             },
             fields[1]["array_inner"],
         )
-        self.assertEqual("bool", fields[2]["type"])
+        self.assertEqual("redacted_transfer_payload_bool", fields[2]["type"])
         self.assertEqual({"byte_mask": "0x01", "field_mask": "0xff"}, fields[2]["bool_masks"])
         self.assertEqual(1, fields[2]["bool_field_size"])
         self.assertEqual(0, fields[2]["bool_byte_offset"])
         self.assertEqual("0x01", fields[2]["byte_mask"])
         self.assertEqual("0xff", fields[2]["field_mask"])
         self.assertIs(False, fields[2]["native_bool"])
+        self.assertIn("no_public_transfer_sdk", signature["promotion_blockers"])
+        self.assertIn("transfer_scriptstruct_payload_decode_blocked", signature["promotion_blockers"])
+        self.assertIn("no_public_transfer_sdk", fields[2]["promotion_blockers"])
+        self.assertIn("transfer_scriptstruct_payload_decode_blocked", fields[2]["promotion_blockers"])
 
         safety = report["safety_summary"]
         self.assertEqual("candidate_only", safety["artifact_status"])
         self.assertIs(False, safety["promotion_ready"])
         self.assertEqual("offline_review_only", safety["intended_use"])
         self.assertEqual(3, safety["field_count_total"])
-        self.assertEqual(1, safety["copied_scalar_count_total"])
-        self.assertEqual({"bool": 1}, safety["copied_scalar_by_kind"])
-        self.assertEqual(2, safety["redacted_count_total"])
-        self.assertEqual({"array": 1, "sensitive_scalar": 1}, safety["redacted_by_reason"])
+        self.assertEqual(0, safety["copied_scalar_count_total"])
+        self.assertEqual({}, safety["copied_scalar_by_kind"])
+        self.assertEqual(3, safety["redacted_count_total"])
+        self.assertEqual(
+            {"array": 1, "transfer_payload_bool": 1, "transfer_payload_scalar": 1},
+            safety["redacted_by_reason"],
+        )
         self.assertIn("public_scriptstruct_sdk", safety["not_promoted_surfaces"])
         self.assertIn("resource_handle", safety["not_promoted_surfaces"])
 
@@ -173,6 +180,7 @@ class BuildRedactedScriptStructSignaturesTest(unittest.TestCase):
         )
         self.assertEqual("candidate_only", report["safety_summary"]["artifact_status"])
         self.assertIs(False, report["safety_summary"]["promotion_ready"])
+        self.assertEqual(0, report["safety_summary"]["copied_scalar_count_total"])
         self.assertIn("transfer_payload_decoding", report["safety_summary"]["not_promoted_surfaces"])
         player_data = next(
             signature
@@ -193,11 +201,17 @@ class BuildRedactedScriptStructSignaturesTest(unittest.TestCase):
             set(bool_fields),
         )
         for semantics in bool_fields.values():
+            self.assertEqual("redacted_transfer_payload_bool", semantics["type"])
             self.assertEqual(1, semantics["bool_field_size"])
             self.assertEqual(0, semantics["bool_byte_offset"])
             self.assertEqual("0x01", semantics["byte_mask"])
             self.assertEqual("0xff", semantics["field_mask"])
             self.assertIs(False, semantics["native_bool"])
+            self.assertIn("no_public_transfer_sdk", semantics["promotion_blockers"])
+            self.assertIn("transfer_scriptstruct_payload_decode_blocked", semantics["promotion_blockers"])
+        for signature in report["signatures"]:
+            self.assertIn("no_public_transfer_sdk", signature["promotion_blockers"])
+            self.assertIn("transfer_scriptstruct_payload_decode_blocked", signature["promotion_blockers"])
 
         serialized = json.dumps(report)
         self.assertNotIn(str(fixture_root), serialized)

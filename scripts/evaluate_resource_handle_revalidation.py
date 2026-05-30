@@ -29,6 +29,8 @@ GOBJECTS_RECONCILIATION_SCHEMA = "obelisk.gobjects-sample-reconciliation.v1"
 STATIC_GLOBAL_EVIDENCE_SCHEMA = "obelisk.static-global-promotion-evidence.v1"
 UOBJECT_FLAG_POLICY_REPORT_SCHEMA = "obelisk.uobject-flag-policy-report.v1"
 INTERNAL_UOBJECT_REVALIDATION_CANDIDATE_SCHEMA = "obelisk.internal-uobject-revalidation-candidate.v1"
+RUNTIME_REJECTION_SAMPLES_SCHEMA = "obelisk.internal-uobject-revalidation-runtime-rejection-samples.v1"
+RUNTIME_SERIAL_SEMANTICS_SCHEMA = "obelisk.internal-uobject-revalidation-runtime-serial-semantics.v1"
 
 STATUS_CANDIDATE_UOBJECT = "candidate-uobject"
 BLOCKER_ZERO_OR_MISSING_SERIAL = "zero_or_missing_fuobjectitem_serial_candidates"
@@ -101,6 +103,18 @@ RESOURCE_HANDLE_LIFETIME_BLOCKERS = (
     "no_serial_reuse_or_wraparound_policy",
     "no_version_matched_source_decompiler_correlation_for_public_lifecycle_names",
     "no_rejected_runtime_object_samples",
+)
+RESOURCE_HANDLE_RUNTIME_EVIDENCE_REQUIREMENTS = (
+    {
+        "schema": RUNTIME_REJECTION_SAMPLES_SCHEMA,
+        "blocker": "no_rejected_runtime_object_samples",
+        "present": False,
+    },
+    {
+        "schema": RUNTIME_SERIAL_SEMANTICS_SCHEMA,
+        "blocker": "no_serial_reuse_or_wraparound_policy",
+        "present": False,
+    },
 )
 
 def load_json(path: Path, label: str) -> dict[str, Any]:
@@ -629,6 +643,9 @@ def build_evaluation(
         "post_callback_lifetime_contract_present": False,
         "post_callback_lifetime_policy_proven": False,
         "serial_reuse_or_wraparound_policy_present": False,
+        "runtime_rejection_samples_present": False,
+        "runtime_serial_semantics_present": False,
+        "runtime_resourcehandle_promotion_evidence_complete": False,
         "version_matched_source_decompiler_correlation_for_public_lifecycle_names_present": False,
         "rejected_runtime_object_samples_present": False,
         "evidence_without_lifetime_flags_ready": evidence_without_lifetime_flags_ready,
@@ -667,6 +684,9 @@ def build_evaluation(
             "public_contract_present": False,
             "post_callback_contract_present": False,
             "serial_reuse_or_wraparound_policy_present": False,
+            "runtime_rejection_samples_present": False,
+            "runtime_serial_semantics_present": False,
+            "required_runtime_artifact_schemas": list(RESOURCE_HANDLE_RUNTIME_EVIDENCE_REQUIREMENTS),
             "rejected_runtime_object_samples_present": False,
         },
         "non_claims": list(RESOURCE_HANDLE_NON_CLAIMS),

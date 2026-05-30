@@ -187,8 +187,8 @@ The promotion check always includes the public RC UFunction target sets:
 configured second-source snapshot root, either through
 `OBELISK_UFUNCTION_SECOND_SOURCE_ROOT` or `--ufunction-second-source-root`; without one,
 the gate fails closed with missing second-source evidence. Explicit
-`--ufunction-second-source-target-set` values add module target sets to the required RC
-target sets; they do not replace or omit the public RC gate.
+`--ufunction-second-source-target-set` values add promoted release-readiness module target
+sets to the required RC target sets; they do not replace or omit the public RC gate.
 
 The accepted default intake is layout-only evidence: reports may show
 `promotion_gate.ready=true` with `promotion_gate.ready_scope=layout_only` and
@@ -200,8 +200,9 @@ candidate-only. It also does not prove resource cross-event correlation.
 
 Accepted transfer second-source extraction, including `transfer-ufunction-intake` and
 `transfer-scriptstruct`, is layout-only offline evidence unless a later release or PR
-explicitly names those target sets and passes the promotion gates. It does not promote a
-public Transfer SDK, payload decoding, object identity, runtime hooks, mutation, return
+promotes a separate release-readiness target set and passes the promotion gates. Existing
+transfer target-set names are not release-readiness inputs. This does not promote a public
+Transfer SDK, payload decoding, object identity, runtime hooks, mutation, return
 overrides, or `ResourceHandle`.
 
 UObject flag transition matrices and static flag-policy reports that pass the offline
@@ -275,8 +276,10 @@ sets: `minimal-second-source-intake`, `structure-observer-intake`,
 `item-return-only-policy-slice`, and `chat-message-intake`. Mission target sets such as
 `mission-compact-intake` are not part of that gate, and scalar-candidate summaries are
 review aids only, not RC scope. Transfer target sets such as `transfer-ufunction-intake`
-are also not part of the default gate. ScriptStruct promotion, including transfer structs,
-is not part of the default gate and must be opted in explicitly.
+are also not part of the default gate. ScriptStruct target sets such as
+`transfer-scriptstruct` are internal/layout-only until a separate promoted target set is
+classified as release readiness; passing `--scriptstruct-second-source-root` is valid only
+with a ScriptStruct target set that has gone through that promotion.
 Planning/guidance-only target sets such as `players-identity-lifecycle-intake` and
 `mission-copied-bool-policy-slice` are not promotable release target sets and are rejected by `scripts/check_release_readiness.sh`.
 The Mission copied-bool lane is a planning-only/internal observer lane, not a public
@@ -286,15 +289,15 @@ NextGen/Plugin Hub planning target sets are also guidance-only demand signals, n
 release/public promotion evidence; replace guidance-only lanes with a separately promoted
 release/public target set after the SDK and second-source gates are satisfied.
 A release or PR that promotes another reflected module family must name each promoted
-target set explicitly; those named sets are added to the public RC target sets:
+target set explicitly after the shared target-set classifier marks it
+`release_readiness`; those named sets are added to the public RC target sets:
 
 ```bash
 scripts/check_release_readiness.sh \
   --require-second-source-readiness \
   --ufunction-second-source-target-set minimal-second-source-intake \
-  --ufunction-second-source-target-set buff-compact-intake \
-  --ufunction-second-source-target-set dino-compact-intake \
-  --scriptstruct-second-source-target-set transfer-scriptstruct \
+  --ufunction-second-source-target-set <promoted-release-readiness-ufunction-target-set> \
+  --scriptstruct-second-source-target-set <promoted-release-readiness-scriptstruct-target-set> \
   --ufunction-second-source-root <second-source-ufunction-snapshots> \
   --scriptstruct-second-source-root <second-source-scriptstruct-snapshots>
 ```
