@@ -1094,6 +1094,91 @@ namespace
         }
     }
 
+    void TestPostOriginalBoolObservationHelper()
+    {
+        {
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+            fixture.Params[0x08] = 1;
+            fixture.Params[0x09] = 0;
+            Attempt attempt = Identify(fixture, kAddPlayerToMissionNameIndex);
+
+            CopiedMissionObservation observation;
+            Require(TryBuildCopiedMissionBoolObservationAfterOriginal(true, attempt, observation),
+                    "post-original AddPlayerToMission attempt did not produce copied bool output");
+            Require(observation.BoolCount == 2, "post-original AddPlayerToMission bool count mismatch");
+            Require(observation.BoolStorage[0].Field == MissionReflection::MissionField::BForceAdd,
+                    "post-original AddPlayerToMission first bool field mismatch");
+            Require(observation.BoolStorage[0].Value,
+                    "post-original AddPlayerToMission first bool value mismatch");
+            Require(observation.BoolStorage[1].Field == MissionReflection::MissionField::ReturnValue,
+                    "post-original AddPlayerToMission return field mismatch");
+            Require(!observation.BoolStorage[1].Value,
+                    "post-original AddPlayerToMission return value mismatch");
+        }
+        {
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+            fixture.Params[0x08] = 1;
+            fixture.Params[0x09] = 1;
+            Attempt attempt = Identify(fixture, kAddPlayerToMissionNameIndex);
+
+            CopiedMissionObservation observation;
+            PoisonObservation(observation);
+            Require(!TryBuildCopiedMissionBoolObservationAfterOriginal(false, attempt, observation),
+                    "pre-original AddPlayerToMission attempt produced copied bool output");
+            RequireObservationCleared(observation,
+                                      "pre-original AddPlayerToMission attempt did not clear copied output");
+        }
+        {
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+            WriteAt(fixture.Function, 0x90, uint32_t{0x0c020c00});
+            Attempt attempt = TryIdentifyInvocation(
+                EnabledGate(),
+                kAddPlayerToMissionNameIndex,
+                fixture.Reader(),
+                fixture.Function.data(),
+                fixture.Params.data());
+
+            CopiedMissionObservation observation;
+            PoisonObservation(observation);
+            Require(!TryBuildCopiedMissionBoolObservationAfterOriginal(true, attempt, observation),
+                    "post-original rejected mission attempt produced copied bool output");
+            RequireObservationCleared(observation,
+                                      "post-original rejected mission attempt did not clear copied output");
+        }
+        {
+            MissionFixture fixture;
+            BuildBPAllowPlayerToLeaveMission(fixture);
+            fixture.Params[0x08] = 1;
+            Attempt attempt = Identify(fixture, kBPAllowPlayerToLeaveMissionNameIndex);
+
+            CopiedMissionObservation observation;
+            Require(TryBuildCopiedMissionBoolObservationAfterOriginal(true, attempt, observation),
+                    "post-original BPAllowPlayerToLeaveMission attempt did not produce copied bool output");
+            fixture.Params[0x08] = 0;
+            Require(observation.BoolCount == 1,
+                    "post-original BPAllowPlayerToLeaveMission bool count mismatch");
+            Require(observation.BoolStorage[0].Field == MissionReflection::MissionField::ReturnValue,
+                    "post-original BPAllowPlayerToLeaveMission return field mismatch");
+            Require(observation.BoolStorage[0].Value,
+                    "post-original BPAllowPlayerToLeaveMission copied data was not independent");
+        }
+        {
+            MissionFixture fixture;
+            BuildGetPlayerUsableItems(fixture);
+            Attempt attempt = Identify(fixture, kGetPlayerUsableItemsNameIndex);
+
+            CopiedMissionObservation observation;
+            PoisonObservation(observation);
+            Require(!TryBuildCopiedMissionBoolObservationAfterOriginal(true, attempt, observation),
+                    "post-original GetPlayerUsableItems produced copied bool output");
+            RequireObservationCleared(observation,
+                                      "post-original GetPlayerUsableItems did not clear copied output");
+        }
+    }
+
     void TestCopiedObservationRejectsWrongFieldShape()
     {
         {
@@ -1428,6 +1513,7 @@ int main()
     TestBuildsMetadataAndCopiedBoolObservationOnly();
     TestCopiedObservationRejectsForgedObjectAndArrayRanges();
     TestMatchedAttemptBoolObservationFence();
+    TestPostOriginalBoolObservationHelper();
     TestCopiedObservationRejectsWrongFieldShape();
     TestCopiedObservationRejectsInvalidBoolRangesAndCounts();
     TestCopiedObservationApprovedBoolSurface();

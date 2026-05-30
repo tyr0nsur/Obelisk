@@ -76,6 +76,7 @@ add_library(obelisk SHARED
     hooks/ProcessEventHook.cpp
     core/ChatEventDispatcher.cpp
     core/InventoryPolicyEventDispatcher.cpp
+    core/ItemReturnEventDispatcher.cpp
     core/StructureEventDispatcher.cpp
     core/TimerManager.cpp
     core/EventManager.cpp
@@ -173,6 +174,16 @@ target_include_directories(inventory_policy_event_dispatcher_tests PRIVATE ${CMA
 target_link_libraries(inventory_policy_event_dispatcher_tests PRIVATE fmt::fmt spdlog::spdlog)
 
 add_test(NAME InventoryPolicyEventDispatcherTests COMMAND inventory_policy_event_dispatcher_tests)
+
+add_executable(item_return_event_dispatcher_tests
+    tests/core/ItemReturnEventDispatcherTests.cpp
+    core/ItemReturnEventDispatcher.cpp
+    runtime/Logger.cpp
+)
+target_include_directories(item_return_event_dispatcher_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(item_return_event_dispatcher_tests PRIVATE fmt::fmt spdlog::spdlog)
+
+add_test(NAME ItemReturnEventDispatcherTests COMMAND item_return_event_dispatcher_tests)
 
 add_executable(plugin_manager_tests
     tests/core/PluginManagerTests.cpp

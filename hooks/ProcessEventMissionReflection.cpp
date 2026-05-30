@@ -491,4 +491,15 @@ namespace Obelisk::Hooks::ProcessEventMissionReflection
         out = value;
         return true;
     }
+
+    bool TryBuildCopiedMissionBoolObservationAfterOriginal(bool originalWasCalled,
+                                                           const Attempt& attempt,
+                                                           CopiedMissionObservation& out)
+    {
+        out = {};
+        if (!originalWasCalled)
+            return false;
+
+        return TryBuildCopiedMissionBoolObservationForMatchedAttempt(attempt, out);
+    }
 }

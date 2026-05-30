@@ -106,9 +106,10 @@ recovery context is not active routing for the current head; use
   Structure non-pin copied-scalar, and Buff breadth packages are evidence-only/internal.
   Consume mode accepts the relevant slices where documented, while promote mode remains
   blocked. See `docs/research/` for artifact paths, manifests, hashes, and target lists.
-- Item return-only policy remains internal and non-authoritative: no public Inventory SDK,
-  hook wiring, markers/env, runtime logs, identity, lookup, mutation, return override, or
-  ResourceHandle.
+- Item return-only policy remains internal and non-authoritative. It now has a private
+  `ItemReturnEventDispatcher` for copied `ReturnValue` bool observations, but still has no
+  public Inventory/Items SDK, hook wiring, markers/env, runtime logs, identity, lookup,
+  mutation, return override, or ResourceHandle.
 - Item return-only now has internal post-original copied-payload helper coverage. Public
   promotion should be a future append-only `GameplayPolicyEvent` expansion with three
   distinct inventory-item event kinds for `AllowEquipItem`, `CanRepair`, and
@@ -147,9 +148,11 @@ recovery context is not active routing for the current head; use
 - Current post-RC focus: Item return-only policy, Mission copied-bool observer, then
   Transfer `bAccept`; this is no RC public SDK/API promotion and does not authorize
   Transfer runtime work.
-- Next Item promotion round must be deliberate ABI work: append event/mask constants,
-  descriptors, C/C++ ABI layout checks, SDK consumer coverage, owner-token lifecycle
-  cleanup tests, and documentation. Do not route it through `InventoryPolicyEventKind::CanUse`.
+- Next Item runtime round, if pursued, should wire only the private dispatcher behind
+  fail-closed observer gates and post-original copied payloads. Public Item promotion must
+  be a later deliberate ABI round: append event/mask constants, descriptors, C/C++ ABI
+  layout checks, SDK consumer coverage, owner-token lifecycle cleanup tests, and
+  documentation. Do not route it through `InventoryPolicyEventKind::CanUse`.
 - Secondary evidence-only lanes may continue for structure non-pin copied scalars and Buff
   breadth, but they must not imply runtime work, marker/env changes, public SDK expansion,
   or RC surface changes.

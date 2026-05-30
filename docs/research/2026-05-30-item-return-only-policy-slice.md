@@ -286,6 +286,12 @@ payload only when the original `ProcessEvent` path reports success, rejects pre-
 rejected attempts, clears failed output, and keeps copied bool storage independent from
 later parameter mutation.
 
-This is still internal plumbing. It does not add an item dispatcher, public
-`GameplayPolicyEvent` mapping, ABI values, plugin callback, runtime hook wiring, marker/env
-gate, live-server validation, mutation, blocking, return override, or an Items SDK.
+The slice now also has a private/internal `ItemReturnEventDispatcher`. It accepts only
+three event kinds (`AllowEquipItem`, `CanRepair`, `UseItemOntoItem`) and exactly one copied
+scalar field (`ReturnValue` bool). The dispatcher mirrors existing owner-scoped callback
+lifecycle behavior, copies payload storage for callback duration, contains callback
+exceptions, and defers user-data cleanup safely when a callback unregisters itself.
+
+This is still internal plumbing. It does not add public `GameplayPolicyEvent` mapping, ABI
+values, plugin callback registration, runtime hook wiring, marker/env gate, live-server
+validation, mutation, blocking, return override, or an Items SDK.
