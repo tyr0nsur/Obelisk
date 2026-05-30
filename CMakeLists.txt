@@ -102,13 +102,6 @@ if(OBELISK_BUILD_EXPERIMENTAL_PLUGINS)
 endif()
 add_subdirectory(tests/sdk_consumer)
 
-add_test(
-    NAME InstallLayoutPublicSdkConsumer
-    COMMAND ${CMAKE_COMMAND} -E env
-        OBELISK_BUILD_DIR=${CMAKE_BINARY_DIR}
-        ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_install_obelisk_layout.sh
-)
-
 add_executable(plugin_config_tests
     tests/core/PluginConfigTests.cpp
     core/PluginConfig.cpp

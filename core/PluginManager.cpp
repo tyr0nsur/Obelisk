@@ -1920,7 +1920,18 @@ namespace Obelisk::Core
                 OBELISK_WARN("CallProcessEvent rejected. Enable allow-call-process-event only for a controlled debug window.");
                 return;
             }
-            Hooks::ProcessEventHook::CallOriginalProcessEvent(caller, function, parms);
+            try
+            {
+                Hooks::ProcessEventHook::CallOriginalProcessEvent(caller, function, parms);
+            }
+            catch (const std::exception& e)
+            {
+                SafeLogErrorNoThrow("CallProcessEvent failed after exception", e.what());
+            }
+            catch (...)
+            {
+                SafeLogErrorNoThrow("CallProcessEvent failed after unknown exception.");
+            }
         }
     }
 

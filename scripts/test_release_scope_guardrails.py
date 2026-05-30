@@ -890,13 +890,14 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
                 self.assertIn("mutation", compact)
                 self.assertIn("return override", compact)
 
-    def test_installed_sdk_consumer_is_registered_as_ctest(self) -> None:
+    def test_installed_sdk_consumer_stays_in_release_gate_not_default_ctest(self) -> None:
         cmake = read("CMakeLists.txt")
+        release_gate = read("scripts/check_release_readiness.sh")
 
-        self.assertIn("add_test(", cmake)
-        self.assertIn("NAME InstallLayoutPublicSdkConsumer", cmake)
-        self.assertIn("scripts/test_install_obelisk_layout.sh", cmake)
-        self.assertIn("OBELISK_BUILD_DIR=${CMAKE_BINARY_DIR}", cmake)
+        self.assertNotIn("InstallLayoutPublicSdkConsumer", cmake)
+        self.assertNotIn("scripts/test_install_obelisk_layout.sh", cmake)
+        self.assertIn("scripts/test_install_obelisk_layout.sh", release_gate)
+        self.assertIn("LAYOUT_CHECK_ROOT", release_gate)
 
     def test_mission_copied_bool_observer_stays_internal_and_non_authoritative(self) -> None:
         mission_plan = read("docs/research/2026-05-30-mission-copied-bool-observer-plan.md")

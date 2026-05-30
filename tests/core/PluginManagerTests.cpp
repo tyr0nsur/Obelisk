@@ -28,6 +28,7 @@ namespace Obelisk::Hooks
 {
     int ProcessEventCallOriginalCountForTesting();
     void ResetProcessEventCallOriginalCountForTesting();
+    void SetProcessEventCallOriginalThrowForTesting(bool enabled);
 }
 
 namespace
@@ -3767,6 +3768,53 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestCallProcessEventSuppressesOriginalException()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_call_process_event_exception");
+        ConfigureEnvironment(root);
+        setenv("OBELISK_ALLOW_CALL_PROCESS_EVENT", "1", 1);
+        fs::create_directories(root / "state" / "instances" / "arkserver");
+        std::ofstream marker(root / "state" / "instances" / "arkserver" / "allow-call-process-event");
+        Require(marker.is_open(), "failed to create CallProcessEvent marker");
+        marker.close();
+        Obelisk::Hooks::ResetProcessEventCallOriginalCountForTesting();
+        Obelisk::Hooks::SetProcessEventCallOriginalThrowForTesting(true);
+
+        FakePlugin plugin{.filename = "call_process_event_exception.so", .captureApi = true};
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        Require((manager.ApiCapabilitiesForTesting() & OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT) != 0,
+                "CallProcessEvent capability was not enabled with env and marker gate");
+
+        manager.LoadPlugins((root / "plugins").string());
+        Require(plugin.initCalls == 1, "CallProcessEvent-exception plugin was not initialized");
+
+        try
+        {
+            plugin.capturedApi.CallProcessEvent(
+                reinterpret_cast<void*>(0x1),
+                reinterpret_cast<void*>(0x2),
+                reinterpret_cast<void*>(0x3));
+        }
+        catch (...)
+        {
+            Require(false, "CallProcessEvent let a trampoline exception escape the C ABI boundary");
+        }
+
+        Require(Obelisk::Hooks::ProcessEventCallOriginalCountForTesting() == 1,
+                "CallProcessEvent did not attempt original trampoline before suppressing exception");
+
+        manager.UnloadAll();
+        CleanupPlugin(plugin);
+        Obelisk::Hooks::SetProcessEventCallOriginalThrowForTesting(false);
+        unsetenv("OBELISK_ALLOW_CALL_PROCESS_EVENT");
+        fs::remove_all(root);
+    }
+
     void TestDisabledPluginPreparesConfigButDoesNotInit()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_disabled");
@@ -4351,6 +4399,7 @@ int main()
     TestCallProcessEventRejectedByDefault();
     TestCallProcessEventAllowedWithGate();
     TestCallProcessEventRejectedAfterGateRevoked();
+    TestCallProcessEventSuppressesOriginalException();
     TestDisabledPluginPreparesConfigButDoesNotInit();
     TestInstanceDisallowedPluginDoesNotInit();
     TestMissingGetInfoRejectsAndCloses();
