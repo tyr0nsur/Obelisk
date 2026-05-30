@@ -16,9 +16,10 @@ for the exact command and artifact root. RC public scope remains limited to
 `GameplayPolicyEvent`, the minimal copied `ChatMessageEvent`, `DescribeResourceKind`, and
 `DescribeGameplayPolicyEventKind`. It does not promote a public Inventory/Items SDK,
 `ResourceHandle`, identity, lookup, mutation, return override, or live-server claim.
-Post-RC development targets a broader `v1.0` core-stability track: general reflection evidence,
-copied-data module APIs, operator lifecycle safety, and ArkApi-style plugin replacement
-capacity without retroactively expanding the RC.
+Post-RC development promotes process-local owner-token timers as a first-stable v0.1 core
+primitive while still targeting the broader `v1.0` core-stability track: general
+reflection evidence, copied-data module APIs, operator lifecycle safety, and ArkApi-style
+plugin replacement capacity without retroactively expanding the published RC tag.
 
 Contributor reading guide:
 
@@ -56,7 +57,7 @@ define or protect runtime behavior.
 | Plugin C ABI loading | Stable baseline | ABI is C-compatible and currently append-only for new metadata fields; the first stable `v0.1.0` line freezes the current `ObeliskApi` ABI v1 layout, and any ABI v2 requires an explicit migration plan. ABI guardrails include layout validation, in-tree and installed SDK consumer checks, and capability-snapshot tests for owner-token public registrations. |
 | Filtered ProcessEvent callbacks | Debug-gated raw ABI | Runtime infrastructure only: callbacks scoped by `FName` index still receive borrowed UE pointers and raw params, so they are rejected unless `OBELISK_ALLOW_FILTERED_PROCESS_EVENT_CALLBACKS=1` and `allow-filtered-process-event-callbacks` are active. This is not public module dispatch, gameplay mutation, return override, or a stable parameter API. |
 | Plugin callback ownership | Stable baseline | Callback owner tokens are unregistered on init failure and before plugin unload; owner-token handle registration supports helper/background-thread callbacks and explicit owner-scoped unregister without creating ownerless registrations. Owner-token callback registration uses the plugin owner's init-time capability snapshot, so later manager construction cannot widen an already-loaded plugin. Unregister/owner cleanup initiated from gameplay callbacks avoids dispatcher cleanup waits to prevent callback-to-callback deadlocks, while non-callback owner/plugin cleanup still waits for in-flight dispatch and deferred `DestroyUserData` cleanup. |
-| Process-local timers | Post-RC core primitive | Implemented after the published RC as an append-only core scheduler: owner-token one-shot/repeating callbacks, process-local handles, explicit unregister, exception containment, and owner cleanup on init failure/unload. This is not a UE/gameplay timer, persistent cluster state, object identity, command API, or permission API. |
+| Process-local timers | Promoted v0.1 core primitive | Append-only core scheduler with owner-token one-shot/repeating callbacks, process-local handles, explicit unregister, exception containment, and owner cleanup on init failure/unload. This is not a UE/gameplay timer, persistent cluster state, object identity, command API, or permission API. `oProcessTimer` is the first-party release example. |
 | Plugin architecture policy | Stable baseline | See `docs/PLUGIN_ARCHITECTURE.md`; examples must stay small and experimental plugins stay out of top-level build. Plugins with background workers, sockets, HTTP, long-lived file readers, or other external ingress are experimental until they pass a promotion gate for idempotent shutdown, owner-token unregister, queue drain, thread join, socket/file close, and no detached workers or persisted runtime handles. |
 | `oBaseEvents` | Release example | First official example plugin; demonstrates ABI validation, config creation, debug-gated filtered callback handle lifecycle, and shutdown unregister. It is not gameplay dispatch or a stable parameter API. |
 | `oPolicyAudit` | Experimental | First-party `GameplayPolicyEvent` audit example excluded from the default build and release scope unless `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`; not published by `scripts/check_release_readiness.sh`. |

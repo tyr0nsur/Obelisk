@@ -46,9 +46,17 @@ Included:
   `enable-chat-events` path during an approved operator-selected beta-test window, with no
   privacy blockers; historical `enable-chat-reflection` observer logs do not satisfy that
   gate.
+- Process-local owner-token timers as a v0.1 core primitive: one-shot/repeating callbacks,
+  zero-failure handles, explicit unregister, exception containment, and owner cleanup on
+  plugin init failure/unload. They are not UE/gameplay timers, gameplay/module timer APIs,
+  shared scheduler state, persistent handles, identity, lookup, permissions, commands, or
+  cluster coordination. `oProcessTimer` is the first-party example and is published by the
+  release gate.
 
 RC public scope remains limited to `GameplayPolicyEvent`, the minimal copied
 `ChatMessageEvent`, `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`.
+The future first-stable `v0.1.0` scope additionally includes process-local owner-token
+timers after the timer release-prep gate passes on the intended ref.
 
 Excluded:
 

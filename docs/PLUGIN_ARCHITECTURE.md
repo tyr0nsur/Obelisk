@@ -20,8 +20,9 @@ plugins/
 focused on teaching one stable plugin model each: copied events/config/lifecycle for
 `oBaseEvents`, and process-local owner-token timers for `oProcessTimer`.
 
-Release-scope caveat: `oProcessTimer` and the timer ABI are post-RC/v1 reference material,
-not part of the `v0.1.0-rc.1` public surface.
+Release-scope caveat: `oProcessTimer` and the timer ABI are first-stable `v0.1.0` core
+reference material only. They are process-local scheduler primitives, not gameplay/module
+timer APIs.
 
 `oPolicyAudit` is an experimental first-party example for `GameplayPolicyEvent`
 descriptors and callbacks. `oChatLogger` is an experimental first-party smoke test for

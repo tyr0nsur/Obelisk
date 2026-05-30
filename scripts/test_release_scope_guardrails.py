@@ -451,6 +451,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("gameplay/module second-source promotion gate was not run", script)
         self.assertIn("scripts/install_obelisk_plugin.sh --dry-run", script)
         self.assertIn("${BUILD_DIR}/plugins/oBaseEvents/oBaseEvents.so", script)
+        self.assertIn("${BUILD_DIR}/plugins/oProcessTimer/oProcessTimer.so", script)
         self.assertNotIn("oPolicyAudit.so", script)
         self.assertIn("--require-second-source-readiness", release)
         self.assertIn("an existing local\nor unpublished RC tag is not proof", release)
@@ -606,9 +607,9 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
 
         plugins_readme = normalized(read("plugins/README.md"))
         timer_source = read("plugins/oProcessTimer/oProcessTimer.cpp")
-        self.assertIn("`oProcessTimer` is post-RC/v1 core scope, not part of the `v0.1.0-rc.1` public surface", plugins_readme)
-        self.assertIn('out->version = "0.2.0-dev";', timer_source)
-        self.assertNotIn('out->version = "0.1.0";', timer_source)
+        self.assertIn("`oProcessTimer` is part of the first-stable core plugin set for `v0.1.0`", plugins_readme)
+        self.assertIn('out->version = "0.1.0";', timer_source)
+        self.assertNotIn('out->version = "0.2.0-dev";', timer_source)
         self.assertNotIn('out->version = "0.1.0-rc.1";', timer_source)
 
     def test_arkapi_reference_is_names_behavior_only_not_porting_or_copying(self) -> None:

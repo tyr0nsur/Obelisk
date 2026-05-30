@@ -257,6 +257,25 @@ namespace
         g_RegisteredChatMessageCallback(&event, g_RegisteredChatMessageUserData);
     }
 
+    void DispatchMalformedChatMessageEvent(uint32_t sendMode,
+                                           uint64_t flags,
+                                           const char* message,
+                                           size_t size)
+    {
+        Require(g_RegisteredChatMessageCallback != nullptr, "missing chat message callback");
+        Require(g_RegisteredChatMessageUserData != nullptr, "missing chat message user data");
+
+        ObeliskChatMessageEvent event{};
+        event.abi_version = OBELISK_CHAT_MESSAGE_EVENT_ABI_VERSION;
+        event.struct_size = sizeof(ObeliskChatMessageEvent);
+        event.send_mode = sendMode;
+        event.flags = flags;
+        event.sequence = 44;
+        event.message = {message, size};
+
+        g_RegisteredChatMessageCallback(&event, g_RegisteredChatMessageUserData);
+    }
+
     void DispatchValidTimer()
     {
         Require(g_RegisteredTimerCallback != nullptr, "missing timer callback");
@@ -1068,6 +1087,23 @@ int main(int argc, char** argv)
                 kOBaseEventsMaxLocalCommandBytes + 1);
             Require(HasLogContaining(g_ErrorLogs, "Local chat command rejected reason=malformed-event"),
                 "chat command helper did not reject oversized chat message event");
+            DispatchMalformedChatMessageEvent(
+                OBELISK_CHAT_SEND_MODE_MAX + 1,
+                OBELISK_CHAT_MESSAGE_EVENT_FLAG_COPIED_PAYLOAD,
+                "/help invalid-send-mode-secret",
+                std::strlen("/help invalid-send-mode-secret"));
+            DispatchMalformedChatMessageEvent(
+                OBELISK_CHAT_SEND_MODE_GLOBAL,
+                0,
+                "/help missing-copied-flag-secret",
+                std::strlen("/help missing-copied-flag-secret"));
+            DispatchMalformedChatMessageEvent(
+                OBELISK_CHAT_SEND_MODE_GLOBAL,
+                OBELISK_CHAT_MESSAGE_EVENT_FLAG_COPIED_PAYLOAD,
+                nullptr,
+                std::strlen("/help null-data-secret"));
+            Require(HasLogContaining(g_ErrorLogs, "Local chat command rejected reason=malformed-event"),
+                "chat command helper did not reject malformed chat message events");
             Require(!HasLogContaining(g_InfoLogs, "hello"), "chat command helper logged raw non-command chat text");
             Require(!HasLogContaining(g_InfoLogs, "raw-secret") &&
                     !HasLogContaining(g_ErrorLogs, "raw-secret"),
@@ -1075,6 +1111,15 @@ int main(int argc, char** argv)
             Require(!HasLogContaining(g_InfoLogs, "oversize-secret") &&
                     !HasLogContaining(g_ErrorLogs, "oversize-secret"),
                 "chat command helper logged raw oversized chat text");
+            Require(!HasLogContaining(g_InfoLogs, "invalid-send-mode-secret") &&
+                    !HasLogContaining(g_ErrorLogs, "invalid-send-mode-secret"),
+                "chat command helper logged raw invalid send mode chat text");
+            Require(!HasLogContaining(g_InfoLogs, "missing-copied-flag-secret") &&
+                    !HasLogContaining(g_ErrorLogs, "missing-copied-flag-secret"),
+                "chat command helper logged raw missing copied flag chat text");
+            Require(!HasLogContaining(g_InfoLogs, "null-data-secret") &&
+                    !HasLogContaining(g_ErrorLogs, "null-data-secret"),
+                "chat command helper logged raw null data chat text");
         }
         api = {};
         if (shutdown)

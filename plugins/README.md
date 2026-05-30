@@ -10,19 +10,18 @@ plugin.
 ```text
 plugins/
   oBaseEvents/    Official example plugin for events, config, ABI checks, and shutdown.
-  oProcessTimer/  Post-RC/v1 core example plugin for process-local Obelisk timers.
+  oProcessTimer/  Official core example plugin for process-local Obelisk timers.
 ```
 
 `oBaseEvents` is the first plugin planned for the initial public release. It should remain
 small and instructional: it exists to show contributors how to build their own Obelisk
 plugin, not to become a feature-heavy server plugin.
 
-`oProcessTimer` is post-RC/v1 core scope, not part of the `v0.1.0-rc.1` public surface. It
-demonstrates only the process-local timer ABI: owner-token registration, zero-failure
-handles, and explicit unregister on shutdown. It is not a gameplay/module timer
-abstraction and does not use UE timers, gameplay timers, UE identity, lookup,
-permissions, commands, shared scheduler state, persistent handles, or cluster
-coordination.
+`oProcessTimer` is part of the first-stable core plugin set for `v0.1.0`. It demonstrates
+only the process-local timer ABI: owner-token registration, zero-failure handles, and
+explicit unregister on shutdown. It is not a gameplay/module timer abstraction and does not
+use UE timers, gameplay timers, UE identity, lookup, permissions, commands, shared
+scheduler state, persistent handles, or cluster coordination.
 
 ## Experimental Examples
 

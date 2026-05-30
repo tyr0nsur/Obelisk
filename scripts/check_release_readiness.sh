@@ -522,6 +522,8 @@ run_step scripts/obelisk.py --root "${LAYOUT_CHECK_ROOT}" status
 run_step scripts/install_obelisk.sh --build-dir "${BUILD_DIR}" --dry-run "${RELEASE_CHECK_ROOT}"
 run_step scripts/install_obelisk_plugin.sh --dry-run \
     "${BUILD_DIR}/plugins/oBaseEvents/oBaseEvents.so" "${RELEASE_CHECK_ROOT}"
+run_step scripts/install_obelisk_plugin.sh --dry-run \
+    "${BUILD_DIR}/plugins/oProcessTimer/oProcessTimer.so" "${RELEASE_CHECK_ROOT}"
 run_step git diff --check
 
 printf '\n==> git status --short --ignored\n'

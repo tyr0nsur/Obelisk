@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Added a post-RC owner-token timer API as the first non-UE-dependent v1 core primitive:
+- Promoted the owner-token timer API as the first non-UE-dependent v0.1 core primitive:
   process-local one-shot/repeating callbacks, zero-failure handles, explicit owner-scoped
   unregister, plugin init-failure/unload cleanup, and ABI/layout tests. Timer handles are
   not persistent, shared-cluster state, UE identity, lookup, mutation, or command routing.

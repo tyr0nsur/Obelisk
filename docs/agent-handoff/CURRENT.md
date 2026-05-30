@@ -64,13 +64,12 @@ recovery context is not active routing for the current head; use
 - Promoted copied events remain non-authoritative: no UE pointers, raw params, object
   identity, lookup, mutation, return override, pincode/player text publication, or broad
   module SDK claim.
-- Current post-RC core primitive: owner-token process-local timers. They are not part of
-  the RC public surface, gameplay/module timer abstractions, gameplay/module timer APIs,
-  or shared scheduler state.
-  They are ABI append-only, zero-failure handles, one-shot/repeating, explicit unregister,
-  and cleaned on plugin init failure/unload. Timer ids are not shared config, cluster
-  state, UE identity, or persistent handles. `oProcessTimer` is the first-party example
-  with SDK consumer coverage.
+- Owner-token process-local timers are now first-stable v0.1 core scope, not gameplay/module
+  timer abstractions, gameplay/module timer APIs, or shared scheduler state. They are ABI
+  append-only, zero-failure handles, one-shot/repeating, explicit unregister, and cleaned
+  on plugin init failure/unload. Timer ids are not shared config, cluster state, UE
+  identity, or persistent handles. `oProcessTimer` is the first-party example with SDK
+  consumer coverage and release-gate dry-run publication.
 - `oBaseEvents` has a disabled-by-default plugin-local `chat_command_helper` over copied
   `ChatMessageEvent` bytes. It has config and owner-token register/unregister, but no
   command ABI/router, identity, reply, mutation, or extra exported plugin symbols beyond
