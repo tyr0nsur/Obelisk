@@ -288,6 +288,9 @@ class ResourceHandleRevalidationEvaluatorTests(unittest.TestCase):
             {"evidence_pack_id": ""},
             {"capture_id": "unspecified-capture"},
             {"evidence_pack_id": "unspecified-evidence-pack"},
+            {"artifact_kind": "static-global-default-kind"},
+            {"capture_id": "static-global-default-capture"},
+            {"evidence_pack_id": "static-global-default-pack"},
         )
         for override in invalid_values:
             with self.subTest(override=override):
@@ -307,6 +310,28 @@ class ResourceHandleRevalidationEvaluatorTests(unittest.TestCase):
                 self.assertEqual(payload["artifact_identity"]["missing_or_partial_input_count"], 0)
                 self.assertEqual(payload["artifact_identity"]["invalid_input_count"], 1)
                 self.assertIn(evaluator.BLOCKER_INVALID_ARTIFACT_IDENTITY, payload["blockers"])
+
+    def test_require_artifact_identity_rejects_static_default_identity_on_static_evidence(self) -> None:
+        payload = evaluator.build_evaluation(
+            [reconciliation_report(serial_values=[17], artifact_identity_sha256="a" * 64)],
+            static_evidence(
+                coherent=True,
+                artifact_identity_override={
+                    "artifact_kind": "objdump",
+                    "artifact_sha256": "b" * 64,
+                    "capture_id": "static-global-default-capture",
+                    "evidence_pack_id": "pack-b",
+                },
+            ),
+            require_artifact_identity=True,
+        )
+
+        assert_fail_closed_resource_handle_contract(self, payload)
+        self.assertFalse(payload["evidence_checks"]["evidence_without_lifetime_flags_ready"])
+        self.assertEqual(payload["artifact_identity"]["complete_input_count"], 1)
+        self.assertEqual(payload["artifact_identity"]["missing_or_partial_input_count"], 0)
+        self.assertEqual(payload["artifact_identity"]["invalid_input_count"], 1)
+        self.assertIn(evaluator.BLOCKER_INVALID_ARTIFACT_IDENTITY, payload["blockers"])
 
     def test_require_artifact_identity_accepts_complete_identity_without_changing_lifetime_blocker(self) -> None:
         report = reconciliation_report(serial_values=[17, 23], artifact_identity_sha256="a" * 64)
@@ -456,6 +481,32 @@ class ResourceHandleRevalidationEvaluatorTests(unittest.TestCase):
                     "artifact_sha256": "C" * 64,
                     "capture_id": "capture-policy",
                     "evidence_pack_id": "pack-policy",
+                }
+            ),
+        )
+
+        assert_fail_closed_resource_handle_contract(self, payload)
+        self.assertFalse(payload["evidence_checks"]["evidence_without_lifetime_flags_ready"])
+        self.assertFalse(payload["evidence_checks"]["internal_uobject_revalidation_candidate_present"])
+        self.assertEqual(payload["artifact_identity"]["complete_input_count"], 2)
+        self.assertEqual(payload["artifact_identity"]["missing_or_partial_input_count"], 0)
+        self.assertEqual(payload["artifact_identity"]["invalid_input_count"], 1)
+        self.assertIn(evaluator.BLOCKER_INVALID_ARTIFACT_IDENTITY, payload["blockers"])
+        candidate = payload["internal_uobject_revalidation_candidate"]
+        self.assertFalse(candidate["accepted"])
+        self.assertIn(evaluator.BLOCKER_INVALID_ARTIFACT_IDENTITY, candidate["issues"])
+
+    def test_require_artifact_identity_blocks_policy_with_static_default_identity(self) -> None:
+        payload = evaluator.build_evaluation(
+            [reconciliation_report(serial_values=[17], artifact_identity_sha256="a" * 64)],
+            static_evidence(coherent=True, artifact_identity_sha256="b" * 64),
+            require_artifact_identity=True,
+            uobject_flag_policy=uobject_flag_policy_report(
+                artifact_identity_override={
+                    "artifact_kind": "uobject-flag-policy",
+                    "artifact_sha256": "c" * 64,
+                    "capture_id": "capture-policy",
+                    "evidence_pack_id": "static-global-default-pack",
                 }
             ),
         )

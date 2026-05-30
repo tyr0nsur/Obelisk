@@ -109,6 +109,12 @@ recovery context is not active routing for the current head; use
 - Item return-only policy remains internal and non-authoritative: no public Inventory SDK,
   hook wiring, markers/env, runtime logs, identity, lookup, mutation, return override, or
   ResourceHandle.
+- Item return-only now has internal post-original copied-payload helper coverage. Public
+  promotion should be a future append-only `GameplayPolicyEvent` expansion with three
+  distinct inventory-item event kinds for `AllowEquipItem`, `CanRepair`, and
+  `UseItemOntoItem`, all `ReturnValue` only. Do not reuse
+  `INVENTORY_USE_CHECK`, do not map `CanRepair.bIgnoreInventoryRequirement` to
+  `IGNORE_COOLDOWN`, and do not backfill the frozen `v0.1.0-rc.1` scope.
 - Mission copied-bool observer remains internal and non-authoritative. Mission bool-tail
   evidence is consume-only non-promotion: consume mode accepts and promote mode blocks.
 - Mission bool-tail evidence preserves `bool_field_size=1`, `bool_byte_offset=0`,
@@ -141,6 +147,9 @@ recovery context is not active routing for the current head; use
 - Current post-RC focus: Item return-only policy, Mission copied-bool observer, then
   Transfer `bAccept`; this is no RC public SDK/API promotion and does not authorize
   Transfer runtime work.
+- Next Item promotion round must be deliberate ABI work: append event/mask constants,
+  descriptors, C/C++ ABI layout checks, SDK consumer coverage, owner-token lifecycle
+  cleanup tests, and documentation. Do not route it through `InventoryPolicyEventKind::CanUse`.
 - Secondary evidence-only lanes may continue for structure non-pin copied scalars and Buff
   breadth, but they must not imply runtime work, marker/env changes, public SDK expansion,
   or RC surface changes.

@@ -277,3 +277,15 @@ Promotion gates remain explicit: append-only ABI design, numeric event/mask allo
 descriptor tests, C and installed-SDK consumer coverage, owner-token lifecycle cleanup
 coverage, and a public manifest update are all required before these names become more
 than candidate metadata.
+
+## Internal Post-Original Helper
+
+The hook-side item return-only path now has an internal
+`TryBuildCopiedItemReturnObservationAfterOriginal` helper. It builds the copied return-only
+payload only when the original `ProcessEvent` path reports success, rejects pre-original or
+rejected attempts, clears failed output, and keeps copied bool storage independent from
+later parameter mutation.
+
+This is still internal plumbing. It does not add an item dispatcher, public
+`GameplayPolicyEvent` mapping, ABI values, plugin callback, runtime hook wiring, marker/env
+gate, live-server validation, mutation, blocking, return override, or an Items SDK.

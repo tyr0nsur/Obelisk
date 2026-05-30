@@ -532,6 +532,36 @@ namespace
                                "matched item attempt without ReturnValue built copied output");
     }
 
+    void TestBuildsCopiedReturnObservationOnlyAfterOriginal()
+    {
+        uint8_t returnValue = 1;
+        Attempt matched;
+        matched.Status = AttemptStatus::Matched;
+        matched.Invocation = MakeValidAllowEquipItemInvocation(returnValue);
+
+        CopiedItemObservation observation;
+        Require(TryBuildCopiedItemReturnObservationAfterOriginal(true, matched, observation),
+                "post-original matched item attempt did not build copied return observation");
+        RequireReturnOnlyPayload(observation, true, "post-original copied item return payload mismatch");
+
+        returnValue = 0;
+        RequireReturnOnlyPayload(observation,
+                                 true,
+                                 "post-original copied item return observation read mutated params");
+
+        CopiedItemObservation skipped = observation;
+        Require(!TryBuildCopiedItemReturnObservationAfterOriginal(false, matched, skipped),
+                "pre-original item attempt built copied return observation");
+        Require(skipped.BoolCount == 0, "pre-original item attempt left copied output");
+
+        Attempt rejected = matched;
+        rejected.Status = AttemptStatus::Rejected;
+        skipped = observation;
+        Require(!TryBuildCopiedItemReturnObservationAfterOriginal(true, rejected, skipped),
+                "post-original rejected item attempt built copied return observation");
+        Require(skipped.BoolCount == 0, "post-original rejected item attempt left copied output");
+    }
+
     void TestBuildAndReserveItemReturnObservationForMatchedAttempt()
     {
         uint8_t returnValue = 1;
@@ -913,6 +943,7 @@ int main()
     TestCopiedItemObservationAbiShape();
     TestBuildDoesNotMutateItemParams();
     TestBuildsCopiedReturnObservationOnlyForMatchedAttempts();
+    TestBuildsCopiedReturnObservationOnlyAfterOriginal();
     TestBuildAndReserveItemReturnObservationForMatchedAttempt();
     TestInvalidItemReturnObservationDoesNotReserveBudget();
     TestRejectsMalformedReturnOnlyShapes();

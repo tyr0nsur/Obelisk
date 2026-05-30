@@ -100,6 +100,9 @@ namespace Obelisk::Hooks::ProcessEventItemReflection
                                        CopiedItemObservation& out);
     bool TryBuildCopiedItemReturnObservationForMatchedAttempt(const Attempt& attempt,
                                                               CopiedItemObservation& out);
+    bool TryBuildCopiedItemReturnObservationAfterOriginal(bool originalWasCalled,
+                                                          const Attempt& attempt,
+                                                          CopiedItemObservation& out);
     bool TryBuildAndReserveItemReturnObservationForMatchedAttempt(const Attempt& attempt,
                                                                   std::atomic<uint64_t>& counter,
                                                                   uint64_t observationLimit,
