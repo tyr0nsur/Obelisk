@@ -283,6 +283,15 @@ target_include_directories(process_event_mission_reflection_tests PRIVATE ${CMAK
 
 add_test(NAME ProcessEventMissionReflectionTests COMMAND process_event_mission_reflection_tests)
 
+add_executable(transfer_reflection_tests
+    tests/core/TransferReflectionTests.cpp
+    ue/TransferReflection.cpp
+    ue/RuntimeReflection.cpp
+)
+target_include_directories(transfer_reflection_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_test(NAME TransferReflectionTests COMMAND transfer_reflection_tests)
+
 add_executable(structure_reflection_tests
     tests/core/StructureReflectionTests.cpp
     ue/StructureReflection.cpp

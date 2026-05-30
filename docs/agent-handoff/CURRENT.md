@@ -185,12 +185,11 @@ This active routing table keeps only next-round facts; put durable evidence in
 - Inventory hook dispatch builds/reuses copied payloads once, uses subscriber count only
   as a cheap mirror, and rebinding/cancel paths keep copied scalar spans owner-local. The
   strict RC `minimal-second-source-intake` redacted signature pack has complete coverage.
-- Post-RC internal recognizer work stays test-only. For the fastest path toward useful
-  plugin/resource modeling, preserve Item return-only policy evidence first; keep Mission
-  copied-bool lifecycle review as the better-covered parallel/next recognizer; keep
-  Transfer `bAccept` fixture-only after those. None of these promote public Mission,
-  Items, Transfer, Inventory, or Structure SDKs; public callbacks; ABI; marker/env;
-  runtime logs; hook wiring; mutation; return override; object identity; lookup; or
+- Post-RC internal recognizer work stays test-only. The post-RC internal recognizer order
+  is Mission copied-bool observer, Item return-only policy, then Transfer `bAccept`; this
+  is no RC public SDK/API promotion. None of these promote public Mission, Items,
+  Transfer, Inventory, or Structure SDKs; public callbacks; ABI; marker/env; runtime
+  logs; hook wiring; mutation; return override; object identity; lookup; or
   `ResourceHandle`. Mission helper tests cover disabled/non-mission no-read/no-budget
   paths, blocked object/array field range forgeries, null bool data, stale-output
   clearing on rejection, and the exact five-bool internal copied surface. Item helper

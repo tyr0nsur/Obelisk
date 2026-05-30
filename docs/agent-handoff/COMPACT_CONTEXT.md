@@ -268,14 +268,13 @@ priorities, and do not use history files as the active source of truth.
   public `CallProcessEvent`, background worker plugins, operator lifecycle commands, and
   ScriptStruct/transfer promotion remain blocked unless a later focused gate changes
   scope.
-- If post-RC internal recognizer work resumes, keep it test-only. For plugin/resource
-  usefulness, preserve Item return-only policy evidence first; keep Mission copied-bool
-  lifecycle review as the better-covered parallel/next recognizer; keep Transfer
-  `bAccept` fixture-only after those. None of these promote public Mission/Items/Transfer
-  SDKs, public callbacks, ABI, markers/env, runtime logs, hook wiring, mutation, return
-  override, object identity, lookup, or `ResourceHandle`. Start from the dated research
-  notes, not public API docs, until a separate promotion gate approves runtime
-  observation, dispatcher lifecycle, ABI, and SDK policy.
+- If post-RC internal recognizer work resumes, keep it test-only. The post-RC internal
+  recognizer order is Mission copied-bool observer, Item return-only policy, then
+  Transfer `bAccept`; this is no RC public SDK/API promotion. None of these promote
+  public Mission/Items/Transfer SDKs, public callbacks, ABI, markers/env, runtime logs,
+  hook wiring, mutation, return override, object identity, lookup, or `ResourceHandle`.
+  Start from the dated research notes, not public API docs, until a separate promotion
+  gate approves runtime observation, dispatcher lifecycle, ABI, and SDK policy.
 - Runtime dispatcher hardening: hook-called Chat, Structure, and Inventory dispatchers
   must fail closed on setup/internal errors instead of rethrowing into `ProcessEvent`.
   Chat dispatch snapshots registration ids, skips callbacks removed during the same

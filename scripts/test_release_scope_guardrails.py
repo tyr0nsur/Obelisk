@@ -843,6 +843,8 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         obelisk_sources = obelisk_target.group("sources")
 
         for source in [
+            "ue/MissionReflection.cpp",
+            "ue/TransferReflection.cpp",
             "hooks/ProcessEventMissionReflection.cpp",
             "hooks/ProcessEventItemReflection.cpp",
             "hooks/ProcessEventTransferReflection.cpp",
