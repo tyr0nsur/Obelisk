@@ -81,6 +81,7 @@ PLUGIN_HUB_PUBLIC_BOUNDARY_DOC_FILES = [
     REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md",
     REPO_ROOT / "plugins" / "README.md",
 ]
+RESEARCH_MODULE_BOUNDARY_README = REPO_ROOT / "docs" / "research" / "README.md"
 V010_CORE_API_CAPABILITY_ALLOWLIST = [
     "OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS",
     "OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS",
@@ -973,6 +974,22 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         self.assertEqual(offenders, [])
 
+    def test_research_index_defines_module_layout_terms_as_non_public_non_callable(self) -> None:
+        readme = RESEARCH_MODULE_BOUNDARY_README.read_text(encoding="utf-8")
+
+        required = (
+            "`promotion_gate.ready=true`, `accepted targets`, and `candidate` in\n"
+            "module-specific notes mean offline evidence readiness for the named layout or artifact\n"
+            "gate only",
+            "They do not make the named UE functions callable or usable plugin functions",
+            "Dino, Buff, Tribe, Transfer, Structure build policy, permissions/admin/RCON/economy/storage",
+            "public surfaces are not promoted and named UE functions are not usable plugin APIs",
+        )
+
+        for text in required:
+            with self.subTest(text=text):
+                self.assertIn(text, readme)
+
     def test_plugin_hub_planning_uses_arkapi_sources_as_demand_dictionary_only(self) -> None:
         texts = {
             path.relative_to(REPO_ROOT).as_posix(): path.read_text(encoding="utf-8")
@@ -1101,12 +1118,14 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         for text, required in (
             (foundation, "## Fastest Honest Creator Path"),
             (foundation, "Add descriptor reads"),
-            (foundation, "Add passive copied chat parsing"),
             (foundation, "Add process-local timers"),
-            (foundation, "Add copied policy auditors"),
+            (foundation, "Keep passive copied chat parsing experimental and local-only"),
+            (foundation, "Keep copied policy auditors experimental"),
             (foundation, "Only lifecycle/config/logging, descriptor/catalog, and process-local timer examples are\nproduction-supported seeds after the RC"),
             (foundation, "Copied chat parsers and copied policy auditors\nmay demonstrate patterns, but they remain experimental"),
             (matrix, "## Post-v0.1 Creator Ladder"),
+            (matrix, "Production-supported seed lanes"),
+            (matrix, "Experimental pattern examples only"),
             (matrix, "Descriptor consumers"),
             (matrix, "Passive chat text parsers"),
             (matrix, "Timer utilities"),
@@ -1245,6 +1264,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
     def test_sdk_install_layout_publishes_only_allowlisted_public_header(self) -> None:
         root_cmake = (REPO_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
         installer = (REPO_ROOT / "scripts" / "install_obelisk.sh").read_text(encoding="utf-8")
+        install_doc = (REPO_ROOT / "docs" / "INSTALL.md").read_text(encoding="utf-8")
         public_headers = sorted(
             path.relative_to(REPO_ROOT).as_posix()
             for path in (REPO_ROOT / "include").rglob("*")
@@ -1259,6 +1279,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             r"DESTINATION\s+\$\{CMAKE_INSTALL_INCLUDEDIR\}/obelisk\s+COMPONENT\s+SDK\s*\)",
         )
         self.assertIn('"include/obelisk/ObeliskApi.h"', installer)
+        self.assertIn("include/obelisk/ObeliskApi.h", install_doc)
+        self.assertNotIn("include/obelisk/*.h", install_doc)
 
     def test_nextgenplugins_absolute_path_stays_out_of_public_docs_and_skills(self) -> None:
         offenders: list[str] = []
@@ -3341,12 +3363,22 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md": (
                 "Post-RC production-supported seed work is limited to lifecycle/config/logging skeletons",
                 "Copied `ChatMessageEvent` parsing and copied `GameplayPolicyEvent` auditing remain experimental seed patterns only",
+                "Foundation V1 is enough for small, honest Plugin Hub seeds when the support tier is explicit",
+                "Production-supported seeds:",
+                "process-local timer utilities",
+                "Experimental pattern examples only:",
+                "copied `GameplayPolicyEvent` auditors",
+                "Keep passive copied chat parsing experimental and local-only",
+                "Keep copied policy auditors experimental",
                 "Foundation V1 does not provide or imply",
             ),
             REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md": (
                 "Post-RC production-supported Plugin Hub seed work is limited to lifecycle/config/logging",
                 "`experimental seed only`: allowed for explicitly labeled pattern examples",
                 "not supported as production Plugin Hub modules",
+                "keep the support tier explicit",
+                "Production-supported seed lanes",
+                "Experimental pattern examples only",
             ),
             REPO_ROOT / "plugins" / "README.md": (
                 "The production-supported additions after `v0.1` are descriptor readers and process-local timer utilities",

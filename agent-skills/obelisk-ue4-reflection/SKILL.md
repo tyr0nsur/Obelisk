@@ -18,7 +18,7 @@ metadata.
   Obelisk's Linux-native `ReflectionScanner`, `RuntimeReflection`, and
   `ProcessEventHook` paths with binary-hash-scoped evidence.
 - `UObject::ProcessEvent` is hookable and currently observed around `0x1d34e20` on the
-  validated Ragnarok binary.
+  validated ARK Linux server binary hash.
 - `UObjectBase::NamePrivate.ComparisonIndex` has been observed at object offset `0x18`
   and `Number` at `0x1c`.
 - Confirmed core FName clues for the current ARK binary hash include:
@@ -189,16 +189,16 @@ Do not skip steps because a single core, log line, or recognizer test looks conv
 - Rejection paths must clear copied output, and recognition-only object/array fields must
   reject forged copied ranges.
 - Reserve runtime observation budgets only after cheap exact prefilters pass.
-- On live servers, keep plugin discovery off unless testing a known safe build.
-- Current operator direction in `docs/agent-handoff/CURRENT.md` selects the server-backed
-  target. `arkserver` / Ragnarok may be used only for an approved announced beta window
-  with privacy bounds and exact feature gates. `arkserver2` / TheIsland is the isolated
-  debug target when player involvement is not desired, but it still requires an approved
-  scoped run before starts, restarts, marker edits, or runtime observation.
+- On live servers, keep plugin discovery off unless testing a known safe build inside an
+  approved feature-test window.
+- Server-backed reflection work has no default target. Use only the currently approved
+  live-ops brief, and require exact instance/map, feature gates, time window, privacy
+  bounds, evidence path, and rollback before starts, restarts, marker edits, runtime
+  observation, or `/servidor/ark` access.
 - Do not enable raw discovery, broad tracing, native exec probes, ptrace/gcore, or
   `ReflectionScanner` without exact operator approval for that run, copied-log evidence,
-  and rollback. Prefer `arkserver2` / TheIsland or `arkserver-obelisk-debug` for
-  scanner-like captures only when the operator explicitly approves that target.
+  and rollback. The approved brief selects the target; do not infer one from historical
+  notes, older runbooks, or previous conversation state.
 
 ## Review Checklist
 

@@ -96,14 +96,20 @@ or shared across maps, processes, or clusters.
 
 ## Safe Uses Now
 
-Foundation V1 is enough for small, honest Plugin Hub seeds:
+Foundation V1 is enough for small, honest Plugin Hub seeds when the support tier is
+explicit:
+
+Production-supported seeds:
 
 - lifecycle, config, and logging examples;
 - descriptor/catalog readers;
+- process-local timer utilities.
+
+Experimental pattern examples only:
+
 - copied `GameplayPolicyEvent` auditors;
 - copied `ChatMessageEvent` text parsers without sender identity, replies, moderation, or
-  a command SDK;
-- process-local timer utilities.
+  a command SDK.
 
 Only lifecycle/config/logging, descriptor/catalog, and process-local timer examples are
 production-supported seeds after the RC. Copied chat parsers and copied policy auditors
@@ -119,12 +125,13 @@ Obelisk-native examples in this order:
 1. Start from lifecycle, config, logging, and `struct_size`/capability checks.
 2. Add descriptor reads so plugins can explain which copied event categories are actually
    promoted.
-3. Add passive copied chat parsing for local text routing only, with no sender identity,
-   replies, moderation, blocking, or send-chat behavior.
-4. Add process-local timers only for plugin-owned periodic work, never as gameplay timers,
+3. Add process-local timers only for plugin-owned periodic work, never as gameplay timers,
    persistent ids, or cluster coordination.
-5. Add copied policy auditors that observe promoted `GameplayPolicyEvent` data without
-   identity, lookup, mutation, return override, or module SDK claims.
+4. Keep passive copied chat parsing experimental and local-only, with no sender identity,
+   replies, moderation, blocking, or send-chat behavior.
+5. Keep copied policy auditors experimental; they may observe promoted
+   `GameplayPolicyEvent` data without identity, lookup, mutation, return override, or
+   module SDK claims.
 
 If a plugin idea needs player identity, permissions, persistence, operator ingress,
 replies, broadcast, inventory/item mutation, teleport, structure placement enforcement, or

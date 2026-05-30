@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Hardened post-RC SDK/evidence boundaries so copied-event `DestroyUserData` cleanup runs
+  inside the matching gameplay callback scope, core evidence-pack manifests carry an
+  explicit schema before snapshot consumers trust `core.path`, target-set listings state
+  layout-only/non-public SDK scope, installed SDK docs name only the public header, and
+  research/Plugin Hub notes separate production-supported seeds from experimental patterns.
 - Hardened dispatcher cleanup and evidence identity so `DestroyUserData` reentrancy does
   not deadlock copied-event dispatcher cleanup, snapshot evidence IDs must be safe
   non-placeholder components, SHA256 metadata is normalized, release-readiness target

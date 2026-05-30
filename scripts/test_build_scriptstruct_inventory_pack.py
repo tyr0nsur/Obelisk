@@ -260,6 +260,7 @@ class BuildScriptStructInventoryPackTests(unittest.TestCase):
             manifest.write_text(
                 json.dumps(
                     {
+                        "schema": "obelisk.core-dump-evidence-pack.v1",
                         "binary": {
                             "sha256": "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
                         },
@@ -303,6 +304,7 @@ class BuildScriptStructInventoryPackTests(unittest.TestCase):
             pack_manifest.write_text(
                 json.dumps(
                     {
+                        "schema": "obelisk.core-dump-evidence-pack.v1",
                         "binary": {
                             "sha256": "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
                         },

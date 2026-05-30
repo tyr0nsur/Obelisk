@@ -150,6 +150,11 @@ totals.targets=3
 totals.second_source_accepted=3
 ```
 
+In that expected shape, `promotion_gate.ready=true` means only that the offline
+second-source layout comparison would be ready for the named target set. It would not make
+the named UE functions usable plugin APIs and would not authorize public SDK, runtime
+hook, callback, mutation, return override, identity, or raw pointer exposure.
+
 ## Risks And Boundaries
 
 - Do not treat existing minimal or dino snapshot roots as buff second-source evidence; they

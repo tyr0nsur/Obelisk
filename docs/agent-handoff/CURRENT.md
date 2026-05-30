@@ -60,10 +60,16 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   explicit install layout/test updates and ABI review.
 - Installed `Obelisk_*` CMake variables are derived from public C header `OBELISK_*` ABI
   macros at configure time; installed SDK consumers verify package/header parity.
+- Core dump evidence-pack manifests must declare
+  `schema: obelisk.core-dump-evidence-pack.v1`; snapshot/regeneration consumers reject
+  missing or different schemas before using manifest `core.path`.
 - Promoted copied events are observational and non-authoritative: no UE pointers, raw
   params, identity, lookup, mutation, return override, pincode/player text publication, or
   broad module SDK claim.
 - Plugin unload/init-failure cleanup skips `dlclose` when callback cleanup cannot be proven complete, retains the plugin for retry, does not repeat plugin shutdown, avoids copied-event `DestroyUserData` reentrant cleanup deadlocks, and release readiness rejects production `libobelisk.so` builds exposing manager/dispatcher test-only symbols.
+- Copied-event dispatchers now run `DestroyUserData` inside the relevant
+  `GameplayCallbackScope` so destructor-triggered reentrant cleanup uses the same
+  cross-dispatcher wait signal. This is runtime hardening only; it does not add public API.
 - `oProcessTimer` is the first process-local timer example. Timer ids are process-local,
   not cluster state, UE identity, gameplay/module timer abstractions, or persistent
   handles, or shared scheduler state; owner-token timers require explicit unregister.

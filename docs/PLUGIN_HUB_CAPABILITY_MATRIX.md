@@ -126,13 +126,18 @@ event data is callback-scope only.
 ## Post-v0.1 Creator Ladder
 
 For the first Plugin Hub seeds after `v0.1`, prefer plugins that stay inside the current
-ABI and teach reusable patterns:
+ABI and keep the support tier explicit:
+
+Production-supported seed lanes:
 
 1. Lifecycle/config/logging skeletons with safe-disabled config.
 2. Descriptor consumers that print sanitized promoted category/event metadata.
-3. Passive chat text parsers that do local routing only.
-4. Timer utilities for plugin-owned process-local periodic work.
-5. Copied policy auditors over promoted `GameplayPolicyEvent` kinds.
+3. Timer utilities for plugin-owned process-local periodic work.
+
+Experimental pattern examples only:
+
+1. Passive chat text parsers that do local routing only.
+2. Copied policy auditors over promoted `GameplayPolicyEvent` kinds.
 
 The current first-party examples already cover this safe seed set: `oBaseEvents`,
 `oProcessTimer`, and `oDescriptorCatalog` cover the release-scope foundation, while

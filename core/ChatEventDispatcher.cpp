@@ -48,6 +48,7 @@ namespace Obelisk::Core
             try
             {
                 DestroyUserDataScope cleanupScope;
+                GameplayCallbackScope callbackScope(GameplayCallbackFamily::Chat);
                 subscription.DestroyUserData(subscription.UserData);
             }
             catch (const std::exception& e)

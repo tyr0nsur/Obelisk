@@ -56,6 +56,7 @@ class VersioningGuardrailTests(unittest.TestCase):
         installed_consumer_cmake = (
             REPO_ROOT / "tests/sdk_installed_consumer/CMakeLists.txt"
         ).read_text(encoding="utf-8")
+        install_doc = (REPO_ROOT / "docs/INSTALL.md").read_text(encoding="utf-8")
 
         self.assertRegex(cmake, re.compile(r"project\(Obelisk VERSION 0\.1\.0 LANGUAGES C CXX\)"))
         self.assertIn('set(OBELISK_DEVELOPMENT_LINE "0.1.0-dev")', cmake)
@@ -68,6 +69,9 @@ class VersioningGuardrailTests(unittest.TestCase):
             "find_package(Obelisk 0.1.0 CONFIG REQUIRED)",
             installed_consumer_cmake,
         )
+        self.assertIn("find_package(Obelisk 0.1.0 CONFIG REQUIRED)", install_doc)
+        self.assertIn("numeric package version is the SDK compatibility floor", install_doc)
+        self.assertIn("not a claim that a stable `v0.1.0` tag exists", install_doc)
         for token in (
             "Obelisk_DEVELOPMENT_LINE",
             "Obelisk_RELEASE_CHANNEL",

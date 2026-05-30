@@ -57,6 +57,12 @@ promotion_gate.promotion_ready=false
 blockers=[]
 ```
 
+Here `promotion_gate.ready=true` is scoped by
+`evidence_scope=second_source_layout_evidence_only`,
+`promotion_gate.ready_scope=layout_only`, and
+`promotion_gate.promotion_ready=false`. It is not a public/runtime readiness claim, and
+the accepted targets are not usable Transfer functions or plugin APIs.
+
 Accepted targets:
 
 ```text
@@ -88,6 +94,10 @@ promotion_gate.ready_scope=layout_only
 promotion_gate.promotion_ready=false
 blockers=[]
 ```
+
+This has the same layout-only meaning: accepted ScriptStruct targets are evidence for
+offline field review, not decoded payload contracts, runtime dispatch approval, or public
+Transfer SDK/API surfaces.
 
 Accepted targets:
 

@@ -238,17 +238,37 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         sets = {item["name"]: item["targets"] for item in report["target_sets"]}
         classifications = {item["name"]: item["readiness_classification"] for item in report["target_sets"]}
         release_flags = {item["name"]: item["release_readiness"] for item in report["target_sets"]}
+        readiness_scopes = {item["name"]: item["readiness_scope"] for item in report["target_sets"]}
+        promotion_flags = {item["name"]: item["promotion_ready"] for item in report["target_sets"]}
+        public_sdk_flags = {item["name"]: item["public_sdk_ready"] for item in report["target_sets"]}
+        self.assertEqual(report["evidence_scope"], "second_source_layout_evidence_only")
+        self.assertIn("public_sdk", report["not_promoted_surfaces"])
+        self.assertIn("runtime_hooks", report["not_promoted_surfaces"])
+        self.assertTrue(
+            any(
+                "release readiness does not imply public SDK readiness for Mission, Transfer, Structure, Item"
+                in claim
+                for claim in report["non_claims"]
+            ),
+            report["non_claims"],
+        )
+        self.assertFalse(any(promotion_flags.values()))
+        self.assertFalse(any(public_sdk_flags.values()))
         self.assertIn("minimal-second-source-intake", sets)
         self.assertEqual(classifications["minimal-second-source-intake"], "release_readiness")
         self.assertIs(release_flags["minimal-second-source-intake"], True)
+        self.assertEqual(readiness_scopes["minimal-second-source-intake"], "layout_only")
         self.assertEqual(classifications["buff-compact-intake"], "internal_layout_only")
         self.assertIs(release_flags["buff-compact-intake"], False)
+        self.assertEqual(readiness_scopes["buff-compact-intake"], "internal_layout_only")
         self.assertEqual(classifications["mission-copied-bool-policy-slice"], "planning_only")
         self.assertIs(release_flags["mission-copied-bool-policy-slice"], False)
+        self.assertEqual(readiness_scopes["mission-copied-bool-policy-slice"], "planning_only")
         self.assertEqual(classifications["players-identity-lifecycle-intake"], "planning_only")
         self.assertIs(release_flags["players-identity-lifecycle-intake"], False)
         self.assertEqual(classifications["transfer-baccept-only-policy-slice"], "internal_layout_only")
         self.assertIs(release_flags["transfer-baccept-only-policy-slice"], False)
+        self.assertEqual(readiness_scopes["transfer-baccept-only-policy-slice"], "internal_layout_only")
         self.assertEqual(classifications["transfer-scriptstruct"], "internal_layout_only")
         self.assertIs(release_flags["transfer-scriptstruct"], False)
         self.assertEqual(
@@ -363,6 +383,21 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertIn(
             "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerUploadDino",
             sets["transfer-ufunction-intake"],
+        )
+
+        text_result = run_compare_raw("--list-target-sets")
+        self.assertEqual(text_result.returncode, 0, text_result.stderr + text_result.stdout)
+        self.assertIn(
+            "minimal-second-source-intake: readiness_classification=release_readiness "
+            "release_readiness=true readiness_scope=layout_only promotion_ready=false "
+            "public_sdk_ready=false",
+            text_result.stdout,
+        )
+        self.assertIn(
+            "mission-copied-bool-policy-slice: readiness_classification=planning_only "
+            "release_readiness=false readiness_scope=planning_only promotion_ready=false "
+            "public_sdk_ready=false",
+            text_result.stdout,
         )
 
     def test_structure_build_policy_targets_stay_out_of_rc_compact_sets_with_missing_base_gap(self) -> None:

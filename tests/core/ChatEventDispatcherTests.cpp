@@ -679,6 +679,34 @@ namespace
                 "chat callbacks survived deferred reentrant destroy cleanup");
     }
 
+    struct DestroyScopeState
+    {
+        bool insideAnyCallback = false;
+        bool insideChatCallback = false;
+    };
+
+    void RecordDestroyGameplayScope(void* userData)
+    {
+        auto* state = static_cast<DestroyScopeState*>(userData);
+        state->insideAnyCallback = Obelisk::Core::GameplayCallbackScope::IsInsideAnyCallback();
+        state->insideChatCallback =
+            Obelisk::Core::GameplayCallbackScope::IsInsideCallback(Obelisk::Core::GameplayCallbackFamily::Chat);
+    }
+
+    void TestDestroyUserDataRunsInsideGameplayCallbackScope()
+    {
+        Obelisk::Core::ChatEventDispatcher dispatcher;
+        int owner = 0;
+        DestroyScopeState state;
+
+        const uint64_t id = dispatcher.Register(&owner, {NoopCallback, &state, RecordDestroyGameplayScope});
+        Require(id != 0, "destroy scope chat registration failed");
+        Require(dispatcher.Unregister(id), "destroy scope chat unregister failed");
+
+        Require(state.insideAnyCallback, "DestroyUserData did not enter any gameplay callback scope");
+        Require(state.insideChatCallback, "DestroyUserData did not enter chat callback scope");
+    }
+
     void TestRejectsUnknownSendMode()
     {
         Obelisk::Core::ChatEventDispatcher dispatcher;
@@ -721,6 +749,7 @@ int main()
     TestOwnerCleanup();
     TestDestroyUserDataCanUnregisterAnotherCallbackWithoutDeadlock();
     TestDeferredDestroyUserDataCanUnregisterAnotherCallbackWithoutDeadlock();
+    TestDestroyUserDataRunsInsideGameplayCallbackScope();
     TestRejectsUnknownSendMode();
     TestExceptionsDoNotStopDispatch();
 

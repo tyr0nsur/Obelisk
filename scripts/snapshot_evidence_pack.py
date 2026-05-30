@@ -15,6 +15,7 @@ import protected_paths
 
 SAFE_COMPONENT_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+CORE_DUMP_EVIDENCE_PACK_SCHEMA = "obelisk.core-dump-evidence-pack.v1"
 SERVER_ROOT = Path("/servidor/ark")
 APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -168,6 +169,10 @@ def evidence_pack_defaults(
     path = reject_protected_input_path(path, "--evidence-pack-manifest")
     reject_symlink_component(original_path, "--evidence-pack-manifest")
     payload = json.loads(path.read_text(encoding="utf-8"))
+    if payload.get("schema") != CORE_DUMP_EVIDENCE_PACK_SCHEMA:
+        raise SystemExit(
+            f"{path}: evidence pack manifest schema must be {CORE_DUMP_EVIDENCE_PACK_SCHEMA}"
+        )
     binary = payload.get("binary")
     if not isinstance(binary, dict):
         raise SystemExit(f"{path}: evidence pack manifest missing binary object")

@@ -2,9 +2,9 @@
 
 ## Objective
 
-Use the general offline `UFunction` inventory to move Obelisk roadmap work across the full modding surface and
-identify high-value player/controller function families for future reflection and SDK
-planning.
+Use the general offline `UFunction` inventory to move Obelisk roadmap work across the full
+modding surface and identify high-value player/controller function families for future
+reflection planning. This is not public SDK planning.
 
 ## Environment
 
@@ -75,6 +75,9 @@ notification/message/dialog:39
 ```
 
 Representative candidates:
+
+`Candidate` here means an offline metadata target for reconstruction. These names are not
+usable functions, callable plugin APIs, runtime hook approvals, or public SDK promises.
 
 | Area | Candidate | Params | ParmsSize | Notes |
 | --- | --- | ---: | ---: | --- |
@@ -152,7 +155,7 @@ No candidate is SDK-ready and no runtime invocation is implied.
 1. Add focused reports for `PrimalItem`, `PrimalDinoCharacter`, and `PrimalStructure`.
 2. Promote one inventory candidate into an offline analyzer fixture for property-chain
    decoding.
-3. Add a general module taxonomy document mapping candidate families to future public SDK
-   areas, still behind ABI and ownership gates.
-4. Use TheIsland or a dedicated debug instance only after an explicit runtime validation
-   window; keep Ragnarok out of this line of work.
+3. Add a general module taxonomy document mapping candidate families to future review
+   areas, with SDK promotion still blocked behind ABI and ownership gates.
+4. Use only the exact target named by a future approved live-ops brief for any runtime
+   validation window; do not infer a server instance from this historical note.

@@ -42,6 +42,7 @@ class SnapshotEvidencePackTests(unittest.TestCase):
         if sha is None:
             sha = sha256_bytes(core_path.read_bytes()) if core_path.exists() else "4" * 64
         payload = {
+            "schema": snapshot_evidence_pack.CORE_DUMP_EVIDENCE_PACK_SCHEMA,
             "binary": {
                 "sha256": binary_sha,
             },
@@ -161,6 +162,29 @@ class SnapshotEvidencePackTests(unittest.TestCase):
                     "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
                     parse_int,
                 )
+
+    def test_rejects_missing_or_wrong_schema(self) -> None:
+        invalid_schemas: list[object] = [None, "obelisk.future-core-pack.v1"]
+        for invalid_schema in invalid_schemas:
+            with self.subTest(schema=invalid_schema), tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                manifest = root / "pack-A" / "manifest.json"
+                self.write_pack(manifest, core_path=root / "core")
+                payload = json.loads(manifest.read_text(encoding="utf-8"))
+                if invalid_schema is None:
+                    payload.pop("schema")
+                else:
+                    payload["schema"] = invalid_schema
+                manifest.write_text(json.dumps(payload), encoding="utf-8")
+
+                with self.assertRaisesRegex(SystemExit, "evidence pack manifest schema"):
+                    evidence_pack_defaults(
+                        manifest,
+                        None,
+                        None,
+                        "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                        parse_int,
+                    )
 
     def test_rejects_evidence_pack_manifest_under_protected_server_root_before_reading(self) -> None:
         with self.assertRaisesRegex(SystemExit, "--evidence-pack-manifest must not read"):

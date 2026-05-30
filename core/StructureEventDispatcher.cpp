@@ -139,6 +139,7 @@ namespace Obelisk::Core
             try
             {
                 DestroyUserDataScope cleanupScope;
+                GameplayCallbackScope callbackScope(GameplayCallbackFamily::Structure);
                 subscription.DestroyUserData(subscription.UserData);
             }
             catch (const std::exception& e)

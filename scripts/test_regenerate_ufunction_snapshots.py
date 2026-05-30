@@ -71,6 +71,7 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
     ) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         manifest = {
+            "schema": "obelisk.core-dump-evidence-pack.v1",
             "binary": {
                 "sha256": binary_sha,
             },

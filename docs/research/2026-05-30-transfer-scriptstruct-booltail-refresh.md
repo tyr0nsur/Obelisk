@@ -108,6 +108,10 @@ promotion_gate.promotion_ready=false
 blockers=[]
 ```
 
+Here `promotion_gate.ready=true` means only that the refreshed ScriptStruct layout
+comparison passed with `ready_scope=layout_only` and `promotion_ready=false`. It does not
+make the transfer structs decoded payload contracts or usable plugin APIs.
+
 Accepted targets:
 
 ```text

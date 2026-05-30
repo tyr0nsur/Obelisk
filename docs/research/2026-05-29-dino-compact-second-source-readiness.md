@@ -42,6 +42,10 @@ second_source_rejected=0
 strict_identity_indices=false
 ```
 
+In this report, `promotion_gate.ready=true` means offline layout comparison readiness for
+the named target set only. It does not make the accepted UE functions callable or usable
+plugin APIs.
+
 Accepted targets:
 
 ```text
@@ -71,7 +75,7 @@ obelisk.ufunction-chain.snapshot.v1:PrimalDinoCharacter.AllowCarryCharacter
 No target-set expansion is justified by this artifact. Transfer dino targets,
 blueprint-side carry hooks, tame-state functions, attack functions, controller stat
 requests, arrays, strings, structs, and admin/NetExec surfaces remain outside this
-compact promotion gate.
+compact layout comparison gate.
 
 ## Boundary Decision
 
@@ -116,10 +120,9 @@ plan with no public ABI and no hook integration:
    exact prefilters, supported-SHA gating, observer-profile gating, instance markers,
    explicit non-zero budgets, no mutation, no return override, and rollback docs.
 
-The follow-on runtime-observation step, when separately approved, should use a dedicated
-debug instance or the approved `arkserver2` development posture only. It should not touch
-`arkserver` / Ragnarok and should produce bounded metadata-only logs for the exact compact
-targets.
+The follow-on runtime-observation step, when separately approved, must use the exact
+instance/map named by that live-ops brief. This note does not select a default server
+target. The run should produce bounded metadata-only logs for the exact compact targets.
 
 ## Validation
 

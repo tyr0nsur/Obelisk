@@ -41,7 +41,7 @@ The script copies:
 ```text
 build/libobelisk.so                         -> lib/libobelisk.so
 build/_deps/subhook-build/libsubhook.so     -> lib/libsubhook.so
-include/obelisk/*.h                         -> include/obelisk/
+include/obelisk/ObeliskApi.h                -> include/obelisk/ObeliskApi.h
 build/ObeliskConfig*.cmake                  -> lib/cmake/Obelisk/
 ```
 
@@ -65,9 +65,15 @@ the stable posture check.
 External plugins can consume the installed SDK through the exported CMake package:
 
 ```cmake
-find_package(Obelisk CONFIG REQUIRED)
+find_package(Obelisk 0.1.0 CONFIG REQUIRED)
 target_link_libraries(MyPlugin PRIVATE Obelisk::obelisk_sdk)
 ```
+
+The numeric package version is the SDK compatibility floor for the current pre-release
+line, not a claim that a stable `v0.1.0` tag exists. The installed package also exposes
+`Obelisk_*ABI_VERSION` CMake variables that mirror the `OBELISK_*ABI_VERSION` macros in
+`ObeliskApi.h`; plugin source should continue to check the header macros and runtime
+`struct_size`/capability fields before using appended ABI slots.
 
 Plugins loaded from `plugins/` are expected to own their config defaults. The preferred
 directory for plugin config is:

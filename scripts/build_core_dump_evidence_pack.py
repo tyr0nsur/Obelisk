@@ -23,6 +23,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SERVER_ROOT = Path("/servidor/ark")
 APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
+CORE_DUMP_EVIDENCE_PACK_SCHEMA = "obelisk.core-dump-evidence-pack.v1"
 
 DEFAULT_CANDIDATES = [
     ("static_fname_root_slot", 0x5956F30),
@@ -1265,6 +1266,7 @@ def main() -> int:
     )
 
     manifest = {
+        "schema": CORE_DUMP_EVIDENCE_PACK_SCHEMA,
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "repo_root": str(REPO_ROOT),
         "obelisk": {

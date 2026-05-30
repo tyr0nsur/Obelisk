@@ -40,6 +40,11 @@ function name, outer, `NumParms`, `ParmsSize`, return offset, property names/cla
 offsets, sizes, array dimensions, supported SHA, and enabled-layout gates. Object and
 class pointer ranges remain hidden.
 
+Here `promotion_gate.ready=true` means offline layout comparison readiness only. The
+accepted target names are not callable plugin functions and do not authorize public SDK
+surface, runtime observer, hook, mutation, return override, identity, or raw UE pointer
+access.
+
 ## Recommendation
 
 Do not start buff runtime hooks yet. The useful safe next step is documentation cleanup and,

@@ -62,10 +62,13 @@ PrimalBuff.BP_OnBuffLifetimeUpdated
 
 ## Boundary
 
-This promotes compact buff UFunction layout evidence only. It does not promote a public
-Buff SDK, hooks, callbacks, object/class exposure, mutation, return overrides, raw params,
-or resource identity. Buff runtime work still needs copied payload policy, exact runtime
-gates, ABI/lifecycle tests, and public redaction docs before any plugin-facing surface.
+This records accepted compact buff UFunction layout evidence only.
+`promotion_gate.ready=true` in this note means the offline layout comparison passed for
+the named target set; it is not runtime readiness and it does not make the named UE
+functions usable plugin APIs. It does not promote a public Buff SDK, hooks, callbacks,
+object/class exposure, mutation, return overrides, raw params, or resource identity.
+Buff runtime work still needs copied payload policy, exact runtime gates, ABI/lifecycle
+tests, and public redaction docs before any plugin-facing surface.
 
 ## Breadth Follow-Up
 

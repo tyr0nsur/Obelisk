@@ -64,7 +64,15 @@ READINESS_NOT_PROMOTED_SURFACES = {
 }
 READINESS_NON_CLAIMS = [
     "accepted second-source readiness is layout evidence only",
-    "does not promote public SDK, Inventory SDK, Items SDK, object identity, lookup, mutation, return override, ResourceHandle, or runtime hooks",
+    (
+        "release readiness does not imply public SDK readiness for Mission, Transfer, "
+        "Structure, Item, Inventory, or Items modules"
+    ),
+    (
+        "does not promote public SDK, Mission SDK, Transfer SDK, Structure SDK, "
+        "StructureEvents, Inventory SDK, Items SDK, object identity, lookup, mutation, "
+        "return override, ResourceHandle, or runtime hooks"
+    ),
 ]
 MISSION_COPIED_BOOL_POLICY_ARTIFACT = (
     "/home/flowcommunity-ark/obelisk-artifacts/"
@@ -485,11 +493,21 @@ def reject_protected_input_path(label: str, path: Path) -> None:
 def target_set_report() -> dict[str, Any]:
     return {
         "schema": "obelisk.reflection-snapshot-target-sets.v1",
+        "evidence_scope": READINESS_EVIDENCE_SCOPE,
+        "not_promoted_surfaces": sorted(READINESS_NOT_PROMOTED_SURFACES),
+        "non_claims": list(READINESS_NON_CLAIMS),
         "target_sets": [
             {
                 "name": name,
                 "readiness_classification": target_set_readiness_classification(name),
                 "release_readiness": name in RELEASE_READINESS_TARGET_SETS,
+                "readiness_scope": (
+                    "layout_only"
+                    if name in RELEASE_READINESS_TARGET_SETS
+                    else target_set_readiness_classification(name)
+                ),
+                "promotion_ready": False,
+                "public_sdk_ready": False,
                 "targets": list(targets),
             }
             for name, targets in sorted(TARGET_SETS.items())
@@ -1240,7 +1258,18 @@ def readiness_report(
 def print_text(report: dict[str, Any]) -> None:
     if report["schema"] == "obelisk.reflection-snapshot-target-sets.v1":
         for item in report["target_sets"]:
-            print(f"{item['name']}: readiness_classification={item['readiness_classification']}")
+            print(
+                "{name}: readiness_classification={classification} "
+                "release_readiness={release_readiness} readiness_scope={readiness_scope} "
+                "promotion_ready={promotion_ready} public_sdk_ready={public_sdk_ready}".format(
+                    name=item["name"],
+                    classification=item["readiness_classification"],
+                    release_readiness=str(item["release_readiness"]).lower(),
+                    readiness_scope=item["readiness_scope"],
+                    promotion_ready=str(item["promotion_ready"]).lower(),
+                    public_sdk_ready=str(item["public_sdk_ready"]).lower(),
+                )
+            )
             for target in item["targets"]:
                 print(f"  {target}")
         return

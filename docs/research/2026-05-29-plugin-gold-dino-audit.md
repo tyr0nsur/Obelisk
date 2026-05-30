@@ -1,10 +1,10 @@
-# Plugin-Useful Gold Dino Audit
+# Offline-Useful Dino Audit
 
 ## Objective
 
-Independently audit the next small plugin-useful evidence after the current Structures and
-Inventory work. The focus is the UE4 reconstruction chain that still matters for module
-promotion:
+Independently audit the next small module-relevant evidence after the current Structures
+and Inventory work. The focus is the UE4 reconstruction chain that still matters for
+internal layout promotion:
 
 1. artifact-specific `FName` root,
 2. `GObjects`/`UObject` membership,

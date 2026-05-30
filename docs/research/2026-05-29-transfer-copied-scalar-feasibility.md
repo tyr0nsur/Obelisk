@@ -13,7 +13,7 @@ evidence. This is planning input only, not an RC public API proposal.
 | Target | Decision | Reason |
 | --- | --- | --- |
 | Public Transfer SDK for RC | No-go | Transfer remains outside the core-first RC. Current evidence is layout-only and does not promote payload decoding, identity, hooks, mutation, return override, `ResourceHandle`, or a public SDK. |
-| `ShooterPlayerController.ServerTransferredPlayerConfirmationResult.bAccept` | Go, post-RC internal candidate only | Cleanest copied-scalar candidate: one non-native bool at offset `0`, `ParmsSize=1`, no refs, classes, arrays, strings, structs, ids, or return capture. |
+| `ShooterPlayerController.ServerTransferredPlayerConfirmationResult.bAccept` | Proceed only as fixture/internal candidate | Cleanest copied-scalar candidate: one non-native bool at offset `0`, `ParmsSize=1`, no refs, classes, arrays, strings, structs, ids, or return capture. This is not a usable Transfer function or plugin API. |
 | `ShooterPlayerController.ServerDownloadTransferredPlayer.SpawnPointID` / `spawnPointRegionIndex` | Maybe, post-RC research | Pure `IntProperty` scalars at offsets `0` and `4`, but spawn-point semantics may reveal location or flow choices. Requires privacy/utility review before dispatch. |
 | `PrimalDinoCharacter.IsAllowedToTransfer.ReturnValue` | Maybe, post-RC research | Copied bool return at offset `8`, but paired with `WorldContextObject:ObjectProperty`; only possible as post-original copied return bool with object redacted and no return override. |
 | `ShooterGameState.AllowDownloadDino.ReturnValue` | Maybe, post-RC research | Copied bool return at offset `8`, but paired with `TheDinoClass:ClassProperty`; class identity must remain redacted. |

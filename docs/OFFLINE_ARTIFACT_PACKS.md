@@ -31,6 +31,10 @@ cross-binary portability.
 - Manifest schema must be `obelisk.artifact-pack.manifest.v1`.
 - Legacy spellings such as `obelisk.artifact_pack.manifest.v1` are unsupported and fail
   closed as unknown schemas.
+- Core dump evidence pack manifests produced by
+  `scripts/build_core_dump_evidence_pack.py` must declare
+  `schema: obelisk.core-dump-evidence-pack.v1`; snapshot regeneration consumers reject
+  missing or different schemas before using `core.path` defaults.
 - `artifact_id` must be a safe component, normally the pack directory name.
 - Snapshot/evidence identity fields such as `capture_id` and `evidence_pack_id` must be
   safe artifact identity components: start with an alphanumeric character, contain only

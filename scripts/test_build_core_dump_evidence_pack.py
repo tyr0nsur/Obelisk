@@ -359,6 +359,7 @@ class CoreDumpEvidencePackCommandTests(unittest.TestCase):
 
         self.assertEqual(result, 0)
         manifest = core_pack.json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["schema"], core_pack.CORE_DUMP_EVIDENCE_PACK_SCHEMA)
         self.assertEqual(manifest["evidence_status"]["status"], "complete")
         self.assertFalse(manifest["evidence_status"]["gdb_core_failed"])
         self.assertFalse(manifest["evidence_status"]["allow_partial_gdb"])

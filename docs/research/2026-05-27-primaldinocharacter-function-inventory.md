@@ -80,6 +80,9 @@ blueprint hooks:171
 
 Representative candidates:
 
+`Candidate` here means an offline metadata target for reconstruction. These names are not
+usable functions, callable plugin APIs, runtime hook approvals, or public SDK promises.
+
 | Area | Candidate | Params | ParmsSize | Notes |
 | --- | --- | ---: | ---: | --- |
 | Passenger | `AddPassenger` | 6 | 16 | Compact object/int/bool return chain. |

@@ -123,6 +123,11 @@ Historical notes and fixture paths may use labels such as `sdk_buffs`, `sdk_dino
 `sdk.tribes`, or `sdk.transfers`. In this research tree those labels are snapshot or
 target-set namespaces only. They are not public SDK module names, ABI commitments,
 runtime hooks, callback families, or permission to expose UE object identity.
+Likewise, `promotion_gate.ready=true`, `accepted targets`, and `candidate` in
+module-specific notes mean offline evidence readiness for the named layout or artifact
+gate only. They do not make the named UE functions callable or usable plugin functions,
+and they do not authorize public SDK surfaces, runtime observers, hooks, mutation, return
+overrides, lookup, identity, or raw UE pointer access.
 
 SDK v1 routing snapshot from the current notes:
 
@@ -133,7 +138,7 @@ SDK v1 routing snapshot from the current notes:
 | Copied gameplay policy: inventory/items/structures | Fact: `GameplayPolicyEvent` is the promoted public gameplay surface; item return-only and structure non-PIN slices are evidence/internal unless explicitly promoted. | Preserve copied/redacted scalar policy work without publishing Inventory, Items, StructureEvents, mutation, return override, lookup, or `ResourceHandle`. |
 | Players identity lifecycle | Hypothesis/planning: highest-value broad discovery family after current descriptor/smoke, transfer bool-tail, and item return-only work; the seed set is docs-only and candidate-only. | Build only a closed offline target-set review from known names; keep login/logout names, stable identity, lookup, privacy, and public SDK blocked until evidence exists. |
 | Mission copied-bool internal bridge | Fact: accepted compact layout evidence and copied-bool test planning make it the selected post-RC internal planning thread. | Use as internal/test-only copied-bool hardening; no runtime hooks, public Mission SDK, object/array/player identity, mutation, or return override. |
-| Dino, Buff, Tribe, Transfer, Structure build policy, permissions/admin/RCON/economy/storage | Fact: demand and/or layout evidence exists at different maturity levels; public surfaces are not promoted. | Treat as internal/layout/planning-only backlog lanes behind copied-data ownership, lifecycle cleanup, privacy/redaction, second-source/static evidence, ABI, installed SDK consumer coverage, and approved runtime validation gates. |
+| Dino, Buff, Tribe, Transfer, Structure build policy, permissions/admin/RCON/economy/storage | Fact: demand and/or layout evidence exists at different maturity levels; public surfaces are not promoted and named UE functions are not usable plugin APIs. | Treat as internal/layout/planning-only backlog lanes behind copied-data ownership, lifecycle cleanup, privacy/redaction, second-source/static evidence, ABI, installed SDK consumer coverage, and approved runtime validation gates. |
 
 Historical reusable evidence:
 
