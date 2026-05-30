@@ -59,8 +59,8 @@ UE lookup, or `ResourceHandle` APIs.
    copied-scalar slices until separate runtime, dispatcher lifecycle, ABI, and privacy
    gates exist.
 4. Validate the first non-UE-dependent core service end to end: owner-token
-   process-local timers now have ABI, runtime, and unload cleanup tests; next work is
-   plugin-facing documentation/example usage before identity, permissions, and command
-   routing.
+   process-local timers now have ABI, runtime, unload cleanup, init-failure cleanup, and
+   first-party `oProcessTimer` example coverage. Keep timers independent of identity,
+   permissions, command routing, UE/gameplay timers, and shared-cluster state.
 5. Keep server-backed validation behind explicit live-ops windows; prefer offline
    artifacts and fixture-backed tests until a concrete runtime signal is required.

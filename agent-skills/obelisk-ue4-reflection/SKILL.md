@@ -11,8 +11,8 @@ metadata.
 
 ## Current Reality
 
-- ArkServerApi/AseApi may be used only as an algorithmic reference and as a dictionary of
-  Unreal/ARK `Class.Function` and `Class.Property` names. Do not copy memory offsets,
+- ArkServerApi/AseApi may be used only as a names and behavior dictionary for familiar
+  Unreal/ARK `Class.Function` and `Class.Property` concepts. Do not copy memory offsets,
   vtable definitions, struct layouts, MSVC calling conventions, Windows-only ABI choices,
   or direct native call wrappers from it. Reimplement any property/function access through
   Obelisk's Linux-native `ReflectionScanner`, `RuntimeReflection`, and

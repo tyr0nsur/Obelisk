@@ -137,3 +137,18 @@ python3 scripts/validate_uobject_flag_policy_provenance_inputs.py \
   --window gc_static_0x100_support=<offline-root>/windows/gobjects-100-gc-pass.objdump.txt \
   --json
 ```
+
+Use `--require-rich-provenance` only when the source sidecars already carry mechanical
+reproduction metadata. That opt-in layer requires `command`, `tool`, `tool_version`,
+`start_address`, `stop_address`, and `source_path`, and validates command/path hygiene plus
+monotonic address ranges. Do not add placeholder fields just to satisfy the preflight;
+minimal verified sidecars remain valid for the default route.
+
+Follow-up `/tmp` rehearsal confirmed the rich route is mechanically viable against the
+offline ShooterGameServer binary
+`7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`. Regenerating the six
+small raw inputs with Ghidra 12.1, radare2 5.5.0, and GNU objdump 2.42 plus rich sidecars
+made `validate_uobject_flag_policy_provenance_inputs.py --require-rich-provenance`
+accepted, the consume gate accepted, and promote mode blocked with the expected
+candidate-only blockers. Keep this as internal static evidence only; it does not promote
+`ResourceHandle`, object identity, lookup, lifecycle names, mutation, or return override.

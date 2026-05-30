@@ -184,8 +184,8 @@ Use variable names only in repo files, handoff notes, and prompts:
   only. Examples: release/RC publication, new stable public plugin surface, important SDK
   migration, or a documented compatibility breakthrough that plugin authors can act on.
 - `OBELISK_BETA_TEST_WEBHOOK_URL`: operator-approved in-game test windows only. Use this
-  when players need to perform a bounded action in game, such as testing chat delivery or
-  another copied public event on a named server window.
+  when players need to perform a bounded action in game, such as testing a named copied
+  public event or feature on an approved server window.
 
 Decision rule:
 
@@ -195,6 +195,17 @@ Decision rule:
   bounded window, use `--channel beta-test`.
 - If the message is only an internal round, validation result, agent status, speculative
   finding, or private live-ops detail, do not send Discord.
+
+Pre-send checklist:
+
+- Confirm the user explicitly approved this Discord send for the current turn. Prior
+  release/publication approval does not imply approval for a new Discord message.
+- Select exactly one channel from intent, not convenience: `community` for stable
+  modder-facing Obelisk milestones, `beta-test` for approved player test windows.
+- Load the endpoint only through the matching variable in ignored `local/discord-webhooks.env`;
+  never paste or pass raw webhook URLs into prompts, docs, commits, or sub-agent tasks.
+- Run `scripts/send_discord_embed.py --dry-run` first and inspect that the embed has a
+  professional title, concise description, status/scope, and 2-5 useful fields.
 
 Never use Discord for routine validation logs, internal agent status, private server
 details, raw player text, secrets, hashes that are not part of a public artifact, or

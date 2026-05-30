@@ -472,6 +472,10 @@ int main(int argc, char** argv)
             timerSeen = ResolveOptional<BoolProbeFn>(handle, "CAbiMinimal_TimerSeen");
         if (!timerAccepted)
             timerAccepted = ResolveOptional<BoolProbeFn>(handle, "CAbiMinimal_TimerAccepted");
+        if (!timerSeen)
+            timerSeen = ResolveOptional<BoolProbeFn>(handle, "OProcessTimer_TimerSeen");
+        if (!timerAccepted)
+            timerAccepted = ResolveOptional<BoolProbeFn>(handle, "OProcessTimer_TimerAccepted");
 
         ObeliskPluginMetadata metadata{};
         Require(getInfo(&metadata), "ObeliskPlugin_GetInfo failed");
@@ -483,6 +487,13 @@ int main(int argc, char** argv)
         const char* configJson = metadata.default_config_json;
         if (mode == "active-process-event" || mode == "callback-throw-log")
             configJson = kActiveOBaseEventsConfig;
+        else if (mode == "active-timer" ||
+            (mode == "fail-timer-registration" && std::strcmp(expectedPluginId, "oProcessTimer") == 0))
+            configJson = R"json({
+    "enabled": true,
+    "allow_all_instances": false,
+    "instance_allowlist": ["sdk-consumer-test"]
+})json";
         else if (mode == "unsupported-map-allowlist")
             configJson = kUnsupportedMapAllowlistConfig;
         else if (mode == "invalid-process-event-config")
@@ -636,6 +647,16 @@ int main(int argc, char** argv)
             closeHandle();
             return 0;
         }
+        if (std::strcmp(expectedPluginId, "oProcessTimer") == 0 &&
+            (mode == "no-timer-capability" || mode == "short-api-before-gameplay-policy"))
+        {
+            Require(!initSucceeded, "timer example accepted missing or too-short timer API");
+            Require(g_TimerRegisterCount == 0, "timer example unexpectedly registered with unavailable timer API");
+            Require(g_TimerUnregisterCount == 0, "timer example unexpectedly unregistered with unavailable timer API");
+            cleanupConfigDir();
+            closeHandle();
+            return 0;
+        }
         if (mode == "fail-gameplay-policy-registration")
         {
             Require(!initSucceeded, "plugin accepted failed gameplay policy registration");
@@ -677,14 +698,28 @@ int main(int argc, char** argv)
         if (mode == "fail-timer-registration")
         {
             Require(!initSucceeded, "plugin accepted failed timer registration");
-            Require(g_GameplayPolicyRegisterCount == 1,
-                "plugin did not register gameplay policy before timer failure");
-            Require(g_GameplayPolicyUnregisterCount == 1,
-                "plugin did not unregister gameplay policy after timer failure");
-            Require(g_ChatMessageRegisterCount == 1,
-                "plugin did not register chat before timer failure");
-            Require(g_ChatMessageUnregisterCount == 1,
-                "plugin did not unregister chat after timer failure");
+            if (std::strcmp(expectedPluginId, "oProcessTimer") == 0)
+            {
+                Require(g_GameplayPolicyRegisterCount == 0,
+                    "timer example unexpectedly registered gameplay policy before timer failure");
+                Require(g_GameplayPolicyUnregisterCount == 0,
+                    "timer example unexpectedly unregistered gameplay policy after timer failure");
+                Require(g_ChatMessageRegisterCount == 0,
+                    "timer example unexpectedly registered chat before timer failure");
+                Require(g_ChatMessageUnregisterCount == 0,
+                    "timer example unexpectedly unregistered chat after timer failure");
+            }
+            else
+            {
+                Require(g_GameplayPolicyRegisterCount == 1,
+                    "plugin did not register gameplay policy before timer failure");
+                Require(g_GameplayPolicyUnregisterCount == 1,
+                    "plugin did not unregister gameplay policy after timer failure");
+                Require(g_ChatMessageRegisterCount == 1,
+                    "plugin did not register chat before timer failure");
+                Require(g_ChatMessageUnregisterCount == 1,
+                    "plugin did not unregister chat after timer failure");
+            }
             Require(g_RegisteredGameplayPolicyCallback == nullptr,
                 "gameplay policy callback survived failed timer registration cleanup");
             Require(g_RegisteredChatMessageCallback == nullptr,
@@ -814,13 +849,20 @@ int main(int argc, char** argv)
             Require(!timerSeen(), "plugin reported timer event without registration");
             Require(!timerAccepted(), "plugin accepted timer event without registration");
         }
-        else if (hasTimerProbe)
+        else if (hasTimerProbe && (mode == "active-timer" || std::strcmp(expectedPluginId, "oProcessTimer") != 0))
         {
             Require(g_TimerRegisterCount == 1, "plugin did not register one timer callback");
             Require(g_TimerUnregisterCount == 0, "plugin unregistered timer callback before shutdown");
             DispatchValidTimer();
             Require(timerSeen(), "plugin did not observe timer event");
             Require(timerAccepted(), "plugin did not validate timer event");
+        }
+        else if (hasTimerProbe && std::strcmp(expectedPluginId, "oProcessTimer") == 0)
+        {
+            Require(g_TimerRegisterCount == 0, "disabled timer example unexpectedly registered a timer");
+            Require(g_TimerUnregisterCount == 0, "disabled timer example unexpectedly unregistered a timer");
+            Require(!timerSeen(), "disabled timer example reported timer event");
+            Require(!timerAccepted(), "disabled timer example accepted timer event");
         }
         if (mode == "callback-throw-log")
         {
@@ -903,12 +945,17 @@ int main(int argc, char** argv)
             Require(g_TimerUnregisterCount == 0,
                 "plugin unregistered timer callback without capability");
         }
-        else if (hasTimerProbe)
+        else if (hasTimerProbe && (mode == "active-timer" || std::strcmp(expectedPluginId, "oProcessTimer") != 0))
         {
             Require(g_TimerRegisterCount == 1, "plugin did not register one timer callback");
             Require(g_TimerUnregisterCount == 1, "plugin did not unregister one timer callback");
             Require(g_RegisteredTimerCallback == nullptr, "timer callback survived shutdown unregister");
             Require(g_RegisteredTimerUserData == nullptr, "timer user data survived shutdown unregister");
+        }
+        else if (hasTimerProbe && std::strcmp(expectedPluginId, "oProcessTimer") == 0)
+        {
+            Require(g_TimerRegisterCount == 0, "disabled timer example registered a timer before shutdown");
+            Require(g_TimerUnregisterCount == 0, "disabled timer example unregistered a timer on shutdown");
         }
         else if (std::strcmp(expectedPluginId, "oBaseEvents") == 0 && mode.empty())
         {

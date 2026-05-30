@@ -134,6 +134,9 @@ CORE_TIMER_PUBLIC_TOKENS = {
     "ObeliskTimer",
     "UnregisterTimer",
 }
+CORE_TIMER_EXAMPLE_TOKENS = CORE_TIMER_PUBLIC_TOKENS | {
+    "OnTimer",
+}
 V010_PUBLIC_MANIFEST_METADATA_SURFACE_IDS = [
     "obelisk.resource_kind_descriptors.v1",
     "obelisk.gameplay_policy_event_descriptors.v1",
@@ -289,6 +292,35 @@ UNPROMOTED_COMMAND_ADMIN_PLAYER_API_TOKENS = (
     "FindPlayer",
     "ResolvePlayer",
 )
+ROADMAP_COMMAND_HELPER_PROMOTION_TOKENS = (
+    "Command",
+    "Permission",
+    "PlayerSnapshot",
+    "ParameterData",
+)
+PROMOTED_RUNTIME_PAYLOAD_FILES = (
+    REPO_ROOT / "core" / "ChatEventDispatcher.h",
+    REPO_ROOT / "core" / "ChatEventDispatcher.cpp",
+    REPO_ROOT / "core" / "StructureEventDispatcher.h",
+    REPO_ROOT / "core" / "StructureEventDispatcher.cpp",
+    REPO_ROOT / "core" / "InventoryPolicyEventDispatcher.h",
+    REPO_ROOT / "core" / "InventoryPolicyEventDispatcher.cpp",
+    REPO_ROOT / "core" / "PluginManager.cpp",
+    REPO_ROOT / "hooks" / "ProcessEventChatReflection.h",
+    REPO_ROOT / "hooks" / "ProcessEventChatReflection.cpp",
+    REPO_ROOT / "hooks" / "ProcessEventStructureReflection.h",
+    REPO_ROOT / "hooks" / "ProcessEventStructureReflection.cpp",
+    REPO_ROOT / "hooks" / "ProcessEventInventoryReflection.h",
+    REPO_ROOT / "hooks" / "ProcessEventInventoryReflection.cpp",
+    REPO_ROOT / "plugins" / "oChatLogger" / "oChatLogger.c",
+    REPO_ROOT / "plugins" / "oPolicyAudit" / "oPolicyAudit.cpp",
+)
+RUNTIME_LOG_SCAN_ROOTS = (
+    REPO_ROOT / "core",
+    REPO_ROOT / "hooks",
+    REPO_ROOT / "plugins",
+)
+RUNTIME_LOG_SCAN_SUFFIXES = {".c", ".cpp", ".h", ".hpp"}
 UNPROMOTED_SDK_CONSUMER_API_TOKENS = (
     "OBELISK_API_CAPABILITY_INVENTORY_EVENTS",
     "OBELISK_API_CAPABILITY_INVENTORY_POLICY_EVENTS",
@@ -425,6 +457,10 @@ def obelisk_api_struct_body(header: str) -> str:
 def strip_c_comments(text: str) -> str:
     text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
     return re.sub(r"//.*", "", text)
+
+
+def c_like_string_literals(text: str) -> list[str]:
+    return re.findall(r'"(?:\\.|[^"\\])*"', strip_c_comments(text), flags=re.DOTALL)
 
 
 def normalized(text: str) -> str:
@@ -686,6 +722,31 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                     offenders.append(f"{path}: {marker}")
 
         visit(manifest, "manifest")
+        self.assertEqual(offenders, [])
+
+    def test_command_helper_roadmap_terms_stay_out_of_public_payloads_and_runtime_logs(self) -> None:
+        public_surfaces = (
+            PUBLIC_API_HEADER,
+            PUBLIC_GAMEPLAY_EVENTS_MANIFEST,
+            *PROMOTED_RUNTIME_PAYLOAD_FILES,
+        )
+        offenders: list[str] = []
+
+        for path in public_surfaces:
+            text = path.read_text(encoding="utf-8")
+            for token in ROADMAP_COMMAND_HELPER_PROMOTION_TOKENS:
+                if token in text:
+                    offenders.append(f"{path.relative_to(REPO_ROOT)}: public/payload token {token}")
+
+        for root in RUNTIME_LOG_SCAN_ROOTS:
+            for path in root.rglob("*"):
+                if not path.is_file() or path.suffix not in RUNTIME_LOG_SCAN_SUFFIXES:
+                    continue
+                for literal in c_like_string_literals(path.read_text(encoding="utf-8")):
+                    for token in ROADMAP_COMMAND_HELPER_PROMOTION_TOKENS:
+                        if token in literal:
+                            offenders.append(f"{path.relative_to(REPO_ROOT)}: runtime log/string token {token}")
+
         self.assertEqual(offenders, [])
 
     def test_public_sdk_core_api_surface_matches_v010_allowlist(self) -> None:
@@ -1674,6 +1735,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         for path in scanned_files:
             text = path.read_text(encoding="utf-8")
             for token in forbidden:
+                if path.relative_to(REPO_ROOT).as_posix().startswith("plugins/oProcessTimer/") and token in CORE_TIMER_EXAMPLE_TOKENS:
+                    continue
                 if token in text:
                     offenders.append(f"{path.relative_to(REPO_ROOT)}: {token}")
 
@@ -1717,6 +1780,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         for path in scanned_files:
             text = path.read_text(encoding="utf-8")
             for token in forbidden:
+                if path.relative_to(REPO_ROOT).as_posix().startswith("plugins/oProcessTimer/") and token in CORE_TIMER_EXAMPLE_TOKENS:
+                    continue
                 if token in text:
                     offenders.append(f"{path.relative_to(REPO_ROOT)}: {token}")
 
@@ -2052,6 +2117,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         for path in scanned_files:
             text = path.read_text(encoding="utf-8")
             for token in forbidden:
+                if path.relative_to(REPO_ROOT).as_posix().startswith("plugins/oProcessTimer/") and token in CORE_TIMER_EXAMPLE_TOKENS:
+                    continue
                 if token in text:
                     offenders.append(f"{path.relative_to(REPO_ROOT)}: {token}")
             for pattern in forbidden_positive_claims:

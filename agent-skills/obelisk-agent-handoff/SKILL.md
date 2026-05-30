@@ -29,7 +29,7 @@ distilled task brief containing only the facts, risks, allowed paths, required s
 expected decision for their scope. Assign handoff-file edits only as an explicit ownership
 scope.
 
-Update these before finishing:
+For lead or explicitly assigned integration turns, update these before finishing:
 
 - `docs/agent-handoff/CURRENT.md` for short-lived active context.
 - `docs/agent-handoff/COMPACT_CONTEXT.md` when the stable baseline or hard rules change.

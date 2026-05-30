@@ -1982,6 +1982,36 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestTimerCallbackCleansOnInitFailure()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_timer_init_fail");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "timer_init_fail.so",
+            .initResult = false,
+            .registerTimerCallback = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "timer init-fail plugin was not initialized");
+        Require(plugin.shutdownCalls == 1, "timer init-fail plugin shutdown was not called");
+        Require(plugin.closeCalls == 1, "timer init-fail plugin was not closed");
+        Require(plugin.timerRegistrationId != 0, "timer was not registered before init failure");
+        Require(Obelisk::Core::TimerManager::Get().UnregisterCallbacksForOwner(plugin.owner) == 0,
+                "timer survived plugin init failure");
+        Require(plugin.timerEventCalls == 0, "long-delay timer fired before init-failure cleanup");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestChatMessageRegistrationRejectedWhenCapabilityWasNotAdvertised()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_chat_message_capability_snapshot");
@@ -4077,6 +4107,7 @@ int main()
     TestOwnerTokenGameplayPolicyEventRegistrationCanUnregister();
     TestOwnerTokenChatMessageEventRegistrationCanUnregister();
     TestOwnerTokenTimerRegistrationCanUnregisterAndUnload();
+    TestTimerCallbackCleansOnInitFailure();
     TestChatMessageRegistrationRejectedWhenCapabilityWasNotAdvertised();
     TestChatMessageCallbackExceptionDoesNotEscapeDispatch();
     TestChatMessageRegistrationUsesOwnerCapabilitySnapshotAcrossManagers();

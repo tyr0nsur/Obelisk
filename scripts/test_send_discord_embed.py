@@ -2,15 +2,26 @@
 
 from __future__ import annotations
 
+import argparse
+import importlib.util
 import json
+import os
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "send_discord_embed.py"
+
+_SPEC = importlib.util.spec_from_file_location("send_discord_embed", SCRIPT)
+assert _SPEC is not None
+send_discord_embed = importlib.util.module_from_spec(_SPEC)
+assert _SPEC.loader is not None
+_SPEC.loader.exec_module(send_discord_embed)
 
 
 class SendDiscordEmbedTests(unittest.TestCase):
@@ -98,6 +109,67 @@ class SendDiscordEmbedTests(unittest.TestCase):
         source = Path(__file__).read_text(encoding="utf-8")
         self.assertNotIn("discord.com/" + "api/webhooks", source)
         self.assertNotIn("discordapp.com/" + "api/webhooks", source)
+
+    def test_channel_webhooks_are_loaded_from_their_own_variables(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            env_file = Path(tmpdir) / "discord-webhooks.env"
+            env_file.write_text(
+                "\n".join(
+                    [
+                        "OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL" + "=https://example.invalid/community",
+                        "OBELISK_BETA_TEST_WEBHOOK_URL" + "=https://example.invalid/beta-test",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            with mock.patch.dict(os.environ, {}, clear=True):
+                community = send_discord_embed.load_webhook_url(
+                    argparse.Namespace(channel="community", env_file=env_file)
+                )
+                beta_test = send_discord_embed.load_webhook_url(
+                    argparse.Namespace(channel="beta-test", env_file=env_file)
+                )
+
+        self.assertEqual(community, "https://example.invalid/community")
+        self.assertEqual(beta_test, "https://example.invalid/beta-test")
+
+    def test_environment_webhook_overrides_local_env_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            env_file = Path(tmpdir) / "discord-webhooks.env"
+            env_file.write_text(
+                "OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL"
+                + "=https://example.invalid/local\n",
+                encoding="utf-8",
+            )
+
+            with mock.patch.dict(
+                os.environ,
+                {"OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL": "https://example.invalid/process"},
+                clear=True,
+            ):
+                webhook_url = send_discord_embed.load_webhook_url(
+                    argparse.Namespace(channel="community", env_file=env_file)
+                )
+
+        self.assertEqual(webhook_url, "https://example.invalid/process")
+
+    def test_missing_channel_webhook_does_not_fall_back_to_other_channel(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            env_file = Path(tmpdir) / "discord-webhooks.env"
+            env_file.write_text(
+                "OBELISK_BETA_TEST_WEBHOOK_URL"
+                + "=https://example.invalid/beta-test\n",
+                encoding="utf-8",
+            )
+
+            with mock.patch.dict(os.environ, {}, clear=True):
+                with self.assertRaises(SystemExit) as raised:
+                    send_discord_embed.load_webhook_url(
+                        argparse.Namespace(channel="community", env_file=env_file)
+                    )
+
+        self.assertIn("OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL", str(raised.exception))
 
 
 if __name__ == "__main__":

@@ -74,7 +74,10 @@ sequence.
 - Current post-RC core primitive: owner-token process-local timers. They are ABI
   append-only, zero-failure handles, one-shot/repeating, explicit unregister, and cleaned
   on plugin init failure/unload. Timer ids are not shared config, cluster state, UE
-  identity, or persistent handles.
+  identity, or persistent handles. `oProcessTimer` is the first-party process-local timer
+  example and has SDK consumer coverage for disabled config, active one-shot callback,
+  missing capability, short API, zero owner token, registration failure, and shutdown
+  unregister.
 - Internal bridges only: `StructureEventDispatcher`, `InventoryPolicyEventDispatcher`,
   Item/Mission/Transfer recognizers, weak-helper artifacts, GObjects evidence, and route
   observers are planning/evidence inputs until a separate promotion gate changes scope.
@@ -102,10 +105,10 @@ sequence.
 - Regenerate the blocked UObject flag-policy artifact with current provenance/caller-row
   requirements before spending more ResourceHandle effort. Do not rerun broad FName,
   GObjects, or core scans unless the binary hash changes or evidence contradicts current
-  roots/candidates. Current shortest path is blocked only by missing verified provenance
-  sidecars for the small weak-helper caller-mode and UObject policy window inputs listed
-  in `docs/research/2026-05-30-uobject-flag-policy-gate-refresh.md`; do not fabricate
-  sidecars.
+  roots/candidates. A `/tmp` rehearsal proved the small rich-provenance route can pass
+  preflight and consume mode while promote mode remains blocked; keep it internal static
+  evidence only and use the command shape recorded in
+  `docs/research/2026-05-30-uobject-flag-policy-gate-refresh.md`.
 - Any future live/player validation requires a new approved live-ops brief and, when
   players are involved, a beta-test notice through the configured local webhook variable.
 

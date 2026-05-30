@@ -139,6 +139,36 @@ add_test(
     COMMAND sdk_consumer_fixture "$<TARGET_FILE:oBaseEvents>" oBaseEvents unsafe-instance-allowlist
 )
 
+add_test(
+    NAME SdkConsumerFixtureOProcessTimer
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oProcessTimer>" oProcessTimer
+)
+
+add_test(
+    NAME SdkConsumerFixtureOProcessTimerActive
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oProcessTimer>" oProcessTimer active-timer
+)
+
+add_test(
+    NAME SdkConsumerFixtureOProcessTimerNoTimerCapability
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oProcessTimer>" oProcessTimer no-timer-capability
+)
+
+add_test(
+    NAME SdkConsumerFixtureOProcessTimerShortApi
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oProcessTimer>" oProcessTimer short-api-before-gameplay-policy
+)
+
+add_test(
+    NAME SdkConsumerFixtureOProcessTimerRejectsZeroOwnerToken
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oProcessTimer>" oProcessTimer zero-owner-token
+)
+
+add_test(
+    NAME SdkConsumerFixtureOProcessTimerRegistrationFailure
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oProcessTimer>" oProcessTimer fail-timer-registration
+)
+
 if(TARGET oPolicyAudit)
     add_test(
         NAME SdkConsumerFixtureOPolicyAudit
