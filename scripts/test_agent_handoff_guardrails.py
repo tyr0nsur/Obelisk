@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
+import re
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -95,13 +96,18 @@ class AgentHandoffGuardrailsTests(unittest.TestCase):
         self.assertIn("GitHub work may be delegated only for an evidenced, stable milestone", current)
         self.assertNotIn("forbids GitHub pushes", current)
         self.assertNotIn("Do not push unless the operator reopens pushing", current)
-        self.assertIn("standing debug approval", current)
-        self.assertIn("standing operator approval for Obelisk debug/development tests", compact)
+        self.assertIn("No server target\n  has standing approval", current)
+        self.assertIn("Technical progress is only a reason to request a scoped run", current)
+        self.assertIn("No standing operator approval for Obelisk debug/development or beta tests", compact)
         self.assertIn("server-safety decisions", current)
-        self.assertIn("two on Obelisk engineering/audit/development", current)
-        self.assertIn("on research/knowledge/reversing/dump", current)
-        self.assertIn("two on Obelisk engineering/audit/development", compact)
-        self.assertIn("four on research/knowledge/reversing/dump", workflow_skill)
+        self.assertIn("Follow explicit lead-provided routing only", workflow_skill)
+        for text in (current, compact, workflow_skill):
+            self.assertNotIn("two on Obelisk engineering/audit/development", text)
+            self.assertNotIn("four on research/knowledge/reversing/dump", text)
+            self.assertNotIn("six-agent split", text)
+            self.assertNotIn("local critical-path task", text)
+            self.assertNotIn("parallel sub-agents", text)
+            self.assertIsNone(re.search(r"\b\d+\s+tests passed\b", text))
 
         self.assertIn("documented next actions", workflow_skill)
         self.assertNotIn("queued next tasks", workflow_skill)

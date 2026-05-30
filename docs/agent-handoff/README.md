@@ -17,9 +17,9 @@ These files are internal coordination notes for agents and the project lead. Pub
 contributor workflow belongs in `CONTRIBUTING.md`.
 
 When assigning sub-agent work, use these files to extract only the scoped facts, risks,
-allowed paths, required skills, and expected decision. Do not copy the full active
-objective, agent balance, GitHub flow, Discord policy, or unrelated module history into
-default sub-agent prompts.
+allowed paths, required skills, and expected decision. Do not copy the full leader
+objective, agent balance, GitHub flow, community/announcement policy, or unrelated module
+history into default sub-agent prompts.
 
 ## Rules
 
