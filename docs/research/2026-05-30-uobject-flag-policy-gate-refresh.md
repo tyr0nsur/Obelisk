@@ -226,3 +226,17 @@ The manifest keeps `promotion_ready=false`, `public_resource_handle_ready=false`
 `post_callback_resource_handle_ready=false`. Treat this pack as canonical internal
 static evidence for the current binary hash, not as a public ResourceHandle, GObjects,
 identity, lookup, lifecycle, mutation, return-override, or SDK promotion.
+
+## Gate Contract Hardening
+
+Follow-up audit found that consume mode already required the
+`internal_revalidation_contract`, but it did not fully reject contradictions in adjacent
+fields. The gate now also validates the exact `weak_helper_caller_mode` shape, requires
+`promotion_gate_ready=false`, requires the expected `0x100` / `0x4000` flag rules, rejects
+unexpected fields in `policy_candidates`, and scans extra `remaining_blockers` /
+`non_claims` entries for public `ResourceHandle`, lookup, SDK, runtime, or callback
+overclaims.
+
+This is a validator hardening only. It does not change the durable artifact's promotion
+status and does not promote `ResourceHandle`, public GObjects, object identity, lookup,
+lifecycle names, mutation, return override, or any public SDK surface.

@@ -3905,21 +3905,87 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         )
 
     def test_blocks_uobject_flag_policy_relaxed_internal_revalidation_contract(self) -> None:
+        mutations = {
+            "name": lambda contract: contract.__setitem__("name", "ResourceHandleCandidate"),
+            "lifetime": lambda contract: contract.__setitem__("lifetime", "post_callback"),
+            "post_callback_lookup": lambda contract: contract.__setitem__("post_callback_lookup", "allowed"),
+            "flag_0x100": lambda contract: contract["flag_policy"].__setitem__("0x100", "allow"),
+            "flag_0x4000": lambda contract: contract["flag_policy"].__setitem__("0x4000", "allow_by_default"),
+            "output": lambda contract: contract.__setitem__("output", "resourcehandle_lookup"),
+            "public_api": lambda contract: contract.__setitem__("public_api", "promoted"),
+            "extra_key": lambda contract: contract.__setitem__("lookup", "ready"),
+        }
+
+        for case, mutate in mutations.items():
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as tmp:
+                protected = Path(tmp) / "server"
+                workspace = protected / "workspace-offline"
+                manifest = workspace / "uobject-flags.json"
+                payload = uobject_flag_policy_report_manifest()
+                mutate(payload["internal_revalidation_contract"])
+                write_json(manifest, payload)
+
+                result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+            self.assertIn(
+                "uobject_flag_policy_internal_revalidation_contract_mismatch",
+                {blocker["reason"] for blocker in result["blockers"]},
+            )
+
+    def test_blocks_uobject_flag_policy_missing_internal_revalidation_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"
             workspace = protected / "workspace-offline"
             manifest = workspace / "uobject-flags.json"
             payload = uobject_flag_policy_report_manifest()
-            payload["internal_revalidation_contract"]["post_callback_lookup"] = "allowed"
-            payload["internal_revalidation_contract"]["flag_policy"]["0x4000"] = "allow_by_default"
+            del payload["internal_revalidation_contract"]
             write_json(manifest, payload)
 
             result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
 
         self.assertIn(
-            "uobject_flag_policy_internal_revalidation_contract_mismatch",
+            "uobject_flag_policy_internal_revalidation_contract_missing",
             {blocker["reason"] for blocker in result["blockers"]},
         )
+
+    def test_blocks_uobject_flag_policy_weak_helper_contract_overclaims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flags.json"
+            payload = uobject_flag_policy_report_manifest()
+            payload["weak_helper_caller_mode"]["promotion_gate_ready"] = True
+            payload["weak_helper_caller_mode"]["flag_rules"][0]["result"] = "allow"
+            payload["weak_helper_caller_mode"]["schema"] = "obsolete"
+            payload["weak_helper_caller_mode"]["public_api"] = "ResourceHandle lookup ready"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("uobject_flag_policy_weak_helper_promotion_gate_overclaim", reasons)
+        self.assertIn("uobject_flag_policy_weak_helper_flag_rules_mismatch", reasons)
+        self.assertIn("uobject_flag_policy_weak_helper_schema_mismatch", reasons)
+        self.assertIn("uobject_flag_policy_weak_helper_unexpected_fields", reasons)
+
+    def test_blocks_uobject_flag_policy_payload_public_overclaims_in_extra_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flags.json"
+            payload = uobject_flag_policy_report_manifest()
+            payload["policy_candidates"][0]["public_api"] = "ResourceHandle lookup ready"
+            payload["remaining_blockers"].append("ResourceHandle runtime promotion")
+            payload["non_claims"].append("ResourceHandle lookup ready")
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("uobject_flag_policy_candidate_unexpected_fields", reasons)
+        self.assertIn("uobject_flag_policy_candidate_public_overclaim_resourcehandle", reasons)
+        self.assertIn("uobject_flag_policy_remaining_blockers_public_overclaim_resourcehandle", reasons)
+        self.assertIn("uobject_flag_policy_non_claims_public_overclaim_resourcehandle", reasons)
 
     def test_blocks_uobject_flag_policy_bad_caller_rows_summary(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

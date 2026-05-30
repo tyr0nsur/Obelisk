@@ -7,6 +7,10 @@ defined in [VERSIONING.md](VERSIONING.md).
 
 ## Scope
 
+Release scope is intentionally narrower than the active research roadmap. Post-RC
+recognizers, runtime-observer summaries, artifact packs, and internal dispatch helpers are
+review inputs unless a release or PR explicitly promotes them through the gates below.
+
 Included:
 
 - Runtime bootstrap.
@@ -94,9 +98,9 @@ The script requires a clean worktree by default. Use `--allow-dirty` only while 
 the release gate itself. Set `OBELISK_KEEP_RELEASE_CHECK_ROOTS=1` to keep the temporary
 install roots for manual inspection after the script completes.
 
-For `v0.1.0-rc.1`, treat this command as a local smoke/build gate. The final RC candidate
-must also pass the second-source readiness gate below on a clean worktree with the accepted
-snapshot root configured.
+Treat this command as a local smoke/build gate. A final RC or stable candidate must also
+pass the second-source readiness gate below on a clean worktree with the accepted snapshot
+root configured.
 
 After assembling an RC second-source root, run the committed RC layout smoke. This checks
 that the copied second-source snapshots compare cleanly against the in-repo sanitized
@@ -105,13 +109,13 @@ UFunction fixtures for the RC target sets without claiming runtime promotion,
 
 ```bash
 scripts/check_rc_layout_evidence_smoke.sh \
-  --candidate-root /tmp/obelisk-rc-ufunction-second-source-root
+  --candidate-root <second-source-ufunction-snapshots>
 ```
 
 For future RC/stable publication, the final local candidate gate is the canonical release
 readiness script with second-source readiness enabled and the accepted target-set
 UFunction snapshot root configured. The published `v0.1.0-rc.1` checkpoint passed this
-gate with `/tmp/obelisk-rc-ufunction-second-source-root`; see
+gate with the historical root recorded in
 [`2026-05-30-rc-second-source-release-gate-check.md`](research/2026-05-30-rc-second-source-release-gate-check.md).
 Rerun the same gate on the intended release ref immediately before any
 release-manager tag/push:
@@ -119,7 +123,7 @@ release-manager tag/push:
 ```bash
 scripts/check_release_readiness.sh \
   --require-second-source-readiness \
-  --ufunction-second-source-root /tmp/obelisk-rc-ufunction-second-source-root \
+  --ufunction-second-source-root <second-source-ufunction-snapshots> \
   --ufunction-second-source-target-set minimal-second-source-intake \
   --ufunction-second-source-target-set structure-observer-intake \
   --ufunction-second-source-target-set chat-message-intake \
@@ -242,7 +246,9 @@ If internal module recognizer work resumes after the RC, the current order is It
 return-only policy, Mission copied-bool observer, then Transfer `bAccept`. That ordering
 is post-RC planning only and does not promote a public SDK/API surface.
 
-Runtime-observer log summaries are a separate review artifact, not a release gate and not
+## Review Artifacts
+
+Runtime-observer log summaries are review artifacts, not release gates and not
 second-source promotion evidence. Use them only on copied or sanitized logs when reviewing
 an approved observer capture:
 
@@ -314,9 +320,9 @@ scripts/check_linuxgsm_wrapper_drift.sh \
 scripts/check_obelisk_server_posture.sh --expect-stable --map <map> --instance <instance-id>
 ```
 
-11. For a future release candidate, tag the validated candidate first. Release tags and release
-    ref pushes are release-manager/lead-only; contributors should not tag or push release
-    refs from ordinary development branches.
+11. For a future release candidate, tag the validated candidate first. Release tags and
+    release ref pushes are release-manager/lead-only; contributors should not tag or push
+    release refs from ordinary development branches.
     No tag or release-ref push is authorized without explicit release-manager/lead
     authorization for the current turn.
     Replace `<rc-tag>` with the new release tag. Do not recreate the published
@@ -334,9 +340,13 @@ python3 scripts/check_release_tag_state.py --tag <rc-tag> --ref HEAD
 ```
 
 After RC feedback is resolved and the stable release gate passes on the intended ref, tag
-the stable release in a focused release-prep pass with explicit release-manager approval:
+the stable release in a focused release-prep pass with explicit release-manager approval.
+Use the same exact tag/ref verification flow and keep publication as an explicit step:
 
 ```bash
-git tag -a v0.1.0 -m "Obelisk 0.1.0"
-git push origin v0.1.0
+python3 scripts/check_release_tag_state.py --tag <stable-tag> --ref HEAD --allow-missing
+git tag -a <stable-tag> -m "Obelisk <stable-version>"
+python3 scripts/check_release_tag_state.py --tag <stable-tag> --ref HEAD
+# Only after explicit release-manager approval:
+# git push origin <stable-tag>
 ```

@@ -357,6 +357,19 @@ UOBJECT_FLAG_POLICY_CALLER_ROWS_SOURCE_KEYS = {
     "caller_rows_sha256",
     "path_redacted",
 }
+UOBJECT_FLAG_POLICY_WEAK_HELPER_KEYS = {
+    "schema",
+    "artifact_sha256",
+    "promotion_gate_ready",
+    "direct_call_coverage",
+    "flag_rules",
+    "caller_rows_summary",
+    "caller_rows_source",
+}
+UOBJECT_FLAG_POLICY_WEAK_HELPER_FLAG_RULES = [
+    {"mask": "0x100", "result": "null_always"},
+    {"mask": "0x4000", "result": "null_when_sil_zero"},
+]
 UOBJECT_FLAG_POLICY_PUBLIC_HELPER_ID = "weak_helper_flag_policy_candidate"
 REQUIRED_UOBJECT_FLAG_POLICY_CANDIDATES = {
     "0x100": {
@@ -3546,6 +3559,15 @@ def validate_uobject_flag_policy_report_manifest(
     if not isinstance(weak_helper, dict):
         blockers.append({"reason": "uobject_flag_policy_missing_weak_helper_caller_mode", "label": f"{label}:$.weak_helper_caller_mode"})
     else:
+        weak_helper_label = f"{label}:$.weak_helper_caller_mode"
+        if set(weak_helper) != UOBJECT_FLAG_POLICY_WEAK_HELPER_KEYS:
+            blockers.append({"reason": "uobject_flag_policy_weak_helper_unexpected_fields", "label": weak_helper_label})
+        if weak_helper.get("schema") != WEAK_HELPER_CALLER_MODE_SCHEMA:
+            blockers.append({"reason": "uobject_flag_policy_weak_helper_schema_mismatch", "label": f"{weak_helper_label}.schema"})
+        if weak_helper.get("promotion_gate_ready") is not False:
+            blockers.append({"reason": "uobject_flag_policy_weak_helper_promotion_gate_overclaim", "label": f"{weak_helper_label}.promotion_gate_ready"})
+        if weak_helper.get("flag_rules") != UOBJECT_FLAG_POLICY_WEAK_HELPER_FLAG_RULES:
+            blockers.append({"reason": "uobject_flag_policy_weak_helper_flag_rules_mismatch", "label": f"{weak_helper_label}.flag_rules"})
         artifact_sha = weak_helper.get("artifact_sha256")
         coverage = weak_helper.get("direct_call_coverage")
         coverage_entry = coverage.get(UOBJECT_FLAG_POLICY_PUBLIC_HELPER_ID) if isinstance(coverage, dict) else None
@@ -3623,6 +3645,10 @@ def validate_uobject_flag_policy_report_manifest(
             if not isinstance(candidate, dict):
                 blockers.append({"reason": "uobject_flag_policy_candidate_not_object", "label": candidate_label})
                 continue
+            if set(candidate) != {"mask", "candidate", "support", "ue_lifecycle_name"}:
+                blockers.append({"reason": "uobject_flag_policy_candidate_unexpected_fields", "label": candidate_label})
+            for trail, _, reason in collect_candidate_public_overclaims(candidate):
+                blockers.append({"reason": f"uobject_flag_policy_candidate_public_overclaim_{reason}", "label": f"{candidate_label}:{trail}"})
             mask = candidate.get("mask")
             if isinstance(mask, str):
                 observed_masks.add(mask)
@@ -3801,6 +3827,12 @@ def validate_uobject_flag_policy_report_manifest(
                 "recorded": blockers_list,
             }
         )
+    elif any(not isinstance(blocker, str) for blocker in blockers_list):
+        blockers.append({"reason": "uobject_flag_policy_remaining_blockers_invalid", "label": f"{label}:$.remaining_blockers"})
+    else:
+        extra_blockers = [blocker for blocker in blockers_list if blocker not in REQUIRED_UOBJECT_FLAG_POLICY_BLOCKERS]
+        for trail, _, reason in collect_candidate_public_overclaims(extra_blockers, allowed_prefixes=()):
+            blockers.append({"reason": f"uobject_flag_policy_remaining_blockers_public_overclaim_{reason}", "label": f"{label}:$.remaining_blockers:{trail}"})
     non_claims = payload.get("non_claims")
     if not isinstance(non_claims, list) or not REQUIRED_UOBJECT_FLAG_POLICY_NON_CLAIMS.issubset(set(non_claims)):
         blockers.append(
@@ -3811,6 +3843,12 @@ def validate_uobject_flag_policy_report_manifest(
                 "recorded": non_claims,
             }
         )
+    elif any(not isinstance(non_claim, str) for non_claim in non_claims):
+        blockers.append({"reason": "uobject_flag_policy_non_claims_invalid", "label": f"{label}:$.non_claims"})
+    else:
+        extra_non_claims = [non_claim for non_claim in non_claims if non_claim not in REQUIRED_UOBJECT_FLAG_POLICY_NON_CLAIMS]
+        for trail, _, reason in collect_candidate_public_overclaims(extra_non_claims, allowed_prefixes=()):
+            blockers.append({"reason": f"uobject_flag_policy_non_claims_public_overclaim_{reason}", "label": f"{label}:$.non_claims:{trail}"})
     if mode == "promote":
         blockers.append({"reason": "promote_mode_uobject_flag_policy_candidate_only", "label": label})
     lower_strings = [value.casefold() for _, value in collect_string_fields(payload)]

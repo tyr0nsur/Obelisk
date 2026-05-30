@@ -204,7 +204,10 @@ priorities, and do not use history files as the active source of truth.
   Current offline flag-policy tooling requires the internal label
   `InternalUObjectRevalidationCandidate` with frame-local lifetime only, post-callback
   lookup rejected, `0x100` rejected, `0x4000` rejected by default, and output limited to
-  copied bool/reason or Obelisk-owned copied data.
+  copied bool/reason or Obelisk-owned copied data. The consume gate also validates the
+  exact `weak_helper_caller_mode` shape/flag rules, rejects candidate fields outside the
+  known contract, and blocks extra blocker/non-claim text that overclaims public
+  `ResourceHandle`, lookup, SDK, runtime, or callback readiness.
 - Static GObjects/FUObjectItem evidence is internal offline input only. `0x595b7e0`
   supports target-set enumeration across current copied-core evidence, but not public
   GObjects, identity, lookup, `ResourceHandle`, mutation, or return override. Evidence:
@@ -228,6 +231,10 @@ priorities, and do not use history files as the active source of truth.
   `UseItemOntoItem.ReturnValue`. Its internal helper can build-and-reserve the copied
   return observation in one operation and clears output on invalid attempts or exhausted
   budget; it remains internal/test-only.
+  Chat command ergonomics should start as a plugin-local parser/helper over the existing
+  copied `ChatMessageEvent`, not as a new ABI. Keep output callback-scope only and keep
+  player identity, permissions, targeting, chat send/reply, moderation/blocking, mutation,
+  and return override blocked.
   The strict RC `minimal-second-source-intake` redacted signature pack with complete
   target-set coverage is preserved at
   `/home/flowcommunity-ark/obelisk-artifacts/rc-minimal-redacted-signatures-strict-20260530T000000Z/`;

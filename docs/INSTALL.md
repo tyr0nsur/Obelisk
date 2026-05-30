@@ -59,8 +59,8 @@ libraries before replacement. If runtime or SDK publication fails, temporary
 installer cleanup trap, and any already-published runtime or SDK files are restored.
 
 Rollback should restore `libobelisk.so` and `libsubhook.so` as a compatible pair from the
-same backup timestamp, then restart only the target instance named by explicit
-current-turn operator approval and re-run the stable posture check.
+same backup timestamp, then restart only the explicitly approved target instance and rerun
+the stable posture check.
 
 External plugins can consume the installed SDK through the exported CMake package:
 
@@ -122,11 +122,11 @@ Then configure LinuxGSM:
 executable="./ObeliskRun.sh"
 ```
 
-Do not restart, change markers, run runtime observations, send beta/community notices, or
-run Obelisk tests on shared or player-facing instances without explicit current-turn
-operator approval for the exact target, marker/env delta, restart expectation, rollback
-plan, evidence capture, notice path when applicable, and shutdown expectations. Keep
-current instance posture in operator-owned deployment notes outside the public SDK docs.
+Do not restart, change markers, run runtime observations, or run Obelisk tests on shared
+or player-facing instances without explicit operational approval for the exact target,
+marker/env delta, restart expectation, rollback plan, evidence capture, notice path when
+applicable, and shutdown expectations. Keep current instance posture and notification
+routing in operator-owned deployment notes outside the public SDK docs.
 
 ## Instance Identity
 
@@ -190,7 +190,7 @@ Do not create, remove, or refresh markers on shared or player-facing instances f
 ordinary install or debug rounds. Treat the live marker list as observed baseline unless
 the operator opens an explicit maintenance window for that instance in the current turn.
 Experimental module markers, scanners, ReflectionScanner, ptrace/gcore, broad tracing,
-runtime observation, beta/community notices, and restarts require explicit current-turn
+runtime observation, player-facing notices, and restarts require explicit current-turn
 operator approval for the exact scoped run.
 
 Useful flags:
@@ -324,12 +324,12 @@ supported LinuxGSM wrapper is used. The runtime itself disables plugin loading o
 `OBELISK_DISABLE_PLUGINS=1` is present; the `disable-plugins` marker is the wrapper input
 that sets that environment variable.
 
-Keep current instance names, maps, beta-test routing, and debug-instance startup/shutdown
-rules in operator-owned deployment notes, not in public SDK install docs. For any
-current-turn approved exact server-side feature window, announce before activation through
-the current-turn approved notice path when applicable, enable only the required markers,
-avoid raw player text or identity logging, preserve copied logs, and remove experimental
-markers before returning to stable posture.
+Keep current instance names, maps, beta-test routing, community-update routing, and
+debug-instance startup/shutdown rules in operator-owned deployment notes, not in public
+SDK install docs. For any approved exact server-side feature window, announce before
+activation through the approved notice path when applicable, enable only the required
+markers, avoid raw player text or identity logging, preserve copied logs, and remove
+experimental markers before returning to stable posture.
 
 Stable production posture also requires no forbidden experimental marker entries for the
 instance, including observer, scanner, debug-control, native-exec, ptrace, global callback,

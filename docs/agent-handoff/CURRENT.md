@@ -171,7 +171,15 @@ sequence.
   The offline flag-policy report/gate now requires an explicit internal revalidation
   contract: frame-local only, post-callback lookup rejected, `0x100` rejected, `0x4000`
   rejected by default, output limited to copied bool/reason or Obelisk-owned copied data,
-  and public API not promoted.
+  and public API not promoted. The consume gate also validates the exact
+  `weak_helper_caller_mode` shape/flag rules, rejects candidate fields outside the known
+  contract, and blocks extra blocker/non-claim text that overclaims public
+  `ResourceHandle`, lookup, SDK, runtime, or callback readiness.
+- Chat command ergonomics should start as a plugin-local parser/helper over the existing
+  copied `ChatMessageEvent`, not as a new ABI. The minimum contract is callback-scope
+  slices over copied UTF-8 bytes with valid ABI/version/struct-size/send-mode checks.
+  Player identity, permissions, targeting, chat send/reply, moderation/blocking, mutation,
+  and return override remain blocked.
 - Any future live/player validation requires a new approved live-ops brief and, when
   players are involved, a beta-test notice through the configured local webhook variable.
 

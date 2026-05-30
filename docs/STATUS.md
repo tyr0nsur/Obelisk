@@ -7,21 +7,25 @@ for detailed research notes.
 Current published release-candidate baseline is core-first `v0.1.0-rc.1`; see
 [VERSIONING.md](VERSIONING.md). This is not a production-stable `v1.0` release claim.
 
-Current RC validation checkpoint as of 2026-05-30: the release ref passed
-`scripts/check_release_readiness.sh --require-second-source-readiness` with
-`/tmp/obelisk-rc-ufunction-second-source-root` as the configured UFunction
-second-source root, and the published tag was verified against that intended validated
-release ref with exact tag/ref verification; see
-[`2026-05-30-rc-second-source-release-gate-check.md`](research/2026-05-30-rc-second-source-release-gate-check.md).
-This only validates the documented RC gate for the public scope below:
-`GameplayPolicyEvent`, the minimal copied `ChatMessageEvent`, `DescribeResourceKind`, and
-`DescribeGameplayPolicyEventKind`. RC public scope remains limited to
+Current RC validation checkpoint as of 2026-05-30: the published tag was checked against
+the intended release ref after the canonical release gate, including second-source
+readiness for the documented RC target sets. See
+[`2026-05-30-rc-second-source-release-gate-check.md`](research/2026-05-30-rc-second-source-release-gate-check.md)
+for the exact command and artifact root. This only validates the public RC scope below:
 `GameplayPolicyEvent`, the minimal copied `ChatMessageEvent`, `DescribeResourceKind`, and
 `DescribeGameplayPolicyEventKind`. It does not promote a public Inventory/Items SDK,
 `ResourceHandle`, identity, lookup, mutation, return override, or live-server claim.
-Post-RC development now targets a broader `v1.0` production core. That route should add
-general reflection evidence, copied-data module APIs, operator lifecycle safety, and
-ArkApi-style plugin replacement capacity without retroactively expanding the RC scope.
+Post-RC development targets a broader `v1.0` production core: general reflection evidence,
+copied-data module APIs, operator lifecycle safety, and ArkApi-style plugin replacement
+capacity without retroactively expanding the RC.
+
+Contributor reading guide:
+
+- use the matrix below for current public SDK status;
+- use `docs/RELEASE.md` only when preparing or auditing a release candidate;
+- use `docs/research/` for evidence trails, rejected hypotheses, and promotion blockers;
+- keep operator deployment details outside public SDK docs unless they define a stable
+  runtime contract.
 
 The current ARK server setup is a validation adapter used to check Obelisk in a
 real UE4 Linux process. Adapter operations are documented here only when they
@@ -42,16 +46,16 @@ define or protect runtime behavior.
 | `LD_PRELOAD` bootstrap | Stable baseline | Runtime loads through the central install layout. |
 | Central install root | Stable baseline | Operator-chosen Obelisk root with `lib/`, `plugins/`, `config/`, `logs/`, and `state/instances/`; examples should use placeholders such as `<obelisk-root>`. |
 | Multi-server shared root | Stable baseline | Multiple ARK processes may share Obelisk `lib/`, `plugins/`, and `config/` when each process has a unique `OBELISK_INSTANCE_ID`; logs, markers, and mutable runtime state stay per instance. |
-| ARK/LinuxGSM validation adapter | Stable baseline | Versioned wrappers live under `packaging/linuxgsm/`; copy to the ARK binary directory only for adapter validation. Use `scripts/check_linuxgsm_wrapper_drift.sh` before maintenance restarts and review `linuxgsm_wrapper_drift_status` in operator posture reports. |
+| ARK/LinuxGSM validation adapter | Stable baseline | Versioned wrappers live under `packaging/linuxgsm/`; copy to the ARK binary directory only for adapter validation. Use `scripts/check_linuxgsm_wrapper_drift.sh` before maintenance restarts. |
 | Installer plugin posture | Stable baseline | `scripts/install_obelisk.sh` installs runtime/SDK artifacts; plugins are published with `scripts/install_obelisk_plugin.sh`, which stages under a non-`.so` name before atomic rename into `plugins/`. |
 | Operator CLI | Experimental | `scripts/obelisk.py` exposes read-only `status`, `instances list`, `plugins list`, and `plugins show`; lifecycle commands are planned after LinuxGSM integration and explicit restart safety gates. |
 | Per-instance runtime flags | Stable baseline | `OBELISK_INSTANCE_ID` selects logs and markers under `state/instances/<id>/`; map markers are obsolete. |
 | ProcessEvent hook | Stable baseline | Stable validation enables the hook while plugin loading is disabled through `OBELISK_DISABLE_PLUGINS=1`; live posture must be verified with `check_obelisk_server_posture.sh` before making claims. |
-| Server posture check | Stable baseline | `scripts/check_obelisk_server_posture.sh --expect-stable --map <map> --instance <instance-id>` validates stable env flags, requires central `${OBELISK_ROOT}/lib/libobelisk.so` in `LD_PRELOAD` and maps, requires a safe instance id, a non-symlink marker directory, and the stable per-instance markers, rejects deleted runtime mappings, and fails closed on forbidden per-instance marker entries that would reactivate experimental features at next restart. Covered by offline procfs-fixture tests. `--forbid-chat-reflection` remains a legacy compatibility flag because chat observers are already forbidden by `--expect-stable`. |
-| Plugin C ABI loading | Stable baseline | ABI is C-compatible and currently append-only for new metadata fields; `v0.1.0` freezes the current `ObeliskApi` ABI v1 layout, and any ABI v2 requires an explicit migration plan. ABI guardrails include layout validation, in-tree and installed SDK consumer checks, and capability-snapshot tests for owner-token public registrations. |
+| Server posture check | Stable baseline | `scripts/check_obelisk_server_posture.sh --expect-stable --map <map> --instance <instance-id>` validates stable env flags, central runtime mapping, safe instance id, non-symlink marker roots, and absence of forbidden experimental markers. Covered by offline procfs-fixture tests. |
+| Plugin C ABI loading | Stable baseline | ABI is C-compatible and currently append-only for new metadata fields; the first stable `v0.1.0` line freezes the current `ObeliskApi` ABI v1 layout, and any ABI v2 requires an explicit migration plan. ABI guardrails include layout validation, in-tree and installed SDK consumer checks, and capability-snapshot tests for owner-token public registrations. |
 | Filtered ProcessEvent callbacks | Debug-gated raw ABI | Runtime infrastructure only: callbacks scoped by `FName` index still receive borrowed UE pointers and raw params, so they are rejected unless `OBELISK_ALLOW_FILTERED_PROCESS_EVENT_CALLBACKS=1` and `allow-filtered-process-event-callbacks` are active. This is not public module dispatch, gameplay mutation, return override, or a stable parameter API. |
 | Plugin callback ownership | Stable baseline | Callback owner tokens are unregistered on init failure and before plugin unload; owner-token handle registration supports helper/background-thread callbacks and explicit owner-scoped unregister without creating ownerless registrations. Owner-token callback registration uses the plugin owner's init-time capability snapshot, so later manager construction cannot widen an already-loaded plugin. Unregister/owner cleanup initiated from gameplay callbacks avoids dispatcher cleanup waits to prevent callback-to-callback deadlocks, while non-callback owner/plugin cleanup still waits for in-flight dispatch and deferred `DestroyUserData` cleanup. |
-| Process-local timers | Post-RC core primitive | `OBELISK_API_CAPABILITY_TIMERS` exposes owner-token one-shot/repeating callbacks with process-local handles, zero-failure registration, explicit unregister, callback exception containment, and owner cleanup on init failure/unload. This is a core scheduler only: not a UE/gameplay timer, not persistent cluster state, not object identity, and not a command/permission API. |
+| Process-local timers | Post-RC core primitive | Implemented after the published RC as an append-only core scheduler: owner-token one-shot/repeating callbacks, process-local handles, explicit unregister, exception containment, and owner cleanup on init failure/unload. This is not a UE/gameplay timer, persistent cluster state, object identity, command API, or permission API. |
 | Plugin architecture policy | Stable baseline | See `docs/PLUGIN_ARCHITECTURE.md`; examples must stay small and experimental plugins stay out of top-level build. Plugins with background workers, sockets, HTTP, long-lived file readers, or other external ingress are experimental until they pass a promotion gate for idempotent shutdown, owner-token unregister, queue drain, thread join, socket/file close, and no detached workers or persisted runtime handles. |
 | `oBaseEvents` | Release example | First official example plugin; demonstrates ABI validation, config creation, debug-gated filtered callback handle lifecycle, and shutdown unregister. It is not gameplay dispatch or a stable parameter API. |
 | `oPolicyAudit` | Experimental | First-party `GameplayPolicyEvent` audit example excluded from the default build and release scope unless `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`; not published by `scripts/check_release_readiness.sh`. |

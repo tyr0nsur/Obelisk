@@ -763,6 +763,37 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         self.assertEqual(offenders, [])
 
+    def test_contributor_docs_do_not_promote_blocked_sdk_surfaces_or_authority(self) -> None:
+        forbidden_positive_claims = (
+            r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported|include|includes|included|provide|provides|provided)\s+(?:a\s+)?(?:public\s+)?Inventory\s+SDKs?\b",
+            r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported|include|includes|included|provide|provides|provided)\s+(?:a\s+)?(?:public\s+)?StructureEvents?(?:\s+(?:SDKs?|APIs?|surfaces?))?\b",
+            r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported|include|includes|included|provide|provides|provided)\s+(?:a\s+)?(?:public\s+)?ResourceHandle(?:\s+(?:SDKs?|APIs?|surfaces?))?\b",
+            r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported|include|includes|included|provide|provides|provided)\s+(?:public\s+)?(?:resource|object|player|sender|inventory|item|structure|tribe|UE|game\s+object)\s+identity(?:\s+(?:APIs?|surfaces?|authority))?\b",
+            r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported|include|includes|included|provide|provides|provided)\s+(?:public\s+)?(?:gameplay\s+)?mutation(?:\s+(?:APIs?|SDKs?|surfaces?|authority))?\b",
+            r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported|include|includes|included|provide|provides|provided)\s+(?:public\s+)?return[- ]overrides?(?:\s+(?:APIs?|SDKs?|surfaces?|authority))?\b",
+            r"\bInventory\s+SDKs?\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
+            r"\bStructureEvents?(?:\s+(?:SDKs?|APIs?|surfaces?))?\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
+            r"\bResourceHandle(?:\s+(?:SDKs?|APIs?|surfaces?))?\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
+            r"\b(?:resource|object|player|sender|inventory|item|structure|tribe|UE|game\s+object)\s+identity(?:\s+(?:APIs?|surfaces?|authority))?\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
+            r"\b(?:gameplay\s+)?mutation(?:\s+(?:APIs?|SDKs?|surfaces?|authority))?\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
+            r"\breturn[- ]overrides?(?:\s+(?:APIs?|SDKs?|surfaces?|authority))?\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
+        )
+        negated_claim_context = re.compile(
+            r"\b(?:does\s+not|do\s+not|must\s+not|not|no|never|without|blocked|excludes?|outside|rejected|redacted|remain|remains)\b",
+            re.IGNORECASE,
+        )
+        offenders: list[str] = []
+
+        for path in PUBLIC_DOC_FILES:
+            text = path.read_text(encoding="utf-8")
+            for line, segment in sentence_like_segments(text):
+                for pattern in forbidden_positive_claims:
+                    if re.search(pattern, segment, flags=re.IGNORECASE) and not negated_claim_context.search(segment):
+                        offenders.append(f"{path.relative_to(REPO_ROOT)}:{line}: {normalized(segment)}")
+                        break
+
+        self.assertEqual(offenders, [])
+
     def test_public_manifest_does_not_use_static_resource_or_command_evidence_for_rc_surfaces(self) -> None:
         manifest = json.loads(PUBLIC_GAMEPLAY_EVENTS_MANIFEST.read_text(encoding="utf-8"))
         evidence_keys = {
