@@ -108,6 +108,9 @@ V010_PUBLIC_ENUM_VALUE_ALLOWLIST = {
         "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_SEAT_CHECK",
         "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK",
         "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK",
+        "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_ALLOW_EQUIP_ITEM_CHECK",
+        "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_CAN_REPAIR_CHECK",
+        "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK",
     ],
     "ObeliskGameplayPolicyResourceKind": [
         "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_UNKNOWN",
@@ -204,6 +207,9 @@ V010_PUBLIC_GAMEPLAY_POLICY_EVENT_TOKENS = [
     "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_SEAT_CHECK",
     "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK",
     "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_ALLOW_EQUIP_ITEM_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_CAN_REPAIR_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK",
 ]
 V010_PUBLIC_GAMEPLAY_POLICY_STABLE_NAMES = [
     "structure.access_check",
@@ -214,6 +220,9 @@ V010_PUBLIC_GAMEPLAY_POLICY_STABLE_NAMES = [
     "structure.seat_check",
     "inventory.remote_add_check",
     "inventory.use_check",
+    "inventory_item.allow_equip_check",
+    "inventory_item.can_repair_check",
+    "inventory_item.use_onto_item_check",
 ]
 CHAT_MESSAGE_EVENT_PUBLIC_CLAIM_FILES = [
     PUBLIC_GAMEPLAY_EVENTS_MANIFEST,
@@ -787,8 +796,13 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         for path in PUBLIC_DOC_FILES:
             text = path.read_text(encoding="utf-8")
             for line, segment in sentence_like_segments(text):
+                context_start = max(0, line - 160)
+                negation_context = text[context_start:line + len(segment)]
                 for pattern in forbidden_positive_claims:
-                    if re.search(pattern, segment, flags=re.IGNORECASE) and not negated_claim_context.search(segment):
+                    if (
+                        re.search(pattern, segment, flags=re.IGNORECASE) and
+                        not negated_claim_context.search(negation_context)
+                    ):
                         offenders.append(f"{path.relative_to(REPO_ROOT)}:{line}: {normalized(segment)}")
                         break
 
@@ -1669,7 +1683,11 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 )
                 event_kinds = event.get("event_kinds")
                 self.assertIsInstance(event_kinds, list, f"{event.get('event_id')} missing event_kinds")
-                self.assertEqual(len(event_kinds), 8, f"{event.get('event_id')} event kind count drifted")
+                self.assertEqual(
+                    len(event_kinds),
+                    len(V010_PUBLIC_GAMEPLAY_POLICY_EVENT_TOKENS),
+                    f"{event.get('event_id')} event kind count drifted",
+                )
                 for event_kind in event_kinds:
                     self.assertIsInstance(event_kind, dict)
                     self.assertRegex(

@@ -293,7 +293,31 @@ namespace
                 OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED,
                 OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK,
                 OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN,
-                "inventory.use_check");
+                "inventory.use_check") &&
+            ValidateGameplayPolicyEventDescriptor(
+                api,
+                OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_ALLOW_EQUIP_ITEM_CHECK,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM,
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_ALLOW_EQUIP_ITEM_CHECK,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE,
+                "inventory_item.allow_equip_check") &&
+            ValidateGameplayPolicyEventDescriptor(
+                api,
+                OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_CAN_REPAIR_CHECK,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM,
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_CAN_REPAIR_CHECK,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE,
+                "inventory_item.can_repair_check") &&
+            ValidateGameplayPolicyEventDescriptor(
+                api,
+                OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM,
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE,
+                "inventory_item.use_onto_item_check");
     }
 
     bool HasChatMessageEventApi(const ObeliskApi* api)

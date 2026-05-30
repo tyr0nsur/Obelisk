@@ -1,6 +1,7 @@
 #include "PluginManager.h"
 #include "EventManager.h"
 #include "InventoryPolicyEventDispatcher.h"
+#include "ItemReturnEventDispatcher.h"
 #include "PluginConfig.h"
 #include "StructureEventDispatcher.h"
 #include "TimerManager.h"
@@ -37,6 +38,7 @@ namespace Obelisk::Core
             void* Owner = nullptr;
             uint64_t StructureRegistrationId = 0;
             uint64_t InventoryRegistrationId = 0;
+            uint64_t ItemReturnRegistrationId = 0;
         };
 
         struct ChatMessageRegistration
@@ -709,6 +711,35 @@ namespace Obelisk::Core
                     CopyDescriptorText(descriptor.display_name, "Inventory Use Check");
                     *out = descriptor;
                     return true;
+                case OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_ALLOW_EQUIP_ITEM_CHECK:
+                    descriptor.resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM;
+                    descriptor.flags |= OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED;
+                    descriptor.event_kind_mask =
+                        OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_ALLOW_EQUIP_ITEM_CHECK;
+                    descriptor.field_mask = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE;
+                    CopyDescriptorText(descriptor.stable_name, "inventory_item.allow_equip_check");
+                    CopyDescriptorText(descriptor.display_name, "Inventory Item Allow Equip Check");
+                    *out = descriptor;
+                    return true;
+                case OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_CAN_REPAIR_CHECK:
+                    descriptor.resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM;
+                    descriptor.flags |= OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED;
+                    descriptor.event_kind_mask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_CAN_REPAIR_CHECK;
+                    descriptor.field_mask = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE;
+                    CopyDescriptorText(descriptor.stable_name, "inventory_item.can_repair_check");
+                    CopyDescriptorText(descriptor.display_name, "Inventory Item Can Repair Check");
+                    *out = descriptor;
+                    return true;
+                case OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK:
+                    descriptor.resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM;
+                    descriptor.flags |= OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED;
+                    descriptor.event_kind_mask =
+                        OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK;
+                    descriptor.field_mask = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE;
+                    CopyDescriptorText(descriptor.stable_name, "inventory_item.use_onto_item_check");
+                    CopyDescriptorText(descriptor.display_name, "Inventory Item Use Onto Item Check");
+                    *out = descriptor;
+                    return true;
                 default:
                     return false;
             }
@@ -838,6 +869,20 @@ namespace Obelisk::Core
             return OBELISK_GAMEPLAY_POLICY_EVENT_KIND_UNKNOWN;
         }
 
+        uint32_t ToGameplayPolicyEventKind(ItemReturnEventKind kind)
+        {
+            switch (kind)
+            {
+            case ItemReturnEventKind::AllowEquipItem:
+                return OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_ALLOW_EQUIP_ITEM_CHECK;
+            case ItemReturnEventKind::CanRepair:
+                return OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_CAN_REPAIR_CHECK;
+            case ItemReturnEventKind::UseItemOntoItem:
+                return OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK;
+            }
+            return OBELISK_GAMEPLAY_POLICY_EVENT_KIND_UNKNOWN;
+        }
+
         uint64_t ToGameplayPolicyEventMask(uint32_t eventKind)
         {
             switch (eventKind)
@@ -858,6 +903,12 @@ namespace Obelisk::Core
                 return OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_REMOTE_ADD_CHECK;
             case OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK:
                 return OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK;
+            case OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_ALLOW_EQUIP_ITEM_CHECK:
+                return OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_ALLOW_EQUIP_ITEM_CHECK;
+            case OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_CAN_REPAIR_CHECK:
+                return OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_CAN_REPAIR_CHECK;
+            case OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK:
+                return OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK;
             default:
                 return 0;
             }
@@ -936,6 +987,19 @@ namespace Obelisk::Core
             case InventoryPolicyScalarField::BIgnoreCooldown:
                 SetGameplayPolicyBoolField(publicEvent,
                                            OBELISK_GAMEPLAY_POLICY_FIELD_IGNORE_COOLDOWN,
+                                           scalar.BoolValue);
+                return;
+            }
+        }
+
+        void CopyGameplayPolicyScalar(ObeliskGameplayPolicyEvent& publicEvent,
+                                      const ItemReturnScalarValue& scalar)
+        {
+            switch (scalar.Field)
+            {
+            case ItemReturnScalarField::ReturnValue:
+                SetGameplayPolicyBoolField(publicEvent,
+                                           OBELISK_GAMEPLAY_POLICY_FIELD_RETURN_VALUE,
                                            scalar.BoolValue);
                 return;
             }
@@ -1024,6 +1088,35 @@ namespace Obelisk::Core
                 .int32_values = {},
             };
             for (const InventoryPolicyScalarValue& scalar : event.Scalars)
+                CopyGameplayPolicyScalar(publicEvent, scalar);
+            InvokeGameplayPolicyEventCallback(*state, publicEvent);
+        }
+
+        void DispatchGameplayPolicyEventFromItemReturn(const ItemReturnEventView& event, void* userData)
+        {
+            auto* state = static_cast<GameplayPolicyEventCallbackState*>(userData);
+            if (!state || !state->Callback)
+                return;
+
+            const uint32_t eventKind = ToGameplayPolicyEventKind(event.Kind);
+            if (eventKind == OBELISK_GAMEPLAY_POLICY_EVENT_KIND_UNKNOWN)
+                return;
+            const uint64_t eventMask = ToGameplayPolicyEventMask(eventKind);
+            if (eventMask == 0 || (state->EventKindMask & eventMask) == 0)
+                return;
+
+            ObeliskGameplayPolicyEvent publicEvent{
+                .abi_version = OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION,
+                .struct_size = sizeof(ObeliskGameplayPolicyEvent),
+                .event_kind = eventKind,
+                .resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM,
+                .flags = OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD |
+                    OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED,
+                .field_mask = 0,
+                .bool_values = 0,
+                .int32_values = {},
+            };
+            for (const ItemReturnScalarValue& scalar : event.Scalars)
                 CopyGameplayPolicyScalar(publicEvent, scalar);
             InvokeGameplayPolicyEventCallback(*state, publicEvent);
         }
@@ -1227,6 +1320,7 @@ namespace Obelisk::Core
                 .Owner = owner,
                 .StructureRegistrationId = 0,
                 .InventoryRegistrationId = 0,
+                .ItemReturnRegistrationId = 0,
             };
 
             if ((eventKindMask & OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES) != 0)
@@ -1247,7 +1341,10 @@ namespace Obelisk::Core
 
             try
             {
-                if ((eventKindMask & OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY) != 0)
+                const uint64_t inventoryPolicyMask =
+                    OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_REMOTE_ADD_CHECK |
+                    OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK;
+                if ((eventKindMask & inventoryPolicyMask) != 0)
                 {
                     auto state = std::make_unique<GameplayPolicyEventCallbackState>(
                         GameplayPolicyEventCallbackState{eventKindMask, callback, userData});
@@ -1270,6 +1367,40 @@ namespace Obelisk::Core
                     }
                     (void)state.release();
                 }
+
+                const uint64_t itemReturnMask =
+                    OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_ALLOW_EQUIP_ITEM_CHECK |
+                    OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_CAN_REPAIR_CHECK |
+                    OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK;
+                if ((eventKindMask & itemReturnMask) != 0)
+                {
+                    auto state = std::make_unique<GameplayPolicyEventCallbackState>(
+                        GameplayPolicyEventCallbackState{eventKindMask, callback, userData});
+                    registration.ItemReturnRegistrationId = ItemReturnEventDispatcher::Get().Register(
+                        owner,
+                        ItemReturnEventSubscription{
+                            DispatchGameplayPolicyEventFromItemReturn,
+                            state.get(),
+                            DestroyGameplayPolicyEventCallbackState,
+                        });
+                    if (registration.ItemReturnRegistrationId == 0)
+                    {
+                        if (registration.StructureRegistrationId != 0)
+                        {
+                            (void)StructureEventDispatcher::Get().UnregisterCallbackForOwner(
+                                owner,
+                                registration.StructureRegistrationId);
+                        }
+                        if (registration.InventoryRegistrationId != 0)
+                        {
+                            (void)InventoryPolicyEventDispatcher::Get().UnregisterCallbackForOwner(
+                                owner,
+                                registration.InventoryRegistrationId);
+                        }
+                        return 0;
+                    }
+                    (void)state.release();
+                }
             }
             catch (...)
             {
@@ -1278,6 +1409,18 @@ namespace Obelisk::Core
                     (void)StructureEventDispatcher::Get().UnregisterCallbackForOwner(
                         owner,
                         registration.StructureRegistrationId);
+                }
+                if (registration.InventoryRegistrationId != 0)
+                {
+                    (void)InventoryPolicyEventDispatcher::Get().UnregisterCallbackForOwner(
+                        owner,
+                        registration.InventoryRegistrationId);
+                }
+                if (registration.ItemReturnRegistrationId != 0)
+                {
+                    (void)ItemReturnEventDispatcher::Get().UnregisterCallbackForOwner(
+                        owner,
+                        registration.ItemReturnRegistrationId);
                 }
                 throw;
             }
@@ -1300,6 +1443,12 @@ namespace Obelisk::Core
                     (void)InventoryPolicyEventDispatcher::Get().UnregisterCallbackForOwner(
                         owner,
                         registration.InventoryRegistrationId);
+                }
+                if (registration.ItemReturnRegistrationId != 0)
+                {
+                    (void)ItemReturnEventDispatcher::Get().UnregisterCallbackForOwner(
+                        owner,
+                        registration.ItemReturnRegistrationId);
                 }
                 throw;
             }
@@ -1333,6 +1482,12 @@ namespace Obelisk::Core
                 removed = InventoryPolicyEventDispatcher::Get().UnregisterCallbackForOwner(
                     owner,
                     registration.InventoryRegistrationId) || removed;
+            }
+            if (registration.ItemReturnRegistrationId != 0)
+            {
+                removed = ItemReturnEventDispatcher::Get().UnregisterCallbackForOwner(
+                    owner,
+                    registration.ItemReturnRegistrationId) || removed;
             }
             return removed;
         }
@@ -1374,6 +1529,12 @@ namespace Obelisk::Core
                     removedAny = InventoryPolicyEventDispatcher::Get().UnregisterCallbackForOwner(
                         owner,
                         registration.InventoryRegistrationId) || removedAny;
+                }
+                if (registration.ItemReturnRegistrationId != 0)
+                {
+                    removedAny = ItemReturnEventDispatcher::Get().UnregisterCallbackForOwner(
+                        owner,
+                        registration.ItemReturnRegistrationId) || removedAny;
                 }
                 if (removedAny)
                     ++removed;
@@ -2077,6 +2238,9 @@ namespace Obelisk::Core
         const size_t inventoryRemoved = cleanupFamily("inventory policy", [&]() {
             return InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
         });
+        const size_t itemReturnRemoved = cleanupFamily("item return", [&]() {
+            return ItemReturnEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
+        });
 
         const auto logRemoved = [&](size_t count, const char* label) {
             if (count == 0)
@@ -2092,6 +2256,7 @@ namespace Obelisk::Core
         logRemoved(chatRemoved, "chat");
         logRemoved(structureRemoved, "structure");
         logRemoved(inventoryRemoved, "inventory policy");
+        logRemoved(itemReturnRemoved, "item return");
 
         return cleanupSucceeded;
     }

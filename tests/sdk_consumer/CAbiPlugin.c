@@ -172,6 +172,9 @@ static void CompileGameplayPolicyAbi(void)
     volatile uint64_t all_events = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL;
     volatile uint64_t all_structures = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES;
     volatile uint64_t all_inventory = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY;
+    volatile uint64_t allow_equip_item = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_ALLOW_EQUIP_ITEM_CHECK;
+    volatile uint64_t can_repair = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_CAN_REPAIR_CHECK;
+    volatile uint64_t use_item_onto_item = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK;
     volatile uint64_t copied_payload = OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD;
     volatile uint64_t inventory_backed = OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED;
     volatile uint64_t return_value = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE;
@@ -226,6 +229,17 @@ static void CompileGameplayPolicyAbi(void)
         1ull << OBELISK_GAMEPLAY_POLICY_FIELD_RETURN_VALUE,
         {0, 0, 0, 0, 0, 0},
     };
+    ObeliskGameplayPolicyEvent item_return_event = {
+        OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION,
+        sizeof(ObeliskGameplayPolicyEvent),
+        OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_ALLOW_EQUIP_ITEM_CHECK,
+        OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM,
+        OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD |
+            OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED,
+        OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE,
+        1ull << OBELISK_GAMEPLAY_POLICY_FIELD_RETURN_VALUE,
+        {0, 0, 0, 0, 0, 0},
+    };
     ObeliskResourceKindDescriptor descriptor = {
         OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION,
         sizeof(ObeliskResourceKindDescriptor),
@@ -258,6 +272,7 @@ static void CompileGameplayPolicyAbi(void)
     callback(&event, NULL);
     callback(&inventory_remote_add_event, NULL);
     callback(&inventory_use_event, NULL);
+    callback(&item_return_event, NULL);
     chat_callback(&chat_event, NULL);
     scheduled_callback(1, NULL);
     (void)capability;
@@ -269,6 +284,9 @@ static void CompileGameplayPolicyAbi(void)
     (void)all_events;
     (void)all_structures;
     (void)all_inventory;
+    (void)allow_equip_item;
+    (void)can_repair;
+    (void)use_item_onto_item;
     (void)copied_payload;
     (void)inventory_backed;
     (void)return_value;
@@ -439,6 +457,36 @@ static bool ValidateGameplayPolicyDescriptors(const ObeliskApi* api)
             OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK,
             OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN,
             "inventory.use_check"))
+        return false;
+
+    if (!ValidateGameplayPolicyEventDescriptor(
+            api,
+            OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_ALLOW_EQUIP_ITEM_CHECK,
+            OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM,
+            OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED,
+            OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_ALLOW_EQUIP_ITEM_CHECK,
+            OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE,
+            "inventory_item.allow_equip_check"))
+        return false;
+
+    if (!ValidateGameplayPolicyEventDescriptor(
+            api,
+            OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_CAN_REPAIR_CHECK,
+            OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM,
+            OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED,
+            OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_CAN_REPAIR_CHECK,
+            OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE,
+            "inventory_item.can_repair_check"))
+        return false;
+
+    if (!ValidateGameplayPolicyEventDescriptor(
+            api,
+            OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK,
+            OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM,
+            OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED,
+            OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK,
+            OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE,
+            "inventory_item.use_onto_item_check"))
         return false;
 
     return true;

@@ -262,9 +262,12 @@ scripts/check_release_readiness.sh \
   --scriptstruct-second-source-root <second-source-scriptstruct-snapshots>
 ```
 
-If internal module recognizer work resumes after the RC, the current order is Item
-return-only policy, Mission copied-bool observer, then Transfer `bAccept`. That ordering
-is post-RC planning only and does not promote a public SDK/API surface.
+If internal module recognizer work resumes after the RC, the remaining item
+producer/runtime validation, Mission copied-bool observer, and Transfer `bAccept` lanes
+stay internal unless a release names a separate promotion gate. The three item return-only
+checks are public only as copied `GameplayPolicyEvent` `ReturnValue` kinds; they do not
+create an Inventory SDK, Items SDK, identity, lookup, mutation, return override, or
+`ResourceHandle`; those remain absent.
 
 Review artifacts:
 

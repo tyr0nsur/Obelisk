@@ -121,21 +121,17 @@ recovery context is not active routing for the current head; use
   tag only; future RC/stable candidates must regenerate a root for their exact intended
   ref. See
   `docs/research/2026-05-30-head-rc-second-source-refresh-gap.md`.
-- Item return-only, Mission copied-bool, Transfer `bAccept`, Structure return-only,
-  Structure non-pin copied-scalar, and Buff breadth packages are evidence-only/internal.
-  Consume mode accepts the relevant slices where documented, while promote mode remains
-  blocked. See `docs/research/` for artifact paths, manifests, hashes, and target lists.
-- Item return-only policy remains internal and non-authoritative. It now has a private
-  `ItemReturnEventDispatcher` and default-off hook producer for copied `ReturnValue` bool
-  observations behind observer profile/window/marker/SHA/budget gates, but still has no
-  public Inventory SDK, public Items SDK, runtime validation, identity, lookup, mutation,
-  return override, or ResourceHandle.
-- Item return-only now has internal post-original copied-payload helper coverage. Public
-  promotion should be a future append-only `GameplayPolicyEvent` expansion with three
-  distinct inventory-item event kinds for `AllowEquipItem`, `CanRepair`, and
-  `UseItemOntoItem`, all `ReturnValue` only. Do not reuse
-  `INVENTORY_USE_CHECK`, do not map `CanRepair.bIgnoreInventoryRequirement` to
-  `IGNORE_COOLDOWN`, and do not backfill the frozen `v0.1.0-rc.2` scope.
+- Mission copied-bool, Transfer `bAccept`, Structure return-only, Structure non-pin
+  copied-scalar, and Buff breadth packages remain evidence-only/internal. Consume mode
+  accepts the relevant slices where documented, while promote mode remains blocked. See
+  `docs/research/` for artifact paths, manifests, hashes, and target lists.
+- Item return-only policy now has three append-only public `GameplayPolicyEvent` kinds for
+  `AllowEquipItem`, `CanRepair`, and `UseItemOntoItem`, all copied `ReturnValue` only and
+  `inventory_item` category only. The private `ItemReturnEventDispatcher`, hook producer,
+  broader item/inventory decoding, runtime validation, identity, lookup, mutation, return
+  override, `ResourceHandle`, public Inventory SDK, and public Items SDK remain absent.
+  Do not reuse `INVENTORY_USE_CHECK` or map `CanRepair.bIgnoreInventoryRequirement` to
+  `IGNORE_COOLDOWN`.
 - `ChatMessageEvent` is sufficient for plugin-local command parsing/handlers in the next
   RC scope when described as copied chat input only, not a command SDK: no identity,
   permissions, replies, send-chat API, blocking, mutation, or return override. Before an
@@ -187,19 +183,22 @@ recovery context is not active routing for the current head; use
 - Preserve RC scope while reducing architecture debt, improving evidence tooling, and
   promoting only copied module APIs through strict gates.
 - Previous internal recognizer order was Item return-only policy, Mission copied-bool
-  observer, then Transfer `bAccept`; keep those lanes internal and non-authoritative.
-- Current post-RC focus: keep Item return-only and Mission copied-bool internal, then
-  refresh Transfer ScriptStruct bool-tail second-source evidence before any Transfer
-  payload/redaction work. This is no RC public SDK/API promotion and does not authorize
+  observer, then Transfer `bAccept`. That is historical pre-promotion context for the item
+  slice; only the three copied `ReturnValue` item checks are promoted publicly, and only as
+  `GameplayPolicyEvent` kinds.
+- Current post-RC focus: keep remaining item producer/runtime validation and Mission
+  copied-bool work internal, then refresh Transfer ScriptStruct bool-tail second-source
+  evidence before any Transfer payload/redaction work. Public Inventory SDK, Items SDK,
+  Mission SDK, and Transfer SDK surfaces remain absent, and this does not authorize
   Transfer runtime work.
 - Runtime lifecycle callback-cleanup debt is addressed in post-RC head: `PluginManager`
   now skips `dlclose` when callback cleanup fails, retains the plugin for retry, preserves
   owner-token unregister while unloading, and avoids repeating shutdown on retry.
-- Next Item runtime round, if pursued, should wire only the private dispatcher behind
-  fail-closed observer gates and post-original copied payloads. Public Item promotion must
-  be a later deliberate ABI round: append event/mask constants, descriptors, C/C++ ABI
-  layout checks, SDK consumer coverage, owner-token lifecycle cleanup tests, and
-  documentation. Do not route it through `InventoryPolicyEventKind::CanUse`.
+- Next Item runtime round, if pursued, should validate only the private producer behind
+  fail-closed observer gates and post-original copied payloads for the already-promoted
+  three `GameplayPolicyEvent` kinds. Do not route it through
+  `InventoryPolicyEventKind::CanUse`, and do not expand into an Items SDK or Inventory SDK
+  without a separate promotion gate.
 - Secondary evidence-only lanes may continue for structure non-pin copied scalars and Buff
   breadth, but they must not imply runtime work, marker/env changes, public SDK expansion,
   or RC surface changes.

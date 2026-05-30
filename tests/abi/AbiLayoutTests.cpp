@@ -131,9 +131,13 @@ int main()
     static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_SEAT_CHECK == (1ull << 5));
     static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_REMOTE_ADD_CHECK == (1ull << 6));
     static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK == (1ull << 7));
+    static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_ALLOW_EQUIP_ITEM_CHECK == (1ull << 8));
+    static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_CAN_REPAIR_CHECK == (1ull << 9));
+    static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK == (1ull << 10));
     static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES == ((1ull << 6) - 1));
-    static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY == ((1ull << 6) | (1ull << 7)));
-    static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL == ((1ull << 8) - 1));
+    static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY ==
+        ((1ull << 6) | (1ull << 7) | (1ull << 8) | (1ull << 9) | (1ull << 10)));
+    static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL == ((1ull << 11) - 1));
     static_assert(OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE == (1ull << 0));
     static_assert(OBELISK_GAMEPLAY_POLICY_FIELD_MASK_VARIANT_INDEX == (1ull << 1));
     static_assert(OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE_SET == (1ull << 2));
@@ -145,8 +149,8 @@ int main()
     static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_KIND_MIN ==
         OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_ACCESS_CHECK);
     static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_KIND_MAX ==
-        OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK);
-    static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_KIND_COUNT == 8);
+        OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK);
+    static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_KIND_COUNT == 11);
     static_assert(static_cast<std::uint32_t>(OBELISK_GAMEPLAY_POLICY_EVENT_KIND_UNKNOWN) == 0);
     static_assert(static_cast<std::uint32_t>(OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_ACCESS_CHECK) == 1);
     static_assert(static_cast<std::uint32_t>(OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_DEMOLISH_CHECK) == 2);
@@ -156,6 +160,12 @@ int main()
     static_assert(static_cast<std::uint32_t>(OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_SEAT_CHECK) == 6);
     static_assert(static_cast<std::uint32_t>(OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK) == 7);
     static_assert(static_cast<std::uint32_t>(OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK) == 8);
+    static_assert(static_cast<std::uint32_t>(
+        OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_ALLOW_EQUIP_ITEM_CHECK) == 9);
+    static_assert(static_cast<std::uint32_t>(
+        OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_CAN_REPAIR_CHECK) == 10);
+    static_assert(static_cast<std::uint32_t>(
+        OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK) == 11);
 
     static_assert(sizeof(ObeliskGameplayPolicyResourceKind) == 4);
     static_assert(static_cast<std::uint32_t>(OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_UNKNOWN) == 0);

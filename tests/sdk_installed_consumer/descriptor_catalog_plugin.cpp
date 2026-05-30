@@ -200,7 +200,34 @@ namespace
                     OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN,
                 OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED,
                 "inventory.use_check",
-                "Inventory Use Check");
+                "Inventory Use Check") &&
+            ValidateGameplayPolicyEventDescriptor(
+                api,
+                OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_ALLOW_EQUIP_ITEM_CHECK,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_ALLOW_EQUIP_ITEM_CHECK,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE,
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED,
+                "inventory_item.allow_equip_check",
+                "Inventory Item Allow Equip Check") &&
+            ValidateGameplayPolicyEventDescriptor(
+                api,
+                OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_CAN_REPAIR_CHECK,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_CAN_REPAIR_CHECK,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE,
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED,
+                "inventory_item.can_repair_check",
+                "Inventory Item Can Repair Check") &&
+            ValidateGameplayPolicyEventDescriptor(
+                api,
+                OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE,
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED,
+                "inventory_item.use_onto_item_check",
+                "Inventory Item Use Onto Item Check");
     }
 }
 

@@ -17,6 +17,9 @@
   retained unload attempt.
 - Added `oDescriptorCatalog` as a release-scope metadata-only reference plugin for
   descriptor discovery and routing validation without callbacks or ABI expansion.
+- Promoted three item return-only checks as append-only `GameplayPolicyEvent` kinds for
+  copied `ReturnValue` observation: allow-equip, can-repair, and use-item-onto-item. This
+  does not add a public Items SDK, Inventory SDK, identity, mutation, or return override.
 
 ## 0.1.0-rc.2
 

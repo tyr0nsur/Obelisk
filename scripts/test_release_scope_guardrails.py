@@ -608,11 +608,10 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         )
         self.assertIn("not part of the default gate", release)
         self.assertIn("scalar-candidate summaries are review aids only, not RC scope", normalized(release))
-        self.assertIn(
-            "Item return-only policy, Mission copied-bool observer, then Transfer `bAccept`",
-            normalized(release),
-        )
-        self.assertIn("not promote a public SDK/API surface", release)
+        self.assertIn("remaining item producer/runtime validation", normalized(release))
+        self.assertIn("Mission copied-bool observer, and Transfer `bAccept` lanes stay internal", normalized(release))
+        self.assertIn("three item return-only checks are public only as copied `GameplayPolicyEvent`", normalized(release))
+        self.assertIn("do not create an Inventory SDK, Items SDK", normalized(release))
         self.assertNormalizedIn("Explicit `--ufunction-second-source-target-set` values add module target sets", release)
         self.assertIn("they do not replace or omit the public RC gate", release)
         self.assertIn("--ufunction-second-source-target-set minimal-second-source-intake", release)
@@ -954,17 +953,33 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         current = read("docs/agent-handoff/CURRENT.md")
         status = read("docs/STATUS.md")
 
-        order = "Item return-only policy, Mission copied-bool observer, then Transfer `bAccept`"
         for path, text in (
             ("docs/research/2026-05-29-rc-checkpoint-slicing-plan.md", plan),
             ("docs/agent-handoff/COMPACT_CONTEXT.md", compact),
+        ):
+            with self.subTest(file=path, item="post-RC recognizer order"):
+                self.assertIn(
+                    "Item return-only policy, Mission copied-bool observer, then Transfer `bAccept`",
+                    normalized(text),
+                )
+            with self.subTest(file=path, item="no RC public SDK/API promotion"):
+                self.assertRegex(normalized(text), r"no RC public SDK/API|not RC public SDK/API|does not change the RC public API")
+
+        for path, text in (
             ("docs/agent-handoff/CURRENT.md", current),
             ("docs/STATUS.md", status),
         ):
-            with self.subTest(file=path, item="post-RC recognizer order"):
-                self.assertIn(order, normalized(text))
-            with self.subTest(file=path, item="no RC public SDK/API promotion"):
-                self.assertRegex(normalized(text), r"no RC public SDK/API|not RC public SDK/API|does not change the RC public API")
+            compact_text = normalized(text)
+            with self.subTest(file=path, item="item return-only public shape"):
+                self.assertIn("three", compact_text)
+                self.assertIn("GameplayPolicyEvent", compact_text)
+                self.assertIn("ReturnValue", compact_text)
+            with self.subTest(file=path, item="no separate item/inventory SDK promotion"):
+                self.assertIn("public Inventory SDK", compact_text)
+                self.assertIn("Items SDK", compact_text)
+                self.assertIn("identity", compact_text)
+                self.assertIn("mutation", compact_text)
+                self.assertIn("return override", compact_text)
 
         for path, text in (
             ("docs/agent-handoff/COMPACT_CONTEXT.md", compact),
@@ -986,7 +1001,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
                 self.assertIn("mutation", compact_text)
                 self.assertIn("fail-closed", compact_text)
 
-    def test_item_return_only_policy_slice_stays_internal_and_non_authoritative(self) -> None:
+    def test_item_return_only_policy_slice_promotes_only_copied_return_value_events(self) -> None:
         bridge_plan = read("docs/research/2026-05-29-item-return-only-policy-bridge-plan.md")
         slice_note = read("docs/research/2026-05-30-item-return-only-policy-slice.md")
         current = read("docs/agent-handoff/CURRENT.md")
@@ -1008,7 +1023,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
                 self.assertIn("toInventory", text)
                 self.assertIn("DestinationItem", text)
                 self.assertIn("AdditionalData", text)
-            with self.subTest(file=path, item="no public promotion"):
+            with self.subTest(file=path, item="historical notes do not promote broad item SDKs"):
                 self.assertIn("does not promote", compact)
                 self.assertIn("Items SDK", compact)
                 self.assertIn("Inventory SDK", compact)
@@ -1043,12 +1058,15 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             ("docs/STATUS.md", status),
         ):
             compact = normalized(text)
-            with self.subTest(file=path, item="post-RC order and RC boundary"):
-                self.assertIn("Item return-only policy, Mission copied-bool observer, then Transfer `bAccept`", compact)
-                self.assertRegex(compact, r"no RC public SDK/API|not RC public SDK/API|does not change the RC public API")
+            with self.subTest(file=path, item="three public GameplayPolicyEvent kinds only"):
+                self.assertIn("three", compact)
+                self.assertIn("GameplayPolicyEvent", compact)
+                self.assertIn("ReturnValue", compact)
             with self.subTest(file=path, item="item blockers"):
                 self.assertIn("ResourceHandle", compact)
                 self.assertIn("public Inventory SDK", compact)
+                self.assertIn("Items SDK", compact)
+                self.assertIn("identity", compact)
                 self.assertIn("mutation", compact)
                 self.assertIn("return override", compact)
 
@@ -1134,9 +1152,9 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             ("docs/STATUS.md", status),
         ):
             compact = normalized(text)
-            with self.subTest(file=path, item="post-RC order and RC boundary"):
-                self.assertIn("Item return-only policy, Mission copied-bool observer, then Transfer `bAccept`", compact)
-                self.assertRegex(compact, r"no RC public SDK/API|not RC public SDK/API|does not change the RC public API")
+            with self.subTest(file=path, item="mission remains internal after item event promotion"):
+                self.assertIn("Mission copied-bool", compact)
+                self.assertRegex(compact, r"internal|absent|not ready")
             with self.subTest(file=path, item="mission blockers"):
                 self.assertRegex(compact, r"public Mission SDK|missions.*public.*SDK|public module SDK")
                 self.assertIn("ResourceHandle", compact)

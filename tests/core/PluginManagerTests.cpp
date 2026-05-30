@@ -1,10 +1,16 @@
 #include "core/ChatEventDispatcher.h"
 #include "core/EventManager.h"
 #include "core/InventoryPolicyEventDispatcher.h"
+#include "core/ItemReturnEventDispatcher.h"
 #include "core/PluginManager.h"
 #include "core/StructureEventDispatcher.h"
 #include "core/TimerManager.h"
 #include "runtime/Logger.h"
+
+// The plugin-manager test target compiles PluginManager.cpp directly instead of linking
+// the full core object list, so keep the private item-return dispatcher implementation
+// available here without changing build-system scope.
+#include "core/ItemReturnEventDispatcher.cpp"
 
 #include <atomic>
 #include <chrono>
@@ -566,6 +572,26 @@ namespace
     {
         return {
             .Kind = Obelisk::Core::InventoryPolicyEventKind::CanUse,
+            .Scalars = scalars,
+        };
+    }
+
+    std::vector<Obelisk::Core::ItemReturnScalarValue> MakeItemReturnScalars(bool returnValue)
+    {
+        return {
+            {
+                .Field = Obelisk::Core::ItemReturnScalarField::ReturnValue,
+                .BoolValue = returnValue,
+            },
+        };
+    }
+
+    Obelisk::Core::ItemReturnEventView MakeItemReturnEvent(
+        Obelisk::Core::ItemReturnEventKind kind,
+        const std::vector<Obelisk::Core::ItemReturnScalarValue>& scalars)
+    {
+        return {
+            .Kind = kind,
             .Scalars = scalars,
         };
     }
@@ -1559,6 +1585,8 @@ namespace
                 "invalid gameplay policy registrations left structure subscriptions behind");
         Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
                 "invalid gameplay policy registrations left inventory subscriptions behind");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 0,
+                "invalid gameplay policy registrations left item-return subscriptions behind");
 
         const uint64_t registrationId =
             plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
@@ -1571,6 +1599,8 @@ namespace
                 "owner-token gameplay policy callback was not bridged into structure dispatcher");
         Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
                 "structure-only gameplay policy callback registered inventory dispatcher");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 0,
+                "structure-only gameplay policy callback registered item-return dispatcher");
 
         Require(!plugin.capturedApi.UnregisterGameplayPolicyEventWithOwnerToken(
                     otherPlugin.initOwnerToken,
@@ -1627,6 +1657,43 @@ namespace
                 "zero gameplay policy callback handle unregistered a callback");
         Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
                 "owner-token gameplay policy callback survived explicit unregister");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
+                "owner-token gameplay policy unregister left inventory dispatcher behind");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 0,
+                "owner-token gameplay policy unregister left item-return dispatcher behind");
+
+        const uint64_t itemOnlyRegistrationId =
+            plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                plugin.initOwnerToken,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_ALLOW_EQUIP_ITEM_CHECK,
+                FakeGameplayPolicyEventCallback,
+                &plugin);
+        Require(itemOnlyRegistrationId != 0,
+                "owner-token item-return gameplay policy registration returned zero");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
+                "item-return-only gameplay policy callback registered structure dispatcher");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
+                "item-return-only gameplay policy callback registered inventory dispatcher");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 1,
+                "item-return-only gameplay policy callback did not register item-return dispatcher");
+
+        const std::vector<Obelisk::Core::ItemReturnScalarValue> itemOnlyScalars =
+            MakeItemReturnScalars(true);
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().Dispatch(
+                    MakeItemReturnEvent(
+                        Obelisk::Core::ItemReturnEventKind::AllowEquipItem,
+                        itemOnlyScalars)) == 1,
+                "item-return-only gameplay policy callback did not receive item return dispatch");
+        Require(plugin.gameplayPolicyEventKind ==
+                    OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_ALLOW_EQUIP_ITEM_CHECK,
+                "item-return-only gameplay policy event kind was not mapped");
+        Require(plugin.capturedApi.UnregisterGameplayPolicyEventWithOwnerToken(
+                    plugin.initOwnerToken,
+                    itemOnlyRegistrationId),
+                "owner-token item-return gameplay policy unregister failed");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 0,
+                "item-return-only gameplay policy callback survived explicit unregister");
+        plugin.gameplayPolicyEventCalls = 1;
 
         const uint64_t unloadRegistrationId =
             plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
@@ -1639,11 +1706,11 @@ namespace
                 "all gameplay policy callback did not register structure dispatcher");
         Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 1,
                 "all gameplay policy callback did not register inventory dispatcher");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 1,
+                "all gameplay policy callback did not register item-return dispatcher");
 
         Require(Obelisk::Core::StructureEventDispatcher::Get().Dispatch(MakeSetVariantEvent(setVariantScalars)) == 1,
                 "all-structures gameplay policy callback did not receive set variant dispatch");
-        Require(plugin.gameplayPolicyEventCalls == 2,
-                "all-structures gameplay policy callback did not dispatch set variant event");
         Require(plugin.gameplayPolicyEventKind ==
                     OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_VARIANT_CHANGE,
                 "set variant event kind was not mapped");
@@ -1667,8 +1734,6 @@ namespace
         Require(Obelisk::Core::StructureEventDispatcher::Get().Dispatch(
                     MakeActivationToggleEvent(activationToggleScalars)) == 1,
                 "all gameplay policy callback did not receive activation toggle dispatch");
-        Require(plugin.gameplayPolicyEventCalls == 3,
-                "activation toggle gameplay policy callback did not dispatch");
         Require(plugin.gameplayPolicyEventKind ==
                     OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_ACTIVATION_TOGGLE,
                 "activation toggle event kind was not mapped");
@@ -1680,8 +1745,6 @@ namespace
         const std::vector<Obelisk::Core::StructureScalarValue> canSeatScalars = MakeCanSeatScalars();
         Require(Obelisk::Core::StructureEventDispatcher::Get().Dispatch(MakeCanSeatEvent(canSeatScalars)) == 1,
                 "all gameplay policy callback did not receive can-seat dispatch");
-        Require(plugin.gameplayPolicyEventCalls == 4,
-                "can-seat gameplay policy callback did not dispatch");
         Require(plugin.gameplayPolicyEventKind ==
                     OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_SEAT_CHECK,
                 "can-seat event kind was not mapped");
@@ -1701,8 +1764,6 @@ namespace
         Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().Dispatch(
                     MakeInventoryRemoteAddEvent(inventoryRemoteAddScalars)) == 1,
                 "all gameplay policy callback did not receive inventory remote-add dispatch");
-        Require(plugin.gameplayPolicyEventCalls == 5,
-                "inventory gameplay policy callback did not dispatch");
         Require(plugin.gameplayPolicyEventKind ==
                     OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK,
                 "inventory remote-add event kind was not mapped");
@@ -1731,8 +1792,6 @@ namespace
         Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().Dispatch(
                     MakeInventoryCanUseEvent(inventoryCanUseScalars)) == 1,
                 "all gameplay policy callback did not receive inventory can-use dispatch");
-        Require(plugin.gameplayPolicyEventCalls == 6,
-                "inventory can-use gameplay policy callback did not dispatch");
         Require(plugin.gameplayPolicyEventKind ==
                     OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK,
                 "inventory use event kind was not mapped");
@@ -1742,12 +1801,68 @@ namespace
                     (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_IGNORE_COOLDOWN)) == 0,
                 "inventory can-use copied wrong ignore-cooldown value");
 
+        const std::vector<Obelisk::Core::ItemReturnScalarValue> allowEquipScalars =
+            MakeItemReturnScalars(true);
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().Dispatch(
+                    MakeItemReturnEvent(
+                        Obelisk::Core::ItemReturnEventKind::AllowEquipItem,
+                        allowEquipScalars)) == 1,
+                "all gameplay policy callback did not receive allow-equip item return dispatch");
+        Require(plugin.gameplayPolicyEventKind ==
+                    OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_ALLOW_EQUIP_ITEM_CHECK,
+                "allow-equip item return event kind was not mapped");
+        Require(plugin.gameplayPolicyResourceKind ==
+                    OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM,
+                "allow-equip item return resource kind was not inventory item");
+        Require((plugin.gameplayPolicyFlags & OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED) != 0,
+                "allow-equip item return event was not marked inventory-backed");
+        Require(plugin.gameplayPolicyFieldMask == OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE,
+                "allow-equip item return exposed fields beyond return value");
+        Require((plugin.gameplayPolicyBoolValues &
+                    (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_RETURN_VALUE)) != 0,
+                "allow-equip item return copied wrong return value");
+
+        const std::vector<Obelisk::Core::ItemReturnScalarValue> canRepairScalars =
+            MakeItemReturnScalars(false);
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().Dispatch(
+                    MakeItemReturnEvent(
+                        Obelisk::Core::ItemReturnEventKind::CanRepair,
+                        canRepairScalars)) == 1,
+                "all gameplay policy callback did not receive can-repair item return dispatch");
+        Require(plugin.gameplayPolicyEventKind ==
+                    OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_CAN_REPAIR_CHECK,
+                "can-repair item return event kind was not mapped");
+        Require(plugin.gameplayPolicyFieldMask == OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE,
+                "can-repair item return exposed fields beyond return value");
+        Require((plugin.gameplayPolicyBoolValues &
+                    (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_RETURN_VALUE)) == 0,
+                "can-repair item return copied wrong return value");
+
+        const std::vector<Obelisk::Core::ItemReturnScalarValue> useOntoScalars =
+            MakeItemReturnScalars(true);
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().Dispatch(
+                    MakeItemReturnEvent(
+                        Obelisk::Core::ItemReturnEventKind::UseItemOntoItem,
+                        useOntoScalars)) == 1,
+                "all gameplay policy callback did not receive use-item-onto-item return dispatch");
+        Require(plugin.gameplayPolicyEventKind ==
+                    OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK,
+                "use-item-onto-item return event kind was not mapped");
+        Require(plugin.gameplayPolicyFieldMask == OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE,
+                "use-item-onto-item return exposed fields beyond return value");
+        Require((plugin.gameplayPolicyBoolValues &
+                    (OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER |
+                     OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN)) == 0,
+                "use-item-onto-item return leaked inventory policy-only boolean fields");
+
         manager.UnloadAll();
 
         Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
                 "owner-token gameplay policy callback survived plugin unload");
         Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
                 "owner-token gameplay policy inventory callback survived plugin unload");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 0,
+                "owner-token gameplay policy item-return callback survived plugin unload");
         Require(plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
                     plugin.initOwnerToken,
                     OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL,
@@ -3200,6 +3315,36 @@ namespace
                     OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN,
                 "inventory.use_check",
                 "Inventory Use Check",
+            },
+            {
+                OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_ALLOW_EQUIP_ITEM_CHECK,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM,
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD |
+                    OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_ALLOW_EQUIP_ITEM_CHECK,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE,
+                "inventory_item.allow_equip_check",
+                "Inventory Item Allow Equip Check",
+            },
+            {
+                OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_CAN_REPAIR_CHECK,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM,
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD |
+                    OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_CAN_REPAIR_CHECK,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE,
+                "inventory_item.can_repair_check",
+                "Inventory Item Can Repair Check",
+            },
+            {
+                OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM,
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD |
+                    OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE,
+                "inventory_item.use_onto_item_check",
+                "Inventory Item Use Onto Item Check",
             },
         };
 

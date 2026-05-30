@@ -265,6 +265,18 @@ namespace
             OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
                 OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN,
             1ull << OBELISK_GAMEPLAY_POLICY_FIELD_RETURN_VALUE);
+        DispatchValidInventoryGameplayPolicyEvent(
+            OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_ALLOW_EQUIP_ITEM_CHECK,
+            OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE,
+            1ull << OBELISK_GAMEPLAY_POLICY_FIELD_RETURN_VALUE);
+        DispatchValidInventoryGameplayPolicyEvent(
+            OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_CAN_REPAIR_CHECK,
+            OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE,
+            0);
+        DispatchValidInventoryGameplayPolicyEvent(
+            OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK,
+            OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE,
+            1ull << OBELISK_GAMEPLAY_POLICY_FIELD_RETURN_VALUE);
     }
 
     bool DescribeResourceKind(uint32_t resourceKind, ObeliskResourceKindDescriptor* out)
@@ -390,6 +402,33 @@ namespace
             out->field_mask |= OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN;
             std::strncpy(out->stable_name, "inventory.use_check", sizeof(out->stable_name) - 1);
             std::strncpy(out->display_name, "Inventory Use Check", sizeof(out->display_name) - 1);
+            return true;
+        }
+        if (eventKind == OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_ALLOW_EQUIP_ITEM_CHECK)
+        {
+            out->resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM;
+            out->flags |= OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED;
+            out->event_kind_mask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_ALLOW_EQUIP_ITEM_CHECK;
+            std::strncpy(out->stable_name, "inventory_item.allow_equip_check", sizeof(out->stable_name) - 1);
+            std::strncpy(out->display_name, "Inventory Item Allow Equip Check", sizeof(out->display_name) - 1);
+            return true;
+        }
+        if (eventKind == OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_CAN_REPAIR_CHECK)
+        {
+            out->resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM;
+            out->flags |= OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED;
+            out->event_kind_mask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_CAN_REPAIR_CHECK;
+            std::strncpy(out->stable_name, "inventory_item.can_repair_check", sizeof(out->stable_name) - 1);
+            std::strncpy(out->display_name, "Inventory Item Can Repair Check", sizeof(out->display_name) - 1);
+            return true;
+        }
+        if (eventKind == OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK)
+        {
+            out->resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM;
+            out->flags |= OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED;
+            out->event_kind_mask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK;
+            std::strncpy(out->stable_name, "inventory_item.use_onto_item_check", sizeof(out->stable_name) - 1);
+            std::strncpy(out->display_name, "Inventory Item Use Onto Item Check", sizeof(out->display_name) - 1);
             return true;
         }
         throw std::runtime_error("unexpected gameplay policy event kind");
