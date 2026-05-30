@@ -129,13 +129,14 @@ public SDK docs.
 
 ## Instance Identity
 
-`OBELISK_INSTANCE_ID` identifies the LinuxGSM instance, not the ARK map. The production
-wrapper sets known defaults:
+`OBELISK_INSTANCE_ID` identifies the LinuxGSM instance, not the ARK map. Configure stable
+instance identifiers per server process and keep current map-to-instance routing in
+operator-owned deployment notes:
 
 ```text
-Ragnarok  -> arkserver
-TheIsland -> arkserver2
-Debug     -> arkserver-obelisk-debug
+<map-or-role> -> <instance-id>
+<map-or-role> -> <instance-id>
+<debug-role>  -> <debug-instance-id>
 ```
 
 Operators can override it before launching the wrapper.
@@ -178,15 +179,16 @@ discovery.
 Instance marker files are preferred for production operations:
 
 ```bash
-# Approved debug window only. Do not run from an ordinary install or agent round.
+# Approved debug window only. Do not run from an ordinary install or debug run.
 # mkdir -p <obelisk-root>/state/instances/<approved-instance-id>
 # touch <obelisk-root>/state/instances/<approved-instance-id>/<approved-marker>
 ```
 
-Do not create, remove, or refresh `arkserver` / Ragnarok markers from install or debug
-rounds. Treat the Ragnarok marker list as observed baseline unless the operator opens a
-Ragnarok maintenance window in the current turn. Experimental module markers, scanners,
-ptrace/gcore, broad tracing, and restarts require explicit run-window approval.
+Do not create, remove, or refresh markers on shared or player-facing instances from
+ordinary install or debug rounds. Treat the live marker list as observed baseline unless
+the operator opens an explicit maintenance window for that instance in the current turn.
+Experimental module markers, scanners, ptrace/gcore, broad tracing, and restarts require
+explicit run-window approval.
 
 Useful flags:
 
@@ -194,6 +196,7 @@ Useful flags:
 state/instances/<instance-id>/enable-process-event-hook
 state/instances/<instance-id>/disable-plugins
 state/instances/<instance-id>/allow-experimental-observers  # required with observer markers below
+state/instances/<instance-id>/enable-chat-events  # experimental ChatMessageEvent producer
 state/instances/<instance-id>/enable-chat-reflection  # experimental
 state/instances/<instance-id>/enable-inventory-reflection  # experimental, metadata-only
 state/instances/<instance-id>/enable-structure-reflection  # experimental, metadata-only
@@ -207,7 +210,22 @@ uses `OBELISK_WRAPPER_PROFILE=observer-debug` and the same instance has
 only inside an approved debug window and remove them before returning the instance to
 stable posture.
 
-`enable-chat-reflection` makes the wrapper set:
+`enable-chat-events` makes the wrapper set the minimal copied `ChatMessageEvent`
+producer:
+
+```text
+OBELISK_ENABLE_CHAT_EVENTS=1
+OBELISK_CHAT_EVENTS_BINARY_SHA256=<supported ARK SHA256>
+OBELISK_CHAT_EVENTS_DISPATCH_LIMIT=<positive dispatch budget>
+```
+
+This is the marker/env path for the copied `ChatMessageEvent` producer. Copied
+plugin-facing delivery for all four known chat send modes has accepted copied-log
+validation; use this path only for newly approved regression/beta windows, after an
+operator-approved notice, with a short observer-debug window and explicit rollback.
+Do not use `enable-chat-reflection` as delivery evidence.
+
+`enable-chat-reflection` makes the wrapper set the historical chat observer:
 
 ```text
 OBELISK_ENABLE_CHAT_REFLECTION=1
@@ -242,7 +260,8 @@ OBELISK_INVENTORY_REFLECTION_LOG_LIMIT=0
 ```
 
 Inventory reflection is internal metadata observation only. It must not expose item ids,
-contents, player identity, or gameplay-authoritative overrides.
+contents, player identity, gameplay-authoritative overrides, a public Inventory SDK,
+`ResourceHandle`, lookup, mutation, raw UE pointers/params, or return override.
 
 Decoded chat text logging is not enabled by the marker. It requires an additional explicit
 environment gate:
@@ -275,20 +294,22 @@ from `OBELISK_ROOT`, both `${OBELISK_ROOT}` and `${OBELISK_ROOT}/logs` must be
 non-symlink directories. Per-instance log directories are also rejected when symlinked, so
 log writes cannot escape the central root through an inherited environment.
 
-## Current Safe Production Posture
+## Stable Validation Posture
 
-For live servers, the safest known posture is:
+For a live or live-like validation instance, the stable posture is:
 
 ```text
-state/instances/arkserver/enable-process-event-hook
-state/instances/arkserver/disable-plugins
+state/instances/<instance-id>/enable-process-event-hook
+state/instances/<instance-id>/disable-plugins
 ```
 
 This validates the core ProcessEvent hook without loading experimental plugins.
 
-Use `arkserver2` / TheIsland for debug/development markers and validation windows only
-after explicit operator approval. It starts from powered off and must be stopped again
-after the scoped test. Keep `arkserver` / Ragnarok protected while users are active.
+Keep current instance names, maps, beta-test routing, and debug-instance startup/shutdown
+rules in operator-owned deployment notes, not in public SDK install docs. For any approved
+server-side feature window, announce before activation, enable only
+the required markers, avoid raw player text or identity logging, preserve copied logs, and
+remove experimental markers before returning to stable posture.
 
 Stable production posture also requires no forbidden experimental marker entries for the
 instance, including observer, scanner, debug-control, native-exec, ptrace, global callback,

@@ -6,6 +6,7 @@
 #include <cstring>
 #include <iostream>
 #include <stdexcept>
+#include <string_view>
 #include <vector>
 
 namespace
@@ -295,8 +296,12 @@ namespace
                 "OnServerChatMessage delegate FName was not accepted by cheap filter");
         Require(IsReflectedChatNameIndex(kServerSendChatMessageNameIndex),
                 "ServerSendChatMessage FName was not accepted by cheap filter");
+        Require(IsServerSendChatMessageNameIndex(kServerSendChatMessageNameIndex),
+                "ServerSendChatMessage FName was not accepted by route observer cheap filter");
         Require(IsReflectedChatNameIndex(kServerChatNameIndex), "ServerChat FName was not accepted by cheap filter");
         Require(!IsReflectedChatNameIndex(42), "unrelated FName was accepted by cheap filter");
+        Require(!IsServerSendChatMessageNameIndex(kServerChatNameIndex),
+                "non-ServerSendChatMessage FName was accepted by route observer cheap filter");
     }
 
     void TestDisabledGateDoesNotRead()
@@ -562,6 +567,53 @@ namespace
                 "unknown send mode produced a chat message event");
     }
 
+    void TestBuildsChatRouteObservationWithoutTextDecode()
+    {
+        ChatFixture fixture;
+        BuildServerSendChatMessage(fixture);
+        fixture.Params[0x10] = 0x01;
+
+        MemoryReader reader = fixture.Reader();
+        Attempt attempt = TryIdentifyInvocation(
+            EnabledGate(),
+            kServerSendChatMessageNameIndex,
+            reader,
+            fixture.Function.data(),
+            fixture.Params.data());
+
+        Require(attempt.Status == AttemptStatus::Matched, attempt.Result.Reason.c_str());
+
+        ChatRouteObservation observation;
+        Require(TryBuildChatRouteObservation(attempt.Invocation, observation),
+                "known send mode did not produce a route observation");
+        Require(observation.SendMode == 1, "route observation send mode mismatch");
+        Require(std::string_view(observation.SendModeName) == "GlobalTribeChat",
+                "route observation send mode name mismatch");
+
+        fixture.Params[0x10] = 0x04;
+        attempt = TryIdentifyInvocation(
+            EnabledGate(),
+            kServerSendChatMessageNameIndex,
+            reader,
+            fixture.Function.data(),
+            fixture.Params.data());
+        Require(attempt.Status == AttemptStatus::Matched, attempt.Result.Reason.c_str());
+        Require(!TryBuildChatRouteObservation(attempt.Invocation, observation),
+                "unknown send mode produced a route observation");
+
+        ChatFixture otherFixture;
+        BuildServerChatToPlayer(otherFixture);
+        Attempt otherAttempt = TryIdentifyInvocation(
+            EnabledGate(),
+            kServerChatToPlayerNameIndex,
+            otherFixture.Reader(),
+            otherFixture.Function.data(),
+            otherFixture.Params.data());
+        Require(otherAttempt.Status == AttemptStatus::Matched, otherAttempt.Result.Reason.c_str());
+        Require(!TryBuildChatRouteObservation(otherAttempt.Invocation, observation),
+                "non-ServerSendChatMessage function produced a route observation");
+    }
+
 }
 
 int main()
@@ -579,6 +631,7 @@ int main()
     TestDecodesServerSendChatMessageTextForLog();
     TestBuildsCopiedChatMessageEventWithoutSenderIdentity();
     TestRejectsUnknownSendModeForCopiedChatMessageEvent();
+    TestBuildsChatRouteObservationWithoutTextDecode();
 
     std::cout << "ProcessEventChatReflectionTests passed\n";
     return 0;

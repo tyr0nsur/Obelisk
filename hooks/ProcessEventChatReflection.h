@@ -51,7 +51,14 @@ namespace Obelisk::Hooks::ProcessEventChatReflection
         std::string Message;
     };
 
+    struct ChatRouteObservation
+    {
+        uint8_t SendMode = 0xff;
+        const char* SendModeName = "Unknown";
+    };
+
     Gate EvaluateGate(const char* enableChatReflection, bool instanceMarkerEnabled, const char* binarySha256);
+    bool IsServerSendChatMessageNameIndex(int32_t nameIndex);
     bool IsReflectedChatNameIndex(int32_t nameIndex);
     bool ShouldAttemptObservation(uint64_t limit);
     bool ShouldLogObservation(uint64_t observationNumber, uint64_t limit);
@@ -85,4 +92,8 @@ namespace Obelisk::Hooks::ProcessEventChatReflection
         const Obelisk::UE::ChatReflection::ChatInvocation& invocation,
         CopiedChatMessageEvent& out,
         int32_t maxChars = 512);
+
+    bool TryBuildChatRouteObservation(
+        const Obelisk::UE::ChatReflection::ChatInvocation& invocation,
+        ChatRouteObservation& out);
 }

@@ -151,6 +151,11 @@ namespace Obelisk::Hooks::ProcessEventChatReflection
                nameIndex == 28549;
     }
 
+    bool IsServerSendChatMessageNameIndex(int32_t nameIndex)
+    {
+        return nameIndex == 2697;
+    }
+
     bool ShouldAttemptObservation(uint64_t limit)
     {
         return limit != 0;
@@ -338,6 +343,26 @@ namespace Obelisk::Hooks::ProcessEventChatReflection
             .SendMode = static_cast<Obelisk::Core::ChatSendMode>(sendMode),
             .SenderNameIndex = -1,
         };
+        return true;
+    }
+
+    bool TryBuildChatRouteObservation(
+        const Obelisk::UE::ChatReflection::ChatInvocation& invocation,
+        ChatRouteObservation& out)
+    {
+        out = {};
+        if (invocation.Function != Obelisk::UE::ChatReflection::ChatFunction::ServerSendChatMessage)
+            return false;
+
+        uint8_t sendMode = 0xff;
+        if (!Obelisk::UE::ChatReflection::TryGetSendMode(invocation, sendMode) ||
+            !Obelisk::UE::ChatReflection::IsKnownSendMode(sendMode))
+        {
+            return false;
+        }
+
+        out.SendMode = sendMode;
+        out.SendModeName = Obelisk::UE::ChatReflection::SendModeName(sendMode);
         return true;
     }
 }

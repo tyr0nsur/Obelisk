@@ -53,6 +53,21 @@ expect_success stable-posture-instance-id-alias \
 expect_success stable-posture-legacy-chat-forbidden-flag-clean \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable --forbid-chat-reflection --instance arkserver
 
+fake_pgrep="${TMP_DIR}/fake-pgrep"
+cat > "${fake_pgrep}" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ "$*" != *"(^|/)ShooterGameServer Ragnarok"* ]]; then
+    echo "unexpected pgrep args: $*" >&2
+    exit 1
+fi
+printf '101\n'
+EOF
+chmod +x "${fake_pgrep}"
+expect_success stable-posture-map-detects-absolute-shootergameserver \
+    env PGREP_BIN="${fake_pgrep}" "${SCRIPT}" \
+        --proc-root "${TMP_DIR}/proc" --map Ragnarok --expect-stable --instance arkserver
+
 write_proc_fixture 118 "${stable_maps}" \
     "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
     "OBELISK_INSTANCE_ID=arkserver" \
@@ -146,6 +161,19 @@ write_proc_fixture 110 "${stable_maps}" \
 expect_failure chat-text-forbidden-for-stable \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 110 --expect-stable --instance arkserver
 
+write_proc_fixture 122 "${stable_maps}" \
+    "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
+    "OBELISK_INSTANCE_ID=arkserver" \
+    "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
+    "OBELISK_DISABLE_PLUGINS=1" \
+    "OBELISK_ENABLE_CHAT_ROUTE_OBSERVER=1" \
+    "OBELISK_CHAT_ROUTE_OBSERVER_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520" \
+    "OBELISK_CHAT_ROUTE_OBSERVER_LIMIT=2"
+expect_failure chat-route-observer-forbidden-for-stable \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 122 --expect-stable --instance arkserver
+expect_failure chat-route-observer-forbidden-for-stable-legacy-flag \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 122 --expect-stable --forbid-chat-reflection --instance arkserver
+
 write_proc_fixture 111 "${stable_maps}" \
     "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
     "OBELISK_INSTANCE_ID=arkserver" \
@@ -187,6 +215,15 @@ write_proc_fixture 113 "${stable_maps}" \
     "OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS=1"
 expect_failure global-process-event-callbacks-forbidden-for-stable \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 113 --expect-stable --instance arkserver
+
+write_proc_fixture 1131 "${stable_maps}" \
+    "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
+    "OBELISK_INSTANCE_ID=arkserver" \
+    "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
+    "OBELISK_DISABLE_PLUGINS=1" \
+    "OBELISK_ALLOW_FILTERED_PROCESS_EVENT_CALLBACKS=1"
+expect_failure filtered-process-event-callbacks-forbidden-for-stable \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 1131 --expect-stable --instance arkserver
 
 write_proc_fixture 114 "${stable_maps}" \
     "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
@@ -292,10 +329,12 @@ for marker in \
     enable-debug-control \
     enable-native-exec-probes \
     allow-global-process-event-callbacks \
+    allow-filtered-process-event-callbacks \
     allow-call-process-event \
     allow-process-event-blocking \
     enable-chat-events \
     enable-chat-reflection \
+    enable-chat-route-observer \
     enable-inventory-reflection \
     enable-structure-reflection \
     enable-reflection-scanner
@@ -328,5 +367,14 @@ expect_failure chat-events-marker-forbidden-for-stable \
 expect_failure chat-events-marker-forbidden-for-stable-legacy-flag \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable --forbid-chat-reflection --instance arkserver
 rm -f "${TEST_OBELISK_ROOT}/state/instances/arkserver/enable-chat-events"
+
+: > "${TMP_DIR}/external-chat-route-marker"
+ln -s "${TMP_DIR}/external-chat-route-marker" \
+    "${TEST_OBELISK_ROOT}/state/instances/arkserver/enable-chat-route-observer"
+expect_failure chat-route-marker-symlink-forbidden-for-stable \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable --instance arkserver
+expect_failure chat-route-marker-symlink-forbidden-for-stable-legacy-flag \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable --forbid-chat-reflection --instance arkserver
+rm -f "${TEST_OBELISK_ROOT}/state/instances/arkserver/enable-chat-route-observer"
 
 echo "check_obelisk_server_posture offline tests passed"

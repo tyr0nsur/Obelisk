@@ -80,7 +80,8 @@ if [[ -z "${PID}" && -z "${MAP}" ]]; then
 fi
 
 if [[ -z "${PID}" ]]; then
-    PID="$(pgrep -f "^./ShooterGameServer ${MAP}" | head -n1 || true)"
+    PGREP_BIN="${PGREP_BIN:-pgrep}"
+    PID="$("${PGREP_BIN}" -f "(^|/)ShooterGameServer ${MAP}" | head -n1 || true)"
 fi
 
 if [[ -z "${PID}" ]]; then
@@ -247,6 +248,7 @@ if [[ "${EXPECT_STABLE}" == "1" ]]; then
     forbid_env OBELISK_ENABLE_DEBUG_CONTROL
     forbid_env OBELISK_ENABLE_NATIVE_EXEC_PROBES
     forbid_env OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS
+    forbid_env OBELISK_ALLOW_FILTERED_PROCESS_EVENT_CALLBACKS
     forbid_env OBELISK_ALLOW_CALL_PROCESS_EVENT
     forbid_env OBELISK_ALLOW_PROCESS_EVENT_BLOCKING
     forbid_env_value OBELISK_WRAPPER_PROFILE observer-debug
@@ -258,6 +260,9 @@ if [[ "${EXPECT_STABLE}" == "1" ]]; then
     forbid_env OBELISK_CHAT_REFLECTION_BINARY_SHA256
     forbid_env OBELISK_CHAT_REFLECTION_LOG_LIMIT
     forbid_env OBELISK_CHAT_REFLECTION_LOG_TEXT
+    forbid_env OBELISK_ENABLE_CHAT_ROUTE_OBSERVER
+    forbid_env OBELISK_CHAT_ROUTE_OBSERVER_BINARY_SHA256
+    forbid_env OBELISK_CHAT_ROUTE_OBSERVER_LIMIT
     forbid_env OBELISK_ENABLE_INVENTORY_REFLECTION
     forbid_env OBELISK_INVENTORY_REFLECTION_BINARY_SHA256
     forbid_env OBELISK_INVENTORY_REFLECTION_LOG_LIMIT
@@ -278,10 +283,12 @@ if [[ "${EXPECT_STABLE}" == "1" ]]; then
     forbid_marker enable-debug-control
     forbid_marker enable-native-exec-probes
     forbid_marker allow-global-process-event-callbacks
+    forbid_marker allow-filtered-process-event-callbacks
     forbid_marker allow-call-process-event
     forbid_marker allow-process-event-blocking
     forbid_marker enable-chat-events
     forbid_marker enable-chat-reflection
+    forbid_marker enable-chat-route-observer
     forbid_marker enable-inventory-reflection
     forbid_marker enable-structure-reflection
     forbid_marker enable-reflection-scanner
@@ -296,6 +303,10 @@ if [[ "${FORBID_CHAT_REFLECTION}" == "1" ]]; then
     forbid_env OBELISK_CHAT_REFLECTION_BINARY_SHA256
     forbid_env OBELISK_CHAT_REFLECTION_LOG_LIMIT
     forbid_env OBELISK_CHAT_REFLECTION_LOG_TEXT
+    forbid_env OBELISK_ENABLE_CHAT_ROUTE_OBSERVER
+    forbid_env OBELISK_CHAT_ROUTE_OBSERVER_BINARY_SHA256
+    forbid_env OBELISK_CHAT_ROUTE_OBSERVER_LIMIT
     forbid_marker enable-chat-events
     forbid_marker enable-chat-reflection
+    forbid_marker enable-chat-route-observer
 fi

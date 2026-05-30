@@ -13,6 +13,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
+#include <exception>
 #include <mutex>
 #include <string>
 #include <string_view>
@@ -67,6 +68,29 @@ namespace Obelisk::Hooks
             ActiveProcessEventFrame(const ActiveProcessEventFrame&) = delete;
             ActiveProcessEventFrame& operator=(const ActiveProcessEventFrame&) = delete;
         };
+
+        thread_local bool* s_CurrentOriginalProcessEventCalled = nullptr;
+
+        class OriginalProcessEventCallFlagScope
+        {
+        public:
+            explicit OriginalProcessEventCallFlagScope(bool& originalWasCalled)
+                : m_Previous(s_CurrentOriginalProcessEventCalled)
+            {
+                s_CurrentOriginalProcessEventCalled = &originalWasCalled;
+            }
+
+            OriginalProcessEventCallFlagScope(const OriginalProcessEventCallFlagScope&) = delete;
+            OriginalProcessEventCallFlagScope& operator=(const OriginalProcessEventCallFlagScope&) = delete;
+
+            ~OriginalProcessEventCallFlagScope()
+            {
+                s_CurrentOriginalProcessEventCalled = m_Previous;
+            }
+
+        private:
+            bool* m_Previous = nullptr;
+        };
     }
 
     static std::atomic<uint32_t> s_ActiveProcessEventFrames{0};
@@ -75,6 +99,7 @@ namespace Obelisk::Hooks
     static std::atomic<uint64_t> s_ReflectedChatCalls{0};
     static std::atomic<uint64_t> s_ReflectedChatRejects{0};
     static std::atomic<uint64_t> s_ReflectedChatEventDispatches{0};
+    static std::atomic<uint64_t> s_ChatRouteObserverSequences{0};
     static std::atomic<uint64_t> s_ReflectedInventoryCalls{0};
     static std::atomic<uint64_t> s_ReflectedInventoryRejects{0};
     static std::atomic<uint64_t> s_ReflectedInventoryDispatches{0};
@@ -253,6 +278,44 @@ namespace Obelisk::Hooks
         return reinterpret_cast<ProcessEvent_t>(s_ProcessEventHook.Trampoline);
     }
 
+    static void CallOriginalProcessEventFromDetour(void* object, void* function, void* params)
+    {
+        ProcessEvent_t original = SnapshotOriginalProcessEvent();
+        if (!original)
+        {
+            if (s_RemovingProcessEventHook.load(std::memory_order_acquire))
+                OBELISK_WARN("ProcessEvent original skipped while hook removal is in progress.");
+            return;
+        }
+
+        if (s_CurrentOriginalProcessEventCalled)
+            *s_CurrentOriginalProcessEventCalled = true;
+        original(object, function, params);
+    }
+
+    static void TryCallOriginalProcessEventAfterDetourFailure(
+        bool& originalWasCalled,
+        void* object,
+        void* function,
+        void* params)
+    {
+        if (originalWasCalled)
+            return;
+
+        try
+        {
+            CallOriginalProcessEventFromDetour(object, function, params);
+        }
+        catch (const std::exception& e)
+        {
+            OBELISK_CRITICAL("ProcessEvent original threw while recovering from detour failure: {}", e.what());
+        }
+        catch (...)
+        {
+            OBELISK_CRITICAL("ProcessEvent original threw an unknown exception while recovering from detour failure.");
+        }
+    }
+
     static bool RemoveAbsoluteHook(AbsoluteHook& hook)
     {
         {
@@ -376,6 +439,13 @@ namespace Obelisk::Hooks
                AreExperimentalObserverMarkersEnabled("enable-chat-events");
     }
 
+    static bool IsChatRouteObserverDebugGateEnabled()
+    {
+        return IsObserverDebugProfileEnabled() &&
+               IsObserverDebugWindowMarkerEnabled() &&
+               AreExperimentalObserverMarkersEnabled("enable-chat-route-observer");
+    }
+
     static const ProcessEventChatReflection::Gate& GetChatReflectionGate()
     {
         static ProcessEventChatReflection::Gate gate = [] {
@@ -476,6 +546,57 @@ namespace Obelisk::Hooks
     static bool IsChatEventProducerEnabled()
     {
         return GetChatEventProducerGate().Enabled();
+    }
+
+    static const ProcessEventChatReflection::Gate& GetChatRouteObserverGate()
+    {
+        static ProcessEventChatReflection::Gate gate = [] {
+            ProcessEventChatReflection::Gate value =
+                ProcessEventChatReflection::EvaluateGate(
+                    std::getenv("OBELISK_ENABLE_CHAT_ROUTE_OBSERVER"),
+                    IsChatRouteObserverDebugGateEnabled(),
+                    std::getenv("OBELISK_CHAT_ROUTE_OBSERVER_BINARY_SHA256"));
+
+            switch (value.Status)
+            {
+            case ProcessEventChatReflection::GateStatus::Disabled:
+                break;
+            case ProcessEventChatReflection::GateStatus::MissingInstanceMarker:
+                if (!IsObserverDebugProfileEnabled())
+                {
+                    OBELISK_WARN("Chat route observer disabled: OBELISK_WRAPPER_PROFILE=observer-debug is required.");
+                }
+                else if (!IsObserverDebugWindowMarkerEnabled())
+                {
+                    OBELISK_WARN("Chat route observer disabled: allow-observer-debug-window instance marker is required.");
+                }
+                else
+                {
+                    OBELISK_WARN("Chat route observer disabled: instance markers allow-experimental-observers and "
+                                 "enable-chat-route-observer are required.");
+                }
+                break;
+            case ProcessEventChatReflection::GateStatus::MissingBinarySha256:
+                OBELISK_WARN("Chat route observer disabled: OBELISK_CHAT_ROUTE_OBSERVER_BINARY_SHA256 is required.");
+                break;
+            case ProcessEventChatReflection::GateStatus::UnsupportedBinarySha256:
+                OBELISK_WARN("Chat route observer disabled: unsupported ShooterGameServer SHA256 '{}'.",
+                             value.BinarySha256);
+                break;
+            case ProcessEventChatReflection::GateStatus::Enabled:
+                OBELISK_WARN("Chat route observer enabled for ShooterGameServer SHA256 {}.",
+                             value.BinarySha256);
+                break;
+            }
+
+            return value;
+        }();
+        return gate;
+    }
+
+    static bool IsChatRouteObserverEnabled()
+    {
+        return GetChatRouteObserverGate().Enabled();
     }
 
     static const ProcessEventStructureReflection::Gate& GetStructureReflectionGate()
@@ -603,6 +724,16 @@ namespace Obelisk::Hooks
         return limit;
     }
 
+    static uint64_t GetChatRouteObserverLimit()
+    {
+        static uint64_t limit = [] {
+            const char* env = std::getenv("OBELISK_CHAT_ROUTE_OBSERVER_LIMIT");
+            if (!env || env[0] == '\0') return uint64_t{0};
+            return static_cast<uint64_t>(std::strtoull(env, nullptr, 10));
+        }();
+        return limit;
+    }
+
     static bool IsChatEventProducerActive()
     {
         const uint64_t dispatchLimit = GetChatEventDispatchLimit();
@@ -610,6 +741,14 @@ namespace Obelisk::Hooks
                ProcessEventChatReflection::ShouldAttemptObservation(dispatchLimit) &&
                s_ReflectedChatEventDispatches.load(std::memory_order_relaxed) < dispatchLimit &&
                Core::ChatEventDispatcher::Get().SubscriptionCount() > 0;
+    }
+
+    static bool IsChatRouteObserverActive()
+    {
+        const uint64_t limit = GetChatRouteObserverLimit();
+        return ProcessEventChatReflection::ShouldAttemptObservation(limit) &&
+               IsChatRouteObserverEnabled() &&
+               s_ChatRouteObserverSequences.load(std::memory_order_relaxed) < limit;
     }
 
     static uint64_t GetStructureReflectionLogLimit()
@@ -664,12 +803,16 @@ namespace Obelisk::Hooks
 
     static bool IsInventoryObservationActive()
     {
+        const uint64_t logLimit = GetInventoryReflectionLogLimit();
+        const uint64_t dispatchLimit = GetInventoryReflectionDispatchLimit();
         return IsInventoryReflectionEnabled() &&
-               ProcessEventInventoryReflection::ShouldAttemptRuntimeObservation(
-                   s_ReflectedInventoryCalls,
-                   GetInventoryReflectionLogLimit(),
-                   s_ReflectedInventoryDispatches,
-                   GetInventoryReflectionDispatchLimit());
+               (ProcessEventInventoryReflection::HasObservationBudgetRemaining(
+                    s_ReflectedInventoryCalls,
+                    logLimit) ||
+                ProcessEventInventoryReflection::ShouldAttemptDispatchObservation(
+                    s_ReflectedInventoryDispatches,
+                    dispatchLimit,
+                    Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount()));
     }
 
     static const char* ChatFunctionName(Obelisk::UE::ChatReflection::ChatFunction function)
@@ -928,6 +1071,69 @@ namespace Obelisk::Hooks
         return Core::ChatEventDispatcher::Get().Dispatch(event.View);
     }
 
+    static bool TryReserveChatRouteObserverSequence(uint64_t limit, uint64_t& sequence)
+    {
+        sequence = 0;
+        if (!ProcessEventChatReflection::ShouldAttemptObservation(limit))
+            return false;
+
+        uint64_t current = s_ChatRouteObserverSequences.load(std::memory_order_relaxed);
+        while (current < limit)
+        {
+            if (s_ChatRouteObserverSequences.compare_exchange_weak(
+                    current,
+                    current + 1,
+                    std::memory_order_relaxed,
+                    std::memory_order_relaxed))
+            {
+                sequence = current + 1;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static void ObserveChatRouteAfterOriginal(
+        bool originalWasCalled,
+        int32_t nameIndex,
+        void* function,
+        void* params)
+    {
+        if (!originalWasCalled)
+            return;
+
+        if (!ProcessEventChatReflection::IsServerSendChatMessageNameIndex(nameIndex))
+            return;
+
+        const uint64_t limit = GetChatRouteObserverLimit();
+        if (!ProcessEventChatReflection::ShouldAttemptObservation(limit))
+            return;
+
+        const ProcessEventChatReflection::Gate& gate = GetChatRouteObserverGate();
+        if (!gate.Enabled())
+            return;
+
+        Obelisk::UE::RuntimeReflection::MemoryReader reader{RuntimeReflectionReader, nullptr};
+        ProcessEventChatReflection::Attempt attempt =
+            ProcessEventChatReflection::TryIdentifyInvocation(gate, nameIndex, reader, function, params);
+        if (attempt.Status != ProcessEventChatReflection::AttemptStatus::Matched)
+            return;
+
+        ProcessEventChatReflection::ChatRouteObservation observation;
+        if (!ProcessEventChatReflection::TryBuildChatRouteObservation(attempt.Invocation, observation))
+            return;
+
+        uint64_t sequence = 0;
+        if (!TryReserveChatRouteObserverSequence(limit, sequence))
+            return;
+
+        OBELISK_INFO("ChatRouteObserver event sequence={} send_mode={} send_mode_name={} "
+                     "post_original=true delivery_claim=none.",
+                     sequence,
+                     static_cast<unsigned int>(observation.SendMode),
+                     observation.SendModeName);
+    }
+
     static void TraceReflectedStructureInvocation(bool originalWasCalled, int32_t nameIndex, void* function, void* params)
     {
         if (!originalWasCalled)
@@ -1018,18 +1224,27 @@ namespace Obelisk::Hooks
             return;
         const uint64_t logLimit = GetInventoryReflectionLogLimit();
         const uint64_t dispatchLimit = GetInventoryReflectionDispatchLimit();
-        if (!ProcessEventInventoryReflection::ShouldAttemptNameObservation(nameIndex, logLimit, dispatchLimit))
+        if (!ProcessEventInventoryReflection::IsReflectedInventoryNameIndex(nameIndex))
             return;
-        if (!ProcessEventInventoryReflection::HasObservationBudgetRemaining(s_ReflectedInventoryCalls, logLimit) &&
-            !ProcessEventInventoryReflection::HasObservationBudgetRemaining(s_ReflectedInventoryDispatches, dispatchLimit))
-        {
+        const bool hasDispatchSubscriber =
+            Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() > 0;
+        const bool hasLogBudget =
+            ProcessEventInventoryReflection::HasObservationBudgetRemaining(s_ReflectedInventoryCalls, logLimit);
+        const bool hasDispatchBudget =
+            ProcessEventInventoryReflection::ShouldAttemptDispatchObservation(
+                s_ReflectedInventoryDispatches,
+                dispatchLimit,
+                hasDispatchSubscriber ? 1 : 0);
+        if (!hasLogBudget && !hasDispatchBudget)
             return;
-        }
         uint64_t observationNumber = 0;
         const bool logReserved = ProcessEventInventoryReflection::TryReserveObservationBudget(
             s_ReflectedInventoryCalls, logLimit, observationNumber);
         if (!logReserved &&
-            !ProcessEventInventoryReflection::HasObservationBudgetRemaining(s_ReflectedInventoryDispatches, dispatchLimit))
+            !ProcessEventInventoryReflection::ShouldAttemptDispatchObservation(
+                s_ReflectedInventoryDispatches,
+                dispatchLimit,
+                hasDispatchSubscriber ? 1 : 0))
             return;
 
         Obelisk::UE::RuntimeReflection::MemoryReader reader{RuntimeReflectionReader, nullptr};
@@ -1054,13 +1269,15 @@ namespace Obelisk::Hooks
         const Obelisk::UE::InventoryReflection::InventoryInvocation& invocation = attempt.Invocation;
         size_t dispatched = 0;
         uint64_t dispatchObservationNumber = 0;
-        const bool dispatchReserved = ProcessEventInventoryReflection::TryReserveDispatchBudgetForMatchedAttempt(
-            attempt, s_ReflectedInventoryDispatches, dispatchLimit, dispatchObservationNumber);
+        ProcessEventInventoryReflection::CopiedInventoryPolicyEvent copiedEvent;
+        const bool dispatchReserved = hasDispatchSubscriber &&
+            ProcessEventInventoryReflection::TryBuildAndReserveDispatchBudgetForMatchedAttempt(
+                attempt, s_ReflectedInventoryDispatches, dispatchLimit, dispatchObservationNumber, copiedEvent);
         if (dispatchReserved)
         {
             dispatched = ProcessEventInventoryReflection::MaybeDispatchCopiedInventoryPolicyEventAfterOriginal(
                 originalWasCalled,
-                invocation);
+                copiedEvent);
         }
 
         if (!logReserved || !ProcessEventInventoryReflection::ShouldLogObservation(observationNumber, logLimit))
@@ -1090,34 +1307,51 @@ namespace Obelisk::Hooks
     void ProcessEvent_Detour(void* object, void* function, void* params)
     {
         ActiveProcessEventFrame activeFrame;
-        uint64_t callNumber = ++s_ProcessEventCalls;
-        TraceProcessEventCall(callNumber, object, function, params);
+        bool originalWasCalled = false;
+        OriginalProcessEventCallFlagScope originalCallFlag(originalWasCalled);
+        try
+        {
+            uint64_t callNumber = ++s_ProcessEventCalls;
+            TraceProcessEventCall(callNumber, object, function, params);
 
-        auto& eventManager = Core::EventManager::Get();
-        const bool hasPreCallbacks = eventManager.HasPreProcessEventCallbacks();
-        const bool hasPostCallbacks = eventManager.HasPostProcessEventCallbacks();
-        const bool chatReflectionEnabled = IsChatReflectionEnabled();
-        const bool chatEventProducerActive = IsChatEventProducerActive();
-        const bool inventoryObservationActive = IsInventoryObservationActive();
-        const bool structureObservationActive = IsStructureObservationActive();
-        const bool needsNameIndex =
-            hasPreCallbacks || hasPostCallbacks || chatReflectionEnabled || chatEventProducerActive ||
-            inventoryObservationActive || structureObservationActive;
-        const int32_t nameIndex = needsNameIndex ? GetFunctionNameIndex(function) : -1;
+            auto& eventManager = Core::EventManager::Get();
+            const bool hasPreCallbacks = eventManager.HasPreProcessEventCallbacks();
+            const bool hasPostCallbacks = eventManager.HasPostProcessEventCallbacks();
+            const bool chatReflectionEnabled = IsChatReflectionEnabled();
+            const bool chatEventProducerActive = IsChatEventProducerActive();
+            const bool chatRouteObserverActive = IsChatRouteObserverActive();
+            const bool inventoryObservationActive = IsInventoryObservationActive();
+            const bool structureObservationActive = IsStructureObservationActive();
+            const bool needsNameIndex =
+                hasPreCallbacks || hasPostCallbacks || chatReflectionEnabled || chatEventProducerActive ||
+                chatRouteObserverActive || inventoryObservationActive || structureObservationActive;
+            const int32_t nameIndex = needsNameIndex ? GetFunctionNameIndex(function) : -1;
 
-        TraceReflectedChatInvocation(nameIndex, function, params);
-        const bool originalWasCalled = DispatchProcessEventCallbacks(
-            nameIndex,
-            object,
-            function,
-            params,
-            hasPreCallbacks,
-            hasPostCallbacks,
-            SnapshotOriginalProcessEvent());
+            TraceReflectedChatInvocation(nameIndex, function, params);
+            originalWasCalled = DispatchProcessEventCallbacks(
+                nameIndex,
+                object,
+                function,
+                params,
+                hasPreCallbacks,
+                hasPostCallbacks,
+                CallOriginalProcessEventFromDetour);
 
-        DispatchReflectedChatMessageEventAfterOriginal(originalWasCalled, nameIndex, function, params);
-        TraceReflectedInventoryInvocation(originalWasCalled, nameIndex, function, params);
-        TraceReflectedStructureInvocation(originalWasCalled, nameIndex, function, params);
+            ObserveChatRouteAfterOriginal(originalWasCalled, nameIndex, function, params);
+            DispatchReflectedChatMessageEventAfterOriginal(originalWasCalled, nameIndex, function, params);
+            TraceReflectedInventoryInvocation(originalWasCalled, nameIndex, function, params);
+            TraceReflectedStructureInvocation(originalWasCalled, nameIndex, function, params);
+        }
+        catch (const std::exception& e)
+        {
+            OBELISK_ERROR("ProcessEvent detour failed internally: {}", e.what());
+            TryCallOriginalProcessEventAfterDetourFailure(originalWasCalled, object, function, params);
+        }
+        catch (...)
+        {
+            OBELISK_ERROR("ProcessEvent detour failed internally with an unknown exception.");
+            TryCallOriginalProcessEventAfterDetourFailure(originalWasCalled, object, function, params);
+        }
     }
 
     void ProcessEventHook::Install()

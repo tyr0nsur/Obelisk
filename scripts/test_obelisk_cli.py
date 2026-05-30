@@ -91,6 +91,7 @@ class ObeliskCliTests(unittest.TestCase):
             (experimental / "allow-experimental-observers").write_text("", encoding="utf-8")
             (experimental / "enable-chat-events").write_text("", encoding="utf-8")
             (experimental / "enable-chat-reflection").write_text("", encoding="utf-8")
+            (experimental / "enable-chat-route-observer").write_text("", encoding="utf-8")
 
             result = run_cli(root, "instances", "list")
 
@@ -101,7 +102,7 @@ class ObeliskCliTests(unittest.TestCase):
             self.assertIn("arkserver2", result.stdout)
             self.assertIn("experimental", result.stdout)
             self.assertIn(
-                "forbidden=allow-experimental-observers,allow-observer-debug-window,enable-chat-events,enable-chat-reflection",
+                "forbidden=allow-experimental-observers,allow-observer-debug-window,enable-chat-events,enable-chat-reflection,enable-chat-route-observer",
                 result.stdout,
             )
 

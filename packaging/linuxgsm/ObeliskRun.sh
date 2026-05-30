@@ -51,6 +51,8 @@ inherited_chat_reflection_log_limit="${OBELISK_CHAT_REFLECTION_LOG_LIMIT:-}"
 inherited_chat_reflection_log_text="${OBELISK_CHAT_REFLECTION_LOG_TEXT:-}"
 inherited_chat_events_binary_sha256="${OBELISK_CHAT_EVENTS_BINARY_SHA256:-}"
 inherited_chat_events_dispatch_limit="${OBELISK_CHAT_EVENTS_DISPATCH_LIMIT:-}"
+inherited_chat_route_observer_binary_sha256="${OBELISK_CHAT_ROUTE_OBSERVER_BINARY_SHA256:-}"
+inherited_chat_route_observer_limit="${OBELISK_CHAT_ROUTE_OBSERVER_LIMIT:-}"
 inherited_inventory_reflection_binary_sha256="${OBELISK_INVENTORY_REFLECTION_BINARY_SHA256:-}"
 inherited_inventory_reflection_log_limit="${OBELISK_INVENTORY_REFLECTION_LOG_LIMIT:-}"
 inherited_inventory_reflection_dispatch_limit="${OBELISK_INVENTORY_REFLECTION_DISPATCH_LIMIT:-}"
@@ -65,6 +67,7 @@ unset OBELISK_ENABLE_DEBUG_CONTROL
 unset OBELISK_ENABLE_REFLECTION_SCANNER
 unset OBELISK_ENABLE_NATIVE_EXEC_PROBES
 unset OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS
+unset OBELISK_ALLOW_FILTERED_PROCESS_EVENT_CALLBACKS
 unset OBELISK_ALLOW_CALL_PROCESS_EVENT
 unset OBELISK_ALLOW_PROCESS_EVENT_BLOCKING
 unset OBELISK_PE_TRACE_LIMIT
@@ -75,6 +78,9 @@ unset OBELISK_ENABLE_CHAT_REFLECTION
 unset OBELISK_CHAT_REFLECTION_BINARY_SHA256
 unset OBELISK_CHAT_REFLECTION_LOG_LIMIT
 unset OBELISK_CHAT_REFLECTION_LOG_TEXT
+unset OBELISK_ENABLE_CHAT_ROUTE_OBSERVER
+unset OBELISK_CHAT_ROUTE_OBSERVER_BINARY_SHA256
+unset OBELISK_CHAT_ROUTE_OBSERVER_LIMIT
 unset OBELISK_ENABLE_INVENTORY_REFLECTION
 unset OBELISK_INVENTORY_REFLECTION_BINARY_SHA256
 unset OBELISK_INVENTORY_REFLECTION_LOG_LIMIT
@@ -114,7 +120,19 @@ require_sha256_hex() {
     local value="$2"
 
     if [[ ! "${value}" =~ ^[0-9a-f]{64}$ ]]; then
-        echo "${name} must be an explicit lowercase SHA256 hex value for observer-debug chat events." >&2
+        echo "${name} must be an explicit lowercase SHA256 hex value for observer-debug observer gates." >&2
+        exit 1
+    fi
+}
+
+require_supported_sha256() {
+    local name="$1"
+    local value="$2"
+    local supported_sha256="7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
+
+    require_sha256_hex "${name}" "${value}"
+    if [[ "${value}" != "${supported_sha256}" ]]; then
+        echo "${name} must match the supported ShooterGameServer SHA256 for observer-debug route observation." >&2
         exit 1
     fi
 }
@@ -124,7 +142,7 @@ require_positive_integer() {
     local value="$2"
 
     if [[ ! "${value}" =~ ^0*[1-9][0-9]*$ ]]; then
-        echo "${name} must be an explicit positive integer for observer-debug chat events." >&2
+        echo "${name} must be an explicit positive integer for observer-debug observer gates." >&2
         exit 1
     fi
 }
@@ -140,6 +158,7 @@ validate_observer_wrapper_profile() {
                 allow-experimental-observers \
                 enable-chat-events \
                 enable-chat-reflection \
+                enable-chat-route-observer \
                 enable-inventory-reflection \
                 enable-structure-reflection
             do
@@ -174,6 +193,20 @@ configure_chat_events() {
     export OBELISK_ENABLE_CHAT_EVENTS=1
     export OBELISK_CHAT_EVENTS_BINARY_SHA256="${inherited_chat_events_binary_sha256}"
     export OBELISK_CHAT_EVENTS_DISPATCH_LIMIT="${inherited_chat_events_dispatch_limit}"
+}
+
+configure_chat_route_observer() {
+    [[ "${OBELISK_WRAPPER_PROFILE:-stable}" == "observer-debug" ]] || return 0
+    enable_marker "allow-observer-debug-window" || return 0
+    enable_marker "allow-experimental-observers" || return 0
+    enable_marker "enable-chat-route-observer" || return 0
+
+    require_supported_sha256 "OBELISK_CHAT_ROUTE_OBSERVER_BINARY_SHA256" "${inherited_chat_route_observer_binary_sha256}"
+    require_positive_integer "OBELISK_CHAT_ROUTE_OBSERVER_LIMIT" "${inherited_chat_route_observer_limit}"
+
+    export OBELISK_ENABLE_CHAT_ROUTE_OBSERVER=1
+    export OBELISK_CHAT_ROUTE_OBSERVER_BINARY_SHA256="${inherited_chat_route_observer_binary_sha256}"
+    export OBELISK_CHAT_ROUTE_OBSERVER_LIMIT="${inherited_chat_route_observer_limit}"
 }
 
 configure_chat_reflection() {
@@ -225,6 +258,7 @@ case "${1:-}" in
         enable_marker "enable-reflection-scanner" && export OBELISK_ENABLE_REFLECTION_SCANNER=1
         enable_marker "enable-native-exec-probes" && export OBELISK_ENABLE_NATIVE_EXEC_PROBES=1
         configure_chat_events
+        configure_chat_route_observer
         configure_chat_reflection
         configure_inventory_reflection
         configure_structure_reflection
@@ -239,6 +273,7 @@ case "${1:-}" in
         enable_marker "enable-reflection-scanner" && export OBELISK_ENABLE_REFLECTION_SCANNER=1
         enable_marker "enable-native-exec-probes" && export OBELISK_ENABLE_NATIVE_EXEC_PROBES=1
         configure_chat_events
+        configure_chat_route_observer
         configure_chat_reflection
         configure_inventory_reflection
         configure_structure_reflection

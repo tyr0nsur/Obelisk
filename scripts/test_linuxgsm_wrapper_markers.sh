@@ -115,6 +115,9 @@ assert_not_contains "${capture_no_marker}" '^OBELISK_STRUCTURE_REFLECTION_BINARY
 assert_not_contains "${capture_no_marker}" '^OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT='
 assert_not_contains "${capture_no_marker}" '^OBELISK_STRUCTURE_REFLECTION_DISPATCH_LIMIT='
 assert_not_contains "${capture_no_marker}" '^OBELISK_ENABLE_CHAT_EVENTS='
+assert_not_contains "${capture_no_marker}" '^OBELISK_ENABLE_CHAT_ROUTE_OBSERVER='
+assert_not_contains "${capture_no_marker}" '^OBELISK_CHAT_ROUTE_OBSERVER_BINARY_SHA256='
+assert_not_contains "${capture_no_marker}" '^OBELISK_CHAT_ROUTE_OBSERVER_LIMIT='
 assert_not_contains "${capture_no_marker}" '^OBELISK_ENABLE_INVENTORY_REFLECTION='
 assert_not_contains "${capture_no_marker}" '^OBELISK_INVENTORY_REFLECTION_BINARY_SHA256='
 assert_not_contains "${capture_no_marker}" '^OBELISK_INVENTORY_REFLECTION_LOG_LIMIT='
@@ -215,6 +218,74 @@ assert_contains "${capture_chat_events}" '^OBELISK_CHAT_EVENTS_DISPATCH_LIMIT=1$
 assert_not_contains "${capture_chat_events}" '^OBELISK_ENABLE_CHAT_REFLECTION='
 assert_not_contains "${capture_chat_events}" '^OBELISK_CHAT_REFLECTION_BINARY_SHA256='
 assert_not_contains "${capture_chat_events}" '^OBELISK_CHAT_REFLECTION_LOG_LIMIT='
+
+root_chat_route="${TMP_DIR}/root-chat-route"
+capture_chat_route="${TMP_DIR}/chat-route.env"
+prepare_root "${root_chat_route}"
+: > "${root_chat_route}/state/instances/arkserver2/allow-observer-debug-window"
+: > "${root_chat_route}/state/instances/arkserver2/allow-experimental-observers"
+: > "${root_chat_route}/state/instances/arkserver2/enable-chat-route-observer"
+expect_wrapper_failure chat-route-marker-stable-profile env \
+    OBELISK_ROOT="${root_chat_route}" \
+    OBELISK_WRAPPER_CAPTURE="${TMP_DIR}/chat-route-marker-stable-profile.env" \
+    "${WRAPPER}" TheIsland?listen
+expect_wrapper_failure chat-route-marker-without-explicit-budget env \
+    OBELISK_ROOT="${root_chat_route}" \
+    OBELISK_WRAPPER_CAPTURE="${TMP_DIR}/chat-route-marker-without-explicit-budget.env" \
+    OBELISK_WRAPPER_PROFILE=observer-debug \
+    "${WRAPPER}" TheIsland?listen
+expect_wrapper_failure chat-route-marker-with-zero-budget env \
+    OBELISK_ROOT="${root_chat_route}" \
+    OBELISK_WRAPPER_CAPTURE="${TMP_DIR}/chat-route-marker-with-zero-budget.env" \
+    OBELISK_WRAPPER_PROFILE=observer-debug \
+    OBELISK_CHAT_ROUTE_OBSERVER_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
+    OBELISK_CHAT_ROUTE_OBSERVER_LIMIT=0 \
+    "${WRAPPER}" TheIsland?listen
+expect_wrapper_failure chat-route-marker-with-unsupported-sha env \
+    OBELISK_ROOT="${root_chat_route}" \
+    OBELISK_WRAPPER_CAPTURE="${TMP_DIR}/chat-route-marker-with-unsupported-sha.env" \
+    OBELISK_WRAPPER_PROFILE=observer-debug \
+    OBELISK_CHAT_ROUTE_OBSERVER_BINARY_SHA256=1111111111111111111111111111111111111111111111111111111111111111 \
+    OBELISK_CHAT_ROUTE_OBSERVER_LIMIT=1 \
+    "${WRAPPER}" TheIsland?listen
+(
+    cd "${RUN_CWD}"
+    OBELISK_ROOT="${root_chat_route}" \
+    OBELISK_WRAPPER_CAPTURE="${capture_chat_route}" \
+    OBELISK_WRAPPER_PROFILE=observer-debug \
+    OBELISK_CHAT_ROUTE_OBSERVER_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
+    OBELISK_CHAT_ROUTE_OBSERVER_LIMIT=2 \
+    "${WRAPPER}" TheIsland?listen
+)
+
+assert_contains "${capture_chat_route}" '^OBELISK_ENABLE_CHAT_ROUTE_OBSERVER=1$'
+assert_contains "${capture_chat_route}" '^OBELISK_CHAT_ROUTE_OBSERVER_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520$'
+assert_contains "${capture_chat_route}" '^OBELISK_CHAT_ROUTE_OBSERVER_LIMIT=2$'
+assert_not_contains "${capture_chat_route}" '^OBELISK_ENABLE_CHAT_EVENTS='
+assert_not_contains "${capture_chat_route}" '^OBELISK_ENABLE_CHAT_REFLECTION='
+
+root_chat_events_ragnarok="${TMP_DIR}/root-chat-events-ragnarok"
+capture_chat_events_ragnarok="${TMP_DIR}/chat-events-ragnarok.env"
+prepare_root "${root_chat_events_ragnarok}"
+mkdir -p "${root_chat_events_ragnarok}/state/instances/arkserver"
+: > "${root_chat_events_ragnarok}/state/instances/arkserver/allow-observer-debug-window"
+: > "${root_chat_events_ragnarok}/state/instances/arkserver/allow-experimental-observers"
+: > "${root_chat_events_ragnarok}/state/instances/arkserver/enable-chat-events"
+(
+    cd "${RUN_CWD}"
+    OBELISK_ROOT="${root_chat_events_ragnarok}" \
+    OBELISK_WRAPPER_CAPTURE="${capture_chat_events_ragnarok}" \
+    OBELISK_WRAPPER_PROFILE=observer-debug \
+    OBELISK_CHAT_EVENTS_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
+    OBELISK_CHAT_EVENTS_DISPATCH_LIMIT=1 \
+    "${WRAPPER}" Ragnarok?listen
+)
+
+assert_contains "${capture_chat_events_ragnarok}" '^OBELISK_INSTANCE_ID=arkserver$'
+assert_contains "${capture_chat_events_ragnarok}" '^OBELISK_ENABLE_CHAT_EVENTS=1$'
+assert_contains "${capture_chat_events_ragnarok}" '^OBELISK_CHAT_EVENTS_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520$'
+assert_contains "${capture_chat_events_ragnarok}" '^OBELISK_CHAT_EVENTS_DISPATCH_LIMIT=1$'
+assert_not_contains "${capture_chat_events_ragnarok}" '^OBELISK_ENABLE_CHAT_REFLECTION='
 
 root_ragnarok_stale="${TMP_DIR}/root-ragnarok-stale"
 capture_ragnarok_stale="${TMP_DIR}/ragnarok-stale.env"
@@ -320,6 +391,9 @@ prepare_root "${root_inherited}"
     OBELISK_CHAT_REFLECTION_BINARY_SHA256=bad-chat-sha \
     OBELISK_CHAT_REFLECTION_LOG_LIMIT=99 \
     OBELISK_CHAT_REFLECTION_LOG_TEXT=1 \
+    OBELISK_ENABLE_CHAT_ROUTE_OBSERVER=1 \
+    OBELISK_CHAT_ROUTE_OBSERVER_BINARY_SHA256=bad-chat-route-sha \
+    OBELISK_CHAT_ROUTE_OBSERVER_LIMIT=33 \
     OBELISK_ENABLE_INVENTORY_REFLECTION=1 \
     OBELISK_INVENTORY_REFLECTION_BINARY_SHA256=bad-inventory-sha \
     OBELISK_INVENTORY_REFLECTION_LOG_LIMIT=88 \
@@ -345,6 +419,7 @@ assert_not_contains "${capture_inherited}" '^OBELISK_ENABLE_DEBUG_CONTROL='
 assert_not_contains "${capture_inherited}" '^OBELISK_ENABLE_REFLECTION_SCANNER='
 assert_not_contains "${capture_inherited}" '^OBELISK_ENABLE_NATIVE_EXEC_PROBES='
 assert_not_contains "${capture_inherited}" '^OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS='
+assert_not_contains "${capture_inherited}" '^OBELISK_ALLOW_FILTERED_PROCESS_EVENT_CALLBACKS='
 assert_not_contains "${capture_inherited}" '^OBELISK_ALLOW_CALL_PROCESS_EVENT='
 assert_not_contains "${capture_inherited}" '^OBELISK_ALLOW_PROCESS_EVENT_BLOCKING='
 assert_not_contains "${capture_inherited}" '^OBELISK_PE_TRACE_LIMIT='
@@ -355,6 +430,9 @@ assert_not_contains "${capture_inherited}" '^OBELISK_ENABLE_CHAT_REFLECTION='
 assert_not_contains "${capture_inherited}" '^OBELISK_CHAT_REFLECTION_BINARY_SHA256='
 assert_not_contains "${capture_inherited}" '^OBELISK_CHAT_REFLECTION_LOG_LIMIT='
 assert_not_contains "${capture_inherited}" '^OBELISK_CHAT_REFLECTION_LOG_TEXT='
+assert_not_contains "${capture_inherited}" '^OBELISK_ENABLE_CHAT_ROUTE_OBSERVER='
+assert_not_contains "${capture_inherited}" '^OBELISK_CHAT_ROUTE_OBSERVER_BINARY_SHA256='
+assert_not_contains "${capture_inherited}" '^OBELISK_CHAT_ROUTE_OBSERVER_LIMIT='
 assert_not_contains "${capture_inherited}" '^OBELISK_ENABLE_INVENTORY_REFLECTION='
 assert_not_contains "${capture_inherited}" '^OBELISK_INVENTORY_REFLECTION_BINARY_SHA256='
 assert_not_contains "${capture_inherited}" '^OBELISK_INVENTORY_REFLECTION_LOG_LIMIT='

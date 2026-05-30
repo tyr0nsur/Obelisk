@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <iterator>
 #include <span>
 #include <string_view>
 #include <utility>
@@ -59,6 +60,14 @@ namespace Obelisk::Hooks::ProcessEventInventoryReflection
                HasObservationBudgetRemaining(dispatchCounter, dispatchLimit);
     }
 
+    bool ShouldAttemptDispatchObservation(const std::atomic<uint64_t>& dispatchCounter,
+                                          uint64_t dispatchLimit,
+                                          size_t subscriptionCount)
+    {
+        return subscriptionCount != 0 &&
+               HasObservationBudgetRemaining(dispatchCounter, dispatchLimit);
+    }
+
     bool ShouldAttemptNameObservation(int32_t nameIndex, uint64_t limit)
     {
         return ShouldAttemptObservation(limit) && IsReflectedInventoryNameIndex(nameIndex);
@@ -105,29 +114,176 @@ namespace Obelisk::Hooks::ProcessEventInventoryReflection
                                                    uint64_t limit,
                                                    uint64_t& observationNumber)
     {
+        CopiedInventoryPolicyEvent event;
+        return TryBuildAndReserveDispatchBudgetForMatchedAttempt(
+            attempt, counter, limit, observationNumber, event);
+    }
+
+    bool TryBuildAndReserveDispatchBudgetForMatchedAttempt(const Attempt& attempt,
+                                                           std::atomic<uint64_t>& counter,
+                                                           uint64_t limit,
+                                                           uint64_t& observationNumber,
+                                                           CopiedInventoryPolicyEvent& out)
+    {
         if (attempt.Status != AttemptStatus::Matched)
+        {
+            observationNumber = 0;
+            out = {};
+            return false;
+        }
+
+        if (!TryBuildCopiedInventoryPolicyEvent(attempt.Invocation, out))
         {
             observationNumber = 0;
             return false;
         }
-        return TryReserveObservationBudget(counter, limit, observationNumber);
+
+        if (!TryReserveObservationBudget(counter, limit, observationNumber))
+        {
+            out = {};
+            return false;
+        }
+        return true;
     }
 
     namespace
     {
-        Obelisk::Core::InventoryPolicyEventKind ToEventKind(
-            Obelisk::UE::InventoryReflection::InventoryFunction function)
+        constexpr int32_t kAllowRemoteAddToInventoryNameIndex = 6236;
+        constexpr int32_t kCanUseNameIndex = 6252;
+        constexpr int32_t kPrimalItemNameIndex = 6231;
+        constexpr int32_t kInvCompNameIndex = 18798;
+        constexpr int32_t kByPCNameIndex = 18797;
+        constexpr int32_t kBRequestedByPlayerNameIndex = 18796;
+        constexpr int32_t kReturnValueNameIndex = 17716;
+        constexpr int32_t kBIgnoreCooldownNameIndex = 18814;
+        constexpr int32_t kBoolPropertyClassNameIndex = 3;
+        constexpr int32_t kObjectPropertyClassNameIndex = 5;
+        constexpr int32_t kBoolPropertyClassObjectIndex = 532;
+        constexpr int32_t kObjectPropertyClassObjectIndex = 534;
+        constexpr uint64_t kBoolInputPropertyFlags = 0x1040000280;
+        constexpr uint64_t kBoolReturnPropertyFlags = 0x1040000780;
+        constexpr uint64_t kRemoteAddInventoryComponentPropertyFlags = 0x1044080280;
+        constexpr uint64_t kObjectInputPropertyFlags = 0x1040000280;
+
+        struct ExpectedPolicyField
+        {
+            Obelisk::UE::InventoryReflection::InventoryField SourceField;
+            int32_t PropertyNameIndex;
+            int32_t PropertyClassNameIndex;
+            int32_t PropertyClassObjectIndex;
+            uint64_t PropertyFlags;
+            int32_t Offset;
+            size_t Size;
+            bool ExposesRange;
+            Obelisk::Core::InventoryPolicyScalarField TargetField;
+        };
+
+        struct ExpectedPolicyShape
+        {
+            Obelisk::Core::InventoryPolicyEventKind Kind = Obelisk::Core::InventoryPolicyEventKind::CanUse;
+            const ExpectedPolicyField* Fields = nullptr;
+            size_t FieldCount = 0;
+            size_t ScalarCount = 0;
+        };
+
+        bool TryGetDispatchShape(Obelisk::UE::InventoryReflection::InventoryFunction function,
+                                 int32_t functionNameIndex,
+                                 int32_t outerNameIndex,
+                                 ExpectedPolicyShape& out)
         {
             using Obelisk::Core::InventoryPolicyEventKind;
+            using Obelisk::Core::InventoryPolicyScalarField;
             using Obelisk::UE::InventoryReflection::InventoryFunction;
+            using Obelisk::UE::InventoryReflection::InventoryField;
+            static constexpr ExpectedPolicyField kAllowRemoteAddFields[] = {
+                {InventoryField::InventoryComponent,
+                 kInvCompNameIndex,
+                 kObjectPropertyClassNameIndex,
+                 kObjectPropertyClassObjectIndex,
+                 kRemoteAddInventoryComponentPropertyFlags,
+                 0x00,
+                 sizeof(uint64_t),
+                 false,
+                 InventoryPolicyScalarField::BRequestedByPlayer},
+                {InventoryField::ByPC,
+                 kByPCNameIndex,
+                 kObjectPropertyClassNameIndex,
+                 kObjectPropertyClassObjectIndex,
+                 kObjectInputPropertyFlags,
+                 0x08,
+                 sizeof(uint64_t),
+                 false,
+                 InventoryPolicyScalarField::BRequestedByPlayer},
+                {InventoryField::BRequestedByPlayer,
+                 kBRequestedByPlayerNameIndex,
+                 kBoolPropertyClassNameIndex,
+                 kBoolPropertyClassObjectIndex,
+                 kBoolInputPropertyFlags,
+                 0x10,
+                 sizeof(uint8_t),
+                 true,
+                 InventoryPolicyScalarField::BRequestedByPlayer},
+                {InventoryField::ReturnValue,
+                 kReturnValueNameIndex,
+                 kBoolPropertyClassNameIndex,
+                 kBoolPropertyClassObjectIndex,
+                 kBoolReturnPropertyFlags,
+                 0x11,
+                 sizeof(uint8_t),
+                 true,
+                 InventoryPolicyScalarField::ReturnValue},
+            };
+            static constexpr ExpectedPolicyField kCanUseFields[] = {
+                {InventoryField::BIgnoreCooldown,
+                 kBIgnoreCooldownNameIndex,
+                 kBoolPropertyClassNameIndex,
+                 kBoolPropertyClassObjectIndex,
+                 kBoolInputPropertyFlags,
+                 0x00,
+                 sizeof(uint8_t),
+                 true,
+                 InventoryPolicyScalarField::BIgnoreCooldown},
+                {InventoryField::ReturnValue,
+                 kReturnValueNameIndex,
+                 kBoolPropertyClassNameIndex,
+                 kBoolPropertyClassObjectIndex,
+                 kBoolReturnPropertyFlags,
+                 0x01,
+                 sizeof(uint8_t),
+                 true,
+                 InventoryPolicyScalarField::ReturnValue},
+            };
+
+            out = {};
             switch (function)
             {
             case InventoryFunction::AllowRemoteAddToInventory:
-                return InventoryPolicyEventKind::AllowRemoteAddToInventory;
+                if (functionNameIndex != kAllowRemoteAddToInventoryNameIndex ||
+                    outerNameIndex != kPrimalItemNameIndex)
+                {
+                    return false;
+                }
+                out.Kind = InventoryPolicyEventKind::AllowRemoteAddToInventory;
+                out.Fields = kAllowRemoteAddFields;
+                out.FieldCount = std::size(kAllowRemoteAddFields);
+                out.ScalarCount = 2;
+                return true;
             case InventoryFunction::CanUse:
-                return InventoryPolicyEventKind::CanUse;
+                if (functionNameIndex != kCanUseNameIndex ||
+                    outerNameIndex != kPrimalItemNameIndex)
+                {
+                    return false;
+                }
+                out.Kind = InventoryPolicyEventKind::CanUse;
+                out.Fields = kCanUseFields;
+                out.FieldCount = std::size(kCanUseFields);
+                out.ScalarCount = 2;
+                return true;
+            case InventoryFunction::ServerRequestInventoryUseItem:
+            case InventoryFunction::ServerRequestInventoryUseItemWithActor:
+                return false;
             }
-            return InventoryPolicyEventKind::CanUse;
+            return false;
         }
 
         bool TryGetScalarField(Obelisk::UE::InventoryReflection::InventoryField source,
@@ -146,6 +302,10 @@ namespace Obelisk::Hooks::ProcessEventInventoryReflection
             case InventoryField::ReturnValue:
                 out = InventoryPolicyScalarField::ReturnValue;
                 return true;
+            case InventoryField::Actor:
+            case InventoryField::RedactedItemId:
+            case InventoryField::RedactedItemId1:
+            case InventoryField::AdditionalData:
             case InventoryField::InventoryComponent:
             case InventoryField::ByPC:
                 return false;
@@ -154,13 +314,31 @@ namespace Obelisk::Hooks::ProcessEventInventoryReflection
         }
 
         bool TryCopyScalar(const Obelisk::UE::InventoryReflection::InventoryFieldRange& field,
+                           const ExpectedPolicyField& expected,
                            Obelisk::Core::InventoryPolicyScalarValue& out)
         {
             Obelisk::Core::InventoryPolicyScalarField scalarField;
             if (!TryGetScalarField(field.Field, scalarField))
                 return false;
-            if (!field.ExposesRange || !field.Range.Data || field.Size != sizeof(uint8_t))
+            if (field.Field != expected.SourceField ||
+                field.PropertyNameIndex != expected.PropertyNameIndex ||
+                field.PropertyClassNameIndex != expected.PropertyClassNameIndex ||
+                field.PropertyClassObjectIndex != expected.PropertyClassObjectIndex ||
+                field.PropertyFlags != expected.PropertyFlags ||
+                field.Offset != expected.Offset ||
+                field.Size != expected.Size ||
+                scalarField != expected.TargetField)
+            {
                 return false;
+            }
+            if (!field.ExposesRange ||
+                !field.Range.Data ||
+                field.Range.Size != expected.Size ||
+                field.Size != sizeof(uint8_t) ||
+                !expected.ExposesRange)
+            {
+                return false;
+            }
 
             uint8_t value = 0;
             std::memcpy(&value, field.Range.Data, sizeof(value));
@@ -192,9 +370,20 @@ namespace Obelisk::Hooks::ProcessEventInventoryReflection
             Obelisk::UE::RuntimeReflection::MakeReadOptionsForBinary(gate.BinarySha256, true);
 
         Obelisk::UE::InventoryReflection::InventoryInvocation invocation;
-        Obelisk::UE::RuntimeReflection::ReadResult result =
-            Obelisk::UE::InventoryReflection::TryIdentifyInventoryInvocation(
+        Obelisk::UE::RuntimeReflection::ReadResult result;
+        try
+        {
+            result = Obelisk::UE::InventoryReflection::TryIdentifyInventoryInvocation(
                 reader, options, function, params, invocation);
+        }
+        catch (...)
+        {
+            return {
+                AttemptStatus::Rejected,
+                {Obelisk::UE::RuntimeReflection::ReadStatus::Implausible, {}},
+                {},
+            };
+        }
         if (!result)
             return {AttemptStatus::Rejected, std::move(result), {}};
 
@@ -206,33 +395,73 @@ namespace Obelisk::Hooks::ProcessEventInventoryReflection
         CopiedInventoryPolicyEvent& out)
     {
         out = {};
-        out.View.Kind = ToEventKind(invocation.Function);
-
-        for (const Obelisk::UE::InventoryReflection::InventoryFieldRange& field : invocation.Fields)
+        ExpectedPolicyShape expected;
+        if (!TryGetDispatchShape(invocation.Function,
+                                 invocation.FunctionNameIndex,
+                                 invocation.OuterNameIndex,
+                                 expected))
         {
-            Obelisk::Core::InventoryPolicyScalarValue scalar;
-            if (!TryCopyScalar(field, scalar))
-                continue;
-            if (out.ScalarCount >= out.ScalarStorage.size())
-                return false;
+            return false;
+        }
+        out.View.Kind = expected.Kind;
 
+        if (!invocation.HasParameterRanges)
+            return false;
+
+        if (!expected.Fields || invocation.Fields.size() != expected.FieldCount)
+            return false;
+
+        for (size_t fieldIndex = 0; fieldIndex < invocation.Fields.size(); ++fieldIndex)
+        {
+            const Obelisk::UE::InventoryReflection::InventoryFieldRange& field = invocation.Fields[fieldIndex];
+            const ExpectedPolicyField& expectedField = expected.Fields[fieldIndex];
+            if (field.Field != expectedField.SourceField ||
+                field.PropertyNameIndex != expectedField.PropertyNameIndex ||
+                field.PropertyClassNameIndex != expectedField.PropertyClassNameIndex ||
+                field.PropertyClassObjectIndex != expectedField.PropertyClassObjectIndex ||
+                field.PropertyFlags != expectedField.PropertyFlags ||
+                field.Offset != expectedField.Offset ||
+                field.Size != expectedField.Size ||
+                field.ExposesRange != expectedField.ExposesRange)
+            {
+                out = {};
+                return false;
+            }
+
+            if (!expectedField.ExposesRange)
+            {
+                if (field.Range.Data || field.Range.Size != 0)
+                {
+                    out = {};
+                    return false;
+                }
+                continue;
+            }
+
+            Obelisk::Core::InventoryPolicyScalarValue scalar;
+            if (out.ScalarCount >= out.ScalarStorage.size() ||
+                !TryCopyScalar(field, expectedField, scalar))
+            {
+                out = {};
+                return false;
+            }
             out.ScalarStorage[out.ScalarCount++] = scalar;
         }
 
         out.View.Scalars = std::span<const Obelisk::Core::InventoryPolicyScalarValue>(
             out.ScalarStorage.data(), out.ScalarCount);
+        if (out.ScalarCount != expected.ScalarCount)
+        {
+            out = {};
+            return false;
+        }
         return true;
     }
 
     namespace
     {
-        size_t DispatchCopiedInventoryPolicyEvent(
-            const Obelisk::UE::InventoryReflection::InventoryInvocation& invocation)
+        size_t DispatchCopiedInventoryPolicyEvent(const CopiedInventoryPolicyEvent& event)
         {
-            CopiedInventoryPolicyEvent event;
-            if (!TryBuildCopiedInventoryPolicyEvent(invocation, event))
-                return 0;
-
             return Obelisk::Core::InventoryPolicyEventDispatcher::Get().Dispatch(event.View);
         }
     }
@@ -244,6 +473,20 @@ namespace Obelisk::Hooks::ProcessEventInventoryReflection
         if (!originalWasCalled)
             return 0;
 
-        return DispatchCopiedInventoryPolicyEvent(invocation);
+        CopiedInventoryPolicyEvent event;
+        if (!TryBuildCopiedInventoryPolicyEvent(invocation, event))
+            return 0;
+
+        return DispatchCopiedInventoryPolicyEvent(event);
+    }
+
+    size_t MaybeDispatchCopiedInventoryPolicyEventAfterOriginal(
+        bool originalWasCalled,
+        const CopiedInventoryPolicyEvent& event)
+    {
+        if (!originalWasCalled)
+            return 0;
+
+        return DispatchCopiedInventoryPolicyEvent(event);
     }
 }
