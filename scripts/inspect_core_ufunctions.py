@@ -9,6 +9,7 @@ It reads an existing core file only and never attaches to a running process.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import struct
 import sys
@@ -57,6 +58,17 @@ def is_sha256_hex(value: str | None) -> bool:
         and len(value) == SHA256_HEX_LENGTH
         and all(char in "0123456789abcdefABCDEF" for char in value)
     )
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except OSError as exc:
+        raise SystemExit(f"--core is unreadable while verifying --evidence-artifact-sha256: {exc}") from exc
+    return digest.hexdigest()
 
 
 def reject_evidence_pack_manifest_core(path: Path) -> None:
@@ -1370,10 +1382,13 @@ def main() -> int:
     elif args.snapshot_json:
         if len(payload.get("targets", [])) != 1:
             raise SystemExit("--snapshot-json requires exactly one matched target")
+        observed_artifact_sha256 = sha256_file(core_path)
+        if args.evidence_artifact_sha256.lower() != observed_artifact_sha256:
+            raise SystemExit("--evidence-artifact-sha256 does not match --core contents")
         evidence = {
             "ark_binary_sha256": args.evidence_ark_sha256,
             "artifact_kind": args.evidence_artifact_kind,
-            "artifact_sha256": args.evidence_artifact_sha256,
+            "artifact_sha256": observed_artifact_sha256,
             "capture_id": args.evidence_capture_id,
             "evidence_pack_id": args.evidence_pack_id,
             "obelisk_commit": args.evidence_obelisk_commit,

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Hardened release and evidence gates so release readiness rejects production
+  `libobelisk.so` builds exposing test-only symbols, snapshot JSON verifies offline core
+  artifact SHA256, readiness reports carry target-set guidance, Plugin Hub contributor
+  routing starts from Foundation/Capability Matrix, and all public ABI version macros are
+  covered by versioning guardrails.
 - Hardened SDK/research guardrails so installed CMake ABI variables are derived from
   `ObeliskApi.h`, production-supported Plugin Hub seeds stay limited to safe core
   utilities, internal Transfer/Buff/Dino target guidance names its policy blockers, and

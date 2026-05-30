@@ -3294,6 +3294,29 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             with self.subTest(required=required):
                 self.assertIn(required, compact)
 
+    def test_public_contributor_docs_route_plugin_hub_through_foundation_and_matrix(self) -> None:
+        required_phrases = {
+            REPO_ROOT / "README.md": (
+                "Plugin Hub work starts with",
+                "docs/PLUGIN_HUB_FOUNDATION_V1.md",
+                "docs/PLUGIN_HUB_CAPABILITY_MATRIX.md",
+                "NextGenPlugins are held to the same demand-dictionary boundary",
+            ),
+            REPO_ROOT / "CONTRIBUTING.md": (
+                "Start Plugin Hub work from",
+                "docs/PLUGIN_HUB_FOUNDATION_V1.md",
+                "docs/PLUGIN_HUB_CAPABILITY_MATRIX.md",
+                "ArkServerApi, AseApi, and NextGenPlugins are names and demand dictionaries only",
+                "not sources for code, offsets, control flow, parsers, schemas, or implementation behavior",
+            ),
+        }
+
+        for path, phrases in required_phrases.items():
+            compact = normalized(path.read_text(encoding="utf-8"))
+            for phrase in phrases:
+                with self.subTest(file=path.relative_to(REPO_ROOT), phrase=phrase):
+                    self.assertIn(normalized(phrase), compact)
+
     def test_mission_plugin_hub_boundary_stays_planning_only(self) -> None:
         foundation = (REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md").read_text(
             encoding="utf-8"

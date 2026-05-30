@@ -5,11 +5,13 @@ Engine dedicated server processes.
 
 It aims to bring familiar ARK plugin concepts to Linux without porting Windows
 assumptions: runtime injection, UE event hooks, a stable plugin ABI,
-reflection-driven research tooling, and eventually reusable gameplay APIs.
+reflection-driven research tooling, and eventually promoted gameplay APIs.
 ArkServerApi/AseApi compatibility research is limited to a names and demand
 dictionary for familiar plugin concepts; it is not a behavior map, not a porting target,
 not a copying source, and not an implementation guide for offsets, layouts, ABI assumptions,
 wrappers, raw UE pointer APIs, command parsers, return semantics, or implementations.
+Local popular-plugin clones such as NextGenPlugins are held to the same demand-dictionary
+boundary.
 
 ARK: Survival Evolved is currently the debug harness used to validate Obelisk
 inside a real stripped UE4 Linux server. ARK/LinuxGSM details are validation
@@ -108,6 +110,10 @@ packaging/            Harness adapters and wrapper templates
 Plugin policy is documented in
 [docs/PLUGIN_ARCHITECTURE.md](docs/PLUGIN_ARCHITECTURE.md). The initial read-only
 operator CLI is documented in [docs/OPERATOR_CLI.md](docs/OPERATOR_CLI.md).
+Plugin Hub work starts with
+[docs/PLUGIN_HUB_FOUNDATION_V1.md](docs/PLUGIN_HUB_FOUNDATION_V1.md) and
+[docs/PLUGIN_HUB_CAPABILITY_MATRIX.md](docs/PLUGIN_HUB_CAPABILITY_MATRIX.md); those files
+define the current supported seed boundary before any new public SDK surface is proposed.
 
 ## Build And Test
 
@@ -521,7 +527,8 @@ Near-term engineering:
   validates the current field layout.
 - Harden the small SDK seed set for production contributors: installed package
   consumers, lifecycle/config examples, descriptors, process-local timers, and copied
-  event examples that do not rely on raw UE pointers.
+  event examples that stay inside the Plugin Hub Foundation and Capability Matrix instead
+  of relying on raw UE pointers or compatibility-source behavior.
 
 Later:
 

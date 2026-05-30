@@ -25,6 +25,14 @@ def header_define_value(header_text: str, macro: str) -> str:
     return match.group("value")
 
 
+def public_abi_version_macros(header_text: str) -> list[tuple[str, str]]:
+    return re.findall(
+        r"^\s*#define\s+(OBELISK_[A-Z0-9_]*ABI_VERSION)\s+([0-9]+)u\s*$",
+        header_text,
+        re.M,
+    )
+
+
 class VersioningGuardrailTests(unittest.TestCase):
     def test_public_docs_link_versioning_policy(self) -> None:
         for relative in ("README.md", "docs/STATUS.md", "docs/RELEASE.md"):
@@ -106,23 +114,16 @@ class VersioningGuardrailTests(unittest.TestCase):
 
         self.assertIn("freezes the current append-only `ObeliskApi` ABI v1", versioning)
 
-        for variable, macro, exported in (
-            ("OBELISK_API_ABI_VERSION", "OBELISK_API_ABI_VERSION", "Obelisk_API_ABI_VERSION"),
-            (
-                "OBELISK_PLUGIN_METADATA_ABI_VERSION",
-                "OBELISK_PLUGIN_METADATA_ABI_VERSION",
-                "Obelisk_PLUGIN_METADATA_ABI_VERSION",
-            ),
-            (
-                "OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION",
-                "OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION",
-                "Obelisk_PLUGIN_INIT_CONTEXT_ABI_VERSION",
-            ),
-        ):
-            with self.subTest(variable=variable):
-                self.assertTrue(cmake_derives_abi_version(cmake, variable))
+        header_abi_macros = public_abi_version_macros(header)
+        self.assertGreater(len(header_abi_macros), 0)
+
+        for macro, _version in header_abi_macros:
+            exported = macro.replace("OBELISK_", "Obelisk_", 1)
+            with self.subTest(variable=macro):
+                self.assertTrue(cmake_derives_abi_version(cmake, macro))
                 self.assertIsNotNone(header_define_value(header, macro))
-                self.assertIn(f"set({exported} @{variable}@)", config_template)
+                self.assertIn(f"set({exported} @{macro}@)", config_template)
+                self.assertIn(exported, versioning)
 
     def test_release_doc_does_not_claim_current_stable_release(self) -> None:
         text = (REPO_ROOT / "docs/RELEASE.md").read_text(encoding="utf-8")

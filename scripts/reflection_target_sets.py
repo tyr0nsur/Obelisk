@@ -118,7 +118,6 @@ PLANNING_ONLY_TARGET_SETS = frozenset(
     (
         "mission-copied-bool-policy-slice",
         "players-identity-lifecycle-intake",
-        "transfer-baccept-only-policy-slice",
     )
 )
 

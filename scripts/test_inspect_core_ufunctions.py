@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import struct
 import subprocess
 import sys
@@ -16,6 +17,10 @@ sys.path.insert(0, str(SCRIPT_DIR))
 import enumerate_core_uobjects as enum
 import inspect_core_ufunctions as inspector
 from test_scan_core_fname_tables import write_minimal_elf64_core
+
+
+def sha256_file(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def build_core_fixture(path: Path) -> dict[str, int]:
@@ -2075,6 +2080,109 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             core = Path(temp_dir) / "core"
             addrs = build_core_fixture(core)
+            core_sha256 = sha256_file(core)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "inspect_core_ufunctions.py"),
+                    "--core",
+                    str(core),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--name-exact",
+                    "BPAllowPlayerToLeaveMission",
+                    "--outer-exact",
+                    "MissionType",
+                    "--snapshot-json",
+                    "--evidence-ark-sha256",
+                    "f" * 64,
+                    "--evidence-artifact-sha256",
+                    core_sha256,
+                    "--evidence-capture-id",
+                    "fixture-capture",
+                    "--evidence-pack-id",
+                    "fixture-pack",
+                    "--evidence-obelisk-commit",
+                    "fixture-commit",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["evidence"]["ark_binary_sha256"], "f" * 64)
+        self.assertEqual(payload["evidence"]["artifact_kind"], "offline_core")
+        self.assertEqual(payload["evidence"]["artifact_sha256"], core_sha256)
+        self.assertEqual(payload["evidence"]["capture_id"], "fixture-capture")
+        self.assertEqual(payload["evidence"]["evidence_pack_id"], "fixture-pack")
+        self.assertEqual(payload["evidence"]["obelisk_commit"], "fixture-commit")
+        self.assertEqual(payload["evidence"]["source"], "offline_core")
+        self.assertEqual(payload["evidence"]["status"], "candidate-only")
+        self.assertEqual(payload["targets"][0]["target"]["name"], "BPAllowPlayerToLeaveMission")
+        self.assertNotIn(str(core), result.stdout)
+        self.assertNotIn(hex(addrs["bp_allow_player_leave_function"]), result.stdout)
+        self.assertNotIn(hex(addrs["leave_player_character_property"]), result.stdout)
+        self.assertNotIn(hex(addrs["gobjects"]), result.stdout)
+        self.assertNotIn(hex(addrs["fname_table"]), result.stdout)
+
+    def test_cli_documented_structure_snapshot_flags_stay_supported(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            core = Path(temp_dir) / "core"
+            addrs = build_core_fixture(core)
+            core_sha256 = sha256_file(core)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "inspect_core_ufunctions.py"),
+                    "--core",
+                    str(core),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--outer-exact",
+                    "PrimalStructure",
+                    "--name-exact",
+                    "AllowStructureAccess",
+                    "--inspection-mode",
+                    "ufunction",
+                    "--snapshot-json",
+                    "--evidence-ark-sha256",
+                    "1" * 64,
+                    "--evidence-artifact-sha256",
+                    core_sha256,
+                    "--evidence-artifact-kind",
+                    "offline_core",
+                    "--evidence-capture-id",
+                    "fixture-structure-capture",
+                    "--evidence-pack-id",
+                    "fixture-structure-pack",
+                    "--evidence-obelisk-commit",
+                    "fixture-commit",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["schema"], "obelisk.ufunction-chain.snapshot.v1")
+        self.assertEqual(payload["evidence"]["artifact_kind"], "offline_core")
+        self.assertEqual(payload["evidence"]["ark_binary_sha256"], "1" * 64)
+        self.assertEqual(payload["evidence"]["artifact_sha256"], core_sha256)
+        self.assertEqual(payload["targets"][0]["target"]["outer_name"], "PrimalStructure")
+        self.assertEqual(payload["targets"][0]["target"]["name"], "AllowStructureAccess")
+        self.assertEqual(payload["targets"][0]["inspection_mode"], "ufunction")
+        self.assertNotIn(str(core), result.stdout)
+        self.assertNotIn(hex(addrs["allow_structure_access_function"]), result.stdout)
+
+    def test_cli_snapshot_json_rejects_artifact_sha_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            core = Path(temp_dir) / "core"
+            addrs = build_core_fixture(core)
             result = subprocess.run(
                 [
                     sys.executable,
@@ -2101,81 +2209,18 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
                     "--evidence-obelisk-commit",
                     "fixture-commit",
                 ],
-                check=True,
                 capture_output=True,
                 text=True,
             )
 
-        payload = json.loads(result.stdout)
-        self.assertEqual(payload["evidence"]["ark_binary_sha256"], "f" * 64)
-        self.assertEqual(payload["evidence"]["artifact_kind"], "offline_core")
-        self.assertEqual(payload["evidence"]["artifact_sha256"], "0" * 64)
-        self.assertEqual(payload["evidence"]["capture_id"], "fixture-capture")
-        self.assertEqual(payload["evidence"]["evidence_pack_id"], "fixture-pack")
-        self.assertEqual(payload["evidence"]["obelisk_commit"], "fixture-commit")
-        self.assertEqual(payload["evidence"]["source"], "offline_core")
-        self.assertEqual(payload["evidence"]["status"], "candidate-only")
-        self.assertEqual(payload["targets"][0]["target"]["name"], "BPAllowPlayerToLeaveMission")
-        self.assertNotIn(str(core), result.stdout)
-        self.assertNotIn(hex(addrs["bp_allow_player_leave_function"]), result.stdout)
-        self.assertNotIn(hex(addrs["leave_player_character_property"]), result.stdout)
-        self.assertNotIn(hex(addrs["gobjects"]), result.stdout)
-        self.assertNotIn(hex(addrs["fname_table"]), result.stdout)
-
-    def test_cli_documented_structure_snapshot_flags_stay_supported(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            core = Path(temp_dir) / "core"
-            addrs = build_core_fixture(core)
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(SCRIPT_DIR / "inspect_core_ufunctions.py"),
-                    "--core",
-                    str(core),
-                    "--gobjects",
-                    hex(addrs["gobjects"]),
-                    "--fname-root-slot",
-                    hex(addrs["fname_root_slot"]),
-                    "--outer-exact",
-                    "PrimalStructure",
-                    "--name-exact",
-                    "AllowStructureAccess",
-                    "--inspection-mode",
-                    "ufunction",
-                    "--snapshot-json",
-                    "--evidence-ark-sha256",
-                    "1" * 64,
-                    "--evidence-artifact-sha256",
-                    "2" * 64,
-                    "--evidence-artifact-kind",
-                    "offline_core",
-                    "--evidence-capture-id",
-                    "fixture-structure-capture",
-                    "--evidence-pack-id",
-                    "fixture-structure-pack",
-                    "--evidence-obelisk-commit",
-                    "fixture-commit",
-                ],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-
-        payload = json.loads(result.stdout)
-        self.assertEqual(payload["schema"], "obelisk.ufunction-chain.snapshot.v1")
-        self.assertEqual(payload["evidence"]["artifact_kind"], "offline_core")
-        self.assertEqual(payload["evidence"]["ark_binary_sha256"], "1" * 64)
-        self.assertEqual(payload["evidence"]["artifact_sha256"], "2" * 64)
-        self.assertEqual(payload["targets"][0]["target"]["outer_name"], "PrimalStructure")
-        self.assertEqual(payload["targets"][0]["target"]["name"], "AllowStructureAccess")
-        self.assertEqual(payload["targets"][0]["inspection_mode"], "ufunction")
-        self.assertNotIn(str(core), result.stdout)
-        self.assertNotIn(hex(addrs["allow_structure_access_function"]), result.stdout)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--evidence-artifact-sha256 does not match --core contents", result.stderr)
 
     def test_cli_script_struct_mode_emits_script_struct_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             core = Path(temp_dir) / "core"
             addrs = build_core_fixture(core)
+            core_sha256 = sha256_file(core)
             result = subprocess.run(
                 [
                     sys.executable,
@@ -2196,7 +2241,7 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
                     "--evidence-ark-sha256",
                     "3" * 64,
                     "--evidence-artifact-sha256",
-                    "4" * 64,
+                    core_sha256,
                     "--evidence-capture-id",
                     "fixture-scriptstruct-capture",
                     "--evidence-pack-id",

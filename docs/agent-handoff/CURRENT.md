@@ -65,8 +65,8 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   broad module SDK claim.
 - Plugin unload/init-failure cleanup skips `dlclose` when callback cleanup cannot be
   proven complete, retains the plugin for retry, does not repeat plugin shutdown, leaves
-  mapped on retention failure, and keeps manager/dispatcher test hooks out of production
-  `libobelisk.so`.
+  mapped on retention failure, and release readiness rejects production `libobelisk.so`
+  builds exposing manager/dispatcher test-only symbols.
 - `oProcessTimer` is the first process-local timer example. Timer ids are process-local,
   not cluster state, UE identity, gameplay/module timer abstractions, or persistent
   handles, or shared scheduler state; owner-token timers require explicit unregister.
@@ -138,7 +138,7 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   execution is still blocked until an operator-approved live-ops brief names the exact
   debug target, gates, window, rollback, artifacts, and posture checks. Do not replace
   this with another broad offline FName/GObjects scan.
-- Transfer ScriptStruct bool-tail evidence has a refreshed local root; old 20260529
+- Transfer ScriptStruct/bAccept evidence has refreshed internal-layout roots; old 20260529
   transfer roots are stale. Transfer scalar/bool fields are redacted metadata only; gates
   detect Transfer structs without labels and require transfer blockers on every field.
 - `validate_offline_artifact_gate.py` consumes `obelisk.artifact-pack.manifest.v1`
@@ -148,10 +148,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - UFunction target-set listing and release-gate option parsing are classified as
   `release_readiness`, `planning_only`, or `internal_layout_only`; promotion accepts only
   explicit release-readiness sets, rejects explicit `--target` widening outside named
-  target sets, and reports internal/layout-only gaps as `target_set_not_release_readiness`.
-- Offline artifact JSON manifests, provenance sidecars, artifact checksum reads, and
-  core inspector inputs use no-symlink regular-file opens after protected-path prechecks;
-  relative manifest/provenance/resource-handle core paths resolve against their sidecar before protected-root checks.
+  target sets, reports target-set guidance in readiness JSON, and marks internal/layout-only gaps as `target_set_not_release_readiness`.
+- Offline artifact JSON manifests, provenance sidecars, artifact checksum reads, and core inspector inputs use no-symlink regular-file opens after protected-path prechecks; relative
+  manifest/provenance/resource-handle core paths resolve against their sidecar, and
+  `--snapshot-json` verifies the observed offline core SHA256 before emitting evidence.
 - `scripts/check_static_tooling.py` records optional radare2/rizin/Ghidra availability and
   runs smoke checks only on approved offline binaries/output roots.
 - `APrimalStructure.IsAllowedToBuild` is second-wave only: no committed snapshot,

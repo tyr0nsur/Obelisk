@@ -24,6 +24,15 @@ PUBLIC_RC_UFUNCTION_SECOND_SOURCE_TARGET_SETS=(
     "item-return-only-policy-slice"
     "chat-message-intake"
 )
+PRODUCTION_FORBIDDEN_SYMBOL_PATTERNS=(
+    "ForTesting"
+    "SetNextRegistrationIdForTesting"
+    "ApiCapabilitiesForTesting"
+    "SetNextTimerIdForTesting"
+    "SetPluginCallbackCleanupFailure"
+    "SetPluginRetentionFailure"
+    "ClearPluginOwnerLifecycle"
+)
 
 is_under_path() {
     local path="$1"
@@ -660,9 +669,40 @@ check_clean_tree() {
     fi
 }
 
+check_production_runtime_symbols() {
+    local runtime_library="${BUILD_DIR}/libobelisk.so"
+
+    if [[ ! -f "${runtime_library}" ]]; then
+        printf 'Production runtime library missing after build: %s\n' "${runtime_library}" >&2
+        exit 1
+    fi
+    if ! command -v nm >/dev/null 2>&1; then
+        echo "Release readiness requires nm to inspect production libobelisk.so symbols." >&2
+        exit 1
+    fi
+
+    local symbol_dump
+    symbol_dump="$(nm -C "${runtime_library}")"
+
+    local pattern
+    local forbidden_matches=""
+    for pattern in "${PRODUCTION_FORBIDDEN_SYMBOL_PATTERNS[@]}"; do
+        if grep -F -- "${pattern}" <<<"${symbol_dump}" >/dev/null; then
+            forbidden_matches+="${pattern}"$'\n'
+        fi
+    done
+
+    if [[ -n "${forbidden_matches}" ]]; then
+        printf 'Production libobelisk.so exposes test-only/internal symbols:\n%s' \
+            "${forbidden_matches}" >&2
+        exit 1
+    fi
+}
+
 check_clean_tree
 run_step cmake -S . -B "${BUILD_DIR}" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DOBELISK_BUILD_EXPERIMENTAL_PLUGINS=OFF
 run_step cmake --build "${BUILD_DIR}" -j"${JOBS}"
+run_step check_production_runtime_symbols
 run_step ctest --test-dir "${BUILD_DIR}" --output-on-failure
 run_step scripts/run_script_tests.sh
 if [[ "${REQUIRE_SECOND_SOURCE_READINESS}" == "1" ]]; then

@@ -87,6 +87,7 @@ TARGET_BLOCKER_GUIDANCE = {
         "why_blocked": [
             "missing_committed_sanitized_snapshot",
             "missing_distinct_second_source_layout",
+            "target_set_coverage_blocked",
             "placement_struct_redaction_policy_unproven",
             "build_denial_return_override_policy_blocked",
         ],
@@ -117,6 +118,7 @@ TARGET_BLOCKER_GUIDANCE = {
             "missing_committed_sanitized_snapshot",
             "missing_distinct_second_source_layout",
             "reflected_owner_unproven",
+            "target_set_coverage_blocked",
             "placement_struct_redaction_policy_unproven",
             "build_denial_return_override_policy_blocked",
         ],
@@ -231,6 +233,7 @@ TARGET_SET_BLOCKER_GUIDANCE = {
     "transfer-baccept-only-policy-slice": {
         "classification": "internal_transfer_baccept_policy_candidate",
         "why_blocked": [
+            "internal_layout_evidence_only",
             "policy_slice_evidence_only",
             "not_release_readiness_target",
             "missing_distinct_second_source_layout",
@@ -1453,6 +1456,7 @@ def main() -> int:
             target_filters=target_filters,
             candidate=candidate,
         )
+        report["target_set_guidance"] = target_set_guidance_report(args.target_set)
         if args.fail_on_readiness_gaps:
             report["gate_mode"] = "second_source_promotion"
         elif args.fail_on_base_readiness_gaps:

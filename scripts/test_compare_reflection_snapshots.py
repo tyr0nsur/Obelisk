@@ -247,6 +247,8 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertIs(release_flags["mission-copied-bool-policy-slice"], False)
         self.assertEqual(classifications["players-identity-lifecycle-intake"], "planning_only")
         self.assertIs(release_flags["players-identity-lifecycle-intake"], False)
+        self.assertEqual(classifications["transfer-baccept-only-policy-slice"], "internal_layout_only")
+        self.assertIs(release_flags["transfer-baccept-only-policy-slice"], False)
         self.assertEqual(classifications["transfer-scriptstruct"], "internal_layout_only")
         self.assertIs(release_flags["transfer-scriptstruct"], False)
         self.assertEqual(
@@ -373,19 +375,7 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild",
             "obelisk.ufunction-chain.snapshot.v1:APrimalStructure.IsAllowedToBuild",
         }
-        guarded_target_sets = {
-            "minimal-second-source-intake",
-            "structure-observer-intake",
-            "chat-message-intake",
-            "buff-compact-intake",
-            "dino-compact-intake",
-            "item-compact-intake",
-            "inventory-action-compact-intake",
-            "mission-compact-intake",
-            "tribe-compact-intake",
-        }
-        self.assertTrue(guarded_target_sets.issubset(set(sets)))
-        for target_set in guarded_target_sets:
+        for target_set in sets:
             with self.subTest(target_set=target_set):
                 self.assertTrue(forbidden_targets.isdisjoint(set(sets[target_set])))
 
@@ -423,6 +413,7 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(primal_guidance["classification"], "second_wave_structure_build_policy_candidate")
         self.assertIn("missing_committed_sanitized_snapshot", primal_guidance["why_blocked"])
         self.assertIn("missing_distinct_second_source_layout", primal_guidance["why_blocked"])
+        self.assertIn("target_set_coverage_blocked", primal_guidance["why_blocked"])
         self.assertIn("approved non-protected copied/offline core", primal_guidance["next_offline_input"])
         self.assertIn(
             "emit exact schema-qualified target obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild",
@@ -595,6 +586,7 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(transfer["classification"], "internal_transfer_baccept_policy_candidate")
         self.assertIn("not_release_readiness_target", transfer["why_blocked"])
         self.assertIn("public_transfer_sdk_blocked", transfer["why_blocked"])
+        self.assertIn("internal_layout_evidence_only", transfer["why_blocked"])
         self.assertIn("Transfer SDK", transfer["non_claim"])
         self.assertIn("transfer payload decoding", transfer["non_claim"])
         self.assertIn(
@@ -2242,6 +2234,14 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         report = json.loads(result.stdout)
         self.assertEqual(report["gate_mode"], "second_source_promotion")
         self.assertEqual(report["target_sets"], [target_set])
+        self.assertEqual(len(report["target_set_guidance"]), 1)
+        guidance = report["target_set_guidance"][0]
+        self.assertEqual(guidance["target_set"], target_set)
+        self.assertEqual(guidance["classification"], "internal_mission_copied_bool_policy_candidate")
+        self.assertIn("consume_mode_only", guidance["why_blocked"])
+        self.assertIn("promote_mode_blocked", guidance["why_blocked"])
+        self.assertIn("Mission SDK", guidance["non_claim"])
+        self.assertIn("runtime hooks", guidance["non_claim"])
         self.assertEqual(report["totals"]["targets"], 3)
         self.assertEqual(report["totals"]["second_source_accepted"], 3)
         self.assertEqual(
@@ -2282,6 +2282,15 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         report = json.loads(result.stdout)
         self.assertEqual(report["gate_mode"], "second_source_promotion")
         self.assertEqual(report["target_sets"], [target_set])
+        self.assertEqual(len(report["target_set_guidance"]), 1)
+        guidance = report["target_set_guidance"][0]
+        self.assertEqual(guidance["target_set"], target_set)
+        self.assertEqual(guidance["classification"], "release_gameplay_policy_item_return_only")
+        self.assertIn("standalone_items_inventory_sdk_blocked", guidance["why_blocked"])
+        self.assertIn("GameplayPolicyEvent copied-scalar lane only", " ".join(guidance["snapshot_prep_checks"]))
+        self.assertIn("Items SDK", guidance["non_claim"])
+        self.assertIn("Inventory SDK", guidance["non_claim"])
+        self.assertIn("runtime validation", guidance["non_claim"])
         self.assertEqual(report["totals"]["second_source_accepted"], 4)
         self.assertEqual(
             report["promotion_gate"],
@@ -2324,13 +2333,21 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         report = json.loads(result.stdout)
         self.assertEqual(report["gate_mode"], "second_source_promotion")
         self.assertEqual(report["target_sets"], [target_set])
+        self.assertEqual(len(report["target_set_guidance"]), 1)
+        guidance = report["target_set_guidance"][0]
+        self.assertEqual(guidance["target_set"], target_set)
+        self.assertEqual(guidance["classification"], "internal_transfer_baccept_policy_candidate")
+        self.assertIn("internal_layout_evidence_only", guidance["why_blocked"])
+        self.assertIn("policy_slice_evidence_only", guidance["why_blocked"])
+        self.assertIn("Transfer SDK", guidance["non_claim"])
+        self.assertIn("runtime hooks", guidance["non_claim"])
         self.assertEqual(report["totals"]["targets"], 1)
         self.assertEqual(report["totals"]["second_source_accepted"], 1)
         self.assertEqual(
             report["promotion_gate"],
             {
                 "ready": False,
-                "ready_scope": "planning_only",
+                "ready_scope": "internal_layout_only",
                 "layout_ready": True,
                 "promotion_ready": False,
                 "blockers": [{"reason": "target_set_not_release_readiness", "count": 1}],

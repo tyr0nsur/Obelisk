@@ -737,7 +737,6 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         blocked_cases = [
             ("--ufunction-second-source-target-set", "players-identity-lifecycle-intake", "UFunction"),
             ("--ufunction-second-source-target-set", "mission-copied-bool-policy-slice", "UFunction"),
-            ("--ufunction-second-source-target-set", "transfer-baccept-only-policy-slice", "UFunction"),
             ("--ufunction-second-source-target-set", "nextgen-plugin-hub-planning", "UFunction"),
             ("--scriptstruct-second-source-target-set", "plugin-hub-planning", "ScriptStruct"),
         ]
@@ -767,6 +766,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         blocked_cases = [
             ("--ufunction-second-source-target-set", "buff-compact-intake", "UFunction"),
             ("--ufunction-second-source-target-set", "transfer-ufunction-intake", "UFunction"),
+            ("--ufunction-second-source-target-set", "transfer-baccept-only-policy-slice", "UFunction"),
             ("--scriptstruct-second-source-target-set", "transfer-scriptstruct", "ScriptStruct"),
         ]
 

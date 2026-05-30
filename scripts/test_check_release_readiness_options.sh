@@ -188,6 +188,39 @@ if ! grep -Fq -- 'SECOND_SOURCE_REPORT_DIR="${RELEASE_CHECK_ROOT}/second-source-
     exit 1
 fi
 
+production_symbol_function="$(sed -n '/^check_production_runtime_symbols()/,/^}/p' scripts/check_release_readiness.sh)"
+if [[ -z "${production_symbol_function}" ]]; then
+    printf 'missing production runtime symbol guard\n' >&2
+    exit 1
+fi
+for expected in \
+    'nm -C "${runtime_library}"' \
+    'PRODUCTION_FORBIDDEN_SYMBOL_PATTERNS[@]' \
+    'Production libobelisk.so exposes test-only/internal symbols'; do
+    if ! grep -Fq -- "${expected}" <<<"${production_symbol_function}"; then
+        printf 'missing production symbol guard logic: %s\n%s\n' \
+            "${expected}" "${production_symbol_function}" >&2
+        exit 1
+    fi
+done
+for expected in \
+    "ForTesting" \
+    "SetNextRegistrationIdForTesting" \
+    "ApiCapabilitiesForTesting" \
+    "SetNextTimerIdForTesting" \
+    "SetPluginCallbackCleanupFailure" \
+    "SetPluginRetentionFailure" \
+    "ClearPluginOwnerLifecycle"; do
+    if ! grep -Fq -- "\"${expected}\"" scripts/check_release_readiness.sh; then
+        printf 'missing forbidden production symbol pattern: %s\n' "${expected}" >&2
+        exit 1
+    fi
+done
+if ! grep -Fq -- 'run_step check_production_runtime_symbols' scripts/check_release_readiness.sh; then
+    printf 'release readiness must run the production symbol guard after build\n' >&2
+    exit 1
+fi
+
 second_source_report_dir_default_block="$(
     awk '
         /^if \[\[ "\$\{REQUIRE_SECOND_SOURCE_READINESS\}" == "1" && -z "\$\{SECOND_SOURCE_REPORT_DIR\}" \]\]; then/ { printing = 1 }
