@@ -31,6 +31,7 @@ namespace
     constexpr int32_t kObjectPropertyClassObjectIndex = 534;
     constexpr int32_t kArrayPropertyClassObjectIndex = 528;
     constexpr int32_t kFunctionClassObjectIndex = 518;
+    constexpr int32_t kMissionTypeObjectIndex = 179;
     constexpr int32_t kControllerNameIndex = 5908;
     constexpr int32_t kCharacterNameIndex = 7990;
     constexpr int32_t kPlayerNameIndex = 9972;
@@ -208,7 +209,7 @@ namespace
                        const std::array<FieldDef, 4>& fields)
     {
         InitClasses(fixture);
-        WriteObject(fixture.Outer, kMissionTypeNameIndex, kMissionTypeNameIndex, nullptr, nullptr);
+        WriteObject(fixture.Outer, kMissionTypeNameIndex, kMissionTypeObjectIndex, nullptr, nullptr);
         WriteObject(fixture.Function,
                     functionNameIndex,
                     functionNameIndex,
@@ -1037,6 +1038,17 @@ namespace
             CopiedMissionObservation observation;
             Require(!TryBuildCopiedMissionObservation(attempt.Invocation, observation),
                     "copied mission bool count below expected was accepted");
+        }
+        {
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+            fixture.Params[0x08] = 2;
+            fixture.Params[0x09] = 1;
+            Attempt attempt = Identify(fixture, kAddPlayerToMissionNameIndex);
+
+            CopiedMissionObservation observation;
+            Require(!TryBuildCopiedMissionObservation(attempt.Invocation, observation),
+                    "copied mission bool byte above one was normalized to true");
         }
     }
 

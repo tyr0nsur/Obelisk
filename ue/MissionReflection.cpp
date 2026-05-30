@@ -17,6 +17,11 @@ namespace Obelisk::UE::MissionReflection
         constexpr int32_t kObjectPropertyClassNameIndex = 5;
         constexpr int32_t kArrayPropertyClassNameIndex = 9;
         constexpr int32_t kFunctionClassNameIndex = 10650;
+        constexpr int32_t kMissionTypeObjectIndex = 179;
+        constexpr int32_t kArrayPropertyClassObjectIndex = 528;
+        constexpr int32_t kBoolPropertyClassObjectIndex = 532;
+        constexpr int32_t kObjectPropertyClassObjectIndex = 534;
+        constexpr int32_t kFunctionClassObjectIndex = 518;
 
         constexpr int32_t kControllerNameIndex = 5908;
         constexpr int32_t kCharacterNameIndex = 7990;
@@ -44,6 +49,7 @@ namespace Obelisk::UE::MissionReflection
             int32_t Offset;
             size_t Size;
             int32_t ClassNameIndex;
+            int32_t ClassObjectIndex;
             uint64_t PropertyFlags;
             bool ExposesRange;
         };
@@ -53,6 +59,7 @@ namespace Obelisk::UE::MissionReflection
             MissionFunction Function;
             int32_t NameIndex;
             int32_t OuterNameIndex;
+            int32_t OuterObjectIndex;
             uint16_t NumParms;
             uint16_t ParmsSize;
             uint16_t ReturnValueOffset;
@@ -67,6 +74,7 @@ namespace Obelisk::UE::MissionReflection
              0x00,
              kObjectPropertySize,
              kObjectPropertyClassNameIndex,
+             kObjectPropertyClassObjectIndex,
              kObjectInputPropertyFlags,
              false},
             {MissionField::OutItemIDs,
@@ -74,6 +82,7 @@ namespace Obelisk::UE::MissionReflection
              0x08,
              kArrayPropertySize,
              kArrayPropertyClassNameIndex,
+             kArrayPropertyClassObjectIndex,
              kArrayOutPropertyFlags,
              false},
         }};
@@ -84,6 +93,7 @@ namespace Obelisk::UE::MissionReflection
              0x00,
              kObjectPropertySize,
              kObjectPropertyClassNameIndex,
+             kObjectPropertyClassObjectIndex,
              kObjectInputPropertyFlags,
              false},
             {MissionField::BForceAdd,
@@ -91,6 +101,7 @@ namespace Obelisk::UE::MissionReflection
              0x08,
              kBoolPropertySize,
              kBoolPropertyClassNameIndex,
+             kBoolPropertyClassObjectIndex,
              kBoolInputPropertyFlags,
              true},
             {MissionField::ReturnValue,
@@ -98,6 +109,7 @@ namespace Obelisk::UE::MissionReflection
              0x09,
              kBoolPropertySize,
              kBoolPropertyClassNameIndex,
+             kBoolPropertyClassObjectIndex,
              kBoolReturnPropertyFlags,
              true},
         }};
@@ -108,6 +120,7 @@ namespace Obelisk::UE::MissionReflection
              0x00,
              kObjectPropertySize,
              kObjectPropertyClassNameIndex,
+             kObjectPropertyClassObjectIndex,
              kObjectInputPropertyFlags,
              false},
             {MissionField::ReturnValue,
@@ -115,6 +128,7 @@ namespace Obelisk::UE::MissionReflection
              0x08,
              kBoolPropertySize,
              kBoolPropertyClassNameIndex,
+             kBoolPropertyClassObjectIndex,
              kBoolReturnPropertyFlags,
              true},
         }};
@@ -125,6 +139,7 @@ namespace Obelisk::UE::MissionReflection
              0x00,
              kObjectPropertySize,
              kObjectPropertyClassNameIndex,
+             kObjectPropertyClassObjectIndex,
              kObjectInputPropertyFlags,
              false},
             {MissionField::Controller,
@@ -132,6 +147,7 @@ namespace Obelisk::UE::MissionReflection
              0x08,
              kObjectPropertySize,
              kObjectPropertyClassNameIndex,
+             kObjectPropertyClassObjectIndex,
              kObjectInputPropertyFlags,
              false},
             {MissionField::BFromMissionCompleteEvent,
@@ -139,6 +155,7 @@ namespace Obelisk::UE::MissionReflection
              0x10,
              kBoolPropertySize,
              kBoolPropertyClassNameIndex,
+             kBoolPropertyClassObjectIndex,
              kBoolInputPropertyFlags,
              true},
             {MissionField::BLastPhaseSuccess,
@@ -146,6 +163,7 @@ namespace Obelisk::UE::MissionReflection
              0x11,
              kBoolPropertySize,
              kBoolPropertyClassNameIndex,
+             kBoolPropertyClassObjectIndex,
              kBoolInputPropertyFlags,
              true},
         }};
@@ -154,6 +172,7 @@ namespace Obelisk::UE::MissionReflection
             MissionFunction::GetPlayerUsableItems,
             kGetPlayerUsableItemsNameIndex,
             kMissionTypeNameIndex,
+            kMissionTypeObjectIndex,
             2,
             0x18,
             0xffff,
@@ -166,6 +185,7 @@ namespace Obelisk::UE::MissionReflection
             MissionFunction::AddPlayerToMission,
             kAddPlayerToMissionNameIndex,
             kMissionTypeNameIndex,
+            kMissionTypeObjectIndex,
             3,
             0x0a,
             0x09,
@@ -178,6 +198,7 @@ namespace Obelisk::UE::MissionReflection
             MissionFunction::BPAllowPlayerToLeaveMission,
             kBPAllowPlayerToLeaveMissionNameIndex,
             kMissionTypeNameIndex,
+            kMissionTypeObjectIndex,
             2,
             0x09,
             0x08,
@@ -190,6 +211,7 @@ namespace Obelisk::UE::MissionReflection
             MissionFunction::BPOnPlayerRemovedFromMission,
             kBPOnPlayerRemovedFromMissionNameIndex,
             kMissionTypeNameIndex,
+            kMissionTypeObjectIndex,
             4,
             0x12,
             0xffff,
@@ -243,10 +265,11 @@ namespace Obelisk::UE::MissionReflection
             if (!result)
                 return result;
 
-            if (functionClass.NamePrivate.ComparisonIndex != kFunctionClassNameIndex ||
+            if (functionClass.InternalIndex != kFunctionClassObjectIndex ||
+                functionClass.NamePrivate.ComparisonIndex != kFunctionClassNameIndex ||
                 functionClass.NamePrivate.Number != 0)
                 return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
-                                                           "mission UFunction class FName mismatch");
+                                                           "mission UFunction class identity mismatch");
             return RuntimeReflection::ReadResult::Ok();
         }
 
@@ -290,10 +313,11 @@ namespace Obelisk::UE::MissionReflection
             if (!result)
                 return result;
 
-            if (outer.NamePrivate.ComparisonIndex != spec.OuterNameIndex ||
+            if (outer.InternalIndex != spec.OuterObjectIndex ||
+                outer.NamePrivate.ComparisonIndex != spec.OuterNameIndex ||
                 outer.NamePrivate.Number != 0)
                 return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
-                                                           "mission UFunction outer FName mismatch");
+                                                           "mission UFunction outer identity mismatch");
             return RuntimeReflection::ReadResult::Ok();
         }
 
@@ -312,10 +336,11 @@ namespace Obelisk::UE::MissionReflection
             if (!result)
                 return result;
 
-            if (propertyClass.NamePrivate.ComparisonIndex != spec.ClassNameIndex ||
+            if (propertyClass.InternalIndex != spec.ClassObjectIndex ||
+                propertyClass.NamePrivate.ComparisonIndex != spec.ClassNameIndex ||
                 propertyClass.NamePrivate.Number != 0)
                 return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
-                                                           "mission property class FName mismatch");
+                                                           "mission property class identity mismatch");
             return RuntimeReflection::ReadResult::Ok();
         }
 

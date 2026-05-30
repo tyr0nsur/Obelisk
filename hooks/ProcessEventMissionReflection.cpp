@@ -290,6 +290,8 @@ namespace Obelisk::Hooks::ProcessEventMissionReflection
 
             uint8_t value = 0;
             std::memcpy(&value, field.Range.Data, sizeof(value));
+            if (value > 1)
+                return false;
             out.Field = field.Field;
             out.Value = value != 0;
             return true;

@@ -26,6 +26,7 @@ namespace
     constexpr int32_t kObjectPropertyClassObjectIndex = 534;
     constexpr int32_t kArrayPropertyClassObjectIndex = 528;
     constexpr int32_t kFunctionClassObjectIndex = 518;
+    constexpr int32_t kMissionTypeObjectIndex = 179;
     constexpr int32_t kControllerNameIndex = 5908;
     constexpr int32_t kCharacterNameIndex = 7990;
     constexpr int32_t kPlayerNameIndex = 9972;
@@ -196,7 +197,7 @@ namespace
                        const std::array<FieldDef, 4>& fields)
     {
         InitClasses(fixture);
-        WriteObject(fixture.Outer, kMissionTypeNameIndex, kMissionTypeNameIndex, nullptr, nullptr);
+        WriteObject(fixture.Outer, kMissionTypeNameIndex, kMissionTypeObjectIndex, nullptr, nullptr);
         WriteObject(fixture.Function,
                     functionNameIndex,
                     functionNameIndex,
@@ -598,7 +599,7 @@ namespace
         {
             MissionFixture fixture;
             BuildAddPlayerToMission(fixture);
-            WriteObject(fixture.Outer, kMissionTypeNameIndex, kMissionTypeNameIndex, nullptr, nullptr, 1);
+            WriteObject(fixture.Outer, kMissionTypeNameIndex, kMissionTypeObjectIndex, nullptr, nullptr, 1);
 
             MissionReflection::MissionInvocation invocation;
             ReadResult result = MissionReflection::TryIdentifyMissionInvocation(
@@ -608,6 +609,20 @@ namespace
                 fixture.Params.data(),
                 invocation);
             Require(result.Status == ReadStatus::Implausible, "numbered MissionType FName was accepted");
+        }
+        {
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+            WriteObject(fixture.Outer, kMissionTypeNameIndex, 99000, nullptr, nullptr);
+
+            MissionReflection::MissionInvocation invocation;
+            ReadResult result = MissionReflection::TryIdentifyMissionInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "wrong MissionType object index was accepted");
         }
         {
             MissionFixture fixture;
@@ -641,6 +656,20 @@ namespace
                 fixture.Params.data(),
                 invocation);
             Require(result.Status == ReadStatus::Implausible, "wrong mission UFunction class was accepted");
+        }
+        {
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+            WriteObject(fixture.FunctionClass, kFunctionClassNameIndex, 99001, nullptr, nullptr);
+
+            MissionReflection::MissionInvocation invocation;
+            ReadResult result = MissionReflection::TryIdentifyMissionInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "wrong mission UFunction class object index was accepted");
         }
     }
 
@@ -798,6 +827,20 @@ namespace
         }
         {
             MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+            WriteObject(fixture.BoolPropertyClass, kBoolPropertyClassNameIndex, 99002, nullptr, nullptr);
+
+            MissionReflection::MissionInvocation invocation;
+            ReadResult result = MissionReflection::TryIdentifyMissionInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "wrong mission property class object index was accepted");
+        }
+        {
+            MissionFixture fixture;
             BuildBPOnPlayerRemovedFromMission(fixture);
             WriteAt(fixture.PropertyB, 0x28, static_cast<const void*>(nullptr));
 
@@ -824,25 +867,6 @@ namespace
                 invocation);
             Require(result.Status == ReadStatus::Implausible, "overlong mission property chain was accepted");
         }
-    }
-
-    void TestAcceptsPropertyClassSemanticNamesWithoutStableInternalIndices()
-    {
-        MissionFixture fixture;
-        BuildAddPlayerToMission(fixture);
-        WriteObject(fixture.ObjectPropertyClass, kObjectPropertyClassNameIndex, 99001, nullptr, nullptr);
-        WriteObject(fixture.BoolPropertyClass, kBoolPropertyClassNameIndex, 99002, nullptr, nullptr);
-
-        MissionReflection::MissionInvocation invocation;
-        ReadResult result = MissionReflection::TryIdentifyMissionInvocation(
-            fixture.Reader(),
-            Options(),
-            fixture.Function.data(),
-            fixture.Params.data(),
-            invocation);
-        Require(static_cast<bool>(result), result.Reason.c_str());
-        Require(invocation.Function == MissionReflection::MissionFunction::AddPlayerToMission,
-                "semantic class FName acceptance changed mission kind");
     }
 
     void TestRejectsUnsupportedTarget()
@@ -951,7 +975,6 @@ int main()
     TestRejectsWrongOuterNameNumberAndClass();
     TestRejectsWrongShape();
     TestRejectsWrongPropertyNameClassAndChain();
-    TestAcceptsPropertyClassSemanticNamesWithoutStableInternalIndices();
     TestRejectsUnsupportedTarget();
     TestGateRejectsBeforeReading();
     TestRejectsNullFunction();

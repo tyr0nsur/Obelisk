@@ -38,9 +38,10 @@ accepted compact mission target set:
 - Wrong outer, numbered `FName`, wrong function/property class, wrong property name,
   wrong flags, wrong `ParmsSize`, wrong return offset, truncated chains, overlong chains,
   and null function pointers are rejected.
-- Property class identity is semantic by class name rather than stable internal object
-  index, matching the current rule that raw indices are evidence hints, not public
-  contracts.
+- Property class, `Function` class, and `MissionType` outer identity are now strict for
+  the supported binary hash: the recognizer checks both FName and observed internal object
+  index for the validated fixture identities. These indices remain internal
+  SHA-scoped guardrails, not public contracts.
 
 ## Boundary Decision
 
@@ -197,3 +198,58 @@ python3 scripts/test_release_scope_guardrails.py
 All passed locally. Mission remains internal/test-only and post-RC; this does not promote
 Mission SDK, runtime observer wiring, public callbacks, identity, mutation, return
 override, or server validation.
+
+## Strict Identity And Signature Artifact Follow-Up
+
+On 2026-05-30, a post-RC local hardening pass tightened the Mission recognizer and
+hook-side copied-bool helper without adding runtime wiring or public SDK surface.
+
+Code hardening:
+
+- `MissionReflection` now validates exact SHA-scoped internal object identity for the
+  `Function` class (`518`), `MissionType` outer (`179`), `BoolProperty` class (`532`),
+  `ObjectProperty` class (`534`), and `ArrayProperty` class (`528`) in addition to FName,
+  number, flags, size, offset, chain, and range checks.
+- `ProcessEventMissionReflection` rejects copied bool bytes greater than `1` instead of
+  normalizing non-canonical bytes to `true`.
+- Public SDK guardrails now generate and block unpromoted module consumer tokens such as
+  `ObeliskMissionEvent`, `RegisterMissionEvent`, and Mission policy-event variants.
+
+Offline artifact generated under the protected workspace:
+
+```text
+/servidor/ark/workspace-offline/mission-compact-redacted-signatures-strict-20260530T015442Z/
+```
+
+Artifact summary:
+
+- `signatures.json` schema: `obelisk.redacted-ufunction-signatures.v1`;
+- target set: `mission-compact-intake`;
+- coverage: complete for `MissionType.AddPlayerToMission`,
+  `MissionType.BPAllowPlayerToLeaveMission`, `MissionType.BPOnPlayerRemovedFromMission`,
+  and `MissionType.GetPlayerUsableItems`;
+- signature count: `4`;
+- copied scalar count: `5` bool fields;
+- redacted fields: `6` object/container fields;
+- consume gate: `accepted`;
+- artifact status: `candidate_only`;
+- promotion ready: `false`.
+
+Validation:
+
+```bash
+cmake --build build --target mission_reflection_tests process_event_mission_reflection_tests -j"$(nproc)"
+ctest --test-dir build --output-on-failure -R '^(MissionReflectionTests|ProcessEventMissionReflectionTests|AbiLayoutTests|CAbiLayoutTests|SdkConsumerFixture.*)$'
+python3 scripts/test_public_sdk_guardrails.py
+python3 scripts/test_release_scope_guardrails.py
+git diff --check
+```
+
+All passed locally.
+
+Remaining blockers are unchanged: this does not promote Mission SDK, runtime observer
+wiring, dispatcher lifecycle, callback ABI, identity/lookup, arrays, mutation, return
+override, or server validation. A current strict second-source comparison still needs a
+comparable artifact that includes bool semantics for the three bool-bearing Mission
+targets; the strict redacted-signature artifact closes target-set coverage, not the full
+promotion ladder.

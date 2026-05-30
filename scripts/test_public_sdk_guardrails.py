@@ -346,6 +346,33 @@ def unpromoted_gameplay_tokens() -> list[str]:
     return tokens
 
 
+def unpromoted_sdk_consumer_tokens() -> list[str]:
+    tokens = list(UNPROMOTED_SDK_CONSUMER_API_TOKENS)
+    for singular in UNPROMOTED_GAMEPLAY_SURFACES:
+        plural = f"{singular}s"
+        for term in (singular, plural):
+            tokens.extend(
+                [
+                    f"OBELISK_API_CAPABILITY_{term.upper()}_EVENTS",
+                    f"OBELISK_API_CAPABILITY_{term.upper()}_POLICY_EVENTS",
+                    f"Obelisk{term}Event",
+                    f"Obelisk{term}PolicyEvent",
+                    f"{term}EventCallback",
+                    f"{term}PolicyEventCallback",
+                    f"{term}EventSubscription",
+                    f"{term}PolicyEventSubscription",
+                    f"Register{term}Event",
+                    f"Register{term}PolicyEvent",
+                    f"RegisterOn{term}Event",
+                    f"RegisterOn{term}PolicyEvent",
+                    f"Unregister{term}Event",
+                    f"Unregister{term}PolicyEvent",
+                ]
+            )
+
+    return list(dict.fromkeys(tokens))
+
+
 def public_api_capability_defines(header: str) -> list[str]:
     return re.findall(
         r"^\s*#define\s+(OBELISK_API_CAPABILITY_[A-Z0-9_]+)\b",
@@ -1688,6 +1715,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
     def test_unpromoted_gameplay_token_list_covers_documented_examples(self) -> None:
         tokens = set(unpromoted_gameplay_tokens())
+        sdk_consumer_tokens = set(unpromoted_sdk_consumer_tokens())
 
         for token in (
             "ObeliskCommand",
@@ -1700,6 +1728,20 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "UnregisterCommands",
         ):
             self.assertIn(token, tokens)
+
+        for token in (
+            "OBELISK_API_CAPABILITY_MISSION_EVENTS",
+            "OBELISK_API_CAPABILITY_MISSION_POLICY_EVENTS",
+            "ObeliskMissionEvent",
+            "ObeliskMissionPolicyEvent",
+            "MissionEventCallback",
+            "MissionEventSubscription",
+            "RegisterMissionEvent",
+            "RegisterMissionPolicyEvent",
+            "RegisterOnMissionEvent",
+            "UnregisterMissionEvent",
+        ):
+            self.assertIn(token, sdk_consumer_tokens)
 
     def test_public_sdk_headers_have_no_gameplay_module_api_until_promotion(self) -> None:
         offenders: list[str] = []
@@ -1768,7 +1810,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 if not path.is_file() or path.suffix not in {".c", ".cpp", ".h", ".hpp", ".txt"}:
                     continue
                 text = strip_c_comments(path.read_text(encoding="utf-8"))
-                for token in UNPROMOTED_SDK_CONSUMER_API_TOKENS:
+                for token in unpromoted_sdk_consumer_tokens():
                     if token in text:
                         offenders.append(f"{path.relative_to(REPO_ROOT)}: {token}")
 
