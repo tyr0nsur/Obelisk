@@ -202,6 +202,15 @@ V010_GAMEPLAY_POLICY_EVENT_PAYLOAD_FIELDS = [
     "bool_values",
     "int32_values",
 ]
+V010_CHAT_MESSAGE_EVENT_PAYLOAD_FIELDS = [
+    "abi_version",
+    "struct_size",
+    "send_mode",
+    "reserved0",
+    "flags",
+    "sequence",
+    "message",
+]
 V010_GAMEPLAY_POLICY_TARGET_SETS = [
     "structure-observer-intake",
     "minimal-second-source-intake",
@@ -1200,6 +1209,68 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             with self.subTest(field=field):
                 for forbidden in forbidden_payload_fields:
                     self.assertNotIn(forbidden, lowered)
+
+    def test_chat_message_event_payload_stays_minimal_copied_notification(self) -> None:
+        header = PUBLIC_API_HEADER.read_text(encoding="utf-8")
+
+        self.assertEqual(
+            public_struct_field_names(header, "ObeliskChatMessageEvent"),
+            V010_CHAT_MESSAGE_EVENT_PAYLOAD_FIELDS,
+        )
+
+        forbidden_payload_fields = (
+            "sender",
+            "player",
+            "tribe",
+            "identity",
+            "id",
+            "handle",
+            "resource",
+            "object",
+            "uobject",
+            "function",
+            "fname",
+            "gname",
+            "gobject",
+            "lookup",
+            "resolve",
+            "mutat",
+            "override",
+            "return_override",
+            "route",
+            "reply",
+            "moderation",
+            "command",
+        )
+        for field in public_struct_field_names(header, "ObeliskChatMessageEvent"):
+            lowered = field.lower()
+            with self.subTest(field=field):
+                for forbidden in forbidden_payload_fields:
+                    self.assertNotIn(forbidden, lowered)
+
+    def test_copied_event_callback_contracts_remain_void_observational_and_callback_scope(self) -> None:
+        header = PUBLIC_API_HEADER.read_text(encoding="utf-8")
+        comment_terms = (
+            "Gameplay policy event data is callback-scope",
+            "plugins may read the copied POD\n// payload during the callback only",
+            "Chat message event data is callback-scope",
+            "plugins may read the copied UTF-8\n// payload during the callback only",
+            "provides no identity, lookup, mutation, return\n// override, or raw UE pointer access",
+        )
+        stripped_header = strip_c_comments(header)
+
+        for term in comment_terms:
+            self.assertIn(term, header)
+        for callback_name, event_type in (
+            ("ObeliskGameplayPolicyEventCallback", "ObeliskGameplayPolicyEvent"),
+            ("ObeliskChatMessageEventCallback", "ObeliskChatMessageEvent"),
+        ):
+            with self.subTest(callback=callback_name):
+                self.assertRegex(
+                    stripped_header,
+                    rf"typedef\s+void\s+\(\*\s*{callback_name}\s*\)"
+                    rf"\s*\(\s*const\s+{event_type}\s*\*\s*event\s*,\s*void\s*\*\s*user_data\s*\)\s*;",
+                )
 
     def test_public_sdk_surface_parsers_include_anonymous_and_non_void_callback_typedefs(self) -> None:
         header = """

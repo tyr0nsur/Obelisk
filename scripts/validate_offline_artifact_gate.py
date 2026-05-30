@@ -1102,6 +1102,8 @@ def path_state(path: Path, *, workspace_root: Path, protected_root: Path) -> dic
 def path_blockers(path: Path, *, label: str, workspace_root: Path, protected_root: Path, require_workspace: bool) -> list[dict[str, Any]]:
     state = path_state(path, workspace_root=workspace_root, protected_root=protected_root)
     blockers: list[dict[str, Any]] = []
+    if path.expanduser().is_symlink():
+        blockers.append({"reason": "path_is_symlink", "label": label, **state})
     if state["direct_under_protected"] and not state["direct_under_workspace"]:
         blockers.append({"reason": "path_text_under_protected_root", "label": label, **state})
     if state["resolved_under_protected"] and not state["resolved_under_workspace"]:
@@ -1610,17 +1612,18 @@ def validate_rc_ufunction_second_source_root_manifest(
                         }
                     )
                 used_relative_paths[relative_path] = str(target)
-                snapshot_path = manifest_path.parent / relative_path
-                blockers.extend(
-                    path_blockers(
-                        snapshot_path,
-                        label=f"{snapshot_label}.relative_path",
-                        workspace_root=workspace_root,
-                        protected_root=protected_root,
-                        require_workspace=True,
-                    )
+                candidate_snapshot_path = manifest_path.parent / relative_path
+                snapshot_path_blockers = path_blockers(
+                    candidate_snapshot_path,
+                    label=f"{snapshot_label}.relative_path",
+                    workspace_root=workspace_root,
+                    protected_root=protected_root,
+                    require_workspace=True,
                 )
-                if not snapshot_path.is_file():
+                blockers.extend(snapshot_path_blockers)
+                if not snapshot_path_blockers:
+                    snapshot_path = candidate_snapshot_path
+                if snapshot_path is not None and not snapshot_path.is_file():
                     blockers.append(
                         {
                             "reason": "rc_ufunction_manifest_snapshot_file_missing",
@@ -5565,16 +5568,15 @@ def validate_resource_handle_serial_scan_manifest(
         blockers.append({"reason": "resource_handle_serial_scan_core_path_invalid", "label": f"{label}:$.core_path"})
     else:
         resolved_core_path = Path(core_path).expanduser().resolve(strict=False)
-        blockers.extend(
-            path_blockers(
-                Path(core_path),
-                label=f"{label}:$.core_path",
-                workspace_root=workspace_root,
-                protected_root=protected_root,
-                require_workspace=True,
-            )
+        core_path_blockers = path_blockers(
+            Path(core_path),
+            label=f"{label}:$.core_path",
+            workspace_root=workspace_root,
+            protected_root=protected_root,
+            require_workspace=True,
         )
-        if isinstance(core_sha256, str) and SHA256_RE.fullmatch(core_sha256) is not None:
+        blockers.extend(core_path_blockers)
+        if not core_path_blockers and isinstance(core_sha256, str) and SHA256_RE.fullmatch(core_sha256) is not None:
             blockers.extend(
                 sha256_file_or_blocker(
                     resolved_core_path,
@@ -7258,6 +7260,18 @@ def validate_artifact_pack_manifest(
         if not isinstance(entry, dict) or not isinstance(entry.get("path"), str):
             continue
         child_path = manifest_path.parent / entry["path"]
+        child_path_state = path_state(child_path, workspace_root=workspace_root, protected_root=protected_root)
+        child_path_blockers = path_blockers(
+            child_path,
+            label=f"{child_path}:pack-entry",
+            workspace_root=workspace_root,
+            protected_root=protected_root,
+            require_workspace=True,
+        )
+        blockers.extend(child_path_blockers)
+        if child_path_blockers:
+            continue
+        child_path = Path(child_path_state["resolved"])
         child_payload, child_load_blockers = load_json(child_path)
         if child_payload is None:
             if child_path.suffix == ".json":
@@ -7496,6 +7510,16 @@ def build_result(args: argparse.Namespace) -> dict[str, Any]:
     all_blockers: list[dict[str, Any]] = []
     artifacts: list[dict[str, Any]] = []
     manifests: list[dict[str, Any]] = []
+
+    all_blockers.extend(
+        path_blockers(
+            workspace_root,
+            label="root",
+            workspace_root=workspace_root,
+            protected_root=protected_root,
+            require_workspace=False,
+        )
+    )
 
     for path in args.manifest:
         record, blockers = validate_manifest(

@@ -161,6 +161,9 @@ for the current checkpoint.
 
 - Current post-RC focus: preserve RC scope while reducing architecture debt, improving evidence tooling, and
   promoting only copied module APIs through strict gates.
+- `mission-copied-bool-policy-slice` is the next best internal offline copied-data lane:
+  it already has exact target guidance and hook-side copied-bool tests, but remains
+  evidence-only with no Mission SDK, identity, mutation, or return override.
 - Item return-only bridge hardening now keeps copied dispatch construction in
   `ProcessEventItemReflection` helpers, with unit coverage for the three supported event
   kinds, `CraftBlueprint` rejection before runtime item-return reflection, exact
@@ -198,11 +201,9 @@ for the current checkpoint.
   The default release gate and `check_rc_layout_evidence_smoke.sh` are aligned on the four
   public RC UFunction target sets, including `item-return-only-policy-slice`; the combined
   RC UFunction root helper now requires `--item-return-root` and assembles 12 snapshots.
-- Runtime/plugin lifecycle audit found no P1 blocker. Documented guardrail: individual
-  timer unregister cancels future delivery but is not a general quiescence barrier; owner
-  cleanup during unload is the final barrier. PluginManager lifecycle coverage now asserts
-  direct item-return callbacks remain available during plugin shutdown and are removed
-  before close on normal unload, init failure, init exception, and shutdown exception.
+- Runtime/plugin lifecycle audit found no P1 blocker, but `EventManager` raw ProcessEvent
+  unregister still waits behind dispatch callbacks. Treat snapshot/in-flight cleanup for
+  raw callbacks as v1 debt; current owner cleanup remains the unload barrier.
 - Any future live/player validation requires a new approved live-ops brief and beta-test
   notice through the configured local webhook variable when players are involved.
 

@@ -137,6 +137,7 @@ def ensure_real_directory(path: Path, label: str) -> None:
 
 def resolve_input_binary(path: Path) -> Path:
     resolved = protected_paths.reject_protected_input_path(path, "--binary")
+    reject_symlink(path.expanduser(), "--binary")
     if not resolved.exists():
         raise SystemExit(f"--binary does not exist: {resolved}")
     if not resolved.is_file():

@@ -99,10 +99,13 @@ permissions group management, structure build policy, dino carry/color/reward ho
 RCON/operator utilities. These names are useful as candidate seeds only; every promoted
 Obelisk equivalent still needs native Linux reflection/runtime evidence.
 
-Quick local scan result: the cloned plugin area currently exposes 570
-source/header/readme-like files. High-frequency ArkApi surfaces include chat, console,
-and RCON command registration; timer callbacks; direct hooks; world/actor traversal;
-chat/server messages; permissions; and save/respawn/build/damage-style gameplay hooks.
+Quick local filename scan result, excluding `.git` metadata: the cloned plugin area
+currently exposes 834 C/C++ source/header plus readme/license-like files. If project
+metadata such as JSON, solution, and Visual Studio project files is included, the count is
+higher; use the narrower 834 figure for reproducible demand inventory checks. Visible
+ArkApi-facing filenames and plugin families point to chat, console, and RCON command
+registration; timer callbacks; hook-heavy gameplay integrations; world/actor traversal;
+chat/server messages; permissions; and save/respawn/build/damage-style demand.
 `StructuresLimit`, `SafeZone`, and `NoCollision` reinforce demand for a future structure
 build-placement policy lane, but they do not promote `APrimalStructure.IsAllowedToBuild`
 or any return-code semantics today.
@@ -182,13 +185,14 @@ demand-ranked dependency sketch for future design reviews after the promotion ga
 
 1. Hub foundation: lifecycle, descriptors, timers, config/logging, reload posture, and
    multi-instance-safe packaging.
-2. Passive chat parsing and command-like local routing on top of copied `ChatMessageEvent`,
+2. Passive chat parsing and plugin-local text routing on top of copied `ChatMessageEvent`,
    without claiming a command, moderation, or reply/send-chat SDK.
 3. Permissions/admin only after copied identity and privacy-safe grants/checks; do not use
    public `ResourceHandle` or UE pointers.
 4. RCON/operator I/O only after secret-safe ingress, audit policy, and lifecycle rules.
-5. Basic economy/rewards only after command-like routing, permissions, identity, and
-   persistence are promoted, and still before any give-item or mutation surface.
+5. Basic economy/rewards only after plugin-local text routing or a future promoted command
+   surface, permissions, identity, and persistence are promoted, and still before any
+   give-item or mutation surface.
 6. Homes/safe zones/structures only after location, ownership, enforcement, and mutation
    contracts have their own evidence and promotion records.
 7. Items, inventory, dinos, transfers, and missions remain investigation/internal unless

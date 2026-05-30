@@ -2637,6 +2637,38 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertEqual("blocked", result["status"])
         self.assertIn("path_text_under_protected_root", reasons)
 
+    def test_rejects_workspace_artifact_symlink_even_when_it_resolves_inside_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            target = workspace / "artifact.txt"
+            target.parent.mkdir(parents=True)
+            target.write_text("offline evidence\n", encoding="utf-8")
+            link = workspace / "artifact-link.txt"
+            link.symlink_to(target)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, artifacts=[("linked", link)]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertEqual("blocked", result["status"])
+        self.assertIn("path_is_symlink", reasons)
+
+    def test_rejects_workspace_manifest_symlink_even_when_it_resolves_inside_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            target = workspace / "pack" / "manifest.json"
+            target.parent.mkdir(parents=True)
+            write_json(target, readiness_report_manifest())
+            link = workspace / "manifest-link.json"
+            link.symlink_to(target)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[link]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertEqual("blocked", result["status"])
+        self.assertIn("path_is_symlink", reasons)
+
     def test_allows_similar_prefix_outside_protected_but_not_as_workspace_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"
@@ -5354,6 +5386,24 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
             "path_not_resolved_under_workspace_root",
             {blocker["reason"] for blocker in result["blockers"]},
         )
+
+    def test_blocks_resource_handle_serial_scan_core_path_symlink_inside_workspace_without_hashing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            target = workspace / "copied-core"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(b"offline copied core fixture\n")
+            link = workspace / "core-link"
+            link.symlink_to(target)
+            manifest = workspace / "resource-handle-serial-scan.json"
+            write_json(manifest, resource_handle_serial_scan_manifest(core_path=str(link), core_sha256="b" * 64))
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("path_is_symlink", reasons)
+        self.assertNotIn("resource_handle_serial_scan_core_sha256_mismatch", reasons)
 
     def test_blocks_resource_handle_serial_scan_totals_contradict_candidates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

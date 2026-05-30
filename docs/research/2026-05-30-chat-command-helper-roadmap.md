@@ -2,9 +2,9 @@
 
 ## Objective
 
-Define a plugin-author helper pattern for command-like routing on top of the minimal copied
-`ChatMessageEvent` payload without adding runtime ABI, identity, permission, mutation, or
-chat-response semantics.
+Define a plugin-author helper pattern for plugin-local text routing on top of the minimal
+copied `ChatMessageEvent` payload without adding runtime ABI, identity, permission,
+mutation, or chat-response semantics.
 
 This is documentation-only design guidance. It is not a request to change
 `include/obelisk/ObeliskApi.h`, `core/ChatEventDispatcher`, CMake targets, runtime

@@ -24,8 +24,10 @@ PUBLIC_RC_UFUNCTION_SECOND_SOURCE_TARGET_SETS=(
     "item-return-only-policy-slice"
     "chat-message-intake"
 )
-GUIDANCE_ONLY_UFUNCTION_SECOND_SOURCE_TARGET_SETS=(
+GUIDANCE_ONLY_SECOND_SOURCE_TARGET_SETS=(
     "players-identity-lifecycle-intake"
+    "nextgen-plugin-hub-planning"
+    "plugin-hub-planning"
 )
 
 is_under_path() {
@@ -69,25 +71,44 @@ reject_protected_path() {
     fi
 }
 
-reject_guidance_only_ufunction_target_set() {
+reject_guidance_only_second_source_target_set() {
     local target_set="$1"
+    local label="$2"
     local guidance_only_target_set
+    local normalized_target_set
 
-    for guidance_only_target_set in "${GUIDANCE_ONLY_UFUNCTION_SECOND_SOURCE_TARGET_SETS[@]}"; do
+    for guidance_only_target_set in "${GUIDANCE_ONLY_SECOND_SOURCE_TARGET_SETS[@]}"; do
         if [[ "${target_set}" == "${guidance_only_target_set}" ]]; then
-            printf '%s is planning/guidance-only and cannot be used as a release readiness UFunction target set.\n' \
-                "${target_set}" >&2
+            printf '%s is planning/guidance-only and cannot be used as a release readiness %s target set.\n' \
+                "${target_set}" "${label}" >&2
             printf 'Promote a separate release/public target set through the documented SDK and second-source gates instead.\n' >&2
             exit 2
         fi
     done
+
+    normalized_target_set="${target_set,,}"
+    if [[ "${normalized_target_set}" == *nextgen* || "${normalized_target_set}" == *plugin-hub* ]]; then
+        if [[ "${normalized_target_set}" == *planning* || "${normalized_target_set}" == *guidance* ]]; then
+            printf '%s is planning/guidance-only and cannot be used as a release readiness %s target set.\n' \
+                "${target_set}" "${label}" >&2
+            printf 'Promote a separate release/public target set through the documented SDK and second-source gates instead.\n' >&2
+            exit 2
+        fi
+    fi
 }
 
 add_ufunction_second_source_target_set() {
     local target_set="$1"
 
-    reject_guidance_only_ufunction_target_set "${target_set}"
+    reject_guidance_only_second_source_target_set "${target_set}" "UFunction"
     UFUNCTION_SECOND_SOURCE_TARGET_SETS+=("${target_set}")
+}
+
+add_scriptstruct_second_source_target_set() {
+    local target_set="$1"
+
+    reject_guidance_only_second_source_target_set "${target_set}" "ScriptStruct"
+    SCRIPTSTRUCT_SECOND_SOURCE_TARGET_SETS+=("${target_set}")
 }
 
 validate_second_source_report_dir() {
@@ -246,7 +267,7 @@ EOF
             shift 2
             ;;
         --scriptstruct-second-source-target-set)
-            SCRIPTSTRUCT_SECOND_SOURCE_TARGET_SETS+=("${2:?--scriptstruct-second-source-target-set requires a name}")
+            add_scriptstruct_second_source_target_set "${2:?--scriptstruct-second-source-target-set requires a name}"
             shift 2
             ;;
         *)

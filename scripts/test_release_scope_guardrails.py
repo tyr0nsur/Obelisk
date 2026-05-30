@@ -661,6 +661,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             normalized(release),
         )
         self.assertIn("Planning/guidance-only target sets such as `players-identity-lifecycle-intake`", release)
+        self.assertIn("NextGen/Plugin Hub planning target sets", release)
         self.assertIn("rejected by `scripts/check_release_readiness.sh`", release)
         self.assertIn("not part of the default gate", release)
         self.assertIn("scalar-candidate summaries are review aids only, not RC scope", normalized(release))
@@ -676,10 +677,15 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("--scriptstruct-second-source-root requires at least one --scriptstruct-second-source-target-set", script)
         self.assertNotIn('SCRIPTSTRUCT_SECOND_SOURCE_TARGET_SETS=("transfer-scriptstruct")', script)
         self.assertEqual(
-            shell_array_values(script, "GUIDANCE_ONLY_UFUNCTION_SECOND_SOURCE_TARGET_SETS"),
-            ["players-identity-lifecycle-intake"],
+            shell_array_values(script, "GUIDANCE_ONLY_SECOND_SOURCE_TARGET_SETS"),
+            [
+                "players-identity-lifecycle-intake",
+                "nextgen-plugin-hub-planning",
+                "plugin-hub-planning",
+            ],
         )
-        self.assertIn("reject_guidance_only_ufunction_target_set", script)
+        self.assertIn("reject_guidance_only_second_source_target_set", script)
+        self.assertIn("add_scriptstruct_second_source_target_set", script)
         self.assertIn("planning/guidance-only", script)
         self.assertIn("name every promoted target set", pr_template)
         self.assertIn(
@@ -715,12 +721,40 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("--map <map> --instance <instance-id>", release)
 
     def test_release_gate_rejects_guidance_only_target_sets_before_build(self) -> None:
+        blocked_cases = [
+            ("--ufunction-second-source-target-set", "players-identity-lifecycle-intake", "UFunction"),
+            ("--ufunction-second-source-target-set", "nextgen-plugin-hub-planning", "UFunction"),
+            ("--scriptstruct-second-source-target-set", "plugin-hub-planning", "ScriptStruct"),
+        ]
+
+        for option, target_set, label in blocked_cases:
+            with self.subTest(target_set=target_set):
+                result = subprocess.run(
+                    [
+                        str(REPO_ROOT / "scripts/check_release_readiness.sh"),
+                        "--require-second-source-readiness",
+                        option,
+                        target_set,
+                    ],
+                    cwd=REPO_ROOT,
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+
+                self.assertEqual(result.returncode, 2, result.stderr + result.stdout)
+                self.assertIn(f"{target_set} is planning/guidance-only", result.stderr)
+                self.assertIn(f"release readiness {label} target set", result.stderr)
+                self.assertIn("Promote a separate release/public target set", result.stderr)
+                self.assertNotIn("cmake -S", result.stdout)
+
+    def test_release_gate_rejects_guidance_only_target_set_patterns_before_build(self) -> None:
         result = subprocess.run(
             [
                 str(REPO_ROOT / "scripts/check_release_readiness.sh"),
                 "--require-second-source-readiness",
                 "--ufunction-second-source-target-set",
-                "players-identity-lifecycle-intake",
+                "NextGen-plugin-hub-guidance",
             ],
             cwd=REPO_ROOT,
             text=True,
@@ -729,7 +763,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         )
 
         self.assertEqual(result.returncode, 2, result.stderr + result.stdout)
-        self.assertIn("players-identity-lifecycle-intake is planning/guidance-only", result.stderr)
+        self.assertIn("NextGen-plugin-hub-guidance is planning/guidance-only", result.stderr)
         self.assertIn("Promote a separate release/public target set", result.stderr)
         self.assertNotIn("cmake -S", result.stdout)
 

@@ -81,7 +81,10 @@ def reject_protected_output_path(path: Path, label: str) -> Path:
 
 
 def reject_protected_core_path(path: Path, manifest_path: Path) -> Path:
-    return reject_protected_input_path(path, f"{manifest_path}: evidence pack core.path")
+    resolved = reject_protected_input_path(path, f"{manifest_path}: evidence pack core.path")
+    if path.expanduser().is_symlink():
+        raise SystemExit(f"{manifest_path}: evidence pack core.path must not be a symlink: {path}")
+    return resolved
 
 
 def sha256_file(path: Path) -> str:
@@ -138,7 +141,10 @@ def evidence_pack_defaults(
     expected_ark_binary_sha256: str,
     parse_int: Callable[[str], int],
 ) -> EvidencePackDefaults:
+    original_path = path
     path = reject_protected_input_path(path, "--evidence-pack-manifest")
+    if original_path.expanduser().is_symlink():
+        raise SystemExit(f"--evidence-pack-manifest must not be a symlink: {original_path}")
     payload = json.loads(path.read_text(encoding="utf-8"))
     binary = payload.get("binary")
     if not isinstance(binary, dict):

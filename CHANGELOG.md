@@ -12,8 +12,8 @@
   without promoting player identity, lookup, runtime work, or SDK surface.
 - Hardened static tooling checks so Ghidra headless usage output is treated as installed
   tooling evidence and smoke outputs reject symlink races.
-- Blocked guidance-only target sets such as `players-identity-lifecycle-intake` from
-  release readiness target-set promotion.
+- Blocked guidance-only target sets such as `players-identity-lifecycle-intake` and
+  NextGen/Plugin Hub planning lanes from release readiness target-set promotion.
 - Mark post-RC installed SDK packages as `0.1.0-dev` / `dev` so development builds do not
   masquerade as the published `v0.1.0-rc.2` tag.
 - Hardened the internal Mission copied-bool recognizer to validate Unreal `BoolProperty`

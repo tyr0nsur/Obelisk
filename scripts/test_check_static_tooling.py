@@ -90,6 +90,19 @@ class CheckStaticToolingTests(unittest.TestCase):
         self.assertNotEqual(0, result.returncode)
         self.assertIn("--binary must not read from protected server root", result.stderr)
 
+    def test_rejects_symlinked_binary_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = root / "ShooterGameServer.real"
+            link = root / "ShooterGameServer"
+            target.write_bytes(b"not really an elf")
+            link.symlink_to(target)
+
+            result = self.run_tool("--binary", str(link), "--json", check=False)
+
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("--binary must not be a symlink", result.stderr)
+
     def test_rejects_protected_smoke_output_root(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             binary = Path(temp_dir) / "ShooterGameServer"

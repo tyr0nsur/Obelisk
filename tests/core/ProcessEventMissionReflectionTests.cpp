@@ -1236,6 +1236,30 @@ namespace
         }
         {
             MissionFixture fixture;
+            BuildBPOnPlayerRemovedFromMission(fixture);
+            fixture.Params[0x10] = 1;
+            fixture.Params[0x11] = 0;
+            Attempt attempt = Identify(fixture, kBPOnPlayerRemovedFromMissionNameIndex);
+
+            CopiedMissionObservation observation;
+            Require(TryBuildCopiedMissionBoolObservationAfterOriginal(true, attempt, observation),
+                    "post-original BPOnPlayerRemovedFromMission attempt did not produce copied bool output");
+            fixture.Params[0x10] = 0;
+            fixture.Params[0x11] = 1;
+            Require(observation.BoolCount == 2,
+                    "post-original BPOnPlayerRemovedFromMission bool count mismatch");
+            Require(observation.BoolStorage[0].Field ==
+                        MissionReflection::MissionField::BFromMissionCompleteEvent,
+                    "post-original BPOnPlayerRemovedFromMission first bool field mismatch");
+            Require(observation.BoolStorage[0].Value,
+                    "post-original BPOnPlayerRemovedFromMission first bool was not copied");
+            Require(observation.BoolStorage[1].Field == MissionReflection::MissionField::BLastPhaseSuccess,
+                    "post-original BPOnPlayerRemovedFromMission second bool field mismatch");
+            Require(!observation.BoolStorage[1].Value,
+                    "post-original BPOnPlayerRemovedFromMission copied data was not independent");
+        }
+        {
+            MissionFixture fixture;
             BuildGetPlayerUsableItems(fixture);
             Attempt attempt = Identify(fixture, kGetPlayerUsableItemsNameIndex);
 

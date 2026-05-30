@@ -186,6 +186,24 @@ class SnapshotEvidencePackTests(unittest.TestCase):
                     parse_int,
                 )
 
+    def test_rejects_evidence_pack_manifest_symlinked_to_offline_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            real_manifest = root / "pack-A" / "manifest.json"
+            core = root / "core"
+            self.write_pack(real_manifest, core_path=core)
+            manifest_link = root / "manifest-link.json"
+            manifest_link.symlink_to(real_manifest)
+
+            with self.assertRaisesRegex(SystemExit, "--evidence-pack-manifest must not be a symlink"):
+                evidence_pack_defaults(
+                    manifest_link,
+                    None,
+                    None,
+                    "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                    parse_int,
+                )
+
     def test_rejects_partial_gdb_failed_pack(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -304,6 +322,25 @@ class SnapshotEvidencePackTests(unittest.TestCase):
             self.write_pack(manifest, core_path=core_link, sha="4" * 64, write_core=False)
 
             with self.assertRaisesRegex(SystemExit, "core.path must not read from protected server root"):
+                evidence_pack_defaults(
+                    manifest,
+                    None,
+                    None,
+                    "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                    parse_int,
+                )
+
+    def test_rejects_manifest_core_path_symlink_to_offline_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core_target = root / "core-target"
+            core_target.write_bytes(b"core")
+            core_link = root / "core-link"
+            core_link.symlink_to(core_target)
+            manifest = root / "pack-A" / "manifest.json"
+            self.write_pack(manifest, core_path=core_link, sha=sha256_bytes(b"core"), write_core=False)
+
+            with self.assertRaisesRegex(SystemExit, "core.path must not be a symlink"):
                 evidence_pack_defaults(
                     manifest,
                     None,

@@ -21,6 +21,10 @@ cross-binary portability.
 
 - The pack root must be a real directory, not a symlink.
 - Pack contents must be regular files or directories; symlinked entries fail closed.
+- Direct gate inputs such as `--manifest`, `--artifact`, reusable provenance sidecars,
+  static-tool smoke binaries, and core paths referenced by snapshot evidence packs must
+  be real files. Use copies or hardlinks in the offline workspace; symlinks fail closed
+  even when they currently resolve inside the workspace.
 - Root outputs must be named exactly `artifact-pack.manifest.json` and `SHA256SUMS`.
 - Manifest schema must be `obelisk.artifact-pack.manifest.v1`.
 - Legacy spellings such as `obelisk.artifact_pack.manifest.v1` are unsupported and fail

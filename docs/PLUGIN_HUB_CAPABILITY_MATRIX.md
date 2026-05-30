@@ -29,20 +29,20 @@ it does not promise ArkApi plugin compatibility.
 | Priority | Category | Obelisk status | Safe interpretation |
 | --- | --- | --- | --- |
 | 1 | Lifecycle, descriptors, logging, config, local timers | available | Build native examples around current core primitives; process restart/crash management is not public SDK surface |
-| 2 | Passive chat parsing and command-like routing | available | Use copied `ChatMessageEvent` for local parsing only; no sender identity, replies, blocking, or moderation contract |
+| 2 | Passive chat parsing and plugin-local text routing | narrowly available | Use copied `ChatMessageEvent` for local parsing only; no command SDK, sender identity, replies, blocking, or moderation contract |
 | 3 | Timed notices and chat broadcasts | blocked | Owner-token timers exist, but public send-chat/broadcast policy is not promoted |
 | 4 | Permissions/admin groups | blocked | Needs identity, persistence, privacy-safe grants/checks, and operator reload policy |
 | 5 | RCON/operator I/O and Unicode text | blocked | Needs secret-safe ingress, audit policy, encoding rules, and command lifecycle |
 | 6 | Economy, shops, kits, rewards, stats | blocked | Needs commands, identity, permissions, persistence, item mutation, and event evidence |
 | 7 | Homes, teleport, safe zones, area policy | blocked | Needs location/area data, identity, combat/enemy restrictions, and safe mutation/enforcement contracts |
-| 8 | Structure counts, placement, ownership, collision policy | experimental | Copied policy observers can support narrow audits; census, ownership, placement denial, and mutation are not public surfaces |
+| 8 | Structure counts, placement, ownership, collision policy | mostly blocked | Only narrow copied policy observer examples are experimental; census, ownership, placement denial, collision control, and mutation are not public surfaces |
 | 9 | Dino colors, carry rules, spawn/cosmetic policy | blocked | Needs dino/player identity, classification, interaction events, and safe mutation/enforcement |
 | 10 | Engrams, inventory, item give/remove flows | blocked | Needs player/inventory/item identity, progression or item mutation APIs, rollback, and privacy policy |
 
-`available` means a narrow Obelisk-native plugin can be written against current public ABI
-today. It does not mean the corresponding ArkApi plugin family can be ported, that command
-or identity semantics exist, or that blocked dependencies can be simulated through raw
-game access.
+`available` or `narrowly available` means an Obelisk-native plugin can be written against
+the stated current public ABI slice today. It does not mean the corresponding ArkApi
+plugin family can be ported, that command or identity semantics exist, or that blocked
+dependencies can be simulated through raw game access.
 
 | Modder intent | Use now | Status | Must not imply |
 | --- | --- | --- | --- |

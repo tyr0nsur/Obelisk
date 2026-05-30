@@ -198,17 +198,18 @@ typedef struct ObeliskGameplayPolicyEventDescriptor {
     char display_name[64];
 } ObeliskGameplayPolicyEventDescriptor;
 
-// Borrowed event data is valid only for the duration of the callback.
-// Gameplay policy events are observational copied POD payloads unless a future
-// append-only API explicitly adds a decision/override contract. This event
-// intentionally exposes no UE4 object pointers, FName/GObjects indices, raw
-// parameter buffers, player identity, secrets, or mutable parameter storage.
+// Gameplay policy event data is callback-scope: plugins may read the copied POD
+// payload during the callback only; retaining data requires a plugin-owned copy.
+// This observational surface provides no identity, lookup, mutation, return
+// override, or raw UE pointer access unless a future append-only API explicitly
+// adds a separate decision contract.
 typedef void (*ObeliskGameplayPolicyEventCallback)(const ObeliskGameplayPolicyEvent* event, void* user_data);
 
-// Borrowed event data is valid only for the duration of the callback.
-// Chat events are copied UTF-8 notifications for plugins that parse text locally. They
-// expose no UE4 object pointers, raw ProcessEvent params, FName/GObjects indices, mutable
-// message storage, command routing, or authoritative sender/resource identity.
+// Chat message event data is callback-scope: plugins may read the copied UTF-8
+// payload during the callback only; retaining data requires a plugin-owned copy.
+// This notification surface provides no identity, lookup, mutation, return
+// override, or raw UE pointer access. It does not provide command routing,
+// moderation, replies, or authoritative sender/resource identity.
 typedef void (*ObeliskChatMessageEventCallback)(const ObeliskChatMessageEvent* event, void* user_data);
 
 // Process-local timer callback. Timer ids are runtime handles only: they are not stable
