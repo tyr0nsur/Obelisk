@@ -1763,7 +1763,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                     )
                     self.assertIn("not promoted", event.get("inventory_sdk", ""))
 
-    def test_public_gameplay_policy_manifest_redacts_inventory_backing_identity_and_authority(self) -> None:
+    def test_public_gameplay_policy_manifest_redacts_structure_and_inventory_backing_identity_and_authority(self) -> None:
         manifest = json.loads(PUBLIC_GAMEPLAY_EVENTS_MANIFEST.read_text(encoding="utf-8"))
         gameplay_policy = next(
             (
@@ -1792,6 +1792,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "FName/GObjects indices",
             "raw parameter buffers",
             "player identity",
+            "structure object identity",
             "inventory object identity",
             "item identity",
             "mutation or return override authority",
@@ -1812,7 +1813,27 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         minimal_scope = minimal_intake.get("scope", "")
         self.assertIn("layout-only", minimal_scope)
         self.assertIn("no standalone", minimal_scope)
+        self.assertIn("structure", minimal_scope)
         self.assertIn("inventory", minimal_scope)
+
+        structure_intake = next(
+            (
+                evidence for evidence in target_set_evidence
+                if isinstance(evidence, dict) and evidence.get("target_set") == "structure-observer-intake"
+            ),
+            None,
+        )
+        self.assertIsNotNone(structure_intake)
+        structure_scope = structure_intake.get("scope", "")
+        for required_scope_term in (
+            "copied-redacted",
+            "no identity",
+            "no lookup",
+            "no mutation",
+            "no return override",
+            "ResourceHandle",
+        ):
+            self.assertIn(required_scope_term, structure_scope)
 
     def test_obasevents_documents_binary_scoped_fname_resolution(self) -> None:
         text = (REPO_ROOT / "docs/oBaseEvents.md").read_text(encoding="utf-8")

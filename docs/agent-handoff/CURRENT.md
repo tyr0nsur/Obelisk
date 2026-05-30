@@ -90,6 +90,10 @@ sequence.
   spans owned, scalar range sizes are validated, and reader exceptions fail closed. This
   remains internal copied-scalar infrastructure only; it does not promote public
   StructureEvents, identity, lookup, mutation, return override, or `ResourceHandle`.
+  Follow-up contract hardening also rejects any structure event whose scalar fields/types
+  do not exactly match the public descriptor for that event kind, and the hook hot-path
+  predicate now requires structure subscribers before dispatch budget can activate
+  structure observation.
 - ResourceHandle/public GObjects remain blocked. The old flag-policy artifact is obsolete;
   the durable rich-provenance refresh is preserved at
   `/home/flowcommunity-ark/obelisk-artifacts/uobject-flag-policy-refresh-20260530T071436Z/`.
@@ -134,6 +138,9 @@ sequence.
   It is evidence-only: consume mode accepts it, promote mode blocks it, and it does not
   authorize public Items/Inventory SDK, runtime hook wiring, markers/env, mutation, return
   override, identity, lookup, or `ResourceHandle`.
+  The internal item helper can build-and-reserve a copied return-only observation in one
+  operation and clears output on invalid attempts or exhausted budget; this remains
+  test-only/internal and does not authorize public callbacks or runtime wiring.
 - The durable Mission copied-bool policy slice is preserved at
   `/home/flowcommunity-ark/obelisk-artifacts/mission-copied-bool-policy-slice-20260530T072912Z/`.
   Its manifest SHA256 is

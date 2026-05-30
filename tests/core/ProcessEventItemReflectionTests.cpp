@@ -532,6 +532,58 @@ namespace
                                "matched item attempt without ReturnValue built copied output");
     }
 
+    void TestBuildAndReserveItemReturnObservationForMatchedAttempt()
+    {
+        uint8_t returnValue = 1;
+        Attempt matched;
+        matched.Status = AttemptStatus::Matched;
+        matched.Invocation = MakeValidAllowEquipItemInvocation(returnValue);
+
+        std::atomic<uint64_t> counter{0};
+        uint64_t observationNumber = 99;
+        CopiedItemObservation observation;
+        Require(TryBuildAndReserveItemReturnObservationForMatchedAttempt(
+                    matched, counter, 1, observationNumber, observation),
+                "matched item return observation did not build and reserve budget");
+        Require(observationNumber == 1, "item return reservation used wrong observation number");
+        Require(counter.load() == 1, "item return reservation did not advance counter");
+
+        returnValue = 0;
+        RequireReturnOnlyPayload(observation,
+                                 true,
+                                 "reserved copied item return observation read mutated params");
+
+        CopiedItemObservation exhaustedObservation = observation;
+        observationNumber = 99;
+        Require(!TryBuildAndReserveItemReturnObservationForMatchedAttempt(
+                    matched, counter, 1, observationNumber, exhaustedObservation),
+                "exhausted item return observation budget built output");
+        Require(observationNumber == 0, "exhausted item return reservation left observation number");
+        Require(exhaustedObservation.BoolCount == 0,
+                "exhausted item return reservation left copied output");
+    }
+
+    void TestInvalidItemReturnObservationDoesNotReserveBudget()
+    {
+        uint8_t invalidReturnValue = 2;
+        Attempt matched;
+        matched.Status = AttemptStatus::Matched;
+        matched.Invocation = MakeValidAllowEquipItemInvocation(invalidReturnValue);
+
+        std::atomic<uint64_t> counter{0};
+        uint64_t observationNumber = 99;
+        CopiedItemObservation observation;
+        observation.BoolCount = 1;
+        observation.BoolStorage[0].Value = true;
+
+        Require(!TryBuildAndReserveItemReturnObservationForMatchedAttempt(
+                    matched, counter, 1, observationNumber, observation),
+                "invalid item return observation reserved budget");
+        Require(counter.load() == 0, "invalid item return observation advanced counter");
+        Require(observationNumber == 0, "invalid item return observation left observation number");
+        Require(observation.BoolCount == 0, "invalid item return observation left copied output");
+    }
+
     void TestRejectsMalformedReturnOnlyShapes()
     {
         uint8_t returnValue = 1;
@@ -861,6 +913,8 @@ int main()
     TestCopiedItemObservationAbiShape();
     TestBuildDoesNotMutateItemParams();
     TestBuildsCopiedReturnObservationOnlyForMatchedAttempts();
+    TestBuildAndReserveItemReturnObservationForMatchedAttempt();
+    TestInvalidItemReturnObservationDoesNotReserveBudget();
     TestRejectsMalformedReturnOnlyShapes();
     TestRejectsNonCanonicalBoolBytes();
     TestRejectsPartialCanRepairShape();

@@ -40,6 +40,12 @@ namespace
                 .Int32Value = 7,
             },
             {
+                .Field = Obelisk::Core::StructureScalarField::BForceSet,
+                .Type = Obelisk::Core::StructureScalarType::Bool,
+                .BoolValue = true,
+                .Int32Value = 0,
+            },
+            {
                 .Field = Obelisk::Core::StructureScalarField::ReturnValue,
                 .Type = Obelisk::Core::StructureScalarType::Bool,
                 .BoolValue = true,
@@ -91,17 +97,22 @@ namespace
         Require(capture.Kind == Obelisk::Core::StructureEventKind::SetVariant, "event kind changed");
         Require(capture.FunctionNameIndex == 7605, "function name index changed");
         Require(capture.OuterNameIndex == 7539, "outer name index changed");
-        Require(capture.Scalars.size() == 2, "scalar count mismatch");
+        Require(capture.Scalars.size() == 3, "scalar count mismatch");
         Require(capture.Scalars[0].Field == Obelisk::Core::StructureScalarField::VariantIndex,
                 "first scalar field mismatch");
         Require(capture.Scalars[0].Type == Obelisk::Core::StructureScalarType::Int32,
                 "first scalar type mismatch");
         Require(capture.Scalars[0].Int32Value == 7, "first scalar value mismatch");
-        Require(capture.Scalars[1].Field == Obelisk::Core::StructureScalarField::ReturnValue,
-                "return scalar field mismatch");
+        Require(capture.Scalars[1].Field == Obelisk::Core::StructureScalarField::BForceSet,
+                "force-set scalar field mismatch");
         Require(capture.Scalars[1].Type == Obelisk::Core::StructureScalarType::Bool,
+                "force-set scalar type mismatch");
+        Require(capture.Scalars[1].BoolValue, "force-set scalar value mismatch");
+        Require(capture.Scalars[2].Field == Obelisk::Core::StructureScalarField::ReturnValue,
+                "return scalar field mismatch");
+        Require(capture.Scalars[2].Type == Obelisk::Core::StructureScalarType::Bool,
                 "return scalar type mismatch");
-        Require(capture.Scalars[1].BoolValue, "return scalar value mismatch");
+        Require(capture.Scalars[2].BoolValue, "return scalar value mismatch");
         Require(capture.ScalarPointer != sourcePointer, "dispatcher passed borrowed scalar storage");
     }
 
@@ -141,6 +152,79 @@ namespace
         unknownScalarType.Scalars = scalars;
         Require(dispatcher.Dispatch(unknownScalarType) == 0, "unknown structure scalar type was dispatched");
         Require(capture.Calls == 0, "invalid structure event reached callback");
+    }
+
+    void TestDispatchRejectsFieldsOutsideEventContract()
+    {
+        Obelisk::Core::StructureEventDispatcher dispatcher;
+        int owner = 0;
+        Capture capture;
+        dispatcher.Register(&owner, {CaptureCallback, &capture});
+
+        std::vector<Obelisk::Core::StructureScalarValue> returnOnly{{
+            .Field = Obelisk::Core::StructureScalarField::ReturnValue,
+            .Type = Obelisk::Core::StructureScalarType::Bool,
+            .BoolValue = true,
+            .Int32Value = 0,
+        }};
+        Obelisk::Core::StructureEventView pinCode{
+            .Kind = Obelisk::Core::StructureEventKind::VerifyPinCode,
+            .FunctionNameIndex = 7556,
+            .OuterNameIndex = 7540,
+            .Scalars = returnOnly,
+        };
+        Require(dispatcher.Dispatch(pinCode) == 1, "valid pin-code structure event was rejected");
+
+        std::vector<Obelisk::Core::StructureScalarValue> wrongPinCode = returnOnly;
+        wrongPinCode.insert(wrongPinCode.begin(),
+                            {
+                                .Field = Obelisk::Core::StructureScalarField::VariantIndex,
+                                .Type = Obelisk::Core::StructureScalarType::Int32,
+                                .BoolValue = false,
+                                .Int32Value = 7,
+                            });
+        pinCode.Scalars = wrongPinCode;
+        Require(dispatcher.Dispatch(pinCode) == 0,
+                "pin-code event accepted fields outside its public descriptor");
+
+        std::vector<Obelisk::Core::StructureScalarValue> scalars = MakeScalars();
+        Obelisk::Core::StructureEventView setVariant = MakeEvent(scalars);
+        Require(dispatcher.Dispatch(setVariant) == 1, "valid SetVariant structure event was rejected");
+
+        std::swap(scalars[0], scalars[1]);
+        setVariant.Scalars = scalars;
+        Require(dispatcher.Dispatch(setVariant) == 0, "reordered SetVariant fields were dispatched");
+
+        scalars = MakeScalars();
+        scalars.pop_back();
+        setVariant.Scalars = scalars;
+        Require(dispatcher.Dispatch(setVariant) == 0, "partial SetVariant fields were dispatched");
+
+        std::vector<Obelisk::Core::StructureScalarValue> canSeatScalars{
+            {
+                .Field = Obelisk::Core::StructureScalarField::BForce,
+                .Type = Obelisk::Core::StructureScalarType::Bool,
+                .BoolValue = true,
+                .Int32Value = 0,
+            },
+            {
+                .Field = Obelisk::Core::StructureScalarField::ReturnValue,
+                .Type = Obelisk::Core::StructureScalarType::Bool,
+                .BoolValue = true,
+                .Int32Value = 0,
+            },
+        };
+        Obelisk::Core::StructureEventView canSeat{
+            .Kind = Obelisk::Core::StructureEventKind::CanSeat,
+            .FunctionNameIndex = 8481,
+            .OuterNameIndex = 7538,
+            .Scalars = canSeatScalars,
+        };
+        Require(dispatcher.Dispatch(canSeat) == 1, "valid CanSeat structure event was rejected");
+
+        canSeatScalars[0].Type = Obelisk::Core::StructureScalarType::Int32;
+        canSeat.Scalars = canSeatScalars;
+        Require(dispatcher.Dispatch(canSeat) == 0, "CanSeat accepted wrong scalar type");
     }
 
     void TestUnregisterIsIdempotent()
@@ -600,6 +684,7 @@ int main()
     TestDispatchCopiesScalarInputForCallbackDuration();
     TestRegisterRejectsInvalidInput();
     TestDispatchRejectsUnknownEventShape();
+    TestDispatchRejectsFieldsOutsideEventContract();
     TestUnregisterIsIdempotent();
     TestUnregisterForOwnerRequiresMatchingOwner();
     TestRegistrationIdsSkipZeroAndLiveIdsAfterWrap();

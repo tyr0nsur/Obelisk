@@ -423,4 +423,23 @@ namespace Obelisk::Hooks::ProcessEventItemReflection
 
         return TryBuildCopiedItemObservation(attempt.Invocation, out);
     }
+
+    bool TryBuildAndReserveItemReturnObservationForMatchedAttempt(const Attempt& attempt,
+                                                                  std::atomic<uint64_t>& counter,
+                                                                  uint64_t observationLimit,
+                                                                  uint64_t& observationNumber,
+                                                                  CopiedItemObservation& out)
+    {
+        observationNumber = 0;
+        if (!TryBuildCopiedItemReturnObservationForMatchedAttempt(attempt, out))
+            return false;
+
+        if (!TryReserveObservationBudget(counter, observationLimit, observationNumber))
+        {
+            out = {};
+            return false;
+        }
+
+        return true;
+    }
 }

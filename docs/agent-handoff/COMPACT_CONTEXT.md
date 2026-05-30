@@ -114,8 +114,11 @@ priorities, and do not use history files as the active source of truth.
 - Structure copied-policy dispatch now follows the same safety pattern: dispatch budget
   requires live subscribers, matched attempts reserve with one self-contained copied event,
   copied scalar spans rebind on copy/move, exposed scalar range sizes are validated, and
-  reader exceptions fail closed. This remains internal infrastructure, not a public
-  StructureEvents SDK or structure identity surface.
+  reader exceptions fail closed. Structure dispatcher output also rejects scalar
+  fields/types outside the exact public descriptor contract for each event kind, and
+  structure dispatch budget no longer keeps the hook hot path active when there are no
+  subscribers. This remains internal infrastructure, not a public StructureEvents SDK or
+  structure identity surface.
 - Public `GameplayPolicyEvent` and `ChatMessageEvent` plugin callbacks are caught at the
   bridge to prevent C++ plugin exceptions from escaping into dispatcher/hook code.
 - Release scope wording separates copied RC plugin events from debug-gated raw
@@ -213,7 +216,9 @@ priorities, and do not use history files as the active source of truth.
   `/home/flowcommunity-ark/obelisk-artifacts/item-return-only-policy-slice-20260530T072255Z/`;
   consume mode is accepted and promote mode is blocked with evidence-only/non-claim
   blockers. It copies only `AllowEquipItem.ReturnValue`, `CanRepair.ReturnValue`, and
-  `UseItemOntoItem.ReturnValue`.
+  `UseItemOntoItem.ReturnValue`. Its internal helper can build-and-reserve the copied
+  return observation in one operation and clears output on invalid attempts or exhausted
+  budget; it remains internal/test-only.
   The strict RC `minimal-second-source-intake` redacted signature pack with complete
   target-set coverage is preserved at
   `/home/flowcommunity-ark/obelisk-artifacts/rc-minimal-redacted-signatures-strict-20260530T000000Z/`;

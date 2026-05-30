@@ -806,12 +806,16 @@ namespace Obelisk::Hooks
 
     static bool IsStructureObservationActive()
     {
+        const uint64_t logLimit = GetStructureReflectionLogLimit();
+        const uint64_t dispatchLimit = GetStructureReflectionDispatchLimit();
         return IsStructureReflectionEnabled() &&
-               ProcessEventStructureReflection::ShouldAttemptRuntimeObservation(
-                   s_ReflectedStructureCalls,
-                   GetStructureReflectionLogLimit(),
-                   s_ReflectedStructureDispatches,
-                   GetStructureReflectionDispatchLimit());
+               (ProcessEventStructureReflection::HasObservationBudgetRemaining(
+                    s_ReflectedStructureCalls,
+                    logLimit) ||
+                ProcessEventStructureReflection::ShouldAttemptDispatchObservation(
+                    s_ReflectedStructureDispatches,
+                    dispatchLimit,
+                    Core::StructureEventDispatcher::Get().SubscriptionCount()));
     }
 
     static bool IsInventoryObservationActive()

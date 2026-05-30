@@ -38,10 +38,70 @@ namespace Obelisk::Core
             if (!IsKnownEventKind(event.Kind))
                 return false;
 
+            const StructureScalarField* expectedFields = nullptr;
+            const StructureScalarType* expectedTypes = nullptr;
+            size_t expectedFieldCount = 0;
+            constexpr StructureScalarField returnOnlyFields[] = {
+                StructureScalarField::ReturnValue,
+            };
+            constexpr StructureScalarType returnOnlyTypes[] = {
+                StructureScalarType::Bool,
+            };
+            constexpr StructureScalarField setVariantFields[] = {
+                StructureScalarField::VariantIndex,
+                StructureScalarField::BForceSet,
+                StructureScalarField::ReturnValue,
+            };
+            constexpr StructureScalarType setVariantTypes[] = {
+                StructureScalarType::Int32,
+                StructureScalarType::Bool,
+                StructureScalarType::Bool,
+            };
+            constexpr StructureScalarField canSeatFields[] = {
+                StructureScalarField::BForce,
+                StructureScalarField::ReturnValue,
+            };
+            constexpr StructureScalarType canSeatTypes[] = {
+                StructureScalarType::Bool,
+                StructureScalarType::Bool,
+            };
+            switch (event.Kind)
+            {
+            case StructureEventKind::AllowStructureAccess:
+            case StructureEventKind::IsAllowedToDemolish:
+            case StructureEventKind::AllowToggleActivation:
+            case StructureEventKind::VerifyPinCode:
+                expectedFields = returnOnlyFields;
+                expectedTypes = returnOnlyTypes;
+                expectedFieldCount = std::size(returnOnlyFields);
+                break;
+            case StructureEventKind::SetVariant:
+                expectedFields = setVariantFields;
+                expectedTypes = setVariantTypes;
+                expectedFieldCount = std::size(setVariantFields);
+                break;
+            case StructureEventKind::CanSeat:
+                expectedFields = canSeatFields;
+                expectedTypes = canSeatTypes;
+                expectedFieldCount = std::size(canSeatFields);
+                break;
+            }
+
+            if (event.Scalars.size() != expectedFieldCount)
+                return false;
+
+            size_t index = 0;
             for (const StructureScalarValue& scalar : event.Scalars)
             {
                 if (!IsKnownScalarField(scalar.Field) || !IsKnownScalarType(scalar.Type))
                     return false;
+                if (!expectedFields || !expectedTypes ||
+                    scalar.Field != expectedFields[index] ||
+                    scalar.Type != expectedTypes[index])
+                {
+                    return false;
+                }
+                ++index;
             }
 
             return true;
