@@ -20,6 +20,7 @@ PUBLIC_DOC_FILES = [
     REPO_ROOT / "docs" / "INSTALL.md",
     REPO_ROOT / "docs" / "OPERATOR_CLI.md",
     REPO_ROOT / "docs" / "PLUGIN_ARCHITECTURE.md",
+    REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md",
     REPO_ROOT / "docs" / "RELEASE.md",
     REPO_ROOT / "docs" / "STATUS.md",
     REPO_ROOT / "docs" / "VERSIONING.md",
@@ -806,6 +807,52 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                     ):
                         offenders.append(f"{path.relative_to(REPO_ROOT)}:{line}: {normalized(segment)}")
                         break
+
+        self.assertEqual(offenders, [])
+
+    def test_plugin_hub_planning_uses_arkapi_sources_as_demand_dictionary_only(self) -> None:
+        matrix = (REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md").read_text(encoding="utf-8")
+        inventory = (
+            REPO_ROOT / "docs" / "research" / "2026-05-30-nextgenplugins-reference-inventory.md"
+        ).read_text(encoding="utf-8")
+        workflow_skill = (
+            REPO_ROOT / "agent-skills" / "obelisk-github-research-workflow" / "SKILL.md"
+        ).read_text(encoding="utf-8")
+
+        for text, required in (
+            (matrix, "not as portable implementation source"),
+            (matrix, "rebuild every promoted surface through Obelisk reflection"),
+            (inventory, "Use this clone as a demand-map and dictionary source"),
+            (inventory, "Do not treat it as source code to port"),
+            (inventory, "Do not trust `DECLARE_HOOK` declarations as Linux ABI"),
+            (workflow_skill, "only as names, demand signals, and behavior dictionaries"),
+            (workflow_skill, "must not copy ArkServerApi/AseApi, NextGenPlugins"),
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, text)
+
+        forbidden_positive_claims = (
+            r"\bArkApi[- ]compatible\b",
+            r"\bport(?:s|ed|ing)?\s+(?:ArkApi|NextGenPlugins)\b",
+            r"\bcopy(?:ing|ied)?\s+(?:ArkApi|NextGenPlugins)\s+(?:code|implementations?)\b",
+            r"\buse\s+`?DECLARE_HOOK`?\s+(?:as|for)\s+(?:Linux\s+)?ABI\b",
+        )
+        negated_context = re.compile(
+            r"\b(?:do\s+not|does\s+not|must\s+not|not|no|never|without|forbids?|forbidden|"
+            r"does\s+not\s+authorize)\b",
+            re.IGNORECASE,
+        )
+
+        offenders: list[str] = []
+        for name, text in (
+            ("docs/PLUGIN_HUB_CAPABILITY_MATRIX.md", matrix),
+            ("docs/research/2026-05-30-nextgenplugins-reference-inventory.md", inventory),
+            ("agent-skills/obelisk-github-research-workflow/SKILL.md", workflow_skill),
+        ):
+            for line_no, line in enumerate(text.splitlines(), start=1):
+                for pattern in forbidden_positive_claims:
+                    if re.search(pattern, line, flags=re.IGNORECASE) and not negated_context.search(line):
+                        offenders.append(f"{name}:{line_no}: {line.strip()}")
 
         self.assertEqual(offenders, [])
 

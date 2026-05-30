@@ -47,8 +47,8 @@ The repo includes Ark/Atlas public headers and implementation code under
 - Chat hook naming around
   `AShooterPlayerController.ServerSendChatMessage_Implementation`.
 
-Those are valuable for naming and product compatibility, but the implementation strategy is
-not portable to Obelisk's Linux safety model.
+Those are valuable for naming and future Plugin Hub demand taxonomy, but the
+implementation strategy is not portable to Obelisk's Linux safety model.
 
 ## Obelisk Rule
 
@@ -63,7 +63,7 @@ Every AseApi-derived target must be revalidated through Obelisk:
 
 ## Next Steps
 
-- Build a small ArkApi compatibility matrix from AseApi names only:
+- Build a small Plugin Hub capability/demand matrix from AseApi names only:
   commands, timers, permissions, chat, players, tribes, dinos, items/inventory,
   structures, admin, storage/config.
 - Start with non-UE-dependent Obelisk primitives, especially owner-token timers, then

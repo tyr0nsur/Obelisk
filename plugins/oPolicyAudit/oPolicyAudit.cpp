@@ -504,6 +504,21 @@ namespace
         for (auto& name : g_ResourceNames)
             CopySanitizedDescriptorName(name, nullptr, "unknown");
     }
+
+    void UnregisterGameplayPolicyCallback() noexcept
+    {
+        try
+        {
+            if (g_HasApi && g_GameplayPolicyRegistrationId != 0 && g_Api.UnregisterGameplayPolicyEventWithOwnerToken)
+            {
+                g_Api.UnregisterGameplayPolicyEventWithOwnerToken(g_OwnerToken, g_GameplayPolicyRegistrationId);
+                g_GameplayPolicyRegistrationId = 0;
+            }
+        }
+        catch (...)
+        {
+        }
+    }
 }
 
 extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out)
@@ -599,12 +614,14 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(Obelis
     catch (const std::exception& e)
     {
         SafeLogError(api, (std::string("[oPolicyAudit] Init failed: ") + e.what()).c_str());
+        UnregisterGameplayPolicyCallback();
         ResetState();
         return false;
     }
     catch (...)
     {
         SafeLogError(api, "[oPolicyAudit] Init failed with unknown exception.");
+        UnregisterGameplayPolicyCallback();
         ResetState();
         return false;
     }
@@ -614,12 +631,7 @@ extern "C" __attribute__((visibility("default"))) void ObeliskPlugin_Shutdown()
 {
     try
     {
-        if (g_HasApi && g_GameplayPolicyRegistrationId != 0 && g_Api.UnregisterGameplayPolicyEventWithOwnerToken)
-        {
-            g_Api.UnregisterGameplayPolicyEventWithOwnerToken(g_OwnerToken, g_GameplayPolicyRegistrationId);
-            g_GameplayPolicyRegistrationId = 0;
-        }
-
+        UnregisterGameplayPolicyCallback();
         SafeLogInfo("[oPolicyAudit] Shutdown.");
     }
     catch (...)

@@ -18,7 +18,7 @@ second-source fixtures, copied C ABI contracts, and runtime safety gates.
 | Load a Linux-native plugin | `ObeliskPlugin_GetInfo`, `ObeliskPlugin_Init`, optional `ObeliskPlugin_Shutdown` | Stable baseline | Hot reload of Obelisk itself, detached workers, or background ingress without shutdown proof |
 | Log through Obelisk | `ObeliskPluginInitContext::Log` after `struct_size` checks | Stable baseline | Long-lived ownership of callback data or cross-thread logging contracts not proven by the plugin |
 | Discover resource categories | `DescribeResourceKind` | Promoted metadata | Resource identity, object lookup, persistent handles, or correlation between events |
-| Discover promoted policy event kinds | `DescribeGameplayPolicyEventKind` | Promoted metadata | Complete gameplay inventory, public module SDK, mutation path, or return override |
+| Discover promoted policy event kinds | `DescribeGameplayPolicyEventKind` | Promoted metadata | No complete gameplay inventory, public module SDK, mutation path, or return override |
 | Observe promoted structure/item policy data | `GameplayPolicyEvent` with owner-token registration | Promoted v0.1 SDK surface | Public `StructureEvents`, Inventory SDK, Items SDK, UE pointers, player/item/structure identity, mutation, or return override |
 | Parse copied chat text locally | `ChatMessageEvent` with owner-token registration | Minimal v0.1-rc ABI surface | Command SDK, sender identity, replies, moderation, chat blocking, or send-chat API |
 | Run process-local scheduled work | Owner-token timers | Promoted v0.1 core primitive | UE/gameplay timers, cluster scheduler, persistent ids, permission system, or command router |

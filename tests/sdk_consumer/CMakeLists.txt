@@ -249,6 +249,11 @@ if(TARGET oPolicyAudit)
         NAME SdkConsumerFixtureOPolicyAudit
         COMMAND sdk_consumer_fixture "$<TARGET_FILE:oPolicyAudit>" oPolicyAudit
     )
+
+    add_test(
+        NAME SdkConsumerFixtureOPolicyAuditPostRegistrationFailureCleanup
+        COMMAND sdk_consumer_fixture "$<TARGET_FILE:oPolicyAudit>" oPolicyAudit throw-log-after-gameplay-policy-registration
+    )
 endif()
 
 if(TARGET oChatAudit)

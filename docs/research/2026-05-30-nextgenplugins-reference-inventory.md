@@ -95,16 +95,16 @@ chat/server messages; permissions; and save/respawn/build/damage-style gameplay 
 build-placement policy lane, but they do not promote `APrimalStructure.IsAllowedToBuild`
 or any return-code semantics today.
 
-Use this clone as a demand-map and dictionary source, not as source code to port. Do not
-trust `DECLARE_HOOK` declarations as Linux ABI, direct UE pointer wrappers as safe public
-API shape, or ArkApi return constants as accepted Linux ARK behavior.
+Use this clone as a demand-map and dictionary source, not as source code to port. Do not treat it as source code to port.
+Do not trust `DECLARE_HOOK` declarations as Linux ABI, direct UE pointer wrappers as safe
+public API shape, or ArkApi return constants as accepted Linux ARK behavior.
 
 ## Constraints
 
 - Keep the current Obelisk core route first: copied events, stable C ABI, owner-token
   lifecycle, descriptor metadata, no UE internals in public plugin APIs.
 - Treat ArkApi plugin source as a feature dictionary only.
-- Any future Obelisk Plugin Hub compatibility note must describe behavior at a high level,
+- Any future Obelisk Plugin Hub capability note must describe behavior at a high level,
   not copy implementation.
 - Public APIs needed by these plugin families still require Obelisk promotion gates:
   copied payloads, second-source evidence where relevant, ABI tests, privacy policy,
@@ -113,7 +113,7 @@ API shape, or ArkApi return constants as accepted Linux ARK behavior.
 ## Recommendation
 
 Keep this local clone out of the Obelisk repository and use it later to build a
-`Plugin Hub compatibility matrix` once the v0.1 stable core is ready. The first useful
+`Plugin Hub capability matrix` once the v0.1 stable core is ready. The first useful
 matrix should list plugin name, feature category, required Obelisk API surface, current
 Obelisk readiness, and blocked capabilities.
 

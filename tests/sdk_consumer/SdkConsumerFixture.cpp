@@ -39,6 +39,7 @@ namespace
     bool g_FailChatMessageRegistration = false;
     bool g_FailTimerRegistration = false;
     bool g_ThrowLogAfterTimerRegistration = false;
+    bool g_ThrowLogAfterGameplayPolicyRegistration = false;
     bool g_BadGameplayPolicyDescriptor = false;
     bool g_BadDescriptorCatalogMetadata = false;
     bool g_BadDescriptorCatalogName = false;
@@ -139,6 +140,8 @@ namespace
         g_RegisteredGameplayPolicyCallback = callback;
         g_RegisteredGameplayPolicyUserData = userData;
         ++g_GameplayPolicyRegisterCount;
+        if (g_ThrowLogAfterGameplayPolicyRegistration)
+            g_ThrowLog = true;
         return 2002;
     }
 
@@ -635,6 +638,17 @@ namespace
     }
 })json";
 
+    constexpr const char* kActiveOPolicyAuditConfig = R"json({
+    "enabled": true,
+    "allow_all_instances": false,
+    "instance_allowlist": ["sdk-consumer-test"],
+    "policy_audit": {
+        "enabled": true,
+        "event_kind_mask": 2047,
+        "log_limit": 10
+    }
+})json";
+
     constexpr const char* kInvalidODescriptorCatalogConfig = R"json({
     "enabled": true,
     "allow_all_instances": false,
@@ -779,6 +793,10 @@ int main(int argc, char** argv)
             configJson = kActiveODescriptorCatalogConfig;
         else if (std::strcmp(expectedPluginId, "oDescriptorCatalog") == 0 && mode == "invalid-descriptor-catalog-config")
             configJson = kInvalidODescriptorCatalogConfig;
+        else if (std::strcmp(expectedPluginId, "oPolicyAudit") == 0 &&
+            (mode == "active-policy-audit" ||
+             mode == "throw-log-after-gameplay-policy-registration"))
+            configJson = kActiveOPolicyAuditConfig;
         else if (mode == "unsupported-map-allowlist")
             configJson = kUnsupportedMapAllowlistConfig;
         else if (mode == "invalid-process-event-config")
@@ -867,6 +885,8 @@ int main(int argc, char** argv)
             g_FailTimerRegistration = true;
         if (mode == "throw-log-after-timer-registration")
             g_ThrowLogAfterTimerRegistration = true;
+        if (mode == "throw-log-after-gameplay-policy-registration")
+            g_ThrowLogAfterGameplayPolicyRegistration = true;
         if (mode == "bad-gameplay-policy-descriptor")
             g_BadGameplayPolicyDescriptor = true;
         if (mode == "bad-descriptor-catalog-metadata")
@@ -966,6 +986,23 @@ int main(int argc, char** argv)
                 "timer user data survived post-registration init failure cleanup");
             g_ThrowLog = false;
             g_ThrowLogAfterTimerRegistration = false;
+            cleanupConfigDir();
+            closeHandle();
+            return 0;
+        }
+        if (mode == "throw-log-after-gameplay-policy-registration")
+        {
+            Require(!initSucceeded, "plugin accepted log failure after gameplay policy registration");
+            Require(g_GameplayPolicyRegisterCount == 1,
+                "plugin did not register gameplay policy callback before injected log failure");
+            Require(g_GameplayPolicyUnregisterCount == 1,
+                "plugin did not unregister gameplay policy callback after injected log failure");
+            Require(g_RegisteredGameplayPolicyCallback == nullptr,
+                "gameplay policy callback survived post-registration init failure cleanup");
+            Require(g_RegisteredGameplayPolicyUserData == nullptr,
+                "gameplay policy user data survived post-registration init failure cleanup");
+            g_ThrowLog = false;
+            g_ThrowLogAfterGameplayPolicyRegistration = false;
             cleanupConfigDir();
             closeHandle();
             return 0;
