@@ -422,6 +422,9 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("${BUILD_DIR}/plugins/oBaseEvents/oBaseEvents.so", script)
         self.assertNotIn("oPolicyAudit.so", script)
         self.assertIn("--require-second-source-readiness", release)
+        self.assertIn("An existing local or unpublished RC tag is not proof", release)
+        self.assertIn("may point behind the current validated head", release)
+        self.assertIn("verified against that intended validated release ref", status)
         self.assertIn("--require-second-source-readiness", pr_template)
         self.assertIn("--require-second-source-readiness", script)
         self.assertIn("--ufunction-second-source-root", release)
@@ -522,6 +525,27 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("runtime_observer_observational_only", release)
         self.assertNotIn("--map Ragnarok --instance arkserver", release)
         self.assertIn("--map <map> --instance <instance-id>", release)
+
+    def test_disable_plugins_marker_is_documented_as_wrapper_input_not_runtime_gate(self) -> None:
+        install = read("docs/INSTALL.md")
+        status = read("docs/STATUS.md")
+
+        for path, text in (("docs/INSTALL.md", install), ("docs/STATUS.md", status)):
+            with self.subTest(file=path, item="marker named"):
+                self.assertIn("state/instances/<instance-id>/disable-plugins", text)
+            with self.subTest(file=path, item="runtime env gate"):
+                self.assertIn("OBELISK_DISABLE_PLUGINS=1", text)
+            with self.subTest(file=path, item="not runtime gate by itself"):
+                self.assertRegex(
+                    normalized(text),
+                    r"disable-plugins.*(?:not an independent runtime gate|not a runtime gate by itself)",
+                )
+
+        normalized_install = normalized(install)
+        normalized_status = normalized(status)
+        self.assertIn("wrapper translates it into `OBELISK_DISABLE_PLUGINS=1`", normalized_install)
+        self.assertIn("custom launchers must set that environment variable themselves", normalized_install)
+        self.assertIn("when the wrapper or launcher sets `OBELISK_DISABLE_PLUGINS=1`", normalized_status)
 
     def test_rc_final_validation_does_not_use_minimal_only_root_for_all_public_target_sets(self) -> None:
         plan = read("docs/research/2026-05-29-rc-checkpoint-slicing-plan.md")

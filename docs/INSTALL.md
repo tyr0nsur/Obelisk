@@ -194,13 +194,17 @@ Useful flags:
 
 ```text
 state/instances/<instance-id>/enable-process-event-hook
-state/instances/<instance-id>/disable-plugins
+state/instances/<instance-id>/disable-plugins  # wrapper input
 state/instances/<instance-id>/allow-experimental-observers  # required with observer markers below
 state/instances/<instance-id>/enable-chat-events  # experimental ChatMessageEvent producer
 state/instances/<instance-id>/enable-chat-reflection  # experimental
 state/instances/<instance-id>/enable-inventory-reflection  # experimental, metadata-only
 state/instances/<instance-id>/enable-structure-reflection  # experimental, metadata-only
 ```
+
+`disable-plugins` is a supported LinuxGSM wrapper marker, not an independent runtime
+gate. The wrapper translates it into `OBELISK_DISABLE_PLUGINS=1`; custom launchers must
+set that environment variable themselves when plugin loading should be disabled.
 
 The normal LinuxGSM wrapper is protected by default. If any experimental observer marker is
 present for the selected instance, it refuses to launch unless the approved debug window
@@ -278,8 +282,8 @@ OBELISK_CHAT_REFLECTION_LOG_TEXT=1
 ```
 
 Rollback is removing the observer/debug-window markers and restarting the instance. The
-stable production posture is still process-event hook enabled, plugins disabled for debug,
-and all experimental observers off.
+stable production posture is still process-event hook enabled, plugin loading disabled
+through `OBELISK_DISABLE_PLUGINS=1`, and all experimental observers off.
 
 Map markers such as `enable-process-event-hook-ragnarok` are obsolete and are not read by
 the release wrapper.
@@ -310,7 +314,10 @@ state/instances/<instance-id>/enable-process-event-hook
 state/instances/<instance-id>/disable-plugins
 ```
 
-This validates the core ProcessEvent hook without loading experimental plugins.
+This validates the core ProcessEvent hook without loading experimental plugins when the
+supported LinuxGSM wrapper is used. The runtime itself disables plugin loading only when
+`OBELISK_DISABLE_PLUGINS=1` is present; the `disable-plugins` marker is the wrapper input
+that sets that environment variable.
 
 Keep current instance names, maps, beta-test routing, and debug-instance startup/shutdown
 rules in operator-owned deployment notes, not in public SDK install docs. For any approved

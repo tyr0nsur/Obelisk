@@ -31,6 +31,16 @@ namespace
     Obelisk::Core::EventManager* g_SelfUnregisterEvents = nullptr;
     uint64_t g_SelfUnregisterId = 0;
 
+    struct ReentrantUnregisterState {
+        Obelisk::Core::EventManager* events = nullptr;
+        void* owner = nullptr;
+        uint64_t other_id = 0;
+        int first_calls = 0;
+        int second_calls = 0;
+    };
+
+    ReentrantUnregisterState* g_ReentrantUnregisterState = nullptr;
+
     struct BlockingCallbackState {
         std::mutex mutex;
         std::condition_variable cv;
@@ -148,6 +158,25 @@ namespace
         Require(g_SelfUnregisterEvents != nullptr, "self-unregister callback has no event manager");
         Require(g_SelfUnregisterEvents->UnregisterCallback(g_SelfUnregisterId),
                 "self-unregister callback could not unregister itself");
+        return true;
+    }
+
+    bool ReentrantUnregisterFirst(void*, void*, void*)
+    {
+        Require(g_ReentrantUnregisterState != nullptr, "reentrant unregister callback has no state");
+        Require(g_ReentrantUnregisterState->events != nullptr, "reentrant unregister callback has no event manager");
+        ++g_ReentrantUnregisterState->first_calls;
+        Require(g_ReentrantUnregisterState->events->UnregisterCallbackForOwner(
+                    g_ReentrantUnregisterState->owner,
+                    g_ReentrantUnregisterState->other_id),
+                "reentrant unregister of second callback failed");
+        return true;
+    }
+
+    bool ReentrantUnregisterSecond(void*, void*, void*)
+    {
+        Require(g_ReentrantUnregisterState != nullptr, "reentrant unregister second callback has no state");
+        ++g_ReentrantUnregisterState->second_calls;
         return true;
     }
 
@@ -420,6 +449,80 @@ namespace
         g_SelfUnregisterId = 0;
     }
 
+    void TestReentrantUnregisterSkipsLaterRawCallbackSnapshots()
+    {
+        auto run = [](auto register_first, auto register_second, auto trigger, const char* scope) {
+            Obelisk::Core::EventManager events;
+            int owner = 0;
+            ReentrantUnregisterState state;
+            state.events = &events;
+            state.owner = &owner;
+            g_ReentrantUnregisterState = &state;
+
+            const uint64_t firstId = register_first(events, &owner);
+            state.other_id = register_second(events, &owner);
+            Require(firstId != 0 && state.other_id != 0, scope);
+
+            trigger(events);
+            Require(state.first_calls == 1, "first reentrant raw callback did not run");
+            Require(state.second_calls == 0, "unregistered raw callback ran from stale snapshot");
+
+            Require(events.UnregisterCallbackForOwner(&owner, firstId),
+                    "first reentrant raw callback could not unregister");
+            g_ReentrantUnregisterState = nullptr;
+        };
+
+        run(
+            [](Obelisk::Core::EventManager& events, void* owner) {
+                return events.RegisterPreProcessEventOwned(owner, ReentrantUnregisterFirst);
+            },
+            [](Obelisk::Core::EventManager& events, void* owner) {
+                return events.RegisterPreProcessEventOwned(owner, ReentrantUnregisterSecond);
+            },
+            [](Obelisk::Core::EventManager& events) {
+                Require(events.TriggerPreProcessEvent(nullptr, nullptr, nullptr),
+                        "global pre reentrant unregister blocked dispatch");
+            },
+            "global pre reentrant unregister registrations failed");
+
+        run(
+            [](Obelisk::Core::EventManager& events, void* owner) {
+                return events.RegisterPreProcessEventForNameIndexOwned(owner, 42, ReentrantUnregisterFirst);
+            },
+            [](Obelisk::Core::EventManager& events, void* owner) {
+                return events.RegisterPreProcessEventForNameIndexOwned(owner, 42, ReentrantUnregisterSecond);
+            },
+            [](Obelisk::Core::EventManager& events) {
+                Require(events.TriggerPreProcessEvent(42, nullptr, nullptr, nullptr),
+                        "filtered pre reentrant unregister blocked dispatch");
+            },
+            "filtered pre reentrant unregister registrations failed");
+
+        run(
+            [](Obelisk::Core::EventManager& events, void* owner) {
+                return events.RegisterPostProcessEventOwned(owner, ReentrantUnregisterFirst);
+            },
+            [](Obelisk::Core::EventManager& events, void* owner) {
+                return events.RegisterPostProcessEventOwned(owner, ReentrantUnregisterSecond);
+            },
+            [](Obelisk::Core::EventManager& events) {
+                events.TriggerPostProcessEvent(nullptr, nullptr, nullptr);
+            },
+            "global post reentrant unregister registrations failed");
+
+        run(
+            [](Obelisk::Core::EventManager& events, void* owner) {
+                return events.RegisterPostProcessEventForNameIndexOwned(owner, 42, ReentrantUnregisterFirst);
+            },
+            [](Obelisk::Core::EventManager& events, void* owner) {
+                return events.RegisterPostProcessEventForNameIndexOwned(owner, 42, ReentrantUnregisterSecond);
+            },
+            [](Obelisk::Core::EventManager& events) {
+                events.TriggerPostProcessEvent(42, nullptr, nullptr, nullptr);
+            },
+            "filtered post reentrant unregister registrations failed");
+    }
+
     void TestOwnerCleanupWaitsForInFlightFilteredPreCallback()
     {
         ResetCounters();
@@ -558,6 +661,7 @@ int main()
     TestSingleRegistrationUnregister();
     TestNullCallbacksAreIgnored();
     TestCallbackCanUnregisterItself();
+    TestReentrantUnregisterSkipsLaterRawCallbackSnapshots();
     TestOwnerCleanupWaitsForInFlightFilteredPreCallback();
     TestOwnerCleanupWaitsForInFlightPostCallback();
     TestRegistrationIdsSkipZeroAfterWrap();

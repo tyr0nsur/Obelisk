@@ -129,3 +129,38 @@ This closes the second-source layout gap only. It does not promote public Invent
 Items SDKs, `ItemNetID`, item/inventory/actor identity, `ResourceHandle`, mutation, return
 override, raw params, or runtime hooks. The safe model for `ItemId` and `ItemID1` remains:
 opaque 8-byte struct parameters used by these two inventory action calls.
+
+## 2026-05-30 Strict Artifact Flow Recommendation
+
+The next offline artifact for `inventory-action-compact-intake` should regenerate the
+candidate-only redacted UFunction signatures from the committed sanitized snapshot
+manifest and require strict target-set coverage at consume time. This is a documentation
+recommendation only; no new artifact was generated in this round.
+
+Recommended offline flow:
+
+```bash
+artifact_dir=/servidor/ark/workspace-offline/inventory-action-compact-redacted-signatures-strict-YYYYMMDDTHHMMSSZ
+mkdir -p "$artifact_dir"
+python3 scripts/build_redacted_ufunction_signatures.py \
+  --target-set inventory-action-compact-intake \
+  --json > "$artifact_dir/signatures.json"
+python3 scripts/validate_offline_artifact_gate.py \
+  --mode consume \
+  --root /servidor/ark/workspace-offline \
+  --manifest "$artifact_dir/signatures.json" \
+  --strict-target-set-coverage \
+  --json > "$artifact_dir/consume-gate.json"
+```
+
+The expected strict artifact property is `target_set_coverage.status=complete` for exactly:
+
+```text
+ShooterPlayerController.ServerRequestInventoryUseItem
+ShooterPlayerController.ServerRequestInventoryUseItemWithActor
+```
+
+Consume-gate acceptance would remain planning hygiene only. It must not be treated as
+runtime validation or SDK promotion, and it does not weaken the existing blockers around
+redacted `ItemNetID` structs, redacted UObject references, identity, mutation, return
+override, raw params, public callbacks, or `ResourceHandle`.

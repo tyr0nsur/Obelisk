@@ -77,6 +77,11 @@ namespace Obelisk::Core
                containsId(m_FilteredPostProcessEventCallbacks);
     }
 
+    bool EventManager::IsRegistrationActive(uint64_t registrationId) const
+    {
+        return registrationId != 0 && HasRegistrationId(registrationId);
+    }
+
     uint64_t EventManager::RegisterPreProcessEventOwned(void* owner, OnProcessEventCallback callback)
     {
         std::lock_guard<std::mutex> lock(m_Mutex);
@@ -201,22 +206,27 @@ namespace Obelisk::Core
 
     bool EventManager::TriggerPreProcessEvent(void* caller, void* function, void* parms)
     {
-        std::vector<OnProcessEventCallback> callbacks;
+        std::vector<CallbackSnapshot> callbacks;
         std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
             for (const auto& item : m_PreProcessEventCallbacks)
-                callbacks.push_back(item.callback);
+                callbacks.push_back({item.id, item.callback});
         }
 
-        for (auto callback : callbacks)
+        for (const auto& snapshot : callbacks)
         {
-            if (!callback)
+            if (!snapshot.callback)
                 continue;
+            {
+                std::lock_guard<std::mutex> lock(m_Mutex);
+                if (!IsRegistrationActive(snapshot.id))
+                    continue;
+            }
 
             try
             {
-                if (!callback(caller, function, parms))
+                if (!snapshot.callback(caller, function, parms))
                 {
                     if (IsProcessEventBlockingAllowed())
                         return false;
@@ -240,25 +250,30 @@ namespace Obelisk::Core
         if (!TriggerPreProcessEvent(caller, function, parms))
             return false;
 
-        std::vector<OnProcessEventCallback> callbacks;
+        std::vector<CallbackSnapshot> callbacks;
         std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
             for (const auto& item : m_FilteredPreProcessEventCallbacks)
             {
                 if (item.nameIndex == nameIndex)
-                    callbacks.push_back(item.callback);
+                    callbacks.push_back({item.id, item.callback});
             }
         }
 
-        for (auto callback : callbacks)
+        for (const auto& snapshot : callbacks)
         {
-            if (!callback)
+            if (!snapshot.callback)
                 continue;
+            {
+                std::lock_guard<std::mutex> lock(m_Mutex);
+                if (!IsRegistrationActive(snapshot.id))
+                    continue;
+            }
 
             try
             {
-                if (!callback(caller, function, parms))
+                if (!snapshot.callback(caller, function, parms))
                 {
                     if (IsProcessEventBlockingAllowed())
                         return false;
@@ -279,22 +294,27 @@ namespace Obelisk::Core
 
     void EventManager::TriggerPostProcessEvent(void* caller, void* function, void* parms)
     {
-        std::vector<OnProcessEventCallback> callbacks;
+        std::vector<CallbackSnapshot> callbacks;
         std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
             for (const auto& item : m_PostProcessEventCallbacks)
-                callbacks.push_back(item.callback);
+                callbacks.push_back({item.id, item.callback});
         }
 
-        for (auto callback : callbacks)
+        for (const auto& snapshot : callbacks)
         {
-            if (!callback)
+            if (!snapshot.callback)
                 continue;
+            {
+                std::lock_guard<std::mutex> lock(m_Mutex);
+                if (!IsRegistrationActive(snapshot.id))
+                    continue;
+            }
 
             try
             {
-                callback(caller, function, parms);
+                snapshot.callback(caller, function, parms);
             }
             catch (const std::exception& e)
             {
@@ -311,25 +331,30 @@ namespace Obelisk::Core
     {
         TriggerPostProcessEvent(caller, function, parms);
 
-        std::vector<OnProcessEventCallback> callbacks;
+        std::vector<CallbackSnapshot> callbacks;
         std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
             for (const auto& item : m_FilteredPostProcessEventCallbacks)
             {
                 if (item.nameIndex == nameIndex)
-                    callbacks.push_back(item.callback);
+                    callbacks.push_back({item.id, item.callback});
             }
         }
 
-        for (auto callback : callbacks)
+        for (const auto& snapshot : callbacks)
         {
-            if (!callback)
+            if (!snapshot.callback)
                 continue;
+            {
+                std::lock_guard<std::mutex> lock(m_Mutex);
+                if (!IsRegistrationActive(snapshot.id))
+                    continue;
+            }
 
             try
             {
-                callback(caller, function, parms);
+                snapshot.callback(caller, function, parms);
             }
             catch (const std::exception& e)
             {

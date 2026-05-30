@@ -115,6 +115,12 @@ release-manager tag/push:
 scripts/check_release_readiness.sh --require-second-source-readiness
 ```
 
+An existing local or unpublished RC tag is not proof that the current validated
+head is tagged. It may point behind the current validated head after later
+release-prep fixes. Before any release-manager tag/push, verify that the RC tag
+commit, if it already exists, is exactly the intended validated release ref; if
+it is not, stop and resolve the stale tag state instead of reusing or pushing it.
+
 The promotion check always includes the public RC UFunction target sets:
 `minimal-second-source-intake`, `structure-observer-intake`, and `chat-message-intake`.
 The check still needs a configured second-source snapshot root, either through

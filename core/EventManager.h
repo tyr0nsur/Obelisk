@@ -49,8 +49,14 @@ namespace Obelisk::Core
             void* owner;
         };
 
+        struct CallbackSnapshot {
+            uint64_t id;
+            OnProcessEventCallback callback;
+        };
+
         uint64_t AllocateRegistrationId();
         bool HasRegistrationId(uint64_t registrationId) const;
+        bool IsRegistrationActive(uint64_t registrationId) const;
 
         std::mutex m_Mutex;
         std::recursive_mutex m_DispatchMutex;

@@ -186,8 +186,8 @@ namespace Obelisk::Core
 
         DlopenLibraryLoader& DefaultLoader()
         {
-            static DlopenLibraryLoader loader;
-            return loader;
+            static auto* loader = new DlopenLibraryLoader();
+            return *loader;
         }
 
         bool IsLoadedPluginOwnerLocked(void* owner)
@@ -1778,8 +1778,8 @@ namespace Obelisk::Core
 
     PluginManager& PluginManager::Get()
     {
-        static PluginManager instance;
-        return instance;
+        static auto* instance = new PluginManager();
+        return *instance;
     }
 
     PluginManager::PluginManager()

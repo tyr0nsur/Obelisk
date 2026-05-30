@@ -18,7 +18,9 @@ gameplay policy event descriptors. It does not promote a public Inventory/Items
 SDK, `ResourceHandle`, identity, lookup, mutation, return override, or
 live-server claim. Remaining `v0.1.0-rc.1` release work is release-manager
 confirmation on the intended release ref, CI/clean-tree review, and tag/push
-when explicitly authorized.
+when explicitly authorized. Existing local or unpublished RC tags must be
+verified against that intended validated release ref because they may point
+behind the current validated head after later release-prep fixes.
 
 The current ARK server setup is a validation adapter used to check Obelisk in a
 real UE4 Linux process. Adapter operations are documented here only when they
@@ -43,7 +45,7 @@ define or protect runtime behavior.
 | Installer plugin posture | Stable baseline | `scripts/install_obelisk.sh` installs runtime/SDK artifacts; plugins are published with `scripts/install_obelisk_plugin.sh`, which stages under a non-`.so` name before atomic rename into `plugins/`. |
 | Operator CLI | Experimental | `scripts/obelisk.py` exposes read-only `status`, `instances list`, `plugins list`, and `plugins show`; lifecycle commands are planned after LinuxGSM integration and explicit restart safety gates. |
 | Per-instance runtime flags | Stable baseline | `OBELISK_INSTANCE_ID` selects logs and markers under `state/instances/<id>/`; map markers are obsolete. |
-| ProcessEvent hook | Stable baseline | Stable validation enables the hook while disabling plugins; live posture must be verified with `check_obelisk_server_posture.sh` before making claims. |
+| ProcessEvent hook | Stable baseline | Stable validation enables the hook while plugin loading is disabled through `OBELISK_DISABLE_PLUGINS=1`; live posture must be verified with `check_obelisk_server_posture.sh` before making claims. |
 | Server posture check | Stable baseline | `scripts/check_obelisk_server_posture.sh --expect-stable --map <map> --instance <instance-id>` validates stable env flags, requires central `${OBELISK_ROOT}/lib/libobelisk.so` in `LD_PRELOAD` and maps, requires a safe instance id, a non-symlink marker directory, and the stable per-instance markers, rejects deleted runtime mappings, and fails closed on forbidden per-instance marker entries that would reactivate experimental features at next restart. Covered by offline procfs-fixture tests. `--forbid-chat-reflection` remains a legacy compatibility flag because chat observers are already forbidden by `--expect-stable`. |
 | Plugin C ABI loading | Stable baseline | ABI is C-compatible and currently append-only for new metadata fields; `v0.1.0` freezes the current `ObeliskApi` ABI v1 layout, and any ABI v2 requires an explicit migration plan. ABI guardrails include layout validation, in-tree and installed SDK consumer checks, and capability-snapshot tests for owner-token public registrations. |
 | Filtered ProcessEvent callbacks | Debug-gated raw ABI | Runtime infrastructure only: callbacks scoped by `FName` index still receive borrowed UE pointers and raw params, so they are rejected unless `OBELISK_ALLOW_FILTERED_PROCESS_EVENT_CALLBACKS=1` and `allow-filtered-process-event-callbacks` are active. This is not public module dispatch, gameplay mutation, return override, or a stable parameter API. |
@@ -106,6 +108,10 @@ For any shared or player-facing validation adapter, the documented stable marker
 state/instances/<instance-id>/enable-process-event-hook
 state/instances/<instance-id>/disable-plugins
 ```
+
+`disable-plugins` is a supported wrapper marker. It is not a runtime gate by itself; the
+runtime disables plugin loading when the wrapper or launcher sets
+`OBELISK_DISABLE_PLUGINS=1`.
 
 Do not enable native exec probes on validation adapter servers. Keep experimental
 plugins in the repository or another staging location until isolated validation
