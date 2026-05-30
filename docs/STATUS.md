@@ -7,6 +7,19 @@ for detailed research notes.
 Current release-prep route is core-first `v0.1.0-rc.1`; see
 [VERSIONING.md](VERSIONING.md). This is not a production-stable release claim.
 
+Current RC validation checkpoint as of 2026-05-30: the local tree passed
+`scripts/check_release_readiness.sh --require-second-source-readiness` with
+`/tmp/obelisk-rc-ufunction-second-source-root` as the configured UFunction
+second-source root; see
+[`2026-05-30-rc-second-source-release-gate-check.md`](research/2026-05-30-rc-second-source-release-gate-check.md).
+This only validates the documented RC gate for the public scope below:
+`ChatMessageEvent`, `GameplayPolicyEvent`, resource kind descriptors, and
+gameplay policy event descriptors. It does not promote a public Inventory/Items
+SDK, `ResourceHandle`, identity, lookup, mutation, return override, or
+live-server claim. Remaining `v0.1.0-rc.1` release work is release-manager
+confirmation on the intended release ref, CI/clean-tree review, and tag/push
+when explicitly authorized.
+
 The current ARK server setup is a validation adapter used to check Obelisk in a
 real UE4 Linux process. Adapter operations are documented here only when they
 define or protect runtime behavior.

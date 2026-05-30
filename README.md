@@ -165,18 +165,13 @@ Obelisk installs under an operator-chosen root, referenced in docs as
       <instance-id>/
         enable-process-event-hook
         disable-plugins
-        allow-experimental-observers  # required with experimental observer markers
-        enable-chat-events  # experimental ChatMessageEvent producer
-        enable-chat-reflection  # historical observer; not ChatMessageEvent delivery
-        enable-inventory-reflection  # experimental
-        enable-structure-reflection  # experimental
-        allow-ptrace  # approved debug window only
-        enable-debug-control  # approved debug window only
-        enable-reflection-scanner  # approved debug window only
-        enable-native-exec-probes  # never on live/shared instances
-        allow-global-process-event-callbacks  # experimental SDK callback scope
-        allow-call-process-event  # experimental outbound UE call surface
 ```
+
+The stable posture markers are `enable-process-event-hook` and `disable-plugins`.
+Experimental observer, scanner, outbound-call, ptrace, native-exec, and raw callback
+markers are documented in [docs/INSTALL.md](docs/INSTALL.md) and
+[docs/STATUS.md](docs/STATUS.md); they are not stable posture and require an approved
+debug or beta window.
 
 The target binary directory should only need a thin launcher/wrapper. Runtime
 libraries, plugins, config, logs, and state markers belong under the Obelisk
@@ -207,23 +202,11 @@ Minimal shape:
 
 static ObeliskApi g_api{};
 static bool g_has_api = false;
-static uint64_t g_owner_token = 0;
-static uint64_t g_pre_handle = 0;
 
 static void ResetState()
 {
     g_api = {};
     g_has_api = false;
-    g_owner_token = 0;
-    g_pre_handle = 0;
-}
-
-static bool OnProcessEvent(void* caller, void* function, void* params)
-{
-    (void)caller;
-    (void)function;
-    (void)params;
-    return true;
 }
 
 extern "C" __attribute__((visibility("default")))
@@ -262,26 +245,7 @@ bool ObeliskPlugin_Init(ObeliskApi* api, const ObeliskPluginInitContext* context
 
         g_api = *api;
         g_has_api = true;
-        g_owner_token = context->plugin_owner_token;
         api->LogInfo("Plugin loaded");
-
-        const int32_t validated_function_index = -1;
-        if (validated_function_index >= 0 &&
-            (api->capabilities & OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS) &&
-            (api->capabilities & OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS) &&
-            (api->capabilities & OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES) &&
-            api->struct_size >= offsetof(ObeliskApi, UnregisterProcessEventCallbackWithOwnerToken) +
-                sizeof(api->UnregisterProcessEventCallbackWithOwnerToken) &&
-            g_owner_token != 0 &&
-            api->RegisterPreProcessEventForNameIndexWithOwnerTokenHandle &&
-            api->UnregisterProcessEventCallbackWithOwnerToken)
-        {
-            g_pre_handle = api->RegisterPreProcessEventForNameIndexWithOwnerTokenHandle(
-                g_owner_token, validated_function_index, OnProcessEvent);
-            if (g_pre_handle == 0)
-                api->LogWarn("Filtered ProcessEvent callback registration was rejected");
-        }
-
         return true;
     } catch (...) {
         ResetState();
@@ -293,8 +257,8 @@ extern "C" __attribute__((visibility("default")))
 void ObeliskPlugin_Shutdown()
 {
     try {
-        if (g_has_api && g_pre_handle != 0 && g_api.UnregisterProcessEventCallbackWithOwnerToken)
-            g_api.UnregisterProcessEventCallbackWithOwnerToken(g_owner_token, g_pre_handle);
+        if (g_has_api && g_api.LogInfo)
+            g_api.LogInfo("Plugin shutdown");
     } catch (...) {
     }
     ResetState();
