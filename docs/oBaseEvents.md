@@ -5,8 +5,8 @@ safe by default.
 
 It demonstrates plugin lifecycle, config, and filtered `ProcessEvent` callback mechanics.
 The promoted v0.1 gameplay callback path is `GameplayPolicyEvent`; use
-`DescribeGameplayPolicyEventKind` and `DescribeResourceKind` for metadata-only discovery
-when building gameplay policy plugins.
+`DescribeGameplayPolicyEventKind` and `DescribeResourceKind` for metadata-only descriptions
+of promoted event kinds and resource categories when building gameplay policy plugins.
 
 It demonstrates:
 

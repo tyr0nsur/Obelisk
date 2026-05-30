@@ -80,16 +80,58 @@ List the named target sets used by focused readiness checks with:
 python3 scripts/compare_reflection_snapshots.py --list-target-sets
 ```
 
-Current UFunction target sets:
+Current UFunction target sets are defined in `scripts/reflection_target_sets.py`.
+`scripts/check_release_readiness.sh --require-second-source-readiness` automatically
+gates the public RC UFunction backing sets below, even when they are not supplied
+explicitly:
 
-- `minimal-second-source-intake`: first inventory/structure promotion gate.
-- `structure-observer-intake`: all six structure observer UFunctions currently recognized
-  internally.
-- `buff-compact-intake`: compact `PrimalBuff` bool/scalar shapes for P1 research.
-- `dino-compact-intake`: compact dino passenger/carry shapes for P1 research.
-- `mission-compact-intake`: compact mission lifecycle and usable-item targets.
+- `minimal-second-source-intake`: first inventory/structure layout backing for copied
+  `GameplayPolicyEvent` policy fields. This is layout evidence only and does not promote
+  a public Inventory or StructureEvents SDK.
+- `structure-observer-intake`: all six structure observer UFunctions used as layout
+  backing for copied/redacted `GameplayPolicyEvent` fields. This does not promote raw
+  structure callbacks, object identity, mutation, or return overrides.
+- `chat-message-intake`: `ShooterPlayerController.ServerSendChatMessage`, the layout
+  backing for the minimal copied `ChatMessageEvent` RC/public callback. This covers the
+  copied notification contract only, not command routing, sender identity, moderation,
+  raw `FString` storage, mutation, or return override.
+
+Internal or RC-excluded UFunction target sets require explicit
+`--ufunction-second-source-target-set` selection and do not replace the public RC backing
+sets:
+
+- `buff-compact-intake`: compact `PrimalBuff` bool/scalar shapes for internal research.
+- `buff-breadth-intake`: broader `PrimalBuff` inventory/add/prevent shapes for internal
+  research.
+- `dino-compact-intake`: compact dino passenger/carry shapes for internal research.
+- `mission-compact-intake`: compact mission lifecycle and usable-item targets. Scalar
+  summaries are review aids only and are not RC scope.
 - `tribe-compact-intake`: compact tribe/admin-adjacent identity and log targets.
-- `transfer-ufunction-intake`: transfer upload/download and validation functions.
+
+Post-RC layout-only target sets are accepted as offline fixture/comparison evidence only
+unless a later focused promotion gate explicitly changes release scope:
+
+- `item-compact-intake`: compact `PrimalItem` policy/action layouts.
+- `inventory-action-compact-intake`: compact inventory-use request layouts.
+- `transfer-ufunction-intake`: transfer upload/download and validation layouts; no public
+  Transfer SDK, runtime hook, payload decoding, identity, mutation, or return override is
+  promoted by this target set.
+
+Manifest-backed snapshots may also exist outside any current named target set.
+`PrimalInventoryComponent.InventoryCustomFilter` is committed in `manifest.json`, but it
+does not currently belong to any named target set in `scripts/reflection_target_sets.py`.
+
+## RC Checkpoint Scope
+
+`manifest.json` is a mixed fixture inventory. It contains RC backing targets, internal
+research targets, and post-RC candidates, all as sanitized snapshot evidence. Do not cite
+the whole manifest as RC readiness evidence. RC readiness is target-set-scoped and must
+come from the release gate target sets above plus an accepted second-source comparison.
+
+Snapshot fields such as `object_index`, `name_index`, `class_object_index`, and target
+identity values are correlation fields for comparing sanitized snapshots. They are not
+stable object identity, public `ResourceHandle` evidence, UE lookup evidence, lifecycle
+proof, or proof that all FNames/UFunctions are known.
 
 Naming:
 

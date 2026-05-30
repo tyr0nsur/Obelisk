@@ -421,9 +421,10 @@ Plugins that need category metadata can call `DescribeResourceKind` after checki
 supported gameplay policy masks, supported field masks, and flags that explicitly mark the
 category as no-identity and no-lookup.
 
-Plugins that need event-kind discovery can call `DescribeGameplayPolicyEventKind` after
-checking `OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS`, that `struct_size`
-covers the appended slot, and that the function pointer is non-null. The returned
+Plugins that need metadata for promoted event kinds can call
+`DescribeGameplayPolicyEventKind` after checking
+`OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS`, that `struct_size` covers the
+appended slot, and that the function pointer is non-null. The returned
 `ObeliskGameplayPolicyEventDescriptor` is copied POD metadata only: stable event name,
 resource category, event-kind mask, supported field mask, and copied-payload/backing
 flags. It does not expose UE internals, identity, lookup, mutation, or override authority.
@@ -437,10 +438,9 @@ does not expose sender identity, resource identity, raw `FString`, UE pointers,
 FName/GObjects indices, raw params, chat send/moderation/blocking, mutation, or return
 override authority. Callback data is valid only for the callback duration, and the handle
 must be unregistered with `UnregisterChatMessageEventWithOwnerToken` during shutdown.
-End-to-end delivery validation is specifically the `enable-chat-events` producer during
-an approved operator-selected beta-test window; `enable-chat-reflection` is only the
-historical observer path, so SDK registration support alone is not an end-to-end delivery
-claim.
+Copied plugin-facing delivery evidence covers the gated `enable-chat-events` producer
+during an approved operator-selected beta-test window; `enable-chat-reflection` is only
+the historical observer path, so SDK registration support alone is not a delivery claim.
 
 `CallProcessEvent` is a low-level trampoline escape hatch. The ABI slot exists for
 compatibility, but plugins must treat it as unavailable unless `struct_size` covers the
