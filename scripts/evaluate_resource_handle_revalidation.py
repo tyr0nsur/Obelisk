@@ -98,6 +98,7 @@ RESOURCE_HANDLE_LIFETIME_BLOCKERS = (
 
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 SAFE_ARTIFACT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
+PLACEHOLDER_ARTIFACT_ID_PREFIX = "unspecified-"
 
 
 def load_json(path: Path, label: str) -> dict[str, Any]:
@@ -141,6 +142,10 @@ def safe_artifact_id(value: object) -> bool:
     return isinstance(value, str) and SAFE_ARTIFACT_ID_RE.fullmatch(value) is not None and ".." not in value
 
 
+def placeholder_artifact_id(value: object) -> bool:
+    return isinstance(value, str) and value.casefold().startswith(PLACEHOLDER_ARTIFACT_ID_PREFIX)
+
+
 def classify_artifact_identity(report: dict[str, Any]) -> tuple[str, set[str]]:
     identity = report.get("artifact_identity")
     if not isinstance(identity, dict):
@@ -157,6 +162,9 @@ def classify_artifact_identity(report: dict[str, Any]) -> tuple[str, set[str]]:
         or not is_sha256(artifact_sha256)
         or not safe_artifact_id(capture_id)
         or not safe_artifact_id(evidence_pack_id)
+        or placeholder_artifact_id(artifact_kind)
+        or placeholder_artifact_id(capture_id)
+        or placeholder_artifact_id(evidence_pack_id)
     ):
         return "invalid", set()
     return "complete", {str(artifact_sha256)}

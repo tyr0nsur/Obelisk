@@ -129,6 +129,20 @@ accepted, its promote gate remains blocked, and the manifest explicitly keeps pu
 ResourceHandle, public GObjects, object identity, post-callback lookup, lifecycle names,
 mutation, return override, and SDK exposure as non-claims.
 
+The current sample-report refresh that combines the rich transition matrix with the
+canonical policy pack is:
+
+```text
+/home/flowcommunity-ark/obelisk-artifacts/uobject-flag-sample-refresh-20260530T112500Z/
+```
+
+`uobject-flag-sample-report.json` has SHA256
+`520278d7388a7740bdd9e39d7ea055fa3b1c7262ff2403af68cbabbef6ececbf`.
+The consume gate is accepted and the promote gate is blocked with the expected
+candidate-only/non-claims blockers. Treat this as internal static sample evidence only;
+it does not clear `uobject_flags_validity_semantics_unproven` or promote
+`ResourceHandle`.
+
 Superseded inputs should stay historical only:
 
 - `/servidor/ark/workspace-offline/uobject-flag-policy-static-negative-20260529T143705Z/`

@@ -282,9 +282,12 @@ class ResourceHandleRevalidationEvaluatorTests(unittest.TestCase):
     def test_require_artifact_identity_adds_blocker_for_invalid_identity(self) -> None:
         invalid_values = (
             {"artifact_sha256": "A" * 64},
+            {"artifact_kind": "unspecified-core"},
             {"capture_id": "../bad"},
             {"capture_id": "bad/path"},
             {"evidence_pack_id": ""},
+            {"capture_id": "unspecified-capture"},
+            {"evidence_pack_id": "unspecified-evidence-pack"},
         )
         for override in invalid_values:
             with self.subTest(override=override):
