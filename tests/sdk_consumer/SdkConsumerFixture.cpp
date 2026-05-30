@@ -209,6 +209,87 @@ namespace
         g_RegisteredGameplayPolicyCallback(&event, g_RegisteredGameplayPolicyUserData);
     }
 
+    bool DescribeResourceKind(uint32_t resourceKind, ObeliskResourceKindDescriptor* out)
+    {
+        Require(out != nullptr, "resource descriptor output was null");
+        Require(out->struct_size >= sizeof(ObeliskResourceKindDescriptor), "resource descriptor size mismatch");
+
+        out->abi_version = OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION;
+        out->struct_size = sizeof(ObeliskResourceKindDescriptor);
+        out->resource_kind = resourceKind;
+        out->reserved0 = 0;
+        out->flags = OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_CATEGORY_ONLY |
+            OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY |
+            OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP;
+        if (resourceKind == OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE)
+        {
+            out->supported_gameplay_policy_event_mask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES;
+            out->supported_gameplay_policy_field_mask = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_VARIANT_INDEX |
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE_SET |
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE;
+            std::strncpy(out->stable_name, "structure", sizeof(out->stable_name) - 1);
+            std::strncpy(out->display_name, "Structure", sizeof(out->display_name) - 1);
+            return true;
+        }
+        if (resourceKind == OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM)
+        {
+            out->supported_gameplay_policy_event_mask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY;
+            out->supported_gameplay_policy_field_mask = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER |
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN;
+            std::strncpy(out->stable_name, "inventory_item", sizeof(out->stable_name) - 1);
+            std::strncpy(out->display_name, "Inventory Item", sizeof(out->display_name) - 1);
+            return true;
+        }
+        throw std::runtime_error("unexpected resource kind");
+    }
+
+    bool DescribeGameplayPolicyEventKind(uint32_t eventKind, ObeliskGameplayPolicyEventDescriptor* out)
+    {
+        Require(out != nullptr, "event descriptor output was null");
+        Require(out->struct_size >= sizeof(ObeliskGameplayPolicyEventDescriptor),
+                "event descriptor size mismatch");
+
+        out->abi_version = OBELISK_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION;
+        out->struct_size = sizeof(ObeliskGameplayPolicyEventDescriptor);
+        out->event_kind = eventKind;
+        out->flags = OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD;
+        out->field_mask = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE;
+        if (eventKind == OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_VARIANT_CHANGE)
+        {
+            out->resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE;
+            out->flags |= OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED;
+            out->event_kind_mask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_VARIANT_CHANGE;
+            out->field_mask |= OBELISK_GAMEPLAY_POLICY_FIELD_MASK_VARIANT_INDEX |
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE_SET;
+            std::strncpy(out->stable_name, "structure.variant_change", sizeof(out->stable_name) - 1);
+            std::strncpy(out->display_name, "Structure Variant Change", sizeof(out->display_name) - 1);
+            return true;
+        }
+        if (eventKind == OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK)
+        {
+            out->resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM;
+            out->flags |= OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED;
+            out->event_kind_mask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_REMOTE_ADD_CHECK;
+            out->field_mask |= OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER;
+            std::strncpy(out->stable_name, "inventory.remote_add_check", sizeof(out->stable_name) - 1);
+            std::strncpy(out->display_name, "Inventory Remote Add Check", sizeof(out->display_name) - 1);
+            return true;
+        }
+        if (eventKind == OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK)
+        {
+            out->resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM;
+            out->flags |= OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED;
+            out->event_kind_mask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK;
+            out->field_mask |= OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN;
+            std::strncpy(out->stable_name, "inventory.use_check", sizeof(out->stable_name) - 1);
+            std::strncpy(out->display_name, "Inventory Use Check", sizeof(out->display_name) - 1);
+            return true;
+        }
+        throw std::runtime_error("unexpected gameplay policy event kind");
+    }
+
     constexpr const char* kActiveOBaseEventsConfig = R"json({
     "enabled": true,
     "log_level": "info",
@@ -380,11 +461,15 @@ int main(int argc, char** argv)
             UnregisterProcessEventCallbackWithOwnerToken;
         if (mode != "no-gameplay-policy-capability")
         {
-            api.capabilities |= OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS;
+            api.capabilities |= OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS |
+                OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS |
+                OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS;
             api.RegisterGameplayPolicyEventWithOwnerTokenHandle =
                 RegisterGameplayPolicyEventWithOwnerTokenHandle;
             api.UnregisterGameplayPolicyEventWithOwnerToken =
                 UnregisterGameplayPolicyEventWithOwnerToken;
+            api.DescribeResourceKind = DescribeResourceKind;
+            api.DescribeGameplayPolicyEventKind = DescribeGameplayPolicyEventKind;
         }
         if (mode != "no-chat-message-capability")
         {
