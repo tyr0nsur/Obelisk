@@ -314,6 +314,21 @@ Plugins subscribe with `RegisterGameplayPolicyEventWithOwnerTokenHandle`, an eve
 mask, and a process-local owner-token handle; shutdown must call
 `UnregisterGameplayPolicyEventWithOwnerToken`.
 
+The intended v0.1.x resource/plugin route is:
+
+1. Discover supported categories with `DescribeResourceKind`.
+2. Discover promoted policy kinds with `DescribeGameplayPolicyEventKind`.
+3. Subscribe to `GameplayPolicyEvent` with an event-kind mask.
+4. Route each copied event by `resource_kind`, `event_kind`, and `field_mask`.
+
+For inventory-backed policy checks, `inventory_item` means only "this copied policy event
+came from the promoted inventory-item-backed category." A plugin can use
+`resource_kind=inventory_item` with the event descriptor's `event_kind` and supported
+`field_mask` to decide whether to audit, count, or log sanitized policy decisions. That
+triple is the stable v0.1.x shape; it does not carry item identity, inventory identity,
+player identity, lookup authority, mutation authority, return override authority, or a
+`ResourceHandle`.
+
 `GameplayPolicyEvent` exposes only approved scalar fields through `field_mask`,
 `bool_values`, and `int32_values`: return values, variant index, force-set, force,
 requested-by-player, and ignore-cooldown where the backing target contains them. Pincode
@@ -329,7 +344,8 @@ policy events under the same callback family. They use
 `InventoryPolicyEvent*` structs, Inventory callback capability bits, item handles,
 inventory lookup, inventory contents, item/player handles, mutation, or return override
 authority.
-Filtered `ProcessEvent` callbacks and runtime-observer log summaries are still not a public gameplay event API.
+Filtered `ProcessEvent` callbacks and runtime-observer log summaries are still not a
+public gameplay event API.
 
 In v0.1, `resource_kind` is a category only, not a game object identity. It may be used for
 routing, metrics, and sanitized logs such as "this policy event is structure-backed" or

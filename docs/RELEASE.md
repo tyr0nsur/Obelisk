@@ -193,6 +193,16 @@ the public SDK. Inventory-backed signals are published only as
 `GameplayPolicyEvent` masks/kinds/fields with `INVENTORY_BACKED`; they are not a separate
 Inventory SDK.
 
+The v0.1.x resource programming shape is descriptor-driven and category-only:
+`DescribeResourceKind`, `DescribeGameplayPolicyEventKind`, then
+`GameplayPolicyEvent` routing by `resource_kind`, `event_kind`, and `field_mask`.
+In v0.1, `resource_kind` is a category only, not a game object identity. It must not be
+treated as "this same structure/item", a lookup handle, a persistent ID, cross-event
+correlation, coordinates, owner identity, or UE object access. Do not add `GetResource`,
+`ResolveResource`, `ResourceHandle`, pointer-derived IDs, GNames/GObjects-derived IDs, or
+mutation APIs without a new promotion gate that defines identity stability, privacy,
+lifecycle, and cross-instance semantics.
+
 The default second-source gate is intentionally scoped to the public RC UFunction target
 sets: `minimal-second-source-intake`, `structure-observer-intake`, and
 `chat-message-intake`. Mission target sets such as `mission-compact-intake` are not part of

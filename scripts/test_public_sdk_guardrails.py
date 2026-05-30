@@ -136,6 +136,28 @@ V010_PUBLIC_MANIFEST_PROMOTED_EVENT_IDS = [
 V010_PUBLIC_MANIFEST_RC_EVENT_IDS = [
     "obelisk.chat_message.v1",
 ]
+V010_RESOURCE_KIND_DESCRIPTOR_FIELDS = [
+    "abi_version",
+    "struct_size",
+    "resource_kind",
+    "reserved0",
+    "flags",
+    "supported_gameplay_policy_event_mask",
+    "supported_gameplay_policy_field_mask",
+    "stable_name",
+    "display_name",
+]
+V010_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_FIELDS = [
+    "abi_version",
+    "struct_size",
+    "event_kind",
+    "resource_kind",
+    "flags",
+    "event_kind_mask",
+    "field_mask",
+    "stable_name",
+    "display_name",
+]
 V010_GAMEPLAY_POLICY_TARGET_SETS = [
     "structure-observer-intake",
     "minimal-second-source-intake",
@@ -395,6 +417,10 @@ def obelisk_api_struct_body(header: str) -> str:
 def strip_c_comments(text: str) -> str:
     text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
     return re.sub(r"//.*", "", text)
+
+
+def normalized(text: str) -> str:
+    return " ".join(text.split())
 
 
 def obelisk_api_field_names(header: str) -> list[str]:
@@ -821,6 +847,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
     def test_plugin_architecture_defines_public_gameplay_event_promotion_gate(self) -> None:
         text = (REPO_ROOT / "docs/PLUGIN_ARCHITECTURE.md").read_text(encoding="utf-8")
+        normalized_text = normalized(text)
 
         required_terms = (
             "Gameplay Event Promotion Gate",
@@ -841,7 +868,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         )
 
         for term in required_terms:
-            self.assertIn(term, text)
+            self.assertIn(normalized(term), normalized_text)
 
     def test_release_docs_define_public_gameplay_event_sdk_gate(self) -> None:
         text = (REPO_ROOT / "docs/RELEASE.md").read_text(encoding="utf-8")
@@ -1005,12 +1032,21 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "display_name",
         ):
             self.assertIn(field, resource_surface.get("descriptor_fields", []))
+        self.assertEqual(resource_surface.get("descriptor_fields"), V010_RESOURCE_KIND_DESCRIPTOR_FIELDS)
         for flag in (
             "OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_CATEGORY_ONLY",
             "OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY",
             "OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP",
         ):
             self.assertIn(flag, resource_surface.get("flags", []))
+        self.assertEqual(
+            resource_surface.get("flags"),
+            [
+                "OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_CATEGORY_ONLY",
+                "OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY",
+                "OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP",
+            ],
+        )
         kinds = {item.get("kind"): item for item in resource_surface.get("resource_kinds", [])}
         self.assertIn("OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE", kinds)
         self.assertIn("OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM", kinds)
@@ -1022,7 +1058,15 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             kinds["OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM"].get("supported_gameplay_policy_event_mask"),
             "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY",
         )
-        for excluded in ("ResourceHandle", "object identity", "lookup", "UE pointers", "mutation", "return override"):
+        for excluded in (
+            "ResourceHandle",
+            "object identity",
+            "lookup",
+            "cross-event correlation",
+            "UE pointers",
+            "mutation",
+            "return override",
+        ):
             self.assertIn(excluded, resource_surface.get("not_promoted", []))
 
     def test_public_metadata_manifest_declares_gameplay_policy_event_descriptor_surface(self) -> None:
@@ -1061,6 +1105,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "display_name",
         ):
             self.assertIn(field, event_surface.get("descriptor_fields", []))
+        self.assertEqual(
+            event_surface.get("descriptor_fields"),
+            V010_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_FIELDS,
+        )
         for flag in (
             "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD",
             "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED",
@@ -1073,11 +1121,126 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "persistent handles",
             "object identity",
             "lookup",
+            "cross-event correlation",
             "UE pointers",
             "mutation",
             "return override",
         ):
             self.assertIn(excluded, event_surface.get("not_promoted", []))
+
+    def test_public_resource_programming_manifest_stays_category_only_without_identity_or_lookup(self) -> None:
+        manifest = json.loads(PUBLIC_GAMEPLAY_EVENTS_MANIFEST.read_text(encoding="utf-8"))
+
+        resource_surface = next(
+            (
+                surface for surface in manifest.get("metadata_surfaces", [])
+                if isinstance(surface, dict) and surface.get("surface_id") == "obelisk.resource_kind_descriptors.v1"
+            ),
+            None,
+        )
+        event_surface = next(
+            (
+                surface for surface in manifest.get("metadata_surfaces", [])
+                if isinstance(surface, dict) and
+                surface.get("surface_id") == "obelisk.gameplay_policy_event_descriptors.v1"
+            ),
+            None,
+        )
+        gameplay_policy = next(
+            (
+                event for event in manifest.get("promoted_events", [])
+                if isinstance(event, dict) and event.get("event_id") == "obelisk.gameplay_policy.v1"
+            ),
+            None,
+        )
+        self.assertIsNotNone(resource_surface)
+        self.assertIsNotNone(event_surface)
+        self.assertIsNotNone(gameplay_policy)
+
+        self.assertEqual(resource_surface.get("descriptor_fields"), V010_RESOURCE_KIND_DESCRIPTOR_FIELDS)
+        self.assertEqual(
+            resource_surface.get("flags"),
+            [
+                "OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_CATEGORY_ONLY",
+                "OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY",
+                "OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP",
+            ],
+        )
+        self.assertEqual(
+            event_surface.get("descriptor_fields"),
+            V010_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_FIELDS,
+        )
+        self.assertEqual(
+            gameplay_policy.get("resource_contract"),
+            "kind-only, no identity, no lookup, no persistent handle, no cross-event correlation",
+        )
+
+        for path, text in (
+            ("metadata_surfaces.resource.scope", resource_surface.get("scope", "")),
+            ("metadata_surfaces.event.scope", event_surface.get("scope", "")),
+            ("promoted_events.gameplay_policy.resource_contract", gameplay_policy.get("resource_contract", "")),
+        ):
+            compact_text = normalized(text)
+            with self.subTest(path=path):
+                self.assertIn("no identity", compact_text)
+                self.assertIn("lookup", compact_text)
+                self.assertIn("cross-event correlation", compact_text)
+
+        for resource_kind in resource_surface.get("resource_kinds", []):
+            with self.subTest(kind=resource_kind.get("kind", "<missing>")):
+                self.assertEqual(
+                    set(resource_kind),
+                    {
+                        "kind",
+                        "stable_name",
+                        "supported_gameplay_policy_event_mask",
+                        "supported_gameplay_policy_field_mask",
+                    },
+                )
+
+        for event_kind in gameplay_policy.get("event_kinds", []):
+            with self.subTest(event_kind=event_kind.get("kind", "<missing>")):
+                self.assertEqual(
+                    set(event_kind),
+                    {
+                        "kind",
+                        "stable_name",
+                        "resource_kind",
+                        "event_kind_mask",
+                        "field_mask",
+                    },
+                )
+
+        forbidden_public_field_names = {
+            "handle",
+            "resource_handle",
+            "resource_id",
+            "object_id",
+            "player_id",
+            "tribe_id",
+            "inventory_id",
+            "item_id",
+            "lookup_key",
+            "uobject",
+            "gobject",
+            "gobjects",
+            "fname_index",
+            "coordinates",
+            "location",
+        }
+        public_field_lists = [
+            resource_surface.get("descriptor_fields", []),
+            event_surface.get("descriptor_fields", []),
+            gameplay_policy.get("public_fields", []),
+            gameplay_policy.get("descriptor_fields", []),
+        ]
+        offenders = [
+            field
+            for fields in public_field_lists
+            for field in fields
+            if field in forbidden_public_field_names
+        ]
+        self.assertEqual(offenders, [])
 
     def test_public_gameplay_event_capability_regex_matches_event_defines(self) -> None:
         header = "#define OBELISK_API_CAPABILITY_STRUCTURE_EVENTS (1ull << 42)\n"
@@ -1299,7 +1462,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         self.assertEqual(
             gameplay_policy.get("resource_contract"),
-            "kind-only, no identity, no lookup, no persistent handle",
+            "kind-only, no identity, no lookup, no persistent handle, no cross-event correlation",
         )
         self.assertEqual(gameplay_policy.get("payload"), "copied POD scalar fields only")
         self.assertIn("not promoted", gameplay_policy.get("inventory_sdk", ""))

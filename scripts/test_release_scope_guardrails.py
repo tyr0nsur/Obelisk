@@ -169,6 +169,26 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             with self.subTest(file="README.md", item=item):
                 self.assertIn(item, readme)
 
+    def test_resource_programming_scope_stays_category_only_in_release_docs(self) -> None:
+        release = read("docs/RELEASE.md")
+        compact_release = normalized(release)
+
+        for item in [
+            "`DescribeResourceKind` as metadata-only resource category descriptors",
+            "not `ResourceHandle`, resource lookup, object identity, or cross-event correlation",
+            "`GameplayPolicyEvent` as the promoted v0.1 gameplay policy callback family",
+            "copied POD scalar payloads and no identity, lookup, mutation, or return override authority",
+            "it does not by itself promote a public Inventory SDK",
+            "It also does not prove resource cross-event correlation",
+            "must not unlock `ResourceHandle`, object lookup, GObjects promotion",
+            "ResourceHandle semantic work must remain blocked",
+            "In v0.1, `resource_kind` is a category only, not a game object identity",
+            "must not be treated as \"this same structure/item\", a lookup handle, a persistent ID",
+            "Do not add `GetResource`, `ResolveResource`, `ResourceHandle`, pointer-derived IDs",
+        ]:
+            with self.subTest(file="docs/RELEASE.md", item=item):
+                self.assertIn(normalized(item), compact_release)
+
     def test_chat_message_event_release_docs_keep_rc_boundary_explicit(self) -> None:
         readme = read("README.md")
         release = read("docs/RELEASE.md")

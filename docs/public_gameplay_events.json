@@ -7,7 +7,7 @@
       "capability": "OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS",
       "descriptor_struct": "ObeliskResourceKindDescriptor",
       "descriptor": "DescribeResourceKind",
-      "scope": "metadata-only resource category descriptors for routing/config; no identity, lookup, handle, mutation, or UE object access",
+      "scope": "metadata-only resource category descriptors for routing/config; no identity, lookup, handle, cross-event correlation, mutation, or UE object access",
       "descriptor_fields": [
         "abi_version",
         "struct_size",
@@ -54,6 +54,7 @@
         "ResourceHandle",
         "object identity",
         "lookup",
+        "cross-event correlation",
         "persistent handles",
         "UE pointers",
         "mutation",
@@ -84,7 +85,7 @@
       "capability": "OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS",
       "descriptor_struct": "ObeliskGameplayPolicyEventDescriptor",
       "descriptor": "DescribeGameplayPolicyEventKind",
-      "scope": "metadata-only descriptors for promoted GameplayPolicyEvent kinds; no identity, lookup, mutation, return override, or UE object access",
+      "scope": "metadata-only descriptors for promoted GameplayPolicyEvent kinds; no identity, lookup, cross-event correlation, mutation, return override, or UE object access",
       "descriptor_fields": [
         "abi_version",
         "struct_size",
@@ -111,6 +112,7 @@
         "persistent handles",
         "object identity",
         "lookup",
+        "cross-event correlation",
         "UE pointers",
         "mutation",
         "return override"
@@ -148,7 +150,7 @@
       "unregister": "UnregisterGameplayPolicyEventWithOwnerToken",
       "backing_target_set": "structure-observer-intake",
       "inventory_backing_target_set": "minimal-second-source-intake",
-      "resource_contract": "kind-only, no identity, no lookup, no persistent handle",
+      "resource_contract": "kind-only, no identity, no lookup, no persistent handle, no cross-event correlation",
       "payload": "copied POD scalar fields only",
       "public_fields": [
         "abi_version",
@@ -298,7 +300,7 @@
             "docs/research/2026-05-28-second-source-reversing-gap-matrix.md",
             "docs/research/2026-05-29-structure-observer-intake-refresh.md"
           ],
-          "scope": "fresh copied-redacted GameplayPolicyEvent structure backing; layout-only, no identity, lookup, mutation, return override, or ResourceHandle"
+          "scope": "fresh copied-redacted GameplayPolicyEvent structure backing; layout-only, no identity, lookup, cross-event correlation, mutation, return override, or ResourceHandle"
         },
         {
           "target_set": "minimal-second-source-intake",
