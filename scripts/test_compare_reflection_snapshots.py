@@ -2164,7 +2164,7 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         }
 
         with mock.patch.object(compare, "PLANNING_ONLY_TARGET_SETS", frozenset()):
-            compare.block_planning_only_target_set_promotion(report, [target_set])
+            compare.block_non_release_target_set_promotion(report, [target_set])
 
         self.assertIn(target_set, compare.MISSION_CONSUME_ONLY_TARGET_SETS)
         self.assertEqual(
@@ -2177,6 +2177,100 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
                 "blockers": [{"reason": "target_set_not_release_readiness", "count": 1}],
             },
         )
+
+    def test_readiness_report_blocks_internal_general_v1_target_set_promotion_gates(self) -> None:
+        internal_target_sets = (
+            "buff-compact-intake",
+            "buff-breadth-intake",
+            "dino-compact-intake",
+            "inventory-action-compact-intake",
+            "item-compact-intake",
+            "mission-compact-intake",
+            "structure-nonpin-copied-scalar-policy-slice",
+            "structure-return-only-policy-slice",
+            "transfer-ufunction-intake",
+            "tribe-compact-intake",
+        )
+        self.assertTrue(set(internal_target_sets).issubset(compare.INTERNAL_LAYOUT_ONLY_TARGET_SETS))
+
+        for target_set in internal_target_sets:
+            with self.subTest(target_set=target_set), tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                write_target_set_root(root / "base", target_set)
+                write_target_set_root(root / "candidate", target_set)
+
+                result = run_compare(
+                    root / "base",
+                    root / "candidate",
+                    "--readiness-report",
+                    "--target-set",
+                    target_set,
+                    "--fail-on-readiness-gaps",
+                    "--json",
+                )
+
+                self.assertEqual(result.returncode, 1, result.stderr + result.stdout)
+                report = json.loads(result.stdout)
+                self.assertEqual(report["gate_mode"], "second_source_promotion")
+                self.assertEqual(report["target_sets"], [target_set])
+                self.assertEqual(report["totals"]["targets"], len(compare.TARGET_SETS[target_set]))
+                self.assertEqual(report["totals"]["second_source_accepted"], len(compare.TARGET_SETS[target_set]))
+                self.assertEqual(
+                    report["promotion_gate"],
+                    {
+                        "ready": False,
+                        "ready_scope": "internal_layout_only",
+                        "layout_ready": True,
+                        "promotion_ready": False,
+                        "blockers": [{"reason": "target_set_not_release_readiness", "count": 1}],
+                    },
+                )
+
+    def test_internal_general_v1_target_set_guidance_can_be_listed_without_snapshots(self) -> None:
+        result = run_compare_raw(
+            "--list-target-guidance",
+            "--target-set",
+            "buff-compact-intake",
+            "--target-set",
+            "dino-compact-intake",
+            "--target-set",
+            "mission-compact-intake",
+            "--target-set",
+            "transfer-ufunction-intake",
+            "--target-set",
+            "tribe-compact-intake",
+            "--json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["schema"], "obelisk.reflection-target-guidance.v1")
+        guidance = {item["target_set"]: item for item in report["target_set_guidance"]}
+        self.assertEqual(
+            set(guidance),
+            {
+                "buff-compact-intake",
+                "dino-compact-intake",
+                "mission-compact-intake",
+                "transfer-ufunction-intake",
+                "tribe-compact-intake",
+            },
+        )
+        self.assertEqual(guidance["buff-compact-intake"]["classification"], "internal_buff_layout_only_candidate")
+        self.assertEqual(guidance["dino-compact-intake"]["classification"], "internal_dino_layout_only_candidate")
+        self.assertEqual(guidance["mission-compact-intake"]["classification"], "internal_mission_layout_only_candidate")
+        self.assertEqual(guidance["transfer-ufunction-intake"]["classification"], "internal_transfer_layout_only_candidate")
+        self.assertEqual(guidance["tribe-compact-intake"]["classification"], "internal_tribe_layout_only_candidate")
+        for target_set, item in guidance.items():
+            with self.subTest(target_set=target_set):
+                self.assertIn("internal_layout_evidence_only", item["why_blocked"])
+                self.assertIn("not_release_readiness_target", item["why_blocked"])
+                self.assertIn("runtime_observation_requires_separate_approval", item["why_blocked"])
+                self.assertIn(
+                    "do not use this target set for release/readiness or public SDK promotion gates",
+                    item["snapshot_prep_checks"],
+                )
+                self.assertIn("runtime hooks", item["non_claim"])
 
     def test_readiness_report_target_set_rejected_second_source_exits_one(self) -> None:
         def reject_one(payload: dict[str, object], _outer: str, name: str) -> None:

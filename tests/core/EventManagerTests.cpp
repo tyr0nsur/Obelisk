@@ -504,22 +504,34 @@ namespace
         Require(events.UnregisterCallbacksForOwner(&owner) == 2, "owner cleanup did not remove remaining callbacks");
     }
 
-    void TestNullCallbacksAreIgnored()
+    void TestNullCallbackRegistrationsAreRejected()
     {
         ResetCounters();
         Obelisk::Core::EventManager events;
         int owner = 0;
 
-        events.RegisterPreProcessEventOwned(&owner, nullptr);
-        events.RegisterPostProcessEventOwned(&owner, nullptr);
-        events.RegisterPreProcessEventForNameIndexOwned(&owner, 42, nullptr);
-        events.RegisterPostProcessEventForNameIndexOwned(&owner, 42, nullptr);
-        events.RegisterPreProcessEventOwned(&owner, NullSafeCallback);
+        Require(events.RegisterPreProcessEventOwned(&owner, nullptr) == 0,
+                "null global pre callback registration returned a handle");
+        Require(events.RegisterPostProcessEventOwned(&owner, nullptr) == 0,
+                "null global post callback registration returned a handle");
+        Require(events.RegisterPreProcessEventForNameIndexOwned(&owner, 42, nullptr) == 0,
+                "null filtered pre callback registration returned a handle");
+        Require(events.RegisterPostProcessEventForNameIndexOwned(&owner, 42, nullptr) == 0,
+                "null filtered post callback registration returned a handle");
+
+        Require(!events.HasPreProcessEventCallbacks(),
+                "null pre callback registration changed pre callback state");
+        Require(!events.HasPostProcessEventCallbacks(),
+                "null post callback registration changed post callback state");
+
+        const uint64_t validId = events.RegisterPreProcessEventOwned(&owner, NullSafeCallback);
+        Require(validId != 0, "valid callback registration failed after null rejections");
 
         Require(events.TriggerPreProcessEvent(42, nullptr, nullptr, nullptr),
-                "null pre callback blocked event");
+                "valid pre callback blocked event after null rejections");
         events.TriggerPostProcessEvent(42, nullptr, nullptr, nullptr);
-        Require(events.UnregisterCallbacksForOwner(&owner) == 5, "null callbacks were not tracked for cleanup");
+        Require(events.UnregisterCallbacksForOwner(&owner) == 1,
+                "null callback registrations were tracked for owner cleanup");
     }
 
     void TestCallbackCanUnregisterItself()
@@ -1031,7 +1043,7 @@ int main()
     TestPostCallbackExceptionsDoNotStopLaterCallbacks();
     TestOwnerCleanup();
     TestSingleRegistrationUnregister();
-    TestNullCallbacksAreIgnored();
+    TestNullCallbackRegistrationsAreRejected();
     TestCallbackCanUnregisterItself();
     TestReentrantUnregisterSkipsLaterRawCallbackSnapshots();
     TestReusedRawRegistrationIdDoesNotReactivateStaleSnapshot();

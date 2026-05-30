@@ -1012,6 +1012,21 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             with self.subTest(item=item):
                 self.assertIn(normalized(item), compact)
 
+    def test_docs_index_keeps_plugin_author_creation_boundary_visible(self) -> None:
+        docs_index = (REPO_ROOT / "docs" / "README.md").read_text(encoding="utf-8")
+        compact = normalized(docs_index)
+
+        required = (
+            "what a plugin can honestly build today",
+            "current production-supported seeds are lifecycle/config/logging, descriptor/catalog consumers, and process-local timers",
+            "Copied chat parsers and `GameplayPolicyEvent` auditors are experimental pattern examples only",
+            "not production command/chat/policy SDKs",
+            "identity, lookup, mutation, replies/send-chat, permissions, storage, RCON, inventory/item APIs, or structure enforcement stays blocked until promoted",
+        )
+        for item in required:
+            with self.subTest(item=item):
+                self.assertIn(normalized(item), compact)
+
     def test_first_party_examples_stay_on_fastest_honest_creator_path(self) -> None:
         plugins_readme = (REPO_ROOT / "plugins" / "README.md").read_text(encoding="utf-8")
         foundation = (REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md").read_text(encoding="utf-8")
@@ -1702,6 +1717,28 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             with self.subTest(path=path.relative_to(REPO_ROOT)):
                 for term in required_terms:
                     self.assertIn(term, text)
+
+    def test_versioning_policy_distinguishes_cmake_variables_from_c_header_macros(self) -> None:
+        versioning = (REPO_ROOT / "docs" / "VERSIONING.md").read_text(encoding="utf-8")
+        installed_consumer_cmake = (
+            REPO_ROOT / "tests" / "sdk_installed_consumer" / "CMakeLists.txt"
+        ).read_text(encoding="utf-8")
+        header = PUBLIC_API_HEADER.read_text(encoding="utf-8")
+
+        self.assertIn("installed CMake package variables", versioning)
+        self.assertIn("not C preprocessor macros", versioning)
+        self.assertIn("mirror the `OBELISK_*` header macros", versioning)
+
+        for cmake_variable, c_macro in (
+            ("Obelisk_API_ABI_VERSION", "OBELISK_API_ABI_VERSION"),
+            ("Obelisk_PLUGIN_METADATA_ABI_VERSION", "OBELISK_PLUGIN_METADATA_ABI_VERSION"),
+            ("Obelisk_PLUGIN_INIT_CONTEXT_ABI_VERSION", "OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION"),
+        ):
+            with self.subTest(cmake_variable=cmake_variable, c_macro=c_macro):
+                self.assertIn(cmake_variable, versioning)
+                self.assertIn(cmake_variable, installed_consumer_cmake)
+                self.assertIn(c_macro, versioning)
+                self.assertRegex(header, re.compile(rf"^#define\s+{re.escape(c_macro)}\s+1u$", re.M))
 
     def test_plugin_architecture_defines_public_gameplay_event_promotion_gate(self) -> None:
         text = (REPO_ROOT / "docs/PLUGIN_ARCHITECTURE.md").read_text(encoding="utf-8")

@@ -15,6 +15,13 @@ on contributors, plugin authors, operators, and reproducible research.
 
 ## Plugin Author
 
+Start with the capability matrix when deciding what a plugin can honestly build today.
+The current production-supported seeds are lifecycle/config/logging, descriptor/catalog
+consumers, and process-local timers. Copied chat parsers and `GameplayPolicyEvent`
+auditors are experimental pattern examples only, not production command/chat/policy
+SDKs. Anything that needs identity, lookup, mutation, replies/send-chat, permissions,
+storage, RCON, inventory/item APIs, or structure enforcement stays blocked until promoted.
+
 - `PLUGIN_ARCHITECTURE.md`: plugin lifecycle, ABI rules, examples, and promotion gates.
 - `PLUGIN_HUB_FOUNDATION_V1.md`: minimal Plugin Hub foundation contract and anti-promises.
 - `PLUGIN_HUB_CAPABILITY_MATRIX.md`: current safe plugin intents and future Plugin Hub boundaries.

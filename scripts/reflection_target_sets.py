@@ -123,6 +123,19 @@ PLANNING_ONLY_TARGET_SETS = frozenset(
 )
 
 
+RELEASE_READINESS_TARGET_SETS = frozenset(
+    (
+        "chat-message-intake",
+        "item-return-only-policy-slice",
+        "minimal-second-source-intake",
+        "structure-observer-intake",
+    )
+)
+
+
+INTERNAL_LAYOUT_ONLY_TARGET_SETS = frozenset(TARGET_SETS) - RELEASE_READINESS_TARGET_SETS
+
+
 def schema_targets(target_set: str, schema: str) -> set[str]:
     targets = set()
     for target in TARGET_SETS[target_set]:

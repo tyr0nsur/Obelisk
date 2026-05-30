@@ -92,6 +92,9 @@ namespace Obelisk::Core
 
     uint64_t EventManager::RegisterPreProcessEventOwned(void* owner, OnProcessEventCallback callback)
     {
+        if (!callback)
+            return 0;
+
         std::lock_guard<std::mutex> lock(m_Mutex);
         const uint64_t id = AllocateRegistrationId();
         m_PreProcessEventCallbacks.push_back({id, AllocateRegistrationGeneration(), -1, callback, owner});
@@ -100,6 +103,9 @@ namespace Obelisk::Core
 
     uint64_t EventManager::RegisterPostProcessEventOwned(void* owner, OnProcessEventCallback callback)
     {
+        if (!callback)
+            return 0;
+
         std::lock_guard<std::mutex> lock(m_Mutex);
         const uint64_t id = AllocateRegistrationId();
         m_PostProcessEventCallbacks.push_back({id, AllocateRegistrationGeneration(), -1, callback, owner});
@@ -108,6 +114,9 @@ namespace Obelisk::Core
 
     uint64_t EventManager::RegisterPreProcessEventForNameIndexOwned(void* owner, int32_t nameIndex, OnProcessEventCallback callback)
     {
+        if (!callback)
+            return 0;
+
         std::lock_guard<std::mutex> lock(m_Mutex);
         const uint64_t id = AllocateRegistrationId();
         m_FilteredPreProcessEventCallbacks.push_back({id, AllocateRegistrationGeneration(), nameIndex, callback, owner});
@@ -116,6 +125,9 @@ namespace Obelisk::Core
 
     uint64_t EventManager::RegisterPostProcessEventForNameIndexOwned(void* owner, int32_t nameIndex, OnProcessEventCallback callback)
     {
+        if (!callback)
+            return 0;
+
         std::lock_guard<std::mutex> lock(m_Mutex);
         const uint64_t id = AllocateRegistrationId();
         m_FilteredPostProcessEventCallbacks.push_back({id, AllocateRegistrationGeneration(), nameIndex, callback, owner});

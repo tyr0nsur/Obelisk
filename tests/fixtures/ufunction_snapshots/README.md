@@ -125,6 +125,13 @@ unless a later focused promotion gate explicitly changes release scope:
   Transfer SDK, runtime hook, payload decoding, identity, mutation, or return override is
   promoted by this target set.
 
+The comparator's promotion mode (`--readiness-report --fail-on-readiness-gaps`) only
+accepts the release-readiness backing target sets listed above. Internal/general v1
+target sets such as players, tribes, dinos, buffs, transfers, structures, and missions
+may have accepted second-source layout comparisons, but the gate still reports
+`target_set_not_release_readiness`; use `--list-target-guidance --target-set <name>` for
+offline blocker guidance.
+
 Manifest-backed snapshots may also exist outside any current named target set.
 `PrimalInventoryComponent.InventoryCustomFilter` is committed in `manifest.json`, but it
 does not currently belong to any named target set in `scripts/reflection_target_sets.py`.

@@ -2691,6 +2691,76 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertEqual("blocked", result["status"])
         self.assertIn("path_is_symlink", reasons)
 
+    def test_rejects_manifest_symlink_swap_after_path_precheck(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "pack" / "manifest.json"
+            live_manifest = protected / "live" / "manifest.json"
+            write_json(manifest, readiness_report_manifest())
+            write_json(live_manifest, readiness_report_manifest())
+
+            original_path_blockers = gate.path_blockers
+            swapped = False
+
+            def race_path_blockers(path: Path, **kwargs: object) -> list[dict]:
+                nonlocal swapped
+                if path == manifest and not swapped:
+                    swapped = True
+                    manifest.unlink()
+                    manifest.symlink_to(live_manifest)
+                    return []
+                return original_path_blockers(path, **kwargs)
+
+            with mock.patch.object(gate, "path_blockers", side_effect=race_path_blockers):
+                result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertEqual("blocked", result["status"])
+        self.assertIn("json_path_is_symlink", reasons)
+
+    def test_rejects_provenance_sidecar_symlink_swap_after_path_precheck(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            artifact = workspace / "pack" / "artifact.txt"
+            artifact.parent.mkdir(parents=True)
+            artifact.write_text("offline evidence\n", encoding="utf-8")
+            artifact_sha = gate.sha256_file(artifact)
+            sidecar = Path(f"{artifact}.provenance.json")
+            live_sidecar = protected / "live" / "artifact.txt.provenance.json"
+            sidecar_payload = {
+                "schema": gate.PROVENANCE_SCHEMA,
+                "verified": True,
+                "artifact_kind": "objdump",
+                "producer": "test",
+                "tool": "objdump",
+                "binary_sha256": BINARY_SHA,
+                "artifact_sha256": artifact_sha,
+                "source_provenance": {},
+            }
+            write_json(sidecar, sidecar_payload)
+            write_json(live_sidecar, sidecar_payload)
+
+            original_path_blockers = gate.path_blockers
+            swapped = False
+
+            def race_path_blockers(path: Path, **kwargs: object) -> list[dict]:
+                nonlocal swapped
+                if path == sidecar and not swapped:
+                    swapped = True
+                    sidecar.unlink()
+                    sidecar.symlink_to(live_sidecar)
+                    return []
+                return original_path_blockers(path, **kwargs)
+
+            with mock.patch.object(gate, "path_blockers", side_effect=race_path_blockers):
+                result = gate.build_result(args(root=workspace, protected_root=protected, artifacts=[("objdump", artifact)]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertEqual("blocked", result["status"])
+        self.assertIn("json_path_is_symlink", reasons)
+
     def test_rejects_workspace_manifest_under_symlinked_directory_even_when_it_resolves_inside_workspace(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"

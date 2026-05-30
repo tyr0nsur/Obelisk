@@ -12,7 +12,12 @@ import re
 
 from artifact_identity import ARTIFACT_IDENTITY_KEYS, is_safe_artifact_id, is_sha256
 import protected_paths
-from reflection_target_sets import PLANNING_ONLY_TARGET_SETS, TARGET_SETS
+from reflection_target_sets import (
+    INTERNAL_LAYOUT_ONLY_TARGET_SETS,
+    PLANNING_ONLY_TARGET_SETS,
+    RELEASE_READINESS_TARGET_SETS,
+    TARGET_SETS,
+)
 
 
 SUPPORTED_SCHEMAS = {
@@ -214,6 +219,64 @@ TARGET_SET_BLOCKER_GUIDANCE = {
     },
 }
 
+INTERNAL_TARGET_SET_MODULE_GUIDANCE = {
+    "buff-breadth-intake": {
+        "classification": "internal_buff_layout_only_candidate",
+        "module": "Buff",
+        "redactions": "buff payloads, inventory/add/prevent context, object refs, strings, arrays, raw params, and UE pointers",
+    },
+    "buff-compact-intake": {
+        "classification": "internal_buff_layout_only_candidate",
+        "module": "Buff",
+        "redactions": "buff payloads, inventory context, object refs, strings, arrays, raw params, and UE pointers",
+    },
+    "dino-compact-intake": {
+        "classification": "internal_dino_layout_only_candidate",
+        "module": "Dino",
+        "redactions": "rider/passenger identity, carried actor identity, object refs, strings, arrays, raw params, and UE pointers",
+    },
+    "inventory-action-compact-intake": {
+        "classification": "internal_inventory_action_layout_only_candidate",
+        "module": "Inventory",
+        "redactions": "inventory item identity, actor identity, object refs, strings, arrays, raw params, and UE pointers",
+    },
+    "item-compact-intake": {
+        "classification": "internal_item_layout_only_candidate",
+        "module": "Item",
+        "redactions": "item identity, inventory identity, object refs, strings, arrays, raw params, and UE pointers",
+    },
+    "mission-compact-intake": {
+        "classification": "internal_mission_layout_only_candidate",
+        "module": "Mission",
+        "redactions": "player/controller/character object refs, item arrays, mission payload identity, raw params, and UE pointers",
+    },
+    "structure-nonpin-copied-scalar-policy-slice": {
+        "classification": "internal_structure_scalar_layout_only_candidate",
+        "module": "Structure",
+        "redactions": "pin codes, player context, structure identity, object refs, strings, arrays, raw params, and UE pointers",
+    },
+    "structure-return-only-policy-slice": {
+        "classification": "internal_structure_return_layout_only_candidate",
+        "module": "Structure",
+        "redactions": "player context, structure identity, object refs, strings, arrays, raw params, and UE pointers",
+    },
+    "transfer-scriptstruct": {
+        "classification": "internal_transfer_scriptstruct_layout_only_candidate",
+        "module": "Transfer",
+        "redactions": "transferred player/dino payloads, inventory data, object refs, strings, arrays, raw params, and UE pointers",
+    },
+    "transfer-ufunction-intake": {
+        "classification": "internal_transfer_layout_only_candidate",
+        "module": "Transfer",
+        "redactions": "transferred player/dino payloads, inventory data, object refs, strings, arrays, raw params, and UE pointers",
+    },
+    "tribe-compact-intake": {
+        "classification": "internal_tribe_layout_only_candidate",
+        "module": "Tribe",
+        "redactions": "player ids, platform ids, names, tribe ids, online-list values, object refs, arrays, strings, raw params, and UE pointers",
+    },
+}
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -355,7 +418,36 @@ def target_guidance_report(target_filters: set[str]) -> dict[str, Any]:
 def target_set_blocker_guidance(target_set: str) -> dict[str, Any] | None:
     guidance = TARGET_SET_BLOCKER_GUIDANCE.get(target_set)
     if guidance is None:
-        return None
+        if target_set not in INTERNAL_LAYOUT_ONLY_TARGET_SETS:
+            return None
+        internal_guidance = INTERNAL_TARGET_SET_MODULE_GUIDANCE.get(target_set)
+        if internal_guidance is None:
+            return None
+        module = internal_guidance["module"]
+        return {
+            "classification": internal_guidance["classification"],
+            "why_blocked": [
+                "internal_layout_evidence_only",
+                "not_release_readiness_target",
+                f"public_{module.lower()}_sdk_blocked",
+                "runtime_observation_requires_separate_approval",
+            ],
+            "next_offline_input": (
+                "sanitized offline snapshots from distinct non-protected artifacts with "
+                "complete artifact identity"
+            ),
+            "snapshot_prep_checks": [
+                f"compare schema-qualified targets through --target-set {target_set} for internal coverage review only",
+                f"keep {internal_guidance['redactions']} redacted or recognition-only",
+                "require target, class, outer, every property, and nested struct/array candidates to be candidate-uobject",
+                "require distinct artifact identity before any second-source layout claim",
+                "do not use this target set for release/readiness or public SDK promotion gates",
+            ],
+            "non_claim": (
+                f"does not promote {module} SDK, identity, lookup, mutation, return override, "
+                "runtime hooks, or release readiness"
+            ),
+        }
     copied: dict[str, Any] = {}
     for key, value in guidance.items():
         copied[key] = list(value) if isinstance(value, list) else value
@@ -1216,22 +1308,26 @@ def require_target_set_for_promotion(report: dict[str, Any], target_sets: list[s
         blockers.append({"reason": "promotion_requires_target_set", "count": 1})
 
 
-def block_planning_only_target_set_promotion(report: dict[str, Any], target_sets: list[str]) -> None:
+def block_non_release_target_set_promotion(report: dict[str, Any], target_sets: list[str]) -> None:
     if report.get("schema") != "obelisk.reflection-snapshot-readiness.v1":
         return
     if report.get("gate_mode") != "second_source_promotion":
         return
-    planning_only = sorted(set(target_sets) & (PLANNING_ONLY_TARGET_SETS | MISSION_CONSUME_ONLY_TARGET_SETS))
-    if not planning_only:
+    requested = set(target_sets)
+    non_release = sorted(requested - RELEASE_READINESS_TARGET_SETS)
+    if not non_release:
         return
     promotion_gate = report.get("promotion_gate")
     if not isinstance(promotion_gate, dict):
         return
     promotion_gate["ready"] = False
-    promotion_gate["ready_scope"] = "planning_only"
+    planning_only = sorted(requested & (PLANNING_ONLY_TARGET_SETS | MISSION_CONSUME_ONLY_TARGET_SETS))
+    promotion_gate["ready_scope"] = (
+        "planning_only" if planning_only and set(non_release) == set(planning_only) else "internal_layout_only"
+    )
     blockers = promotion_gate.setdefault("blockers", [])
     if isinstance(blockers, list):
-        blockers.append({"reason": "target_set_not_release_readiness", "count": len(planning_only)})
+        blockers.append({"reason": "target_set_not_release_readiness", "count": len(non_release)})
 
 
 def main() -> int:
@@ -1287,7 +1383,7 @@ def main() -> int:
             report["gate_mode"] = "informational_gap_report"
         apply_readiness_gate_mode(report)
         require_target_set_for_promotion(report, args.target_set)
-        block_planning_only_target_set_promotion(report, args.target_set)
+        block_non_release_target_set_promotion(report, args.target_set)
     else:
         if candidate is None:
             raise SystemExit("--candidate-root is required unless --readiness-report is used")

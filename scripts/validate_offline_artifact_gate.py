@@ -4,9 +4,12 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import hashlib
 import json
+import os
 import re
+import stat
 import sys
 from collections import Counter
 from pathlib import Path, PurePosixPath
@@ -1111,6 +1114,55 @@ def first_symlink_component(path: Path) -> Path | None:
     return None
 
 
+class SymlinkPathError(OSError):
+    def __init__(self, component: Path) -> None:
+        super().__init__(errno.ELOOP, f"path must not be a symlink: {component}")
+        self.component = component
+
+
+def open_regular_file_no_symlink(path: Path):
+    symlink_component = first_symlink_component(path)
+    if symlink_component is not None:
+        raise SymlinkPathError(symlink_component)
+
+    expanded = path.expanduser()
+    candidate = expanded if expanded.is_absolute() else expanded.absolute()
+    if not candidate.name:
+        raise OSError(errno.EINVAL, f"path must be a regular file: {candidate}")
+
+    common_flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+    directory_flags = common_flags | getattr(os, "O_DIRECTORY", 0)
+    flags = common_flags
+    if hasattr(os, "O_NOFOLLOW"):
+        directory_flags |= os.O_NOFOLLOW
+        flags |= os.O_NOFOLLOW
+
+    parent_fd: int | None = None
+    try:
+        parent_fd = os.open(candidate.anchor, directory_flags)
+        for part in candidate.parts[1:-1]:
+            next_fd = os.open(part, directory_flags, dir_fd=parent_fd)
+            os.close(parent_fd)
+            parent_fd = next_fd
+        fd = os.open(candidate.name, flags, dir_fd=parent_fd)
+    except OSError as exc:
+        if exc.errno == errno.ELOOP:
+            raise SymlinkPathError(candidate) from exc
+        raise
+    finally:
+        if parent_fd is not None:
+            os.close(parent_fd)
+
+    try:
+        status = os.fstat(fd)
+        if not stat.S_ISREG(status.st_mode):
+            raise OSError(errno.EINVAL, f"path must be a regular file: {candidate}")
+        return os.fdopen(fd, "rb")
+    except Exception:
+        os.close(fd)
+        raise
+
+
 def path_blockers(path: Path, *, label: str, workspace_root: Path, protected_root: Path, require_workspace: bool) -> list[dict[str, Any]]:
     state = path_state(path, workspace_root=workspace_root, protected_root=protected_root)
     blockers: list[dict[str, Any]] = []
@@ -1283,14 +1335,31 @@ def is_safe_semantic_input_name(value: object) -> bool:
 
 def load_json(path: Path) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        with open_regular_file_no_symlink(path) as handle:
+            payload = json.loads(handle.read().decode("utf-8"))
     except json.JSONDecodeError as exc:
         return None, [{"reason": "malformed_json", "path": str(path), "detail": str(exc)}]
+    except SymlinkPathError as exc:
+        return None, [
+            {
+                "reason": "json_path_is_symlink",
+                "path": str(path),
+                "symlink_component": str(exc.component),
+            }
+        ]
     except OSError as exc:
         return None, [{"reason": "unreadable_json", "path": str(path), "detail": str(exc)}]
     if not isinstance(payload, dict):
         return None, [{"reason": "json_not_object", "path": str(path), "recorded_type": type(payload).__name__}]
     return payload, []
+
+
+def checked_sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with open_regular_file_no_symlink(path) as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def validate_json_path_fields(
@@ -7212,12 +7281,21 @@ def validate_artifact(
     }
     if blockers:
         return record, blockers
-    resolved = Path(state["resolved"])
-    if not resolved.is_file():
-        return record, [{"reason": "artifact_not_file", "label": label, "path": str(path)}]
-    artifact_sha256 = sha256_file(resolved)
+    try:
+        artifact_sha256 = checked_sha256_file(path)
+    except SymlinkPathError as exc:
+        return record, [
+            {
+                "reason": "artifact_path_is_symlink",
+                "label": label,
+                "path": str(path),
+                "symlink_component": str(exc.component),
+            }
+        ]
+    except OSError as exc:
+        return record, [{"reason": "artifact_not_file", "label": label, "path": str(path), "detail": str(exc)}]
     provenance, provenance_blockers = validate_provenance(
-        artifact_path=resolved,
+        artifact_path=path,
         artifact_sha256=artifact_sha256,
         expected_binary_sha256=expected_binary_sha256,
         workspace_root=workspace_root,
@@ -7347,14 +7425,23 @@ def validate_manifest(
     record: dict[str, Any] = {"path": str(path), "resolved_path": state["resolved"], "schema": None, "sha256": None}
     if blockers:
         return record, blockers
-    resolved = Path(state["resolved"])
-    if not resolved.is_file():
-        return record, [{"reason": "manifest_not_file", "path": str(path)}]
-    payload, load_blockers = load_json(resolved)
+    payload, load_blockers = load_json(path)
     if payload is None:
         return record, load_blockers
     record["schema"] = payload.get("schema")
-    record["sha256"] = sha256_file(resolved)
+    try:
+        record["sha256"] = checked_sha256_file(path)
+    except SymlinkPathError as exc:
+        return record, [
+            {
+                "reason": "manifest_path_is_symlink",
+                "path": str(path),
+                "symlink_component": str(exc.component),
+            }
+        ]
+    except OSError as exc:
+        return record, [{"reason": "manifest_not_file", "path": str(path), "detail": str(exc)}]
+    resolved = Path(state["resolved"])
     if payload.get("schema") not in SUPPORTED_MANIFEST_SCHEMAS:
         blockers.append(
             {

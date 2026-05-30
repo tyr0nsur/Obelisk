@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Hardened `EventManager` owned callback registration so null raw ProcessEvent callbacks
+  fail closed without creating inert handles or owner-cleanup state.
+- Hardened UFunction reflection promotion gates so internal/layout-only target sets cannot
+  satisfy release-readiness just because their second-source layout comparison is accepted.
+- Hardened offline artifact gates so JSON manifests, provenance sidecars, and artifact
+  checksums are opened without following symlinks after protected-path prechecks.
+- Clarified SDK/plugin-author docs so installed CMake package variables are distinct from
+  public C header macros and current production-supported plugin seeds stay explicit.
 - Hardened timer core registration so repeating timers with zero interval are rejected at
   `TimerManager`, matching the public plugin ABI contract.
 - Hardened SDK consumer guardrails for append-only API slots: consumers must check

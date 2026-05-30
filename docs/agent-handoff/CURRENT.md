@@ -62,6 +62,8 @@ for the current checkpoint.
   second-source/static evidence.
 - SDK packaging publishes only `include/obelisk/ObeliskApi.h`; more public headers require
   explicit install layout/test updates and ABI review.
+- Installed `Obelisk_*` CMake variables mirror public C header `OBELISK_*` ABI macros;
+  plugin source uses the header macros, installed SDK consumers may validate both.
 - Promoted copied events are observational and non-authoritative: no UE pointers, raw
   params, identity, lookup, mutation, return override, pincode/player text publication, or
   broad module SDK claim.
@@ -142,12 +144,15 @@ for the current checkpoint.
 - Transfer ScriptStruct bool-tail evidence has a refreshed local root; older
   `/servidor/ark/workspace-offline/...20260529...` transfer roots are stale under current
   bool-tail strictness.
-- `validate_offline_artifact_gate.py` now consumes `obelisk.artifact-pack.manifest.v1`
-  containers: the pack manifest and relative `SHA256SUMS` must match current contents,
-  symlinked pack entries fail closed, supported child manifests keep their own
-  consume/promote blockers, and `promote` mode blocks the pack as container-only.
-  Relative `--root`, protected-root inputs, and singular/plural path-like sidecar fields
-  are protected-root checked. Duplicate target guidance filters fail closed.
+- `validate_offline_artifact_gate.py` consumes `obelisk.artifact-pack.manifest.v1`
+  containers with current-content checksums, symlink fail-closed checks, child-manifest
+  blockers, container-only promote blocking, protected-root checks, and duplicate target
+  guidance rejection.
+- UFunction target-set promotion mode accepts only explicit release-readiness target sets;
+  internal/layout-only sets still compare/list guidance, but readiness gaps report
+  `target_set_not_release_readiness` until explicit promotion.
+- Offline artifact JSON manifests, provenance sidecars, and artifact checksum reads use
+  no-symlink regular-file opens after protected-path prechecks.
 - `scripts/check_static_tooling.py` records optional radare2/rizin/Ghidra availability and
   runs smoke checks only on approved offline binaries/output roots.
 - `APrimalStructure.IsAllowedToBuild` is a high-demand build-policy dictionary seed, but it
@@ -161,8 +166,8 @@ for the current checkpoint.
 
 ## Priority Next Steps
 
-- Current post-RC focus: preserve RC scope while reducing architecture debt, improving evidence tooling, and
-  promoting only copied module APIs through strict gates.
+- Current post-RC focus: preserve RC scope, reduce architecture debt, improve evidence
+  tooling, and promote only copied module APIs through strict gates.
 - `mission-copied-bool-policy-slice` is the next best internal offline copied-data lane:
   it is now planning-only/consume-only, blocks release/public promotion, and keeps
   `GetPlayerUsableItems` recognition-only with no Mission SDK, identity, mutation, or
@@ -184,28 +189,19 @@ for the current checkpoint.
   the binary-scoped `0x5956f30` FName root slot and `0x595b7e0` GObjects candidate, then a
   distinct second-source compare. Do not add either key to release target sets, ABI enums,
   descriptors, dispatchers, public docs, or runtime gates.
-- Plugin Hub planning order from current demand map and local `NextGenPlugins` dictionary:
-  `docs/PLUGIN_HUB_FOUNDATION_V1.md` is the contributor-facing foundation boundary,
-  backed by `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`. Post-RC production-supported seeds
-  are lifecycle/config/logging, descriptor/catalog, and process-local timer examples.
-  Copied chat parsing and copied policy auditing remain experimental seed patterns, not
-  production modules, command/chat SDKs, policy-enforcement SDKs, or ArkApi compatibility.
-  Keep permissions, RCON, economy, storage/database, webhooks, homes/safe zones,
-  structure enforcement, dinos, tribes, transfers, inventory, item mutation, identity,
-  lookup, replies, send-chat, moderation, and ArkApi portability as design backlogs until
-  their own public surfaces are promoted.
-  Keep the clone out of repo and use it only as a names/demand dictionary.
+- Plugin Hub planning starts from `docs/PLUGIN_HUB_FOUNDATION_V1.md` and
+  `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`: production seeds are lifecycle/config/logging,
+  descriptor/catalog, and process-local timers; copied chat/policy examples remain
+  experimental, and ArkApi/NextGen inputs stay names/demand dictionaries only.
 - Artifact-pack contributor onboarding now has `docs/OFFLINE_ARTIFACT_PACKS.md` as the
   concise runbook. UFunction regeneration and RC root assembly require complete
   `offline_core` artifact identity, sanitized capture/pack IDs, and current bool-tail
   metadata; `--snapshot-json` is exact/direct single-target candidate-only output. The
   release gate preflights the four public RC target sets before build work.
-- Runtime/plugin lifecycle audit found no P1 blocker. `EventManager` granular raw
-  ProcessEvent unregister now avoids waiting behind unrelated in-flight callbacks and
-  validates snapshotted callbacks by id, generation, and callback pointer within the same
-  family; owner cleanup still waits as the plugin unload barrier. Plugin init-failure
-  close paths reject late owner-token timer registration, and repeating zero-interval
-  timers are rejected at `TimerManager`.
+- Runtime/plugin lifecycle audit found no P1 blocker. `EventManager` granular unregister
+  skips unrelated in-flight callbacks, validates snapshotted callbacks by id/generation/
+  pointer/family, and rejects null owned callbacks with handle `0`; owner cleanup remains
+  the unload barrier.
 - Any future live/player validation requires a new approved live-ops brief and beta-test
   notice through the configured local webhook variable when players are involved.
 

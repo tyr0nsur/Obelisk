@@ -52,6 +52,17 @@ The installed package also exports:
 Consumers can inspect those CMake variables when they need to distinguish a dev package
 from a tagged release or pin against a specific public C ABI.
 
+These are installed CMake package variables, not C preprocessor macros. Plugin C/C++
+source should continue to use the public header macros:
+
+- `OBELISK_API_ABI_VERSION`
+- `OBELISK_PLUGIN_METADATA_ABI_VERSION`
+- `OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION`
+
+The `Obelisk_*` CMake variables mirror the `OBELISK_*` header macros so installed SDK
+consumers can validate both package metadata and compiled ABI expectations without
+inventing separate version numbers.
+
 ## Allowed Version Labels
 
 Use these labels consistently:

@@ -108,6 +108,17 @@ Focused evidence lanes such as copied chat, `ResourceHandle` blocker work, and
 `APrimalStructure.IsAllowedToBuild` triage are inputs to that broader map, not a narrowed
 v1 product center or SDK promise.
 
+Read the current v1 route through three gates:
+
+- Routing snapshot: the table below is a research index for next work, not live agent
+  routing, release authorization, or a public compatibility roadmap. Active turn routing
+  stays in the lead handoff brief.
+- Evidence gate: accepted target-set, consume-gate, or layout evidence can justify
+  fixture/internal work only for the named slice. It does not promote adjacent identity,
+  lookup, mutation, return override, runtime observer, or SDK surfaces.
+- SDK boundary: public v1 APIs stay copied, redacted, C/POD, owner-token scoped, and
+  capability-discovered. ArkApi/AseApi material remains a names/demand dictionary only.
+
 SDK v1 routing snapshot from the current notes:
 
 | Route | Current state | Use next |

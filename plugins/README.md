@@ -35,11 +35,12 @@ HTTP endpoints, resource identities, lookups, mutations, return overrides, or ra
 ## Adding Creator-Facing Examples
 
 New first-party Plugin Hub seed examples should be small, safe-disabled, and native to the
-current Obelisk C ABI. The fastest useful additions after `v0.1` are descriptor readers,
-passive copied-chat parsers, process-local timer utilities, and copied policy auditors.
-The current tree already has examples for those categories. Treat new first-party work as
-a promotion or refinement of the existing examples unless a separate copied-data surface
-has passed the capability-matrix evidence gate.
+current Obelisk C ABI. The fastest useful additions after `v0.1` are production-supported
+descriptor readers and process-local timer utilities, plus experimental passive
+copied-chat parsers and copied policy auditors. The current tree already has examples for
+those categories. Treat new first-party work as a promotion or refinement of the existing
+examples unless a separate copied-data surface has passed the capability-matrix evidence
+gate.
 
 If an example request is motivated by ArkApi, AseApi, NextGenPlugins, or another
 popular-plugin family, treat that input as names/demand signals only. It is not a
