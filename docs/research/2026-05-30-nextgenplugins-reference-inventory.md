@@ -76,3 +76,10 @@ Keep this local clone out of the Obelisk repository and use it later to build a
 `Plugin Hub compatibility matrix` once the v0.1 stable core is ready. The first useful
 matrix should list plugin name, feature category, required Obelisk API surface, current
 Obelisk readiness, and blocked capabilities.
+
+Do not let this inventory pull internal evidence lanes into Plugin Hub scope prematurely.
+For example, Transfer remains an internal evidence backlog item unless a concrete plugin
+family creates demand for a public Transfer surface and the Obelisk promotion gates are
+met. The current high-demand families are permissions/admin, economy/shop/rewards, chat
+commands, homes/teleport/safe-zone, RCON/operator integration, structures, dinos, tribes,
+and lifecycle/crash handling.

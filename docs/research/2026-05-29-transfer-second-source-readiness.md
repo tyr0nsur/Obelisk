@@ -1,5 +1,19 @@
 # Transfer Second-Source Readiness
 
+## Current Status
+
+The historical ScriptStruct candidate root recorded below predates the current bool-tail
+strictness. Rechecking it now leaves `PrimalLocalProfile.ArkTributePlayerData`
+inconclusive because three `BoolProperty` fields lack `bool_field_size` and
+`bool_byte_offset`.
+
+Use the refreshed 2026-05-30 evidence for current local `transfer-scriptstruct`
+comparisons:
+
+- [2026-05-30-transfer-scriptstruct-booltail-refresh.md](2026-05-30-transfer-scriptstruct-booltail-refresh.md)
+
+The UFunction second-source result in this note remains useful historical layout evidence.
+
 ## Objective
 
 Record the first accepted offline second-source layout evidence for transfer-related

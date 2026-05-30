@@ -154,11 +154,17 @@ recovery context is not active routing for the current head; use
   `artifact_identity.artifact_sha256`; durable `/servidor/ark/workspace-offline`
   regeneration remains a separate explicit offline write step and still does not promote
   public GObjects, `ResourceHandle`, lookup, identity, mutation, or return override.
-- Transfer ScriptStruct fixtures already preserve `ArkTributePlayerData` bool-tail
-  metadata for `bWasAllowDPCUpload`, `bWithItems`, and `bForServerTransfer`. The current
-  stale second-source/inventory artifacts under `/servidor/ark/workspace-offline` should
-  not be reused until regenerated; no valid local second source exists under the repo or
-  `/home/flowcommunity-ark/obelisk-artifacts`.
+- Transfer ScriptStruct fixtures and the refreshed local second-source root preserve
+  `ArkTributePlayerData` bool-tail metadata for `bWasAllowDPCUpload`, `bWithItems`, and
+  `bForServerTransfer`: `bool_field_size=1`, `bool_byte_offset=0`, `byte_mask=0x1`,
+  `field_mask=0xff`, and `native_bool=false`. Current refreshed evidence accepted
+  `transfer-scriptstruct` 2/2 as layout-only at
+  `/home/flowcommunity-ark/obelisk-artifacts/transfer-scriptstruct-bool-tail-refresh-20260530T163945Z`.
+  Its regenerated `inventory-pack` includes structs, has consume gate accepted, promote
+  gate blocked, and normalized `artifact-pack.manifest.json`/`SHA256SUMS`.
+  The older root under `/servidor/ark/workspace-offline/transfer-second-source-20260529T154200Z/scriptstruct-snapshots`
+  is stale under current bool-tail strictness and should not be reused for current
+  comparisons.
 
 ## ResourceHandle Blockers
 
@@ -189,10 +195,13 @@ recovery context is not active routing for the current head; use
   slice; only the three copied `ReturnValue` item checks are promoted publicly, and only as
   `GameplayPolicyEvent` kinds.
 - Current post-RC focus: keep remaining item producer/runtime validation and Mission
-  copied-bool work internal, then refresh Transfer ScriptStruct bool-tail second-source
-  evidence before any Transfer payload/redaction work. Public Inventory SDK, Items SDK,
-  Mission SDK, and Transfer SDK surfaces remain absent, and this does not authorize
-  Transfer runtime work.
+  copied-bool work internal, then if Transfer continues, consume the refreshed
+  bool-tail-complete ScriptStruct root for inventory-pack normalization or redacted
+  signature refresh before any Transfer payload/redaction work. The inventory pack is now
+  normalized locally; redacted signatures or a stricter transfer-specific inventory
+  guardrail are the next evidence-only steps. Public Inventory SDK,
+  Items SDK, Mission SDK, and Transfer SDK surfaces remain absent, and this does not
+  authorize Transfer runtime work.
 - Runtime lifecycle callback-cleanup debt is addressed in post-RC head: `PluginManager`
   now skips `dlclose` when callback cleanup fails, retains the plugin for retry, preserves
   owner-token unregister while unloading, and avoids repeating shutdown on retry.
