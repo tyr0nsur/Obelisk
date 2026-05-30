@@ -1029,6 +1029,21 @@ namespace
                 invocation);
             Require(result.Status == ReadStatus::Implausible, "overlong mission property chain was accepted");
         }
+        {
+            MissionFixture fixture;
+            BuildBPOnPlayerRemovedFromMission(fixture);
+            WriteAt(fixture.PropertyC, 0x28, fixture.PropertyB.data());
+
+            MissionReflection::MissionInvocation invocation;
+            ReadResult result = MissionReflection::TryIdentifyMissionInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "cyclic mission property chain was accepted");
+            Require(invocation.Fields.empty(), "cyclic mission property chain left stale fields");
+        }
     }
 
     void TestRejectsUnsupportedTarget()

@@ -233,6 +233,17 @@ def target_guidance_report(target_filters: set[str]) -> dict[str, Any]:
     }
 
 
+def unmatched_target_guidance_filters(targets: list[str]) -> list[str]:
+    return [
+        target
+        for target in targets
+        if not any(
+            matches_target_filter(guidance_target, {target})
+            for guidance_target in TARGET_BLOCKER_GUIDANCE
+        )
+    ]
+
+
 def target_blocker_guidance(target: str) -> dict[str, Any] | None:
     guidance = TARGET_BLOCKER_GUIDANCE.get(target)
     if guidance is None:
@@ -1031,6 +1042,12 @@ def main() -> int:
         return 0
     target_filters = expand_target_filters(args.target, args.target_set)
     if args.list_target_guidance:
+        unmatched_guidance = unmatched_target_guidance_filters(args.target)
+        if unmatched_guidance:
+            raise SystemExit(
+                "target guidance filter did not match known guidance: "
+                + ", ".join(sorted(unmatched_guidance))
+            )
         report = target_guidance_report(target_filters)
         report["target_sets"] = sorted(args.target_set)
         if args.json:

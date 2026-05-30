@@ -81,6 +81,11 @@ namespace
         throw std::runtime_error("expected structure dispatcher test exception");
     }
 
+    void ThrowingUnknownCallback(const Obelisk::Core::StructureEventView&, void*)
+    {
+        throw 7;
+    }
+
     void TestDispatchCopiesScalarInputForCallbackDuration()
     {
         Obelisk::Core::StructureEventDispatcher dispatcher;
@@ -672,6 +677,7 @@ namespace
         Capture capture;
         const std::vector<Obelisk::Core::StructureScalarValue> scalars = MakeScalars();
         dispatcher.Register(&owner, {ThrowingCallback, nullptr});
+        dispatcher.Register(&owner, {ThrowingUnknownCallback, nullptr});
         dispatcher.Register(&owner, {CaptureCallback, &capture});
 
         Require(dispatcher.Dispatch(MakeEvent(scalars)) == 1, "successful dispatch count ignored exception");

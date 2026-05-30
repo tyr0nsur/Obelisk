@@ -129,10 +129,22 @@ namespace
         throw std::runtime_error("global pre failed");
     }
 
+    bool ThrowingUnknownGlobalPre(void*, void*, void*)
+    {
+        ++g_Counters.global_pre;
+        throw 7;
+    }
+
     bool ThrowingFilteredPre(void*, void*, void*)
     {
         ++g_Counters.filtered_pre;
         throw std::runtime_error("filtered pre failed");
+    }
+
+    bool ThrowingUnknownFilteredPre(void*, void*, void*)
+    {
+        ++g_Counters.filtered_pre;
+        throw 7;
     }
 
     bool ThrowingGlobalPost(void*, void*, void*)
@@ -141,10 +153,22 @@ namespace
         throw std::runtime_error("global post failed");
     }
 
+    bool ThrowingUnknownGlobalPost(void*, void*, void*)
+    {
+        ++g_Counters.global_post;
+        throw 7;
+    }
+
     bool ThrowingFilteredPost(void*, void*, void*)
     {
         ++g_Counters.filtered_post;
         throw std::runtime_error("filtered post failed");
+    }
+
+    bool ThrowingUnknownFilteredPost(void*, void*, void*)
+    {
+        ++g_Counters.filtered_post;
+        throw 7;
     }
 
     bool NullSafeCallback(void*, void*, void*)
@@ -311,14 +335,16 @@ namespace
         int owner = 0;
 
         events.RegisterPreProcessEventOwned(&owner, ThrowingGlobalPre);
+        events.RegisterPreProcessEventOwned(&owner, ThrowingUnknownGlobalPre);
         events.RegisterPreProcessEventOwned(&owner, GlobalPre);
         events.RegisterPreProcessEventForNameIndexOwned(&owner, 42, ThrowingFilteredPre);
+        events.RegisterPreProcessEventForNameIndexOwned(&owner, 42, ThrowingUnknownFilteredPre);
         events.RegisterPreProcessEventForNameIndexOwned(&owner, 42, FilteredPre);
 
         Require(events.TriggerPreProcessEvent(42, nullptr, nullptr, nullptr),
                 "throwing pre callback blocked event dispatch");
-        Require(g_Counters.global_pre == 2, "global pre dispatch stopped after exception");
-        Require(g_Counters.filtered_pre == 2, "filtered pre dispatch stopped after exception");
+        Require(g_Counters.global_pre == 3, "global pre dispatch stopped after exception");
+        Require(g_Counters.filtered_pre == 3, "filtered pre dispatch stopped after exception");
     }
 
     void TestPostCallbackExceptionsDoNotStopLaterCallbacks()
@@ -328,13 +354,15 @@ namespace
         int owner = 0;
 
         events.RegisterPostProcessEventOwned(&owner, ThrowingGlobalPost);
+        events.RegisterPostProcessEventOwned(&owner, ThrowingUnknownGlobalPost);
         events.RegisterPostProcessEventOwned(&owner, GlobalPost);
         events.RegisterPostProcessEventForNameIndexOwned(&owner, 42, ThrowingFilteredPost);
+        events.RegisterPostProcessEventForNameIndexOwned(&owner, 42, ThrowingUnknownFilteredPost);
         events.RegisterPostProcessEventForNameIndexOwned(&owner, 42, FilteredPost);
 
         events.TriggerPostProcessEvent(42, nullptr, nullptr, nullptr);
-        Require(g_Counters.global_post == 2, "global post dispatch stopped after exception");
-        Require(g_Counters.filtered_post == 2, "filtered post dispatch stopped after exception");
+        Require(g_Counters.global_post == 3, "global post dispatch stopped after exception");
+        Require(g_Counters.filtered_post == 3, "filtered post dispatch stopped after exception");
     }
 
     void TestOwnerCleanup()

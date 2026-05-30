@@ -65,6 +65,11 @@ namespace
         throw std::runtime_error("expected inventory policy dispatcher test exception");
     }
 
+    void ThrowingUnknownCallback(const Obelisk::Core::InventoryPolicyEventView&, void*)
+    {
+        throw 7;
+    }
+
     void TestDispatchCopiesScalarInputForCallbackDuration()
     {
         Obelisk::Core::InventoryPolicyEventDispatcher dispatcher;
@@ -631,6 +636,7 @@ namespace
         Capture capture;
         const std::vector<Obelisk::Core::InventoryPolicyScalarValue> scalars = MakeScalars();
         dispatcher.Register(&owner, {ThrowingCallback, nullptr});
+        dispatcher.Register(&owner, {ThrowingUnknownCallback, nullptr});
         dispatcher.Register(&owner, {CaptureCallback, &capture});
 
         Require(dispatcher.Dispatch(MakeEvent(scalars)) == 1, "successful dispatch count ignored exception");

@@ -48,6 +48,11 @@ namespace
         throw std::runtime_error("expected test exception");
     }
 
+    void ThrowingUnknownCallback(const Obelisk::Core::ChatMessageView&, void*)
+    {
+        throw 7;
+    }
+
     void NoopCallback(const Obelisk::Core::ChatMessageView&, void*)
     {
     }
@@ -584,6 +589,7 @@ namespace
         int owner = 0;
         Capture capture;
         dispatcher.Register(&owner, {ThrowingCallback, nullptr});
+        dispatcher.Register(&owner, {ThrowingUnknownCallback, nullptr});
         dispatcher.Register(&owner, {CaptureCallback, &capture});
 
         Require(dispatcher.Dispatch(MakeMessage()) == 1, "successful dispatch count ignored exception");

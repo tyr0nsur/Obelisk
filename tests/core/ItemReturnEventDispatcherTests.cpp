@@ -65,6 +65,11 @@ namespace
         throw std::runtime_error("expected item return dispatcher test exception");
     }
 
+    void ThrowingUnknownCallback(const Obelisk::Core::ItemReturnEventView&, void*)
+    {
+        throw 7;
+    }
+
     void TestDispatchCopiesScalarInputForCallbackDuration()
     {
         Obelisk::Core::ItemReturnEventDispatcher dispatcher;
@@ -561,13 +566,15 @@ namespace
 
         Require(dispatcher.Register(&owner, {ThrowingCallback, nullptr}) != 0,
                 "throwing callback registration failed");
+        Require(dispatcher.Register(&owner, {ThrowingUnknownCallback, nullptr}) != 0,
+                "unknown-throwing callback registration failed");
         Require(dispatcher.Register(&owner, {CaptureCallback, &capture}) != 0,
                 "capture callback registration failed");
         Require(dispatcher.Dispatch(MakeEvent(scalars)) == 1,
                 "throwing callback counted as successful dispatch or stopped later callback");
         Require(capture.Calls == 1, "callback after throwing item return callback did not run");
-        Require(dispatcher.SubscriptionCount() == 2, "exception changed item return registrations");
-        Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 2,
+        Require(dispatcher.SubscriptionCount() == 3, "exception changed item return registrations");
+        Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 3,
                 "owner cleanup after exception removed wrong callback count");
     }
 }

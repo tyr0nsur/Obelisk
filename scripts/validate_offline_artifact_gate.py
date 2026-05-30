@@ -5118,6 +5118,7 @@ def internal_uobject_runtime_serial_semantics_canonical_report(payload: dict[str
         "source_artifacts": payload.get("source_artifacts"),
         "binary_sha256": payload.get("binary_sha256"),
         "rows": payload.get("rows"),
+        "summary": payload.get("summary"),
         "serial_semantics": payload.get("serial_semantics"),
         "privacy": payload.get("privacy"),
         "remaining_blockers": payload.get("remaining_blockers"),
@@ -5442,11 +5443,13 @@ def validate_internal_uobject_runtime_serial_semantics_manifest(
             blockers.append({"reason": "runtime_serial_semantics_fuobjectitem_0xC_not_unknown", "label": f"{label}:$.serial_semantics.fuobjectitem_dword_0xC"})
 
     rows = payload.get("rows")
+    actual_fresh_allow_count: int | None = None
+    actual_negative_reject_count: int | None = None
     if not isinstance(rows, list) or not rows:
         blockers.append({"reason": "runtime_serial_semantics_rows_missing", "label": f"{label}:$.rows"})
     else:
-        has_fresh_allow = False
-        has_reject = False
+        fresh_allow_count = 0
+        negative_reject_count = 0
         for index, row in enumerate(rows):
             row_label = f"{label}:$.rows[{index}]"
             if not isinstance(row, dict):
@@ -5466,19 +5469,34 @@ def validate_internal_uobject_runtime_serial_semantics_manifest(
                 if row.get("same_frame") is not True or row.get("fuobjectitem_dword_0x8_status") != "fresh_nonzero_match" or decision != "allow_candidate_frame_local_only":
                     blockers.append({"reason": "runtime_serial_semantics_fresh_case_not_frame_local_only", "label": row_label})
                 else:
-                    has_fresh_allow = True
+                    fresh_allow_count += 1
             elif decision == "reject":
                 if row.get("reject_reason") not in RUNTIME_SERIAL_SEMANTICS_REJECT_REASONS:
                     blockers.append({"reason": "runtime_serial_semantics_reject_reason_invalid", "label": f"{row_label}.reject_reason"})
                 if row.get("copied_output") != "reason_category_only":
                     blockers.append({"reason": "runtime_serial_semantics_copied_output_invalid", "label": f"{row_label}.copied_output"})
-                has_reject = True
+                negative_reject_count += 1
             else:
                 blockers.append({"reason": "runtime_serial_semantics_row_decision_invalid", "label": f"{row_label}.decision"})
-        if not has_fresh_allow:
+        actual_fresh_allow_count = fresh_allow_count
+        actual_negative_reject_count = negative_reject_count
+        if fresh_allow_count < 1:
             blockers.append({"reason": "runtime_serial_semantics_missing_fresh_frame_local_allow", "label": f"{label}:$.rows"})
-        if not has_reject:
+        if negative_reject_count < 1:
             blockers.append({"reason": "runtime_serial_semantics_missing_negative_reject", "label": f"{label}:$.rows"})
+
+    summary = payload.get("summary")
+    if not isinstance(summary, dict):
+        blockers.append({"reason": "runtime_serial_semantics_summary_missing", "label": f"{label}:$.summary"})
+    else:
+        if not is_json_int(summary.get("fresh_frame_local_allow_rows")) or summary["fresh_frame_local_allow_rows"] < 1:
+            blockers.append({"reason": "runtime_serial_semantics_summary_missing_fresh_frame_local_allow", "label": f"{label}:$.summary.fresh_frame_local_allow_rows"})
+        elif actual_fresh_allow_count is not None and summary["fresh_frame_local_allow_rows"] != actual_fresh_allow_count:
+            blockers.append({"reason": "runtime_serial_semantics_summary_fresh_frame_local_allow_rows_mismatch", "label": f"{label}:$.summary.fresh_frame_local_allow_rows"})
+        if not is_json_int(summary.get("negative_reject_rows")) or summary["negative_reject_rows"] < 1:
+            blockers.append({"reason": "runtime_serial_semantics_summary_missing_negative_reject", "label": f"{label}:$.summary.negative_reject_rows"})
+        elif actual_negative_reject_count is not None and summary["negative_reject_rows"] != actual_negative_reject_count:
+            blockers.append({"reason": "runtime_serial_semantics_summary_negative_reject_rows_mismatch", "label": f"{label}:$.summary.negative_reject_rows"})
     return blockers
 
 

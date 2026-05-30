@@ -124,7 +124,9 @@ for the current checkpoint.
   `obelisk.internal-uobject-revalidation-runtime-rejection-samples.v1` and
   `obelisk.internal-uobject-revalidation-runtime-serial-semantics.v1` schemas, remain
   consume-only/promote-blocked, redact run identity and privacy-sensitive values, and
-  still reject post-callback lookup. The minimal planning note now lives in
+  still reject post-callback lookup. These schemas are not public SDK/runtime-readiness
+  contracts, and offline or copied-core scans cannot satisfy them. The minimal planning
+  note now lives in
   `docs/research/2026-05-30-post-rc-offline-resourcehandle-priority.md#future-runtime-observation-plan`;
   execution is still blocked until an operator-approved live-ops brief names the exact
   debug target, gates, window, rollback, artifacts, and posture checks. Do not replace
@@ -157,17 +159,18 @@ for the current checkpoint.
   candidate pack to validate; fixture-only readiness reports `missing_base_snapshot` for
   both `PrimalStructure.IsAllowedToBuild` and `APrimalStructure.IsAllowedToBuild`. First
   useful action is a sanitized focused snapshot from an approved copied/offline core or
-  complete core evidence-pack manifest outside protected server paths; fixture-only
-  reports are a negative guardrail, not promotion evidence. Use the
-  binary-scoped `0x5956f30` FName root slot and `0x595b7e0` GObjects candidate, then a
+  complete core evidence-pack manifest outside protected server paths; rootless or
+  fixture-only reports are a negative guardrail, not progress or promotion evidence. Use
+  the binary-scoped `0x5956f30` FName root slot and `0x595b7e0` GObjects candidate, then a
   distinct second-source compare. Do not add either key to release target sets, ABI enums,
   descriptors, dispatchers, public docs, or runtime gates.
 - Plugin Hub planning order from current demand map and local `NextGenPlugins` dictionary:
   `docs/PLUGIN_HUB_FOUNDATION_V1.md` is now the contributor-facing foundation boundary,
   backed by `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`. The fastest honest creator path after
   `v0.1` is small Obelisk-native examples for lifecycle/config/logging, descriptor reads,
-  passive copied-chat parsing, process-local timers, and copied policy auditing. Keep
-  permissions, RCON, economy, homes/safe zones, structure enforcement, dinos, tribes,
+  passive copied-chat parsing, process-local timers, and copied policy auditing. Treat
+  that as a non-production-ready seed, not a Plugin Hub stability or compatibility claim.
+  Keep permissions, RCON, economy, homes/safe zones, structure enforcement, dinos, tribes,
   transfers, inventory, item mutation, identity, lookup, replies, send-chat, moderation,
   and ArkApi portability as design backlogs until their own public surfaces are promoted.
   Keep the clone out of repo and use it only as a names/demand dictionary.

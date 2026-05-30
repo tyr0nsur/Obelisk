@@ -117,7 +117,8 @@ priorities, and do not use history files as the active source of truth.
   `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`. The near-term seed boundary is small
   Obelisk-native examples for lifecycle/config/logging, descriptor reads, passive copied
   chat parsing, process-local timers, and copied policy auditing; demand-map or
-  `NextGenPlugins` dictionary entries do not promote permissions, RCON, economy,
+  `NextGenPlugins` dictionary entries do not make the seed production-ready and do not
+  promote permissions, RCON, economy,
   homes/safe zones, structure enforcement, dinos, tribes, transfers, inventory, item
   mutation, identity, lookup, replies, send-chat, moderation, or ArkApi portability.
 - `DescribeResourceKind` is a metadata-only v0.1 SDK helper for known resource categories.
@@ -212,8 +213,9 @@ priorities, and do not use history files as the active source of truth.
   second-wave build-policy dictionary seed only. There is no committed candidate pack,
   second-source comparison, target-set promotion, public StructureEvents/build-policy SDK,
   mutation, or return override. Fixture-only `missing_base_snapshot` readiness is a
-  negative guardrail, not promotion evidence. First useful work is an approved offline
-  focused snapshot and distinct second-source compare; do not add either key to release
+  negative guardrail, not progress or promotion evidence. First useful work is an approved
+  offline focused snapshot with an explicit base root or complete core evidence-pack
+  manifest, followed by a distinct second-source compare; do not add either key to release
   targets, ABI enums, descriptors, dispatchers, public docs, or runtime gates.
 - `ue/MissionReflection.*` is an internal fixture-backed recognizer for
   `mission-compact-intake`: copied bool ranges only, object refs and `OutItemIDs` arrays
@@ -360,7 +362,8 @@ priorities, and do not use history files as the active source of truth.
   schemas require redacted run identity, privacy-safe copied output, the strict serial
   policy source artifact, consume-only acceptance, promote-mode blockers, and no
   post-callback lookup, public `ResourceHandle`, object identity, mutation, return
-  override, raw UE pointer, serial-value, or protected-path disclosure.
+  override, raw UE pointer, serial-value, or protected-path disclosure. They are not public
+  SDK/runtime-readiness contracts and cannot be satisfied by offline or copied-core scans.
 - Raw core captures under `/servidor/ark/obelisk/dumps` are protected storage, not direct
   promotion inputs. Promotion tooling consumes hardlinked or copied offline artifacts.
 - Second-source intake must derive artifact-specific FName root, validate GObjects,

@@ -430,6 +430,20 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             text_result.stdout,
         )
 
+    def test_structure_build_policy_guidance_rejects_unmatched_explicit_target(self) -> None:
+        result = run_compare_raw(
+            "--list-target-guidance",
+            "--target",
+            "PrimalStructure.DoesNotExist",
+            "--json",
+        )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(
+            "target guidance filter did not match known guidance: PrimalStructure.DoesNotExist",
+            result.stderr,
+        )
+
     def test_requires_base_root_unless_listing_target_sets(self) -> None:
         result = run_compare_raw("--readiness-report")
 

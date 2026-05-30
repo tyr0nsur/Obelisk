@@ -1355,6 +1355,10 @@ def runtime_serial_semantics_manifest() -> dict:
                 "copied_output": "reason_category_only",
             },
         ],
+        "summary": {
+            "fresh_frame_local_allow_rows": 1,
+            "negative_reject_rows": 1,
+        },
         "serial_semantics": {
             "unknown_wraparound_reject": True,
             "cross_frame_lookup": "reject",
@@ -4916,6 +4920,28 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("runtime_serial_semantics_row_unexpected_field", reasons)
         self.assertIn("runtime_serial_semantics_forbidden_disclosure_field", reasons)
         self.assertIn("runtime_serial_semantics_fresh_case_not_frame_local_only", reasons)
+
+    def test_blocks_runtime_serial_semantics_summary_negative_reject_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "runtime-serial-semantics.json"
+            payload = runtime_serial_semantics_manifest()
+            payload["summary"]["negative_reject_rows"] = 2
+            attach_runtime_output_identity(
+                payload,
+                schema=gate.INTERNAL_UOBJECT_RUNTIME_SERIAL_SEMANTICS_SCHEMA,
+                capture_id="runtime-serial-test",
+                evidence_pack_id="runtime-serial-pack",
+            )
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "runtime_serial_semantics_summary_negative_reject_rows_mismatch",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
 
     def test_accepts_resource_handle_serial_scan_with_rejection_candidate_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

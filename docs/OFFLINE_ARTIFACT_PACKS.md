@@ -88,6 +88,23 @@ into supported child manifests and preserves their consume/promote blockers.
 Promote mode is not a pack-container approval path. The gate intentionally blocks
 artifact-pack manifests in promote mode as container-only evidence.
 
+## ResourceHandle Runtime Candidate Checks
+
+Future ResourceHandle runtime artifacts are accepted only as internal planning inputs.
+The gate recognizes these schemas in consume mode:
+
+- `obelisk.internal-uobject-revalidation-runtime-rejection-samples.v1`
+- `obelisk.internal-uobject-revalidation-runtime-serial-semantics.v1`
+
+They must redact run identity, reference an accepted strict serial-policy source
+artifact, expose only copied or aggregate reason/status fields, keep privacy flags false
+for raw UE pointers, object indices, serial values, player/gameplay payloads, persistent
+lookup tokens, protected paths, broad tracing, ReflectionScanner, ptrace/gcore, and
+`FUObjectItem+0xc` serial claims, and keep promotion/public readiness flags false.
+Promote mode remains blocked. Passing these manifests does not approve a runtime
+observation window and does not promote `ResourceHandle`, object identity, lookup,
+post-callback handles, mutation, return override, GObjects, or public SDK surface.
+
 ## Strict Target-Set Coverage
 
 For redacted UFunction signature manifests that name target sets, run the consume gate
@@ -118,6 +135,12 @@ python3 scripts/compare_reflection_snapshots.py \
   --list-target-guidance \
   --target PrimalStructure.IsAllowedToBuild
 ```
+
+Guidance filters use exact `Outer.Name` or `schema:Outer.Name` targets. An explicit
+`--target` that does not match known deferred-target guidance fails closed instead of
+returning an empty success report. A `--target-set` filter may return zero guidance
+entries; that only means the set has no deferred-target guidance recorded here, not that
+the set is promoted or that build-policy coverage exists.
 
 For deferred structure build-policy targets, contributors can check the current fixture
 blocker without server paths:
