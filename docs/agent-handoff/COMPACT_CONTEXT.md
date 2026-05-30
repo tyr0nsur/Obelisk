@@ -159,6 +159,13 @@ priorities, and do not use history files as the active source of truth.
   `/home/flowcommunity-ark/obelisk-artifacts/mission-copied-bool-policy-slice-20260530T072912Z/`
   with manifest SHA256 `94e3a09a92006e1726aa425045af9581bf0b5ec508fa29691065fe7048b0bea2`;
   consume mode accepts it and promote mode remains blocked.
+- `ue/TransferReflection.*` is an internal/test-only recognizer for the
+  `ServerTransferredPlayerConfirmationResult.bAccept` copied bool. It validates exact
+  SHA-scoped function/property shape and bool mask metadata, but has no hook/runtime
+  dispatcher/public Transfer SDK. The durable focused Transfer policy slice is preserved at
+  `/home/flowcommunity-ark/obelisk-artifacts/transfer-baccept-only-policy-slice-20260530T073308Z/`
+  with manifest SHA256 `a2b0939189cb847b351c638141fa5e122c08ca69acadae8b5c86d894fc208f12`;
+  consume mode accepts it and promote mode remains blocked.
 - ResourceHandle remains post-RC/internal and blocked by
   `uobject_flags_validity_semantics_unproven`; see the ResourceHandle/UObject flag
   research notes for evidence. Do not reopen broad FName/GObjects discovery or create

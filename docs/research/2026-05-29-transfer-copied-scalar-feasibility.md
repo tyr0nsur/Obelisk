@@ -100,7 +100,8 @@ and pins one copied field:
 - `ShooterPlayerController.ServerTransferredPlayerConfirmationResult.bAccept`
 
 The manifest must keep `policy_status=evidence-only`, `snapshot_root=redacted`,
-`promotion_ready=false`, exactly one input snapshot, and the exact copied bool shape:
+`promotion_ready=false`, complete seven-snapshot `transfer-ufunction-intake` provenance,
+and the exact copied bool shape:
 `FunctionFlags=0x220cc0`, `NumParms=1`, `ParmsSize=1`,
 `ReturnValueOffset=0xffff`, `BoolProperty`, offset `0`, `ElementSize=1`,
 `ArrayDim=1`, byte mask `0x01`, field mask `0xff`, and `native_bool=false`.
@@ -123,6 +124,38 @@ Promotion mode is always blocked for this schema. Public/runtime overclaims are 
 outside the required non-claims and explicit exclusions. The explicit exclusions include
 tribute structs, arrays, strings, ids, object/class refs, mutation, return override,
 dispatcher wiring, runtime hook wiring, and public SDK promotion.
+
+## 2026-05-30 Durable Policy Slice
+
+The focused Transfer `bAccept` policy slice is preserved at:
+
+```text
+/home/flowcommunity-ark/obelisk-artifacts/transfer-baccept-only-policy-slice-20260530T073308Z/
+```
+
+Artifact checksums:
+
+- `transfer-baccept-only-policy-slice.json`:
+  `a2b0939189cb847b351c638141fa5e122c08ca69acadae8b5c86d894fc208f12`
+- `consume-gate.json`:
+  `0e6e05d6975472a12ab8537550a939334e84156ba4fc78f64c5542254ffdfebc`
+- `promote-gate.json`:
+  `70661c87f8dc8cec0c944820e2692f8b924051b33e9e71b6ade2862ca1933912`
+
+Consume mode accepts the slice with no blockers. Promote mode blocks it with
+`promote_mode_transfer_baccept_policy_slice_evidence_only` and
+`promote_mode_manifest_has_non_claims`. This is the intended result: the slice is
+offline/internal evidence only and does not authorize hook wiring, marker/env activation,
+dispatcher callbacks, runtime logs, public Transfer SDK, identity, mutation, return
+override, or payload decoding.
+
+Use the focused policy slice above as the canonical `bAccept` evidence. Use
+`/servidor/ark/workspace-offline/transfer-second-source-20260529T154200Z/` only as the
+broader target-set/layout evidence source: its UFunction readiness accepted `7/7`
+`transfer-ufunction-intake` targets with `promotion_ready=false`, and its ScriptStruct
+readiness accepted `2/2` transfer structs as layout-only evidence. Older transfer-risk
+rollups without provenance sidecars or target-set coverage remain stale triage inputs, not
+promotion evidence.
 
 ## Non-Claims
 

@@ -1219,6 +1219,29 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
                 with self.subTest(file=path, token=token):
                     self.assertNotIn(token, text)
 
+    def test_transfer_observer_has_no_operational_runtime_gate(self) -> None:
+        operational_paths = [
+            "loader/Bootstrap.cpp",
+            "runtime/RuntimeMarkers.cpp",
+            "runtime/RuntimeMarkers.h",
+            "scripts/check_obelisk_server_posture.sh",
+            "scripts/check_release_readiness.sh",
+            "scripts/install_obelisk.sh",
+            "scripts/obelisk.py",
+        ]
+
+        for path in operational_paths:
+            text = read(path)
+            for token in [
+                "OBELISK_ENABLE_TRANSFER_REFLECTION",
+                "OBELISK_ENABLE_TRANSFER_BACCEPT",
+                "enable-transfer-reflection",
+                "enable-transfer-baccept",
+                "TransferBAcceptObserver",
+            ]:
+                with self.subTest(file=path, token=token):
+                    self.assertNotIn(token, text)
+
     def test_post_rc_hook_recognizers_remain_test_only_targets(self) -> None:
         cmake = read("CMakeLists.txt")
         post_rc_hook_sources = [

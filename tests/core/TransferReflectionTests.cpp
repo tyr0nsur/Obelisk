@@ -677,16 +677,32 @@ namespace
     void TestRejectsUnsupportedTarget()
     {
         TransferFixture fixture;
-        BuildConfirmationResult(fixture, 9999);
-
         TransferReflection::TransferInvocation invocation;
+        BuildConfirmationResult(fixture);
         ReadResult result = TransferReflection::TryIdentifyTransferInvocation(
             fixture.Reader(),
             Options(),
             fixture.Function.data(),
             fixture.Params.data(),
             invocation);
+        Require(static_cast<bool>(result), result.Reason.c_str());
+        Require(invocation.FunctionNameIndex == kServerTransferredPlayerConfirmationResultNameIndex,
+                "valid transfer invocation did not populate unsupported-target stale source");
+
+        BuildConfirmationResult(fixture, 9999);
+        result = TransferReflection::TryIdentifyTransferInvocation(
+            fixture.Reader(),
+            Options(),
+            fixture.Function.data(),
+            fixture.Params.data(),
+            invocation);
         Require(result.Status == ReadStatus::Implausible, "unsupported transfer target was accepted");
+        Require(invocation.FunctionNameIndex == -1, "unsupported transfer target left stale function name");
+        Require(invocation.OuterNameIndex == -1, "unsupported transfer target left stale outer name");
+        Require(!invocation.HasParameterRanges, "unsupported transfer target left stale range state");
+        Require(invocation.ParameterData == nullptr, "unsupported transfer target left stale parameter data");
+        Require(invocation.ParameterSize == 0, "unsupported transfer target left stale parameter size");
+        Require(invocation.Fields.empty(), "unsupported transfer target left stale fields");
     }
 
     void TestGateRejectsBeforeReading()

@@ -121,6 +121,14 @@ sequence.
   accepts it, and promote mode blocks it with evidence-only/non-claim blockers. It copies
   only the five frozen Mission bool fields and keeps object refs plus `OutItemIDs`
   recognition-only.
+- The durable Transfer `bAccept` policy slice is preserved at
+  `/home/flowcommunity-ark/obelisk-artifacts/transfer-baccept-only-policy-slice-20260530T073308Z/`.
+  Its manifest SHA256 is
+  `a2b0939189cb847b351c638141fa5e122c08ca69acadae8b5c86d894fc208f12`; consume mode
+  accepts it, and promote mode blocks it with evidence-only/non-claim blockers. It copies
+  only `ShooterPlayerController.ServerTransferredPlayerConfirmationResult.bAccept` and
+  keeps transfer payloads, ids, object/class refs, mutation, return override, hook wiring,
+  dispatcher wiring, and public Transfer SDK blocked.
 - Do not rerun broad FName, GObjects, or core scans for ResourceHandle unless the binary
   hash changes or evidence contradicts current roots/candidates. The next ResourceHandle
   work should use the durable flag-policy refresh as internal static input and focus on
