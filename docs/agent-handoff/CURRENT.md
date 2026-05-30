@@ -200,10 +200,10 @@ recovery context is not active routing for the current head; use
   copied-bool work internal, then if Transfer continues, consume the refreshed
   bool-tail-complete ScriptStruct root for redacted signature hardening/refresh before any
   Transfer payload/redaction work. The inventory pack is now normalized locally and guarded
-  by a transfer-specific bool-tail contract; redacted signatures still need to preserve
-  bool-tail metadata before they can be treated as bool-tail-complete. Public Inventory
-  SDK, Items SDK, Mission SDK, and Transfer SDK surfaces remain absent, and this does not
-  authorize Transfer runtime work.
+  by a transfer-specific bool-tail contract; redacted ScriptStruct signatures now preserve
+  the same bool-tail metadata and reject incomplete `transfer-scriptstruct` signatures in
+  the offline artifact gate. Public Inventory SDK, Items SDK, Mission SDK, and Transfer SDK
+  surfaces remain absent, and this does not authorize Transfer runtime work.
 - Runtime lifecycle callback-cleanup debt is addressed in post-RC head: `PluginManager`
   now skips `dlclose` when callback cleanup fails, retains the plugin for retry, preserves
   owner-token unregister while unloading, and avoids repeating shutdown on retry.

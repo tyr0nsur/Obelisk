@@ -257,6 +257,22 @@ def bool_masks(prop: dict[str, Any]) -> dict[str, Any]:
     return masks
 
 
+def bool_field_metadata(prop: dict[str, Any]) -> dict[str, Any]:
+    metadata: dict[str, Any] = {}
+    field_size = parse_int_value(prop.get("bool_field_size"))
+    byte_offset = parse_int_value(prop.get("bool_byte_offset"))
+    if field_size is not None:
+        metadata["bool_field_size"] = field_size
+    if byte_offset is not None:
+        metadata["bool_byte_offset"] = byte_offset
+    masks = bool_masks(prop)
+    metadata.update(masks)
+    native_bool = prop.get("native_bool")
+    if isinstance(native_bool, bool):
+        metadata["native_bool"] = native_bool
+    return metadata
+
+
 def is_sensitive_scalar_name(name: str) -> bool:
     lowered = name.lower()
     return any(fragment in lowered for fragment in SENSITIVE_SCALAR_NAME_FRAGMENTS)
@@ -336,6 +352,7 @@ def classify_property(prop: dict[str, Any]) -> dict[str, Any]:
         masks = bool_masks(prop)
         if masks:
             field["bool_masks"] = masks
+        field.update(bool_field_metadata(prop))
 
     nested = prop.get("array_inner_candidate")
     if isinstance(nested, dict):

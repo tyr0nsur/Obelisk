@@ -2393,6 +2393,97 @@ def validate_redacted_scriptstruct_signature_manifest(
     signatures = payload.get("signatures")
     if not isinstance(signatures, list):
         blockers.append({"reason": "scriptstruct_signature_signatures_not_list", "label": f"{source_label}:$.signatures"})
+    elif target_sets_include_transfer(payload):
+        blockers.extend(validate_transfer_redacted_scriptstruct_bool_tail_contract(payload, source_label=source_label))
+    return blockers
+
+
+def target_sets_include_transfer(payload: dict[str, Any]) -> bool:
+    for key in ("target_sets", "source_target_sets"):
+        values = payload.get(key)
+        if isinstance(values, list) and TRANSFER_SCRIPTSTRUCT_TARGET_SET in values:
+            return True
+    return False
+
+
+def transfer_contract_recorded_value(container: dict[str, Any], key: str) -> object:
+    if key == "offset_internal":
+        return container.get("offset")
+    if key in {"byte_mask", "field_mask"}:
+        return parse_hex_mask(container.get(key))
+    return container.get(key)
+
+
+def validate_transfer_redacted_scriptstruct_bool_tail_contract(
+    payload: dict[str, Any],
+    *,
+    source_label: str,
+) -> list[dict[str, Any]]:
+    blockers: list[dict[str, Any]] = []
+    signatures = payload.get("signatures")
+    if not isinstance(signatures, list):
+        return blockers
+    signatures_by_target = {
+        signature.get("target"): signature
+        for signature in signatures
+        if isinstance(signature, dict) and isinstance(signature.get("target"), str)
+    }
+    for struct_name, expected_props in TRANSFER_SCRIPTSTRUCT_BOOL_TAIL_CONTRACT.items():
+        signature = signatures_by_target.get(struct_name)
+        if not isinstance(signature, dict):
+            blockers.append(
+                {
+                    "reason": "scriptstruct_signature_transfer_struct_missing",
+                    "label": f"{source_label}:$.signatures",
+                    "target": struct_name,
+                }
+            )
+            continue
+        fields = signature.get("fields")
+        if not isinstance(fields, list):
+            blockers.append(
+                {
+                    "reason": "scriptstruct_signature_transfer_fields_invalid",
+                    "label": f"{source_label}:$.signatures.{struct_name}.fields",
+                    "target": struct_name,
+                }
+            )
+            continue
+        fields_by_name = {field.get("name"): field for field in fields if isinstance(field, dict) and isinstance(field.get("name"), str)}
+        for field_name, expected_values in expected_props.items():
+            field = fields_by_name.get(field_name)
+            field_label = f"{source_label}:$.signatures.{struct_name}.{field_name}"
+            if not isinstance(field, dict):
+                blockers.append(
+                    {
+                        "reason": "scriptstruct_signature_transfer_bool_missing",
+                        "label": field_label,
+                        "target": struct_name,
+                        "property": field_name,
+                    }
+                )
+                continue
+            if field.get("source_property_class") != "BoolProperty":
+                blockers.append(
+                    {
+                        "reason": "scriptstruct_signature_transfer_bool_class_mismatch",
+                        "label": f"{field_label}.source_property_class",
+                        "expected": "BoolProperty",
+                        "recorded": field.get("source_property_class"),
+                    }
+                )
+            for key, expected in expected_values.items():
+                source = field
+                recorded = transfer_contract_recorded_value(source, key)
+                if recorded != expected:
+                    blockers.append(
+                        {
+                            "reason": f"scriptstruct_signature_transfer_bool_{key}_mismatch",
+                            "label": f"{field_label}.{key}",
+                            "expected": f"0x{expected:x}" if key in {"byte_mask", "field_mask"} else expected,
+                            "recorded": source.get("offset" if key == "offset_internal" else key),
+                        }
+                    )
     return blockers
 
 

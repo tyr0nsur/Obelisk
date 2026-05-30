@@ -181,9 +181,10 @@ is stale with current comparator strictness. It accepts `ARKTributeDino`, but le
 ## Next Step
 
 If Transfer continues, keep it internal and evidence-only. The next useful step is to
-harden redacted ScriptStruct signatures so `BoolProperty` entries carry
-`bool_field_size`, `bool_byte_offset`, masks, and `native_bool`, then reject
-`transfer-scriptstruct` redacted signatures unless the same three
-`ArkTributePlayerData` bool contracts are present. Keep consume accepted / promote
-blocked and do not add a public Transfer SDK, runtime observer, payload decoder, identity,
+harden the artifact lineage around the redacted ScriptStruct signatures generated from
+this bool-tail-complete evidence. `BoolProperty` fields in redacted signatures now carry
+`bool_field_size`, `bool_byte_offset`, masks, and `native_bool`, and the offline artifact
+gate rejects `transfer-scriptstruct` redacted signatures unless the same three
+`ArkTributePlayerData` bool contracts are present. Keep consume accepted / promote blocked
+and do not add a public Transfer SDK, runtime observer, payload decoder, identity,
 mutation, or return override.

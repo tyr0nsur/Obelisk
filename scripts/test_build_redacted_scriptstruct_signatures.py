@@ -81,6 +81,8 @@ class BuildRedactedScriptStructSignaturesTest(unittest.TestCase):
                                 "class_membership_status": "candidate-uobject",
                                 "outer_membership_status": "candidate-uobject",
                                 "native_bool": False,
+                                "bool_field_size": 1,
+                                "bool_byte_offset": 0,
                                 "byte_mask": "0x1",
                                 "field_mask": "0xff",
                             },
@@ -128,6 +130,11 @@ class BuildRedactedScriptStructSignaturesTest(unittest.TestCase):
         )
         self.assertEqual("bool", fields[2]["type"])
         self.assertEqual({"byte_mask": "0x01", "field_mask": "0xff"}, fields[2]["bool_masks"])
+        self.assertEqual(1, fields[2]["bool_field_size"])
+        self.assertEqual(0, fields[2]["bool_byte_offset"])
+        self.assertEqual("0x01", fields[2]["byte_mask"])
+        self.assertEqual("0xff", fields[2]["field_mask"])
+        self.assertIs(False, fields[2]["native_bool"])
 
         safety = report["safety_summary"]
         self.assertEqual("candidate_only", safety["artifact_status"])
@@ -167,6 +174,30 @@ class BuildRedactedScriptStructSignaturesTest(unittest.TestCase):
         self.assertEqual("candidate_only", report["safety_summary"]["artifact_status"])
         self.assertIs(False, report["safety_summary"]["promotion_ready"])
         self.assertIn("transfer_payload_decoding", report["safety_summary"]["not_promoted_surfaces"])
+        player_data = next(
+            signature
+            for signature in report["signatures"]
+            if signature["target"] == "PrimalLocalProfile.ArkTributePlayerData"
+        )
+        bool_fields = {
+            field["name"]: field
+            for field in player_data["fields"]
+            if field.get("source_property_class") == "BoolProperty"
+        }
+        self.assertEqual(
+            {
+                "bWasAllowDPCUpload",
+                "bWithItems",
+                "bForServerTransfer",
+            },
+            set(bool_fields),
+        )
+        for semantics in bool_fields.values():
+            self.assertEqual(1, semantics["bool_field_size"])
+            self.assertEqual(0, semantics["bool_byte_offset"])
+            self.assertEqual("0x01", semantics["byte_mask"])
+            self.assertEqual("0xff", semantics["field_mask"])
+            self.assertIs(False, semantics["native_bool"])
 
         serialized = json.dumps(report)
         self.assertNotIn(str(fixture_root), serialized)
