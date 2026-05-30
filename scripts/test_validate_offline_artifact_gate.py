@@ -998,6 +998,160 @@ def resource_handle_revalidation_evaluator_manifest(*, ready: bool = False) -> d
     }
 
 
+def internal_uobject_post_callback_contract_manifest(*, overclaim: bool = False) -> dict:
+    payload = {
+        "schema": gate.INTERNAL_UOBJECT_POST_CALLBACK_CONTRACT_SCHEMA,
+        "evidence_kind": "internal_post_callback_rejection_contract",
+        "status": "accepted_internal_rejection_contract",
+        "source_artifacts": [
+            {
+                "schema": gate.RESOURCE_HANDLE_REVALIDATION_EVALUATOR_SCHEMA,
+                "artifact_sha256": "c" * 64,
+                "capture_id": "source-capture",
+                "evidence_pack_id": "source-pack",
+                "consume_gate_status": "accepted",
+                "path_redacted": True,
+            }
+        ],
+        "binary_sha256": BINARY_SHA,
+        "internal_candidate": {
+            "schema": "obelisk.internal-uobject-revalidation-candidate.v1",
+            "accepted": True,
+            "candidate_level": "internal_static_candidate",
+            "source_artifact_hashes": ["a" * 64, "b" * 64],
+            "contract": {
+                "name": "InternalUObjectRevalidationCandidate",
+                "lifetime": "frame_local_only",
+                "post_callback_lookup": "rejected",
+                "output": "copied_bool_or_obelisk_owned_data_only",
+                "public_api": "not_promoted",
+                "flag_policy": {
+                    "0x100": "reject",
+                    "0x4000": "reject_by_default",
+                },
+            },
+        },
+        "contract": {
+            "subject": "InternalUObjectRevalidationCandidate",
+            "lifetime": "frame_local_only",
+            "validity_scope": "same_hook_or_callback_frame_only",
+            "post_callback_lookup": "allowed" if overclaim else "rejected",
+            "post_callback_use": "rejected",
+            "resource_handle": "not_promoted",
+            "gobjects_lookup": "not_promoted",
+            "object_identity": "not_promoted",
+            "inputs": [
+                "internal_index_serial_evidence",
+                "binary_sha256",
+                "complete_consumed_artifact_identity",
+            ],
+            "acceptance_checks_frame_local_only": [
+                "supported_binary_sha256",
+                "accepted_consume_gate",
+                "coherent_gobjects_evidence",
+                "in_bounds_chunk_and_item",
+                "readable_fuobjectitem",
+                "nonzero_serial",
+                "serial_match_at_current_candidate_slot",
+                "non_null_uobject",
+                "plausible_membership",
+            ],
+            "flag_policy": {
+                "UObject+0x8&0x100": "reject",
+                "UObject+0x8&0x4000": "reject_by_default",
+                "0x4000_exception": "allowed_only_inside_a_reviewed_helper_mode_before_callback_return",
+            },
+            "post_callback_behavior": {
+                "stored_token": "invalid",
+                "lookup_attempt": "fail_closed",
+                "return_value": "not_found_or_invalid",
+                "ue_pointer_return": "forbidden",
+                "raw_identity_return": "forbidden",
+            },
+            "output": "copied_bool_or_reason_or_obelisk_owned_copied_data_only",
+            "forbidden_outputs": [
+                "UObject_pointer",
+                "GObjects_index",
+                "FUObjectItem_address",
+                "serial",
+                "InternalIndex",
+                "persistent_handle",
+                "lookup_token",
+                "mutation_path",
+                "return_override",
+            ],
+            "public_api": "not_promoted",
+        },
+        "contract_checks": {
+            "source_candidate_accepted": True,
+            "source_post_callback_resource_handle_ready": False,
+            "frame_local_lifetime_required": True,
+            "post_callback_lookup_rejected": True,
+            "public_resource_handle_contract_present": False,
+            "public_resourcehandle_policy_present": False,
+            "post_callback_lifetime_contract_present": True,
+            "post_callback_lifetime_policy_proven": True,
+            "runtime_object_samples_present": False,
+            "serial_reuse_or_wraparound_policy_present": False,
+        },
+        "remaining_blockers": [
+            "candidate_only_post_callback_rejection_contract",
+            "no_public_resource_handle_contract",
+            "public_resourcehandle_policy_missing",
+            "post_callback_lifetime_policy_unproven",
+            "no_serial_reuse_or_wraparound_policy",
+            "no_rejected_runtime_object_samples",
+            "uobject_flags_validity_semantics_unproven",
+        ],
+        "non_claims": [
+            "does_not_unlock_resource_handle",
+            "does_not_promote_gobjects_lookup",
+            "does_not_promote_public_object_identity",
+            "does_not_claim_post_callback_lookup",
+            "does_not_allow_mutation_or_return_override",
+            "does_not_replace_rejected_runtime_object_samples",
+        ],
+        "promotion_ready": False,
+        "public_resource_handle_ready": False,
+        "post_callback_resource_handle_ready": overclaim,
+        "post_callback_lookup_ready": False,
+        "promotion_gate": {
+            "ready": False,
+            "blockers": ["candidate_only_post_callback_rejection_contract"],
+        },
+    }
+    identity_without_hash = {
+        "artifact_kind": gate.INTERNAL_UOBJECT_POST_CALLBACK_CONTRACT_SCHEMA,
+        "capture_id": "post-callback-contract-test",
+        "evidence_pack_id": "post-callback-contract-pack",
+    }
+    material = {
+        "artifact_identity": identity_without_hash,
+        "report": {
+            "schema": payload["schema"],
+            "evidence_kind": payload["evidence_kind"],
+            "status": payload["status"],
+            "source_artifacts": payload["source_artifacts"],
+            "binary_sha256": payload["binary_sha256"],
+            "internal_candidate": payload["internal_candidate"],
+            "contract": payload["contract"],
+            "contract_checks": payload["contract_checks"],
+            "remaining_blockers": payload["remaining_blockers"],
+            "non_claims": payload["non_claims"],
+            "promotion_ready": payload["promotion_ready"],
+            "public_resource_handle_ready": payload["public_resource_handle_ready"],
+            "post_callback_resource_handle_ready": payload["post_callback_resource_handle_ready"],
+            "post_callback_lookup_ready": payload["post_callback_lookup_ready"],
+            "promotion_gate": payload["promotion_gate"],
+        },
+    }
+    payload["output_artifact_identity"] = {
+        **identity_without_hash,
+        "artifact_sha256": hashlib.sha256(gate.canonical_json_bytes(material)).hexdigest(),
+    }
+    return payload
+
+
 def resource_handle_serial_scan_manifest(
     *,
     include_candidate: bool = True,
@@ -4063,6 +4217,59 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         reasons = {blocker["reason"] for blocker in result["blockers"]}
         self.assertIn("resource_handle_revalidation_artifact_identity_placeholder_id", reasons)
         self.assertIn("resource_handle_revalidation_artifact_identity_invalid_inputs", reasons)
+
+    def test_accepts_internal_uobject_post_callback_contract_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "post-callback-contract.json"
+            write_json(manifest, internal_uobject_post_callback_contract_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual(result["blockers"], [])
+
+    def test_blocks_internal_uobject_post_callback_contract_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "post-callback-contract.json"
+            write_json(manifest, internal_uobject_post_callback_contract_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("promote_mode_post_callback_contract_candidate_only", reasons)
+
+    def test_blocks_internal_uobject_post_callback_contract_overclaims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "post-callback-contract.json"
+            payload = internal_uobject_post_callback_contract_manifest(overclaim=True)
+            payload["contract_checks"]["post_callback_lookup_rejected"] = False
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("post_callback_contract_post_callback_resourcehandle_overclaim", reasons)
+        self.assertIn("post_callback_contract_post_callback_lookup_mismatch", reasons)
+        self.assertIn("post_callback_contract_check_post_callback_lookup_rejected_mismatch", reasons)
+
+    def test_blocks_internal_uobject_post_callback_contract_identity_hash_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "post-callback-contract.json"
+            payload = internal_uobject_post_callback_contract_manifest()
+            payload["output_artifact_identity"]["artifact_sha256"] = "0" * 64
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("post_callback_contract_output_artifact_identity_hash_mismatch", reasons)
 
     def test_accepts_resource_handle_serial_scan_with_rejection_candidate_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

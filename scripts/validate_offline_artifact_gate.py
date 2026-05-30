@@ -69,6 +69,7 @@ RC_UFUNCTION_SNAPSHOT_SCHEMA = "obelisk.ufunction-chain.snapshot.v1"
 WEAK_HELPER_CALLER_MODE_SCHEMA = "obelisk.weak-helper-caller-mode-redacted.v1"
 STATIC_GLOBAL_PROMOTION_EVIDENCE_SCHEMA = "obelisk.static-global-promotion-evidence.v1"
 RESOURCE_HANDLE_REVALIDATION_EVALUATOR_SCHEMA = "obelisk.resource-handle-revalidation-evaluator.v1"
+INTERNAL_UOBJECT_POST_CALLBACK_CONTRACT_SCHEMA = "obelisk.internal-uobject-revalidation-post-callback-contract.v1"
 RESOURCE_HANDLE_SERIAL_SCAN_SCHEMA = "obelisk.resource-handle-serial-scan.v1"
 RESOURCE_HANDLE_SERIAL_SCAN_PROVENANCE_SCHEMA = "obelisk.resource-handle-serial-scan.v1.provenance.v1"
 RESOURCE_HANDLE_SERIAL_SCAN_CONSUME_GATE_SCHEMA = "obelisk.resource-handle-serial-scan.v1.consume-gate-expectation.v1"
@@ -94,6 +95,7 @@ SUPPORTED_MANIFEST_SCHEMAS = {
     WEAK_HELPER_CALLER_MODE_SCHEMA,
     STATIC_GLOBAL_PROMOTION_EVIDENCE_SCHEMA,
     RESOURCE_HANDLE_REVALIDATION_EVALUATOR_SCHEMA,
+    INTERNAL_UOBJECT_POST_CALLBACK_CONTRACT_SCHEMA,
     RESOURCE_HANDLE_SERIAL_SCAN_SCHEMA,
     READINESS_REPORT_SCHEMA,
     UOBJECT_FLAG_POLICY_REPORT_SCHEMA,
@@ -4550,6 +4552,206 @@ def validate_resource_handle_revalidation_evaluator_manifest(
     return blockers
 
 
+def internal_uobject_post_callback_contract_canonical_report(payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "schema": payload.get("schema"),
+        "evidence_kind": payload.get("evidence_kind"),
+        "status": payload.get("status"),
+        "source_artifacts": payload.get("source_artifacts"),
+        "binary_sha256": payload.get("binary_sha256"),
+        "internal_candidate": payload.get("internal_candidate"),
+        "contract": payload.get("contract"),
+        "contract_checks": payload.get("contract_checks"),
+        "remaining_blockers": payload.get("remaining_blockers"),
+        "non_claims": payload.get("non_claims"),
+        "promotion_ready": payload.get("promotion_ready"),
+        "public_resource_handle_ready": payload.get("public_resource_handle_ready"),
+        "post_callback_resource_handle_ready": payload.get("post_callback_resource_handle_ready"),
+        "post_callback_lookup_ready": payload.get("post_callback_lookup_ready"),
+        "promotion_gate": payload.get("promotion_gate"),
+    }
+
+
+def validate_internal_uobject_post_callback_contract_manifest(
+    payload: dict[str, Any],
+    *,
+    label: str,
+    mode: str,
+) -> list[dict[str, Any]]:
+    if payload.get("schema") != INTERNAL_UOBJECT_POST_CALLBACK_CONTRACT_SCHEMA:
+        return []
+
+    blockers: list[dict[str, Any]] = []
+    identity, identity_errors = complete_artifact_identity(
+        payload,
+        container_key="output_artifact_identity",
+        expected_artifact_kind=INTERNAL_UOBJECT_POST_CALLBACK_CONTRACT_SCHEMA,
+    )
+    if identity_errors or identity is None:
+        blockers.append(
+            {
+                "reason": "post_callback_contract_output_artifact_identity_invalid",
+                "label": f"{label}:$.output_artifact_identity",
+                "errors": identity_errors,
+            }
+        )
+    else:
+        identity_without_hash = {
+            "artifact_kind": identity["artifact_kind"],
+            "capture_id": identity["capture_id"],
+            "evidence_pack_id": identity["evidence_pack_id"],
+        }
+        material = {
+            "artifact_identity": identity_without_hash,
+            "report": internal_uobject_post_callback_contract_canonical_report(payload),
+        }
+        expected_hash = hashlib.sha256(canonical_json_bytes(material)).hexdigest()
+        if identity["artifact_sha256"] != expected_hash:
+            blockers.append(
+                {
+                    "reason": "post_callback_contract_output_artifact_identity_hash_mismatch",
+                    "label": f"{label}:$.output_artifact_identity.artifact_sha256",
+                    "expected": expected_hash,
+                    "recorded": identity["artifact_sha256"],
+                }
+            )
+
+    source_artifacts = payload.get("source_artifacts")
+    if not isinstance(source_artifacts, list) or len(source_artifacts) != 1 or not isinstance(source_artifacts[0], dict):
+        blockers.append({"reason": "post_callback_contract_source_artifacts_invalid", "label": f"{label}:$.source_artifacts"})
+    else:
+        source = source_artifacts[0]
+        if source.get("schema") != RESOURCE_HANDLE_REVALIDATION_EVALUATOR_SCHEMA:
+            blockers.append({"reason": "post_callback_contract_source_schema_mismatch", "label": f"{label}:$.source_artifacts[0].schema"})
+        if not isinstance(source.get("artifact_sha256"), str) or SHA256_RE.fullmatch(source["artifact_sha256"]) is None:
+            blockers.append({"reason": "post_callback_contract_source_artifact_sha_invalid", "label": f"{label}:$.source_artifacts[0].artifact_sha256"})
+        if source.get("consume_gate_status") != "accepted":
+            blockers.append({"reason": "post_callback_contract_source_consume_gate_not_accepted", "label": f"{label}:$.source_artifacts[0].consume_gate_status"})
+        if source.get("path_redacted") is not True:
+            blockers.append({"reason": "post_callback_contract_source_path_not_redacted", "label": f"{label}:$.source_artifacts[0].path_redacted"})
+
+    contract = payload.get("contract")
+    expected_contract_values = {
+        "subject": "InternalUObjectRevalidationCandidate",
+        "lifetime": "frame_local_only",
+        "validity_scope": "same_hook_or_callback_frame_only",
+        "post_callback_lookup": "rejected",
+        "post_callback_use": "rejected",
+        "resource_handle": "not_promoted",
+        "gobjects_lookup": "not_promoted",
+        "object_identity": "not_promoted",
+        "output": "copied_bool_or_reason_or_obelisk_owned_copied_data_only",
+        "public_api": "not_promoted",
+    }
+    if not isinstance(contract, dict):
+        blockers.append({"reason": "post_callback_contract_missing_contract", "label": f"{label}:$.contract"})
+    else:
+        for key, expected in expected_contract_values.items():
+            if contract.get(key) != expected:
+                blockers.append(
+                    {
+                        "reason": f"post_callback_contract_{key}_mismatch",
+                        "label": f"{label}:$.contract.{key}",
+                        "expected": expected,
+                        "recorded": contract.get(key),
+                    }
+                )
+        behavior = contract.get("post_callback_behavior")
+        if not isinstance(behavior, dict) or behavior.get("lookup_attempt") != "fail_closed":
+            blockers.append({"reason": "post_callback_contract_behavior_not_fail_closed", "label": f"{label}:$.contract.post_callback_behavior"})
+        forbidden_outputs = contract.get("forbidden_outputs")
+        required_forbidden = {
+            "UObject_pointer",
+            "GObjects_index",
+            "FUObjectItem_address",
+            "serial",
+            "InternalIndex",
+            "persistent_handle",
+            "lookup_token",
+            "mutation_path",
+            "return_override",
+        }
+        if not isinstance(forbidden_outputs, list) or not required_forbidden.issubset(set(forbidden_outputs)):
+            blockers.append(
+                {
+                    "reason": "post_callback_contract_forbidden_outputs_incomplete",
+                    "label": f"{label}:$.contract.forbidden_outputs",
+                    "expected": sorted(required_forbidden),
+                    "recorded": forbidden_outputs,
+                }
+            )
+
+    checks = payload.get("contract_checks")
+    expected_checks = {
+        "source_candidate_accepted": True,
+        "source_post_callback_resource_handle_ready": False,
+        "frame_local_lifetime_required": True,
+        "post_callback_lookup_rejected": True,
+        "public_resource_handle_contract_present": False,
+        "public_resourcehandle_policy_present": False,
+        "post_callback_lifetime_contract_present": True,
+        "post_callback_lifetime_policy_proven": True,
+        "runtime_object_samples_present": False,
+        "serial_reuse_or_wraparound_policy_present": False,
+    }
+    if not isinstance(checks, dict):
+        blockers.append({"reason": "post_callback_contract_missing_checks", "label": f"{label}:$.contract_checks"})
+    else:
+        for key, expected in expected_checks.items():
+            if checks.get(key) is not expected:
+                blockers.append(
+                    {
+                        "reason": f"post_callback_contract_check_{key}_mismatch",
+                        "label": f"{label}:$.contract_checks.{key}",
+                        "expected": expected,
+                        "recorded": checks.get(key),
+                    }
+                )
+
+    if payload.get("promotion_ready") is not False:
+        blockers.append({"reason": "post_callback_contract_promotion_ready_overclaim", "label": f"{label}:$.promotion_ready"})
+    if payload.get("public_resource_handle_ready") is not False:
+        blockers.append({"reason": "post_callback_contract_public_resourcehandle_overclaim", "label": f"{label}:$.public_resource_handle_ready"})
+    if payload.get("post_callback_resource_handle_ready") is not False:
+        blockers.append({"reason": "post_callback_contract_post_callback_resourcehandle_overclaim", "label": f"{label}:$.post_callback_resource_handle_ready"})
+    if payload.get("post_callback_lookup_ready") is not False:
+        blockers.append({"reason": "post_callback_contract_lookup_ready_overclaim", "label": f"{label}:$.post_callback_lookup_ready"})
+
+    non_claims = payload.get("non_claims")
+    required_non_claims = {
+        "does_not_unlock_resource_handle",
+        "does_not_promote_gobjects_lookup",
+        "does_not_promote_public_object_identity",
+        "does_not_claim_post_callback_lookup",
+        "does_not_allow_mutation_or_return_override",
+        "does_not_replace_rejected_runtime_object_samples",
+    }
+    if not isinstance(non_claims, list) or not required_non_claims.issubset(set(non_claims)):
+        blockers.append({"reason": "post_callback_contract_non_claims_missing", "label": f"{label}:$.non_claims"})
+
+    promotion_gate = payload.get("promotion_gate")
+    if not isinstance(promotion_gate, dict) or promotion_gate.get("ready") is not False:
+        blockers.append({"reason": "post_callback_contract_promotion_gate_not_false", "label": f"{label}:$.promotion_gate.ready"})
+    elif "candidate_only_post_callback_rejection_contract" not in set(promotion_gate.get("blockers") or []):
+        blockers.append({"reason": "post_callback_contract_promotion_gate_blocker_missing", "label": f"{label}:$.promotion_gate.blockers"})
+
+    for trail, _, reason in collect_candidate_public_overclaims(
+        payload,
+        allowed_prefixes=(
+            "$.output_artifact_identity",
+            "$.source_artifacts",
+            "$.remaining_blockers",
+            "$.promotion_gate.blockers",
+            "$.non_claims",
+        ),
+    ):
+        blockers.append({"reason": f"post_callback_contract_public_overclaim_{reason}", "label": f"{label}:{trail}"})
+
+    if mode == "promote":
+        blockers.append({"reason": "promote_mode_post_callback_contract_candidate_only", "label": label})
+    return blockers
+
+
 def validate_resource_handle_serial_scan_manifest(
     payload: dict[str, Any],
     *,
@@ -6317,6 +6519,7 @@ def validate_manifest(
     blockers.extend(validate_gobjects_two_core_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_static_global_promotion_evidence_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_resource_handle_revalidation_evaluator_manifest(payload, label=str(resolved), mode=mode))
+    blockers.extend(validate_internal_uobject_post_callback_contract_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(
         validate_resource_handle_serial_scan_manifest(
             payload,

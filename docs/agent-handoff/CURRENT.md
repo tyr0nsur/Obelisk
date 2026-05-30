@@ -195,10 +195,22 @@ recovery context is not active routing for the current head; use
   44/44 reconciliation samples are accepted, field-window evidence is coherent, and the
   result remains fail-closed with `promotion_ready=false`,
   `public_resource_handle_ready=false`, and `post_callback_resource_handle_ready=false`.
+- The internal post-callback rejection contract is preserved at
+  `/home/flowcommunity-ark/obelisk-artifacts/resourcehandle-post-callback-contract-20260530T171910Z/`.
+  `post-callback-contract.json` has file SHA256
+  `caaad8b80608e6af603da413f021ae43c8a44a55a3c1964f9e4e69eee10c4fd0` and
+  `output_artifact_identity.artifact_sha256=a80e8597a027fd8e7a3c5bb2c42abfc7523e1dc13c69111629aed3450d8260d5`.
+  Consume mode accepts it and promote mode blocks with
+  `promote_mode_post_callback_contract_candidate_only` and
+  `promote_mode_manifest_has_non_claims`. It is a negative lifecycle
+  contract only: frame-local internal candidate, post-callback lookup/use rejected, no
+  public `ResourceHandle`, identity, GObjects lookup, mutation, return override, or Plugin
+  Hub promise.
 - Next useful ResourceHandle work is semantic, not more broad static scanning: rejected
-  runtime object samples, serial reuse/wraparound policy, and especially a strict
-  post-callback lifetime/lookup rejection contract before any public identity or lookup
-  surface can be considered.
+  runtime object samples and serial reuse/wraparound policy before any public identity or
+  lookup surface can be considered. Do not create another serial policy report from frozen
+  cores only; wait for real temporal evidence or version-matched source/decompiler
+  correlation.
 
 ## Priority Next Steps
 

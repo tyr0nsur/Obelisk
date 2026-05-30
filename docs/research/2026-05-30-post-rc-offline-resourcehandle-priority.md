@@ -232,3 +232,38 @@ is frame-local only, post-callback lookup is rejected, output remains copied boo
 Obelisk-owned copied data, and no public `ResourceHandle`, GObjects lookup, identity,
 mutation, or return override is promoted. This advances the lifecycle contract without
 inventing runtime samples or relaxing the public API blocker.
+
+## Post-Callback Rejection Contract
+
+The post-callback rejection contract is now preserved at:
+
+```text
+/home/flowcommunity-ark/obelisk-artifacts/resourcehandle-post-callback-contract-20260530T171910Z/
+```
+
+It is generated from the identity-complete fail-closed evaluator artifact and uses the
+internal schema:
+
+```text
+obelisk.internal-uobject-revalidation-post-callback-contract.v1
+```
+
+Result:
+
+```text
+post-callback-contract.json sha256=caaad8b80608e6af603da413f021ae43c8a44a55a3c1964f9e4e69eee10c4fd0
+output_artifact_identity.artifact_sha256=a80e8597a027fd8e7a3c5bb2c42abfc7523e1dc13c69111629aed3450d8260d5
+consume-gate.status=accepted
+promote-gate.status=blocked
+promote blockers=promote_mode_post_callback_contract_candidate_only,promote_mode_manifest_has_non_claims
+promotion_ready=false
+public_resource_handle_ready=false
+post_callback_resource_handle_ready=false
+post_callback_lookup_ready=false
+```
+
+The contract is a negative/lifetime artifact only. It proves that the internal candidate
+is frame-local and that post-callback lookup/use must fail closed. It does not clear
+runtime object samples, serial reuse/wraparound, public lifecycle names, public
+`ResourceHandle`, object identity, GObjects lookup, mutation, return override, or Plugin
+Hub identity requirements.
