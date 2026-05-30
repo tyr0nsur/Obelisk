@@ -109,12 +109,11 @@ class PluginManagerGuardrailTests(unittest.TestCase):
     def test_init_failure_cleanup_keeps_each_cleanup_step_isolated(self) -> None:
         text = PLUGIN_MANAGER.read_text(encoding="utf-8")
         match = re.search(
-            r"auto initCleanup = MakeScopeExit\(\[\&\]\(\) \{(?P<body>.*?)\n\s*\}\);",
+            r"auto initCleanup = MakeScopeExit\(\[\&\]\(\)",
             text,
-            re.S,
         )
         self.assertIsNotNone(match)
-        body = match.group("body")
+        body = extract_braced_body(text, match)
 
         for token in (
             "MarkPluginOwnerUnloading(pluginOwner)",
@@ -143,7 +142,7 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                 token_index = body.find(token)
                 self.assertNotEqual(token_index, -1)
                 preceding = body[max(0, token_index - 120):token_index]
-                following = body[token_index:token_index + 260]
+                following = body[token_index:token_index + 420]
                 self.assertIn("try", preceding)
                 self.assertIn("catch", following)
                 self.assertIn("SafeLogErrorNoThrow", following)
@@ -152,7 +151,7 @@ class PluginManagerGuardrailTests(unittest.TestCase):
         text = PLUGIN_MANAGER.read_text(encoding="utf-8")
         body = extract_function_body(
             text,
-            r"void PluginManager::UnregisterPluginCallbacks\(.*?\)",
+            r"bool PluginManager::UnregisterPluginCallbacks\(.*?\)",
         )
 
         self.assertIn("cleanupFamily", body)
@@ -161,6 +160,21 @@ class PluginManagerGuardrailTests(unittest.TestCase):
         self.assertIn("SafeLogErrorNoThrow", body)
         self.assertNotIn("OBELISK_ERROR", body)
         self.assertGreaterEqual(body.count("cleanupFamily("), 5)
+
+    def test_plugin_boundary_catches_use_no_throw_logging(self) -> None:
+        text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+        for function_name in ("InvokeGameplayPolicyEventCallback", "InvokeChatMessageEventCallback"):
+            with self.subTest(function_name=function_name):
+                body = extract_function_body(text, rf"void {function_name}\(.*?\)")
+                self.assertIn("SafeLogErrorNoThrow", body)
+                self.assertNotIn("OBELISK_ERROR", body)
+
+        extern_match = re.search(r"// C-API Wrappers for Plugins\s+extern \"C\" \{", text)
+        self.assertIsNotNone(extern_match)
+        extern_body = extract_braced_body(text, extern_match)
+        for catch_body in re.findall(r"catch\s*\([^)]*\)\s*\{(?P<body>.*?)\n\s*\}", extern_body, re.S):
+            with self.subTest(catch_body=catch_body.strip()[:80]):
+                self.assertNotIn("OBELISK_ERROR", catch_body)
 
 
 if __name__ == "__main__":

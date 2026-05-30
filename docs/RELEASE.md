@@ -17,7 +17,8 @@ Included:
 - ProcessEvent hook.
 - C plugin ABI, after an explicit first-stable ABI freeze decision.
 - Central install script and LinuxGSM wrappers.
-- `oBaseEvents`.
+- `oBaseEvents`, `oProcessTimer`, and `oDescriptorCatalog` as the built-by-default
+  first-party reference plugin set published by the release gate.
 - `OBELISK_INSTANCE_ID` logs and state markers.
 - Filtered raw `ProcessEvent` callback infrastructure as debug-gated runtime plumbing.
   Stable plugin paths should use copied Obelisk-owned events. Target-specific gameplay/module
@@ -50,8 +51,12 @@ Included:
   zero-failure handles, explicit unregister, exception containment, and owner cleanup on
   plugin init failure/unload. They are not UE/gameplay timers, gameplay/module timer APIs,
   shared scheduler state, persistent handles, identity, lookup, permissions, commands, or
-  cluster coordination. `oProcessTimer` is the first-party example and is published by the
-  release gate.
+  cluster coordination. `oProcessTimer` is the first-party timer example and is published
+  by the release gate.
+- `oDescriptorCatalog` as a metadata-only descriptor reference plugin. It validates
+  `DescribeResourceKind` and `DescribeGameplayPolicyEventKind` consumption without
+  callbacks, timers, chat, identity, lookup, mutation, return override, or ABI expansion,
+  and is published by the release gate.
 
 RC public scope remains limited to `GameplayPolicyEvent`, the minimal copied
 `ChatMessageEvent`, `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`.

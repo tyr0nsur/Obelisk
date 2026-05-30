@@ -189,7 +189,8 @@ The stable operational flow is:
 2. Ensure `${OBELISK_CONFIG_DIR}/<plugin-id>/config.json` exists or let the runtime
    create the safe-disabled default on first load.
 3. Install the `.so` with `scripts/install_obelisk_plugin.sh PluginName.so <obelisk-root>`.
-4. Restart only the target ARK instance named by explicit current-turn operator approval.
+4. Restart only the target ARK instance named by explicit operator approval for that
+   maintenance or debug window.
 
 The plugin installer copies to a temporary non-`.so` name in the destination directory and
 then publishes with an atomic rename, so runtime discovery cannot see a partial copy. Direct
@@ -289,9 +290,9 @@ Rules:
   must treat `RegisterPreProcessEvent` and `RegisterPostProcessEvent` as unavailable.
 - Handle-returning global registration follows the same gate and returns `0` when global
   callbacks are not explicitly enabled for the current instance.
-- Any global-callback debug window also requires explicit current-turn operator approval
-  for the exact scoped run, plus a documented objective, bounded trace limits, named debug
-  instance, and rollback plan.
+- Any global-callback debug window also requires explicit operator approval for the exact
+  scoped run, plus a documented objective, bounded trace limits, named debug instance, and
+  rollback plan.
 - Pre-callbacks are observational by default. A `false` return blocks the original
   `ProcessEvent` only when `OBELISK_ALLOW_PROCESS_EVENT_BLOCKING=1`, the per-instance
   `allow-process-event-blocking` marker exists, and
@@ -310,7 +311,7 @@ Rules:
   to avoid double execution. Post-callbacks must not replay the same event through
   `CallProcessEvent`.
 - A global callback may be acceptable for an isolated discovery run only if the explicit
-  gate is enabled on the current-turn approved exact debug instance and the test has
+  gate is enabled on the operator-approved exact debug instance and the test has
   rollback instructions.
 
 A plugin that depends on raw filtered callbacks remains debug/tooling unless a later gate
@@ -421,8 +422,8 @@ send/moderation/blocking authority, command registration/routing, mutation, or r
 override. Plugins that want commands must parse the copied text locally; Obelisk v0.1 does
 not ship a separate command SDK. The ABI slots are in v0.1-rc scope and can be compiled,
 tested, and consumed offline through the SDK without live-ops approval. Only live or
-player-facing validation of the `enable-chat-events` producer path requires a current-turn
-operator-approved exact window after a current-turn operator-approved notice. Copied
+player-facing validation of the `enable-chat-events` producer path requires an
+operator-approved exact window after an operator-approved notice. Copied
 plugin-facing delivery has accepted beta evidence for the known send modes;
 `enable-chat-reflection` is only the historical observer path and does not prove
 `ChatMessageEvent` delivery.

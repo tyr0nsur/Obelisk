@@ -1045,6 +1045,40 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("scripts/test_install_obelisk_layout.sh", release_gate)
         self.assertIn("LAYOUT_CHECK_ROOT", release_gate)
 
+    def test_installed_sdk_smoke_covers_repeating_timers_in_release_gate(self) -> None:
+        release_gate = read("scripts/check_release_readiness.sh")
+        layout_test = read("scripts/test_install_obelisk_layout.sh")
+        consumer = read("tests/sdk_installed_consumer/consumer_plugin.cpp")
+        fixture = read("tests/sdk_installed_consumer/consumer_fixture.cpp")
+
+        self.assertIn('scripts/test_install_obelisk_layout.sh "${LAYOUT_CHECK_ROOT}"', release_gate)
+        self.assertIn('cp -R "${REPO_DIR}/tests/sdk_installed_consumer/." "${WORK_DIR}/"', layout_test)
+        self.assertIn('"${WORK_DIR}/build/consumer_fixture"', layout_test)
+        self.assertIn('"${PLUGIN_PATH}"', layout_test)
+
+        self.assertRegex(
+            consumer,
+            re.compile(
+                r"OBELISK_CONCAT\(Register, TimerWithOwnerTokenHandle\)\(\s*"
+                r"g_OwnerToken,\s*"
+                r"1000,\s*"
+                r"1000,\s*"
+                r"OBELISK_TIMER_FLAG_REPEATING,\s*"
+                r"HandleScheduledCallback,",
+                re.S,
+            ),
+        )
+        self.assertIn("InstallLayoutConsumer_ScheduledCallbackSeen", consumer)
+
+        for token in [
+            'Require(intervalMs == 1000, "unexpected repeating timer interval");',
+            'Require(flags == OBELISK_TIMER_FLAG_REPEATING, "unexpected repeating timer flags");',
+            "DispatchValidTimer();",
+            'Require(timerSeen(), "expected plugin to observe timer callback");',
+        ]:
+            with self.subTest(file="tests/sdk_installed_consumer/consumer_fixture.cpp", token=token):
+                self.assertIn(token, fixture)
+
     def test_mission_copied_bool_observer_stays_internal_and_non_authoritative(self) -> None:
         mission_plan = read("docs/research/2026-05-30-mission-copied-bool-observer-plan.md")
         current = read("docs/agent-handoff/CURRENT.md")

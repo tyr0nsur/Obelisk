@@ -48,7 +48,7 @@ v0.1-rc SDK surfaces:
   descriptors.
 - CTest coverage for plugin config and ABI layout.
 
-Post-RC core primitives:
+Core runtime primitives:
 
 - Timer callbacks are process-local runtime utilities: owner-token scoped registration,
   zero-failure handles, one-shot/repeating callbacks, explicit unregister, and plugin
@@ -96,7 +96,9 @@ hooks/                Runtime hooks, including ProcessEvent
 loader/               LD_PRELOAD bootstrap
 runtime/              Logging and runtime services
 ue/                   UE4 memory/reflection helpers
-plugins/oBaseEvents/  First official example plugin
+plugins/oBaseEvents/  Official event/config/lifecycle reference plugin
+plugins/oProcessTimer/  Official process-local timer reference plugin
+plugins/oDescriptorCatalog/  Official descriptor-catalog reference plugin
 tests/                Offline C++/SDK/ABI tests
 docs/                 Architecture, install, research, release notes
 scripts/              Install and offline analyzer helpers
@@ -160,6 +162,8 @@ Main build outputs:
 ```text
 build/libobelisk.so
 build/plugins/oBaseEvents/oBaseEvents.so
+build/plugins/oProcessTimer/oProcessTimer.so
+build/plugins/oDescriptorCatalog/oDescriptorCatalog.so
 build/_deps/subhook-build/libsubhook.so
 ```
 
@@ -438,7 +442,9 @@ is non-null. If a pre-callback calls it, that callback should return `false`; if
 `true`, the runtime skips the automatic original call and warns to avoid double execution.
 Stable plugin APIs should prefer higher-level Obelisk module surfaces as they are promoted.
 
-The first official example is [oBaseEvents](docs/oBaseEvents.md).
+The official reference plugin set includes [oBaseEvents](docs/oBaseEvents.md),
+`oProcessTimer`, and `oDescriptorCatalog`; each demonstrates a different promoted
+core/SDK pattern without expanding gameplay module scope.
 
 ## ARK Debug Harness
 

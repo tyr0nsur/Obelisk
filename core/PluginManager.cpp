@@ -962,13 +962,11 @@ namespace Obelisk::Core
             }
             catch (const std::exception& e)
             {
-                if (Obelisk::Logger::IsInitialized())
-                    OBELISK_ERROR("Gameplay policy event callback threw: {}", e.what());
+                SafeLogErrorNoThrow("Gameplay policy event callback threw", e.what());
             }
             catch (...)
             {
-                if (Obelisk::Logger::IsInitialized())
-                    OBELISK_ERROR("Gameplay policy event callback threw an unknown exception.");
+                SafeLogErrorNoThrow("Gameplay policy event callback threw an unknown exception.");
             }
         }
 
@@ -1050,13 +1048,11 @@ namespace Obelisk::Core
             }
             catch (const std::exception& e)
             {
-                if (Obelisk::Logger::IsInitialized())
-                    OBELISK_ERROR("Chat message event callback threw: {}", e.what());
+                SafeLogErrorNoThrow("Chat message event callback threw", e.what());
             }
             catch (...)
             {
-                if (Obelisk::Logger::IsInitialized())
-                    OBELISK_ERROR("Chat message event callback threw an unknown exception.");
+                SafeLogErrorNoThrow("Chat message event callback threw an unknown exception.");
             }
         }
 
@@ -1501,11 +1497,11 @@ namespace Obelisk::Core
             }
             catch (const std::exception& e)
             {
-                OBELISK_ERROR("RegisterPreProcessEvent rejected callback after exception: {}", e.what());
+                SafeLogErrorNoThrow("RegisterPreProcessEvent rejected callback after exception", e.what());
             }
             catch (...)
             {
-                OBELISK_ERROR("RegisterPreProcessEvent rejected callback after unknown exception.");
+                SafeLogErrorNoThrow("RegisterPreProcessEvent rejected callback after unknown exception.");
             }
         }
         void PluginRegisterPostProcessEvent(OnProcessEventCallback callback) {
@@ -1524,11 +1520,11 @@ namespace Obelisk::Core
             }
             catch (const std::exception& e)
             {
-                OBELISK_ERROR("RegisterPostProcessEvent rejected callback after exception: {}", e.what());
+                SafeLogErrorNoThrow("RegisterPostProcessEvent rejected callback after exception", e.what());
             }
             catch (...)
             {
-                OBELISK_ERROR("RegisterPostProcessEvent rejected callback after unknown exception.");
+                SafeLogErrorNoThrow("RegisterPostProcessEvent rejected callback after unknown exception.");
             }
         }
         void PluginRegisterPreProcessEventForNameIndex(int32_t nameIndex, OnProcessEventCallback callback) {
@@ -1551,11 +1547,11 @@ namespace Obelisk::Core
             }
             catch (const std::exception& e)
             {
-                OBELISK_ERROR("RegisterPreProcessEventForNameIndex rejected callback after exception: {}", e.what());
+                SafeLogErrorNoThrow("RegisterPreProcessEventForNameIndex rejected callback after exception", e.what());
             }
             catch (...)
             {
-                OBELISK_ERROR("RegisterPreProcessEventForNameIndex rejected callback after unknown exception.");
+                SafeLogErrorNoThrow("RegisterPreProcessEventForNameIndex rejected callback after unknown exception.");
             }
         }
         void PluginRegisterPostProcessEventForNameIndex(int32_t nameIndex, OnProcessEventCallback callback) {
@@ -1578,11 +1574,11 @@ namespace Obelisk::Core
             }
             catch (const std::exception& e)
             {
-                OBELISK_ERROR("RegisterPostProcessEventForNameIndex rejected callback after exception: {}", e.what());
+                SafeLogErrorNoThrow("RegisterPostProcessEventForNameIndex rejected callback after exception", e.what());
             }
             catch (...)
             {
-                OBELISK_ERROR("RegisterPostProcessEventForNameIndex rejected callback after unknown exception.");
+                SafeLogErrorNoThrow("RegisterPostProcessEventForNameIndex rejected callback after unknown exception.");
             }
         }
         uint64_t PluginRegisterPreProcessEventWithOwnerTokenHandle(uint64_t ownerToken, OnProcessEventCallback callback) {
@@ -1605,12 +1601,12 @@ namespace Obelisk::Core
             }
             catch (const std::exception& e)
             {
-                OBELISK_ERROR("RegisterPreProcessEventWithOwnerToken rejected callback after exception: {}", e.what());
+                SafeLogErrorNoThrow("RegisterPreProcessEventWithOwnerToken rejected callback after exception", e.what());
                 return 0;
             }
             catch (...)
             {
-                OBELISK_ERROR("RegisterPreProcessEventWithOwnerToken rejected callback after unknown exception.");
+                SafeLogErrorNoThrow("RegisterPreProcessEventWithOwnerToken rejected callback after unknown exception.");
                 return 0;
             }
         }
@@ -1634,12 +1630,12 @@ namespace Obelisk::Core
             }
             catch (const std::exception& e)
             {
-                OBELISK_ERROR("RegisterPostProcessEventWithOwnerToken rejected callback after exception: {}", e.what());
+                SafeLogErrorNoThrow("RegisterPostProcessEventWithOwnerToken rejected callback after exception", e.what());
                 return 0;
             }
             catch (...)
             {
-                OBELISK_ERROR("RegisterPostProcessEventWithOwnerToken rejected callback after unknown exception.");
+                SafeLogErrorNoThrow("RegisterPostProcessEventWithOwnerToken rejected callback after unknown exception.");
                 return 0;
             }
         }
@@ -1663,12 +1659,14 @@ namespace Obelisk::Core
             }
             catch (const std::exception& e)
             {
-                OBELISK_ERROR("RegisterPreProcessEventForNameIndexWithOwnerToken rejected callback after exception: {}", e.what());
+                SafeLogErrorNoThrow("RegisterPreProcessEventForNameIndexWithOwnerToken rejected callback after exception",
+                                    e.what());
                 return 0;
             }
             catch (...)
             {
-                OBELISK_ERROR("RegisterPreProcessEventForNameIndexWithOwnerToken rejected callback after unknown exception.");
+                SafeLogErrorNoThrow(
+                    "RegisterPreProcessEventForNameIndexWithOwnerToken rejected callback after unknown exception.");
                 return 0;
             }
         }
@@ -1692,12 +1690,14 @@ namespace Obelisk::Core
             }
             catch (const std::exception& e)
             {
-                OBELISK_ERROR("RegisterPostProcessEventForNameIndexWithOwnerToken rejected callback after exception: {}", e.what());
+                SafeLogErrorNoThrow("RegisterPostProcessEventForNameIndexWithOwnerToken rejected callback after exception",
+                                    e.what());
                 return 0;
             }
             catch (...)
             {
-                OBELISK_ERROR("RegisterPostProcessEventForNameIndexWithOwnerToken rejected callback after unknown exception.");
+                SafeLogErrorNoThrow(
+                    "RegisterPostProcessEventForNameIndexWithOwnerToken rejected callback after unknown exception.");
                 return 0;
             }
         }
@@ -1723,12 +1723,12 @@ namespace Obelisk::Core
             }
             catch (const std::exception& e)
             {
-                OBELISK_ERROR("UnregisterProcessEventCallbackWithOwnerToken failed after exception: {}", e.what());
+                SafeLogErrorNoThrow("UnregisterProcessEventCallbackWithOwnerToken failed after exception", e.what());
                 return false;
             }
             catch (...)
             {
-                OBELISK_ERROR("UnregisterProcessEventCallbackWithOwnerToken failed after unknown exception.");
+                SafeLogErrorNoThrow("UnregisterProcessEventCallbackWithOwnerToken failed after unknown exception.");
                 return false;
             }
         }
@@ -1761,12 +1761,14 @@ namespace Obelisk::Core
             }
             catch (const std::exception& e)
             {
-                OBELISK_ERROR("RegisterGameplayPolicyEventWithOwnerTokenHandle rejected callback after exception: {}", e.what());
+                SafeLogErrorNoThrow("RegisterGameplayPolicyEventWithOwnerTokenHandle rejected callback after exception",
+                                    e.what());
                 return 0;
             }
             catch (...)
             {
-                OBELISK_ERROR("RegisterGameplayPolicyEventWithOwnerTokenHandle rejected callback after unknown exception.");
+                SafeLogErrorNoThrow(
+                    "RegisterGameplayPolicyEventWithOwnerTokenHandle rejected callback after unknown exception.");
                 return 0;
             }
         }
@@ -1780,12 +1782,12 @@ namespace Obelisk::Core
             }
             catch (const std::exception& e)
             {
-                OBELISK_ERROR("UnregisterGameplayPolicyEventWithOwnerToken failed after exception: {}", e.what());
+                SafeLogErrorNoThrow("UnregisterGameplayPolicyEventWithOwnerToken failed after exception", e.what());
                 return false;
             }
             catch (...)
             {
-                OBELISK_ERROR("UnregisterGameplayPolicyEventWithOwnerToken failed after unknown exception.");
+                SafeLogErrorNoThrow("UnregisterGameplayPolicyEventWithOwnerToken failed after unknown exception.");
                 return false;
             }
         }
@@ -1807,12 +1809,14 @@ namespace Obelisk::Core
             }
             catch (const std::exception& e)
             {
-                OBELISK_ERROR("RegisterChatMessageEventWithOwnerTokenHandle rejected callback after exception: {}", e.what());
+                SafeLogErrorNoThrow("RegisterChatMessageEventWithOwnerTokenHandle rejected callback after exception",
+                                    e.what());
                 return 0;
             }
             catch (...)
             {
-                OBELISK_ERROR("RegisterChatMessageEventWithOwnerTokenHandle rejected callback after unknown exception.");
+                SafeLogErrorNoThrow(
+                    "RegisterChatMessageEventWithOwnerTokenHandle rejected callback after unknown exception.");
                 return 0;
             }
         }
@@ -1826,12 +1830,12 @@ namespace Obelisk::Core
             }
             catch (const std::exception& e)
             {
-                OBELISK_ERROR("UnregisterChatMessageEventWithOwnerToken failed after exception: {}", e.what());
+                SafeLogErrorNoThrow("UnregisterChatMessageEventWithOwnerToken failed after exception", e.what());
                 return false;
             }
             catch (...)
             {
-                OBELISK_ERROR("UnregisterChatMessageEventWithOwnerToken failed after unknown exception.");
+                SafeLogErrorNoThrow("UnregisterChatMessageEventWithOwnerToken failed after unknown exception.");
                 return false;
             }
         }
@@ -1879,12 +1883,12 @@ namespace Obelisk::Core
             }
             catch (const std::exception& e)
             {
-                OBELISK_ERROR("RegisterTimerWithOwnerTokenHandle rejected callback after exception: {}", e.what());
+                SafeLogErrorNoThrow("RegisterTimerWithOwnerTokenHandle rejected callback after exception", e.what());
                 return 0;
             }
             catch (...)
             {
-                OBELISK_ERROR("RegisterTimerWithOwnerTokenHandle rejected callback after unknown exception.");
+                SafeLogErrorNoThrow("RegisterTimerWithOwnerTokenHandle rejected callback after unknown exception.");
                 return 0;
             }
         }
@@ -1898,12 +1902,12 @@ namespace Obelisk::Core
             }
             catch (const std::exception& e)
             {
-                OBELISK_ERROR("UnregisterTimerWithOwnerToken failed after exception: {}", e.what());
+                SafeLogErrorNoThrow("UnregisterTimerWithOwnerToken failed after exception", e.what());
                 return false;
             }
             catch (...)
             {
-                OBELISK_ERROR("UnregisterTimerWithOwnerToken failed after unknown exception.");
+                SafeLogErrorNoThrow("UnregisterTimerWithOwnerToken failed after unknown exception.");
                 return false;
             }
         }
