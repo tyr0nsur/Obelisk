@@ -43,6 +43,28 @@ The same command was rerun without broad scans or runtime access and reproduced 
 /servidor/ark/workspace-offline/gobjects-reconcile-minimal-second-source-20260529T034612Z/gobjects-reconciliation.json
 ```
 
+The second core was later cross-checked against the same 10-sample set used by the
+durable `FUObjectArray` pack. This avoids comparing a 10-sample primary core against a
+smaller second-core sample.
+
+```bash
+python3 scripts/reconcile_gobjects_samples.py \
+  --core /servidor/ark/workspace-offline/second-source-arkserver2-TheIsland-20260529T011227Z/raw/core \
+  --gobjects-candidate 0x595b7e0 \
+  --fname-root-slot 0x5956f30 \
+  --sample-index package=0 \
+  --sample-index object_class=1 \
+  --sample-index primal_dino_character=225 \
+  --sample-index shooter_cheat_manager=400 \
+  --sample-index package_class=516 \
+  --sample-index class_class=517 \
+  --sample-index function_class=518 \
+  --sample-index server_chat=25447 \
+  --sample-index dino_add_passenger=19479 \
+  --sample-index dino_allow_carry_character=19489 \
+  --output /servidor/ark/workspace-offline/gobjects-two-core-crosscheck-20260529T090844Z/second-core-10-sample-gobjects-reconciliation.json
+```
+
 ## Result
 
 ```text
@@ -52,6 +74,19 @@ accepted_count=3
 rejected_count=0
 membership_pass_count=3
 item_dword_0x8_zero_count=3
+item_dword_0x8_nonzero_count=0
+promotion_status=internal-only-single-artifact
+```
+
+10-sample cross-check result:
+
+```text
+schema=obelisk.gobjects-sample-reconciliation.v1
+sample_count=10
+accepted_count=10
+rejected_count=0
+membership_pass_count=10
+item_dword_0x8_zero_count=10
 item_dword_0x8_nonzero_count=0
 promotion_status=internal-only-single-artifact
 ```
@@ -84,7 +119,8 @@ index 25447
 
 This supports the `0x595b7e0` candidate on a second offline core: sampled
 `GObjects[index]` entries round-trip through `UObject.InternalIndex`, and target/class/
-outer membership checks pass. Combined with
+outer membership checks pass. The later 10-sample cross-check aligns the second core with
+the durable pack sample set. Combined with
 `2026-05-29-static-gobjects-same-fuobjectarray.md`, the candidate is now much stronger for
 offline reflection work.
 

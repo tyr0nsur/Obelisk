@@ -34,12 +34,12 @@ object identity, public callbacks, mutation, or a resource lookup API.
 
 The active identity blockers remain:
 
-- `FUObjectArray` same-instance proof: the root/chunks/count evidence and serial-bearing
-  accessor evidence are compatible, but still lack local/decompiler proof that
-  `0x595b7e0`, `0x595b7f0`, `0x595b804`, and `0x595b838` are one `FUObjectArray`
-  instance.
+- `FUObjectArray` static/global proof: later same-base and two-core reconciliation evidence
+  makes `0x595b7e0` strong enough for offline UFunction enumeration, but still not a
+  public/runtime object identity or lookup contract.
 - Serial lifetime: static evidence favors `FUObjectItem+0x8` as the serial-backed dword;
-  `FUObjectItem+0xc` remains unknown, and current copied-core samples show `+0x8 == 0`.
+  `FUObjectItem+0xc` remains unknown. Later full scans found repeatable nonzero `+0x8`
+  candidates, so the active gap is lifetime/reuse semantics rather than zero-only samples.
 - `uobject_flags_validity_semantics_unproven`: `UObject+0x8` is confirmed as a 32-bit
   object flags field for the current binary hash. Static weak-handle/object-validity
   helpers consult `0x100` and `0x4000` after `{index, serial}` validation, but accepted

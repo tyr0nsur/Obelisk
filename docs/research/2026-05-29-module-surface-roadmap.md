@@ -2,16 +2,16 @@
 
 ## Objective
 
-Rank the next non-chat ARK/UE4 module surfaces from existing Obelisk evidence, prioritizing
-stable v0.1 production value and copied-POD event feasibility.
+Rank the next ARK/UE4 module surfaces from existing Obelisk evidence, prioritizing stable
+v0.1 production value and copied-POD event feasibility.
 
 ## Environment
 
 - Repo: `/home/flowcommunity-ark/Obelisk`
 - Date: 2026-05-29
 - Evidence only: committed docs, sanitized UFunction/ScriptStruct snapshots, target-set
-  definitions, internal recognizer headers, and accepted copied-offline minimal, buff,
-  dino, mission, and tribe compact layout artifacts.
+  definitions, internal recognizer headers, and accepted copied-offline minimal, item,
+  inventory-action, buff, dino, mission, and tribe compact layout artifacts.
 - Live-server impact: none. No live-server reads, restarts, marker changes, runtime probes,
   ptrace, `gcore`, scanner runs, commits, public ABI edits, or pushes.
 
@@ -26,8 +26,12 @@ evidence:
   `promotion_gate.ready=true`, and no blockers for `PrimalItem.CanUse`,
   `PrimalItem.AllowRemoteAddToInventory`, `PrimalStructure.AllowStructureAccess`, and
   `PrimalStructure.IsAllowedToDemolish`.
-- `structure-observer-intake`: 6/6 comparable; historical clean triage accepted, but
-  promotion tooling still needs regenerated copied-offline artifacts for fresh review.
+- `structure-observer-intake`: fresh copied-offline regeneration accepted under
+  `/servidor/ark/workspace-offline/structure-observer-intake-refresh-20260529T141455Z`;
+  `6/6` accepted, `gate_mode=second_source_promotion`, `promotion_gate.ready=true`, and
+  no blockers. This is layout-only structure backing for copied/redacted
+  `GameplayPolicyEvent`; it does not promote public StructureEvents, identity, lookup,
+  mutation, return override, raw params, or `ResourceHandle`.
 - `buff-compact-intake`: accepted offline layout evidence from
   `/servidor/ark/workspace-offline/buff-compact-intake-20260529T034751Z`;
   `3/3` accepted, `gate_mode=second_source_promotion`,
@@ -51,39 +55,62 @@ evidence:
   `5/5` accepted, `gate_mode=second_source_promotion`,
   `promotion_gate.ready=true`, and no blockers. This is post-RC layout evidence only;
   split scalar targets before considering public work.
-- `transfer-ufunction-intake`: 7/7 comparable; second source missing.
-- `transfer-scriptstruct`: 2/2 comparable; second source missing.
+- `transfer-ufunction-intake`: accepted layout-only second-source evidence for 7/7
+  comparable targets. This supersedes the older missing-second-source line but does not
+  promote a public Transfer SDK, runtime hooks, payload decoding, identity, mutation,
+  return override, or `ResourceHandle`.
+- `transfer-scriptstruct`: accepted layout-only second-source evidence for 2/2
+  comparable ScriptStruct targets. Payload decoding remains no-go because tribute structs
+  contain names, byte arrays, ids, class refs, stats, and server names.
 - `sdk.admin`: documentation-only; no committed admin snapshot target set.
 
 ## Result
 
 Recommended order:
 
-RC stays centered on `GameplayPolicyEvent` and `DescribeResourceKind`. The module ranking
-below is post-RC/internal research direction unless a later focused gate explicitly changes
-release scope.
+RC stays centered on `GameplayPolicyEvent`, the minimal copied `ChatMessageEvent`,
+`DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`. The module ranking below is
+post-RC/internal research direction unless a later focused gate explicitly changes release
+scope.
 
+0. `resources / ResourceHandle`: do not run more broad FName/GObjects/UFunction scans for
+   this track on the current binary. Existing offline evidence is strong enough for target
+   work; the live blocker is lifecycle/flag semantics and a fail-closed handle contract.
+   Treat `0x100` as a hard-invalid internal candidate and `0x4000` as mode-dependent
+   weak-delegate evidence only until rejected runtime samples or stronger static semantics
+   prove a safe public policy.
 1. `sdk.structures`: keep `GameplayPolicyEvent` as the only promoted public gameplay
    surface; next work should harden docs/evidence around copied scalar fields, not add raw
    StructureEvents.
-2. `sdk.inventory`: next best candidate for a future internal copied-POD observer because
-   `CanUse` and `AllowRemoteAddToInventory` have compact bool/object layouts and existing
-   marker-gated observer policy.
-3. `sdk.missions`: accepted compact lifecycle evidence makes it the cleaner first
-   post-RC module candidate, but public work still needs copied-POD/redaction policy and
-   array-presence-only handling.
-4. `sdk.dinos`: compact passenger/carry policy shapes now have accepted second-source
+2. `sdk.inventory`: current best hardened backing inside existing `GameplayPolicyEvent`.
+   `CanUse` and `AllowRemoteAddToInventory` are copied-bool only, require exact full field
+   sequences, and reject forged metadata-only ranges.
+3. `sdk.items`: best post-RC internal bridge candidate after inventory hardening, but only
+   for return-only observations that already fit the public `GameplayPolicyEvent`
+   `RETURN_VALUE` field mask. Do not weaken `InventoryPolicyEventDispatcher::CanUse` by
+   fabricating `BIgnoreCooldown` from item-only fields.
+4. `sdk.missions`: useful post-RC internal recognizer candidate after item return-only
+   evidence is preserved. Keep it as a reduced copied-bool observer with
+   object/player/controller/array fields recognition-only.
+5. `sdk.items detail`: `ue/ItemReflection` now implements the first fixture-backed, SHA-gated
+   internal recognizer for `PrimalItem.AllowEquipItem`, `CanRepair`, `CraftBlueprint`, and
+   `UseItemOntoItem`. It exposes only bool ranges; `toInventory`, `DestinationItem`,
+   `AdditionalData`, `ItemNetID`, identity, mutation, return override, hooks,
+   dispatchers, and SDK callbacks stay blocked.
+6. `sdk.dinos`: compact passenger/carry policy shapes now have accepted second-source
    layout evidence and are useful internal recognizer inputs after inventory. They remain
    blocked from public payloads because raw actor identity, object lifetime, resource
    handles, taming, attack, mutation, and return-override semantics are unresolved.
-5. `sdk.buffs`: good reflection coverage for bool-return and zero-param shapes; poorer
+7. `sdk.buffs`: good reflection coverage for bool-return and zero-param shapes; poorer
    product candidate until buff semantics, object/class redaction, and no-override policy
    are explicit.
-6. `sdk.tribes`: accepted permission and membership layout evidence is valuable, but public
+8. `sdk.tribes`: accepted permission and membership layout evidence is valuable, but public
    usefulness is identity-sensitive and array/string targets remain blocked.
-7. `sdk.transfers`: broad fixture coverage exists, including tribute structs, but transfer
-   payloads are sensitive and array/string/nested struct ownership is unresolved.
-8. `sdk.admin`: keep documentation-only until a permission model and abuse controls exist.
+9. `sdk.transfers`: broad fixture coverage and layout-only second-source evidence exist,
+   including tribute structs, but transfer payloads are sensitive and array/string/nested
+   struct ownership is unresolved. The only clean post-RC first slice is
+   `ServerTransferredPlayerConfirmationResult.bAccept` as an internal copied bool.
+10. `sdk.admin`: keep documentation-only until a permission model and abuse controls exist.
 
 ## Copied-POD Candidates
 
@@ -93,6 +120,11 @@ release scope.
 - Inventory future internal-only candidates: `bIgnoreCooldown`,
   `bRequestedByPlayer`, and `ReturnValue`; `invComp`, `ByPC`, `InventoryComp`, item ids,
   array contents, and struct payloads stay redacted.
+- Items current internal-only recognizer fields: `AllowEquipItem.ReturnValue`,
+  `CanRepair.bIgnoreInventoryRequirement`, `CanRepair.ReturnValue`,
+  `CraftBlueprint.bConsumeResources`, and `UseItemOntoItem.ReturnValue`; `toInventory`,
+  `DestinationItem`, `AdditionalData`, item/inventory identity, raw object refs, mutation,
+  and return override stay blocked.
 - Dinos accepted internal layout-only candidates: `PassengerSeatIndex`,
   `bForcePassenger`, `bAllowFlyersAndWaterDinos`, `bSkipLineTrace`, and `ReturnValue`
   from `AddPassenger`/`AllowCarryCharacter`; character/dino object identity, raw
@@ -105,13 +137,17 @@ release scope.
   contents, object pointers, mutation, and return overrides stay redacted.
 - Tribes future internal-only candidates: `TribeGroupPermission` and `ReturnValue`; player
   ids, tribe/object identity, logs, mission tags, and online arrays stay redacted.
-- Transfers future offline-only candidates: scalar spawn/region ids, confirmation bool,
-  `PlayerDataID`, and `IgnoreBedID` only as redacted/internal fields; dino classes,
-  uploaded dino/object refs, tribute names, byte arrays, nested item data, and strings stay
+- Transfers future offline-only candidates: `ServerTransferredPlayerConfirmationResult`
+  `bAccept` is the only clean first internal copied-scalar candidate. Spawn/region ints
+  remain maybe/research-only; `PlayerDataID`, `IgnoreBedID`, dino classes, uploaded
+  dino/object refs, tribute names, byte arrays, nested item data, and strings stay
   blocked.
 
 ## Promotion Blockers
 
+- `ResourceHandle` is not blocked by lack of FName/UFunction discovery. It is blocked by
+  `uobject_flags_validity_semantics_unproven`, lack of rejected object samples, and no
+  accepted lifetime/revalidation contract across hook callbacks and possible object reuse.
 - Missing accepted second-source comparison roots for transfer, admin, broader non-compact
   target sets, and any broader module target set. The accepted minimal
   inventory/structure evidence is limited to four compact `UFunction` layouts, and the
@@ -120,8 +156,9 @@ release scope.
 - Dinos still lack runtime observation, copied-data ownership, callback lifetime policy,
   SDK ABI design/tests, resource identity policy, and privacy/redaction policy; the
   accepted compact evidence only advances the offline layout rung.
-- Historical structure/intake triage must be regenerated from copied offline artifacts
-  outside protected server paths before being reused as fresh promotion evidence.
+- Structure fresh-evidence risk was resolved by regenerating `structure-observer-intake`
+  from copied offline artifacts outside protected server paths; keep future promotion
+  claims tied to the refreshed pack path above, not only to historical triage.
 - Public SDK expansion requires append-only C ABI design, ABI layout tests, installed SDK
   consumer tests, owner-token lifecycle cleanup, capability docs, and explicit redaction
   statements per event.
@@ -132,13 +169,18 @@ release scope.
 ## Next Steps
 
 1. Keep v0.1 public scope centered on copied/redacted `GameplayPolicyEvent`.
-2. Make inventory the next internal observer candidate from the accepted minimal layout
+2. Stop broad discovery loops on the current binary unless a hash/artifact contradiction
+   appears; use existing GObjects/UFunction evidence for focused target-set work.
+3. Make inventory the next internal observer candidate from the accepted minimal layout
    evidence, with copied-scalar payloads only.
-3. Do not route mission, tribe, buff, or dino toward public API or runtime promotion before
-   RC; mission is only the first post-RC module candidate after an explicit gate.
-4. Treat the accepted dino compact pair as internal layout evidence for later recognizer
+4. Preserve item return-only evidence as the first post-RC bridge candidate after
+   inventory hardening; do not map `bIgnoreInventoryRequirement` to `BIgnoreCooldown` or
+   publish an Items SDK.
+5. Do not route mission, tribe, buff, or dino toward public API or runtime promotion before
+   RC; mission remains internal recognizer work after item return-only evidence.
+6. Treat the accepted dino compact pair as internal layout evidence for later recognizer
    design only; do not build a public Dino SDK or runtime observer from it yet.
-5. Keep buff compact as accepted internal layout evidence only; any further buff work
+7. Keep buff compact as accepted internal layout evidence only; any further buff work
    should be fixture/offline expansion or copied-payload design, not runtime hooks.
-6. Keep tribe, transfer, and admin surfaces blocked from public ABI until identity,
+8. Keep tribe, transfer, and admin surfaces blocked from public ABI until identity,
    payload ownership, and permission policy are designed.

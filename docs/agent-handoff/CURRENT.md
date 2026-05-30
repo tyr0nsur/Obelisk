@@ -7,10 +7,10 @@ This active routing table keeps only next-round facts; put durable evidence in
 
 ## Active Objective
 
-- Continue the core-first `v0.1.0-rc.1` path: Linux runtime, ProcessEvent hook
-  infrastructure, plugin lifecycle, central install layout, `oBaseEvents`,
-  `GameplayPolicyEvent`, minimal copied `ChatMessageEvent`, `DescribeResourceKind`, and
-  `DescribeGameplayPolicyEventKind`.
+- `v0.1.0-rc.1` is closed as a local tag. Continue from that core-first baseline:
+  Linux runtime, ProcessEvent hook infrastructure, plugin lifecycle, central install
+  layout, `oBaseEvents`, `GameplayPolicyEvent`, minimal copied `ChatMessageEvent`,
+  `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`.
 - Do not add public gameplay callback/module APIs beyond `GameplayPolicyEvent` and the
   minimal copied `ChatMessageEvent`, or public metadata helpers beyond
   `DescribeResourceKind` / `DescribeGameplayPolicyEventKind`, before the RC unless a new
@@ -185,15 +185,22 @@ This active routing table keeps only next-round facts; put durable evidence in
 - Inventory hook dispatch builds/reuses copied payloads once, uses subscriber count only
   as a cheap mirror, and rebinding/cancel paths keep copied scalar spans owner-local. The
   strict RC `minimal-second-source-intake` redacted signature pack has complete coverage.
-- Post-RC internal recognizer work stays test-only. Keep the order as Mission copied-bool
-  observer, Item return-only policy, then Transfer `bAccept`; Mission/Item helpers have
-  forgery/layout guardrails, but no hook wiring, public ABI, server marker/env, runtime
-  logs, public Items SDK, and no RC public SDK/API promotion. Mission helper tests now
-  also cover disabled/non-mission no-read/no-budget paths, all blocked object/array field
-  range forgeries, null bool data, stale-output clearing on rejection, and the exact
-  five-bool internal copied surface. Item helper tests now document bounded budget
-  reservation before metadata reads and cover forged `DestinationItem` ranges while
-  keeping copied output return-only.
+- Post-RC internal recognizer work stays test-only. For the fastest path toward useful
+  plugin/resource modeling, preserve Item return-only policy evidence first; keep Mission
+  copied-bool lifecycle review as the better-covered parallel/next recognizer; keep
+  Transfer `bAccept` fixture-only after those. None of these promote public Mission,
+  Items, Transfer, Inventory, or Structure SDKs; public callbacks; ABI; marker/env;
+  runtime logs; hook wiring; mutation; return override; object identity; lookup; or
+  `ResourceHandle`. Mission helper tests cover disabled/non-mission no-read/no-budget
+  paths, blocked object/array field range forgeries, null bool data, stale-output
+  clearing on rejection, and the exact five-bool internal copied surface. Item helper
+  tests document bounded budget reservation before metadata reads and forged
+  `DestinationItem` rejection while keeping copied output return-only.
+- Post-RC offline tooling checkpoint `8e76d3c` added candidate-only UObject flag,
+  weak-helper, and GObjects evidence builders plus gate tests. These tools are for
+  consume-mode internal/offline indexing only. They do not promote public GObjects,
+  lookup, identity, lifecycle, `ResourceHandle`, mutation, return override, or SDK
+  surfaces.
 - Keep redacted UFunction signatures, offline manifests, item compact intake,
   inventory-action compact intake, and BoolProperty gates candidate/layout-only unless the
   exact target set passes promote-mode artifact gates plus second-source/static evidence.

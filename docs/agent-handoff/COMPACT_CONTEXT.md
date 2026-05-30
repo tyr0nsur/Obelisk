@@ -35,8 +35,9 @@ priorities, and do not use history files as the active source of truth.
 - Repo: `/home/flowcommunity-ark/Obelisk`
 - Remote: `git@github.com:tyr0nsur/Obelisk.git`
 - Central Obelisk root: `/servidor/ark/obelisk`
-- Current dev line: `0.1.0-dev`; the release path should go through `0.1.0-rc.1` before
-  stable.
+- Current release baseline: local tag `v0.1.0-rc.1` exists as the small core-first RC
+  checkpoint. Post-RC work stays internal/offline unless a separate promotion gate
+  changes scope.
 - Stable plugin loading requires safe `OBELISK_INSTANCE_ID` plus real non-symlink plugin,
   config, log, and state roots.
 - `ObeliskApi` v1 is append-only for `v0.1.0`; ABI v2 requires an explicit migration plan.
@@ -143,15 +144,14 @@ priorities, and do not use history files as the active source of truth.
   supports target-set enumeration across current copied-core evidence, but not public
   GObjects, identity, lookup, `ResourceHandle`, mutation, or return override. Evidence:
   `docs/research/2026-05-29-gobjects-fuobjectarray-durable-pack.md`,
-  `docs/research/2026-05-29-gobjects-second-core-reconciliation.md`,
-  `docs/research/2026-05-29-gobjects-two-core-inventory-input.md`, and
+  `docs/research/2026-05-29-gobjects-second-core-reconciliation.md`, and
   `docs/research/2026-05-29-gobjects-cross-manifest-comparison.md`.
 - Redacted UFunction signatures, offline manifests, item compact intake, inventory-action
   compact intake, and BoolProperty mask/native markers are candidate/layout hygiene only.
   They are useful for planning and fixture comparison, not runtime safety, public SDKs,
   identity, mutation, return override, or `ResourceHandle`. Use the dated research notes
   such as `docs/research/2026-05-29-item-compact-second-source-readiness.md`,
-  `docs/research/2026-05-29-item-compact-redacted-signature-readiness.md`,
+  `docs/research/2026-05-29-item-return-only-policy-bridge-plan.md`,
   `docs/research/2026-05-29-inventory-action-redacted-signature-readiness.md`, and
   `/servidor/ark/workspace-offline/redacted-ufunction-signatures-rollup-20260529T101249Z`
   instead of copying artifact detail into handoff.
@@ -163,19 +163,21 @@ priorities, and do not use history files as the active source of truth.
   strict-pattern artifact is accepted for consume-mode indexing only; it is not
   ResourceHandle promotion evidence, and promote mode remains blocked by
   candidate-only/non-claims.
+- Post-RC offline tooling checkpoint `8e76d3c` added candidate-only UObject flag,
+  weak-helper, and GObjects evidence builders. They are consume-mode internal/offline
+  indexing tools only and do not promote public GObjects, lookup, identity, lifecycle,
+  `ResourceHandle`, mutation, return override, or SDK surfaces.
 - `scripts/build_uobject_flag_sample_report.py` produces
   `obelisk.uobject-flag-sample-report.v1` from the transition-matrix plus regenerated
   policy artifacts. Each `--input` must be paired with a `--consume-gate` in the same
   order, and the output embeds redacted consume-gate summaries for the source artifacts,
   not raw gate JSON. The offline artifact gate accepts it only in consume mode and blocks
-  promote mode; see `docs/research/2026-05-29-uobject-flag-sample-report.md`.
-- Pointer-or-null weak helpers `0x1d56c00` and `0x1d56c70` are preserved when regenerating
-  the normalized caller-mode pack, still consume-mode only; see
-  `docs/research/2026-05-29-pointer-helper-normalization.md`.
+  promote mode; use the script tests and gate output as the authoritative reference.
 - Weak-helper caller-mode artifacts are consume-mode research hygiene and promote-mode
   blocked. They refine helper evidence while keeping `ResourceHandle`, UE lifecycle names,
-  post-callback lookup, mutation, and return override blocked; see
-  `docs/research/2026-05-29-weak-helper-caller-mode-probe.md`.
+  post-callback lookup, mutation, and return override blocked; summarize durable policy in
+  `docs/research/2026-05-29-resource-handle-flag-policy-candidate.md` and
+  `docs/research/2026-05-29-uobject-flags-validity-blocker.md`.
 - `weak-helper-static-polarity-report.v1` has a candidate-only builder/gate contract for
   provenance-gated consume-mode indexing. It narrows internal flag-policy research only;
   promote mode remains blocked and it does not clear `ResourceHandle`, lifecycle-name,
@@ -266,10 +268,14 @@ priorities, and do not use history files as the active source of truth.
   public `CallProcessEvent`, background worker plugins, operator lifecycle commands, and
   ScriptStruct/transfer promotion remain blocked unless a later focused gate changes
   scope.
-- If post-RC internal recognizer work resumes, keep it test-only. Keep the order as Mission
-  copied-bool observer, Item return-only policy, then Transfer `bAccept`: Mission is currently
-  better covered, Item needs layout/forgery guardrails before any promotion beyond
-  test-only, and Transfer stays later; no RC public SDK/API promotion.
+- If post-RC internal recognizer work resumes, keep it test-only. For plugin/resource
+  usefulness, preserve Item return-only policy evidence first; keep Mission copied-bool
+  lifecycle review as the better-covered parallel/next recognizer; keep Transfer
+  `bAccept` fixture-only after those. None of these promote public Mission/Items/Transfer
+  SDKs, public callbacks, ABI, markers/env, runtime logs, hook wiring, mutation, return
+  override, object identity, lookup, or `ResourceHandle`. Start from the dated research
+  notes, not public API docs, until a separate promotion gate approves runtime
+  observation, dispatcher lifecycle, ABI, and SDK policy.
 - Runtime dispatcher hardening: hook-called Chat, Structure, and Inventory dispatchers
   must fail closed on setup/internal errors instead of rethrowing into `ProcessEvent`.
   Chat dispatch snapshots registration ids, skips callbacks removed during the same

@@ -70,9 +70,9 @@ Resources API.
 
 1. `GUObjectArray` root and field contract
 
-   The project needs accepted evidence that the candidate root, chunks pointer, live count,
-   and serial/master-serial fields form one coherent object-array contract for this binary.
-   The current static audit still reports `missing_gobjects_coherent_field_window`.
+   Later same-base static work and two-core reconciliation make the candidate object-array
+   contract strong enough for offline enumeration. That evidence still does not promote a
+   public/runtime object identity, lookup, or `ResourceHandle` contract.
 
 2. `FUObjectItem` layout and serial semantics
 

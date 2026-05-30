@@ -9,13 +9,17 @@ hash, and runtime flags.
 
 Historical module-specific notes, especially early chat reflection notes, remain indexed as
 evidence trails. Treat them as examples of the common reflection and promotion-gate ladder,
-not as the current product center. Current research should prefer general UE4 reflection,
-FName/GObjects/UFunction evidence, copied-data ownership, lifecycle safety, and public SDK
-promotion gates that apply across all ARK gameplay surfaces.
+not as the current product center. For RC work, follow `docs/agent-handoff/CURRENT.md` and
+the RC required path below; broad UE4 reflection, FName/GObjects expansion, and new module
+surface discovery are post-RC unless a new binary hash or contradictory evidence changes
+the active routing.
 
 ## Start Here
 
-Use these notes as the current core-first path for new work.
+Use these notes as the current curated core-first path for new work. This README is a
+navigation aid, not an exhaustive inventory of every evidence note; unlisted notes may
+still preserve durable evidence and should not be deleted only because they are absent
+from this index.
 
 RC required path:
 
@@ -23,12 +27,20 @@ RC required path:
 - [2026-05-28-second-source-reversing-gap-matrix.md](2026-05-28-second-source-reversing-gap-matrix.md)
 - [2026-05-28-second-source-core-intake-runbook.md](2026-05-28-second-source-core-intake-runbook.md)
 - [2026-05-29-minimal-second-source-readiness.md](2026-05-29-minimal-second-source-readiness.md)
+- [2026-05-29-public-gameplay-event-readiness-audit.md](2026-05-29-public-gameplay-event-readiness-audit.md)
+- [2026-05-29-chat-message-second-source-readiness.md](2026-05-29-chat-message-second-source-readiness.md)
 - [2026-05-29-rc-checkpoint-slicing-plan.md](2026-05-29-rc-checkpoint-slicing-plan.md)
 
 Post-RC/research candidates:
 
 - [2026-05-29-module-surface-roadmap.md](2026-05-29-module-surface-roadmap.md)
 - [2026-05-29-next-targetset-discovery.md](2026-05-29-next-targetset-discovery.md)
+- [2026-05-29-mission-reflection-internal-readiness.md](2026-05-29-mission-reflection-internal-readiness.md)
+- [2026-05-29-item-compact-second-source-readiness.md](2026-05-29-item-compact-second-source-readiness.md)
+- [2026-05-29-item-return-only-policy-bridge-plan.md](2026-05-29-item-return-only-policy-bridge-plan.md)
+- [2026-05-29-inventory-action-redacted-signature-readiness.md](2026-05-29-inventory-action-redacted-signature-readiness.md)
+- [2026-05-29-transfer-second-source-readiness.md](2026-05-29-transfer-second-source-readiness.md)
+- [2026-05-29-transfer-copied-scalar-feasibility.md](2026-05-29-transfer-copied-scalar-feasibility.md)
 - [2026-05-28-fname-index-manifest-plan.md](2026-05-28-fname-index-manifest-plan.md)
 - [2026-05-29-ghidra-fuobjectarray-field-window-probe.md](2026-05-29-ghidra-fuobjectarray-field-window-probe.md)
 - [2026-05-29-resource-handle-revalidation-evaluator.md](2026-05-29-resource-handle-revalidation-evaluator.md)
@@ -36,10 +48,10 @@ Post-RC/research candidates:
 - [2026-05-29-uobject-flags-fullscan.md](2026-05-29-uobject-flags-fullscan.md)
 - [2026-05-29-weak-helper-flag-polarity.md](2026-05-29-weak-helper-flag-polarity.md)
 - [2026-05-29-offline-evidence-canonicality.md](2026-05-29-offline-evidence-canonicality.md)
-- [2026-05-29-plugin-loader-bootstrap-state.md](2026-05-29-plugin-loader-bootstrap-state.md)
 - [2026-05-29-resource-identity-feasibility.md](2026-05-29-resource-identity-feasibility.md)
 - [2026-05-29-uobject-flags-validity-blocker.md](2026-05-29-uobject-flags-validity-blocker.md)
 - [2026-05-29-fuobjectitem-serial-lifetime-audit.md](2026-05-29-fuobjectitem-serial-lifetime-audit.md)
+- [2026-05-29-resource-handle-flag-policy-candidate.md](2026-05-29-resource-handle-flag-policy-candidate.md)
 - [2026-05-29-reflection-inventory-pack-smoke.md](2026-05-29-reflection-inventory-pack-smoke.md)
 
 Historical reusable evidence:
@@ -82,7 +94,10 @@ when a task explicitly targets that module.
 | [2026-05-27-module-readiness-matrix.md](2026-05-27-module-readiness-matrix.md) | Module readiness matrix | Summarizes manifest-backed module readiness and next gates without promoting public SDK status. |
 | [2026-05-28-reversing-objective-map.md](2026-05-28-reversing-objective-map.md) | Reversing objective map | Defines the broad ARK/UE4 research objective and keeps module work aligned to a general Linux modding core. |
 | [2026-05-28-second-source-reversing-gap-matrix.md](2026-05-28-second-source-reversing-gap-matrix.md) | Second-source reversing gap matrix | Defines the evidence gaps and target-set promotion gates for FName/GObjects/UObject/UFunction reflection evidence. |
-| [2026-05-29-minimal-second-source-readiness.md](2026-05-29-minimal-second-source-readiness.md) | Minimal second-source readiness | Records accepted direct-root second-source layout evidence for two inventory and two structure UFunction targets, without promoting GObjects, identity, mutation, return override, or public SDK surfaces. |
+| [2026-05-29-minimal-second-source-readiness.md](2026-05-29-minimal-second-source-readiness.md) | Minimal second-source readiness | Records accepted direct-root second-source layout evidence and the current validator refresh for two inventory and two structure UFunction targets, without promoting GObjects, identity, mutation, return override, or public SDK surfaces. |
+| [2026-05-29-public-gameplay-event-readiness-audit.md](2026-05-29-public-gameplay-event-readiness-audit.md) | Public gameplay event readiness audit | Promotes `GameplayPolicyEvent` as copied/redacted POD backed by accepted target-set evidence, while keeping public Inventory/Structure SDKs, identity, mutation, and return override blocked. |
+| [2026-05-29-chat-message-second-source-readiness.md](2026-05-29-chat-message-second-source-readiness.md) | Chat message second-source readiness | Records accepted layout evidence plus copied plugin-facing delivery validation for all four known chat send modes, while keeping identity, commands, mutation, and UE internals blocked. |
+| [2026-05-29-filtered-process-event-debug-gate-hardening.md](2026-05-29-filtered-process-event-debug-gate-hardening.md) | Filtered ProcessEvent debug gate hardening | Records why raw filtered `ProcessEvent` callbacks moved behind an explicit debug gate so copied events remain the RC plugin path. |
 | [2026-05-29-rc-checkpoint-slicing-plan.md](2026-05-29-rc-checkpoint-slicing-plan.md) | RC checkpoint slicing | Splits the broad dirty worktree into reviewable local checkpoints and keeps the first RC limited to core API, lifecycle, release gates, and redacted evidence. |
 | [2026-05-29-buff-after-compact-next-step.md](2026-05-29-buff-after-compact-next-step.md) | Buff after compact next step | Recommends no buff runtime hooks after accepted compact layout evidence; limits useful follow-up to docs or offline target-set expansion. |
 | [2026-05-27-primaldinocharacter-function-inventory.md](2026-05-27-primaldinocharacter-function-inventory.md) | PrimalDinoCharacter function inventory | Focuses the general inventory on dino passenger, carry, attack, flight, tame-status, and blueprint hook candidates. |
@@ -102,15 +117,23 @@ when a task explicitly targets that module.
 | [2026-05-28-fname-index-manifest-plan.md](2026-05-28-fname-index-manifest-plan.md) | FName index manifest plan | Defines a binary-scoped manifest/resolver path so raw `FName` indices remain evidence-backed and fail closed by ARK binary hash. |
 | [2026-05-29-module-surface-roadmap.md](2026-05-29-module-surface-roadmap.md) | Module surface roadmap | Ranks current module surfaces and keeps accepted compact target sets separate from public SDK promotion. |
 | [2026-05-29-next-targetset-discovery.md](2026-05-29-next-targetset-discovery.md) | Next target-set discovery | Records accepted second-source layout evidence for mission and tribe compact target sets and ranks mission as the cleaner next module candidate. |
+| [2026-05-29-mission-reflection-internal-readiness.md](2026-05-29-mission-reflection-internal-readiness.md) | Mission reflection internal readiness | Reviews the expanded `MissionReflectionTests` coverage and limits mission readiness to an internal recognizer/copy-readiness pack without public SDK, hook, dispatcher, identity, mutation, or return override promotion. |
 | [2026-05-29-reflection-inventory-pack-smoke.md](2026-05-29-reflection-inventory-pack-smoke.md) | Reflection inventory pack smoke | Validates the redacted candidate-only inventory pack builder on offline core evidence, with FName root ready and 8/8 requested target-set functions present. |
+| [2026-05-29-gobjects-cross-manifest-comparison.md](2026-05-29-gobjects-cross-manifest-comparison.md) | GObjects cross-manifest comparison | Compares existing gobjects-sampling manifests across two copied cores, reinforcing `0x595b7e0` for internal offline work while keeping public GObjects, ResourceHandle, identity, lookup, mutation, and return override blocked. |
 | [2026-05-29-ghidra-fuobjectarray-field-window-probe.md](2026-05-29-ghidra-fuobjectarray-field-window-probe.md) | Bounded Ghidra/r2 FUObjectArray probe | Records redacted internal evidence that the static GObjects candidate and serial accessors share one coherent field-window hypothesis for the current ARK binary hash. |
 | [2026-05-29-resource-handle-nonzero-revalidation.md](2026-05-29-resource-handle-nonzero-revalidation.md) | ResourceHandle nonzero serial revalidation | Records `32/32` accepted offline samples with `32` nonzero serial candidates and proven GObjects field coherence, while keeping public ResourceHandle blocked on `uobject_flags_validity_semantics_unproven`. |
 | [2026-05-29-uobject-flags-fullscan.md](2026-05-29-uobject-flags-fullscan.md) | UObject flags fullscan | Records full copied-core scans with thousands of nonzero serial candidates, zero `InternalIndex` mismatches, and no `0x100`/`0x4000` mask-positive samples, refining the ResourceHandle blocker. |
 | [2026-05-29-weak-helper-flag-polarity.md](2026-05-29-weak-helper-flag-polarity.md) | Weak helper flag polarity | Refines `UObject+0x8` validity semantics from bounded static helper/caller evidence while keeping public ResourceHandle blocked. |
+| [2026-05-29-resource-handle-flag-policy-candidate.md](2026-05-29-resource-handle-flag-policy-candidate.md) | ResourceHandle flag-policy candidate | Consolidates weak-helper caller-mode and nonzero readiness JSON into a short matrix: FName/GObjects/serial are not the main blocker; flag and lifecycle semantics keep post-callback handles blocked. |
 | [2026-05-29-offline-evidence-canonicality.md](2026-05-29-offline-evidence-canonicality.md) | Offline evidence canonicality | Marks stale ResourceHandle evaluator output, dry-run plans, and duplicate GObjects reports so future rounds do not use them as independent promotion evidence. |
-| [2026-05-29-plugin-loader-bootstrap-state.md](2026-05-29-plugin-loader-bootstrap-state.md) | Plugin loader bootstrap state | Records the `LD_PRELOAD` static-state crash found during `oChatLogger` validation and the process-lifetime registry rule for plugin lifecycle state. |
+| [2026-05-29-dispatcher-hook-safety-hardening.md](2026-05-29-dispatcher-hook-safety-hardening.md) | Dispatcher hook safety hardening | Records Chat/Structure/Inventory dispatcher fail-closed behavior and reentrant unregister cleanup rules for hook-called dispatchers. |
 | [2026-05-29-buff-compact-second-source-result.md](2026-05-29-buff-compact-second-source-result.md) | Buff compact second-source result | Records accepted second-source layout evidence for the three-target buff compact intake without promoting a public Buff SDK. |
 | [2026-05-29-dino-compact-second-source-readiness.md](2026-05-29-dino-compact-second-source-readiness.md) | Dino compact second-source readiness | Records accepted second-source layout evidence for passenger/carry dino targets without promoting public Dino callbacks or identity. |
+| [2026-05-29-item-compact-second-source-readiness.md](2026-05-29-item-compact-second-source-readiness.md) | Item compact second-source readiness | Records accepted strict second-source layout evidence for four compact `PrimalItem` targets without promoting public Items/Inventory SDKs, identity, mutation, return override, or ResourceHandle. |
+| [2026-05-29-item-return-only-policy-bridge-plan.md](2026-05-29-item-return-only-policy-bridge-plan.md) | Item return-only bridge plan | Defines the safe post-RC internal path for item return-only observations without public Items SDK, dispatcher weakening, identity, mutation, return override, or ResourceHandle claims. |
+| [2026-05-29-inventory-action-redacted-signature-readiness.md](2026-05-29-inventory-action-redacted-signature-readiness.md) | Inventory action redacted signature readiness | Records candidate-only redacted signatures and accepted second-source layout evidence for controller-side inventory use actions without promoting public Inventory/Items SDKs, `ItemNetID`, identity, mutation, return override, or ResourceHandle. |
+| [2026-05-29-transfer-second-source-readiness.md](2026-05-29-transfer-second-source-readiness.md) | Transfer second-source readiness | Records accepted layout-only second-source evidence for seven transfer UFunctions and two transfer ScriptStructs, plus consume-mode redacted signatures, without promoting public Transfer SDKs, payload decoding, identity, mutation, return override, runtime hooks, or ResourceHandle. |
+| [2026-05-29-transfer-copied-scalar-feasibility.md](2026-05-29-transfer-copied-scalar-feasibility.md) | Transfer copied-scalar feasibility | Ranks post-RC transfer copied-scalar candidates, with `ServerTransferredPlayerConfirmationResult.bAccept` as the only clean first internal candidate and no RC/public Transfer SDK claim. |
 | [2026-05-27-sdk-chat-event-ownership-plan.md](2026-05-27-sdk-chat-event-ownership-plan.md) | Historical SDK event ownership plan | Defines ownership, ABI, callback cleanup, and validation gates required before a public module callback API. |
 | [2026-05-27-chat-sdk-abi-preflight.md](2026-05-27-chat-sdk-abi-preflight.md) | Historical SDK ABI preflight | Defines test-first ABI and dispatcher gates for a future module callback without changing the public header yet. |
 | [2026-05-27-theisland-chat-reflection-ab-runbook.md](2026-05-27-theisland-chat-reflection-ab-runbook.md) | TheIsland historical module A/B runbook | Historical/superseded; do not execute without explicit approval to start `arkserver2`, test, and shut it down afterward. |

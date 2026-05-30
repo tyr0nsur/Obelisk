@@ -9,8 +9,8 @@ revalidation.
 
 This note used only existing scripts, copied/offline static artifacts, copied core
 evidence packs, and existing research notes. It did not attach to a process, create a
-core, touch live runtime markers, run ReflectionScanner, stage commits, push, or post to
-Discord.
+core, touch live runtime markers, run ReflectionScanner, stage commits, push, or post an
+external status update.
 
 ## Environment
 
@@ -131,9 +131,11 @@ uobject_flags_validity_semantics_unproven:
 
 This blocker is separate from, and additive to:
 
-- `missing_gobjects_coherent_field_window`
-- unproven `FUObjectItem+0x8` serial lifetime/reuse behavior
-- zero serial samples in copied cores
+- static global promotion remains candidate-only even though later GObjects work found
+  stronger same-base and two-core reconciliation evidence
+- unproven `FUObjectItem+0x8` serial lifetime/reuse behavior; later full scans found
+  repeatable nonzero serial candidates, so earlier zero-only samples are narrow historical
+  evidence rather than the active blocker
 - class/outer privacy and redaction policy
 - public ABI/lifecycle/SDK consumer tests
 
@@ -211,3 +213,123 @@ This strengthens `FUObjectItem+0x8` as the serial-backed field and `0x595b838` a
 serial counter candidate for this binary hash. It does not by itself prove named lifetime
 semantics for `0x100`/`0x4000`, provide a rejected-object sample, or promote public
 `ResourceHandle` revalidation.
+
+## 2026-05-29 FUObjectArray Flag Sweep Update
+
+A later bounded pass used the durable static pack at
+`/servidor/ark/workspace-offline/gobjects-fuobjectarray-durable-pack-20260529T051759Z`.
+It inspected only the existing `ShooterGameServer.objdump` for the same binary SHA256
+`7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`; no server process,
+marker, scanner, ptrace/gcore run, external status update, commit, or push was involved.
+
+The function starting at `0x1d18a90` is useful evidence because it iterates over the
+`FUObjectArray` chunks/count pair and writes object flags directly:
+
+```text
+0x1d18ada: mov eax,DWORD PTR [rip+0x3c42d24]  # 0x595b804 count
+0x1d18ae5: mov rcx,QWORD PTR [rip+0x3c42d04]  # 0x595b7f0 chunks
+0x1d18b33: mov rdi,QWORD PTR [rdi]            # FUObjectItem+0x0 UObject*
+0x1d18b36: or  DWORD PTR [rdi+0x8],0x100      # set UObject+0x8 mask 0x100
+```
+
+The same function later performs a second pass over non-null object slots:
+
+```text
+0x1d18be0: mov rdi,QWORD PTR [rdx]            # FUObjectItem+0x0 UObject*
+0x1d18be3: mov edx,DWORD PTR [rdi+0x8]
+0x1d18be8: and esi,0x8100
+0x1d18bee: cmp esi,0x100
+0x1d18bf6: or  edx,0x8000
+0x1d18bfc: mov DWORD PTR [rdi+0x8],edx
+0x1d18bff: call QWORD PTR [rax+0x88]
+```
+
+This strengthens the neutral model:
+
+- `UObject+0x8` is a mutable object-flags dword, not just a passive header field.
+- `0x100` is mass-applied across live `FUObjectArray` object slots in this binary hash.
+- `0x8000` is set on objects where `(flags & 0x8100) == 0x100`, followed by a virtual
+  call at vtable offset `0x88`.
+- The static path is consistent with the weak-helper evidence that later consults
+  `0x100` and `0x4000`, but it does not map any mask to a version-matched UE4 lifecycle
+  name.
+
+This does not close `uobject_flags_validity_semantics_unproven`. The update still lacks:
+
+- a copied-core negative sample where `0x100`, `0x4000`, or `0x8000` proves rejection;
+- a decompiler/source-backed name for the masks in ARK's exact UE4 fork;
+- proof that checking these bits after a plugin callback is a safe lifetime guarantee;
+- a fail-closed runtime design for object identity, lookup, reuse, and unload behavior.
+
+Therefore `ResourceHandle` remains blocked for public SDK work. The only safe use of this
+evidence is internal research planning for flag sampling and decompiler-target selection.
+
+## 2026-05-29 0x4000 Cross-Window Classification
+
+A parallel bounded static audit classified additional windows and found real `0x4000`
+accesses on the same `UObject+0x8` flags field:
+
+```text
+0x11ee150: test BYTE PTR [rdi+0x9],0x40      # flags & 0x4000 skip/reject branch
+0x11ee1df: or   DWORD PTR [rax+0x8],0x4000   # marks prior object before holder clear
+0x29829ed: test BYTE PTR [rbx+0x9],0x40      # after GObjects/FUObjectItem resolution
+0x2982ad3: or   DWORD PTR [rax+0x8],0x4000   # mark/propagation path
+0x298d4dd: or   DWORD PTR [rax+0x8],0x4000
+0x2abee38: or   DWORD PTR [rax+0x8],0x4000
+```
+
+The strongest validation window is `0x2982920..0x2982b60`: it checks the same
+`0x595b804` count and `0x595b7f0` chunk globals, resolves an `FUObjectItem`, loads the
+`UObject*`, and then tests `BYTE [object+0x9],0x40`.
+
+This confirms `0x4000` is an engine-side object flag consulted by reject/skip/mark paths.
+It still does not prove the named lifetime semantic. Full copied-core scans remain
+mask-negative for `0x100` and `0x4000`, so there is still no runtime negative sample that
+would justify public post-callback object validity.
+
+## 2026-05-29 Static Flag Semantics Update
+
+A later read-only pass over the verified
+`/home/flowcommunity-ark/obelisk-artifacts/static-global-preflight-20260529/ShooterGameServer.objdump`
+adds stronger internal semantics, but still does not promote public handles.
+
+`0x100` is now a strong internal hard-invalid candidate tied to a garbage-collection
+marking pass:
+
+- the `0x1d18a90` pass iterates `FUObjectArray` through `0x595b804` and `0x595b7f0`;
+- `0x1d18b36` mass-applies `or DWORD PTR [object+0x8],0x100`;
+- a second pass checks `(flags & 0x8100) == 0x100`, sets `0x8000`, and calls
+  `vtable+0x88`;
+- binary strings include `GarbageCollection.cpp` and `CollectGarbage`;
+- nearby code clears `0x100` with masks such as `0x7fffeff`.
+
+`0x4000` is now a strong internal strict-invalid/stale-or-replaced candidate:
+
+- weak helpers reject it in strict paths and allow it only in reviewed helper modes;
+- `0x11ee150` skips when `flags & 0x4000` is set, then `0x11ee1df` marks a previous
+  object with `0x4000` before clearing its holder;
+- `0x29829ed` resolves through `FUObjectArray`, rejects/skips `0x4000`, and nearby paths
+  propagate that bit to object/outer/related objects;
+- a small set/clear sequence writes `0x4000`, calls `vtable+0x68`, then clears it with
+  `0x7ffbfff`.
+
+The names `RF_TagGarbageTemp` for `0x100` and `RF_NewerVersionExists` for `0x4000` are
+plausible UE4 hypotheses only. Do not use those names as accepted ARK contracts until a
+version-matched source or decompiler path is recorded.
+
+Current policy:
+
+```text
+post_callback_resource_handle_ready=false
+0x100: hard-invalid internal candidate
+0x4000: strict-invalid internal candidate unless an explicitly reviewed helper mode allows it
+required next evidence: controlled negative sample showing a valid {index, serial}
+  resolving to an object with one of these bits and being rejected by the intended policy
+```
+
+Follow-up static negative-equivalent evidence is now represented by the post-RC offline
+tooling in `scripts/build_uobject_flag_policy_report.py`,
+`scripts/build_uobject_flag_transition_matrix.py`, and
+`scripts/build_uobject_flag_sample_report.py`. The resulting artifacts must remain
+`promotion_ready=false` and `post_callback_resource_handle_ready=false`; use them only as
+internal support for future fail-closed handle-candidate design.
