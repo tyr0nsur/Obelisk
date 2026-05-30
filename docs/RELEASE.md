@@ -142,6 +142,7 @@ scripts/check_release_readiness.sh \
   --ufunction-second-source-root <second-source-ufunction-snapshots> \
   --ufunction-second-source-target-set minimal-second-source-intake \
   --ufunction-second-source-target-set structure-observer-intake \
+  --ufunction-second-source-target-set item-return-only-policy-slice \
   --ufunction-second-source-target-set chat-message-intake \
   --second-source-report-dir /tmp/obelisk-rc-second-source
 ```
@@ -160,8 +161,9 @@ published release-candidate tag unless explicitly recovering a release error, an
 push a stale tag.
 
 The promotion check always includes the public RC UFunction target sets:
-`minimal-second-source-intake`, `structure-observer-intake`, and `chat-message-intake`.
-The check still needs a configured second-source snapshot root, either through
+`minimal-second-source-intake`, `structure-observer-intake`,
+`item-return-only-policy-slice`, and `chat-message-intake`. The check still needs a
+configured second-source snapshot root, either through
 `OBELISK_UFUNCTION_SECOND_SOURCE_ROOT` or `--ufunction-second-source-root`; without one,
 the gate fails closed with missing second-source evidence. Explicit
 `--ufunction-second-source-target-set` values add module target sets to the required RC
@@ -242,14 +244,14 @@ mutation APIs without a new promotion gate that defines identity stability, priv
 lifecycle, and cross-instance semantics.
 
 The default second-source gate is intentionally scoped to the public RC UFunction target
-sets: `minimal-second-source-intake`, `structure-observer-intake`, and
-`chat-message-intake`. Mission target sets such as `mission-compact-intake` are not part of
-that gate, and scalar-candidate summaries are review aids only, not RC scope. Transfer
-target sets such as `transfer-ufunction-intake` are also not part of the default gate.
-ScriptStruct promotion, including transfer structs, is not part of the default gate and
-must be opted in explicitly. A release or PR that promotes another reflected module family
-must name each promoted target set explicitly; those named sets are added to the public RC
-target sets:
+sets: `minimal-second-source-intake`, `structure-observer-intake`,
+`item-return-only-policy-slice`, and `chat-message-intake`. Mission target sets such as
+`mission-compact-intake` are not part of that gate, and scalar-candidate summaries are
+review aids only, not RC scope. Transfer target sets such as `transfer-ufunction-intake`
+are also not part of the default gate. ScriptStruct promotion, including transfer structs,
+is not part of the default gate and must be opted in explicitly. A release or PR that
+promotes another reflected module family must name each promoted target set explicitly;
+those named sets are added to the public RC target sets:
 
 ```bash
 scripts/check_release_readiness.sh \

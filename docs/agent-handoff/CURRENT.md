@@ -136,9 +136,11 @@ for the current checkpoint.
   profiling justifies a larger callback snapshot strategy.
 - Structure second-wave next step is offline-only candidate metadata/redaction review for
   `PrimalStructure.IsAllowedToBuild`. First useful action is a sanitized focused snapshot
-  for `PrimalStructure.IsAllowedToBuild` from an approved offline artifact, then a
-  distinct second-source compare. Do not add it to release target sets, ABI enums,
-  descriptors, dispatchers, public docs, or runtime gates.
+  for `PrimalStructure.IsAllowedToBuild` and, if reflected separately,
+  `APrimalStructure.IsAllowedToBuild` from an approved offline artifact, then a distinct
+  second-source compare. Fixture-only readiness currently reports `missing_base_snapshot`
+  for both keys. Do not add either key to release target sets, ABI enums, descriptors,
+  dispatchers, public docs, or runtime gates.
 - Plugin Hub planning order from current demand map and local `NextGenPlugins` inventory:
   `docs/PLUGIN_HUB_FOUNDATION_V1.md` is now the contributor-facing foundation boundary,
   backed by `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`. Next useful Plugin Hub work is copied
@@ -146,13 +148,12 @@ for the current checkpoint.
   identity/permissions, RCON/operator I/O, economy/persistence, homes/safe zones and
   structure/player-world policy after their promotion gates. Keep the clone out of repo
   and use it only as a dictionary/demand signal.
-- Artifact-pack contributor onboarding has a real documentation gap. A read-only audit
-  found the mechanics are tested, but the flow is spread across research and handoff
-  notes. Next docs/tooling priority is a concise contributor runbook for offline artifact
-  packs, including normalize/check, consume gate, strict target-set coverage,
-  second-source compare, pack-shape expectations, and non-claims. Also reconcile why
-  `check_rc_layout_evidence_smoke.sh` includes `item-return-only-policy-slice` while
-  `check_release_readiness.sh` defaults do not, or align the gates.
+- Artifact-pack contributor onboarding now has `docs/OFFLINE_ARTIFACT_PACKS.md` as the
+  concise contributor runbook. It documents normalize/check, consume gate, strict
+  target-set coverage, second-source compare, pack-shape expectations, and non-claims.
+  The default release gate and `check_rc_layout_evidence_smoke.sh` are aligned on the four
+  public RC UFunction target sets, including `item-return-only-policy-slice`; the combined
+  RC UFunction root helper now requires `--item-return-root` and assembles 12 snapshots.
 - Runtime/plugin lifecycle audit found no P1 blocker. Documented guardrail: individual
   timer unregister cancels future delivery but is not a general quiescence barrier; owner
   cleanup during unload is the final barrier. Future test debt: add PluginManager

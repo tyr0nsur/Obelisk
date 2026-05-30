@@ -41,6 +41,7 @@ Source roots:
 python3 scripts/assemble_rc_ufunction_second_source_root.py \
   --minimal-root /servidor/ark/workspace-offline/minimal-second-source-intake-refresh-20260529T124340Z/ufunction-snapshots \
   --structure-root /servidor/ark/workspace-offline/structure-observer-intake-refresh-20260529T141455Z/ufunction-snapshots \
+  --item-return-root /home/flowcommunity-ark/obelisk-artifacts/item-return-only-policy-slice-20260530T072255Z/ufunction-snapshots \
   --chat-root /servidor/ark/workspace-offline/chat-message-intake-20260529T000000Z/ufunction-snapshots \
   --output-root /tmp/obelisk-rc-ufunction-second-source-root \
   --replace
@@ -54,6 +55,7 @@ scripts/check_release_readiness.sh \
   --ufunction-second-source-root /tmp/obelisk-rc-ufunction-second-source-root \
   --ufunction-second-source-target-set minimal-second-source-intake \
   --ufunction-second-source-target-set structure-observer-intake \
+  --ufunction-second-source-target-set item-return-only-policy-slice \
   --ufunction-second-source-target-set chat-message-intake \
   --second-source-report-dir /tmp/obelisk-rc-second-source
 ```

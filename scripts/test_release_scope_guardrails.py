@@ -566,6 +566,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("default second-source gate is intentionally scoped to the public RC UFunction target", release)
         self.assertIn("`minimal-second-source-intake`", release)
         self.assertIn("`structure-observer-intake`", release)
+        self.assertIn("`item-return-only-policy-slice`", release)
         self.assertIn("`chat-message-intake`", release)
         self.assertIn("accepted default intake is layout-only evidence", release)
         self.assertIn("promotion_gate.ready_scope=layout_only", release)
@@ -601,7 +602,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("cross-event correlation", status)
         self.assertIn("refreshed default `minimal-second-source-intake`", changelog)
         self.assertIn("does not promote public\n  Inventory/Structure SDKs", changelog)
-        self.assertIn("Mission target sets such as `mission-compact-intake` are", release)
+        self.assertIn("Mission target sets such as `mission-compact-intake` are", normalized(release))
         self.assertIn(
             "Transfer target sets such as `transfer-ufunction-intake` are also not part of the default gate",
             normalized(release),
@@ -615,7 +616,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertNormalizedIn("Explicit `--ufunction-second-source-target-set` values add module target sets", release)
         self.assertIn("they do not replace or omit the public RC gate", release)
         self.assertIn("--ufunction-second-source-target-set minimal-second-source-intake", release)
-        self.assertIn("ScriptStruct promotion, including transfer structs, is not part of the default gate", release)
+        self.assertIn("ScriptStruct promotion, including transfer structs, is not part of the default gate", normalized(release))
         self.assertIn("ScriptStruct promotion requires explicit opt-in", script)
         self.assertIn("--scriptstruct-second-source-root requires at least one --scriptstruct-second-source-target-set", script)
         self.assertNotIn('SCRIPTSTRUCT_SECOND_SOURCE_TARGET_SETS=("transfer-scriptstruct")', script)
@@ -899,14 +900,45 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("scripts/assemble_rc_ufunction_second_source_root.py", final_text)
         self.assertIn("--minimal-root", final_text)
         self.assertIn("--structure-root", final_text)
+        self.assertIn("--item-return-root", final_text)
         self.assertIn("--chat-root", final_text)
         self.assertIn("/tmp/obelisk-rc-ufunction-second-source-root", final_text)
         self.assertIn("--ufunction-second-source-root /tmp/obelisk-rc-ufunction-second-source-root", release_gate_text)
-        self.assertIn("must contain the candidate snapshots for all three", final_text)
+        self.assertIn("must contain the candidate snapshots for all four", final_text)
         self.assertNotRegex(
             release_gate_text,
             r"--ufunction-second-source-root\s+/servidor/ark/workspace-offline/[^\\\n]*minimal[^\\\n]*/ufunction-snapshots",
         )
+
+    def test_offline_artifact_pack_runbook_stays_container_scoped(self) -> None:
+        runbook = read("docs/OFFLINE_ARTIFACT_PACKS.md")
+        compact = normalized(runbook)
+
+        required = (
+            "This runbook is for contributors who receive or prepare already-captured offline evidence packs",
+            "The pack container is evidence packaging, not a promotion result",
+            "unsupported JSON is only covered by the container checksum",
+            "Promote mode is not a pack-container approval path",
+            "Strict coverage requires `target_set_coverage` to be complete and internally consistent",
+            "does not replace per-target readiness reports",
+            "Do not claim that a passing pack promotes a public SDK",
+            "object identity, lookup, mutation, return overrides, ResourceHandle",
+        )
+        for item in required:
+            with self.subTest(item=item):
+                self.assertIn(normalized(item), compact)
+
+        forbidden = (
+            "/servidor/ark/",
+            "arkserver restart",
+            "arkserver2 restart",
+            "git push",
+            "git tag",
+            "discord.com/" + "api/webhooks",
+        )
+        for item in forbidden:
+            with self.subTest(forbidden=item):
+                self.assertNotIn(item, runbook)
 
     def test_structure_build_policy_target_is_not_release_scope(self) -> None:
         forbidden_terms = [
@@ -1670,7 +1702,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         fixture_readme = read("tests/fixtures/ufunction_snapshots/README.md")
 
         self.assertIn("mission/transfer APIs", release)
-        self.assertIn("Mission target sets such as `mission-compact-intake` are", release)
+        self.assertIn("Mission target sets such as `mission-compact-intake` are", normalized(release))
         self.assertIn("not part of the default gate", release)
         self.assertIn("scalar-candidate summaries are review aids only, not RC scope", normalized(release))
         self.assertIn("missions", status)

@@ -21,6 +21,7 @@ SCRIPTSTRUCT_SECOND_SOURCE_TARGET_SETS=()
 PUBLIC_RC_UFUNCTION_SECOND_SOURCE_TARGET_SETS=(
     "minimal-second-source-intake"
     "structure-observer-intake"
+    "item-return-only-policy-slice"
     "chat-message-intake"
 )
 
@@ -184,7 +185,8 @@ Options:
                                     UFunction target set to gate. Repeat for each promoted module.
                                     Defaults to the public RC target sets:
                                     minimal-second-source-intake,
-                                    structure-observer-intake, and chat-message-intake.
+                                    structure-observer-intake,
+                                    item-return-only-policy-slice, and chat-message-intake.
   --scriptstruct-second-source-target-set
                                     ScriptStruct target set to gate. Repeat for each promoted module.
                                     No default; ScriptStruct promotion requires explicit opt-in.

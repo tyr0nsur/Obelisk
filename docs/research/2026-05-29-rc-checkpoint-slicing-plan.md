@@ -483,6 +483,7 @@ manifests that captured absolute source roots or other non-redacted input paths:
 python3 scripts/assemble_rc_ufunction_second_source_root.py \
   --minimal-root /servidor/ark/workspace-offline/minimal-second-source-intake-refresh-20260529T124340Z/ufunction-snapshots \
   --structure-root /servidor/ark/workspace-offline/structure-observer-intake-refresh-20260529T141455Z/ufunction-snapshots \
+  --item-return-root /home/flowcommunity-ark/obelisk-artifacts/item-return-only-policy-slice-20260530T072255Z/ufunction-snapshots \
   --chat-root /servidor/ark/workspace-offline/chat-message-intake-20260529T000000Z/ufunction-snapshots \
   --output-root /tmp/obelisk-rc-ufunction-second-source-root
 scripts/check_rc_layout_evidence_smoke.sh \
@@ -497,6 +498,7 @@ scripts/check_release_readiness.sh \
   --ufunction-second-source-root /tmp/obelisk-rc-ufunction-second-source-root \
   --ufunction-second-source-target-set minimal-second-source-intake \
   --ufunction-second-source-target-set structure-observer-intake \
+  --ufunction-second-source-target-set item-return-only-policy-slice \
   --ufunction-second-source-target-set chat-message-intake \
   --second-source-report-dir /tmp/obelisk-rc-second-source
 git status --short --ignored
@@ -509,5 +511,6 @@ copied `ChatMessageEvent`, `DescribeResourceKind`, and
 `DescribeGameplayPolicyEventKind` remained metadata-only: no module SDK, UE lookup,
 mutation, identity, or return override. In short: no module SDK, UE lookup, mutation,
 identity, or return override. This means no module SDK, UE lookup, mutation, identity, or return override.
-The final UFunction second-source root must contain the candidate snapshots for all three
-public RC target sets; a minimal-only root was not valid for the structure and chat gates.
+The final UFunction second-source root must contain the candidate snapshots for all four
+public RC target sets; a minimal-only root is not valid for the structure, item-return, or
+chat gates.

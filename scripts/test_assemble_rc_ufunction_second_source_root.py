@@ -38,6 +38,11 @@ TARGET_PATHS = {
         "sdk_structures/PrimalStructureItemContainer.VerifyPinCode.snapshot.json",
         "sdk_structures/PrimalStructureSeating.CanSeat.snapshot.json",
     ],
+    "item_return": [
+        "sdk_items/PrimalItem.AllowEquipItem.snapshot.json",
+        "sdk_items/PrimalItem.CanRepair.snapshot.json",
+        "sdk_items/PrimalItem.UseItemOntoItem.snapshot.json",
+    ],
     "chat": [
         "sdk_chat/ShooterPlayerController.ServerSendChatMessage.snapshot.json",
     ],
@@ -80,6 +85,7 @@ class AssembleRcUFunctionSecondSourceRootTests(unittest.TestCase):
             temp = Path(temp_dir)
             minimal = self.copy_root(temp, "minimal")
             structure = self.copy_root(temp, "structure")
+            item_return = self.copy_root(temp, "item_return")
             chat = self.copy_root(temp, "chat")
             output = temp / "rc-root"
 
@@ -88,6 +94,8 @@ class AssembleRcUFunctionSecondSourceRootTests(unittest.TestCase):
                 str(minimal),
                 "--structure-root",
                 str(structure),
+                "--item-return-root",
+                str(item_return),
                 "--chat-root",
                 str(chat),
                 "--output-root",
@@ -98,14 +106,19 @@ class AssembleRcUFunctionSecondSourceRootTests(unittest.TestCase):
             manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
             output_snapshot_count = len(list(output.rglob("*.snapshot.json")))
 
-            self.assertEqual(summary["target_count"], 9)
-            self.assertEqual(manifest["target_count"], 9)
+            self.assertEqual(summary["target_count"], 12)
+            self.assertEqual(manifest["target_count"], 12)
             self.assertIs(manifest["path_redacted"], True)
             self.assertEqual(
                 manifest["target_sets"],
-                ["minimal-second-source-intake", "structure-observer-intake", "chat-message-intake"],
+                [
+                    "minimal-second-source-intake",
+                    "structure-observer-intake",
+                    "item-return-only-policy-slice",
+                    "chat-message-intake",
+                ],
             )
-            self.assertEqual(output_snapshot_count, 9)
+            self.assertEqual(output_snapshot_count, 12)
             manifest_text = json.dumps(manifest, sort_keys=True)
             self.assertNotIn(str(temp), manifest_text)
             self.assertNotIn("/servidor/ark", manifest_text)
@@ -143,6 +156,7 @@ class AssembleRcUFunctionSecondSourceRootTests(unittest.TestCase):
             temp = Path(temp_dir)
             minimal = self.copy_root(temp, "minimal")
             structure = self.copy_root(temp, "structure")
+            item_return = self.copy_root(temp, "item_return")
             chat = self.copy_root(temp, "chat")
             chat_snapshot = chat / SHA_PREFIX / "sdk_chat/ShooterPlayerController.ServerSendChatMessage.snapshot.json"
             payload = json.loads(chat_snapshot.read_text(encoding="utf-8"))
@@ -156,6 +170,8 @@ class AssembleRcUFunctionSecondSourceRootTests(unittest.TestCase):
                 str(minimal),
                 "--structure-root",
                 str(structure),
+                "--item-return-root",
+                str(item_return),
                 "--chat-root",
                 str(chat),
                 "--output-root",
@@ -175,6 +191,7 @@ class AssembleRcUFunctionSecondSourceRootTests(unittest.TestCase):
             temp = Path(temp_dir)
             minimal = self.copy_root(temp, "minimal")
             structure = self.copy_root(temp, "structure")
+            item_return = self.copy_root(temp, "item_return")
             chat = temp / "chat-empty"
             chat.mkdir()
             result = self.run_builder(
@@ -182,6 +199,8 @@ class AssembleRcUFunctionSecondSourceRootTests(unittest.TestCase):
                 str(minimal),
                 "--structure-root",
                 str(structure),
+                "--item-return-root",
+                str(item_return),
                 "--chat-root",
                 str(chat),
                 "--output-root",
@@ -197,6 +216,7 @@ class AssembleRcUFunctionSecondSourceRootTests(unittest.TestCase):
             temp = Path(temp_dir)
             minimal = self.copy_root(temp, "minimal")
             structure = self.copy_root(temp, "structure")
+            item_return = self.copy_root(temp, "item_return")
             chat = self.copy_root(temp, "chat")
             duplicate = structure / SHA_PREFIX / "sdk_structures/PrimalStructure.AllowStructureAccess.snapshot.json"
             payload = json.loads(duplicate.read_text(encoding="utf-8"))
@@ -208,6 +228,8 @@ class AssembleRcUFunctionSecondSourceRootTests(unittest.TestCase):
                 str(minimal),
                 "--structure-root",
                 str(structure),
+                "--item-return-root",
+                str(item_return),
                 "--chat-root",
                 str(chat),
                 "--output-root",

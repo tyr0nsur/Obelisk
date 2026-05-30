@@ -149,6 +149,7 @@ READY_OVERCLAIM_KEYS = {
 RC_UFUNCTION_TARGET_SETS = (
     "minimal-second-source-intake",
     "structure-observer-intake",
+    "item-return-only-policy-slice",
     "chat-message-intake",
 )
 REQUIRED_RC_UFUNCTION_NON_CLAIMS = {

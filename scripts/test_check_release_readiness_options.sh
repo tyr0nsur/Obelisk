@@ -59,6 +59,7 @@ fi
 for expected in \
     "Defaults to the public RC target sets" \
     "structure-observer-intake" \
+    "item-return-only-policy-slice" \
     "chat-message-intake"; do
     if ! grep -Fq -- "${expected}" <<<"${help_output}"; then
         printf 'missing public RC target-set help text: %s\n' "${expected}" >&2
@@ -118,6 +119,7 @@ assert_ufunction_target_sets_after_defaults() {
     local PUBLIC_RC_UFUNCTION_SECOND_SOURCE_TARGET_SETS=(
         "minimal-second-source-intake"
         "structure-observer-intake"
+        "item-return-only-policy-slice"
         "chat-message-intake"
     )
     local UFUNCTION_SECOND_SOURCE_TARGET_SETS=("$@")
@@ -137,12 +139,12 @@ assert_ufunction_target_sets_after_defaults() {
 }
 
 assert_ufunction_target_sets_after_defaults \
-    "minimal-second-source-intake,structure-observer-intake,chat-message-intake"
+    "minimal-second-source-intake,structure-observer-intake,item-return-only-policy-slice,chat-message-intake"
 assert_ufunction_target_sets_after_defaults \
-    "buff-compact-intake,minimal-second-source-intake,structure-observer-intake,chat-message-intake" \
+    "buff-compact-intake,minimal-second-source-intake,structure-observer-intake,item-return-only-policy-slice,chat-message-intake" \
     "buff-compact-intake"
 assert_ufunction_target_sets_after_defaults \
-    "minimal-second-source-intake,dino-compact-intake,structure-observer-intake,chat-message-intake" \
+    "minimal-second-source-intake,dino-compact-intake,structure-observer-intake,item-return-only-policy-slice,chat-message-intake" \
     "minimal-second-source-intake" \
     "dino-compact-intake"
 
@@ -890,6 +892,7 @@ assert_minimal_only_ufunction_root_does_not_satisfy_public_rc_target_sets() {
     local PUBLIC_RC_UFUNCTION_SECOND_SOURCE_TARGET_SETS=(
         "minimal-second-source-intake"
         "structure-observer-intake"
+        "item-return-only-policy-slice"
         "chat-message-intake"
     )
     local UFUNCTION_SECOND_SOURCE_TARGET_SETS=()
@@ -942,6 +945,14 @@ assert_minimal_only_ufunction_root_does_not_satisfy_public_rc_target_sets() {
                     exit 1
                 fi
                 assert_public_rc_report_state "${report_path}" "${target_set}" false 2 4
+                ;;
+            item-return-only-policy-slice)
+                if [[ "${status}" -eq 0 ]]; then
+                    printf 'minimal-only UFunction second source unexpectedly satisfied item return RC target set\n%s\n' \
+                        "${output}" >&2
+                    exit 1
+                fi
+                assert_public_rc_report_state "${report_path}" "${target_set}" false 0 3
                 ;;
             chat-message-intake)
                 if [[ "${status}" -eq 0 ]]; then

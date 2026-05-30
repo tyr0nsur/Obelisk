@@ -339,16 +339,17 @@ priorities, and do not use history files as the active source of truth.
   --fail-on-readiness-gaps`.
 - `scripts/check_release_readiness.sh --require-second-source-readiness` defaults to the
   public RC UFunction target sets: `minimal-second-source-intake`,
-  `structure-observer-intake`, and `chat-message-intake`. ScriptStruct promotion requires
-  an explicit ScriptStruct target set.
+  `structure-observer-intake`, `item-return-only-policy-slice`, and
+  `chat-message-intake`. ScriptStruct promotion requires an explicit ScriptStruct target
+  set.
 - Reflection snapshot readiness reports are consumable only when they come from
   `gate_mode=second_source_promotion`, name at least one target set, and keep
   `promotion_ready=false`; this is layout evidence, not public API/runtime promotion.
-- `scripts/assemble_rc_ufunction_second_source_root.py` assembles those three accepted
+- `scripts/assemble_rc_ufunction_second_source_root.py` assembles those four accepted
   UFunction roots into one release-gate root. It copies existing sanitized snapshots only
   and does not regenerate evidence. It produced
-  `/tmp/obelisk-rc-ufunction-second-source-root` with 9 unique snapshots from the current
-  accepted minimal/structure/chat roots, and each target set passed
+  `/tmp/obelisk-rc-ufunction-second-source-root` with 12 unique snapshots from the current
+  accepted minimal/structure/item-return/chat roots, and each target set passed
   `compare_reflection_snapshots.py --readiness-report --fail-on-readiness-gaps` against
   that assembled root. The helper manifest is path-redacted; do not preserve or publish
   older `/tmp` manifests that contain absolute source roots.

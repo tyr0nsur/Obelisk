@@ -91,6 +91,9 @@ explicitly:
 - `structure-observer-intake`: all six structure observer UFunctions used as layout
   backing for copied/redacted `GameplayPolicyEvent` fields. This does not promote raw
   structure callbacks, object identity, mutation, or return overrides.
+- `item-return-only-policy-slice`: the three item return-only UFunctions used as layout
+  backing for copied `GameplayPolicyEvent` `ReturnValue` fields. This does not promote an
+  Inventory SDK, Items SDK, item identity, lookup, mutation, or return override authority.
 - `chat-message-intake`: `ShooterPlayerController.ServerSendChatMessage`, the layout
   backing for the minimal copied `ChatMessageEvent` RC/public callback. This covers the
   copied notification contract only, not command routing, sender identity, moderation,

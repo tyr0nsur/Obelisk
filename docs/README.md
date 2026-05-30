@@ -11,6 +11,7 @@ on contributors, plugin authors, operators, and reproducible research.
 - `STATUS.md`: current release scope and known limitations.
 - `RELEASE.md`: release readiness gates and RC scope.
 - `ARCHITECTURE.md`: runtime and SDK architecture.
+- `OFFLINE_ARTIFACT_PACKS.md`: contributor runbook for normalized offline evidence packs.
 
 ## Plugin Author
 

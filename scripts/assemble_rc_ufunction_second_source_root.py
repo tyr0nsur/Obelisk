@@ -23,6 +23,7 @@ SNAPSHOT_SCHEMA = "obelisk.ufunction-chain.snapshot.v1"
 RC_TARGET_SETS = (
     "minimal-second-source-intake",
     "structure-observer-intake",
+    "item-return-only-policy-slice",
     "chat-message-intake",
 )
 EVIDENCE_IDENTITY_FIELDS = (
@@ -199,6 +200,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--minimal-root", required=True, type=Path)
     parser.add_argument("--structure-root", required=True, type=Path)
+    parser.add_argument("--item-return-root", required=True, type=Path)
     parser.add_argument("--chat-root", required=True, type=Path)
     parser.add_argument("--output-root", required=True, type=Path)
     parser.add_argument("--replace", action="store_true")
@@ -210,6 +212,7 @@ def main() -> int:
     roots = {
         "minimal-second-source-intake": args.minimal_root,
         "structure-observer-intake": args.structure_root,
+        "item-return-only-policy-slice": args.item_return_root,
         "chat-message-intake": args.chat_root,
     }
     manifest = write_output(source_records(roots), args.output_root, replace=args.replace)
