@@ -112,6 +112,47 @@ gobjects blocker: missing_gobjects_coherent_field_window
 promotion_gate.ready: false
 ```
 
+Lead execution result on commit `96c656079f88`:
+
+```text
+output_dir: /tmp/obelisk-static-global-strict-refresh-20260530T000000Z
+artifact_identity.artifact_sha256: 35692df0f5a5348771504d0fa2131e78cc3e08495e28080a3be2c5fd2595ba11
+manifest_sha256: 39ca36f1b853e57e41be1c1d0dd424cf1dc6dbab06da0604a9ff7336e0e1f21f
+static_xrefs_sha256: ccf8991fa9cdc465f565a64e83bbb00688469eb856a74957253d59dc77bb2be4
+fname_root static_contract.satisfied: true
+gobjects static_contract.satisfied: false
+gobjects blocker: missing_gobjects_coherent_field_window
+promotion_gate.ready: false
+consume_gate with --root /tmp: accepted
+```
+
+The first consume-gate attempt without `--root /tmp` correctly blocked because the
+default approved workspace root is `/servidor/ark/workspace-offline`; this was a path
+policy check, not an evidence failure. The artifact remains a temporary fail-closed audit
+output, not a durable promotion input, until a matching workspace/offline-artifact location
+and missing field-window evidence are supplied.
+
+Lead follow-up with the durable workspace field-window input:
+
+```text
+field_window_input: /servidor/ark/workspace-offline/gobjects-fuobjectarray-durable-pack-20260529T051759Z/field-window/fuobjectarray-field-window.redacted.json
+field_window_schema: obelisk.fuobjectarray-field-window-redacted.v1
+field_window_sha256: cf1d430833d232ecbfda8ba8791730f1c56032b6e0f18d93cf5ab7c92c679d57
+output_dir: /tmp/obelisk-static-global-strict-with-field-window-20260530T000000Z
+artifact_identity.artifact_sha256: ce5eca1f8ba35297e00005628a301f5a55dd3c4e6724d44904ae70250c62e78c
+manifest_sha256: b1466b6dcc5995f00f953d54859e101a9c78f00ca8f9eca823897b4b71eabd53
+fname_root static_contract.satisfied: true
+gobjects static_contract.satisfied: true
+gobjects blocker: cleared missing_gobjects_coherent_field_window
+promotion_gate.ready: false
+promotion_gate blocker: static_only_evidence
+consume_gate with --root /tmp: accepted
+```
+
+This clears only the static `gobjects` coherent field-window blocker for the reviewed
+binary/candidate pair. It still does not promote public `GObjects`, `ResourceHandle`,
+lookup, identity, lifetime, mutation, return override, or UE call replay.
+
 ## Blocked Field-Window Upgrade
 
 `scripts/build_static_global_promotion_evidence.py` can clear only the
@@ -123,14 +164,14 @@ matching redacted field-window JSON through this argument:
 ```
 
 No valid existing path for that argument was found under
-`/home/flowcommunity-ark/obelisk-artifacts`. The repository docs record that the raw
-Ghidra/radare2 FUObjectArray work originally stayed under `/tmp`, so the durable artifact
-is currently missing from the reviewed artifact surface.
+`/home/flowcommunity-ark/obelisk-artifacts` during the first read-only artifact search.
+A valid pre-strict-identity redacted field-window artifact was later found under the
+approved offline workspace at `/servidor/ark/workspace-offline` and consumed in the
+follow-up result above.
 
-Do not invent a path for this input. The next executable step is to first create or
-durably copy a real `obelisk.fuobjectarray-field-window-redacted.v1` JSON under
-`/home/flowcommunity-ark/obelisk-artifacts`, then rerun the static-global command above
-with that existing path.
+Do not invent a path for this input. If a new run is needed, first create or durably copy
+a real `obelisk.fuobjectarray-field-window-redacted.v1` JSON under an approved offline
+workspace, then rerun the static-global command above with that existing path.
 
 ## Strict ResourceHandle Evaluator Path
 

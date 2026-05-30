@@ -97,6 +97,18 @@ ITEM_RETURN_ONLY_COPIED_FIELDS = (
     "PrimalItem.UseItemOntoItem.ReturnValue",
 )
 
+ITEM_RETURN_ONLY_DESCRIPTOR_BY_TARGET = {
+    "PrimalItem.AllowEquipItem": "inventory_item.allow_equip_check",
+    "PrimalItem.CanRepair": "inventory_item.can_repair_check",
+    "PrimalItem.UseItemOntoItem": "inventory_item.use_onto_item_check",
+}
+
+ITEM_RETURN_ONLY_EXPECTED_DESCRIPTORS = (
+    "inventory_item.allow_equip_check",
+    "inventory_item.can_repair_check",
+    "inventory_item.use_onto_item_check",
+)
+
 ITEM_RETURN_ONLY_EXCLUDED_REASONS = {
     "PrimalItem.AllowEquipItem.toInventory": "object_ref_excluded",
     "PrimalItem.CanRepair.bIgnoreInventoryRequirement": "non_return_bool_excluded",
@@ -1326,6 +1338,74 @@ def require_item_return_only_shape(target_payload: dict[str, Any], source_snapsh
     return copied, excluded
 
 
+def build_item_return_only_descriptor_preflight(copied: list[dict[str, Any]]) -> dict[str, Any]:
+    descriptors: list[dict[str, Any]] = []
+    for entry in copied:
+        target = entry.get("target")
+        descriptor = ITEM_RETURN_ONLY_DESCRIPTOR_BY_TARGET.get(target)
+        if descriptor is None:
+            raise SystemExit(f"item descriptor preflight has no descriptor for target: {target}")
+        if entry.get("direction") != "return" or entry.get("type") != "bool":
+            raise SystemExit(f"{target} descriptor preflight is not return-bool-only")
+        descriptors.append(
+            {
+                "descriptor": descriptor,
+                "target": target,
+                "copied_field": entry["copied_field"],
+                "field": entry["field"],
+                "direction": "return",
+                "type": "bool",
+                "resource_kind": "INVENTORY_ITEM",
+                "resource_backing": "inventory_backed",
+                "payload_policy": "copied_return_value_only",
+                "assigned_event_kind": None,
+                "assigned_event_kind_mask": None,
+                "promotion_ready": False,
+                "public_promotion": False,
+                "source_snapshot": entry["source_snapshot"],
+                "source_snapshot_sha256": entry["source_snapshot_sha256"],
+                "evidence_status": "descriptor-preflight-only",
+            }
+        )
+
+    emitted = [entry["descriptor"] for entry in descriptors]
+    missing = [descriptor for descriptor in ITEM_RETURN_ONLY_EXPECTED_DESCRIPTORS if descriptor not in emitted]
+    unexpected = [descriptor for descriptor in emitted if descriptor not in ITEM_RETURN_ONLY_EXPECTED_DESCRIPTORS]
+    if missing or unexpected:
+        raise SystemExit(
+            "item descriptor preflight failed closed: "
+            + ",".join(
+                [
+                    *[f"missing_descriptor:{descriptor}" for descriptor in missing],
+                    *[f"unexpected_descriptor:{descriptor}" for descriptor in unexpected],
+                ]
+            )
+        )
+
+    return {
+        "status": "internal-evidence-only",
+        "scope": "item-return-only-policy-slice",
+        "descriptor_count": len(descriptors),
+        "resource_kind": "INVENTORY_ITEM",
+        "resource_backing": "inventory_backed",
+        "payload_policy": "copied_return_value_only",
+        "return_value_only": True,
+        "assigned_event_kind": None,
+        "assigned_event_kind_mask": None,
+        "promotion_ready": False,
+        "public_promotion": False,
+        "public_surface": False,
+        "descriptors": descriptors,
+        "explicitly_not_assigned": [
+            "event_kind",
+            "event_kind_mask",
+            "public_metadata_json",
+            "runtime_dispatcher_tables",
+            "plugin_callbacks",
+        ],
+    }
+
+
 def require_transfer_baccept_only_shape(target_payload: dict[str, Any], source_snapshot: dict[str, str]) -> list[dict[str, Any]]:
     target_identity = target_payload.get("target")
     property_chain = target_payload.get("property_chain")
@@ -1894,11 +1974,13 @@ def build_item_return_only_policy_slice(*, snapshot_root: Path = DEFAULT_SNAPSHO
         },
         "copied_return_bools": copied,
         "excluded_fields": excluded,
+        "descriptor_preflight": build_item_return_only_descriptor_preflight(copied),
         "safety_summary": {
             "artifact_status": "evidence_only",
             "promotion_ready": False,
             "intended_use": "offline_review_only",
             "copied_bool_count": len(copied),
+            "descriptor_preflight_count": len(ITEM_RETURN_ONLY_EXPECTED_DESCRIPTORS),
             "excluded_field_count": len(excluded),
             "explicitly_excluded": [
                 "CraftBlueprint",
@@ -1907,6 +1989,8 @@ def build_item_return_only_policy_slice(*, snapshot_root: Path = DEFAULT_SNAPSHO
                 "toInventory",
                 "DestinationItem",
                 "AdditionalData",
+                "event_kind_assignment",
+                "event_kind_mask_assignment",
                 "object_refs",
                 "mutation",
                 "return_override",
@@ -1915,6 +1999,7 @@ def build_item_return_only_policy_slice(*, snapshot_root: Path = DEFAULT_SNAPSHO
         },
         "non_claims": [
             "does not promote public SDK callbacks or public metadata helpers",
+            "does not assign event_kind or event_kind_mask values",
             "does not expose UE pointers, object identity, class identity, raw params, mutation, or return overrides",
             "does not copy CraftBlueprint, bIgnoreInventoryRequirement, bConsumeResources, toInventory, DestinationItem, or AdditionalData",
         ],

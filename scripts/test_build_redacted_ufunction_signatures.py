@@ -221,11 +221,14 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
             [entry["excluded_field"] for entry in report["excluded_fields"]],
         )
         self.assertEqual(3, report["safety_summary"]["copied_bool_count"])
+        self.assertEqual(3, report["safety_summary"]["descriptor_preflight_count"])
         self.assertEqual(5, report["safety_summary"]["excluded_field_count"])
         self.assertIs(False, report["safety_summary"]["promotion_ready"])
         self.assertIn("public_sdk", report["safety_summary"]["explicitly_excluded"])
         self.assertIn("return_override", report["safety_summary"]["explicitly_excluded"])
         self.assertIn("object_refs", report["safety_summary"]["explicitly_excluded"])
+        self.assertIn("event_kind_assignment", report["safety_summary"]["explicitly_excluded"])
+        self.assertIn("event_kind_mask_assignment", report["safety_summary"]["explicitly_excluded"])
 
         serialized = json.dumps(report)
         self.assertNotIn(str(fixture_root), serialized)
@@ -236,6 +239,65 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         self.assertNotIn("toInventory", copied_serialized)
         self.assertNotIn("DestinationItem", copied_serialized)
         self.assertNotIn("AdditionalData", copied_serialized)
+
+    def test_item_return_only_descriptor_preflight_is_internal_and_descriptor_only(self) -> None:
+        fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
+
+        report = tool.build_item_return_only_policy_slice(snapshot_root=fixture_root)
+        preflight = report["descriptor_preflight"]
+
+        self.assertEqual("internal-evidence-only", preflight["status"])
+        self.assertEqual("item-return-only-policy-slice", preflight["scope"])
+        self.assertEqual("INVENTORY_ITEM", preflight["resource_kind"])
+        self.assertEqual("inventory_backed", preflight["resource_backing"])
+        self.assertEqual("copied_return_value_only", preflight["payload_policy"])
+        self.assertIs(True, preflight["return_value_only"])
+        self.assertIsNone(preflight["assigned_event_kind"])
+        self.assertIsNone(preflight["assigned_event_kind_mask"])
+        self.assertIs(False, preflight["promotion_ready"])
+        self.assertIs(False, preflight["public_promotion"])
+        self.assertIs(False, preflight["public_surface"])
+        self.assertEqual(3, preflight["descriptor_count"])
+        self.assertEqual(
+            [
+                "inventory_item.allow_equip_check",
+                "inventory_item.can_repair_check",
+                "inventory_item.use_onto_item_check",
+            ],
+            [entry["descriptor"] for entry in preflight["descriptors"]],
+        )
+        self.assertEqual(
+            [
+                "PrimalItem.AllowEquipItem",
+                "PrimalItem.CanRepair",
+                "PrimalItem.UseItemOntoItem",
+            ],
+            [entry["target"] for entry in preflight["descriptors"]],
+        )
+        self.assertEqual(
+            [entry["copied_field"] for entry in report["copied_return_bools"]],
+            [entry["copied_field"] for entry in preflight["descriptors"]],
+        )
+        self.assertTrue(all(entry["resource_kind"] == "INVENTORY_ITEM" for entry in preflight["descriptors"]))
+        self.assertTrue(all(entry["resource_backing"] == "inventory_backed" for entry in preflight["descriptors"]))
+        self.assertTrue(all(entry["payload_policy"] == "copied_return_value_only" for entry in preflight["descriptors"]))
+        self.assertTrue(all(entry["direction"] == "return" for entry in preflight["descriptors"]))
+        self.assertTrue(all(entry["type"] == "bool" for entry in preflight["descriptors"]))
+        self.assertTrue(all(entry["assigned_event_kind"] is None for entry in preflight["descriptors"]))
+        self.assertTrue(all(entry["assigned_event_kind_mask"] is None for entry in preflight["descriptors"]))
+        self.assertTrue(all(entry["promotion_ready"] is False for entry in preflight["descriptors"]))
+        self.assertTrue(all(entry["public_promotion"] is False for entry in preflight["descriptors"]))
+        self.assertIn("event_kind", preflight["explicitly_not_assigned"])
+        self.assertIn("event_kind_mask", preflight["explicitly_not_assigned"])
+        self.assertIn("public_metadata_json", preflight["explicitly_not_assigned"])
+        self.assertIn("runtime_dispatcher_tables", preflight["explicitly_not_assigned"])
+        self.assertIn("plugin_callbacks", preflight["explicitly_not_assigned"])
+
+        serialized = json.dumps(preflight)
+        self.assertNotIn("OBELISK_GAMEPLAY_POLICY_EVENT_KIND", serialized)
+        self.assertNotIn("OBELISK_GAMEPLAY_POLICY_FIELD_MASK", serialized)
+        self.assertNotIn("ResourceHandle", serialized)
+        self.assertNotIn("Inventory SDK", serialized)
 
     def test_item_return_only_target_set_excludes_craftblueprint(self) -> None:
         from reflection_target_sets import TARGET_SETS
