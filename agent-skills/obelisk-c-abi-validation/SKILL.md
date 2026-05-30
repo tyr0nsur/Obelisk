@@ -129,8 +129,9 @@ Validation rules:
   callbacks, and stop dispatching into that address range.
 - Shutdown exports must be idempotent, stop external ingress before releasing state, and
   catch all exceptions before returning across the C ABI boundary.
-- Prefer filtered ProcessEvent callbacks over global callbacks. Global callbacks are hot
-  path and should be rare, measured, and disabled by default for experimental plugins.
+- Prefer copied Obelisk-level events over raw ProcessEvent callbacks. Filtered and global
+  ProcessEvent callbacks expose borrowed UE pointers/raw params and are disabled by
+  default behind explicit debug-window capabilities and markers.
 - Callback implementations must be non-blocking and must not call back into unsafe UE4
   functions unless reentrancy is explicitly handled.
 - Future gameplay events beyond `GameplayPolicyEvent` and the minimal
@@ -141,6 +142,10 @@ Validation rules:
 - `ChatMessageEvent` is an RC ABI surface but must pass through the internal
   `core/ChatEventDispatcher` ownership layer. Do not dispatch plugin-facing chat callbacks
   directly from the `ProcessEvent` hook.
+- Public event registration must require both the advertised API capability bit captured
+  in the plugin's `ObeliskApi` table and the live runtime gate. Do not let a later env or
+  marker change widen capabilities for a plugin that loaded before that capability was
+  advertised.
 - `PluginManager` must unregister both `EventManager` and `ChatEventDispatcher` callbacks
   for a plugin owner on init failure and before `dlclose` during unload.
 - Current public callback registration functions must not create ownerless registrations.

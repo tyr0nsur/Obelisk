@@ -55,70 +55,16 @@ Own these areas:
   object handles. Treat `FUObjectItem+0xc` as unknown, not accepted serial evidence.
   Offline tooling should record both fields neutrally until independent core reconciliation
   proves exact semantics and reuse/invalidation rules.
-- Broad copied-core scans now found nonzero `FUObjectItem+0x8` serial candidates in both
-  available cores: first 200,000 readable object slots showed `817` nonzero serials,
-  `197330` zero serials, and `0` internal-index mismatches per core. This weakens the old
-  tiny-sample `zero_or_missing_fuobjectitem_serial_candidates` blocker for broad evidence,
-  but public `ResourceHandle` remains blocked by lifetime/reuse and `UObject+0x8` flag
-  semantics. Use `scripts/scan_resource_handle_serials.py` for repeatable offline scans.
-- Targeted Ghidra/radare2 evidence for this binary hash confirms a weak-object helper at
-  `0x1d56a30` that validates `{index, serial}` against `0x595b804`, `0x595b7f0`,
-  `FUObjectItem+0x8`, and `UObject+0x8` masks `0x100`/`0x4000`. Serial-publication
-  candidates at `0x1d56980` and `0x1d56e20` allocate through `lock xadd [0x595b838]` and
-  `cmpxchg [FUObjectItem+0x8]`. This strengthens serial evidence only; it does not prove
-  public handle lifetime, flag semantics, or same-instance promotion by itself.
-- `uobject_flags_validity_semantics_unproven` blocks public/post-callback
-  `ResourceHandle` work. `UObject+0x8` is a 32-bit flags field for the current hash; static
-  helpers consult `0x100` and `0x4000` after `{index, serial}` validation, accepted samples
-  include `0x81`/`0xc7`/`0xc5`, and no rejected sample or named lifetime semantic is
-  proven. Keep identity, handles, mutation, and return overrides unpromoted.
-- Full copied-core scans across the two available offline cores found thousands of nonzero
-  `FUObjectItem+0x8` serial candidates and zero `InternalIndex` mismatches, but no
-  `UObject+0x8` samples with masks `0x100` or `0x4000`. Treat this as blocker refinement:
-  further broad scans are low value unless a new artifact likely contains destroyed or
-  pending objects; resolve the blocker through static/decompiler semantics or targeted
-  negative samples instead.
-- Bounded static helper/caller evidence now refines `UObject+0x8` flag polarity for the
-  current hash: reviewed weak-handle helpers treat `0x100` as invalid and treat `0x4000`
-  as invalid in strict variants, with at least one helper mode that may tolerate `0x4000`.
-  This is internal revalidation evidence only; public `ResourceHandle` remains blocked on
-  named lifetime semantics and a fail-closed runtime policy.
-- `minimal-second-source-intake` has accepted offline second-source UFunction layout
-  evidence from
-  `/servidor/ark/workspace-offline/minimal-second-source-intake-direct-20260529T033919Z`:
-  `gate_mode=second_source_promotion`, `promotion_gate.ready=true`, empty blockers, and
-  `4/4` accepted compact targets for `sdk_inventory` and `sdk_structures`
-  (`PrimalItem.CanUse`, `PrimalItem.AllowRemoteAddToInventory`,
-  `PrimalStructure.AllowStructureAccess`, and `PrimalStructure.IsAllowedToDemolish`).
-  This promotes layout evidence only. It does not promote `GObjects`, `ResourceHandle`,
-  `UObject` identity, mutation, return overrides, raw params, player/item/inventory
-  identity, or public Inventory/StructureEvents SDK surfaces.
-- `structure-observer-intake` now has a clean second-source readiness report with
-  `promotion_gate.ready=true`, `blockers=[]`, and `6/6` accepted UFunction targets for
-  `sdk.structures`. This backs the copied/redacted `GameplayPolicyEvent` promotion only.
-  `StructureEventDispatcher` remains internal; do not promote public `StructureEvents`,
-  raw pincode values, player identity, mutation, or return overrides.
-- `dino-compact-intake` has accepted offline second-source layout evidence for
-  `PrimalDinoCharacter.AddPassenger` and `PrimalDinoCharacter.AllowCarryCharacter`
-  (`2/2`, `promotion_gate.ready=true`, empty blockers) from the
-  `fuobjectitem-dino-reconcile-20260529T120000Z` workspace pack. Treat this as internal
-  layout evidence only; it does not promote public Dino callbacks, object identity,
-  mutation, return overrides, or resource handles.
-- `buff-compact-intake` has accepted offline second-source UFunction layout evidence from
-  `/servidor/ark/workspace-offline/buff-compact-intake-20260529T034751Z`:
-  `promotion_gate.ready=true`, empty blockers, and `3/3` accepted targets
-  (`PrimalBuff.AllowPostProcessEffect`, `PrimalBuff.BPBuffPreventUploading`, and
-  `PrimalBuff.BP_OnBuffLifetimeUpdated`). Treat this as layout evidence only; it does not
-  promote a public Buff SDK, runtime hooks, callbacks, mutation, return overrides, object
-  identity, or raw params.
-- `mission-compact-intake` and `tribe-compact-intake` have accepted offline second-source
-  UFunction layout evidence from
-  `/servidor/ark/workspace-offline/next-targetset-discovery-20260529T000000Z`:
-  mission is `4/4` accepted and tribe is `5/5` accepted, both with
-  `promotion_gate.ready=true` and empty blockers. Treat both as layout evidence only.
-  Mission is the cleaner next module candidate; tribe should be split into a scalar subset
-  before any public work. Do not promote player/tribe identity, arrays, strings, object
-  pointers, mutation, return overrides, or public Mission/Tribe SDK surfaces.
+- ResourceHandle remains blocked on UObject flag/lifetime semantics and a fail-closed
+  runtime policy. Use the dated ResourceHandle, GObjects, and weak-helper research notes
+  for scan counts, helper addresses, serial evidence, flag-sweep evidence, and blocker
+  history. Static `0x1d18a90` evidence shows a `FUObjectArray` sweep that sets
+  `UObject+0x8` bit `0x100` and conditionally sets `0x8000`, but this is still unnamed
+  lifecycle evidence and does not promote public handles.
+- Accepted compact target sets are layout evidence only. They do not promote public module
+  SDKs, object identity, mutation, return overrides, raw params, or `ResourceHandle`.
+  Current module routing belongs in `docs/agent-handoff/CURRENT.md` and dated research
+  notes.
 - `ue/MissionReflection.*` implements the first internal mission recognizer for those
   four mission targets. It is SHA-gated and fixture-backed, exposes copied bool ranges
   only, and keeps player/controller/character object refs plus `OutItemIDs` arrays
@@ -133,16 +79,15 @@ Own these areas:
   broad reverse FName table scans and pass that root slot explicitly into evidence-pack,
   GObjects sampling, or snapshot regeneration tooling. Reopen scanning only when a new
   binary hash or contradictory artifact evidence invalidates the known root.
-- Runtime debug control can trigger bounded probes after the process is alive. The first
-  post-start `request-static-fname-probe` for `0x5956f30` executed correctly but still
-  rejected the slot (`table=0x13733660`, `implausible_num_elements`). Do not keep waiting
-  for bootstrap retries or promote `0x5956f30` from a single core-dump session.
+- Runtime debug control can trigger bounded probes after the process is alive. Do not keep
+  waiting for bootstrap retries or promote candidates from a single core-dump session.
 
 ## Research Principles
 
 - Prefer reflection-backed decoding over raw memory scanning in plugins.
 - Do not scan arbitrary params on every `ProcessEvent` in live servers.
-- Use filtered callbacks by `fname_index` whenever possible.
+- Use filtered callbacks by `fname_index` only inside an explicit debug gate; stable
+  plugin surfaces should consume copied Obelisk-level events instead of raw UE params.
 - Treat `ReflectionScanner` as an offline/debug tool, not a production startup feature.
 - Treat ReflectionScanner `evidence_pack.status=research-candidate` as candidate ranking
   only. The structured `promotion_gate` must remain `ready=false` and non-promotable for
@@ -157,7 +102,8 @@ Own these areas:
   remain archival evidence only.
 - FName index manifest resolution must use offline inputs or an explicit SHA256. Do not
   point `--manifest`, `--ark-binary`, or accepted entry evidence-pack manifest paths at
-  `/servidor/ark`; direct and symlinked live-server paths are rejected by the validator.
+  protected `/servidor/ark` live paths; direct and symlinked live-server paths are rejected
+  by the validator.
 - Raw captures may be stored under `/servidor/ark/obelisk/dumps` for disk-space reasons,
   but snapshot regeneration and promotion tooling must consume hardlinked or copied
   offline artifacts from `/servidor/ark/workspace-offline` or another approved offline
@@ -189,7 +135,7 @@ environment variables from safe per-instance markers such as
 ```bash
 export OBELISK_ENABLE_PROCESS_EVENT_HOOK=1
 export OBELISK_DISABLE_PLUGINS=1
-export OBELISK_INSTANCE_ID=arkserver2
+export OBELISK_INSTANCE_ID=<approved-instance>
 export OBELISK_PE_TRACE_LIMIT=0
 unset OBELISK_ENABLE_NATIVE_EXEC_PROBES
 ```
@@ -230,9 +176,14 @@ posture before doing more code or agent work.
 1. Resolve `fname_index -> name` through GNames/FNamePool.
 2. Add a bounded live data-mapping scanner or offline core scanner for FName-table-shaped
    pointers instead of relying on one static slot.
-3. Locate GObjects and enumerate UFunction objects.
-4. Register callbacks by function name, not raw index.
-5. Decode function params from UProperty metadata.
-6. Compare sanitized UFunction/ScriptStruct snapshots against a second source before
+3. Use the binary-hash-scoped `GUObjectArray` research-candidate only as an offline input
+   for candidate UFunction enumeration and redacted signature tooling. Public/runtime
+   GObjects, object identity, lookup, and `ResourceHandle` promotion remain separate
+   blocked gates.
+4. Promote or validate GObjects beyond research-candidate status before any public object
+   identity or runtime lookup contract.
+5. Register callbacks by function name, not raw index.
+6. Decode function params from UProperty metadata.
+7. Compare sanitized UFunction/ScriptStruct snapshots against a second source before
    promoting module recognizers.
-7. Replace raw FString and arbitrary param probing with reflected param decoding.
+8. Replace raw FString and arbitrary param probing with reflected param decoding.

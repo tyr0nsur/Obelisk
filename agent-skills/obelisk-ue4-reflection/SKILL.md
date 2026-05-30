@@ -48,11 +48,8 @@ metadata.
   property-chain recognition, bounded FString decoding, marker/env/SHA gates, dispatcher
   ownership, ABI guardrails, and benchmark gates. Keep details in `docs/research/`; do
   not let chat dominate new reflection/API rounds unless explicitly requested.
-- `arkserver` / Ragnarok has carried experimental chat reflection in historical runs. Do
-  not add, remove, or rely on that marker for new validation. Current runtime observer
-  work belongs only on the currently approved target or a dedicated debug instance;
-  current operator direction grants standing use of `arkserver2` / TheIsland for Obelisk
-  debug/development tests when needed.
+- Runtime/server routing belongs to `obelisk-live-ops` and the current handoff, not this
+  reflection skill. Any runtime observation requires an approved scoped live-ops plan.
 - `ReflectionScanner` FName table output must be treated as candidate ranking. Analyzer
   `--strict` requires repeat-confirmed exact `matched_clues=3/3` evidence, and even that
   needs a second isolated capture or static xref before becoming an accepted offset.
@@ -65,60 +62,21 @@ metadata.
   UFunction layout evidence is promoted only per target set after a second-source
   readiness report. Static xrefs and analyzer evidence are supporting evidence; they are
   not acceptance by themselves.
-- Public/post-callback `ResourceHandle` remains blocked by
-  `uobject_flags_validity_semantics_unproven`: `UObject+0x8` is confirmed only as a 32-bit
-  flags field; helper paths consult `0x100` and `0x4000` after `{index, serial}` validation;
-  accepted samples show `0x81`/`0xc7`/`0xc5`; no rejected sample or exact lifetime semantic
-  is proven.
-- Do not claim all copied-core `FUObjectItem+0x8` serial samples are zero. Wider offline
-  scans with `scripts/scan_resource_handle_serials.py` found repeatable nonzero serial
-  candidates in both copied cores. This supports internal handle-revalidation tooling only;
-  `ResourceHandle`, object identity, lookup, and post-callback validity remain unpromoted
-  until lifetime/reuse behavior and `UObject+0x8` flag semantics are proven.
+- Public/post-callback `ResourceHandle`, object identity, lookup, and post-callback
+  validity remain blocked until lifecycle/reuse behavior and `UObject` flag semantics are
+  proven. Keep detailed masks, samples, paths, and rejected-candidate criteria in dated
+  research notes; skills should only preserve the blocking rule.
 - Do not restart `GObjects` work from broad candidate search. Repeat classified checks on a
   second isolated core or future binary before promoting runtime-stable contracts.
-- General/core offline layout promotion has accepted `minimal-second-source-intake`:
-  `PrimalItem.CanUse`, `PrimalItem.AllowRemoteAddToInventory`,
-  `PrimalStructure.AllowStructureAccess`, and `PrimalStructure.IsAllowedToDemolish`.
-  This target set now has accepted offline second-source UFunction layout evidence from
-  `/servidor/ark/workspace-offline/minimal-second-source-intake-direct-20260529T033919Z`
-  with `promotion_gate.ready=true`, empty blockers, and `4/4` accepted targets. Treat it
-  as layout promotion only; it does not promote `GObjects`, `ResourceHandle`, `UObject`
-  identity, mutation, return overrides, raw params, player/item/inventory identity, or
-  public Inventory/StructureEvents SDK surfaces. `dino-compact-intake` is a separate
-  internal-layout result.
-- Module recognizers are active research tracks, not public SDK:
-  - `ue/StructureReflection` has a hook-side observer, but it requires env, supported SHA,
-    non-zero budget, `state/instances/<id>/allow-experimental-observers`, and
-    `state/instances/<id>/enable-structure-reflection`.
-    Its accepted `structure-observer-intake` evidence now backs the public
-    `GameplayPolicyEvent` ABI, but only through copied/redacted POD scalars.
-  - `ue/InventoryReflection` is internal recognizer only. A future runtime observer must
-    require `allow-experimental-observers`, `enable-inventory-reflection`, exact `CanUse`
-    / `AllowRemoteAddToInventory` FName prefiltering before budget reservation, exact
-    per-target `FunctionFlags` for the supported binary, and no return override or
-    gameplay mutation. Current copied-scalar fields are `CanUse.bIgnoreCooldown`,
-    `CanUse.ReturnValue`, `AllowRemoteAddToInventory.bRequestedByPlayer`, and
-    `AllowRemoteAddToInventory.ReturnValue`; object fields stay redacted.
-  - `ue/BuffReflection` has accepted `buff-compact-intake` layout evidence for three
-    compact targets, but remains an offline/internal recognizer track only. Keep buff
-    hooks, callbacks, return overrides, raw object/class exposure, and gameplay mutation
-    blocked until SDK policy, copied payload design, runtime gates, and lifecycle tests
-    exist.
-  - `ue/DinoReflection` is allowed only as an internal, fixture-backed compact recognizer
-    for the accepted `dino-compact-intake` layouts
-    (`PrimalDinoCharacter.AddPassenger` and `PrimalDinoCharacter.AllowCarryCharacter`).
-    This is internal layout evidence only; no public Dino SDK/API, runtime observer,
-    object identity, mutation, return override, or resource-handle behavior is promoted.
-  - `mission-compact-intake` and `tribe-compact-intake` now have accepted offline
-    second-source layout evidence. Mission is the next cleaner internal module candidate
-    after inventory hardening, but only as a reduced copied-scalar observer; tribe requires
-    a reduced scalar subset before public consideration. Keep player/tribe/mission
-    identity, arrays, strings, object pointers, mutation, return override, and public
-    Mission/Tribe SDK surfaces blocked.
-  - Use the same gates for future dinos, tribes, missions, transfers, admin, and item
-    recognizers: exact metadata shape, candidate-only fixtures, no mutation, no raw UE
-    pointer exposure, and no public callbacks before ABI/lifetime policy.
+- Accepted target sets are layout-only unless the release/public SDK docs name the surface
+  and a strict readiness note promotes it. Keep exact target lists, counts, artifact paths,
+  and commands in `docs/research/`; do not pass them to sub-agents through this skill.
+- Module recognizers are active research tracks, not public SDKs. Use the same gates for
+  structures, inventory, items, buffs, dinos, tribes, missions, transfers, admin, and future
+  modules: exact metadata shape, fixture-backed tests, SHA/binary scoping, copied scalars
+  only, no raw UE pointer exposure, no identity/lookup/`ResourceHandle`, no mutation, no
+  return override, no public callback before ABI/lifetime policy, and no runtime observer
+  without live-ops approval.
 
 ## Reflection Direction
 
@@ -204,10 +162,11 @@ Do not skip steps because a single core, log line, or recognizer test looks conv
   dispatch public plugin callbacks from candidate evidence.
 - Reserve runtime observation budgets only after cheap exact prefilters pass.
 - On live servers, keep plugin discovery off unless testing a known safe build.
-- Current operator direction protects `arkserver` / Ragnarok because users may be active
-  there. Do not restart it, change markers, or run runtime tests there. `arkserver2` /
-  TheIsland has standing approval for Obelisk debug/development tests when needed; restore
-  stable posture and shut it down when no longer needed.
+- Current operator direction in `docs/agent-handoff/CURRENT.md` selects the server-backed
+  target. `arkserver` / Ragnarok may be used only for an approved announced beta window
+  with privacy bounds and exact feature gates. `arkserver2` / TheIsland is the isolated
+  debug target when player involvement is not desired, but it still requires an approved
+  scoped run before starts, restarts, marker edits, or runtime observation.
 - Do not enable raw discovery, broad tracing, native exec probes, ptrace/gcore, or
   `ReflectionScanner` without exact operator approval for that run, copied-log evidence,
   and rollback. Prefer `arkserver2` / TheIsland or `arkserver-obelisk-debug` for

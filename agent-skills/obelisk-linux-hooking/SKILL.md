@@ -53,10 +53,11 @@ When patching `.text`:
 
 ## Validation
 
-Run live validation on the currently approved target. As of 2026-05-28, `arkserver` /
-Ragnarok has active users and is protected from Obelisk tests. If a server is needed, use
-`arkserver2` / TheIsland only after explicit approval for start/restart, the exact run
-window, rollback, and shutdown at the end. High-risk hook/scanner captures still require
+Run live validation on the currently approved target from `docs/agent-handoff/CURRENT.md`
+or the current operator turn. `arkserver` / Ragnarok is a player-facing beta target only
+inside an approved announced feature-test window. If player involvement is not desired,
+use `arkserver2` / TheIsland only after approval for start/restart, the exact run window,
+rollback, and shutdown expectations. High-risk hook/scanner captures still require
 separate explicit approval.
 
 ```bash
@@ -71,6 +72,7 @@ Expected:
 - server process remains alive
 - player can join
 
-Do not use `arkserver` / Ragnarok for hook validation while users are active. Use
-`arkserver2` / TheIsland only after explicit operator approval for the scoped test, then
-shut it down afterward.
+Do not use `arkserver` / Ragnarok for hook validation unless the operator has approved an
+announced beta-test window for that exact feature. Use `arkserver2` / TheIsland for
+isolated hook validation only after explicit operator approval for the scoped test, then
+follow the approved shutdown expectation.

@@ -47,12 +47,23 @@ Own these areas:
   rollback plan.
 - Global `RegisterPreProcessEvent` and `RegisterPostProcessEvent` callbacks are runtime
   default-deny. They require `OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS=1` plus the
-  safe per-instance marker `allow-global-process-event-callbacks`; filtered callbacks stay
-  the stable plugin path.
+  safe per-instance marker `allow-global-process-event-callbacks`.
+- Filtered raw `ProcessEvent` callbacks are also runtime default-deny because they expose
+  borrowed UE pointers and raw parameter buffers. They require
+  `OBELISK_ALLOW_FILTERED_PROCESS_EVENT_CALLBACKS=1` plus the safe per-instance marker
+  `allow-filtered-process-event-callbacks`; stable plugins should use copied
+  `GameplayPolicyEvent` or `ChatMessageEvent` surfaces instead.
 - Public `CallProcessEvent` is also runtime default-deny. It requires
   `OBELISK_ALLOW_CALL_PROCESS_EVENT=1` plus the safe per-instance marker
   `allow-call-process-event`, and the runtime only advertises
   `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT` when that gate is active.
+- `CallProcessEvent` is an ABI v1 compatibility/debug escape hatch only. It is not
+  owner-scoped in ABI v1 because the legacy function signature carries no owner token or
+  caller context, so it cannot prove the calling plugin's captured capability snapshot.
+  Treat `allow-call-process-event` as a controlled debug-window marker, never as a
+  production plugin API. A future owner-scoped replacement must require an owner token and
+  reject calls when the owner's init-time capability snapshot did not advertise
+  `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT`.
 - Pre-callback blocking of the original `ProcessEvent` is runtime default-deny. A
   callback return value of `false` is observational unless
   `OBELISK_ALLOW_PROCESS_EVENT_BLOCKING=1`, `allow-process-event-blocking`, and
@@ -89,6 +100,10 @@ Own these areas:
   The runtime accepts owner-token registrations from helper/background threads during
   `ObeliskPlugin_Init` while the plugin owner is in the initializing set, then removes
   owner tokens on init failure and before/with plugin unload.
+- Capability-gated owner-token registrations must check the plugin owner's init-time
+  capability snapshot plus the current live runtime gate. Do not authorize public
+  callback registration from process-global capability state that a later `PluginManager`
+  construction could widen for an already-loaded plugin.
 - For new public ProcessEvent registrations, prefer owner-token handle functions that
   return a non-zero `uint64_t` handle and require
   `UnregisterProcessEventCallbackWithOwnerToken(owner_token, handle)` for granular
@@ -101,6 +116,19 @@ Own these areas:
   subscriptions are backed by `StructureEventDispatcher` and must keep owner-token handle
   registration, owner-scoped unregister, `DestroyUserData` cleanup, and plugin unload
   cleanup intact.
+- Internal dispatchers called from the `ProcessEvent` hook must fail closed on setup or
+  internal allocation errors. Do not rethrow dispatcher internals into the hook path.
+  Snapshot callbacks by registration id, skip callbacks whose registration was removed
+  during the same dispatch, and defer `DestroyUserData` until the outermost dispatch
+  finishes. Owner/plugin cleanup that is not running inside the same dispatcher callback
+  must wait for both in-flight dispatch and deferred `DestroyUserData` cleanup to finish
+  before returning, so plugin unload cannot race `dlclose` against user-data destructors.
+- Do not hold dispatcher mutexes while invoking plugin/gameplay callbacks. If multiple
+  dispatcher families can back one public API, unregister and cleanup paths must not be
+  able to deadlock across those families when callbacks unregister themselves or their
+  owner token. Unregister/owner cleanup initiated from any gameplay callback family must
+  avoid waiting on dispatcher cleanup; non-callback plugin unload/owner cleanup must still
+  wait for all in-flight dispatch and deferred `DestroyUserData` cleanup before returning.
 - Preserve optional plugin shutdown ordering: call `ObeliskPlugin_Shutdown()` before
   plugin-owned callback cleanup and before `dlclose`.
 - Follow `docs/PLUGIN_ARCHITECTURE.md` before adding plugin examples or promoting
@@ -127,10 +155,11 @@ instead of clearing the hook while patched bytes may still execute.
 
 Do not treat any shared or player-facing ARK instance as a validation target by default.
 Read `docs/agent-handoff/CURRENT.md` for the current live target posture before any
-server-backed work. If CURRENT grants standing approval for `arkserver2` / TheIsland, that
-instance may be used for scoped Obelisk debug/development validation; other instances
-require explicit operator approval for the exact instance, marker changes, restart window,
-rollback plan, and shutdown expectations.
+server-backed work. Use only the named target approved there or in the current operator
+turn. `arkserver` / Ragnarok is a player-facing beta target only inside an announced,
+privacy-bounded feature-test window. `arkserver2` / TheIsland is the isolated debug target
+when player involvement is not desired, but it still requires an approved scoped run
+before starts, restarts, marker edits, or runtime observation.
 
 For risky probes such as ReflectionScanner, native exec, ptrace/gcore, broad tracing, or
 text/gameplay-payload logging, first obtain explicit operator approval for the exact debug
@@ -169,7 +198,8 @@ Expected:
   logging should stay at one allocation or lower.
 - Any player-text or gameplay-payload logging work must keep a separate explicit gate
   (`OBELISK_CHAT_REFLECTION_LOG_TEXT=1` for the historical chat path), sanitize output
-  through tested helpers, and avoid publishing player contents in docs or Discord updates.
+  through tested helpers, and avoid publishing player contents in docs or community
+  updates.
 - Require a validated, idempotent plugin shutdown export before treating thread-owning or
   HTTP-owning plugins as stable.
 

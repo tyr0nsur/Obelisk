@@ -14,14 +14,15 @@ Lead agents should read these before planning or delegating work:
 
 - `docs/agent-handoff/CURRENT.md`: current active state, blockers, next tasks.
 - `docs/agent-handoff/COMPACT_CONTEXT.md`: compact resume state after long sessions.
-- `docs/research/`: durable investigation notes and evidence.
+- `docs/research/README.md`: curated research index, then only the specific dated
+  research notes relevant to the current scope.
 - `docs/SERVER_RESTORE.md`: recovery flow for ARK config after SteamCMD/LinuxGSM rewrites.
-- `agent-skills/`: operational rules that future agents must follow.
+- only the `agent-skills/*/SKILL.md` files relevant to the current scope.
 
 Treat handoff files as source material for a scoped prompt, not as text to forward
-wholesale. Do not pass the active objective, leader cadence, Discord policy, GitHub flow,
-agent balance, or unrelated module history to a sub-agent unless that detail changes its
-specific task.
+wholesale. Do not pass the full leader objective, leader cadence,
+community/announcement policy, GitHub flow, agent balance, or unrelated module history to
+a sub-agent unless that detail changes its specific task.
 
 Sub-agents should not read `CURRENT.md` or `COMPACT_CONTEXT.md` by default. Give them a
 distilled task brief containing only the facts, risks, allowed paths, required skills, and

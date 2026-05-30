@@ -87,6 +87,8 @@ template using `scripts/check_linuxgsm_wrapper_drift.sh --installed <path>/Obeli
   consumer validation, read-only CLI status, installer dry-runs, and clean-tree checks.
 - Do not add parallel installer or SDK layout checks to CI with different defaults. Extend
   the release gate or its tests instead so release readiness remains one reproducible path.
+- Second-source report dirs inside the repo must be Git-ignored, such as `local/...`.
+  Non-ignored in-repo report dirs must fail before the gate writes generated evidence.
 
 ## Before Commit
 
@@ -109,11 +111,13 @@ scripts/check_obelisk_server_posture.sh --expect-stable --map <map> --instance <
 ```
 
 Use explicit `--map` and `--instance`; do not rely on script defaults during Obelisk debug
-rounds. Current operator direction protects `arkserver` / Ragnarok while users are active.
-If server validation is needed, use `arkserver2` / TheIsland as the debug target and shut
-it down when the test window ends. Do not move debug instrumentation to player-facing
-Ragnarok until the same posture is proven on `arkserver2` and the operator approves that
-specific player-signal window.
+rounds. Read `docs/agent-handoff/CURRENT.md` before server validation. `arkserver` /
+Ragnarok is a player-facing beta target only inside an approved announced feature-test
+window. `arkserver2` / TheIsland is the isolated debug target when player involvement is
+not desired, but it still requires an approved scoped run before starts, restarts, marker
+edits, or runtime observation. Do not move debug instrumentation to player-facing
+Ragnarok until the same posture is proven on an isolated target and the operator approves
+that specific player-signal window.
 
 Check that no files matching these patterns are staged:
 

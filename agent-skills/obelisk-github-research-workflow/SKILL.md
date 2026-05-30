@@ -71,8 +71,9 @@ to every sub-agent.
 - Assign agents as scope experts, not generic helpers. Name the expert role in the task
   prompt, such as ABI/API engineer, UE4 reflection engineer, static binary analysis
   engineer, build/SDK engineer, live-ops engineer, or release-readiness auditor.
-- Do not pass broad leader cadence, long-term goal wording, Discord policy, commit flow, or
-  unrelated module history unless that information changes the agent's concrete task.
+- Do not pass broad leader cadence, long-term goal wording,
+  community/announcement policy, commit flow, or unrelated module history unless that
+  information changes the agent's concrete task.
 - Before spawning agents, define disjoint ownership:
   - runtime/core: hooks, loader, EventManager, PluginManager, ABI
   - reversing/research: FName, GNames, GObjects, UFunction, event decoding experiments
@@ -96,10 +97,9 @@ to every sub-agent.
   for exactly that turn.
 - Close old agents after their findings are integrated so stale context does not keep
   influencing new work.
-- When the operator requests a six-agent Obelisk round, keep a 2+4 balance: two agents on
-  Obelisk engineering/audit/development and four on research/knowledge/reversing/dump
-  work, with the lead supervising and integrating all six. If the operator requests a
-  different explicit balance, follow that current balance in the handoff state.
+- Follow explicit lead-provided routing only when it is included in the current task
+  prompt, and keep operator cadence plus long-term goal wording out of default sub-agent
+  prompts.
 - Relaunch agents after major skill updates when their next task depends on the new rules.
 - Documentation/skills workers must not edit runtime C++ or `/servidor/ark` unless their
   prompt explicitly widens scope.
@@ -107,7 +107,8 @@ to every sub-agent.
   supervised round by leaving active agents without a recorded handoff or polling plan.
 - Reused agents are useful only if the platform preserves their context and they are still
   aligned with current skills. After major skill or research changes, relaunch fresh agents
-  and make them read the updated handoff/skills.
+  and give them the updated relevant skills plus a distilled handoff brief unless handoff
+  review/editing is their explicit scope.
 - Coordinate sub-agents directly with scoped ownership, safety baseline, allowed paths,
   required skills, expert role, and expected decision. Do not introduce separate
   repo-local task-queue machinery for this workflow.
@@ -159,10 +160,10 @@ Skip the build only for docs-only or skills-only commits, and say so in the fina
 
 ## Community Updates
 
-Community/Discord updates are lead-only and reserved for major public modder-facing
-milestones, previews, migrations, or releases. Do not send or draft them unless the task
-explicitly delegates that scope. Keep detailed announcement policy outside default
-sub-agent prompts.
+Do not draft or send community announcements unless explicitly delegated for the current
+turn. In-game beta-test activation notices are live-ops messages, not routine development
+updates; require an operator-approved notice path for that turn and never store secret
+endpoints in repo files or sub-agent prompts.
 
 ## Research Notes
 

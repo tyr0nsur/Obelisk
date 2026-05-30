@@ -14,8 +14,9 @@ claims from a stripped Linux server binary.
   evidence plus an isolated runtime capture or a second independent static path.
 - Never infer a stable SDK contract from one address, one string xref, or one analyzer row.
 - Record binary hash, command, tool version when available, and the Obelisk commit used.
-- Do not edit `/servidor/ark` while doing offline analysis. Copy artifacts to `/tmp` or a
-  documented research workspace.
+- Do not edit protected live-server paths while doing offline analysis. Copy artifacts to
+  `/tmp`, `/servidor/ark/workspace-offline`, or another documented offline research
+  workspace.
 - Static/offline tooling must reject protected server paths in both forms: the expanded
   path textually under `/servidor/ark`, and the resolved path after following symlinks.
   This blocks both symlinks inside the protected root that point outward and symlinks
@@ -25,7 +26,68 @@ claims from a stripped Linux server binary.
 - Pre-existing `objdump`/`readelf` text used as static evidence must have a sibling
   `<artifact>.provenance.json` with `verified=true`, matching `binary_sha256`, and matching
   `artifact_sha256`. Missing, unverified, mismatched, malformed, or `/servidor/ark`-
-  resolving sidecars are fail-closed evidence blockers.
+  resolving sidecars are fail-closed evidence blockers. Sidecars that resolve to
+  `/servidor/ark/workspace-offline` are allowed when the artifact is part of an approved
+  offline workspace.
+- Path fields inside provenance sidecars must be checked after resolving relative paths
+  against the sidecar directory; do not ignore relative `../...` paths when applying
+  protected-path rules.
+- Use `scripts/validate_offline_artifact_gate.py` as the passive fail-closed gate for
+  reusable offline manifests, redacted signature packs, and static artifacts before
+  contributor-facing claims. Passing the gate validates path/provenance hygiene only; it
+  does not promote GObjects, UFunction ABI contracts, object identity, mutation, return
+  override, `ResourceHandle`, or cross-binary portability.
+- New manifest schemas must be added to the gate's supported-schema allowlist with
+  schema-specific validation before consume/promote acceptance. Unknown schemas are
+  blockers even when generic path/claim scans look clean.
+- `obelisk.uobject-flag-policy-report.v1` reports are consume-mode static candidates only.
+  The gate must keep them `candidate_blocked`, require explicit non-claims/blockers, and
+  reject promote mode; do not use them as accepted `ResourceHandle` or post-callback
+  lookup evidence while raw objdump provenance or lifecycle semantics are incomplete.
+  If a report consumes weak-helper `caller_rows`, it must summarize them as internal
+  caller-mode hygiene only and carry a source weak-helper artifact hash plus caller-row
+  digest. Do not copy raw caller addresses into the report or use `caller_rows` to promote
+  lifecycle names, public object identity, `ResourceHandle`, lookup, mutation, or return
+  override.
+- `obelisk.uobject-flag-transition-matrix.v1` reports are provenance-gated static
+  candidates only. They may organize helper-window evidence for `UObject+0x8` bits such
+  as `0x100`, `0x4000`, and `0x8000`, but they must stay `candidate_blocked` and must not
+  assign public lifecycle names, promote `ResourceHandle`, or claim post-callback lookup
+  safety without runtime negative samples and an accepted lookup contract. The offline
+  artifact gate may accept them in consume mode for indexing and must block promote mode.
+- `obelisk.uobject-flag-semantic-correlation.v1` reports are also candidate-only. The gate
+  must require `candidate_blocked`, explicit non-claims/blockers, a fail-closed builder
+  contract, redacted binary/source-pack fields, and verified per-input provenance before
+  consume-mode use. Existing semantic packs without that contract are useful notes only,
+  not gated artifacts.
+- Weak-helper polarity/caller-mode reports are accepted internal static evidence only.
+  They may classify helper return polarity and caller mode for a specific binary hash, but
+  they must not assign public lifecycle names, promote `ResourceHandle`, claim
+  post-callback lookup safety, or clear `uobject_flags_validity_semantics_unproven`.
+  Consume-mode gate acceptance is hygiene/indexing only; promote mode remains blocked
+  until rejected runtime object samples and an accepted lookup contract exist.
+  Normalized reports may preserve boolean-like and pointer-or-null helper summaries when
+  redacted, but those summaries remain internal static evidence only.
+- Weak-helper caller-mode redacted reports that hash raw Ghidra/radare inputs but do not
+  require verified sidecar provenance stay candidate consume-mode only. Before using a new
+  caller-mode artifact as reusable promotion support, add or verify fail-closed provenance
+  sidecars for each raw static input, matching the binary hash and artifact hash.
+- `obelisk.uobject-flag-sample-report.v1` reports combine existing UObject flag static
+  artifacts for blocker accounting only. The gate may accept them in consume mode, but
+  promote mode must stay blocked until rejected runtime object samples, post-callback
+  lifetime policy, and a public lookup/revalidation contract exist.
+- `obelisk.resource-handle-serial-scan.v1` is an internal/offline scan artifact only.
+  Consume-mode acceptance requires coherent `flag_rejection_candidate_samples` plus a
+  required `scan_limit` that matches provenance and bounds sparse candidate indices;
+  promote mode must stay blocked and the artifact must not be cited as public handle,
+  lookup, or lifecycle promotion evidence.
+- Redacted UFunction signature reports that claim a named target set should carry
+  `target_set_coverage` metadata. For direct snapshot inputs, pass
+  `--source-target-set <name>` to `scripts/build_redacted_ufunction_signatures.py`; for
+  review gates, use `scripts/validate_offline_artifact_gate.py
+  --strict-target-set-coverage` when the artifact is expected to prove exact target-set
+  coverage. Missing or incomplete coverage is a traceability blocker, not a runtime
+  promotion signal.
 
 ## Baseline Evidence Pack
 

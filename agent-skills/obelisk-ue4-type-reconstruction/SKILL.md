@@ -83,6 +83,11 @@ For each reconstructed field:
 - The active blocker for public module APIs is not more raw scanning; it is second-source
   reflection evidence, copied-data ownership, callback lifecycle, ABI layout tests,
   installed SDK consumer coverage, and approved isolated runtime validation.
+- For ResourceHandle policy work, do not reopen broad FName/GObjects discovery once
+  field coherence and nonzero serial samples are already evidenced. Keep follow-up work
+  on flag/lifecycle semantics, rejected object samples, and a fail-closed lookup contract;
+  additional serial/GObjects packs only strengthen internal evidence unless they resolve
+  the lifecycle blocker.
 - Candidate module recognizers for inventory, structures, buffs, dinos, tribes, missions,
   transfers, admin, and chat must stay internal until the common promotion gates pass.
 - Use sanitized snapshots and `compare_reflection_snapshots.py --target <Outer.Name>` to
