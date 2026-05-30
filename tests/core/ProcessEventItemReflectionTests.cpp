@@ -137,6 +137,21 @@ namespace
         }
     }
 
+    void RequireItemReturnEventView(const CopiedItemObservation& observation,
+                                    Obelisk::Core::ItemReturnEventKind expectedKind,
+                                    bool expectedReturnValue,
+                                    const char* message)
+    {
+        std::array<Obelisk::Core::ItemReturnScalarValue, 1> scalarStorage{};
+        Obelisk::Core::ItemReturnEventView event;
+        Require(TryBuildItemReturnEventView(observation, scalarStorage, event), message);
+        Require(event.Kind == expectedKind, message);
+        Require(event.Scalars.size() == 1, message);
+        Require(event.Scalars.data() == scalarStorage.data(), message);
+        Require(event.Scalars[0].Field == Obelisk::Core::ItemReturnScalarField::ReturnValue, message);
+        Require(event.Scalars[0].BoolValue == expectedReturnValue, message);
+    }
+
     Obelisk::UE::ItemReflection::ItemInvocation MakeValidAllowEquipItemInvocation(uint8_t& returnValue)
     {
         Obelisk::UE::ItemReflection::ItemInvocation invocation;
@@ -640,6 +655,83 @@ namespace
         Require(!TryBuildCopiedItemReturnObservationAfterOriginal(true, rejected, skipped),
                 "post-original rejected item attempt built copied return observation");
         Require(skipped.BoolCount == 0, "post-original rejected item attempt left copied output");
+    }
+
+    void TestBuildsItemReturnEventViewsForSupportedFunctions()
+    {
+        struct Case
+        {
+            Obelisk::UE::ItemReflection::ItemFunction Function;
+            Obelisk::Core::ItemReturnEventKind ExpectedKind;
+            const char* Message;
+        };
+
+        constexpr Case cases[] = {
+            {Obelisk::UE::ItemReflection::ItemFunction::AllowEquipItem,
+             Obelisk::Core::ItemReturnEventKind::AllowEquipItem,
+             "AllowEquipItem item return event view mismatch"},
+            {Obelisk::UE::ItemReflection::ItemFunction::CanRepair,
+             Obelisk::Core::ItemReturnEventKind::CanRepair,
+             "CanRepair item return event view mismatch"},
+            {Obelisk::UE::ItemReflection::ItemFunction::UseItemOntoItem,
+             Obelisk::Core::ItemReturnEventKind::UseItemOntoItem,
+             "UseItemOntoItem item return event view mismatch"},
+        };
+
+        for (const Case& item : cases)
+        {
+            Obelisk::Core::ItemReturnEventKind mappedKind =
+                Obelisk::Core::ItemReturnEventKind::AllowEquipItem;
+            Require(TryMapItemReturnEventKind(item.Function, mappedKind), item.Message);
+            Require(mappedKind == item.ExpectedKind, item.Message);
+
+            CopiedItemObservation observation;
+            observation.Function = item.Function;
+            observation.BoolStorage[0] = {
+                .Field = Obelisk::UE::ItemReflection::ItemField::ReturnValue,
+                .Value = item.ExpectedKind != Obelisk::Core::ItemReturnEventKind::CanRepair,
+            };
+            observation.BoolCount = 1;
+            RequireItemReturnEventView(observation,
+                                       item.ExpectedKind,
+                                       item.ExpectedKind != Obelisk::Core::ItemReturnEventKind::CanRepair,
+                                       item.Message);
+        }
+    }
+
+    void TestItemReturnEventViewRejectsUnsupportedOrMalformedObservations()
+    {
+        Obelisk::Core::ItemReturnEventKind mappedKind =
+            Obelisk::Core::ItemReturnEventKind::AllowEquipItem;
+        Require(!TryMapItemReturnEventKind(
+                    Obelisk::UE::ItemReflection::ItemFunction::CraftBlueprint,
+                    mappedKind),
+                "CraftBlueprint mapped to item return event kind");
+
+        std::array<Obelisk::Core::ItemReturnScalarValue, 1> scalarStorage{};
+        Obelisk::Core::ItemReturnEventView event;
+        CopiedItemObservation observation;
+        observation.Function = Obelisk::UE::ItemReflection::ItemFunction::CraftBlueprint;
+        observation.BoolStorage[0] = {
+            .Field = Obelisk::UE::ItemReflection::ItemField::ReturnValue,
+            .Value = true,
+        };
+        observation.BoolCount = 1;
+        Require(!TryBuildItemReturnEventView(observation, scalarStorage, event),
+                "CraftBlueprint built item return event view");
+
+        observation.Function = Obelisk::UE::ItemReflection::ItemFunction::CanRepair;
+        observation.BoolCount = 0;
+        Require(!TryBuildItemReturnEventView(observation, scalarStorage, event),
+                "empty item return observation built event view");
+
+        observation.BoolStorage[0] = {
+            .Field = Obelisk::UE::ItemReflection::ItemField::BIgnoreInventoryRequirement,
+            .Value = true,
+        };
+        observation.BoolCount = 1;
+        Require(!TryBuildItemReturnEventView(observation, scalarStorage, event),
+                "non-ReturnValue item bool built event view");
     }
 
     void TestBuildAndReserveItemReturnObservationForMatchedAttempt()
@@ -1184,6 +1276,8 @@ int main()
     TestBuildDoesNotMutateItemParams();
     TestBuildsCopiedReturnObservationOnlyForMatchedAttempts();
     TestBuildsCopiedReturnObservationOnlyAfterOriginal();
+    TestBuildsItemReturnEventViewsForSupportedFunctions();
+    TestItemReturnEventViewRejectsUnsupportedOrMalformedObservations();
     TestBuildAndReserveItemReturnObservationForMatchedAttempt();
     TestBuildAndReserveItemReturnObservationFailsClosedBeforeReservation();
     TestReturnOnlyHelpersRejectUnsupportedFunctions();

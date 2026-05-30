@@ -435,6 +435,55 @@ namespace Obelisk::Hooks::ProcessEventItemReflection
         return TryBuildCopiedItemReturnObservationForMatchedAttempt(attempt, out);
     }
 
+    bool TryMapItemReturnEventKind(Obelisk::UE::ItemReflection::ItemFunction function,
+                                   Obelisk::Core::ItemReturnEventKind& out)
+    {
+        using Obelisk::UE::ItemReflection::ItemFunction;
+        switch (function)
+        {
+        case ItemFunction::AllowEquipItem:
+            out = Obelisk::Core::ItemReturnEventKind::AllowEquipItem;
+            return true;
+        case ItemFunction::CanRepair:
+            out = Obelisk::Core::ItemReturnEventKind::CanRepair;
+            return true;
+        case ItemFunction::UseItemOntoItem:
+            out = Obelisk::Core::ItemReturnEventKind::UseItemOntoItem;
+            return true;
+        case ItemFunction::CraftBlueprint:
+            return false;
+        }
+        return false;
+    }
+
+    bool TryBuildItemReturnEventView(const CopiedItemObservation& observation,
+                                     std::array<Obelisk::Core::ItemReturnScalarValue, 1>& scalarStorage,
+                                     Obelisk::Core::ItemReturnEventView& out)
+    {
+        Obelisk::Core::ItemReturnEventKind kind =
+            Obelisk::Core::ItemReturnEventKind::AllowEquipItem;
+        if (!TryMapItemReturnEventKind(observation.Function, kind))
+            return false;
+        if (observation.BoolCount != 1)
+            return false;
+
+        const ItemBoolObservation& returnValue = observation.BoolStorage[0];
+        if (returnValue.Field != Obelisk::UE::ItemReflection::ItemField::ReturnValue)
+            return false;
+
+        scalarStorage[0] = {
+            .Field = Obelisk::Core::ItemReturnScalarField::ReturnValue,
+            .BoolValue = returnValue.Value,
+        };
+        out = {
+            .Kind = kind,
+            .Scalars = std::span<const Obelisk::Core::ItemReturnScalarValue>(
+                scalarStorage.data(),
+                1),
+        };
+        return true;
+    }
+
     bool TryBuildAndReserveItemReturnObservationForMatchedAttempt(const Attempt& attempt,
                                                                   std::atomic<uint64_t>& counter,
                                                                   uint64_t observationLimit,

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/ItemReturnEventDispatcher.h"
 #include "ue/ItemReflection.h"
 #include "ue/RuntimeReflection.h"
 
@@ -103,6 +104,11 @@ namespace Obelisk::Hooks::ProcessEventItemReflection
     bool TryBuildCopiedItemReturnObservationAfterOriginal(bool originalWasCalled,
                                                           const Attempt& attempt,
                                                           CopiedItemObservation& out);
+    bool TryMapItemReturnEventKind(Obelisk::UE::ItemReflection::ItemFunction function,
+                                   Obelisk::Core::ItemReturnEventKind& out);
+    bool TryBuildItemReturnEventView(const CopiedItemObservation& observation,
+                                     std::array<Obelisk::Core::ItemReturnScalarValue, 1>& scalarStorage,
+                                     Obelisk::Core::ItemReturnEventView& out);
     bool TryBuildAndReserveItemReturnObservationForMatchedAttempt(const Attempt& attempt,
                                                                   std::atomic<uint64_t>& counter,
                                                                   uint64_t observationLimit,

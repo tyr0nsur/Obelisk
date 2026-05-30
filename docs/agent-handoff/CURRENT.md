@@ -124,17 +124,20 @@ for the current checkpoint.
 
 - Current post-RC focus: preserve RC scope while reducing architecture debt, improving evidence tooling, and
   promoting only copied module APIs through strict gates.
-- Next offline/code-only item hardening: make the item-return producer bridge directly
-  testable before any live window by moving copied dispatch construction out of private
-  `ProcessEventHook.cpp` logic into `ProcessEventItemReflection` helpers. Test
-  post-original-only dispatch, CraftBlueprint rejection, exact `ReturnValue` scalar scope,
-  and no identity/mutation/return-override leakage.
+- Item return-only bridge hardening now keeps copied dispatch construction in
+  `ProcessEventItemReflection` helpers, with unit coverage for the three supported event
+  kinds, `CraftBlueprint` rejection, exact `ReturnValue` scalar scope, and no
+  identity/mutation/return-override leakage. Next item-return work should target
+  dispatcher hot-path allocation/budget policy only if profiling or a live-ops brief
+  justifies it.
 - Structure second-wave next step is offline-only candidate metadata/redaction review for
   `PrimalStructure.IsAllowedToBuild`; do not add it to release target sets, ABI enums,
   descriptors, dispatchers, public docs, or runtime gates.
-- Plugin Hub planning order from current demand map: identity/permissions first, then chat
-  command/router and operator I/O, then economy/persistence, homes/safe zones/player-world
-  enforcement, and structure ownership/census/build policy.
+- Plugin Hub planning order from current demand map and local `NextGenPlugins` inventory:
+  hub foundation first, then copied-chat command ergonomics, privacy-safe
+  identity/permissions, RCON/operator I/O, economy/persistence, homes/safe zones and
+  structure/player-world policy after their promotion gates. Keep the clone out of repo
+  and use it only as a dictionary/demand signal.
 - Any future live/player validation requires a new approved live-ops brief and beta-test
   notice through the configured local webhook variable when players are involved.
 

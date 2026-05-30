@@ -1064,54 +1064,6 @@ namespace Obelisk::Hooks
         return "Unknown";
     }
 
-    static bool TryMapItemReturnKind(Obelisk::UE::ItemReflection::ItemFunction function,
-                                     Core::ItemReturnEventKind& out)
-    {
-        using Obelisk::UE::ItemReflection::ItemFunction;
-        switch (function)
-        {
-        case ItemFunction::AllowEquipItem:
-            out = Core::ItemReturnEventKind::AllowEquipItem;
-            return true;
-        case ItemFunction::CanRepair:
-            out = Core::ItemReturnEventKind::CanRepair;
-            return true;
-        case ItemFunction::UseItemOntoItem:
-            out = Core::ItemReturnEventKind::UseItemOntoItem;
-            return true;
-        case ItemFunction::CraftBlueprint:
-            return false;
-        }
-        return false;
-    }
-
-    static bool TryBuildItemReturnEventView(
-        const ProcessEventItemReflection::CopiedItemObservation& observation,
-        std::array<Core::ItemReturnScalarValue, 1>& scalarStorage,
-        Core::ItemReturnEventView& out)
-    {
-        Core::ItemReturnEventKind kind = Core::ItemReturnEventKind::AllowEquipItem;
-        if (!TryMapItemReturnKind(observation.Function, kind))
-            return false;
-        if (observation.BoolCount != 1)
-            return false;
-
-        const ProcessEventItemReflection::ItemBoolObservation& returnValue =
-            observation.BoolStorage[0];
-        if (returnValue.Field != Obelisk::UE::ItemReflection::ItemField::ReturnValue)
-            return false;
-
-        scalarStorage[0] = {
-            .Field = Core::ItemReturnScalarField::ReturnValue,
-            .BoolValue = returnValue.Value,
-        };
-        out = {
-            .Kind = kind,
-            .Scalars = std::span<const Core::ItemReturnScalarValue>(scalarStorage.data(), 1),
-        };
-        return true;
-    }
-
     static size_t DispatchReflectedItemReturnEventAfterOriginal(
         bool originalWasCalled,
         int32_t nameIndex,
@@ -1167,7 +1119,7 @@ namespace Obelisk::Hooks
 
         std::array<Core::ItemReturnScalarValue, 1> scalarStorage{};
         Core::ItemReturnEventView event;
-        if (!TryBuildItemReturnEventView(observation, scalarStorage, event))
+        if (!ProcessEventItemReflection::TryBuildItemReturnEventView(observation, scalarStorage, event))
             return 0;
 
         const size_t dispatched = Core::ItemReturnEventDispatcher::Get().Dispatch(event);
