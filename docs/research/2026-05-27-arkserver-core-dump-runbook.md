@@ -10,8 +10,8 @@
 
 Preserve the original Ragnarok core-dump procedure as historical evidence and a source of
 metadata requirements. Future captures must be ported to an isolated/debug target before
-execution. This runbook is for lead review only; sub-agents must not run `gdb`, `gcore`,
-restart servers, or modify `/servidor/ark`.
+execution. This runbook is for authorized maintainer review only; do not run `gdb`,
+`gcore`, restart servers, or modify `/servidor/ark` without an approved capture window.
 
 ## Preconditions
 

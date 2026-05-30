@@ -33,8 +33,8 @@ Existing useful pieces:
 
 Gap found:
 
-- Evidence pack collection was still a manual command sequence. Different agents could
-  omit `readelf`, forget to copy logs, analyze original live log paths, or write raw
+- Evidence pack collection was still a manual command sequence. Different maintainers or
+  runs could omit `readelf`, forget to copy logs, analyze original live log paths, or write raw
   artifacts into unsafe locations.
 
 ## Change

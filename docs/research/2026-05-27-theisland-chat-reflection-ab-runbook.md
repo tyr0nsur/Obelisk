@@ -5,6 +5,9 @@
 > Current operator direction protects `arkserver` / Ragnarok while users are active;
 > start `arkserver2` only for the approved test and shut it down afterward. Chat remains a
 > historical observer family, not the center of the SDK roadmap.
+> This document is preserved as evidence of a retired experiment shape. Use the current
+> chat mode coverage beta runbook for any future player-facing `ChatMessageEvent`
+> validation.
 
 ## Objective
 

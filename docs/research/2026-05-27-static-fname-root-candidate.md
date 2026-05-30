@@ -13,9 +13,8 @@ Find an offline, static route toward `GNames`/`FNamePool` in the current ARK Lin
 - SHA256:
   `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`
 - Obelisk commit during lead-side analysis: `4892005bec1c`
-- Agent session: `019e673a-afe1-7480-adb0-ca85e95f0362`
-- Agent result: blocked by its Codex sandbox before it could run `readelf`, `objdump`, or
-  `strings`; it did not edit files or promote offsets.
+- Prior offline pass produced no promoted offsets; the successful lead-side static
+  artifact below is the evidence source for this note.
 - Lead-side objdump artifact:
   `/tmp/ShooterGameServer.7e7ded49.objdump`
 

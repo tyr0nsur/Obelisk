@@ -520,8 +520,8 @@ Updated: 2026-05-28
   cannot appear before intentional promotion.
 - fact: Commit `b401df4` removed direct TheIsland marker/restart commands from core and
   Linux hooking skills; live validation now requires explicit approval and posture checks.
-- fact: Commit `7a7a307` gates documented debug marker and rollback commands in
-  `docs/INSTALL.md` and `docs/SUPERVISION.md`.
+- fact: Commit `7a7a307` gated documented debug marker and rollback commands in
+  `docs/INSTALL.md` and the now-retired historical supervision note.
 - fact: Commit `a884b3f` adds `scripts/test_operational_doc_guardrails.py` to CI/release
   so docs and skills outside `docs/research/` cannot reintroduce active marker/restart
   commands.
@@ -873,9 +873,10 @@ Updated: 2026-05-28
   rejected the slot (`table=0x13733660`, `implausible_num_elements`). Do not keep extending
   bootstrap waits or promote that slot from one core-dump session; see
   `docs/research/2026-05-27-runtime-debug-control.md`.
-- fact: `scripts/obelisk_supervisor_snapshot.sh` is the only approved unattended
-  cron-style workflow for now. It is read-only and writes snapshots to
-  `/servidor/ark/obelisk/dumps/supervisor/`; see `docs/SUPERVISION.md`. It now fails
+- fact: `scripts/obelisk_supervisor_snapshot.sh` was the only approved unattended
+  cron-style workflow at that point. It was read-only and wrote snapshots to
+  `/servidor/ark/obelisk/dumps/supervisor/`; the referenced supervision note has since
+  been retired. It now fails
   closed on unstable posture, records PID/stable posture summary, and separates chat
   counters for `Reflected chat ProcessEvent`, `ServerSendChatMessage`, exact metadata-only
   fallback names, `metadata_only=true`, rejections, and `send_mode_known=false`.

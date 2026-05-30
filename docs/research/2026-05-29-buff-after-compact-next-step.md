@@ -10,7 +10,7 @@ expansion, runtime hooks, or an explicit no-go.
 - Repo: `/home/flowcommunity-ark/Obelisk`
 - Date: 2026-05-29
 - Live-server impact: none. No runtime server, restarts, marker changes, ptrace, `gcore`,
-  scanner runs, commits, pushes, public ABI edits, or Discord updates.
+  scanner runs, commits, pushes, public ABI edits, or external status updates.
 - Accepted offline result:
   `/servidor/ark/workspace-offline/buff-compact-intake-20260529T034751Z/pack/snapshot-comparison/readiness-report.json`
 

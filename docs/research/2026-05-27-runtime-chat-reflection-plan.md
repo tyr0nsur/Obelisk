@@ -4,11 +4,16 @@
 > directly. Current runtime-observation work is module-first, requires explicit
 > operator-approved `arkserver2` / TheIsland windows, and requires shutting it down after
 > the scoped test. Keep `arkserver` / Ragnarok untouched while users are active.
+>
+> This note is preserved as evidence for earlier chat-specific research. It is not the
+> current product strategy, release plan, or public SDK plan. Chat must not become the
+> center of the project again: the active direction is core-first runtime/ABI stability,
+> with any gameplay or chat surface promoted only through named gates.
 
-## Objective
+## Historical Objective
 
-Define the first safe runtime path from reflected offline chat evidence to a bounded
-`ProcessEvent` chat filter.
+This note originally defined a safe runtime path from reflected offline chat evidence to a
+bounded `ProcessEvent` chat filter.
 
 ## Current Flow
 
@@ -58,7 +63,8 @@ and logs only function/field metadata and borrowed parameter ranges. Metadata-on
 fallback candidates log `metadata_only=true`. It does not decode text, call plugins,
 expose ABI, or hook native exec pointers.
 
-The LinuxGSM wrapper supports marker-based activation:
+Historical LinuxGSM wrapper marker example, preserved for evidence only and not to be run
+from this note:
 
 ```bash
 touch /servidor/ark/obelisk/state/instances/arkserver2/enable-chat-reflection
@@ -69,8 +75,9 @@ The marker sets `OBELISK_ENABLE_CHAT_REFLECTION=1`, the current supported binary
 policy: the marker opens the gate, but a debug window must set an explicit positive budget
 before the runtime reads or logs reflected fields.
 
-Use this marker only on the current approved debug/development target from
-`docs/agent-handoff/CURRENT.md`; keep shared/player-facing instances out of runtime
+Historically, this marker was restricted to the approved debug/development target from
+the then-current handoff. In current work, use the active release/readiness checklist and
+fresh operator approval instead; keep shared/player-facing instances out of runtime
 validation unless the operator opens a specific maintenance window.
 
 The final chat helper should build on that module and:
@@ -107,7 +114,7 @@ From `docs/research/2026-05-27-core-ufunction-property-chain.md`:
 These `ServerChat*` targets are now treated as cheat-manager command coverage, not proof
 of normal player chat.
 
-Current normal-player-chat target:
+Historical normal-player-chat target:
 
 - `ServerSendChatMessage`
   - FName index `2697`
@@ -149,10 +156,14 @@ decode text until a real runtime capture proves they are the path we need.
 - Decode `FString` only after the reflected offset and `ParmsSize` checks pass.
 - Do not dispatch events from `metadata_only=true` recognizers.
 
-## Future Plugin ABI Direction
+## Historical Plugin ABI Sketch
 
-After one real `ServerSendChatMessage` hit validates the path, the first public chat API
-should remain append-only and passive:
+This section records a historical sketch from the chat-observer phase. Do not treat it as
+a standalone SDK promotion plan. Any public chat or gameplay event surface must remain
+append-only, copied-data-only, and explicitly promoted through the current release/public
+SDK gates rather than by following this note alone.
+
+That sketch expected any later public chat event API to remain append-only and passive:
 
 - add a capability bit such as `OBELISK_API_CAPABILITY_CHAT_EVENTS`;
 - add a POD `ObeliskChatMessageEvent` containing copied data only;
@@ -186,11 +197,15 @@ message text.
   ARK binary hash or new core dump before runtime wiring is widened.
 - Still needed: a runtime smoke test with one real in-game chat message.
 
-## Next Step
+## Historical Next Step
 
-The deployed runtime has the `ServerSendChatMessage` recognizer and metadata-only
-fallback recognizers enabled behind the chat reflection gate. Write one in-game chat
-message on the debug server and check for:
+This was the next step for the historical observer plan, not a current action item. Do not
+activate servers or marker gates from this note without a fresh operator-approved window
+and the current release/readiness checklist.
+
+The deployed runtime had the `ServerSendChatMessage` recognizer and metadata-only
+fallback recognizers enabled behind the chat reflection gate. The historical validation
+step was to write one in-game chat message on the debug server and check for:
 
 - `Reflected chat ProcessEvent ... function=ServerSendChatMessage ... metadata_only=false`
 - or exact fallback lines with `metadata_only=true`

@@ -1,5 +1,10 @@
 # SDK Chat Event Ownership Plan
 
+Superseded: this is historical design context. The current RC chat surface is the minimal
+copied `ChatMessageEvent` documented in
+`docs/research/2026-05-29-chat-message-second-source-readiness.md`; it does not expose
+sender identity fields, `RegisterOnChatMessage`, or `ObeliskChatMessageSubscription`.
+
 ## Objective
 
 Define the minimum ownership, ABI, and validation requirements before Obelisk exposes a
@@ -213,7 +218,7 @@ runtime acceptance evidence.
 `scripts/check_chat_reflection_benchmark.py` now enforces those local regression gates for
 the hook-like paths. It requires disabled/chat-unmatched paths to remain allocation-free, caps
 reader calls for hook-like cases, and verifies each required case accepts every iteration.
-This still does not replace TheIsland runtime A/B evidence.
+This still does not replace an approved runtime delivery validation window.
 
 ## Risks
 
@@ -231,5 +236,5 @@ This still does not replace TheIsland runtime A/B evidence.
 4. When public promotion starts, begin with failing ABI and installed SDK consumer tests for
    the C/POD chat structs and append-only `RegisterOnChatMessage` API. Do not bridge the
    internal C++ `ChatMessageView` or `std::string_view` types across the public ABI.
-5. Keep Discord/community messaging explicit: chat SDK events are a future goal, not
-   current public API.
+5. Keep community messaging explicit: chat SDK events are a future goal, not current
+   public API.

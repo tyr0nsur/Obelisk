@@ -49,7 +49,7 @@ Allowed for the first observation pass:
 Blocked:
 
 - raw `UObject*` exposure to plugins,
-- raw pincode values in logs, SDK callbacks, research notes, or Discord updates,
+- raw pincode values in logs, SDK callbacks, research notes, or external status updates,
 - strings, arrays, structs, or object dereferences,
 - player names, Steam IDs, tribe IDs, inventories, locations, or dereferenced
   `ForPC`/`forCharacter` data,

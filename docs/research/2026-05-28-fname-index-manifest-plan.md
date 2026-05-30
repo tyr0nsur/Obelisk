@@ -104,7 +104,7 @@ evidence alone must not turn `promotion_gate.ready` true for UE4 globals or modu
 Per-entry evidence-pack manifest paths may be absolute offline artifact paths or
 repo-relative paths, but they must end in `manifest.json`, must not contain `..`, and must
 not point under `/servidor/ark`. The top-level `promotion_evidence.report` must remain a
-repo-relative dated `docs/research/YYYY-MM-DD-*.md` note so future agents can review the
+repo-relative dated `docs/research/YYYY-MM-DD-*.md` note so future reviewers can review the
 promotion decision without local artifact access.
 
 Final accepted-manifest validation should include a stable-config check such as:

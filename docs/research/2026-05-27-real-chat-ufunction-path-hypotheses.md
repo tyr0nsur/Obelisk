@@ -200,3 +200,37 @@ all seven chat/reflection targets against the offline core; the current core rep
 3. If `ServerSendChatMessage` does not match after confirmed real chat, add exact
    metadata-only counters for the three `ShooterPlayerController` outbound/chat-display
    candidates listed above.
+
+## 2026-05-29 Mode Coverage Follow-Up
+
+Superseded by later 2026-05-29 copied plugin-facing evidence in
+`2026-05-29-chat-message-second-source-readiness.md`, which validates send modes
+`0,1,2,3`. Keep this section only as earlier global-only state.
+
+Approved `arkserver` copied-log evidence validated five plugin-facing
+`ChatMessageEvent` deliveries through `ServerSendChatMessage`, but all observed events
+were `send_mode=0` / global chat. Operator-reported local/alliance/other-mode attempts did
+not appear in the Obelisk plugin log as `send_mode=1`, `send_mode=2`, or `send_mode=3`.
+
+Historical note only: the earlier global-only RC claim was superseded by all-mode copied
+plugin-facing delivery in `2026-05-29-chat-message-second-source-readiness.md`. Route
+observer and controller work remains diagnostic-only and cannot expand public claims
+without copied plugin delivery logs. For mode coverage research, use a candidate-only
+controller target set first:
+
+- `ShooterPlayerController.ClientChatMessage`
+- `ShooterPlayerController.ClientServerChatMessage`
+- `ShooterPlayerController.ClientServerChatDirectMessage`
+
+`ClientChatMessage` is the strongest first candidate because its nested `ChatMessage`
+struct contains `SendMode` in offline notes. Treat `ShooterGameMode.SendServerChatMessage`
+and `ShooterGameMode.OnServerChatMessage__DelegateSignature` as lower-priority
+broadcast/helper candidates only if controller-side coverage does not explain the missing
+modes. Do not include `ShooterCheatManager.ServerChat`, `ServerChatTo`, or
+`ServerChatToPlayer` in the first mode target set; those remain admin/cheat-style paths.
+
+Promotion requirements stay candidate-only until exact sanitized snapshots, redacted
+signature output with target-set coverage, second-source comparison, and a metadata-only
+runtime observer confirm the route. Do not decode chat text, dispatch plugin events,
+change SDK ABI, expose identity, mutate gameplay, or claim tribe/local/alliance runtime
+delivery from this follow-up alone.

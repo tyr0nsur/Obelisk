@@ -5,10 +5,10 @@
 Define the next safe second-source core capture for Obelisk reflection research without
 using `arkserver` / Ragnarok.
 
-This is an approved debug runbook template only. It does not authorize restarts, marker
-changes, ptrace/gcore, text logging, or server launches outside a written scoped run plan.
-`arkserver2` / TheIsland has standing approval for scoped Obelisk debug/development tests,
-but ptrace/gcore still requires that written plan before activation.
+This is a historical debug runbook template only. It does not authorize restarts, marker
+changes, ptrace/gcore, text logging, runtime observation, or server launches outside a
+fresh written scoped run plan. `arkserver2` / TheIsland is an isolated fallback target, not
+a standing approval.
 
 ## Target Priority
 
@@ -19,8 +19,8 @@ Preferred target:
 
 Fallback target:
 
-- `arkserver2` / TheIsland under the standing scoped debug approval. Preserve evidence,
-  restore stable posture, and shut it down afterward.
+- `arkserver2` / TheIsland under a fresh scoped debug approval. Preserve evidence, restore
+  stable posture, and shut it down afterward when that scoped run requires it.
 
 Protected target:
 

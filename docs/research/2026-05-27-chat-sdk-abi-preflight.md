@@ -1,5 +1,10 @@
 # Chat SDK ABI Preflight
 
+Superseded: this was an early design draft. The current RC chat surface is the minimal
+copied `ChatMessageEvent` documented in
+`docs/research/2026-05-29-chat-message-second-source-readiness.md`; it does not expose
+sender identity fields, `RegisterOnChatMessage`, or `ObeliskChatMessageSubscription`.
+
 ## Objective
 
 Define the test-first contract for a future public `OnChatMessage` SDK event without

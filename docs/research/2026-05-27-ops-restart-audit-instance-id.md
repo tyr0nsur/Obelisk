@@ -106,7 +106,7 @@ Optional safety marker for TheIsland while plugin development is settling:
 3. Historical instance marker creation from this maintenance window:
 
    ```text
-   Historical only; do not rerun on Ragnarok during normal agent rounds.
+   Historical only; do not rerun on Ragnarok during normal development/operations.
    state/instances/arkserver/enable-process-event-hook
    state/instances/arkserver/disable-plugins
    state/instances/arkserver2/disable-plugins

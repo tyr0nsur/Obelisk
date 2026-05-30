@@ -23,15 +23,15 @@ debug/development target for future runtime validation and research.
 
 ## Decision
 
-`arkserver` / Ragnarok is currently reserved for player performance testing. Obelisk agents
-must not use it for development experiments while that testing is active.
+`arkserver` / Ragnarok is currently reserved for player performance testing. Development
+work must not use it for experiments while that testing is active.
 
 Future runtime validation and research that needs an ARK server harness should target
 `arkserver2` / TheIsland instead.
 
 ## Safety Rules
 
-Allowed on `arkserver2` after normal lead review:
+Allowed on `arkserver2` after normal maintainer review:
 
 - controlled runtime validation;
 - plugin lifecycle/debug checks;
@@ -91,8 +91,8 @@ For any TheIsland debug run:
 
 ## Result
 
-Workflow documentation and relevant skills have been updated so future agents target
-`arkserver2` / TheIsland for Obelisk debug/development rounds and avoid disrupting
+Workflow documentation and relevant skills have been updated so future debug work targets
+`arkserver2` / TheIsland for Obelisk debug/development rounds and avoids disrupting
 Ragnarok performance testing.
 
 ## Next Steps

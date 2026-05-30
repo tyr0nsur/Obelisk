@@ -257,11 +257,18 @@ posture checks reject these variables.
 OBELISK_ENABLE_INVENTORY_REFLECTION=1
 OBELISK_INVENTORY_REFLECTION_BINARY_SHA256=<supported ARK SHA256>
 OBELISK_INVENTORY_REFLECTION_LOG_LIMIT=0
+OBELISK_INVENTORY_REFLECTION_DISPATCH_LIMIT=0
 ```
 
-Inventory reflection is internal metadata observation only. It must not expose item ids,
-contents, player identity, gameplay-authoritative overrides, a public Inventory SDK,
-`ResourceHandle`, lookup, mutation, raw UE pointers/params, or return override.
+Inventory log and inventory-backed `GameplayPolicyEvent` dispatch budgets are separate and
+both default to `0`, so the marker alone does not read reflected inventory fields or
+dispatch copied internal events. A short debug or beta window must set an explicit
+non-zero budget for the intended path.
+
+Inventory reflection may feed copied, redacted inventory-backed `GameplayPolicyEvent`
+signals when dispatch is explicitly budgeted and subscribed. It must not expose item ids,
+contents, player identity, gameplay-authoritative overrides, a public Inventory or Items
+SDK, `ResourceHandle`, lookup, mutation, raw UE pointers/params, or return override.
 
 Decoded chat text logging is not enabled by the marker. It requires an additional explicit
 environment gate:

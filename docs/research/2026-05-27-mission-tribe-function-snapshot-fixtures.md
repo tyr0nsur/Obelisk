@@ -20,7 +20,7 @@ UFunction snapshots.
 ## Method
 
 Used exact offline inspector lookups for mission and tribe targets recommended by the
-read-only agent pass:
+prior read-only review:
 
 - `MissionType.BPAllowPlayerToLeaveMission`
 - `MissionType.BPOnPlayerRemovedFromMission`

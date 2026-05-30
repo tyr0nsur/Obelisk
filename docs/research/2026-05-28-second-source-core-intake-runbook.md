@@ -15,9 +15,9 @@ exec probes, or live runtime observation.
 - Current ARK binary SHA256:
   `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`
 - Protected live instance: `arkserver` / Ragnarok; do not touch while users are active.
-- Debug fallback: `arkserver2` / TheIsland has standing approval for scoped Obelisk
-  debug/development tests when needed; preserve evidence, restore stable posture, and
-  shut it down afterward.
+- Debug fallback: `arkserver2` / TheIsland can be used only under a fresh scoped Obelisk
+  debug/development approval when needed; preserve evidence, restore stable posture, and
+  shut it down afterward when the scoped run requires it.
 
 ## Current Evidence State
 

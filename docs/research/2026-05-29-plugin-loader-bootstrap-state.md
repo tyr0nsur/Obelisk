@@ -64,8 +64,44 @@ message.
 
 ## Next Steps
 
-- Run one isolated `arkserver2` delivery test with a real controlled chat message,
-  `OBELISK_CHAT_EVENTS_DISPATCH_LIMIT` positive, and `oChatLogger` allowlisted only for
-  `arkserver2`.
+Superseded: later `arkserver` copied-log evidence validated plugin-facing delivery for
+send modes `0,1,2,3`. Keep this runbook command only for future regression/revalidation
+windows.
+
+- Run one approved `arkserver` / Ragnarok beta-test mode-coverage window after sending the
+  operator-approved beta notice. Use the `enable-chat-events` marker,
+  `OBELISK_WRAPPER_PROFILE=observer-debug`, `allow-observer-debug-window`,
+  `allow-experimental-observers`, `OBELISK_CHAT_EVENTS_BINARY_SHA256` set to the supported
+  ARK hash, `OBELISK_CHAT_EVENTS_DISPATCH_LIMIT` positive, `enable-process-event-hook`,
+  and `oChatLogger` allowlisted only for `arkserver`. `disable-plugins` must be absent for
+  the plugin load window.
+- Treat these copied-log lines as the success markers for that future delivery test:
+
+```text
+Chat message event producer enabled for ShooterGameServer SHA256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520.
+[Plugin] [oChatLogger] Registered ChatMessageEvent callback.
+[Plugin] [oChatLogger] ChatMessageEvent received sequence=<nonzero> send_mode=<recognized> flags=<copied-payload-bit-set> message_size=<controlled-size>. mode_count=<n> first_observed=<true|false>.
+```
+
+  Validate the copied beta-window log offline with:
+
+```bash
+scripts/analyze_chat_delivery_log.py \
+  --expected-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
+  --require-send-modes 0,1,2,3 \
+  --require-workspace \
+  --fail-on-quality-blockers \
+  --json \
+  /servidor/ark/workspace-offline/<copied-beta-window-log>
+```
+
+  The analyzer requires the producer gate, `oChatLogger` registration, at least one
+  accepted delivery event with a nonzero sequence, copied-payload flag, known send mode,
+  controlled message size, and no raw chat text or sender/player identity logging. It
+  rejects direct live-server log paths under `/servidor/ark`; copy evidence into
+  `/servidor/ark/workspace-offline` first.
+
+  `enable-chat-reflection` logs are historical observer evidence and do not prove
+  plugin-facing `ChatMessageEvent` delivery.
 - Preserve copied log evidence, then restore stable markers and safe-disabled plugin
   config.
