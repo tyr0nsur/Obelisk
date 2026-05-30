@@ -35,6 +35,10 @@ Use this durable pack as the current canonical static/internal GObjects evidence
 /servidor/ark/workspace-offline/gobjects-fuobjectarray-durable-pack-20260529T051759Z
 ```
 
+Historical caveat: static-global packs produced before `cbf00bd` / `2a178ee` are
+pre-strict-identity evidence. Regenerate them with current producers before using them in
+strict artifact-identity gates.
+
 Its static manifest is internal-only evidence. It does not promote public GObjects,
 object identity, `ResourceHandle`, mutation, or return override behavior because
 `promotion_gate.ready=false` with `static_only_evidence`.
@@ -68,4 +72,3 @@ intended evidence input.
 Do not delete large raw cores or binaries merely because they are duplicated. Prune only
 after a separate storage decision records which canonical manifests and research notes
 replace the duplicate.
-

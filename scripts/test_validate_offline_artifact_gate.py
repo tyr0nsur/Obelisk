@@ -4320,13 +4320,61 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("uobject_flag_policy_artifact_identity_capture_id_invalid", reasons)
         self.assertIn("uobject_flag_policy_artifact_identity_sha_invalid", reasons)
 
+    def test_blocks_uobject_flag_policy_partial_artifact_identity_fields_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flags.json"
+            payload = uobject_flag_policy_report_manifest()
+            payload["artifact_identity"].pop("evidence_pack_id")
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "uobject_flag_policy_artifact_identity_fields_mismatch",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_uobject_flag_policy_artifact_identity_kind_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flags.json"
+            payload = uobject_flag_policy_report_manifest()
+            payload["artifact_identity"]["artifact_kind"] = gate.UOBJECT_FLAG_TRANSITION_MATRIX_SCHEMA
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "uobject_flag_policy_artifact_identity_kind_mismatch",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_uobject_flag_policy_artifact_identity_evidence_pack_id_invalid(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "uobject-flags.json"
+            payload = uobject_flag_policy_report_manifest()
+            payload["artifact_identity"]["evidence_pack_id"] = "../bad"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "uobject_flag_policy_artifact_identity_evidence_pack_id_invalid",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
     def test_blocks_uobject_flag_policy_artifact_identity_hash_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"
             workspace = protected / "workspace-offline"
             manifest = workspace / "uobject-flags.json"
             payload = uobject_flag_policy_report_manifest()
-            payload["windows_summary"]["observed"][0]["byte_count"] = 256
+            payload["artifact_identity"]["artifact_sha256"] = "0" * 64
             write_json(manifest, payload)
 
             result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))

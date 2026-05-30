@@ -7,6 +7,10 @@ offline-only evidence pack. This is internal research evidence for the current A
 hash only; it does not promote public object identity, resource handles, mutation, return
 overrides, or a runtime-stable `GUObjectArray` API.
 
+Historical caveat: this pre-`cbf00bd` / `2a178ee` static-global pack is
+pre-strict-identity evidence. Regenerate it with current producers before using it in
+strict artifact-identity gates.
+
 ## Pack
 
 ```text

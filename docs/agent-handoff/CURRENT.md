@@ -111,13 +111,13 @@ sequence.
   tooling, and promote only copied module APIs with strict gates.
 - Current post-RC focus: Item return-only policy, Mission copied-bool observer, then
   Transfer `bAccept`.
-- The current pushed post-RC line has `oBaseEvents` with a
+- Current post-RC implementation facts: `oBaseEvents` has a
   disabled-by-default plugin-local `chat_command_helper` over copied `ChatMessageEvent`
   bytes, with config, owner-token register/unregister, no command ABI/router, no identity,
   no reply, no mutation, and no extra exported plugin symbols beyond `GetInfo`/`Init`/
-  `Shutdown`. Full build, CTest 61/61, focused guardrails, `git diff --check`, and
-  exported-symbol audit passed before push.
-- The current pushed post-RC line also adds `ProcessEventBuffReflection` as a
+  `Shutdown`. Full build, focused CTest/guardrails, `git diff --check`, and
+  exported-symbol audit passed before publication.
+- Current post-RC implementation facts also include `ProcessEventBuffReflection` as a
   test-only/internal target. It is
   not linked into `libobelisk.so`, not SDK-facing, and does not authorize runtime Buff
   hooks/callbacks, public Buff SDK, object/class exposure, mutation, return override, raw

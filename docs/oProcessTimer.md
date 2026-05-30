@@ -2,6 +2,9 @@
 
 `oProcessTimer` is a minimal first-party example for Obelisk process-local timers.
 
+Release-scope caveat: this plugin and the timer ABI are post-RC/v1 reference material, not
+part of the `v0.1.0-rc.1` public surface.
+
 It demonstrates only the timer ABI:
 
 - owner-token timer registration;

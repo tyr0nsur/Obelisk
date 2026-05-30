@@ -859,6 +859,23 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
                 self.assertRegex(compact, r"(no hook wiring|runtime hook|Before Runtime Wiring|runtime log claim)")
                 self.assertRegex(compact, r"(No SDK/API header|public SDK exposure|public callback)")
 
+        compact_slice = normalized(slice_note)
+        with self.subTest(file="docs/research/2026-05-30-item-return-only-policy-slice.md", item="descriptor-only preflight"):
+            self.assertIn("Descriptor-Only Preflight", slice_note)
+            self.assertIn("inventory_item.allow_equip_check", slice_note)
+            self.assertIn("inventory_item.can_repair_check", slice_note)
+            self.assertIn("inventory_item.use_onto_item_check", slice_note)
+            self.assertIn("promotion_ready=false", compact_slice)
+            self.assertIn("OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE` only", slice_note)
+            self.assertIn("event_kind` and `event_kind_mask`: unassigned candidate slots", slice_note)
+            self.assertIn("docs/public_gameplay_events.json", slice_note)
+            self.assertIn("include/obelisk/ObeliskApi.h", slice_note)
+            self.assertIn("runtime dispatcher tables", compact_slice)
+            self.assertIn("public SDK fixtures", slice_note)
+            self.assertIn("plugin callbacks", slice_note)
+            self.assertIn("OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK", slice_note)
+            self.assertIn("OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN", slice_note)
+
         for path, text in (
             ("docs/agent-handoff/CURRENT.md", current),
             ("docs/STATUS.md", status),
@@ -872,6 +889,14 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
                 self.assertIn("public Inventory SDK", compact)
                 self.assertIn("mutation", compact)
                 self.assertIn("return override", compact)
+
+    def test_installed_sdk_consumer_is_registered_as_ctest(self) -> None:
+        cmake = read("CMakeLists.txt")
+
+        self.assertIn("add_test(", cmake)
+        self.assertIn("NAME InstallLayoutPublicSdkConsumer", cmake)
+        self.assertIn("scripts/test_install_obelisk_layout.sh", cmake)
+        self.assertIn("OBELISK_BUILD_DIR=${CMAKE_BINARY_DIR}", cmake)
 
     def test_mission_copied_bool_observer_stays_internal_and_non_authoritative(self) -> None:
         mission_plan = read("docs/research/2026-05-30-mission-copied-bool-observer-plan.md")

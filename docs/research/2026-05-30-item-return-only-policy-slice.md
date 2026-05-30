@@ -226,7 +226,7 @@ The consume gate accepts the policy slice in this pack. The promote gate still b
 second-source gap for Item return-only, but it does not promote public API, runtime wiring,
 identity, mutation, return override, or an Inventory/Items SDK.
 
-## Candidate-Only Descriptor Shape
+## Descriptor-Only Preflight
 
 The next descriptor shape, if this slice is ever promoted, should be three distinct
 `GameplayPolicyEvent` event-kind descriptors rather than a reuse of
@@ -235,17 +235,19 @@ The next descriptor shape, if this slice is ever promoted, should be three disti
 these item observations prove only `ReturnValue`, so reusing that kind would overclaim the
 payload and blur `CanRepair.bIgnoreInventoryRequirement` into an unrelated cooldown field.
 
-This is a planning shape only. It must not be copied into `include/obelisk/ObeliskApi.h`,
-`docs/public_gameplay_events.json`, runtime dispatcher tables, public SDK fixtures, or
-plugin callbacks until a deliberate ABI promotion adds append-only enum values, masks,
-descriptor coverage, SDK consumer tests, and callback lifecycle review.
+This is a descriptor-only preflight and planning shape only:
+`promotion_ready=false`. It must not be copied into
+`include/obelisk/ObeliskApi.h`, `docs/public_gameplay_events.json`, runtime dispatcher
+tables, public SDK fixtures, or plugin callbacks until a deliberate ABI promotion adds
+append-only enum values, masks, descriptor coverage, SDK consumer tests, and callback
+lifecycle review.
 
 Common candidate descriptor fields:
 
 - `resource_kind`: `OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM`
 - `flags`: `OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD |
   OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED`
-- `field_mask`: `OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE`
+- `field_mask`: `OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE` only
 - `payload`: `bool_values[OBELISK_GAMEPLAY_POLICY_FIELD_RETURN_VALUE]` only
 - `int32_values`: no copied fields
 - `dispatch_phase`: post-original observation only

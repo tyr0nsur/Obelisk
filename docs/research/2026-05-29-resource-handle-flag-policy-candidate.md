@@ -7,6 +7,10 @@ Consolidate the current small-JSON ResourceHandle evidence into a short
 weak-helper caller-mode redacted JSON and the ResourceHandle nonzero readiness JSON, with no
 live-server run, GitHub action, binary scan, or new static analysis.
 
+Workflow caveat: this candidate is superseded for current workflow by the 2026-05-30
+post-RC, UObject flag-policy, and artifact-identity notes. Keep it as historical evidence
+only.
+
 ## Environment
 
 - Date: 2026-05-29

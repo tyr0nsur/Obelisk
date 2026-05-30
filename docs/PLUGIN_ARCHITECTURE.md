@@ -20,6 +20,9 @@ plugins/
 focused on teaching one stable plugin model each: copied events/config/lifecycle for
 `oBaseEvents`, and process-local owner-token timers for `oProcessTimer`.
 
+Release-scope caveat: `oProcessTimer` and the timer ABI are post-RC/v1 reference material,
+not part of the `v0.1.0-rc.1` public surface.
+
 `oPolicyAudit` is an experimental first-party example for `GameplayPolicyEvent`
 descriptors and callbacks. `oChatLogger` is an experimental first-party smoke test for
 the copied `ChatMessageEvent` API and `enable-chat-events` producer path. They are
@@ -400,10 +403,11 @@ duration. The event does not expose sender/player identity, resource identity, r
 `FString`, `UObject`, `UFunction`, raw parameter buffers, FName/GObjects indices, chat
 send/moderation/blocking authority, command registration/routing, mutation, or return
 override. Plugins that want commands must parse the copied text locally; Obelisk v0.1 does
-not ship a separate command SDK. The ABI slots are in v0.1-rc scope; delivery remains gated
-to the approved `enable-chat-events` producer path, and copied plugin-facing delivery has
-accepted beta evidence for the known send modes. Operational use still requires a
-current-turn operator-approved exact window after a current-turn operator-approved notice;
+not ship a separate command SDK. The ABI slots are in v0.1-rc scope and can be compiled,
+tested, and consumed offline through the SDK without live-ops approval. Only live or
+player-facing validation of the `enable-chat-events` producer path requires a current-turn
+operator-approved exact window after a current-turn operator-approved notice. Copied
+plugin-facing delivery has accepted beta evidence for the known send modes;
 `enable-chat-reflection` is only the historical observer path and does not prove
 `ChatMessageEvent` delivery.
 
