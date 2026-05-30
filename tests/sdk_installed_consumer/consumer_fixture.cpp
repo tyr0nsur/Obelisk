@@ -8,12 +8,16 @@
 #include <stdexcept>
 #include <string>
 
+#define OBELISK_CONCAT_INNER(a, b) a##b
+#define OBELISK_CONCAT(a, b) OBELISK_CONCAT_INNER(a, b)
+
 namespace
 {
     using GetInfoFn = bool (*)(ObeliskPluginMetadata*);
     using InitFn = bool (*)(ObeliskApi*, const ObeliskPluginInitContext*);
     using ShutdownFn = void (*)();
     using BoolProbeFn = bool (*)();
+    using ScheduledCallbackFn = void (*)(uint64_t, void*);
 
     int g_RegisterCount = 0;
     int g_UnregisterCount = 0;
@@ -21,10 +25,14 @@ namespace
     int g_GameplayPolicyUnregisterCount = 0;
     int g_ChatMessageRegisterCount = 0;
     int g_ChatMessageUnregisterCount = 0;
+    int g_TimerRegisterCount = 0;
+    int g_TimerUnregisterCount = 0;
     ObeliskGameplayPolicyEventCallback g_GameplayPolicyCallback = nullptr;
     void* g_GameplayPolicyUserData = nullptr;
     ObeliskChatMessageEventCallback g_ChatMessageCallback = nullptr;
     void* g_ChatMessageUserData = nullptr;
+    ScheduledCallbackFn g_TimerCallback = nullptr;
+    void* g_TimerUserData = nullptr;
 
     void Require(bool condition, const char* message)
     {
@@ -116,6 +124,35 @@ namespace
         return true;
     }
 
+    uint64_t RegisterTimerWithOwnerTokenHandle(uint64_t ownerToken,
+                                               uint64_t delayMs,
+                                               uint64_t intervalMs,
+                                               uint64_t flags,
+                                               ScheduledCallbackFn callback,
+                                               void* userData)
+    {
+        Require(ownerToken == 0xC0FFEE, "unexpected owner token in timer registration");
+        Require(delayMs == 1000, "unexpected timer delay");
+        Require(intervalMs == 0, "unexpected timer interval");
+        Require(flags == 0, "unexpected timer flags");
+        Require(callback != nullptr, "timer registration received null callback");
+        Require(userData != nullptr, "timer registration received null user data");
+        ++g_TimerRegisterCount;
+        g_TimerCallback = callback;
+        g_TimerUserData = userData;
+        return 4004;
+    }
+
+    bool RemoveScheduledWithOwnerToken(uint64_t ownerToken, uint64_t timerId)
+    {
+        Require(ownerToken == 0xC0FFEE, "unexpected owner token in timer unregister");
+        Require(timerId == 4004, "unexpected timer id");
+        ++g_TimerUnregisterCount;
+        g_TimerCallback = nullptr;
+        g_TimerUserData = nullptr;
+        return true;
+    }
+
     void DispatchValidChatMessageEvent(uint32_t sendMode)
     {
         Require(g_ChatMessageCallback != nullptr, "chat message callback was not registered");
@@ -138,6 +175,13 @@ namespace
         DispatchValidChatMessageEvent(OBELISK_CHAT_SEND_MODE_TRIBE);
         DispatchValidChatMessageEvent(OBELISK_CHAT_SEND_MODE_LOCAL);
         DispatchValidChatMessageEvent(OBELISK_CHAT_SEND_MODE_ALLIANCE);
+    }
+
+    void DispatchValidTimer()
+    {
+        Require(g_TimerCallback != nullptr, "timer callback was not registered");
+        Require(g_TimerUserData != nullptr, "timer user data was not registered");
+        g_TimerCallback(4004, g_TimerUserData);
     }
 
     void DispatchValidGameplayPolicyEvent(uint32_t eventKind,
@@ -394,7 +438,10 @@ int main(int argc, char** argv)
         ResolveOptional<BoolProbeFn>(handle, "InstallLayoutConsumer_GameplayPolicyEventSeen");
     BoolProbeFn gameplayPolicyEventAccepted =
         ResolveOptional<BoolProbeFn>(handle, "InstallLayoutConsumer_GameplayPolicyEventAccepted");
+    BoolProbeFn timerSeen =
+        ResolveOptional<BoolProbeFn>(handle, "InstallLayoutConsumer_ScheduledCallbackSeen");
     const bool expectsGameplayPolicy = gameplayPolicyEventSeen != nullptr && gameplayPolicyEventAccepted != nullptr;
+    const bool expectsTimer = timerSeen != nullptr;
 
         ObeliskPluginMetadata metadata{};
         Require(getInfo(&metadata), "ObeliskPlugin_GetInfo failed");
@@ -422,7 +469,8 @@ int main(int argc, char** argv)
             OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS |
             OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS |
             OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS |
-            OBELISK_API_CAPABILITY_CHAT_EVENTS;
+            OBELISK_API_CAPABILITY_CHAT_EVENTS |
+            OBELISK_API_CAPABILITY_TIMERS;
         api.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle =
             RegisterNamedProcessEventWithOwnerTokenHandle;
         api.UnregisterProcessEventCallbackWithOwnerToken =
@@ -435,6 +483,8 @@ int main(int argc, char** argv)
         api.DescribeGameplayPolicyEventKind = DescribeGameplayPolicyEventKind;
         api.RegisterChatMessageEventWithOwnerTokenHandle = RegisterChatMessageEventWithOwnerTokenHandle;
         api.UnregisterChatMessageEventWithOwnerToken = UnregisterChatMessageEventWithOwnerToken;
+        api.RegisterTimerWithOwnerTokenHandle = RegisterTimerWithOwnerTokenHandle;
+        api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken) = RemoveScheduledWithOwnerToken;
 
         ObeliskPluginInitContext context{};
         context.abi_version = OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION;
@@ -450,10 +500,14 @@ int main(int argc, char** argv)
         g_GameplayPolicyUnregisterCount = 0;
         g_ChatMessageRegisterCount = 0;
         g_ChatMessageUnregisterCount = 0;
+        g_TimerRegisterCount = 0;
+        g_TimerUnregisterCount = 0;
         g_GameplayPolicyCallback = nullptr;
         g_GameplayPolicyUserData = nullptr;
         g_ChatMessageCallback = nullptr;
         g_ChatMessageUserData = nullptr;
+        g_TimerCallback = nullptr;
+        g_TimerUserData = nullptr;
         Require(init(&api, &context), "ObeliskPlugin_Init failed");
         if (shutdown)
         {
@@ -463,6 +517,10 @@ int main(int argc, char** argv)
             else
                 Require(g_GameplayPolicyRegisterCount == 0, "unexpected gameplay policy callback registration");
             Require(g_ChatMessageRegisterCount == 1, "expected one chat message callback registration");
+            if (expectsTimer)
+                Require(g_TimerRegisterCount == 1, "expected one timer callback registration");
+            else
+                Require(g_TimerRegisterCount == 0, "unexpected timer callback registration");
             if (expectsGameplayPolicy)
             {
                 DispatchAllValidGameplayPolicyEvents();
@@ -472,6 +530,11 @@ int main(int argc, char** argv)
             DispatchAllValidChatMessageEvents();
             if (chatMessageEventSeen)
                 Require(chatMessageEventSeen(), "expected plugin to accept all chat message send modes");
+            if (expectsTimer)
+            {
+                DispatchValidTimer();
+                Require(timerSeen(), "expected plugin to observe timer callback");
+            }
             api = {};
             shutdown();
             Require(g_UnregisterCount == 1, "expected one owner-token callback unregister");
@@ -480,6 +543,10 @@ int main(int argc, char** argv)
             else
                 Require(g_GameplayPolicyUnregisterCount == 0, "unexpected gameplay policy callback unregister");
             Require(g_ChatMessageUnregisterCount == 1, "expected one chat message callback unregister");
+            if (expectsTimer)
+                Require(g_TimerUnregisterCount == 1, "expected one timer callback unregister");
+            else
+                Require(g_TimerUnregisterCount == 0, "unexpected timer callback unregister");
             if (expectsGameplayPolicy)
             {
                 Require(g_GameplayPolicyCallback == nullptr, "gameplay policy callback was not cleared");
@@ -487,6 +554,11 @@ int main(int argc, char** argv)
             }
             Require(g_ChatMessageCallback == nullptr, "chat message callback was not cleared");
             Require(g_ChatMessageUserData == nullptr, "chat message user data was not cleared");
+            if (expectsTimer)
+            {
+                Require(g_TimerCallback == nullptr, "timer callback was not cleared");
+                Require(g_TimerUserData == nullptr, "timer user data was not cleared");
+            }
         }
         else
         {
@@ -496,6 +568,8 @@ int main(int argc, char** argv)
             Require(g_GameplayPolicyUnregisterCount == 0, "no-shutdown fixture should not unregister gameplay callbacks");
             Require(g_ChatMessageRegisterCount == 0, "no-shutdown fixture should not register chat callbacks");
             Require(g_ChatMessageUnregisterCount == 0, "no-shutdown fixture should not unregister chat callbacks");
+            Require(g_TimerRegisterCount == 0, "no-shutdown fixture should not register timer callbacks");
+            Require(g_TimerUnregisterCount == 0, "no-shutdown fixture should not unregister timer callbacks");
         }
         dlclose(handle);
     }

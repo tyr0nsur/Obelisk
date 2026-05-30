@@ -214,6 +214,43 @@ namespace
                 "owner cleanup did not return after callback finished");
         Require(!TimerManager::Get().Unregister(&owner, timerId), "owner cleanup left timer active");
     }
+
+    void TestOwnerCleanupWaitsForExplicitlyUnregisteredInFlightCallback()
+    {
+        int owner = 0;
+        BlockingState state;
+        const uint64_t timerId = TimerManager::Get().Register(&owner, 5, 0, false, BlockingCallback, &state);
+        Require(timerId != 0, "explicit unregister blocking timer registration failed");
+
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&]() { return state.Entered; }),
+                    "explicit unregister blocking timer did not enter callback");
+        }
+
+        Require(TimerManager::Get().Unregister(&owner, timerId),
+                "explicit unregister failed for in-flight timer");
+
+        std::atomic<bool> cleanupReturned{false};
+        std::thread cleanupThread([&]() {
+            const size_t removed = TimerManager::Get().UnregisterCallbacksForOwner(&owner);
+            Require(removed == 0, "owner cleanup counted already-unregistered timer as newly removed");
+            cleanupReturned.store(true, std::memory_order_release);
+        });
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(25));
+        Require(!cleanupReturned.load(std::memory_order_acquire),
+                "owner cleanup returned before explicitly-unregistered in-flight callback finished");
+
+        {
+            std::lock_guard<std::mutex> lock(state.Mutex);
+            state.Release = true;
+        }
+        state.Cv.notify_all();
+        cleanupThread.join();
+        Require(cleanupReturned.load(std::memory_order_acquire),
+                "owner cleanup did not return after explicitly-unregistered callback finished");
+    }
 }
 
 int main()
@@ -225,5 +262,6 @@ int main()
     TestSelfUnregisterDoesNotDeadlock();
     TestCallbackExceptionDoesNotStopWorker();
     TestOwnerCleanupWaitsForInFlightCallback();
+    TestOwnerCleanupWaitsForExplicitlyUnregisteredInFlightCallback();
     return 0;
 }

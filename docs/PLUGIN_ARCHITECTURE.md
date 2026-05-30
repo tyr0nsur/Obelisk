@@ -134,6 +134,17 @@ Callback registration handles are process-local runtime values. Do not write the
 shared config, cluster state, or cross-instance files; a handle from one ARK process is not
 valid in another server process that happens to load the same plugin binary.
 
+Timer handles follow the same process-local rule. Plugins may use
+`OBELISK_API_CAPABILITY_TIMERS` for owner-token one-shot or repeating callbacks after
+checking `struct_size` and non-null function pointers. A `0` timer id means registration
+was rejected. One-shot timers use `delayMs > 0`, `intervalMs == 0`, and `flags == 0`;
+repeating timers use `delayMs > 0`, `intervalMs > 0`, and
+`OBELISK_TIMER_FLAG_REPEATING`. Reserved flags are rejected. Timer callbacks run on an
+Obelisk worker thread, must return quickly, must not throw across the C ABI, and must not
+call unsafe UE4 functions. Unregister timers explicitly during shutdown while callback code
+and state are still valid; runtime owner cleanup on init failure/unload is only the
+backstop and waits for in-flight callbacks before `dlclose`.
+
 ## Build And Drop-In Model
 
 Obelisk should support two plugin build paths:

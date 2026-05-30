@@ -5,6 +5,9 @@
 #include <cstring>
 #include <sys/stat.h>
 
+#define OBELISK_CONCAT_INNER(a, b) a##b
+#define OBELISK_CONCAT(a, b) OBELISK_CONCAT_INNER(a, b)
+
 static_assert(OBELISK_API_ABI_VERSION == 1u, "unexpected Obelisk API ABI version");
 static_assert(OBELISK_PLUGIN_METADATA_ABI_VERSION == 1u, "unexpected plugin metadata ABI version");
 static_assert(OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION == 1u, "unexpected plugin init context ABI version");
@@ -17,11 +20,14 @@ namespace
     uint64_t g_ProcessEventHandle = 0;
     uint64_t g_GameplayPolicyEventHandle = 0;
     uint64_t g_ChatMessageEventHandle = 0;
+    uint64_t g_ScheduledHandle = 0;
     uint64_t g_GameplayPolicyEventUserData = 0x5DC0DE02;
     uint64_t g_ChatMessageEventUserData = 0xC0FFEE02;
+    uint64_t g_ScheduledUserData = 0x71A1E02;
     uint64_t g_GameplayPolicyEventSeenMask = 0;
     uint64_t g_GameplayPolicyEventAcceptedMask = 0;
     uint64_t g_ChatMessageEventSeenModes = 0;
+    bool g_ScheduledSeen = false;
 
     constexpr const char* kDefaultConfig = R"json({
     "enabled": false,
@@ -169,6 +175,12 @@ namespace
         }
     }
 
+    void HandleScheduledCallback(uint64_t timerId, void* userData)
+    {
+        if (timerId == g_ScheduledHandle && timerId != 0 && userData == &g_ScheduledUserData)
+            g_ScheduledSeen = true;
+    }
+
     bool HasProcessEventHandleApi(const ObeliskApi* api)
     {
         return api &&
@@ -265,6 +277,16 @@ namespace
             api->UnregisterChatMessageEventWithOwnerToken;
     }
 
+    bool HasScheduledApi(const ObeliskApi* api)
+    {
+        return api &&
+            (api->capabilities & OBELISK_API_CAPABILITY_TIMERS) != 0 &&
+            api->struct_size >= offsetof(ObeliskApi, OBELISK_CONCAT(Unregister, TimerWithOwnerToken)) +
+                sizeof(api->OBELISK_CONCAT(Unregister, TimerWithOwnerToken)) &&
+            api->OBELISK_CONCAT(Register, TimerWithOwnerTokenHandle) &&
+            api->OBELISK_CONCAT(Unregister, TimerWithOwnerToken);
+    }
+
     void ResetState()
     {
         g_Api = {};
@@ -273,13 +295,20 @@ namespace
         g_ProcessEventHandle = 0;
         g_GameplayPolicyEventHandle = 0;
         g_ChatMessageEventHandle = 0;
+        g_ScheduledHandle = 0;
         g_GameplayPolicyEventSeenMask = 0;
         g_GameplayPolicyEventAcceptedMask = 0;
         g_ChatMessageEventSeenModes = 0;
+        g_ScheduledSeen = false;
     }
 
     void UnregisterCallbacks()
     {
+        if (g_HasApi && g_ScheduledHandle != 0 && g_Api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken))
+        {
+            g_Api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken)(g_OwnerToken, g_ScheduledHandle);
+            g_ScheduledHandle = 0;
+        }
         if (g_HasApi && g_ProcessEventHandle != 0 && g_Api.UnregisterProcessEventCallbackWithOwnerToken)
         {
             g_Api.UnregisterProcessEventCallbackWithOwnerToken(g_OwnerToken, g_ProcessEventHandle);
@@ -389,6 +418,23 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
                 OnGameplayPolicyEvent,
                 &g_GameplayPolicyEventUserData);
             if (g_GameplayPolicyEventHandle == 0)
+            {
+                UnregisterCallbacks();
+                ResetState();
+                return false;
+            }
+        }
+
+        if (HasScheduledApi(api))
+        {
+            g_ScheduledHandle = api->OBELISK_CONCAT(Register, TimerWithOwnerTokenHandle)(
+                g_OwnerToken,
+                1000,
+                0,
+                0,
+                HandleScheduledCallback,
+                &g_ScheduledUserData);
+            if (g_ScheduledHandle == 0)
             {
                 UnregisterCallbacks();
                 ResetState();
@@ -543,4 +589,9 @@ extern "C" __attribute__((visibility("default"))) bool InstallLayoutConsumer_Gam
 {
     return (g_GameplayPolicyEventAcceptedMask & OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL) ==
         OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL;
+}
+
+extern "C" __attribute__((visibility("default"))) bool InstallLayoutConsumer_ScheduledCallbackSeen()
+{
+    return g_ScheduledSeen;
 }

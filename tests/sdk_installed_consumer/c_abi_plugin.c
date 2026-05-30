@@ -5,6 +5,9 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#define OBELISK_CONCAT_INNER(a, b) a##b
+#define OBELISK_CONCAT(a, b) OBELISK_CONCAT_INNER(a, b)
+
 static const char* kDefaultConfig = "{\n"
     "  \"enabled\": false,\n"
     "  \"allow_all_instances\": false,\n"
@@ -22,6 +25,9 @@ static bool g_GameplayPolicyEventAccepted = false;
 static uint64_t g_ChatMessageEventHandle = 0;
 static uint64_t g_ChatMessageEventUserData = 0xC0FFEE02;
 static uint64_t g_ChatMessageEventSeenModes = 0;
+static uint64_t g_TimerHandle = 0;
+static uint64_t g_TimerUserData = 0xC0FFEE06;
+static bool g_TimerSeen = false;
 
 static uint64_t ChatModeMask(uint32_t send_mode)
 {
@@ -149,11 +155,27 @@ static void OnCompileChatMessageEvent(const ObeliskChatMessageEvent* event, void
     }
 }
 
+static void HandleScheduledCallback(uint64_t timer_id, void* user_data)
+{
+    if (timer_id == g_TimerHandle && timer_id != 0 && user_data == &g_TimerUserData)
+        g_TimerSeen = true;
+}
+
+static void CompileScheduledCallback(uint64_t timer_id, void* user_data)
+{
+    volatile uint64_t id = timer_id;
+    volatile bool has_user_data = user_data != NULL;
+    (void)id;
+    (void)has_user_data;
+}
+
 static void CompileGameplayPolicyAbi(void)
 {
     volatile uint64_t capability = OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS;
     volatile uint64_t resource_descriptor_capability = OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS;
     volatile uint64_t chat_capability = OBELISK_API_CAPABILITY_CHAT_EVENTS;
+    volatile uint64_t timer_capability = OBELISK_API_CAPABILITY_TIMERS;
+    volatile uint64_t timer_repeating = OBELISK_TIMER_FLAG_REPEATING;
     volatile uint64_t all_events = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL;
     volatile uint64_t all_structures = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES;
     volatile uint64_t all_inventory = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY;
@@ -238,13 +260,17 @@ static void CompileGameplayPolicyAbi(void)
     };
     ObeliskGameplayPolicyEventCallback callback = OnCompileGameplayPolicyEvent;
     ObeliskChatMessageEventCallback chat_callback = OnCompileChatMessageEvent;
+    void (*scheduled_callback)(uint64_t, void*) = CompileScheduledCallback;
     callback(&event, NULL);
     callback(&inventory_remote_add_event, NULL);
     callback(&inventory_use_event, NULL);
     chat_callback(&chat_event, NULL);
+    scheduled_callback(1, NULL);
     (void)capability;
     (void)resource_descriptor_capability;
     (void)chat_capability;
+    (void)timer_capability;
+    (void)timer_repeating;
     (void)all_events;
     (void)all_structures;
     (void)all_inventory;
@@ -304,6 +330,16 @@ static bool HasGameplayPolicyEventApi(const ObeliskApi* api)
             sizeof(api->UnregisterGameplayPolicyEventWithOwnerToken) &&
         api->RegisterGameplayPolicyEventWithOwnerTokenHandle &&
         api->UnregisterGameplayPolicyEventWithOwnerToken;
+}
+
+static bool HasScheduledApi(const ObeliskApi* api)
+{
+    return api &&
+        (api->capabilities & OBELISK_API_CAPABILITY_TIMERS) != 0 &&
+        api->struct_size >= offsetof(ObeliskApi, OBELISK_CONCAT(Unregister, TimerWithOwnerToken)) +
+            sizeof(api->OBELISK_CONCAT(Unregister, TimerWithOwnerToken)) &&
+        api->OBELISK_CONCAT(Register, TimerWithOwnerTokenHandle) &&
+        api->OBELISK_CONCAT(Unregister, TimerWithOwnerToken);
 }
 
 static bool ValidateResourceKindDescriptor(const ObeliskApi* api,
@@ -434,6 +470,11 @@ static void UnregisterCallbacks(void)
         g_Api.UnregisterProcessEventCallbackWithOwnerToken(g_OwnerToken, g_ProcessEventHandle);
         g_ProcessEventHandle = 0;
     }
+    if (g_HasApi && g_TimerHandle != 0 && g_Api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken))
+    {
+        g_Api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken)(g_OwnerToken, g_TimerHandle);
+        g_TimerHandle = 0;
+    }
     if (g_HasApi && g_GameplayPolicyEventHandle != 0 && g_Api.UnregisterGameplayPolicyEventWithOwnerToken)
     {
         g_Api.UnregisterGameplayPolicyEventWithOwnerToken(g_OwnerToken, g_GameplayPolicyEventHandle);
@@ -457,6 +498,8 @@ static void ResetState(void)
     g_GameplayPolicyEventAccepted = false;
     g_ChatMessageEventHandle = 0;
     g_ChatMessageEventSeenModes = 0;
+    g_TimerHandle = 0;
+    g_TimerSeen = false;
 }
 
 __attribute__((visibility("default"))) bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out)
@@ -551,6 +594,23 @@ __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
         }
     }
 
+    if (HasScheduledApi(api))
+    {
+        g_TimerHandle = api->OBELISK_CONCAT(Register, TimerWithOwnerTokenHandle)(
+            g_OwnerToken,
+            1000,
+            0,
+            0,
+            HandleScheduledCallback,
+            &g_TimerUserData);
+        if (g_TimerHandle == 0)
+        {
+            UnregisterCallbacks();
+            ResetState();
+            return false;
+        }
+    }
+
     CompileGameplayPolicyAbi();
     return true;
 }
@@ -579,4 +639,9 @@ __attribute__((visibility("default"))) bool InstallLayoutConsumer_ChatMessageEve
         (1ull << OBELISK_CHAT_SEND_MODE_LOCAL) |
         (1ull << OBELISK_CHAT_SEND_MODE_ALLIANCE);
     return (g_ChatMessageEventSeenModes & all_chat_modes) == all_chat_modes;
+}
+
+__attribute__((visibility("default"))) bool InstallLayoutConsumer_ScheduledCallbackSeen()
+{
+    return g_TimerSeen;
 }

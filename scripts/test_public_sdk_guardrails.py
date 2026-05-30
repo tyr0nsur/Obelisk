@@ -43,6 +43,7 @@ V010_CORE_API_CAPABILITY_ALLOWLIST = [
     "OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS",
     "OBELISK_API_CAPABILITY_CHAT_EVENTS",
     "OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS",
+    "OBELISK_API_CAPABILITY_TIMERS",
 ]
 V010_CORE_OBELISK_API_FIELD_ALLOWLIST = [
     "LogInfo",
@@ -71,6 +72,8 @@ V010_CORE_OBELISK_API_FIELD_ALLOWLIST = [
     "DescribeGameplayPolicyEventKind",
     "RegisterChatMessageEventWithOwnerTokenHandle",
     "UnregisterChatMessageEventWithOwnerToken",
+    "RegisterTimerWithOwnerTokenHandle",
+    "UnregisterTimerWithOwnerToken",
 ]
 V010_PUBLIC_STRUCT_ALLOWLIST = [
     "ObeliskStringView",
@@ -125,7 +128,12 @@ V010_PUBLIC_CALLBACK_TYPEDEF_ALLOWLIST = [
     "OnProcessEventCallback",
     "ObeliskGameplayPolicyEventCallback",
     "ObeliskChatMessageEventCallback",
+    "ObeliskTimerCallback",
 ]
+CORE_TIMER_PUBLIC_TOKENS = {
+    "ObeliskTimer",
+    "UnregisterTimer",
+}
 V010_PUBLIC_MANIFEST_METADATA_SURFACE_IDS = [
     "obelisk.resource_kind_descriptors.v1",
     "obelisk.gameplay_policy_event_descriptors.v1",
@@ -1933,6 +1941,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 continue
             text = path.read_text(encoding="utf-8")
             for token in forbidden:
+                if token in CORE_TIMER_PUBLIC_TOKENS:
+                    continue
                 if token in text:
                     offenders.append(f"{path.relative_to(REPO_ROOT)}: {token}")
 

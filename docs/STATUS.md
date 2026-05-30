@@ -51,6 +51,7 @@ define or protect runtime behavior.
 | Plugin C ABI loading | Stable baseline | ABI is C-compatible and currently append-only for new metadata fields; `v0.1.0` freezes the current `ObeliskApi` ABI v1 layout, and any ABI v2 requires an explicit migration plan. ABI guardrails include layout validation, in-tree and installed SDK consumer checks, and capability-snapshot tests for owner-token public registrations. |
 | Filtered ProcessEvent callbacks | Debug-gated raw ABI | Runtime infrastructure only: callbacks scoped by `FName` index still receive borrowed UE pointers and raw params, so they are rejected unless `OBELISK_ALLOW_FILTERED_PROCESS_EVENT_CALLBACKS=1` and `allow-filtered-process-event-callbacks` are active. This is not public module dispatch, gameplay mutation, return override, or a stable parameter API. |
 | Plugin callback ownership | Stable baseline | Callback owner tokens are unregistered on init failure and before plugin unload; owner-token handle registration supports helper/background-thread callbacks and explicit owner-scoped unregister without creating ownerless registrations. Owner-token callback registration uses the plugin owner's init-time capability snapshot, so later manager construction cannot widen an already-loaded plugin. Unregister/owner cleanup initiated from gameplay callbacks avoids dispatcher cleanup waits to prevent callback-to-callback deadlocks, while non-callback owner/plugin cleanup still waits for in-flight dispatch and deferred `DestroyUserData` cleanup. |
+| Process-local timers | Post-RC core primitive | `OBELISK_API_CAPABILITY_TIMERS` exposes owner-token one-shot/repeating callbacks with process-local handles, zero-failure registration, explicit unregister, callback exception containment, and owner cleanup on init failure/unload. This is a core scheduler only: not a UE/gameplay timer, not persistent cluster state, not object identity, and not a command/permission API. |
 | Plugin architecture policy | Stable baseline | See `docs/PLUGIN_ARCHITECTURE.md`; examples must stay small and experimental plugins stay out of top-level build. Plugins with background workers, sockets, HTTP, long-lived file readers, or other external ingress are experimental until they pass a promotion gate for idempotent shutdown, owner-token unregister, queue drain, thread join, socket/file close, and no detached workers or persisted runtime handles. |
 | `oBaseEvents` | Release example | First official example plugin; demonstrates ABI validation, config creation, debug-gated filtered callback handle lifecycle, and shutdown unregister. It is not gameplay dispatch or a stable parameter API. |
 | `oPolicyAudit` | Experimental | First-party `GameplayPolicyEvent` audit example excluded from the default build and release scope unless `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`; not published by `scripts/check_release_readiness.sh`. |
@@ -72,7 +73,7 @@ define or protect runtime behavior.
 | GObjects/GUObjectArray enumeration | Not ready | Validate object shapes in isolation before accepting offsets. |
 | UObject flag validity policy | Not ready | Static flag-policy reports and transition matrices that pass the offline artifact gate in consume mode are candidate-only evidence. They do not prove lifecycle/validity semantics, do not satisfy promote-mode gates, and do not unlock `ResourceHandle`, object lookup, GObjects promotion, mutation, or return overrides. |
 | General reflected UFunction parameter decoding | Not ready | Candidate-only module recognizers exist, but SDK-facing decoding remains unpromoted. |
-| Higher-level SDK APIs | Not ready | Outside the promoted `GameplayPolicyEvent` and minimal `ChatMessageEvent` surfaces, Inventory, players, richer chat, tribes, dinos, missions, transfers, permissions, timers, admin, commands, and public `StructureEvents` remain roadmap items until each has copied payloads, ABI tests, privacy policy, and accepted target-set evidence. Post-RC internal recognizer order is Item return-only policy, Mission copied-bool observer, then Transfer `bAccept`; this is not RC public SDK/API scope. |
+| Higher-level SDK APIs | Not ready | Outside the promoted `GameplayPolicyEvent`, minimal `ChatMessageEvent`, and process-local core timers, Inventory, players, richer chat, tribes, dinos, missions, transfers, permissions, gameplay/module timers, admin, commands, and public `StructureEvents` remain roadmap items until each has copied payloads, ABI tests, privacy policy, and accepted target-set evidence. Post-RC internal recognizer order is Item return-only policy, Mission copied-bool observer, then Transfer `bAccept`; this is not RC public SDK/API scope. |
 
 ## Current Game Interaction Boundary
 
@@ -99,7 +100,8 @@ Blocked from stable plugin APIs until promoted with evidence:
 - calling arbitrary UE4 functions or replaying events through `CallProcessEvent`;
 - exposing borrowed `UObject`, `FString`, `UFunction`, or raw parameter memory to plugins;
 - publishing gameplay module APIs for players, richer chat, tribes, buffs, inventory,
-  items, dinos, structures, missions, transfers, permissions, timers, admin, or commands.
+  items, dinos, structures, missions, transfers, permissions, gameplay/module timers,
+  admin, or commands.
 
 ## Harness Safety Baseline
 

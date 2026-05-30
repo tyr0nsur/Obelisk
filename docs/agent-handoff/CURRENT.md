@@ -48,169 +48,50 @@ Active routing only: durable evidence belongs in `docs/research/`, resume facts 
 
 ## Current Routing Facts
 
-- ABI/API: `ObeliskApi` v1 stays append-only for `v0.1.0`; public gameplay SDK surfaces
-  require accepted second-source evidence, copied-data ownership, and lifecycle gates.
-- RC public scope remains limited to `GameplayPolicyEvent`, the minimal copied
+- `v0.1.0-rc.1` is frozen. Public RC scope is only `GameplayPolicyEvent`, minimal copied
   `ChatMessageEvent`, `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`.
-- Promoted gameplay surface: `GameplayPolicyEvent` is the only public gameplay policy
-  event, backed by `docs/public_gameplay_events.json` and
-  `docs/research/2026-05-29-public-gameplay-event-readiness-audit.md`. Its structure and
-  inventory inputs are copied/redacted POD only; no UE pointers, raw params, identity,
-  mutation, or return override are promoted. The separate minimal `ChatMessageEvent` RC
-  surface is a copied chat notification contract, not a gameplay policy/module SDK.
-- Promoted helpers: `DescribeResourceKind` and `DescribeGameplayPolicyEventKind` are
-  metadata-only descriptors for known resource categories and promoted policy event kinds.
-  They are not object identity, UE lookup, mutation, return-override, module SDK, or
-  `ResourceHandle` surfaces.
-- RC chat surface: minimal copied `ChatMessageEvent` is backed by accepted
-  `chat-message-intake` evidence and copied plugin delivery logs; see
-  `docs/research/2026-05-29-chat-message-second-source-readiness.md`. The latest copied
-  `oChatLogger` beta evidence validates plugin-facing delivery for `send_mode=0,1,2,3`
-  with `flags=0x1`, bounded `mode_count` metadata, and no raw text/identity/pointer logs.
-  This promotes only the minimal copied notification contract for plugin-local parsing;
-  it does not promote command routing, sender identity, moderation/blocking, mutation,
-  return override, or UE internals. `docs/public_gameplay_events.json` keeps the event in
-  `rc_events`, not a broad stable chat API.
-- Player-backed beta readiness remains limited to minimal `ChatMessageEvent` copied
-  delivery if a new approved beta window is opened. Inventory, mission, item, dino, buff,
-  tribe, transfer, admin, identity, mutation, and return override are not ready for
-  player-facing SDK tests.
-- ResourceHandle remains blocked on `uobject_flags_validity_semantics_unproven`.
-  Primary Ragnarok copied-core serial scan now has 44 coherent `0x4000` rejected-object
-  candidates; focused reconciliation resolved them as `ParticleSystemComponent0` under
-  `Text_Actor` / `Text_Actor_C`. This is internal blocker evidence only, not public
-  handle/lookup/identity/lifetime promotion. Serial-scan gate consumption requires
-  `scan_limit` to be present, match provenance, and bound sparse candidate indices.
-- Runtime posture remains default-deny for filtered/global raw `ProcessEvent` callbacks,
-  public `CallProcessEvent`, blocking, broad tracing, scanner/debug controls, and
-  observers. Filtered raw callbacks require `OBELISK_ALLOW_FILTERED_PROCESS_EVENT_CALLBACKS=1`
-  plus `allow-filtered-process-event-callbacks`; copied events are the RC plugin paths.
-  `CallProcessEvent` is ABI v1 compatibility/debug only, not owner-scoped, and out of RC.
-- Internal bridges only: `core/StructureEventDispatcher` and
-  `core/InventoryPolicyEventDispatcher` feed copied-scalar policy events. They do not
-  promote standalone public StructureEvents or Inventory SDKs.
-- `plugins/oPolicyAudit` is an experimental `GameplayPolicyEvent` example, outside first
-  release scope, built only with `-DOBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`.
-- `v0.1.0-rc.1` publication completed after `scripts/check_release_readiness.sh` passed
-  without `--allow-dirty` using the accepted RC UFunction second-source root and after
-  exact tag/ref verification. Treat this as a published RC baseline only, not a
-  production-stable `v1.0` claim.
-- Offline/module evidence stays in dated research notes; keep exact target counts,
-  blockers, and accepted/rejected promotion claims out of this current handoff.
-- Canonical offline roots for post-RC modules: Mission compact refresh `20260530T020021Z`;
-  Item `20260529T141900Z`/`20260530T013606Z`; Transfer `20260529T154200Z`.
-- Transfer second-source evidence is accepted as layout-only. No public Transfer SDK,
-  object identity, payload decoding, mutation, return override, runtime hooks, or
-  `ResourceHandle` claim is promoted.
-- Internal recognizers may expand only as fixture-backed, SHA-gated, copied-scalar
-  planning aids. Inventory dispatch stays exact-shape/fail-closed for copied bools only;
-  Mission/Item/Transfer recognizers remain test-only or post-RC planning surfaces unless a
-  separate promotion gate changes scope.
-- Weak-helper and GObjects evidence is internal offline input only. `0x595b7e0` supports
-  target-set enumeration across current copied-core evidence, but not public GObjects,
-  identity, lookup, `ResourceHandle`, mutation, or return override. Do not spend RC rounds
-  on broad FName/GObjects discovery unless a new binary hash or contradictory evidence
-  appears; current RC progress is accepted target-set evidence plus clean release slicing,
-  not proving every FName/UFunction.
-- Weak-helper polarity/caller-mode reports are candidate-only hygiene. Normalized semantic
-  artifacts are consume accepted and promote blocked; they remain internal hook-frame
-  policy input only.
-- Weak-helper `caller_rows` remain internal static caller-mode hygiene only. Follow the
-  static-binary-analysis skill for source/digest rules; do not promote `ResourceHandle`,
-  lookup, lifecycle names, mutation, return override, or public SDK surface from them.
-- Runtime dispatchers use process-lifetime storage, fail closed, snapshot registrations,
-  handle same-dispatch unregister, and preserve cleanup waits. Structure/Inventory now wait
-  across the other in-flight `GameplayPolicyEvent` family; Chat keeps non-blocking
-  cross-family cleanup. Public `GameplayPolicyEvent` and `ChatMessageEvent` plugin
-  callbacks are caught at the public callback bridge so C++ plugin exceptions do not
-  escape back into dispatcher/hook code.
-- RC API audit fixed owner-token capability snapshot blockers for `ChatMessageEvent`,
-  `GameplayPolicyEvent`, and global ProcessEvent callback registration. Legacy public
-  `CallProcessEvent` remains debug-gated and out of the RC public production path.
-- Chat route observation is internal-only; see
-  `docs/research/2026-05-29-chat-route-observer-plan.md`. The route observer is
-  default-off, post-original, no SDK/ABI change, no plugin callback,
-  `delivery_claim=none`, and no text/identity/pointer logging. Wrapper, stable posture,
-  and CLI guardrails now own `enable-chat-route-observer` /
-  `OBELISK_CHAT_ROUTE_OBSERVER_*`: stable launches scrub/fail closed, and
-  `observer-debug` requires the scoped markers, exact supported SHA, and a positive limit.
-  Route observations must not expand public delivery claims without copied plugin delivery
-  logs.
-- `docs/research/2026-05-29-rc-checkpoint-slicing-plan.md` is historical recovery
-  context only; continue from current `main` instead of restarting old slicing.
+  It is not a production-stable `v1.0` claim and must not be expanded retroactively.
+- `ObeliskApi` v1 remains append-only. New public surfaces need copied-data ownership,
+  explicit capability/`struct_size` gates, lifecycle cleanup, privacy rules, and accepted
+  second-source/static evidence.
+- Promoted copied events remain non-authoritative: no UE pointers, raw params, object
+  identity, lookup, mutation, return override, pincode/player text publication, or broad
+  module SDK claim.
+- Runtime posture is default-deny for filtered/global raw `ProcessEvent`, public
+  `CallProcessEvent`, ProcessEvent blocking, broad tracing, ReflectionScanner, debug
+  control, and observers unless an exact approved debug window enables the matching
+  env+marker pair.
+- Current post-RC core primitive: owner-token process-local timers. They are ABI
+  append-only, zero-failure handles, one-shot/repeating, explicit unregister, and cleaned
+  on plugin init failure/unload. Timer ids are not shared config, cluster state, UE
+  identity, or persistent handles.
+- Internal bridges only: `StructureEventDispatcher`, `InventoryPolicyEventDispatcher`,
+  Item/Mission/Transfer recognizers, weak-helper artifacts, GObjects evidence, and route
+  observers are planning/evidence inputs until a separate promotion gate changes scope.
+- ResourceHandle/public GObjects remain blocked. Latest flag-policy consume check is
+  blocked by old artifact vocabulary and missing provenance/caller rows; see
+  `docs/research/2026-05-30-uobject-flag-policy-gate-refresh.md`.
 
 ## Priority Next Steps
 
-- Keep the published RC public API frozen around `GameplayPolicyEvent`, minimal copied
-  `ChatMessageEvent`, and descriptor helpers; continue post-RC work without redefining it.
-- Current post-RC focus: move toward a general `v1.0` production core by reducing
-  architecture debt, improving evidence tooling, and extracting UE4 reflection knowledge
-  needed for safe copied module APIs. Do not jump straight to broad public SDKs.
-- Start a durable v1.0 capability map for ArkApi-style plugin replacement: commands,
-  permissions, players, tribes, dinos, items/inventory, structures, timers, admin, and
-  external storage integrations. Separate core primitives from plugins that should be
-  rebuilt later on top of those primitives.
-- `ArkServerApi/AseApi` is names/behavior reference only; see
-  `docs/research/2026-05-30-aseapi-reference-scan.md`. Do not copy offsets, vtables,
-  layouts, `.lib` artifacts, MSVC conventions, direct field/native-call wrappers, or raw
-  UE pointer APIs; rebuild through Obelisk reflection/ProcessEvent copied-data evidence.
-- Treat the latest `ChatMessageEvent` beta window as closed and preserved. Copied-log
-  evidence under `/servidor/ark/workspace-offline` validates plugin-facing delivery for
-  `send_mode=0,1,2,3` with no raw text/identity leaks. Any future live chat evidence must
-  be a newly approved, privacy-bounded window with analyzer and manifest gates.
-- Keep second-source intake fail-closed: derive artifact-specific FName root, validate
-  GObjects, regenerate snapshots, compare with readiness gaps enabled, and review the JSON
-  plan before execution. Ready readiness reports must come from
-  `gate_mode=second_source_promotion`, name at least one target set, and keep
-  `promotion_ready=false`; consume-mode acceptance is layout evidence, not API/runtime
-  promotion.
-- Keep ResourceHandle promotion blocked and internal only. Use
-  `docs/research/2026-05-30-post-rc-offline-resourcehandle-priority.md` as the current
-  flag-policy/ResourceHandle pointer: consume-mode evidence is useful, promote-mode stays
-  blocked, and the next meaningful step is a post-RC lifecycle/reuse experiment plan, not
-  more broad scans.
-- Treat Item return-only policy modeling as the best next value/risk target only inside
-  the existing `GameplayPolicyEvent`/internal recognizer path. Keep it copied bools only;
-  no `ItemId`, `AdditionalData`, `ResourceHandle`, return override, or public Inventory
-  SDK. Freeze broader Inventory target sets for now; `CraftBlueprint`,
-  `InventoryCustomFilter` arrays, and `ServerRequestInventoryUseItemWithTransform` stay
-  out of scope.
-- The first non-UE-dependent v1 core service is in post-RC development: owner-token
-  process-local timers with append-only ABI, `OBELISK_API_CAPABILITY_TIMERS`,
-  zero-is-failure handles, explicit unregister, owner cleanup on init failure/unload, and
-  in-flight callback cleanup tests. Treat timer handles as process-local only; do not
-  persist them, share them across clustered ARK processes, or imply UE/game identity.
-- InventoryReflection hardening now validates snapshot-backed class object indices,
-  outer object indices, and per-property flags before copied bool dispatch. This is
-  internal-only `GameplayPolicyEvent` hardening, not a public Inventory SDK or ABI change.
-- Inventory hook dispatch builds/reuses copied payloads once, uses subscriber count only
-  as a cheap mirror, and rebinding/cancel paths keep copied scalar spans owner-local. The
-  strict RC `minimal-second-source-intake` redacted signature pack has complete coverage.
-- Internal recognizer work stays test-only until promoted. The current recognizer order
-  is Item return-only policy, Mission copied-bool observer, then Transfer `bAccept`; this
-  is not RC public SDK/API scope and does not change the RC public API. It does not
-  promote public module SDKs, callbacks, ABI, marker/env, runtime logs, hook wiring,
-  mutation, return override, object identity, lookup, or `ResourceHandle`; keep detailed
-  test coverage in dated research notes.
-- Post-RC offline tooling added candidate-only UObject flag, weak-helper, and GObjects
-  evidence builders plus gate tests. These tools are for consume-mode internal/offline
-  indexing only. They do not promote public GObjects, lookup, identity, lifecycle,
-  `ResourceHandle`, mutation, return override, or SDK surfaces.
-- Keep redacted UFunction signatures, offline manifests, item compact intake,
-  inventory-action compact intake, and BoolProperty gates candidate/layout-only unless the
-  exact target set passes promote-mode artifact gates plus second-source/static evidence.
-- Keep MissionReflection and ProcessEventItemReflection test-only: no hook wiring,
-  dispatcher, public ABI, marker/env, runtime logs, or SDK surface.
-- Route observer remains internal diagnostic evidence only; see the chat route observation
-  fact above for gates and limits.
-- No broad new core dump is needed for the published RC surfaces. Existing fixture-backed
-  target sets cover exact RC UFunctions; safe claims remain target-set-scoped, not "all
-  FNames" or "all UFunctions". For v1.0 research, prefer focused offline evidence:
-  GObjects coherent-field-window hardening, Mission copied-bool observer planning, Item
-  return-only policy modeling, and Transfer `bAccept` modeling before any live-server
-  debug request.
+- Preserve RC scope while moving toward `v1.0`: reduce architecture debt, improve evidence
+  tooling, and promote only copied module APIs with strict gates.
+- Next development target after timer hardening: Item return-only policy modeling inside
+  the existing internal recognizer/`GameplayPolicyEvent` path. Keep it copied bools only:
+  no `ItemId`, `AdditionalData`, `ResourceHandle`, return override, public Inventory SDK,
+  hook wiring, marker/env, or runtime logs until promoted.
+- Research order after Item: Mission copied-bool observer, then Transfer `bAccept`.
+  Commands/chat routing is important but waits on player context, permissions, and safe
+  response semantics. ArkServerApi/AseApi remains names/behavior reference only.
+- Regenerate the blocked UObject flag-policy artifact with current provenance/caller-row
+  requirements before spending more ResourceHandle effort. Do not rerun broad FName,
+  GObjects, or core scans unless the binary hash changes or evidence contradicts current
+  roots/candidates.
+- Any future live/player validation requires a new approved live-ops brief and, when
+  players are involved, a beta-test notice through the configured local webhook variable.
 
 ## Agent Protocol
 
-- Lead owns server safety, GitHub, and stale-agent cleanup. Sub-agent prompts need scoped
-  objective, safety baseline, paths, skills, expert role, and expected decision.
+- Lead owns server safety, GitHub, and stale-agent cleanup.
+- Before each round: close stale agents, assign expert role, declare read-only/edit paths,
+  pass only relevant skills, state validation expected, and keep integration with lead.

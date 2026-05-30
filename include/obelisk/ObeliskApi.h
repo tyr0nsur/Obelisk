@@ -331,7 +331,10 @@ typedef struct ObeliskApi {
     // OBELISK_API_CAPABILITY_TIMERS, and these function pointers before use. A return
     // value of 0 means registration was rejected. Non-zero handles are process-local,
     // owned by the registering plugin, cleaned up on plugin unload/init failure, and must
-    // not be persisted to shared config or reused across ARK server processes.
+    // not be persisted to shared config or reused across ARK server processes. delayMs
+    // must be non-zero. One-shot timers require intervalMs=0 and flags=0. Repeating
+    // timers require OBELISK_TIMER_FLAG_REPEATING and non-zero intervalMs. Reserved flags
+    // are rejected.
     uint64_t (*RegisterTimerWithOwnerTokenHandle)(
         uint64_t ownerToken,
         uint64_t delayMs,

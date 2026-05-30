@@ -4,6 +4,9 @@
 #include <cstdint>
 #include <cstring>
 
+#define OBELISK_CONCAT_INNER(a, b) a##b
+#define OBELISK_CONCAT(a, b) OBELISK_CONCAT_INNER(a, b)
+
 namespace
 {
     ObeliskApi g_Api{};
@@ -12,12 +15,16 @@ namespace
     uint64_t g_ProcessEventHandle = 0;
     uint64_t g_GameplayPolicyEventHandle = 0;
     uint64_t g_ChatMessageEventHandle = 0;
+    uint64_t g_ScheduledHandle = 0;
     uint64_t g_GameplayPolicyEventUserData = 0x5DC0DE;
     uint64_t g_ChatMessageEventUserData = 0xC0FFEE;
+    uint64_t g_ScheduledUserData = 0x710E;
     bool g_GameplayPolicyEventSeen = false;
     bool g_GameplayPolicyEventAccepted = false;
     bool g_ChatMessageEventSeen = false;
     bool g_ChatMessageEventAccepted = false;
+    bool g_ScheduledSeen = false;
+    bool g_ScheduledAccepted = false;
     ObeliskGameplayPolicyEvent g_GameplayPolicyEventCopy{};
 
     constexpr const char* kDefaultConfig = R"json({
@@ -143,6 +150,14 @@ namespace
             event->message.data[4] == 'o';
     }
 
+    void HandleScheduledCallback(uint64_t timerId, void* userData)
+    {
+        g_ScheduledSeen = true;
+        g_ScheduledAccepted = timerId == g_ScheduledHandle &&
+            timerId != 0 &&
+            userData == &g_ScheduledUserData;
+    }
+
     bool HasProcessEventHandleApi(const ObeliskApi* api)
     {
         return api &&
@@ -175,8 +190,30 @@ namespace
             api->UnregisterChatMessageEventWithOwnerToken;
     }
 
+    bool HasScheduledApi(const ObeliskApi* api)
+    {
+        return api &&
+            (api->capabilities & OBELISK_API_CAPABILITY_TIMERS) != 0 &&
+            api->struct_size >= offsetof(ObeliskApi, OBELISK_CONCAT(Unregister, TimerWithOwnerToken)) +
+                sizeof(api->OBELISK_CONCAT(Unregister, TimerWithOwnerToken)) &&
+            api->OBELISK_CONCAT(Register, TimerWithOwnerTokenHandle) &&
+            api->OBELISK_CONCAT(Unregister, TimerWithOwnerToken);
+    }
+
     void UnregisterCallbacks()
     {
+        if (g_HasApi && g_ScheduledHandle != 0 && g_Api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken))
+        {
+            try
+            {
+                g_Api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken)(g_OwnerToken, g_ScheduledHandle);
+                g_ScheduledHandle = 0;
+            }
+            catch (...)
+            {
+            }
+        }
+
         if (g_HasApi && g_ChatMessageEventHandle != 0 && g_Api.UnregisterChatMessageEventWithOwnerToken)
         {
             try
@@ -222,10 +259,13 @@ namespace
         g_ProcessEventHandle = 0;
         g_GameplayPolicyEventHandle = 0;
         g_ChatMessageEventHandle = 0;
+        g_ScheduledHandle = 0;
         g_GameplayPolicyEventSeen = false;
         g_GameplayPolicyEventAccepted = false;
         g_ChatMessageEventSeen = false;
         g_ChatMessageEventAccepted = false;
+        g_ScheduledSeen = false;
+        g_ScheduledAccepted = false;
         g_GameplayPolicyEventCopy = {};
     }
 }
@@ -319,6 +359,23 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
             }
         }
 
+        if (HasScheduledApi(&g_Api))
+        {
+            g_ScheduledHandle = g_Api.OBELISK_CONCAT(Register, TimerWithOwnerTokenHandle)(
+                g_OwnerToken,
+                1000,
+                0,
+                0,
+                HandleScheduledCallback,
+                &g_ScheduledUserData);
+            if (g_ScheduledHandle == 0)
+            {
+                UnregisterCallbacks();
+                ResetState();
+                return false;
+            }
+        }
+
         return true;
     }
     catch (...)
@@ -362,4 +419,14 @@ extern "C" __attribute__((visibility("default"))) bool SdkConsumerMinimal_ChatMe
 extern "C" __attribute__((visibility("default"))) bool SdkConsumerMinimal_ChatMessageEventAccepted()
 {
     return g_ChatMessageEventAccepted;
+}
+
+extern "C" __attribute__((visibility("default"))) bool SdkConsumerMinimal_ScheduledCallbackSeen()
+{
+    return g_ScheduledSeen;
+}
+
+extern "C" __attribute__((visibility("default"))) bool SdkConsumerMinimal_ScheduledCallbackAccepted()
+{
+    return g_ScheduledAccepted;
 }

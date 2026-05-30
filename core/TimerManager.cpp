@@ -235,7 +235,7 @@ namespace Obelisk::Core
 
         TimerState& state = State();
         std::unique_lock<std::mutex> lock(state.Mutex);
-        std::vector<std::shared_ptr<TimerEntry>> removed;
+        size_t removed = 0;
         for (auto it = state.Timers.begin(); it != state.Timers.end();)
         {
             auto timer = it->second;
@@ -246,7 +246,7 @@ namespace Obelisk::Core
             }
 
             if (!timer->Cancelled)
-                removed.push_back(timer);
+                ++removed;
             timer->Cancelled = true;
             if (timer->InFlight == 0)
                 it = state.Timers.erase(it);
@@ -254,13 +254,10 @@ namespace Obelisk::Core
                 ++it;
         }
 
-        if (removed.empty())
-            return 0;
-
         if (t_CurrentTimerOwner == owner)
         {
             state.Cv.notify_all();
-            return removed.size();
+            return removed;
         }
 
         state.Cv.notify_all();
@@ -269,6 +266,6 @@ namespace Obelisk::Core
                 return item.second->Owner == owner && item.second->InFlight != 0;
             });
         });
-        return removed.size();
+        return removed;
     }
 }
