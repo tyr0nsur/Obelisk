@@ -464,3 +464,128 @@ samples plus runtime serial reuse/wraparound semantics; the accepted serial-poli
 artifact only defines fail-closed policy and explicitly does not prove runtime reuse
 safety, public lookup safety, persistent handles, identity, mutation, return overrides,
 or public `ResourceHandle`.
+
+## Future Runtime Observation Plan
+
+This section is a planning artifact only. It does not approve server operations, marker
+edits, restarts, `/servidor/ark` reads or writes, ptrace/gcore, ReflectionScanner,
+scanner-like probes, broad `ProcessEvent` tracing, Discord notice, GitHub publication, or
+public API promotion.
+
+The minimal future live-ops request should be a single approved debug/development
+runtime-observation window whose only purpose is to produce two redacted internal
+evidence artifacts:
+
+1. `obelisk.internal-uobject-revalidation-runtime-rejection-samples.v1`
+2. `obelisk.internal-uobject-revalidation-runtime-serial-semantics.v1`
+
+Both artifacts must remain consume-only planning inputs with
+`promotion_ready=false`, `public_resource_handle_ready=false`, and
+`post_callback_resource_handle_ready=false`.
+
+### Approval Blockers
+
+The plan is blocked until an operator-approved live-ops brief names all of the following:
+
+- exact debug/development target instance and map, with no production/shared target reuse;
+- ARK binary SHA256 and Obelisk commit expected for the run;
+- restart/start/stop window, rollback steps, and final stable-posture expectation;
+- exact env+marker gates for the observer, including plugins disabled unless the brief
+  explicitly justifies a narrower plugin set;
+- copied-log and artifact output locations, plus the offline promotion path for any raw
+  server-local capture;
+- max runtime duration, max sampled events, max rejected rows, and max log lines;
+- whether players can be present and, if so, the approved notice path.
+
+Without that brief, there is no approval to execute any part of this plan.
+
+### Runtime Gate Shape
+
+Use a new default-off debug observer profile rather than scanner/debug-control tooling.
+The profile should be enabled only by the approved env+marker pair, require the exact
+binary SHA, require an explicit short allowlist of `fname_index` values, and use a hard
+budget. It must never run as broad event discovery.
+
+The observer may inspect only the already reviewed internal candidate state needed to
+decide fail-closed behavior:
+
+- candidate slot in bounds;
+- `FUObjectItem` readable by the runtime's normal guarded read path;
+- object pointer non-null or null as a rejected condition;
+- `FUObjectItem+0x8` nonzero status and match/mismatch status only;
+- `FUObjectItem+0xc` recorded only as `observed_unknown_dword_present`, never as serial;
+- `UObject+0x8` candidate bits `0x100` and `0x4000` as redacted boolean masks;
+- whether the candidate was accepted frame-local, rejected by flag policy, rejected by
+  serial policy, rejected by missing/null object, or rejected by post-callback use.
+
+Logs and artifacts must not contain raw UE pointers, object indices, serial values,
+FName indices beyond the approved allowlist label, class/name/outer paths, player text,
+inventory payloads, gameplay payloads, or persistent lookup tokens.
+
+### Rejected Runtime Object Samples
+
+The rejection-samples artifact is accepted only if it contains at least one redacted row
+where all of the following are true:
+
+- the observation came from the approved SHA, commit, instance, marker profile, and
+  allowlisted callback;
+- the candidate slot was in bounds and structurally readable;
+- the serial candidate was nonzero and matched `FUObjectItem+0x8`;
+- the object pointer was present;
+- `UObject+0x8` contained a candidate reject bit covered by the current fail-closed
+  policy;
+- the observer rejected the candidate and emitted only a copied reason/category.
+
+Reject the artifact if any row requires raw values to interpret, includes public identity,
+comes from an unapproved target/profile, relies on broad tracing, normalizes unknown bits
+into accepted lifecycle names, or treats mutation-window evidence as lookup safety.
+
+### Runtime Serial Semantics
+
+The serial-semantics artifact is accepted only as a negative/fail-closed semantics pack.
+It should answer whether runtime observations contradict the accepted serial policy, not
+try to force a public handle promotion.
+
+Minimum useful rows:
+
+- a fresh same-frame nonzero serial match that reaches
+  `allow_candidate_frame_local_only`;
+- a same-frame serial mismatch or missing/zero serial that rejects;
+- if naturally observed within the approved budget, a slot/object transition where reuse
+  is rejected unless a freshly proven nonzero serial match exists.
+
+Wraparound does not need to be observed. If the run cannot prove wraparound behavior, the
+artifact must explicitly preserve `unknown_wraparound_reject=true`. Any wraparound claim
+requires a separate written plan because forcing wraparound or allocation churn is outside
+this minimal observation window.
+
+Reject the artifact if it exposes serial values, treats `FUObjectItem+0xc` as serial,
+claims persistent handle validity, accepts cross-frame lookup, or relaxes the existing
+zero/missing/mismatch/reuse-without-fresh-serial rejection table.
+
+### Post-Run Gates
+
+After the approved run, the lead should promote only copied logs or redacted artifacts to
+an approved offline root, then run schema-aware consume validation. Promotion validation
+must still block unless a later separate contract also proves public lookup/privacy,
+post-callback lifetime, lifecycle-name correlation, ABI/SDK guardrails, and versioned
+operator safety.
+
+Expected immediate result even after a successful minimal run:
+
+```text
+consume gate: accepted
+promote gate: blocked
+required blockers still present:
+  public_resourcehandle_policy_missing
+  no_public_resource_handle_contract
+  post_callback_lifetime_policy_unproven
+  no_version_matched_source_decompiler_correlation_for_public_lifecycle_names
+  public lookup/privacy/ABI gate missing
+```
+
+The only blockers this plan is intended to narrow are
+`no_rejected_runtime_object_samples` and the runtime-observed portion of
+`no_serial_reuse_or_wraparound_policy`. It must not unlock public `ResourceHandle`,
+public GObjects lookup, object identity, mutation, return override, persistent handles,
+or Plugin Hub SDK exposure.

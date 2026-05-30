@@ -489,6 +489,56 @@ namespace
         }
     }
 
+    void TestRejectsPropertyMetadataDrift()
+    {
+        {
+            StructureFixture fixture;
+            BuildSetVariant(fixture);
+            WriteAt(fixture.PropertyB, 0x30, int32_t{2});
+
+            StructureReflection::StructureInvocation invocation;
+            ReadResult result = StructureReflection::TryIdentifyStructureInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+
+            Require(result.Status == ReadStatus::Implausible, "wrong bForceSet ArrayDim was accepted");
+        }
+        {
+            StructureFixture fixture;
+            BuildSetVariant(fixture);
+            WriteAt(fixture.PropertyB, 0x34, int32_t{2});
+
+            StructureReflection::StructureInvocation invocation;
+            ReadResult result = StructureReflection::TryIdentifyStructureInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+
+            Require(result.Status == ReadStatus::Implausible, "wrong bForceSet ElementSize was accepted");
+        }
+        {
+            StructureFixture fixture;
+            BuildVerifyPinCode(fixture);
+            WriteObject(fixture.IntPropertyClass, kIntPropertyClassNameIndex, 99001, nullptr, nullptr);
+
+            StructureReflection::StructureInvocation invocation;
+            ReadResult result = StructureReflection::TryIdentifyStructureInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+
+            Require(result.Status == ReadStatus::Implausible,
+                    "wrong PinCode IntProperty class object index was accepted");
+        }
+    }
+
     void TestGateRejectsBeforeReading()
     {
         StructureFixture fixture;
@@ -559,6 +609,7 @@ int main()
     TestRecognizesAccessAndDemolishBaselines();
     TestRejectsPartialNameCollisionByOuter();
     TestRejectsWrongShapeAndUnsupportedProperty();
+    TestRejectsPropertyMetadataDrift();
     TestGateRejectsBeforeReading();
     TestNonPinCopiedScalarFilterIsExact();
 

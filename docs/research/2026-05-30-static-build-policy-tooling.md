@@ -311,3 +311,136 @@ its `core.path` resolves outside `/servidor/ark`; then use that non-protected re
 core path in the command above. If the artifact proves `APrimalStructure` is the reflected
 owner, rerun the same command with `--outer-exact APrimalStructure`. Do not generate from
 or dereference protected `/servidor/ark` paths.
+
+## Offline Normalize/Re-root Audit For IsAllowedToBuild
+
+Date: 2026-05-30
+Obelisk commit: `ad8ad8c`
+
+Scope: offline-only review of whether existing non-protected static-global or
+build-policy artifacts can be normalized or re-rooted enough to produce a sanitized
+`IsAllowedToBuild` snapshot without a core. This pass did not read or write
+`/servidor/ark`, did not run server operations, did not use ptrace/gcore/scanners, and
+did not promote any candidate.
+
+Commands run:
+
+```bash
+git rev-parse --short HEAD
+git status --short
+
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/compare_reflection_snapshots.py \
+  --base-root tests/fixtures/ufunction_snapshots \
+  --readiness-report \
+  --target obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild \
+  --json
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/compare_reflection_snapshots.py \
+  --base-root tests/fixtures/ufunction_snapshots \
+  --readiness-report \
+  --target obelisk.ufunction-chain.snapshot.v1:APrimalStructure.IsAllowedToBuild \
+  --json
+
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/normalize_artifact_pack.py \
+  /home/flowcommunity-ark/obelisk-artifacts/structure-return-only-policy-slice-20260530T093002Z \
+  --check --json
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/normalize_artifact_pack.py \
+  /home/flowcommunity-ark/obelisk-artifacts/structure-nonpin-copied-scalar-policy-slice-20260530T100717Z \
+  --check --json
+
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate_offline_artifact_gate.py \
+  --root /home/flowcommunity-ark/obelisk-artifacts/structure-return-only-policy-slice-20260530T093002Z \
+  --manifest /home/flowcommunity-ark/obelisk-artifacts/structure-return-only-policy-slice-20260530T093002Z/artifact-pack.manifest.json \
+  --mode consume --json
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate_offline_artifact_gate.py \
+  --root /home/flowcommunity-ark/obelisk-artifacts/structure-nonpin-copied-scalar-policy-slice-20260530T100717Z \
+  --manifest /home/flowcommunity-ark/obelisk-artifacts/structure-nonpin-copied-scalar-policy-slice-20260530T100717Z/artifact-pack.manifest.json \
+  --mode consume --json
+
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate_offline_artifact_gate.py \
+  --root /home/flowcommunity-ark/obelisk-artifacts/structure-return-only-policy-slice-20260530T093002Z \
+  --manifest /home/flowcommunity-ark/obelisk-artifacts/structure-return-only-policy-slice-20260530T093002Z/structure-return-only-policy-slice.json \
+  --mode consume --json
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate_offline_artifact_gate.py \
+  --root /home/flowcommunity-ark/obelisk-artifacts/structure-return-only-policy-slice-20260530T093002Z \
+  --manifest /home/flowcommunity-ark/obelisk-artifacts/structure-return-only-policy-slice-20260530T093002Z/structure-return-only-policy-slice.json \
+  --mode promote --json
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate_offline_artifact_gate.py \
+  --root /home/flowcommunity-ark/obelisk-artifacts/structure-nonpin-copied-scalar-policy-slice-20260530T100717Z \
+  --manifest /home/flowcommunity-ark/obelisk-artifacts/structure-nonpin-copied-scalar-policy-slice-20260530T100717Z/structure-nonpin-copied-scalar-policy-slice.json \
+  --mode consume --json
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate_offline_artifact_gate.py \
+  --root /home/flowcommunity-ark/obelisk-artifacts/structure-nonpin-copied-scalar-policy-slice-20260530T100717Z \
+  --manifest /home/flowcommunity-ark/obelisk-artifacts/structure-nonpin-copied-scalar-policy-slice-20260530T100717Z/structure-nonpin-copied-scalar-policy-slice.json \
+  --mode promote --json
+
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate_offline_artifact_gate.py \
+  --root /home/flowcommunity-ark/obelisk-artifacts/static-global-preflight-20260529 \
+  --manifest /home/flowcommunity-ark/obelisk-artifacts/static-global-preflight-20260529/manifest.json \
+  --expected-binary-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
+  --mode consume --json
+
+find /home/flowcommunity-ark/obelisk-artifacts -xdev \
+  \( -iname '*core*' -o -iname '*.core' -o -iname 'core.*' -o -iname '*gcore*' -o -iname '*dump*' \) \
+  -printf '%y %s %p -> %l\n' | sort
+find /home/flowcommunity-ark/obelisk-artifacts -xdev -type f -size +100M -printf '%s %p\n' | sort -nr
+rg -n --glob '*.json' --glob '*.md' --glob '*.txt' --glob '*.tsv' \
+  --glob '!*.objdump' --glob '!ShooterGameServer' \
+  'IsAllowedToBuild|AllowedToBuild|BPIsAllowedToBuild|PlacementData|bFinalPlacement|bDontAdjustForMaxRange|PlayerViewRotation|AtLocation|AtRotation' \
+  /home/flowcommunity-ark/obelisk-artifacts
+
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/test_normalize_artifact_pack.py
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/test_snapshot_evidence_pack.py
+```
+
+Results:
+
+- Both exact readiness checks still report `missing_base_snapshot`,
+  `layout_ready=false`, and `promotion_ready=false` for
+  `PrimalStructure.IsAllowedToBuild` and `APrimalStructure.IsAllowedToBuild`.
+- `scripts/normalize_artifact_pack.py` can validate the existing
+  `structure-return-only-policy-slice-*` wrapper as normalized, but wrapper consume-mode
+  gate validation is still blocked by the zero-byte `normalize-artifact-pack.json`, by
+  embedded gate-result JSON with unsupported schema
+  `obelisk.offline-artifact-gate-result.v1`, and by embedded `protected_root` strings.
+- The `structure-nonpin-copied-scalar-policy-slice-*` wrapper is not normalized under the
+  current schema because its manifest uses the legacy spelling
+  `obelisk.artifact-pack-manifest.v1`.
+- The direct structure policy manifests remain useful only as consume-mode evidence:
+  `structure-return-only-policy-slice.json` and
+  `structure-nonpin-copied-scalar-policy-slice.json` both pass consume mode and both block
+  promote mode as evidence-only manifests with non-claims.
+- The static-global preflight manifest still blocks consume mode on
+  `static_global_missing_artifact_identity` and
+  `static_global_static_xrefs_sha256_invalid`. Even if regenerated with
+  `scripts/build_static_global_promotion_evidence.py --strict-artifact-identity`, it
+  would remain static-only global evidence, not reflected `UFunction` snapshot evidence.
+- The non-protected artifact root still has no eligible core. The only file larger than
+  100 MB is `static-global-preflight-20260529/ShooterGameServer.objdump`, and artifact
+  text search found no `IsAllowedToBuild` snapshot, candidate pack, or redacted signature.
+- `scripts/regenerate_ufunction_snapshots.py` can import a complete evidence-pack
+  manifest, but `snapshot_evidence_pack.evidence_pack_defaults()` requires
+  `evidence_status.status=complete`, `gdb_core_failed=false`, a matching binary hash, an
+  existing `core.path` that resolves outside protected server paths, and matching
+  `core.sha256`. Existing protected-path core references under the artifact root are not
+  eligible for this task.
+
+Decision: no current script can normalize or re-root the existing non-protected
+static-global/build-policy artifacts enough to unblock an `IsAllowedToBuild` snapshot
+without a core. The missing evidence is semantic, not just packaging: snapshot generation
+needs a readable offline core or a complete core evidence-pack manifest so
+`inspect_core_ufunctions.py` can walk `GObjects`, resolve FNames, and emit the sanitized
+`UFunction` property-chain snapshot.
+
+Smallest useful tooling improvement once a core is supplied:
+
+- Add a focused offline planner/check mode, either to `scripts/regenerate_ufunction_snapshots.py`
+  or as a tiny wrapper beside it, that accepts `--evidence-pack-manifest` plus exact
+  `--target Outer.Name`, validates the complete non-protected core evidence pack,
+  imports `fname_root_slot`, `gobjects`, artifact identity, and the resolved core path,
+  then prints or writes the exact `inspect_core_ufunctions.py --snapshot-json` command for
+  targets not yet present in `tests/fixtures/ufunction_snapshots/manifest.json`.
+
+That is smaller than broad re-rooting because it does not mutate historical artifact
+packs or weaken gate semantics. It closes the practical gap for one-off post-RC targets
+like `PrimalStructure.IsAllowedToBuild` while preserving fail-closed path, SHA, and
+artifact-identity checks before the core is read.

@@ -1300,6 +1300,10 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "first strict serial reuse/wraparound policy artifact is preserved",
             "manifest consume mode accepts it and promote mode blocks it as candidate-only",
             "does not unlock runtime negative samples, public lookup, object identity",
+            "next strict ResourceHandle blocker is rejected runtime object samples plus runtime serial reuse/wraparound semantics",
+            "future-runtime-observation-plan",
+            "operator-approved live-ops brief names the exact debug target",
+            "Do not replace this with another broad offline FName/GObjects scan",
         ]:
             with self.subTest(file="docs/agent-handoff/CURRENT.md", item=item):
                 self.assertIn(normalized(item), compact_current)

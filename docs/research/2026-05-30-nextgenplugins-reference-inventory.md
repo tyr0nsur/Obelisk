@@ -218,3 +218,15 @@ Fastest honest post-`v0.1` path for plugin creators:
    transfers, inventory, and item mutation as design backlogs, not public examples.
 4. When a backlog category is ready, start with an Obelisk-native design note and evidence
    plan before adding SDK symbols or first-party plugin examples.
+
+Audit note on 2026-05-30: the Plugin Hub docs now give enough contributor guidance for
+post-`v0.1` seed examples because the allowed seed classes, non-goals, and evidence gates
+are explicit in `docs/PLUGIN_HUB_FOUNDATION_V1.md`,
+`docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`, and `plugins/README.md`. The current first-party
+plugin tree already covers every safe current-ABI class: release examples for lifecycle,
+timers, and descriptors, plus experimental examples for copied chat and copied policy
+auditing. Therefore the next honest first-party category is not permissions, economy,
+RCON, homes, inventory, dinos, tribes, transfers, structure enforcement, broadcasts, or
+item mutation. If counting only release-scope examples, graduate passive copied-chat
+audit/parser guidance next; if counting experimental examples too, the honest answer is
+that no new category is ready until a new copied-data surface is promoted.

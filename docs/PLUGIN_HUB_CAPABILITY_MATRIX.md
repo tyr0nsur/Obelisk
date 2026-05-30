@@ -85,6 +85,16 @@ ABI and teach reusable patterns:
 4. Timer utilities for plugin-owned process-local periodic work.
 5. Copied policy auditors over promoted `GameplayPolicyEvent` kinds.
 
+The current first-party examples already cover this safe seed set: `oBaseEvents`,
+`oProcessTimer`, and `oDescriptorCatalog` cover the release-scope foundation, while
+`oPolicyAudit`, `oChatLogger`, and `oChatAudit` cover the experimental copied policy and
+copied chat slices. After those examples, the next honest first-party work is not a new
+ArkApi-style category; it is hardening, documenting, or graduating one of the existing
+copied-data examples. If only default release examples are counted, the next category to
+graduate is passive copied chat auditing/parsing, followed by copied policy auditing.
+If experimental examples are counted too, no additional public category is supported by
+the current ABI.
+
 Do not start public examples with permissions, economy, homes, RCON, inventory, dinos,
 tribes, transfers, structure enforcement, or item grants. Those are valid demand signals,
 but they become Plugin Hub examples only after their own identity, privacy, persistence,

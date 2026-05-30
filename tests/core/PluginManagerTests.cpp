@@ -84,6 +84,8 @@ namespace
         bool callProcessEventInInit = false;
         bool registerOwnerTokenCallbackInShutdown = false;
         bool unregisterOwnerTokenCallbackInShutdown = false;
+        bool registerTimerInShutdown = false;
+        bool unregisterTimerInShutdown = false;
         bool throwOnGetInfoResolve = false;
         bool throwInInitAfterCallbacks = false;
         bool throwOnShutdown = false;
@@ -109,6 +111,8 @@ namespace
         int timerEventCalls = 0;
         uint64_t shutdownRegistrationId = 0;
         bool shutdownUnregisterResult = false;
+        uint64_t shutdownTimerRegistrationId = 0;
+        bool shutdownTimerUnregisterResult = false;
         void* owner = this;
         std::vector<std::string>* orderLog = nullptr;
         Obelisk::Core::ChatEventDispatcher* chatDispatcher = nullptr;
@@ -677,7 +681,9 @@ namespace
         }
 
         if (g_CurrentFakePlugin->registerOwnerTokenCallbackInShutdown ||
-            g_CurrentFakePlugin->unregisterOwnerTokenCallbackInShutdown)
+            g_CurrentFakePlugin->unregisterOwnerTokenCallbackInShutdown ||
+            g_CurrentFakePlugin->registerTimerInShutdown ||
+            g_CurrentFakePlugin->unregisterTimerInShutdown)
         {
             g_CurrentFakePlugin->capturedApi = *api;
         }
@@ -801,6 +807,24 @@ namespace
                 g_CurrentFakePlugin->capturedApi.UnregisterProcessEventCallbackWithOwnerToken(
                     g_CurrentFakePlugin->initOwnerToken,
                     g_CurrentFakePlugin->initThreadRegistrationId);
+        }
+        if (g_CurrentFakePlugin->registerTimerInShutdown)
+        {
+            g_CurrentFakePlugin->shutdownTimerRegistrationId =
+                g_CurrentFakePlugin->capturedApi.RegisterTimerWithOwnerTokenHandle(
+                    g_CurrentFakePlugin->initOwnerToken,
+                    1000,
+                    0,
+                    0,
+                    FakeTimerCallback,
+                    g_CurrentFakePlugin);
+        }
+        if (g_CurrentFakePlugin->unregisterTimerInShutdown)
+        {
+            g_CurrentFakePlugin->shutdownTimerUnregisterResult =
+                g_CurrentFakePlugin->capturedApi.UnregisterTimerWithOwnerToken(
+                    g_CurrentFakePlugin->initOwnerToken,
+                    g_CurrentFakePlugin->timerRegistrationId);
         }
         if (g_CurrentFakePlugin->throwOnShutdown)
             throw std::runtime_error("fake shutdown failure");
@@ -2370,6 +2394,134 @@ namespace
         Require(Obelisk::Core::TimerManager::Get().UnregisterCallbacksForOwner(plugin.owner) == 0,
                 "timer survived plugin init failure");
         Require(plugin.timerEventCalls == 0, "long-delay timer fired before init-failure cleanup");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestOwnerTokenTimerRegistrationRejectedDuringShutdown()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_timer_shutdown_register");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "timer_shutdown_register.so",
+            .pluginId = "timer_shutdown_register",
+            .registerTimerInShutdown = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1, "timer shutdown-register plugin shutdown was not called");
+        Require(plugin.shutdownTimerRegistrationId == 0,
+                "owner-token timer registration succeeded while plugin was unloading");
+        Require(Obelisk::Core::TimerManager::Get().UnregisterCallbacksForOwner(plugin.owner) == 0,
+                "shutdown-time owner-token timer survived unload");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestOwnerTokenTimerRegistrationRejectedDuringInitFailureShutdown()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_timer_init_fail_shutdown_register");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "timer_init_fail_shutdown_register.so",
+            .pluginId = "timer_init_fail_shutdown_register",
+            .initResult = false,
+            .registerTimerInShutdown = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "timer init-failure shutdown-register plugin Init was not called");
+        Require(plugin.shutdownCalls == 1, "timer init-failure shutdown-register plugin shutdown was not called");
+        Require(plugin.shutdownTimerRegistrationId == 0,
+                "owner-token timer registration succeeded during init-failure shutdown");
+        Require(Obelisk::Core::TimerManager::Get().UnregisterCallbacksForOwner(plugin.owner) == 0,
+                "init-failure shutdown-time owner-token timer survived load failure");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestOwnerTokenTimerUnregisterAllowedDuringShutdown()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_timer_shutdown_unregister");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "timer_shutdown_unregister.so",
+            .pluginId = "timer_shutdown_unregister",
+            .registerTimerCallback = true,
+            .unregisterTimerInShutdown = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.timerRegistrationId != 0,
+                "timer shutdown-unregister plugin did not register a timer before unload");
+
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1, "timer shutdown-unregister plugin shutdown was not called");
+        Require(plugin.shutdownTimerUnregisterResult,
+                "owner-token timer unregister was rejected while plugin was unloading");
+        Require(Obelisk::Core::TimerManager::Get().UnregisterCallbacksForOwner(plugin.owner) == 0,
+                "shutdown-unregistered owner-token timer survived unload");
+        Require(plugin.timerEventCalls == 0, "long-delay timer fired before shutdown unregister");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestOwnerTokenTimerUnregisterAllowedDuringInitFailureShutdown()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_timer_init_fail_shutdown_unregister");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "timer_init_fail_shutdown_unregister.so",
+            .pluginId = "timer_init_fail_shutdown_unregister",
+            .initResult = false,
+            .registerTimerCallback = true,
+            .unregisterTimerInShutdown = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "timer init-failure shutdown-unregister plugin Init was not called");
+        Require(plugin.shutdownCalls == 1, "timer init-failure shutdown-unregister plugin shutdown was not called");
+        Require(plugin.timerRegistrationId != 0,
+                "timer init-failure shutdown-unregister plugin did not register a timer before failing");
+        Require(plugin.shutdownTimerUnregisterResult,
+                "owner-token timer unregister was rejected during init-failure shutdown");
+        Require(Obelisk::Core::TimerManager::Get().UnregisterCallbacksForOwner(plugin.owner) == 0,
+                "init-failure shutdown-unregistered owner-token timer survived load failure");
+        Require(plugin.timerEventCalls == 0, "long-delay timer fired before init-failure shutdown unregister");
 
         CleanupPlugin(plugin);
         fs::remove_all(root);
@@ -4678,6 +4830,10 @@ int main()
     TestPublicRepeatingTimerFiresAndStopsAfterUnregister();
     TestUnloadAllWaitsForInFlightPluginTimerBeforeClose();
     TestTimerCallbackCleansOnInitFailure();
+    TestOwnerTokenTimerRegistrationRejectedDuringShutdown();
+    TestOwnerTokenTimerRegistrationRejectedDuringInitFailureShutdown();
+    TestOwnerTokenTimerUnregisterAllowedDuringShutdown();
+    TestOwnerTokenTimerUnregisterAllowedDuringInitFailureShutdown();
     TestChatMessageRegistrationRejectedWhenCapabilityWasNotAdvertised();
     TestChatMessageCallbackExceptionDoesNotEscapeDispatch();
     TestChatMessageRegistrationUsesOwnerCapabilitySnapshotAcrossManagers();

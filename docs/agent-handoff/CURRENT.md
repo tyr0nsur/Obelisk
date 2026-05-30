@@ -54,8 +54,10 @@ for the current checkpoint.
 ## Current Routing Facts
 
 - RC public scope remains limited to `GameplayPolicyEvent`, minimal copied
-  `ChatMessageEvent`, `DescribeResourceKind`, `DescribeGameplayPolicyEventKind`, and
-  process-local owner-token timers. It is not a production-stable `v1.0` claim.
+  `ChatMessageEvent`, `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`.
+  `v0.1.0-rc.2` additionally includes process-local owner-token timers as core runtime
+  API without promoting gameplay/module timers. It is not a production-stable `v1.0`
+  claim.
 - `ObeliskApi` v1 remains append-only. New public surfaces require copied-data ownership,
   capability/`struct_size` gates, lifecycle cleanup, privacy rules, and accepted
   second-source/static evidence.
@@ -116,9 +118,12 @@ for the current checkpoint.
   narrows the serial-policy design gap but does not unlock runtime negative samples,
   public lookup, object identity, mutation, return override, persistent handles, or
   public `ResourceHandle`. The next strict ResourceHandle blocker is rejected runtime
-  object samples plus runtime serial reuse/wraparound semantics; it requires a future
-  approved live-ops/runtime-observation plan, not another broad offline FName/GObjects
-  scan.
+  object samples plus runtime serial reuse/wraparound semantics. The minimal planning
+  note now lives in
+  `docs/research/2026-05-30-post-rc-offline-resourcehandle-priority.md#future-runtime-observation-plan`;
+  execution is still blocked until an operator-approved live-ops brief names the exact
+  debug target, gates, window, rollback, artifacts, and posture checks. Do not replace
+  this with another broad offline FName/GObjects scan.
 - Transfer ScriptStruct bool-tail evidence has a refreshed local root; older
   `/servidor/ark/workspace-offline/...20260529...` transfer roots are stale under current
   bool-tail strictness.
