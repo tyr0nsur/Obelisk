@@ -97,6 +97,9 @@ Before adopting a tool into the workflow:
   collection. Promotion, snapshot regeneration, static evidence, and second-source intake
   tools must consume hardlinked or copied artifacts from `/servidor/ark/workspace-offline`
   or another approved offline root, not direct `dumps` paths.
+- Provenance sidecars are path evidence too. Resolve relative path fields against the
+  sidecar directory before applying protected-root checks; do not ignore relative
+  `../...` values just because the artifact argument was relative.
 - A tool result is not accepted unless another engineer can reproduce it from the command,
   binary hash, Obelisk commit, and copied artifacts.
 - UI-only Ghidra conclusions must be translated into text: function/address, xref path,

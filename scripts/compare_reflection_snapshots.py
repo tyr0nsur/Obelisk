@@ -143,6 +143,32 @@ TARGET_BLOCKER_GUIDANCE = {
     },
 }
 TARGET_SET_BLOCKER_GUIDANCE = {
+    "item-return-only-policy-slice": {
+        "classification": "release_gameplay_policy_item_return_only",
+        "why_blocked": [
+            "standalone_items_inventory_sdk_blocked",
+            "identity_lookup_resourcehandle_blocked",
+            "mutation_return_override_blocked",
+            "runtime_producer_validation_requires_separate_approval",
+        ],
+        "next_offline_input": (
+            "no broader item/inventory target expansion is ready; keep any follow-up evidence "
+            "to the three copied ReturnValue-only targets unless a separate promotion note "
+            "adds an explicit target set"
+        ),
+        "snapshot_prep_checks": [
+            "compare only AllowEquipItem, CanRepair, and UseItemOntoItem through --target-set item-return-only-policy-slice",
+            "copy only the ReturnValue BoolProperty field for each target",
+            "keep CraftBlueprint, bIgnoreInventoryRequirement, bConsumeResources, toInventory, DestinationItem, AdditionalData, object refs, raw params, and UE pointers excluded",
+            "keep item identity, inventory identity, lookup, ResourceHandle, mutation, and return override blocked",
+            "treat release readiness as the narrow GameplayPolicyEvent copied-scalar lane only, not an Items SDK or Inventory SDK",
+            "runtime producer validation still requires a separate gated debug-window brief",
+        ],
+        "non_claim": (
+            "does not promote Items SDK, Inventory SDK, identity, lookup, ResourceHandle, "
+            "mutation, return override, runtime validation, or target-set expansion"
+        ),
+    },
     "players-identity-lifecycle-intake": {
         "classification": "players_identity_lifecycle_guidance_only_candidate",
         "why_blocked": [

@@ -619,6 +619,63 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertIn("does not promote Mission SDK", text_result.stdout)
         self.assertIn("does not promote Transfer SDK", text_result.stdout)
 
+    def test_item_return_target_set_guidance_keeps_release_scope_narrow(self) -> None:
+        result = run_compare_raw(
+            "--list-target-guidance",
+            "--target-set",
+            "item-return-only-policy-slice",
+            "--json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["schema"], "obelisk.reflection-target-guidance.v1")
+        self.assertEqual(report["target_sets"], ["item-return-only-policy-slice"])
+        self.assertEqual(report["targets"], [])
+        self.assertEqual(len(report["target_set_guidance"]), 1)
+        guidance = report["target_set_guidance"][0]
+        self.assertEqual(guidance["target_set"], "item-return-only-policy-slice")
+        self.assertEqual(guidance["classification"], "release_gameplay_policy_item_return_only")
+        self.assertIn("standalone_items_inventory_sdk_blocked", guidance["why_blocked"])
+        self.assertIn("identity_lookup_resourcehandle_blocked", guidance["why_blocked"])
+        self.assertIn("mutation_return_override_blocked", guidance["why_blocked"])
+        self.assertIn(
+            "runtime_producer_validation_requires_separate_approval",
+            guidance["why_blocked"],
+        )
+        for required in (
+            "AllowEquipItem",
+            "CanRepair",
+            "UseItemOntoItem",
+            "ReturnValue BoolProperty",
+            "GameplayPolicyEvent copied-scalar lane only",
+            "runtime producer validation still requires a separate gated debug-window brief",
+        ):
+            self.assertTrue(
+                any(required in item for item in guidance["snapshot_prep_checks"]),
+                f"missing guidance term: {required}",
+            )
+        for blocked in (
+            "Items SDK",
+            "Inventory SDK",
+            "identity",
+            "ResourceHandle",
+            "mutation",
+            "return override",
+            "runtime validation",
+        ):
+            self.assertIn(blocked, guidance["non_claim"])
+
+        text_result = run_compare_raw(
+            "--list-target-guidance",
+            "--target-set",
+            "item-return-only-policy-slice",
+        )
+        self.assertEqual(text_result.returncode, 0, text_result.stderr + text_result.stdout)
+        self.assertIn("target_set_guidance=1", text_result.stdout)
+        self.assertIn("release_gameplay_policy_item_return_only", text_result.stdout)
+        self.assertIn("does not promote Items SDK, Inventory SDK", text_result.stdout)
+
     def test_player_identity_lifecycle_guidance_can_be_listed_without_snapshots(self) -> None:
         result = run_compare_raw(
             "--list-target-guidance",

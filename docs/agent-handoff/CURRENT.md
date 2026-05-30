@@ -1,5 +1,4 @@
 # Current Agent Handoff
-
 This file is an active routing table only. Durable evidence belongs in `docs/research/`,
 resume facts in `COMPACT_CONTEXT.md`, and old detail in `HISTORY-*.md`. Historical
 recovery context is not active routing; use `git log --oneline -1` for the checkpoint.
@@ -71,9 +70,9 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - `oProcessTimer` is the first process-local timer example. Timer ids are process-local,
   not cluster state, UE identity, gameplay/module timer abstractions, or persistent
   handles, or shared scheduler state; owner-token timers require explicit unregister.
-  Safe-disabled discovery/config prep succeeds without optional timer capability, while
-  active timer config still fails closed if timer capability, owner token, or appended
-  timer slots are unavailable.
+  Timer allocation skips zero/live ids after wrap. Safe-disabled config prep works without
+  optional timer capability; active config fails closed on missing timer capability, owner
+  token, or appended timer slots.
 - `oPolicyAudit` now unregisters its `GameplayPolicyEvent` owner-token handle if init
   fails after callback registration. The SDK fixture covers injected post-registration log
   failure cleanup.
@@ -141,7 +140,7 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   this with another broad offline FName/GObjects scan.
 - Transfer ScriptStruct bool-tail evidence has a refreshed local root; old 20260529
   transfer roots are stale. Transfer scalar/bool fields are redacted metadata only; gates
-  detect Transfer structs without labels and require `no_public_transfer_sdk` blockers.
+  detect Transfer structs without labels and require transfer blockers on every field.
 - `validate_offline_artifact_gate.py` consumes `obelisk.artifact-pack.manifest.v1`
   containers with current-content checksums, symlink fail-closed checks, child-manifest
   blockers, container-only promote blocking, protected-root checks, and duplicate target
@@ -151,7 +150,8 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   explicit release-readiness sets, rejects explicit `--target` widening outside named
   target sets, and reports internal/layout-only gaps as `target_set_not_release_readiness`.
 - Offline artifact JSON manifests, provenance sidecars, artifact checksum reads, and
-  core inspector inputs use no-symlink regular-file opens after protected-path prechecks.
+  core inspector inputs use no-symlink regular-file opens after protected-path prechecks;
+  relative provenance paths resolve against their sidecar before protected-root checks.
 - `scripts/check_static_tooling.py` records optional radare2/rizin/Ghidra availability and
   runs smoke checks only on approved offline binaries/output roots.
 - `APrimalStructure.IsAllowedToBuild` is second-wave only: no committed snapshot,

@@ -1,8 +1,10 @@
+#define OBELISK_TIMER_MANAGER_ENABLE_TEST_HOOKS
 #include "core/TimerManager.h"
 
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <limits>
 #include <mutex>
 #include <stdexcept>
 #include <thread>
@@ -98,6 +100,29 @@ namespace
         Require(TimerManager::Get().Register(&owner, 1, 0, true, CountCallback, &state) == 0,
                 "timer registration accepted repeating timer with zero interval");
         Require(!TimerManager::Get().Unregister(&owner, 0), "timer unregister accepted zero handle");
+    }
+
+    void TestTimerIdsSkipZeroAndLiveIdsAfterWrap()
+    {
+        int owner = 0;
+        CounterState state;
+        TimerManager& timers = TimerManager::Get();
+
+        timers.SetNextTimerIdForTesting(1);
+        const uint64_t firstId = timers.Register(&owner, 60000, 0, false, CountCallback, &state);
+        Require(firstId == 1, "first timer id was not one");
+
+        timers.SetNextTimerIdForTesting(std::numeric_limits<uint64_t>::max());
+        const uint64_t lastId = timers.Register(&owner, 60000, 0, false, CountCallback, &state);
+        const uint64_t wrappedId = timers.Register(&owner, 60000, 0, false, CountCallback, &state);
+
+        Require(lastId == std::numeric_limits<uint64_t>::max(), "last timer id was not preserved");
+        Require(wrappedId == 2, "wrapped timer id did not skip zero or live ids");
+        Require(wrappedId != firstId, "wrapped timer id reused a live timer id");
+        Require(!timers.Unregister(&owner, 0), "zero timer id unregistered a timer after wrap");
+        Require(timers.Unregister(&owner, firstId), "first timer id could not unregister");
+        Require(timers.Unregister(&owner, lastId), "last timer id could not unregister");
+        Require(timers.Unregister(&owner, wrappedId), "wrapped timer id could not unregister");
     }
 
     void TestOneShotTimerFiresOnce()
@@ -278,6 +303,7 @@ namespace
 int main()
 {
     TestRegisterRejectsInvalidInputs();
+    TestTimerIdsSkipZeroAndLiveIdsAfterWrap();
     TestOneShotTimerFiresOnce();
     TestRepeatingTimerStopsAfterUnregister();
     TestWrongOwnerCannotUnregister();

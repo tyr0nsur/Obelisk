@@ -20,6 +20,9 @@ namespace Obelisk::Core
                           void* userData);
         bool Unregister(void* owner, uint64_t timerId);
         size_t UnregisterCallbacksForOwner(void* owner);
+#ifdef OBELISK_TIMER_MANAGER_ENABLE_TEST_HOOKS
+        void SetNextTimerIdForTesting(uint64_t nextTimerId);
+#endif
 
     private:
         TimerManager() = default;

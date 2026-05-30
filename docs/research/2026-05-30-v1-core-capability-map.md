@@ -3,8 +3,8 @@
 ## Objective
 
 Define the post-`v0.1.0-rc.2` direction toward a broader production-ready Obelisk core
-that can later support ArkApi-style plugin replacement on Linux without exposing UE4
-internals or unsafe memory-derived handles.
+that can later support Obelisk-native Linux plugins for common ArkApi-style modding
+needs without exposing UE4 internals or unsafe memory-derived handles.
 
 ## Baseline
 
@@ -57,8 +57,8 @@ identity, lookup, mutation, return override, or handle contract.
   lifecycle cleanup, privacy rules, and tests that prove no mutation or return override is
   implied unless explicitly promoted.
 - ArkApi-style demand should be met, where feasible, by Obelisk-native plugins and
-  module APIs on top of Obelisk primitives; this is not ArkApi source, ABI, or behavior
-  compatibility, and must not clone unsafe raw UE pointer surfaces.
+  module APIs on top of Obelisk primitives; this is not ArkApi source, ABI, behavior, or
+  plugin compatibility, and must not clone unsafe raw UE pointer surfaces.
 
 ## Next Work
 

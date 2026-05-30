@@ -2225,7 +2225,18 @@ def redacted_scriptstruct_signature_manifest() -> dict:
                     "scriptstruct_layout_candidate_only",
                     "transfer_scriptstruct_payload_decode_blocked",
                 ],
-                "fields": [{"name": "DinoClassName", "type": "redacted_text"}],
+                "fields": [
+                    {
+                        "name": "DinoClassName",
+                        "type": "redacted_text",
+                        "source_property_class": "StrProperty",
+                        "promotion_blockers": [
+                            "no_public_transfer_sdk",
+                            "scriptstruct_payload_not_runtime_observed",
+                            "transfer_scriptstruct_payload_decode_blocked",
+                        ],
+                    }
+                ],
             },
             {
                 "target": "PrimalLocalProfile.ArkTributePlayerData",
@@ -2463,6 +2474,20 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("scriptstruct_signature_transfer_scalar_type_not_redacted_payload", reasons)
         self.assertIn("scriptstruct_signature_transfer_field_blockers_missing", reasons)
 
+    def test_blocks_redacted_transfer_scriptstruct_nonscalar_missing_field_blockers(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "scriptstruct-signatures" / "manifest.json"
+            payload = redacted_scriptstruct_signature_manifest()
+            payload["signatures"][0]["fields"][0].pop("promotion_blockers")
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("scriptstruct_signature_transfer_field_blockers_missing", reasons)
+
     def test_blocks_redacted_transfer_scriptstruct_missing_expected_bool(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"
@@ -2656,6 +2681,37 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertEqual("accepted", result["status"])
         self.assertEqual([], result["blockers"])
         self.assertTrue(result["artifacts"][0]["provenance_verified"])
+
+    def test_rejects_relative_provenance_path_from_relative_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            previous_cwd = Path.cwd()
+            os.chdir(tmp)
+            try:
+                protected = Path("server")
+                workspace = protected / "workspace-offline"
+                artifact = workspace / "pack" / "artifact.txt"
+                artifact.parent.mkdir(parents=True)
+                artifact.write_text("offline evidence\n", encoding="utf-8")
+                write_json(
+                    Path(f"{artifact}.provenance.json"),
+                    {
+                        "schema": gate.PROVENANCE_SCHEMA,
+                        "verified": True,
+                        "artifact_kind": "objdump",
+                        "producer": "test",
+                        "tool": "objdump",
+                        "binary_sha256": BINARY_SHA,
+                        "artifact_sha256": gate.sha256_file(artifact),
+                        "source_path": "../../live/objdump.txt",
+                    },
+                )
+
+                result = gate.build_result(args(root=workspace, protected_root=protected, artifacts=[("objdump", artifact)]))
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual("blocked", result["status"])
+        self.assertIn("path_resolves_under_protected_root", {b["reason"] for b in result["blockers"]})
 
     def test_rejects_symlinked_workspace_root_even_when_it_resolves_to_workspace(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

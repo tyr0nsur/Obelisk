@@ -1,3 +1,7 @@
+#if !defined(obelisk_EXPORTS)
+#define OBELISK_TIMER_MANAGER_ENABLE_TEST_HOOKS
+#endif
+
 #include "TimerManager.h"
 
 #include "runtime/Logger.h"
@@ -268,4 +272,13 @@ namespace Obelisk::Core
         });
         return removed;
     }
+
+#ifdef OBELISK_TIMER_MANAGER_ENABLE_TEST_HOOKS
+    void TimerManager::SetNextTimerIdForTesting(uint64_t nextTimerId)
+    {
+        TimerState& state = State();
+        std::lock_guard<std::mutex> lock(state.Mutex);
+        state.NextId = nextTimerId == 0 ? 1 : nextTimerId;
+    }
+#endif
 }

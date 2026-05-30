@@ -2821,6 +2821,19 @@ def validate_transfer_redacted_scriptstruct_payload_boundary(
                         "recorded": type_name,
                     }
                 )
+            field_blockers = field.get("promotion_blockers")
+            if (
+                not isinstance(field_blockers, list)
+                or not TRANSFER_SCRIPTSTRUCT_REQUIRED_BLOCKERS.issubset(set(field_blockers))
+            ):
+                blockers.append(
+                    {
+                        "reason": "scriptstruct_signature_transfer_field_blockers_missing",
+                        "label": f"{field_label}.promotion_blockers",
+                        "expected": sorted(TRANSFER_SCRIPTSTRUCT_REQUIRED_BLOCKERS),
+                        "recorded": field_blockers,
+                    }
+                )
             source_property_class = field.get("source_property_class")
             if source_property_class not in TRANSFER_SCRIPTSTRUCT_SCALAR_PROPERTY_CLASSES:
                 continue
@@ -2836,19 +2849,6 @@ def validate_transfer_redacted_scriptstruct_payload_boundary(
                         "label": f"{field_label}.type",
                         "expected": expected_type,
                         "recorded": type_name,
-                    }
-                )
-            field_blockers = field.get("promotion_blockers")
-            if (
-                not isinstance(field_blockers, list)
-                or not TRANSFER_SCRIPTSTRUCT_REQUIRED_BLOCKERS.issubset(set(field_blockers))
-            ):
-                blockers.append(
-                    {
-                        "reason": "scriptstruct_signature_transfer_field_blockers_missing",
-                        "label": f"{field_label}.promotion_blockers",
-                        "expected": sorted(TRANSFER_SCRIPTSTRUCT_REQUIRED_BLOCKERS),
-                        "recorded": field_blockers,
                     }
                 )
     return blockers
@@ -7315,6 +7315,11 @@ def validate_provenance(
     protected_root: Path,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     provenance_path = Path(f"{artifact_path}.provenance.json")
+    provenance_state = path_state(
+        provenance_path,
+        workspace_root=workspace_root,
+        protected_root=protected_root,
+    )
     blockers = path_blockers(
         provenance_path,
         label=f"{artifact_path}:provenance",
@@ -7336,7 +7341,7 @@ def validate_provenance(
     blockers.extend(
         validate_json_path_fields(
             payload,
-            source_label=str(provenance_path),
+            source_label=provenance_state["resolved"],
             workspace_root=workspace_root,
             protected_root=protected_root,
         )

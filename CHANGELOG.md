@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Hardened timer id allocation and offline artifact validation so timer handles skip zero
+  and live ids after wrap, Transfer ScriptStruct fields all carry transfer blockers, and
+  relative provenance paths are resolved against their sidecar before protected-root checks.
 - Kept `PluginManager` cleanup-failure injection hooks out of production shared-library
   builds while preserving the test-only retry coverage.
 - Hardened raw `EventManager` snapshot setup-failure handling so a global callback

@@ -54,6 +54,18 @@ NEXTGEN_DEMAND_BOUNDARY_FILES = [
     REPO_ROOT / "docs" / "research" / "2026-05-30-nextgenplugins-reference-inventory.md",
     REPO_ROOT / "plugins" / "README.md",
 ]
+ARKAPI_DEMAND_BOUNDARY_FILES = [
+    REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md",
+    REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md",
+    REPO_ROOT / "docs" / "research" / "2026-05-30-v1-core-capability-map.md",
+    REPO_ROOT / "docs" / "research" / "2026-05-29-module-surface-roadmap.md",
+    REPO_ROOT / "docs" / "research" / "README.md",
+    REPO_ROOT / "plugins" / "README.md",
+    REPO_ROOT / "docs" / "research" / "2026-05-30-nextgenplugins-reference-inventory.md",
+    REPO_ROOT / "docs" / "research" / "2026-05-30-aseapi-reference-scan.md",
+    REPO_ROOT / "agent-skills" / "obelisk-github-research-workflow" / "SKILL.md",
+    REPO_ROOT / "docs" / "agent-handoff" / "CURRENT.md",
+]
 V010_CORE_API_CAPABILITY_ALLOWLIST = [
     "OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS",
     "OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS",
@@ -911,48 +923,41 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertEqual(offenders, [])
 
     def test_plugin_hub_planning_uses_arkapi_sources_as_demand_dictionary_only(self) -> None:
-        foundation = (REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md").read_text(encoding="utf-8")
-        matrix = (REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md").read_text(encoding="utf-8")
-        plugins_readme = (REPO_ROOT / "plugins" / "README.md").read_text(encoding="utf-8")
-        inventory = (
-            REPO_ROOT / "docs" / "research" / "2026-05-30-nextgenplugins-reference-inventory.md"
-        ).read_text(encoding="utf-8")
-        aseapi_scan = (
-            REPO_ROOT / "docs" / "research" / "2026-05-30-aseapi-reference-scan.md"
-        ).read_text(encoding="utf-8")
-        workflow_skill = (
-            REPO_ROOT / "agent-skills" / "obelisk-github-research-workflow" / "SKILL.md"
-        ).read_text(encoding="utf-8")
-        current_handoff = (REPO_ROOT / "docs" / "agent-handoff" / "CURRENT.md").read_text(
-            encoding="utf-8"
-        )
+        texts = {
+            path.relative_to(REPO_ROOT).as_posix(): path.read_text(encoding="utf-8")
+            for path in ARKAPI_DEMAND_BOUNDARY_FILES
+        }
 
         for text, required in (
-            (foundation, "does not promise ArkApi/AseApi\ncompatibility"),
-            (foundation, "demand dictionaries only"),
-            (foundation, "rebuilt through Obelisk\nreflection"),
-            (matrix, "not as\nportable behavior, source, ABI, constants, schemas, command parsers, or implementation\npatterns"),
-            (matrix, "Rebuild every promoted surface through Obelisk reflection"),
-            (matrix, "provenance for\n"
+            (texts["docs/PLUGIN_HUB_FOUNDATION_V1.md"], "does not promise ArkApi/AseApi\ncompatibility"),
+            (texts["docs/PLUGIN_HUB_FOUNDATION_V1.md"], "demand dictionaries only"),
+            (texts["docs/PLUGIN_HUB_FOUNDATION_V1.md"], "rebuilt through Obelisk\nreflection"),
+            (texts["docs/PLUGIN_HUB_CAPABILITY_MATRIX.md"], "not as\nportable behavior, source, ABI, constants, schemas, command parsers, or implementation\npatterns"),
+            (texts["docs/PLUGIN_HUB_CAPABILITY_MATRIX.md"], "Rebuild every promoted surface through Obelisk reflection"),
+            (texts["docs/PLUGIN_HUB_CAPABILITY_MATRIX.md"], "provenance for\n"
              "demand analysis only"),
-            (matrix, "not license clearance, runtime evidence, an ArkApi\n"
+            (texts["docs/PLUGIN_HUB_CAPABILITY_MATRIX.md"], "not license clearance, runtime evidence, an ArkApi\n"
              "compatibility target, or an ABI reference"),
-            (plugins_readme, "names/demand signals only"),
-            (plugins_readme, "not a\n"
+            (texts["docs/research/2026-05-30-v1-core-capability-map.md"], "ArkServerApi/AseApi is a demand dictionary only"),
+            (texts["docs/research/2026-05-30-v1-core-capability-map.md"], "this is not ArkApi source, ABI, behavior, or\n  plugin compatibility"),
+            (texts["docs/research/2026-05-30-v1-core-capability-map.md"], "Obelisk-native Linux plugins for common ArkApi-style modding\nneeds"),
+            (texts["docs/research/README.md"], "ArkApi/AseApi material remains a names/demand dictionary only"),
+            (texts["plugins/README.md"], "names/demand signals only"),
+            (texts["plugins/README.md"], "not a\n"
              "compatibility target, source reference, ABI reference, schema, command parser, or\n"
              "implementation pattern"),
-            (inventory, "Use this clone as a names/demand dictionary"),
-            (inventory, "not as source code to port"),
-            (inventory, "Do not trust `DECLARE_HOOK` declarations as Linux ABI"),
-            (inventory, "not runtime evidence and do not authorize copied implementation"),
-            (aseapi_scan, "only as a names and demand dictionary"),
-            (aseapi_scan, "not a behavior map,\ncompatibility target, implementation guide, or evidence source"),
-            (aseapi_scan, "Candidate name discovery only"),
-            (aseapi_scan, "Behavior parity, control flow, command parsers, schemas, constants, return semantics"),
-            (workflow_skill, "Local NextGenPlugins clones are names and demand\nsignals only"),
-            (workflow_skill, "Obelisk must not copy ArkServerApi/AseApi,\nNextGenPlugins"),
-            (current_handoff, "ArkServerApi/AseApi and local `NextGenPlugins` clones are names and demand dictionaries\n  only"),
-            (current_handoff, "Do not copy code, offsets, layouts, vtables, ABI assumptions"),
+            (texts["docs/research/2026-05-30-nextgenplugins-reference-inventory.md"], "Use this clone as a names/demand dictionary"),
+            (texts["docs/research/2026-05-30-nextgenplugins-reference-inventory.md"], "not as source code to port"),
+            (texts["docs/research/2026-05-30-nextgenplugins-reference-inventory.md"], "Do not trust `DECLARE_HOOK` declarations as Linux ABI"),
+            (texts["docs/research/2026-05-30-nextgenplugins-reference-inventory.md"], "not runtime evidence and do not authorize copied implementation"),
+            (texts["docs/research/2026-05-30-aseapi-reference-scan.md"], "only as a names and demand dictionary"),
+            (texts["docs/research/2026-05-30-aseapi-reference-scan.md"], "not a behavior map,\ncompatibility target, implementation guide, or evidence source"),
+            (texts["docs/research/2026-05-30-aseapi-reference-scan.md"], "Candidate name discovery only"),
+            (texts["docs/research/2026-05-30-aseapi-reference-scan.md"], "Behavior parity, control flow, command parsers, schemas, constants, return semantics"),
+            (texts["agent-skills/obelisk-github-research-workflow/SKILL.md"], "Local NextGenPlugins clones are names and demand\nsignals only"),
+            (texts["agent-skills/obelisk-github-research-workflow/SKILL.md"], "Obelisk must not copy ArkServerApi/AseApi,\nNextGenPlugins"),
+            (texts["docs/agent-handoff/CURRENT.md"], "ArkServerApi/AseApi and local `NextGenPlugins` clones are names and demand dictionaries\n  only"),
+            (texts["docs/agent-handoff/CURRENT.md"], "Do not copy code, offsets, layouts, vtables, ABI assumptions"),
         ):
             with self.subTest(required=required):
                 self.assertIn(required, text)
@@ -973,15 +978,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         )
 
         offenders: list[str] = []
-        for name, text in (
-            ("docs/PLUGIN_HUB_FOUNDATION_V1.md", foundation),
-            ("docs/PLUGIN_HUB_CAPABILITY_MATRIX.md", matrix),
-            ("plugins/README.md", plugins_readme),
-            ("docs/research/2026-05-30-nextgenplugins-reference-inventory.md", inventory),
-            ("docs/research/2026-05-30-aseapi-reference-scan.md", aseapi_scan),
-            ("agent-skills/obelisk-github-research-workflow/SKILL.md", workflow_skill),
-            ("docs/agent-handoff/CURRENT.md", current_handoff),
-        ):
+        for name, text in texts.items():
             for line_no, line in enumerate(text.splitlines(), start=1):
                 for pattern in forbidden_positive_claims:
                     if re.search(pattern, line, flags=re.IGNORECASE) and not negated_context.search(line):
@@ -2369,8 +2366,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                             "UseItemOntoItem",
                             "no standalone item or inventory module surface",
                             "no identity",
+                            "no lookup",
                             "no mutation",
                             "no return override",
+                            "ResourceHandle",
                         ):
                             self.assertIn(required_scope_term, scope)
                     reports = item.get("reports")
