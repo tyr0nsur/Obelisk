@@ -438,8 +438,16 @@ namespace
         Require(observationNumber == 0, "rejected dispatch attempt did not clear observation number");
         Require(dispatchCounter.load() == 0, "rejected structure attempt changed dispatch counter");
 
-        Attempt matchedAttempt;
-        matchedAttempt.Status = AttemptStatus::Matched;
+        StructureFixture fixture;
+        BuildVerifyPinCode(fixture);
+        fixture.Params[4] = 1;
+        Attempt matchedAttempt = TryIdentifyInvocation(
+            EnabledGate(),
+            kVerifyPinCodeNameIndex,
+            fixture.Reader(),
+            fixture.Function.data(),
+            fixture.Params.data());
+        Require(matchedAttempt.Status == AttemptStatus::Matched, matchedAttempt.Result.Reason.c_str());
         Require(TryReserveDispatchBudgetForMatchedAttempt(matchedAttempt, dispatchCounter, 1, observationNumber),
                 "matched structure attempt did not reserve dispatch budget");
         Require(observationNumber == 1, "matched dispatch observation number mismatch");
@@ -728,6 +736,47 @@ namespace
         }
     }
 
+    void TestRejectsNonCanonicalStructureBoolWithoutDispatchBudget()
+    {
+        StructureFixture fixture;
+        BuildSetVariant(fixture);
+        const int32_t variant = 11;
+        WriteAt(fixture.Params, 0x00, variant);
+        fixture.Params[0x04] = 2;
+        fixture.Params[0x05] = 1;
+
+        Attempt attempt = TryIdentifyInvocation(
+            EnabledGate(),
+            kSetVariantNameIndex,
+            fixture.Reader(),
+            fixture.Function.data(),
+            fixture.Params.data());
+        Require(attempt.Status == AttemptStatus::Matched, attempt.Result.Reason.c_str());
+
+        CopiedStructureEvent event;
+        Require(!TryBuildCopiedStructureEvent(attempt.Invocation, event),
+                "copied SetVariant event accepted non-canonical bool");
+        Require(event.View.Scalars.empty(), "failed non-canonical SetVariant left copied scalar span");
+
+        std::atomic<uint64_t> dispatchCounter{0};
+        uint64_t observationNumber = 99;
+        Require(!TryReserveDispatchBudgetForMatchedAttempt(attempt, dispatchCounter, 1, observationNumber),
+                "non-canonical SetVariant consumed structure dispatch budget");
+        Require(observationNumber == 0, "non-canonical SetVariant did not clear dispatch observation number");
+        Require(dispatchCounter.load() == 0, "non-canonical SetVariant changed dispatch counter");
+
+        int owner = 0;
+        std::vector<CapturedStructureEvent> captured;
+        const uint64_t registrationId = Obelisk::Core::StructureEventDispatcher::Get().Register(
+            &owner,
+            Obelisk::Core::StructureEventSubscription{CaptureStructureEvent, &captured});
+        Require(registrationId != 0, "failed to register structure event callback");
+        Require(MaybeDispatchCopiedStructureEventAfterOriginal(true, attempt.Invocation) == 0,
+                "non-canonical SetVariant dispatched copied structure event");
+        Obelisk::Core::StructureEventDispatcher::Get().UnregisterCallbacksForOwner(&owner);
+        Require(captured.empty(), "non-canonical SetVariant reached structure callback");
+    }
+
     void TestDispatchesCopiedStructureEventThroughInternalDispatcher()
     {
         StructureFixture fixture;
@@ -877,6 +926,7 @@ int main()
     TestRejectsStructureHookWrongOuter();
     TestBuildsCopiedStructureEventWithoutBorrowedObjectOrSensitiveFields();
     TestBuildsCopiedStructureEventForScalarStructureTargets();
+    TestRejectsNonCanonicalStructureBoolWithoutDispatchBudget();
     TestDispatchesCopiedStructureEventThroughInternalDispatcher();
     TestCopiedStructureDispatchRequiresOriginalProcessEvent();
     TestBlockedPreCallbackPreventsIntegratedStructureDispatch();

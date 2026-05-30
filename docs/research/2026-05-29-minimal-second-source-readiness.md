@@ -135,6 +135,45 @@ This closes the target-set coverage traceability gap for RC review while preserv
 same candidate-only non-claims. Consume-mode acceptance is hygiene evidence only; promote
 mode remains blocked by design.
 
+## 2026-05-30 Consume Refresh
+
+A focused offline refresh regenerated the same `minimal-second-source-intake` evidence
+from committed fixtures plus the preserved second-source snapshot root:
+
+```text
+/home/flowcommunity-ark/obelisk-artifacts/minimal-second-source-intake-offline-20260530T075501Z/
+```
+
+Result:
+
+```text
+target_sets=["minimal-second-source-intake"]
+targets=4
+comparable=4
+second_source_accepted=4
+second_source_missing=0
+second_source_rejected=0
+promotion_gate.ready=true
+promotion_gate.layout_ready=true
+promotion_gate.promotion_ready=false
+readiness-report consume gate=status=accepted
+redacted-minimal consume gate=status=accepted
+```
+
+Hashes:
+
+```text
+d6c96751fb486769c28a74d3e6f03cdc4ca9a1a67992721e845d202b2f3124d7  snapshot-comparison/readiness-report.json
+83cee10c2837b39be3703a4dc52e46dcccdd3a971825db680939a2fc9d53806b  snapshot-comparison/offline-artifact-gate-consume.json
+32264856a5ab8beeabe008ce9ad350d0705372304b0187624cb7818b43dfec9d  redacted-minimal/signatures.json
+bbeacfab0bbc162cb5e596463a65cfbda33b8d7e6f9214a709a1d0776aeae9af  redacted-minimal/consume-gate.json
+```
+
+This refresh reinforces the copied `GameplayPolicyEvent` structure/inventory lane only.
+It does not promote public Inventory SDK, public StructureEvents, object identity,
+lookup, `ResourceHandle`, mutation, return override, runtime hook contracts, or raw UE
+internals.
+
 ## Promotion Boundary
 
 This promotes compact UFunction layout evidence for the listed inventory and structure

@@ -103,6 +103,11 @@ sequence.
   `PrimalItem.CanUse` and `PrimalItem.AllowRemoteAddToInventory` backing. Use AseApi only
   for names and familiar concept grouping. Do not copy offsets, layouts, wrappers,
   Windows ABI assumptions, raw pointer APIs, or implementation logic.
+- The latest `minimal-second-source-intake` consume refresh is preserved at
+  `/home/flowcommunity-ark/obelisk-artifacts/minimal-second-source-intake-offline-20260530T075501Z/`:
+  4/4 targets accepted, consume gates accepted, and `promotion_ready=false`. It supports
+  the copied `GameplayPolicyEvent` structure/inventory lane only, not Inventory SDK,
+  StructureEvents, identity, lookup, mutation, return override, or raw UE internals.
 - Current post-RC focus: Item return-only policy, Mission copied-bool observer,
   then Transfer `bAccept`. This is no RC public SDK/API promotion. Item return-only and
   Mission copied-bool now have internal/test-only consume-mode policy slices, and Mission

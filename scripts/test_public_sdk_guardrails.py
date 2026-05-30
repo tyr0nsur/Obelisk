@@ -169,6 +169,16 @@ V010_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_FIELDS = [
     "stable_name",
     "display_name",
 ]
+V010_GAMEPLAY_POLICY_EVENT_PAYLOAD_FIELDS = [
+    "abi_version",
+    "struct_size",
+    "event_kind",
+    "resource_kind",
+    "flags",
+    "field_mask",
+    "bool_values",
+    "int32_values",
+]
 V010_GAMEPLAY_POLICY_TARGET_SETS = [
     "structure-observer-intake",
     "minimal-second-source-intake",
@@ -537,6 +547,27 @@ def public_enum_definitions(header: str) -> dict[str, list[str]]:
     return definitions
 
 
+def public_struct_field_names(header: str, struct_name: str) -> list[str]:
+    match = re.search(
+        rf"typedef\s+struct\s+{re.escape(struct_name)}\s*\{{(?P<body>.*?)\}}\s*"
+        rf"{re.escape(struct_name)}\s*;",
+        strip_c_comments(header),
+        re.DOTALL,
+    )
+    if not match:
+        raise AssertionError(f"typedef struct {struct_name} block not found")
+
+    fields: list[str] = []
+    for declaration in match.group("body").split(";"):
+        declaration = " ".join(declaration.split())
+        if not declaration:
+            continue
+        field = re.search(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*(?:\[[^\]]+\])?$", declaration)
+        if field:
+            fields.append(field.group(1))
+    return fields
+
+
 def public_callback_typedefs(header: str) -> list[str]:
     return re.findall(
         r"typedef\s+[^;(){}]+?\(\*\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)\s*\(",
@@ -758,6 +789,43 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertEqual(public_enum_typedefs(header), V010_PUBLIC_ENUM_ALLOWLIST)
         self.assertEqual(public_enum_definitions(header), V010_PUBLIC_ENUM_VALUE_ALLOWLIST)
         self.assertEqual(public_callback_typedefs(header), V010_PUBLIC_CALLBACK_TYPEDEF_ALLOWLIST)
+
+    def test_gameplay_policy_event_payload_stays_minimal_copied_pod(self) -> None:
+        header = PUBLIC_API_HEADER.read_text(encoding="utf-8")
+
+        self.assertEqual(
+            public_struct_field_names(header, "ObeliskGameplayPolicyEvent"),
+            V010_GAMEPLAY_POLICY_EVENT_PAYLOAD_FIELDS,
+        )
+
+        forbidden_payload_fields = (
+            "inventory",
+            "item",
+            "structure",
+            "player",
+            "tribe",
+            "identity",
+            "id",
+            "handle",
+            "object",
+            "uobject",
+            "function",
+            "fname",
+            "gname",
+            "gobject",
+            "lookup",
+            "resolve",
+            "mutat",
+            "override",
+            "return_override",
+            "pin",
+            "secret",
+        )
+        for field in public_struct_field_names(header, "ObeliskGameplayPolicyEvent"):
+            lowered = field.lower()
+            with self.subTest(field=field):
+                for forbidden in forbidden_payload_fields:
+                    self.assertNotIn(forbidden, lowered)
 
     def test_public_sdk_surface_parsers_include_anonymous_and_non_void_callback_typedefs(self) -> None:
         header = """

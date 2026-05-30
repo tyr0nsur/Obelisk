@@ -115,6 +115,12 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
             observationNumber = 0;
             return false;
         }
+        CopiedStructureEvent event;
+        if (!TryBuildCopiedStructureEvent(attempt.Invocation, event))
+        {
+            observationNumber = 0;
+            return false;
+        }
         return TryReserveObservationBudget(counter, limit, observationNumber);
     }
 
@@ -193,6 +199,8 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
             {
                 uint8_t value = 0;
                 std::memcpy(&value, field.Range.Data, sizeof(value));
+                if (value > 1)
+                    return false;
                 out.Type = Obelisk::Core::StructureScalarType::Bool;
                 out.BoolValue = value != 0;
                 out.Int32Value = 0;
@@ -244,11 +252,21 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
 
         for (const Obelisk::UE::StructureReflection::StructureFieldRange& field : invocation.Fields)
         {
+            Obelisk::Core::StructureScalarField scalarField;
+            if (!TryGetScalarField(field.Field, scalarField))
+                continue;
+
             Obelisk::Core::StructureScalarValue scalar;
             if (!TryCopyScalar(field, scalar))
-                continue;
-            if (out.ScalarCount >= out.ScalarStorage.size())
+            {
+                out = {};
                 return false;
+            }
+            if (out.ScalarCount >= out.ScalarStorage.size())
+            {
+                out = {};
+                return false;
+            }
 
             out.ScalarStorage[out.ScalarCount++] = scalar;
         }

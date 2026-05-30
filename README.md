@@ -46,11 +46,14 @@ v0.1-rc SDK surfaces:
   handles or lookup yet.
 - Metadata-only `DescribeGameplayPolicyEventKind` helper for promoted event-kind
   descriptors.
-- Post-RC core timer callbacks are process-local runtime utilities: owner-token scoped
-  registration, zero-failure handles, one-shot/repeating callbacks, explicit unregister,
-  and plugin lifecycle cleanup. They are not gameplay/module timer abstractions, shared
-  scheduler state, UE identity, persistent handles, or cluster coordination.
 - CTest coverage for plugin config and ABI layout.
+
+Post-RC core primitives:
+
+- Timer callbacks are process-local runtime utilities: owner-token scoped registration,
+  zero-failure handles, one-shot/repeating callbacks, explicit unregister, and plugin
+  lifecycle cleanup. They are not gameplay/module timer abstractions, shared scheduler
+  state, UE identity, persistent handles, or cluster coordination.
 
 Experimental:
 
