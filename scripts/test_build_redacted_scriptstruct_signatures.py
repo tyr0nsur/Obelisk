@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import build_redacted_scriptstruct_signatures as tool
@@ -180,6 +181,43 @@ class BuildRedactedScriptStructSignaturesTest(unittest.TestCase):
             tool.build_report(target_sets=["item-compact-intake"])
 
         self.assertIn("target set did not include ScriptStruct snapshots", str(raised.exception))
+
+    def test_rejects_live_server_paths(self) -> None:
+        with self.assertRaises(SystemExit):
+            tool.reject_protected_input_path("snapshot", Path("/servidor/ark/live/snapshot.json"))
+
+    def test_allows_approved_offline_workspace_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            protected = root / "server"
+            workspace = protected / "workspace-offline"
+            workspace.mkdir(parents=True)
+            path = workspace / "snapshot.json"
+            path.write_text("{}", encoding="utf-8")
+
+            with (
+                mock.patch.object(tool, "PROTECTED_SERVER_ROOT", protected),
+                mock.patch.object(tool, "APPROVED_OFFLINE_WORKSPACE_ROOTS", (workspace,)),
+            ):
+                tool.reject_protected_input_path("snapshot", path)
+
+    def test_rejects_textually_protected_workspace_symlink_resolving_outside(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            protected = root / "server"
+            workspace = protected / "workspace-offline"
+            workspace.mkdir(parents=True)
+            outside = root / "outside.snapshot.json"
+            outside.write_text("{}", encoding="utf-8")
+            link = workspace / "outward.snapshot.json"
+            link.symlink_to(outside)
+
+            with (
+                mock.patch.object(tool, "PROTECTED_SERVER_ROOT", protected),
+                mock.patch.object(tool, "APPROVED_OFFLINE_WORKSPACE_ROOTS", (workspace,)),
+                self.assertRaises(SystemExit),
+            ):
+                tool.reject_protected_input_path("snapshot", link)
 
     def test_direct_snapshots_can_require_source_target_set_coverage(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

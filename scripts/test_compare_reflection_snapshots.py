@@ -411,6 +411,24 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             ):
                 compare.reject_protected_input_path("--base-root", workspace / "snapshots")
 
+    def test_rejects_textually_protected_workspace_symlink_resolving_outside(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            protected = root / "server-root"
+            workspace = protected / "workspace-offline"
+            workspace.mkdir(parents=True)
+            outside = root / "outside"
+            outside.mkdir()
+            link = workspace / "outward-link"
+            link.symlink_to(outside, target_is_directory=True)
+
+            with (
+                mock.patch.object(compare, "PROTECTED_SERVER_ROOT", protected),
+                mock.patch.object(compare, "APPROVED_OFFLINE_WORKSPACE_ROOTS", (workspace,)),
+                self.assertRaisesRegex(SystemExit, "--base-root must not read"),
+            ):
+                compare.reject_protected_input_path("--base-root", link / "snapshots")
+
     def test_missing_generated_by_blocks_comparable_layout(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

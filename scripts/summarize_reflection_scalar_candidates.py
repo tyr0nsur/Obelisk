@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+import protected_paths
 from reflection_target_sets import TARGET_SETS
 
 
@@ -61,28 +62,24 @@ def load_manifest(snapshot_root: Path) -> dict[str, Any]:
 
 
 def is_under_path(path: Path, root: Path) -> bool:
-    try:
-        path.relative_to(root)
-        return True
-    except ValueError:
-        return False
+    return protected_paths.is_under_path(path, root)
 
 
 def is_approved_offline_workspace_path(path: Path) -> bool:
-    resolved = path.resolve()
-    return any(is_under_path(resolved, root.resolve()) for root in APPROVED_OFFLINE_WORKSPACE_ROOTS)
+    return protected_paths.is_approved_offline_workspace_path(
+        path,
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    )
 
 
 def reject_protected_input_path(label: str, path: Path) -> None:
-    expanded = path.expanduser()
-    direct = expanded.absolute()
-    resolved = expanded.resolve()
-    direct_protected = PROTECTED_SERVER_ROOT.absolute()
-    protected = PROTECTED_SERVER_ROOT.resolve()
-    if is_under_path(direct, direct_protected) and not is_approved_offline_workspace_path(expanded):
-        raise SystemExit(f"{label} must not read from protected live-server path: {path}")
-    if is_under_path(resolved, protected) and not is_approved_offline_workspace_path(resolved):
-        raise SystemExit(f"{label} must not read from protected live-server path: {path}")
+    protected_paths.reject_protected_input_path(
+        path,
+        label,
+        protected_root=PROTECTED_SERVER_ROOT,
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+        message=f"{label} must not read from protected live-server path: {path}",
+    )
 
 
 def manifest_index(manifest: dict[str, Any], snapshot_root: Path) -> dict[str, Path]:

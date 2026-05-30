@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import protected_paths
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SERVER_ROOT = Path("/servidor/ark")
@@ -87,36 +88,29 @@ def git_commit() -> str | None:
 
 
 def is_relative_to(path: Path, parent: Path) -> bool:
-    try:
-        path.relative_to(parent)
-    except ValueError:
-        return False
-    return True
+    return protected_paths.is_under_path(path, parent)
 
 
 def is_approved_offline_workspace_path(path: Path) -> bool:
-    resolved = path.resolve()
-    return any(is_relative_to(resolved, root.resolve()) for root in APPROVED_OFFLINE_WORKSPACE_ROOTS)
+    return protected_paths.is_approved_offline_workspace_path(
+        path,
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    )
 
 
 def path_blockers(path: Path) -> list[dict[str, str]]:
-    blockers: list[dict[str, str]] = []
-    path_text = str(path)
-    resolved = path.resolve()
-    if path_text.startswith(f"{SERVER_ROOT}/") and not is_approved_offline_workspace_path(path):
-        blockers.append(
-            {
-                "reason": "log_path_under_live_server_root",
-                "detail": "analyze copied logs under /servidor/ark/workspace-offline, not live server logs",
-            }
-        )
-    if is_relative_to(resolved, SERVER_ROOT.resolve()) and not is_approved_offline_workspace_path(path):
-        blockers.append(
-            {
-                "reason": "resolved_log_path_under_live_server_root",
-                "detail": "resolved log path is not under /servidor/ark/workspace-offline",
-            }
-        )
+    blockers = protected_paths.protected_input_path_blockers(
+        path,
+        protected_root=SERVER_ROOT,
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    )
+    for blocker in blockers:
+        if blocker["reason"] == "path_under_live_server_root":
+            blocker["reason"] = "log_path_under_live_server_root"
+            blocker["detail"] = "analyze copied logs under /servidor/ark/workspace-offline, not live server logs"
+        elif blocker["reason"] == "resolved_path_under_live_server_root":
+            blocker["reason"] = "resolved_log_path_under_live_server_root"
+            blocker["detail"] = "resolved log path is not under /servidor/ark/workspace-offline"
     return blockers
 
 
@@ -157,6 +151,7 @@ def parse_log(
     required_send_modes: set[int] | None = None,
     required_route_send_modes: set[int] | None = None,
     require_workspace: bool = False,
+    allow_server_path: bool = False,
 ) -> dict[str, Any]:
     blockers = path_blockers(path)
     if require_workspace and not is_approved_offline_workspace_path(path):
@@ -176,7 +171,10 @@ def parse_log(
     delivery_events: list[dict[str, Any]] = []
     route_events: list[dict[str, Any]] = []
 
-    if not path.exists():
+    if blockers and not allow_server_path:
+        lines = []
+        log_sha256 = None
+    elif not path.exists():
         blockers.append({"reason": "log_missing", "detail": str(path)})
         lines: list[str] = []
         log_sha256 = None
@@ -421,6 +419,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Comma-separated accepted route observer send modes required for an internal route-coverage claim, e.g. 0,1,2,3.",
     )
     parser.add_argument("--require-workspace", action="store_true", help="Require log path under /servidor/ark/workspace-offline.")
+    parser.add_argument(
+        "--allow-server-path",
+        action="store_true",
+        help="Allow direct live-server log reads for operator-approved emergency review.",
+    )
     parser.add_argument("--fail-on-quality-blockers", action="store_true", help="Exit non-zero when blockers exist.")
     parser.add_argument("--json", action="store_true", help="Emit JSON summary.")
     return parser
@@ -456,6 +459,7 @@ def main(argv: list[str] | None = None) -> int:
         required_send_modes=required_send_modes,
         required_route_send_modes=required_route_send_modes,
         require_workspace=args.require_workspace,
+        allow_server_path=args.allow_server_path,
     )
     if args.json:
         print(json.dumps(result, indent=2, sort_keys=True))

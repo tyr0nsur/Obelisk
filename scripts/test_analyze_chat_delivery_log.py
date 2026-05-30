@@ -9,6 +9,7 @@ from pathlib import Path
 import sys
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import analyze_chat_delivery_log as analyzer
@@ -532,6 +533,54 @@ class AnalyzeChatDeliveryLogTests(unittest.TestCase):
             result = analyzer.parse_log(log, expected_sha256=SHA, min_events=1, require_workspace=True)
 
         self.assertIn("log_not_under_approved_offline_workspace", {b["reason"] for b in result["promotion_gate"]["blockers"]})
+
+    def test_blocks_protected_path_without_reading_by_default(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            protected = root / "server"
+            protected.mkdir()
+            log = protected / "chat-delivery.log"
+            write_log(
+                log,
+                "\n".join(
+                    [
+                        f"[info] Chat message event producer enabled for ShooterGameServer SHA256 {SHA}.",
+                        "[info] [Plugin] [oChatLogger] Registered ChatMessageEvent callback.",
+                        "[info] [Plugin] [oChatLogger] ChatMessageEvent received sequence=1 send_mode=0 flags=0x1 message_size=5.",
+                    ]
+                ),
+            )
+
+            with mock.patch.object(analyzer, "SERVER_ROOT", protected):
+                result = analyzer.parse_log(log, expected_sha256=SHA, min_events=1)
+
+        reasons = {blocker["reason"] for blocker in result["promotion_gate"]["blockers"]}
+        self.assertIn("log_path_under_live_server_root", reasons)
+        self.assertEqual(0, result["accepted_delivery_event_count"])
+        self.assertEqual(0, result["source"]["line_count"])
+
+    def test_allow_server_path_reads_protected_path_for_operator_review(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            protected = root / "server"
+            protected.mkdir()
+            log = protected / "chat-delivery.log"
+            write_log(
+                log,
+                "\n".join(
+                    [
+                        f"[info] Chat message event producer enabled for ShooterGameServer SHA256 {SHA}.",
+                        "[info] [Plugin] [oChatLogger] Registered ChatMessageEvent callback.",
+                        "[info] [Plugin] [oChatLogger] ChatMessageEvent received sequence=1 send_mode=0 flags=0x1 message_size=5.",
+                    ]
+                ),
+            )
+
+            with mock.patch.object(analyzer, "SERVER_ROOT", protected):
+                result = analyzer.parse_log(log, expected_sha256=SHA, min_events=1, allow_server_path=True)
+
+        self.assertEqual(1, result["accepted_delivery_event_count"])
+        self.assertGreater(result["source"]["line_count"], 0)
 
     def test_cli_fail_on_quality_blockers_returns_three(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

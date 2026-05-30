@@ -18,6 +18,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
+import protected_paths
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SERVER_ROOT = Path("/servidor/ark")
@@ -106,16 +107,14 @@ def git_commit() -> str | None:
 
 
 def is_relative_to(path: Path, parent: Path) -> bool:
-    try:
-        path.relative_to(parent)
-    except ValueError:
-        return False
-    return True
+    return protected_paths.is_under_path(path, parent)
 
 
 def is_approved_offline_workspace_path(path: Path) -> bool:
-    resolved = path.resolve()
-    return any(is_relative_to(resolved, root.resolve()) for root in APPROVED_OFFLINE_WORKSPACE_ROOTS)
+    return protected_paths.is_approved_offline_workspace_path(
+        path,
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    )
 
 
 def bool_from_text(value: str | None) -> bool | None:
@@ -540,11 +539,13 @@ def main() -> int:
 
     for path in args.logs:
         expanded = path.expanduser()
-        resolved = path.resolve()
-        protected_direct = expanded.is_absolute() and is_relative_to(expanded, SERVER_ROOT)
-        protected_resolved = is_relative_to(resolved, SERVER_ROOT.resolve())
-        approved_offline = is_approved_offline_workspace_path(expanded)
-        if (protected_direct or protected_resolved) and not approved_offline and not args.allow_server_path:
+        status = protected_paths.protected_path_status(
+            expanded,
+            protected_root=SERVER_ROOT,
+            approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+        )
+        resolved = status.resolved
+        if status.protected and not args.allow_server_path:
             print(
                 f"refusing to read live server path without --allow-server-path: {resolved}",
                 file=sys.stderr,

@@ -12,6 +12,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import build_redacted_ufunction_signatures as tool
@@ -1049,6 +1050,39 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
     def test_rejects_live_server_paths(self) -> None:
         with self.assertRaises(SystemExit):
             tool.reject_protected_input_path("snapshot", Path("/servidor/ark/live/snapshot.json"))
+
+    def test_allows_approved_offline_workspace_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            protected = root / "server"
+            workspace = protected / "workspace-offline"
+            workspace.mkdir(parents=True)
+            path = workspace / "snapshot.json"
+            path.write_text("{}", encoding="utf-8")
+
+            with (
+                mock.patch.object(tool, "PROTECTED_SERVER_ROOT", protected),
+                mock.patch.object(tool, "APPROVED_OFFLINE_WORKSPACE_ROOTS", (workspace,)),
+            ):
+                tool.reject_protected_input_path("snapshot", path)
+
+    def test_rejects_textually_protected_workspace_symlink_resolving_outside(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            protected = root / "server"
+            workspace = protected / "workspace-offline"
+            workspace.mkdir(parents=True)
+            outside = root / "outside.snapshot.json"
+            outside.write_text("{}", encoding="utf-8")
+            link = workspace / "outward.snapshot.json"
+            link.symlink_to(outside)
+
+            with (
+                mock.patch.object(tool, "PROTECTED_SERVER_ROOT", protected),
+                mock.patch.object(tool, "APPROVED_OFFLINE_WORKSPACE_ROOTS", (workspace,)),
+                self.assertRaises(SystemExit),
+            ):
+                tool.reject_protected_input_path("snapshot", link)
 
     def test_labels_reference_out_array_flags(self) -> None:
         prop = {

@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
+import protected_paths
+
 SAFE_COMPONENT_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 SERVER_ROOT = Path("/servidor/ark")
@@ -36,21 +38,13 @@ def safe_component(value: str, field: str) -> str:
 
 
 def is_relative_to(path: Path, parent: Path) -> bool:
-    try:
-        path.relative_to(parent)
-    except ValueError:
-        return False
-    return True
+    return protected_paths.is_under_path(path, parent)
 
 
 def is_approved_offline_workspace_path(path: Path) -> bool:
-    expanded = path.expanduser()
-    resolved = path.resolve()
-    return any(
-        expanded.is_absolute()
-        and is_relative_to(expanded, root)
-        and is_relative_to(resolved, root.resolve())
-        for root in APPROVED_OFFLINE_WORKSPACE_ROOTS
+    return protected_paths.is_approved_offline_workspace_path(
+        path,
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
     )
 
 
@@ -69,23 +63,21 @@ def require_ignored_output_path(path: Path, label: str) -> None:
 
 
 def reject_protected_input_path(path: Path, label: str) -> Path:
-    expanded = path.expanduser()
-    if expanded.is_absolute() and is_relative_to(expanded, SERVER_ROOT) and not is_approved_offline_workspace_path(expanded):
-        raise SystemExit(f"{label} must not read from protected server root {SERVER_ROOT}: {expanded}")
-    resolved = expanded.resolve()
-    if is_relative_to(resolved, SERVER_ROOT) and not is_approved_offline_workspace_path(expanded):
-        raise SystemExit(f"{label} must not read from protected server root {SERVER_ROOT}: {resolved}")
-    return resolved
+    return protected_paths.reject_protected_input_path(
+        path,
+        label,
+        protected_root=SERVER_ROOT,
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    )
 
 
 def reject_protected_output_path(path: Path, label: str) -> Path:
-    expanded = path.expanduser()
-    if expanded.is_absolute() and is_relative_to(expanded, SERVER_ROOT) and not is_approved_offline_workspace_path(expanded):
-        raise SystemExit(f"{label} must not write under protected server root {SERVER_ROOT}: {expanded}")
-    resolved = expanded.resolve()
-    if is_relative_to(resolved, SERVER_ROOT) and not is_approved_offline_workspace_path(expanded):
-        raise SystemExit(f"{label} must not write under protected server root {SERVER_ROOT}: {resolved}")
-    return resolved
+    return protected_paths.reject_protected_output_path(
+        path,
+        label,
+        protected_root=SERVER_ROOT,
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    )
 
 
 def reject_protected_core_path(path: Path, manifest_path: Path) -> Path:
