@@ -253,3 +253,70 @@ override, or server validation. A current strict second-source comparison still 
 comparable artifact that includes bool semantics for the three bool-bearing Mission
 targets; the strict redacted-signature artifact closes target-set coverage, not the full
 promotion ladder.
+
+## Second-Source Bool Semantics Refresh
+
+Later on 2026-05-30, the stale second-source Mission snapshots were regenerated from the
+existing offline TheIsland core with current snapshot tooling. No server was started and
+no live instance was touched.
+
+Offline inputs:
+
+- core:
+  `/servidor/ark/workspace-offline/vanilla-gdb-arkserver2-TheIsland-20260529T012853Z/raw/core`;
+- binary:
+  `/servidor/ark/workspace-offline/vanilla-gdb-arkserver2-TheIsland-20260529T012853Z/raw/ShooterGameServer`;
+- core SHA256:
+  `56cf24c61d6822a060fa1bb74ebdb7dc13e3ddf9afc3d5f4843787c046eeeedb`;
+- binary SHA256:
+  `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`;
+- FName root slot: `0x5956f30`;
+- GObjects candidate: `0x595b7e0`.
+
+Generated evidence root:
+
+```text
+/servidor/ark/workspace-offline/mission-compact-intake-bool-semantics-refresh-20260530T020021Z/
+```
+
+Important outputs:
+
+- `pack/fname-root-validation/core.fname-root-validation.json`;
+- `pack/gobjects-sampling/manifest.json`;
+- `ufunction-snapshots/7e7ded49e0c6/sdk_missions/*.snapshot.json`;
+- `pack/snapshot-comparison/mission-readiness-report.json`;
+- `pack/redacted-signatures.json`;
+- `pack/redacted-signatures.consume-gate.json`.
+
+The refreshed snapshot comparison now reports:
+
+```text
+target_set=mission-compact-intake
+targets=4
+comparable=4
+second_source_accepted=4
+second_source_inconclusive=0
+second_source_missing=0
+second_source_rejected=0
+promotion_gate.ready=true
+ready_scope=layout_only
+```
+
+The refreshed redacted signature manifest reports:
+
+```text
+signature_count=4
+bool_masked_field_count=5
+copied_scalar_by_kind.bool=5
+redacted_count_total=6
+artifact_status=candidate_only
+promotion_ready=false
+consume_gate.status=accepted
+consume_gate.sha256=09074e71666f755801802e5d796361cf4f84d3e7d8c00663801d84f981a1cc13
+```
+
+This closes the earlier Mission bool second-source gap for the compact target set. It
+still does not promote a public Mission SDK, runtime observer wiring, dispatcher,
+callback ABI, object/class identity, arrays, mutation, return override, or server
+validation. The next Mission step remains an internal/test-only policy decision, not
+public API work.
