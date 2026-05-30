@@ -448,7 +448,7 @@ changes the scope:
 - UObject flag-policy or transition-matrix promotion from consume-mode evidence.
 
 Post-RC internal recognizer work, if reopened after the RC, should proceed in this order:
-Mission copied-bool observer, Item return-only policy, then Transfer `bAccept`. That sequence
+Item return-only policy, Mission copied-bool observer, then Transfer `bAccept`. That sequence
 is an internal planning order only; it does not change the RC public API or release gate.
 
 ## Final RC Validation

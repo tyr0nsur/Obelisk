@@ -448,8 +448,8 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("${BUILD_DIR}/plugins/oBaseEvents/oBaseEvents.so", script)
         self.assertNotIn("oPolicyAudit.so", script)
         self.assertIn("--require-second-source-readiness", release)
-        self.assertIn("An existing local or unpublished RC tag is not proof", release)
-        self.assertIn("may point behind the current validated head", release)
+        self.assertIn("an existing local\nor unpublished RC tag is not proof", release)
+        self.assertIn("may point behind the current validated head", normalized(release))
         self.assertIn("verified against that intended validated release ref", normalized(status))
         self.assertIn("--require-second-source-readiness", pr_template)
         self.assertIn("--require-second-source-readiness", script)
@@ -508,7 +508,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("not part of the default gate", release)
         self.assertIn("scalar-candidate summaries are review aids only, not RC scope", normalized(release))
         self.assertIn(
-            "Mission copied-bool observer, Item return-only policy, then Transfer `bAccept`",
+            "Item return-only policy, Mission copied-bool observer, then Transfer `bAccept`",
             normalized(release),
         )
         self.assertIn("not promote a public SDK/API surface", release)
@@ -552,30 +552,20 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertNotIn("--map Ragnarok --instance arkserver", release)
         self.assertIn("--map <map> --instance <instance-id>", release)
 
-    def test_active_handoff_rc_tag_mentions_require_stale_ref_rerun_guardrails(self) -> None:
-        required_patterns = {
-            "stale tag risk": r"\bstale\b",
-            "rerun or clean intended-ref gate": (
-                r"\bre-?run(?:ning)?\b.*\bgate\b|\bgate\b.*\bre-?run(?:ning)?\b|"
-                r"\bclean release gate\b.*\bintended ref\b"
-            ),
-            "tag/ref verification": (
-                r"\btag/ref verification\b|\bref verification\b.*\btag\b|\btag\b.*\bref verification\b"
-            ),
-        }
-        offenders: list[str] = []
-
+    def test_active_handoff_rc_tag_mentions_track_published_baseline(self) -> None:
         for path in ("docs/agent-handoff/CURRENT.md", "docs/agent-handoff/COMPACT_CONTEXT.md"):
-            for paragraph in paragraphs(read(path)):
-                if "v0.1.0-rc.1" not in paragraph:
-                    continue
-                compact = normalized(paragraph)
-                compact_lower = compact.lower()
-                for label, pattern in required_patterns.items():
-                    if not re.search(pattern, compact_lower):
-                        offenders.append(f"{path}: missing {label}: {compact}")
-
-        self.assertEqual(offenders, [])
+            text = read(path)
+            compact = normalized(text)
+            lower = compact.lower()
+            with self.subTest(file=path, item="published baseline"):
+                self.assertIn("v0.1.0-rc.1", text)
+                self.assertIn("published", lower)
+                self.assertIn("frozen core-first rc baseline", lower)
+            with self.subTest(file=path, item="clean gate and tag verification"):
+                self.assertRegex(lower, r"clean (?:release )?gate|without `--allow-dirty`")
+                self.assertIn("tag/ref verification", lower)
+            with self.subTest(file=path, item="future stale tag guardrail"):
+                self.assertIn("stale", lower)
 
     def test_current_handoff_stays_compact(self) -> None:
         current_lines = read("docs/agent-handoff/CURRENT.md").splitlines()
@@ -591,6 +581,11 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "No tag or release-ref push is authorized without explicit release-manager/lead "
             "authorization for the current turn."
         )
+        published_pattern = (
+            r"`?v?0\.1\.0-rc\.1`? is (?:the )?published|"
+            r"published release-candidate baseline is core-first `v0\.1\.0-rc\.1`|"
+            r"published release candidate"
+        )
 
         docs = {
             "docs/RELEASE.md": read("docs/RELEASE.md"),
@@ -603,20 +598,30 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         for path, text in docs.items():
             compact = normalized(text)
             lower = compact.lower()
-            with self.subTest(file=path, item="stale local tag target"):
-                self.assertIn("v0.1.0-rc.1", text)
-                self.assertIn("stale", lower)
-            with self.subTest(file=path, item="stale tag not publicable"):
-                self.assertRegex(lower, r"(not publicable|do not publish|must not be reused|must not be .*pushed)")
-            with self.subTest(file=path, item="clean intended-ref gate"):
-                self.assertRegex(lower, r"intended (?:release )?ref")
-                self.assertRegex(lower, r"(clean (?:release )?gate|clean worktree|without `--allow-dirty`)")
-            with self.subTest(file=path, item="tag/ref verification"):
-                self.assertIn("tag/ref verification", lower)
-            with self.subTest(file=path, item="no unauthorized push"):
-                self.assertIn(authorization_phrase, compact)
+            with self.subTest(file=path, item="published rc baseline"):
+                self.assertIn("0.1.0-rc.1", text)
             with self.subTest(file=path, item="public api scope"):
                 self.assertIn(required_phrase, compact)
+
+        for path in ("docs/RELEASE.md", "docs/STATUS.md", "docs/agent-handoff/CURRENT.md", "docs/agent-handoff/COMPACT_CONTEXT.md"):
+            text = docs[path]
+            compact = normalized(text)
+            lower = compact.lower()
+            with self.subTest(file=path, item="published wording"):
+                self.assertRegex(compact, published_pattern)
+            with self.subTest(file=path, item="validated publication evidence"):
+                self.assertRegex(lower, r"(clean (?:release )?gate|without `--allow-dirty`|release ref passed|passed this gate)")
+                self.assertIn("tag/ref verification", lower)
+
+        for path in ("docs/RELEASE.md", "docs/agent-handoff/CURRENT.md", "docs/agent-handoff/COMPACT_CONTEXT.md"):
+            text = docs[path]
+            compact = normalized(text)
+            lower = compact.lower()
+            with self.subTest(file=path, item="future unauthorized push guardrail"):
+                self.assertIn(authorization_phrase, compact)
+            with self.subTest(file=path, item="future stale tag guardrail"):
+                self.assertIn("stale", lower)
+                self.assertRegex(lower, r"(not publicable|do not recreate|must not be reused|are not reused or pushed|recreated only after rerunning)")
 
         pr_template = normalized(read(".github/pull_request_template.md"))
         pr_lower = pr_template.lower()
@@ -625,7 +630,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("accepted second-source root", pr_lower)
         self.assertIn("release tags and release-ref pushes have explicit release-manager/lead authorization", pr_lower)
         self.assertIn("exact tag/ref comparison", pr_lower)
-        self.assertIn("stale tags", pr_lower)
+        self.assertIn("stale local tags", pr_lower)
         self.assertIn("are not reused or pushed", pr_lower)
 
     def test_disable_plugins_marker_is_documented_as_wrapper_input_not_runtime_gate(self) -> None:
@@ -727,7 +732,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         current = read("docs/agent-handoff/CURRENT.md")
         status = read("docs/STATUS.md")
 
-        order = "Mission copied-bool observer, Item return-only policy, then Transfer `bAccept`"
+        order = "Item return-only policy, Mission copied-bool observer, then Transfer `bAccept`"
         for path, text in (
             ("docs/research/2026-05-29-rc-checkpoint-slicing-plan.md", plan),
             ("docs/agent-handoff/COMPACT_CONTEXT.md", compact),
@@ -915,7 +920,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("historical recovery context", current_text)
         self.assertIn("not active routing", current_text)
         self.assertIn("use `git log --oneline -1` for the current head", current_lower)
-        self.assertIn("Current RC focus:", current_text)
+        self.assertRegex(current_text, r"Current RC focus:|Current post-RC focus:")
         self.assertIn("accepted RC UFunction second-source root", current_text)
 
     def test_experimental_plugins_stay_out_of_release_scope(self) -> None:

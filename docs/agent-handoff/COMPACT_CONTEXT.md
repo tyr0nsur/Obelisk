@@ -17,7 +17,9 @@ priorities, and do not use history files as the active source of truth.
 
 - GitHub work may be delegated only for an evidenced, stable milestone; routine local
   rounds are not publication events. No tag or release-ref push is authorized without
-  explicit release-manager/lead authorization for the current turn.
+  explicit release-manager/lead authorization for the current turn. Stale local tags are
+  recreated only after rerunning the gate on the intended ref and are not reused or
+  pushed.
 - No server restart/start/stop, `/servidor/ark` edit, marker change, ReflectionScanner,
   ptrace/gcore, broad ProcessEvent tracing, or runtime observation unless the current
   operator turn names an approved debug/beta scope or separately approved exact run.
@@ -30,17 +32,22 @@ priorities, and do not use history files as the active source of truth.
   rollback.
 - Community updates are for major public modder-facing milestones only; beta-test
   activation notices are separate operational live-ops messages.
+- `ArkServerApi/AseApi` may be used only as an algorithmic/name dictionary for
+  ArkApi-style compatibility research. Do not import offsets, vtables, layouts, `.lib`
+  artifacts, MSVC/Windows ABI assumptions, direct `GetNativePointerField`/`NativeCall`
+  wrappers, or raw UE pointer APIs; all access must be rebuilt through Obelisk
+  reflection/ProcessEvent copied-data evidence.
 
 ## Stable Baseline
 
 - Repo: `/home/flowcommunity-ark/Obelisk`
 - Remote: `git@github.com:tyr0nsur/Obelisk.git`
 - Central Obelisk root: `/servidor/ark/obelisk`
-- Current release baseline: the small core-first RC gate has local clean-tree evidence,
-  but `v0.1.0-rc.1` is not published and must not be assumed to point at current `HEAD`.
-  A stale local or unpublished RC tag must not be reused or pushed. Post-RC work stays
-  internal/offline unless a separate promotion gate changes scope, and publication
-  requires rerunning the clean gate on the intended ref plus exact tag/ref verification.
+- Current release baseline: `v0.1.0-rc.1` is published as the frozen core-first RC
+  baseline after a clean release gate and exact tag/ref verification. It is not a
+  production-stable `v1.0` claim. Post-RC work should move toward a broader `v1.0`
+  production core through architecture hardening, UE4 reflection evidence, copied-data
+  module APIs, and later ArkApi-style plugin replacement on top of Obelisk primitives.
 - Stable plugin loading requires safe `OBELISK_INSTANCE_ID` plus real non-symlink plugin,
   config, log, and state roots.
 - `ObeliskApi` v1 is append-only for `v0.1.0`; ABI v2 requires an explicit migration plan.
@@ -214,6 +221,9 @@ priorities, and do not use history files as the active source of truth.
   public RC UFunction target sets: `minimal-second-source-intake`,
   `structure-observer-intake`, and `chat-message-intake`. ScriptStruct promotion requires
   an explicit ScriptStruct target set.
+- Reflection snapshot readiness reports are consumable only when they come from
+  `gate_mode=second_source_promotion`, name at least one target set, and keep
+  `promotion_ready=false`; this is layout evidence, not public API/runtime promotion.
 - `scripts/assemble_rc_ufunction_second_source_root.py` assembles those three accepted
   UFunction roots into one release-gate root. It copies existing sanitized snapshots only
   and does not regenerate evidence. It produced
@@ -237,11 +247,10 @@ priorities, and do not use history files as the active source of truth.
   `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`.
 - `plugins/oPolicyAudit` is experimental and excluded from the default build/release
   scope unless `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`.
-- Historical dirty/offline release-gate runs are smoke evidence only. A later
-  2026-05-30 gate passed from a tracked-clean checkpoint, but it does not validate any
-  stale local or unpublished RC tag. A real published RC requires focused checkpoints, the
-  release gate without `--allow-dirty` on the intended release ref, exact tag/ref
-  verification, and explicit authorization before any tag or release-ref push.
+- Historical dirty/offline release-gate runs are smoke evidence only. The published
+  `v0.1.0-rc.1` baseline was tagged only after the release gate without `--allow-dirty`
+  and exact tag/ref verification. Do not keep reworking that RC unless a critical fix
+  requires a new RC tag.
 - `docs/research/2026-05-29-rc-checkpoint-slicing-plan.md` is historical recovery
   context, not active routing for the current head. Use `git log --oneline -1` for the
   current head, use `CURRENT.md` for current
@@ -266,15 +275,17 @@ priorities, and do not use history files as the active source of truth.
   approved offline workspace; promote remains blocked. Use
   `scripts/scan_resource_handle_serials.py --gate-ready` only for post-RC/internal
   consume-mode scans, not as a public RC gate.
-- Do not promote post-RC work into the RC: ResourceHandle, GNames/GObjects promotion, full
-  UE4 reflection, public Inventory SDK, public StructureEvents, chat APIs beyond minimal
-  copied `ChatMessageEvent`, player/tribe/dino/buff/transfer APIs, mutation, return overrides,
-  public `CallProcessEvent`, background worker plugins, operator lifecycle commands, and
+- Do not retroactively promote post-RC work into `v0.1.0-rc.1`: ResourceHandle,
+  GNames/GObjects promotion, full UE4 reflection, public Inventory SDK, public
+  StructureEvents, chat APIs beyond minimal copied `ChatMessageEvent`,
+  player/tribe/dino/buff/transfer APIs, mutation, return overrides, public
+  `CallProcessEvent`, background worker plugins, operator lifecycle commands, and
   ScriptStruct/transfer promotion remain blocked unless a later focused gate changes
   scope.
-- If post-RC internal recognizer work resumes, keep it test-only. The post-RC internal
-  recognizer order is Mission copied-bool observer, Item return-only policy, then
-  Transfer `bAccept`; this is no RC public SDK/API promotion. None of these promote
+- If internal recognizer work resumes, keep it test-only. The current internal recognizer
+  order is Item return-only policy, Mission copied-bool observer, then Transfer
+  `bAccept`; this is not RC public SDK/API scope and does not change the RC public API.
+  None of these promote
   public Mission/Items/Transfer SDKs, public callbacks, ABI, markers/env, runtime logs,
   hook wiring, mutation, return override, object identity, lookup, or `ResourceHandle`.
   Start from the dated research notes, not public API docs, until a separate promotion

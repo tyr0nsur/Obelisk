@@ -1367,23 +1367,65 @@ namespace Obelisk::Core
             return removed;
         }
 
+        void SafeLogInfoNoThrow(const char* message, const std::string& detail) noexcept
+        {
+            try
+            {
+                if (Logger::IsInitialized())
+                    Logger::Get()->info("{}{}", message ? message : "", detail);
+            }
+            catch (...)
+            {
+            }
+        }
+
+        void SafeLogErrorNoThrow(const char* message, const char* detail = nullptr) noexcept
+        {
+            try
+            {
+                if (!Logger::IsInitialized())
+                    return;
+
+                if (detail)
+                    Logger::Get()->error("{}: {}", message ? message : "", detail);
+                else
+                    Logger::Get()->error("{}", message ? message : "");
+            }
+            catch (...)
+            {
+            }
+        }
+
         template <typename Fn>
-        class ScopeExit
+        class NoThrowScopeExit
         {
         public:
-            explicit ScopeExit(Fn fn)
-                : m_Fn(fn)
+            explicit NoThrowScopeExit(Fn fn)
+                : m_Fn(std::move(fn))
             {
             }
 
-            ~ScopeExit()
+            ~NoThrowScopeExit() noexcept
             {
-                if (m_Active)
+                if (!m_Active)
+                    return;
+
+                try
+                {
                     m_Fn();
+                }
+                catch (const std::exception& e)
+                {
+                    SafeLogErrorNoThrow("Plugin cleanup guard threw during scoped cleanup", e.what());
+                }
+                catch (...)
+                {
+                    SafeLogErrorNoThrow("Plugin cleanup guard threw an unknown exception during scoped cleanup.");
+                }
             }
 
-            ScopeExit(const ScopeExit&) = delete;
-            ScopeExit& operator=(const ScopeExit&) = delete;
+            NoThrowScopeExit(const NoThrowScopeExit&) = delete;
+            NoThrowScopeExit& operator=(const NoThrowScopeExit&) = delete;
 
             void Dismiss()
             {
@@ -1396,9 +1438,9 @@ namespace Obelisk::Core
         };
 
         template <typename Fn>
-        ScopeExit<Fn> MakeScopeExit(Fn fn)
+        NoThrowScopeExit<Fn> MakeScopeExit(Fn fn)
         {
-            return ScopeExit<Fn>(fn);
+            return NoThrowScopeExit<Fn>(std::move(fn));
         }
     }
 
@@ -1845,7 +1887,18 @@ namespace Obelisk::Core
 
     PluginManager::~PluginManager()
     {
-        UnloadAll();
+        try
+        {
+            UnloadAll();
+        }
+        catch (const std::exception& e)
+        {
+            SafeLogErrorNoThrow("PluginManager destructor suppressed unload exception", e.what());
+        }
+        catch (...)
+        {
+            SafeLogErrorNoThrow("PluginManager destructor suppressed unknown unload exception");
+        }
     }
 
     void PluginManager::UnregisterPluginCallbacks(const std::string& pluginName, void* owner, const char* reason)
@@ -2072,12 +2125,83 @@ namespace Obelisk::Core
                 auto initCleanup = MakeScopeExit([&]() {
                     if (!initAttempted)
                         return;
-                    MarkPluginOwnerUnloading(pluginOwner);
-                    CallPluginShutdown(pluginName, shutdownFunc);
-                    RemoveInitializingPluginOwner(pluginOwner);
-                    RemovePluginOwnerToken(pluginOwnerToken);
-                    UnregisterPluginCallbacks(pluginName, pluginOwner, "after init failure and before dlclose");
-                    ClearPluginOwnerUnloading(pluginOwner);
+                    try
+                    {
+                        MarkPluginOwnerUnloading(pluginOwner);
+                    }
+                    catch (const std::exception& e)
+                    {
+                        SafeLogErrorNoThrow("Failed to mark plugin owner unloading after init failure", e.what());
+                    }
+                    catch (...)
+                    {
+                        SafeLogErrorNoThrow("Failed to mark plugin owner unloading after init failure with unknown exception");
+                    }
+
+                    try
+                    {
+                        CallPluginShutdown(pluginName, shutdownFunc);
+                    }
+                    catch (const std::exception& e)
+                    {
+                        SafeLogErrorNoThrow("Failed to call plugin shutdown after init failure", e.what());
+                    }
+                    catch (...)
+                    {
+                        SafeLogErrorNoThrow("Failed to call plugin shutdown after init failure with unknown exception");
+                    }
+
+                    try
+                    {
+                        RemoveInitializingPluginOwner(pluginOwner);
+                    }
+                    catch (const std::exception& e)
+                    {
+                        SafeLogErrorNoThrow("Failed to remove initializing plugin owner after init failure", e.what());
+                    }
+                    catch (...)
+                    {
+                        SafeLogErrorNoThrow("Failed to remove initializing plugin owner after init failure with unknown exception");
+                    }
+
+                    try
+                    {
+                        RemovePluginOwnerToken(pluginOwnerToken);
+                    }
+                    catch (const std::exception& e)
+                    {
+                        SafeLogErrorNoThrow("Failed to remove plugin owner token after init failure", e.what());
+                    }
+                    catch (...)
+                    {
+                        SafeLogErrorNoThrow("Failed to remove plugin owner token after init failure with unknown exception");
+                    }
+
+                    try
+                    {
+                        UnregisterPluginCallbacks(pluginName, pluginOwner, "after init failure and before dlclose");
+                    }
+                    catch (const std::exception& e)
+                    {
+                        SafeLogErrorNoThrow("Failed to unregister plugin callbacks after init failure", e.what());
+                    }
+                    catch (...)
+                    {
+                        SafeLogErrorNoThrow("Failed to unregister plugin callbacks after init failure with unknown exception");
+                    }
+
+                    try
+                    {
+                        ClearPluginOwnerUnloading(pluginOwner);
+                    }
+                    catch (const std::exception& e)
+                    {
+                        SafeLogErrorNoThrow("Failed to clear plugin owner unloading after init failure", e.what());
+                    }
+                    catch (...)
+                    {
+                        SafeLogErrorNoThrow("Failed to clear plugin owner unloading after init failure with unknown exception");
+                    }
                 });
 
                 void* previousOwner = g_CurrentPluginOwner;
@@ -2139,14 +2263,96 @@ namespace Obelisk::Core
         for (auto it = m_LoadedPlugins.rbegin(); it != m_LoadedPlugins.rend(); ++it)
         {
             auto& plugin = *it;
-            OBELISK_INFO("Unloading plugin: {}", plugin.name);
-            MarkPluginOwnerUnloading(plugin.owner);
-            CallPluginShutdown(plugin.name, plugin.shutdown);
-            RemoveLoadedPluginOwner(plugin.owner);
-            RemovePluginOwnerToken(plugin.ownerToken);
-            UnregisterPluginCallbacks(plugin.name, plugin.owner, "before dlclose");
-            ClearPluginOwnerUnloading(plugin.owner);
-            SafeCloseLibrary(*m_Loader, plugin.handle, plugin.name);
+            SafeLogInfoNoThrow("Unloading plugin: ", plugin.name);
+            try
+            {
+                MarkPluginOwnerUnloading(plugin.owner);
+            }
+            catch (const std::exception& e)
+            {
+                SafeLogErrorNoThrow("Failed to mark plugin owner unloading", e.what());
+            }
+            catch (...)
+            {
+                SafeLogErrorNoThrow("Failed to mark plugin owner unloading with unknown exception");
+            }
+
+            try
+            {
+                CallPluginShutdown(plugin.name, plugin.shutdown);
+            }
+            catch (const std::exception& e)
+            {
+                SafeLogErrorNoThrow("Failed to call plugin shutdown during unload", e.what());
+            }
+            catch (...)
+            {
+                SafeLogErrorNoThrow("Failed to call plugin shutdown during unload with unknown exception");
+            }
+
+            try
+            {
+                RemoveLoadedPluginOwner(plugin.owner);
+            }
+            catch (const std::exception& e)
+            {
+                SafeLogErrorNoThrow("Failed to remove loaded plugin owner", e.what());
+            }
+            catch (...)
+            {
+                SafeLogErrorNoThrow("Failed to remove loaded plugin owner with unknown exception");
+            }
+
+            try
+            {
+                RemovePluginOwnerToken(plugin.ownerToken);
+            }
+            catch (const std::exception& e)
+            {
+                SafeLogErrorNoThrow("Failed to remove plugin owner token", e.what());
+            }
+            catch (...)
+            {
+                SafeLogErrorNoThrow("Failed to remove plugin owner token with unknown exception");
+            }
+
+            try
+            {
+                UnregisterPluginCallbacks(plugin.name, plugin.owner, "before dlclose");
+            }
+            catch (const std::exception& e)
+            {
+                SafeLogErrorNoThrow("Failed to unregister plugin callbacks before dlclose", e.what());
+            }
+            catch (...)
+            {
+                SafeLogErrorNoThrow("Failed to unregister plugin callbacks before dlclose with unknown exception");
+            }
+
+            try
+            {
+                ClearPluginOwnerUnloading(plugin.owner);
+            }
+            catch (const std::exception& e)
+            {
+                SafeLogErrorNoThrow("Failed to clear plugin owner unloading", e.what());
+            }
+            catch (...)
+            {
+                SafeLogErrorNoThrow("Failed to clear plugin owner unloading with unknown exception");
+            }
+            try
+            {
+                SafeCloseLibrary(*m_Loader, plugin.handle, plugin.name);
+            }
+            catch (const std::exception& e)
+            {
+                SafeLogErrorNoThrow("Failed to close plugin library during unload", e.what());
+            }
+            catch (...)
+            {
+                SafeLogErrorNoThrow("Failed to close plugin library during unload with unknown exception");
+            }
         }
         m_LoadedPlugins.clear();
     }

@@ -11,6 +11,12 @@ metadata.
 
 ## Current Reality
 
+- ArkServerApi/AseApi may be used only as an algorithmic reference and as a dictionary of
+  Unreal/ARK `Class.Function` and `Class.Property` names. Do not copy memory offsets,
+  vtable definitions, struct layouts, MSVC calling conventions, Windows-only ABI choices,
+  or direct native call wrappers from it. Reimplement any property/function access through
+  Obelisk's Linux-native `ReflectionScanner`, `RuntimeReflection`, and
+  `ProcessEventHook` paths with binary-hash-scoped evidence.
 - `UObject::ProcessEvent` is hookable and currently observed around `0x1d34e20` on the
   validated Ragnarok binary.
 - `UObjectBase::NamePrivate.ComparisonIndex` has been observed at object offset `0x18`

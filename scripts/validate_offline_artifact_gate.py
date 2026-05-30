@@ -2191,6 +2191,14 @@ def validate_readiness_report_manifest(payload: dict[str, Any], *, label: str, m
         blockers.append({"reason": "readiness_report_missing_promotion_gate", "label": label})
         return blockers
 
+    if payload.get("gate_mode") != "second_source_promotion":
+        blockers.append({"reason": "readiness_report_gate_mode_not_second_source_promotion", "label": label})
+    target_sets = payload.get("target_sets")
+    if not isinstance(target_sets, list) or any(not isinstance(item, str) or not item for item in target_sets):
+        blockers.append({"reason": "readiness_report_target_sets_invalid", "label": f"{label}:$.target_sets"})
+    elif not target_sets:
+        blockers.append({"reason": "readiness_report_missing_target_sets", "label": f"{label}:$.target_sets"})
+
     if promotion_gate.get("ready") is True:
         if promotion_gate.get("ready_scope") != "layout_only":
             blockers.append({"reason": "readiness_report_ready_scope_not_layout_only", "label": label})

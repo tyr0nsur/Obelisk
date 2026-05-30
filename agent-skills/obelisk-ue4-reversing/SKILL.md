@@ -55,6 +55,11 @@ from the ELF executable segment plus runtime maps over guesses from one crash lo
 
 Known research targets:
 
+- ArkServerApi/AseApi can accelerate target discovery by naming ARK functions,
+  properties, command/timer concepts, and plugin expectations. Treat it as a name and
+  behavior dictionary only; reject copied offsets, vtables, Windows/MSVC ABI assumptions,
+  and direct memory access patterns. Linux support must be rebuilt through Obelisk
+  `ReflectionScanner` evidence and the native `ProcessEventHook`.
 - Maintain the current FName/GObjects/UFunction evidence against future binary updates.
 - Re-run `scripts/enumerate_core_uobjects.py` and `scripts/inspect_core_ufunctions.py`
   when the ARK binary hash changes.

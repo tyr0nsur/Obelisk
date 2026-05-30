@@ -2,31 +2,31 @@
 
 Updated: 2026-05-30
 
-This active routing table keeps only next-round facts; put durable evidence in
-`docs/research/`, resume facts in `COMPACT_CONTEXT.md`, and old detail in `HISTORY-*.md`.
+Active routing only: durable evidence belongs in `docs/research/`, resume facts in
+`COMPACT_CONTEXT.md`, and old detail in `HISTORY-*.md`.
 
 ## Active Objective
 
-- `v0.1.0-rc.1` is not published and must not be treated as closed until the current
-  intended release ref has passed a clean release gate and exact tag/ref verification.
-  Rerun the clean release gate on the intended ref before publication. A stale local or
-  unpublished RC tag must not be reused or pushed. Continue from the core-first RC
-  baseline:
+- `v0.1.0-rc.1` is published and should be treated as the frozen core-first RC baseline:
   Linux runtime, ProcessEvent hook infrastructure, plugin lifecycle, central install
   layout, `oBaseEvents`, `GameplayPolicyEvent`, minimal copied `ChatMessageEvent`,
   `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`.
-- Do not add public gameplay callback/module APIs beyond `GameplayPolicyEvent` and the
-  minimal copied `ChatMessageEvent`, or public metadata helpers beyond
-  `DescribeResourceKind` / `DescribeGameplayPolicyEventKind`, before the RC unless a new
-  blocker proves the API is required.
-- Treat module work as evidence and tooling above the core, not as the RC center.
+- Do not expand or retag the RC for routine post-RC development. Future work should move
+  toward a broader `v1.0` production-stable Obelisk core: general UE4 reflection,
+  copied-data module APIs, lifecycle-safe plugins, operator lifecycle tooling, and enough
+  compatibility surface to later recreate common ArkApi plugins on Linux.
+- Treat chat, inventory, structures, players, tribes, dinos, buffs, missions, transfers,
+  commands, permissions, timers, economy/database integrations, and admin tooling as
+  module areas above the core. Promote each only through copied-data ABI, privacy,
+  lifecycle, and second-source/static evidence gates.
 
 ## Hard Overrides
 
 - GitHub work may be delegated only for an evidenced, stable milestone. Keep commits
   minimized; no routine push/checkpoint unless selected for validated publication. No tag
   or release-ref push is authorized without explicit release-manager/lead authorization
-  for the current turn.
+  for the current turn. Stale local tags are recreated only after rerunning the gate on
+  the intended ref and are not reused or pushed.
 - Any server-backed debug or beta work requires an approved live-ops brief for that turn:
   target instance/map, feature gates, marker/env changes, restart/start/stop window,
   notice path when players are involved, evidence capture, and rollback. No server target
@@ -86,10 +86,10 @@ This active routing table keeps only next-round facts; put durable evidence in
   promote standalone public StructureEvents or Inventory SDKs.
 - `plugins/oPolicyAudit` is an experimental `GameplayPolicyEvent` example, outside first
   release scope, built only with `-DOBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`.
-- Release readiness must rerun clean through `scripts/check_release_readiness.sh` without
-  `--allow-dirty` before publication. The 2026-05-30 gate passed from a tracked-clean
-  checkpoint, but it does not validate any stale local RC tag; publication still requires
-  a clean rerun on the intended release ref and exact tag/ref verification.
+- `v0.1.0-rc.1` publication completed after `scripts/check_release_readiness.sh` passed
+  without `--allow-dirty` using the accepted RC UFunction second-source root and after
+  exact tag/ref verification. Treat this as a published RC baseline only, not a
+  production-stable `v1.0` claim.
 - Offline/module evidence stays in dated research notes. Use
   `docs/research/2026-05-29-minimal-second-source-readiness.md`,
   `docs/research/2026-05-29-dino-compact-second-source-readiness.md`,
@@ -145,44 +145,56 @@ This active routing table keeps only next-round facts; put durable evidence in
 
 ## Priority Next Steps
 
-- Freeze the RC public API around `GameplayPolicyEvent`, the minimal copied
-  `ChatMessageEvent`, `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`; keep
-  standalone public Inventory SDK, public StructureEvents SDK, dino, buff, mission, tribe,
-  transfer, richer chat, command, player, admin, mutation, return override, and public
-  `CallProcessEvent` surfaces out of RC.
-- Current RC focus: keep the public scope frozen, preserve the ProcessEvent hook-removal
-  and Inventory copied-bool hardening already validated, and rerun the full release gate
-  with the accepted RC UFunction second-source root immediately before any publication
-  request.
+- Keep the published RC public API frozen around `GameplayPolicyEvent`, minimal copied
+  `ChatMessageEvent`, and descriptor helpers; continue post-RC work without redefining it.
+- Current post-RC focus: move toward a general `v1.0` production core by reducing
+  architecture debt, improving evidence tooling, and extracting UE4 reflection knowledge
+  needed for safe copied module APIs. Do not jump straight to broad public SDKs.
+- Start a durable v1.0 capability map for ArkApi-style plugin replacement: commands,
+  permissions, players, tribes, dinos, items/inventory, structures, timers, admin, and
+  external storage integrations. Separate core primitives from plugins that should be
+  rebuilt later on top of those primitives.
+- `ArkServerApi/AseApi` is names/behavior reference only; see
+  `docs/research/2026-05-30-aseapi-reference-scan.md`. Do not copy offsets, vtables,
+  layouts, `.lib` artifacts, MSVC conventions, direct field/native-call wrappers, or raw
+  UE pointer APIs; rebuild through Obelisk reflection/ProcessEvent copied-data evidence.
 - Treat the latest `ChatMessageEvent` beta window as closed and preserved. Copied-log
   evidence under `/servidor/ark/workspace-offline` validates plugin-facing delivery for
   `send_mode=0,1,2,3` with no raw text/identity leaks. Any future live chat evidence must
   be a newly approved, privacy-bounded window with analyzer and manifest gates.
 - Keep second-source intake fail-closed: derive artifact-specific FName root, validate
   GObjects, regenerate snapshots, compare with readiness gaps enabled, and review the JSON
-  plan before execution.
-- Keep ResourceHandle promotion blocked and post-RC/internal only. Use
+  plan before execution. Ready readiness reports must come from
+  `gate_mode=second_source_promotion`, name at least one target set, and keep
+  `promotion_ready=false`; consume-mode acceptance is layout evidence, not API/runtime
+  promotion.
+- Keep ResourceHandle promotion blocked and internal only. Use
   `docs/research/2026-05-30-post-rc-offline-resourcehandle-priority.md` as the current
   flag-policy/ResourceHandle pointer: consume-mode evidence is useful, promote-mode stays
   blocked, and the next meaningful step is a post-RC lifecycle/reuse experiment plan, not
   more broad scans.
-- Treat inventory as the best next value/risk hardening target only inside the existing
-  `GameplayPolicyEvent` path: `PrimalItem.CanUse` and
-  `PrimalItem.AllowRemoteAddToInventory` copied bools only; no `ItemId`, `AdditionalData`,
-  `ResourceHandle`, or public Inventory SDK. Freeze the current Inventory target set for
-  now; `InventoryCustomFilter` arrays and `ServerRequestInventoryUseItemWithTransform`
-  stay out of scope.
+- Treat Item return-only policy modeling as the best next value/risk target only inside
+  the existing `GameplayPolicyEvent`/internal recognizer path. Keep it copied bools only;
+  no `ItemId`, `AdditionalData`, `ResourceHandle`, return override, or public Inventory
+  SDK. Freeze broader Inventory target sets for now; `CraftBlueprint`,
+  `InventoryCustomFilter` arrays, and `ServerRequestInventoryUseItemWithTransform` stay
+  out of scope.
+- For the first non-UE-dependent v1 core service, prefer owner-token process-local timers
+  before identity, permissions, and command routing. Timers still need append-only ABI,
+  capability bits, zero-is-failure handles, owner cleanup on init failure/unload,
+  idempotent unregister, and in-flight callback shutdown tests before implementation.
 - InventoryReflection hardening now validates snapshot-backed class object indices,
   outer object indices, and per-property flags before copied bool dispatch. This is
   internal-only `GameplayPolicyEvent` hardening, not a public Inventory SDK or ABI change.
 - Inventory hook dispatch builds/reuses copied payloads once, uses subscriber count only
   as a cheap mirror, and rebinding/cancel paths keep copied scalar spans owner-local. The
   strict RC `minimal-second-source-intake` redacted signature pack has complete coverage.
-- Post-RC internal recognizer work stays test-only. The post-RC internal recognizer order
-  is Mission copied-bool observer, Item return-only policy, then Transfer `bAccept`; this
-  is no RC public SDK/API promotion. It does not promote public module SDKs, callbacks,
-  ABI, marker/env, runtime logs, hook wiring, mutation, return override, object identity,
-  lookup, or `ResourceHandle`; keep detailed test coverage in dated research notes.
+- Internal recognizer work stays test-only until promoted. The current recognizer order
+  is Item return-only policy, Mission copied-bool observer, then Transfer `bAccept`; this
+  is not RC public SDK/API scope and does not change the RC public API. It does not
+  promote public module SDKs, callbacks, ABI, marker/env, runtime logs, hook wiring,
+  mutation, return override, object identity, lookup, or `ResourceHandle`; keep detailed
+  test coverage in dated research notes.
 - Post-RC offline tooling added candidate-only UObject flag, weak-helper, and GObjects
   evidence builders plus gate tests. These tools are for consume-mode internal/offline
   indexing only. They do not promote public GObjects, lookup, identity, lifecycle,
@@ -191,20 +203,18 @@ This active routing table keeps only next-round facts; put durable evidence in
   inventory-action compact intake, and BoolProperty gates candidate/layout-only unless the
   exact target set passes promote-mode artifact gates plus second-source/static evidence.
 - Keep MissionReflection and ProcessEventItemReflection test-only: no hook wiring,
-  dispatcher, public ABI, server marker/env, runtime logs, or SDK surface.
+  dispatcher, public ABI, marker/env, runtime logs, or SDK surface.
 - Route observer remains internal diagnostic evidence only; see the chat route observation
   fact above for gates and limits.
-- No broad new core dump is needed for current RC surfaces. Existing fixture-backed target
-  sets cover exact RC UFunctions; safe claims remain target-set-scoped, not "all FNames" or
-  "all UFunctions". The prior focused extraction gap for `transfer-ufunction-intake` and
-  `transfer-scriptstruct` now has accepted layout-only second-source evidence; the next
-  transfer step is deciding whether any copied-scalar policy surface is worth modeling
-  after RC, not broad live scanning.
+- No broad new core dump is needed for the published RC surfaces. Existing fixture-backed
+  target sets cover exact RC UFunctions; safe claims remain target-set-scoped, not "all
+  FNames" or "all UFunctions". For v1.0 research, prefer focused offline evidence:
+  GObjects coherent-field-window hardening, Mission copied-bool observer planning, Item
+  return-only policy modeling, and Transfer `bAccept` modeling before any live-server
+  debug request.
 
 ## Agent Protocol
 
-- Lead owns server-safety decisions; apply `obelisk-github-research-workflow` for
-  delegation, GitHub ownership, and stale-agent cleanup.
-- Sub-agent prompts still need scoped objective, safety baseline, allowed paths, required skills,
-  expert role, and expected decision; pass only the skills needed for that scope and close
-  completed sub-agents before the next round.
+- Lead owns server safety; use `obelisk-github-research-workflow` for delegation, GitHub,
+  and stale-agent cleanup.
+- Sub-agent prompts need scoped objective, safety baseline, paths, skills, expert role, and expected decision; pass only needed skills and close completed agents.

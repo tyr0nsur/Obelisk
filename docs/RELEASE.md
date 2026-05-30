@@ -1,8 +1,9 @@
 # Release Process
 
-This project is not ready for a production-stable release yet. Use this checklist for
-`v0.1.0-rc.1` candidates and the eventual first public stable `0.1.0` tag. Version labels
-and pre-release rules are defined in [VERSIONING.md](VERSIONING.md).
+This project is not ready for a production-stable release yet. `v0.1.0-rc.1` is the
+published core-first RC baseline. Use this checklist for future RC/stable candidates and
+the eventual first public stable `0.1.0` tag. Version labels and pre-release rules are
+defined in [VERSIONING.md](VERSIONING.md).
 
 ## Scope
 
@@ -107,9 +108,9 @@ scripts/check_rc_layout_evidence_smoke.sh \
   --candidate-root /tmp/obelisk-rc-ufunction-second-source-root
 ```
 
-For `v0.1.0-rc.1`, the final local candidate gate is the canonical release
-readiness script with second-source readiness enabled and the accepted RC
-UFunction snapshot root configured. The 2026-05-30 local checkpoint passed this
+For future RC/stable publication, the final local candidate gate is the canonical release
+readiness script with second-source readiness enabled and the accepted target-set
+UFunction snapshot root configured. The published `v0.1.0-rc.1` checkpoint passed this
 gate with `/tmp/obelisk-rc-ufunction-second-source-root`; see
 [`2026-05-30-rc-second-source-release-gate-check.md`](research/2026-05-30-rc-second-source-release-gate-check.md).
 Rerun the same gate on the intended release ref immediately before any
@@ -125,13 +126,14 @@ scripts/check_release_readiness.sh \
   --second-source-report-dir /tmp/obelisk-rc-second-source
 ```
 
-An existing local or unpublished RC tag is not proof that the current validated
-head is tagged. It may point behind the current validated head after later
-release-prep fixes. Before any release-manager tag/push, perform exact tag/ref
-verification: verify that the RC tag commit, if it already exists, is exactly the
-intended validated release ref; if it is not, stop and resolve the stale tag state
-instead of reusing or pushing it.
-A stale local `v0.1.0-rc.1` tag is not publicable and must not be pushed.
+For future release candidates or explicit recovery of a published tag, an existing local
+or unpublished RC tag is not proof that the intended validated head is tagged. It may
+point behind the current validated head after later release-prep fixes. Before any
+release-manager tag/push, perform exact tag/ref verification: verify that the RC tag
+commit, if it already exists, is exactly the intended validated release ref; if it is not,
+stop and resolve the stale tag state instead of reusing or pushing it. Do not recreate the
+published `v0.1.0-rc.1` tag unless explicitly recovering a release error, and do not push a
+stale tag.
 
 The promotion check always includes the public RC UFunction target sets:
 `minimal-second-source-intake`, `structure-observer-intake`, and `chat-message-intake`.
@@ -236,9 +238,9 @@ scripts/check_release_readiness.sh \
   --scriptstruct-second-source-root <second-source-scriptstruct-snapshots>
 ```
 
-If internal module recognizer work resumes after the RC, the current order is Mission
-copied-bool observer, Item return-only policy, then Transfer `bAccept`. That ordering is
-post-RC planning only and does not promote a public SDK/API surface.
+If internal module recognizer work resumes after the RC, the current order is Item
+return-only policy, Mission copied-bool observer, then Transfer `bAccept`. That ordering
+is post-RC planning only and does not promote a public SDK/API surface.
 
 Runtime-observer log summaries are a separate review artifact, not a release gate and not
 second-source promotion evidence. Use them only on copied or sanitized logs when reviewing
@@ -312,25 +314,27 @@ scripts/check_linuxgsm_wrapper_drift.sh \
 scripts/check_obelisk_server_posture.sh --expect-stable --map <map> --instance <instance-id>
 ```
 
-11. For a release candidate, tag the validated candidate first. Release tags and release
+11. For a future release candidate, tag the validated candidate first. Release tags and release
     ref pushes are release-manager/lead-only; contributors should not tag or push release
     refs from ordinary development branches.
     No tag or release-ref push is authorized without explicit release-manager/lead
     authorization for the current turn.
-    If `v0.1.0-rc.1` already exists locally, verify it points exactly at the intended
-    validated ref; if it points elsewhere, recreate it only after rerunning the gate on
-    that ref. Do not push a stale tag. Use the tag/ref checker before pushing the tag.
+    Replace `<rc-tag>` with the new release tag. Do not recreate the published
+    `v0.1.0-rc.1` tag unless explicitly recovering a release error. If the target tag
+    already exists locally, verify it points exactly at the intended validated ref; if it
+    points elsewhere, recreate it only after rerunning the gate on that ref. Do not push a
+    stale tag. Use the tag/ref checker before pushing the tag.
 
 ```bash
-python3 scripts/check_release_tag_state.py --tag v0.1.0-rc.1 --ref HEAD --allow-missing
-git tag -a v0.1.0-rc.1 -m "Obelisk 0.1.0-rc.1"
-python3 scripts/check_release_tag_state.py --tag v0.1.0-rc.1 --ref HEAD
+python3 scripts/check_release_tag_state.py --tag <rc-tag> --ref HEAD --allow-missing
+git tag -a <rc-tag> -m "Obelisk <rc-version>"
+python3 scripts/check_release_tag_state.py --tag <rc-tag> --ref HEAD
 # Only after the explicit release-manager/lead authorization above:
-# git push origin v0.1.0-rc.1
+# git push origin <rc-tag>
 ```
 
-After the release candidate is validated and no RC blockers remain, tag the stable
-release in a focused release-prep pass:
+After RC feedback is resolved and the stable release gate passes on the intended ref, tag
+the stable release in a focused release-prep pass with explicit release-manager approval:
 
 ```bash
 git tag -a v0.1.0 -m "Obelisk 0.1.0"

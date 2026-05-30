@@ -4,29 +4,24 @@ This matrix separates the stable baseline from experimental work. It is a
 contributor-facing summary for the Obelisk runtime/API/SDK, not a replacement
 for detailed research notes.
 
-Current release-prep route is core-first `v0.1.0-rc.1`; see
-[VERSIONING.md](VERSIONING.md). This is not a production-stable release claim.
+Current published release-candidate baseline is core-first `v0.1.0-rc.1`; see
+[VERSIONING.md](VERSIONING.md). This is not a production-stable `v1.0` release claim.
 
-Current RC validation checkpoint as of 2026-05-30: the local tree passed
+Current RC validation checkpoint as of 2026-05-30: the release ref passed
 `scripts/check_release_readiness.sh --require-second-source-readiness` with
 `/tmp/obelisk-rc-ufunction-second-source-root` as the configured UFunction
-second-source root; see
+second-source root, and the published tag was verified against that intended validated
+release ref with exact tag/ref verification; see
 [`2026-05-30-rc-second-source-release-gate-check.md`](research/2026-05-30-rc-second-source-release-gate-check.md).
 This only validates the documented RC gate for the public scope below:
 `GameplayPolicyEvent`, the minimal copied `ChatMessageEvent`, `DescribeResourceKind`, and
 `DescribeGameplayPolicyEventKind`. RC public scope remains limited to
 `GameplayPolicyEvent`, the minimal copied `ChatMessageEvent`, `DescribeResourceKind`, and
 `DescribeGameplayPolicyEventKind`. It does not promote a public Inventory/Items SDK,
-`ResourceHandle`, identity, lookup, mutation, return override, or
-live-server claim. Remaining `v0.1.0-rc.1` release work is release-manager
-confirmation on the intended release ref, CI/clean-tree review, and tag/push when
-explicitly authorized. Existing local or unpublished RC tags must be verified against that
-intended validated release ref because they may point behind the current validated head
-after later release-prep fixes. A stale local `v0.1.0-rc.1` tag is not publicable and
-must not be reused, pushed, or treated as validated. Publication requires rerunning the
-gate without `--allow-dirty` on the intended release ref plus exact tag/ref verification
-before recreating or verifying the tag there. No tag or release-ref push is authorized
-without explicit release-manager/lead authorization for the current turn.
+`ResourceHandle`, identity, lookup, mutation, return override, or live-server claim.
+Post-RC development now targets a broader `v1.0` production core. That route should add
+general reflection evidence, copied-data module APIs, operator lifecycle safety, and
+ArkApi-style plugin replacement capacity without retroactively expanding the RC scope.
 
 The current ARK server setup is a validation adapter used to check Obelisk in a
 real UE4 Linux process. Adapter operations are documented here only when they
@@ -77,7 +72,7 @@ define or protect runtime behavior.
 | GObjects/GUObjectArray enumeration | Not ready | Validate object shapes in isolation before accepting offsets. |
 | UObject flag validity policy | Not ready | Static flag-policy reports and transition matrices that pass the offline artifact gate in consume mode are candidate-only evidence. They do not prove lifecycle/validity semantics, do not satisfy promote-mode gates, and do not unlock `ResourceHandle`, object lookup, GObjects promotion, mutation, or return overrides. |
 | General reflected UFunction parameter decoding | Not ready | Candidate-only module recognizers exist, but SDK-facing decoding remains unpromoted. |
-| Higher-level SDK APIs | Not ready | Outside the promoted `GameplayPolicyEvent` and minimal `ChatMessageEvent` surfaces, Inventory, players, richer chat, tribes, dinos, missions, transfers, permissions, timers, admin, commands, and public `StructureEvents` remain roadmap items until each has copied payloads, ABI tests, privacy policy, and accepted target-set evidence. Post-RC internal recognizer order is Mission copied-bool observer, Item return-only policy, then Transfer `bAccept`; this is not RC public SDK/API scope. |
+| Higher-level SDK APIs | Not ready | Outside the promoted `GameplayPolicyEvent` and minimal `ChatMessageEvent` surfaces, Inventory, players, richer chat, tribes, dinos, missions, transfers, permissions, timers, admin, commands, and public `StructureEvents` remain roadmap items until each has copied payloads, ABI tests, privacy policy, and accepted target-set evidence. Post-RC internal recognizer order is Item return-only policy, Mission copied-bool observer, then Transfer `bAccept`; this is not RC public SDK/API scope. |
 
 ## Current Game Interaction Boundary
 

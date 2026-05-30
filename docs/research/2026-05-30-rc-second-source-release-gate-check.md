@@ -103,5 +103,5 @@ and `scripts/__pycache__/`.
 - Do not reuse an existing local/unpublished `v0.1.0-rc.1` tag unless it dereferences
   exactly to the intended validated release ref; stale local tags must be resolved before
   any tag push.
-- Keep post-RC discovery separate from this scope: Mission copied-bool observer, Item
-  return-only policy, and Transfer `bAccept` remain candidate/internal work.
+- Keep post-RC discovery separate from this scope: Item return-only policy, Mission
+  copied-bool observer, and Transfer `bAccept` remain candidate/internal work.

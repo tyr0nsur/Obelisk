@@ -1,14 +1,12 @@
 # Changelog
 
-## 0.1.0-rc.1 preparation
+## 0.1.0-rc.1
 
-Release-candidate preparation is in progress. RC public scope remains limited to
+Published release candidate. RC public scope remains limited to
 `GameplayPolicyEvent`, the minimal copied `ChatMessageEvent`, `DescribeResourceKind`, and
 `DescribeGameplayPolicyEventKind`. This entry is not a production-stable release claim.
-Any existing local or unpublished `v0.1.0-rc.1` tag must pass exact tag/ref verification
-against the intended release ref after a clean release gate before push; stale tags must
-not be reused or pushed. No tag or release-ref push is authorized without explicit
-release-manager/lead authorization for the current turn.
+Post-RC development should target the broader `v1.0` production core and eventual
+ArkApi-style plugin replacement without retroactively expanding this RC scope.
 
 ## 0.1.0-dev
 

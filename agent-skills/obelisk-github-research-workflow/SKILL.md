@@ -18,6 +18,11 @@ promotion gates. Treat chat, inventory, structures, buffs, dinos, tribes, missio
 transfers, and admin surfaces as module areas on top of the same core, not as the center of
 the project.
 
+Compatibility research may consult ArkServerApi/AseApi only as a naming/behavior
+dictionary for familiar ARK plugin concepts. Obelisk must not copy ArkServerApi offsets,
+vtables, layouts, `.lib` artifacts, MSVC conventions, or direct UE pointer APIs; Linux
+support is rebuilt from Obelisk reflection and hook evidence.
+
 Keep leader-only strategy, cadence, and active goal text outside this skill. The active
 leader objective belongs in the goal tool and short-lived handoff state, not in prompts sent
 to every sub-agent.

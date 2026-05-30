@@ -241,10 +241,18 @@ def historical_missing_coverage_marker() -> dict:
     }
 
 
-def readiness_report_manifest(*, ready: bool = True, include_boundaries: bool = True) -> dict:
+def readiness_report_manifest(
+    *,
+    ready: bool = True,
+    include_boundaries: bool = True,
+    gate_mode: str = "second_source_promotion",
+    target_sets: list[str] | None = None,
+) -> dict:
+    if target_sets is None:
+        target_sets = ["minimal-second-source-intake"]
     payload = {
         "schema": gate.READINESS_REPORT_SCHEMA,
-        "gate_mode": "second_source_promotion",
+        "gate_mode": gate_mode,
         "promotion_gate": {
             "ready": ready,
             "ready_scope": "layout_only" if ready else "not_ready",
@@ -253,6 +261,7 @@ def readiness_report_manifest(*, ready: bool = True, include_boundaries: bool = 
             "blockers": [],
         },
         "totals": {"targets": 1},
+        "target_sets": target_sets,
     }
     if include_boundaries:
         payload.update(
@@ -2288,6 +2297,30 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
 
         reasons = {blocker["reason"] for blocker in result["blockers"]}
         self.assertIn("readiness_report_promotion_ready_not_false", reasons)
+
+    def test_blocks_readiness_report_without_second_source_gate_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "readiness.json"
+            write_json(manifest, readiness_report_manifest(ready=False, gate_mode="informational_gap_report"))
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("readiness_report_gate_mode_not_second_source_promotion", reasons)
+
+    def test_blocks_readiness_report_without_named_target_set(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "readiness.json"
+            write_json(manifest, readiness_report_manifest(ready=False, target_sets=[]))
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("readiness_report_missing_target_sets", reasons)
 
     def test_blocks_readiness_report_in_promote_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

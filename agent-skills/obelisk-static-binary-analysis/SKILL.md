@@ -88,6 +88,11 @@ claims from a stripped Linux server binary.
   --strict-target-set-coverage` when the artifact is expected to prove exact target-set
   coverage. Missing or incomplete coverage is a traceability blocker, not a runtime
   promotion signal.
+- Reflection snapshot readiness reports are accepted only as named second-source layout
+  evidence: `gate_mode=second_source_promotion`, non-empty `target_sets`, and
+  `promotion_gate.promotion_ready=false`. Consume-mode acceptance is not public API,
+  runtime hook, mutation, return override, or object identity promotion, and promote mode
+  must stay blocked until a separate schema-specific promotion contract exists.
 
 ## Baseline Evidence Pack
 

@@ -46,6 +46,8 @@ Historical recovery reference:
 
 Post-RC/research candidates:
 
+- [2026-05-30-v1-core-capability-map.md](2026-05-30-v1-core-capability-map.md)
+- [2026-05-30-aseapi-reference-scan.md](2026-05-30-aseapi-reference-scan.md)
 - [2026-05-29-module-surface-roadmap.md](2026-05-29-module-surface-roadmap.md)
 - [2026-05-29-next-targetset-discovery.md](2026-05-29-next-targetset-discovery.md)
 - [2026-05-29-mission-reflection-internal-readiness.md](2026-05-29-mission-reflection-internal-readiness.md)
@@ -114,6 +116,8 @@ when a task explicitly targets that module.
 | [2026-05-29-minimal-second-source-readiness.md](2026-05-29-minimal-second-source-readiness.md) | Minimal second-source readiness | Records accepted direct-root second-source layout evidence and the current validator refresh for two inventory and two structure UFunction targets, without promoting GObjects, identity, mutation, return override, or public SDK surfaces. |
 | [2026-05-29-public-gameplay-event-readiness-audit.md](2026-05-29-public-gameplay-event-readiness-audit.md) | Public gameplay event readiness audit | Promotes `GameplayPolicyEvent` as copied/redacted POD backed by accepted target-set evidence, while keeping public Inventory/Structure SDKs, identity, mutation, and return override blocked. |
 | [2026-05-29-chat-message-second-source-readiness.md](2026-05-29-chat-message-second-source-readiness.md) | Chat message second-source readiness | Records accepted layout evidence plus copied plugin-facing delivery validation for all four known chat send modes, while keeping identity, commands, mutation, and UE internals blocked. |
+| [2026-05-30-v1-core-capability-map.md](2026-05-30-v1-core-capability-map.md) | v1 core capability map | Defines the post-RC route toward a general Linux ARK modding core and separates v1 infrastructure from later ArkApi-style module/plugin work. |
+| [2026-05-30-aseapi-reference-scan.md](2026-05-30-aseapi-reference-scan.md) | AseApi reference scan | Allows ArkServerApi/AseApi as a names/behavior dictionary while banning copied offsets, vtables, MSVC ABI, Windows libs, direct UE pointer APIs, and direct memory access patterns. |
 | [2026-05-29-filtered-process-event-debug-gate-hardening.md](2026-05-29-filtered-process-event-debug-gate-hardening.md) | Filtered ProcessEvent debug gate hardening | Records why raw filtered `ProcessEvent` callbacks moved behind an explicit debug gate so copied events remain the RC plugin path. |
 | [2026-05-29-rc-checkpoint-slicing-plan.md](2026-05-29-rc-checkpoint-slicing-plan.md) | RC checkpoint slicing | Splits the broad dirty worktree into reviewable local checkpoints and keeps the first RC limited to core API, lifecycle, release gates, and redacted evidence. |
 | [2026-05-29-buff-after-compact-next-step.md](2026-05-29-buff-after-compact-next-step.md) | Buff after compact next step | Recommends no buff runtime hooks after accepted compact layout evidence; limits useful follow-up to docs or offline target-set expansion. |
