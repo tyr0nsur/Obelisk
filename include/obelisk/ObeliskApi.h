@@ -354,8 +354,9 @@ typedef struct ObeliskApi {
 // instance_allowlist array so clustered installs have an explicit activation envelope.
 // __attribute__((visibility("default"))) bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out);
 // The api and context pointers passed to ObeliskPlugin_Init are borrowed for init only.
-// Copy ObeliskApi by value if the plugin needs runtime callbacks during shutdown,
-// worker threads, or later event callbacks.
+// If a plugin needs runtime callbacks during shutdown, worker threads, or later event
+// callbacks, copy only the advertised API prefix with a bounded copy and check
+// struct_size/capabilities before using appended fields.
 // __attribute__((visibility("default"))) bool ObeliskPlugin_Init(ObeliskApi* api, const ObeliskPluginInitContext* context);
 //
 // Plugins may also export this optional lifecycle hook. When present, the runtime

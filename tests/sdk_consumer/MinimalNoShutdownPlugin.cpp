@@ -1,7 +1,16 @@
 #include <obelisk/ObeliskApi.h>
 
+#include <cstddef>
+
 namespace
 {
+    bool HasMinimalApiPrefix(const ObeliskApi* api)
+    {
+        return api &&
+            api->abi_version == OBELISK_API_ABI_VERSION &&
+            api->struct_size >= offsetof(ObeliskApi, struct_size) + sizeof(api->struct_size);
+    }
+
     constexpr const char* kDefaultConfig = R"json({
     "enabled": false,
     "allow_all_instances": false,
@@ -40,8 +49,7 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
         if (!api || !context)
             return false;
 
-        return api->abi_version == OBELISK_API_ABI_VERSION &&
-            api->struct_size >= sizeof(ObeliskApi) &&
+        return HasMinimalApiPrefix(api) &&
             context->abi_version == OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION &&
             context->struct_size >= sizeof(ObeliskPluginInitContext);
     }

@@ -734,11 +734,14 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "plugins/oBaseEvents/oBaseEvents.cpp",
             "plugins/oProcessTimer/oProcessTimer.cpp",
             "plugins/oDescriptorCatalog/oDescriptorCatalog.cpp",
+            "plugins/oChatAudit/oChatAudit.cpp",
+            "plugins/oPolicyAudit/oPolicyAudit.cpp",
+            "plugins/oChatLogger/oChatLogger.c",
         ):
             source = read(relative)
             with self.subTest(file=relative):
                 self.assertIn("CopyApiPrefix", source)
-                self.assertIn("std::memcpy(&g_Api, api, copySize);", source)
+                self.assertRegex(source, r"(?:std::)?memcpy\(&g_Api, api, copySize\);")
                 self.assertIn("api->struct_size < sizeof(g_Api)", source)
                 self.assertNotIn("g_Api = *api;", source)
 

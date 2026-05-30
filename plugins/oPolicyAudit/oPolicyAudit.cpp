@@ -424,6 +424,20 @@ namespace
                api->DescribeGameplayPolicyEventKind;
     }
 
+    void CopyApiPrefix(const ObeliskApi* api)
+    {
+        g_Api = {};
+        if (!api)
+        {
+            g_HasApi = false;
+            return;
+        }
+
+        const size_t copySize = api->struct_size < sizeof(g_Api) ? api->struct_size : sizeof(g_Api);
+        std::memcpy(&g_Api, api, copySize);
+        g_HasApi = true;
+    }
+
     bool CacheDescriptorNames(const ObeliskApi* api)
     {
         if (!api)
@@ -522,7 +536,7 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(Obelis
             return false;
 
         if (api->abi_version != OBELISK_API_ABI_VERSION ||
-            api->struct_size < sizeof(ObeliskApi) ||
+            api->struct_size < offsetof(ObeliskApi, capabilities) + sizeof(api->capabilities) ||
             context->abi_version != OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION ||
             context->struct_size < sizeof(ObeliskPluginInitContext))
         {
@@ -530,8 +544,7 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(Obelis
             return false;
         }
 
-        g_Api = *api;
-        g_HasApi = true;
+        CopyApiPrefix(api);
         g_OwnerToken = context->plugin_owner_token;
         g_LoggedEvents.store(0);
 

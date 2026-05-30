@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 static ObeliskApi g_Api;
 static bool g_HasApi = false;
@@ -91,6 +92,20 @@ static void ResetState(void)
         atomic_store_explicit(&g_ModeEventCounts[i], 0u, memory_order_relaxed);
 }
 
+static void CopyApiPrefix(const ObeliskApi* api)
+{
+    g_Api = (ObeliskApi){0};
+    if (!api)
+    {
+        g_HasApi = false;
+        return;
+    }
+
+    const size_t copySize = api->struct_size < sizeof(g_Api) ? api->struct_size : sizeof(g_Api);
+    memcpy(&g_Api, api, copySize);
+    g_HasApi = true;
+}
+
 __attribute__((visibility("default"))) bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out)
 {
     if (!out)
@@ -113,7 +128,8 @@ __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
     if (!api || !context)
         return false;
     if (api->abi_version != OBELISK_API_ABI_VERSION ||
-        api->struct_size < sizeof(ObeliskApi) ||
+        api->struct_size < offsetof(ObeliskApi, UnregisterChatMessageEventWithOwnerToken) +
+            sizeof(api->UnregisterChatMessageEventWithOwnerToken) ||
         context->abi_version != OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION ||
         context->struct_size < sizeof(ObeliskPluginInitContext) ||
         context->plugin_owner_token == 0)
@@ -123,8 +139,7 @@ __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
         return false;
     }
 
-    g_Api = *api;
-    g_HasApi = true;
+    CopyApiPrefix(api);
     g_OwnerToken = context->plugin_owner_token;
     for (unsigned i = 0; i < OBELISK_CHAT_SEND_MODE_COUNT; ++i)
         atomic_store_explicit(&g_ModeEventCounts[i], 0u, memory_order_relaxed);

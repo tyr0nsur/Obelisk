@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <exception>
 #include <filesystem>
 #include <fstream>
@@ -317,6 +318,20 @@ namespace
             api->UnregisterTimerWithOwnerToken;
     }
 
+    void CopyApiPrefix(const ObeliskApi* api)
+    {
+        g_Api = {};
+        if (!api)
+        {
+            g_HasApi = false;
+            return;
+        }
+
+        const size_t copySize = api->struct_size < sizeof(g_Api) ? api->struct_size : sizeof(g_Api);
+        std::memcpy(&g_Api, api, copySize);
+        g_HasApi = true;
+    }
+
     std::size_t SizeBucket(uint64_t size, uint64_t maxBucket)
     {
         if (size == 0)
@@ -533,8 +548,7 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
 
         {
             std::lock_guard<std::mutex> lock(g_StateMutex);
-            g_Api = *api;
-            g_HasApi = true;
+            CopyApiPrefix(api);
             g_OwnerToken = context->plugin_owner_token;
             g_ChatRegistrationId = 0;
             g_TimerId.store(0, std::memory_order_release);
