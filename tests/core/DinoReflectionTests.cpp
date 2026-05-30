@@ -26,6 +26,10 @@ namespace
     constexpr int32_t kObjectPropertyClassObjectIndex = 534;
     constexpr int32_t kFunctionClassObjectIndex = 518;
     constexpr int32_t kIntPropertyClassObjectIndex = 539;
+    constexpr uint64_t kObjectInputPropertyFlags = 0x1040000280;
+    constexpr uint64_t kIntInputPropertyFlags = 0x1040000280;
+    constexpr uint64_t kBoolInputPropertyFlags = 0x1040000280;
+    constexpr uint64_t kBoolReturnPropertyFlags = 0x1040000780;
     constexpr int32_t kACharacterNameIndex = 4044;
     constexpr int32_t kReturnValueNameIndex = 17716;
     constexpr int32_t kBSkipLineTraceNameIndex = 25580;
@@ -100,12 +104,12 @@ namespace
                        const void* klass,
                        int32_t nameIndex,
                        int32_t offset,
-                       int32_t elementSize)
+                       int32_t elementSize,
+                       uint64_t propertyFlags)
     {
         WriteObject(buffer, nameIndex, nameIndex, klass, owner);
 
         const int32_t arrayDim = 1;
-        const uint64_t propertyFlags = 0x80;
         WriteAt(buffer, 0x28, next);
         WriteAt(buffer, 0x30, arrayDim);
         WriteAt(buffer, 0x34, elementSize);
@@ -119,6 +123,7 @@ namespace
         int32_t Offset = -1;
         int32_t ElementSize = 0;
         const void* Class = nullptr;
+        uint64_t PropertyFlags = 0;
     };
 
     struct DinoFixture
@@ -220,7 +225,8 @@ namespace
                           fields[i].Class,
                           fields[i].NameIndex,
                           fields[i].Offset,
-                          fields[i].ElementSize);
+                          fields[i].ElementSize,
+                          fields[i].PropertyFlags);
         }
 
         WriteAt(fixture.Function, 0x38, numParms > 0 ? fixture.PropertyA.data() : nullptr);
@@ -239,12 +245,36 @@ namespace
                       0x10,
                       0x0f,
                       {{
-                          {kACharacterNameIndex, 0x00, 0x08, fixture.ObjectPropertyClass.data()},
-                          {kPassengerSeatIndexNameIndex, 0x08, 0x04, fixture.IntPropertyClass.data()},
-                          {kBForcePassengerNameIndex, 0x0c, 0x01, fixture.BoolPropertyClass.data()},
-                          {kBAllowFlyersAndWaterDinosNameIndex, 0x0d, 0x01, fixture.BoolPropertyClass.data()},
-                          {kBSkipLineTraceNameIndex, 0x0e, 0x01, fixture.BoolPropertyClass.data()},
-                          {kReturnValueNameIndex, 0x0f, 0x01, fixture.BoolPropertyClass.data()},
+                          {kACharacterNameIndex,
+                           0x00,
+                           0x08,
+                           fixture.ObjectPropertyClass.data(),
+                           kObjectInputPropertyFlags},
+                          {kPassengerSeatIndexNameIndex,
+                           0x08,
+                           0x04,
+                           fixture.IntPropertyClass.data(),
+                           kIntInputPropertyFlags},
+                          {kBForcePassengerNameIndex,
+                           0x0c,
+                           0x01,
+                           fixture.BoolPropertyClass.data(),
+                           kBoolInputPropertyFlags},
+                          {kBAllowFlyersAndWaterDinosNameIndex,
+                           0x0d,
+                           0x01,
+                           fixture.BoolPropertyClass.data(),
+                           kBoolInputPropertyFlags},
+                          {kBSkipLineTraceNameIndex,
+                           0x0e,
+                           0x01,
+                           fixture.BoolPropertyClass.data(),
+                           kBoolInputPropertyFlags},
+                          {kReturnValueNameIndex,
+                           0x0f,
+                           0x01,
+                           fixture.BoolPropertyClass.data(),
+                           kBoolReturnPropertyFlags},
                       }});
     }
 
@@ -258,8 +288,16 @@ namespace
                       0x09,
                       0x08,
                       {{
-                          {kCanCarryPawnNameIndex, 0x00, 0x08, fixture.ObjectPropertyClass.data()},
-                          {kReturnValueNameIndex, 0x08, 0x01, fixture.BoolPropertyClass.data()},
+                          {kCanCarryPawnNameIndex,
+                           0x00,
+                           0x08,
+                           fixture.ObjectPropertyClass.data(),
+                           kObjectInputPropertyFlags},
+                          {kReturnValueNameIndex,
+                           0x08,
+                           0x01,
+                           fixture.BoolPropertyClass.data(),
+                           kBoolReturnPropertyFlags},
                           {},
                           {},
                           {},
@@ -448,26 +486,72 @@ namespace
         }
     }
 
-    void TestAcceptsSemanticClassNamesWithDifferentInternalIndices()
+    void TestRejectsClassObjectsWithWrongInternalIndices()
     {
-        DinoFixture fixture;
-        BuildAddPassenger(fixture);
-        WriteObject(fixture.FunctionClass, kFunctionClassNameIndex, 9001, nullptr, nullptr);
-        WriteObject(fixture.ObjectPropertyClass, kObjectPropertyClassNameIndex, 9002, nullptr, nullptr);
-        WriteObject(fixture.IntPropertyClass, kIntPropertyClassNameIndex, 9003, nullptr, nullptr);
-        WriteObject(fixture.BoolPropertyClass, kBoolPropertyClassNameIndex, 9004, nullptr, nullptr);
+        {
+            DinoFixture fixture;
+            BuildAddPassenger(fixture);
+            WriteObject(fixture.FunctionClass, kFunctionClassNameIndex, 9001, nullptr, nullptr);
 
-        DinoReflection::DinoInvocation invocation;
-        ReadResult result = DinoReflection::TryIdentifyDinoInvocation(
-            fixture.Reader(),
-            Options(),
-            fixture.Function.data(),
-            fixture.Params.data(),
-            invocation);
+            DinoReflection::DinoInvocation invocation;
+            ReadResult result = DinoReflection::TryIdentifyDinoInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible,
+                    "wrong UFunction class object index was accepted");
+        }
+        {
+            DinoFixture fixture;
+            BuildAddPassenger(fixture);
+            WriteObject(fixture.ObjectPropertyClass,
+                        kObjectPropertyClassNameIndex,
+                        9002,
+                        nullptr,
+                        nullptr);
 
-        Require(static_cast<bool>(result), result.Reason.c_str());
-        Require(invocation.Function == DinoReflection::DinoFunction::AddPassenger,
-                "semantic class-name dino recognition kind mismatch");
+            DinoReflection::DinoInvocation invocation;
+            ReadResult result = DinoReflection::TryIdentifyDinoInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible,
+                    "wrong ObjectProperty class object index was accepted");
+        }
+        {
+            DinoFixture fixture;
+            BuildAddPassenger(fixture);
+            WriteObject(fixture.IntPropertyClass, kIntPropertyClassNameIndex, 9003, nullptr, nullptr);
+
+            DinoReflection::DinoInvocation invocation;
+            ReadResult result = DinoReflection::TryIdentifyDinoInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible,
+                    "wrong IntProperty class object index was accepted");
+        }
+        {
+            DinoFixture fixture;
+            BuildAddPassenger(fixture);
+            WriteObject(fixture.BoolPropertyClass, kBoolPropertyClassNameIndex, 9004, nullptr, nullptr);
+
+            DinoReflection::DinoInvocation invocation;
+            ReadResult result = DinoReflection::TryIdentifyDinoInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible,
+                    "wrong BoolProperty class object index was accepted");
+        }
     }
 
     void TestRejectsWrongShape()
@@ -523,7 +607,8 @@ namespace
                           fixture.BoolPropertyClass.data(),
                           kPassengerSeatIndexNameIndex,
                           0x08,
-                          0x01);
+                          0x01,
+                          kIntInputPropertyFlags);
 
             DinoReflection::DinoInvocation invocation;
             ReadResult result = DinoReflection::TryIdentifyDinoInvocation(
@@ -543,7 +628,8 @@ namespace
                           fixture.ObjectPropertyClass.data(),
                           kCanCarryPawnNameIndex,
                           0x01,
-                          0x08);
+                          0x08,
+                          kObjectInputPropertyFlags);
 
             DinoReflection::DinoInvocation invocation;
             ReadResult result = DinoReflection::TryIdentifyDinoInvocation(
@@ -567,6 +653,38 @@ namespace
                 fixture.Params.data(),
                 invocation);
             Require(!result, "wrong bool property ArrayDim was accepted");
+        }
+    }
+
+    void TestRejectsWrongPropertyFlags()
+    {
+        {
+            DinoFixture fixture;
+            BuildAddPassenger(fixture);
+            WriteAt(fixture.PropertyB, 0x38, uint64_t{kIntInputPropertyFlags ^ 0x400});
+
+            DinoReflection::DinoInvocation invocation;
+            ReadResult result = DinoReflection::TryIdentifyDinoInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "wrong dino int property flags were accepted");
+        }
+        {
+            DinoFixture fixture;
+            BuildAllowCarryCharacter(fixture);
+            WriteAt(fixture.PropertyB, 0x38, uint64_t{kBoolInputPropertyFlags});
+
+            DinoReflection::DinoInvocation invocation;
+            ReadResult result = DinoReflection::TryIdentifyDinoInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "wrong dino return property flags were accepted");
         }
     }
 
@@ -669,8 +787,9 @@ int main()
     TestAcceptsMetadataOnlyRecognition();
     TestRejectsPartialNameCollisions();
     TestRejectsWrongOuterNameNumberAndClass();
-    TestAcceptsSemanticClassNamesWithDifferentInternalIndices();
+    TestRejectsClassObjectsWithWrongInternalIndices();
     TestRejectsWrongShape();
+    TestRejectsWrongPropertyFlags();
     TestRejectsNullFunction();
     TestRejectsUnreadableScalarRange();
     TestRejectsTruncatedAndOverlongPropertyChains();

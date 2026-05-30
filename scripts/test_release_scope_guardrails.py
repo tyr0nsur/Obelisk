@@ -177,7 +177,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "`DescribeResourceKind` as metadata-only resource category descriptors",
             "not `ResourceHandle`, resource lookup, object identity, or cross-event correlation",
             "`GameplayPolicyEvent` as the promoted v0.1 gameplay policy callback family",
-            "copied POD scalar payloads and no identity, lookup, mutation, or return override authority",
+            "copied POD scalar payloads and no identity, no lookup, no mutation, and no return override authority",
             "it does not by itself promote a public Inventory SDK",
             "It also does not prove resource cross-event correlation",
             "must not unlock `ResourceHandle`, object lookup, GObjects promotion",

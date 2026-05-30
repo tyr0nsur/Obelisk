@@ -48,6 +48,9 @@ instances still require explicit operator approval for the target instance, mark
 restart window, rollback plan, and whether the server must be shut down afterward.
 ReflectionScanner, native exec probes, ptrace/gcore, broad ProcessEvent tracing, and
 text/gameplay-payload logging must still have a written scoped run plan before activation.
+Do not write or execute an operational runbook unless the exact instance, marker/env
+gates, restart window, rollback, evidence paths, and shutdown/posture expectation are
+named.
 
 ## Production Baseline
 

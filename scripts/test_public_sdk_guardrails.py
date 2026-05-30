@@ -423,6 +423,23 @@ def normalized(text: str) -> str:
     return " ".join(text.split())
 
 
+def assert_explicit_category_only_resource_contract(
+    testcase: unittest.TestCase,
+    text: str,
+    *,
+    require_kind_only: bool = False,
+) -> None:
+    compact_text = normalized(text)
+    if require_kind_only:
+        testcase.assertIn("kind-only", compact_text)
+    for term in (
+        "no identity",
+        "no lookup",
+        "no cross-event correlation",
+    ):
+        testcase.assertIn(term, compact_text)
+
+
 def obelisk_api_field_names(header: str) -> list[str]:
     body = strip_c_comments(obelisk_api_struct_body(header))
     fields: list[str] = []
@@ -1170,21 +1187,20 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             event_surface.get("descriptor_fields"),
             V010_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_FIELDS,
         )
-        self.assertEqual(
-            gameplay_policy.get("resource_contract"),
-            "kind-only, no identity, no lookup, no persistent handle, no cross-event correlation",
+        assert_explicit_category_only_resource_contract(
+            self,
+            gameplay_policy.get("resource_contract", ""),
+            require_kind_only=True,
         )
+        self.assertIn("no persistent handle", normalized(gameplay_policy.get("resource_contract", "")))
 
         for path, text in (
             ("metadata_surfaces.resource.scope", resource_surface.get("scope", "")),
             ("metadata_surfaces.event.scope", event_surface.get("scope", "")),
             ("promoted_events.gameplay_policy.resource_contract", gameplay_policy.get("resource_contract", "")),
         ):
-            compact_text = normalized(text)
             with self.subTest(path=path):
-                self.assertIn("no identity", compact_text)
-                self.assertIn("lookup", compact_text)
-                self.assertIn("cross-event correlation", compact_text)
+                assert_explicit_category_only_resource_contract(self, text)
 
         for resource_kind in resource_surface.get("resource_kinds", []):
             with self.subTest(kind=resource_kind.get("kind", "<missing>")):
@@ -1460,10 +1476,13 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         )
         self.assertIsNotNone(gameplay_policy)
 
-        self.assertEqual(
-            gameplay_policy.get("resource_contract"),
-            "kind-only, no identity, no lookup, no persistent handle, no cross-event correlation",
+        resource_contract = gameplay_policy.get("resource_contract", "")
+        assert_explicit_category_only_resource_contract(
+            self,
+            resource_contract,
+            require_kind_only=True,
         )
+        self.assertIn("no persistent handle", normalized(resource_contract))
         self.assertEqual(gameplay_policy.get("payload"), "copied POD scalar fields only")
         self.assertIn("not promoted", gameplay_policy.get("inventory_sdk", ""))
 

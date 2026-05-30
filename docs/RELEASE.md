@@ -23,7 +23,8 @@ Included:
   waits to prevent callback-to-callback deadlocks, while non-callback owner/plugin cleanup
   still waits for in-flight dispatch and deferred `DestroyUserData` cleanup.
 - `GameplayPolicyEvent` as the promoted v0.1 gameplay policy callback family, with copied
-  POD scalar payloads and no identity, lookup, mutation, or return override authority.
+  POD scalar payloads and no identity, no lookup, no mutation, and no return override
+  authority.
   Structure-backed claims point to the fresh
   [`structure-observer-intake` evidence](research/2026-05-29-structure-observer-intake-refresh.md).
 - `DescribeResourceKind` as metadata-only resource category descriptors, not

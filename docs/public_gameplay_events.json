@@ -7,7 +7,7 @@
       "capability": "OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS",
       "descriptor_struct": "ObeliskResourceKindDescriptor",
       "descriptor": "DescribeResourceKind",
-      "scope": "metadata-only resource category descriptors for routing/config; no identity, lookup, handle, cross-event correlation, mutation, or UE object access",
+      "scope": "metadata-only resource category descriptors for routing/config; no identity, no lookup, no handle, no cross-event correlation, no mutation, and no UE object access",
       "descriptor_fields": [
         "abi_version",
         "struct_size",
@@ -85,7 +85,7 @@
       "capability": "OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS",
       "descriptor_struct": "ObeliskGameplayPolicyEventDescriptor",
       "descriptor": "DescribeGameplayPolicyEventKind",
-      "scope": "metadata-only descriptors for promoted GameplayPolicyEvent kinds; no identity, lookup, cross-event correlation, mutation, return override, or UE object access",
+      "scope": "metadata-only descriptors for promoted GameplayPolicyEvent kinds; no identity, no lookup, no cross-event correlation, no mutation, no return override, and no UE object access",
       "descriptor_fields": [
         "abi_version",
         "struct_size",
@@ -300,7 +300,7 @@
             "docs/research/2026-05-28-second-source-reversing-gap-matrix.md",
             "docs/research/2026-05-29-structure-observer-intake-refresh.md"
           ],
-          "scope": "fresh copied-redacted GameplayPolicyEvent structure backing; layout-only, no identity, lookup, cross-event correlation, mutation, return override, or ResourceHandle"
+          "scope": "fresh copied-redacted GameplayPolicyEvent structure backing; layout-only, no identity, no lookup, no cross-event correlation, no mutation, no return override, and no ResourceHandle"
         },
         {
           "target_set": "minimal-second-source-intake",

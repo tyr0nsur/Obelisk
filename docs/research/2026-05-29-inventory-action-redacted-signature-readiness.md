@@ -164,3 +164,25 @@ Consume-gate acceptance would remain planning hygiene only. It must not be treat
 runtime validation or SDK promotion, and it does not weaken the existing blockers around
 redacted `ItemNetID` structs, redacted UObject references, identity, mutation, return
 override, raw params, public callbacks, or `ResourceHandle`.
+
+## 2026-05-30 Runtime Observer Gate Blocker
+
+Do not run an `inventory-action-compact-intake` runtime observer from the generic
+`enable-inventory-reflection` gate. A future observer needs its own exact target-set gate
+before any server-backed window is proposed. That gate must allow only:
+
+```text
+ShooterPlayerController.ServerRequestInventoryUseItem
+ShooterPlayerController.ServerRequestInventoryUseItemWithActor
+```
+
+The gate must fail closed unless it can enforce the exact function name, outer/class,
+`ParmsSize`, property-chain shape, binary hash, target-set coverage, redacted UObject
+refs, and redacted `ItemNetID` structs before reading parameters. Stable posture checks
+and wrappers should scrub or reject any future inventory-action observer marker/env unless
+an approved `observer-debug` window is active.
+
+Until that gate exists in code/config, runtime observer runbooks for this target set are
+premature. The safe next work is gate design and tests, not server execution. This does
+not promote public Inventory/Items SDKs, item or inventory identity, actor identity,
+lookup, mutation, return override, raw params, public callbacks, or `ResourceHandle`.

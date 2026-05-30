@@ -273,6 +273,65 @@ static bool HasGameplayPolicyEventApi(const ObeliskApi* api)
         api->UnregisterGameplayPolicyEventWithOwnerToken;
 }
 
+static bool ValidateResourceKindDescriptor(const ObeliskApi* api,
+                                           uint32_t resource_kind,
+                                           uint64_t expected_event_mask,
+                                           uint64_t expected_field_mask,
+                                           const char* stable_name)
+{
+    ObeliskResourceKindDescriptor descriptor;
+    const uint64_t required_flags = OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_CATEGORY_ONLY |
+        OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY |
+        OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP;
+
+    if (!api ||
+        (api->capabilities & OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS) == 0 ||
+        api->struct_size < offsetof(ObeliskApi, DescribeResourceKind) + sizeof(api->DescribeResourceKind) ||
+        !api->DescribeResourceKind)
+    {
+        return true;
+    }
+
+    memset(&descriptor, 0, sizeof(descriptor));
+    descriptor.struct_size = sizeof(ObeliskResourceKindDescriptor);
+    if (!api->DescribeResourceKind(resource_kind, &descriptor))
+        return false;
+
+    return descriptor.abi_version == OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION &&
+        descriptor.struct_size >= sizeof(ObeliskResourceKindDescriptor) &&
+        descriptor.resource_kind == resource_kind &&
+        (descriptor.flags & required_flags) == required_flags &&
+        descriptor.supported_gameplay_policy_event_mask == expected_event_mask &&
+        descriptor.supported_gameplay_policy_field_mask == expected_field_mask &&
+        strcmp(descriptor.stable_name, stable_name) == 0;
+}
+
+static bool ValidateResourceKindDescriptors(const ObeliskApi* api)
+{
+    if (!ValidateResourceKindDescriptor(
+            api,
+            OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE,
+            OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES,
+            OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_VARIANT_INDEX |
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE_SET |
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE,
+            "structure"))
+        return false;
+
+    if (!ValidateResourceKindDescriptor(
+            api,
+            OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM,
+            OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY,
+            OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER |
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN,
+            "inventory_item"))
+        return false;
+
+    return true;
+}
+
 static void UnregisterCallbacks(void)
 {
     if (g_HasApi && g_GameplayPolicyEventHandle != 0 && g_Api.UnregisterGameplayPolicyEventWithOwnerToken)
@@ -340,6 +399,9 @@ __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
         return false;
 
     if (context->plugin_owner_token == 0)
+        return false;
+
+    if (!ValidateResourceKindDescriptors(api))
         return false;
 
     memset(&g_Api, 0, sizeof(g_Api));

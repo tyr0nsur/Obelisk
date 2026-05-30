@@ -160,6 +160,9 @@ Do not skip steps because a single core, log line, or recognizer test looks conv
 - For inventory, structure, buff, transfer, admin, chat, and other authority functions, do
   not override return values, mutate params, call original `ProcessEvent` manually, or
   dispatch public plugin callbacks from candidate evidence.
+- Treat mutation and return override as separate promotions after read-only copied-scalar
+  callbacks; neither is implied by layout acceptance, runtime observation, or internal
+  event support.
 - Reserve runtime observation budgets only after cheap exact prefilters pass.
 - On live servers, keep plugin discovery off unless testing a known safe build.
 - Current operator direction in `docs/agent-handoff/CURRENT.md` selects the server-backed

@@ -15,6 +15,10 @@ namespace Obelisk::UE::DinoReflection
         constexpr int32_t kBoolPropertyClassNameIndex = 3;
         constexpr int32_t kObjectPropertyClassNameIndex = 5;
         constexpr int32_t kFunctionClassNameIndex = 10650;
+        constexpr int32_t kBoolPropertyClassObjectIndex = 532;
+        constexpr int32_t kObjectPropertyClassObjectIndex = 534;
+        constexpr int32_t kFunctionClassObjectIndex = 518;
+        constexpr int32_t kIntPropertyClassObjectIndex = 539;
 
         constexpr int32_t kACharacterNameIndex = 4044;
         constexpr int32_t kReturnValueNameIndex = 17716;
@@ -27,6 +31,10 @@ namespace Obelisk::UE::DinoReflection
         constexpr size_t kObjectPropertySize = 0x8;
         constexpr size_t kIntPropertySize = 0x4;
         constexpr size_t kBoolPropertySize = 0x1;
+        constexpr uint64_t kObjectInputPropertyFlags = 0x1040000280;
+        constexpr uint64_t kIntInputPropertyFlags = 0x1040000280;
+        constexpr uint64_t kBoolInputPropertyFlags = 0x1040000280;
+        constexpr uint64_t kBoolReturnPropertyFlags = 0x1040000780;
 
         struct DinoFieldSpec
         {
@@ -35,6 +43,8 @@ namespace Obelisk::UE::DinoReflection
             int32_t Offset;
             size_t Size;
             int32_t ClassNameIndex;
+            int32_t ClassObjectIndex;
+            uint64_t PropertyFlags;
             bool ExposesRange;
         };
 
@@ -57,36 +67,48 @@ namespace Obelisk::UE::DinoReflection
              0x00,
              kObjectPropertySize,
              kObjectPropertyClassNameIndex,
+             kObjectPropertyClassObjectIndex,
+             kObjectInputPropertyFlags,
              false},
             {DinoField::PassengerSeatIndex,
              kPassengerSeatIndexNameIndex,
              0x08,
              kIntPropertySize,
              kIntPropertyClassNameIndex,
+             kIntPropertyClassObjectIndex,
+             kIntInputPropertyFlags,
              true},
             {DinoField::BForcePassenger,
              kBForcePassengerNameIndex,
              0x0c,
              kBoolPropertySize,
              kBoolPropertyClassNameIndex,
+             kBoolPropertyClassObjectIndex,
+             kBoolInputPropertyFlags,
              true},
             {DinoField::BAllowFlyersAndWaterDinos,
              kBAllowFlyersAndWaterDinosNameIndex,
              0x0d,
              kBoolPropertySize,
              kBoolPropertyClassNameIndex,
+             kBoolPropertyClassObjectIndex,
+             kBoolInputPropertyFlags,
              true},
             {DinoField::BSkipLineTrace,
              kBSkipLineTraceNameIndex,
              0x0e,
              kBoolPropertySize,
              kBoolPropertyClassNameIndex,
+             kBoolPropertyClassObjectIndex,
+             kBoolInputPropertyFlags,
              true},
             {DinoField::ReturnValue,
              kReturnValueNameIndex,
              0x0f,
              kBoolPropertySize,
              kBoolPropertyClassNameIndex,
+             kBoolPropertyClassObjectIndex,
+             kBoolReturnPropertyFlags,
              true},
         }};
 
@@ -96,12 +118,16 @@ namespace Obelisk::UE::DinoReflection
              0x00,
              kObjectPropertySize,
              kObjectPropertyClassNameIndex,
+             kObjectPropertyClassObjectIndex,
+             kObjectInputPropertyFlags,
              false},
             {DinoField::ReturnValue,
              kReturnValueNameIndex,
              0x08,
              kBoolPropertySize,
              kBoolPropertyClassNameIndex,
+             kBoolPropertyClassObjectIndex,
+             kBoolReturnPropertyFlags,
              true},
         }};
 
@@ -170,10 +196,11 @@ namespace Obelisk::UE::DinoReflection
             if (!result)
                 return result;
 
-            if (functionClass.NamePrivate.ComparisonIndex != kFunctionClassNameIndex ||
+            if (functionClass.InternalIndex != kFunctionClassObjectIndex ||
+                functionClass.NamePrivate.ComparisonIndex != kFunctionClassNameIndex ||
                 functionClass.NamePrivate.Number != 0)
                 return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
-                                                           "dino UFunction class FName mismatch");
+                                                           "dino UFunction class identity mismatch");
             return RuntimeReflection::ReadResult::Ok();
         }
 
@@ -239,10 +266,11 @@ namespace Obelisk::UE::DinoReflection
             if (!result)
                 return result;
 
-            if (propertyClass.NamePrivate.ComparisonIndex != spec.ClassNameIndex ||
+            if (propertyClass.InternalIndex != spec.ClassObjectIndex ||
+                propertyClass.NamePrivate.ComparisonIndex != spec.ClassNameIndex ||
                 propertyClass.NamePrivate.Number != 0)
                 return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
-                                                           "dino property class FName mismatch");
+                                                           "dino property class identity mismatch");
             return RuntimeReflection::ReadResult::Ok();
         }
 
@@ -261,6 +289,9 @@ namespace Obelisk::UE::DinoReflection
             if (property.ByteSize != spec.Size)
                 return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
                                                            "dino property size mismatch");
+            if (property.PropertyFlags != spec.PropertyFlags)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                           "dino property flags mismatch");
             if (property.ElementSize != static_cast<int32_t>(spec.Size))
                 return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
                                                            "dino property ElementSize mismatch");
