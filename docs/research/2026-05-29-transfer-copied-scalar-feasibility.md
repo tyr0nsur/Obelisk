@@ -141,6 +141,10 @@ Artifact checksums:
   `0e6e05d6975472a12ab8537550a939334e84156ba4fc78f64c5542254ffdfebc`
 - `promote-gate.json`:
   `70661c87f8dc8cec0c944820e2692f8b924051b33e9e71b6ade2862ca1933912`
+- `artifact-pack.manifest.json`:
+  `dc35acbf63c9f22ffa5281952f2b651e034288f56ab9dec093cbfcfd368d841d`
+- relative `SHA256SUMS`:
+  `715f7c2b048370a74dbacfadd13d06496cf7e56867bb571351c2653d4fd297f8`
 
 Consume mode accepts the slice with no blockers. Promote mode blocks it with
 `promote_mode_transfer_baccept_policy_slice_evidence_only` and

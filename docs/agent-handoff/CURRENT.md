@@ -155,19 +155,23 @@ sequence.
   test-only/internal and does not authorize public callbacks or runtime wiring.
 - The durable Mission copied-bool policy slice is preserved at
   `/home/flowcommunity-ark/obelisk-artifacts/mission-copied-bool-policy-slice-20260530T072912Z/`.
-  Its manifest SHA256 is
-  `94e3a09a92006e1726aa425045af9581bf0b5ec508fa29691065fe7048b0bea2`; consume mode
-  accepts it, and promote mode blocks it with evidence-only/non-claim blockers. It copies
-  only the five frozen Mission bool fields and keeps object refs plus `OutItemIDs`
-  recognition-only.
+  It now includes `artifact-pack.manifest.json`
+  (`sha256=22e5b79dd42395e32df444375ffd526b1e02985253d8847f0568522ff9a53f63`)
+  and relative `SHA256SUMS`
+  (`sha256=f63b69302bf7996ce38d1e02a4acdc4ca88904cb92cb8bb59e7de4b6a5611766`);
+  consume mode accepts it, and promote mode blocks it with evidence-only/non-claim
+  blockers. It copies only the five frozen Mission bool fields and keeps object refs plus
+  `OutItemIDs` recognition-only.
 - The durable Transfer `bAccept` policy slice is preserved at
   `/home/flowcommunity-ark/obelisk-artifacts/transfer-baccept-only-policy-slice-20260530T073308Z/`.
-  Its manifest SHA256 is
-  `a2b0939189cb847b351c638141fa5e122c08ca69acadae8b5c86d894fc208f12`; consume mode
-  accepts it, and promote mode blocks it with evidence-only/non-claim blockers. It copies
-  only `ShooterPlayerController.ServerTransferredPlayerConfirmationResult.bAccept` and
-  keeps transfer payloads, ids, object/class refs, mutation, return override, hook wiring,
-  dispatcher wiring, and public Transfer SDK blocked.
+  It now includes `artifact-pack.manifest.json`
+  (`sha256=dc35acbf63c9f22ffa5281952f2b651e034288f56ab9dec093cbfcfd368d841d`)
+  and relative `SHA256SUMS`
+  (`sha256=715f7c2b048370a74dbacfadd13d06496cf7e56867bb571351c2653d4fd297f8`);
+  consume mode accepts it, and promote mode blocks it with evidence-only/non-claim
+  blockers. It copies only `ShooterPlayerController.ServerTransferredPlayerConfirmationResult.bAccept`
+  and keeps transfer payloads, ids, object/class refs, mutation, return override, hook
+  wiring, dispatcher wiring, and public Transfer SDK blocked.
 - Do not rerun broad FName, GObjects, or core scans for ResourceHandle unless the binary
   hash changes or evidence contradicts current roots/candidates. The next ResourceHandle
   work should use the durable flag-policy refresh as internal static input and focus on

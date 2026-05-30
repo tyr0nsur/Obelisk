@@ -179,14 +179,20 @@ priorities, and do not use history files as the active source of truth.
   with SHA256 `09074e71666f755801802e5d796361cf4f84d3e7d8c00663801d84f981a1cc13`.
   The durable focused Mission policy slice is preserved at
   `/home/flowcommunity-ark/obelisk-artifacts/mission-copied-bool-policy-slice-20260530T072912Z/`
-  with manifest SHA256 `94e3a09a92006e1726aa425045af9581bf0b5ec508fa29691065fe7048b0bea2`;
+  with `artifact-pack.manifest.json`
+  SHA256 `22e5b79dd42395e32df444375ffd526b1e02985253d8847f0568522ff9a53f63`
+  and `SHA256SUMS` SHA256
+  `f63b69302bf7996ce38d1e02a4acdc4ca88904cb92cb8bb59e7de4b6a5611766`;
   consume mode accepts it and promote mode remains blocked.
 - `ue/TransferReflection.*` is an internal/test-only recognizer for the
   `ServerTransferredPlayerConfirmationResult.bAccept` copied bool. It validates exact
   SHA-scoped function/property shape and bool mask metadata, but has no hook/runtime
   dispatcher/public Transfer SDK. The durable focused Transfer policy slice is preserved at
   `/home/flowcommunity-ark/obelisk-artifacts/transfer-baccept-only-policy-slice-20260530T073308Z/`
-  with manifest SHA256 `a2b0939189cb847b351c638141fa5e122c08ca69acadae8b5c86d894fc208f12`;
+  with `artifact-pack.manifest.json`
+  SHA256 `dc35acbf63c9f22ffa5281952f2b651e034288f56ab9dec093cbfcfd368d841d`
+  and `SHA256SUMS` SHA256
+  `715f7c2b048370a74dbacfadd13d06496cf7e56867bb571351c2653d4fd297f8`;
   consume mode accepts it and promote mode remains blocked.
 - ResourceHandle remains post-RC/internal and blocked by
   `uobject_flags_validity_semantics_unproven`; see the ResourceHandle/UObject flag

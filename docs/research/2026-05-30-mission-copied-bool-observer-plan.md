@@ -28,6 +28,10 @@ The current evidence source is
   `/home/flowcommunity-ark/obelisk-artifacts/mission-copied-bool-policy-slice-20260530T072912Z/`
 - Durable focused policy artifact SHA256:
   `94e3a09a92006e1726aa425045af9581bf0b5ec508fa29691065fe7048b0bea2`
+- `artifact-pack.manifest.json` SHA256:
+  `22e5b79dd42395e32df444375ffd526b1e02985253d8847f0568522ff9a53f63`
+- Relative `SHA256SUMS` SHA256:
+  `f63b69302bf7996ce38d1e02a4acdc4ca88904cb92cb8bb59e7de4b6a5611766`
 - Consume gate: `accepted`
 - Promotion ready: `false`
 - Copied scalar count: `5` bool fields

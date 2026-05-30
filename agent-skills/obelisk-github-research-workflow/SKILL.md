@@ -179,9 +179,9 @@ in repo files, handoff notes, commits, and prompts. Use `--channel community` fo
 public, modder-facing milestones only, and `--channel beta-test` only for
 operator-approved in-game test windows. Never use Discord for routine validations, internal
 agent status, speculative reversing notes, private live-ops detail, raw player text, or
-secrets. Operators should prefer the guarded helper instead of hand-written webhook calls. Always run
-`scripts/send_discord_embed.py --dry-run` first and send one concise professional embed
-with title, description, status/scope, and 2-5 public-safe fields. Run with `--dry-run` first.
+secrets. Operators should prefer the guarded helper instead of hand-written webhook calls.
+Always run `scripts/send_discord_embed.py --dry-run` first and send one concise
+professional embed with title, description, status/scope, and 2-5 public-safe fields.
 
 ```bash
 python3 scripts/send_discord_embed.py --channel community --title "..." \

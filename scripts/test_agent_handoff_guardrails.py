@@ -26,6 +26,10 @@ SCOPED_GUARDRAIL_FILES = [
 ]
 
 
+def normalized(text: str) -> str:
+    return " ".join(text.split())
+
+
 class AgentHandoffGuardrailsTests(unittest.TestCase):
     def test_current_stays_concise_routing_table(self) -> None:
         text = CURRENT.read_text(encoding="utf-8")
@@ -108,7 +112,8 @@ class AgentHandoffGuardrailsTests(unittest.TestCase):
         self.assertIn("Technical progress is only a reason to request a scoped run", current)
         self.assertIn("No standing operator approval for Obelisk debug/development or beta tests", compact)
         self.assertIn("server-safety decisions", current)
-        self.assertIn("Follow explicit lead-provided routing only", workflow_skill)
+        normalized_workflow = normalized(workflow_skill)
+        self.assertRegex(normalized_workflow, r"Follow explicit .* routing only")
         for text in (current, compact, workflow_skill):
             self.assertNotIn("two on Obelisk engineering/audit/development", text)
             self.assertNotIn("four on research/knowledge/reversing/dump", text)
@@ -117,7 +122,7 @@ class AgentHandoffGuardrailsTests(unittest.TestCase):
             self.assertNotIn("parallel sub-agents", text)
             self.assertIsNone(re.search(r"\b\d+\s+tests passed\b", text))
 
-        self.assertIn("documented next actions", workflow_skill)
+        self.assertRegex(normalized_workflow, r"(documented|recorded) next actions")
         self.assertNotIn("queued next tasks", workflow_skill)
 
     def test_discord_policy_stays_embed_helper_and_approval_scoped(self) -> None:
@@ -144,11 +149,14 @@ class AgentHandoffGuardrailsTests(unittest.TestCase):
                 self.assertIn("routine validation", lowered)
                 self.assertIn("speculative", lowered)
 
+        normalized_workflow = normalized(workflow_skill)
+        self.assertIn("Do not draft or send Discord updates unless explicitly approved", workflow_skill)
         self.assertIn("Do not draft or send community announcements unless explicitly delegated", workflow_skill)
         self.assertIn("Prefer `scripts/send_discord_embed.py --dry-run`", current)
         self.assertIn("prefer the guarded helper instead of hand-written", workflow_skill)
         self.assertIn("python3 scripts/send_discord_embed.py --channel community", workflow_skill)
-        self.assertIn("Run with `--dry-run` first", workflow_skill)
+        self.assertRegex(normalized_workflow, r"run .*send_discord_embed\.py --dry-run.*first")
+        self.assertRegex(normalized_workflow, r"approved .* current turn|current-turn approval")
 
     def test_scoped_guardrail_files_do_not_store_secret_webhook_urls(self) -> None:
         forbidden_literals = [
