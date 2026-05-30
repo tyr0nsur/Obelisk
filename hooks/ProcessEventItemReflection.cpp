@@ -236,9 +236,22 @@ namespace Obelisk::Hooks::ProcessEventItemReflection
 
             uint8_t value = 0;
             std::memcpy(&value, field.Range.Data, sizeof(value));
+            if (value > 1)
+                return false;
+
             out.Field = field.Field;
             out.Value = value != 0;
             return true;
+        }
+
+        bool TryReadCanonicalBoolByte(const Obelisk::UE::ItemReflection::ItemFieldRange& field)
+        {
+            if (!field.Range.Data || field.Range.Size != sizeof(uint8_t))
+                return false;
+
+            uint8_t value = 0;
+            std::memcpy(&value, field.Range.Data, sizeof(value));
+            return value <= 1;
         }
     }
 
@@ -369,7 +382,7 @@ namespace Obelisk::Hooks::ProcessEventItemReflection
 
             if (field.Field != Obelisk::UE::ItemReflection::ItemField::ReturnValue)
             {
-                if (!field.Range.Data || field.Range.Size != sizeof(uint8_t))
+                if (!TryReadCanonicalBoolByte(field))
                 {
                     out = {};
                     return false;
@@ -399,5 +412,15 @@ namespace Obelisk::Hooks::ProcessEventItemReflection
         }
 
         return true;
+    }
+
+    bool TryBuildCopiedItemReturnObservationForMatchedAttempt(const Attempt& attempt,
+                                                              CopiedItemObservation& out)
+    {
+        out = {};
+        if (attempt.Status != AttemptStatus::Matched)
+            return false;
+
+        return TryBuildCopiedItemObservation(attempt.Invocation, out);
     }
 }

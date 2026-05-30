@@ -67,6 +67,13 @@ Expected policy report result:
 Confirmed as an offline evidence-only slice. The implementation proves that the committed
 snapshots support exactly three copied return bool observations and no wider item payload.
 
+The internal `TryBuildCopiedItemReturnObservationForMatchedAttempt` helper is
+return-bearing only. It accepts only `AttemptStatus::Matched` attempts whose copied
+observation contains the approved `ReturnValue` bool, rejects non-canonical bool bytes
+greater than `1`, and returns false for disabled, budget-exhausted, non-item, rejected,
+metadata-only, or recognition-only item attempts. It does not authorize public Items SDK,
+runtime hook wiring, dispatcher work, mutation, or return override.
+
 ## Non-Claims
 
 This does not promote an Items SDK, Inventory SDK, public callback, public metadata helper,

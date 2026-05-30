@@ -98,4 +98,6 @@ namespace Obelisk::Hooks::ProcessEventItemReflection
                                  uint64_t& observationNumber);
     bool TryBuildCopiedItemObservation(const Obelisk::UE::ItemReflection::ItemInvocation& invocation,
                                        CopiedItemObservation& out);
+    bool TryBuildCopiedItemReturnObservationForMatchedAttempt(const Attempt& attempt,
+                                                              CopiedItemObservation& out);
 }

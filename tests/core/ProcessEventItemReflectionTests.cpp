@@ -94,6 +94,17 @@ namespace
         Require(observation.BoolCount == 0, "rejected copied item observation left bool payload");
     }
 
+    void RequireAttemptRejected(const Attempt& attempt, const char* message)
+    {
+        CopiedItemObservation observation;
+        observation.BoolCount = 1;
+        observation.BoolStorage[0].Field = Obelisk::UE::ItemReflection::ItemField::ReturnValue;
+        observation.BoolStorage[0].Value = true;
+
+        Require(!TryBuildCopiedItemReturnObservationForMatchedAttempt(attempt, observation), message);
+        Require(observation.BoolCount == 0, "rejected matched-attempt item observation left bool payload");
+    }
+
     void RequireBool(const CopiedItemObservation& observation,
                      size_t index,
                      Obelisk::UE::ItemReflection::ItemField field,
@@ -419,6 +430,54 @@ namespace
         Require(params == before, "copied item observation mutated parameter bytes");
     }
 
+    void TestBuildsCopiedReturnObservationOnlyForMatchedAttempts()
+    {
+        uint8_t returnValue = 1;
+        Obelisk::UE::ItemReflection::ItemInvocation returnBearing =
+            MakeValidAllowEquipItemInvocation(returnValue);
+
+        Attempt matched;
+        matched.Status = AttemptStatus::Matched;
+        matched.Invocation = returnBearing;
+
+        CopiedItemObservation observation;
+        Require(TryBuildCopiedItemReturnObservationForMatchedAttempt(matched, observation),
+                "matched return-bearing item attempt did not build copied output");
+        RequireReturnOnlyPayload(observation, true, "matched return-bearing item payload mismatch");
+
+        std::array<AttemptStatus, 4> nonMatchedStatuses{{
+            AttemptStatus::Disabled,
+            AttemptStatus::BudgetExhausted,
+            AttemptStatus::NonItemFunction,
+            AttemptStatus::Rejected,
+        }};
+        for (AttemptStatus status : nonMatchedStatuses)
+        {
+            Attempt nonMatched;
+            nonMatched.Status = status;
+            nonMatched.Invocation = returnBearing;
+            RequireAttemptRejected(nonMatched, "non-matched item attempt built copied output");
+        }
+
+        uint8_t consumeResources = 1;
+        Attempt matchedWithoutReturn;
+        matchedWithoutReturn.Status = AttemptStatus::Matched;
+        matchedWithoutReturn.Invocation.Function = Obelisk::UE::ItemReflection::ItemFunction::CraftBlueprint;
+        matchedWithoutReturn.Invocation.FunctionNameIndex = kCraftBlueprintNameIndex;
+        matchedWithoutReturn.Invocation.OuterNameIndex = kPrimalItemNameIndex;
+        matchedWithoutReturn.Invocation.HasParameterRanges = true;
+        matchedWithoutReturn.Invocation.Fields.push_back(
+            MakeField(Obelisk::UE::ItemReflection::ItemField::BConsumeResources,
+                      kBConsumeResourcesNameIndex,
+                      0x00,
+                      sizeof(uint8_t),
+                      true,
+                      &consumeResources,
+                      sizeof(consumeResources)));
+        RequireAttemptRejected(matchedWithoutReturn,
+                               "matched item attempt without ReturnValue built copied output");
+    }
+
     void TestRejectsMalformedReturnOnlyShapes()
     {
         uint8_t returnValue = 1;
@@ -530,6 +589,27 @@ namespace
                                                   &consumeResources,
                                                   sizeof(consumeResources)));
         RequireRejected(craftBlueprint, "CraftBlueprint bConsumeResources built copied item observation");
+    }
+
+    void TestRejectsNonCanonicalBoolBytes()
+    {
+        uint8_t invalidReturnValue = 2;
+        Obelisk::UE::ItemReflection::ItemInvocation invalidReturn =
+            MakeValidAllowEquipItemInvocation(invalidReturnValue);
+        RequireRejected(invalidReturn, "ReturnValue byte greater than one built copied item observation");
+
+        uint8_t invalidIgnoredRequirement = 2;
+        uint8_t validReturnValue = 1;
+        Obelisk::UE::ItemReflection::ItemInvocation invalidInput =
+            MakeValidCanRepairInvocation(invalidIgnoredRequirement, validReturnValue);
+        RequireRejected(invalidInput,
+                        "bIgnoreInventoryRequirement byte greater than one built copied item observation");
+
+        Attempt matchedInvalidReturn;
+        matchedInvalidReturn.Status = AttemptStatus::Matched;
+        matchedInvalidReturn.Invocation = invalidReturn;
+        RequireAttemptRejected(matchedInvalidReturn,
+                               "matched item attempt with non-canonical ReturnValue built copied output");
     }
 
     void TestRejectsPartialCanRepairShape()
@@ -725,7 +805,9 @@ int main()
     TestBuildsCopiedItemObservations();
     TestCopiedItemObservationAbiShape();
     TestBuildDoesNotMutateItemParams();
+    TestBuildsCopiedReturnObservationOnlyForMatchedAttempts();
     TestRejectsMalformedReturnOnlyShapes();
+    TestRejectsNonCanonicalBoolBytes();
     TestRejectsPartialCanRepairShape();
     TestRejectsMissingOrForbiddenRanges();
     TestObserveReservesBudgetBeforeRead();
