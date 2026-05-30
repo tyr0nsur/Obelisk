@@ -133,10 +133,12 @@ exist:
 
 - lifecycle/config/logging examples;
 - descriptor/catalog consumers;
-- copied `GameplayPolicyEvent` auditors;
-- copied `ChatMessageEvent` parsers that do not claim identity, replies, moderation, or a
-  command SDK;
 - process-local timer utilities.
+
+Those are the production-supported seed lanes. Copied `GameplayPolicyEvent` auditors and
+copied `ChatMessageEvent` parsers may still be useful experimental pattern examples, but
+they must be labeled as experimental and must not claim policy enforcement, general chat,
+commands, identity, replies, moderation, send-chat, or production Plugin Hub availability.
 
 Higher-level ArkApi-style families such as permissions, economy, kits, homes, safe zones,
 RCON, storage/database services, webhooks, inventory tools, dino tools, tribe tools, and

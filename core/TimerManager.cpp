@@ -187,7 +187,7 @@ namespace Obelisk::Core
                                     TimerCallback callback,
                                     void* userData)
     {
-        if (!owner || !callback)
+        if (!owner || !callback || (repeating && intervalMs == 0))
             return 0;
 
         TimerState& state = State();

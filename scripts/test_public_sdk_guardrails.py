@@ -456,6 +456,73 @@ UNPROMOTED_SDK_CONSUMER_API_TOKENS = (
     "return_override",
     *UNPROMOTED_COMMAND_ADMIN_PLAYER_API_TOKENS,
 )
+PUBLIC_SDK_OPTIONAL_API_CONSUMERS = [
+    REPO_ROOT / "tests" / "sdk_consumer" / "MinimalPlugin.cpp",
+    REPO_ROOT / "tests" / "sdk_consumer" / "CAbiPlugin.c",
+    REPO_ROOT / "tests" / "sdk_installed_consumer" / "consumer_plugin.cpp",
+    REPO_ROOT / "tests" / "sdk_installed_consumer" / "c_abi_plugin.c",
+]
+PUBLIC_SDK_OPTIONAL_API_SURFACES = [
+    {
+        "name": "ProcessEvent owner-token handles",
+        "trigger": "RegisterPreProcessEventForNameIndexWithOwnerTokenHandle",
+        "capabilities": [
+            "OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS",
+            "OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES",
+            "OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS",
+        ],
+        "terminal_slot": "UnregisterProcessEventCallbackWithOwnerToken",
+        "required_slots": [
+            "RegisterPreProcessEventForNameIndexWithOwnerTokenHandle",
+            "UnregisterProcessEventCallbackWithOwnerToken",
+        ],
+    },
+    {
+        "name": "GameplayPolicyEvent callbacks",
+        "trigger": "RegisterGameplayPolicyEventWithOwnerTokenHandle",
+        "capabilities": ["OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS"],
+        "terminal_slot": "UnregisterGameplayPolicyEventWithOwnerToken",
+        "required_slots": [
+            "RegisterGameplayPolicyEventWithOwnerTokenHandle",
+            "UnregisterGameplayPolicyEventWithOwnerToken",
+        ],
+    },
+    {
+        "name": "resource kind descriptors",
+        "trigger": "DescribeResourceKind",
+        "capabilities": ["OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS"],
+        "terminal_slot": "DescribeResourceKind",
+        "required_slots": ["DescribeResourceKind"],
+    },
+    {
+        "name": "gameplay policy event descriptors",
+        "trigger": "DescribeGameplayPolicyEventKind",
+        "capabilities": ["OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS"],
+        "terminal_slot": "DescribeGameplayPolicyEventKind",
+        "required_slots": ["DescribeGameplayPolicyEventKind"],
+    },
+    {
+        "name": "ChatMessageEvent callbacks",
+        "trigger": "RegisterChatMessageEventWithOwnerTokenHandle",
+        "capabilities": ["OBELISK_API_CAPABILITY_CHAT_EVENTS"],
+        "terminal_slot": "UnregisterChatMessageEventWithOwnerToken",
+        "required_slots": [
+            "RegisterChatMessageEventWithOwnerTokenHandle",
+            "UnregisterChatMessageEventWithOwnerToken",
+        ],
+    },
+    {
+        "name": "timers",
+        "trigger": "RegisterTimerWithOwnerTokenHandle",
+        "capabilities": ["OBELISK_API_CAPABILITY_TIMERS"],
+        "terminal_slot": "UnregisterTimerWithOwnerToken",
+        "required_slots": [
+            "RegisterTimerWithOwnerTokenHandle",
+            "UnregisterTimerWithOwnerToken",
+        ],
+        "terminal_slot_alias": "OBELISK_CONCAT(Unregister, TimerWithOwnerToken)",
+    },
+]
 
 
 def unpromoted_gameplay_tokens() -> list[str]:
@@ -1023,6 +1090,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         for required in (
             "passive copied chat auditing/parsing is a candidate for promotion review before copied policy auditing, not a promised graduation path",
             "The first useful Plugin Hub seed examples should be built from surfaces that already exist",
+            "Those are the production-supported seed lanes",
+            "Copied `GameplayPolicyEvent` auditors and\ncopied `ChatMessageEvent` parsers may still be useful experimental pattern examples",
+            "must not claim policy enforcement, general chat,\ncommands, identity, replies, moderation, send-chat, or production Plugin Hub availability",
         ):
             with self.subTest(required=required):
                 self.assertIn(normalized(required), compact_matrix)
@@ -1491,6 +1561,55 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 self.assertIn(token, consumer)
             with self.subTest(file="consumer_fixture.cpp", required_field_or_resource=token):
                 self.assertIn(token, fixture)
+
+    def test_public_sdk_consumers_guard_append_only_api_slots(self) -> None:
+        metadata_guard = "api->struct_size < offsetof(ObeliskApi, capabilities) + sizeof(api->capabilities)"
+
+        for path in PUBLIC_SDK_OPTIONAL_API_CONSUMERS:
+            text = path.read_text(encoding="utf-8")
+            relative = path.relative_to(REPO_ROOT).as_posix()
+
+            self.assertIn("api->abi_version != OBELISK_API_ABI_VERSION", text)
+            self.assertIn(metadata_guard, text)
+
+            if "memcpy(&g_Api" in text or "std::memcpy(&g_Api" in text:
+                self.assertIn("api->struct_size < sizeof(g_Api) ? api->struct_size : sizeof(g_Api)", text)
+
+            for surface in PUBLIC_SDK_OPTIONAL_API_SURFACES:
+                trigger = surface["trigger"]
+                if trigger not in text:
+                    continue
+
+                with self.subTest(file=relative, surface=surface["name"]):
+                    for capability in surface["capabilities"]:
+                        self.assertIn(capability, text)
+
+                    terminal_slot = surface["terminal_slot"]
+                    terminal_slot_alias = surface.get("terminal_slot_alias", terminal_slot)
+                    terminal_offset_tokens = {
+                        f"offsetof(ObeliskApi, {terminal_slot})",
+                        f"offsetof(ObeliskApi, {terminal_slot_alias})",
+                    }
+                    terminal_size_tokens = {
+                        f"sizeof(api->{terminal_slot})",
+                        f"sizeof(api->{terminal_slot_alias})",
+                    }
+                    self.assertTrue(
+                        any(token in text for token in terminal_offset_tokens),
+                        f"{relative} must struct_size-gate {surface['name']} with offsetof",
+                    )
+                    self.assertTrue(
+                        any(token in text for token in terminal_size_tokens),
+                        f"{relative} must include terminal slot size for {surface['name']}",
+                    )
+
+                    for slot in surface["required_slots"]:
+                        slot_alias = "OBELISK_CONCAT(Unregister, TimerWithOwnerToken)" \
+                            if slot == "UnregisterTimerWithOwnerToken" else slot
+                        self.assertTrue(
+                            f"api->{slot}" in text or f"api->{slot_alias}" in text,
+                            f"{relative} must null-check/use {slot} for {surface['name']}",
+                        )
 
     def test_public_abi_layout_freeze_tests_cover_repo_and_installed_consumers(self) -> None:
         root_cmake = (REPO_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")

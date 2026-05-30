@@ -2839,6 +2839,28 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
 
         self.assertIn("path_resolves_under_protected_root", {b["reason"] for b in result["blockers"]})
 
+    def test_rejects_relative_provenance_source_artifacts_list_resolving_to_protected_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            artifact = workspace / "pack" / "artifact.txt"
+            artifact.parent.mkdir(parents=True)
+            artifact.write_text("offline evidence\n", encoding="utf-8")
+            write_json(
+                Path(f"{artifact}.provenance.json"),
+                {
+                    "schema": gate.PROVENANCE_SCHEMA,
+                    "verified": True,
+                    "binary_sha256": BINARY_SHA,
+                    "artifact_sha256": gate.sha256_file(artifact),
+                    "source_artifacts": ["../../live/raw-objdump.txt"],
+                },
+            )
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, artifacts=[("objdump", artifact)]))
+
+        self.assertIn("path_resolves_under_protected_root", {b["reason"] for b in result["blockers"]})
+
     def test_accepts_complete_core_manifest_and_blocks_partial(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"

@@ -128,7 +128,7 @@ WEAK_HELPER_STATIC_POLARITY_PROVENANCE_SCHEMAS = UOBJECT_FLAG_TRANSITION_PROVENA
 }
 WEAK_HELPER_BINARY_SHA256 = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 DEFAULT_WORKSPACE_ROOT = Path("/servidor/ark/workspace-offline")
-PATH_KEY_RE = re.compile(r"(?:^|_)(path|file|source|artifact|binary|core|stdout|stderr|copied_to)$")
+PATH_KEY_RE = re.compile(r"(?:^|_)(paths?|files?|sources?|artifacts?|binaries|binary|cores?|stdouts?|stderrs?|copied_to)$")
 SEMANTIC_INPUT_NAME_MAX_LENGTH = 128
 REQUIRED_REDACTED_SIGNATURE_NON_PROMOTED_SURFACES = {
     "class_identity",
@@ -1151,7 +1151,7 @@ def sha256_file_or_blocker(path: Path, *, label: str, expected_sha256: str) -> l
 
 def key_names_path(key: object) -> bool:
     text = str(key).casefold()
-    return bool(PATH_KEY_RE.search(text)) or text.endswith("_path") or text.endswith("_file")
+    return bool(PATH_KEY_RE.search(text)) or text.endswith(("_path", "_paths", "_file", "_files"))
 
 
 def collect_path_fields(value: object, *, trail: str = "$", path_context: bool = False) -> list[tuple[str, str]]:

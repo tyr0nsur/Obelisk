@@ -146,9 +146,8 @@ for the current checkpoint.
   containers: the pack manifest and relative `SHA256SUMS` must match current contents,
   symlinked pack entries fail closed, supported child manifests keep their own
   consume/promote blockers, and `promote` mode blocks the pack as container-only.
-  Relative `--root` and protected-root inputs are normalized before direct-path and
-  symlink-resolved protected path checks. Duplicate `--target-set` filters in target
-  guidance now fail closed instead of emitting repeated planning output.
+  Relative `--root`, protected-root inputs, and singular/plural path-like sidecar fields
+  are protected-root checked. Duplicate target guidance filters fail closed.
 - `scripts/check_static_tooling.py` records optional radare2/rizin/Ghidra availability and
   runs smoke checks only on approved offline binaries/output roots.
 - `APrimalStructure.IsAllowedToBuild` is a high-demand build-policy dictionary seed, but it
@@ -205,7 +204,8 @@ for the current checkpoint.
   ProcessEvent unregister now avoids waiting behind unrelated in-flight callbacks and
   validates snapshotted callbacks by id, generation, and callback pointer within the same
   family; owner cleanup still waits as the plugin unload barrier. Plugin init-failure
-  close paths also reject late owner-token timer registration.
+  close paths reject late owner-token timer registration, and repeating zero-interval
+  timers are rejected at `TimerManager`.
 - Any future live/player validation requires a new approved live-ops brief and beta-test
   notice through the configured local webhook variable when players are involved.
 

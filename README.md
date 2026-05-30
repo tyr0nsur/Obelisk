@@ -443,8 +443,10 @@ is non-null. If a pre-callback calls it, that callback should return `false`; if
 Stable plugin APIs should prefer higher-level Obelisk module surfaces as they are promoted.
 
 The official reference plugin set includes [oBaseEvents](docs/oBaseEvents.md),
-`oProcessTimer`, and `oDescriptorCatalog`; each demonstrates a different promoted
-core/SDK pattern without expanding gameplay module scope.
+`oProcessTimer`, and `oDescriptorCatalog`; each demonstrates a release-scope core/SDK
+pattern without expanding gameplay module scope. Experimental copied chat and policy
+examples are documented separately in [plugins/README.md](plugins/README.md) and are not
+production Plugin Hub modules.
 
 ## ARK Debug Harness
 

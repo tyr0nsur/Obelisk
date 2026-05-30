@@ -625,6 +625,23 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             result.stderr,
         )
 
+    def test_target_guidance_rejects_duplicate_explicit_target_filter(self) -> None:
+        result = run_compare_raw(
+            "--list-target-guidance",
+            "--target",
+            "PrimalStructure.IsAllowedToBuild",
+            "--target",
+            "PrimalStructure.IsAllowedToBuild",
+            "--json",
+        )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, "")
+        self.assertIn(
+            "duplicate target guidance filter(s): PrimalStructure.IsAllowedToBuild",
+            result.stderr,
+        )
+
     def test_structure_build_policy_guidance_rejects_unmatched_explicit_target(self) -> None:
         result = run_compare_raw(
             "--list-target-guidance",

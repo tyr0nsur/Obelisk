@@ -375,7 +375,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "It is not a `ResourceHandle`, object identity, lookup API, persistent handle",
             "resource identity, raw `FString`, raw params, FName/GObjects indices, UE pointers",
             "Inventory-backed signals use the same `GameplayPolicyEvent` family, not a separate Inventory SDK",
-            "Outside the promoted `GameplayPolicyEvent` and minimal `ChatMessageEvent` surfaces",
+            "Outside the promoted `GameplayPolicyEvent` surface and the minimal `ChatMessageEvent` RC notification surface",
         ]:
             with self.subTest(file="docs/STATUS.md", item=item):
                 self.assertIn(item, status)
@@ -1334,6 +1334,9 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn('cp -R "${REPO_DIR}/tests/sdk_installed_consumer/." "${WORK_DIR}/"', layout_test)
         self.assertIn('"${WORK_DIR}/build/consumer_fixture"', layout_test)
         self.assertIn('"${PLUGIN_PATH}"', layout_test)
+        self.assertIn('installed_headers="$(find "${INSTALL_ROOT}/include" -type f', layout_test)
+        self.assertIn('obelisk/ObeliskApi.h', layout_test)
+        self.assertIn("SDK install published unexpected public headers", layout_test)
 
         self.assertRegex(
             consumer,

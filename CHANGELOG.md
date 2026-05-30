@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Hardened timer core registration so repeating timers with zero interval are rejected at
+  `TimerManager`, matching the public plugin ABI contract.
+- Hardened SDK consumer guardrails for append-only API slots: consumers must check
+  `abi_version`, `struct_size`, capability bits, terminal slot offsets, and non-null
+  function pointers before optional API use.
+- Hardened offline evidence gates so plural path-like sidecar fields such as
+  `source_artifacts` cannot hide relative protected-root paths.
+- Hardened target guidance so duplicate explicit `--target` filters fail closed.
+- Clarified v1 research routing and Plugin Hub docs so production seeds stay limited to
+  lifecycle/config/logging, descriptor/catalog, and process-local timers while copied chat
+  and copied policy examples remain experimental patterns.
 - Hardened SDK packaging so install layout publishes only the allowlisted public
   `include/obelisk/ObeliskApi.h` header instead of the full `include/` tree.
 - Hardened PluginManager init-failure cleanup coverage so owner-token timer registration

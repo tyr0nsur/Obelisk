@@ -316,6 +316,13 @@ require_path "${INSTALL_ROOT}/lib/cmake/Obelisk/ObeliskConfig.cmake"
 require_path "${INSTALL_ROOT}/lib/cmake/Obelisk/ObeliskConfigVersion.cmake"
 require_path "${INSTALL_ROOT}/lib/cmake/Obelisk/ObeliskTargets.cmake"
 
+installed_headers="$(find "${INSTALL_ROOT}/include" -type f -printf '%P\n' | sort)"
+if [[ "${installed_headers}" != "obelisk/ObeliskApi.h" ]]; then
+    echo "SDK install published unexpected public headers" >&2
+    printf '%s\n' "${installed_headers}" >&2
+    exit 1
+fi
+
 if find "${INSTALL_ROOT}/lib" -maxdepth 1 -name '*.incoming.*' | grep -q .; then
     echo "Runtime install left incoming temporary files in ${INSTALL_ROOT}/lib" >&2
     find "${INSTALL_ROOT}/lib" -maxdepth 1 -print >&2

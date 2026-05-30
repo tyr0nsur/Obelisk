@@ -113,7 +113,9 @@ pass the same fail-closed consume gate as any other static artifact.
 Relative path fields inside JSON manifests and provenance sidecars are resolved relative
 to the JSON file that contains them before protected-root checks are applied; `../`
 traversal into protected server trees remains a blocker even when the protected path is
-not written literally.
+not written literally. Path-like keys are checked in singular and plural forms, so lists
+such as `source_artifacts`, `input_files`, or `core_paths` cannot hide relative protected
+paths.
 CLI `--root` and hidden protected-root inputs may be absolute or relative; the gate
 normalizes them before comparing direct path text and symlink-resolved paths.
 

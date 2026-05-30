@@ -95,6 +95,8 @@ namespace
                 "timer registration accepted null owner");
         Require(TimerManager::Get().Register(&owner, 1, 0, false, nullptr, &state) == 0,
                 "timer registration accepted null callback");
+        Require(TimerManager::Get().Register(&owner, 1, 0, true, CountCallback, &state) == 0,
+                "timer registration accepted repeating timer with zero interval");
         Require(!TimerManager::Get().Unregister(&owner, 0), "timer unregister accepted zero handle");
     }
 

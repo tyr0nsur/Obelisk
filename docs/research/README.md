@@ -108,6 +108,17 @@ Focused evidence lanes such as copied chat, `ResourceHandle` blocker work, and
 `APrimalStructure.IsAllowedToBuild` triage are inputs to that broader map, not a narrowed
 v1 product center or SDK promise.
 
+SDK v1 routing snapshot from the current notes:
+
+| Route | Current state | Use next |
+| --- | --- | --- |
+| Hub foundation: lifecycle, descriptors, timers, config/logging, packaging | Fact: current ABI-safe seed class with first-party examples and no UE identity dependency. | Production Plugin Hub lane; harden docs, tests, packaging, and fail-closed configuration before adding new module promises. |
+| Passive copied chat parsing/audit | Fact: minimal copied `ChatMessageEvent` exists; hypothesis: passive parser/auditor is the next honest release-facing seed if only release-scope examples are counted. | Keep sender identity, permissions, replies/send-chat, moderation, and command SDK blocked until copied identity and authority are promoted. |
+| Copied gameplay policy: inventory/items/structures | Fact: `GameplayPolicyEvent` is the promoted public gameplay surface; item return-only and structure non-PIN slices are evidence/internal unless explicitly promoted. | Preserve copied/redacted scalar policy work without publishing Inventory, Items, StructureEvents, mutation, return override, lookup, or `ResourceHandle`. |
+| Players identity lifecycle | Hypothesis/planning: highest-value broad discovery family after current descriptor/smoke, transfer bool-tail, and item return-only work; the seed set is docs-only and candidate-only. | Build only a closed offline target-set review from known names; keep login/logout names, stable identity, lookup, privacy, and public SDK blocked until evidence exists. |
+| Mission copied-bool internal bridge | Fact: accepted compact layout evidence and copied-bool test planning make it the selected post-RC internal planning thread. | Use as internal/test-only copied-bool hardening; no runtime hooks, public Mission SDK, object/array/player identity, mutation, or return override. |
+| Dino, Buff, Tribe, Transfer, Structure build policy, permissions/admin/RCON/economy/storage | Fact: demand and/or layout evidence exists at different maturity levels; public surfaces are not promoted. | Treat as backlog lanes behind copied identity/privacy, permission/authority, payload ownership, second-source/static evidence, ABI, and runtime validation gates. |
+
 Historical reusable evidence:
 
 - [2026-05-27-general-ufunction-inventory.md](2026-05-27-general-ufunction-inventory.md)

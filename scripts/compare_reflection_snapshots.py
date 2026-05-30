@@ -387,6 +387,12 @@ def reject_duplicate_target_set_guidance_filters(target_sets: list[str]) -> None
         raise SystemExit("duplicate target-set guidance filter(s): " + ", ".join(duplicates))
 
 
+def reject_duplicate_target_guidance_filters(targets: list[str]) -> None:
+    duplicates = duplicate_values(targets)
+    if duplicates:
+        raise SystemExit("duplicate target guidance filter(s): " + ", ".join(duplicates))
+
+
 def unmatched_target_guidance_filters(targets: list[str]) -> list[str]:
     return [
         target
@@ -1240,6 +1246,7 @@ def main() -> int:
     target_filters = expand_target_filters(args.target, args.target_set)
     if args.list_target_guidance:
         reject_duplicate_target_set_guidance_filters(args.target_set)
+        reject_duplicate_target_guidance_filters(args.target)
         unmatched_guidance = unmatched_target_guidance_filters(args.target)
         if unmatched_guidance:
             raise SystemExit(
