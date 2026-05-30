@@ -517,6 +517,14 @@ namespace
 
     void TestHookLevelDisabledAndNonMissionDoNotReadOrReserve()
     {
+        for (GateStatus status : {
+                 GateStatus::Disabled,
+                 GateStatus::MissingObserverDebugProfile,
+                 GateStatus::MissingObserverDebugWindow,
+                 GateStatus::MissingInstanceMarker,
+                 GateStatus::MissingBinarySha256,
+                 GateStatus::UnsupportedBinarySha256,
+             })
         {
             MissionFixture fixture;
             BuildAddPlayerToMission(fixture);
@@ -524,7 +532,7 @@ namespace
             std::atomic<uint64_t> observationCounter{0};
             uint64_t observationNumber = 99;
             Attempt attempt = TryObserveInvocation(
-                {GateStatus::Disabled, std::string(kSupportedShooterGameServerSha256)},
+                {status, std::string(kSupportedShooterGameServerSha256)},
                 kAddPlayerToMissionNameIndex,
                 fixture.Reader(),
                 fixture.Function.data(),
@@ -534,10 +542,10 @@ namespace
                 observationNumber);
 
             Require(attempt.Status == AttemptStatus::Disabled,
-                    "disabled mission gate did not short-circuit hook-level observation");
-            Require(observationNumber == 0, "disabled mission gate kept an observation number");
-            Require(observationCounter.load() == 0, "disabled mission gate reserved observation budget");
-            Require(fixture.Context.Calls == 0, "disabled mission gate touched UFunction memory");
+                    "non-enabled mission gate did not short-circuit hook-level observation");
+            Require(observationNumber == 0, "non-enabled mission gate kept an observation number");
+            Require(observationCounter.load() == 0, "non-enabled mission gate reserved observation budget");
+            Require(fixture.Context.Calls == 0, "non-enabled mission gate touched UFunction memory");
         }
         {
             MissionFixture fixture;

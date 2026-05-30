@@ -32,6 +32,18 @@ category/event summaries. It does not register callbacks, timers, threads, chat 
 HTTP endpoints, resource identities, lookups, mutations, return overrides, or raw
 `ProcessEvent` access.
 
+## Adding Creator-Facing Examples
+
+New first-party Plugin Hub seed examples should be small, safe-disabled, and native to the
+current Obelisk C ABI. The fastest useful additions after `v0.1` are descriptor readers,
+passive copied-chat parsers, process-local timer utilities, and copied policy auditors.
+
+Do not add a first-party example that implies commands, permissions, economy, homes, RCON,
+inventory/item mutation, dino tools, tribe tools, transfer handling, structure placement
+enforcement, identity, lookup, replies, send-chat, moderation, or ArkApi portability until
+the matching public surface is promoted in the capability matrix and documented with its
+own evidence gate.
+
 ## Experimental Examples
 
 `oPolicyAudit` demonstrates the promoted `GameplayPolicyEvent` callback family without

@@ -6,6 +6,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
@@ -132,6 +133,24 @@ class ResourceHandleSerialPolicyBuilderTests(unittest.TestCase):
 
         with self.assertRaises(SystemExit):
             builder.build_policy(source, capture_id="serial-policy-test", evidence_pack_id="serial-policy-pack")
+
+    def test_rejects_unsafe_capture_and_evidence_pack_ids(self) -> None:
+        with self.assertRaises(SystemExit):
+            builder.validate_safe_identity_args(
+                SimpleNamespace(capture_id="../bad", evidence_pack_id="serial-policy-pack")
+            )
+
+        with self.assertRaises(SystemExit):
+            builder.validate_safe_identity_args(
+                SimpleNamespace(capture_id="serial-policy-test", evidence_pack_id="/bad")
+            )
+
+    def test_cli_path_guards_reject_protected_server_paths(self) -> None:
+        with self.assertRaises(SystemExit):
+            builder.reject_protected_input_path(Path("/servidor/ark/live-resourcehandle.json"), "--revalidation")
+
+        with self.assertRaises(SystemExit):
+            builder.reject_protected_output_path(Path("/servidor/ark/live-policy.json"), "--output")
 
 
 if __name__ == "__main__":

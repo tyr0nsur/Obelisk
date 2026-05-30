@@ -2617,6 +2617,62 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         self.assertEqual(offenders, [])
 
+    def test_resource_handle_serial_policy_tooling_stays_internal_candidate_only(self) -> None:
+        script = (REPO_ROOT / "scripts" / "build_resource_handle_serial_policy.py").read_text(
+            encoding="utf-8"
+        )
+        research_note = (
+            REPO_ROOT / "docs" / "research" / "2026-05-30-post-rc-offline-resourcehandle-priority.md"
+        ).read_text(encoding="utf-8")
+        compact_research = normalized(research_note)
+
+        for item in (
+            '"""Build a candidate-only serial reuse/wraparound policy artifact."""',
+            'SCHEMA = "obelisk.internal-uobject-revalidation-serial-policy.v1"',
+            '"evidence_kind": "internal_serial_reuse_wraparound_fail_closed_policy"',
+            '"scope": "frame_local_candidate_only"',
+            '"public_api": "not_promoted"',
+            '"public_lookup_request": "reject"',
+            '"promotion_ready": False',
+            '"public_resource_handle_ready": False',
+            '"post_callback_resource_handle_ready": False',
+            '"does_not_promote_persistent_handles"',
+            '"does_not_claim_serial_reuse_or_wraparound_safety"',
+            '"does_not_claim_slot_reuse_safety_without_fresh_serial"',
+            'raise SystemExit("source promotion_ready must be false")',
+            'raise SystemExit("source public_resource_handle_ready must be false")',
+            'raise SystemExit("source post_callback_resource_handle_ready must be false")',
+            'raise SystemExit("source already claims serial reuse/wraparound policy")',
+        ):
+            with self.subTest(file="scripts/build_resource_handle_serial_policy.py", item=item):
+                self.assertIn(item, script)
+
+        for item in (
+            "This artifact is a policy contract, not runtime proof.",
+            "It does not read cores, rerun scanners, or use server paths.",
+            "Only a fresh nonzero serial match in the same hook/callback frame can reach "
+            "`allow_candidate_frame_local_only`",
+            "The report keeps `promotion_ready=false`, `public_resource_handle_ready=false`, "
+            "`post_callback_resource_handle_ready=false`, and `promotion_gate.ready=false`.",
+            "does not prove runtime reuse semantics or public lookup safety",
+        ):
+            with self.subTest(file="docs/research/2026-05-30-post-rc-offline-resourcehandle-priority.md", item=item):
+                self.assertIn(normalized(item), compact_research)
+
+        forbidden_public_markers = (
+            "build_resource_handle_serial_policy.py",
+            "obelisk.internal-uobject-revalidation-serial-policy.v1",
+            "allow_candidate_frame_local_only",
+        )
+        offenders: list[str] = []
+        for path in (PUBLIC_GAMEPLAY_EVENTS_MANIFEST, *PUBLIC_DOC_FILES, REPO_ROOT / "plugins" / "README.md"):
+            text = path.read_text(encoding="utf-8")
+            for marker in forbidden_public_markers:
+                if marker in text:
+                    offenders.append(f"{path.relative_to(REPO_ROOT)}: {marker}")
+
+        self.assertEqual(offenders, [])
+
     def test_scalar_candidate_tooling_is_not_public_sdk_promotion(self) -> None:
         fixture_readme = (REPO_ROOT / "tests/fixtures/ufunction_snapshots/README.md").read_text(
             encoding="utf-8"

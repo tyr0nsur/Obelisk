@@ -38,6 +38,11 @@ it does not promise ArkApi plugin compatibility.
 | 9 | Dino colors, carry rules, spawn/cosmetic policy | blocked | Needs dino/player identity, classification, interaction events, and safe mutation/enforcement |
 | 10 | Engrams, inventory, item give/remove flows | blocked | Needs player/inventory/item identity, progression or item mutation APIs, rollback, and privacy policy |
 
+`available` means a narrow Obelisk-native plugin can be written against current public ABI
+today. It does not mean the corresponding ArkApi plugin family can be ported, that command
+or identity semantics exist, or that blocked dependencies can be simulated through raw
+game access.
+
 | Modder intent | Use now | Status | Must not imply |
 | --- | --- | --- | --- |
 | Load a Linux-native plugin | `ObeliskPlugin_GetInfo`, `ObeliskPlugin_Init`, optional `ObeliskPlugin_Shutdown` | Stable baseline | Hot reload of Obelisk itself, detached workers, or background ingress without shutdown proof |
@@ -68,6 +73,22 @@ For plugin authors, the stable v0.1.x shape is descriptor-driven:
 
 Plugins must copy any callback data they need after the callback returns. Runtime-owned
 event data is callback-scope only.
+
+## Post-v0.1 Creator Ladder
+
+For the first Plugin Hub seeds after `v0.1`, prefer plugins that stay inside the current
+ABI and teach reusable patterns:
+
+1. Lifecycle/config/logging skeletons with safe-disabled config.
+2. Descriptor consumers that print sanitized promoted category/event metadata.
+3. Passive chat text parsers that do local routing only.
+4. Timer utilities for plugin-owned process-local periodic work.
+5. Copied policy auditors over promoted `GameplayPolicyEvent` kinds.
+
+Do not start public examples with permissions, economy, homes, RCON, inventory, dinos,
+tribes, transfers, structure enforcement, or item grants. Those are valid demand signals,
+but they become Plugin Hub examples only after their own identity, privacy, persistence,
+operator-ingress, mutation/enforcement, lifecycle, and evidence gates are satisfied.
 
 ## Plugin Hub Direction
 

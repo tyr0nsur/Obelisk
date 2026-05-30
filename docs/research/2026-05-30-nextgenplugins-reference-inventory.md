@@ -11,6 +11,11 @@ Use this material only as a behavior and feature-priority reference. Do not copy
 ArkApi code, offsets, MSVC ABI assumptions, vtables, memory layouts, direct UE pointer API
 patterns, or implementation details into Obelisk.
 
+This note intentionally records demand categories and visible plugin-family names only.
+It is not a source-mining checklist: do not use the clone to import signatures, constants,
+call sequences, control flow, command parsers, database schemas, or wrapper patterns into
+Obelisk.
+
 ## Local Inventory
 
 Top-level collections:
@@ -202,3 +207,14 @@ Near-term Plugin Hub demand should therefore start with foundation examples, pas
 parsers, descriptor/timer utilities, and copied policy auditors. High-demand ArkApi-style
 features are valuable prioritization signals, but most require identity, mutation,
 persistence, operator ingress, and enforcement contracts that Obelisk has not promoted.
+
+Fastest honest post-`v0.1` path for plugin creators:
+
+1. Publish or refine small examples for lifecycle/config/logging, descriptors, timers,
+   passive copied chat parsing, and copied policy auditing.
+2. Keep command-like chat routing local and non-authoritative until identity, replies,
+   moderation, and send-chat are promoted.
+3. Treat permissions, RCON, economy, homes/safe zones, structures, dinos, tribes,
+   transfers, inventory, and item mutation as design backlogs, not public examples.
+4. When a backlog category is ready, start with an Obelisk-native design note and evidence
+   plan before adding SDK symbols or first-party plugin examples.

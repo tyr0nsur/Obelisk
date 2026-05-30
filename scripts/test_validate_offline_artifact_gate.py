@@ -15,6 +15,7 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import validate_offline_artifact_gate as gate
 import normalize_artifact_pack as artifact_pack
+import build_resource_handle_serial_policy as serial_policy_builder
 
 
 BINARY_SHA = "a" * 64
@@ -1151,6 +1152,53 @@ def internal_uobject_post_callback_contract_manifest(*, overclaim: bool = False)
         "artifact_sha256": hashlib.sha256(gate.canonical_json_bytes(material)).hexdigest(),
     }
     return payload
+
+
+def internal_uobject_serial_policy_manifest() -> dict:
+    return serial_policy_builder.build_policy(
+        {
+            "schema": serial_policy_builder.RESOURCE_HANDLE_REVALIDATION_EVALUATOR_SCHEMA,
+            "output_artifact_identity": {
+                "artifact_kind": serial_policy_builder.RESOURCE_HANDLE_REVALIDATION_EVALUATOR_SCHEMA,
+                "artifact_sha256": "c" * 64,
+                "capture_id": "source-capture",
+                "evidence_pack_id": "source-pack",
+            },
+            "artifact_identity": {
+                "required": True,
+                "hash_count": 2,
+                "hashes": ["a" * 64, "b" * 64],
+                "complete_input_count": 2,
+                "missing_or_partial_input_count": 0,
+                "invalid_input_count": 0,
+            },
+            "reconciliation_summary": {
+                "sample_count": 44,
+                "accepted_sample_count": 44,
+                "rejected_sample_count": 0,
+                "membership_pass_count": 44,
+                "serial_candidate_zero_count": 0,
+                "serial_candidate_nonzero_count": 44,
+                "serial_candidate_missing_count": 0,
+            },
+            "evidence_checks": {
+                "serial_reuse_or_wraparound_policy_present": False,
+            },
+            "promotion_ready": False,
+            "public_resource_handle_ready": False,
+            "post_callback_resource_handle_ready": False,
+            "internal_uobject_revalidation_candidate": {
+                "schema": serial_policy_builder.INTERNAL_UOBJECT_REVALIDATION_CANDIDATE_SCHEMA,
+                "accepted": True,
+                "candidate_level": "internal_static_candidate",
+                "binary_sha256": BINARY_SHA,
+                "source_post_callback_resource_handle_ready": False,
+                "candidate": serial_policy_builder.INTERNAL_UOBJECT_REVALIDATION_CONTRACT,
+            },
+        },
+        capture_id="serial-policy-test",
+        evidence_pack_id="serial-policy-pack",
+    )
 
 
 def resource_handle_serial_scan_manifest(
@@ -4425,6 +4473,61 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
 
         reasons = {blocker["reason"] for blocker in result["blockers"]}
         self.assertIn("post_callback_contract_output_artifact_identity_hash_mismatch", reasons)
+
+    def test_accepts_internal_uobject_serial_policy_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "serial-policy.json"
+            write_json(manifest, internal_uobject_serial_policy_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual(result["blockers"], [])
+
+    def test_blocks_internal_uobject_serial_policy_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "serial-policy.json"
+            write_json(manifest, internal_uobject_serial_policy_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("promote_mode_serial_policy_candidate_only", reasons)
+
+    def test_blocks_internal_uobject_serial_policy_overclaims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "serial-policy.json"
+            payload = internal_uobject_serial_policy_manifest()
+            payload["public_resource_handle_ready"] = True
+            payload["serial_policy"]["fail_closed_rules"]["public_lookup_request"] = "allow"
+            payload["contract_checks"]["serial_reuse_or_wraparound_safety_proven"] = True
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("serial_policy_public_resourcehandle_overclaim", reasons)
+        self.assertIn("serial_policy_fail_closed_public_lookup_request_not_reject", reasons)
+        self.assertIn("serial_policy_check_serial_reuse_or_wraparound_safety_proven_mismatch", reasons)
+
+    def test_blocks_internal_uobject_serial_policy_identity_hash_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "serial-policy.json"
+            payload = internal_uobject_serial_policy_manifest()
+            payload["output_artifact_identity"]["artifact_sha256"] = "0" * 64
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("serial_policy_output_artifact_identity_hash_mismatch", reasons)
 
     def test_accepts_resource_handle_serial_scan_with_rejection_candidate_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

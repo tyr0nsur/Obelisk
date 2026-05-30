@@ -121,3 +121,67 @@ The local machine has the expected offline static tooling (`radare2` and Ghidra
 packs relevant to build-policy triage. The next useful offline step is to validate the
 specific candidate artifact pack for `IsAllowedToBuild` through the repository's
 fail-closed offline gate before using it as reusable evidence.
+
+## Follow-up: IsAllowedToBuild Artifact Readiness
+
+Date: 2026-05-30
+
+This follow-up rechecked the current repo and
+`/home/flowcommunity-ark/obelisk-artifacts` state for an exact
+`PrimalStructure.IsAllowedToBuild` / `APrimalStructure.IsAllowedToBuild` offline artifact.
+It did not read or write `/servidor/ark`, start servers, attach to processes, run
+ReflectionScanner, or promote any candidate.
+
+Validation results:
+
+- Fixture readiness for both exact targets still reports `missing_base_snapshot`,
+  `layout_ready=false`, and `promotion_ready=false`.
+- No current non-protected artifact filename or JSON payload under
+  `/home/flowcommunity-ark/obelisk-artifacts` contains an exact IsAllowedToBuild snapshot
+  or candidate artifact pack.
+- The only file larger than 100 MB in that artifact root remains
+  `static-global-preflight-20260529/ShooterGameServer.objdump`; no offline core file was
+  found there.
+- Adjacent structure child manifests are gate-consumable but evidence-only:
+  `structure-return-only-policy-slice.json` and
+  `structure-nonpin-copied-scalar-policy-slice.json` pass consume mode and block promote
+  mode.
+- The adjacent structure artifact-pack containers are not currently reusable packs:
+  return-only is blocked by the zero-byte `normalize-artifact-pack.json` and embedded
+  gate-result JSON, while non-PIN is blocked by the older
+  `obelisk.artifact-pack-manifest.v1` schema spelling.
+- The static-global preflight manifest is useful historical context for the binary-scoped
+  `0x5956f30` FName root slot and `0x595b7e0` GObjects research-candidate, but current
+  consume-mode gating blocks it for missing `artifact_identity` and an invalid
+  `static_xrefs_sha256`.
+
+Decision: there is no specific IsAllowedToBuild candidate pack to validate yet. The exact
+next offline artifact step is to identify or create an approved copied/offline core or
+complete core evidence-pack manifest outside protected server paths, for the
+`7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520` binary or a clearly
+documented second source. Once that artifact exists and passes path/provenance hygiene,
+run the focused snapshot extraction, keeping the reviewed globals binary-hash-scoped:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/inspect_core_ufunctions.py \
+  --core <approved-offline-core> \
+  --gobjects 0x595b7e0 \
+  --fname-root-slot 0x5956f30 \
+  --outer-exact PrimalStructure \
+  --name-exact IsAllowedToBuild \
+  --inspection-mode ufunction \
+  --snapshot-json \
+  --evidence-ark-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
+  --evidence-artifact-sha256 <offline-core-or-pack-sha256> \
+  --evidence-artifact-kind offline_core \
+  --evidence-capture-id <sanitized-capture-id> \
+  --evidence-pack-id <sanitized-pack-id> \
+  --evidence-obelisk-commit <commit> \
+  > <review-output>/PrimalStructure.IsAllowedToBuild.snapshot.json
+```
+
+If `APrimalStructure` resolves as a separate reflected owner in the same artifact, repeat
+the same command with `--outer-exact APrimalStructure`. Do not add target sets, redacted
+signatures, runtime callbacks, descriptors, ABI enums, mutation, return override, or
+public Structure SDK surfaces until the candidate snapshot and a distinct second-source
+layout comparison exist.

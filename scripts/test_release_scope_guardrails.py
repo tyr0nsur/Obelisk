@@ -1288,8 +1288,9 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "Consume mode accepts it and promote mode stays blocked",
             "Do not rerun broad FName, GObjects, or core scans for ResourceHandle",
             "post-callback rejection contract is preserved as candidate-only",
-            "next offline ResourceHandle work is a strict serial reuse/wraparound policy artifact",
-            "runtime negative samples and public lookup/identity blocked",
+            "first strict serial reuse/wraparound policy artifact is preserved",
+            "manifest consume mode accepts it and promote mode blocks it as candidate-only",
+            "does not unlock runtime negative samples, public lookup, object identity",
         ]:
             with self.subTest(file="docs/agent-handoff/CURRENT.md", item=item):
                 self.assertIn(normalized(item), compact_current)

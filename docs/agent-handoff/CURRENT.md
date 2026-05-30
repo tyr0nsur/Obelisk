@@ -109,9 +109,13 @@ for the current checkpoint.
   durable rich-provenance refresh is preserved. Consume mode accepts it and promote mode
   stays blocked. Do not rerun broad FName, GObjects, or core scans for ResourceHandle
   unless the binary hash changes or evidence is contradicted. The semantic blockers remain:
-  the post-callback rejection contract is preserved as candidate-only and fail-closed;
-  next offline ResourceHandle work is a strict serial reuse/wraparound policy artifact
-  that keeps runtime negative samples and public lookup/identity blocked.
+  the post-callback rejection contract is preserved as candidate-only and fail-closed.
+  The first strict serial reuse/wraparound policy artifact is preserved at
+  `/home/flowcommunity-ark/obelisk-artifacts/resourcehandle-serial-policy-20260530T190642Z/serial-policy.json`;
+  manifest consume mode accepts it and promote mode blocks it as candidate-only. This
+  narrows the serial-policy design gap but does not unlock runtime negative samples,
+  public lookup, object identity, mutation, return override, persistent handles, or
+  public `ResourceHandle`.
 - Transfer ScriptStruct bool-tail evidence has a refreshed local root; older
   `/servidor/ark/workspace-offline/...20260529...` transfer roots are stale under current
   bool-tail strictness.
@@ -136,19 +140,23 @@ for the current checkpoint.
   benchmark gate for no-subscriber and <=4-subscriber snapshots; do not expand it unless
   profiling justifies a larger callback snapshot strategy.
 - Structure second-wave next step is offline-only candidate metadata/redaction review for
-  `PrimalStructure.IsAllowedToBuild`. First useful action is a sanitized focused snapshot
-  for `PrimalStructure.IsAllowedToBuild` and, if reflected separately,
-  `APrimalStructure.IsAllowedToBuild` from an approved offline artifact, then a distinct
-  second-source compare. Fixture-only readiness currently reports `missing_base_snapshot`
-  for both keys. Do not add either key to release target sets, ABI enums, descriptors,
-  dispatchers, public docs, or runtime gates.
+  `PrimalStructure.IsAllowedToBuild`. There is still no specific IsAllowedToBuild
+  candidate pack to validate; fixture-only readiness reports `missing_base_snapshot` for
+  both `PrimalStructure.IsAllowedToBuild` and `APrimalStructure.IsAllowedToBuild`. First
+  useful action is a sanitized focused snapshot from an approved copied/offline core or
+  complete core evidence-pack manifest outside protected server paths, using the
+  binary-scoped `0x5956f30` FName root slot and `0x595b7e0` GObjects candidate, then a
+  distinct second-source compare. Do not add either key to release target sets, ABI enums,
+  descriptors, dispatchers, public docs, or runtime gates.
 - Plugin Hub planning order from current demand map and local `NextGenPlugins` inventory:
   `docs/PLUGIN_HUB_FOUNDATION_V1.md` is now the contributor-facing foundation boundary,
-  backed by `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`. Next useful Plugin Hub work is copied
-  chat text ergonomics without command SDK promises, then privacy-safe
-  identity/permissions, RCON/operator I/O, economy/persistence, homes/safe zones and
-  structure/player-world policy after their promotion gates. Keep the clone out of repo
-  and use it only as a dictionary/demand signal.
+  backed by `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`. The fastest honest creator path after
+  `v0.1` is small Obelisk-native examples for lifecycle/config/logging, descriptor reads,
+  passive copied-chat parsing, process-local timers, and copied policy auditing. Keep
+  permissions, RCON, economy, homes/safe zones, structure enforcement, dinos, tribes,
+  transfers, inventory, item mutation, identity, lookup, replies, send-chat, moderation,
+  and ArkApi portability as design backlogs until their own public surfaces are promoted.
+  Keep the clone out of repo and use it only as a dictionary/demand signal.
 - Artifact-pack contributor onboarding now has `docs/OFFLINE_ARTIFACT_PACKS.md` as the
   concise contributor runbook. It documents normalize/check, consume gate, strict
   target-set coverage, second-source compare, pack-shape expectations, and non-claims.

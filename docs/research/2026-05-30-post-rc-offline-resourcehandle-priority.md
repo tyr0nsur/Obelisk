@@ -336,3 +336,92 @@ Remaining non-claims are unchanged for public `ResourceHandle`, public GObjects 
 object identity, mutation, return override, persistent handles, and public SDK exposure.
 The policy narrows the serial reuse/wraparound design gap but does not prove runtime
 reuse semantics or public lookup safety.
+
+## Serial Policy Result
+
+The existing identity-complete evaluator artifact is safe for
+`scripts/build_resource_handle_serial_policy.py` to consume:
+
+```text
+/home/flowcommunity-ark/obelisk-artifacts/resourcehandle-identity-complete-failclosed-20260530T165521Z/resourcehandle-revalidation.json
+```
+
+Validation summary:
+
+- source consume gate accepted with `--root /home/flowcommunity-ark/obelisk-artifacts`
+- source file sha256:
+  `9eb1fcd672327d1509becc9fd9d2937fc227f5cdb6fc23403a79a99a115fb833`
+- source `output_artifact_identity.artifact_sha256`:
+  `d358b16e4c70ef3b320e00143f3ed2bd41581c4d40045974b02ef61c55b4dab2`
+- identity inputs complete: `missing_or_partial_input_count=0`,
+  `invalid_input_count=0`
+- reconciliation samples: `accepted_sample_count=44`,
+  `serial_candidate_nonzero_count=44`, `serial_candidate_zero_count=0`,
+  `serial_candidate_missing_count=0`
+- source keeps `promotion_ready=false`, `public_resource_handle_ready=false`,
+  and `post_callback_resource_handle_ready=false`
+- source has `serial_reuse_or_wraparound_policy_present=false`, so the builder is not
+  consuming a pre-existing serial-policy overclaim
+
+Generated artifact:
+
+```text
+/home/flowcommunity-ark/obelisk-artifacts/resourcehandle-serial-policy-20260530T190642Z/
+```
+
+Command:
+
+```bash
+python3 scripts/build_resource_handle_serial_policy.py \
+  --revalidation /home/flowcommunity-ark/obelisk-artifacts/resourcehandle-identity-complete-failclosed-20260530T165521Z/resourcehandle-revalidation.json \
+  --capture-id resourcehandle-serial-policy-20260530T190642Z \
+  --evidence-pack-id resourcehandle-serial-policy-20260530T190642Z \
+  --output /home/flowcommunity-ark/obelisk-artifacts/resourcehandle-serial-policy-20260530T190642Z/serial-policy.json
+```
+
+Result:
+
+```text
+serial-policy.json sha256=a4fe1b1390103b31e49c241deadc3bca0f12adc37d4a1efa306a02dbf8de3532
+output_artifact_identity.artifact_sha256=01cb5335dca3fe6301ddee007284e61044d30b288a0f2c33e160df562344406d
+schema=obelisk.internal-uobject-revalidation-serial-policy.v1
+status=accepted_internal_candidate_policy
+promotion_ready=false
+public_resource_handle_ready=false
+post_callback_resource_handle_ready=false
+promotion_gate.ready=false
+promotion_gate.blockers=candidate_only_serial_reuse_wraparound_policy
+```
+
+The decision table rejects zero serials, serial mismatches, unknown wraparound, slot reuse
+without a freshly proven serial, and post-callback/cross-frame use. Only a fresh nonzero
+serial match in the same hook/callback frame reaches `allow_candidate_frame_local_only`,
+and output remains copied bool/reason or Obelisk-owned copied data only.
+
+Follow-up gate integration registered
+`obelisk.internal-uobject-revalidation-serial-policy.v1` as a manifest schema. The
+generated serial-policy report now passes consume mode when provided as a manifest:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate_offline_artifact_gate.py \
+  --root /home/flowcommunity-ark/obelisk-artifacts \
+  --manifest /home/flowcommunity-ark/obelisk-artifacts/resourcehandle-serial-policy-20260530T190642Z/serial-policy.json \
+  --mode consume
+```
+
+Result:
+
+```text
+accepted mode=consume blockers=0
+```
+
+Promote mode remains blocked:
+
+```text
+promote_mode_serial_policy_candidate_only
+promote_mode_manifest_has_non_claims
+```
+
+Use `--manifest` for this structured JSON report. The generic `--artifact` path still
+requires a `.provenance.json` sidecar because it validates unstructured files rather than
+schema-aware JSON reports.

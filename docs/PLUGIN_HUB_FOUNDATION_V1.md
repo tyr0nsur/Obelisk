@@ -97,6 +97,26 @@ These examples may demonstrate patterns, but they are not promises for complete 
 permissions, homes, kits, shops, RCON, inventory, item, dino, tribe, mission, transfer, or
 structure modules.
 
+## Fastest Honest Creator Path
+
+After `v0.1`, the fastest useful path for plugin creators is to build narrow
+Obelisk-native examples in this order:
+
+1. Start from lifecycle, config, logging, and `struct_size`/capability checks.
+2. Add descriptor reads so plugins can explain which copied event categories are actually
+   promoted.
+3. Add passive copied chat parsing for local text routing only, with no sender identity,
+   replies, moderation, blocking, or send-chat behavior.
+4. Add process-local timers only for plugin-owned periodic work, never as gameplay timers,
+   persistent ids, or cluster coordination.
+5. Add copied policy auditors that observe promoted `GameplayPolicyEvent` data without
+   identity, lookup, mutation, return override, or module SDK claims.
+
+If a plugin idea needs player identity, permissions, persistence, operator ingress,
+replies, broadcast, inventory/item mutation, teleport, structure placement enforcement, or
+raw UE access, it is not a Foundation V1 plugin. Keep it as a design/research note until a
+separate copied-data surface is promoted.
+
 ## Anti-Promises
 
 Foundation V1 does not provide or imply:
