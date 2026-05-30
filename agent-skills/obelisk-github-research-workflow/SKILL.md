@@ -195,6 +195,19 @@ timestamp, and a restrained color (`0x2ecc71` release/success, `0x3498db` beta/i
 `0xf1c40f` caution). Plain content should be empty or a short label; put the substantive
 message in the embed.
 
+When sending is explicitly approved, prefer the guarded helper instead of hand-written
+`curl`:
+
+```bash
+python3 scripts/send_discord_embed.py --channel community --title "..." \
+  --description "..." --status "..." --scope "..." \
+  --field "Cambio=..." --field "Impacto=..."
+```
+
+Use `--channel community` only for `OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL` and
+`--channel beta-test` only for `OBELISK_BETA_TEST_WEBHOOK_URL`. Run with `--dry-run` first
+when composing a new message shape.
+
 ## Research Notes
 
 Use `docs/research/YYYY-MM-DD-topic.md` for non-trivial investigation.

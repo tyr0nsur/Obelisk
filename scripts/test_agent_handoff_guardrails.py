@@ -112,6 +112,36 @@ class AgentHandoffGuardrailsTests(unittest.TestCase):
         self.assertIn("documented next actions", workflow_skill)
         self.assertNotIn("queued next tasks", workflow_skill)
 
+    def test_discord_policy_stays_embed_helper_and_approval_scoped(self) -> None:
+        current = CURRENT.read_text(encoding="utf-8")
+        workflow_skill = GITHUB_WORKFLOW_SKILL.read_text(encoding="utf-8")
+
+        for path, text in (
+            ("docs/agent-handoff/CURRENT.md", current),
+            ("agent-skills/obelisk-github-research-workflow/SKILL.md", workflow_skill),
+        ):
+            with self.subTest(file=path, item="webhook variables only"):
+                self.assertIn("OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL", text)
+                self.assertIn("OBELISK_BETA_TEST_WEBHOOK_URL", text)
+                self.assertNotIn("discord.com/api/webhooks", text)
+                self.assertNotIn("discordapp.com/api/webhooks", text)
+            with self.subTest(file=path, item="approval scope"):
+                self.assertIn("approved", text)
+                self.assertIn("public", text)
+                self.assertIn("milestones", text)
+                self.assertIn("beta-test", text)
+            with self.subTest(file=path, item="embed shape"):
+                lowered = text.lower()
+                self.assertIn("embed", lowered)
+                self.assertIn("routine validation", lowered)
+                self.assertIn("speculative", lowered)
+
+        self.assertIn("Do not draft or send community announcements unless explicitly delegated", workflow_skill)
+        self.assertIn("Prefer `scripts/send_discord_embed.py --dry-run`", current)
+        self.assertIn("prefer the guarded helper instead of hand-written", workflow_skill)
+        self.assertIn("python3 scripts/send_discord_embed.py --channel community", workflow_skill)
+        self.assertIn("Run with `--dry-run` first", workflow_skill)
+
     def test_learning_skill_keeps_adopted_knowledge_compact(self) -> None:
         skill = (REPO_ROOT / "agent-skills/obelisk-continuous-learning/SKILL.md").read_text(
             encoding="utf-8"

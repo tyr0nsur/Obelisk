@@ -757,6 +757,55 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
                 self.assertIn("mutation", compact_text)
                 self.assertIn("fail-closed", compact_text)
 
+    def test_item_return_only_policy_slice_stays_internal_and_non_authoritative(self) -> None:
+        bridge_plan = read("docs/research/2026-05-29-item-return-only-policy-bridge-plan.md")
+        slice_note = read("docs/research/2026-05-30-item-return-only-policy-slice.md")
+        current = read("docs/agent-handoff/CURRENT.md")
+        status = read("docs/STATUS.md")
+
+        for path, text in (
+            ("docs/research/2026-05-29-item-return-only-policy-bridge-plan.md", bridge_plan),
+            ("docs/research/2026-05-30-item-return-only-policy-slice.md", slice_note),
+        ):
+            compact = normalized(text)
+            with self.subTest(file=path, item="return-only bool shape"):
+                self.assertIn("PrimalItem.AllowEquipItem.ReturnValue", text)
+                self.assertIn("PrimalItem.CanRepair.ReturnValue", text)
+                self.assertIn("PrimalItem.UseItemOntoItem.ReturnValue", text)
+            with self.subTest(file=path, item="excluded item fields"):
+                self.assertIn("CraftBlueprint", text)
+                self.assertIn("bIgnoreInventoryRequirement", text)
+                self.assertIn("bConsumeResources", text)
+                self.assertIn("toInventory", text)
+                self.assertIn("DestinationItem", text)
+                self.assertIn("AdditionalData", text)
+            with self.subTest(file=path, item="no public promotion"):
+                self.assertIn("does not promote", compact)
+                self.assertIn("Items SDK", compact)
+                self.assertIn("Inventory SDK", compact)
+                self.assertIn("ResourceHandle", compact)
+                self.assertIn("identity", compact)
+                self.assertIn("mutation", compact)
+                self.assertIn("return override", compact)
+            with self.subTest(file=path, item="no runtime claim"):
+                self.assertRegex(compact, r"(test-only|offline evidence-only|offline review evidence only)")
+                self.assertRegex(compact, r"(no hook wiring|runtime hook|Before Runtime Wiring|runtime log claim)")
+                self.assertRegex(compact, r"(No SDK/API header|public SDK exposure|public callback)")
+
+        for path, text in (
+            ("docs/agent-handoff/CURRENT.md", current),
+            ("docs/STATUS.md", status),
+        ):
+            compact = normalized(text)
+            with self.subTest(file=path, item="post-RC order and RC boundary"):
+                self.assertIn("Item return-only policy, Mission copied-bool observer, then Transfer `bAccept`", compact)
+                self.assertRegex(compact, r"no RC public SDK/API|not RC public SDK/API|does not change the RC public API")
+            with self.subTest(file=path, item="item blockers"):
+                self.assertIn("ResourceHandle", compact)
+                self.assertIn("public Inventory SDK", compact)
+                self.assertIn("mutation", compact)
+                self.assertIn("return override", compact)
+
     def test_historical_checkpoint_zero_stays_guardrail_only(self) -> None:
         plan = read("docs/research/2026-05-29-rc-checkpoint-slicing-plan.md")
         compact = read("docs/agent-handoff/COMPACT_CONTEXT.md")

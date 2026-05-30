@@ -1,6 +1,7 @@
 #include "ItemReflection.h"
 
 #include <array>
+#include <cstring>
 #include <utility>
 
 namespace Obelisk::UE::ItemReflection
@@ -354,6 +355,21 @@ namespace Obelisk::UE::ItemReflection
 
             return ValidatePropertyClass(reader, layout, property, spec);
         }
+
+        RuntimeReflection::ReadResult ValidateCanonicalCopiedBool(const RuntimeReflection::ParamRange& range)
+        {
+            if (!range.Data || range.Size != sizeof(uint8_t))
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                           "item bool range is not a single byte");
+
+            uint8_t value = 0;
+            std::memcpy(&value, range.Data, sizeof(value));
+            if (value > 1)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                           "item bool byte is not canonical");
+
+            return RuntimeReflection::ReadResult::Ok();
+        }
     }
 
     RuntimeReflection::ReadResult TryIdentifyItemInvocation(const RuntimeReflection::MemoryReader& reader,
@@ -446,6 +462,8 @@ namespace Obelisk::UE::ItemReflection
                 {
                     return result;
                 }
+                if (RuntimeReflection::ReadResult result = ValidateCanonicalCopiedBool(field.Range); !result)
+                    return result;
             }
 
             value.Fields.push_back(field);

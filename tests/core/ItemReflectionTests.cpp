@@ -528,6 +528,59 @@ namespace
         }
     }
 
+    void TestRejectsNonCanonicalBoolBytes()
+    {
+        {
+            ItemFixture fixture;
+            BuildAllowEquipItem(fixture);
+            fixture.Params[0x08] = 2;
+
+            ItemReflection::ItemInvocation invocation;
+            ReadResult result = ItemReflection::TryIdentifyItemInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible,
+                    "non-canonical AllowEquipItem ReturnValue was accepted");
+            Require(invocation.Fields.empty(), "rejected AllowEquipItem left stale fields");
+        }
+        {
+            ItemFixture fixture;
+            BuildCanRepair(fixture);
+            fixture.Params[0x00] = 2;
+            fixture.Params[0x01] = 1;
+
+            ItemReflection::ItemInvocation invocation;
+            ReadResult result = ItemReflection::TryIdentifyItemInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible,
+                    "non-canonical CanRepair input bool was accepted");
+            Require(invocation.Fields.empty(), "rejected CanRepair input left stale fields");
+        }
+        {
+            ItemFixture fixture;
+            BuildUseItemOntoItem(fixture);
+            fixture.Params[0x0c] = 2;
+
+            ItemReflection::ItemInvocation invocation;
+            ReadResult result = ItemReflection::TryIdentifyItemInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible,
+                    "non-canonical UseItemOntoItem ReturnValue was accepted");
+            Require(invocation.Fields.empty(), "rejected UseItemOntoItem left stale fields");
+        }
+    }
+
     void TestRejectsWrongOuterAndNameNumber()
     {
         {
@@ -882,6 +935,7 @@ int main()
     TestRecognizesUseItemOntoItemWithOnlyBoolRange();
     TestMetadataOnlyItemFieldsAreNotReadFromParams();
     TestNullParamsProduceMetadataOnlyRanges();
+    TestRejectsNonCanonicalBoolBytes();
     TestRejectsWrongOuterAndNameNumber();
     TestRejectsWrongFunctionClass();
     TestRejectsWrongShapeAndPropertyChain();

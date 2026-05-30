@@ -2,8 +2,11 @@
 
 Updated: 2026-05-30
 
-Active routing only: durable evidence belongs in `docs/research/`, resume facts in
+This is an active routing table only: durable evidence belongs in `docs/research/`, resume facts in
 `COMPACT_CONTEXT.md`, and old detail in `HISTORY-*.md`.
+historical recovery context is not active routing for the current head; use
+`git log --oneline -1` for the current head rather than by the old 0-pre/0a/0b slicing
+sequence.
 
 ## Active Objective
 
@@ -11,6 +14,8 @@ Active routing only: durable evidence belongs in `docs/research/`, resume facts 
   Linux runtime, ProcessEvent hook infrastructure, plugin lifecycle, central install
   layout, `oBaseEvents`, `GameplayPolicyEvent`, minimal copied `ChatMessageEvent`,
   `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`.
+- RC publication passed a clean release gate on the intended ref and exact tag/ref
+  verification; stale tags are recreated only after rerunning the gate and are not reused.
 - Do not expand or retag the RC for routine post-RC development. Future work should move
   toward a broader `v1.0` production-stable Obelisk core: general UE4 reflection,
   copied-data module APIs, lifecycle-safe plugins, operator lifecycle tooling, and enough
@@ -44,13 +49,16 @@ Active routing only: durable evidence belongs in `docs/research/`, resume facts 
   `OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL` for public modder-facing milestones and
   `OBELISK_BETA_TEST_WEBHOOK_URL` for approved in-game test windows. Send professional
   Discord embeds only; never expose raw URLs, player text, secrets, routine validation
-  logs, or speculative reversing notes.
+  logs, or speculative reversing notes. Prefer `scripts/send_discord_embed.py --dry-run`
+  before any approved send.
 
 ## Current Routing Facts
 
-- `v0.1.0-rc.1` is frozen. Public RC scope is only `GameplayPolicyEvent`, minimal copied
-  `ChatMessageEvent`, `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`.
-  It is not a production-stable `v1.0` claim and must not be expanded retroactively.
+- `v0.1.0-rc.1` is frozen. RC public scope remains limited to `GameplayPolicyEvent`, the
+  minimal copied `ChatMessageEvent`, `DescribeResourceKind`, and
+  `DescribeGameplayPolicyEventKind`. It is not a production-stable `v1.0` claim and must
+  not be expanded retroactively. Post-RC internal modeling does not change the RC public
+  API; accepted RC UFunction second-source root evidence remains the publication baseline.
 - `ObeliskApi` v1 remains append-only. New public surfaces need copied-data ownership,
   explicit capability/`struct_size` gates, lifecycle cleanup, privacy rules, and accepted
   second-source/static evidence.
@@ -76,13 +84,15 @@ Active routing only: durable evidence belongs in `docs/research/`, resume facts 
 
 - Preserve RC scope while moving toward `v1.0`: reduce architecture debt, improve evidence
   tooling, and promote only copied module APIs with strict gates.
-- Next development target after timer hardening: Item return-only policy modeling inside
-  the existing internal recognizer/`GameplayPolicyEvent` path. Keep it copied bools only:
-  no `ItemId`, `AdditionalData`, `ResourceHandle`, return override, public Inventory SDK,
-  hook wiring, marker/env, or runtime logs until promoted.
-- Research order after Item: Mission copied-bool observer, then Transfer `bAccept`.
-  Commands/chat routing is important but waits on player context, permissions, and safe
-  response semantics. ArkServerApi/AseApi remains names/behavior reference only.
+- Current post-RC focus: Item return-only policy, Mission copied-bool observer, then
+  Transfer `bAccept`. This is no RC public SDK/API promotion. Item return-only is now
+  validated as an internal/test-only copied-bool slice; continue Mission copied-bool
+  observer hardening next. Keep both free of `ResourceHandle`, identity, mutation, return
+  override, public Inventory SDK, public Mission SDK, hook wiring, marker/env, or runtime
+  logs until promoted. ResourceHandle semantic work still needs helper evidence, mutation-window
+  rejection, and a fail-closed contract. Commands/chat routing waits on player context,
+  permissions, and safe response semantics. ArkServerApi/AseApi remains names/behavior
+  reference only.
 - Regenerate the blocked UObject flag-policy artifact with current provenance/caller-row
   requirements before spending more ResourceHandle effort. Do not rerun broad FName,
   GObjects, or core scans unless the binary hash changes or evidence contradicts current
@@ -92,6 +102,9 @@ Active routing only: durable evidence belongs in `docs/research/`, resume facts 
 
 ## Agent Protocol
 
-- Lead owns server safety, GitHub, and stale-agent cleanup.
-- Before each round: close stale agents, assign expert role, declare read-only/edit paths,
-  pass only relevant skills, state validation expected, and keep integration with lead.
+- Lead owns server-safety decisions, GitHub, and stale-agent cleanup.
+- Sub-agents receive scoped expert tasks, not leader cadence or unrelated project policy.
+- Before each sub-agent round: close stale agents, assign expert role, declare
+  read-only/edit paths, declare allowed paths and required skills, pass only the skills
+  required for that scope, state validation expected, state the expected decision, and
+  keep integration with lead.

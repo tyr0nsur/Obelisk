@@ -1229,11 +1229,18 @@ namespace
             BuildAddPlayerToMission(fixture);
             fixture.Params[0x08] = 2;
             fixture.Params[0x09] = 1;
-            Attempt attempt = Identify(fixture, kAddPlayerToMissionNameIndex);
 
-            CopiedMissionObservation observation;
-            Require(!TryBuildCopiedMissionObservation(attempt.Invocation, observation),
-                    "copied mission bool byte above one was normalized to true");
+            Attempt attempt = TryIdentifyInvocation(
+                EnabledGate(),
+                kAddPlayerToMissionNameIndex,
+                fixture.Reader(),
+                fixture.Function.data(),
+                fixture.Params.data());
+
+            Require(attempt.Status == AttemptStatus::Rejected,
+                    "non-canonical mission bool byte reached copied observation builder");
+            Require(attempt.Invocation.Fields.empty(),
+                    "rejected non-canonical mission attempt left copied field ranges");
         }
     }
 

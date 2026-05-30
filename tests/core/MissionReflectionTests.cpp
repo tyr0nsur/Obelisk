@@ -473,6 +473,63 @@ namespace
         Require(!result, "mission bool range was accepted from unreadable params");
     }
 
+    void TestRejectsNonCanonicalBoolBytes()
+    {
+        {
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+            fixture.Params[0x08] = 2;
+            fixture.Params[0x09] = 1;
+
+            MissionReflection::MissionInvocation invocation;
+            ReadResult result = MissionReflection::TryIdentifyMissionInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+
+            Require(result.Status == ReadStatus::Implausible,
+                    "non-canonical AddPlayerToMission bForceAdd was accepted");
+            Require(invocation.Fields.empty(), "rejected AddPlayerToMission left stale fields");
+        }
+        {
+            MissionFixture fixture;
+            BuildBPAllowPlayerToLeaveMission(fixture);
+            fixture.Params[0x08] = 2;
+
+            MissionReflection::MissionInvocation invocation;
+            ReadResult result = MissionReflection::TryIdentifyMissionInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+
+            Require(result.Status == ReadStatus::Implausible,
+                    "non-canonical BPAllowPlayerToLeaveMission ReturnValue was accepted");
+            Require(invocation.Fields.empty(), "rejected BPAllowPlayerToLeaveMission left stale fields");
+        }
+        {
+            MissionFixture fixture;
+            BuildBPOnPlayerRemovedFromMission(fixture);
+            fixture.Params[0x10] = 1;
+            fixture.Params[0x11] = 2;
+
+            MissionReflection::MissionInvocation invocation;
+            ReadResult result = MissionReflection::TryIdentifyMissionInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+
+            Require(result.Status == ReadStatus::Implausible,
+                    "non-canonical BPOnPlayerRemovedFromMission bool was accepted");
+            Require(invocation.Fields.empty(), "rejected BPOnPlayerRemovedFromMission left stale fields");
+        }
+    }
+
     void TestRecognizesLeaveAndRemovedMissionBoolRangesOnly()
     {
         {
@@ -970,6 +1027,7 @@ int main()
     TestRecognitionOnlyMissionFieldsDoNotReadParams();
     TestRecognizesAddPlayerToMissionBoolRangesOnly();
     TestUnreadableBoolRangeFailsClosed();
+    TestRejectsNonCanonicalBoolBytes();
     TestRecognizesLeaveAndRemovedMissionBoolRangesOnly();
     TestAcceptsMetadataOnlyRecognition();
     TestRejectsWrongOuterNameNumberAndClass();

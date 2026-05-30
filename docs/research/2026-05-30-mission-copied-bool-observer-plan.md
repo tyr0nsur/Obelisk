@@ -116,6 +116,14 @@ raw buffers, FName indices, GObjects indices, `ResourceHandle`, strings, text, m
 location, tribe/platform IDs, return override decisions, plugin subscriber state, or
 payload sizes derived from redacted arrays.
 
+## 2026-05-30 Recognizer Hardening
+
+The base `MissionReflection` recognizer now rejects non-canonical copied bool ranges before
+returning a matched invocation, mirroring the Item return-only hardening. This keeps
+malformed bool bytes out of both the recognizer output and the hook-side copied observer
+builder. The change remains internal/test-only: no hook wiring, marker/env, public Mission
+SDK, identity, mutation, or return override is promoted.
+
 Rejected metadata, disabled gates, non-mission FName values, unsupported SHA values,
 unreadable params, malformed bool bytes, and exhausted budgets should not emit per-event
 value logs. If counters are added later, they must be aggregate-only and must not include
