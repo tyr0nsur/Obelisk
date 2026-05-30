@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Hardened plugin init-failure cleanup so a callback-cleanup failure still avoids
+  `dlclose` if retry-retention tracking itself fails.
+- Fixed experimental `oChatLogger` safe-disabled initialization so it reads config before
+  requiring/registering chat callbacks, and added active/disabled SDK fixture coverage.
+- Added a protected-path-aware static tooling checker for optional radare2/Ghidra
+  availability and smoke evidence.
+- Added a candidate-only `players-identity-lifecycle-intake` target-set guidance lane
+  without promoting player identity, lookup, runtime work, or SDK surface.
 - Mark post-RC installed SDK packages as `0.1.0-dev` / `dev` so development builds do not
   masquerade as the published `v0.1.0-rc.2` tag.
 - Hardened the internal Mission copied-bool recognizer to validate Unreal `BoolProperty`

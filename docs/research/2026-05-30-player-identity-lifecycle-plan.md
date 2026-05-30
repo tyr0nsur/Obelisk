@@ -81,8 +81,14 @@ future work after second-source layout evidence:
 
 ## Guarded Next Step
 
-When offline artifact work is approved separately, the smallest target-set name should be
-`players-identity-lifecycle-intake`. Its first review should only answer:
+This pass can support a closed offline planning target-set named
+`players-identity-lifecycle-intake`, using only the names in the closed seed set above.
+That target-set is a guidance index for future review, not a release/readiness target,
+not a public target-set, and not evidence that fixtures or second-source layouts exist
+for every seed.
+
+When offline artifact work is approved separately, the first review of
+`players-identity-lifecycle-intake` should only answer:
 
 1. Which of the closed seed names have existing sanitized fixtures or accepted
    second-source layout evidence?

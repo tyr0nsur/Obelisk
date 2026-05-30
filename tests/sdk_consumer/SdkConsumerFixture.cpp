@@ -616,6 +616,12 @@ namespace
     }
 })json";
 
+    constexpr const char* kActiveOChatLoggerConfig = R"json({
+    "enabled": true,
+    "allow_all_instances": false,
+    "instance_allowlist": ["sdk-consumer-test"]
+})json";
+
     constexpr const char* kInvalidOChatAuditConfig = R"json({
     "enabled": true,
     "allow_all_instances": false,
@@ -779,10 +785,17 @@ int main(int argc, char** argv)
              mode == "active-chat-audit-double-shutdown" ||
              mode == "no-chat-message-capability" ||
              mode == "no-timer-capability" ||
+             mode == "active-chat-audit-short-api-before-chat-slots" ||
+             mode == "active-chat-audit-short-api-before-timer-slots" ||
              mode == "zero-owner-token" ||
              mode == "fail-chat-message-registration" ||
              mode == "fail-timer-registration"))
             configJson = kActiveOChatAuditConfig;
+        else if (std::strcmp(expectedPluginId, "oChatLogger") == 0 &&
+            (mode == "active-chat-logger" ||
+             mode == "active-chat-logger-no-chat-capability" ||
+             mode == "active-chat-logger-short-api-before-chat-slots"))
+            configJson = kActiveOChatLoggerConfig;
         else if (std::strcmp(expectedPluginId, "oChatAudit") == 0 && mode == "invalid-chat-audit-config")
             configJson = kInvalidOChatAuditConfig;
         else if (std::strcmp(expectedPluginId, "oDescriptorCatalog") == 0 &&
@@ -797,6 +810,8 @@ int main(int argc, char** argv)
             configJson = kInvalidODescriptorCatalogConfig;
         else if (std::strcmp(expectedPluginId, "oPolicyAudit") == 0 &&
             (mode == "active-policy-audit" ||
+             mode == "active-policy-audit-no-gameplay-policy-capability" ||
+             mode == "active-policy-audit-short-api-before-gameplay-policy" ||
              mode == "throw-log-after-gameplay-policy-registration"))
             configJson = kActiveOPolicyAuditConfig;
         else if (mode == "unsupported-map-allowlist")
@@ -833,6 +848,7 @@ int main(int argc, char** argv)
         api.UnregisterProcessEventCallbackWithOwnerToken =
             UnregisterProcessEventCallbackWithOwnerToken;
         if (mode != "no-gameplay-policy-capability" &&
+            mode != "active-policy-audit-no-gameplay-policy-capability" &&
             mode != "no-descriptor-capability" &&
             mode != "disabled-no-descriptor-capability")
         {
@@ -848,7 +864,8 @@ int main(int argc, char** argv)
         }
         if (mode != "no-chat-message-capability" &&
             mode != "disabled-no-chat-message-capability" &&
-            mode != "active-chat-command-helper-no-chat-capability")
+            mode != "active-chat-command-helper-no-chat-capability" &&
+            mode != "active-chat-logger-no-chat-capability")
         {
             api.capabilities |= OBELISK_API_CAPABILITY_CHAT_EVENTS;
             api.RegisterChatMessageEventWithOwnerTokenHandle =
@@ -874,6 +891,14 @@ int main(int argc, char** argv)
             api.RegisterTimerWithOwnerTokenHandle = nullptr;
             api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken) = nullptr;
         }
+        if (mode == "active-policy-audit-short-api-before-gameplay-policy")
+        {
+            api.struct_size = offsetof(ObeliskApi, RegisterGameplayPolicyEventWithOwnerTokenHandle);
+            api.RegisterGameplayPolicyEventWithOwnerTokenHandle = nullptr;
+            api.UnregisterGameplayPolicyEventWithOwnerToken = nullptr;
+            api.DescribeResourceKind = nullptr;
+            api.DescribeGameplayPolicyEventKind = nullptr;
+        }
         if (mode == "short-api-before-descriptors")
         {
             api.struct_size = offsetof(ObeliskApi, DescribeResourceKind);
@@ -891,6 +916,26 @@ int main(int argc, char** argv)
             api.struct_size = offsetof(ObeliskApi, RegisterChatMessageEventWithOwnerTokenHandle);
             api.RegisterChatMessageEventWithOwnerTokenHandle = nullptr;
             api.UnregisterChatMessageEventWithOwnerToken = nullptr;
+            api.RegisterTimerWithOwnerTokenHandle = nullptr;
+            api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken) = nullptr;
+        }
+        if (mode == "active-chat-audit-short-api-before-chat-slots")
+        {
+            api.struct_size = offsetof(ObeliskApi, RegisterChatMessageEventWithOwnerTokenHandle);
+            api.RegisterChatMessageEventWithOwnerTokenHandle = nullptr;
+            api.UnregisterChatMessageEventWithOwnerToken = nullptr;
+            api.RegisterTimerWithOwnerTokenHandle = nullptr;
+            api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken) = nullptr;
+        }
+        if (mode == "active-chat-logger-short-api-before-chat-slots")
+        {
+            api.struct_size = offsetof(ObeliskApi, RegisterChatMessageEventWithOwnerTokenHandle);
+            api.RegisterChatMessageEventWithOwnerTokenHandle = nullptr;
+            api.UnregisterChatMessageEventWithOwnerToken = nullptr;
+        }
+        if (mode == "active-chat-audit-short-api-before-timer-slots")
+        {
+            api.struct_size = offsetof(ObeliskApi, RegisterTimerWithOwnerTokenHandle);
             api.RegisterTimerWithOwnerTokenHandle = nullptr;
             api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken) = nullptr;
         }
@@ -1034,6 +1079,23 @@ int main(int argc, char** argv)
             closeHandle();
             return 0;
         }
+        if (std::strcmp(expectedPluginId, "oPolicyAudit") == 0 &&
+            (mode == "active-policy-audit-no-gameplay-policy-capability" ||
+             mode == "active-policy-audit-short-api-before-gameplay-policy"))
+        {
+            Require(!initSucceeded, "active policy audit accepted missing or too-short gameplay policy API");
+            Require(g_GameplayPolicyRegisterCount == 0,
+                "policy audit registered gameplay policy callback with unavailable API");
+            Require(g_GameplayPolicyUnregisterCount == 0,
+                "policy audit unregistered gameplay policy callback with unavailable API");
+            Require(g_ChatMessageRegisterCount == 0,
+                "policy audit unexpectedly registered chat callback");
+            Require(g_TimerRegisterCount == 0,
+                "policy audit unexpectedly registered timer");
+            cleanupConfigDir();
+            closeHandle();
+            return 0;
+        }
         if (std::strcmp(expectedPluginId, "oChatAudit") == 0 &&
             (mode == "no-chat-message-capability" || mode == "no-timer-capability"))
         {
@@ -1046,6 +1108,19 @@ int main(int argc, char** argv)
             closeHandle();
             return 0;
         }
+        if (std::strcmp(expectedPluginId, "oChatAudit") == 0 &&
+            (mode == "active-chat-audit-short-api-before-chat-slots" ||
+             mode == "active-chat-audit-short-api-before-timer-slots"))
+        {
+            Require(!initSucceeded, "chat audit accepted active config with too-short API table");
+            Require(g_ChatMessageRegisterCount == 0,
+                "chat audit registered chat callback with too-short API table");
+            Require(g_TimerRegisterCount == 0,
+                "chat audit registered timer with too-short API table");
+            cleanupConfigDir();
+            closeHandle();
+            return 0;
+        }
         if (std::strcmp(expectedPluginId, "oChatAudit") == 0 && mode == "invalid-chat-audit-config")
         {
             Require(!initSucceeded, "chat audit accepted invalid active config");
@@ -1053,6 +1128,17 @@ int main(int argc, char** argv)
                 "rejected chat audit unexpectedly registered a chat callback");
             Require(g_TimerRegisterCount == 0,
                 "rejected chat audit unexpectedly registered a timer");
+            cleanupConfigDir();
+            closeHandle();
+            return 0;
+        }
+        if (std::strcmp(expectedPluginId, "oChatLogger") == 0 &&
+            (mode == "active-chat-logger-no-chat-capability" ||
+             mode == "active-chat-logger-short-api-before-chat-slots"))
+        {
+            Require(!initSucceeded, "active chat logger accepted missing or too-short chat API");
+            Require(g_ChatMessageRegisterCount == 0,
+                "chat logger registered chat callback with unavailable API");
             cleanupConfigDir();
             closeHandle();
             return 0;
@@ -1431,6 +1517,13 @@ int main(int argc, char** argv)
             Require(g_TimerRegisterCount == 0,
                 "disabled chat audit unexpectedly registered timer");
         }
+        if (std::strcmp(expectedPluginId, "oChatLogger") == 0 && mode.empty())
+        {
+            Require(g_ChatMessageRegisterCount == 0,
+                "disabled chat logger unexpectedly registered chat callback");
+            Require(g_TimerRegisterCount == 0,
+                "disabled chat logger unexpectedly registered timer");
+        }
         if (std::strcmp(expectedPluginId, "oDescriptorCatalog") == 0 &&
             (mode.empty() || mode == "disabled-no-descriptor-capability"))
         {
@@ -1493,6 +1586,29 @@ int main(int argc, char** argv)
             Require(!HasLogContaining(g_InfoLogs, "malformed-secret-token") &&
                     !HasLogContaining(g_ErrorLogs, "malformed-secret-token"),
                 "chat audit logged raw malformed chat text");
+        }
+        if (std::strcmp(expectedPluginId, "oChatLogger") == 0 && mode == "active-chat-logger")
+        {
+            Require(g_ChatMessageRegisterCount == 1,
+                "chat logger did not register one chat callback");
+            Require(g_ChatMessageUnregisterCount == 0,
+                "chat logger unregistered chat callback before shutdown");
+
+            DispatchValidChatMessageEventWithText("logger-secret-token");
+            DispatchMalformedChatMessageEvent(
+                OBELISK_CHAT_SEND_MODE_MAX + 1,
+                OBELISK_CHAT_MESSAGE_EVENT_FLAG_COPIED_PAYLOAD,
+                "malformed-logger-secret",
+                std::strlen("malformed-logger-secret"));
+
+            Require(HasLogContaining(g_InfoLogs, "[oChatLogger] ChatMessageEvent received"),
+                "chat logger did not log accepted chat metadata");
+            Require(!HasLogContaining(g_InfoLogs, "logger-secret-token") &&
+                    !HasLogContaining(g_ErrorLogs, "logger-secret-token"),
+                "chat logger logged raw chat text");
+            Require(!HasLogContaining(g_InfoLogs, "malformed-logger-secret") &&
+                    !HasLogContaining(g_ErrorLogs, "malformed-logger-secret"),
+                "chat logger logged raw malformed chat text");
         }
         api = {};
         if (shutdown)
@@ -1613,6 +1729,24 @@ int main(int argc, char** argv)
                 "disabled chat audit registered a timer before shutdown");
             Require(g_TimerUnregisterCount == 0,
                 "disabled chat audit unregistered a timer on shutdown");
+        }
+        if (std::strcmp(expectedPluginId, "oChatLogger") == 0 && mode.empty())
+        {
+            Require(g_ChatMessageRegisterCount == 0,
+                "disabled chat logger registered a chat callback before shutdown");
+            Require(g_ChatMessageUnregisterCount == 0,
+                "disabled chat logger unregistered a chat callback on shutdown");
+        }
+        if (std::strcmp(expectedPluginId, "oChatLogger") == 0 && mode == "active-chat-logger")
+        {
+            Require(g_ChatMessageRegisterCount == 1,
+                "chat logger did not register one chat callback");
+            Require(g_ChatMessageUnregisterCount == 1,
+                "chat logger did not unregister one chat callback");
+            Require(g_RegisteredChatMessageCallback == nullptr,
+                "chat logger callback survived shutdown unregister");
+            Require(g_RegisteredChatMessageUserData == nullptr,
+                "chat logger user data survived shutdown unregister");
         }
         if (std::strcmp(expectedPluginId, "oChatAudit") == 0 &&
             (mode == "active-chat-audit" || mode == "active-chat-audit-double-shutdown"))

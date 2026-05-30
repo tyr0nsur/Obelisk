@@ -11,10 +11,12 @@ static ObeliskApi g_Api;
 static bool g_HasApi = false;
 static uint64_t g_OwnerToken = 0;
 static uint64_t g_ChatRegistrationId = 0;
+static uint64_t g_UserData = 0xC0A71066;
 static atomic_uint_fast64_t g_ModeEventCounts[OBELISK_CHAT_SEND_MODE_COUNT];
 
 enum
 {
+    kConfigMaxBytes = 8192,
     kPerModeLogLimit = 16
 };
 
@@ -24,6 +26,8 @@ static const char* kDefaultConfig =
     "  \"allow_all_instances\": false,\n"
     "  \"instance_allowlist\": []\n"
     "}\n";
+
+static const size_t kRequiredBaseApiSize = offsetof(ObeliskApi, capabilities) + sizeof(((ObeliskApi*)0)->capabilities);
 
 static void SafeLogInfo(const char* message)
 {
@@ -45,6 +49,138 @@ static bool HasChatMessageEventApi(const ObeliskApi* api)
             sizeof(api->UnregisterChatMessageEventWithOwnerToken) &&
         api->RegisterChatMessageEventWithOwnerTokenHandle &&
         api->UnregisterChatMessageEventWithOwnerToken;
+}
+
+static const char* SkipWhitespace(const char* cursor)
+{
+    while (cursor && (*cursor == ' ' || *cursor == '\t' || *cursor == '\r' || *cursor == '\n'))
+        ++cursor;
+    return cursor;
+}
+
+static bool ReadConfigFile(const char* path, char* buffer, size_t bufferSize)
+{
+    if (!path || path[0] == '\0' || !buffer || bufferSize == 0)
+        return false;
+
+    FILE* file = fopen(path, "rb");
+    if (!file)
+        return false;
+
+    const size_t bytesRead = fread(buffer, 1u, bufferSize - 1u, file);
+    const bool readError = ferror(file) != 0;
+    const int next = fgetc(file);
+    fclose(file);
+
+    if (readError || next != EOF)
+        return false;
+
+    buffer[bytesRead] = '\0';
+    return true;
+}
+
+static bool JsonBoolValue(const char* document, const char* key, bool* out)
+{
+    if (!document || !key || !out)
+        return false;
+
+    char quotedKey[96];
+    if (snprintf(quotedKey, sizeof(quotedKey), "\"%s\"", key) >= (int)sizeof(quotedKey))
+        return false;
+
+    const char* cursor = strstr(document, quotedKey);
+    if (!cursor)
+        return false;
+    cursor += strlen(quotedKey);
+    cursor = SkipWhitespace(cursor);
+    if (!cursor || *cursor != ':')
+        return false;
+    cursor = SkipWhitespace(cursor + 1);
+    if (!cursor)
+        return false;
+    if (strncmp(cursor, "true", 4u) == 0)
+    {
+        *out = true;
+        return true;
+    }
+    if (strncmp(cursor, "false", 5u) == 0)
+    {
+        *out = false;
+        return true;
+    }
+    return false;
+}
+
+static bool InstanceAllowlistContains(const char* document, const char* instanceId)
+{
+    if (!document || !instanceId || instanceId[0] == '\0')
+        return false;
+
+    const char* cursor = strstr(document, "\"instance_allowlist\"");
+    if (!cursor)
+        return false;
+    cursor = strchr(cursor, '[');
+    if (!cursor)
+        return false;
+    ++cursor;
+
+    while (*cursor)
+    {
+        cursor = SkipWhitespace(cursor);
+        if (!cursor || *cursor == ']')
+            return false;
+        if (*cursor != '"')
+            return false;
+        ++cursor;
+        const char* end = strchr(cursor, '"');
+        if (!end)
+            return false;
+        if ((size_t)(end - cursor) == strlen(instanceId) &&
+            strncmp(cursor, instanceId, (size_t)(end - cursor)) == 0)
+            return true;
+        cursor = SkipWhitespace(end + 1);
+        if (!cursor)
+            return false;
+        if (*cursor == ',')
+        {
+            ++cursor;
+            continue;
+        }
+        if (*cursor == ']')
+            return false;
+        return false;
+    }
+
+    return false;
+}
+
+static bool LoadRuntimeEnabled(const ObeliskPluginInitContext* context, bool* runtimeEnabled)
+{
+    if (!context || !runtimeEnabled)
+        return false;
+
+    char config[kConfigMaxBytes];
+    if (!ReadConfigFile(context->config_path, config, sizeof(config)))
+        return false;
+
+    bool enabled = false;
+    if (!JsonBoolValue(config, "enabled", &enabled))
+        return false;
+    if (!enabled)
+    {
+        *runtimeEnabled = false;
+        return true;
+    }
+
+    bool allowAllInstances = false;
+    if (JsonBoolValue(config, "allow_all_instances", &allowAllInstances) && allowAllInstances)
+    {
+        *runtimeEnabled = true;
+        return true;
+    }
+
+    *runtimeEnabled = InstanceAllowlistContains(config, context->instance_id);
+    return true;
 }
 
 static void OnChatMessageEvent(const ObeliskChatMessageEvent* event, void* user_data)
@@ -128,8 +264,7 @@ __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
     if (!api || !context)
         return false;
     if (api->abi_version != OBELISK_API_ABI_VERSION ||
-        api->struct_size < offsetof(ObeliskApi, UnregisterChatMessageEventWithOwnerToken) +
-            sizeof(api->UnregisterChatMessageEventWithOwnerToken) ||
+        api->struct_size < kRequiredBaseApiSize ||
         context->abi_version != OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION ||
         context->struct_size < sizeof(ObeliskPluginInitContext) ||
         context->plugin_owner_token == 0)
@@ -144,6 +279,19 @@ __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
     for (unsigned i = 0; i < OBELISK_CHAT_SEND_MODE_COUNT; ++i)
         atomic_store_explicit(&g_ModeEventCounts[i], 0u, memory_order_relaxed);
 
+    bool runtimeEnabled = false;
+    if (!LoadRuntimeEnabled(context, &runtimeEnabled))
+    {
+        api->LogError("[oChatLogger] Invalid config.");
+        ResetState();
+        return false;
+    }
+    if (!runtimeEnabled)
+    {
+        api->LogInfo("[oChatLogger] Disabled by config.");
+        return true;
+    }
+
     api->LogInfo("[oChatLogger] Loaded.");
     if (!HasChatMessageEventApi(api))
     {
@@ -155,7 +303,7 @@ __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
     g_ChatRegistrationId = api->RegisterChatMessageEventWithOwnerTokenHandle(
         context->plugin_owner_token,
         OnChatMessageEvent,
-        NULL);
+        &g_UserData);
     if (g_ChatRegistrationId == 0)
     {
         api->LogError("[oChatLogger] Failed to register ChatMessageEvent callback.");

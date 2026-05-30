@@ -113,6 +113,9 @@ cmake --build build --target oPolicyAudit oChatLogger oChatAudit -j"$(nproc)"
 events for each mode `0..3`. It records only sequence, send mode, copied-payload flag,
 message size, per-mode count, and first-observed status; it does not log raw chat text,
 sender identity, or UE pointers.
+When disabled by config, it requires only the base ABI prefix and owner token and does not
+register a chat callback. Active config requires the public chat-event capability, matching
+appended API slots via `struct_size`, and non-null chat registration functions.
 
 `oChatAudit` config:
 
@@ -130,9 +133,10 @@ sender identity, or UE pointers.
 }
 ```
 
-When active, `oChatAudit` requires the public chat-event capability, timer capability, and
-a non-zero owner token. It registers exactly one chat callback and one repeating timer,
-then unregisters the timer before the chat callback during shutdown. Digest output is
+When active, `oChatAudit` requires the public chat-event capability, timer capability,
+matching appended API slots via `struct_size`, non-null registration functions, and a
+non-zero owner token. It registers exactly one chat callback and one repeating timer, then
+unregisters the timer before the chat callback during shutdown. Digest output is
 process-local metadata only: accepted/malformed event counts, per-mode counts, total and
 max byte sizes, bounded size buckets, and overflow count.
 When disabled by config, discovery/init should require only the base ABI prefix and owner

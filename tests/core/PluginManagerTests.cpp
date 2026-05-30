@@ -40,6 +40,8 @@ namespace Obelisk::Hooks
 namespace Obelisk::Core
 {
     void SetPluginCallbackCleanupFailureForTesting(bool enabled);
+    void SetPluginRetentionFailureForTesting(bool enabled);
+    void ClearPluginOwnerLifecycleForTesting(void* owner, uint64_t token);
 }
 
 namespace
@@ -5091,6 +5093,56 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestInitFailureDoesNotCloseWhenCleanupFailsAndRetentionTrackingFails()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_init_cleanup_retention_fail");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "init_cleanup_retention_fail.so",
+            .pluginId = "init_cleanup_retention_fail",
+            .initResult = false,
+            .registerTimerCallback = true,
+            .captureApi = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        Obelisk::Core::SetPluginCallbackCleanupFailureForTesting(true);
+        Obelisk::Core::SetPluginRetentionFailureForTesting(true);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Obelisk::Core::SetPluginRetentionFailureForTesting(false);
+        Obelisk::Core::SetPluginCallbackCleanupFailureForTesting(false);
+
+        Require(plugin.initCalls == 1, "retention-fail plugin was not initialized");
+        Require(plugin.shutdownCalls == 1, "retention-fail plugin shutdown was not called after init failure");
+        Require(plugin.timerRegistrationId != 0, "retention-fail plugin timer was not registered");
+        Require(plugin.closeCalls == 0,
+                "retention-fail plugin was closed after cleanup failed and retention tracking failed");
+        Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    1000,
+                    0,
+                    0,
+                    FakeTimerCallback,
+                    &plugin) == 0,
+                "retention-fail plugin accepted a new owner-token timer while unloading");
+        Require(plugin.capturedApi.UnregisterTimerWithOwnerToken(
+                    plugin.initOwnerToken,
+                    plugin.timerRegistrationId),
+                "retention-fail plugin owner-token timer unregister was rejected while unloading");
+        Require(Obelisk::Core::TimerManager::Get().UnregisterCallbacksForOwner(plugin.owner) == 0,
+                "retention-fail plugin timer survived explicit unregister");
+
+        Obelisk::Core::ClearPluginOwnerLifecycleForTesting(plugin.owner, plugin.initOwnerToken);
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestDuplicatePluginIdRejectsSecondPlugin()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_duplicate_id");
@@ -5236,6 +5288,7 @@ int main()
     TestUnloadAllCleansAfterShutdownException();
     TestUnloadAllRetainsPluginWhenCallbackCleanupFails();
     TestInitFailureRetainsPluginWhenCallbackCleanupFailsAndRetries();
+    TestInitFailureDoesNotCloseWhenCleanupFailsAndRetentionTrackingFails();
     TestDuplicatePluginIdRejectsSecondPlugin();
     TestLoadPluginsSkipsAlreadyLoadedPluginId();
 

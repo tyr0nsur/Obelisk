@@ -71,6 +71,34 @@ Treat availability as an environmental fact: record `command -v`, version output
 available, exact commands, and the binary/artifact SHA only when the tool was actually
 used.
 
+Use the passive tooling check when onboarding a machine or recording environment evidence:
+
+```sh
+python3 scripts/check_static_tooling.py --json
+```
+
+If a specific offline extraction step needs `radare2` or Ghidra headless, make that
+requirement explicit instead of assuming local installation:
+
+```sh
+python3 scripts/check_static_tooling.py \
+  --require-tool radare2 \
+  --require-tool analyzeHeadless \
+  --json
+```
+
+To smoke-test imports against a copied/offline `ShooterGameServer`, pass both the input
+binary and a non-protected output root. The script rejects direct or symlink-resolved
+protected server paths outside the approved offline workspace before running either tool:
+
+```sh
+python3 scripts/check_static_tooling.py \
+  --binary "$OFFLINE_WORKSPACE/raw/ShooterGameServer" \
+  --output-root "$OFFLINE_WORKSPACE/static-tooling-smoke" \
+  --run-smoke \
+  --json
+```
+
 Do not let optional-tool availability bypass path hygiene. Inputs, Ghidra project
 directories, and radare/rizin/Ghidra text outputs must live under `/tmp`, an approved
 offline workspace such as `<approved-offline-workspace>`, or another documented

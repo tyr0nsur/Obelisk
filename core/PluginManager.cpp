@@ -32,6 +32,7 @@ namespace Obelisk::Core
         thread_local void* g_CurrentPluginOwner = nullptr;
         std::atomic<uint64_t> g_ApiCapabilities{OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS};
         std::atomic_bool g_ForcePluginCallbackCleanupFailureForTesting{false};
+        std::atomic_bool g_ForcePluginRetentionFailureForTesting{false};
 
         struct GameplayPolicyRegistration
         {
@@ -2112,6 +2113,22 @@ namespace Obelisk::Core
         g_ForcePluginCallbackCleanupFailureForTesting.store(enabled, std::memory_order_release);
     }
 
+    void SetPluginRetentionFailureForTesting(bool enabled)
+    {
+        g_ForcePluginRetentionFailureForTesting.store(enabled, std::memory_order_release);
+    }
+
+    void ClearPluginOwnerLifecycleForTesting(void* owner, uint64_t token)
+    {
+        std::lock_guard<std::mutex> lock(PluginOwnerLifecycleMutex());
+        LoadedPluginOwners().erase(owner);
+        InitializingPluginOwners().erase(owner);
+        UnloadingPluginOwners().erase(owner);
+        if (token != 0)
+            PluginOwnerTokens().erase(token);
+        PluginOwnerApiStates().erase(owner);
+    }
+
     PluginManager::PluginManager()
         : PluginManager(DefaultLoader(), ChatEventDispatcher::Get())
     {
@@ -2521,15 +2538,33 @@ namespace Obelisk::Core
                         handleCleanup.Dismiss();
                         ownerTokenCleanup.Dismiss();
                         initializingOwnerCleanup.Dismiss();
-                        m_LoadedPlugins.push_back({
-                            pluginName,
-                            metadata.plugin_id,
-                            handle,
-                            pluginOwner,
-                            pluginOwnerToken,
-                            shutdownFunc,
-                            true,
-                        });
+                        try
+                        {
+                            if (g_ForcePluginRetentionFailureForTesting.load(std::memory_order_acquire))
+                                throw std::runtime_error("injected plugin retention failure");
+                            m_LoadedPlugins.push_back({
+                                pluginName,
+                                metadata.plugin_id,
+                                handle,
+                                pluginOwner,
+                                pluginOwnerToken,
+                                shutdownFunc,
+                                true,
+                            });
+                        }
+                        catch (const std::exception& e)
+                        {
+                            SafeLogErrorNoThrow(
+                                "Plugin callback cleanup failed after init failure and retention tracking failed; leaving library mapped without dlclose",
+                                e.what());
+                            return;
+                        }
+                        catch (...)
+                        {
+                            SafeLogErrorNoThrow(
+                                "Plugin callback cleanup failed after init failure and retention tracking failed with unknown exception; leaving library mapped without dlclose");
+                            return;
+                        }
                         SafeLogErrorNoThrow(
                             "Plugin callback cleanup failed after init failure; retaining library mapped for retry",
                             pluginName.c_str());

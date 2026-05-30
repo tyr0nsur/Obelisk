@@ -5,11 +5,13 @@ from __future__ import annotations
 
 import json
 import re
+import runpy
 import unittest
 from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+TARGET_SETS = runpy.run_path(str(REPO_ROOT / "scripts" / "reflection_target_sets.py"))["TARGET_SETS"]
 PUBLIC_GAMEPLAY_EVENTS_MANIFEST = REPO_ROOT / "docs" / "public_gameplay_events.json"
 PUBLIC_API_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
 PUBLIC_DOC_FILES = [
@@ -2707,6 +2709,48 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         self.assertEqual(offenders, [])
 
+    def test_plugin_hub_matrix_keeps_general_demand_spectrum_visible(self) -> None:
+        matrix = (REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md").read_text(
+            encoding="utf-8"
+        )
+        compact = normalized(matrix)
+        compact_lower = compact.lower()
+
+        for required in (
+            "Permissions/admin groups",
+            "RCON/operator I/O",
+            "Economy, shops, kits, rewards",
+            "Homes, teleport, safe zones",
+            "Structure counts, placement, ownership",
+            "Dino colors, carry rules",
+            "Engrams, inventory, item give/remove flows",
+            "Commands, permissions, economy, kits, shops, RCON",
+            "Players, tribes, dinos, missions, transfers",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, compact)
+
+        for required in (
+            "structures",
+            "dinos",
+            "tribes",
+            "inventory",
+            "items",
+            "permissions",
+            "commands",
+            "RCON",
+            "economy",
+            "homes",
+        ):
+            with self.subTest(surface=required):
+                self.assertIn(required.lower(), compact_lower)
+
+        self.assertIn(
+            "Current attention on passive chat, `ResourceHandle` blockers, or structure build-placement "
+            "triage must not turn those lanes into the Plugin Hub center",
+            compact,
+        )
+
     def test_v1_modding_route_keeps_broad_surface_without_sdk_promise(self) -> None:
         v1_map = (
             REPO_ROOT / "docs" / "research" / "2026-05-30-v1-core-capability-map.md"
@@ -2849,6 +2893,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         plan = plan_path.read_text(encoding="utf-8")
         compact = normalized(plan)
         compact_lower = compact.lower()
+        manifest = json.loads(PUBLIC_GAMEPLAY_EVENTS_MANIFEST.read_text(encoding="utf-8"))
+        target_set_name = "players-identity-lifecycle-intake"
+        target_set = TARGET_SETS.get(target_set_name)
 
         for phrase in (
             "candidate-only",
@@ -2876,6 +2923,44 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             with self.subTest(target=target):
                 self.assertIn(target, plan)
+
+        self.assertIn(target_set_name, TARGET_SETS)
+        self.assertEqual(
+            target_set,
+            (
+                "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerListPlayers",
+                "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerKickPlayer",
+                "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerSendChatMessage",
+                "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerRequestTribeLog",
+                "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.AllowTribeGroupPermission",
+                "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.IsInTribe",
+                "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ClientReceiveMyTribeOnlineList",
+                "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ClientReceiveActiveMissionTags",
+                "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerState.ServerRequestSpawnPointsForDownloadedCharacters",
+                "obelisk.ufunction-chain.snapshot.v1:MissionType.AddPlayerToMission",
+                "obelisk.ufunction-chain.snapshot.v1:MissionType.BPAllowPlayerToLeaveMission",
+                "obelisk.ufunction-chain.snapshot.v1:MissionType.BPOnPlayerRemovedFromMission",
+            ),
+        )
+        self.assertIn("guidance index", compact)
+        self.assertIn("not a release/readiness target", compact)
+        self.assertIn("not a public target-set", compact)
+        self.assertIn("not evidence that fixtures or second-source layouts exist", compact)
+        for target in target_set:
+            with self.subTest(target_set_target=target):
+                self.assertTrue(target.startswith("obelisk.ufunction-chain.snapshot.v1:"))
+                self.assertIn(target.rpartition(":")[2], plan)
+                self.assertNotRegex(target, r"\b(?:Login|Logout|PostLogin)\b")
+
+        public_manifest_sets = [
+            target_set
+            for section in ("promoted_events", "rc_events")
+            for event in manifest.get(section, [])
+            for target_set in event.get("target_sets", [])
+        ]
+        self.assertNotIn(target_set_name, V010_GAMEPLAY_POLICY_TARGET_SETS)
+        self.assertNotIn(target_set_name, V010_CHAT_MESSAGE_TARGET_SETS)
+        self.assertNotIn(target_set_name, public_manifest_sets)
 
         self.assertIn("docs do not establish an exact accepted login/logout target", compact_lower)
 

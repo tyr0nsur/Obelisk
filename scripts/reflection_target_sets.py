@@ -90,6 +90,23 @@ TARGET_SETS = {
         "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ClientReceiveMyTribeOnlineList",
         "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ClientReceiveActiveMissionTags",
     ),
+    # Planning/guidance only: closed player identity lifecycle seed list from
+    # docs/research/2026-05-30-player-identity-lifecycle-plan.md. This is not
+    # release/public evidence and must stay out of public SDK target sets.
+    "players-identity-lifecycle-intake": (
+        "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerListPlayers",
+        "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerKickPlayer",
+        "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerSendChatMessage",
+        "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerRequestTribeLog",
+        "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.AllowTribeGroupPermission",
+        "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.IsInTribe",
+        "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ClientReceiveMyTribeOnlineList",
+        "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ClientReceiveActiveMissionTags",
+        "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerState.ServerRequestSpawnPointsForDownloadedCharacters",
+        "obelisk.ufunction-chain.snapshot.v1:MissionType.AddPlayerToMission",
+        "obelisk.ufunction-chain.snapshot.v1:MissionType.BPAllowPlayerToLeaveMission",
+        "obelisk.ufunction-chain.snapshot.v1:MissionType.BPOnPlayerRemovedFromMission",
+    ),
     "transfer-scriptstruct": (
         "obelisk.scriptstruct-chain.snapshot.v1:PrimalLocalProfile.ARKTributeDino",
         "obelisk.scriptstruct-chain.snapshot.v1:PrimalLocalProfile.ArkTributePlayerData",

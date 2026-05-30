@@ -261,8 +261,40 @@ if(TARGET oPolicyAudit)
     )
 
     add_test(
+        NAME SdkConsumerFixtureOPolicyAuditActiveNoGameplayPolicyCapability
+        COMMAND sdk_consumer_fixture "$<TARGET_FILE:oPolicyAudit>" oPolicyAudit active-policy-audit-no-gameplay-policy-capability
+    )
+
+    add_test(
+        NAME SdkConsumerFixtureOPolicyAuditActiveShortApi
+        COMMAND sdk_consumer_fixture "$<TARGET_FILE:oPolicyAudit>" oPolicyAudit active-policy-audit-short-api-before-gameplay-policy
+    )
+
+    add_test(
         NAME SdkConsumerFixtureOPolicyAuditPostRegistrationFailureCleanup
         COMMAND sdk_consumer_fixture "$<TARGET_FILE:oPolicyAudit>" oPolicyAudit throw-log-after-gameplay-policy-registration
+    )
+endif()
+
+if(TARGET oChatLogger)
+    add_test(
+        NAME SdkConsumerFixtureOChatLogger
+        COMMAND sdk_consumer_fixture "$<TARGET_FILE:oChatLogger>" oChatLogger
+    )
+
+    add_test(
+        NAME SdkConsumerFixtureOChatLoggerActive
+        COMMAND sdk_consumer_fixture "$<TARGET_FILE:oChatLogger>" oChatLogger active-chat-logger
+    )
+
+    add_test(
+        NAME SdkConsumerFixtureOChatLoggerNoChatCapability
+        COMMAND sdk_consumer_fixture "$<TARGET_FILE:oChatLogger>" oChatLogger active-chat-logger-no-chat-capability
+    )
+
+    add_test(
+        NAME SdkConsumerFixtureOChatLoggerActiveShortApi
+        COMMAND sdk_consumer_fixture "$<TARGET_FILE:oChatLogger>" oChatLogger active-chat-logger-short-api-before-chat-slots
     )
 endif()
 
@@ -290,6 +322,16 @@ if(TARGET oChatAudit)
     add_test(
         NAME SdkConsumerFixtureOChatAuditNoTimerCapability
         COMMAND sdk_consumer_fixture "$<TARGET_FILE:oChatAudit>" oChatAudit no-timer-capability
+    )
+
+    add_test(
+        NAME SdkConsumerFixtureOChatAuditActiveShortApiBeforeChatSlots
+        COMMAND sdk_consumer_fixture "$<TARGET_FILE:oChatAudit>" oChatAudit active-chat-audit-short-api-before-chat-slots
+    )
+
+    add_test(
+        NAME SdkConsumerFixtureOChatAuditActiveShortApiBeforeTimerSlots
+        COMMAND sdk_consumer_fixture "$<TARGET_FILE:oChatAudit>" oChatAudit active-chat-audit-short-api-before-timer-slots
     )
 
     add_test(

@@ -64,8 +64,9 @@ for the current checkpoint.
 - Promoted copied events are observational and non-authoritative: no UE pointers, raw
   params, identity, lookup, mutation, return override, pincode/player text publication, or
   broad module SDK claim.
-- Plugin unload skips `dlclose` on callback cleanup failure, retains the plugin library for
-  retry, and does not repeat plugin shutdown on retry.
+- Plugin unload/init-failure cleanup skips `dlclose` when callback cleanup cannot be
+  proven complete, retains the plugin for retry when possible, does not repeat plugin shutdown,
+  and leaves the library mapped if retention tracking also fails.
 - `oProcessTimer` is the first process-local timer example. Timer ids are process-local,
   not cluster state, UE identity, gameplay/module timer abstractions, or persistent
   handles, or shared scheduler state; owner-token timers require explicit unregister.
@@ -80,9 +81,10 @@ for the current checkpoint.
 - `oBaseEvents` has a disabled-by-default plugin-local chat command helper over copied
   `ChatMessageEvent` bytes; no command ABI/router, identity, replies, moderation, send-chat
   API, mutation, or extra exported plugin symbols.
-- `oChatAudit` is still experimental and excluded from default release scope. Safe-disabled
-  init now requires only the base ABI prefix and owner token; optional chat/timer slots are
-  required only when config enables active audit registration.
+- `oChatLogger` and `oChatAudit` are experimental and excluded from default release scope.
+  Safe-disabled init requires only the base ABI prefix/owner token; active config fails
+  closed on missing capabilities, short `struct_size`, null registration slots, or null
+  callback user data.
 - ArkServerApi/AseApi remain names and behavior dictionaries for familiar ARK plugin
   concepts. Local `NextGenPlugins` clones are names/demand dictionaries only, not a
   porting target or copying source. Do not copy code, offsets, layouts, vtables, ABI
@@ -144,14 +146,16 @@ for the current checkpoint.
   Relative `--root` and protected-root inputs are normalized before direct-path and
   symlink-resolved protected path checks. Duplicate `--target-set` filters in target
   guidance now fail closed instead of emitting repeated planning output.
+- `scripts/check_static_tooling.py` records optional radare2/rizin/Ghidra availability and
+  runs smoke checks only on approved offline binaries/output roots.
 - `APrimalStructure.IsAllowedToBuild` is a high-demand build-policy dictionary seed, but it
   is second-wave only: no committed snapshot, no second-source comparison, no target-set
   promotion, no public StructureEvents/build-policy SDK, no mutation, and no return
   override.
-- `players_identity_lifecycle` has a docs-only candidate plan at
-  `docs/research/2026-05-30-player-identity-lifecycle-plan.md`. It is copied/redacted
-  planning only and does not establish accepted login/logout targets, player SDK,
-  `ResourceHandle`, lookup, runtime work, mutation, or return override.
+- `players-identity-lifecycle-intake` is a guidance-only target set backed by
+  `docs/research/2026-05-30-player-identity-lifecycle-plan.md`; it stays out of RC/public
+  target sets and does not promote identity, lookup, runtime work, mutation, or return
+  override.
 
 ## Priority Next Steps
 
