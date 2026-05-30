@@ -10,11 +10,11 @@ Current baseline:
 - Linux `LD_PRELOAD` runtime bootstrap validated through the ARK: Survival Evolved
   dedicated server debug harness.
 - Absolute x86_64 `UObject::ProcessEvent` hook with guarded validation.
-- C plugin ABI with logging, filtered ProcessEvent callbacks, owner cleanup, owner-token
-  callback handles, owner-scoped unregister, and optional plugin shutdown.
+- C plugin ABI with logging, debug-gated filtered ProcessEvent callbacks, owner cleanup,
+  owner-token callback handles, owner-scoped unregister, and optional plugin shutdown.
 - Public plugin C ABI v1 is the intended first-stable compatibility contract for
   `v0.1.0`; any ABI v2 must ship with an explicit migration plan.
-- Runtime default-deny gates for global ProcessEvent callbacks, the unpromoted
+- Runtime default-deny gates for filtered/global ProcessEvent callbacks, the unpromoted
   `CallProcessEvent` escape hatch, and plugin callback blocking of the original
   ProcessEvent path. These require explicit debug-window env, marker, and capability
   posture before they behave as active features.
@@ -38,11 +38,14 @@ Current baseline:
 - `DescribeGameplayPolicyEventKind` as metadata-only descriptors for promoted
   `GameplayPolicyEvent` kinds, explicitly not a module SDK, UE lookup, mutation, or
   return-override surface.
-- `ChatMessageEvent` as a minimal v0.1-rc chat plugin event candidate with copied UTF-8
+- `ChatMessageEvent` as a minimal v0.1-rc chat plugin event ABI surface with copied UTF-8
   message bytes, send mode, copied-payload flag, and process-local sequence only;
   explicitly not a command SDK, sender identity API, chat send/moderation surface, UE
-  lookup, mutation, or return-override surface. Actual plugin-facing delivery from a real
-  chat message still needs isolated `arkserver2` validation before milestone publication.
+  lookup, raw `FString`, raw params, UE pointers, mutation, or return-override surface.
+  Actual plugin-facing delivery from real chat messages has accepted copied-log
+  `enable-chat-events` validation with 18 accepted delivery events from an approved
+  operator-selected beta-test window, covering send modes `0,1,2,3` with no privacy
+  blockers.
 - First-stable plugin scope now excludes background workers, sockets, HTTP
   listeners/clients, long-lived file readers, and other external ingress unless a future
   plugin passes explicit shutdown, unregister, drain, join, and close gates.
@@ -51,7 +54,10 @@ Current baseline:
   read-only CLI status, installer dry-runs, and whitespace checks.
 - Offline reflection capture analyzer, shared target-set snapshot comparison/regeneration,
   evidence-pack tooling, and dry-run UFunction target-set regeneration planning for
-  second-source reflection research.
+  second-source reflection research. The refreshed default `minimal-second-source-intake`
+  remains layout-only with `promotion_ready=false` and does not promote public
+  Inventory/Structure SDKs, `ResourceHandle`, GObjects lookup, mutation, or return
+  overrides.
 - Static-only global candidate evidence tooling for FName/GNames/GObjects promotion
   research, with fail-closed promotion gates, explicit candidate-kind handling,
   copied/generated artifact hashes, and per-target ELF/xref provenance.

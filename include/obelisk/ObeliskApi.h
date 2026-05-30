@@ -17,6 +17,7 @@
 #define OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS (1ull << 7)
 #define OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS (1ull << 8)
 #define OBELISK_API_CAPABILITY_CHAT_EVENTS (1ull << 9)
+#define OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS (1ull << 10)
 #define OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION 1u
 #define OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION 1u
 #define OBELISK_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION 1u
@@ -194,9 +195,9 @@ typedef struct ObeliskGameplayPolicyEventDescriptor {
 typedef void (*ObeliskGameplayPolicyEventCallback)(const ObeliskGameplayPolicyEvent* event, void* user_data);
 
 // Borrowed event data is valid only for the duration of the callback.
-// Chat events are copied UTF-8 notifications for command-style plugins. They expose no UE4
-// object pointers, raw ProcessEvent params, FName/GObjects indices, mutable message storage,
-// or authoritative sender/resource identity.
+// Chat events are copied UTF-8 notifications for plugins that parse text locally. They
+// expose no UE4 object pointers, raw ProcessEvent params, FName/GObjects indices, mutable
+// message storage, command routing, or authoritative sender/resource identity.
 typedef void (*ObeliskChatMessageEventCallback)(const ObeliskChatMessageEvent* event, void* user_data);
 
 typedef struct ObeliskPluginMetadata {
@@ -231,7 +232,10 @@ typedef struct ObeliskApi {
     void (*LogWarn)(const char* message);
     void (*LogError)(const char* message);
 
-    // Event Registration
+    // Raw ProcessEvent callback registration. These callbacks expose borrowed UE4
+    // pointers and raw parameter buffers; stable plugin code should prefer copied
+    // Obelisk-level event APIs. Filtered registrations are rejected unless
+    // OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS is advertised.
     void (*RegisterPreProcessEvent)(OnProcessEventCallback callback);
     void (*RegisterPostProcessEvent)(OnProcessEventCallback callback);
     void (*RegisterPreProcessEventForNameIndex)(int32_t nameIndex, OnProcessEventCallback callback);
@@ -265,8 +269,11 @@ typedef struct ObeliskApi {
     void (*RegisterPostProcessEventForNameIndexWithOwnerToken)(uint64_t ownerToken, int32_t nameIndex, OnProcessEventCallback callback);
 
     // Handle-returning ProcessEvent callback registration. Plugins must check struct_size,
-    // OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS, and
+    // OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS and
     // OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES before using these fields.
+    // Name-index-filtered variants also require
+    // OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS. Global variants require
+    // OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS and remain debug-only.
     // A return value of 0 means the registration was rejected. Non-zero handles can be
     // passed with the same owner token to
     // UnregisterProcessEventCallbackWithOwnerToken for granular cleanup; plugin-owner
@@ -288,22 +295,25 @@ typedef struct ObeliskApi {
         void* userData);
     bool (*UnregisterGameplayPolicyEventWithOwnerToken)(uint64_t ownerToken, uint64_t registrationId);
 
-    // Metadata-only resource kind descriptors. This is category information for routing
-    // and plugin capability discovery only; it is not object identity, lookup, persistence,
-    // or a mutable resource API. Callers must initialize out->struct_size to
-    // sizeof(ObeliskResourceKindDescriptor) before use.
+    // Metadata-only resource kind descriptors. Plugins must check struct_size,
+    // OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS, and this function pointer before
+    // use. This is category information for routing and plugin capability discovery only;
+    // it is not object identity, lookup, persistence, or a mutable resource API. Callers
+    // must initialize out->struct_size to sizeof(ObeliskResourceKindDescriptor) before use.
     bool (*DescribeResourceKind)(uint32_t resourceKind, ObeliskResourceKindDescriptor* out);
 
-    // Metadata-only gameplay policy event descriptors. This is event-kind discovery for
-    // routing and plugin capability checks only; it is not identity, lookup, mutation, or
-    // return-override authority. Callers must initialize out->struct_size to
-    // sizeof(ObeliskGameplayPolicyEventDescriptor) before use.
+    // Metadata-only gameplay policy event descriptors. Plugins must check struct_size,
+    // OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS, and this function pointer
+    // before use. This is event-kind discovery for routing and plugin capability checks
+    // only; it is not identity, lookup, mutation, or return-override authority. Callers
+    // must initialize out->struct_size to sizeof(ObeliskGameplayPolicyEventDescriptor)
+    // before use.
     bool (*DescribeGameplayPolicyEventKind)(uint32_t eventKind, ObeliskGameplayPolicyEventDescriptor* out);
 
-    // Copied chat message events for command-style plugins. Plugins must check struct_size,
-    // OBELISK_API_CAPABILITY_CHAT_EVENTS, and these function pointers before use. A return
-    // value of 0 means registration was rejected. Non-zero handles are process-local and
-    // must be unregistered with the same owner token.
+    // Copied chat message notifications for plugins that parse text locally. Plugins must
+    // check struct_size, OBELISK_API_CAPABILITY_CHAT_EVENTS, and these function pointers
+    // before use. A return value of 0 means registration was rejected. Non-zero handles are
+    // process-local and must be unregistered with the same owner token.
     uint64_t (*RegisterChatMessageEventWithOwnerTokenHandle)(
         uint64_t ownerToken,
         ObeliskChatMessageEventCallback callback,

@@ -1,5 +1,140 @@
 {
   "schema": "obelisk.public-gameplay-events.v1",
+  "metadata_surfaces": [
+    {
+      "surface_id": "obelisk.resource_kind_descriptors.v1",
+      "public_name": "DescribeResourceKind",
+      "capability": "OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS",
+      "descriptor_struct": "ObeliskResourceKindDescriptor",
+      "descriptor": "DescribeResourceKind",
+      "scope": "metadata-only resource category descriptors for routing/config; no identity, lookup, handle, mutation, or UE object access",
+      "descriptor_fields": [
+        "abi_version",
+        "struct_size",
+        "resource_kind",
+        "reserved0",
+        "flags",
+        "supported_gameplay_policy_event_mask",
+        "supported_gameplay_policy_field_mask",
+        "stable_name",
+        "display_name"
+      ],
+      "flags": [
+        "OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_CATEGORY_ONLY",
+        "OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY",
+        "OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP"
+      ],
+      "resource_kinds": [
+        {
+          "kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE",
+          "stable_name": "structure",
+          "supported_gameplay_policy_event_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES",
+          "supported_gameplay_policy_field_mask": [
+            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
+            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_VARIANT_INDEX",
+            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE_SET",
+            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE"
+          ]
+        },
+        {
+          "kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM",
+          "stable_name": "inventory_item",
+          "supported_gameplay_policy_event_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY",
+          "supported_gameplay_policy_field_mask": [
+            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
+            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER",
+            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN"
+          ]
+        }
+      ],
+      "no_ue_internals_in_public_abi": true,
+      "append_only_abi": true,
+      "capability_gated": true,
+      "not_promoted": [
+        "ResourceHandle",
+        "object identity",
+        "lookup",
+        "persistent handles",
+        "UE pointers",
+        "mutation",
+        "return override"
+      ],
+      "abi_tests": [
+        "tests/abi/AbiLayoutTests.cpp",
+        "tests/abi/CAbiLayoutTests.c"
+      ],
+      "sdk_consumer_tests": [
+        "tests/sdk_consumer/MinimalPlugin.cpp",
+        "tests/sdk_installed_consumer/consumer_plugin.cpp",
+        "tests/sdk_installed_consumer/consumer_fixture.cpp",
+        "tests/sdk_installed_consumer/c_abi_plugin.c"
+      ],
+      "lifecycle_tests": [
+        "tests/core/PluginManagerTests.cpp"
+      ],
+      "docs": [
+        "docs/PLUGIN_ARCHITECTURE.md",
+        "docs/RELEASE.md",
+        "docs/STATUS.md"
+      ]
+    },
+    {
+      "surface_id": "obelisk.gameplay_policy_event_descriptors.v1",
+      "public_name": "DescribeGameplayPolicyEventKind",
+      "capability": "OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS",
+      "descriptor_struct": "ObeliskGameplayPolicyEventDescriptor",
+      "descriptor": "DescribeGameplayPolicyEventKind",
+      "scope": "metadata-only descriptors for promoted GameplayPolicyEvent kinds; no identity, lookup, mutation, return override, or UE object access",
+      "descriptor_fields": [
+        "abi_version",
+        "struct_size",
+        "event_kind",
+        "resource_kind",
+        "flags",
+        "event_kind_mask",
+        "field_mask",
+        "stable_name",
+        "display_name"
+      ],
+      "flags": [
+        "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD",
+        "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED",
+        "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED"
+      ],
+      "described_event": "obelisk.gameplay_policy.v1",
+      "no_ue_internals_in_public_abi": true,
+      "append_only_abi": true,
+      "capability_gated": true,
+      "not_promoted": [
+        "module-specific SDK",
+        "ResourceHandle",
+        "persistent handles",
+        "object identity",
+        "lookup",
+        "UE pointers",
+        "mutation",
+        "return override"
+      ],
+      "abi_tests": [
+        "tests/abi/AbiLayoutTests.cpp",
+        "tests/abi/CAbiLayoutTests.c"
+      ],
+      "sdk_consumer_tests": [
+        "tests/sdk_consumer/MinimalPlugin.cpp",
+        "tests/sdk_installed_consumer/consumer_plugin.cpp",
+        "tests/sdk_installed_consumer/consumer_fixture.cpp",
+        "tests/sdk_installed_consumer/c_abi_plugin.c"
+      ],
+      "lifecycle_tests": [
+        "tests/core/PluginManagerTests.cpp"
+      ],
+      "docs": [
+        "docs/PLUGIN_ARCHITECTURE.md",
+        "docs/RELEASE.md",
+        "docs/STATUS.md"
+      ]
+    }
+  ],
   "promoted_events": [
     {
       "event_id": "obelisk.gameplay_policy.v1",
@@ -51,14 +186,18 @@
           "stable_name": "structure.access_check",
           "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE",
           "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACCESS_CHECK",
-          "field_mask": ["OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"]
+          "field_mask": [
+            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"
+          ]
         },
         {
           "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_DEMOLISH_CHECK",
           "stable_name": "structure.demolish_check",
           "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE",
           "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_DEMOLISH_CHECK",
-          "field_mask": ["OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"]
+          "field_mask": [
+            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"
+          ]
         },
         {
           "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_VARIANT_CHANGE",
@@ -76,14 +215,18 @@
           "stable_name": "structure.activation_toggle",
           "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE",
           "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACTIVATION_TOGGLE",
-          "field_mask": ["OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"]
+          "field_mask": [
+            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"
+          ]
         },
         {
           "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_PIN_CODE_CHECK",
           "stable_name": "structure.pin_code_check",
           "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE",
           "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_PIN_CODE_CHECK",
-          "field_mask": ["OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"]
+          "field_mask": [
+            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"
+          ]
         },
         {
           "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_SEAT_CHECK",
@@ -145,15 +288,42 @@
       "second_source_reports": [
         "docs/research/2026-05-28-second-source-reversing-gap-matrix.md",
         "docs/research/2026-05-28-second-source-core-intake-runbook.md",
+        "docs/research/2026-05-29-structure-observer-intake-refresh.md",
         "docs/research/2026-05-29-minimal-second-source-readiness.md"
       ],
+      "target_set_evidence": [
+        {
+          "target_set": "structure-observer-intake",
+          "reports": [
+            "docs/research/2026-05-28-second-source-reversing-gap-matrix.md",
+            "docs/research/2026-05-29-structure-observer-intake-refresh.md"
+          ],
+          "scope": "fresh copied-redacted GameplayPolicyEvent structure backing; layout-only, no identity, lookup, mutation, return override, or ResourceHandle"
+        },
+        {
+          "target_set": "minimal-second-source-intake",
+          "reports": [
+            "docs/research/2026-05-29-minimal-second-source-readiness.md"
+          ],
+          "scope": "layout-only compact inventory/structure backing; no standalone module-specific inventory or structure surface"
+        }
+      ],
+      "excluded_target_sets": [
+        {
+          "target_set": "inventory-action-compact-intake",
+          "reason": "layout-only internal recognizer evidence; not public SDK or RC gameplay policy backing"
+        }
+      ],
       "abi_tests": [
-        "tests/abi/AbiLayoutTests.cpp"
+        "tests/abi/AbiLayoutTests.cpp",
+        "tests/abi/CAbiLayoutTests.c"
       ],
       "sdk_consumer_tests": [
         "tests/sdk_consumer/MinimalPlugin.cpp",
         "tests/sdk_consumer/SdkConsumerFixture.cpp",
         "tests/sdk_consumer/CAbiPlugin.c",
+        "tests/sdk_installed_consumer/consumer_plugin.cpp",
+        "tests/sdk_installed_consumer/consumer_fixture.cpp",
         "tests/sdk_installed_consumer/c_abi_plugin.c"
       ],
       "lifecycle_tests": [
@@ -181,7 +351,7 @@
       "target_sets": [
         "chat-message-intake"
       ],
-      "scope": "v0.1-rc SDK ABI surface for copied UTF-8 chat notifications; no command SDK, no sender identity, no UE internals, no mutation, no return override",
+      "scope": "v0.1-rc SDK ABI surface for copied UTF-8 chat notifications; no command SDK, no sender identity, no resource identity, no ResourceHandle, no UE lookup, no UE internals, no mutation, no return override",
       "payload": "copied UTF-8 message bytes, send mode, copied-payload flag, and process-local sequence",
       "public_fields": [
         "abi_version",
@@ -198,6 +368,14 @@
         "OBELISK_CHAT_SEND_MODE_LOCAL",
         "OBELISK_CHAT_SEND_MODE_ALLIANCE"
       ],
+      "live_debug_validated_send_modes": [
+        "OBELISK_CHAT_SEND_MODE_GLOBAL",
+        "OBELISK_CHAT_SEND_MODE_TRIBE",
+        "OBELISK_CHAT_SEND_MODE_LOCAL",
+        "OBELISK_CHAT_SEND_MODE_ALLIANCE"
+      ],
+      "live_debug_unvalidated_send_modes": [],
+      "mode_coverage_note": "Live copied-log delivery validates plugin-facing copied delivery for all four known chat send modes; this does not promote identity, command routing, moderation, mutation, return override, or UE internals.",
       "flags": [
         "OBELISK_CHAT_MESSAGE_EVENT_FLAG_COPIED_PAYLOAD"
       ],
@@ -209,6 +387,9 @@
         "raw parameter buffers",
         "sender identity",
         "player identity",
+        "resource identity",
+        "ResourceHandle",
+        "UE lookup",
         "Steam/platform identity",
         "chat send authority",
         "chat moderation or blocking authority",
@@ -224,13 +405,17 @@
       "owner_token_handle_registration": true,
       "owner_scoped_unregister": true,
       "plugin_owner_cleanup": true,
-      "runtime_producer_gate_pending": false,
-      "live_debug_delivery_pending": true,
+      "runtime_producer_gate_implemented": true,
+      "live_debug_delivery_pending": false,
+      "live_debug_delivery_validated": true,
+      "live_debug_delivery_accepted_event_count": 18,
+      "live_debug_delivery_evidence": "docs/research/2026-05-29-chat-message-second-source-readiness.md",
       "second_source_reports": [
         "docs/research/2026-05-29-chat-message-second-source-readiness.md"
       ],
       "abi_tests": [
-        "tests/abi/AbiLayoutTests.cpp"
+        "tests/abi/AbiLayoutTests.cpp",
+        "tests/abi/CAbiLayoutTests.c"
       ],
       "sdk_consumer_tests": [
         "tests/sdk_consumer/MinimalPlugin.cpp",
@@ -248,9 +433,10 @@
         "README.md",
         "CHANGELOG.md",
         "docs/PLUGIN_ARCHITECTURE.md",
+        "docs/INSTALL.md",
         "docs/RELEASE.md",
         "docs/STATUS.md",
-        "docs/research/2026-05-27-chat-sdk-abi-preflight.md"
+        "docs/research/2026-05-29-chat-message-second-source-readiness.md"
       ]
     }
   ]

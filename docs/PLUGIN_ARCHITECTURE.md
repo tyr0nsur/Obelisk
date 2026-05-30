@@ -20,8 +20,9 @@ on teaching the plugin model.
 
 `oPolicyAudit` is an experimental first-party example for `GameplayPolicyEvent`
 descriptors and callbacks. `oChatLogger` is an experimental first-party smoke test for
-minimal `ChatMessageEvent` delivery. They are excluded from the default build and release
-scope unless `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`.
+the copied `ChatMessageEvent` API and `enable-chat-events` producer path. They are
+excluded from the default build and release scope unless
+`OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`.
 
 ## Plugin Categories
 
@@ -65,8 +66,9 @@ valid `plugin_owner_token` supplied in `ObeliskPluginInitContext`. Callback func
 helper `.so` files, external thunks, or background threads must use the owner-token
 registration functions and remain covered by plugin-local shutdown tests. New code should
 prefer the handle-returning owner-token functions when
-`OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS` and
-`OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES` are both advertised, store the
+`OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS`,
+`OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS`, and
+`OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES` are all advertised, store the
 returned non-zero handle in process-local state, and call
 `UnregisterProcessEventCallbackWithOwnerToken` during shutdown before callback code or
 state can disappear. Owner-token registration is valid during `ObeliskPlugin_Init`, even
@@ -195,7 +197,9 @@ handle-returning owner-token API and explicit unregister:
 
 1. Check `OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS`,
    `OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES`, `struct_size`, a non-zero
-   `plugin_owner_token`, and the relevant function pointers.
+   `plugin_owner_token`, and the relevant function pointers. Name-index-filtered variants
+   also require `OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS`; global variants
+   require `OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS` and remain debug-only.
 2. Register with `RegisterPreProcessEventForNameIndexWithOwnerTokenHandle` or the matching
    post/global variant.
 3. Treat a `0` return value as rejected registration.
@@ -232,12 +236,20 @@ this shutdown path.
 
 ## ProcessEvent Policy
 
-`ProcessEvent` is a hot path. Global callbacks are the highest-risk plugin
-integration point.
+`ProcessEvent` is a hot path. Raw callbacks expose borrowed UE pointers and raw parameter
+buffers, so copied Obelisk-level events are the stable plugin path.
 
 Rules:
 
-- Prefer `RegisterPreProcessEventForNameIndex` or another filtered API.
+- Prefer `GameplayPolicyEvent`, `ChatMessageEvent`, or another copied Obelisk-level API.
+- Filtered callbacks are rejected by default. They require both
+  `OBELISK_ALLOW_FILTERED_PROCESS_EVENT_CALLBACKS=1` and the per-instance marker
+  `allow-filtered-process-event-callbacks`; only then does the runtime advertise
+  `OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS` and
+  `OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES`.
+- A plugin that does not see `OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS`
+  must treat `RegisterPreProcessEventForNameIndex`,
+  `RegisterPostProcessEventForNameIndex`, and their owner-token variants as unavailable.
 - Global callbacks are rejected by default. They require both
   `OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS=1` and the per-instance marker
   `allow-global-process-event-callbacks`; only then does the runtime advertise
@@ -268,9 +280,9 @@ Rules:
 - A global callback may be acceptable for an isolated discovery run if the explicit gate
   is enabled only on the approved debug instance and the test has rollback instructions.
 
-Promotion from experimental to stable requires proving that a plugin can run
-with filtered callbacks only, or documenting why a global callback is necessary
-and measuring its overhead on an isolated server.
+A plugin that depends on raw filtered callbacks remains debug/tooling unless a later gate
+explicitly promotes a copied Obelisk-level API. Global raw callbacks are discovery-only
+and require isolated-server overhead measurement plus a rollback plan.
 
 ## Gameplay Event Promotion Gate
 
@@ -293,11 +305,13 @@ proves all of these items together:
   separate from second-source promotion evidence.
 
 The promoted v0.1 gameplay surface is `GameplayPolicyEvent`, an Obelisk-level copied POD
-policy signal backed by the accepted `structure-observer-intake` target set and the
-accepted compact inventory/structure layouts from `minimal-second-source-intake`. It is
-not a public `StructureEvents` wrapper, not a public Inventory SDK, and it does not expose
-UE4 objects. Plugins subscribe with `RegisterGameplayPolicyEventWithOwnerTokenHandle`, an
-event-kind mask, and a process-local owner-token handle; shutdown must call
+policy signal. Its structure-backed promotion claim points to the fresh accepted
+[`structure-observer-intake` evidence](research/2026-05-29-structure-observer-intake-refresh.md)
+and remains paired with the accepted compact inventory/structure layouts from
+`minimal-second-source-intake` for the generic policy family. It is not a public
+`StructureEvents` wrapper, not a public Inventory SDK, and it does not expose UE4 objects.
+Plugins subscribe with `RegisterGameplayPolicyEventWithOwnerTokenHandle`, an event-kind
+mask, and a process-local owner-token handle; shutdown must call
 `UnregisterGameplayPolicyEventWithOwnerToken`.
 
 `GameplayPolicyEvent` exposes only approved scalar fields through `field_mask`,
@@ -350,8 +364,12 @@ duration. The event does not expose sender/player identity, resource identity, r
 `FString`, `UObject`, `UFunction`, raw parameter buffers, FName/GObjects indices, chat
 send/moderation/blocking authority, command registration/routing, mutation, or return
 override. Plugins that want commands must parse the copied text locally; Obelisk v0.1 does
-not ship a separate command SDK. Runtime producer hookup remains a separate gate, so
-registration support does not by itself prove end-to-end chat delivery.
+not ship a separate command SDK. Registration/API support and the gated producer path are
+in v0.1-rc scope, and copied plugin-facing delivery has accepted beta evidence for the
+known send modes. Operational use still requires the `enable-chat-events` producer path
+during an approved operator-selected window after an operator-approved notice;
+`enable-chat-reflection` is only the historical observer path and does not prove
+`ChatMessageEvent` delivery.
 
 ## HTTP And Security
 

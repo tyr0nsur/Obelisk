@@ -34,6 +34,8 @@ namespace
         volatile std::uint64_t gameplayPolicyEventDescriptorsCapability =
             OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS;
         volatile std::uint64_t chatEventsCapability = OBELISK_API_CAPABILITY_CHAT_EVENTS;
+        volatile std::uint64_t filteredCallbacksCapability =
+            OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS;
         volatile std::uint32_t gameplayPolicyEventVersion = OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION;
         volatile std::uint32_t resourceKindDescriptorVersion = OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION;
         volatile std::uint32_t gameplayPolicyEventDescriptorVersion =
@@ -67,6 +69,7 @@ namespace
         (void)resourceKindDescriptorsCapability;
         (void)gameplayPolicyEventDescriptorsCapability;
         (void)chatEventsCapability;
+        (void)filteredCallbacksCapability;
         (void)gameplayPolicyEventVersion;
         (void)resourceKindDescriptorVersion;
         (void)gameplayPolicyEventDescriptorVersion;
@@ -104,6 +107,7 @@ int main()
     static_assert(OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS == (1ull << 7));
     static_assert(OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS == (1ull << 8));
     static_assert(OBELISK_API_CAPABILITY_CHAT_EVENTS == (1ull << 9));
+    static_assert(OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS == (1ull << 10));
     static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION == 1u);
     static_assert(OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION == 1u);
     static_assert(OBELISK_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION == 1u);

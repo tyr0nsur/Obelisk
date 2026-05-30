@@ -27,10 +27,17 @@ Stable baseline:
   checks before maintenance restarts.
 - Plugin-owned callback cleanup and optional `ObeliskPlugin_Shutdown`.
 - Public SDK header at `include/obelisk/ObeliskApi.h`.
-- Promoted `GameplayPolicyEvent` callback ABI for copied POD structure and
-  inventory-backed policy signals.
+
+v0.1-rc SDK surfaces:
+
+- Promoted `GameplayPolicyEvent` callback ABI for copied POD structure-backed policy
+  signals tied to fresh [`structure-observer-intake` evidence](docs/research/2026-05-29-structure-observer-intake-refresh.md)
+  and inventory-backed policy signals through the same generic family.
 - Minimal v0.1-rc `ChatMessageEvent` callback ABI for copied UTF-8 chat notifications;
-  runtime producer hookup remains a separate gate.
+  copied plugin-facing delivery has accepted `enable-chat-events` validation for all four
+  known send modes (`0..3`). Historical `enable-chat-reflection` observer output is not
+  delivery evidence. This remains a copied notification contract only, not commands,
+  identity, moderation/blocking, mutation, return override, or UE internals.
 - Metadata-only `DescribeResourceKind` helper for category descriptors; no resource
   handles or lookup yet.
 - Metadata-only `DescribeGameplayPolicyEventKind` helper for promoted event-kind
@@ -159,7 +166,8 @@ Obelisk installs under an operator-chosen root, referenced in docs as
         enable-process-event-hook
         disable-plugins
         allow-experimental-observers  # required with experimental observer markers
-        enable-chat-reflection  # experimental
+        enable-chat-events  # experimental ChatMessageEvent producer
+        enable-chat-reflection  # historical observer; not ChatMessageEvent delivery
         enable-inventory-reflection  # experimental
         enable-structure-reflection  # experimental
         allow-ptrace  # approved debug window only
@@ -260,6 +268,7 @@ bool ObeliskPlugin_Init(ObeliskApi* api, const ObeliskPluginInitContext* context
         const int32_t validated_function_index = -1;
         if (validated_function_index >= 0 &&
             (api->capabilities & OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS) &&
+            (api->capabilities & OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS) &&
             (api->capabilities & OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES) &&
             api->struct_size >= offsetof(ObeliskApi, UnregisterProcessEventCallbackWithOwnerToken) +
                 sizeof(api->UnregisterProcessEventCallbackWithOwnerToken) &&
@@ -292,13 +301,14 @@ void ObeliskPlugin_Shutdown()
 }
 ```
 
-Prefer filtered callbacks. Global `ProcessEvent` callbacks are hot-path debug
-tools unless explicitly measured and gated.
+Prefer copied Obelisk-level events. Filtered and global raw `ProcessEvent` callbacks are
+hot-path debug tools unless explicitly measured and gated.
 
 Callbacks registered after `ObeliskPlugin_Init`, from helper libraries, or from background
 threads should use the owner-token registration fields appended to `ObeliskApi`. New
-plugins should prefer the handle-returning owner-token functions when both
+plugins should prefer the handle-returning owner-token functions when
 `OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS` and
+`OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS` and
 `OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES` are advertised, store returned
 handles only in process-local state, and unregister them with
 `UnregisterProcessEventCallbackWithOwnerToken` during shutdown. Handles are not cluster
@@ -314,8 +324,11 @@ Copy the `ObeliskApi` table by value if shutdown, worker threads, or later callb
 runtime functions.
 
 The promoted gameplay callback path is `GameplayPolicyEvent`. It is copied POD policy
-data, not a UE object/resource handle. Plugins must check the capability, appended
-function pointers, `struct_size`, and a non-zero `plugin_owner_token` before subscribing:
+data, not a UE object/resource handle. Structure-backed claims point to fresh
+[`structure-observer-intake` evidence](docs/research/2026-05-29-structure-observer-intake-refresh.md),
+which is layout-only support for copied/redacted backing. Plugins must check the
+capability, appended function pointers, `struct_size`, and a non-zero
+`plugin_owner_token` before subscribing:
 
 ```cpp
 static uint64_t g_gameplay_policy_handle = 0;
@@ -424,8 +437,10 @@ does not expose sender identity, resource identity, raw `FString`, UE pointers,
 FName/GObjects indices, raw params, chat send/moderation/blocking, mutation, or return
 override authority. Callback data is valid only for the callback duration, and the handle
 must be unregistered with `UnregisterChatMessageEventWithOwnerToken` during shutdown.
-Runtime producer hookup is a separate gate, so SDK registration support alone is not an
-end-to-end delivery claim.
+End-to-end delivery validation is specifically the `enable-chat-events` producer during
+an approved operator-selected beta-test window; `enable-chat-reflection` is only the
+historical observer path, so SDK registration support alone is not an end-to-end delivery
+claim.
 
 `CallProcessEvent` is a low-level trampoline escape hatch. The ABI slot exists for
 compatibility, but plugins must treat it as unavailable unless `struct_size` covers the
@@ -460,6 +475,9 @@ OBELISK_DISABLE_PLUGINS=1
 OBELISK_ENABLE_REFLECTION_SCANNER=1
 OBELISK_ENABLE_INVENTORY_REFLECTION=1
 OBELISK_ENABLE_STRUCTURE_REFLECTION=1
+OBELISK_ENABLE_CHAT_EVENTS=1
+OBELISK_CHAT_EVENTS_BINARY_SHA256=<supported ARK SHA256>
+OBELISK_CHAT_EVENTS_DISPATCH_LIMIT=<positive dispatch budget>
 OBELISK_ENABLE_CHAT_REFLECTION=1
 OBELISK_<MODULE>_REFLECTION_BINARY_SHA256=<supported ARK SHA256>
 OBELISK_<MODULE>_REFLECTION_LOG_LIMIT=<bounded-count>
@@ -540,7 +558,7 @@ For debug harness validation:
 - Enable hooks per instance, not globally.
 - Keep experimental scanners disabled by default.
 - Keep native exec probes off unless explicitly isolated.
-- Prefer filtered callbacks.
+- Prefer copied Obelisk-level events; filtered raw callbacks require an explicit gate.
 - Keep logs per instance.
 - Treat multi-instance plugins as the normal clustered case: shared config is fine,
   shared mutable state requires an explicit ownership and locking design.

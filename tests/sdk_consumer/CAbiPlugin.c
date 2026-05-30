@@ -2,16 +2,73 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 static ObeliskApi g_Api;
 static bool g_HasApi = false;
 static uint64_t g_OwnerToken = 0;
+static uint64_t g_GameplayPolicyEventHandle = 0;
+static uint64_t g_GameplayPolicyEventUserData = 0xC0FFEE04;
+static bool g_GameplayPolicyEventSeen = false;
+static bool g_GameplayPolicyEventAccepted = false;
 static uint64_t g_ChatMessageEventHandle = 0;
 static uint64_t g_ChatMessageEventUserData = 0xC0FFEE03;
 static bool g_ChatMessageEventSeen = false;
 static bool g_ChatMessageEventAccepted = false;
 
 static void OnGameplayPolicyEvent(const ObeliskGameplayPolicyEvent* event, void* user_data)
+{
+    g_GameplayPolicyEventSeen = true;
+    g_GameplayPolicyEventAccepted = false;
+
+    if (event &&
+        event->abi_version == OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION &&
+        event->struct_size >= sizeof(ObeliskGameplayPolicyEvent) &&
+        (event->flags & OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD) != 0 &&
+        user_data == &g_GameplayPolicyEventUserData)
+    {
+        volatile uint32_t event_kind = event->event_kind;
+        volatile uint64_t field_mask = event->field_mask;
+        volatile int32_t variant_index =
+            event->int32_values[OBELISK_GAMEPLAY_POLICY_FIELD_VARIANT_INDEX];
+        volatile bool requested_by_player =
+            (event->field_mask & OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER) != 0 &&
+            (event->bool_values & (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_REQUESTED_BY_PLAYER)) != 0;
+        volatile bool ignore_cooldown =
+            (event->field_mask & OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN) != 0 &&
+            (event->bool_values & (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_IGNORE_COOLDOWN)) != 0;
+        (void)event_kind;
+        (void)field_mask;
+        (void)variant_index;
+        (void)requested_by_player;
+        (void)ignore_cooldown;
+
+        if (event->event_kind == OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_VARIANT_CHANGE)
+        {
+            g_GameplayPolicyEventAccepted =
+                event->resource_kind == OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE &&
+                (event->flags & OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED) != 0 &&
+                (event->field_mask & OBELISK_GAMEPLAY_POLICY_FIELD_MASK_VARIANT_INDEX) != 0 &&
+                event->int32_values[OBELISK_GAMEPLAY_POLICY_FIELD_VARIANT_INDEX] == 7;
+        }
+        else if (event->event_kind == OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK)
+        {
+            g_GameplayPolicyEventAccepted =
+                event->resource_kind == OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM &&
+                (event->flags & OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED) != 0 &&
+                requested_by_player;
+        }
+        else if (event->event_kind == OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK)
+        {
+            g_GameplayPolicyEventAccepted =
+                event->resource_kind == OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM &&
+                (event->flags & OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED) != 0 &&
+                (event->field_mask & OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN) != 0;
+        }
+    }
+}
+
+static void OnCompileGameplayPolicyEvent(const ObeliskGameplayPolicyEvent* event, void* user_data)
 {
     (void)user_data;
     if (event && event->struct_size >= sizeof(ObeliskGameplayPolicyEvent))
@@ -170,7 +227,7 @@ static void CompileGameplayPolicyAbi(void)
         "structure.variant_change",
         "Structure Variant Change",
     };
-    ObeliskGameplayPolicyEventCallback callback = OnGameplayPolicyEvent;
+    ObeliskGameplayPolicyEventCallback callback = OnCompileGameplayPolicyEvent;
     ObeliskChatMessageEventCallback chat_callback = OnCompileChatMessageEvent;
     callback(&event, NULL);
     callback(&inventory_remote_add_event, NULL);
@@ -206,8 +263,23 @@ static bool HasChatMessageEventApi(const ObeliskApi* api)
         api->UnregisterChatMessageEventWithOwnerToken;
 }
 
+static bool HasGameplayPolicyEventApi(const ObeliskApi* api)
+{
+    return api &&
+        (api->capabilities & OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS) != 0 &&
+        api->struct_size >= offsetof(ObeliskApi, UnregisterGameplayPolicyEventWithOwnerToken) +
+            sizeof(api->UnregisterGameplayPolicyEventWithOwnerToken) &&
+        api->RegisterGameplayPolicyEventWithOwnerTokenHandle &&
+        api->UnregisterGameplayPolicyEventWithOwnerToken;
+}
+
 static void UnregisterCallbacks(void)
 {
+    if (g_HasApi && g_GameplayPolicyEventHandle != 0 && g_Api.UnregisterGameplayPolicyEventWithOwnerToken)
+    {
+        g_Api.UnregisterGameplayPolicyEventWithOwnerToken(g_OwnerToken, g_GameplayPolicyEventHandle);
+        g_GameplayPolicyEventHandle = 0;
+    }
     if (g_HasApi && g_ChatMessageEventHandle != 0 && g_Api.UnregisterChatMessageEventWithOwnerToken)
     {
         g_Api.UnregisterChatMessageEventWithOwnerToken(g_OwnerToken, g_ChatMessageEventHandle);
@@ -220,6 +292,9 @@ static void ResetState(void)
     g_Api = (ObeliskApi){0};
     g_HasApi = false;
     g_OwnerToken = 0;
+    g_GameplayPolicyEventHandle = 0;
+    g_GameplayPolicyEventSeen = false;
+    g_GameplayPolicyEventAccepted = false;
     g_ChatMessageEventHandle = 0;
     g_ChatMessageEventSeen = false;
     g_ChatMessageEventAccepted = false;
@@ -254,7 +329,7 @@ __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
         return false;
 
     if (api->abi_version != OBELISK_API_ABI_VERSION ||
-        api->struct_size < sizeof(ObeliskApi) ||
+        api->struct_size < offsetof(ObeliskApi, capabilities) + sizeof(api->capabilities) ||
         context->abi_version != OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION ||
         context->struct_size < sizeof(ObeliskPluginInitContext))
     {
@@ -267,11 +342,29 @@ __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
     if (context->plugin_owner_token == 0)
         return false;
 
-    g_Api = *api;
+    memset(&g_Api, 0, sizeof(g_Api));
+    memcpy(&g_Api, api, api->struct_size < sizeof(g_Api) ? api->struct_size : sizeof(g_Api));
     g_HasApi = true;
     g_OwnerToken = context->plugin_owner_token;
+    g_GameplayPolicyEventSeen = false;
+    g_GameplayPolicyEventAccepted = false;
     g_ChatMessageEventSeen = false;
     g_ChatMessageEventAccepted = false;
+
+    if (HasGameplayPolicyEventApi(api))
+    {
+        g_GameplayPolicyEventHandle = api->RegisterGameplayPolicyEventWithOwnerTokenHandle(
+            g_OwnerToken,
+            OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL,
+            OnGameplayPolicyEvent,
+            &g_GameplayPolicyEventUserData);
+        if (g_GameplayPolicyEventHandle == 0)
+        {
+            UnregisterCallbacks();
+            ResetState();
+            return false;
+        }
+    }
 
     if (HasChatMessageEventApi(api))
     {
@@ -281,6 +374,7 @@ __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
             &g_ChatMessageEventUserData);
         if (g_ChatMessageEventHandle == 0)
         {
+            UnregisterCallbacks();
             ResetState();
             return false;
         }
@@ -295,6 +389,16 @@ __attribute__((visibility("default"))) void ObeliskPlugin_Shutdown(void)
 {
     UnregisterCallbacks();
     ResetState();
+}
+
+__attribute__((visibility("default"))) bool CAbiMinimal_GameplayPolicyEventSeen(void)
+{
+    return g_GameplayPolicyEventSeen;
+}
+
+__attribute__((visibility("default"))) bool CAbiMinimal_GameplayPolicyEventAccepted(void)
+{
+    return g_GameplayPolicyEventAccepted;
 }
 
 __attribute__((visibility("default"))) bool CAbiMinimal_ChatMessageEventSeen(void)

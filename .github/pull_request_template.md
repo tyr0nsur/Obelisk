@@ -6,7 +6,9 @@
 - [ ] I did not touch live server roots or commit server-local artifacts.
 - [ ] I did not commit build outputs, `.so` files, logs, cores, local config, or state markers.
 - [ ] Runtime/reversing changes include a matching research note or public documentation update.
-- [ ] This PR does not promote chat beyond minimal `ChatMessageEvent` or any gameplay module to public SDK/release scope unless `docs/STATUS.md`, `docs/RELEASE.md`, and explicitly named second-source gates are updated.
+- [ ] This PR does not promote chat beyond minimal `ChatMessageEvent` or any gameplay module to public SDK/release scope unless `docs/STATUS.md`, `docs/RELEASE.md`, `docs/public_gameplay_events.json`, `CHANGELOG.md`, installed SDK evidence, and explicitly named second-source gates are updated.
+- [ ] This PR does not expose public Inventory SDKs, `ResourceHandle`, resource/object identity, UE pointers, raw `FString`, raw params, FName/GObjects indices, mutation, or return overrides without a separately named promotion gate.
+- [ ] If this PR claims runtime `ChatMessageEvent` delivery, the evidence uses the `enable-chat-events` path during an approved operator-selected beta-test window after an operator-approved notice; historical `enable-chat-reflection` observer logs are not counted as delivery evidence.
 
 ## Safety
 

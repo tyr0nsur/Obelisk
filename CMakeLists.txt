@@ -197,6 +197,13 @@ target_link_libraries(abi_layout_tests PRIVATE obelisk_sdk)
 
 add_test(NAME AbiLayoutTests COMMAND abi_layout_tests)
 
+add_executable(c_abi_layout_tests
+    tests/abi/CAbiLayoutTests.c
+)
+target_link_libraries(c_abi_layout_tests PRIVATE obelisk_sdk)
+
+add_test(NAME CAbiLayoutTests COMMAND c_abi_layout_tests)
+
 add_executable(runtime_reflection_tests
     tests/core/RuntimeReflectionTests.cpp
     ue/RuntimeReflection.cpp

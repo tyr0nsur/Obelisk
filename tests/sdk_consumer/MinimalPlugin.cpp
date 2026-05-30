@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 
 namespace
 {
@@ -29,6 +30,14 @@ namespace
     bool OnProcessEvent(void*, void*, void*)
     {
         return true;
+    }
+
+    void CopyApiPrefix(const ObeliskApi* api)
+    {
+        g_Api = {};
+        if (!api)
+            return;
+        std::memcpy(&g_Api, api, api->struct_size < sizeof(g_Api) ? api->struct_size : sizeof(g_Api));
     }
 
     bool ValidateGameplayPolicyEventCopy(const ObeliskGameplayPolicyEvent& event, void* userData)
@@ -142,6 +151,7 @@ namespace
         return api &&
             (api->capabilities & OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS) != 0 &&
             (api->capabilities & OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES) != 0 &&
+            (api->capabilities & OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS) != 0 &&
             api->struct_size >= offsetof(ObeliskApi, UnregisterProcessEventCallbackWithOwnerToken) +
                 sizeof(api->UnregisterProcessEventCallbackWithOwnerToken) &&
             api->RegisterPreProcessEventForNameIndexWithOwnerTokenHandle &&
@@ -256,7 +266,7 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
             return false;
 
         if (api->abi_version != OBELISK_API_ABI_VERSION ||
-            api->struct_size < sizeof(ObeliskApi) ||
+            api->struct_size < offsetof(ObeliskApi, capabilities) + sizeof(api->capabilities) ||
             context->abi_version != OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION ||
             context->struct_size < sizeof(ObeliskPluginInitContext) ||
             context->plugin_owner_token == 0)
@@ -264,7 +274,7 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
             return false;
         }
 
-        g_Api = *api;
+        CopyApiPrefix(api);
         g_HasApi = true;
         g_OwnerToken = context->plugin_owner_token;
 

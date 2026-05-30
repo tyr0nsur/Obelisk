@@ -15,9 +15,13 @@ namespace
     bool g_HasApi = false;
     uint64_t g_OwnerToken = 0;
     uint64_t g_ProcessEventHandle = 0;
+    uint64_t g_GameplayPolicyEventHandle = 0;
     uint64_t g_ChatMessageEventHandle = 0;
+    uint64_t g_GameplayPolicyEventUserData = 0x5DC0DE02;
     uint64_t g_ChatMessageEventUserData = 0xC0FFEE02;
-    bool g_ChatMessageEventSeen = false;
+    uint64_t g_GameplayPolicyEventSeenMask = 0;
+    uint64_t g_GameplayPolicyEventAcceptedMask = 0;
+    uint64_t g_ChatMessageEventSeenModes = 0;
 
     constexpr const char* kDefaultConfig = R"json({
     "enabled": false,
@@ -25,10 +29,57 @@ namespace
     "instance_allowlist": []
 })json";
 
+    uint64_t EventMask(uint32_t eventKind)
+    {
+        switch (eventKind)
+        {
+        case OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_ACCESS_CHECK:
+            return OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACCESS_CHECK;
+        case OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_DEMOLISH_CHECK:
+            return OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_DEMOLISH_CHECK;
+        case OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_VARIANT_CHANGE:
+            return OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_VARIANT_CHANGE;
+        case OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_ACTIVATION_TOGGLE:
+            return OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACTIVATION_TOGGLE;
+        case OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_PIN_CODE_CHECK:
+            return OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_PIN_CODE_CHECK;
+        case OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_SEAT_CHECK:
+            return OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_SEAT_CHECK;
+        case OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK:
+            return OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_REMOTE_ADD_CHECK;
+        case OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK:
+            return OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK;
+        default:
+            return 0;
+        }
+    }
+
+    uint64_t ChatModeMask(uint32_t sendMode)
+    {
+        switch (sendMode)
+        {
+        case OBELISK_CHAT_SEND_MODE_GLOBAL:
+        case OBELISK_CHAT_SEND_MODE_TRIBE:
+        case OBELISK_CHAT_SEND_MODE_LOCAL:
+        case OBELISK_CHAT_SEND_MODE_ALLIANCE:
+            return 1ull << sendMode;
+        default:
+            return 0;
+        }
+    }
+
     bool PathExists(const char* path)
     {
         struct stat st {};
         return path && stat(path, &st) == 0;
+    }
+
+    void CopyApiPrefix(const ObeliskApi* api)
+    {
+        g_Api = {};
+        if (!api)
+            return;
+        std::memcpy(&g_Api, api, api->struct_size < sizeof(g_Api) ? api->struct_size : sizeof(g_Api));
     }
 
     bool OnProcessEvent(void*, void*, void*)
@@ -36,12 +87,77 @@ namespace
         return true;
     }
 
+    void OnGameplayPolicyEvent(const ObeliskGameplayPolicyEvent* event, void* userData)
+    {
+        if (!event ||
+            event->abi_version != OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION ||
+            event->struct_size < sizeof(ObeliskGameplayPolicyEvent) ||
+            userData != &g_GameplayPolicyEventUserData ||
+            (event->flags & OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD) == 0)
+        {
+            return;
+        }
+
+        const uint64_t eventMask = EventMask(event->event_kind);
+        g_GameplayPolicyEventSeenMask |= eventMask;
+        bool accepted = false;
+        if (event->resource_kind == OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE)
+        {
+            constexpr uint64_t kRequiredFlags = OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD |
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED;
+            accepted =
+                (event->flags & kRequiredFlags) == kRequiredFlags &&
+                (event->flags & OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED) == 0 &&
+                (event->field_mask & OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE) != 0;
+            if (event->event_kind == OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_VARIANT_CHANGE)
+            {
+                accepted = accepted &&
+                    (event->field_mask & OBELISK_GAMEPLAY_POLICY_FIELD_MASK_VARIANT_INDEX) != 0 &&
+                    (event->field_mask & OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE_SET) != 0 &&
+                    event->int32_values[OBELISK_GAMEPLAY_POLICY_FIELD_VARIANT_INDEX] == 7 &&
+                    (event->bool_values & (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_FORCE_SET)) != 0;
+            }
+            if (event->event_kind == OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_SEAT_CHECK)
+            {
+                accepted = accepted &&
+                    (event->field_mask & OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE) != 0 &&
+                    (event->bool_values & (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_FORCE)) != 0;
+            }
+        }
+        else if (event->resource_kind == OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM)
+        {
+            constexpr uint64_t kRequiredFlags = OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD |
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED;
+            accepted =
+                (event->flags & kRequiredFlags) == kRequiredFlags &&
+                (event->flags & OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED) == 0 &&
+                (event->field_mask & OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE) != 0;
+            if (event->event_kind == OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK)
+            {
+                accepted = accepted &&
+                    (event->field_mask & OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER) != 0 &&
+                    (event->bool_values & (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_RETURN_VALUE)) != 0 &&
+                    (event->bool_values & (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_REQUESTED_BY_PLAYER)) != 0;
+            }
+            if (event->event_kind == OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK)
+            {
+                accepted = accepted &&
+                    (event->field_mask & OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN) != 0 &&
+                    (event->bool_values & (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_RETURN_VALUE)) != 0 &&
+                    (event->bool_values & (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_IGNORE_COOLDOWN)) == 0;
+            }
+        }
+
+        if (accepted)
+            g_GameplayPolicyEventAcceptedMask |= eventMask;
+    }
+
     void OnChatMessageEvent(const ObeliskChatMessageEvent* event, void* userData)
     {
         if (event &&
             event->abi_version == OBELISK_CHAT_MESSAGE_EVENT_ABI_VERSION &&
             event->struct_size >= sizeof(ObeliskChatMessageEvent) &&
-            event->send_mode == OBELISK_CHAT_SEND_MODE_GLOBAL &&
+            ChatModeMask(event->send_mode) != 0 &&
             (event->flags & OBELISK_CHAT_MESSAGE_EVENT_FLAG_COPIED_PAYLOAD) != 0 &&
             event->sequence != 0 &&
             event->message.data &&
@@ -49,7 +165,7 @@ namespace
             userData == &g_ChatMessageEventUserData &&
             std::memcmp(event->message.data, "!ping", 5) == 0)
         {
-            g_ChatMessageEventSeen = true;
+            g_ChatMessageEventSeenModes |= ChatModeMask(event->send_mode);
         }
     }
 
@@ -58,13 +174,28 @@ namespace
         return api &&
             (api->capabilities & OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS) != 0 &&
             (api->capabilities & OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES) != 0 &&
+            (api->capabilities & OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS) != 0 &&
             api->struct_size >= offsetof(ObeliskApi, UnregisterProcessEventCallbackWithOwnerToken) +
                 sizeof(api->UnregisterProcessEventCallbackWithOwnerToken) &&
             api->RegisterPreProcessEventForNameIndexWithOwnerTokenHandle &&
             api->UnregisterProcessEventCallbackWithOwnerToken;
     }
 
-    bool ValidateStructureResourceKindDescriptor(const ObeliskApi* api)
+    bool HasGameplayPolicyEventApi(const ObeliskApi* api)
+    {
+        return api &&
+            (api->capabilities & OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS) != 0 &&
+            api->struct_size >= offsetof(ObeliskApi, UnregisterGameplayPolicyEventWithOwnerToken) +
+                sizeof(api->UnregisterGameplayPolicyEventWithOwnerToken) &&
+            api->RegisterGameplayPolicyEventWithOwnerTokenHandle &&
+            api->UnregisterGameplayPolicyEventWithOwnerToken;
+    }
+
+    bool ValidateResourceKindDescriptor(const ObeliskApi* api,
+                                        uint32_t resourceKind,
+                                        uint64_t eventMask,
+                                        uint64_t fieldMask,
+                                        const char* stableName)
     {
         if (!api ||
             (api->capabilities & OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS) == 0 ||
@@ -76,7 +207,7 @@ namespace
 
         ObeliskResourceKindDescriptor descriptor{};
         descriptor.struct_size = sizeof(ObeliskResourceKindDescriptor);
-        if (!api->DescribeResourceKind(OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE, &descriptor))
+        if (!api->DescribeResourceKind(resourceKind, &descriptor))
             return false;
 
         constexpr uint64_t kRequiredFlags = OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_CATEGORY_ONLY |
@@ -84,17 +215,20 @@ namespace
             OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP;
         return descriptor.abi_version == OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION &&
             descriptor.struct_size >= sizeof(ObeliskResourceKindDescriptor) &&
-            descriptor.resource_kind == OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE &&
+            descriptor.resource_kind == resourceKind &&
             (descriptor.flags & kRequiredFlags) == kRequiredFlags &&
-            (descriptor.supported_gameplay_policy_event_mask &
-                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES) ==
-                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES &&
-            (descriptor.supported_gameplay_policy_field_mask &
-                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE) != 0 &&
-            std::strcmp(descriptor.stable_name, "structure") == 0;
+            descriptor.supported_gameplay_policy_event_mask == eventMask &&
+            descriptor.supported_gameplay_policy_field_mask == fieldMask &&
+            std::strcmp(descriptor.stable_name, stableName) == 0;
     }
 
-    bool ValidateGameplayPolicyEventDescriptor(const ObeliskApi* api)
+    bool ValidateGameplayPolicyEventDescriptor(const ObeliskApi* api,
+                                               uint32_t eventKind,
+                                               uint32_t resourceKind,
+                                               uint64_t eventKindMask,
+                                               uint64_t fieldMask,
+                                               uint64_t requiredFlag,
+                                               const char* stableName)
     {
         if (!api ||
             (api->capabilities & OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS) == 0 ||
@@ -107,22 +241,18 @@ namespace
 
         ObeliskGameplayPolicyEventDescriptor descriptor{};
         descriptor.struct_size = sizeof(ObeliskGameplayPolicyEventDescriptor);
-        if (!api->DescribeGameplayPolicyEventKind(
-                OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_VARIANT_CHANGE,
-                &descriptor))
-        {
+        if (!api->DescribeGameplayPolicyEventKind(eventKind, &descriptor))
             return false;
-        }
 
         return descriptor.abi_version == OBELISK_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION &&
             descriptor.struct_size >= sizeof(ObeliskGameplayPolicyEventDescriptor) &&
-            descriptor.event_kind == OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_VARIANT_CHANGE &&
-            descriptor.resource_kind == OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE &&
+            descriptor.event_kind == eventKind &&
+            descriptor.resource_kind == resourceKind &&
             (descriptor.flags & OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD) != 0 &&
-            (descriptor.flags & OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED) != 0 &&
-            descriptor.event_kind_mask == OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_VARIANT_CHANGE &&
-            (descriptor.field_mask & OBELISK_GAMEPLAY_POLICY_FIELD_MASK_VARIANT_INDEX) != 0 &&
-            std::strcmp(descriptor.stable_name, "structure.variant_change") == 0;
+            (descriptor.flags & requiredFlag) != 0 &&
+            descriptor.event_kind_mask == eventKindMask &&
+            (descriptor.field_mask & fieldMask) == fieldMask &&
+            std::strcmp(descriptor.stable_name, stableName) == 0;
     }
 
     bool HasChatMessageEventApi(const ObeliskApi* api)
@@ -141,8 +271,30 @@ namespace
         g_HasApi = false;
         g_OwnerToken = 0;
         g_ProcessEventHandle = 0;
+        g_GameplayPolicyEventHandle = 0;
         g_ChatMessageEventHandle = 0;
-        g_ChatMessageEventSeen = false;
+        g_GameplayPolicyEventSeenMask = 0;
+        g_GameplayPolicyEventAcceptedMask = 0;
+        g_ChatMessageEventSeenModes = 0;
+    }
+
+    void UnregisterCallbacks()
+    {
+        if (g_HasApi && g_ProcessEventHandle != 0 && g_Api.UnregisterProcessEventCallbackWithOwnerToken)
+        {
+            g_Api.UnregisterProcessEventCallbackWithOwnerToken(g_OwnerToken, g_ProcessEventHandle);
+            g_ProcessEventHandle = 0;
+        }
+        if (g_HasApi && g_GameplayPolicyEventHandle != 0 && g_Api.UnregisterGameplayPolicyEventWithOwnerToken)
+        {
+            g_Api.UnregisterGameplayPolicyEventWithOwnerToken(g_OwnerToken, g_GameplayPolicyEventHandle);
+            g_GameplayPolicyEventHandle = 0;
+        }
+        if (g_HasApi && g_ChatMessageEventHandle != 0 && g_Api.UnregisterChatMessageEventWithOwnerToken)
+        {
+            g_Api.UnregisterChatMessageEventWithOwnerToken(g_OwnerToken, g_ChatMessageEventHandle);
+            g_ChatMessageEventHandle = 0;
+        }
     }
 }
 
@@ -178,14 +330,14 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
             return false;
 
         if (api->abi_version != OBELISK_API_ABI_VERSION ||
-            api->struct_size < sizeof(ObeliskApi) ||
+            api->struct_size < offsetof(ObeliskApi, capabilities) + sizeof(api->capabilities) ||
             context->abi_version != OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION ||
             context->struct_size < sizeof(ObeliskPluginInitContext))
         {
             return false;
         }
 
-        g_Api = *api;
+        CopyApiPrefix(api);
         g_HasApi = true;
         g_OwnerToken = context->plugin_owner_token;
 
@@ -223,18 +375,128 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
                 &g_ChatMessageEventUserData);
             if (g_ChatMessageEventHandle == 0)
             {
+                UnregisterCallbacks();
                 ResetState();
                 return false;
             }
         }
 
-        if (!ValidateStructureResourceKindDescriptor(api))
+        if (HasGameplayPolicyEventApi(api))
         {
+            g_GameplayPolicyEventHandle = api->RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                g_OwnerToken,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL,
+                OnGameplayPolicyEvent,
+                &g_GameplayPolicyEventUserData);
+            if (g_GameplayPolicyEventHandle == 0)
+            {
+                UnregisterCallbacks();
+                ResetState();
+                return false;
+            }
+        }
+
+        if (!ValidateResourceKindDescriptor(
+                api,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+                    OBELISK_GAMEPLAY_POLICY_FIELD_MASK_VARIANT_INDEX |
+                    OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE_SET |
+                    OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE,
+                "structure"))
+        {
+            UnregisterCallbacks();
             ResetState();
             return false;
         }
-        if (!ValidateGameplayPolicyEventDescriptor(api))
+        if (!ValidateResourceKindDescriptor(
+                api,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+                    OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER |
+                    OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN,
+                "inventory_item"))
         {
+            UnregisterCallbacks();
+            ResetState();
+            return false;
+        }
+
+        const bool descriptorOk =
+            ValidateGameplayPolicyEventDescriptor(
+                api,
+                OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_ACCESS_CHECK,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACCESS_CHECK,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE,
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED,
+                "structure.access_check") &&
+            ValidateGameplayPolicyEventDescriptor(
+                api,
+                OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_DEMOLISH_CHECK,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_DEMOLISH_CHECK,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE,
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED,
+                "structure.demolish_check") &&
+            ValidateGameplayPolicyEventDescriptor(
+                api,
+                OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_VARIANT_CHANGE,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_VARIANT_CHANGE,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+                    OBELISK_GAMEPLAY_POLICY_FIELD_MASK_VARIANT_INDEX |
+                    OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE_SET,
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED,
+                "structure.variant_change") &&
+            ValidateGameplayPolicyEventDescriptor(
+                api,
+                OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_ACTIVATION_TOGGLE,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACTIVATION_TOGGLE,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE,
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED,
+                "structure.activation_toggle") &&
+            ValidateGameplayPolicyEventDescriptor(
+                api,
+                OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_PIN_CODE_CHECK,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_PIN_CODE_CHECK,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE,
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED,
+                "structure.pin_code_check") &&
+            ValidateGameplayPolicyEventDescriptor(
+                api,
+                OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_SEAT_CHECK,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_SEAT_CHECK,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+                    OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE,
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED,
+                "structure.seat_check") &&
+            ValidateGameplayPolicyEventDescriptor(
+                api,
+                OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_REMOTE_ADD_CHECK,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+                    OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER,
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED,
+                "inventory.remote_add_check") &&
+            ValidateGameplayPolicyEventDescriptor(
+                api,
+                OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK,
+                OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK,
+                OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE |
+                    OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN,
+                OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED,
+                "inventory.use_check");
+        if (!descriptorOk)
+        {
+            UnregisterCallbacks();
             ResetState();
             return false;
         }
@@ -243,6 +505,7 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
     }
     catch (...)
     {
+        UnregisterCallbacks();
         ResetState();
         return false;
     }
@@ -252,10 +515,7 @@ extern "C" __attribute__((visibility("default"))) void ObeliskPlugin_Shutdown()
 {
     try
     {
-        if (g_HasApi && g_ProcessEventHandle != 0 && g_Api.UnregisterProcessEventCallbackWithOwnerToken)
-            g_Api.UnregisterProcessEventCallbackWithOwnerToken(g_OwnerToken, g_ProcessEventHandle);
-        if (g_HasApi && g_ChatMessageEventHandle != 0 && g_Api.UnregisterChatMessageEventWithOwnerToken)
-            g_Api.UnregisterChatMessageEventWithOwnerToken(g_OwnerToken, g_ChatMessageEventHandle);
+        UnregisterCallbacks();
     }
     catch (...)
     {
@@ -265,5 +525,22 @@ extern "C" __attribute__((visibility("default"))) void ObeliskPlugin_Shutdown()
 
 extern "C" __attribute__((visibility("default"))) bool InstallLayoutConsumer_ChatMessageEventSeen()
 {
-    return g_ChatMessageEventSeen;
+    constexpr uint64_t kAllChatModes =
+        (1ull << OBELISK_CHAT_SEND_MODE_GLOBAL) |
+        (1ull << OBELISK_CHAT_SEND_MODE_TRIBE) |
+        (1ull << OBELISK_CHAT_SEND_MODE_LOCAL) |
+        (1ull << OBELISK_CHAT_SEND_MODE_ALLIANCE);
+    return (g_ChatMessageEventSeenModes & kAllChatModes) == kAllChatModes;
+}
+
+extern "C" __attribute__((visibility("default"))) bool InstallLayoutConsumer_GameplayPolicyEventSeen()
+{
+    return (g_GameplayPolicyEventSeenMask & OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL) ==
+        OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL;
+}
+
+extern "C" __attribute__((visibility("default"))) bool InstallLayoutConsumer_GameplayPolicyEventAccepted()
+{
+    return (g_GameplayPolicyEventAcceptedMask & OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL) ==
+        OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL;
 }

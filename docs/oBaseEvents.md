@@ -13,9 +13,11 @@ It demonstrates:
 - C ABI validation with `abi_version` and `struct_size`.
 - Runtime-owned first-run config creation under the central Obelisk config directory.
 - `ObeliskPlugin_GetInfo` metadata and `ObeliskPluginInitContext` config paths.
-- A filtered `ProcessEvent` callback.
+- A filtered raw `ProcessEvent` callback when the runtime explicitly advertises the
+  filtered debug capability.
 - Handle-returning callback registration plus explicit unregister during shutdown when the
-  runtime advertises both `OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS` and
+  runtime advertises `OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS`,
+  `OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS`, and
   `OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES`.
 - Optional `ObeliskPlugin_Shutdown()`.
 

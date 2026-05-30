@@ -65,8 +65,28 @@ add_test(
 )
 
 add_test(
+    NAME SdkConsumerFixtureCAbiPluginShortApiSkipsAppendedCallbacks
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:sdk_consumer_c_abi_plugin>" c_abi_minimal short-api-before-gameplay-policy
+)
+
+add_test(
+    NAME SdkConsumerFixtureCAbiPluginCleansUpFailedGameplayPolicyRegistration
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:sdk_consumer_c_abi_plugin>" c_abi_minimal fail-gameplay-policy-registration
+)
+
+add_test(
+    NAME SdkConsumerFixtureCAbiPluginCleansUpFailedChatMessageRegistration
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:sdk_consumer_c_abi_plugin>" c_abi_minimal fail-chat-message-registration
+)
+
+add_test(
     NAME SdkConsumerFixtureCAbiPluginSkipsChatMessageWithoutCapability
     COMMAND sdk_consumer_fixture "$<TARGET_FILE:sdk_consumer_c_abi_plugin>" c_abi_minimal no-chat-message-capability
+)
+
+add_test(
+    NAME SdkConsumerFixtureCAbiPluginSkipsGameplayPolicyWithoutCapability
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:sdk_consumer_c_abi_plugin>" c_abi_minimal no-gameplay-policy-capability
 )
 
 add_test(
