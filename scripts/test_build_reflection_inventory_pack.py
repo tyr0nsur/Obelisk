@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 import sys
@@ -270,6 +271,109 @@ class BuildReflectionInventoryPackTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("do not pass overrides", result.stderr)
         self.assertNotIn("does not exist", result.stderr)
+
+    def test_evidence_pack_mode_plans_exact_focal_snapshot_without_target_set(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            addrs = build_core_fixture(core)
+            core_sha = hashlib.sha256(core.read_bytes()).hexdigest()
+            manifest = root / "pack" / "manifest.json"
+            manifest.parent.mkdir()
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.core-dump-evidence-pack.v1",
+                        "binary": {
+                            "sha256": "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                        },
+                        "core": {
+                            "path": str(core),
+                            "sha256": core_sha,
+                        },
+                        "evidence_status": {"status": "complete", "gdb_core_failed": False},
+                        "fname_root_slots": [{"address": hex(addrs["fname_root_slot"])}],
+                        "gobjects_candidates": [{"address": hex(addrs["gobjects"])}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            output_dir = root / "out"
+
+            result = self.run_builder(
+                [
+                    "--evidence-pack-manifest",
+                    str(manifest),
+                    "--fname-index",
+                    "None=0",
+                    "--fname-index",
+                    "ServerChat=4",
+                    "--plan-target",
+                    "obelisk.ufunction-chain.snapshot.v1:/Script/CoreUObject.ServerChat",
+                    "--output-dir",
+                    str(output_dir),
+                ]
+            )
+
+            stdout_manifest = json.loads(result.stdout)
+            inventory = json.loads((output_dir / "ufunction-inventory.json").read_text(encoding="utf-8"))
+            written_manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(stdout_manifest["summary"]["function_count"], 1)
+        self.assertEqual(written_manifest["inputs"]["plan_targets"], [
+            "obelisk.ufunction-chain.snapshot.v1:/Script/CoreUObject.ServerChat"
+        ])
+        plan = inventory["focal_snapshot_plan"]
+        self.assertEqual(plan["schema"], "obelisk.ufunction-focal-snapshot-plan.v1")
+        self.assertEqual(plan["planned_command_count"], 1)
+        self.assertEqual(plan["blocked_count"], 0)
+        target = plan["targets"][0]
+        self.assertEqual(target["status"], "planned")
+        self.assertEqual(target["promotion_status"], "not_promoted_candidate_only")
+        self.assertIn("redacted or recognition-only", " ".join(target["redaction_review"]))
+        command = plan["snapshot_commands"][0]["argv"]
+        self.assertIn("--snapshot-json", command)
+        self.assertIn("--outer-exact", command)
+        self.assertIn("/Script/CoreUObject", command)
+        self.assertIn("--name-exact", command)
+        self.assertIn("ServerChat", command)
+        self.assertIn("--evidence-artifact-sha256", command)
+        self.assertIn(core_sha, command)
+        self.assertNotIn("--target-set", command)
+
+    def test_plan_target_reports_missing_inventory_target_as_blocked(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            addrs = build_core_fixture(core)
+            output_dir = root / "out"
+
+            self.run_builder(
+                [
+                    "--core",
+                    str(core),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--fname-index",
+                    "None=0",
+                    "--ark-binary-sha256",
+                    "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                    "--plan-target",
+                    "PrimalStructure.IsAllowedToBuild",
+                    "--output-dir",
+                    str(output_dir),
+                ]
+            )
+            inventory = json.loads((output_dir / "ufunction-inventory.json").read_text(encoding="utf-8"))
+
+        plan = inventory["focal_snapshot_plan"]
+        self.assertEqual(plan["planned_command_count"], 0)
+        self.assertEqual(plan["blocked_count"], 1)
+        self.assertEqual(plan["targets"][0]["status"], "blocked")
+        self.assertEqual(plan["targets"][0]["blocker"], "missing_inventory_target")
+        self.assertEqual(plan["targets"][0]["target"], "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild")
 
 
 if __name__ == "__main__":

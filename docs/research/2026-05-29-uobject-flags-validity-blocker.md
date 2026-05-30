@@ -172,7 +172,15 @@ jq '.samples[] | {label,index,object_name,class_name,uobject_flags:.uobject.flag
 
 ## Next Evidence Needed
 
-The smallest useful next step is still offline-only:
+2026-05-31 audit note: the offline-only list below is historical. Post-RC tooling has
+since produced the canonical UObject flag-policy report, transition/sample reports,
+identity-complete fail-closed evaluator, post-callback rejection contract, and
+candidate-only serial policy. Those artifacts narrow internal policy but still do not
+prove runtime rejection or public lookup safety. Do not repeat broad FName/GObjects/core,
+serial-sweep, fullscan, ReflectionScanner, or scanner-like discovery for the current
+binary hash from this section.
+
+Historical offline next step at the time of this note:
 
 1. Use a bounded decompiler/static pass on the existing helper family to recover caller
    options and return polarity for the `0x100` and `0x4000` branches.
@@ -333,3 +341,10 @@ tooling in `scripts/build_uobject_flag_policy_report.py`,
 `scripts/build_uobject_flag_sample_report.py`. The resulting artifacts must remain
 `promotion_ready=false` and `post_callback_resource_handle_ready=false`; use them only as
 internal support for future fail-closed handle-candidate design.
+
+Current blocker after those offline artifacts: runtime negative samples plus runtime
+serial reuse/wraparound semantics under an approved live-ops brief. Unknown wraparound,
+zero/missing serials, serial mismatches, slot reuse without a fresh nonzero match, and
+post-callback use remain fail-closed. Public `ResourceHandle`, public GObjects lookup,
+object identity, mutation, return override, lifecycle names, and SDK exposure remain
+unpromoted.

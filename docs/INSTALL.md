@@ -17,13 +17,15 @@ Recommended root:
 ```text
 <obelisk-root>/
   lib/
+  include/obelisk/
+  lib/cmake/Obelisk/
   plugins/
   config/<plugin-id>/<plugin-config-file>
   logs/<instance-id>/
   state/instances/<instance-id>/
 ```
 
-Install the runtime:
+Install the runtime and SDK package:
 
 ```bash
 ./scripts/install_obelisk.sh --backup-existing <obelisk-root>
@@ -32,9 +34,10 @@ Install the runtime:
 The install root must be supplied explicitly as a positional argument; the installer does
 not default to the live root and does not use inherited `OBELISK_ROOT` when omitted. The
 root must be a non-root absolute path and must not be a symlink. Managed subdirectories
-must also be real directories, not symlinks: `lib`, `plugins`, `include`, `config`, `logs`,
-`state`, and `state/instances`. The installer rejects empty, relative, `/`, symlink roots,
-and symlinked managed paths before creating directories or publishing artifacts.
+must also be real directories, not symlinks: `lib`, `plugins`, `include`,
+`include/obelisk`, `lib/cmake`, `lib/cmake/Obelisk`, `config`, `logs`, `state`, and
+`state/instances`. The installer rejects empty, relative, `/`, symlink roots, and
+symlinked managed paths before creating directories or publishing artifacts.
 
 The script copies:
 
@@ -42,10 +45,12 @@ The script copies:
 build/libobelisk.so                         -> lib/libobelisk.so
 build/_deps/subhook-build/libsubhook.so     -> lib/libsubhook.so
 include/obelisk/ObeliskApi.h                -> include/obelisk/ObeliskApi.h
-build/ObeliskConfig*.cmake                  -> lib/cmake/Obelisk/
+build/ObeliskConfig.cmake                   -> lib/cmake/Obelisk/ObeliskConfig.cmake
+build/ObeliskConfigVersion.cmake            -> lib/cmake/Obelisk/ObeliskConfigVersion.cmake
+build-generated ObeliskTargets.cmake        -> lib/cmake/Obelisk/ObeliskTargets.cmake
 ```
 
-It also creates `plugins`, `config`, `logs`, and `state/instances`.
+It also creates the managed directories shown in the layout above.
 Runtime libraries and SDK files are staged before publication. `libobelisk.so` is produced
 through the CMake `Runtime` component in a temporary install root, then both
 `libsubhook.so` and `libobelisk.so` are installed under temporary `.incoming.<pid>` names

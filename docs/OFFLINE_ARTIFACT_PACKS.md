@@ -35,6 +35,10 @@ cross-binary portability.
   `scripts/build_core_dump_evidence_pack.py` must declare
   `schema: obelisk.core-dump-evidence-pack.v1`; snapshot regeneration consumers reject
   missing or different schemas before using `core.path` defaults.
+- The consume gate treats core dump evidence packs as fail-closed schema-specific
+  manifests: `binary.sha256`, `core.path`, `core.sha256`, and
+  `evidence_status.status=complete` with `gdb_core_failed=false` must be present before
+  the pack can be accepted.
 - `artifact_id` must be a safe component, normally the pack directory name.
 - Snapshot/evidence identity fields such as `capture_id` and `evidence_pack_id` must be
   safe artifact identity components: start with an alphanumeric character, contain only

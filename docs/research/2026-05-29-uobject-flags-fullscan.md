@@ -38,6 +38,10 @@ The output JSON files are redacted summaries:
 Confirmed as an offline blocker refinement: the available copied cores do not provide
 mask-positive `UObject+0x8` samples for `0x100` or `0x4000` across their full object-array
 walks. This makes further broad core scanning a low-value next step for this blocker.
+Later primary-core and post-RC artifacts supplied stronger internal `0x4000` candidate
+accounting, strict reconciliation, and candidate-only serial policy. Treat this fullscan
+as historical evidence that broad copied-core volume is not the blocker on the current
+binary hash.
 
 Not promoted: public `ResourceHandle`, post-callback object identity, lifetime/reuse
 semantics, mutation, and return overrides remain blocked. The scan does not name the bits
@@ -55,6 +59,7 @@ or prove that matching `{index, serial}` pairs are safe after callbacks.
 
 - Use static/decompiler evidence around the weak-handle helper and version-matched UE4
   semantics to classify `UObject+0x8` checks.
-- Do not repeat broad full scans unless a new independent core artifact or a controlled
-  state likely to contain destroyed/pending objects is available.
+- Do not repeat broad full scans for the current binary hash. The next useful evidence is
+  an approved debug-runtime semantic pack with rejected object samples and serial
+  reuse/wraparound observations; absent that live-ops brief, keep the lane no-scan.
 - Keep the evaluator fail-closed with `post_callback_resource_handle_ready=false`.

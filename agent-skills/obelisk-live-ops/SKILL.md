@@ -70,10 +70,10 @@ current-turn operator-approved offline artifact workspace.
 ```bash
 # Only run marker/start/stop commands when that exact change is part of a
 # current-turn operator-approved debug/development instance test window:
-# mkdir -p /servidor/ark/obelisk/state/instances/arkserver2
-# touch /servidor/ark/obelisk/state/instances/arkserver2/enable-process-event-hook
-# touch /servidor/ark/obelisk/state/instances/arkserver2/disable-plugins
-# env -u TMUX ./arkserver2 start
+# mkdir -p /servidor/ark/obelisk/state/instances/<approved-instance-id>
+# touch /servidor/ark/obelisk/state/instances/<approved-instance-id>/enable-process-event-hook
+# touch /servidor/ark/obelisk/state/instances/<approved-instance-id>/disable-plugins
+# env -u TMUX ./<approved-instance-id> start
 ```
 
 Expected logs:
@@ -131,9 +131,9 @@ scripts/check_obelisk_server_posture.sh --expect-stable \
   It is a per-launch debug-window profile for the normal wrapper.
 - Keep `OBELISK_PE_TRACE_LIMIT=0` by default; use short trace windows only for
   current-turn approved exact evidence windows.
-- Do not move debug instrumentation to player-facing `arkserver` / Ragnarok until the same
-  posture is proven on `arkserver2` and the operator gives current-turn approval for an
-  exact privacy-bounded player signal window.
+- Do not move debug instrumentation to any player-facing instance until the same posture
+  is proven on the current approved isolated target and the operator gives current-turn
+  approval for an exact privacy-bounded player signal window.
 
 ## Debug Profiles
 

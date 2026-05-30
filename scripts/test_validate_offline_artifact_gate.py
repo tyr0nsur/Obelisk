@@ -1927,6 +1927,24 @@ def write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
+def core_dump_evidence_pack_manifest(
+    workspace: Path,
+    *,
+    binary_sha256: str = BINARY_SHA,
+    evidence_status: dict | None = None,
+    core_path: str | None = None,
+    core_sha256: str = "c" * 64,
+) -> dict:
+    return {
+        "schema": gate.CORE_DUMP_EVIDENCE_PACK_SCHEMA,
+        "binary": {"sha256": binary_sha256},
+        "evidence_status": evidence_status
+        if evidence_status is not None
+        else {"status": "complete", "gdb_core_failed": False},
+        "core": {"path": core_path if core_path is not None else str(workspace / "core"), "sha256": core_sha256},
+    }
+
+
 def gobjects_two_core_manifest() -> dict:
     sample_set = [
         {"label": "package", "index": 0},
@@ -3058,30 +3076,69 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
             protected = Path(tmp) / "server"
             workspace = protected / "workspace-offline"
             manifest = workspace / "pack" / "manifest.json"
-            write_json(
-                manifest,
-                {
-                    "schema": "obelisk.core-dump-evidence-pack.v1",
-                    "binary": {"sha256": BINARY_SHA},
-                    "evidence_status": {"status": "complete", "gdb_core_failed": False},
-                    "core": {"path": str(workspace / "core"), "sha256": "c" * 64},
-                },
-            )
+            write_json(manifest, core_dump_evidence_pack_manifest(workspace))
             accepted = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
-            write_json(
-                manifest,
-                {
-                    "schema": "obelisk.core-dump-evidence-pack.v1",
-                    "binary": {"sha256": BINARY_SHA},
-                    "evidence_status": {"status": "partial-gdb-failed", "gdb_core_failed": True},
-                },
+            partial_payload = core_dump_evidence_pack_manifest(
+                workspace,
+                evidence_status={"status": "partial-gdb-failed", "gdb_core_failed": True},
             )
+            write_json(manifest, partial_payload)
             blocked = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
 
         self.assertEqual("accepted", accepted["status"])
         blocked_reasons = {b["reason"] for b in blocked["blockers"]}
         self.assertIn("evidence_pack_not_complete", blocked_reasons)
         self.assertIn("evidence_pack_gdb_core_failed", blocked_reasons)
+
+    def test_blocks_core_manifest_missing_fail_closed_status(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "pack" / "manifest.json"
+            payload = core_dump_evidence_pack_manifest(workspace)
+            payload.pop("evidence_status")
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn("evidence_pack_missing_evidence_status", {b["reason"] for b in result["blockers"]})
+
+    def test_blocks_core_manifest_shape_and_expected_binary_mismatch(self) -> None:
+        cases = [
+            ("binary", "evidence_pack_binary_sha256_invalid"),
+            ("core", "evidence_pack_core_missing"),
+            ("core_sha256", "evidence_pack_core_sha256_invalid"),
+            ("core_path", "evidence_pack_core_path_invalid"),
+        ]
+        for field, reason in cases:
+            with self.subTest(field=field), tempfile.TemporaryDirectory() as tmp:
+                protected = Path(tmp) / "server"
+                workspace = protected / "workspace-offline"
+                manifest = workspace / "pack" / "manifest.json"
+                payload = core_dump_evidence_pack_manifest(workspace)
+                if field == "binary":
+                    payload["binary"] = {"sha256": "not-a-sha"}
+                elif field == "core":
+                    payload.pop("core")
+                elif field == "core_sha256":
+                    payload["core"]["sha256"] = "not-a-sha"
+                elif field == "core_path":
+                    payload["core"]["path"] = ""
+                write_json(manifest, payload)
+
+                result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+                self.assertIn(reason, {b["reason"] for b in result["blockers"]})
+
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "pack" / "manifest.json"
+            write_json(manifest, core_dump_evidence_pack_manifest(workspace, binary_sha256="b" * 64))
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn("evidence_pack_binary_sha256_mismatch", {b["reason"] for b in result["blockers"]})
 
     def test_blocks_unknown_manifest_schema_before_generic_claims_acceptance(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -3152,6 +3209,21 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
             result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[pack / artifact_pack.MANIFEST_NAME]))
 
         self.assertIn("unsupported_manifest_schema", {blocker["reason"] for blocker in result["blockers"]})
+
+    def test_artifact_pack_revalidates_core_child_fail_closed_status(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            pack = workspace / "artifact-pack-20260530T072255Z"
+            pack.mkdir(parents=True)
+            child = core_dump_evidence_pack_manifest(workspace, core_path="core")
+            child.pop("evidence_status")
+            write_json(pack / "core-evidence.json", child)
+            artifact_pack.normalize_pack(pack, pack.name, "2026-05-30T07:22:55Z")
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[pack / artifact_pack.MANIFEST_NAME]))
+
+        self.assertIn("evidence_pack_missing_evidence_status", {blocker["reason"] for blocker in result["blockers"]})
 
     def test_artifact_pack_blocks_zero_byte_normalizer_summary_child(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

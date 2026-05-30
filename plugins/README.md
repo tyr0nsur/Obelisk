@@ -80,6 +80,8 @@ owner-token timers to emit a bounded periodic digest of chat counts, send modes,
 message-size buckets. It does not log raw chat text, player/sender identity, UE pointers,
 commands, permissions, moderation decisions, mutations, replies, persistent handles, or
 cross-process/cluster audit state.
+These examples observe copied data only; they are not policy enforcement, command/chat
+authority, storage/webhook, or public module SDK examples.
 Their default configs are safe-disabled and cluster-scoped. They are not part of the first
 release scope or the default top-level build; build them only when explicitly investigating
 experimental examples:

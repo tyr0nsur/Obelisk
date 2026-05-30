@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -61,6 +62,16 @@ def parse_args() -> argparse.Namespace:
         choices=ufunction_inventory.UFUNCTION_TARGET_SETS,
         default=[],
         help="Report coverage against a named UFunction target set.",
+    )
+    parser.add_argument(
+        "--plan-target",
+        action="append",
+        default=[],
+        metavar="Outer.Name",
+        help=(
+            "Plan one exact ad hoc UFunction snapshot without adding a target set. "
+            "Useful for second-wave candidates such as PrimalStructure.IsAllowedToBuild."
+        ),
     )
     parser.add_argument(
         "--fname-index",
@@ -139,6 +150,152 @@ def reject_artifact_symlink(path: Path) -> None:
         raise SystemExit(f"refusing to overwrite symlinked pack artifact: {path}")
 
 
+def repo_commit() -> str:
+    return subprocess.check_output(
+        ["git", "rev-parse", "--short", "HEAD"],
+        cwd=SCRIPT_DIR.parent,
+        text=True,
+    ).strip()
+
+
+def parse_exact_target(target: str) -> tuple[str, str, str]:
+    schema = "obelisk.ufunction-chain.snapshot.v1"
+    schema_part, separator, short_target = target.partition(":")
+    if separator:
+        if schema_part != schema:
+            raise SystemExit(f"--plan-target only supports {schema}: {target}")
+    else:
+        short_target = target
+    outer, dot, name = short_target.rpartition(".")
+    if not dot or not outer or not name:
+        raise SystemExit(f"--plan-target must be an exact Outer.Name target: {target}")
+    return schema, outer, name
+
+
+def plan_output_filename(outer: str, name: str) -> str:
+    return safe_component(f"{outer.replace('/', '_')}.{name}.snapshot.json", "plan-target-output")
+
+
+def focal_snapshot_plan(
+    functions: list[dict[str, object]],
+    *,
+    requested_targets: list[str],
+    core: Path,
+    gobjects: int,
+    fname_root_slot: int,
+    binary_sha: str,
+    core_sha: str,
+    capture_id: str,
+    evidence_pack_id: str,
+    max_object_scan: int,
+) -> dict[str, object]:
+    inventory_by_key: dict[str, list[dict[str, object]]] = {}
+    for item in functions:
+        outer = item.get("outer_name")
+        name = item.get("name")
+        if isinstance(outer, str) and isinstance(name, str) and outer and name:
+            inventory_by_key.setdefault(f"{outer}.{name}", []).append(item)
+
+    obelisk_commit = repo_commit()
+    records: list[dict[str, object]] = []
+    commands: list[dict[str, object]] = []
+    blockers: list[dict[str, object]] = []
+    seen: set[str] = set()
+    for raw_target in requested_targets:
+        schema, outer, name = parse_exact_target(raw_target)
+        target = f"{outer}.{name}"
+        if target in seen:
+            raise SystemExit(f"duplicate --plan-target: {target}")
+        seen.add(target)
+        matches = inventory_by_key.get(target, [])
+        if not matches:
+            status = "blocked"
+            blocker = "missing_inventory_target"
+        elif len(matches) > 1:
+            status = "blocked"
+            blocker = "ambiguous_inventory_target"
+        else:
+            status = "planned"
+            blocker = None
+
+        record: dict[str, object] = {
+            "target": f"{schema}:{target}",
+            "short_target": target,
+            "inventory_status": "present" if len(matches) == 1 else "missing" if not matches else "ambiguous",
+            "inventory_match_count": len(matches),
+            "status": status,
+            "promotion_status": "not_promoted_candidate_only",
+            "snapshot_output_hint": f"<non-protected-review-output>/{plan_output_filename(outer, name)}",
+            "redaction_review": [
+                "review placement structs, location vectors, rotation values, player/controller context, object refs, arrays, and raw params before any copied payload",
+                "keep non-scalar or identity-bearing fields redacted or recognition-only unless separately promoted",
+            ],
+            "non_claims": [
+                "does not add a target set or fixture",
+                "does not promote StructureEvents, build-policy SDK, runtime hooks, mutation, or return override",
+            ],
+        }
+        if blocker is not None:
+            record["blocker"] = blocker
+            blockers.append({"target": f"{schema}:{target}", "reason": blocker})
+        else:
+            command = [
+                sys.executable,
+                "scripts/inspect_core_ufunctions.py",
+                "--core",
+                str(core),
+                "--gobjects",
+                hex(gobjects),
+                "--fname-root-slot",
+                hex(fname_root_slot),
+                "--outer-exact",
+                outer,
+                "--name-exact",
+                name,
+                "--max-object-scan",
+                str(max_object_scan),
+                "--inspection-mode",
+                "ufunction",
+                "--snapshot-json",
+                "--evidence-ark-sha256",
+                binary_sha,
+                "--evidence-artifact-sha256",
+                core_sha,
+                "--evidence-artifact-kind",
+                "offline_core",
+                "--evidence-capture-id",
+                capture_id,
+                "--evidence-pack-id",
+                evidence_pack_id,
+                "--evidence-obelisk-commit",
+                obelisk_commit,
+            ]
+            record["snapshot_command"] = command
+            commands.append({"target": f"{schema}:{target}", "argv": command})
+        records.append(record)
+
+    return {
+        "schema": "obelisk.ufunction-focal-snapshot-plan.v1",
+        "requested_count": len(requested_targets),
+        "planned_command_count": len(commands),
+        "blocked_count": len(blockers),
+        "core": str(core),
+        "gobjects": hex(gobjects),
+        "fname_root_slot": hex(fname_root_slot),
+        "artifact_identity": {
+            "artifact_kind": "offline_core",
+            "artifact_sha256": core_sha,
+            "capture_id": capture_id,
+            "evidence_pack_id": evidence_pack_id,
+        },
+        "binary": {"sha256": binary_sha},
+        "targets": records,
+        "snapshot_commands": commands,
+        "blockers": blockers,
+        "promotion_status": "not_promoted_candidate_only",
+    }
+
+
 def write_json(path: Path, payload: dict[str, object]) -> None:
     reject_artifact_symlink(path)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -156,8 +313,9 @@ def main() -> int:
         raise SystemExit("--max-params must be non-negative")
     if args.min_params is not None and args.max_params is not None and args.min_params > args.max_params:
         raise SystemExit("--min-params must be less than or equal to --max-params")
-    if args.plan_regeneration and not args.target_set:
-        raise SystemExit("--plan-regeneration requires at least one --target-set")
+    if args.plan_regeneration and not args.target_set and not args.plan_target:
+        raise SystemExit("--plan-regeneration requires at least one --target-set or --plan-target")
+    target_set_plan_regeneration = args.plan_regeneration and bool(args.target_set)
 
     output_dir = reject_protected_output_path(args.output_dir, "--output-dir")
     require_ignored_output_path(output_dir, "--output-dir")
@@ -191,7 +349,7 @@ def main() -> int:
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    if args.plan_regeneration:
+    if target_set_plan_regeneration:
         reject_protected_input_path(args.snapshot_manifest, "--snapshot-manifest")
         snapshot_manifest = ufunction_inventory.load_snapshot_manifest(args.snapshot_manifest)
     else:
@@ -218,11 +376,11 @@ def main() -> int:
             max_groups=args.max_groups,
             filters=filters,
             target_sets=args.target_set,
-            include_functions=args.include_functions,
+            include_functions=args.include_functions or bool(args.plan_target),
             redact_pointers=True,
             snapshot_manifest=snapshot_manifest,
-            snapshot_manifest_path=args.snapshot_manifest if args.plan_regeneration else None,
-            plan_regeneration=args.plan_regeneration,
+            snapshot_manifest_path=args.snapshot_manifest if target_set_plan_regeneration else None,
+            plan_regeneration=target_set_plan_regeneration,
             evidence_pack_manifest=evidence_pack_manifest,
             evidence_pack_payload=(
                 {
@@ -237,6 +395,23 @@ def main() -> int:
         fname_table = memory.read_ptr(fname_root_slot)
     finally:
         memory.close()
+
+    if args.plan_target:
+        functions = inventory_payload.get("functions")
+        if not isinstance(functions, list):
+            raise SystemExit("--plan-target requires redacted function inventory")
+        inventory_payload["focal_snapshot_plan"] = focal_snapshot_plan(
+            [item for item in functions if isinstance(item, dict)],
+            requested_targets=args.plan_target,
+            core=core,
+            gobjects=gobjects,
+            fname_root_slot=fname_root_slot,
+            binary_sha=binary_sha,
+            core_sha=core_sha,
+            capture_id=capture_id,
+            evidence_pack_id=evidence_pack_id,
+            max_object_scan=args.max_objects,
+        )
 
     fname_payload = {
         "schema": fname_scanner.ROOT_VALIDATION_SCHEMA,
@@ -284,6 +459,7 @@ def main() -> int:
         "inputs": {
             "evidence_pack_manifest": str(evidence_pack_manifest) if evidence_pack_manifest else None,
             "target_sets": args.target_set,
+            "plan_targets": args.plan_target,
             "max_objects": args.max_objects,
             "fname_indices": [{"label": label, "index": index} for label, index in indices],
         },

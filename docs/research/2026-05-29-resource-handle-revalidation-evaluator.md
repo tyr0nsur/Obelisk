@@ -13,21 +13,25 @@ FName data, FUObjectItem addresses, or raw serial values.
 ## Current Posture
 
 With the narrow copied-offline reconciliation reports, accepted samples still had zero
-serial-candidate values. Later broad serial scans supersede that narrow conclusion for the
-full object array: `FUObjectItem+0x8` has nonzero serial candidates in both copied cores.
-That is serial-only evidence and does not prove public `ResourceHandle` readiness. Static
-global evidence also remains blocked unless it proves a coherent root/chunks/count/serial
-field window for the same candidate.
+serial-candidate values. Existing serial-scan/fullscan and strict reconciliation
+artifacts supersede that narrow conclusion for the current binary hash:
+`FUObjectItem+0x8` has accepted nonzero serial candidates, including identity-complete
+internal evidence. That is historical/internal serial evidence only; it is not a request
+to run another broad serial sweep and it does not prove public `ResourceHandle`
+readiness.
 
-If redacted field-window evidence clears `missing_gobjects_coherent_field_window`, that is
-only a static-contract improvement. It may set the coherent-window booleans in this
-evaluator, but it must not flip `post_callback_resource_handle_ready`; serial/lifetime
-revalidation and `uobject_flags_validity_semantics_unproven` remain independent blockers.
+The static coherent field-window and artifact-identity gaps have been narrowed by later
+post-RC artifacts for internal planning. They must still not flip
+`post_callback_resource_handle_ready`; rejected runtime object samples, runtime
+serial-reuse/wraparound semantics, lookup privacy, public lifecycle naming, and API/SDK
+contracts remain independent blockers.
 
 The expected active blockers depend on the input pack:
 
+- `no_rejected_runtime_object_samples`
+- `no_serial_reuse_or_wraparound_policy`
 - `uobject_flags_validity_semantics_unproven`
-- lifetime/reuse behavior not proven
+- public lookup/privacy/API contract not proven
 
 Older or narrower packs may also report `missing_gobjects_coherent_field_window`; the
 `resource-handle-nonzero-revalidation-20260529T060741Z` pack clears that static-contract
@@ -37,6 +41,10 @@ Treat `zero_or_missing_fuobjectitem_serial_candidates` as historical or narrow-s
 evidence when reviewing old evaluator output. A current evaluator should distinguish
 `no_nonzero_serial_candidates_found` from expected mixed zero/nonzero serials in broad
 object-array scans.
+
+Do not answer any of those historical blocker names by creating a fresh broad scan for the
+current binary hash. Use the canonical post-RC inputs and target only the future
+approved-runtime semantic artifacts.
 
 `post_callback_resource_handle_ready` remains `false`. ResourceHandle, object identity,
 mutation, and return override surfaces remain unpromoted.

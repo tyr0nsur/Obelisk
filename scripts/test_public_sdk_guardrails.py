@@ -1280,6 +1280,20 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         )
         self.assertIn('"include/obelisk/ObeliskApi.h"', installer)
         self.assertIn("include/obelisk/ObeliskApi.h", install_doc)
+        self.assertIn('"lib/cmake/Obelisk/ObeliskConfig.cmake"', installer)
+        self.assertIn('"lib/cmake/Obelisk/ObeliskConfigVersion.cmake"', installer)
+        self.assertIn('"lib/cmake/Obelisk/ObeliskTargets.cmake"', installer)
+        self.assertIn("lib/cmake/Obelisk/ObeliskConfig.cmake", install_doc)
+        self.assertIn("lib/cmake/Obelisk/ObeliskConfigVersion.cmake", install_doc)
+        self.assertIn("lib/cmake/Obelisk/ObeliskTargets.cmake", install_doc)
+        for managed_subpath in (
+            "include/obelisk",
+            "lib/cmake",
+            "lib/cmake/Obelisk",
+        ):
+            with self.subTest(managed_subpath=managed_subpath):
+                self.assertIn(f'"{managed_subpath}"', installer)
+                self.assertIn(f"`{managed_subpath}`", install_doc)
         self.assertNotIn("include/obelisk/*.h", install_doc)
 
     def test_nextgenplugins_absolute_path_stays_out_of_public_docs_and_skills(self) -> None:
@@ -3366,6 +3380,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 "Foundation V1 is enough for small, honest Plugin Hub seeds when the support tier is explicit",
                 "Production-supported seeds:",
                 "process-local timer utilities",
+                "This list names ABI primitives, not Plugin Hub module tiers",
                 "Experimental pattern examples only:",
                 "copied `GameplayPolicyEvent` auditors",
                 "Keep passive copied chat parsing experimental and local-only",
@@ -3384,6 +3399,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 "The production-supported additions after `v0.1` are descriptor readers and process-local timer utilities",
                 "Passive copied-chat parsers and copied policy auditors are experimental pattern examples only",
                 "promoted in the public ABI, recorded in the capability matrix, and documented with its own evidence gate",
+                "These examples observe copied data only",
+                "not policy enforcement, command/chat authority, storage/webhook, or public module SDK examples",
             ),
         }
 

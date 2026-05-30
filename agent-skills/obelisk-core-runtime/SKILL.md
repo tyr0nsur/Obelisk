@@ -161,15 +161,15 @@ instead of clearing the hook while patched bytes may still execute.
 
 Do not treat any shared or player-facing ARK instance as a validation target by default.
 Read `docs/agent-handoff/CURRENT.md` for the current live target posture before any
-server-backed work. Use only the named target approved there or in the current operator
-turn. `arkserver` / Ragnarok is a player-facing beta target only inside an announced,
-privacy-bounded feature-test window. `arkserver2` / TheIsland is the isolated debug target
-when player involvement is not desired, but it still requires an approved scoped run
-before starts, restarts, marker edits, or runtime observation.
+server-backed work. Use only the exact instance/map named by the current approved
+live-ops brief. Historical instance names in notes or older runbooks are not approval and
+must not be treated as defaults for starts, restarts, marker edits, runtime observation,
+or `/servidor/ark` access.
 
 For risky probes such as ReflectionScanner, native exec, ptrace/gcore, broad tracing, or
-text/gameplay-payload logging, first obtain explicit operator approval for the exact debug
-instance run, marker changes, restart window, rollback plan, and shutdown at the end.
+text/gameplay-payload logging, first obtain explicit operator approval for the exact
+instance/map, marker changes, restart window, rollback plan, evidence path, and shutdown
+expectation.
 
 For an approved validation target, use the target's explicit map, instance id, copied logs,
 and posture command. Do not run these checks on a protected production instance unless the

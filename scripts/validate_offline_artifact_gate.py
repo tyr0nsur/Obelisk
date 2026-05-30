@@ -2972,6 +2972,65 @@ def validate_claims(payload: dict[str, Any], *, label: str, mode: str) -> list[d
     return blockers
 
 
+def validate_core_dump_evidence_pack_manifest(
+    payload: dict[str, Any],
+    *,
+    label: str,
+    manifest_path: Path,
+    workspace_root: Path,
+    protected_root: Path,
+    expected_binary_sha256: str | None,
+) -> list[dict[str, Any]]:
+    if payload.get("schema") != CORE_DUMP_EVIDENCE_PACK_SCHEMA:
+        return []
+
+    blockers: list[dict[str, Any]] = []
+    binary = payload.get("binary")
+    if not isinstance(binary, dict) or not isinstance(binary.get("sha256"), str) or SHA256_RE.fullmatch(binary["sha256"]) is None:
+        blockers.append({"reason": "evidence_pack_binary_sha256_invalid", "label": f"{label}:$.binary.sha256"})
+    elif expected_binary_sha256 is not None and binary["sha256"] != expected_binary_sha256:
+        blockers.append(
+            {
+                "reason": "evidence_pack_binary_sha256_mismatch",
+                "label": f"{label}:$.binary.sha256",
+                "expected_binary_sha256": expected_binary_sha256,
+                "recorded_binary_sha256": binary["sha256"],
+            }
+        )
+
+    evidence_status = payload.get("evidence_status")
+    if not isinstance(evidence_status, dict):
+        blockers.append({"reason": "evidence_pack_missing_evidence_status", "label": f"{label}:$.evidence_status"})
+
+    core = payload.get("core")
+    if not isinstance(core, dict):
+        blockers.append({"reason": "evidence_pack_core_missing", "label": f"{label}:$.core"})
+        return blockers
+
+    core_sha256 = core.get("sha256")
+    if not isinstance(core_sha256, str) or SHA256_RE.fullmatch(core_sha256) is None:
+        blockers.append({"reason": "evidence_pack_core_sha256_invalid", "label": f"{label}:$.core.sha256"})
+
+    core_path = core.get("path")
+    if not isinstance(core_path, str) or not core_path:
+        blockers.append({"reason": "evidence_pack_core_path_invalid", "label": f"{label}:$.core.path"})
+        return blockers
+
+    core_candidate = Path(core_path)
+    if not core_candidate.is_absolute():
+        core_candidate = manifest_path.parent / core_candidate
+    blockers.extend(
+        path_blockers(
+            core_candidate,
+            label=f"{label}:$.core.path",
+            workspace_root=workspace_root,
+            protected_root=protected_root,
+            require_workspace=True,
+        )
+    )
+    return blockers
+
+
 def validate_scriptstruct_inventory_child_artifact(
     artifacts: dict[str, Any],
     key: str,
@@ -7627,6 +7686,16 @@ def validate_manifest(
             protected_root=protected_root,
             mode=mode,
             strict_target_set_coverage=strict_target_set_coverage,
+            expected_binary_sha256=expected_binary_sha256,
+        )
+    )
+    blockers.extend(
+        validate_core_dump_evidence_pack_manifest(
+            payload,
+            label=str(resolved),
+            manifest_path=resolved,
+            workspace_root=workspace_root,
+            protected_root=protected_root,
             expected_binary_sha256=expected_binary_sha256,
         )
     )

@@ -38,6 +38,9 @@ Foundation V1 contains only the public ABI already exposed by `ObeliskApi.h`:
 - owner-token, process-local timers
 - raw `ProcessEvent` callbacks only as debug-gated runtime plumbing, not as Plugin Hub API
 
+This list names ABI primitives, not Plugin Hub module tiers. Use the support-tier split
+below before presenting any example as production-supported, experimental, or blocked.
+
 Plugins should use `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md` to decide which intents are safe
 today. If an intent is marked "not ready", a plugin must not fill the gap with raw UE
 pointers, GObjects traversal, raw params, return overrides, mutation, or copied ArkApi

@@ -111,13 +111,11 @@ scripts/check_obelisk_server_posture.sh --expect-stable --map <map> --instance <
 ```
 
 Use explicit `--map` and `--instance`; do not rely on script defaults during Obelisk debug
-rounds. Read `docs/agent-handoff/CURRENT.md` before server validation. `arkserver` /
-Ragnarok is a player-facing beta target only inside an approved announced feature-test
-window. `arkserver2` / TheIsland is the isolated debug target when player involvement is
-not desired, but it still requires an approved scoped run before starts, restarts, marker
-edits, or runtime observation. Do not move debug instrumentation to player-facing
-Ragnarok until the same posture is proven on an isolated target and the operator approves
-that specific player-signal window.
+rounds. Read `docs/agent-handoff/CURRENT.md` before server validation. Server validation
+has no default target: use only the exact instance/map named by a current approved
+live-ops brief, with scoped marker edits, start/restart window, evidence path, rollback,
+and shutdown expectation. Do not infer targets from historical notes, older runbooks, or
+previous conversation state.
 
 Check that no files matching these patterns are staged:
 

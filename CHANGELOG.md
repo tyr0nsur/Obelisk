@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Added a candidate-only focal snapshot planner for exact second-wave structure
+  build-policy UFunction targets, extended offline artifact gates to validate
+  `obelisk.core-dump-evidence-pack.v1` manifests schema-specifically, clarified that
+  ResourceHandle no longer needs repeated broad scans on the current binary hash, and
+  removed named server defaults from operational skills.
 - Hardened post-RC SDK/evidence boundaries so copied-event `DestroyUserData` cleanup runs
   inside the matching gameplay callback scope, core evidence-pack manifests carry an
   explicit schema before snapshot consumers trust `core.path`, target-set listings state

@@ -9,6 +9,16 @@ This note is design-only. It does not add a public ABI, does not promote `GObjec
 not expose raw `UObject`, and does not authorize runtime server access, marker changes,
 ptrace, `gcore`, ReflectionScanner, native exec probes, mutation, or return overrides.
 
+2026-05-31 audit note: this roadmap is historical design context. Current routing lives
+in [2026-05-30-post-rc-offline-resourcehandle-priority.md](2026-05-30-post-rc-offline-resourcehandle-priority.md).
+Do not use the older "Minimal Next Step" list below to request fresh broad FName,
+GObjects, core, UFunction, serial-sweep, or scanner-like discovery for the current binary
+hash. The static field-window, identity-complete evaluator, post-callback rejection
+contract, and candidate-only serial policy are already sufficient for internal planning.
+The remaining ResourceHandle blocker is semantic runtime evidence under an approved
+live-ops brief: rejected runtime object samples and runtime serial reuse/wraparound
+behavior, with public API promotion still blocked.
+
 ## Current Evidence Boundary
 
 `minimal-second-source-intake` is now ready:
@@ -196,13 +206,11 @@ Public ABI and SDK tests, only when a public handle is proposed:
 
 ## Evidence Still Missing
 
-- A promotion-grade same-instance proof for the `FUObjectArray` candidate: either a
-  coherent local executable window or decompiler/static evidence tying root, chunks,
-  count, and serial to the same instance.
-- A distinct second-source GObjects/UObject promotion report, not just UFunction snapshot
-  readiness, with artifact-specific FName root and direct target/class/outer membership.
-- Nonzero serial evidence or static decompiler evidence sufficient to prove
-  `FUObjectItem+0x8` invalidation behavior, zero handling, and slot reuse.
+- Runtime rejected-object samples proving that a structurally valid `{index, serial}`
+  candidate with object present fails closed for the reviewed `UObject+0x8` flag policy.
+- Runtime serial semantics showing that fresh same-frame nonzero matches behave as
+  expected and that zero, missing, mismatch, reuse-without-fresh-serial, and unknown
+  wraparound remain rejected.
 - Closure for `uobject_flags_validity_semantics_unproven`: a mapping for the
   `UObject+0x8` masks used by the handle accessor path, including negative samples or an
   independent source/decompiler path for the exact reject semantics.
@@ -213,12 +221,12 @@ Public ABI and SDK tests, only when a public handle is proposed:
 
 Do not implement `ResourceHandle` yet. The next useful step is evidence-only:
 
-1. Close or formally refine the same-instance static blocker for `0x595b7e0` using the
-   narrow decompiler/static plan already scoped around `0x1d4a8b0..0x1d4aa18`,
-   `0x1d56970..0x1d56a26`, and `0x1d56d60..0x1d56ecd`.
-2. Produce a second-source GObjects/UObject reconciliation report with explicit
-   artifact-specific FName root, no protected paths, complete artifact identity, and
-   direct target/class/outer membership.
-3. Keep any handle design internal and hook-frame-only until serial lifetime/reuse and
-   `uobject_flags_validity_semantics_unproven` are resolved; do not promote public
-   identity, post-callback lookup, mutation, or return overrides.
+1. Reuse the canonical no-scan inputs listed in the post-RC priority note; do not repeat
+   broad static/core/GObjects/serial discovery on the current binary hash.
+2. Wait for an operator-approved debug/runtime observation brief before attempting the two
+   runtime semantic artifacts: rejected object samples and serial reuse/wraparound
+   semantics.
+3. Keep any handle design internal and hook-frame-only until those runtime semantics,
+   lookup privacy, public lifecycle policy, ABI/SDK guardrails, and public contract work
+   are separately proven; do not promote public identity, post-callback lookup, mutation,
+   or return overrides.
