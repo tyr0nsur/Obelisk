@@ -19,6 +19,10 @@ def normalized(text: str) -> str:
     return " ".join(text.split())
 
 
+def normalized_contains(text: str, expected: str) -> bool:
+    return normalized(expected) in normalized(text)
+
+
 def sentences(text: str) -> list[str]:
     return [part.strip() for part in re.split(r"(?<=[.!?|\n])\s+", text) if part.strip()]
 
@@ -39,6 +43,46 @@ def cmake_targets(cmake: str) -> list[tuple[str, str, str]]:
 
 
 class ReleaseScopeGuardrailTests(unittest.TestCase):
+    def assertNormalizedIn(self, expected: str, text: str, msg: str | None = None) -> None:
+        self.assertTrue(normalized_contains(text, expected), msg or expected)
+
+    def assertRcPublicScopeClaim(self, path: str, text: str) -> None:
+        compact = normalized(text)
+        match = re.search(
+            r"RC public scope remains limited to (?P<claim>[^.]*DescribeGameplayPolicyEventKind)",
+            compact,
+        )
+        self.assertIsNotNone(match, f"{path}: missing limited RC public scope claim")
+        claim = match.group("claim") if match else ""
+
+        allowed_surfaces = [
+            "GameplayPolicyEvent",
+            "minimal copied `ChatMessageEvent`",
+            "DescribeResourceKind",
+            "DescribeGameplayPolicyEventKind",
+        ]
+        forbidden_scope_additions = re.compile(
+            r"\b(?:Inventory|StructureEvents|Mission|Transfer|Dino|Buff|Tribe|Player|"
+            r"Admin|Command|Permission|gameplay/module timer)\b",
+            re.IGNORECASE,
+        )
+        with self.subTest(file=path, claim="RC public scope"):
+            for surface in allowed_surfaces:
+                self.assertIn(surface, claim)
+            self.assertIsNone(forbidden_scope_additions.search(claim), claim)
+
+    def assertCurrentTurnReleaseAuthorization(self, path: str, text: str) -> None:
+        compact = normalized(text)
+        self.assertRegex(
+            compact,
+            re.compile(
+                r"\bNo\b[^.]*\btag or release-ref push\b[^.]*\b(?:release-manager|lead)\b"
+                r"[^.]*\bauthorization\b[^.]*\bcurrent[- ]turn\b",
+                re.IGNORECASE,
+            ),
+            f"{path}: tag/release-ref authorization must be explicit and current-turn scoped",
+        )
+
     def test_first_stable_included_scope_is_documented_as_baseline(self) -> None:
         release = read("docs/RELEASE.md")
         status = read("docs/STATUS.md")
@@ -444,19 +488,19 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("scripts/check_release_readiness.sh", release)
         self.assertIn("--ufunction-second-source-root <second-source-ufunction-snapshots>", release)
         self.assertIn("refreshed root recorded in", release)
-        self.assertIn("do not reuse it as the\nfinal root for any later candidate", release)
+        self.assertNormalizedIn("do not reuse it as the final root for any later candidate", release)
         self.assertIn("including current bool-tail metadata", release)
         self.assertIn("--second-source-report-dir /tmp/obelisk-rc-second-source", release)
         self.assertIn("`oPolicyAudit`", release)
         self.assertIn("Verify the ABI v1 freeze artifacts before tagging", release)
-        self.assertIn("Obelisk freezes the\n   current append-only `ObeliskApi` ABI v1", release)
+        self.assertNormalizedIn("Obelisk freezes the current append-only `ObeliskApi` ABI v1", release)
         self.assertIn("Any ABI v2 must use an explicit migration plan", release)
-        self.assertIn("installed SDK consumer validation, and the `oBaseEvents` release\n   example", release)
+        self.assertNormalizedIn("installed SDK consumer validation, and the `oBaseEvents` release example", release)
         self.assertIn("Owner-token public registrations must keep using the plugin owner's init-time", release)
         self.assertIn("first-stable plugin scope excludes background-work plugins", release)
         self.assertIn("idempotent shutdown through `ObeliskPlugin_Shutdown`", release)
         self.assertIn("owner-token callback handles unregistered before unload", release)
-        self.assertIn("threads\n   joined, sockets/files closed", release)
+        self.assertNormalizedIn("threads joined, sockets/files closed", release)
         self.assertIn("scripts/check_release_readiness.sh", pr_template)
         self.assertIn("scripts/check_release_readiness.sh", ci)
         self.assertIn("scripts/check_release_readiness.sh", build_skill)
@@ -494,13 +538,14 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("scripts/install_obelisk_plugin.sh --dry-run", script)
         self.assertIn("${BUILD_DIR}/plugins/oBaseEvents/oBaseEvents.so", script)
         self.assertIn("${BUILD_DIR}/plugins/oProcessTimer/oProcessTimer.so", script)
+        self.assertIn("${BUILD_DIR}/plugins/oDescriptorCatalog/oDescriptorCatalog.so", script)
         self.assertNotIn("oPolicyAudit.so", script)
         rc_smoke = read("scripts/check_rc_layout_evidence_smoke.sh")
         self.assertIn("freshly assembled for the intended HEAD", rc_smoke)
-        self.assertIn("including current\nbool-tail metadata", rc_smoke)
+        self.assertNormalizedIn("including current bool-tail metadata", rc_smoke)
         self.assertIn("do not reuse the historical v0.1.0-rc.1 root", rc_smoke)
         self.assertIn("--require-second-source-readiness", release)
-        self.assertIn("an existing local\nor unpublished RC tag is not proof", release)
+        self.assertNormalizedIn("an existing local or unpublished RC tag is not proof", release)
         self.assertIn("may point behind the current validated head", normalized(release))
         self.assertIn("tag was checked against the intended release ref", normalized(status))
         self.assertIn("exact tag/ref verification", normalized(status))
@@ -526,14 +571,17 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("promotion_gate.ready_scope=layout_only", release)
         self.assertIn("promotion_gate.promotion_ready=false", release)
         self.assertIn("does not by itself promote a public Inventory SDK", release)
-        self.assertIn("redacted signature manifests accepted in offline-artifact consume mode remain\ncandidate-only", release)
+        self.assertNormalizedIn(
+            "redacted signature manifests accepted in offline-artifact consume mode remain candidate-only",
+            release,
+        )
         self.assertIn("transfer-ufunction-intake", release)
         self.assertIn("transfer-scriptstruct", release)
         self.assertIn("is layout-only offline evidence", release)
-        self.assertIn("does not promote a\npublic Transfer SDK", release)
+        self.assertNormalizedIn("does not promote a public Transfer SDK", release)
         self.assertIn("UObject flag transition matrices and static flag-policy reports", release)
-        self.assertIn("pass the offline\nartifact gate in consume mode are candidate evidence only", release)
-        self.assertIn("does\nnot prove lifecycle/validity semantics", release)
+        self.assertNormalizedIn("pass the offline artifact gate in consume mode are candidate evidence only", release)
+        self.assertNormalizedIn("does not prove lifecycle/validity semantics", release)
         self.assertIn("does not satisfy promote-mode artifact gates", release)
         self.assertIn("must not unlock `ResourceHandle`, object lookup, GObjects promotion", release)
         self.assertIn("does not prove resource cross-event correlation", release)
@@ -565,7 +613,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             normalized(release),
         )
         self.assertIn("not promote a public SDK/API surface", release)
-        self.assertIn("Explicit\n`--ufunction-second-source-target-set` values add module target sets", release)
+        self.assertNormalizedIn("Explicit `--ufunction-second-source-target-set` values add module target sets", release)
         self.assertIn("they do not replace or omit the public RC gate", release)
         self.assertIn("--ufunction-second-source-target-set minimal-second-source-intake", release)
         self.assertIn("ScriptStruct promotion, including transfer structs, is not part of the default gate", release)
@@ -583,7 +631,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("validate_second_source_report_dir", script)
         self.assertIn("git check-ignore", script)
         self.assertIn("Second-source report dir inside the repository must be ignored", script)
-        self.assertIn("unignored in-repo report paths are rejected before the\nrelease build starts", release)
+        self.assertNormalizedIn("unignored in-repo report paths are rejected before the release build starts", release)
         self.assertIn("--fail-on-readiness-gaps", script)
         self.assertIn("gate_mode=second_source_promotion", release)
         self.assertIn("promotion_gate.ready=true", release)
@@ -593,7 +641,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("required positional install roots even when `OBELISK_ROOT` is set", release)
         self.assertIn("analyze_runtime_observer_log.py --fail-on-quality-blockers", release)
         self.assertIn("not a release gate", release)
-        self.assertIn("not\nsecond-source promotion evidence", release)
+        self.assertNormalizedIn("not second-source promotion evidence", release)
         self.assertIn("Module-level field aggregates are not promotable layouts", release)
         self.assertIn("not used as promotion evidence", release)
         self.assertIn("per target set/function", release)
@@ -621,9 +669,31 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
                 self.assertIn("stale", lower)
 
     def test_current_handoff_stays_compact(self) -> None:
-        current_lines = read("docs/agent-handoff/CURRENT.md").splitlines()
+        current = read("docs/agent-handoff/CURRENT.md")
+        section_headings = re.findall(r"^##\s+", current, re.M)
 
-        self.assertLessEqual(len(current_lines), 220)
+        self.assertLessEqual(len(section_headings), 8)
+        self.assertNotIn("```", current)
+        self.assertNotRegex(current, r"(?m)^###\s+")
+
+        compact = normalized(current)
+        for expected in [
+            "This file is an active routing table only",
+            "Durable evidence belongs in `docs/research/`",
+            "resume facts in `COMPACT_CONTEXT.md`",
+            "use `git log --oneline -1`",
+        ]:
+            with self.subTest(item=expected):
+                self.assertIn(expected, compact)
+
+        for stale_detail in [
+            "Include only:",
+            "Validate:",
+            "checkpoint zero",
+            "0-pre/0a/0b slicing sequence",
+        ]:
+            with self.subTest(stale_detail=stale_detail):
+                self.assertNotIn(stale_detail, compact)
 
     def test_core_timers_stay_distinct_from_gameplay_module_timer_apis(self) -> None:
         docs = {
@@ -713,14 +783,6 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
                     self.assertIn(item, compact)
 
     def test_rc_publication_guardrails_are_consistent(self) -> None:
-        required_phrase = (
-            "RC public scope remains limited to `GameplayPolicyEvent`, the minimal copied "
-            "`ChatMessageEvent`, `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`."
-        )
-        authorization_phrase = (
-            "No tag or release-ref push is authorized without explicit release-manager/lead "
-            "authorization for the current turn."
-        )
         published_pattern = (
             r"`?v?0\.1\.0-rc\.2`? is (?:the )?(?:current )?published|"
             r"published release-candidate baseline is core-first `v0\.1\.0-rc\.2`|"
@@ -741,7 +803,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             with self.subTest(file=path, item="published rc baseline"):
                 self.assertRegex(text, r"0\.1\.0-rc\.[12]")
             with self.subTest(file=path, item="public api scope"):
-                self.assertIn(required_phrase, compact)
+                self.assertRcPublicScopeClaim(path, text)
 
         for path in ("docs/RELEASE.md", "docs/STATUS.md", "docs/agent-handoff/CURRENT.md", "docs/agent-handoff/COMPACT_CONTEXT.md"):
             text = docs[path]
@@ -758,7 +820,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             compact = normalized(text)
             lower = compact.lower()
             with self.subTest(file=path, item="future unauthorized push guardrail"):
-                self.assertIn(authorization_phrase, compact)
+                self.assertCurrentTurnReleaseAuthorization(path, text)
             with self.subTest(file=path, item="future stale tag guardrail"):
                 self.assertIn("stale", lower)
                 self.assertRegex(lower, r"(not publicable|do not recreate|must not be reused|are not reused or pushed|recreated only after rerunning)")

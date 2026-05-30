@@ -136,6 +136,10 @@ recovery context is not active routing for the current head; use
   `UseItemOntoItem`, all `ReturnValue` only. Do not reuse
   `INVENTORY_USE_CHECK`, do not map `CanRepair.bIgnoreInventoryRequirement` to
   `IGNORE_COOLDOWN`, and do not backfill the frozen `v0.1.0-rc.2` scope.
+- `ChatMessageEvent` is sufficient for plugin-local command parsing/handlers in the next
+  RC scope when described as copied chat input only, not a command SDK: no identity,
+  permissions, replies, send-chat API, blocking, mutation, or return override. Before an
+  RC claim, rerun chat/ABI/SDK/release guardrails.
 - Mission copied-bool observer remains internal and non-authoritative. Mission bool-tail
   evidence is consume-only non-promotion: consume mode accepts and promote mode blocks.
 - Mission bool-tail evidence preserves `bool_field_size=1`, `bool_byte_offset=0`,
@@ -155,8 +159,8 @@ recovery context is not active routing for the current head; use
 - Transfer ScriptStruct fixtures already preserve `ArkTributePlayerData` bool-tail
   metadata for `bWasAllowDPCUpload`, `bWithItems`, and `bForServerTransfer`. The current
   stale second-source/inventory artifacts under `/servidor/ark/workspace-offline` should
-  not be reused until regenerated; local inventory tooling now preserves and gates
-  `bool_field_size`/`bool_byte_offset`.
+  not be reused until regenerated; no valid local second source exists under the repo or
+  `/home/flowcommunity-ark/obelisk-artifacts`.
 
 ## ResourceHandle Blockers
 
@@ -173,6 +177,10 @@ recovery context is not active routing for the current head; use
   serials, or UE pointers.
 - `ResourceHandle` semantic promotion still needs helper evidence, mutation-window
   rejection, runtime negative samples, and a fail-closed lookup contract.
+- After local GObjects field-window evidence, the next useful ResourceHandle step is an
+  identity-complete redacted `evaluate_resource_handle_revalidation.py` artifact that
+  still proves fail-closed; more static scanning alone cannot clear
+  `uobject_flags_validity_semantics_unproven`.
 
 ## Priority Next Steps
 

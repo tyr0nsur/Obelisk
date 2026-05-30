@@ -105,6 +105,27 @@ class SendDiscordEmbedTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("forbidden phrase", result.stderr)
 
+    def test_rejects_reserved_custom_field_names(self) -> None:
+        result = self.run_dry(
+            "--channel",
+            "community",
+            "--title",
+            "Obelisk update",
+            "--description",
+            "Public update for plugin authors.",
+            "--status",
+            "In progress",
+            "--scope",
+            "SDK",
+            "--field",
+            "Estado=Duplicated heading",
+            "--field",
+            "Impacto=Clearer embeds",
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("reserved names", result.stderr)
+
     def test_test_fixtures_do_not_store_webhook_endpoint_literals(self) -> None:
         source = Path(__file__).read_text(encoding="utf-8")
         self.assertNotIn("discord.com/" + "api/webhooks", source)

@@ -1,9 +1,14 @@
 #include "core/ItemReturnEventDispatcher.h"
 
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <iostream>
 #include <limits>
+#include <mutex>
 #include <stdexcept>
+#include <thread>
 #include <vector>
 
 namespace
@@ -239,6 +244,205 @@ namespace
         Require(dispatcher.Dispatch(MakeEvent(scalars)) == 0, "self-unregistered callback ran twice");
     }
 
+    struct OwnerCleanupDuringDispatchState
+    {
+        Obelisk::Core::ItemReturnEventDispatcher* Dispatcher = nullptr;
+        void* Owner = nullptr;
+        int FirstCalls = 0;
+        int SecondCalls = 0;
+        int Destroyed = 0;
+        size_t Removed = 99;
+    };
+
+    void OwnerCleanupFirstCallback(const Obelisk::Core::ItemReturnEventView&, void* userData)
+    {
+        auto* state = static_cast<OwnerCleanupDuringDispatchState*>(userData);
+        ++state->FirstCalls;
+        Require(state->Destroyed == 0, "item return owner cleanup destroyed user data before callback body");
+        Require(state->Dispatcher != nullptr, "owner cleanup callback had no dispatcher");
+        state->Removed = state->Dispatcher->UnregisterCallbacksForOwner(state->Owner);
+        Require(state->Removed == 2, "owner cleanup during item return dispatch removed wrong count");
+        Require(state->Destroyed == 0, "item return owner cleanup destroyed user data before callback returned");
+    }
+
+    void OwnerCleanupSecondCallback(const Obelisk::Core::ItemReturnEventView&, void* userData)
+    {
+        auto* state = static_cast<OwnerCleanupDuringDispatchState*>(userData);
+        ++state->SecondCalls;
+    }
+
+    void CountOwnerCleanupDestroyed(void* userData)
+    {
+        auto* state = static_cast<OwnerCleanupDuringDispatchState*>(userData);
+        ++state->Destroyed;
+    }
+
+    void TestOwnerCleanupDuringDispatchDefersDestroyAndSkipsRemovedCallbacks()
+    {
+        Obelisk::Core::ItemReturnEventDispatcher dispatcher;
+        int owner = 0;
+        OwnerCleanupDuringDispatchState state{&dispatcher, &owner, 0, 0, 0, 99};
+        const std::vector<Obelisk::Core::ItemReturnScalarValue> scalars = MakeScalars();
+
+        const uint64_t firstId =
+            dispatcher.Register(&owner, {OwnerCleanupFirstCallback, &state, CountOwnerCleanupDestroyed});
+        const uint64_t secondId =
+            dispatcher.Register(&owner, {OwnerCleanupSecondCallback, &state, CountOwnerCleanupDestroyed});
+        Require(firstId != 0 && secondId != 0, "owner cleanup during dispatch registrations failed");
+
+        Require(dispatcher.Dispatch(MakeEvent(scalars)) == 1,
+                "owner cleanup during item return dispatch ran removed callback");
+        Require(state.FirstCalls == 1, "owner cleanup first item return callback did not run");
+        Require(state.SecondCalls == 0, "cleaned item return callback ran from stale snapshot");
+        Require(state.Destroyed == 2, "item return owner cleanup did not destroy user data after dispatch");
+        Require(dispatcher.SubscriptionCount() == 0,
+                "owner cleanup during item return dispatch left callbacks registered");
+        Require(dispatcher.Dispatch(MakeEvent(scalars)) == 0,
+                "owner-cleaned item return callback ran in a later dispatch");
+        Require(state.FirstCalls == 1 && state.SecondCalls == 0,
+                "owner-cleaned item return callbacks changed after later dispatch");
+    }
+
+    struct BlockingOwnerCleanupState
+    {
+        std::mutex Mutex;
+        std::condition_variable Cv;
+        bool CallbackEntered = false;
+        bool ReleaseCallback = false;
+        int Calls = 0;
+        int Destroyed = 0;
+    };
+
+    void BlockingOwnerCleanupCallback(const Obelisk::Core::ItemReturnEventView&, void* userData)
+    {
+        auto* state = static_cast<BlockingOwnerCleanupState*>(userData);
+        std::unique_lock<std::mutex> lock(state->Mutex);
+        ++state->Calls;
+        state->CallbackEntered = true;
+        state->Cv.notify_all();
+        state->Cv.wait(lock, [&state]() { return state->ReleaseCallback; });
+        Require(state->Destroyed == 0, "item return user data was destroyed while callback was in flight");
+    }
+
+    void CountBlockingOwnerCleanupDestroyed(void* userData)
+    {
+        auto* state = static_cast<BlockingOwnerCleanupState*>(userData);
+        std::lock_guard<std::mutex> lock(state->Mutex);
+        ++state->Destroyed;
+        state->Cv.notify_all();
+    }
+
+    void TestOwnerCleanupWaitsForInFlightDispatchBeforeDestroy()
+    {
+        Obelisk::Core::ItemReturnEventDispatcher dispatcher;
+        int owner = 0;
+        BlockingOwnerCleanupState state;
+        std::atomic<bool> cleanupFinished{false};
+        size_t removed = 99;
+        const std::vector<Obelisk::Core::ItemReturnScalarValue> scalars = MakeScalars();
+
+        const uint64_t id = dispatcher.Register(&owner, {
+            BlockingOwnerCleanupCallback,
+            &state,
+            CountBlockingOwnerCleanupDestroyed,
+        });
+        Require(id != 0, "blocking owner cleanup item return registration failed");
+
+        std::thread dispatchThread([&dispatcher, &scalars]() {
+            Require(dispatcher.Dispatch(MakeEvent(scalars)) == 1,
+                    "blocking owner cleanup item return callback did not dispatch");
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() { return state.CallbackEntered; }),
+                    "blocking owner cleanup item return callback did not enter");
+        }
+
+        std::thread cleanupThread([&]() {
+            removed = dispatcher.UnregisterCallbacksForOwner(&owner);
+            cleanupFinished.store(true, std::memory_order_release);
+        });
+
+        const auto cleanupDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        while (dispatcher.SubscriptionCount() != 0 && std::chrono::steady_clock::now() < cleanupDeadline)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
+        Require(dispatcher.SubscriptionCount() == 0,
+                "owner cleanup did not remove item return callback during dispatch");
+        Require(!cleanupFinished.load(std::memory_order_acquire),
+                "owner cleanup completed while item return callback was still in flight");
+        {
+            std::lock_guard<std::mutex> lock(state.Mutex);
+            Require(state.Destroyed == 0, "item return user data was destroyed before dispatch finished");
+            state.ReleaseCallback = true;
+        }
+        state.Cv.notify_all();
+
+        dispatchThread.join();
+        cleanupThread.join();
+
+        Require(cleanupFinished.load(std::memory_order_acquire), "owner cleanup did not complete after dispatch");
+        Require(removed == 1, "owner cleanup removed wrong item return callback count after dispatch");
+        Require(state.Calls == 1, "blocking owner cleanup item return callback ran wrong number of times");
+        Require(state.Destroyed == 1, "item return user data was not destroyed after dispatch");
+        Require(dispatcher.SubscriptionCount() == 0, "owner cleanup left item return callback registered");
+        Require(dispatcher.Dispatch(MakeEvent(scalars)) == 0,
+                "owner-cleaned item return callback ran after in-flight cleanup");
+        Require(state.Calls == 1, "owner-cleaned item return callback ran again");
+    }
+
+    struct OwnerCleanupNoDispatchState
+    {
+        int Calls = 0;
+        int Destroyed = 0;
+    };
+
+    void OwnerCleanupNoDispatchCallback(const Obelisk::Core::ItemReturnEventView&, void* userData)
+    {
+        auto* state = static_cast<OwnerCleanupNoDispatchState*>(userData);
+        ++state->Calls;
+    }
+
+    void CountOwnerCleanupNoDispatchDestroyed(void* userData)
+    {
+        auto* state = static_cast<OwnerCleanupNoDispatchState*>(userData);
+        ++state->Destroyed;
+    }
+
+    void TestOwnerCleanupWithoutDispatchDestroysImmediatelyAndSuppressesCallbacks()
+    {
+        Obelisk::Core::ItemReturnEventDispatcher dispatcher;
+        int ownerA = 0;
+        int ownerB = 0;
+        OwnerCleanupNoDispatchState removedState;
+        OwnerCleanupNoDispatchState keptState;
+        const std::vector<Obelisk::Core::ItemReturnScalarValue> scalars = MakeScalars();
+
+        Require(dispatcher.Register(
+                    &ownerA,
+                    {OwnerCleanupNoDispatchCallback, &removedState, CountOwnerCleanupNoDispatchDestroyed}) != 0,
+                "first no-dispatch owner cleanup registration failed");
+        Require(dispatcher.Register(
+                    &ownerA,
+                    {OwnerCleanupNoDispatchCallback, &removedState, CountOwnerCleanupNoDispatchDestroyed}) != 0,
+                "second no-dispatch owner cleanup registration failed");
+        Require(dispatcher.Register(&ownerB, {OwnerCleanupNoDispatchCallback, &keptState}) != 0,
+                "kept no-dispatch owner cleanup registration failed");
+
+        Require(dispatcher.UnregisterCallbacksForOwner(&ownerA) == 2,
+                "no-dispatch owner cleanup removed wrong item return callback count");
+        Require(removedState.Destroyed == 2, "no-dispatch owner cleanup did not destroy user data immediately");
+        Require(removedState.Calls == 0, "no-dispatch owner cleanup ran removed callbacks");
+        Require(dispatcher.SubscriptionCount() == 1,
+                "no-dispatch owner cleanup removed the wrong item return callbacks");
+
+        Require(dispatcher.Dispatch(MakeEvent(scalars)) == 1,
+                "kept item return callback did not run after owner cleanup");
+        Require(removedState.Calls == 0, "cleaned item return callback ran after no-dispatch cleanup");
+        Require(keptState.Calls == 1, "kept item return callback ran wrong number of times");
+    }
+
     void TestCallbackExceptionDoesNotStopDispatch()
     {
         Obelisk::Core::ItemReturnEventDispatcher dispatcher;
@@ -270,6 +474,9 @@ int main()
         TestUnregisterForOwnerRequiresMatchingOwner();
         TestRegistrationIdsSkipZeroAndLiveIdsAfterWrap();
         TestSelfUnregisterDefersUserDataDestroyUntilCallbackReturns();
+        TestOwnerCleanupDuringDispatchDefersDestroyAndSkipsRemovedCallbacks();
+        TestOwnerCleanupWaitsForInFlightDispatchBeforeDestroy();
+        TestOwnerCleanupWithoutDispatchDestroysImmediatelyAndSuppressesCallbacks();
         TestCallbackExceptionDoesNotStopDispatch();
     }
     catch (const std::exception& e)

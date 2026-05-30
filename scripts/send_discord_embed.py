@@ -29,6 +29,8 @@ CHANNELS = {
     },
 }
 
+RESERVED_FIELD_NAMES = frozenset({"estado", "alcance"})
+
 FORBIDDEN_TEXT = (
     "discord.com/" + "api/webhooks",
     "discordapp.com/" + "api/webhooks",
@@ -78,6 +80,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     )
     if not (2 <= len(args.field) <= 5):
         raise SystemExit("use 2-5 embed fields to keep Discord updates concise")
+    for field in args.field:
+        if field["name"].casefold() in RESERVED_FIELD_NAMES:
+            raise SystemExit("custom embed fields must not reuse reserved names: Estado, Alcance")
 
     channel = CHANNELS[args.channel]
     fields = [
