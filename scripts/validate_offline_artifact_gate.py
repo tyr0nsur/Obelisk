@@ -23,6 +23,8 @@ PROVENANCE_SCHEMA = "obelisk.offline-artifact-provenance.v1"
 CORE_DUMP_EVIDENCE_PACK_SCHEMA = "obelisk.core-dump-evidence-pack.v1"
 GOBJECTS_TWO_CORE_MANIFEST_SCHEMA = "obelisk.gobjects-two-core-manifest.v1"
 REDACTED_UFUNCTION_SIGNATURE_SCHEMA = "obelisk.redacted-ufunction-signatures.v1"
+REDACTED_SCRIPTSTRUCT_SIGNATURE_SCHEMA = "obelisk.redacted-scriptstruct-signatures.v1"
+SCRIPTSTRUCT_INVENTORY_PACK_SCHEMA = "obelisk.scriptstruct-inventory-pack.v1"
 TARGET_SET_COVERAGE_SCHEMA = "obelisk.redacted-ufunction-target-set-coverage.v1"
 REDACTED_UFUNCTION_ARTIFACT_HYGIENE_SCHEMA = "obelisk.redacted-ufunction-artifact-hygiene.v1"
 RC_UFUNCTION_SECOND_SOURCE_ROOT_SCHEMA = "obelisk.rc-ufunction-second-source-root-manifest.v1"
@@ -44,6 +46,8 @@ SUPPORTED_MANIFEST_SCHEMAS = {
     CORE_DUMP_EVIDENCE_PACK_SCHEMA,
     GOBJECTS_TWO_CORE_MANIFEST_SCHEMA,
     REDACTED_UFUNCTION_SIGNATURE_SCHEMA,
+    REDACTED_SCRIPTSTRUCT_SIGNATURE_SCHEMA,
+    SCRIPTSTRUCT_INVENTORY_PACK_SCHEMA,
     RC_UFUNCTION_SECOND_SOURCE_ROOT_SCHEMA,
     WEAK_HELPER_CALLER_MODE_SCHEMA,
     STATIC_GLOBAL_PROMOTION_EVIDENCE_SCHEMA,
@@ -103,6 +107,26 @@ REQUIRED_REDACTED_SIGNATURE_NON_CLAIMS = {
     "candidate-only redacted UFunction signature report",
     "does not expose UE pointers, object identity, class identity, raw params, mutation, or return overrides",
     "does not promote public SDK callbacks or public metadata helpers",
+}
+REQUIRED_REDACTED_SCRIPTSTRUCT_NON_CLAIMS = {
+    "candidate-only ScriptStruct layout summary",
+    "does not promote public ScriptStruct or Transfer SDK callbacks",
+    "does not decode transfer payloads or expose UE pointers, identity, raw params, mutation, or return overrides",
+}
+REQUIRED_REDACTED_SCRIPTSTRUCT_NOT_PROMOTED_SURFACES = {
+    "mutation",
+    "object_identity",
+    "public_scriptstruct_sdk",
+    "raw_ue_params",
+    "resource_handle",
+    "return_override",
+    "transfer_payload_decoding",
+}
+REQUIRED_SCRIPTSTRUCT_INVENTORY_NON_CLAIMS = {
+    "Does not promote a public ScriptStruct SDK.",
+    "Does not promote Inventory, Transfer, Items, or Resources SDK callbacks.",
+    "Does not expose UObject pointers, raw UE params, FName/GObjects indices, object identity, lookup, or ResourceHandle.",
+    "Does not authorize mutation, return override, ProcessEvent blocking, or UE call replay.",
 }
 REQUIRED_READINESS_NON_PROMOTED_SURFACES = {
     "class_identity",
@@ -1777,6 +1801,66 @@ def validate_weak_helper_caller_mode_manifest(
     return blockers
 
 
+def validate_redacted_scriptstruct_signature_manifest(
+    payload: dict[str, Any],
+    *,
+    source_label: str,
+    mode: str,
+) -> list[dict[str, Any]]:
+    if payload.get("schema") != REDACTED_SCRIPTSTRUCT_SIGNATURE_SCHEMA:
+        return []
+    blockers: list[dict[str, Any]] = []
+    if payload.get("snapshot_root") != "redacted":
+        blockers.append({"reason": "scriptstruct_signature_snapshot_root_not_redacted", "label": f"{source_label}:$.snapshot_root"})
+    generated_from = payload.get("generated_from")
+    if not isinstance(generated_from, dict):
+        blockers.append({"reason": "scriptstruct_signature_missing_generated_from", "label": f"{source_label}:$.generated_from"})
+    elif generated_from.get("snapshot_schema") != "obelisk.scriptstruct-chain.snapshot.v1":
+        blockers.append(
+            {
+                "reason": "scriptstruct_signature_snapshot_schema_mismatch",
+                "label": f"{source_label}:$.generated_from.snapshot_schema",
+                "recorded_schema": generated_from.get("snapshot_schema"),
+            }
+        )
+    non_claims = payload.get("non_claims")
+    if not isinstance(non_claims, list) or not REQUIRED_REDACTED_SCRIPTSTRUCT_NON_CLAIMS.issubset(set(non_claims)):
+        blockers.append(
+            {
+                "reason": "scriptstruct_signature_non_claims_missing",
+                "label": f"{source_label}:$.non_claims",
+                "expected": sorted(REQUIRED_REDACTED_SCRIPTSTRUCT_NON_CLAIMS),
+                "recorded": non_claims,
+            }
+        )
+    safety_summary = payload.get("safety_summary")
+    if not isinstance(safety_summary, dict):
+        blockers.append({"reason": "scriptstruct_signature_missing_safety_summary", "label": f"{source_label}:$.safety_summary"})
+    else:
+        if safety_summary.get("artifact_status") != "candidate_only":
+            blockers.append({"reason": "scriptstruct_signature_status_not_candidate_only", "label": f"{source_label}:$.safety_summary.artifact_status"})
+        if safety_summary.get("promotion_ready") is not False:
+            blockers.append({"reason": "scriptstruct_signature_promotion_ready_overclaim", "label": f"{source_label}:$.safety_summary.promotion_ready"})
+        if safety_summary.get("intended_use") != "offline_review_only":
+            blockers.append({"reason": "scriptstruct_signature_intended_use_not_offline_review_only", "label": f"{source_label}:$.safety_summary.intended_use"})
+        not_promoted = safety_summary.get("not_promoted_surfaces")
+        if not isinstance(not_promoted, list) or set(not_promoted) != REQUIRED_REDACTED_SCRIPTSTRUCT_NOT_PROMOTED_SURFACES:
+            blockers.append(
+                {
+                    "reason": "scriptstruct_signature_not_promoted_surfaces_mismatch",
+                    "label": f"{source_label}:$.safety_summary.not_promoted_surfaces",
+                    "expected": sorted(REQUIRED_REDACTED_SCRIPTSTRUCT_NOT_PROMOTED_SURFACES),
+                    "recorded": not_promoted,
+                }
+            )
+        if mode == "promote":
+            blockers.append({"reason": "promote_mode_scriptstruct_signature_candidate_only", "label": f"{source_label}:$.safety_summary"})
+    signatures = payload.get("signatures")
+    if not isinstance(signatures, list):
+        blockers.append({"reason": "scriptstruct_signature_signatures_not_list", "label": f"{source_label}:$.signatures"})
+    return blockers
+
+
 def validate_claims(payload: dict[str, Any], *, label: str, mode: str) -> list[dict[str, Any]]:
     blockers: list[dict[str, Any]] = []
     blockers_value = payload.get("blockers")
@@ -1809,6 +1893,44 @@ def validate_claims(payload: dict[str, Any], *, label: str, mode: str) -> list[d
             blockers.append({"reason": "promote_mode_manifest_has_non_claims", "label": label})
         if isinstance(blocked_contracts, list) and blocked_contracts:
             blockers.append({"reason": "promote_mode_manifest_has_blocked_contracts", "label": label})
+    return blockers
+
+
+def validate_scriptstruct_inventory_pack_manifest(payload: dict[str, Any], *, label: str, mode: str) -> list[dict[str, Any]]:
+    if payload.get("schema") != SCRIPTSTRUCT_INVENTORY_PACK_SCHEMA:
+        return []
+    blockers: list[dict[str, Any]] = []
+    if payload.get("status") != "candidate-only":
+        blockers.append({"reason": "scriptstruct_inventory_status_not_candidate_only", "label": f"{label}:$.status"})
+    if payload.get("promotion_status") != "not_promoted_candidate_only":
+        blockers.append({"reason": "scriptstruct_inventory_promotion_status_mismatch", "label": f"{label}:$.promotion_status"})
+    binary = payload.get("binary")
+    if not isinstance(binary, dict) or not isinstance(binary.get("sha256"), str) or SHA256_RE.fullmatch(binary["sha256"]) is None:
+        blockers.append({"reason": "scriptstruct_inventory_binary_sha256_invalid", "label": f"{label}:$.binary.sha256"})
+    core = payload.get("core")
+    if not isinstance(core, dict) or not isinstance(core.get("sha256"), str) or SHA256_RE.fullmatch(core["sha256"]) is None:
+        blockers.append({"reason": "scriptstruct_inventory_core_sha256_invalid", "label": f"{label}:$.core.sha256"})
+    artifact_identity = payload.get("artifact_identity")
+    if not isinstance(artifact_identity, dict) or artifact_identity.get("artifact_sha256") != (core or {}).get("sha256"):
+        blockers.append({"reason": "scriptstruct_inventory_artifact_identity_mismatch", "label": f"{label}:$.artifact_identity"})
+    artifacts = payload.get("artifacts")
+    if not isinstance(artifacts, dict) or artifacts.get("scriptstruct_inventory") != "scriptstruct-inventory.json":
+        blockers.append({"reason": "scriptstruct_inventory_artifact_missing", "label": f"{label}:$.artifacts.scriptstruct_inventory"})
+    summary = payload.get("summary")
+    if not isinstance(summary, dict) or not is_json_int(summary.get("scriptstruct_count")):
+        blockers.append({"reason": "scriptstruct_inventory_summary_invalid", "label": f"{label}:$.summary.scriptstruct_count"})
+    non_claims = payload.get("non_claims")
+    if not isinstance(non_claims, list) or not REQUIRED_SCRIPTSTRUCT_INVENTORY_NON_CLAIMS.issubset(set(non_claims)):
+        blockers.append(
+            {
+                "reason": "scriptstruct_inventory_non_claims_missing",
+                "label": f"{label}:$.non_claims",
+                "expected": sorted(REQUIRED_SCRIPTSTRUCT_INVENTORY_NON_CLAIMS),
+                "recorded": non_claims,
+            }
+        )
+    if mode == "promote":
+        blockers.append({"reason": "promote_mode_scriptstruct_inventory_candidate_only", "label": label})
     return blockers
 
 
@@ -3544,6 +3666,8 @@ def validate_manifest(
             strict_target_set_coverage=strict_target_set_coverage,
         )
     )
+    blockers.extend(validate_redacted_scriptstruct_signature_manifest(payload, source_label=str(resolved), mode=mode))
+    blockers.extend(validate_scriptstruct_inventory_pack_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(
         validate_rc_ufunction_second_source_root_manifest(
             payload,

@@ -833,6 +833,90 @@ def gobjects_two_core_manifest() -> dict:
     }
 
 
+def scriptstruct_inventory_pack_manifest(workspace: Path) -> dict:
+    return {
+        "schema": gate.SCRIPTSTRUCT_INVENTORY_PACK_SCHEMA,
+        "source": "offline_core",
+        "status": "candidate-only",
+        "promotion_status": "not_promoted_candidate_only",
+        "artifact_identity": {
+            "artifact_kind": "offline_core",
+            "artifact_sha256": "b" * 64,
+            "capture_id": "test-core",
+            "evidence_pack_id": "test-pack",
+        },
+        "binary": {"sha256": BINARY_SHA},
+        "core": {"path": str(workspace / "cores" / "core"), "sha256": "b" * 64},
+        "addresses": {
+            "gobjects": "0x595b7e0",
+            "fname_root_slot": "0x5956f30",
+            "fname_table": "0x5a94660",
+        },
+        "inputs": {
+            "evidence_pack_manifest": None,
+            "target_sets": ["transfer-scriptstruct"],
+            "targets": [],
+            "max_objects": 30000,
+            "fname_indices": [{"label": "None", "index": 0}],
+        },
+        "artifacts": {
+            "scriptstruct_inventory": "scriptstruct-inventory.json",
+            "fname_root_validation": "fname-root-validation.json",
+        },
+        "summary": {
+            "scriptstruct_count": 2,
+            "fname_root_ready": True,
+            "target_requested_count": 2,
+            "target_matched_count": 2,
+            "target_missing_count": 0,
+            "target_ambiguous_count": 0,
+        },
+        "blockers": [],
+        "non_claims": sorted(gate.REQUIRED_SCRIPTSTRUCT_INVENTORY_NON_CLAIMS)
+        + [
+            "Does not decode transfer, item, inventory, player, actor, dino, tribe, or structure identity.",
+            "Does not claim portability across ARK binary hashes.",
+        ],
+    }
+
+
+def redacted_scriptstruct_signature_manifest() -> dict:
+    return {
+        "schema": gate.REDACTED_SCRIPTSTRUCT_SIGNATURE_SCHEMA,
+        "snapshot_root": "redacted",
+        "target_sets": ["transfer-scriptstruct"],
+        "source_target_sets": [],
+        "snapshot_count": 1,
+        "signature_count": 1,
+        "missing_targets": [],
+        "generated_from": {
+            "snapshot_schema": "obelisk.scriptstruct-chain.snapshot.v1",
+            "input_snapshots": [{"id": "snapshot-0001", "sha256": "c" * 64}],
+        },
+        "safety_summary": {
+            "artifact_status": "candidate_only",
+            "promotion_ready": False,
+            "intended_use": "offline_review_only",
+            "field_count_total": 1,
+            "copied_scalar_count_total": 0,
+            "copied_scalar_by_kind": {},
+            "redacted_count_total": 1,
+            "redacted_by_reason": {"text": 1},
+            "promotion_blocker_count_total": 0,
+            "promotion_blockers_by_reason": {},
+            "not_promoted_surfaces": sorted(gate.REQUIRED_REDACTED_SCRIPTSTRUCT_NOT_PROMOTED_SURFACES),
+        },
+        "signatures": [
+            {
+                "target": "PrimalLocalProfile.ARKTributeDino",
+                "property_count": 1,
+                "fields": [{"name": "DinoClassName", "type": "redacted_text"}],
+            }
+        ],
+        "non_claims": sorted(gate.REQUIRED_REDACTED_SCRIPTSTRUCT_NON_CLAIMS),
+    }
+
+
 def args(
     *,
     root: Path,
@@ -856,6 +940,54 @@ def args(
 
 
 class ValidateOfflineArtifactGateTests(unittest.TestCase):
+    def test_accepts_scriptstruct_inventory_pack_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "scriptstruct-pack" / "manifest.json"
+            write_json(manifest, scriptstruct_inventory_pack_manifest(workspace))
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual(result["status"], "accepted")
+        self.assertEqual([], result["blockers"])
+
+    def test_blocks_scriptstruct_inventory_pack_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "scriptstruct-pack" / "manifest.json"
+            write_json(manifest, scriptstruct_inventory_pack_manifest(workspace))
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("promote_mode_scriptstruct_inventory_candidate_only", reasons)
+
+    def test_accepts_redacted_scriptstruct_signatures_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "scriptstruct-signatures" / "manifest.json"
+            write_json(manifest, redacted_scriptstruct_signature_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual(result["status"], "accepted")
+        self.assertEqual([], result["blockers"])
+
+    def test_blocks_redacted_scriptstruct_signatures_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "scriptstruct-signatures" / "manifest.json"
+            write_json(manifest, redacted_scriptstruct_signature_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("promote_mode_scriptstruct_signature_candidate_only", reasons)
+
     def test_accepts_artifact_with_verified_sidecar_under_workspace(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"

@@ -1,0 +1,272 @@
+#!/usr/bin/env python3
+"""Tests for build_scriptstruct_inventory_pack.py."""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPT_DIR))
+from test_inspect_core_ufunctions import build_core_fixture  # noqa: E402
+
+
+class BuildScriptStructInventoryPackTests(unittest.TestCase):
+    def run_builder(self, args: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [sys.executable, str(SCRIPT_DIR / "build_scriptstruct_inventory_pack.py"), *args],
+            check=check,
+            capture_output=True,
+            text=True,
+        )
+
+    def test_builds_redacted_pack_from_direct_core(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            addrs = build_core_fixture(core)
+            output_dir = root / "pack"
+
+            result = self.run_builder(
+                [
+                    "--core",
+                    str(core),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--fname-index",
+                    "None=0",
+                    "--ark-binary-sha256",
+                    "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                    "--target",
+                    "/Script/ShooterGame.ARKTributeDino",
+                    "--include-structs",
+                    "--output-dir",
+                    str(output_dir),
+                ]
+            )
+
+            manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+            inventory = json.loads((output_dir / "scriptstruct-inventory.json").read_text(encoding="utf-8"))
+            fname = json.loads((output_dir / "fname-root-validation.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(json.loads(result.stdout)["schema"], "obelisk.scriptstruct-inventory-pack.v1")
+        self.assertEqual(manifest["status"], "candidate-only")
+        self.assertEqual(manifest["promotion_status"], "not_promoted_candidate_only")
+        self.assertIn("Does not promote a public ScriptStruct SDK.", manifest["non_claims"])
+        self.assertTrue(manifest["summary"]["fname_root_ready"])
+        self.assertEqual(manifest["summary"]["scriptstruct_count"], 1)
+        self.assertEqual(fname["manifest_readiness"]["exact_match_count"], 1)
+        self.assertEqual(inventory["schema"], "obelisk.scriptstruct-inventory.v1")
+        self.assertEqual(inventory["summary"]["scriptstruct_count"], 1)
+        struct = inventory["scriptstructs"][0]
+        self.assertEqual(struct["target"], "/Script/ShooterGame.ARKTributeDino")
+        self.assertEqual(struct["class_name"], "ScriptStruct")
+        self.assertEqual(struct["properties_size"], 288)
+        self.assertEqual([prop["name"] for prop in struct["properties"]], ["DinoClassName", "DinoID1"])
+        serialized = json.dumps(inventory)
+        self.assertNotIn("0x27400", serialized)
+        self.assertNotIn("pointer_window", serialized)
+        self.assertNotIn("integer_window", serialized)
+
+    def test_direct_core_requires_explicit_addresses(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            build_core_fixture(core)
+
+            result = self.run_builder(
+                [
+                    "--core",
+                    str(core),
+                    "--output-dir",
+                    str(root / "pack"),
+                ],
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("direct --core mode requires explicit --gobjects and --fname-root-slot", result.stderr)
+
+    def test_direct_core_requires_binary_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            addrs = build_core_fixture(core)
+
+            result = self.run_builder(
+                [
+                    "--core",
+                    str(core),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--output-dir",
+                    str(root / "pack"),
+                ],
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("direct --core mode requires --binary or --ark-binary-sha256", result.stderr)
+
+    def test_direct_core_rejects_invalid_binary_sha(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            addrs = build_core_fixture(core)
+
+            result = self.run_builder(
+                [
+                    "--core",
+                    str(core),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--ark-binary-sha256",
+                    "not-a-sha",
+                    "--output-dir",
+                    str(root / "pack"),
+                ],
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--ark-binary-sha256 must be a lowercase 64-character SHA256", result.stderr)
+
+    def test_rejects_protected_core_and_output_before_opening(self) -> None:
+        result = self.run_builder(
+            [
+                "--core",
+                "/servidor/ark/obelisk/dumps/core",
+                "--gobjects",
+                "0x1",
+                "--fname-root-slot",
+                "0x2",
+                "--output-dir",
+                "/tmp/obelisk-scriptstruct-pack",
+            ],
+            check=False,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--core must not read from protected server root /servidor/ark", result.stderr)
+
+        result = self.run_builder(
+            [
+                "--core",
+                "/tmp/missing-core",
+                "--gobjects",
+                "0x1",
+                "--fname-root-slot",
+                "0x2",
+                "--output-dir",
+                "/servidor/ark/obelisk/packs/out",
+            ],
+            check=False,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--output-dir must not write under protected server root /servidor/ark", result.stderr)
+
+    def test_rejects_symlinked_pack_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            addrs = build_core_fixture(core)
+            output_dir = root / "pack"
+            output_dir.mkdir()
+            (output_dir / "manifest.json").symlink_to(root / "outside-manifest.json")
+
+            result = self.run_builder(
+                [
+                    "--core",
+                    str(core),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--fname-index",
+                    "None=0",
+                    "--ark-binary-sha256",
+                    "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                    "--target",
+                    "/Script/ShooterGame.ARKTributeDino",
+                    "--output-dir",
+                    str(output_dir),
+                ],
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("refusing to overwrite symlinked pack artifact", result.stderr)
+
+    def test_evidence_pack_mode_rejects_overrides_before_hashing_core(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            manifest = root / "pack" / "manifest.json"
+            manifest.parent.mkdir()
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "binary": {
+                            "sha256": "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                        },
+                        "core": {
+                            "path": str(root / "missing-core"),
+                            "sha256": "8" * 64,
+                        },
+                        "evidence_status": {"status": "complete", "gdb_core_failed": False},
+                        "fname_root_slots": [{"address": "0x1"}],
+                        "gobjects_candidates": [{"address": "0x2"}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_builder(
+                [
+                    "--evidence-pack-manifest",
+                    str(manifest),
+                    "--gobjects",
+                    "0x1",
+                    "--output-dir",
+                    str(root / "out"),
+                ],
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("do not pass overrides", result.stderr)
+        self.assertNotIn("does not exist", result.stderr)
+
+    def test_rejects_ufunction_only_target_set(self) -> None:
+        result = self.run_builder(
+            [
+                "--core",
+                "/tmp/missing-core",
+                "--gobjects",
+                "0x1",
+                "--fname-root-slot",
+                "0x2",
+                "--ark-binary-sha256",
+                "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                "--target-set",
+                "item-compact-intake",
+                "--output-dir",
+                "/tmp/obelisk-scriptstruct-pack",
+            ],
+            check=False,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("invalid choice", result.stderr)
+
+
+if __name__ == "__main__":
+    unittest.main()
