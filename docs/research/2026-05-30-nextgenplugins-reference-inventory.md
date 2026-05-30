@@ -18,6 +18,10 @@ Top-level collections:
 - `/home/flowcommunity-ark/NextGenPlugins/Michidu-Ark-Server-Plugins`
 - `/home/flowcommunity-ark/NextGenPlugins/ASE-Plugins`
 
+Verification note: both roots currently expose the same visible plugin family set at
+shallow depth. Treat duplicated repositories as one demand signal until a later Plugin Hub
+matrix records exact source commits, licenses, and per-plugin provenance.
+
 Observed plugin directories:
 
 - `AdminsPermissions`
@@ -76,6 +80,12 @@ The visible demand clusters from the local clone are:
 - RCON/operator I/O: remote commands, reloads, broadcasts, and Unicode/text robustness;
 - lifecycle/ops: plugin crash handling, timers, reload expectations, shutdown cleanup,
   and multi-instance configuration.
+
+Observed ArkApi-facing concepts include chat commands, console commands, RCON commands,
+timer callbacks, direct hooks such as player login/logout, item/shop/kits flows,
+permissions group management, structure build policy, dino carry/color/reward hooks, and
+RCON/operator utilities. These names are useful as candidate seeds only; every promoted
+Obelisk equivalent still needs native Linux reflection/runtime evidence.
 
 ## Constraints
 

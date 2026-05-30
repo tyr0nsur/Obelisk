@@ -235,15 +235,15 @@ recovery context is not active routing for the current head; use
   fail-closed observer gates and post-original copied payloads for the already-promoted
   three `GameplayPolicyEvent` kinds. Do not route it through
   `InventoryPolicyEventKind::CanUse`, and do not expand into an Items SDK or Inventory SDK
-  without a separate promotion gate. Before requesting `arkserver2`, keep evidence offline:
-  `analyze_runtime_observer_log.py` recognizes sanitized item-return enabled/rejected/
-  dispatched lines, but the current comparison tooling does not reproduce the old
-  item-return-only second-source acceptance because the stale candidate snapshots lack
-  `bool_field_size` and `bool_byte_offset`. Regenerate the
-  `item-return-only-policy-slice` snapshots from the existing offline core with
-  `scripts/regenerate_ufunction_snapshots.py`, then rerun
-  `scripts/compare_reflection_snapshots.py --target-set item-return-only-policy-slice`
-  before asking for any live item runtime window.
+  without a separate promotion gate. The stale bool-tail comparison gap is closed by
+  `/home/flowcommunity-ark/obelisk-artifacts/item-return-only-bool-tail-refresh-20260530T172552Z`:
+  current `compare_reflection_snapshots.py --target-set item-return-only-policy-slice`
+  accepts `3/3` (`AllowEquipItem`, `CanRepair`, `UseItemOntoItem`) as layout-only
+  second-source evidence, consume gate accepts, and promote gate blocks with
+  `promote_mode_readiness_report_layout_only`. `analyze_runtime_observer_log.py`
+  recognizes sanitized item-return enabled/rejected/dispatched lines, but any live item
+  runtime window still requires a separate live-ops brief and must remain private producer
+  validation only.
 - Secondary evidence-only lanes may continue for structure non-pin copied scalars and Buff
   breadth, but they must not imply runtime work, marker/env changes, public SDK expansion,
   or RC surface changes.

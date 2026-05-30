@@ -226,16 +226,61 @@ The consume gate accepts the policy slice in this pack. The promote gate still b
 second-source gap for Item return-only, but it does not promote public API, runtime wiring,
 identity, mutation, return override, or an Inventory/Items SDK.
 
-Current tooling caveat: the preserved second-source result above predates strict
-`BoolProperty` tail comparison. Rerunning `compare_reflection_snapshots.py` with the
-current comparator against
-`/servidor/ark/workspace-offline/item-compact-intake-second-source-20260529T141900Z/ufunction-snapshots`
-now yields `accepted=0` and `inconclusive=3` because the stale candidate snapshots do not
-carry `bool_field_size` and `bool_byte_offset`. Before any live item runtime brief,
-regenerate only the `item-return-only-policy-slice` UFunction snapshots from the existing
-offline core with `scripts/regenerate_ufunction_snapshots.py`, then rerun the focused
-comparison and preserve a fresh bool-tail-complete artifact pack. Do not normalize these
-fields by hand.
+## Bool-Tail Refresh
+
+The stale second-source snapshot root above predates strict `BoolProperty` tail
+comparison. A fresh offline regeneration from the existing clean core now preserves the
+current bool-tail metadata and restores strict second-source acceptance for the same three
+targets.
+
+Artifact root:
+
+```text
+/home/flowcommunity-ark/obelisk-artifacts/item-return-only-bool-tail-refresh-20260530T172552Z
+```
+
+Regenerated snapshots:
+
+- `PrimalItem.AllowEquipItem`
+- `PrimalItem.CanRepair`
+- `PrimalItem.UseItemOntoItem`
+
+Focused comparison:
+
+```bash
+python3 scripts/compare_reflection_snapshots.py \
+  --base-root tests/fixtures/ufunction_snapshots \
+  --candidate-root "$OUT/ufunction-snapshots" \
+  --readiness-report \
+  --target-set item-return-only-policy-slice \
+  --fail-on-readiness-gaps \
+  --json
+```
+
+Readiness result:
+
+- `targets=3`
+- `comparable=3`
+- `second_source_accepted=3`
+- `second_source_inconclusive=0`
+- `promotion_gate.ready=true`
+- `promotion_gate.ready_scope=layout_only`
+
+Pack checksums:
+
+- `compare-readiness.json`
+  (`sha256=ed05f564352bb63f2d57226fd8d190229af61cc71bdd478782dda31994a609d7`)
+- `consume-gate.json`
+  (`sha256=6c8902f305bae3da62c930dd42a17c756cf0454e46fc69698b5a1ae2188db2ec`)
+- `promote-gate.json`
+  (`sha256=85c979dc6b5d247ca190d44ba4fa2be302c0296ea5e595884414720bf96cc6e7`)
+- `SHA256SUMS`
+  (`sha256=3ab095fb4cedeb40e9b02d3f84fa792e4e64f128ca9e36f6577e5d487145ef4f`)
+
+Consume gate accepts this readiness report. Promote gate remains blocked with
+`promote_mode_readiness_report_layout_only` and `promote_mode_manifest_has_non_claims`.
+This closes the stale bool-tail comparison gap, but it still does not promote public API,
+runtime wiring, identity, mutation, return override, or an Inventory/Items SDK.
 
 ## Descriptor-Only Preflight
 
