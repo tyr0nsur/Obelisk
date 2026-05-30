@@ -10,13 +10,32 @@ include(CMakePackageConfigHelpers)
 
 set(OBELISK_DEVELOPMENT_LINE "0.1.0-dev")
 set(OBELISK_RELEASE_CHANNEL "dev")
-set(OBELISK_API_ABI_VERSION 1)
-set(OBELISK_PLUGIN_METADATA_ABI_VERSION 1)
-set(OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION 1)
-set(OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION 1)
-set(OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION 1)
-set(OBELISK_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION 1)
-set(OBELISK_CHAT_MESSAGE_EVENT_ABI_VERSION 1)
+set(OBELISK_PUBLIC_API_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/include/obelisk/ObeliskApi.h")
+
+function(obelisk_read_public_abi_version macro_name)
+    file(STRINGS "${OBELISK_PUBLIC_API_HEADER}" abi_version_lines
+        REGEX "^[ \t]*#define[ \t]+${macro_name}[ \t]+[0-9]+u[ \t]*$")
+    list(LENGTH abi_version_lines abi_version_count)
+    if(NOT abi_version_count EQUAL 1)
+        message(FATAL_ERROR
+            "Expected exactly one public ABI version macro ${macro_name} in ${OBELISK_PUBLIC_API_HEADER}")
+    endif()
+
+    string(REGEX REPLACE
+        "^[ \t]*#define[ \t]+${macro_name}[ \t]+([0-9]+)u[ \t]*$"
+        "\\1"
+        abi_version
+        "${abi_version_lines}")
+    set(${macro_name} "${abi_version}" PARENT_SCOPE)
+endfunction()
+
+obelisk_read_public_abi_version(OBELISK_API_ABI_VERSION)
+obelisk_read_public_abi_version(OBELISK_PLUGIN_METADATA_ABI_VERSION)
+obelisk_read_public_abi_version(OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION)
+obelisk_read_public_abi_version(OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION)
+obelisk_read_public_abi_version(OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION)
+obelisk_read_public_abi_version(OBELISK_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION)
+obelisk_read_public_abi_version(OBELISK_CHAT_MESSAGE_EVENT_ABI_VERSION)
 
 # Use fPIC as it's a shared library
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)

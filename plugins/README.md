@@ -53,12 +53,14 @@ transfer handling, structure placement enforcement, identity, lookup, replies, s
 moderation, or ArkApi portability until the matching public surface is promoted in the
 capability matrix and documented with its own evidence gate.
 
-Seed examples are production-ready only when they keep the shared safe default config
-posture (`enabled=false`, `allow_all_instances=false`, and an empty
-`instance_allowlist`), fail closed on missing capabilities or callbacks, validate instance
-scoping, unregister owner-token handles on every shutdown or partial-init path, treat
-callback payloads as callback-scope, keep mutable state process-local unless a locking
-model is documented, and log only bounded, sanitized output.
+Production-supported seed examples are limited to lifecycle/config/logging, descriptor
+readers, and process-local timer utilities. Those production-supported seeds still must
+keep the shared safe default config posture (`enabled=false`, `allow_all_instances=false`,
+and an empty `instance_allowlist`), fail closed on missing capabilities or callbacks,
+validate instance scoping, unregister owner-token handles on every shutdown or
+partial-init path, treat callback payloads as callback-scope, keep mutable state
+process-local unless a locking model is documented, and log only bounded, sanitized
+output.
 
 Passive copied-chat parser or audit examples must add one stricter rule: copied chat text
 is local routing input only. They may count, bucket, redact, or parse text in memory, but

@@ -613,6 +613,14 @@ def cmake_abi_version_sets(cmake: str) -> list[tuple[str, str]]:
     )
 
 
+def cmake_abi_version_derivations(cmake: str) -> list[str]:
+    return re.findall(
+        r"^\s*obelisk_read_public_abi_version\((OBELISK_[A-Z0-9_]*ABI_VERSION)\)\s*$",
+        cmake,
+        re.MULTILINE,
+    )
+
+
 def package_config_abi_version_sets(package_config: str) -> list[tuple[str, str]]:
     return re.findall(
         r"^\s*set\((Obelisk_[A-Z0-9_]*ABI_VERSION)\s+@(OBELISK_[A-Z0-9_]*ABI_VERSION)@\)\s*$",
@@ -1111,6 +1119,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             (descriptor_doc, "does not register callbacks, timers, chat handlers"),
             (timer_doc, "process-local timers"),
             (timer_doc, "does not use or imply UE timers, gameplay timers, `ProcessEvent`"),
+            (plugins_readme, "Production-supported seed examples are limited to lifecycle/config/logging, descriptor\nreaders, and process-local timer utilities"),
+            (plugins_readme, "Those production-supported seeds still must\nkeep the shared safe default config posture"),
             (plugins_readme, "raw `ProcessEvent` callbacks\n  require explicit debug gates"),
             (plugins_readme, "`oPolicyAudit` demonstrates the promoted `GameplayPolicyEvent` callback family"),
             (plugins_readme, "storage/database services, webhooks, inventory/item mutation"),
@@ -1118,6 +1128,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             with self.subTest(required=required):
                 self.assertIn(normalized(required), normalized(text))
+
+        self.assertNotIn("Seed examples are production-ready only when", plugins_readme)
 
         for required in (
             "OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS",
@@ -1773,9 +1785,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertIn("installed CMake package variables", versioning)
         self.assertIn("not C preprocessor macros", versioning)
         self.assertIn("mirror the `OBELISK_*` header macros", versioning)
+        self.assertIn("derived from the public header", normalized(versioning))
 
         header_abi_macros = public_abi_version_macros(header)
-        expected_cmake_sets = [(macro, version.rstrip("u")) for macro, version in header_abi_macros]
         expected_package_sets = [
             (macro.replace("OBELISK_", "Obelisk_", 1), macro)
             for macro, _version in header_abi_macros
@@ -1784,7 +1796,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         expected_c_macros = [macro for _cmake_variable, macro in expected_package_sets]
 
         self.assertGreater(len(header_abi_macros), 0)
-        self.assertEqual(cmake_abi_version_sets(root_cmake), expected_cmake_sets)
+        self.assertEqual(cmake_abi_version_sets(root_cmake), [])
+        self.assertEqual(cmake_abi_version_derivations(root_cmake), expected_c_macros)
         self.assertEqual(package_config_abi_version_sets(package_config), expected_package_sets)
         self.assertEqual(
             re.findall(r"`(Obelisk_[A-Z0-9_]*ABI_VERSION)`", versioning),

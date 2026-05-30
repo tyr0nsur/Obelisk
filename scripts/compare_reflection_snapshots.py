@@ -471,6 +471,9 @@ def target_set_blocker_guidance(target_set: str) -> dict[str, Any] | None:
             "why_blocked": [
                 "internal_layout_evidence_only",
                 "not_release_readiness_target",
+                "copied_data_policy_unproven",
+                "lifecycle_privacy_policy_unproven",
+                "promotion_gate_blocked",
                 f"public_{module.lower()}_sdk_blocked",
                 "runtime_observation_requires_separate_approval",
             ],
@@ -481,6 +484,7 @@ def target_set_blocker_guidance(target_set: str) -> dict[str, Any] | None:
             "snapshot_prep_checks": [
                 f"compare schema-qualified targets through --target-set {target_set} for internal coverage review only",
                 f"keep {internal_guidance['redactions']} redacted or recognition-only",
+                "keep evidence internal until copied-data, lifecycle, privacy, and promotion gates pass",
                 "require target, class, outer, every property, and nested struct/array candidates to be candidate-uobject",
                 "require distinct artifact identity before any second-source layout claim",
                 "do not use this target set for release/readiness or public SDK promotion gates",

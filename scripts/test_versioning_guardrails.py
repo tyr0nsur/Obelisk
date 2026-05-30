@@ -11,11 +11,11 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
-def cmake_set_value(cmake_text: str, variable: str) -> str:
-    match = re.search(rf"set\({re.escape(variable)}\s+\"?(?P<value>[^\")]+)\"?\)", cmake_text)
-    if not match:
-        raise AssertionError(f"missing CMake variable {variable}")
-    return match.group("value")
+def cmake_derives_abi_version(cmake_text: str, variable: str) -> bool:
+    return (
+        re.search(rf"^\s*obelisk_read_public_abi_version\({re.escape(variable)}\)\s*$", cmake_text, re.M)
+        is not None
+    )
 
 
 def header_define_value(header_text: str, macro: str) -> str:
@@ -120,7 +120,8 @@ class VersioningGuardrailTests(unittest.TestCase):
             ),
         ):
             with self.subTest(variable=variable):
-                self.assertEqual(cmake_set_value(cmake, variable), header_define_value(header, macro))
+                self.assertTrue(cmake_derives_abi_version(cmake, variable))
+                self.assertIsNotNone(header_define_value(header, macro))
                 self.assertIn(f"set({exported} @{variable}@)", config_template)
 
     def test_release_doc_does_not_claim_current_stable_release(self) -> None:

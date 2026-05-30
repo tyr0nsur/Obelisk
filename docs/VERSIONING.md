@@ -69,7 +69,8 @@ source should continue to use the public header macros:
 
 The `Obelisk_*` CMake variables mirror the `OBELISK_*` header macros so installed SDK
 consumers can validate both package metadata and compiled ABI expectations without
-inventing separate version numbers.
+inventing separate version numbers. The CMake package variables are derived from the
+public header at configure time; do not hand-maintain a second ABI version list in CMake.
 
 ## Allowed Version Labels
 

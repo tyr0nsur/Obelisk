@@ -5633,6 +5633,28 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
             {blocker["reason"] for blocker in result["blockers"]},
         )
 
+    def test_accepts_resource_handle_serial_scan_core_path_relative_to_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            pack = workspace / "serial-scan-pack"
+            core = pack / "copied-core"
+            core.parent.mkdir(parents=True)
+            core.write_bytes(b"offline copied core fixture\n")
+            manifest = pack / "resource-handle-serial-scan.json"
+            write_json(
+                manifest,
+                resource_handle_serial_scan_manifest(
+                    core_path="copied-core",
+                    core_sha256=gate.sha256_file(core),
+                ),
+            )
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual("accepted", result["status"])
+        self.assertEqual([], result["blockers"])
+
     def test_blocks_resource_handle_serial_scan_core_path_outside_workspace(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"
@@ -5657,7 +5679,7 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
             result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
 
         self.assertIn(
-            "resource_handle_serial_scan_core_path_invalid",
+            "path_resolves_under_protected_root",
             {blocker["reason"] for blocker in result["blockers"]},
         )
 

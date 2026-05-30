@@ -5751,6 +5751,7 @@ def validate_resource_handle_serial_scan_manifest(
     payload: dict[str, Any],
     *,
     label: str,
+    manifest_path: Path,
     mode: str,
     expected_binary_sha256: str | None,
     workspace_root: Path,
@@ -5766,12 +5767,15 @@ def validate_resource_handle_serial_scan_manifest(
     if payload.get("core_sha256_verified") is not True:
         blockers.append({"reason": "resource_handle_serial_scan_core_sha256_not_verified", "label": f"{label}:$.core_sha256_verified"})
     core_path = payload.get("core_path")
-    if not isinstance(core_path, str) or not Path(core_path).expanduser().is_absolute():
+    if not isinstance(core_path, str) or not core_path:
         blockers.append({"reason": "resource_handle_serial_scan_core_path_invalid", "label": f"{label}:$.core_path"})
     else:
-        resolved_core_path = Path(core_path).expanduser().resolve(strict=False)
+        candidate_core_path = Path(core_path).expanduser()
+        if not candidate_core_path.is_absolute():
+            candidate_core_path = manifest_path.parent / candidate_core_path
+        resolved_core_path = candidate_core_path.resolve(strict=False)
         core_path_blockers = path_blockers(
-            Path(core_path),
+            candidate_core_path,
             label=f"{label}:$.core_path",
             workspace_root=workspace_root,
             protected_root=protected_root,
@@ -7662,6 +7666,7 @@ def validate_manifest(
         validate_resource_handle_serial_scan_manifest(
             payload,
             label=str(resolved),
+            manifest_path=resolved,
             mode=mode,
             expected_binary_sha256=expected_binary_sha256,
             workspace_root=workspace_root,

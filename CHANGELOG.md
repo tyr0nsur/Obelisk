@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Hardened SDK/research guardrails so installed CMake ABI variables are derived from
+  `ObeliskApi.h`, production-supported Plugin Hub seeds stay limited to safe core
+  utilities, internal Transfer/Buff/Dino target guidance names its policy blockers, and
+  ResourceHandle serial-scan core paths may be manifest-relative without bypassing
+  protected-root checks.
 - Kept raw `EventManager`, `PluginManager`, and dispatcher test helpers out of production
   shared-library builds while preserving wraparound and capability regression coverage.
 - Hardened timer id allocation and offline artifact validation so timer handles skip zero

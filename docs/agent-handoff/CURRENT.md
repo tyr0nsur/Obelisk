@@ -58,8 +58,8 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   second-source/static evidence.
 - SDK packaging publishes only `include/obelisk/ObeliskApi.h`; more public headers require
   explicit install layout/test updates and ABI review.
-- Installed `Obelisk_*` CMake variables mirror all public C header `OBELISK_*` ABI macros;
-  installed SDK consumers verify package/header parity.
+- Installed `Obelisk_*` CMake variables are derived from public C header `OBELISK_*` ABI
+  macros at configure time; installed SDK consumers verify package/header parity.
 - Promoted copied events are observational and non-authoritative: no UE pointers, raw
   params, identity, lookup, mutation, return override, pincode/player text publication, or
   broad module SDK claim.
@@ -151,7 +151,7 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   target sets, and reports internal/layout-only gaps as `target_set_not_release_readiness`.
 - Offline artifact JSON manifests, provenance sidecars, artifact checksum reads, and
   core inspector inputs use no-symlink regular-file opens after protected-path prechecks;
-  relative manifest/provenance paths resolve against their sidecar before protected-root checks.
+  relative manifest/provenance/resource-handle core paths resolve against their sidecar before protected-root checks.
 - `scripts/check_static_tooling.py` records optional radare2/rizin/Ghidra availability and
   runs smoke checks only on approved offline binaries/output roots.
 - `APrimalStructure.IsAllowedToBuild` is second-wave only: no committed snapshot,

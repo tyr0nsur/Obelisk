@@ -619,6 +619,40 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertIn("does not promote Mission SDK", text_result.stdout)
         self.assertIn("does not promote Transfer SDK", text_result.stdout)
 
+    def test_internal_transfer_buff_dino_guidance_names_policy_gates(self) -> None:
+        result = run_compare_raw(
+            "--list-target-guidance",
+            "--target-set",
+            "transfer-scriptstruct",
+            "--target-set",
+            "buff-compact-intake",
+            "--target-set",
+            "dino-compact-intake",
+            "--json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        guidance = {item["target_set"]: item for item in report["target_set_guidance"]}
+        self.assertEqual(set(guidance), {"transfer-scriptstruct", "buff-compact-intake", "dino-compact-intake"})
+        for target_set, module in (
+            ("transfer-scriptstruct", "Transfer"),
+            ("buff-compact-intake", "Buff"),
+            ("dino-compact-intake", "Dino"),
+        ):
+            with self.subTest(target_set=target_set):
+                item = guidance[target_set]
+                self.assertIn("internal_layout_evidence_only", item["why_blocked"])
+                self.assertIn("copied_data_policy_unproven", item["why_blocked"])
+                self.assertIn("lifecycle_privacy_policy_unproven", item["why_blocked"])
+                self.assertIn("promotion_gate_blocked", item["why_blocked"])
+                self.assertIn(f"public_{module.lower()}_sdk_blocked", item["why_blocked"])
+                self.assertIn(
+                    "keep evidence internal until copied-data, lifecycle, privacy, and promotion gates pass",
+                    item["snapshot_prep_checks"],
+                )
+                self.assertIn(f"does not promote {module} SDK", item["non_claim"])
+
     def test_item_return_target_set_guidance_keeps_release_scope_narrow(self) -> None:
         result = run_compare_raw(
             "--list-target-guidance",
