@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Mark post-RC installed SDK packages as `0.1.0-dev` / `dev` so development builds do not
+  masquerade as the published `v0.1.0-rc.2` tag.
+- Hardened the internal Mission copied-bool recognizer to validate Unreal `BoolProperty`
+  tail metadata for the five approved copied bools before exposing parameter ranges.
+- Fixed experimental `oChatAudit` safe-disabled initialization so it does not require chat
+  or timer capabilities until its config actually enables audit registration.
+
 ## 0.1.0-rc.2
 
 - Published a refreshed core-first release candidate with the same public copied-data API

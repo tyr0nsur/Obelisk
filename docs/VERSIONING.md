@@ -19,6 +19,17 @@ promotion gate changes it.
 In other words, no `v0.1.0` release is published until the stable release checklist and
 tag are complete.
 
+Current post-RC development packages built from `main` export:
+
+```text
+Obelisk_DEVELOPMENT_LINE=0.1.0-dev
+Obelisk_RELEASE_CHANNEL=dev
+```
+
+Those installed package variables distinguish current development builds from the
+published `v0.1.0-rc.2` tag. Do not label post-RC HEAD packages as the published RC unless
+the release manager is building from that exact tag/ref.
+
 The CMake package version is intentionally numeric during this line:
 
 ```text

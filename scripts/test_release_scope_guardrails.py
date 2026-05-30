@@ -1257,6 +1257,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         for text in (architecture, status, release, plugins_readme):
             self.assertIn("oPolicyAudit", text)
             self.assertIn("oChatLogger", text)
+            self.assertIn("oChatAudit", text)
             self.assertIn("OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON", text)
         self.assertIn("Experimental Examples", plugins_readme)
         self.assertIn("Excluded unless `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`", architecture)

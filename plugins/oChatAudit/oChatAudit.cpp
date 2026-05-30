@@ -531,18 +531,6 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
             return false;
         }
 
-        if (!HasChatApi(api))
-        {
-            SafeLogError(api, "[oChatAudit] ChatMessageEvent API is not available.");
-            return false;
-        }
-
-        if (!HasTimerApi(api))
-        {
-            SafeLogError(api, "[oChatAudit] Timer API is not available.");
-            return false;
-        }
-
         {
             std::lock_guard<std::mutex> lock(g_StateMutex);
             g_Api = *api;
@@ -573,6 +561,20 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
         {
             SafeLogInfo("[oChatAudit] Disabled by config.");
             return true;
+        }
+
+        if (!HasChatApi(api))
+        {
+            SafeLogError(api, "[oChatAudit] ChatMessageEvent API is not available.");
+            ResetState();
+            return false;
+        }
+
+        if (!HasTimerApi(api))
+        {
+            SafeLogError(api, "[oChatAudit] Timer API is not available.");
+            ResetState();
+            return false;
         }
 
         const uint64_t chatRegistrationId = api->RegisterChatMessageEventWithOwnerTokenHandle(

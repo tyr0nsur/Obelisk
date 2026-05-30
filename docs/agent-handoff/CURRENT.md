@@ -130,6 +130,9 @@ recovery context is not active routing for the current head; use
   evidence is consume-only non-promotion: consume mode accepts and promote mode blocks.
 - Mission bool-tail evidence preserves `bool_field_size=1`, `bool_byte_offset=0`,
   `byte_mask=0x01`, `field_mask=0xff`, and `native_bool=false`.
+- Mission test-only recognizer hardening now enforces that exact bool-tail metadata before
+  exposing copied bool ranges. This still does not promote runtime wiring, public Mission
+  SDK/API, identity, mutation, return override, or server validation.
 - Buff breadth is layout-only evidence for the accepted target set. It is not a public
   Buff SDK/runtime promotion and does not authorize hooks, callbacks, object/class
   exposure, mutation, return override, raw params, `ResourceHandle`, or gameplay
@@ -155,8 +158,11 @@ recovery context is not active routing for the current head; use
 
 - Preserve RC scope while reducing architecture debt, improving evidence tooling, and
   promoting only copied module APIs through strict gates.
-- Current post-RC focus: Item return-only policy, Mission copied-bool observer, then
-  Transfer `bAccept`; this is no RC public SDK/API promotion and does not authorize
+- Previous internal recognizer order was Item return-only policy, Mission copied-bool
+  observer, then Transfer `bAccept`; keep those lanes internal and non-authoritative.
+- Current post-RC focus: keep Item return-only and Mission copied-bool internal, then
+  refresh Transfer ScriptStruct bool-tail second-source evidence before any Transfer
+  payload/redaction work. This is no RC public SDK/API promotion and does not authorize
   Transfer runtime work.
 - Next Item runtime round, if pursued, should wire only the private dispatcher behind
   fail-closed observer gates and post-original copied payloads. Public Item promotion must

@@ -14,6 +14,7 @@ plugins/
   oProcessTimer/
   oPolicyAudit/
   oChatLogger/
+  oChatAudit/
 ```
 
 `oBaseEvents` and `oProcessTimer` are official reference plugins. Keep them small and
@@ -26,8 +27,9 @@ timer APIs.
 
 `oPolicyAudit` is an experimental first-party example for `GameplayPolicyEvent`
 descriptors and callbacks. `oChatLogger` is an experimental first-party smoke test for
-the copied `ChatMessageEvent` API and `enable-chat-events` producer path. They are
-excluded from the default build and release scope unless
+the copied `ChatMessageEvent` API and `enable-chat-events` producer path. `oChatAudit`
+is an experimental digest/audit example over the same copied chat surface and timers.
+They are excluded from the default build and release scope unless
 `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`.
 
 ## Plugin Categories
@@ -38,6 +40,7 @@ excluded from the default build and release scope unless
 | `oProcessTimer` | Official reference plugin for process-local owner-token timers. | Built by default. | Published with `scripts/install_obelisk_plugin.sh`; demonstrates one-shot timer lifecycle only, not gameplay timers or shared cluster state. |
 | `oPolicyAudit` | Experimental example for copied `GameplayPolicyEvent` auditing. | Excluded unless `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`. | Do not publish as part of the first release; install only for isolated tests. |
 | `oChatLogger` | Experimental example for copied `ChatMessageEvent` smoke validation. | Excluded unless `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`. | Log metadata and copied message size only; do not log player identity or raw chat text during validation. |
+| `oChatAudit` | Experimental digest/audit example for copied `ChatMessageEvent` plus process-local timers. | Excluded unless `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`. | Safe-disabled by default; do not log raw chat text, player identity, or command outcomes. |
 | research branches | Probes and prototype integrations. | Excluded from top-level build by default. | Do not install into `plugins/` except isolated tests. |
 | stable plugin directories | Operational plugins with documented config, tests, and rollback. | Eligible for top-level build after review. | Instance-gated rollout only. |
 

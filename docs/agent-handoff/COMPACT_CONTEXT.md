@@ -403,9 +403,11 @@ priorities, and do not use history files as the active source of truth.
   `CallProcessEvent`, background worker plugins, operator lifecycle commands, and
   ScriptStruct/transfer promotion remain blocked unless a later focused gate changes
   scope.
-- If internal recognizer work resumes, keep it test-only. The current internal recognizer
-  order is Item return-only policy, Mission copied-bool observer, then Transfer
-  `bAccept`; this is not RC public SDK/API scope and does not change the RC public API.
+- If internal recognizer work resumes, keep it test-only. The previous internal recognizer
+  order was Item return-only policy, Mission copied-bool observer, then Transfer
+  `bAccept`; current follow-up is Item return-only/Mission copied-bool maintenance, then
+  Transfer ScriptStruct bool-tail second-source refresh before payload/redaction work.
+  This is not RC public SDK/API scope and does not change the RC public API.
   None of these promote public Mission/Items/Transfer SDKs, public callbacks, ABI,
   markers/env, runtime logs, hook wiring, mutation, return override, object identity,
   lookup, or `ResourceHandle`, and this handoff does not authorize Transfer runtime work.

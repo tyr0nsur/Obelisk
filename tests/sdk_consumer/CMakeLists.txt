@@ -233,6 +233,16 @@ if(TARGET oChatAudit)
     )
 
     add_test(
+        NAME SdkConsumerFixtureOChatAuditDisabledNoChatCapability
+        COMMAND sdk_consumer_fixture "$<TARGET_FILE:oChatAudit>" oChatAudit disabled-no-chat-message-capability
+    )
+
+    add_test(
+        NAME SdkConsumerFixtureOChatAuditDisabledNoTimerCapability
+        COMMAND sdk_consumer_fixture "$<TARGET_FILE:oChatAudit>" oChatAudit disabled-no-timer-capability
+    )
+
+    add_test(
         NAME SdkConsumerFixtureOChatAuditRejectsZeroOwnerToken
         COMMAND sdk_consumer_fixture "$<TARGET_FILE:oChatAudit>" oChatAudit zero-owner-token
     )

@@ -41,6 +41,10 @@ namespace
     constexpr uint64_t kBoolInputPropertyFlags = 0x1040000280;
     constexpr uint64_t kBoolReturnPropertyFlags = 0x1040000780;
     constexpr uint64_t kArrayOutPropertyFlags = 0x380;
+    constexpr uint8_t kMissionBoolFieldSize = 0x01;
+    constexpr uint8_t kMissionBoolByteOffset = 0x00;
+    constexpr uint8_t kMissionBoolByteMask = 0x01;
+    constexpr uint8_t kMissionBoolFieldMask = 0xff;
 
     struct Region
     {
@@ -119,6 +123,19 @@ namespace
         WriteAt(buffer, 0x34, elementSize);
         WriteAt(buffer, 0x38, propertyFlags);
         WriteAt(buffer, 0x4c, offset);
+
+        if (klass)
+        {
+            FNameValue className{};
+            std::memcpy(&className, static_cast<const uint8_t*>(klass) + 0x18, sizeof(className));
+            if (className.ComparisonIndex == kBoolPropertyClassNameIndex && className.Number == 0)
+            {
+                WriteAt(buffer, 0x70, kMissionBoolFieldSize);
+                WriteAt(buffer, 0x71, kMissionBoolByteOffset);
+                WriteAt(buffer, 0x72, kMissionBoolByteMask);
+                WriteAt(buffer, 0x73, kMissionBoolFieldMask);
+            }
+        }
     }
 
     struct FieldDef
@@ -530,6 +547,91 @@ namespace
             Require(result.Status == ReadStatus::Implausible,
                     "non-canonical BPOnPlayerRemovedFromMission bool was accepted");
             Require(invocation.Fields.empty(), "rejected BPOnPlayerRemovedFromMission left stale fields");
+        }
+    }
+
+    void TestRejectsWrongBoolTailMetadata()
+    {
+        {
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+            WriteAt(fixture.PropertyB, 0x70, uint8_t{2});
+
+            MissionReflection::MissionInvocation invocation;
+            ReadResult result = MissionReflection::TryIdentifyMissionInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible,
+                    "wrong mission bool field size was accepted");
+            Require(invocation.Fields.empty(), "wrong mission bool field size left stale fields");
+        }
+        {
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+            WriteAt(fixture.PropertyC, 0x71, uint8_t{1});
+
+            MissionReflection::MissionInvocation invocation;
+            ReadResult result = MissionReflection::TryIdentifyMissionInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible,
+                    "wrong AddPlayerToMission ReturnValue byte offset was accepted");
+            Require(invocation.Fields.empty(), "wrong mission bool byte offset left stale fields");
+        }
+        {
+            MissionFixture fixture;
+            BuildBPAllowPlayerToLeaveMission(fixture);
+            WriteAt(fixture.PropertyB, 0x72, uint8_t{2});
+
+            MissionReflection::MissionInvocation invocation;
+            ReadResult result = MissionReflection::TryIdentifyMissionInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible,
+                    "wrong BPAllowPlayerToLeaveMission byte mask was accepted");
+            Require(invocation.Fields.empty(), "wrong mission bool byte mask left stale fields");
+        }
+        {
+            MissionFixture fixture;
+            BuildBPOnPlayerRemovedFromMission(fixture);
+            WriteAt(fixture.PropertyC, 0x73, uint8_t{0x01});
+
+            MissionReflection::MissionInvocation invocation;
+            ReadResult result = MissionReflection::TryIdentifyMissionInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible,
+                    "wrong bFromMissionCompleteEvent field mask was accepted");
+            Require(invocation.Fields.empty(), "wrong mission bool field mask left stale fields");
+        }
+        {
+            MissionFixture fixture;
+            BuildBPOnPlayerRemovedFromMission(fixture);
+            WriteAt(fixture.PropertyD, 0x72, uint8_t{0xff});
+            WriteAt(fixture.PropertyD, 0x73, uint8_t{0xff});
+
+            MissionReflection::MissionInvocation invocation;
+            ReadResult result = MissionReflection::TryIdentifyMissionInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible,
+                    "native-bool marker for bLastPhaseSuccess was accepted");
+            Require(invocation.Fields.empty(), "native-bool marker left stale fields");
         }
     }
 
@@ -1033,6 +1135,7 @@ int main()
     TestRecognizesAddPlayerToMissionBoolRangesOnly();
     TestUnreadableBoolRangeFailsClosed();
     TestRejectsNonCanonicalBoolBytes();
+    TestRejectsWrongBoolTailMetadata();
     TestRecognizesLeaveAndRemovedMissionBoolRangesOnly();
     TestAcceptsMetadataOnlyRecognition();
     TestRejectsWrongOuterNameNumberAndClass();

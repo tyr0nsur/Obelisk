@@ -46,6 +46,10 @@ namespace
     constexpr uint64_t kBoolInputPropertyFlags = 0x1040000280;
     constexpr uint64_t kBoolReturnPropertyFlags = 0x1040000780;
     constexpr uint64_t kArrayOutPropertyFlags = 0x380;
+    constexpr uint8_t kMissionBoolFieldSize = 0x01;
+    constexpr uint8_t kMissionBoolByteOffset = 0x00;
+    constexpr uint8_t kMissionBoolByteMask = 0x01;
+    constexpr uint8_t kMissionBoolFieldMask = 0xff;
 
     struct Region
     {
@@ -130,6 +134,19 @@ namespace
         WriteAt(buffer, 0x34, elementSize);
         WriteAt(buffer, 0x38, propertyFlags);
         WriteAt(buffer, 0x4c, offset);
+
+        if (klass)
+        {
+            FNameValue className{};
+            std::memcpy(&className, static_cast<const uint8_t*>(klass) + 0x18, sizeof(className));
+            if (className.ComparisonIndex == kBoolPropertyClassNameIndex && className.Number == 0)
+            {
+                WriteAt(buffer, 0x70, kMissionBoolFieldSize);
+                WriteAt(buffer, 0x71, kMissionBoolByteOffset);
+                WriteAt(buffer, 0x72, kMissionBoolByteMask);
+                WriteAt(buffer, 0x73, kMissionBoolFieldMask);
+            }
+        }
     }
 
     struct FieldDef
@@ -660,6 +677,50 @@ namespace
         Require(attempt.Result.Status == ReadStatus::Implausible,
                 "invalid mission metadata did not fail as implausible");
         Require(fixture.Context.Calls > 0, "invalid matching mission FName did not inspect metadata");
+    }
+
+    void TestHookLevelRejectsWrongBoolTailMetadata()
+    {
+        MissionFixture fixture;
+        BuildAddPlayerToMission(fixture);
+        fixture.Params[0x08] = 1;
+        fixture.Params[0x09] = 0;
+        WriteAt(fixture.PropertyB, 0x72, uint8_t{0xff});
+        WriteAt(fixture.PropertyB, 0x73, uint8_t{0xff});
+
+        Attempt attempt = TryIdentifyInvocation(
+            EnabledGate(),
+            kAddPlayerToMissionNameIndex,
+            fixture.Reader(),
+            fixture.Function.data(),
+            fixture.Params.data());
+
+        Require(attempt.Status == AttemptStatus::Rejected,
+                "mission hook accepted wrong BoolProperty tail metadata");
+        Require(attempt.Invocation.Fields.empty(),
+                "rejected mission hook attempt left stale fields");
+
+        CopiedMissionObservation observation;
+        observation.Function = MissionReflection::MissionFunction::BPOnPlayerRemovedFromMission;
+        observation.FunctionNameIndex = 123456;
+        observation.OuterNameIndex = 654321;
+        observation.BoolStorage[0].Field = MissionReflection::MissionField::BLastPhaseSuccess;
+        observation.BoolStorage[0].Value = true;
+        observation.BoolStorage[1].Field = MissionReflection::MissionField::BFromMissionCompleteEvent;
+        observation.BoolStorage[1].Value = true;
+        observation.BoolCount = observation.BoolStorage.size();
+        Require(!TryBuildCopiedMissionBoolObservationForMatchedAttempt(attempt, observation),
+                "rejected mission bool-tail attempt produced copied bool output");
+        Require(observation.Function == MissionReflection::MissionFunction::GetPlayerUsableItems,
+                "rejected mission bool-tail attempt did not clear function");
+        Require(observation.FunctionNameIndex == -1,
+                "rejected mission bool-tail attempt did not clear function name");
+        Require(observation.OuterNameIndex == -1,
+                "rejected mission bool-tail attempt did not clear outer name");
+        Require(observation.BoolCount == 0,
+                "rejected mission bool-tail attempt did not clear bool count");
+        Require(!observation.BoolStorage[0].Value && !observation.BoolStorage[1].Value,
+                "rejected mission bool-tail attempt did not clear bool storage");
     }
 
     void TestExactPrefilterMustMatchReflectedFunction()
@@ -1508,6 +1569,7 @@ int main()
     TestIdentifyContainsReaderExceptions();
     TestAcceptedTargets();
     TestUnknownAndInvalidRejects();
+    TestHookLevelRejectsWrongBoolTailMetadata();
     TestExactPrefilterMustMatchReflectedFunction();
     TestCopiedObservationPayloadShape();
     TestBuildsMetadataAndCopiedBoolObservationOnly();

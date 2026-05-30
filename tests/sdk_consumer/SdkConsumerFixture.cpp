@@ -712,6 +712,7 @@ int main(int argc, char** argv)
             api.DescribeGameplayPolicyEventKind = DescribeGameplayPolicyEventKind;
         }
         if (mode != "no-chat-message-capability" &&
+            mode != "disabled-no-chat-message-capability" &&
             mode != "active-chat-command-helper-no-chat-capability")
         {
             api.capabilities |= OBELISK_API_CAPABILITY_CHAT_EVENTS;
@@ -720,7 +721,8 @@ int main(int argc, char** argv)
             api.UnregisterChatMessageEventWithOwnerToken =
                 UnregisterChatMessageEventWithOwnerToken;
         }
-        if (mode != "no-timer-capability")
+        if (mode != "no-timer-capability" &&
+            mode != "disabled-no-timer-capability")
         {
             api.capabilities |= OBELISK_API_CAPABILITY_TIMERS;
             api.RegisterTimerWithOwnerTokenHandle = RegisterTimerWithOwnerTokenHandle;
@@ -1211,7 +1213,10 @@ int main(int argc, char** argv)
                     !HasLogContaining(g_ErrorLogs, "null-data-secret"),
                 "chat command helper logged raw null data chat text");
         }
-        if (std::strcmp(expectedPluginId, "oChatAudit") == 0 && mode.empty())
+        if (std::strcmp(expectedPluginId, "oChatAudit") == 0 &&
+            (mode.empty() ||
+             mode == "disabled-no-chat-message-capability" ||
+             mode == "disabled-no-timer-capability"))
         {
             Require(g_GameplayPolicyRegisterCount == 0,
                 "disabled chat audit unexpectedly registered gameplay policy callback");
@@ -1360,7 +1365,10 @@ int main(int argc, char** argv)
             Require(g_RegisterCount == 0, "disabled oBaseEvents unexpectedly registered a callback");
             Require(g_UnregisterCount == 0, "disabled oBaseEvents unexpectedly unregistered a callback");
         }
-        if (std::strcmp(expectedPluginId, "oChatAudit") == 0 && mode.empty())
+        if (std::strcmp(expectedPluginId, "oChatAudit") == 0 &&
+            (mode.empty() ||
+             mode == "disabled-no-chat-message-capability" ||
+             mode == "disabled-no-timer-capability"))
         {
             Require(g_ChatMessageRegisterCount == 0,
                 "disabled chat audit registered a chat callback before shutdown");

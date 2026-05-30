@@ -10,10 +10,10 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(Obelisk 0.1.0 CONFIG REQUIRED)
 
-if(NOT Obelisk_DEVELOPMENT_LINE STREQUAL "0.1.0-rc.2")
+if(NOT Obelisk_DEVELOPMENT_LINE STREQUAL "0.1.0-dev")
     message(FATAL_ERROR "Unexpected Obelisk development line: ${Obelisk_DEVELOPMENT_LINE}")
 endif()
-if(NOT Obelisk_RELEASE_CHANNEL STREQUAL "rc")
+if(NOT Obelisk_RELEASE_CHANNEL STREQUAL "dev")
     message(FATAL_ERROR "Unexpected Obelisk release channel: ${Obelisk_RELEASE_CHANNEL}")
 endif()
 if(NOT Obelisk_API_ABI_VERSION EQUAL 1)

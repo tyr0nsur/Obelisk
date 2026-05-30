@@ -144,6 +144,12 @@ malformed bool bytes out of both the recognizer output and the hook-side copied 
 builder. The change remains internal/test-only: no hook wiring, marker/env, public Mission
 SDK, identity, mutation, or return override is promoted.
 
+The base recognizer also validates the exact Unreal `BoolProperty` tail metadata for all
+five copied bool fields before exposing ranges: `bool_field_size=1`,
+`bool_byte_offset=0`, `byte_mask=0x01`, `field_mask=0xff`, and `native_bool=false`.
+Wrong field size, byte offset, byte mask, field mask, or native-bool marker causes
+recognition to fail closed and leaves no stale copied fields.
+
 The internal hook-side copied observation builder now also requires each copied bool range
 to point back to the original `params + offset` within the validated `ParmsSize` range.
 Forged ranges outside `params`, ranges at the wrong offset, and invocations without
@@ -151,9 +157,9 @@ parameter provenance are rejected and clear stale copied output. `ParameterData`
 borrowed internal pointer for immediate builder validation only; it must not be persisted,
 logged, exposed to plugins, or treated as object identity.
 
-The current test-only recognizer does not yet validate Unreal native-bool mask metadata
-such as byte mask, byte offset, or field mask at runtime. Those mask semantics remain a
-promotion blocker for any future runtime/public Mission path.
+These mask semantics are now covered in test-only recognizer and hook-helper fixtures, but
+Mission still remains internal and non-promoted until runtime observation, dispatcher
+lifecycle, public ABI, identity/privacy, and SDK policy gates are handled separately.
 
 Rejected metadata, disabled gates, non-mission FName values, unsupported SHA values,
 unreadable params, malformed bool bytes, and exhausted budgets should not emit per-event

@@ -36,6 +36,7 @@ class VersioningGuardrailTests(unittest.TestCase):
         text = (REPO_ROOT / "docs/VERSIONING.md").read_text(encoding="utf-8")
 
         self.assertIn("0.1.0-rc.2", text)
+        self.assertIn("0.1.0-dev", text)
         self.assertIn("no `v0.1.0` release is", text)
         self.assertIn("numeric package", text)
         self.assertIn("not a release claim", text)
@@ -49,8 +50,12 @@ class VersioningGuardrailTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertRegex(cmake, re.compile(r"project\(Obelisk VERSION 0\.1\.0 LANGUAGES C CXX\)"))
+        self.assertIn('set(OBELISK_DEVELOPMENT_LINE "0.1.0-dev")', cmake)
+        self.assertIn('set(OBELISK_RELEASE_CHANNEL "dev")', cmake)
         self.assertIn("project(Obelisk VERSION 0.1.0)", versioning)
         self.assertIn("find_package(Obelisk 0.1.0 CONFIG REQUIRED)", versioning)
+        self.assertIn('Obelisk_DEVELOPMENT_LINE STREQUAL "0.1.0-dev"', installed_consumer_cmake)
+        self.assertIn('Obelisk_RELEASE_CHANNEL STREQUAL "dev"', installed_consumer_cmake)
         self.assertIn(
             "find_package(Obelisk 0.1.0 CONFIG REQUIRED)",
             installed_consumer_cmake,
