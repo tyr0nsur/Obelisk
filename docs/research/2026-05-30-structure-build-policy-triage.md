@@ -118,9 +118,10 @@ candidate snapshot for the exact target only. Because this target is not in the 
 fixture manifest, use the ad hoc inspection path before adding any target set.
 
 `scripts/inspect_core_ufunctions.py` currently takes an offline core via `--core`; do not
-pass an evidence-pack manifest to `--core`. If the approved input is a complete
-evidence-pack manifest instead of a copied core, use the snapshot regeneration consumer
-for that manifest and keep the resulting target exact and ad hoc.
+pass an evidence-pack manifest to `--core`. The inspector now rejects evidence-pack
+manifests passed as `--core` before opening them as ELF cores. If the approved input is a
+complete evidence-pack manifest instead of a copied core, use the snapshot regeneration
+consumer for that manifest and keep the resulting target exact and ad hoc.
 
 The command contract below was checked against the inspector CLI on 2026-05-30:
 `--outer-exact`, `--name-exact`, `--inspection-mode ufunction`, `--snapshot-json`, and

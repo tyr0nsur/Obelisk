@@ -138,8 +138,9 @@ Preferred core-first direction:
    other gameplay areas as module-after-gates work, not as the core architecture.
 
 Compatibility references such as ArkServerApi/AseApi are dictionaries for familiar names
-and behavior only. They are not a porting target or copying source for offsets, layouts,
-ABI assumptions, wrappers, raw UE pointer APIs, or implementations.
+and demand only. They are not a behavior map, not a porting target, not a copying source,
+or implementation guides for offsets, layouts, ABI assumptions, wrappers, raw UE pointer
+APIs, command parsers, return semantics, or implementations.
 
 ## Experimental Components
 

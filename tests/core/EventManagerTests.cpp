@@ -433,6 +433,55 @@ namespace
         Require(g_Counters.filtered_post == 3, "filtered post dispatch stopped after exception");
     }
 
+    void TestSnapshotSetupFailureDoesNotEscapeOrInvokeCallbacks()
+    {
+        struct SnapshotFailureGuard
+        {
+            SnapshotFailureGuard()
+            {
+                Obelisk::Core::EventManager::SetForceSnapshotFailureForTesting(true);
+            }
+
+            ~SnapshotFailureGuard()
+            {
+                Obelisk::Core::EventManager::SetForceSnapshotFailureForTesting(false);
+            }
+        };
+
+        ResetCounters();
+        Obelisk::Core::EventManager events;
+        int owner = 0;
+
+        Require(events.RegisterPreProcessEventOwned(&owner, GlobalPre) != 0,
+                "global pre callback registration failed before snapshot failure test");
+        Require(events.RegisterPreProcessEventForNameIndexOwned(&owner, 42, FilteredPre) != 0,
+                "filtered pre callback registration failed before snapshot failure test");
+        Require(events.RegisterPostProcessEventOwned(&owner, GlobalPost) != 0,
+                "global post callback registration failed before snapshot failure test");
+        Require(events.RegisterPostProcessEventForNameIndexOwned(&owner, 42, FilteredPost) != 0,
+                "filtered post callback registration failed before snapshot failure test");
+
+        {
+            SnapshotFailureGuard guard;
+            Require(events.TriggerPreProcessEvent(42, nullptr, nullptr, nullptr),
+                    "snapshot setup failure blocked original ProcessEvent");
+            events.TriggerPostProcessEvent(42, nullptr, nullptr, nullptr);
+        }
+
+        Require(g_Counters.global_pre == 0, "global pre callback ran after snapshot setup failure");
+        Require(g_Counters.filtered_pre == 0, "filtered pre callback ran after snapshot setup failure");
+        Require(g_Counters.global_post == 0, "global post callback ran after snapshot setup failure");
+        Require(g_Counters.filtered_post == 0, "filtered post callback ran after snapshot setup failure");
+
+        Require(events.TriggerPreProcessEvent(42, nullptr, nullptr, nullptr),
+                "pre callbacks did not recover after snapshot failure injection");
+        events.TriggerPostProcessEvent(42, nullptr, nullptr, nullptr);
+        Require(g_Counters.global_pre == 1, "global pre callback did not recover after snapshot failure");
+        Require(g_Counters.filtered_pre == 1, "filtered pre callback did not recover after snapshot failure");
+        Require(g_Counters.global_post == 1, "global post callback did not recover after snapshot failure");
+        Require(g_Counters.filtered_post == 1, "filtered post callback did not recover after snapshot failure");
+    }
+
     void TestOwnerCleanup()
     {
         ResetCounters();
@@ -1041,6 +1090,7 @@ int main()
     TestPostCallbackReturnValueDoesNotAffectDispatch();
     TestPreCallbackExceptionsDoNotBlockOrStopLaterCallbacks();
     TestPostCallbackExceptionsDoNotStopLaterCallbacks();
+    TestSnapshotSetupFailureDoesNotEscapeOrInvokeCallbacks();
     TestOwnerCleanup();
     TestSingleRegistrationUnregister();
     TestNullCallbackRegistrationsAreRejected();

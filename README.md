@@ -6,10 +6,10 @@ Engine dedicated server processes.
 It aims to bring familiar ARK plugin concepts to Linux without porting Windows
 assumptions: runtime injection, UE event hooks, a stable plugin ABI,
 reflection-driven research tooling, and eventually reusable gameplay APIs.
-ArkServerApi/AseApi compatibility research is limited to a names and behavior
-dictionary for familiar plugin concepts; it is not a porting target or copying
-source for offsets, layouts, ABI assumptions, wrappers, raw UE pointer APIs, or
-implementations.
+ArkServerApi/AseApi compatibility research is limited to a names and demand
+dictionary for familiar plugin concepts; it is not a behavior map, not a porting target,
+not a copying source, and not an implementation guide for offsets, layouts, ABI assumptions,
+wrappers, raw UE pointer APIs, command parsers, return semantics, or implementations.
 
 ARK: Survival Evolved is currently the debug harness used to validate Obelisk
 inside a real stripped UE4 Linux server. ARK/LinuxGSM details are validation
@@ -519,8 +519,9 @@ Near-term engineering:
   plugin-facing gameplay events.
 - Generalize FName/GObjects/UFunction lookup only after another capture or binary hash
   validates the current field layout.
-- Add small SDK examples for minimal load, filtered events, config, and safe
-  lifecycle.
+- Harden the small SDK seed set for production contributors: installed package
+  consumers, lifecycle/config examples, descriptors, process-local timers, and copied
+  event examples that do not rely on raw UE pointers.
 
 Later:
 

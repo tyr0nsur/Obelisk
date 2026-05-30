@@ -245,8 +245,27 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertIs(release_flags["buff-compact-intake"], False)
         self.assertEqual(classifications["mission-copied-bool-policy-slice"], "planning_only")
         self.assertIs(release_flags["mission-copied-bool-policy-slice"], False)
+        self.assertEqual(classifications["players-identity-lifecycle-intake"], "planning_only")
+        self.assertIs(release_flags["players-identity-lifecycle-intake"], False)
         self.assertEqual(classifications["transfer-scriptstruct"], "internal_layout_only")
         self.assertIs(release_flags["transfer-scriptstruct"], False)
+        self.assertEqual(
+            sets["players-identity-lifecycle-intake"],
+            [
+                "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerListPlayers",
+                "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerKickPlayer",
+                "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerSendChatMessage",
+                "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerRequestTribeLog",
+                "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.AllowTribeGroupPermission",
+                "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.IsInTribe",
+                "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ClientReceiveMyTribeOnlineList",
+                "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ClientReceiveActiveMissionTags",
+                "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerState.ServerRequestSpawnPointsForDownloadedCharacters",
+                "obelisk.ufunction-chain.snapshot.v1:MissionType.AddPlayerToMission",
+                "obelisk.ufunction-chain.snapshot.v1:MissionType.BPAllowPlayerToLeaveMission",
+                "obelisk.ufunction-chain.snapshot.v1:MissionType.BPOnPlayerRemovedFromMission",
+            ],
+        )
         self.assertEqual(
             sets["structure-nonpin-copied-scalar-policy-slice"],
             [
@@ -2136,6 +2155,45 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
                 "layout_ready": True,
                 "promotion_ready": False,
                 "blockers": [{"reason": "target_set_not_release_readiness", "count": 1}],
+            },
+        )
+
+    def test_release_target_set_promotion_blocks_explicit_targets_outside_named_set(self) -> None:
+        target_set = "item-return-only-policy-slice"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_target_set_root(root / "base", target_set)
+            write_target_set_root(root / "candidate", target_set)
+            for side in ("base", "candidate"):
+                target_dir = root / side / "sha" / "sdk_test"
+                payload = rename_target(base_snapshot(), outer="PrimalItem", name="CraftBlueprint")
+                write_snapshot(target_dir, payload, "PrimalItem.CraftBlueprint.snapshot.json")
+
+            result = run_compare(
+                root / "base",
+                root / "candidate",
+                "--readiness-report",
+                "--target-set",
+                target_set,
+                "--target",
+                "PrimalItem.CraftBlueprint",
+                "--fail-on-readiness-gaps",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 1, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["gate_mode"], "second_source_promotion")
+        self.assertEqual(report["target_sets"], [target_set])
+        self.assertEqual(report["totals"]["second_source_accepted"], 4)
+        self.assertEqual(
+            report["promotion_gate"],
+            {
+                "ready": False,
+                "ready_scope": "not_ready",
+                "layout_ready": True,
+                "promotion_ready": False,
+                "blockers": [{"reason": "explicit_target_not_in_named_target_set", "count": 1}],
             },
         )
 

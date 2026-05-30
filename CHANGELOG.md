@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Hardened raw `EventManager` ProcessEvent dispatch so snapshot setup failures are
+  contained in the hook-facing trigger path without invoking partial callback snapshots.
 - Hardened raw ProcessEvent blocking so plugin pre-callbacks can block only when that
   plugin owner's init-time capability snapshot advertised ProcessEvent blocking and the
   live debug gate remains enabled.

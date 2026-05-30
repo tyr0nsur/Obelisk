@@ -168,9 +168,10 @@ Harden reflected event parameter decoding
 5. Add safe plugin examples only after the relevant promotion gates are met.
 6. Reduce operational and documentation debt that can mislead new contributors.
 
-ArkServerApi/AseApi may be consulted only as a names and behavior dictionary for familiar
-ARK plugin concepts. It is not a porting target or copying source for offsets, layouts,
-ABI assumptions, wrappers, raw UE pointer APIs, or implementations.
+ArkServerApi/AseApi may be consulted only as a names and demand dictionary for familiar
+ARK plugin concepts. It is not a behavior map, not a porting target, not a copying source,
+or implementation guide for offsets, layouts, ABI assumptions, wrappers, raw UE pointer APIs,
+command parsers, return semantics, or implementations.
 
 Use [docs/STATUS.md](docs/STATUS.md) before changing runtime behavior. It
 defines which pieces are stable baseline, experimental, or not ready.

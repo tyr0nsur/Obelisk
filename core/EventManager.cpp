@@ -4,18 +4,54 @@
 #include <algorithm>
 #include <atomic>
 #include <exception>
+#include <new>
 
 namespace Obelisk::Core
 {
     namespace
     {
         std::atomic<bool> g_ProcessEventBlockingCapabilityAdvertised{false};
+        std::atomic<bool> g_ForceSnapshotFailureForTesting{false};
 
         bool IsProcessEventBlockingAllowed()
         {
             return g_ProcessEventBlockingCapabilityAdvertised.load(std::memory_order_acquire) &&
                 Runtime::IsEnvAndInstanceMarkerEnabled("OBELISK_ALLOW_PROCESS_EVENT_BLOCKING",
                                                        "allow-process-event-blocking");
+        }
+
+        void MaybeForceSnapshotFailureForTesting()
+        {
+            if (g_ForceSnapshotFailureForTesting.load(std::memory_order_acquire))
+                throw std::bad_alloc();
+        }
+
+        void SafeLogWarnNoThrow(const char* message) noexcept
+        {
+            try
+            {
+                if (Logger::IsInitialized())
+                    Logger::Get()->warn("{}", message ? message : "");
+            }
+            catch (...)
+            {
+            }
+        }
+
+        void SafeLogErrorNoThrow(const char* message, const char* detail = nullptr) noexcept
+        {
+            try
+            {
+                if (!Logger::IsInitialized())
+                    return;
+                if (detail)
+                    Logger::Get()->error("{}: {}", message ? message : "", detail);
+                else
+                    Logger::Get()->error("{}", message ? message : "");
+            }
+            catch (...)
+            {
+            }
         }
     }
 
@@ -28,6 +64,11 @@ namespace Obelisk::Core
     void EventManager::SetProcessEventBlockingCapabilityAdvertised(bool advertised)
     {
         g_ProcessEventBlockingCapabilityAdvertised.store(advertised, std::memory_order_release);
+    }
+
+    void EventManager::SetForceSnapshotFailureForTesting(bool enabled)
+    {
+        g_ForceSnapshotFailureForTesting.store(enabled, std::memory_order_release);
     }
 
     void EventManager::RegisterPreProcessEvent(OnProcessEventCallback callback)
@@ -250,53 +291,69 @@ namespace Obelisk::Core
 
     bool EventManager::TriggerPreProcessEvent(void* caller, void* function, void* parms)
     {
-        std::vector<CallbackSnapshot> callbacks;
-        std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
-        const auto isSnapshotActive = [this](const CallbackSnapshot& snapshot) {
-            return snapshot.id != 0 &&
-                std::any_of(m_PreProcessEventCallbacks.begin(),
-                            m_PreProcessEventCallbacks.end(),
-                            [&snapshot](const CallbackRegistration& item) {
-                                return item.id == snapshot.id &&
-                                       item.generation == snapshot.generation &&
-                                       item.callback == snapshot.callback;
-                            });
-        };
+        try
         {
-            std::lock_guard<std::mutex> lock(m_Mutex);
-            for (const auto& item : m_PreProcessEventCallbacks)
-                callbacks.push_back({item.id, item.generation, item.callback, item.allowProcessEventBlocking});
-        }
-
-        for (const auto& snapshot : callbacks)
-        {
-            if (!snapshot.callback)
-                continue;
+            std::vector<CallbackSnapshot> callbacks;
+            std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
+            const auto isSnapshotActive = [this](const CallbackSnapshot& snapshot) {
+                return snapshot.id != 0 &&
+                    std::any_of(m_PreProcessEventCallbacks.begin(),
+                                m_PreProcessEventCallbacks.end(),
+                                [&snapshot](const CallbackRegistration& item) {
+                                    return item.id == snapshot.id &&
+                                           item.generation == snapshot.generation &&
+                                           item.callback == snapshot.callback;
+                                });
+            };
             {
                 std::lock_guard<std::mutex> lock(m_Mutex);
-                if (!isSnapshotActive(snapshot))
-                    continue;
+                MaybeForceSnapshotFailureForTesting();
+                callbacks.reserve(m_PreProcessEventCallbacks.size());
+                for (const auto& item : m_PreProcessEventCallbacks)
+                    callbacks.push_back({item.id, item.generation, item.callback, item.allowProcessEventBlocking});
             }
 
-            try
+            for (const auto& snapshot : callbacks)
             {
-                if (!snapshot.callback(caller, function, parms))
+                if (!snapshot.callback)
+                    continue;
                 {
-                    if (snapshot.allowProcessEventBlocking && IsProcessEventBlockingAllowed())
-                        return false;
-                    OBELISK_WARN("PreProcessEvent callback returned false, but ProcessEvent blocking is disabled; continuing original event.");
+                    std::lock_guard<std::mutex> lock(m_Mutex);
+                    if (!isSnapshotActive(snapshot))
+                        continue;
+                }
+
+                try
+                {
+                    if (!snapshot.callback(caller, function, parms))
+                    {
+                        if (snapshot.allowProcessEventBlocking && IsProcessEventBlockingAllowed())
+                            return false;
+                        SafeLogWarnNoThrow(
+                            "PreProcessEvent callback returned false, but ProcessEvent blocking is disabled; continuing original event.");
+                    }
+                }
+                catch (const std::exception& e)
+                {
+                    SafeLogErrorNoThrow("PreProcessEvent callback threw", e.what());
+                }
+                catch (...)
+                {
+                    SafeLogErrorNoThrow("PreProcessEvent callback threw an unknown exception.");
                 }
             }
-            catch (const std::exception& e)
-            {
-                OBELISK_ERROR("PreProcessEvent callback threw: {}", e.what());
-            }
-            catch (...)
-            {
-                OBELISK_ERROR("PreProcessEvent callback threw an unknown exception.");
-            }
+            return true;
         }
-        return true;
+        catch (const std::exception& e)
+        {
+            SafeLogErrorNoThrow("PreProcessEvent dispatch failed internally; continuing original event", e.what());
+            return true;
+        }
+        catch (...)
+        {
+            SafeLogErrorNoThrow("PreProcessEvent dispatch failed internally with an unknown exception; continuing original event.");
+            return true;
+        }
     }
 
     bool EventManager::TriggerPreProcessEvent(int32_t nameIndex, void* caller, void* function, void* parms)
@@ -304,100 +361,130 @@ namespace Obelisk::Core
         if (!TriggerPreProcessEvent(caller, function, parms))
             return false;
 
-        std::vector<CallbackSnapshot> callbacks;
-        std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
-        const auto isSnapshotActive = [this](const CallbackSnapshot& snapshot) {
-            return snapshot.id != 0 &&
-                std::any_of(m_FilteredPreProcessEventCallbacks.begin(),
-                            m_FilteredPreProcessEventCallbacks.end(),
-                            [&snapshot](const CallbackRegistration& item) {
-                                return item.id == snapshot.id &&
-                                       item.generation == snapshot.generation &&
-                                       item.callback == snapshot.callback;
-                            });
-        };
+        try
         {
-            std::lock_guard<std::mutex> lock(m_Mutex);
-            for (const auto& item : m_FilteredPreProcessEventCallbacks)
-            {
-                if (item.nameIndex == nameIndex)
-                    callbacks.push_back({item.id, item.generation, item.callback, item.allowProcessEventBlocking});
-            }
-        }
-
-        for (const auto& snapshot : callbacks)
-        {
-            if (!snapshot.callback)
-                continue;
+            std::vector<CallbackSnapshot> callbacks;
+            std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
+            const auto isSnapshotActive = [this](const CallbackSnapshot& snapshot) {
+                return snapshot.id != 0 &&
+                    std::any_of(m_FilteredPreProcessEventCallbacks.begin(),
+                                m_FilteredPreProcessEventCallbacks.end(),
+                                [&snapshot](const CallbackRegistration& item) {
+                                    return item.id == snapshot.id &&
+                                           item.generation == snapshot.generation &&
+                                           item.callback == snapshot.callback;
+                                });
+            };
             {
                 std::lock_guard<std::mutex> lock(m_Mutex);
-                if (!isSnapshotActive(snapshot))
-                    continue;
-            }
-
-            try
-            {
-                if (!snapshot.callback(caller, function, parms))
+                MaybeForceSnapshotFailureForTesting();
+                callbacks.reserve(m_FilteredPreProcessEventCallbacks.size());
+                for (const auto& item : m_FilteredPreProcessEventCallbacks)
                 {
-                    if (snapshot.allowProcessEventBlocking && IsProcessEventBlockingAllowed())
-                        return false;
-                    OBELISK_WARN("Filtered PreProcessEvent callback returned false, but ProcessEvent blocking is disabled; continuing original event.");
+                    if (item.nameIndex == nameIndex)
+                        callbacks.push_back({item.id, item.generation, item.callback, item.allowProcessEventBlocking});
                 }
             }
-            catch (const std::exception& e)
+
+            for (const auto& snapshot : callbacks)
             {
-                OBELISK_ERROR("Filtered PreProcessEvent callback threw: {}", e.what());
+                if (!snapshot.callback)
+                    continue;
+                {
+                    std::lock_guard<std::mutex> lock(m_Mutex);
+                    if (!isSnapshotActive(snapshot))
+                        continue;
+                }
+
+                try
+                {
+                    if (!snapshot.callback(caller, function, parms))
+                    {
+                        if (snapshot.allowProcessEventBlocking && IsProcessEventBlockingAllowed())
+                            return false;
+                        SafeLogWarnNoThrow(
+                            "Filtered PreProcessEvent callback returned false, but ProcessEvent blocking is disabled; continuing original event.");
+                    }
+                }
+                catch (const std::exception& e)
+                {
+                    SafeLogErrorNoThrow("Filtered PreProcessEvent callback threw", e.what());
+                }
+                catch (...)
+                {
+                    SafeLogErrorNoThrow("Filtered PreProcessEvent callback threw an unknown exception.");
+                }
             }
-            catch (...)
-            {
-                OBELISK_ERROR("Filtered PreProcessEvent callback threw an unknown exception.");
-            }
+            return true;
         }
-        return true;
+        catch (const std::exception& e)
+        {
+            SafeLogErrorNoThrow("Filtered PreProcessEvent dispatch failed internally; continuing original event", e.what());
+            return true;
+        }
+        catch (...)
+        {
+            SafeLogErrorNoThrow(
+                "Filtered PreProcessEvent dispatch failed internally with an unknown exception; continuing original event.");
+            return true;
+        }
     }
 
     void EventManager::TriggerPostProcessEvent(void* caller, void* function, void* parms)
     {
-        std::vector<CallbackSnapshot> callbacks;
-        std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
-        const auto isSnapshotActive = [this](const CallbackSnapshot& snapshot) {
-            return snapshot.id != 0 &&
-                std::any_of(m_PostProcessEventCallbacks.begin(),
-                            m_PostProcessEventCallbacks.end(),
-                            [&snapshot](const CallbackRegistration& item) {
-                                return item.id == snapshot.id &&
-                                       item.generation == snapshot.generation &&
-                                       item.callback == snapshot.callback;
-                            });
-        };
+        try
         {
-            std::lock_guard<std::mutex> lock(m_Mutex);
-            for (const auto& item : m_PostProcessEventCallbacks)
-                callbacks.push_back({item.id, item.generation, item.callback, false});
-        }
-
-        for (const auto& snapshot : callbacks)
-        {
-            if (!snapshot.callback)
-                continue;
+            std::vector<CallbackSnapshot> callbacks;
+            std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
+            const auto isSnapshotActive = [this](const CallbackSnapshot& snapshot) {
+                return snapshot.id != 0 &&
+                    std::any_of(m_PostProcessEventCallbacks.begin(),
+                                m_PostProcessEventCallbacks.end(),
+                                [&snapshot](const CallbackRegistration& item) {
+                                    return item.id == snapshot.id &&
+                                           item.generation == snapshot.generation &&
+                                           item.callback == snapshot.callback;
+                                });
+            };
             {
                 std::lock_guard<std::mutex> lock(m_Mutex);
-                if (!isSnapshotActive(snapshot))
-                    continue;
+                MaybeForceSnapshotFailureForTesting();
+                callbacks.reserve(m_PostProcessEventCallbacks.size());
+                for (const auto& item : m_PostProcessEventCallbacks)
+                    callbacks.push_back({item.id, item.generation, item.callback, false});
             }
 
-            try
+            for (const auto& snapshot : callbacks)
             {
-                snapshot.callback(caller, function, parms);
+                if (!snapshot.callback)
+                    continue;
+                {
+                    std::lock_guard<std::mutex> lock(m_Mutex);
+                    if (!isSnapshotActive(snapshot))
+                        continue;
+                }
+
+                try
+                {
+                    snapshot.callback(caller, function, parms);
+                }
+                catch (const std::exception& e)
+                {
+                    SafeLogErrorNoThrow("PostProcessEvent callback threw", e.what());
+                }
+                catch (...)
+                {
+                    SafeLogErrorNoThrow("PostProcessEvent callback threw an unknown exception.");
+                }
             }
-            catch (const std::exception& e)
-            {
-                OBELISK_ERROR("PostProcessEvent callback threw: {}", e.what());
-            }
-            catch (...)
-            {
-                OBELISK_ERROR("PostProcessEvent callback threw an unknown exception.");
-            }
+        }
+        catch (const std::exception& e)
+        {
+            SafeLogErrorNoThrow("PostProcessEvent dispatch failed internally", e.what());
+        }
+        catch (...)
+        {
+            SafeLogErrorNoThrow("PostProcessEvent dispatch failed internally with an unknown exception.");
         }
     }
 
@@ -405,49 +492,63 @@ namespace Obelisk::Core
     {
         TriggerPostProcessEvent(caller, function, parms);
 
-        std::vector<CallbackSnapshot> callbacks;
-        std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
-        const auto isSnapshotActive = [this](const CallbackSnapshot& snapshot) {
-            return snapshot.id != 0 &&
-                std::any_of(m_FilteredPostProcessEventCallbacks.begin(),
-                            m_FilteredPostProcessEventCallbacks.end(),
-                            [&snapshot](const CallbackRegistration& item) {
-                                return item.id == snapshot.id &&
-                                       item.generation == snapshot.generation &&
-                                       item.callback == snapshot.callback;
-                            });
-        };
+        try
         {
-            std::lock_guard<std::mutex> lock(m_Mutex);
-            for (const auto& item : m_FilteredPostProcessEventCallbacks)
-            {
-                if (item.nameIndex == nameIndex)
-                    callbacks.push_back({item.id, item.generation, item.callback, false});
-            }
-        }
-
-        for (const auto& snapshot : callbacks)
-        {
-            if (!snapshot.callback)
-                continue;
+            std::vector<CallbackSnapshot> callbacks;
+            std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
+            const auto isSnapshotActive = [this](const CallbackSnapshot& snapshot) {
+                return snapshot.id != 0 &&
+                    std::any_of(m_FilteredPostProcessEventCallbacks.begin(),
+                                m_FilteredPostProcessEventCallbacks.end(),
+                                [&snapshot](const CallbackRegistration& item) {
+                                    return item.id == snapshot.id &&
+                                           item.generation == snapshot.generation &&
+                                           item.callback == snapshot.callback;
+                                });
+            };
             {
                 std::lock_guard<std::mutex> lock(m_Mutex);
-                if (!isSnapshotActive(snapshot))
-                    continue;
+                MaybeForceSnapshotFailureForTesting();
+                callbacks.reserve(m_FilteredPostProcessEventCallbacks.size());
+                for (const auto& item : m_FilteredPostProcessEventCallbacks)
+                {
+                    if (item.nameIndex == nameIndex)
+                        callbacks.push_back({item.id, item.generation, item.callback, false});
+                }
             }
 
-            try
+            for (const auto& snapshot : callbacks)
             {
-                snapshot.callback(caller, function, parms);
+                if (!snapshot.callback)
+                    continue;
+                {
+                    std::lock_guard<std::mutex> lock(m_Mutex);
+                    if (!isSnapshotActive(snapshot))
+                        continue;
+                }
+
+                try
+                {
+                    snapshot.callback(caller, function, parms);
+                }
+                catch (const std::exception& e)
+                {
+                    SafeLogErrorNoThrow("Filtered PostProcessEvent callback threw", e.what());
+                }
+                catch (...)
+                {
+                    SafeLogErrorNoThrow("Filtered PostProcessEvent callback threw an unknown exception.");
+                }
             }
-            catch (const std::exception& e)
-            {
-                OBELISK_ERROR("Filtered PostProcessEvent callback threw: {}", e.what());
-            }
-            catch (...)
-            {
-                OBELISK_ERROR("Filtered PostProcessEvent callback threw an unknown exception.");
-            }
+        }
+        catch (const std::exception& e)
+        {
+            SafeLogErrorNoThrow("Filtered PostProcessEvent dispatch failed internally", e.what());
+        }
+        catch (...)
+        {
+            SafeLogErrorNoThrow(
+                "Filtered PostProcessEvent dispatch failed internally with an unknown exception.");
         }
     }
 }

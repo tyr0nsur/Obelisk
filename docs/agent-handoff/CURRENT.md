@@ -86,11 +86,11 @@ for the current checkpoint.
   Safe-disabled init requires only the base ABI prefix/owner token; active config fails
   closed on missing capabilities, short `struct_size`, null registration slots, or null
   callback user data.
-- ArkServerApi/AseApi remain names and behavior dictionaries for familiar ARK plugin
-  concepts. Local `NextGenPlugins` clones are names/demand dictionaries only, not a
-  porting target or copying source. Do not copy code, offsets, layouts, vtables, ABI
-  assumptions, wrappers, raw UE pointer APIs, `.lib` artifacts, constants, schemas,
-  control flow, command parsers, return constants, or implementations.
+- ArkServerApi/AseApi and local `NextGenPlugins` clones are names and demand dictionaries
+  only, not a behavior map, not a porting target, not a copying source, and not
+  implementation guides. Do not copy code, offsets, layouts, vtables, ABI assumptions, wrappers, raw UE
+  pointer APIs, `.lib` artifacts, constants, schemas, control flow, command parsers,
+  return constants, return semantics, or implementations.
 
 ## Evidence Routing
 
@@ -148,17 +148,17 @@ for the current checkpoint.
   guidance rejection.
 - UFunction target-set listing and release-gate option parsing are classified as
   `release_readiness`, `planning_only`, or `internal_layout_only`; promotion accepts only
-  explicit release-readiness sets, and internal/layout-only gaps report
-  `target_set_not_release_readiness` until explicit promotion.
+  explicit release-readiness sets, rejects explicit `--target` widening outside named
+  target sets, and reports internal/layout-only gaps as `target_set_not_release_readiness`.
 - Offline artifact JSON manifests, provenance sidecars, and artifact checksum reads use
   no-symlink regular-file opens after protected-path prechecks.
 - `scripts/check_static_tooling.py` records optional radare2/rizin/Ghidra availability and
   runs smoke checks only on approved offline binaries/output roots.
 - `APrimalStructure.IsAllowedToBuild` is second-wave only: no committed snapshot,
   second-source comparison, target-set promotion, public StructureEvents/build-policy SDK,
-  mutation, or return override. Guidance now requires one exact sanitized candidate
-  snapshot before any target set and keeps evidence-pack manifests out of
-  `inspect_core_ufunctions.py --core`.
+  mutation, or return override. Guidance requires one exact sanitized candidate snapshot
+  before any target set; `inspect_core_ufunctions.py --core` rejects evidence-pack
+  manifests.
 - `players-identity-lifecycle-intake` is a guidance-only target set backed by
   `docs/research/2026-05-30-player-identity-lifecycle-plan.md`; it stays out of RC/public
   target sets, is release-gate rejected, and does not promote identity, lookup, runtime
@@ -201,10 +201,11 @@ for the current checkpoint.
   release gate preflights the four public RC target sets before build work.
 - Runtime/plugin lifecycle audit found no P1 blocker. `EventManager` granular unregister
   skips unrelated in-flight callbacks, validates snapshots by id/generation/pointer/
-  family, rejects null owned callbacks with handle `0`, and lets raw `ProcessEvent`
-  pre-callbacks block only when the owner snapshot had blocking capability and the live
-  gate remains enabled; plugin API rejection paths use no-throw warning logging and
-  `CallProcessEvent` gating stays inside its catch boundary.
+  family, contains snapshot setup failures without invoking partial callback snapshots,
+  rejects null owned callbacks with handle `0`, and lets raw `ProcessEvent` pre-callbacks
+  block only when the owner snapshot had blocking capability and the live gate remains
+  enabled; plugin API rejection paths use no-throw warning logging and `CallProcessEvent`
+  gating stays inside its catch boundary.
 - Any future live/player validation requires a new approved live-ops brief and beta-test
   notice through the configured local webhook variable when players are involved.
 

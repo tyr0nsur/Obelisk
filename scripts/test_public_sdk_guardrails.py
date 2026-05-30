@@ -917,6 +917,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         inventory = (
             REPO_ROOT / "docs" / "research" / "2026-05-30-nextgenplugins-reference-inventory.md"
         ).read_text(encoding="utf-8")
+        aseapi_scan = (
+            REPO_ROOT / "docs" / "research" / "2026-05-30-aseapi-reference-scan.md"
+        ).read_text(encoding="utf-8")
         workflow_skill = (
             REPO_ROOT / "agent-skills" / "obelisk-github-research-workflow" / "SKILL.md"
         ).read_text(encoding="utf-8")
@@ -942,10 +945,14 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             (inventory, "not as source code to port"),
             (inventory, "Do not trust `DECLARE_HOOK` declarations as Linux ABI"),
             (inventory, "not runtime evidence and do not authorize copied implementation"),
+            (aseapi_scan, "only as a names and demand dictionary"),
+            (aseapi_scan, "not a behavior map,\ncompatibility target, implementation guide, or evidence source"),
+            (aseapi_scan, "Candidate name discovery only"),
+            (aseapi_scan, "Behavior parity, control flow, command parsers, schemas, constants, return semantics"),
             (workflow_skill, "Local NextGenPlugins clones are names and demand\nsignals only"),
             (workflow_skill, "Obelisk must not copy ArkServerApi/AseApi,\nNextGenPlugins"),
-            (current_handoff, "Local `NextGenPlugins` clones are names/demand dictionaries only"),
-            (current_handoff, "Do not copy code, offsets, layouts, vtables, ABI\n  assumptions"),
+            (current_handoff, "ArkServerApi/AseApi and local `NextGenPlugins` clones are names and demand dictionaries\n  only"),
+            (current_handoff, "Do not copy code, offsets, layouts, vtables, ABI assumptions"),
         ):
             with self.subTest(required=required):
                 self.assertIn(required, text)
@@ -971,6 +978,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             ("docs/PLUGIN_HUB_CAPABILITY_MATRIX.md", matrix),
             ("plugins/README.md", plugins_readme),
             ("docs/research/2026-05-30-nextgenplugins-reference-inventory.md", inventory),
+            ("docs/research/2026-05-30-aseapi-reference-scan.md", aseapi_scan),
             ("agent-skills/obelisk-github-research-workflow/SKILL.md", workflow_skill),
             ("docs/agent-handoff/CURRENT.md", current_handoff),
         ):
@@ -1222,7 +1230,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn("Use the existing\n`docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`", inventory)
+        self.assertIn("research/provenance note records exact source commits", inventory)
         self.assertNotIn("use it later to build a\n`Plugin Hub capability matrix`", inventory)
+        self.assertNotIn("Plugin Hub\nmatrix records exact source commits", inventory)
         self.assertNotIn("The matrix should stay in\n`docs/research/`", inventory)
 
     def test_public_manifest_does_not_use_static_resource_or_command_evidence_for_rc_surfaces(self) -> None:

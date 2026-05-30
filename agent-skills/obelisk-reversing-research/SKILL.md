@@ -96,7 +96,7 @@ Own these areas:
 
 ## Research Principles
 
-- ArkServerApi/AseApi is reference material only: use it as a names and behavior
+- ArkServerApi/AseApi is reference material only: use it as a names and demand
   dictionary for familiar Unreal/ARK plugin concepts, then verify every
   `UFunction`/`UProperty` through Obelisk reflection evidence. Never import its offsets,
   vtables, struct layouts, `.lib` linkage, MSVC conventions, or direct

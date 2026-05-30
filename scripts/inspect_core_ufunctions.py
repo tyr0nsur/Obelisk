@@ -59,6 +59,24 @@ def is_sha256_hex(value: str | None) -> bool:
     )
 
 
+def reject_evidence_pack_manifest_core(path: Path) -> None:
+    try:
+        if path.stat().st_size > 1024 * 1024:
+            return
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return
+    if not isinstance(payload, dict):
+        return
+    manifest_sections = ("binary", "core", "evidence_status")
+    if not all(isinstance(payload.get(key), dict) for key in manifest_sections):
+        return
+    raise SystemExit(
+        "--core must be a copied/offline ELF core dump, not an evidence-pack manifest; "
+        "use the snapshot regeneration consumer for --evidence-pack-manifest"
+    )
+
+
 def read_int(memory: uobjects.CoreMemory, address: int, fmt: str) -> int | None:
     size = struct.calcsize(fmt)
     data = memory.read(address, size)
@@ -1317,7 +1335,11 @@ def main() -> int:
         validate_snapshot_focus_args(args)
 
     core_path = reject_protected_input_path(args.core, "--core")
-    memory = uobjects.CoreMemory(core_path)
+    reject_evidence_pack_manifest_core(core_path)
+    try:
+        memory = uobjects.CoreMemory(core_path)
+    except ValueError as exc:
+        raise SystemExit(f"--core must be an ELF core dump: {exc}") from exc
     try:
         payload = inspect_core(
             memory,

@@ -14,23 +14,28 @@ Windows/MSVC assumptions into the Linux runtime.
 
 ## Result
 
-Useful, but only as a dictionary and behavior map.
+Useful, but only as a names and demand dictionary. It is not a behavior map,
+compatibility target, implementation guide, or evidence source for public Obelisk SDK
+surfaces.
 
 Use AseApi for:
 
 - ARK/UE name vocabulary such as `AShooterPlayerController.ServerSendChatMessage`,
   `AShooterGameState.bAllowCaveBuildingPvP`, item/inventory/structure/tribe class names,
   and broad plugin-facing capability areas.
-- Compatibility taxonomy for future Obelisk primitives: chat commands, console/RCON
+- Demand taxonomy for future Obelisk design discussions: chat commands, console/RCON
   commands, tick callbacks, timers, plugin lifecycle commands, logging/config helpers,
   permissions, and common ArkApi-style plugin expectations.
-- Candidate target discovery before running Obelisk's own snapshot/second-source checks.
+- Candidate name discovery only, before running Obelisk's own snapshot/second-source
+  checks.
 
 Do not use AseApi for:
 
 - Memory offsets, vtable definitions, direct `GetNativePointerField` accessors, direct
   `NativeCall` wrappers, or copied C++ struct layouts.
 - `.lib` artifacts, MSVC calling conventions, Windows headers, or Windows hook/ABI design.
+- Behavior parity, control flow, command parsers, schemas, constants, return semantics, or
+  source-level implementation patterns.
 - Public Obelisk SDK exposure of raw UE pointers, object identity, mutation, return
   override, or direct internal function invocation.
 
@@ -52,7 +57,8 @@ implementation strategy is not portable to Obelisk's Linux safety model.
 
 ## Obelisk Rule
 
-Every AseApi-derived target must be revalidated through Obelisk:
+Every AseApi-derived name must be revalidated through Obelisk before it can become an
+Obelisk target:
 
 1. Confirm the `UFunction` or `UProperty` name from offline reflection/snapshot evidence.
 2. Confirm owner/class, property chain, sizes, flags, and bounded parameter layout.
@@ -63,10 +69,11 @@ Every AseApi-derived target must be revalidated through Obelisk:
 
 ## Next Steps
 
-- Build a small Plugin Hub capability/demand matrix from AseApi names only:
+- Maintain Plugin Hub capability/demand docs from AseApi names only:
   commands, timers, permissions, chat, players, tribes, dinos, items/inventory,
   structures, admin, storage/config.
 - Start with non-UE-dependent Obelisk primitives, especially owner-token timers, then
-  layer command routing once chat identity/permission requirements are clear.
+  keep command routing in backlog until chat identity, reply/send-chat, and permission
+  requirements have their own promoted surface.
 - For gameplay modules, use AseApi names only as candidate seeds for the existing Item,
   Mission, Transfer, and later broader module recognizer flow.

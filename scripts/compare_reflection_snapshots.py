@@ -1322,6 +1322,38 @@ def require_target_set_for_promotion(report: dict[str, Any], target_sets: list[s
         blockers.append({"reason": "promotion_requires_target_set", "count": 1})
 
 
+def block_explicit_targets_outside_named_target_sets(
+    report: dict[str, Any],
+    targets: list[str],
+    target_sets: list[str],
+) -> None:
+    if report.get("schema") != "obelisk.reflection-snapshot-readiness.v1":
+        return
+    if report.get("gate_mode") != "second_source_promotion":
+        return
+    if not targets or not target_sets:
+        return
+
+    allowed_schema_targets = expand_target_filters([], target_sets)
+    allowed_short_targets = {target.partition(":")[2] for target in allowed_schema_targets}
+    outside = [
+        target
+        for target in targets
+        if target not in allowed_schema_targets and target not in allowed_short_targets
+    ]
+    if not outside:
+        return
+
+    promotion_gate = report.get("promotion_gate")
+    if not isinstance(promotion_gate, dict):
+        return
+    promotion_gate["ready"] = False
+    promotion_gate["ready_scope"] = "not_ready"
+    blockers = promotion_gate.setdefault("blockers", [])
+    if isinstance(blockers, list):
+        blockers.append({"reason": "explicit_target_not_in_named_target_set", "count": len(outside)})
+
+
 def block_non_release_target_set_promotion(report: dict[str, Any], target_sets: list[str]) -> None:
     if report.get("schema") != "obelisk.reflection-snapshot-readiness.v1":
         return
@@ -1397,6 +1429,7 @@ def main() -> int:
             report["gate_mode"] = "informational_gap_report"
         apply_readiness_gate_mode(report)
         require_target_set_for_promotion(report, args.target_set)
+        block_explicit_targets_outside_named_target_sets(report, args.target, args.target_set)
         block_non_release_target_set_promotion(report, args.target_set)
     else:
         if candidate is None:

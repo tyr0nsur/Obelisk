@@ -2613,6 +2613,45 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 1)
                 self.assertIn("--core must not read from protected server root", result.stderr)
 
+    def test_cli_rejects_evidence_pack_manifest_as_core(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest = Path(temp_dir) / "manifest.json"
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "binary": {"sha256": "1" * 64},
+                        "core": {"path": "/tmp/offline-core", "sha256": "2" * 64},
+                        "evidence_status": {
+                            "status": "complete",
+                            "gdb_core_failed": False,
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "inspect_core_ufunctions.py"),
+                    "--core",
+                    str(manifest),
+                    "--gobjects",
+                    "0x595b7e0",
+                    "--fname-root-slot",
+                    "0x5956f30",
+                    "--object",
+                    "0x1",
+                    "--json",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("not an evidence-pack manifest", result.stderr)
+        self.assertIn("--evidence-pack-manifest", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

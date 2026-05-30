@@ -29,8 +29,9 @@ Local source revisions observed on 2026-05-30:
 - `ASE-Plugins`: `81a0a07637af`
 
 Verification note: both roots currently expose the same visible plugin family set at
-shallow depth. Treat duplicated repositories as one demand signal until a later Plugin Hub
-matrix records exact source commits, licenses, and per-plugin provenance.
+shallow depth. Treat duplicated repositories as one demand signal until a later
+research/provenance note records exact source commits, licenses, and per-plugin
+provenance.
 
 Observed plugin directories:
 

@@ -16,6 +16,7 @@ namespace Obelisk::Core
 
         static EventManager& Get();
         static void SetProcessEventBlockingCapabilityAdvertised(bool advertised);
+        static void SetForceSnapshotFailureForTesting(bool enabled);
 
         void RegisterPreProcessEvent(OnProcessEventCallback callback);
         void RegisterPostProcessEvent(OnProcessEventCallback callback);

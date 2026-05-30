@@ -810,6 +810,25 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("Promote a separate release/public target set", result.stderr)
         self.assertNotIn("cmake -S", result.stdout)
 
+    def test_plugin_hub_matrix_keeps_player_identity_lifecycle_intake_planning_only(self) -> None:
+        matrix = read("docs/PLUGIN_HUB_CAPABILITY_MATRIX.md")
+        compact = normalized(matrix)
+
+        self.assertIn("Player identity lifecycle intake", matrix)
+        self.assertIn("`players-identity-lifecycle-intake` research guidance only", matrix)
+        self.assertIn("Planning-only", matrix)
+        self.assertIn(
+            normalized(
+                "Stable player identity, lookup, permissions, send-chat, moderation, public SDK, "
+                "runtime hooks, or release readiness"
+            ),
+            compact,
+        )
+        self.assertLess(
+            matrix.index("Players, tribes, dinos, missions, transfers"),
+            matrix.index("Player identity lifecycle intake"),
+        )
+
     def test_release_gate_rejects_incomplete_ufunction_metadata_before_build(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             candidate_root = Path(temp_dir) / "candidate"
@@ -979,7 +998,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("process-local owner-token timer primitive", release)
         self.assertIn("Added owner-token process-local timers", changelog)
 
-    def test_arkapi_reference_is_names_behavior_only_not_porting_or_copying(self) -> None:
+    def test_arkapi_reference_is_names_demand_only_not_porting_or_copying(self) -> None:
         docs = {
             "README.md": read("README.md"),
             "docs/ARCHITECTURE.md": read("docs/ARCHITECTURE.md"),
@@ -988,7 +1007,8 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         }
         required = [
             "ArkServerApi/AseApi",
-            "names and behavior",
+            "names and demand",
+            "not a behavior map",
             "not a porting",
             "copying source",
             "offsets",
@@ -996,6 +1016,8 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "ABI assumptions",
             "wrappers",
             "raw UE pointer APIs",
+            "command parsers",
+            "return semantics",
             "implementations",
         ]
 

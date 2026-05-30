@@ -355,6 +355,26 @@ class ResearchDocGuardrailTests(unittest.TestCase):
         self.assertIn("`--fname-index` takes either `LABEL=INDEX` or a raw\nnon-negative index", text)
         self.assertIn("`--gobjects-sample-index` takes a non-negative integer", text)
 
+    def test_structure_build_policy_triage_stays_second_wave_offline_only(self) -> None:
+        note = REPO_ROOT / "docs/research/2026-05-30-structure-build-policy-triage.md"
+        text = note.read_text(encoding="utf-8")
+
+        required = (
+            "`APrimalStructure.IsAllowedToBuild` is a valid post-RC research target",
+            "Treat it as a second-wave structure build-policy candidate",
+            "Do not add it to `structure-observer-intake`",
+            "Those lanes do not promote public `StructureEvents`, build-policy SDK",
+            "Return override/build denial is a separate mutation/authority feature and remains\n  blocked.",
+            "Do not infer allow/deny constants\n  from ArkApi code.",
+            "do not\npass an evidence-pack manifest to `--core`",
+            "The inspector now rejects evidence-pack\nmanifests passed as `--core`",
+            "use the snapshot regeneration\nconsumer for that manifest",
+            "This triage does not promote a public Structure SDK, build-policy API",
+        )
+        for phrase in required:
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, text)
+
     def test_gap_matrix_minimal_second_source_compare_is_promotion_gate(self) -> None:
         note = REPO_ROOT / "docs/research/2026-05-28-second-source-reversing-gap-matrix.md"
         text = note.read_text(encoding="utf-8")
