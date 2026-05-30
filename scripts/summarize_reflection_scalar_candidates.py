@@ -17,8 +17,10 @@ SUPPORTED_SCHEMA = "obelisk.ufunction-chain.snapshot.v1"
 PROTECTED_SERVER_ROOT = Path("/servidor/ark")
 APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
 COPIED_BOOL_CLASS = "BoolProperty"
+COPIED_INT32_CLASS = "IntProperty"
 REDACTED_CLASSES = {
     "ArrayProperty",
+    "ClassProperty",
     "ObjectProperty",
     "StrProperty",
     "StructProperty",
@@ -165,6 +167,14 @@ def classify_property(prop: dict[str, Any]) -> dict[str, Any]:
     ):
         field["classification"] = "copied_bool"
         field["reason"] = "candidate BoolProperty with one byte element and array_dim=1"
+    elif (
+        class_name == COPIED_INT32_CLASS
+        and status == "candidate"
+        and element_size == 4
+        and array_dim == 1
+    ):
+        field["classification"] = "copied_int32"
+        field["reason"] = "candidate IntProperty with four byte element and array_dim=1"
     elif class_name in REDACTED_CLASSES:
         field["classification"] = "redacted"
         field["reason"] = f"{class_name} is not copied into internal scalar payloads"
@@ -195,7 +205,11 @@ def summarize_target(path: Path) -> dict[str, Any]:
         "num_parms": target_payload.get("num_parms"),
         "parms_size": target_payload.get("parms_size"),
         "return_value_offset": target_payload.get("return_value_offset"),
-        "copied_fields": [field for field in fields if field["classification"] == "copied_bool"],
+        "copied_fields": [
+            field
+            for field in fields
+            if field["classification"] in {"copied_bool", "copied_int32"}
+        ],
         "redacted_fields": [field for field in fields if field["classification"] == "redacted"],
         "blocked_fields": [field for field in fields if field["classification"] == "blocked"],
     }
@@ -239,7 +253,7 @@ def print_text(report: dict[str, Any]) -> None:
             )
         )
         for field in target["copied_fields"]:
-            print("  copied_bool {name} offset={offset} size={size}".format(**field))
+            print("  {classification} {name} offset={offset} size={size}".format(**field))
         for field in target["redacted_fields"]:
             print("  redacted {name} class={class_name} reason={reason}".format(**field))
         for field in target["blocked_fields"]:

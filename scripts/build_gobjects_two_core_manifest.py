@@ -4,12 +4,14 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
+from artifact_identity import canonical_json_bytes, is_safe_artifact_id  # noqa: E402
 from snapshot_evidence_pack import (  # noqa: E402
     SHA256_RE,
     reject_protected_input_path,
@@ -20,6 +22,8 @@ from snapshot_evidence_pack import (  # noqa: E402
 
 SCHEMA = "obelisk.gobjects-two-core-manifest.v1"
 RECONCILIATION_SCHEMA = "obelisk.gobjects-sample-reconciliation.v1"
+DEFAULT_CAPTURE_ID = "gobjects-two-core-capture"
+DEFAULT_EVIDENCE_PACK_ID = "gobjects-two-core-pack"
 BLOCKED_CONTRACTS = [
     "runtime-stable object identity",
     "ResourceHandle",
@@ -39,6 +43,22 @@ def parse_role_report(value: str) -> tuple[str, Path]:
     if not role:
         raise argparse.ArgumentTypeError("--report role must not be empty")
     return role, Path(raw_path)
+
+
+def validate_safe_artifact_id(value: str, label: str) -> str:
+    if not is_safe_artifact_id(value):
+        raise argparse.ArgumentTypeError(
+            f"{label} must be a safe 1-128 character artifact id without path separators or placeholder prefixes"
+        )
+    return value
+
+
+def parse_capture_id(value: str) -> str:
+    return validate_safe_artifact_id(value, "--capture-id")
+
+
+def parse_evidence_pack_id(value: str) -> str:
+    return validate_safe_artifact_id(value, "--evidence-pack-id")
 
 
 def validate_sha(value: str, label: str) -> str:
@@ -134,6 +154,27 @@ def summarize_report(role: str, report: dict[str, object], *, hash_core: bool) -
     }
 
 
+def build_artifact_identity(
+    manifest: dict[str, object],
+    *,
+    capture_id: str,
+    evidence_pack_id: str,
+) -> dict[str, str]:
+    identity_without_hash = {
+        "artifact_kind": SCHEMA,
+        "capture_id": validate_safe_artifact_id(capture_id, "capture_id"),
+        "evidence_pack_id": validate_safe_artifact_id(evidence_pack_id, "evidence_pack_id"),
+    }
+    material = {
+        "artifact_identity": identity_without_hash,
+        "report": manifest,
+    }
+    return {
+        **identity_without_hash,
+        "artifact_sha256": hashlib.sha256(canonical_json_bytes(material)).hexdigest(),
+    }
+
+
 def build_manifest(args: argparse.Namespace) -> dict[str, object]:
     if len(args.report) < 2:
         raise SystemExit("at least two --report ROLE=PATH entries are required")
@@ -149,7 +190,7 @@ def build_manifest(args: argparse.Namespace) -> dict[str, object]:
     gobjects, fname_root_slot, sample_set = require_same_inputs([report for _role, report in role_reports])
     cores = [summarize_report(role, report, hash_core=not args.no_core_hash) for role, report in role_reports]
 
-    return {
+    manifest = {
         "schema": SCHEMA,
         "binary_sha256": binary_sha256,
         "gobjects_candidate": gobjects,
@@ -168,6 +209,14 @@ def build_manifest(args: argparse.Namespace) -> dict[str, object]:
             "It does not prove ResourceHandle lifetime or serial reuse semantics.",
         ],
     }
+    return {
+        "artifact_identity": build_artifact_identity(
+            manifest,
+            capture_id=args.capture_id,
+            evidence_pack_id=args.evidence_pack_id,
+        ),
+        **manifest,
+    }
 
 
 def parse_args() -> argparse.Namespace:
@@ -175,6 +224,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--binary-sha256", required=True)
     parser.add_argument("--report", action="append", type=parse_role_report, default=[], metavar="ROLE=PATH")
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument(
+        "--capture-id",
+        type=parse_capture_id,
+        default=DEFAULT_CAPTURE_ID,
+        help="Safe capture identifier to include in artifact_identity.",
+    )
+    parser.add_argument(
+        "--evidence-pack-id",
+        type=parse_evidence_pack_id,
+        default=DEFAULT_EVIDENCE_PACK_ID,
+        help="Safe evidence pack identifier to include in artifact_identity.",
+    )
     parser.add_argument(
         "--no-core-hash",
         action="store_true",

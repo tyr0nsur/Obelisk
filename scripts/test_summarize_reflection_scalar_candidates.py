@@ -72,6 +72,53 @@ class SummarizeReflectionScalarCandidatesTests(unittest.TestCase):
         self.assertIn("MissionType.GetPlayerUsableItems", result.stdout)
         self.assertIn("redacted OutItemIDs class=ArrayProperty", result.stdout)
 
+    def test_dino_target_set_marks_int32_and_bool_fields_as_copied(self) -> None:
+        result = run_summary("--target-set", "dino-compact-intake", "--json")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["target_count"], 2)
+        self.assertEqual(payload["summarized_count"], 2)
+        self.assertEqual(payload["missing_targets"], [])
+
+        targets = {target["target"]: target for target in payload["targets"]}
+        add_passenger = targets["PrimalDinoCharacter.AddPassenger"]
+        copied = {field["name"]: field["classification"] for field in add_passenger["copied_fields"]}
+        self.assertEqual(
+            copied,
+            {
+                "PassengerSeatIndex": "copied_int32",
+                "bForcePassenger": "copied_bool",
+                "bAllowFlyersAndWaterDinos": "copied_bool",
+                "bSkipLineTrace": "copied_bool",
+                "ReturnValue": "copied_bool",
+            },
+        )
+        self.assertEqual(
+            [field["name"] for field in add_passenger["redacted_fields"]],
+            ["ACharacter"],
+        )
+        self.assertEqual(add_passenger["blocked_fields"], [])
+
+    def test_buff_target_set_redacts_class_properties(self) -> None:
+        result = run_summary(
+            "--target-set",
+            "buff-compact-intake",
+            "--target-set",
+            "buff-breadth-intake",
+            "--json",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        payload = json.loads(result.stdout)
+        targets = {target["target"]: target for target in payload["targets"]}
+        prevent_other = targets["PrimalBuff.BPPreventAddingOtherBuff"]
+        self.assertEqual(
+            [field["name"] for field in prevent_other["redacted_fields"]],
+            ["anotherBuffClass"],
+        )
+        self.assertEqual(prevent_other["blocked_fields"], [])
+
     def test_rejects_protected_live_server_snapshot_root(self) -> None:
         result = run_summary(
             "--snapshot-root",
