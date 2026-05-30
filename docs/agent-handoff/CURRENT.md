@@ -3,11 +3,9 @@
 Updated: 2026-05-30
 
 This file is an active routing table only. Durable evidence belongs in `docs/research/`,
-resume facts in `COMPACT_CONTEXT.md`, and old detail in `HISTORY-*.md`. Use
-`git log --oneline -1` for the current head; do not preserve old checkpoint slicing here.
-historical recovery context is not active routing for the current head; use
-`git log --oneline -1` for the current head rather than by the old 0-pre/0a/0b slicing
-sequence.
+resume facts in `COMPACT_CONTEXT.md`, and old detail in `HISTORY-*.md`. Historical
+recovery context is not active routing for the current head; use
+`git log --oneline -1` rather than preserving old checkpoint slicing here.
 
 ## Active Objective
 
@@ -37,12 +35,10 @@ sequence.
 - Any server-backed debug or beta work requires a current approved live-ops brief:
   target instance/map, feature gates, marker/env changes, restart/start/stop window,
   player notice path when needed, evidence capture, and rollback.
-- No server target
-  has standing approval. Do not restart servers, edit `/servidor/ark`, change markers,
-  run ReflectionScanner, attach ptrace/gcore, enable broad ProcessEvent tracing, or
-  publish runtime observations outside an exact approved run. Technical progress is only
-  a reason to request a scoped run; it is not approval by itself.
-- Technical progress is only a reason to request a scoped run.
+- No server target has standing approval. Do not restart servers, edit `/servidor/ark`,
+  change markers, run ReflectionScanner, attach ptrace/gcore, enable broad ProcessEvent
+  tracing, or publish runtime observations outside an exact approved run. Technical
+  progress is only a reason to request a scoped run; it is not approval by itself.
 - Runtime posture is default-deny for filtered/global raw `ProcessEvent`, public
   `CallProcessEvent`, ProcessEvent blocking, broad tracing, ReflectionScanner, debug
   control, and observers unless the matching approved env+marker pair is enabled for a
@@ -137,10 +133,8 @@ sequence.
 - Preserve RC scope while reducing architecture debt, improving evidence tooling, and
   promoting only copied module APIs through strict gates.
 - Current post-RC focus: Item return-only policy, Mission copied-bool observer, then
-  Transfer `bAccept`.
-- Immediate post-RC implementation order: Item return-only policy, Mission copied-bool
-  observer, then Transfer `bAccept`; this is no RC public SDK/API promotion and does not
-  authorize Transfer runtime work.
+  Transfer `bAccept`; this is no RC public SDK/API promotion and does not authorize
+  Transfer runtime work.
 - Secondary evidence-only lanes may continue for structure non-pin copied scalars and Buff
   breadth, but they must not imply runtime work, marker/env changes, public SDK expansion,
   or RC surface changes.

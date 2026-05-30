@@ -21,7 +21,7 @@ navigation aid, not an exhaustive inventory of every evidence note; unlisted not
 still preserve durable evidence and should not be deleted only because they are absent
 from this index.
 
-Current release gate lane:
+Published RC baseline evidence lane:
 
 - [2026-05-28-reversing-objective-map.md](2026-05-28-reversing-objective-map.md)
 - [2026-05-28-second-source-reversing-gap-matrix.md](2026-05-28-second-source-reversing-gap-matrix.md)

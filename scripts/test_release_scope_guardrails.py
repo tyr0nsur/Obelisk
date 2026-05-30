@@ -1188,10 +1188,11 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("rather than by the old 0-pre/0a/0b slicing sequence", compact_text)
         current_text = normalized(current)
         current_lower = current_text.lower()
-        self.assertIn("historical recovery context", current_text)
+        self.assertIn("historical recovery context", current_lower)
         self.assertIn("not active routing", current_text)
-        self.assertIn("use `git log --oneline -1` for the current head", current_lower)
-        self.assertRegex(current_text, r"Current RC focus:|Current post-RC focus:")
+        self.assertIn("use `git log --oneline -1`", current_lower)
+        self.assertIn("Current post-RC focus:", current_text)
+        self.assertNotIn("Current RC focus:", current_text)
         self.assertIn("accepted RC UFunction second-source root", current_text)
 
     def test_experimental_plugins_stay_out_of_release_scope(self) -> None:

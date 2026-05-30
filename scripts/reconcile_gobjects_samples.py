@@ -80,6 +80,20 @@ def parse_safe_evidence_pack_id(value: str) -> str:
     return validate_safe_id(value, "--evidence-pack-id")
 
 
+def require_explicit_artifact_identity(capture_id: str, evidence_pack_id: str) -> None:
+    missing = []
+    if capture_id == DEFAULT_CAPTURE_ID:
+        missing.append("--capture-id")
+    if evidence_pack_id == DEFAULT_EVIDENCE_PACK_ID:
+        missing.append("--evidence-pack-id")
+    if missing:
+        raise SystemExit(
+            "--strict-artifact-identity requires explicit "
+            + " and ".join(missing)
+            + "; placeholder artifact identity is not valid second-source evidence"
+        )
+
+
 def hex_or_none(value: int | None) -> str | None:
     return None if value is None else f"0x{value:x}"
 
@@ -415,6 +429,11 @@ def parse_args() -> argparse.Namespace:
         help="Safe evidence pack identifier to include in artifact_identity.",
     )
     parser.add_argument(
+        "--strict-artifact-identity",
+        action="store_true",
+        help="Require explicit --capture-id and --evidence-pack-id values before building the report.",
+    )
+    parser.add_argument(
         "--sample-index",
         action="append",
         type=parse_sample_index,
@@ -434,6 +453,8 @@ def main() -> int:
     output = reject_protected_output_path(args.output, "--output") if args.output else None
     if output:
         require_ignored_output_path(output, "--output")
+    if args.strict_artifact_identity:
+        require_explicit_artifact_identity(args.capture_id, args.evidence_pack_id)
     report = build_report(
         core,
         gobjects=args.gobjects_candidate,

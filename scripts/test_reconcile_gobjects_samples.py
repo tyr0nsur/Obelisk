@@ -254,6 +254,7 @@ class ReconcileGObjectsSamplesTests(unittest.TestCase):
                 "capture_2026-05-30",
                 "--evidence-pack-id",
                 "evidence-pack.alpha_1",
+                "--strict-artifact-identity",
                 "--sample-index",
                 "chat=4",
             ]
@@ -272,6 +273,69 @@ class ReconcileGObjectsSamplesTests(unittest.TestCase):
             payload_a["artifact_identity"]["artifact_sha256"],
             payload_b["artifact_identity"]["artifact_sha256"],
         )
+
+    def test_cli_strict_artifact_identity_rejects_default_ids_before_building_report(self) -> None:
+        with mock.patch.object(
+            sys,
+            "argv",
+            [
+                "reconcile_gobjects_samples.py",
+                "--core",
+                "/tmp/nonexistent-core",
+                "--gobjects-candidate",
+                "0x595b7e0",
+                "--fname-root-slot",
+                "0x5956f30",
+                "--sample-index",
+                "0",
+                "--strict-artifact-identity",
+            ],
+        ), mock.patch.object(reconcile, "build_report") as build_report:
+            with self.assertRaisesRegex(
+                SystemExit,
+                "--strict-artifact-identity requires explicit --capture-id and --evidence-pack-id",
+            ):
+                reconcile.main()
+
+        build_report.assert_not_called()
+
+    def test_cli_strict_artifact_identity_allows_explicit_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            output = root / "report.json"
+            addrs = build_core_fixture(core)
+
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "reconcile_gobjects_samples.py"),
+                    "--core",
+                    str(core),
+                    "--gobjects-candidate",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--capture-id",
+                    "capture.strict_2026-05-30",
+                    "--evidence-pack-id",
+                    "evidence-pack.strict_1",
+                    "--sample-index",
+                    "chat=4",
+                    "--strict-artifact-identity",
+                    "--output",
+                    str(output),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            payload = json.loads(output.read_text(encoding="utf-8"))
+
+        self.assertEqual(payload["artifact_identity"]["capture_id"], "capture.strict_2026-05-30")
+        self.assertEqual(payload["artifact_identity"]["evidence_pack_id"], "evidence-pack.strict_1")
+        self.assertEqual(payload["artifact_identity"]["artifact_sha256"], recompute_artifact_sha256(payload))
 
     def test_cli_rejects_unsafe_identity_ids(self) -> None:
         result = subprocess.run(
@@ -296,6 +360,56 @@ class ReconcileGObjectsSamplesTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("--capture-id must not contain '..'", result.stderr)
+
+    def test_cli_strict_artifact_identity_requires_capture_id(self) -> None:
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPT_DIR / "reconcile_gobjects_samples.py"),
+                "--core",
+                "/tmp/nonexistent-core",
+                "--gobjects-candidate",
+                "0x595b7e0",
+                "--fname-root-slot",
+                "0x5956f30",
+                "--evidence-pack-id",
+                "evidence-pack.alpha_1",
+                "--strict-artifact-identity",
+                "--sample-index",
+                "0",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("requires explicit --capture-id", result.stderr)
+
+    def test_cli_strict_artifact_identity_requires_evidence_pack_id(self) -> None:
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPT_DIR / "reconcile_gobjects_samples.py"),
+                "--core",
+                "/tmp/nonexistent-core",
+                "--gobjects-candidate",
+                "0x595b7e0",
+                "--fname-root-slot",
+                "0x5956f30",
+                "--capture-id",
+                "capture_2026-05-30",
+                "--strict-artifact-identity",
+                "--sample-index",
+                "0",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("requires explicit --evidence-pack-id", result.stderr)
 
     def test_cli_rejects_protected_core_path(self) -> None:
         result = subprocess.run(
@@ -341,6 +455,29 @@ class ReconcileGObjectsSamplesTests(unittest.TestCase):
                 reconcile.main()
 
         self.assertIn("must not write under protected server root", str(raised.exception))
+        build_report.assert_not_called()
+
+    def test_main_strict_artifact_identity_rejects_before_building_report(self) -> None:
+        with mock.patch.object(
+            sys,
+            "argv",
+            [
+                "reconcile_gobjects_samples.py",
+                "--core",
+                "/tmp/nonexistent-core",
+                "--gobjects-candidate",
+                "0x595b7e0",
+                "--fname-root-slot",
+                "0x5956f30",
+                "--strict-artifact-identity",
+                "--sample-index",
+                "0",
+            ],
+        ), mock.patch.object(reconcile, "build_report") as build_report:
+            with self.assertRaises(SystemExit) as raised:
+                reconcile.main()
+
+        self.assertIn("requires explicit --capture-id and --evidence-pack-id", str(raised.exception))
         build_report.assert_not_called()
 
     def test_main_rejects_unignored_in_repo_output_before_building_report(self) -> None:
