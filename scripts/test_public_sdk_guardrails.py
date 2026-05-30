@@ -813,6 +813,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported|include|includes|included|provide|provides|provided)\s+(?:public\s+)?(?:resource|object|player|sender|inventory|item|structure|tribe|UE|game\s+object)\s+identity(?:\s+(?:APIs?|surfaces?|authority))?\b",
             r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported|include|includes|included|provide|provides|provided)\s+(?:public\s+)?(?:gameplay\s+)?mutation(?:\s+(?:APIs?|SDKs?|surfaces?|authority))?\b",
             r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported|include|includes|included|provide|provides|provided)\s+(?:public\s+)?return[- ]overrides?(?:\s+(?:APIs?|SDKs?|surfaces?|authority))?\b",
+            r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported|include|includes|included|provide|provides|provided)\s+(?:a\s+)?(?:public\s+)?(?:storage|database|webhook)\s+(?:SDKs?|APIs?|services?|surfaces?)\b",
+            r"\b(?:storage|database|webhook)\s+(?:SDKs?|APIs?|services?|surfaces?)\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
             r"\bInventory\s+SDKs?\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
             r"\bStructureEvents?(?:\s+(?:SDKs?|APIs?|surfaces?))?\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
             r"\bResourceHandle(?:\s+(?:SDKs?|APIs?|surfaces?))?\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
@@ -933,6 +935,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "Foundation V1 does not provide or imply",
             "`ResourceHandle`, object identity, resource identity, player identity",
             "public Inventory SDK, Items SDK, StructureEvents SDK, command SDK",
+            "public storage SDK, database service",
             "gameplay mutation, inventory mutation",
             "return override authority",
             "persistent or cross-cluster handles",
@@ -2914,7 +2917,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "Dino colors, carry rules",
             "Tribe MOTD, tribe-facing notices",
             "Engrams, inventory, item give/remove flows",
+            "Shared persistence, database-backed state, webhook services",
             "Commands, permissions, economy, kits, shops, RCON",
+            "Persistent storage, databases, webhooks",
             "Players, tribes, dinos, missions, transfers",
         ):
             with self.subTest(required=required):
@@ -2976,6 +2981,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "Dino colors, carry rules, spawn/cosmetic policy": "blocked",
             "Tribe MOTD, tribe-facing notices, and tribe policy": "blocked",
             "Engrams, inventory, item give/remove flows": "blocked",
+            "Shared persistence, database-backed state, webhook services": "blocked",
         }
 
         self.assertEqual(rows, expected_tiers)
@@ -3013,7 +3019,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 self.assertIn(required, compact_matrix)
 
         for text, required in (
-            (compact_foundation, "mission, transfer, or structure modules"),
+            (compact_foundation, "mission, transfer, storage/database, webhook, or structure modules"),
             (compact_foundation, "public Inventory SDK, Items SDK, StructureEvents SDK, command SDK"),
             (compact_inventory, "transfers, and missions remain investigation/internal unless"),
             (compact_inventory, "This list is not a v1 delivery sequence, compatibility plan, or Plugin Hub roadmap."),

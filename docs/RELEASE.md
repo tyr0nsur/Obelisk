@@ -165,6 +165,12 @@ scripts/check_release_readiness.sh \
 The gate rejects second-source snapshot roots whose `evidence.obelisk_commit` does not
 match the current validated `HEAD`. Use `--allow-cross-ref-second-source-root` only for an
 explicit historical tag recovery after review; do not use it for a new release candidate.
+When second-source readiness is required, the release script also runs a pre-build
+UFunction readiness metadata preflight against the configured root and public RC target
+sets. Missing roots, stale/incomplete artifact identity, missing current `BoolProperty`
+tail metadata, or ambiguous RC target coverage fail before the build/test/install steps.
+This protects the current post-RC candidate only; it does not revalidate or expand a
+published RC tag.
 
 For future release candidates or explicit recovery of a published tag, an existing local
 or unpublished RC tag is not proof that the intended validated head is tagged. It may

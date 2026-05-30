@@ -186,6 +186,23 @@ class OperationalDocGuardrailTests(unittest.TestCase):
 
         self.assertEqual(offenders, [])
 
+    def test_gitignore_blocks_local_runtime_and_dump_artifacts(self) -> None:
+        gitignore = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
+        required_patterns = {
+            "build/",
+            "/local/",
+            "*.log",
+            "*.so",
+            "__pycache__/",
+            "*.core",
+            "core.*",
+            "*.dump",
+            "*.dmp",
+            "dumps/",
+        }
+
+        self.assertTrue(required_patterns.issubset(set(gitignore)))
+
 
 if __name__ == "__main__":
     unittest.main()

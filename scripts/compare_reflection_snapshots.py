@@ -68,6 +68,11 @@ MISSION_COPIED_BOOL_POLICY_ARTIFACT_SHA256 = (
 MISSION_COPIED_BOOL_POLICY_MANIFEST_SHA256 = (
     "b47f0497c92ae3e8f9a006fb5be87cfbcc1d1dd5f15d78267ad186073e4c26fb"
 )
+MISSION_CONSUME_ONLY_TARGET_SETS = frozenset(
+    (
+        "mission-copied-bool-policy-slice",
+    )
+)
 TARGET_BLOCKER_GUIDANCE = {
     "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild": {
         "classification": "second_wave_structure_build_policy_candidate",
@@ -1208,7 +1213,7 @@ def block_planning_only_target_set_promotion(report: dict[str, Any], target_sets
         return
     if report.get("gate_mode") != "second_source_promotion":
         return
-    planning_only = sorted(set(target_sets) & PLANNING_ONLY_TARGET_SETS)
+    planning_only = sorted(set(target_sets) & (PLANNING_ONLY_TARGET_SETS | MISSION_CONSUME_ONLY_TARGET_SETS))
     if not planning_only:
         return
     promotion_gate = report.get("promotion_gate")

@@ -63,6 +63,14 @@ namespace Obelisk::Core
         return id;
     }
 
+    uint64_t EventManager::AllocateRegistrationGeneration()
+    {
+        uint64_t generation = m_NextRegistrationGeneration++;
+        if (m_NextRegistrationGeneration == 0)
+            m_NextRegistrationGeneration = 1;
+        return generation == 0 ? 1 : generation;
+    }
+
     bool EventManager::HasRegistrationId(uint64_t registrationId) const
     {
         auto containsId = [registrationId](const auto& callbacks) {
@@ -86,7 +94,7 @@ namespace Obelisk::Core
     {
         std::lock_guard<std::mutex> lock(m_Mutex);
         const uint64_t id = AllocateRegistrationId();
-        m_PreProcessEventCallbacks.push_back({id, -1, callback, owner});
+        m_PreProcessEventCallbacks.push_back({id, AllocateRegistrationGeneration(), -1, callback, owner});
         return id;
     }
 
@@ -94,7 +102,7 @@ namespace Obelisk::Core
     {
         std::lock_guard<std::mutex> lock(m_Mutex);
         const uint64_t id = AllocateRegistrationId();
-        m_PostProcessEventCallbacks.push_back({id, -1, callback, owner});
+        m_PostProcessEventCallbacks.push_back({id, AllocateRegistrationGeneration(), -1, callback, owner});
         return id;
     }
 
@@ -102,7 +110,7 @@ namespace Obelisk::Core
     {
         std::lock_guard<std::mutex> lock(m_Mutex);
         const uint64_t id = AllocateRegistrationId();
-        m_FilteredPreProcessEventCallbacks.push_back({id, nameIndex, callback, owner});
+        m_FilteredPreProcessEventCallbacks.push_back({id, AllocateRegistrationGeneration(), nameIndex, callback, owner});
         return id;
     }
 
@@ -110,7 +118,7 @@ namespace Obelisk::Core
     {
         std::lock_guard<std::mutex> lock(m_Mutex);
         const uint64_t id = AllocateRegistrationId();
-        m_FilteredPostProcessEventCallbacks.push_back({id, nameIndex, callback, owner});
+        m_FilteredPostProcessEventCallbacks.push_back({id, AllocateRegistrationGeneration(), nameIndex, callback, owner});
         return id;
     }
 
@@ -211,13 +219,15 @@ namespace Obelisk::Core
                 std::any_of(m_PreProcessEventCallbacks.begin(),
                             m_PreProcessEventCallbacks.end(),
                             [&snapshot](const CallbackRegistration& item) {
-                                return item.id == snapshot.id && item.callback == snapshot.callback;
+                                return item.id == snapshot.id &&
+                                       item.generation == snapshot.generation &&
+                                       item.callback == snapshot.callback;
                             });
         };
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
             for (const auto& item : m_PreProcessEventCallbacks)
-                callbacks.push_back({item.id, item.callback});
+                callbacks.push_back({item.id, item.generation, item.callback});
         }
 
         for (const auto& snapshot : callbacks)
@@ -263,7 +273,9 @@ namespace Obelisk::Core
                 std::any_of(m_FilteredPreProcessEventCallbacks.begin(),
                             m_FilteredPreProcessEventCallbacks.end(),
                             [&snapshot](const CallbackRegistration& item) {
-                                return item.id == snapshot.id && item.callback == snapshot.callback;
+                                return item.id == snapshot.id &&
+                                       item.generation == snapshot.generation &&
+                                       item.callback == snapshot.callback;
                             });
         };
         {
@@ -271,7 +283,7 @@ namespace Obelisk::Core
             for (const auto& item : m_FilteredPreProcessEventCallbacks)
             {
                 if (item.nameIndex == nameIndex)
-                    callbacks.push_back({item.id, item.callback});
+                    callbacks.push_back({item.id, item.generation, item.callback});
             }
         }
 
@@ -315,13 +327,15 @@ namespace Obelisk::Core
                 std::any_of(m_PostProcessEventCallbacks.begin(),
                             m_PostProcessEventCallbacks.end(),
                             [&snapshot](const CallbackRegistration& item) {
-                                return item.id == snapshot.id && item.callback == snapshot.callback;
+                                return item.id == snapshot.id &&
+                                       item.generation == snapshot.generation &&
+                                       item.callback == snapshot.callback;
                             });
         };
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
             for (const auto& item : m_PostProcessEventCallbacks)
-                callbacks.push_back({item.id, item.callback});
+                callbacks.push_back({item.id, item.generation, item.callback});
         }
 
         for (const auto& snapshot : callbacks)
@@ -360,7 +374,9 @@ namespace Obelisk::Core
                 std::any_of(m_FilteredPostProcessEventCallbacks.begin(),
                             m_FilteredPostProcessEventCallbacks.end(),
                             [&snapshot](const CallbackRegistration& item) {
-                                return item.id == snapshot.id && item.callback == snapshot.callback;
+                                return item.id == snapshot.id &&
+                                       item.generation == snapshot.generation &&
+                                       item.callback == snapshot.callback;
                             });
         };
         {
@@ -368,7 +384,7 @@ namespace Obelisk::Core
             for (const auto& item : m_FilteredPostProcessEventCallbacks)
             {
                 if (item.nameIndex == nameIndex)
-                    callbacks.push_back({item.id, item.callback});
+                    callbacks.push_back({item.id, item.generation, item.callback});
             }
         }
 

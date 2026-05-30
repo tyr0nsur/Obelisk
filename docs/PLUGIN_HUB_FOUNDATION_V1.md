@@ -13,7 +13,7 @@ reflection, copied C ABI contracts, second-source fixtures, and runtime safety g
 This foundation is a post-RC contributor seed for the current ABI, not a change to the
 published `v0.1.0-rc.2` tag. It explains what small native examples can honestly teach
 while module lanes such as commands, permissions, inventory, structures, players,
-missions, and transfers remain planning-only until separately promoted.
+missions, transfers, and storage services remain planning-only until separately promoted.
 
 Post-RC production-supported seed work is limited to lifecycle/config/logging skeletons,
 descriptor/catalog consumers, and process-local timer utilities that use the current C ABI
@@ -109,7 +109,7 @@ Only lifecycle/config/logging, descriptor/catalog, and process-local timer examp
 production-supported seeds after the RC. Copied chat parsers and copied policy auditors
 may demonstrate patterns, but they remain experimental and are not promises for complete
 economy, permissions, homes, kits, shops, RCON, inventory, item, dino, tribe, mission,
-transfer, or structure modules.
+transfer, storage/database, webhook, or structure modules.
 
 ## Fastest Honest Creator Path
 
@@ -143,6 +143,8 @@ Foundation V1 does not provide or imply:
 - public Inventory SDK, Items SDK, StructureEvents SDK, command SDK, permissions,
   economy, kits, shops, homes, teleport, safe zones, RCON, replies, send-chat, or
   moderation;
+- public storage SDK, database service, schema/migration contract, secret manager, webhook
+  client, or cross-instance persistence API;
 - gameplay mutation, inventory mutation, item grants/removal, dino spawn/mutation,
   structure placement denial, no-collision behavior, or return override authority;
 - stable raw `ProcessEvent`, raw UE pointers, raw params, FName indices, GObjects indices,

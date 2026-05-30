@@ -129,6 +129,12 @@ the listed `--evidence-*` metadata flags are supported. The regression test
 covered with a synthetic offline fixture so future doc edits do not drift into a broken
 command.
 
+The snapshot path is now intentionally focused: `--snapshot-json` rejects substring
+discovery filters, requires one direct target or both `--outer-exact` and `--name-exact`,
+requires exactly one matched target, and only accepts `offline_core` /
+`candidate-only` evidence labels. This prevents a future `IsAllowedToBuild` artifact from
+accidentally becoming a broad discovery dump or a misleading promotion artifact.
+
 ```bash
 python3 scripts/inspect_core_ufunctions.py \
   --core <offline-core> \
@@ -256,3 +262,9 @@ from the same binary hash or a properly documented second source, with usable FN
 slot and GObjects inputs. The minimum snapshot command remains the ad hoc
 `inspect_core_ufunctions.py --snapshot-json` command above, targeting only
 `--outer-exact PrimalStructure --name-exact IsAllowedToBuild`.
+
+Tooling guardrail added during this triage follow-up:
+
+- `scripts/inspect_core_ufunctions.py --snapshot-json` now fails closed unless the
+  request is a single focused offline-core candidate snapshot with exact/direct target
+  selection and complete candidate-only evidence metadata.

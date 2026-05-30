@@ -17,6 +17,7 @@ REPO_ROOT = SCRIPT_DIR.parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
 import inspect_core_ufunctions as inspector  # noqa: E402
+from artifact_identity import is_safe_artifact_id  # noqa: E402
 from reflection_target_sets import TARGET_SETS, expand_schema_target_sets  # noqa: E402
 from snapshot_evidence_pack import (  # noqa: E402
     evidence_pack_defaults,
@@ -33,6 +34,7 @@ MANIFEST_SCHEMA = "obelisk.ufunction-snapshot-manifest.v1"
 SNAPSHOT_SCHEMA = "obelisk.ufunction-chain.snapshot.v1"
 SAFE_COMPONENT_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+ALLOWED_ARTIFACT_KINDS = {"offline_core"}
 UNSTABLE_IDENTITY_KEYS = {
     "gobjects_index",
     "object_index",
@@ -98,10 +100,20 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def optional_safe_text(value: str | None, field: str) -> str | None:
+def optional_artifact_kind(value: str | None) -> str | None:
     if value is None:
         return None
-    return safe_component(value, field)
+    if value not in ALLOWED_ARTIFACT_KINDS:
+        raise SystemExit("artifact-kind must be offline_core")
+    return value
+
+
+def optional_artifact_id(value: str | None, field: str) -> str | None:
+    if value is None:
+        return None
+    if not is_safe_artifact_id(value):
+        raise SystemExit(f"{field} must be a sanitized non-placeholder artifact id")
+    return value
 
 
 def optional_sha256(value: str | None, field: str) -> str | None:
@@ -382,10 +394,10 @@ def main() -> int:
             pack_defaults.evidence_pack_id,
             "--evidence-pack-id",
         )
-    artifact_kind = optional_safe_text(args.artifact_kind, "artifact-kind")
+    artifact_kind = optional_artifact_kind(args.artifact_kind)
     artifact_sha256 = optional_sha256(args.artifact_sha256, "artifact-sha256")
-    capture_id = optional_safe_text(args.capture_id, "capture-id")
-    evidence_pack_id = optional_safe_text(args.evidence_pack_id, "evidence-pack-id")
+    capture_id = optional_artifact_id(args.capture_id, "capture-id")
+    evidence_pack_id = optional_artifact_id(args.evidence_pack_id, "evidence-pack-id")
     artifact_identity_fields = (artifact_kind, artifact_sha256, capture_id, evidence_pack_id)
     artifact_identity_supplied = any(
         value is not None

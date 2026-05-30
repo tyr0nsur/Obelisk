@@ -3,8 +3,11 @@
 
 from __future__ import annotations
 
+import json
 import re
+import shutil
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -565,6 +568,11 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("Release readiness requires a clean worktree", script)
         self.assertIn("first-stable core release gate", script)
         self.assertIn("gameplay/module second-source promotion gate was not run", script)
+        self.assertIn("pre-build readiness metadata preflight", script)
+        self.assertIn("current BoolProperty tail metadata", script)
+        self.assertNormalizedIn("fail before the build/test/install steps", release)
+        self.assertIn("preflights the configured UFunction root before build/test/install work", status)
+        self.assertIn("unambiguous public RC target coverage", changelog)
         self.assertIn("scripts/install_obelisk_plugin.sh --dry-run", script)
         self.assertIn("${BUILD_DIR}/plugins/oBaseEvents/oBaseEvents.so", script)
         self.assertIn("${BUILD_DIR}/plugins/oProcessTimer/oProcessTimer.so", script)
@@ -771,6 +779,55 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2, result.stderr + result.stdout)
         self.assertIn("NextGen-plugin-hub-guidance is planning/guidance-only", result.stderr)
         self.assertIn("Promote a separate release/public target set", result.stderr)
+        self.assertNotIn("cmake -S", result.stdout)
+
+    def test_release_gate_rejects_incomplete_ufunction_metadata_before_build(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            candidate_root = Path(temp_dir) / "candidate"
+            shutil.copytree(REPO_ROOT / "tests/fixtures/ufunction_snapshots", candidate_root)
+            head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, text=True).strip()
+
+            for snapshot in candidate_root.rglob("*.snapshot.json"):
+                payload = json.loads(snapshot.read_text(encoding="utf-8"))
+                evidence = payload.setdefault("evidence", {})
+                evidence["obelisk_commit"] = head[:12]
+                evidence["artifact_sha256"] = "b" * 64
+                evidence["capture_id"] = "release-preflight-test-capture"
+                evidence["evidence_pack_id"] = "release-preflight-test-pack"
+                snapshot.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+            malformed = (
+                candidate_root
+                / "7e7ded49e0c6"
+                / "sdk_inventory"
+                / "PrimalItem.AllowRemoteAddToInventory.snapshot.json"
+            )
+            payload = json.loads(malformed.read_text(encoding="utf-8"))
+            properties = payload["targets"][0]["property_chain"]["properties"]
+            for prop in properties:
+                if prop.get("class_name") == "BoolProperty":
+                    prop.pop("bool_property_semantics", None)
+                    break
+            malformed.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    str(REPO_ROOT / "scripts/check_release_readiness.sh"),
+                    "--require-second-source-readiness",
+                    "--ufunction-second-source-root",
+                    str(candidate_root),
+                    "--ufunction-second-source-target-set",
+                    "minimal-second-source-intake",
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+        self.assertEqual(result.returncode, 2, result.stderr + result.stdout)
+        self.assertIn("UFunction second-source root failed pre-build readiness metadata preflight", result.stderr)
+        self.assertIn("complete artifact identity and current BoolProperty tail metadata", result.stderr)
         self.assertNotIn("cmake -S", result.stdout)
 
     def test_active_handoff_rc_tag_mentions_track_published_baseline(self) -> None:

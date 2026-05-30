@@ -54,6 +54,7 @@ it does not promise ArkApi plugin compatibility.
 | 10 | Dino colors, carry rules, spawn/cosmetic policy | blocked | Needs dino/player identity, classification, interaction events, and safe mutation/enforcement |
 | 11 | Tribe MOTD, tribe-facing notices, and tribe policy | blocked | Needs tribe/player identity, privacy policy, send-chat/broadcast or command surface, and moderation/visibility rules |
 | 12 | Engrams, inventory, item give/remove flows | blocked | Needs player/inventory/item identity, progression or item mutation APIs, rollback, and privacy policy |
+| 13 | Shared persistence, database-backed state, webhook services | blocked | Config files are available only for plugin config; no Obelisk storage service, database schema/migration contract, secret manager, webhook client, or cross-instance persistence API |
 
 `production seed available` means an Obelisk-native plugin can be written and documented
 as a supported Plugin Hub seed against the stated current public ABI slice. `experimental
@@ -76,6 +77,7 @@ be simulated through raw game access.
 | Build simple lifecycle/config examples | `oBaseEvents`, `oProcessTimer`, descriptor examples | Reference plugins | Gameplay authority, module SDK coverage, or ArkApi plugin portability |
 | Use raw `ProcessEvent` callbacks | Filtered callbacks behind explicit debug gates | Debug-gated runtime plumbing | Stable gameplay API, borrowed pointer lifetime, raw param API, or public Plugin Hub dependency |
 | Commands, permissions, economy, kits, shops, RCON | No public Obelisk SDK yet | Not ready | ArkApi compatibility, player identity, reply/send-chat, database service, or operator command lifecycle |
+| Persistent storage, databases, webhooks | Plugin-owned config files only | Not ready | Public storage SDK, database service, schema/migration contract, secret management, webhook/RCON integration, or cross-instance state |
 | Inventory/item identity and mutation | No public Obelisk SDK yet | Not ready | `ResourceHandle`, `ItemNetID`, inventory lookup, item mutation, give/remove item, or return override |
 | Players, tribes, dinos, missions, transfers | No public Obelisk SDK yet | Not ready | Public identity, ownership lookup, mutation, teleport/spawn APIs, transfer payload decoding, or cross-map correlation |
 | Mission planning and mission demand | Demand/research notes only | Planning-only | Production Plugin Hub mission module, ArkApi mission compatibility, command SDK dependency, mission identity, mission state mutation, or reward/transfer authority |
@@ -117,10 +119,11 @@ release examples are counted, the next category to graduate is passive copied ch
 auditing/parsing, followed by copied policy auditing. If experimental examples are counted
 too, no additional public category is supported by the current ABI.
 
-Do not start public examples with permissions, economy, homes, RCON, inventory, dinos,
-tribes, transfers, structure enforcement, or item grants. Those are valid demand signals,
-but they become Plugin Hub examples only after their own identity, privacy, persistence,
-operator-ingress, mutation/enforcement, lifecycle, and evidence gates are satisfied.
+Do not start public examples with permissions, economy, homes, RCON, storage/database
+services, webhooks, inventory, dinos, tribes, transfers, structure enforcement, or item
+grants. Those are valid demand signals, but they become Plugin Hub examples only after
+their own identity, privacy, persistence, operator-ingress, mutation/enforcement,
+lifecycle, and evidence gates are satisfied.
 
 ## Plugin Hub Direction
 
@@ -134,9 +137,9 @@ The first useful Plugin Hub categories should be built from surfaces that alread
 - process-local timer utilities.
 
 Higher-level ArkApi-style families such as permissions, economy, kits, homes, safe zones,
-RCON, inventory tools, dino tools, tribe tools, and build-placement policy remain future
-work. Each requires its own copied-data evidence, ABI design, privacy policy, lifecycle
-tests, and promotion gate.
+RCON, storage/database services, webhooks, inventory tools, dino tools, tribe tools, and
+build-placement policy remain future work. Each requires its own copied-data evidence, ABI
+design, privacy policy, lifecycle tests, and promotion gate.
 
 Planning should keep the full demand surface visible: players, tribes, dinos, items,
 structures, permissions, commands, admin, transfers, missions, timers, and storage.

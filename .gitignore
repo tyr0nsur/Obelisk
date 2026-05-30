@@ -15,4 +15,8 @@ compile_commands.json
 /tmp/
 *.core
 core.[0-9]*
+core.*
+*.dump
+*.dmp
+dumps/
 chat_config.json

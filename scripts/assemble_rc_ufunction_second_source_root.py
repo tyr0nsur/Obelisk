@@ -14,6 +14,7 @@ from typing import Any
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
+from artifact_identity import ARTIFACT_IDENTITY_KEYS, complete_artifact_identity  # noqa: E402
 from reflection_target_sets import TARGET_SETS  # noqa: E402
 from snapshot_evidence_pack import reject_protected_input_path, reject_protected_output_path  # noqa: E402
 
@@ -72,10 +73,20 @@ def target_key(payload: dict[str, Any], path: Path) -> str:
     return f"{SNAPSHOT_SCHEMA}:{outer}.{name}"
 
 
-def evidence_identity(payload: dict[str, Any]) -> dict[str, Any]:
+def evidence_identity(payload: dict[str, Any], path: Path) -> dict[str, Any]:
     evidence = payload.get("evidence")
     if not isinstance(evidence, dict):
-        return {}
+        raise SystemExit(f"{path}: missing evidence object")
+    artifact_identity = {key: evidence.get(key) for key in ARTIFACT_IDENTITY_KEYS}
+    _, identity_errors = complete_artifact_identity(
+        {"artifact_identity": artifact_identity},
+        expected_artifact_kind="offline_core",
+    )
+    if identity_errors:
+        raise SystemExit(
+            f"{path}: incomplete or invalid evidence artifact identity: "
+            + ", ".join(identity_errors)
+        )
     identity: dict[str, Any] = {}
     for field in EVIDENCE_IDENTITY_FIELDS:
         value = evidence.get(field)
@@ -144,7 +155,7 @@ def source_records(roots: dict[str, Path]) -> dict[str, dict[str, Any]]:
                 "source_path": str(path),
                 "relative_path": relative_path,
                 "sha256": digest,
-                "evidence": evidence_identity(payload),
+                "evidence": evidence_identity(payload, path),
             }
     missing = sorted(wanted - set(records))
     if missing:

@@ -594,6 +594,72 @@ class RegenerateUFunctionSnapshotsTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("artifact identity must include", result.stderr)
 
+    def test_rejects_identity_values_that_compare_would_mark_inconclusive(self) -> None:
+        cases = (
+            (
+                ["--artifact-kind", "runtime_probe"],
+                "artifact-kind must be offline_core",
+            ),
+            (
+                [
+                    "--artifact-kind",
+                    "offline_core",
+                    "--artifact-sha256",
+                    "2" * 64,
+                    "--capture-id",
+                    "unspecified-capture",
+                    "--evidence-pack-id",
+                    "second-pack",
+                ],
+                "capture-id must be a sanitized non-placeholder artifact id",
+            ),
+            (
+                [
+                    "--artifact-kind",
+                    "offline_core",
+                    "--artifact-sha256",
+                    "2" * 64,
+                    "--capture-id",
+                    "second-core",
+                    "--evidence-pack-id",
+                    "static-global-default-pack",
+                ],
+                "evidence-pack-id must be a sanitized non-placeholder artifact id",
+            ),
+        )
+        for identity_args, expected in cases:
+            with self.subTest(expected=expected), tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                manifest = root / "manifest.json"
+                self.write_manifest(manifest)
+
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(SCRIPT_DIR / "regenerate_ufunction_snapshots.py"),
+                        "--core",
+                        str(root / "missing-core"),
+                        "--manifest",
+                        str(manifest),
+                        "--output-root",
+                        str(root / "out"),
+                        "--gobjects",
+                        "0x1",
+                        "--fname-root-slot",
+                        "0x2",
+                        "--obelisk-commit",
+                        "abcdef1",
+                        *identity_args,
+                        "--write",
+                    ],
+                    capture_output=True,
+                    text=True,
+                )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(expected, result.stderr)
+            self.assertNotIn("No such file", result.stderr)
+
     def test_evidence_pack_manifest_supplies_identity_and_fname_root(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

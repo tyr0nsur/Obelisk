@@ -47,6 +47,7 @@ namespace
         uint64_t stale_id = 0;
         uint64_t replacement_id = 0;
         int mode = 0;
+        bool use_same_callback_replacement = false;
         int first_calls = 0;
         int stale_calls = 0;
         int replacement_calls = 0;
@@ -240,24 +241,27 @@ namespace
         Require(state->events->UnregisterCallbackForOwner(state->owner, state->stale_id),
                 "reused snapshot first callback could not unregister stale callback");
         state->events->SetNextRegistrationIdForTesting(state->stale_id);
+        OnProcessEventCallback replacementCallback = state->use_same_callback_replacement
+            ? ReusedSnapshotStale
+            : ReusedSnapshotReplacement;
 
         switch (state->mode)
         {
             case 0:
                 state->replacement_id =
-                    state->events->RegisterPreProcessEventOwned(state->owner, ReusedSnapshotReplacement);
+                    state->events->RegisterPreProcessEventOwned(state->owner, replacementCallback);
                 break;
             case 1:
                 state->replacement_id =
-                    state->events->RegisterPreProcessEventForNameIndexOwned(state->owner, 42, ReusedSnapshotReplacement);
+                    state->events->RegisterPreProcessEventForNameIndexOwned(state->owner, 42, replacementCallback);
                 break;
             case 2:
                 state->replacement_id =
-                    state->events->RegisterPostProcessEventOwned(state->owner, ReusedSnapshotReplacement);
+                    state->events->RegisterPostProcessEventOwned(state->owner, replacementCallback);
                 break;
             case 3:
                 state->replacement_id =
-                    state->events->RegisterPostProcessEventForNameIndexOwned(state->owner, 42, ReusedSnapshotReplacement);
+                    state->events->RegisterPostProcessEventForNameIndexOwned(state->owner, 42, replacementCallback);
                 break;
             default:
                 Require(false, "reused snapshot test mode is invalid");
@@ -617,13 +621,19 @@ namespace
 
     void TestReusedRawRegistrationIdDoesNotReactivateStaleSnapshot()
     {
-        auto run = [](int mode, auto register_first, auto register_stale, auto trigger, const char* scope) {
+        auto run = [](int mode,
+                      bool useSameCallbackReplacement,
+                      auto register_first,
+                      auto register_stale,
+                      auto trigger,
+                      const char* scope) {
             Obelisk::Core::EventManager events;
             int owner = 0;
             ReusedSnapshotIdState state;
             state.events = &events;
             state.owner = &owner;
             state.mode = mode;
+            state.use_same_callback_replacement = useSameCallbackReplacement;
             g_ReusedSnapshotIdState = &state;
 
             const uint64_t firstId = register_first(events, &owner);
@@ -639,8 +649,16 @@ namespace
             Require(events.UnregisterCallbackForOwner(&owner, firstId),
                     "reused-id first callback could not unregister after dispatch");
             trigger(events);
-            Require(state.replacement_calls == 1, "replacement raw callback did not run in a later dispatch");
-            Require(state.stale_calls == 0, "stale raw callback ran after replacement dispatch");
+            if (useSameCallbackReplacement)
+            {
+                Require(state.replacement_calls == 0, "different replacement callback ran in same-callback test");
+                Require(state.stale_calls == 1, "same-callback replacement did not run in a later dispatch");
+            }
+            else
+            {
+                Require(state.replacement_calls == 1, "replacement raw callback did not run in a later dispatch");
+                Require(state.stale_calls == 0, "stale raw callback ran after replacement dispatch");
+            }
 
             Require(events.UnregisterCallbackForOwner(&owner, state.replacement_id),
                     "reused-id replacement callback could not unregister");
@@ -649,6 +667,7 @@ namespace
 
         run(
             0,
+            false,
             [](Obelisk::Core::EventManager& events, void* owner) {
                 return events.RegisterPreProcessEventOwned(owner, ReusedSnapshotFirst);
             },
@@ -663,6 +682,7 @@ namespace
 
         run(
             1,
+            false,
             [](Obelisk::Core::EventManager& events, void* owner) {
                 return events.RegisterPreProcessEventForNameIndexOwned(owner, 42, ReusedSnapshotFirst);
             },
@@ -677,6 +697,7 @@ namespace
 
         run(
             2,
+            false,
             [](Obelisk::Core::EventManager& events, void* owner) {
                 return events.RegisterPostProcessEventOwned(owner, ReusedSnapshotFirst);
             },
@@ -690,6 +711,7 @@ namespace
 
         run(
             3,
+            false,
             [](Obelisk::Core::EventManager& events, void* owner) {
                 return events.RegisterPostProcessEventForNameIndexOwned(owner, 42, ReusedSnapshotFirst);
             },
@@ -700,6 +722,21 @@ namespace
                 events.TriggerPostProcessEvent(42, nullptr, nullptr, nullptr);
             },
             "filtered post reused-id registrations failed");
+
+        run(
+            0,
+            true,
+            [](Obelisk::Core::EventManager& events, void* owner) {
+                return events.RegisterPreProcessEventOwned(owner, ReusedSnapshotFirst);
+            },
+            [](Obelisk::Core::EventManager& events, void* owner) {
+                return events.RegisterPreProcessEventOwned(owner, ReusedSnapshotStale);
+            },
+            [](Obelisk::Core::EventManager& events) {
+                Require(events.TriggerPreProcessEvent(nullptr, nullptr, nullptr),
+                        "same-callback reused-id dispatch was blocked");
+            },
+            "same-callback reused-id registrations failed");
     }
 
     void TestOwnerCleanupWaitsForInFlightFilteredPreCallback()

@@ -192,6 +192,39 @@ if errors:
 PY
 }
 
+preflight_ufunction_second_source_readiness() {
+    if [[ "${REQUIRE_SECOND_SOURCE_READINESS}" != "1" ]]; then
+        return
+    fi
+
+    if [[ -z "${UFUNCTION_SECOND_SOURCE_ROOT}" ]]; then
+        echo "--require-second-source-readiness requires --ufunction-second-source-root for the public RC UFunction target sets." >&2
+        exit 2
+    fi
+
+    local target_set
+    local status
+    for target_set in "${UFUNCTION_SECOND_SOURCE_TARGET_SETS[@]}"; do
+        set +e
+        python3 scripts/compare_reflection_snapshots.py \
+            --base-root tests/fixtures/ufunction_snapshots \
+            --candidate-root "${UFUNCTION_SECOND_SOURCE_ROOT}" \
+            --readiness-report \
+            --target-set "${target_set}" \
+            --fail-on-readiness-gaps \
+            --json >/dev/null
+        status=$?
+        set -e
+
+        if [[ "${status}" -ne 0 ]]; then
+            printf 'UFunction second-source root failed pre-build readiness metadata preflight for target set %s.\n' \
+                "${target_set}" >&2
+            printf 'Regenerate the root for the intended release ref with complete artifact identity and current BoolProperty tail metadata.\n' >&2
+            exit "${status}"
+        fi
+    done
+}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --allow-dirty)
@@ -322,6 +355,7 @@ fi
 if [[ -n "${SECOND_SOURCE_REPORT_DIR}" ]]; then
     validate_second_source_report_dir "${SECOND_SOURCE_REPORT_DIR}"
 fi
+preflight_ufunction_second_source_readiness
 
 cleanup() {
     if [[ "${OBELISK_KEEP_RELEASE_CHECK_ROOTS:-0}" != "1" ]]; then

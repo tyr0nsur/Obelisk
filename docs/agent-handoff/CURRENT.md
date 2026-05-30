@@ -111,7 +111,8 @@ for the current checkpoint.
   copied-scalar, and Buff breadth packages remain evidence-only/internal. Mission bool-tail
   preserves `bool_field_size=1`, `bool_byte_offset=0`, `byte_mask=0x01`,
   `field_mask=0xff`, and `native_bool=false`; consume mode accepts documented slices and
-  promote mode blocks promotion. This does not authorize Transfer
+  promote mode blocks promotion through a local mission consume-only denylist even if
+  shared planning-only metadata drifts. This does not authorize Transfer
   runtime work, public Mission SDK, ResourceHandle, identity, mutation, or return override.
 - ResourceHandle/public GObjects remain blocked; old flag-policy artifact is obsolete and
   durable rich-provenance refresh is preserved. Consume mode accepts it and promote mode
@@ -188,20 +189,20 @@ for the current checkpoint.
   are lifecycle/config/logging, descriptor/catalog, and process-local timer examples.
   Copied chat parsing and copied policy auditing remain experimental seed patterns, not
   production modules, command/chat SDKs, policy-enforcement SDKs, or ArkApi compatibility.
-  Keep permissions, RCON, economy, homes/safe zones, structure enforcement, dinos, tribes,
-  transfers, inventory, item mutation, identity, lookup, replies, send-chat, moderation,
-  and ArkApi portability as design backlogs until their own public surfaces are promoted.
+  Keep permissions, RCON, economy, storage/database, webhooks, homes/safe zones,
+  structure enforcement, dinos, tribes, transfers, inventory, item mutation, identity,
+  lookup, replies, send-chat, moderation, and ArkApi portability as design backlogs until
+  their own public surfaces are promoted.
   Keep the clone out of repo and use it only as a names/demand dictionary.
 - Artifact-pack contributor onboarding now has `docs/OFFLINE_ARTIFACT_PACKS.md` as the
-  concise runbook. UFunction regeneration requires complete artifact identity or an
-  evidence-pack manifest; ScriptStruct regeneration tests selected FName/GObjects labels.
-  The default release gate and RC layout smoke are aligned on the four public RC
-  UFunction target sets, including `item-return-only-policy-slice`.
+  concise runbook. UFunction regeneration and RC root assembly require complete
+  `offline_core` artifact identity, sanitized capture/pack IDs, and current bool-tail
+  metadata; `--snapshot-json` is exact/direct single-target candidate-only output. The
+  release gate preflights the four public RC target sets before build work.
 - Runtime/plugin lifecycle audit found no P1 blocker. `EventManager` granular raw
   ProcessEvent unregister now avoids waiting behind unrelated in-flight callbacks and
-  validates snapshotted callbacks by id plus callback pointer within the same family;
-  owner cleanup still waits as the plugin unload barrier. Treat a full generational
-  callback-id redesign as v1 debt, not a current unload blocker.
+  validates snapshotted callbacks by id, generation, and callback pointer within the same
+  family; owner cleanup still waits as the plugin unload barrier.
 - Any future live/player validation requires a new approved live-ops brief and beta-test
   notice through the configured local webhook variable when players are involved.
 

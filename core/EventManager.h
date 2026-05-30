@@ -44,6 +44,7 @@ namespace Obelisk::Core
     private:
         struct CallbackRegistration {
             uint64_t id;
+            uint64_t generation;
             int32_t nameIndex;
             OnProcessEventCallback callback;
             void* owner;
@@ -51,16 +52,19 @@ namespace Obelisk::Core
 
         struct CallbackSnapshot {
             uint64_t id;
+            uint64_t generation;
             OnProcessEventCallback callback;
         };
 
         uint64_t AllocateRegistrationId();
+        uint64_t AllocateRegistrationGeneration();
         bool HasRegistrationId(uint64_t registrationId) const;
         bool IsRegistrationActive(uint64_t registrationId) const;
 
         std::mutex m_Mutex;
         std::recursive_mutex m_DispatchMutex;
         uint64_t m_NextRegistrationId = 1;
+        uint64_t m_NextRegistrationGeneration = 1;
         std::vector<CallbackRegistration> m_PreProcessEventCallbacks;
         std::vector<CallbackRegistration> m_PostProcessEventCallbacks;
         std::vector<CallbackRegistration> m_FilteredPreProcessEventCallbacks;

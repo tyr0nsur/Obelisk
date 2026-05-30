@@ -1265,6 +1265,23 @@ def validate_snapshot_evidence_args(args: argparse.Namespace) -> None:
         raise SystemExit("--evidence-ark-sha256 must be a 64-character hex SHA256")
     if not is_sha256_hex(args.evidence_artifact_sha256):
         raise SystemExit("--evidence-artifact-sha256 must be a 64-character hex SHA256")
+    if args.evidence_artifact_kind != "offline_core":
+        raise SystemExit("--snapshot-json only supports --evidence-artifact-kind offline_core")
+    if args.evidence_source != "offline_core":
+        raise SystemExit("--snapshot-json only supports --evidence-source offline_core")
+    if args.evidence_status != "candidate-only":
+        raise SystemExit("--snapshot-json only supports --evidence-status candidate-only")
+
+
+def validate_snapshot_focus_args(args: argparse.Namespace) -> None:
+    if args.name_contains or args.outer_contains:
+        raise SystemExit(
+            "--snapshot-json requires exact target filters; use --name-exact/--outer-exact, not substring filters"
+        )
+    has_direct_target = bool(args.object or args.index)
+    has_exact_name_target = bool(args.name_exact and args.outer_exact)
+    if not has_direct_target and not has_exact_name_target:
+        raise SystemExit("--snapshot-json requires one direct target or both --name-exact and --outer-exact")
 
 
 def main() -> int:
@@ -1297,6 +1314,7 @@ def main() -> int:
         raise SystemExit("evidence metadata flags require --snapshot-json")
     if args.snapshot_json:
         validate_snapshot_evidence_args(args)
+        validate_snapshot_focus_args(args)
 
     core_path = reject_protected_input_path(args.core, "--core")
     memory = uobjects.CoreMemory(core_path)
@@ -1321,6 +1339,8 @@ def main() -> int:
     if args.json:
         print(json.dumps({"core": str(core_path), **payload}, indent=2, sort_keys=True))
     elif args.snapshot_json:
+        if len(payload.get("targets", [])) != 1:
+            raise SystemExit("--snapshot-json requires exactly one matched target")
         evidence = {
             "ark_binary_sha256": args.evidence_ark_sha256,
             "artifact_kind": args.evidence_artifact_kind,

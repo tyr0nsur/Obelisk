@@ -27,7 +27,9 @@ or check one manifest entry.
 The artifact fields are sanitized identifiers used by the comparator to mark
 self-comparison, shared artifact identity, or missing second-source identity as
 `inconclusive`; do not store absolute core paths here. A valid second source must use a
-distinct `artifact_sha256`, `capture_id`, and `evidence_pack_id`.
+distinct `artifact_sha256`, `capture_id`, and `evidence_pack_id`. Regeneration accepts
+only `artifact_kind=offline_core` and rejects placeholder capture or evidence-pack IDs so
+new snapshots do not enter compare/RC gates as permanently inconclusive evidence.
 
 Compare sanitized snapshot layouts between two evidence roots with:
 
@@ -133,6 +135,9 @@ does not currently belong to any named target set in `scripts/reflection_target_
 research targets, and post-RC candidates, all as sanitized snapshot evidence. Do not cite
 the whole manifest as RC readiness evidence. RC readiness is target-set-scoped and must
 come from the release gate target sets above plus an accepted second-source comparison.
+The RC second-source root assembler also requires complete snapshot evidence identity
+before it writes a manifest, so an assembled root cannot hide partial artifact identity
+until a later promotion gate.
 
 Snapshot fields such as `object_index`, `name_index`, `class_object_index`, and target
 identity values are correlation fields for comparing sanitized snapshots. They are not

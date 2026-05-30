@@ -2058,9 +2058,9 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
                     hex(addrs["gobjects"]),
                     "--fname-root-slot",
                     hex(addrs["fname_root_slot"]),
-                    "--name-contains",
+                    "--name-exact",
                     "BPAllowPlayerToLeaveMission",
-                    "--outer-contains",
+                    "--outer-exact",
                     "MissionType",
                     "--snapshot-json",
                     "--evidence-ark-sha256",
@@ -2163,6 +2163,8 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
                     "script-struct",
                     "--name-exact",
                     "ARKTributeDino",
+                    "--outer-exact",
+                    "/Script/ShooterGame",
                     "--snapshot-json",
                     "--evidence-ark-sha256",
                     "3" * 64,
@@ -2229,8 +2231,12 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
                     hex(addrs["fname_root_slot"]),
                     "--name-exact",
                     "ServerChat",
+                    "--outer-exact",
+                    "ShooterGameMode",
                     "--name-exact",
                     "ARKTributeDino",
+                    "--outer-exact",
+                    "/Script/ShooterGame",
                     "--snapshot-json",
                     "--evidence-ark-sha256",
                     "5" * 64,
@@ -2248,7 +2254,7 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
             )
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("single inspection_mode", result.stderr)
+        self.assertIn("--snapshot-json requires exactly one matched target", result.stderr)
 
     def test_cli_snapshot_json_rejects_no_matched_target(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -2266,6 +2272,8 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
                     hex(addrs["fname_root_slot"]),
                     "--name-exact",
                     "DoesNotExist",
+                    "--outer-exact",
+                    "PrimalStructure",
                     "--snapshot-json",
                     "--evidence-ark-sha256",
                     "7" * 64,
@@ -2283,7 +2291,122 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
             )
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("--snapshot-json requires at least one matched target", result.stderr)
+        self.assertIn("--snapshot-json requires exactly one matched target", result.stderr)
+
+    def test_cli_snapshot_json_rejects_substring_filters(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            core = Path(temp_dir) / "core"
+            addrs = build_core_fixture(core)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "inspect_core_ufunctions.py"),
+                    "--core",
+                    str(core),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--name-contains",
+                    "AllowStructure",
+                    "--outer-exact",
+                    "PrimalStructure",
+                    "--snapshot-json",
+                    "--evidence-ark-sha256",
+                    "9" * 64,
+                    "--evidence-artifact-sha256",
+                    "a" * 64,
+                    "--evidence-capture-id",
+                    "fixture-substring-capture",
+                    "--evidence-pack-id",
+                    "fixture-substring-pack",
+                    "--evidence-obelisk-commit",
+                    "fixture-commit",
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("requires exact target filters", result.stderr)
+
+    def test_cli_snapshot_json_rejects_multiple_matched_targets(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            core = Path(temp_dir) / "core"
+            addrs = build_core_fixture(core)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "inspect_core_ufunctions.py"),
+                    "--core",
+                    str(core),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--name-exact",
+                    "AllowStructureAccess",
+                    "--name-exact",
+                    "IsAllowedToDemolish",
+                    "--outer-exact",
+                    "PrimalStructure",
+                    "--snapshot-json",
+                    "--evidence-ark-sha256",
+                    "b" * 64,
+                    "--evidence-artifact-sha256",
+                    "c" * 64,
+                    "--evidence-capture-id",
+                    "fixture-multi-capture",
+                    "--evidence-pack-id",
+                    "fixture-multi-pack",
+                    "--evidence-obelisk-commit",
+                    "fixture-commit",
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--snapshot-json requires exactly one matched target", result.stderr)
+
+    def test_cli_snapshot_json_rejects_non_candidate_offline_evidence_labels(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            core = Path(temp_dir) / "core"
+            addrs = build_core_fixture(core)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "inspect_core_ufunctions.py"),
+                    "--core",
+                    str(core),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--name-exact",
+                    "AllowStructureAccess",
+                    "--outer-exact",
+                    "PrimalStructure",
+                    "--snapshot-json",
+                    "--evidence-ark-sha256",
+                    "d" * 64,
+                    "--evidence-artifact-sha256",
+                    "e" * 64,
+                    "--evidence-capture-id",
+                    "fixture-bad-label-capture",
+                    "--evidence-pack-id",
+                    "fixture-bad-label-pack",
+                    "--evidence-obelisk-commit",
+                    "fixture-commit",
+                    "--evidence-status",
+                    "accepted",
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--snapshot-json only supports --evidence-status candidate-only", result.stderr)
 
     def test_cli_rejects_full_and_snapshot_json_together(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

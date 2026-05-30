@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Hardened release readiness so required UFunction second-source roots are preflighted
+  before build/test/install work for complete artifact identity, current BoolProperty tail
+  metadata, and unambiguous public RC target coverage.
 - Hardened raw `EventManager` snapshot dispatch so reused registration ids do not
   reactivate stale raw callbacks unless the same id and callback pointer are still present
   in the same callback family.

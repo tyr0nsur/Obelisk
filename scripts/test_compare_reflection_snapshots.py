@@ -18,6 +18,8 @@ REPO_ROOT = SCRIPT_DIR.parent
 sys.path.insert(0, str(SCRIPT_DIR))
 import compare_reflection_snapshots as compare
 
+ASSEMBLE_RC_SCRIPT = SCRIPT_DIR / "assemble_rc_ufunction_second_source_root.py"
+
 
 def base_snapshot() -> dict[str, object]:
     return {
@@ -194,6 +196,16 @@ def write_minimal_intake_snapshots(
         candidate_dir.mkdir(parents=True, exist_ok=True)
         write_snapshot(base_dir, base_payload, f"{outer}.{name}.snapshot.json")
         write_snapshot(candidate_dir, candidate_payload, f"{outer}.{name}.snapshot.json")
+
+
+def write_target_set_root(root: Path, target_set: str) -> None:
+    target_dir = root / "sha" / "sdk_test"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    for target in compare.TARGET_SETS[target_set]:
+        _, _, short_key = target.partition(":")
+        outer, _, name = short_key.partition(".")
+        payload = rename_target(base_snapshot(), outer=outer, name=name)
+        write_snapshot(target_dir, payload, f"{outer}.{name}.snapshot.json")
 
 
 def run_compare(base: Path, candidate: Path | None, *extra: str) -> subprocess.CompletedProcess[str]:
@@ -1936,6 +1948,56 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertIn("public_sdk", report["not_promoted_surfaces"])
         self.assertIn("resource_handle", report["not_promoted_surfaces"])
 
+    def test_assemble_rc_root_rejects_partial_evidence_identity_before_gate_use(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            roots = {
+                "minimal": root / "minimal",
+                "structure": root / "structure",
+                "item_return": root / "item_return",
+                "chat": root / "chat",
+            }
+            write_target_set_root(roots["minimal"], "minimal-second-source-intake")
+            write_target_set_root(roots["structure"], "structure-observer-intake")
+            write_target_set_root(roots["item_return"], "item-return-only-policy-slice")
+            write_target_set_root(roots["chat"], "chat-message-intake")
+            chat_snapshot = (
+                roots["chat"]
+                / "sha"
+                / "sdk_test"
+                / "ShooterPlayerController.ServerSendChatMessage.snapshot.json"
+            )
+            payload = json.loads(chat_snapshot.read_text(encoding="utf-8"))
+            payload["evidence"].pop("evidence_pack_id")  # type: ignore[index]
+            chat_snapshot.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+            output = root / "rc-root"
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(ASSEMBLE_RC_SCRIPT),
+                    "--minimal-root",
+                    str(roots["minimal"]),
+                    "--structure-root",
+                    str(roots["structure"]),
+                    "--item-return-root",
+                    str(roots["item_return"]),
+                    "--chat-root",
+                    str(roots["chat"]),
+                    "--output-root",
+                    str(output),
+                ],
+                text=True,
+                capture_output=True,
+            )
+            output_exists = output.exists()
+
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("incomplete or invalid evidence artifact identity", result.stderr)
+        self.assertIn("evidence_pack_id_invalid", result.stderr)
+        self.assertFalse(output_exists)
+
     def test_readiness_report_blocks_player_identity_lifecycle_promotion_gate(self) -> None:
         target_set = "players-identity-lifecycle-intake"
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -2011,6 +2073,35 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(report["target_sets"], [target_set])
         self.assertEqual(report["totals"]["targets"], 3)
         self.assertEqual(report["totals"]["second_source_accepted"], 3)
+        self.assertEqual(
+            report["promotion_gate"],
+            {
+                "ready": False,
+                "ready_scope": "planning_only",
+                "layout_ready": True,
+                "promotion_ready": False,
+                "blockers": [{"reason": "target_set_not_release_readiness", "count": 1}],
+            },
+        )
+
+    def test_mission_copied_bool_policy_slice_has_local_consume_only_promotion_blocker(self) -> None:
+        target_set = "mission-copied-bool-policy-slice"
+        report = {
+            "schema": "obelisk.reflection-snapshot-readiness.v1",
+            "gate_mode": "second_source_promotion",
+            "promotion_gate": {
+                "ready": True,
+                "ready_scope": "layout_only",
+                "layout_ready": True,
+                "promotion_ready": False,
+                "blockers": [],
+            },
+        }
+
+        with mock.patch.object(compare, "PLANNING_ONLY_TARGET_SETS", frozenset()):
+            compare.block_planning_only_target_set_promotion(report, [target_set])
+
+        self.assertIn(target_set, compare.MISSION_CONSUME_ONLY_TARGET_SETS)
         self.assertEqual(
             report["promotion_gate"],
             {
