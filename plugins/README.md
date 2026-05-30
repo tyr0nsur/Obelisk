@@ -54,8 +54,10 @@ cmake --build build --target oPolicyAudit oChatLogger -j"$(nproc)"
 }
 ```
 
-`oChatLogger` logs at most the first five received chat events per process; that limit is
-fixed in the experimental example.
+`oChatLogger` logs a bounded first set per chat send mode, currently up to sixteen accepted
+events for each mode `0..3`. It records only sequence, send mode, copied-payload flag,
+message size, per-mode count, and first-observed status; it does not log raw chat text,
+sender identity, or UE pointers.
 
 ## Policy
 
@@ -70,8 +72,8 @@ fixed in the experimental example.
 - Treat multi-instance loading as the default cluster shape. A plugin may read shared
   config from every ARK process, but mutable plugin state should be stored per
   `OBELISK_INSTANCE_ID` unless the plugin has a documented cross-process locking model.
-- Prefer filtered `ProcessEvent` callbacks. Global callbacks require an explicit research
-  gate and isolated validation.
+- Prefer copied Obelisk-level events. Filtered and global raw `ProcessEvent` callbacks
+  require explicit debug gates and isolated validation.
 - Long-lived callbacks should use owner-token handle registration and explicit unregister
   during shutdown; registration handles are process-local, not shared cluster state.
 - Plugins that start HTTP servers, threads, or file readers need a documented shutdown

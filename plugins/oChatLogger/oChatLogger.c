@@ -10,11 +10,11 @@ static ObeliskApi g_Api;
 static bool g_HasApi = false;
 static uint64_t g_OwnerToken = 0;
 static uint64_t g_ChatRegistrationId = 0;
-static atomic_int g_LoggedEvents = 0;
+static atomic_uint_fast64_t g_ModeEventCounts[OBELISK_CHAT_SEND_MODE_COUNT];
 
 enum
 {
-    kLogLimit = 5
+    kPerModeLogLimit = 16
 };
 
 static const char* kDefaultConfig =
@@ -60,17 +60,24 @@ static void OnChatMessageEvent(const ObeliskChatMessageEvent* event, void* user_
         return;
     }
 
-    if (atomic_fetch_add_explicit(&g_LoggedEvents, 1, memory_order_relaxed) >= kLogLimit)
+    const unsigned sendMode = event->send_mode;
+    const uint_fast64_t previousCount =
+        atomic_fetch_add_explicit(&g_ModeEventCounts[sendMode], 1u, memory_order_relaxed);
+    if (previousCount >= kPerModeLogLimit)
         return;
 
-    char buffer[192];
+    const uint_fast64_t modeCount = previousCount + 1u;
+    char buffer[240];
     snprintf(buffer,
              sizeof(buffer),
-             "[oChatLogger] ChatMessageEvent received sequence=%llu send_mode=%u flags=0x%llx message_size=%zu.",
+             "[oChatLogger] ChatMessageEvent received sequence=%llu send_mode=%u flags=0x%llx message_size=%zu. "
+             "mode_count=%llu first_observed=%s.",
              (unsigned long long)event->sequence,
-             (unsigned)event->send_mode,
+             sendMode,
              (unsigned long long)event->flags,
-             event->message.size);
+             event->message.size,
+             (unsigned long long)modeCount,
+             modeCount == 1u ? "true" : "false");
     SafeLogInfo(buffer);
 }
 
@@ -80,7 +87,8 @@ static void ResetState(void)
     g_HasApi = false;
     g_OwnerToken = 0;
     g_ChatRegistrationId = 0;
-    atomic_store_explicit(&g_LoggedEvents, 0, memory_order_relaxed);
+    for (unsigned i = 0; i < OBELISK_CHAT_SEND_MODE_COUNT; ++i)
+        atomic_store_explicit(&g_ModeEventCounts[i], 0u, memory_order_relaxed);
 }
 
 __attribute__((visibility("default"))) bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out)
@@ -118,7 +126,8 @@ __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
     g_Api = *api;
     g_HasApi = true;
     g_OwnerToken = context->plugin_owner_token;
-    atomic_store_explicit(&g_LoggedEvents, 0, memory_order_relaxed);
+    for (unsigned i = 0; i < OBELISK_CHAT_SEND_MODE_COUNT; ++i)
+        atomic_store_explicit(&g_ModeEventCounts[i], 0u, memory_order_relaxed);
 
     api->LogInfo("[oChatLogger] Loaded.");
     if (!HasChatMessageEventApi(api))

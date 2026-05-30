@@ -344,6 +344,7 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(Obelis
         if (g_ProcessEventEnabled && g_FilteredFunctionIndex >= 0)
         {
             if ((api->capabilities & OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS) == 0 ||
+                (api->capabilities & OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS) == 0 ||
                 (api->capabilities & OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES) == 0 ||
                 api->struct_size < offsetof(ObeliskApi, UnregisterProcessEventCallbackWithOwnerToken) +
                     sizeof(api->UnregisterProcessEventCallbackWithOwnerToken) ||
@@ -351,7 +352,7 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(Obelis
                 !api->RegisterPreProcessEventForNameIndexWithOwnerTokenHandle ||
                 !api->UnregisterProcessEventCallbackWithOwnerToken)
             {
-                api->LogError("[oBaseEvents] ProcessEvent example requires owner-token callback handle API.");
+                api->LogError("[oBaseEvents] ProcessEvent example requires filtered ProcessEvent callback capability and owner-token callback handle API.");
                 ResetState();
                 return false;
             }

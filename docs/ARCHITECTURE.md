@@ -1,8 +1,8 @@
 # Architecture
 
-Obelisk is split into a small Linux runtime core, a C plugin API, and optional
-plugins. The current ARK server integration is a validation adapter for checking
-that runtime against a real stripped UE4 dedicated server process.
+Obelisk is split into a small Linux runtime core, a C plugin ABI, a core SDK header,
+and optional plugins. The current ARK server integration is a validation adapter for
+checking that core against a real stripped UE4 dedicated server process.
 
 ## Runtime Bootstrap
 
@@ -34,20 +34,24 @@ mapped low and `libobelisk.so` is mapped high.
 
 ## Event Dispatch
 
-`core/EventManager` supports two callback styles:
+`core/EventManager` retains debug-gated raw `ProcessEvent` callback infrastructure:
 
 - Global pre/post `ProcessEvent` callbacks.
 - Filtered pre/post callbacks by `FName` index.
 
-Filtered callbacks are strongly preferred because `ProcessEvent` is extremely
-hot. A global callback can receive millions of calls during normal startup and
+Stable RC plugin paths are copied Obelisk-level events such as
+`GameplayPolicyEvent` and `ChatMessageEvent`. Filtered raw callbacks are preferred over
+global raw callbacks only inside approved debug/tooling runs because `ProcessEvent` is
+extremely hot. A global callback can receive millions of calls during normal startup and
 player connection flows.
 
-## Plugin ABI
+## Core Plugin ABI
 
-Plugins interact with Obelisk through the public SDK header
+Plugins interact with Obelisk through the public core SDK header
 `include/obelisk/ObeliskApi.h`. The older `api/ObeliskApi.h` path remains a
-transition wrapper.
+transition wrapper. In this document, "public SDK" means this core C ABI and any
+surface explicitly promoted by release gates; it does not mean public `sdk.inventory`,
+`sdk.chat`, `sdk.structures`, or other module namespaces.
 
 The ABI is C-compatible by design:
 
@@ -97,31 +101,36 @@ LinuxGSM wrapper templates under `packaging/linuxgsm/` are operational helpers
 for that harness, not the core product surface.
 
 ARK-specific paths, instance names, and observed `FName` indices are validation
-inputs only. Stable plugin contracts should be expressed through public SDK
-headers and documented runtime behavior.
+inputs only. Stable plugin contracts should be expressed through the core SDK header,
+documented runtime behavior, and named promotion gates.
 
 Current runtime debug work must keep shared/player-facing instances untouched unless the
 operator approves a specific maintenance window. Server-backed validation should use an
 operator-approved debug/development target with explicit gates, rollback checks, and
 shutdown expectations.
 
-## SDK Direction
+## Core-First SDK Direction
 
-The SDK currently exposes the C ABI header and CMake `obelisk_sdk` interface
-target. Higher-level runtime-backed APIs for common modding tasks remain planned
-until reflection metadata is reliable enough to support them.
+The SDK currently exposes the C ABI header and CMake `obelisk_sdk` interface target.
+The first-stable line is core-first: bootstrap, hook safety, plugin lifecycle,
+callback ownership, install layout, release readiness, and ABI compatibility.
+Higher-level runtime-backed APIs for common modding tasks are module surfaces after
+gates, not the baseline SDK. They require explicit evidence, copied-data ABI design,
+lifecycle tests, documentation, and operator-safe runtime validation before they can
+be described as public.
 
 ## Research Strategy
 
 Long term, Obelisk should avoid raw memory scanning in plugins.
 
-Preferred direction:
+Preferred core-first direction:
 
-1. Resolve FName indices to strings.
-2. Resolve GObjects and UFunction objects.
-3. Register plugin callbacks by function name.
-4. Decode parameters using reflected property metadata.
-5. Expose higher-level APIs for chat, players, inventory, tribes, dinos, and timers.
+1. Validate reflection primitives with second-source evidence.
+2. Keep runtime observation exact, bounded, gated, and non-mutating.
+3. Promote only copied-data ABI surfaces with owner-token lifecycle coverage.
+4. Document every public surface in the release and SDK guardrails.
+5. Treat chat, players, inventory, tribes, dinos, timers, and other gameplay areas as
+   module-after-gates work, not as the core architecture.
 
 ## Experimental Components
 
@@ -129,6 +138,6 @@ Preferred direction:
 disabled by default on validation adapter servers.
 
 The first official plugin target is `plugins/oBaseEvents`, which demonstrates the C ABI,
-safe default config creation, filtered event registration, and plugin shutdown. Larger
-modding features should be built as separate plugins after the reflection layer
-is more complete.
+safe default config creation, optional debug-gated filtered event registration, and plugin
+shutdown. Larger modding features should be built as separate plugins after the reflection
+layer is more complete.
