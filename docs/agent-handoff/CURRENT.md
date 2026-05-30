@@ -183,9 +183,9 @@ recovery context is not active routing for the current head; use
   refresh Transfer ScriptStruct bool-tail second-source evidence before any Transfer
   payload/redaction work. This is no RC public SDK/API promotion and does not authorize
   Transfer runtime work.
-- Runtime lifecycle debt to address later: `PluginManager` should not `dlclose` a plugin
-  after callback cleanup fails; design a no-ABI-change failure path with tests before
-  touching unload semantics.
+- Runtime lifecycle callback-cleanup debt is addressed in post-RC head: `PluginManager`
+  now skips `dlclose` when callback cleanup fails, retains the plugin for retry, preserves
+  owner-token unregister while unloading, and avoids repeating shutdown on retry.
 - Next Item runtime round, if pursued, should wire only the private dispatcher behind
   fail-closed observer gates and post-original copied payloads. Public Item promotion must
   be a later deliberate ABI round: append event/mask constants, descriptors, C/C++ ABI
