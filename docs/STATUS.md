@@ -19,8 +19,9 @@ for the refreshed RC evidence root and gate result. RC public scope remains limi
 `v0.1.0-rc.2` also includes process-local owner-token timers as core runtime API without
 promoting gameplay/module timers.
 Post-RC development continues toward the broader `v1.0` core-stability track: general
-reflection evidence, copied-data module APIs, operator lifecycle safety, and ArkApi-style
-plugin replacement capacity without retroactively expanding the published RC tag.
+reflection evidence, copied-data module APIs, operator lifecycle safety, metadata-only
+reference plugins such as `oDescriptorCatalog`, and ArkApi-style plugin replacement
+capacity without retroactively expanding the published RC tag.
 
 Contributor reading guide:
 
@@ -61,6 +62,7 @@ define or protect runtime behavior.
 | Process-local timers | Promoted v0.1 core primitive | Append-only core scheduler with owner-token one-shot/repeating callbacks, process-local handles, explicit unregister, exception containment, and owner cleanup on init failure/unload. This is not a UE/gameplay timer, persistent cluster state, object identity, command API, or permission API. `oProcessTimer` is the first-party release example. |
 | Plugin architecture policy | Stable baseline | See `docs/PLUGIN_ARCHITECTURE.md`; examples must stay small and experimental plugins stay out of top-level build. Plugins with background workers, sockets, HTTP, long-lived file readers, or other external ingress are experimental until they pass a promotion gate for idempotent shutdown, owner-token unregister, queue drain, thread join, socket/file close, and no detached workers or persisted runtime handles. |
 | `oBaseEvents` | Release example | First official example plugin; demonstrates ABI validation, config creation, debug-gated filtered callback handle lifecycle, and shutdown unregister. It is not gameplay dispatch or a stable parameter API. |
+| `oDescriptorCatalog` | Post-RC release example | Metadata-only descriptor discovery example over `DescribeResourceKind` and `DescribeGameplayPolicyEventKind`; validates routing metadata without callbacks, timers, identity, lookup, mutation, return override, chat, or raw `ProcessEvent`. Added after the frozen `v0.1.0-rc.2` tag. |
 | `oPolicyAudit` | Experimental | First-party `GameplayPolicyEvent` audit example excluded from the default build and release scope unless `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`; not published by `scripts/check_release_readiness.sh`. |
 | `oChatLogger` | Experimental | First-party `ChatMessageEvent` smoke-test example excluded from the default build and release scope unless `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`; logs event metadata and copied message size only, not player identity or raw chat text. |
 | `oChatAudit` | Experimental | First-party `ChatMessageEvent` digest/audit example excluded from the default build and release scope unless `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`; safe-disabled by default and never logs raw chat text or player identity. |

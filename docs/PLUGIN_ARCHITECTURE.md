@@ -12,14 +12,16 @@ plugins/
   README.md
   oBaseEvents/
   oProcessTimer/
+  oDescriptorCatalog/
   oPolicyAudit/
   oChatLogger/
   oChatAudit/
 ```
 
-`oBaseEvents` and `oProcessTimer` are official reference plugins. Keep them small and
-focused on teaching one stable plugin model each: copied events/config/lifecycle for
-`oBaseEvents`, and process-local owner-token timers for `oProcessTimer`.
+`oBaseEvents`, `oProcessTimer`, and `oDescriptorCatalog` are official reference plugins.
+Keep them small and focused on teaching one stable plugin model each: copied
+events/config/lifecycle for `oBaseEvents`, process-local owner-token timers for
+`oProcessTimer`, and metadata-only descriptor discovery for `oDescriptorCatalog`.
 
 Release-scope caveat: `oProcessTimer` and the timer ABI are first-stable `v0.1.0` core
 reference material only. They are process-local scheduler primitives, not gameplay/module
@@ -38,6 +40,7 @@ They are excluded from the default build and release scope unless
 | --- | --- | --- | --- |
 | `oBaseEvents` | Official reference plugin for event/config/lifecycle patterns. | Built by default. | Published with `scripts/install_obelisk_plugin.sh`; activation remains config and instance gated. |
 | `oProcessTimer` | Official reference plugin for process-local owner-token timers. | Built by default. | Published with `scripts/install_obelisk_plugin.sh`; demonstrates one-shot timer lifecycle only, not gameplay timers or shared cluster state. |
+| `oDescriptorCatalog` | Official reference plugin for metadata-only descriptor discovery. | Built by default. | Published with `scripts/install_obelisk_plugin.sh`; demonstrates routing metadata only, not callbacks, identity, lookup, or mutation. |
 | `oPolicyAudit` | Experimental example for copied `GameplayPolicyEvent` auditing. | Excluded unless `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`. | Do not publish as part of the first release; install only for isolated tests. |
 | `oChatLogger` | Experimental example for copied `ChatMessageEvent` smoke validation. | Excluded unless `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`. | Log metadata and copied message size only; do not log player identity or raw chat text during validation. |
 | `oChatAudit` | Experimental digest/audit example for copied `ChatMessageEvent` plus process-local timers. | Excluded unless `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`. | Safe-disabled by default; do not log raw chat text, player identity, or command outcomes. |
@@ -346,6 +349,11 @@ The intended v0.1.x resource/plugin route is:
 2. Discover promoted policy kinds with `DescribeGameplayPolicyEventKind`.
 3. Subscribe to `GameplayPolicyEvent` with an event-kind mask.
 4. Route each copied event by `resource_kind`, `event_kind`, and `field_mask`.
+
+`oDescriptorCatalog` demonstrates only steps 1 and 2. It validates descriptor coherence
+and logs sanitized category/event metadata, but it does not subscribe to events, parse
+chat, start timers, expose identities, perform lookup, mutate gameplay, or override
+returns.
 
 For inventory-backed policy checks, `inventory_item` means only "this copied policy event
 came from the promoted inventory-item-backed category." A plugin can use

@@ -113,6 +113,9 @@ priorities, and do not use history files as the active source of truth.
 - `DescribeGameplayPolicyEventKind` is a metadata-only v0.1 SDK helper for promoted
   `GameplayPolicyEvent` kinds. It returns copied POD descriptors for routing/config, not
   UE lookup, identity, mutation, or return override.
+- `oDescriptorCatalog` is a release-scope reference plugin for those descriptor helpers.
+  It validates descriptor coherence and logs sanitized resource/event metadata only; it
+  registers no callbacks/timers and adds no ABI surface.
 - `InventoryPolicyEventDispatcher` and `StructureEventDispatcher` are internal
   copied-scalar infrastructure only. They do not promote public Inventory or
   StructureEvents SDKs.

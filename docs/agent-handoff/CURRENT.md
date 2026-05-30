@@ -83,6 +83,10 @@ recovery context is not active routing for the current head; use
   `ChatMessageEvent` bytes. It has config and owner-token register/unregister, but no
   command ABI/router, identity, reply, mutation, or extra exported plugin symbols beyond
   `GetInfo`/`Init`/`Shutdown`.
+- `oDescriptorCatalog` is the next release-scope reference plugin after timers: it
+  demonstrates `DescribeResourceKind` and `DescribeGameplayPolicyEventKind` consumption
+  only, validates descriptor coherence, and logs sanitized metadata without callbacks,
+  timers, chat, identity, lookup, mutation, return override, or ABI expansion.
 - Internal/evidence-only lanes include `ProcessEventBuffReflection`,
   `StructureEventDispatcher`, `InventoryPolicyEventDispatcher`, Item/Mission/Transfer
   recognizers, weak-helper artifacts, GObjects evidence, route observers, and structure

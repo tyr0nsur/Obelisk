@@ -15,6 +15,8 @@
 - Hardened plugin unload/init-failure cleanup so a callback cleanup failure prevents
   `dlclose`, retains the plugin for retry, and avoids repeating plugin shutdown on the
   retained unload attempt.
+- Added `oDescriptorCatalog` as a release-scope metadata-only reference plugin for
+  descriptor discovery and routing validation without callbacks or ABI expansion.
 
 ## 0.1.0-rc.2
 

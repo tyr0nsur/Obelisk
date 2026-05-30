@@ -199,6 +199,51 @@ add_test(
     COMMAND sdk_consumer_fixture "$<TARGET_FILE:oProcessTimer>" oProcessTimer throw-log-after-timer-registration
 )
 
+add_test(
+    NAME SdkConsumerFixtureODescriptorCatalog
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oDescriptorCatalog>" oDescriptorCatalog
+)
+
+add_test(
+    NAME SdkConsumerFixtureODescriptorCatalogActive
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oDescriptorCatalog>" oDescriptorCatalog active-descriptor-catalog
+)
+
+add_test(
+    NAME SdkConsumerFixtureODescriptorCatalogDisabledNoDescriptorCapability
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oDescriptorCatalog>" oDescriptorCatalog disabled-no-descriptor-capability
+)
+
+add_test(
+    NAME SdkConsumerFixtureODescriptorCatalogNoDescriptorCapability
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oDescriptorCatalog>" oDescriptorCatalog no-descriptor-capability
+)
+
+add_test(
+    NAME SdkConsumerFixtureODescriptorCatalogShortApi
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oDescriptorCatalog>" oDescriptorCatalog short-api-before-descriptors
+)
+
+add_test(
+    NAME SdkConsumerFixtureODescriptorCatalogBadMetadata
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oDescriptorCatalog>" oDescriptorCatalog bad-descriptor-catalog-metadata
+)
+
+add_test(
+    NAME SdkConsumerFixtureODescriptorCatalogBadName
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oDescriptorCatalog>" oDescriptorCatalog bad-descriptor-catalog-name
+)
+
+add_test(
+    NAME SdkConsumerFixtureODescriptorCatalogBadFlags
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oDescriptorCatalog>" oDescriptorCatalog bad-descriptor-catalog-flags
+)
+
+add_test(
+    NAME SdkConsumerFixtureODescriptorCatalogInvalidConfig
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oDescriptorCatalog>" oDescriptorCatalog invalid-descriptor-catalog-config
+)
+
 if(TARGET oPolicyAudit)
     add_test(
         NAME SdkConsumerFixtureOPolicyAudit

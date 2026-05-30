@@ -40,6 +40,9 @@ namespace
     bool g_FailTimerRegistration = false;
     bool g_ThrowLogAfterTimerRegistration = false;
     bool g_BadGameplayPolicyDescriptor = false;
+    bool g_BadDescriptorCatalogMetadata = false;
+    bool g_BadDescriptorCatalogName = false;
+    bool g_BadDescriptorCatalogFlags = false;
     std::string g_ExpectedPluginId;
     std::vector<std::string> g_InfoLogs;
     std::vector<std::string> g_ErrorLogs;
@@ -372,7 +375,10 @@ namespace
                 OBELISK_GAMEPLAY_POLICY_FIELD_MASK_VARIANT_INDEX |
                 OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE_SET |
                 OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE;
-            std::strncpy(out->stable_name, "structure", sizeof(out->stable_name) - 1);
+            if (g_BadDescriptorCatalogName)
+                std::memset(out->stable_name, 'A', sizeof(out->stable_name));
+            else
+                std::strncpy(out->stable_name, "structure", sizeof(out->stable_name) - 1);
             std::strncpy(out->display_name, "Structure", sizeof(out->display_name) - 1);
             return true;
         }
@@ -400,6 +406,24 @@ namespace
         out->event_kind = eventKind;
         out->flags = OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD;
         out->field_mask = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE;
+        if (eventKind == OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_ACCESS_CHECK)
+        {
+            out->resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE;
+            out->flags |= OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED;
+            out->event_kind_mask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACCESS_CHECK;
+            std::strncpy(out->stable_name, "structure.access_check", sizeof(out->stable_name) - 1);
+            std::strncpy(out->display_name, "Structure Access Check", sizeof(out->display_name) - 1);
+            return true;
+        }
+        if (eventKind == OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_DEMOLISH_CHECK)
+        {
+            out->resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE;
+            out->flags |= OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED;
+            out->event_kind_mask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_DEMOLISH_CHECK;
+            std::strncpy(out->stable_name, "structure.demolish_check", sizeof(out->stable_name) - 1);
+            std::strncpy(out->display_name, "Structure Demolish Check", sizeof(out->display_name) - 1);
+            return true;
+        }
         if (eventKind == OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_VARIANT_CHANGE)
         {
             out->resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE;
@@ -409,6 +433,34 @@ namespace
                 OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE_SET;
             std::strncpy(out->stable_name, "structure.variant_change", sizeof(out->stable_name) - 1);
             std::strncpy(out->display_name, "Structure Variant Change", sizeof(out->display_name) - 1);
+            return true;
+        }
+        if (eventKind == OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_ACTIVATION_TOGGLE)
+        {
+            out->resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE;
+            out->flags |= OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED;
+            out->event_kind_mask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACTIVATION_TOGGLE;
+            std::strncpy(out->stable_name, "structure.activation_toggle", sizeof(out->stable_name) - 1);
+            std::strncpy(out->display_name, "Structure Activation Toggle", sizeof(out->display_name) - 1);
+            return true;
+        }
+        if (eventKind == OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_PIN_CODE_CHECK)
+        {
+            out->resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE;
+            out->flags |= OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED;
+            out->event_kind_mask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_PIN_CODE_CHECK;
+            std::strncpy(out->stable_name, "structure.pin_code_check", sizeof(out->stable_name) - 1);
+            std::strncpy(out->display_name, "Structure Pin Code Check", sizeof(out->display_name) - 1);
+            return true;
+        }
+        if (eventKind == OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_SEAT_CHECK)
+        {
+            out->resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE;
+            out->flags |= OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED;
+            out->event_kind_mask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_SEAT_CHECK;
+            out->field_mask |= OBELISK_GAMEPLAY_POLICY_FIELD_MASK_FORCE;
+            std::strncpy(out->stable_name, "structure.seat_check", sizeof(out->stable_name) - 1);
+            std::strncpy(out->display_name, "Structure Seat Check", sizeof(out->display_name) - 1);
             return true;
         }
         if (eventKind == OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK)
@@ -423,8 +475,12 @@ namespace
         }
         if (eventKind == OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK)
         {
-            out->resource_kind = OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM;
-            out->flags |= OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED;
+            out->resource_kind = g_BadDescriptorCatalogMetadata
+                ? OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE
+                : OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM;
+            out->flags |= g_BadDescriptorCatalogFlags
+                ? OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED
+                : OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED;
             out->event_kind_mask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK;
             if (!g_BadGameplayPolicyDescriptor)
                 out->field_mask |= OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN;
@@ -539,6 +595,26 @@ namespace
         "digest_interval_ms": 0,
         "log_on_shutdown": true,
         "max_message_size_bucket": 4096
+    }
+})json";
+
+    constexpr const char* kActiveODescriptorCatalogConfig = R"json({
+    "enabled": true,
+    "allow_all_instances": false,
+    "instance_allowlist": ["sdk-consumer-test"],
+    "descriptor_catalog": {
+        "enabled": true,
+        "log_catalog": true
+    }
+})json";
+
+    constexpr const char* kInvalidODescriptorCatalogConfig = R"json({
+    "enabled": true,
+    "allow_all_instances": false,
+    "instance_allowlist": ["sdk-consumer-test"],
+    "descriptor_catalog": {
+        "enabled": "yes",
+        "log_catalog": true
     }
 })json";
 
@@ -666,6 +742,16 @@ int main(int argc, char** argv)
             configJson = kActiveOChatAuditConfig;
         else if (std::strcmp(expectedPluginId, "oChatAudit") == 0 && mode == "invalid-chat-audit-config")
             configJson = kInvalidOChatAuditConfig;
+        else if (std::strcmp(expectedPluginId, "oDescriptorCatalog") == 0 &&
+            (mode == "active-descriptor-catalog" ||
+             mode == "no-descriptor-capability" ||
+             mode == "short-api-before-descriptors" ||
+             mode == "bad-descriptor-catalog-metadata" ||
+             mode == "bad-descriptor-catalog-name" ||
+             mode == "bad-descriptor-catalog-flags"))
+            configJson = kActiveODescriptorCatalogConfig;
+        else if (std::strcmp(expectedPluginId, "oDescriptorCatalog") == 0 && mode == "invalid-descriptor-catalog-config")
+            configJson = kInvalidODescriptorCatalogConfig;
         else if (mode == "unsupported-map-allowlist")
             configJson = kUnsupportedMapAllowlistConfig;
         else if (mode == "invalid-process-event-config")
@@ -699,7 +785,9 @@ int main(int argc, char** argv)
             RegisterNamedProcessEventWithOwnerTokenHandle;
         api.UnregisterProcessEventCallbackWithOwnerToken =
             UnregisterProcessEventCallbackWithOwnerToken;
-        if (mode != "no-gameplay-policy-capability")
+        if (mode != "no-gameplay-policy-capability" &&
+            mode != "no-descriptor-capability" &&
+            mode != "disabled-no-descriptor-capability")
         {
             api.capabilities |= OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS |
                 OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS |
@@ -738,6 +826,12 @@ int main(int argc, char** argv)
             api.RegisterTimerWithOwnerTokenHandle = nullptr;
             api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken) = nullptr;
         }
+        if (mode == "short-api-before-descriptors")
+        {
+            api.struct_size = offsetof(ObeliskApi, DescribeResourceKind);
+            api.DescribeResourceKind = nullptr;
+            api.DescribeGameplayPolicyEventKind = nullptr;
+        }
         if (mode == "fail-gameplay-policy-registration")
             g_FailGameplayPolicyRegistration = true;
         if (mode == "fail-chat-message-registration")
@@ -748,6 +842,12 @@ int main(int argc, char** argv)
             g_ThrowLogAfterTimerRegistration = true;
         if (mode == "bad-gameplay-policy-descriptor")
             g_BadGameplayPolicyDescriptor = true;
+        if (mode == "bad-descriptor-catalog-metadata")
+            g_BadDescriptorCatalogMetadata = true;
+        if (mode == "bad-descriptor-catalog-name")
+            g_BadDescriptorCatalogName = true;
+        if (mode == "bad-descriptor-catalog-flags")
+            g_BadDescriptorCatalogFlags = true;
 
         ObeliskPluginInitContext context{};
         context.abi_version = OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION;
@@ -872,6 +972,30 @@ int main(int argc, char** argv)
                 "rejected chat audit unexpectedly registered a chat callback");
             Require(g_TimerRegisterCount == 0,
                 "rejected chat audit unexpectedly registered a timer");
+            cleanupConfigDir();
+            closeHandle();
+            return 0;
+        }
+        if (std::strcmp(expectedPluginId, "oDescriptorCatalog") == 0 &&
+            (mode == "no-descriptor-capability" ||
+             mode == "short-api-before-descriptors" ||
+             mode == "bad-descriptor-catalog-metadata" ||
+             mode == "bad-descriptor-catalog-name" ||
+             mode == "bad-descriptor-catalog-flags" ||
+             mode == "invalid-descriptor-catalog-config"))
+        {
+            Require(!initSucceeded, "descriptor catalog accepted invalid descriptor config/API/metadata");
+            Require(g_RegisterCount == 0,
+                "rejected descriptor catalog unexpectedly registered a ProcessEvent callback");
+            Require(g_GameplayPolicyRegisterCount == 0,
+                "rejected descriptor catalog unexpectedly registered a gameplay policy callback");
+            Require(g_ChatMessageRegisterCount == 0,
+                "rejected descriptor catalog unexpectedly registered a chat callback");
+            Require(g_TimerRegisterCount == 0,
+                "rejected descriptor catalog unexpectedly registered a timer");
+            g_BadDescriptorCatalogMetadata = false;
+            g_BadDescriptorCatalogName = false;
+            g_BadDescriptorCatalogFlags = false;
             cleanupConfigDir();
             closeHandle();
             return 0;
@@ -1224,6 +1348,34 @@ int main(int argc, char** argv)
                 "disabled chat audit unexpectedly registered chat callback");
             Require(g_TimerRegisterCount == 0,
                 "disabled chat audit unexpectedly registered timer");
+        }
+        if (std::strcmp(expectedPluginId, "oDescriptorCatalog") == 0 &&
+            (mode.empty() || mode == "disabled-no-descriptor-capability"))
+        {
+            Require(g_GameplayPolicyRegisterCount == 0,
+                "disabled descriptor catalog unexpectedly registered gameplay policy callback");
+            Require(g_ChatMessageRegisterCount == 0,
+                "disabled descriptor catalog unexpectedly registered chat callback");
+            Require(g_TimerRegisterCount == 0,
+                "disabled descriptor catalog unexpectedly registered timer");
+        }
+        if (std::strcmp(expectedPluginId, "oDescriptorCatalog") == 0 &&
+            mode == "active-descriptor-catalog")
+        {
+            Require(g_GameplayPolicyRegisterCount == 0,
+                "descriptor catalog unexpectedly registered gameplay policy callback");
+            Require(g_ChatMessageRegisterCount == 0,
+                "descriptor catalog unexpectedly registered chat callback");
+            Require(g_TimerRegisterCount == 0,
+                "descriptor catalog unexpectedly registered timer");
+            Require(HasLogContaining(g_InfoLogs, "[oDescriptorCatalog] resource kind=1 stable=structure"),
+                "descriptor catalog did not log structure resource descriptor");
+            Require(HasLogContaining(g_InfoLogs, "[oDescriptorCatalog] resource kind=2 stable=inventory_item"),
+                "descriptor catalog did not log inventory resource descriptor");
+            Require(HasLogContaining(g_InfoLogs, "[oDescriptorCatalog] event kind=8 stable=inventory.use_check"),
+                "descriptor catalog did not log inventory use event descriptor");
+            Require(HasLogContaining(g_InfoLogs, "[oDescriptorCatalog] Descriptor catalog validated."),
+                "descriptor catalog did not log validation completion");
         }
         if (std::strcmp(expectedPluginId, "oChatAudit") == 0 &&
             (mode == "active-chat-audit" || mode == "active-chat-audit-double-shutdown"))

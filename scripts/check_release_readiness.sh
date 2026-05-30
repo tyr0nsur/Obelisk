@@ -524,6 +524,8 @@ run_step scripts/install_obelisk_plugin.sh --dry-run \
     "${BUILD_DIR}/plugins/oBaseEvents/oBaseEvents.so" "${RELEASE_CHECK_ROOT}"
 run_step scripts/install_obelisk_plugin.sh --dry-run \
     "${BUILD_DIR}/plugins/oProcessTimer/oProcessTimer.so" "${RELEASE_CHECK_ROOT}"
+run_step scripts/install_obelisk_plugin.sh --dry-run \
+    "${BUILD_DIR}/plugins/oDescriptorCatalog/oDescriptorCatalog.so" "${RELEASE_CHECK_ROOT}"
 run_step git diff --check
 
 printf '\n==> git status --short --ignored\n'
