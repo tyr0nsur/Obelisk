@@ -1,3 +1,5 @@
+#define OBELISK_INVENTORY_POLICY_EVENT_DISPATCHER_ENABLE_TEST_HOOKS
+
 #include "core/InventoryPolicyEventDispatcher.h"
 #include "core/GameplayCallbackScope.h"
 

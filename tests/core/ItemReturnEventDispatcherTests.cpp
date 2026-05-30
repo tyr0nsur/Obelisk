@@ -1,3 +1,5 @@
+#define OBELISK_ITEM_RETURN_EVENT_DISPATCHER_ENABLE_TEST_HOOKS
+
 #include "core/ItemReturnEventDispatcher.h"
 
 #include <atomic>

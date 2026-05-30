@@ -2203,6 +2203,7 @@ namespace Obelisk::Core
             (m_Api.capabilities & OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING) != 0);
     }
 
+#ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
     uint64_t PluginManager::ApiCapabilitiesForTesting() const
     {
         return m_Api.capabilities;
@@ -2218,6 +2219,7 @@ namespace Obelisk::Core
     {
         NextChatMessageSequence().store(nextSequence == 0 ? 1 : nextSequence, std::memory_order_relaxed);
     }
+#endif
 
     PluginManager::~PluginManager()
     {

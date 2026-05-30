@@ -65,8 +65,8 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   broad module SDK claim.
 - Plugin unload/init-failure cleanup skips `dlclose` when callback cleanup cannot be
   proven complete, retains the plugin for retry, does not repeat plugin shutdown, leaves
-  mapped on retention failure, and keeps cleanup/retention injection hooks out of
-  production `libobelisk.so`.
+  mapped on retention failure, and keeps manager/dispatcher test hooks out of production
+  `libobelisk.so`.
 - `oProcessTimer` is the first process-local timer example. Timer ids are process-local,
   not cluster state, UE identity, gameplay/module timer abstractions, or persistent
   handles, or shared scheduler state; owner-token timers require explicit unregister.
@@ -151,7 +151,7 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   target sets, and reports internal/layout-only gaps as `target_set_not_release_readiness`.
 - Offline artifact JSON manifests, provenance sidecars, artifact checksum reads, and
   core inspector inputs use no-symlink regular-file opens after protected-path prechecks;
-  relative provenance paths resolve against their sidecar before protected-root checks.
+  relative manifest/provenance paths resolve against their sidecar before protected-root checks.
 - `scripts/check_static_tooling.py` records optional radare2/rizin/Ghidra availability and
   runs smoke checks only on approved offline binaries/output roots.
 - `APrimalStructure.IsAllowedToBuild` is second-wave only: no committed snapshot,

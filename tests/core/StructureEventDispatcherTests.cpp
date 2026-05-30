@@ -1,3 +1,5 @@
+#define OBELISK_STRUCTURE_EVENT_DISPATCHER_ENABLE_TEST_HOOKS
+
 #include "core/StructureEventDispatcher.h"
 #include "core/GameplayCallbackScope.h"
 

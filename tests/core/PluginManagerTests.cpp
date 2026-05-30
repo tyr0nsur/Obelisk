@@ -1,3 +1,6 @@
+#define OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
+#define OBELISK_ITEM_RETURN_EVENT_DISPATCHER_ENABLE_TEST_HOOKS
+
 #include "core/ChatEventDispatcher.h"
 #include "core/EventManager.h"
 #include "core/InventoryPolicyEventDispatcher.h"

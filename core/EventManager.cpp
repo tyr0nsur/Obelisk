@@ -309,11 +309,13 @@ namespace Obelisk::Core
         return !m_PostProcessEventCallbacks.empty() || !m_FilteredPostProcessEventCallbacks.empty();
     }
 
+#ifdef OBELISK_EVENT_MANAGER_ENABLE_TEST_HOOKS
     void EventManager::SetNextRegistrationIdForTesting(uint64_t nextRegistrationId)
     {
         std::lock_guard<std::mutex> lock(m_Mutex);
         m_NextRegistrationId = nextRegistrationId == 0 ? 1 : nextRegistrationId;
     }
+#endif
 
     bool EventManager::TriggerPreProcessEvent(void* caller, void* function, void* parms)
     {

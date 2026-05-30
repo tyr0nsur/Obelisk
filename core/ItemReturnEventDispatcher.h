@@ -52,7 +52,9 @@ namespace Obelisk::Core
         bool Unregister(uint64_t registrationId);
         bool UnregisterCallbackForOwner(void* owner, uint64_t registrationId);
         size_t UnregisterCallbacksForOwner(void* owner);
+#ifdef OBELISK_ITEM_RETURN_EVENT_DISPATCHER_ENABLE_TEST_HOOKS
         void SetNextRegistrationIdForTesting(uint64_t nextRegistrationId);
+#endif
 
         size_t Dispatch(const ItemReturnEventView& event);
         size_t SubscriptionCount() const;

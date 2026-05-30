@@ -19,7 +19,7 @@ UE lookup, or `ResourceHandle` APIs.
 
 ## Capability Families
 
-| Family | Current Obelisk surface | v1 core need | Later plugin/module work |
+| Family | Current Obelisk surface | Promotion gate before any v1 surface | Later plugin/module work |
 | --- | --- | --- | --- |
 | Chat and commands | Minimal copied `ChatMessageEvent` with send mode, local sequence, and copied text. | A command router over copied chat text, owner-token command registrations, permission checks, and safe response path once authority is defined. | Command plugins, aliases, moderation, chat tools. |
 | Permissions | No public permission service. | A process-local permission service with stable copied identities when available, config-backed rules, and no pointer-derived IDs. | External sync, admin UI, ArkApi migration helpers. |
@@ -41,7 +41,10 @@ items, structures, permissions, commands, admin, transfers, missions, timers, an
 
 This breadth is a discovery and prioritization guardrail, not a delivery promise. A family
 can appear in the map as demand or future module work while still having no public SDK,
-identity, lookup, mutation, return override, or handle contract.
+identity, lookup, mutation, return override, or handle contract. The promotion-gate column
+records hypotheses and required evidence, not production support for permissions, RCON,
+economy, storage, tribes, dinos, transfers, inventory, commands, or any other unpromoted
+module family.
 
 ## Core v1 Principles
 

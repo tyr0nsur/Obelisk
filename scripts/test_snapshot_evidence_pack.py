@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -310,6 +311,37 @@ class SnapshotEvidencePackTests(unittest.TestCase):
                     "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
                     parse_int,
                 )
+
+    def test_manifest_core_relative_path_resolves_against_manifest_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            manifest = root / "pack-A" / "manifest.json"
+            core = root / "pack-A" / "core"
+            core.parent.mkdir(parents=True)
+            core.write_bytes(b"snapshot evidence pack core fixture")
+            cwd = root / "elsewhere"
+            cwd.mkdir()
+            self.write_pack(
+                manifest,
+                core_path=Path("core"),
+                sha=sha256_bytes(b"snapshot evidence pack core fixture"),
+                write_core=False,
+            )
+
+            previous_cwd = Path.cwd()
+            try:
+                os.chdir(cwd)
+                defaults = evidence_pack_defaults(
+                    manifest,
+                    None,
+                    None,
+                    "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                    parse_int,
+                )
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(defaults.core_path, core.resolve())
 
     def test_rejects_manifest_core_path_under_protected_server_root_outside_dump_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

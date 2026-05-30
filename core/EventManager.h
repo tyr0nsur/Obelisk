@@ -48,7 +48,9 @@ namespace Obelisk::Core
         bool TriggerPreProcessEvent(int32_t nameIndex, void* caller, void* function, void* parms);
         void TriggerPostProcessEvent(int32_t nameIndex, void* caller, void* function, void* parms);
 
+#ifdef OBELISK_EVENT_MANAGER_ENABLE_TEST_HOOKS
         void SetNextRegistrationIdForTesting(uint64_t nextRegistrationId);
+#endif
 
     private:
         struct CallbackRegistration {

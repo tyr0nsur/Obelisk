@@ -66,6 +66,14 @@ ARKAPI_DEMAND_BOUNDARY_FILES = [
     REPO_ROOT / "agent-skills" / "obelisk-github-research-workflow" / "SKILL.md",
     REPO_ROOT / "docs" / "agent-handoff" / "CURRENT.md",
 ]
+PLUGIN_HUB_V1_ROADMAP_BOUNDARY_FILES = [
+    REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md",
+    REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md",
+    REPO_ROOT / "docs" / "research" / "2026-05-30-v1-core-capability-map.md",
+    REPO_ROOT / "docs" / "research" / "2026-05-29-module-surface-roadmap.md",
+    REPO_ROOT / "docs" / "research" / "README.md",
+    REPO_ROOT / "plugins" / "README.md",
+]
 V010_CORE_API_CAPABILITY_ALLOWLIST = [
     "OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS",
     "OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS",
@@ -589,6 +597,30 @@ def public_api_capability_defines(header: str) -> list[str]:
     )
 
 
+def public_abi_version_macros(header: str) -> list[tuple[str, str]]:
+    return re.findall(
+        r"^\s*#define\s+(OBELISK_[A-Z0-9_]*ABI_VERSION)\s+([0-9]+)u\s*$",
+        header,
+        re.MULTILINE,
+    )
+
+
+def cmake_abi_version_sets(cmake: str) -> list[tuple[str, str]]:
+    return re.findall(
+        r"^\s*set\((OBELISK_[A-Z0-9_]*ABI_VERSION)\s+([0-9]+)\)\s*$",
+        cmake,
+        re.MULTILINE,
+    )
+
+
+def package_config_abi_version_sets(package_config: str) -> list[tuple[str, str]]:
+    return re.findall(
+        r"^\s*set\((Obelisk_[A-Z0-9_]*ABI_VERSION)\s+@(OBELISK_[A-Z0-9_]*ABI_VERSION)@\)\s*$",
+        package_config,
+        re.MULTILINE,
+    )
+
+
 def obelisk_api_struct_body(header: str) -> str:
     match = re.search(
         r"typedef\s+struct\s+ObeliskApi\s*\{(?P<body>.*?)\}\s*ObeliskApi\s*;",
@@ -811,6 +843,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             r"\bStructureEvents?\s+(?:APIs?|SDKs?)\b",
             r"\bpromot(?:e|ed|es|ing)\s+(?:a\s+)?(?:public\s+)?Structure\s+(?:APIs?|SDKs?)\b",
             r"\bpublic\s+Structure\s+(?:APIs?|SDKs?)\b",
+            r"\bpromot(?:e|ed|es|ing)\s+(?:a\s+)?(?:public\s+)?(?:structure\s+)?build[- ]policy\s+(?:APIs?|SDKs?|surfaces?)\b",
+            r"\bpublic\s+(?:structure\s+)?build[- ]policy\s+(?:APIs?|SDKs?|surfaces?)\b",
             r"\bpublic\s+Items?\b",
             r"\bItems?\s+SDKs?\b",
             r"\bItems?\s+Events?\b",
@@ -888,6 +922,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         forbidden_positive_claims = (
             r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported|include|includes|included|provide|provides|provided)\s+(?:a\s+)?(?:public\s+)?Inventory\s+SDKs?\b",
             r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported|include|includes|included|provide|provides|provided)\s+(?:a\s+)?(?:public\s+)?StructureEvents?(?:\s+(?:SDKs?|APIs?|surfaces?))?\b",
+            r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported|include|includes|included|provide|provides|provided)\s+(?:a\s+)?(?:public\s+)?(?:structure\s+)?build[- ]policy\s+(?:SDKs?|APIs?|surfaces?)\b",
             r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported|include|includes|included|provide|provides|provided)\s+(?:a\s+)?(?:public\s+)?ResourceHandle(?:\s+(?:SDKs?|APIs?|surfaces?))?\b",
             r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported|include|includes|included|provide|provides|provided)\s+(?:public\s+)?(?:resource|object|player|sender|inventory|item|structure|tribe|UE|game\s+object)\s+identity(?:\s+(?:APIs?|surfaces?|authority))?\b",
             r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported|include|includes|included|provide|provides|provided)\s+(?:public\s+)?(?:gameplay\s+)?mutation(?:\s+(?:APIs?|SDKs?|surfaces?|authority))?\b",
@@ -896,6 +931,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             r"\b(?:storage|database|webhook)\s+(?:SDKs?|APIs?|services?|surfaces?)\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
             r"\bInventory\s+SDKs?\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
             r"\bStructureEvents?(?:\s+(?:SDKs?|APIs?|surfaces?))?\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
+            r"\b(?:structure\s+)?build[- ]policy\s+(?:SDKs?|APIs?|surfaces?)\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
             r"\bResourceHandle(?:\s+(?:SDKs?|APIs?|surfaces?))?\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
             r"\b(?:resource|object|player|sender|inventory|item|structure|tribe|UE|game\s+object)\s+identity(?:\s+(?:APIs?|surfaces?|authority))?\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
             r"\b(?:gameplay\s+)?mutation(?:\s+(?:APIs?|SDKs?|surfaces?|authority))?\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
@@ -1738,25 +1774,36 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertIn("not C preprocessor macros", versioning)
         self.assertIn("mirror the `OBELISK_*` header macros", versioning)
 
-        for cmake_variable, c_macro in (
-            ("Obelisk_API_ABI_VERSION", "OBELISK_API_ABI_VERSION"),
-            ("Obelisk_PLUGIN_METADATA_ABI_VERSION", "OBELISK_PLUGIN_METADATA_ABI_VERSION"),
-            ("Obelisk_PLUGIN_INIT_CONTEXT_ABI_VERSION", "OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION"),
-            ("Obelisk_GAMEPLAY_POLICY_EVENT_ABI_VERSION", "OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION"),
-            ("Obelisk_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION", "OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION"),
-            (
-                "Obelisk_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION",
-                "OBELISK_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION",
-            ),
-            ("Obelisk_CHAT_MESSAGE_EVENT_ABI_VERSION", "OBELISK_CHAT_MESSAGE_EVENT_ABI_VERSION"),
-        ):
+        header_abi_macros = public_abi_version_macros(header)
+        expected_cmake_sets = [(macro, version.rstrip("u")) for macro, version in header_abi_macros]
+        expected_package_sets = [
+            (macro.replace("OBELISK_", "Obelisk_", 1), macro)
+            for macro, _version in header_abi_macros
+        ]
+        expected_cmake_variables = [cmake_variable for cmake_variable, _macro in expected_package_sets]
+        expected_c_macros = [macro for _cmake_variable, macro in expected_package_sets]
+
+        self.assertGreater(len(header_abi_macros), 0)
+        self.assertEqual(cmake_abi_version_sets(root_cmake), expected_cmake_sets)
+        self.assertEqual(package_config_abi_version_sets(package_config), expected_package_sets)
+        self.assertEqual(
+            re.findall(r"`(Obelisk_[A-Z0-9_]*ABI_VERSION)`", versioning),
+            expected_cmake_variables,
+        )
+        self.assertEqual(
+            re.findall(r"`(OBELISK_[A-Z0-9_]*ABI_VERSION)`", versioning),
+            expected_c_macros,
+        )
+
+        for c_macro, version in header_abi_macros:
+            cmake_variable = c_macro.replace("OBELISK_", "Obelisk_", 1)
             with self.subTest(cmake_variable=cmake_variable, c_macro=c_macro):
                 self.assertIn(cmake_variable, versioning)
-                self.assertIn(cmake_variable.replace("Obelisk_", "OBELISK_"), root_cmake)
+                self.assertIn(c_macro, root_cmake)
                 self.assertIn(cmake_variable, package_config)
                 self.assertIn(cmake_variable, installed_consumer_cmake)
                 self.assertIn(c_macro, versioning)
-                self.assertRegex(header, re.compile(rf"^#define\s+{re.escape(c_macro)}\s+1u$", re.M))
+                self.assertRegex(header, re.compile(rf"^#define\s+{re.escape(c_macro)}\s+{version}u$", re.M))
 
     def test_plugin_architecture_defines_public_gameplay_event_promotion_gate(self) -> None:
         text = (REPO_ROOT / "docs/PLUGIN_ARCHITECTURE.md").read_text(encoding="utf-8")
@@ -2639,20 +2686,33 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ]
         forbidden = (
             "OBELISK_API_CAPABILITY_STRUCTURE_EVENTS",
+            "OBELISK_API_CAPABILITY_STRUCTURE_BUILD_POLICY",
             "ObeliskStructureEvent",
+            "ObeliskStructureBuildPolicy",
+            "ObeliskBuildPolicy",
             "ObeliskStructureEventSubscription",
+            "ObeliskStructureBuildPolicySubscription",
             "ObeliskOnStructureEventCallback",
+            "ObeliskOnStructureBuildPolicyCallback",
             "RegisterOnStructureEvent",
             "RegisterOnStructureEvents",
+            "RegisterOnStructureBuildPolicy",
+            "RegisterStructureBuildPolicy",
             "OnStructureEvent",
             "OnStructureEvents",
+            "OnStructureBuildPolicy",
             "UnregisterStructureEvent",
             "UnregisterStructureEvents",
+            "UnregisterStructureBuildPolicy",
             "StructureEventView",
+            "StructureBuildPolicyView",
             "StructureScalarValue",
             "StructureEventCallback",
+            "StructureBuildPolicyCallback",
             "StructureEventSubscription",
+            "StructureBuildPolicySubscription",
             "StructureEventDispatcher",
+            "StructureBuildPolicyDispatcher",
             "StructureReflection",
             "ProcessEventStructureReflection",
         )
@@ -3030,6 +3090,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported)\s+(?:a\s+)?(?:public\s+)?Missions?\s+(?:SDKs?|APIs?|surfaces?)\b",
             r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported)\s+(?:a\s+)?(?:public\s+)?Transfers?\s+(?:SDKs?|APIs?|surfaces?)\b",
             r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported)\s+(?:a\s+)?(?:public\s+)?StructureEvents?\b",
+            r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported)\s+(?:a\s+)?(?:public\s+)?(?:structure\s+)?build[- ]policy\s+(?:SDKs?|APIs?|surfaces?)\b",
             r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported)\s+(?:a\s+)?(?:public\s+)?ResourceHandle\s+(?:SDKs?|APIs?|surfaces?)\b",
             r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported)\s+(?:public\s+)?(?:gameplay\s+)?mutation\s+(?:SDKs?|APIs?|surfaces?|authority)\b",
             r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported)\s+(?:public\s+)?return[- ]overrides?\s+(?:SDKs?|APIs?|surfaces?|authority)\b",
@@ -3040,6 +3101,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             r"\bMissions?\s+(?:SDKs?|APIs?|surfaces?)\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
             r"\bTransfers?\s+(?:SDKs?|APIs?|surfaces?)\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
             r"\bStructureEvents?\s+(?:SDKs?|APIs?|surfaces?)?\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
+            r"\b(?:structure\s+)?build[- ]policy\s+(?:SDKs?|APIs?|surfaces?)\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
             r"\bResourceHandle\s+(?:SDKs?|APIs?|surfaces?)\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
             r"\b(?:gameplay\s+)?mutation\s+(?:SDKs?|APIs?|surfaces?|authority)\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
             r"\breturn[- ]overrides?\s+(?:SDKs?|APIs?|surfaces?|authority)\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
@@ -3333,6 +3395,55 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                     compact_lower,
                     r"not (?:a )?(?:delivery |sdk )?promise|not .* sdk promise|no public sdk|not ready",
                 )
+
+    def test_plugin_hub_blocked_module_families_stay_unpromoted(self) -> None:
+        v1_map = (
+            REPO_ROOT / "docs" / "research" / "2026-05-30-v1-core-capability-map.md"
+        ).read_text(encoding="utf-8")
+        compact_v1_map = normalized(v1_map)
+
+        for required in (
+            "Promotion gate before any v1 surface",
+            "records hypotheses and required evidence, not production support for permissions, RCON, economy, storage, tribes, dinos, transfers, inventory, commands",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(normalized(required), compact_v1_map)
+        self.assertNotIn("v1 core need", compact_v1_map)
+
+        blocked_family = (
+            r"permissions?|RCON|economy|shops?|kits?|storage|database|webhook|"
+            r"tribes?|dinos?|transfers?|inventory|items?"
+        )
+        surface_noun = r"modules?|SDKs?|APIs?|services?|surfaces?"
+        forbidden_positive_claims = (
+            rf"\b(?:production[- ]supported|production|stable|supported|promoted|public|available)\s+"
+            rf"(?:Plugin\s+Hub\s+)?(?:{blocked_family})\s+(?:{surface_noun})\b",
+            rf"\b(?:{blocked_family})\s+(?:{surface_noun})\s+"
+            rf"(?:is|are|as)\s+(?:production[- ]supported|production|stable|supported|promoted|public|available)\b",
+        )
+        negated_or_boundary_context = re.compile(
+            r"\b(?:do\s+not|does\s+not|must\s+not|not|no|never|without|blocked|"
+            r"planning-only|future\s+work|experimental|internal|candidate|hypotheses?|"
+            r"required\s+evidence|demand\s+signals?|does\s+not\s+promote)\b",
+            re.IGNORECASE,
+        )
+
+        offenders: list[str] = []
+        for path in PLUGIN_HUB_V1_ROADMAP_BOUNDARY_FILES:
+            text = path.read_text(encoding="utf-8")
+            for segment_start, segment in sentence_like_segments(text):
+                context_start = max(0, segment_start - 800)
+                context = text[context_start:segment_start + len(segment)]
+                for pattern in forbidden_positive_claims:
+                    if re.search(pattern, segment, flags=re.IGNORECASE) and not (
+                        negated_or_boundary_context.search(context)
+                    ):
+                        line_no = text.count("\n", 0, segment_start) + 1
+                        offenders.append(
+                            f"{path.relative_to(REPO_ROOT)}:{line_no}: {normalized(segment)}"
+                        )
+
+        self.assertEqual(offenders, [])
 
     def test_resource_handle_serial_policy_tooling_stays_internal_candidate_only(self) -> None:
         script = (REPO_ROOT / "scripts" / "build_resource_handle_serial_policy.py").read_text(

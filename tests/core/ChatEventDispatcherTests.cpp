@@ -1,3 +1,5 @@
+#define OBELISK_CHAT_EVENT_DISPATCHER_ENABLE_TEST_HOOKS
+
 #include "core/ChatEventDispatcher.h"
 #include "core/GameplayCallbackScope.h"
 

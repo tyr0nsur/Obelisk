@@ -43,7 +43,9 @@ namespace Obelisk::Core
         uint64_t Register(void* owner, const ChatMessageSubscription& subscription);
         bool Unregister(uint64_t registrationId);
         size_t UnregisterCallbacksForOwner(void* owner);
+#ifdef OBELISK_CHAT_EVENT_DISPATCHER_ENABLE_TEST_HOOKS
         void SetNextRegistrationIdForTesting(uint64_t nextRegistrationId);
+#endif
 
         size_t Dispatch(const ChatMessageView& message);
         size_t SubscriptionCount() const;

@@ -1,3 +1,7 @@
+#if !defined(obelisk_EXPORTS)
+#define OBELISK_CHAT_EVENT_DISPATCHER_ENABLE_TEST_HOOKS
+#endif
+
 #include "ChatEventDispatcher.h"
 #include "GameplayCallbackScope.h"
 #include "runtime/Logger.h"
@@ -148,11 +152,13 @@ namespace Obelisk::Core
         return before - after;
     }
 
+#ifdef OBELISK_CHAT_EVENT_DISPATCHER_ENABLE_TEST_HOOKS
     void ChatEventDispatcher::SetNextRegistrationIdForTesting(uint64_t nextRegistrationId)
     {
         std::lock_guard<std::mutex> lock(m_Mutex);
         m_NextRegistrationId = nextRegistrationId == 0 ? 1 : nextRegistrationId;
     }
+#endif
 
     bool ChatEventDispatcher::QueueOrDestroyRemovedSubscriptions(
         std::vector<ChatMessageSubscription>& removed,

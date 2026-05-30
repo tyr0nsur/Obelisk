@@ -28,9 +28,11 @@ namespace Obelisk::Core
 
         void LoadPlugins(const std::string& directory);
         void UnloadAll();
+#ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
         uint64_t ApiCapabilitiesForTesting() const;
         static void SetNextPluginOwnerTokenForTesting(uint64_t nextOwnerToken);
         static void SetNextChatMessageSequenceForTesting(uint64_t nextSequence);
+#endif
 
     private:
         struct PluginInfo {

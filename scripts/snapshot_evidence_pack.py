@@ -104,6 +104,12 @@ def reject_protected_core_path(path: Path, manifest_path: Path) -> Path:
     return resolved
 
 
+def manifest_relative_path(path: Path, manifest_path: Path) -> Path:
+    if path.is_absolute():
+        return path
+    return manifest_path.parent / path
+
+
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     try:
@@ -187,7 +193,8 @@ def evidence_pack_defaults(
     core_path = core.get("path")
     if not isinstance(core_path, str) or not core_path:
         raise SystemExit(f"{path}: evidence pack manifest missing core.path")
-    resolved_core_path = reject_protected_core_path(Path(core_path), path)
+    core_path_for_read = manifest_relative_path(Path(core_path), path)
+    resolved_core_path = reject_protected_core_path(core_path_for_read, path)
     actual_core_sha = sha256_file(resolved_core_path)
     if actual_core_sha != core_sha:
         raise SystemExit(f"{path}: core.sha256 does not match core.path contents")

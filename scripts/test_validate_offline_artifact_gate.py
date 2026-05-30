@@ -1373,6 +1373,8 @@ def runtime_serial_semantics_manifest() -> dict:
         ],
         "non_claims": [
             "does_not_unlock_resource_handle",
+            "does_not_promote_gobjects_lookup",
+            "does_not_promote_public_object_identity",
             "does_not_promote_persistent_handles",
             "does_not_claim_wraparound_safety",
             "does_not_allow_cross_frame_lookup",
@@ -5292,6 +5294,29 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("runtime_serial_semantics_row_unexpected_field", reasons)
         self.assertIn("runtime_serial_semantics_forbidden_disclosure_field", reasons)
         self.assertIn("runtime_serial_semantics_fresh_case_not_frame_local_only", reasons)
+
+    def test_blocks_runtime_serial_semantics_missing_lookup_identity_non_claims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "runtime-serial-semantics.json"
+            payload = runtime_serial_semantics_manifest()
+            payload["non_claims"].remove("does_not_promote_gobjects_lookup")
+            payload["non_claims"].remove("does_not_promote_public_object_identity")
+            attach_runtime_output_identity(
+                payload,
+                schema=gate.INTERNAL_UOBJECT_RUNTIME_SERIAL_SEMANTICS_SCHEMA,
+                capture_id="runtime-serial-test",
+                evidence_pack_id="runtime-serial-pack",
+            )
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "runtime_serial_semantics_non_claims_missing",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
 
     def test_blocks_runtime_serial_semantics_unknown_top_level_field(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -1,3 +1,7 @@
+#if !defined(obelisk_EXPORTS)
+#define OBELISK_ITEM_RETURN_EVENT_DISPATCHER_ENABLE_TEST_HOOKS
+#endif
+
 #include "ItemReturnEventDispatcher.h"
 #include "GameplayCallbackScope.h"
 #include "runtime/Logger.h"
@@ -259,11 +263,13 @@ namespace Obelisk::Core
         m_DispatchCv.notify_all();
     }
 
+#ifdef OBELISK_ITEM_RETURN_EVENT_DISPATCHER_ENABLE_TEST_HOOKS
     void ItemReturnEventDispatcher::SetNextRegistrationIdForTesting(uint64_t nextRegistrationId)
     {
         std::lock_guard<std::mutex> lock(m_Mutex);
         m_NextRegistrationId = nextRegistrationId == 0 ? 1 : nextRegistrationId;
     }
+#endif
 
     size_t ItemReturnEventDispatcher::Dispatch(const ItemReturnEventView& event)
     {

@@ -1,3 +1,7 @@
+#if !defined(obelisk_EXPORTS)
+#define OBELISK_STRUCTURE_EVENT_DISPATCHER_ENABLE_TEST_HOOKS
+#endif
+
 #include "StructureEventDispatcher.h"
 #include "GameplayCallbackScope.h"
 #include "runtime/Logger.h"
@@ -323,11 +327,13 @@ namespace Obelisk::Core
         m_DispatchCv.notify_all();
     }
 
+#ifdef OBELISK_STRUCTURE_EVENT_DISPATCHER_ENABLE_TEST_HOOKS
     void StructureEventDispatcher::SetNextRegistrationIdForTesting(uint64_t nextRegistrationId)
     {
         std::lock_guard<std::mutex> lock(m_Mutex);
         m_NextRegistrationId = nextRegistrationId == 0 ? 1 : nextRegistrationId;
     }
+#endif
 
     size_t StructureEventDispatcher::Dispatch(const StructureEventView& event)
     {

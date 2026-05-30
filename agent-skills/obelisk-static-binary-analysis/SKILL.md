@@ -29,6 +29,9 @@ claims from a stripped Linux server binary.
   resolving sidecars are fail-closed evidence blockers. Sidecars that resolve to
   `/servidor/ark/workspace-offline` are allowed when the artifact is part of an approved
   offline workspace.
+- Evidence-pack manifest paths are manifest-relative when not absolute. Resolve `core.path`
+  and similar reusable artifact paths against the manifest directory, not the caller's
+  current working directory.
 - Path fields inside provenance sidecars must be checked after resolving relative paths
   against the sidecar directory; do not ignore relative `../...` paths when applying
   protected-path rules.

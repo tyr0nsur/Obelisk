@@ -880,6 +880,8 @@ REQUIRED_RUNTIME_REJECTION_SAMPLE_NON_CLAIMS = {
 }
 REQUIRED_RUNTIME_SERIAL_SEMANTICS_NON_CLAIMS = {
     "does_not_unlock_resource_handle",
+    "does_not_promote_gobjects_lookup",
+    "does_not_promote_public_object_identity",
     "does_not_promote_persistent_handles",
     "does_not_claim_wraparound_safety",
     "does_not_allow_cross_frame_lookup",
