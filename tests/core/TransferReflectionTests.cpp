@@ -18,9 +18,16 @@ namespace
     constexpr int32_t kFunctionClassNameIndex = 10650;
     constexpr int32_t kBoolPropertyClassObjectIndex = 532;
     constexpr int32_t kFunctionClassObjectIndex = 518;
+    constexpr int32_t kServerTransferredPlayerConfirmationResultObjectIndex = 10494;
+    constexpr int32_t kBAcceptObjectIndex = 10495;
+    constexpr int32_t kShooterPlayerControllerObjectIndex = 50;
     constexpr int32_t kShooterPlayerControllerNameIndex = 6721;
     constexpr int32_t kBAcceptNameIndex = 21480;
     constexpr uint64_t kBoolInputPropertyFlags = 0x1040000280;
+    constexpr uint8_t kBAcceptBoolFieldSize = 0x01;
+    constexpr uint8_t kBAcceptBoolByteOffset = 0x00;
+    constexpr uint8_t kBAcceptBoolByteMask = 0x01;
+    constexpr uint8_t kBAcceptBoolFieldMask = 0xff;
 
     struct Region
     {
@@ -87,11 +94,12 @@ namespace
                        const void* owner,
                        const void* klass,
                        int32_t nameIndex,
+                       int32_t objectIndex,
                        int32_t offset,
                        int32_t elementSize,
                        uint64_t propertyFlags)
     {
-        WriteObject(buffer, nameIndex, nameIndex, klass, owner);
+        WriteObject(buffer, nameIndex, objectIndex, klass, owner);
 
         const int32_t arrayDim = 1;
         WriteAt(buffer, 0x28, next);
@@ -99,6 +107,10 @@ namespace
         WriteAt(buffer, 0x34, elementSize);
         WriteAt(buffer, 0x38, propertyFlags);
         WriteAt(buffer, 0x4c, offset);
+        WriteAt(buffer, 0x70, kBAcceptBoolFieldSize);
+        WriteAt(buffer, 0x71, kBAcceptBoolByteOffset);
+        WriteAt(buffer, 0x72, kBAcceptBoolByteMask);
+        WriteAt(buffer, 0x73, kBAcceptBoolFieldMask);
     }
 
     struct TransferFixture
@@ -140,12 +152,12 @@ namespace
         WriteObject(fixture.FunctionClass, kFunctionClassNameIndex, kFunctionClassObjectIndex, nullptr, nullptr);
         WriteObject(fixture.Outer,
                     kShooterPlayerControllerNameIndex,
-                    kShooterPlayerControllerNameIndex,
+                    kShooterPlayerControllerObjectIndex,
                     nullptr,
                     nullptr);
         WriteObject(fixture.Function,
                     functionNameIndex,
-                    functionNameIndex,
+                    kServerTransferredPlayerConfirmationResultObjectIndex,
                     fixture.FunctionClass.data(),
                     fixture.Outer.data());
         WriteProperty(fixture.Property,
@@ -153,6 +165,7 @@ namespace
                       fixture.Function.data(),
                       fixture.BoolPropertyClass.data(),
                       kBAcceptNameIndex,
+                      kBAcceptObjectIndex,
                       0x00,
                       0x01,
                       kBoolInputPropertyFlags);
@@ -253,9 +266,27 @@ namespace
         {
             TransferFixture fixture;
             BuildConfirmationResult(fixture);
+            WriteObject(fixture.Outer,
+                        kShooterPlayerControllerNameIndex,
+                        9999,
+                        nullptr,
+                        nullptr);
+
+            TransferReflection::TransferInvocation invocation;
+            ReadResult result = TransferReflection::TryIdentifyTransferInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "wrong transfer outer object index was accepted");
+        }
+        {
+            TransferFixture fixture;
+            BuildConfirmationResult(fixture);
             WriteObject(fixture.Function,
                         kServerTransferredPlayerConfirmationResultNameIndex,
-                        kServerTransferredPlayerConfirmationResultNameIndex,
+                        kServerTransferredPlayerConfirmationResultObjectIndex,
                         fixture.FunctionClass.data(),
                         fixture.Outer.data(),
                         1);
@@ -272,6 +303,24 @@ namespace
         {
             TransferFixture fixture;
             BuildConfirmationResult(fixture);
+            WriteObject(fixture.Function,
+                        kServerTransferredPlayerConfirmationResultNameIndex,
+                        9999,
+                        fixture.FunctionClass.data(),
+                        fixture.Outer.data());
+
+            TransferReflection::TransferInvocation invocation;
+            ReadResult result = TransferReflection::TryIdentifyTransferInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "wrong transfer UFunction object index was accepted");
+        }
+        {
+            TransferFixture fixture;
+            BuildConfirmationResult(fixture);
             WriteObject(fixture.FunctionClass, 9999, kFunctionClassObjectIndex, nullptr, nullptr);
 
             TransferReflection::TransferInvocation invocation;
@@ -282,6 +331,21 @@ namespace
                 fixture.Params.data(),
                 invocation);
             Require(result.Status == ReadStatus::Implausible, "wrong transfer UFunction class was accepted");
+        }
+        {
+            TransferFixture fixture;
+            BuildConfirmationResult(fixture);
+            WriteObject(fixture.FunctionClass, kFunctionClassNameIndex, 9999, nullptr, nullptr);
+
+            TransferReflection::TransferInvocation invocation;
+            ReadResult result = TransferReflection::TryIdentifyTransferInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible,
+                    "wrong transfer UFunction class object index was accepted");
         }
     }
 
@@ -365,6 +429,33 @@ namespace
         {
             TransferFixture fixture;
             BuildConfirmationResult(fixture);
+            WriteObject(fixture.Property,
+                        kBAcceptNameIndex,
+                        9999,
+                        fixture.BoolPropertyClass.data(),
+                        fixture.Function.data());
+            WriteAt(fixture.Property, 0x28, static_cast<const void*>(nullptr));
+            WriteAt(fixture.Property, 0x30, int32_t{1});
+            WriteAt(fixture.Property, 0x34, int32_t{1});
+            WriteAt(fixture.Property, 0x38, uint64_t{kBoolInputPropertyFlags});
+            WriteAt(fixture.Property, 0x4c, int32_t{0});
+            WriteAt(fixture.Property, 0x70, kBAcceptBoolFieldSize);
+            WriteAt(fixture.Property, 0x71, kBAcceptBoolByteOffset);
+            WriteAt(fixture.Property, 0x72, kBAcceptBoolByteMask);
+            WriteAt(fixture.Property, 0x73, kBAcceptBoolFieldMask);
+
+            TransferReflection::TransferInvocation invocation;
+            ReadResult result = TransferReflection::TryIdentifyTransferInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "wrong transfer property object index was accepted");
+        }
+        {
+            TransferFixture fixture;
+            BuildConfirmationResult(fixture);
             WriteObject(fixture.BoolPropertyClass, 9999, kBoolPropertyClassObjectIndex, nullptr, nullptr);
 
             TransferReflection::TransferInvocation invocation;
@@ -375,6 +466,21 @@ namespace
                 fixture.Params.data(),
                 invocation);
             Require(result.Status == ReadStatus::Implausible, "wrong transfer property class was accepted");
+        }
+        {
+            TransferFixture fixture;
+            BuildConfirmationResult(fixture);
+            WriteObject(fixture.BoolPropertyClass, kBoolPropertyClassNameIndex, 9999, nullptr, nullptr);
+
+            TransferReflection::TransferInvocation invocation;
+            ReadResult result = TransferReflection::TryIdentifyTransferInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible,
+                    "wrong transfer BoolProperty class object index was accepted");
         }
         {
             TransferFixture fixture;
@@ -431,6 +537,80 @@ namespace
                 fixture.Params.data(),
                 invocation);
             Require(result.Status == ReadStatus::OutOfBounds, "wrong transfer property ArrayDim was accepted");
+        }
+    }
+
+    void TestRejectsWrongBoolPropertyMetadata()
+    {
+        {
+            TransferFixture fixture;
+            BuildConfirmationResult(fixture);
+            WriteAt(fixture.Property, 0x70, uint8_t{2});
+
+            TransferReflection::TransferInvocation invocation;
+            ReadResult result = TransferReflection::TryIdentifyTransferInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "wrong transfer bool field size was accepted");
+        }
+        {
+            TransferFixture fixture;
+            BuildConfirmationResult(fixture);
+            WriteAt(fixture.Property, 0x71, uint8_t{1});
+
+            TransferReflection::TransferInvocation invocation;
+            ReadResult result = TransferReflection::TryIdentifyTransferInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "wrong transfer bool byte offset was accepted");
+        }
+        {
+            TransferFixture fixture;
+            BuildConfirmationResult(fixture);
+            WriteAt(fixture.Property, 0x72, uint8_t{0xff});
+
+            TransferReflection::TransferInvocation invocation;
+            ReadResult result = TransferReflection::TryIdentifyTransferInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "native transfer bool marker was accepted");
+        }
+        {
+            TransferFixture fixture;
+            BuildConfirmationResult(fixture);
+            WriteAt(fixture.Property, 0x72, uint8_t{0x02});
+
+            TransferReflection::TransferInvocation invocation;
+            ReadResult result = TransferReflection::TryIdentifyTransferInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "wrong transfer bool byte mask was accepted");
+        }
+        {
+            TransferFixture fixture;
+            BuildConfirmationResult(fixture);
+            WriteAt(fixture.Property, 0x73, uint8_t{0x01});
+
+            TransferReflection::TransferInvocation invocation;
+            ReadResult result = TransferReflection::TryIdentifyTransferInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "wrong transfer bool field mask was accepted");
         }
     }
 
@@ -574,6 +754,7 @@ int main()
     TestRejectsWrongOuterNameNumberAndClass();
     TestRejectsWrongShape();
     TestRejectsWrongPropertyShape();
+    TestRejectsWrongBoolPropertyMetadata();
     TestRejectsPropertyChainDrift();
     TestRejectsUnsupportedTarget();
     TestGateRejectsBeforeReading();

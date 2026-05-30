@@ -40,6 +40,11 @@ TARGET_SETS = {
         "obelisk.ufunction-chain.snapshot.v1:PrimalItem.CraftBlueprint",
         "obelisk.ufunction-chain.snapshot.v1:PrimalItem.UseItemOntoItem",
     ),
+    "item-return-only-policy-slice": (
+        "obelisk.ufunction-chain.snapshot.v1:PrimalItem.AllowEquipItem",
+        "obelisk.ufunction-chain.snapshot.v1:PrimalItem.CanRepair",
+        "obelisk.ufunction-chain.snapshot.v1:PrimalItem.UseItemOntoItem",
+    ),
     "inventory-action-compact-intake": (
         "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerRequestInventoryUseItem",
         "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerRequestInventoryUseItemWithActor",

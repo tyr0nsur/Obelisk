@@ -1,6 +1,6 @@
 # Current Agent Handoff
 
-Updated: 2026-05-29
+Updated: 2026-05-30
 
 This active routing table keeps only next-round facts; put durable evidence in
 `docs/research/`, resume facts in `COMPACT_CONTEXT.md`, and old detail in `HISTORY-*.md`.
@@ -88,6 +88,8 @@ This active routing table keeps only next-round facts; put durable evidence in
   `docs/research/2026-05-29-inventory-action-redacted-signature-readiness.md`, and
   `docs/research/2026-05-29-mission-reflection-internal-readiness.md` for exact target
   counts, blockers, and accepted/rejected promotion claims.
+- Canonical offline roots for post-RC modules: Mission compact refresh `20260530T020021Z`;
+  Item `20260529T141900Z`/`20260530T013606Z`; Transfer `20260529T154200Z`.
 - Transfer second-source evidence is accepted as layout-only. No public Transfer SDK,
   object identity, payload decoding, mutation, return override, runtime hooks, or
   `ResourceHandle` claim is promoted.

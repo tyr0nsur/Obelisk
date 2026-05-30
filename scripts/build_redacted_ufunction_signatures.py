@@ -20,6 +20,7 @@ DEFAULT_SNAPSHOT_ROOT = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
 SUPPORTED_SNAPSHOT_SCHEMA = "obelisk.ufunction-chain.snapshot.v1"
 OUTPUT_SCHEMA = "obelisk.redacted-ufunction-signatures.v1"
 TARGET_SET_COVERAGE_SCHEMA = "obelisk.redacted-ufunction-target-set-coverage.v1"
+ITEM_RETURN_ONLY_POLICY_SCHEMA = "obelisk.item-return-only-policy-slice.v1"
 PROTECTED_SERVER_ROOT = Path("/servidor/ark")
 APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
 
@@ -38,6 +39,59 @@ KNOWN_PROPERTY_FLAG_BITS = (
     | CPF_REFERENCE_PARM
 )
 CANDIDATE_UOBJECT_STATUS = "candidate-uobject"
+ITEM_RETURN_ONLY_INPUT_TARGET_SET = "item-compact-intake"
+ITEM_RETURN_ONLY_OUTPUT_TARGET_SET = "item-return-only-policy-slice"
+
+ITEM_RETURN_ONLY_EXPECTED_SHAPES: dict[str, dict[str, Any]] = {
+    "PrimalItem.AllowEquipItem": {
+        "num_parms": 2,
+        "parms_size": 9,
+        "return_value_offset": 0x8,
+        "properties": (
+            ("toInventory", "ObjectProperty"),
+            ("ReturnValue", "BoolProperty"),
+        ),
+    },
+    "PrimalItem.CanRepair": {
+        "num_parms": 2,
+        "parms_size": 2,
+        "return_value_offset": 0x1,
+        "properties": (
+            ("bIgnoreInventoryRequirement", "BoolProperty"),
+            ("ReturnValue", "BoolProperty"),
+        ),
+    },
+    "PrimalItem.CraftBlueprint": {
+        "num_parms": 1,
+        "parms_size": 1,
+        "return_value_offset": 0xFFFF,
+        "properties": (("bConsumeResources", "BoolProperty"),),
+    },
+    "PrimalItem.UseItemOntoItem": {
+        "num_parms": 3,
+        "parms_size": 13,
+        "return_value_offset": 0xC,
+        "properties": (
+            ("DestinationItem", "ObjectProperty"),
+            ("AdditionalData", "IntProperty"),
+            ("ReturnValue", "BoolProperty"),
+        ),
+    },
+}
+
+ITEM_RETURN_ONLY_COPIED_FIELDS = (
+    "PrimalItem.AllowEquipItem.ReturnValue",
+    "PrimalItem.CanRepair.ReturnValue",
+    "PrimalItem.UseItemOntoItem.ReturnValue",
+)
+
+ITEM_RETURN_ONLY_EXCLUDED_REASONS = {
+    "PrimalItem.AllowEquipItem.toInventory": "object_ref_excluded",
+    "PrimalItem.CanRepair.bIgnoreInventoryRequirement": "non_return_bool_excluded",
+    "PrimalItem.CraftBlueprint.bConsumeResources": "craftblueprint_excluded",
+    "PrimalItem.UseItemOntoItem.DestinationItem": "object_ref_excluded",
+    "PrimalItem.UseItemOntoItem.AdditionalData": "non_return_scalar_excluded",
+}
 
 SCALAR_TYPE_BY_CLASS = {
     "BoolProperty": "bool",
@@ -173,6 +227,15 @@ def parse_args() -> argparse.Namespace:
         "--json",
         action="store_true",
         help="Emit machine-readable JSON. Text output is the default.",
+    )
+    parser.add_argument(
+        "--item-return-only-policy-slice",
+        action="store_true",
+        help=(
+            "Emit a focused evidence-only item policy slice that validates "
+            "item-compact-intake and copies only AllowEquipItem/CanRepair/"
+            "UseItemOntoItem ReturnValue bools."
+        ),
     )
     return parser.parse_args()
 
@@ -877,6 +940,224 @@ def build_report(
     }
 
 
+def format_hex(value: int) -> str:
+    return f"0x{value:x}"
+
+
+def require_int_field(payload: dict[str, Any], key: str, target: str) -> int:
+    value = parse_int_value(payload.get(key))
+    if value is None:
+        raise SystemExit(f"{target} missing or invalid {key}")
+    return value
+
+
+def require_candidate_membership(prop: dict[str, Any], target: str, field: str) -> None:
+    for key in ("membership_status", "class_membership_status", "outer_membership_status"):
+        if prop.get(key) != CANDIDATE_UOBJECT_STATUS:
+            raise SystemExit(f"{target}.{field} {key} is not {CANDIDATE_UOBJECT_STATUS}")
+
+
+def require_bool_return_field(target: str, prop: dict[str, Any], return_value_offset: int) -> dict[str, Any]:
+    offset = require_int_field(prop, "offset_internal", f"{target}.ReturnValue")
+    element_size = require_int_field(prop, "element_size", f"{target}.ReturnValue")
+    flags = property_flags(prop)
+    if offset != return_value_offset:
+        raise SystemExit(f"{target}.ReturnValue offset does not match ReturnValueOffset")
+    if element_size != 1:
+        raise SystemExit(f"{target}.ReturnValue is not a one-byte bool")
+    if not has_flag(flags, CPF_RETURN_PARM):
+        raise SystemExit(f"{target}.ReturnValue is not marked ReturnParm")
+    field = classify_property(prop, return_value_offset)
+    if field["direction"] != "return" or field["type"] != "bool":
+        raise SystemExit(f"{target}.ReturnValue is not a copied bool return")
+    if "bool_masks" not in field:
+        raise SystemExit(f"{target}.ReturnValue lacks bool mask evidence")
+    return field
+
+
+def require_item_return_only_shape(target_payload: dict[str, Any], source_snapshot: dict[str, str]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    target_identity = target_payload.get("target")
+    property_chain = target_payload.get("property_chain")
+    if not isinstance(target_identity, dict) or not isinstance(property_chain, dict):
+        raise SystemExit("item policy snapshot missing target identity or property chain")
+    target = target_name(target_identity)
+    expected = ITEM_RETURN_ONLY_EXPECTED_SHAPES.get(target)
+    if expected is None:
+        raise SystemExit(f"unexpected item policy target: {target}")
+    if target_payload.get("status") != "candidate":
+        raise SystemExit(f"{target} is not a candidate UFunction snapshot")
+    if target_payload.get("inspection_mode") != "ufunction":
+        raise SystemExit(f"{target} is not a UFunction inspection snapshot")
+
+    if require_int_field(target_payload, "num_parms", target) != expected["num_parms"]:
+        raise SystemExit(f"{target} NumParms drifted")
+    if require_int_field(target_payload, "parms_size", target) != expected["parms_size"]:
+        raise SystemExit(f"{target} ParmsSize drifted")
+    return_value_offset = require_int_field(target_payload, "return_value_offset", target)
+    if return_value_offset != expected["return_value_offset"]:
+        raise SystemExit(f"{target} ReturnValueOffset drifted")
+
+    properties = property_chain.get("properties")
+    if not isinstance(properties, list):
+        raise SystemExit(f"{target} property_chain.properties is not a list")
+    if parse_int_value(property_chain.get("expected_count")) != len(expected["properties"]):
+        raise SystemExit(f"{target} expected property count drifted")
+    if parse_int_value(property_chain.get("observed_count")) != len(expected["properties"]):
+        raise SystemExit(f"{target} observed property count drifted")
+    if len(properties) != len(expected["properties"]):
+        raise SystemExit(f"{target} property list length drifted")
+
+    copied: list[dict[str, Any]] = []
+    excluded: list[dict[str, Any]] = []
+    for prop, (expected_name, expected_class) in zip(properties, expected["properties"], strict=True):
+        if not isinstance(prop, dict):
+            raise SystemExit(f"{target} property entry is not an object")
+        name = prop.get("name")
+        class_name = prop.get("class_name")
+        if name != expected_name or class_name != expected_class:
+            raise SystemExit(f"{target} property shape drifted: expected {expected_name}:{expected_class}")
+        if prop.get("status") != "candidate":
+            raise SystemExit(f"{target}.{expected_name} is not a candidate property")
+        require_candidate_membership(prop, target, expected_name)
+
+        field_key = f"{target}.{expected_name}"
+        if field_key in ITEM_RETURN_ONLY_COPIED_FIELDS:
+            field = require_bool_return_field(target, prop, return_value_offset)
+            copied.append(
+                {
+                    "target": target,
+                    "field": expected_name,
+                    "copied_field": field_key,
+                    "direction": "return",
+                    "type": "bool",
+                    "offset": format_hex(require_int_field(prop, "offset_internal", field_key)),
+                    "element_size": require_int_field(prop, "element_size", field_key),
+                    "bool_masks": field["bool_masks"],
+                    "source_snapshot": source_snapshot["id"],
+                    "source_snapshot_sha256": source_snapshot["sha256"],
+                    "evidence_status": "copied-return-bool-only",
+                }
+            )
+        else:
+            reason = ITEM_RETURN_ONLY_EXCLUDED_REASONS.get(field_key)
+            if reason is None:
+                raise SystemExit(f"{field_key} has no explicit exclusion reason")
+            excluded.append(
+                {
+                    "target": target,
+                    "field": expected_name,
+                    "excluded_field": field_key,
+                    "reason": reason,
+                    "source_snapshot": source_snapshot["id"],
+                }
+            )
+    return copied, excluded
+
+
+def build_item_return_only_policy_slice(*, snapshot_root: Path = DEFAULT_SNAPSHOT_ROOT) -> dict[str, Any]:
+    paths, missing_targets = snapshot_paths_from_target_sets(snapshot_root, [ITEM_RETURN_ONLY_INPUT_TARGET_SET])
+    if missing_targets:
+        raise SystemExit("item policy manifest missing targets: " + ",".join(missing_targets))
+
+    input_snapshots = [
+        {"id": f"snapshot-{index:04d}", "sha256": file_sha256(path)}
+        for index, path in enumerate(paths, start=1)
+    ]
+    copied: list[dict[str, Any]] = []
+    excluded: list[dict[str, Any]] = []
+    seen_targets: set[str] = set()
+    for path, source_snapshot in zip(paths, input_snapshots, strict=True):
+        payload = load_json_file("snapshot", path)
+        targets = require_snapshot_payload(payload, path)
+        for target_payload in targets:
+            target_identity = target_payload.get("target")
+            if not isinstance(target_identity, dict):
+                raise SystemExit(f"snapshot missing target identity: {path}")
+            target = target_name(target_identity)
+            if target in seen_targets:
+                raise SystemExit(f"duplicate item policy target: {target}")
+            seen_targets.add(target)
+            target_copied, target_excluded = require_item_return_only_shape(target_payload, source_snapshot)
+            copied.extend(target_copied)
+            excluded.extend(target_excluded)
+
+    expected_input_targets = expand_ufunction_targets([ITEM_RETURN_ONLY_INPUT_TARGET_SET])
+    expected_output_targets = expand_ufunction_targets([ITEM_RETURN_ONLY_OUTPUT_TARGET_SET])
+    emitted_copied_fields = [entry["copied_field"] for entry in copied]
+    emitted_excluded_fields = [entry["excluded_field"] for entry in excluded]
+    missing_input_targets = [target for target in expected_input_targets if target not in seen_targets]
+    unexpected_input_targets = [target for target in seen_targets if target not in expected_input_targets]
+    missing_copied_fields = [field for field in ITEM_RETURN_ONLY_COPIED_FIELDS if field not in emitted_copied_fields]
+    unexpected_copied_fields = [field for field in emitted_copied_fields if field not in ITEM_RETURN_ONLY_COPIED_FIELDS]
+    missing_excluded_fields = [
+        field for field in ITEM_RETURN_ONLY_EXCLUDED_REASONS if field not in emitted_excluded_fields
+    ]
+    unexpected_excluded_fields = [
+        field for field in emitted_excluded_fields if field not in ITEM_RETURN_ONLY_EXCLUDED_REASONS
+    ]
+    output_targets = [entry["target"] for entry in copied]
+    missing_output_targets = [target for target in expected_output_targets if target not in output_targets]
+    unexpected_output_targets = [target for target in output_targets if target not in expected_output_targets]
+    blockers = [
+        *[f"missing_input_target:{target}" for target in missing_input_targets],
+        *[f"unexpected_input_target:{target}" for target in unexpected_input_targets],
+        *[f"missing_copied_field:{field}" for field in missing_copied_fields],
+        *[f"unexpected_copied_field:{field}" for field in unexpected_copied_fields],
+        *[f"missing_excluded_field:{field}" for field in missing_excluded_fields],
+        *[f"unexpected_excluded_field:{field}" for field in unexpected_excluded_fields],
+        *[f"missing_output_target:{target}" for target in missing_output_targets],
+        *[f"unexpected_output_target:{target}" for target in unexpected_output_targets],
+    ]
+    if blockers:
+        raise SystemExit("item return-only policy slice failed closed: " + ",".join(blockers))
+
+    return {
+        "schema": ITEM_RETURN_ONLY_POLICY_SCHEMA,
+        "generated_from": {
+            "snapshot_schema": SUPPORTED_SNAPSHOT_SCHEMA,
+            "input_snapshots": input_snapshots,
+        },
+        "snapshot_root": "redacted",
+        "input_target_set": ITEM_RETURN_ONLY_INPUT_TARGET_SET,
+        "output_target_set": ITEM_RETURN_ONLY_OUTPUT_TARGET_SET,
+        "policy_status": "evidence-only",
+        "missing_targets": [],
+        "coverage": {
+            "status": "complete",
+            "input_targets": expected_input_targets,
+            "copied_targets": expected_output_targets,
+            "copied_fields": list(ITEM_RETURN_ONLY_COPIED_FIELDS),
+            "excluded_fields": list(ITEM_RETURN_ONLY_EXCLUDED_REASONS),
+        },
+        "copied_return_bools": copied,
+        "excluded_fields": excluded,
+        "safety_summary": {
+            "artifact_status": "evidence_only",
+            "promotion_ready": False,
+            "intended_use": "offline_review_only",
+            "copied_bool_count": len(copied),
+            "excluded_field_count": len(excluded),
+            "explicitly_excluded": [
+                "CraftBlueprint",
+                "CanRepair.bIgnoreInventoryRequirement",
+                "CraftBlueprint.bConsumeResources",
+                "toInventory",
+                "DestinationItem",
+                "AdditionalData",
+                "object_refs",
+                "mutation",
+                "return_override",
+                "public_sdk",
+            ],
+        },
+        "non_claims": [
+            "does not promote public SDK callbacks or public metadata helpers",
+            "does not expose UE pointers, object identity, class identity, raw params, mutation, or return overrides",
+            "does not copy CraftBlueprint, bIgnoreInventoryRequirement, bConsumeResources, toInventory, DestinationItem, or AdditionalData",
+        ],
+    }
+
+
 def print_text(report: dict[str, Any]) -> None:
     for signature in report["signatures"]:
         print(
@@ -906,17 +1187,22 @@ def print_text(report: dict[str, Any]) -> None:
 
 def main() -> int:
     args = parse_args()
-    report = build_report(
-        snapshot_root=args.snapshot_root,
-        target_sets=args.target_set,
-        source_target_sets=args.source_target_set,
-        snapshots=args.snapshot,
-    )
+    if args.item_return_only_policy_slice:
+        if args.target_set or args.source_target_set or args.snapshot:
+            raise SystemExit("--item-return-only-policy-slice cannot be combined with target-set or snapshot inputs")
+        report = build_item_return_only_policy_slice(snapshot_root=args.snapshot_root)
+    else:
+        report = build_report(
+            snapshot_root=args.snapshot_root,
+            target_sets=args.target_set,
+            source_target_sets=args.source_target_set,
+            snapshots=args.snapshot,
+        )
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:
         print_text(report)
-    return 1 if report["missing_targets"] else 0
+    return 1 if report.get("missing_targets") else 0
 
 
 if __name__ == "__main__":

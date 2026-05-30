@@ -43,6 +43,24 @@ After RC, start with a fixture-only `ue/TransferReflection` recognizer slice for
 Do not add a hook, dispatcher, public Transfer SDK, struct payload decoder, identity, or
 return override in that first slice.
 
+## 2026-05-30 Fixture Hardening
+
+The internal/test-only `ue/TransferReflection` slice now validates the exact copied-scalar
+candidate observed in the sanitized transfer UFunction snapshot:
+
+- `ServerTransferredPlayerConfirmationResult` object index `10494`, `Function` class object
+  index `518`, and `ShooterPlayerController` outer object index `50`.
+- `bAccept` property object index `10495`, `BoolProperty` class object index `532`,
+  `Offset_Internal=0`, `ElementSize=1`, `ArrayDim=1`, `ParmsSize=1`, and property flags
+  `0x1040000280`.
+- `UBoolProperty` tail bytes at `+0x70..+0x73`: field size `0x01`, byte offset `0x00`,
+  byte mask `0x01`, field mask `0xff`, and `native_bool=false`.
+
+The exact object indices are metadata-recognition guards only, not gameplay/resource
+identity. The tests still expose only a one-byte parameter range for the matched field.
+They do not add runtime hook wiring, a dispatcher, mutation, return override, public ABI,
+or server observation.
+
 ## Non-Claims
 
 This note does not promote transfer to the RC, does not promote any public transfer API,

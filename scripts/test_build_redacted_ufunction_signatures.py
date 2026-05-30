@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import json
 import hashlib
+import contextlib
+import io
 import sys
 import tempfile
 import unittest
@@ -181,6 +183,84 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         self.assertEqual("candidate_only", report["safety_summary"]["artifact_status"])
         self.assertIs(False, report["safety_summary"]["promotion_ready"])
         self.assertEqual("offline_review_only", report["safety_summary"]["intended_use"])
+
+    def test_item_return_only_policy_slice_emits_only_allowed_return_bools(self) -> None:
+        fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
+
+        report = tool.build_item_return_only_policy_slice(snapshot_root=fixture_root)
+
+        self.assertEqual(tool.ITEM_RETURN_ONLY_POLICY_SCHEMA, report["schema"])
+        self.assertEqual("redacted", report["snapshot_root"])
+        self.assertEqual("item-compact-intake", report["input_target_set"])
+        self.assertEqual("item-return-only-policy-slice", report["output_target_set"])
+        self.assertEqual("complete", report["coverage"]["status"])
+        self.assertEqual(
+            [
+                "PrimalItem.AllowEquipItem.ReturnValue",
+                "PrimalItem.CanRepair.ReturnValue",
+                "PrimalItem.UseItemOntoItem.ReturnValue",
+            ],
+            [entry["copied_field"] for entry in report["copied_return_bools"]],
+        )
+        self.assertEqual(
+            ["0x8", "0x1", "0xc"],
+            [entry["offset"] for entry in report["copied_return_bools"]],
+        )
+        self.assertTrue(all(entry["type"] == "bool" for entry in report["copied_return_bools"]))
+        self.assertTrue(all(entry["direction"] == "return" for entry in report["copied_return_bools"]))
+        self.assertTrue(all(entry["bool_masks"] for entry in report["copied_return_bools"]))
+        self.assertEqual(
+            [
+                "PrimalItem.AllowEquipItem.toInventory",
+                "PrimalItem.CanRepair.bIgnoreInventoryRequirement",
+                "PrimalItem.CraftBlueprint.bConsumeResources",
+                "PrimalItem.UseItemOntoItem.DestinationItem",
+                "PrimalItem.UseItemOntoItem.AdditionalData",
+            ],
+            [entry["excluded_field"] for entry in report["excluded_fields"]],
+        )
+        self.assertEqual(3, report["safety_summary"]["copied_bool_count"])
+        self.assertEqual(5, report["safety_summary"]["excluded_field_count"])
+        self.assertIs(False, report["safety_summary"]["promotion_ready"])
+        self.assertIn("public_sdk", report["safety_summary"]["explicitly_excluded"])
+        self.assertIn("return_override", report["safety_summary"]["explicitly_excluded"])
+        self.assertIn("object_refs", report["safety_summary"]["explicitly_excluded"])
+
+        serialized = json.dumps(report)
+        self.assertNotIn(str(fixture_root), serialized)
+        self.assertNotIn("tests/fixtures/ufunction_snapshots", serialized)
+        copied_serialized = json.dumps(report["copied_return_bools"])
+        self.assertNotIn("bIgnoreInventoryRequirement", copied_serialized)
+        self.assertNotIn("bConsumeResources", copied_serialized)
+        self.assertNotIn("toInventory", copied_serialized)
+        self.assertNotIn("DestinationItem", copied_serialized)
+        self.assertNotIn("AdditionalData", copied_serialized)
+
+    def test_item_return_only_target_set_excludes_craftblueprint(self) -> None:
+        from reflection_target_sets import TARGET_SETS
+
+        self.assertEqual(
+            (
+                "obelisk.ufunction-chain.snapshot.v1:PrimalItem.AllowEquipItem",
+                "obelisk.ufunction-chain.snapshot.v1:PrimalItem.CanRepair",
+                "obelisk.ufunction-chain.snapshot.v1:PrimalItem.UseItemOntoItem",
+            ),
+            TARGET_SETS["item-return-only-policy-slice"],
+        )
+
+    def test_item_return_only_cli_mode_returns_success(self) -> None:
+        original_argv = sys.argv
+        try:
+            sys.argv = [
+                "build_redacted_ufunction_signatures.py",
+                "--item-return-only-policy-slice",
+                "--json",
+            ]
+            with contextlib.redirect_stdout(io.StringIO()) as stdout:
+                self.assertEqual(0, tool.main())
+            self.assertIn(tool.ITEM_RETURN_ONLY_POLICY_SCHEMA, stdout.getvalue())
+        finally:
+            sys.argv = original_argv
 
     def test_inventory_action_compact_target_set_stays_candidate_only_and_redacted(self) -> None:
         fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
