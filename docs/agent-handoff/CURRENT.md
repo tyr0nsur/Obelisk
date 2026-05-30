@@ -125,7 +125,7 @@ recovery context is not active routing for the current head; use
   distinct inventory-item event kinds for `AllowEquipItem`, `CanRepair`, and
   `UseItemOntoItem`, all `ReturnValue` only. Do not reuse
   `INVENTORY_USE_CHECK`, do not map `CanRepair.bIgnoreInventoryRequirement` to
-  `IGNORE_COOLDOWN`, and do not backfill the frozen `v0.1.0-rc.1` scope.
+  `IGNORE_COOLDOWN`, and do not backfill the frozen `v0.1.0-rc.2` scope.
 - Mission copied-bool observer remains internal and non-authoritative. Mission bool-tail
   evidence is consume-only non-promotion: consume mode accepts and promote mode blocks.
 - Mission bool-tail evidence preserves `bool_field_size=1`, `bool_byte_offset=0`,

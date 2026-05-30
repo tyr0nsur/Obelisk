@@ -2,9 +2,10 @@
 
 `oProcessTimer` is a minimal first-party example for Obelisk process-local timers.
 
-Release-scope caveat: this plugin and the timer ABI are first-stable `v0.1.0` core
-reference material. They are not part of the already-published `v0.1.0-rc.1` public
-surface and do not reinterpret that RC.
+Release-scope caveat: this plugin and the timer ABI are part of the current
+`v0.1.0-rc.2` core runtime surface. They remain process-local core primitives and do not
+promote UE timers, gameplay/module timers, identity, command routing, or shared-cluster
+state.
 
 It demonstrates only the timer ABI:
 

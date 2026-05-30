@@ -615,7 +615,7 @@ __attribute__((visibility("default"))) bool ObeliskPlugin_GetInfo(ObeliskPluginM
     out->struct_size = sizeof(ObeliskPluginMetadata);
     out->plugin_id = "install_layout_c_abi_consumer";
     out->name = "Install Layout C ABI Consumer";
-    out->version = "0.1.0-rc.1";
+    out->version = "0.1.0-rc.2";
     out->config_file = "config.json";
     out->default_config_json = kDefaultConfig;
     return true;

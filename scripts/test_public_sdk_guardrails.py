@@ -2016,7 +2016,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         for path in scanned_files:
             text = path.read_text(encoding="utf-8")
             for token in forbidden:
-                if path.relative_to(REPO_ROOT).as_posix().startswith("plugins/oProcessTimer/") and token in CORE_TIMER_EXAMPLE_TOKENS:
+                relative = path.relative_to(REPO_ROOT).as_posix()
+                if relative.startswith("plugins/oProcessTimer/") and token in CORE_TIMER_EXAMPLE_TOKENS:
+                    continue
+                if relative.startswith("plugins/oChatAudit/") and token in CORE_TIMER_PUBLIC_TOKENS:
                     continue
                 if token in text:
                     offenders.append(f"{path.relative_to(REPO_ROOT)}: {token}")
@@ -2061,7 +2064,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         for path in scanned_files:
             text = path.read_text(encoding="utf-8")
             for token in forbidden:
-                if path.relative_to(REPO_ROOT).as_posix().startswith("plugins/oProcessTimer/") and token in CORE_TIMER_EXAMPLE_TOKENS:
+                relative = path.relative_to(REPO_ROOT).as_posix()
+                if relative.startswith("plugins/oProcessTimer/") and token in CORE_TIMER_EXAMPLE_TOKENS:
+                    continue
+                if relative.startswith("plugins/oChatAudit/") and token in CORE_TIMER_PUBLIC_TOKENS:
                     continue
                 if token in text:
                     offenders.append(f"{path.relative_to(REPO_ROOT)}: {token}")
@@ -2404,7 +2410,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         for path in scanned_files:
             text = path.read_text(encoding="utf-8")
             for token in forbidden:
-                if path.relative_to(REPO_ROOT).as_posix().startswith("plugins/oProcessTimer/") and token in CORE_TIMER_EXAMPLE_TOKENS:
+                relative = path.relative_to(REPO_ROOT).as_posix()
+                if relative.startswith("plugins/oProcessTimer/") and token in CORE_TIMER_EXAMPLE_TOKENS:
+                    continue
+                if relative.startswith("plugins/oChatAudit/") and token in CORE_TIMER_PUBLIC_TOKENS:
                     continue
                 if token in text:
                     offenders.append(f"{path.relative_to(REPO_ROOT)}: {token}")

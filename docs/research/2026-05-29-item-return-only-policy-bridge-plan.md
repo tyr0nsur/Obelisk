@@ -5,7 +5,8 @@ Date: 2026-05-29
 ## Objective
 
 Define the next safe internal step for `item-compact-intake` after accepted offline layout
-evidence, without expanding the `v0.1.0-rc.1` public ABI or promoting a public Items SDK.
+evidence, without expanding the published `v0.1.0-rc.2` public ABI or promoting a public
+Items SDK.
 
 ## Current Evidence
 

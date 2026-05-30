@@ -205,3 +205,50 @@ if(TARGET oPolicyAudit)
         COMMAND sdk_consumer_fixture "$<TARGET_FILE:oPolicyAudit>" oPolicyAudit
     )
 endif()
+
+if(TARGET oChatAudit)
+    add_test(
+        NAME SdkConsumerFixtureOChatAudit
+        COMMAND sdk_consumer_fixture "$<TARGET_FILE:oChatAudit>" oChatAudit
+    )
+
+    add_test(
+        NAME SdkConsumerFixtureOChatAuditActive
+        COMMAND sdk_consumer_fixture "$<TARGET_FILE:oChatAudit>" oChatAudit active-chat-audit
+    )
+
+    add_test(
+        NAME SdkConsumerFixtureOChatAuditDoubleShutdown
+        COMMAND sdk_consumer_fixture "$<TARGET_FILE:oChatAudit>" oChatAudit active-chat-audit-double-shutdown
+    )
+
+    add_test(
+        NAME SdkConsumerFixtureOChatAuditNoChatCapability
+        COMMAND sdk_consumer_fixture "$<TARGET_FILE:oChatAudit>" oChatAudit no-chat-message-capability
+    )
+
+    add_test(
+        NAME SdkConsumerFixtureOChatAuditNoTimerCapability
+        COMMAND sdk_consumer_fixture "$<TARGET_FILE:oChatAudit>" oChatAudit no-timer-capability
+    )
+
+    add_test(
+        NAME SdkConsumerFixtureOChatAuditRejectsZeroOwnerToken
+        COMMAND sdk_consumer_fixture "$<TARGET_FILE:oChatAudit>" oChatAudit zero-owner-token
+    )
+
+    add_test(
+        NAME SdkConsumerFixtureOChatAuditRejectsInvalidConfig
+        COMMAND sdk_consumer_fixture "$<TARGET_FILE:oChatAudit>" oChatAudit invalid-chat-audit-config
+    )
+
+    add_test(
+        NAME SdkConsumerFixtureOChatAuditChatRegistrationFailure
+        COMMAND sdk_consumer_fixture "$<TARGET_FILE:oChatAudit>" oChatAudit fail-chat-message-registration
+    )
+
+    add_test(
+        NAME SdkConsumerFixtureOChatAuditTimerRegistrationFailure
+        COMMAND sdk_consumer_fixture "$<TARGET_FILE:oChatAudit>" oChatAudit fail-timer-registration
+    )
+endif()

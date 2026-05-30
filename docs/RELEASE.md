@@ -256,7 +256,7 @@ If internal module recognizer work resumes after the RC, the current order is It
 return-only policy, Mission copied-bool observer, then Transfer `bAccept`. That ordering
 is post-RC planning only and does not promote a public SDK/API surface.
 
-## Review Artifacts
+Review artifacts:
 
 Runtime-observer log summaries are review artifacts, not a release gate and not
 second-source promotion evidence. Use them only on copied or sanitized logs when reviewing

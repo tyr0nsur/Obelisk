@@ -29,13 +29,18 @@ scheduler state, persistent handles, or cluster coordination.
 touching `ProcessEvent`, UE internals, object identity, or pointer-derived data.
 `oChatLogger` demonstrates the minimal copied `ChatMessageEvent` surface by logging only
 event metadata and copied message size, not player identity or raw chat payload text.
+`oChatAudit` combines the copied `ChatMessageEvent` surface with process-local
+owner-token timers to emit a bounded periodic digest of chat counts, send modes, and
+message-size buckets. It does not log raw chat text, player/sender identity, UE pointers,
+commands, permissions, moderation decisions, mutations, replies, persistent handles, or
+cross-process/cluster audit state.
 Their default configs are safe-disabled and cluster-scoped. They are not part of the first
 release scope or the default top-level build; build them only when explicitly investigating
 experimental examples:
 
 ```bash
 cmake -S . -B build -DOBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON
-cmake --build build --target oPolicyAudit oChatLogger -j"$(nproc)"
+cmake --build build --target oPolicyAudit oChatLogger oChatAudit -j"$(nproc)"
 ```
 
 ```json
@@ -65,6 +70,28 @@ cmake --build build --target oPolicyAudit oChatLogger -j"$(nproc)"
 events for each mode `0..3`. It records only sequence, send mode, copied-payload flag,
 message size, per-mode count, and first-observed status; it does not log raw chat text,
 sender identity, or UE pointers.
+
+`oChatAudit` config:
+
+```json
+{
+  "enabled": false,
+  "allow_all_instances": false,
+  "instance_allowlist": [],
+  "chat_audit": {
+    "enabled": false,
+    "digest_interval_ms": 60000,
+    "log_on_shutdown": true,
+    "max_message_size_bucket": 4096
+  }
+}
+```
+
+When active, `oChatAudit` requires the public chat-event capability, timer capability, and
+a non-zero owner token. It registers exactly one chat callback and one repeating timer,
+then unregisters the timer before the chat callback during shutdown. Digest output is
+process-local metadata only: accepted/malformed event counts, per-mode counts, total and
+max byte sizes, bounded size buckets, and overflow count.
 
 ## Policy
 

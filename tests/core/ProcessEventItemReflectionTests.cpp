@@ -185,6 +185,50 @@ namespace
         return invocation;
     }
 
+    Obelisk::UE::ItemReflection::ItemInvocation MakeValidUseItemOntoItemInvocation(uint8_t& returnValue)
+    {
+        Obelisk::UE::ItemReflection::ItemInvocation invocation;
+        invocation.Function = Obelisk::UE::ItemReflection::ItemFunction::UseItemOntoItem;
+        invocation.FunctionNameIndex = kUseItemOntoItemNameIndex;
+        invocation.OuterNameIndex = kPrimalItemNameIndex;
+        invocation.HasParameterRanges = true;
+        invocation.Fields.push_back(MakeField(Obelisk::UE::ItemReflection::ItemField::DestinationItem,
+                                              kDestinationItemNameIndex,
+                                              0x00,
+                                              sizeof(uint64_t),
+                                              false));
+        invocation.Fields.push_back(MakeField(Obelisk::UE::ItemReflection::ItemField::AdditionalData,
+                                              kAdditionalDataNameIndex,
+                                              0x08,
+                                              sizeof(int32_t),
+                                              false));
+        invocation.Fields.push_back(MakeField(Obelisk::UE::ItemReflection::ItemField::ReturnValue,
+                                              kReturnValueNameIndex,
+                                              0x0c,
+                                              sizeof(uint8_t),
+                                              true,
+                                              &returnValue,
+                                              sizeof(returnValue)));
+        return invocation;
+    }
+
+    Obelisk::UE::ItemReflection::ItemInvocation MakeCraftBlueprintInvocation(uint8_t& consumeResources)
+    {
+        Obelisk::UE::ItemReflection::ItemInvocation invocation;
+        invocation.Function = Obelisk::UE::ItemReflection::ItemFunction::CraftBlueprint;
+        invocation.FunctionNameIndex = kCraftBlueprintNameIndex;
+        invocation.OuterNameIndex = kPrimalItemNameIndex;
+        invocation.HasParameterRanges = true;
+        invocation.Fields.push_back(MakeField(Obelisk::UE::ItemReflection::ItemField::BConsumeResources,
+                                              kBConsumeResourcesNameIndex,
+                                              0x00,
+                                              sizeof(uint8_t),
+                                              true,
+                                              &consumeResources,
+                                              sizeof(consumeResources)));
+        return invocation;
+    }
+
     void TestGateEvaluation()
     {
         Require(EvaluateGate(nullptr, true, true, true, kSupportedShooterGameServerSha256.data()).Status ==
@@ -628,6 +672,151 @@ namespace
                 "exhausted item return reservation left copied output");
     }
 
+    void TestBuildAndReserveItemReturnObservationFailsClosedBeforeReservation()
+    {
+        uint8_t returnValue = 1;
+        Attempt matched;
+        matched.Status = AttemptStatus::Matched;
+        matched.Invocation = MakeValidAllowEquipItemInvocation(returnValue);
+
+        {
+            std::atomic<uint64_t> counter{0};
+            uint64_t observationNumber = 99;
+            CopiedItemObservation observation;
+            observation.BoolCount = 1;
+            observation.BoolStorage[0].Value = true;
+
+            Require(!TryBuildAndReserveItemReturnObservationForMatchedAttempt(
+                        matched, counter, 0, observationNumber, observation),
+                    "zero-budget item return observation reserved output");
+            Require(counter.load() == 0, "zero-budget item return observation advanced counter");
+            Require(observationNumber == 0, "zero-budget item return reservation left observation number");
+            Require(observation.BoolCount == 0, "zero-budget item return reservation left copied output");
+        }
+
+        {
+            Attempt rejected = matched;
+            rejected.Status = AttemptStatus::Rejected;
+
+            std::atomic<uint64_t> counter{0};
+            uint64_t observationNumber = 99;
+            CopiedItemObservation observation;
+            observation.BoolCount = 1;
+            observation.BoolStorage[0].Value = true;
+
+            Require(!TryBuildAndReserveItemReturnObservationForMatchedAttempt(
+                        rejected, counter, 1, observationNumber, observation),
+                    "rejected item return attempt reserved output");
+            Require(counter.load() == 0, "rejected item return attempt advanced counter");
+            Require(observationNumber == 0, "rejected item return attempt left observation number");
+            Require(observation.BoolCount == 0, "rejected item return attempt left copied output");
+        }
+    }
+
+    void TestReturnOnlyHelpersRejectUnsupportedFunctions()
+    {
+        uint8_t returnValue = 1;
+        uint8_t consumeResources = 1;
+
+        Attempt craftBlueprint;
+        craftBlueprint.Status = AttemptStatus::Matched;
+        craftBlueprint.Invocation = MakeCraftBlueprintInvocation(consumeResources);
+
+        CopiedItemObservation observation;
+        observation.BoolCount = 1;
+        observation.BoolStorage[0].Value = true;
+        Require(!TryBuildCopiedItemReturnObservationAfterOriginal(true, craftBlueprint, observation),
+                "CraftBlueprint built post-original item return observation");
+        Require(observation.BoolCount == 0, "CraftBlueprint left post-original copied output");
+
+        std::atomic<uint64_t> counter{0};
+        uint64_t observationNumber = 99;
+        observation.BoolCount = 1;
+        observation.BoolStorage[0].Value = true;
+        Require(!TryBuildAndReserveItemReturnObservationForMatchedAttempt(
+                    craftBlueprint, counter, 1, observationNumber, observation),
+                "CraftBlueprint reserved item return observation");
+        Require(counter.load() == 0, "CraftBlueprint advanced item return observation counter");
+        Require(observationNumber == 0, "CraftBlueprint left item return observation number");
+        Require(observation.BoolCount == 0, "CraftBlueprint left reserved copied output");
+
+        Attempt unmapped;
+        unmapped.Status = AttemptStatus::Matched;
+        unmapped.Invocation = MakeValidAllowEquipItemInvocation(returnValue);
+        unmapped.Invocation.Function = static_cast<Obelisk::UE::ItemReflection::ItemFunction>(99);
+        unmapped.Invocation.FunctionNameIndex = 9999;
+
+        observation.BoolCount = 1;
+        observation.BoolStorage[0].Value = true;
+        Require(!TryBuildCopiedItemReturnObservationAfterOriginal(true, unmapped, observation),
+                "unmapped item function built post-original item return observation");
+        Require(observation.BoolCount == 0, "unmapped item function left post-original copied output");
+
+        observationNumber = 99;
+        observation.BoolCount = 1;
+        observation.BoolStorage[0].Value = true;
+        Require(!TryBuildAndReserveItemReturnObservationForMatchedAttempt(
+                    unmapped, counter, 1, observationNumber, observation),
+                "unmapped item function reserved item return observation");
+        Require(counter.load() == 0, "unmapped item function advanced item return observation counter");
+        Require(observationNumber == 0, "unmapped item function left item return observation number");
+        Require(observation.BoolCount == 0, "unmapped item function left reserved copied output");
+    }
+
+    void TestReturnOnlyHelpersRejectMalformedUseItemOntoItem()
+    {
+        uint8_t returnValue = 1;
+        Attempt malformed;
+        malformed.Status = AttemptStatus::Matched;
+        malformed.Invocation = MakeValidUseItemOntoItemInvocation(returnValue);
+
+        malformed.Invocation.Fields[2].Offset = 0x08;
+        CopiedItemObservation observation;
+        observation.BoolCount = 1;
+        observation.BoolStorage[0].Value = true;
+        Require(!TryBuildCopiedItemReturnObservationAfterOriginal(true, malformed, observation),
+                "malformed UseItemOntoItem ReturnValue offset built post-original item return observation");
+        Require(observation.BoolCount == 0,
+                "malformed UseItemOntoItem ReturnValue offset left post-original copied output");
+
+        std::atomic<uint64_t> counter{0};
+        uint64_t observationNumber = 99;
+        observation.BoolCount = 1;
+        observation.BoolStorage[0].Value = true;
+        Require(!TryBuildAndReserveItemReturnObservationForMatchedAttempt(
+                    malformed, counter, 1, observationNumber, observation),
+                "malformed UseItemOntoItem ReturnValue offset reserved item return observation");
+        Require(counter.load() == 0,
+                "malformed UseItemOntoItem ReturnValue offset advanced item return observation counter");
+        Require(observationNumber == 0,
+                "malformed UseItemOntoItem ReturnValue offset left item return observation number");
+        Require(observation.BoolCount == 0,
+                "malformed UseItemOntoItem ReturnValue offset left reserved copied output");
+
+        malformed.Invocation = MakeValidUseItemOntoItemInvocation(returnValue);
+        malformed.Invocation.Fields[0].ExposesRange = true;
+        malformed.Invocation.Fields[0].Range = {&returnValue, sizeof(returnValue)};
+        observation.BoolCount = 1;
+        observation.BoolStorage[0].Value = true;
+        Require(!TryBuildCopiedItemReturnObservationAfterOriginal(true, malformed, observation),
+                "forged UseItemOntoItem object range built post-original item return observation");
+        Require(observation.BoolCount == 0,
+                "forged UseItemOntoItem object range left post-original copied output");
+
+        observationNumber = 99;
+        observation.BoolCount = 1;
+        observation.BoolStorage[0].Value = true;
+        Require(!TryBuildAndReserveItemReturnObservationForMatchedAttempt(
+                    malformed, counter, 1, observationNumber, observation),
+                "forged UseItemOntoItem object range reserved item return observation");
+        Require(counter.load() == 0,
+                "forged UseItemOntoItem object range advanced item return observation counter");
+        Require(observationNumber == 0,
+                "forged UseItemOntoItem object range left item return observation number");
+        Require(observation.BoolCount == 0,
+                "forged UseItemOntoItem object range left reserved copied output");
+    }
+
     void TestInvalidItemReturnObservationDoesNotReserveBudget()
     {
         uint8_t invalidReturnValue = 2;
@@ -995,6 +1184,9 @@ int main()
     TestBuildsCopiedReturnObservationOnlyForMatchedAttempts();
     TestBuildsCopiedReturnObservationOnlyAfterOriginal();
     TestBuildAndReserveItemReturnObservationForMatchedAttempt();
+    TestBuildAndReserveItemReturnObservationFailsClosedBeforeReservation();
+    TestReturnOnlyHelpersRejectUnsupportedFunctions();
+    TestReturnOnlyHelpersRejectMalformedUseItemOntoItem();
     TestInvalidItemReturnObservationDoesNotReserveBudget();
     TestRejectsMalformedReturnOnlyShapes();
     TestRejectsNonCanonicalBoolBytes();

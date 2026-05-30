@@ -1249,6 +1249,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
                 r"if\(OBELISK_BUILD_EXPERIMENTAL_PLUGINS\)\s+"
                 r"add_subdirectory\(plugins/oPolicyAudit\)\s+"
                 r"add_subdirectory\(plugins/oChatLogger\)\s+"
+                r"add_subdirectory\(plugins/oChatAudit\)\s+"
                 r"endif\(\)",
                 re.M,
             ),

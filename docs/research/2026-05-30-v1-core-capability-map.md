@@ -2,18 +2,19 @@
 
 ## Objective
 
-Define the post-`v0.1.0-rc.1` direction toward a broader production-ready Obelisk core
+Define the post-`v0.1.0-rc.2` direction toward a broader production-ready Obelisk core
 that can later support ArkApi-style plugin replacement on Linux without exposing UE4
 internals or unsafe memory-derived handles.
 
 ## Baseline
 
-`v0.1.0-rc.1` is the published core-first RC baseline. It proves the Linux runtime,
+`v0.1.0-rc.2` is the published core-first RC baseline. It proves the Linux runtime,
 ProcessEvent hook infrastructure, plugin lifecycle, install layout, `oBaseEvents`, copied
-`GameplayPolicyEvent`, minimal copied `ChatMessageEvent`, and metadata-only descriptors.
+`GameplayPolicyEvent`, minimal copied `ChatMessageEvent`, metadata-only descriptors, and
+process-local owner-token timers.
 
 The RC does not promote public player, tribe, dino, item, inventory, structure, mission,
-transfer, admin, command, permission, timer, economy, database, mutation, return override,
+transfer, admin, command, permission, economy, database, mutation, return override,
 UE lookup, or `ResourceHandle` APIs.
 
 ## Capability Families

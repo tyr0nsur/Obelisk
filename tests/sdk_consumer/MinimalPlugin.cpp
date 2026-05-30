@@ -397,7 +397,7 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_GetInfo(Obe
         out->struct_size = sizeof(ObeliskPluginMetadata);
         out->plugin_id = "sdk_consumer_minimal";
         out->name = "SDK Consumer Minimal";
-        out->version = "0.1.0-rc.1";
+        out->version = "0.1.0-rc.2";
         out->config_file = "config.json";
         out->default_config_json = kDefaultConfig;
         return true;
