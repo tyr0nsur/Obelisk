@@ -30,6 +30,7 @@ namespace Obelisk::Core
         void UnloadAll();
         uint64_t ApiCapabilitiesForTesting() const;
         static void SetNextPluginOwnerTokenForTesting(uint64_t nextOwnerToken);
+        static void SetNextChatMessageSequenceForTesting(uint64_t nextSequence);
 
     private:
         struct PluginInfo {

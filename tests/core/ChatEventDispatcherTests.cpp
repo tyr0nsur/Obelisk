@@ -1,4 +1,5 @@
 #include "core/ChatEventDispatcher.h"
+#include "core/GameplayCallbackScope.h"
 
 #include <atomic>
 #include <chrono>
@@ -45,6 +46,10 @@ namespace
     void ThrowingCallback(const Obelisk::Core::ChatMessageView&, void*)
     {
         throw std::runtime_error("expected test exception");
+    }
+
+    void NoopCallback(const Obelisk::Core::ChatMessageView&, void*)
+    {
     }
 
     Obelisk::Core::ChatMessageView MakeMessage(std::string_view text = "hello from copied chat")
@@ -158,6 +163,61 @@ namespace
         Require(dispatcher.Dispatch(MakeMessage()) == 0, "self-unregistered callback ran twice");
     }
 
+    struct UnregisterOtherCapture
+    {
+        Obelisk::Core::ChatEventDispatcher* dispatcher = nullptr;
+        uint64_t targetRegistrationId = 0;
+        int calls = 0;
+    };
+
+    void UnregisterOtherCallback(const Obelisk::Core::ChatMessageView&, void* userData)
+    {
+        auto* capture = static_cast<UnregisterOtherCapture*>(userData);
+        ++capture->calls;
+        Require(capture->dispatcher != nullptr, "unregister-other callback had no dispatcher");
+        Require(capture->dispatcher->Unregister(capture->targetRegistrationId),
+                "unregister-other callback failed to remove target");
+    }
+
+    struct RemovedSnapshotState
+    {
+        int calls = 0;
+        int destroys = 0;
+    };
+
+    void RemovedSnapshotCallback(const Obelisk::Core::ChatMessageView&, void* userData)
+    {
+        auto* state = static_cast<RemovedSnapshotState*>(userData);
+        ++state->calls;
+    }
+
+    void CountDestroy(void* userData)
+    {
+        auto* state = static_cast<RemovedSnapshotState*>(userData);
+        ++state->destroys;
+    }
+
+    void TestReentrantUnregisterSkipsRemovedSnapshotCallback()
+    {
+        Obelisk::Core::ChatEventDispatcher dispatcher;
+        int owner = 0;
+        RemovedSnapshotState removedState;
+        UnregisterOtherCapture unregisterOther{&dispatcher, 0, 0};
+
+        const uint64_t removerId = dispatcher.Register(&owner, {UnregisterOtherCallback, &unregisterOther});
+        Require(removerId != 0, "remover registration failed");
+        unregisterOther.targetRegistrationId =
+            dispatcher.Register(&owner, {RemovedSnapshotCallback, &removedState, CountDestroy});
+        Require(unregisterOther.targetRegistrationId != 0, "target registration failed");
+
+        Require(dispatcher.Dispatch(MakeMessage()) == 1,
+                "removed snapshot callback was dispatched or remover was skipped");
+        Require(unregisterOther.calls == 1, "remover callback did not run");
+        Require(removedState.calls == 0, "removed snapshot callback still ran");
+        Require(removedState.destroys == 1, "removed callback user data was not destroyed after dispatch");
+        Require(dispatcher.SubscriptionCount() == 1, "wrong subscriptions remained after reentrant unregister");
+    }
+
     struct BlockingCallbackState
     {
         std::mutex mutex;
@@ -219,6 +279,173 @@ namespace
         Require(dispatcher.SubscriptionCount() == 0, "owner callback survived cleanup after dispatch");
     }
 
+    void TestCrossFamilyCallbackSuppressesDeferredCleanupWaitForFamily(
+        Obelisk::Core::GameplayCallbackFamily family)
+    {
+        Obelisk::Core::ChatEventDispatcher dispatcher;
+        int owner = 0;
+        BlockingCallbackState state;
+        std::atomic<bool> cleanupFinished{false};
+        size_t removed = 0;
+
+        const uint64_t id = dispatcher.Register(&owner, {BlockingCallback, &state});
+        Require(id != 0, "cross-family blocking callback registration failed");
+
+        std::thread dispatchThread([&dispatcher]() {
+            Require(dispatcher.Dispatch(MakeMessage()) == 1, "cross-family blocking callback did not dispatch");
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.mutex);
+            Require(state.cv.wait_for(lock, std::chrono::seconds(2), [&state]() { return state.entered; }),
+                    "cross-family blocking callback did not enter");
+        }
+
+        std::thread cleanupThread([&]() {
+            Obelisk::Core::GameplayCallbackScope callbackScope(family);
+            removed = dispatcher.UnregisterCallbacksForOwner(&owner);
+            cleanupFinished.store(true, std::memory_order_release);
+        });
+
+        bool finishedBeforeRelease = false;
+        for (int attempt = 0; attempt < 20; ++attempt)
+        {
+            if (cleanupFinished.load(std::memory_order_acquire))
+            {
+                finishedBeforeRelease = true;
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(state.mutex);
+            state.release = true;
+        }
+        state.cv.notify_all();
+
+        dispatchThread.join();
+        cleanupThread.join();
+
+        Require(finishedBeforeRelease,
+                "cross-family gameplay callback waited for chat deferred cleanup");
+        Require(removed == 1, "cross-family cleanup removed wrong callback count");
+        Require(dispatcher.SubscriptionCount() == 0, "cross-family cleanup left callback registered");
+    }
+
+    void TestCrossFamilyCallbackSuppressesDeferredCleanupWait()
+    {
+        TestCrossFamilyCallbackSuppressesDeferredCleanupWaitForFamily(
+            Obelisk::Core::GameplayCallbackFamily::Structure);
+        TestCrossFamilyCallbackSuppressesDeferredCleanupWaitForFamily(
+            Obelisk::Core::GameplayCallbackFamily::Inventory);
+    }
+
+    struct DeferredDestroyState
+    {
+        std::mutex mutex;
+        std::condition_variable cv;
+        bool callbackEntered = false;
+        bool releaseCallback = false;
+        bool destroyEntered = false;
+        bool releaseDestroy = false;
+    };
+
+    void BlockingDestroyCallback(const Obelisk::Core::ChatMessageView&, void* userData)
+    {
+        auto* state = static_cast<DeferredDestroyState*>(userData);
+        std::unique_lock<std::mutex> lock(state->mutex);
+        state->callbackEntered = true;
+        state->cv.notify_all();
+        state->cv.wait(lock, [&state]() { return state->releaseCallback; });
+    }
+
+    void BlockingDestroy(void* userData)
+    {
+        auto* state = static_cast<DeferredDestroyState*>(userData);
+        std::unique_lock<std::mutex> lock(state->mutex);
+        state->destroyEntered = true;
+        state->cv.notify_all();
+        state->cv.wait(lock, [&state]() { return state->releaseDestroy; });
+    }
+
+    void TestOwnerCleanupWaitsForDeferredDestroyAfterInFlightDispatch()
+    {
+        Obelisk::Core::ChatEventDispatcher dispatcher;
+        int owner = 0;
+        DeferredDestroyState state;
+        std::atomic<bool> cleanupFinished{false};
+        std::atomic<bool> secondCleanupFinished{false};
+        size_t secondRemoved = 99;
+
+        const uint64_t id = dispatcher.Register(&owner, {BlockingDestroyCallback, &state, BlockingDestroy});
+        Require(id != 0, "deferred destroy callback registration failed");
+
+        std::thread dispatchThread([&dispatcher]() {
+            Require(dispatcher.Dispatch(MakeMessage()) == 1, "deferred destroy callback did not dispatch");
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.mutex);
+            Require(state.cv.wait_for(lock, std::chrono::seconds(2), [&state]() { return state.callbackEntered; }),
+                    "deferred destroy callback did not enter");
+        }
+
+        std::thread cleanupThread([&]() {
+            Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 1,
+                    "owner cleanup removed wrong deferred destroy callback count");
+            cleanupFinished.store(true, std::memory_order_release);
+        });
+
+        const auto cleanupDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        while (dispatcher.SubscriptionCount() != 0 && std::chrono::steady_clock::now() < cleanupDeadline)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        Require(dispatcher.SubscriptionCount() == 0, "owner cleanup did not remove callback during dispatch");
+        Require(!cleanupFinished.load(std::memory_order_acquire),
+                "owner cleanup completed before dispatch was released");
+
+        {
+            std::lock_guard<std::mutex> lock(state.mutex);
+            state.releaseCallback = true;
+        }
+        state.cv.notify_all();
+
+        {
+            std::unique_lock<std::mutex> lock(state.mutex);
+            Require(state.cv.wait_for(lock, std::chrono::seconds(2), [&state]() { return state.destroyEntered; }),
+                    "deferred destroy did not run");
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        Require(!cleanupFinished.load(std::memory_order_acquire),
+                "owner cleanup completed while deferred destroy was still running");
+
+        std::thread secondCleanupThread([&]() {
+            secondRemoved = dispatcher.UnregisterCallbacksForOwner(&owner);
+            secondCleanupFinished.store(true, std::memory_order_release);
+        });
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        Require(!secondCleanupFinished.load(std::memory_order_acquire),
+                "no-op owner cleanup completed while deferred destroy was still running");
+
+        {
+            std::lock_guard<std::mutex> lock(state.mutex);
+            state.releaseDestroy = true;
+        }
+        state.cv.notify_all();
+
+        dispatchThread.join();
+        cleanupThread.join();
+        secondCleanupThread.join();
+
+        Require(cleanupFinished.load(std::memory_order_acquire), "owner cleanup did not complete after destroy");
+        Require(secondCleanupFinished.load(std::memory_order_acquire),
+                "no-op owner cleanup did not complete after destroy");
+        Require(secondRemoved == 0, "no-op owner cleanup removed callbacks after deferred destroy");
+        Require(dispatcher.SubscriptionCount() == 0, "deferred destroy callback survived cleanup");
+    }
+
     void TestOwnerCleanup()
     {
         Obelisk::Core::ChatEventDispatcher dispatcher;
@@ -235,6 +462,64 @@ namespace
         Require(dispatcher.Dispatch(MakeMessage()) == 1, "wrong number of callbacks after owner cleanup");
         Require(captureA.calls == 0, "owner A callback survived cleanup");
         Require(captureB.calls == 1, "owner B callback did not run");
+    }
+
+    struct DestroyUnregisterOtherState
+    {
+        Obelisk::Core::ChatEventDispatcher* dispatcher = nullptr;
+        uint64_t otherRegistrationId = 0;
+        std::mutex mutex;
+        std::condition_variable cv;
+        bool finished = false;
+        bool result = false;
+        bool timedOut = false;
+    };
+
+    void DestroyAndUnregisterOther(void* userData)
+    {
+        auto* state = static_cast<DestroyUnregisterOtherState*>(userData);
+        std::thread worker([state]() {
+            const bool result = state->dispatcher && state->dispatcher->Unregister(state->otherRegistrationId);
+            {
+                std::lock_guard<std::mutex> lock(state->mutex);
+                state->result = result;
+                state->finished = true;
+            }
+            state->cv.notify_all();
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state->mutex);
+            state->timedOut = !state->cv.wait_for(lock, std::chrono::seconds(2), [state]() {
+                return state->finished;
+            });
+        }
+
+        if (state->timedOut)
+        {
+            worker.detach();
+            return;
+        }
+        worker.join();
+    }
+
+    void TestDestroyUserDataCanUnregisterAnotherCallbackWithoutDeadlock()
+    {
+        Obelisk::Core::ChatEventDispatcher dispatcher;
+        int owner = 0;
+        Capture capture;
+        DestroyUnregisterOtherState state{&dispatcher, 0};
+
+        state.otherRegistrationId = dispatcher.Register(&owner, {CaptureCallback, &capture});
+        Require(state.otherRegistrationId != 0, "other chat callback registration failed");
+        const uint64_t destroyRegistrationId =
+            dispatcher.Register(&owner, {NoopCallback, &state, DestroyAndUnregisterOther});
+        Require(destroyRegistrationId != 0, "destroy callback registration failed");
+
+        Require(dispatcher.Unregister(destroyRegistrationId), "destroy callback unregister failed");
+        Require(!state.timedOut, "DestroyUserData blocked while unregistering another chat callback");
+        Require(state.result, "DestroyUserData failed to unregister the other chat callback");
+        Require(dispatcher.SubscriptionCount() == 0, "chat callbacks survived reentrant destroy cleanup");
     }
 
     void TestRejectsUnknownSendMode()
@@ -270,8 +555,12 @@ int main()
     TestUnregisterIsIdempotent();
     TestRegistrationIdsSkipZeroAndLiveIdsAfterWrap();
     TestCallbackCanUnregisterItself();
+    TestReentrantUnregisterSkipsRemovedSnapshotCallback();
     TestOwnerCleanupWaitsForInFlightDispatch();
+    TestCrossFamilyCallbackSuppressesDeferredCleanupWait();
+    TestOwnerCleanupWaitsForDeferredDestroyAfterInFlightDispatch();
     TestOwnerCleanup();
+    TestDestroyUserDataCanUnregisterAnotherCallbackWithoutDeadlock();
     TestRejectsUnknownSendMode();
     TestExceptionsDoNotStopDispatch();
 

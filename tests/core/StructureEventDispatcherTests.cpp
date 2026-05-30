@@ -1,4 +1,5 @@
 #include "core/StructureEventDispatcher.h"
+#include "core/GameplayCallbackScope.h"
 
 #include <atomic>
 #include <chrono>
@@ -391,6 +392,176 @@ namespace
         Require(dispatcher.SubscriptionCount() == 0, "owner callback survived cleanup after dispatch");
     }
 
+    void TestCrossFamilyCallbackSuppressesDeferredCleanupWaitForFamily(
+        Obelisk::Core::GameplayCallbackFamily family)
+    {
+        Obelisk::Core::StructureEventDispatcher dispatcher;
+        int owner = 0;
+        BlockingCallbackState state;
+        std::atomic<bool> cleanupFinished{false};
+        size_t removed = 0;
+        const std::vector<Obelisk::Core::StructureScalarValue> scalars = MakeScalars();
+
+        const uint64_t id = dispatcher.Register(&owner, {BlockingCallback, &state});
+        Require(id != 0, "cross-family blocking structure callback registration failed");
+
+        std::thread dispatchThread([&dispatcher, &scalars]() {
+            Require(dispatcher.Dispatch(MakeEvent(scalars)) == 1,
+                    "cross-family blocking structure callback did not dispatch");
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() { return state.Entered; }),
+                    "cross-family blocking structure callback did not enter");
+        }
+
+        std::thread cleanupThread([&]() {
+            Obelisk::Core::GameplayCallbackScope callbackScope(family);
+            removed = dispatcher.UnregisterCallbacksForOwner(&owner);
+            cleanupFinished.store(true, std::memory_order_release);
+        });
+
+        bool finishedBeforeRelease = false;
+        for (int attempt = 0; attempt < 20; ++attempt)
+        {
+            if (cleanupFinished.load(std::memory_order_acquire))
+            {
+                finishedBeforeRelease = true;
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(state.Mutex);
+            state.Release = true;
+        }
+        state.Cv.notify_all();
+
+        dispatchThread.join();
+        cleanupThread.join();
+
+        Require(finishedBeforeRelease,
+                "cross-family gameplay callback waited for structure deferred cleanup");
+        Require(removed == 1, "cross-family structure cleanup removed wrong callback count");
+        Require(dispatcher.SubscriptionCount() == 0, "cross-family structure cleanup left callback registered");
+    }
+
+    void TestCrossFamilyCallbackSuppressesDeferredCleanupWait()
+    {
+        TestCrossFamilyCallbackSuppressesDeferredCleanupWaitForFamily(
+            Obelisk::Core::GameplayCallbackFamily::Chat);
+        TestCrossFamilyCallbackSuppressesDeferredCleanupWaitForFamily(
+            Obelisk::Core::GameplayCallbackFamily::Inventory);
+    }
+
+    struct DeferredDestroyState
+    {
+        std::mutex Mutex;
+        std::condition_variable Cv;
+        bool CallbackEntered = false;
+        bool ReleaseCallback = false;
+        bool DestroyEntered = false;
+        bool ReleaseDestroy = false;
+    };
+
+    void BlockingDestroyCallback(const Obelisk::Core::StructureEventView&, void* userData)
+    {
+        auto* state = static_cast<DeferredDestroyState*>(userData);
+        std::unique_lock<std::mutex> lock(state->Mutex);
+        state->CallbackEntered = true;
+        state->Cv.notify_all();
+        state->Cv.wait(lock, [&state]() { return state->ReleaseCallback; });
+    }
+
+    void BlockingDestroy(void* userData)
+    {
+        auto* state = static_cast<DeferredDestroyState*>(userData);
+        std::unique_lock<std::mutex> lock(state->Mutex);
+        state->DestroyEntered = true;
+        state->Cv.notify_all();
+        state->Cv.wait(lock, [&state]() { return state->ReleaseDestroy; });
+    }
+
+    void TestOwnerCleanupWaitsForDeferredDestroyAfterInFlightDispatch()
+    {
+        Obelisk::Core::StructureEventDispatcher dispatcher;
+        int owner = 0;
+        DeferredDestroyState state;
+        std::atomic<bool> cleanupFinished{false};
+        std::atomic<bool> secondCleanupFinished{false};
+        size_t secondRemoved = 99;
+        const std::vector<Obelisk::Core::StructureScalarValue> scalars = MakeScalars();
+
+        const uint64_t id = dispatcher.Register(&owner, {BlockingDestroyCallback, &state, BlockingDestroy});
+        Require(id != 0, "deferred destroy callback registration failed");
+
+        std::thread dispatchThread([&dispatcher, &scalars]() {
+            Require(dispatcher.Dispatch(MakeEvent(scalars)) == 1, "deferred destroy callback did not dispatch");
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() { return state.CallbackEntered; }),
+                    "deferred destroy callback did not enter");
+        }
+
+        std::thread cleanupThread([&]() {
+            Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 1,
+                    "owner cleanup removed wrong deferred destroy callback count");
+            cleanupFinished.store(true, std::memory_order_release);
+        });
+
+        const auto cleanupDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        while (dispatcher.SubscriptionCount() != 0 && std::chrono::steady_clock::now() < cleanupDeadline)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        Require(dispatcher.SubscriptionCount() == 0, "owner cleanup did not remove callback during dispatch");
+        Require(!cleanupFinished.load(std::memory_order_acquire),
+                "owner cleanup completed before dispatch was released");
+
+        {
+            std::lock_guard<std::mutex> lock(state.Mutex);
+            state.ReleaseCallback = true;
+        }
+        state.Cv.notify_all();
+
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() { return state.DestroyEntered; }),
+                    "deferred destroy did not run");
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        Require(!cleanupFinished.load(std::memory_order_acquire),
+                "owner cleanup completed while deferred destroy was still running");
+
+        std::thread secondCleanupThread([&]() {
+            secondRemoved = dispatcher.UnregisterCallbacksForOwner(&owner);
+            secondCleanupFinished.store(true, std::memory_order_release);
+        });
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        Require(!secondCleanupFinished.load(std::memory_order_acquire),
+                "no-op owner cleanup completed while deferred destroy was still running");
+
+        {
+            std::lock_guard<std::mutex> lock(state.Mutex);
+            state.ReleaseDestroy = true;
+        }
+        state.Cv.notify_all();
+
+        dispatchThread.join();
+        cleanupThread.join();
+        secondCleanupThread.join();
+
+        Require(cleanupFinished.load(std::memory_order_acquire), "owner cleanup did not complete after destroy");
+        Require(secondCleanupFinished.load(std::memory_order_acquire),
+                "no-op owner cleanup did not complete after destroy");
+        Require(secondRemoved == 0, "no-op owner cleanup removed callbacks after deferred destroy");
+        Require(dispatcher.SubscriptionCount() == 0, "deferred destroy callback survived cleanup");
+    }
+
     void TestOwnerCleanup()
     {
         Obelisk::Core::StructureEventDispatcher dispatcher;
@@ -436,6 +607,8 @@ int main()
     TestSelfUnregisterDefersUserDataDestroyUntilCallbackReturns();
     TestReentrantUnregisterSkipsRemovedSnapshotCallback();
     TestOwnerCleanupWaitsForInFlightDispatch();
+    TestCrossFamilyCallbackSuppressesDeferredCleanupWait();
+    TestOwnerCleanupWaitsForDeferredDestroyAfterInFlightDispatch();
     TestOwnerCleanup();
     TestExceptionsDoNotStopDispatch();
 

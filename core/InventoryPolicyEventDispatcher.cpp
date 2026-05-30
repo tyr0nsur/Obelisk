@@ -1,7 +1,9 @@
 #include "InventoryPolicyEventDispatcher.h"
+#include "GameplayCallbackScope.h"
 #include "runtime/Logger.h"
 
 #include <algorithm>
+#include <array>
 #include <exception>
 
 namespace Obelisk::Core
@@ -89,6 +91,11 @@ namespace Obelisk::Core
                     OBELISK_ERROR("Inventory policy event subscription cleanup threw an unknown exception.");
             }
         }
+
+        bool IsInsideAnyGameplayCallback()
+        {
+            return GameplayCallbackScope::IsInsideAnyCallback();
+        }
     }
 
     InventoryPolicyEventDispatcher& InventoryPolicyEventDispatcher::Get()
@@ -107,6 +114,7 @@ namespace Obelisk::Core
         std::lock_guard<std::mutex> lock(m_Mutex);
         const uint64_t id = AllocateRegistrationId();
         m_Registrations.push_back({id, owner, subscription});
+        m_SubscriptionCount.fetch_add(1, std::memory_order_release);
         return id;
     }
 
@@ -143,12 +151,11 @@ namespace Obelisk::Core
         if (registrationId == 0)
             return false;
 
-        std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
         std::vector<InventoryPolicyEventSubscription> removed;
         size_t before = 0;
         size_t after = 0;
         {
-            std::lock_guard<std::mutex> lock(m_Mutex);
+            std::unique_lock<std::mutex> lock(m_Mutex);
             before = m_Registrations.size();
             auto keepEnd = std::remove_if(m_Registrations.begin(),
                                           m_Registrations.end(),
@@ -160,8 +167,15 @@ namespace Obelisk::Core
                                           });
             m_Registrations.erase(keepEnd, m_Registrations.end());
             after = m_Registrations.size();
+            if (before > after)
+                m_SubscriptionCount.fetch_sub(before - after, std::memory_order_release);
+            if (QueueOrDestroyRemovedSubscriptions(removed, lock))
+                m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
+            else if (!IsInsideAnyGameplayCallback() && !IsDispatchCleanupComplete())
+                m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
         }
-        QueueOrDestroyRemovedSubscriptions(removed);
+        for (const InventoryPolicyEventSubscription& subscription : removed)
+            DestroySubscriptionUserData(subscription);
         return after != before;
     }
 
@@ -170,12 +184,11 @@ namespace Obelisk::Core
         if (!owner || registrationId == 0)
             return false;
 
-        std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
         std::vector<InventoryPolicyEventSubscription> removed;
         size_t before = 0;
         size_t after = 0;
         {
-            std::lock_guard<std::mutex> lock(m_Mutex);
+            std::unique_lock<std::mutex> lock(m_Mutex);
             before = m_Registrations.size();
             auto keepEnd = std::remove_if(m_Registrations.begin(),
                                           m_Registrations.end(),
@@ -187,8 +200,15 @@ namespace Obelisk::Core
                                           });
             m_Registrations.erase(keepEnd, m_Registrations.end());
             after = m_Registrations.size();
+            if (before > after)
+                m_SubscriptionCount.fetch_sub(before - after, std::memory_order_release);
+            if (QueueOrDestroyRemovedSubscriptions(removed, lock))
+                m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
+            else if (!IsInsideAnyGameplayCallback() && !IsDispatchCleanupComplete())
+                m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
         }
-        QueueOrDestroyRemovedSubscriptions(removed);
+        for (const InventoryPolicyEventSubscription& subscription : removed)
+            DestroySubscriptionUserData(subscription);
         return after != before;
     }
 
@@ -197,12 +217,11 @@ namespace Obelisk::Core
         if (!owner)
             return 0;
 
-        std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
         std::vector<InventoryPolicyEventSubscription> removed;
         size_t before = 0;
         size_t after = 0;
         {
-            std::lock_guard<std::mutex> lock(m_Mutex);
+            std::unique_lock<std::mutex> lock(m_Mutex);
             before = m_Registrations.size();
             auto keepEnd = std::remove_if(m_Registrations.begin(),
                                           m_Registrations.end(),
@@ -214,41 +233,63 @@ namespace Obelisk::Core
                                           });
             m_Registrations.erase(keepEnd, m_Registrations.end());
             after = m_Registrations.size();
+            if (before > after)
+                m_SubscriptionCount.fetch_sub(before - after, std::memory_order_release);
+            if (QueueOrDestroyRemovedSubscriptions(removed, lock))
+                m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
+            else if (!IsInsideAnyGameplayCallback() && !IsDispatchCleanupComplete())
+                m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
         }
-        QueueOrDestroyRemovedSubscriptions(removed);
+        for (const InventoryPolicyEventSubscription& subscription : removed)
+            DestroySubscriptionUserData(subscription);
         return before - after;
     }
 
-    void InventoryPolicyEventDispatcher::QueueOrDestroyRemovedSubscriptions(
-        std::vector<InventoryPolicyEventSubscription>& removed)
+    bool InventoryPolicyEventDispatcher::QueueOrDestroyRemovedSubscriptions(
+        std::vector<InventoryPolicyEventSubscription>& removed,
+        std::unique_lock<std::mutex>&)
     {
         if (removed.empty())
-            return;
+            return false;
 
         if (m_DispatchDepth > 0)
         {
             m_PendingDestroy.insert(m_PendingDestroy.end(), removed.begin(), removed.end());
             removed.clear();
-            return;
+            return !IsInsideAnyGameplayCallback();
         }
 
-        for (const InventoryPolicyEventSubscription& subscription : removed)
-            DestroySubscriptionUserData(subscription);
+        return false;
+    }
+
+    bool InventoryPolicyEventDispatcher::IsDispatchCleanupComplete() const
+    {
+        return m_DispatchDepth == 0 && m_PendingDestroy.empty() && m_PendingDestroyInProgress == 0;
     }
 
     void InventoryPolicyEventDispatcher::FinishDispatch()
     {
-        if (m_DispatchDepth == 0)
-            return;
-
-        --m_DispatchDepth;
-        if (m_DispatchDepth != 0)
-            return;
-
         std::vector<InventoryPolicyEventSubscription> pending;
-        pending.swap(m_PendingDestroy);
+        {
+            std::lock_guard<std::mutex> lock(m_Mutex);
+            if (m_DispatchDepth == 0)
+                return;
+
+            --m_DispatchDepth;
+            if (m_DispatchDepth != 0)
+                return;
+
+            pending.swap(m_PendingDestroy);
+            m_PendingDestroyInProgress += pending.size();
+        }
+
         for (const InventoryPolicyEventSubscription& subscription : pending)
             DestroySubscriptionUserData(subscription);
+        {
+            std::lock_guard<std::mutex> lock(m_Mutex);
+            m_PendingDestroyInProgress -= pending.size();
+        }
+        m_DispatchCv.notify_all();
     }
 
     void InventoryPolicyEventDispatcher::SetNextRegistrationIdForTesting(uint64_t nextRegistrationId)
@@ -262,62 +303,91 @@ namespace Obelisk::Core
         if (!IsValidEvent(event))
             return 0;
 
-        std::vector<InventoryPolicyScalarValue> scalarCopies(event.Scalars.begin(), event.Scalars.end());
-        InventoryPolicyEventView copiedEvent{
-            .Kind = event.Kind,
-            .Scalars = scalarCopies,
-        };
-
-        std::vector<DispatchRegistration> callbacks;
-        std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
-        ++m_DispatchDepth;
         size_t dispatched = 0;
         try
         {
+            if (event.Scalars.size() > 3)
+                return 0;
+            std::array<InventoryPolicyScalarValue, 3> scalarCopies{};
+            std::copy(event.Scalars.begin(), event.Scalars.end(), scalarCopies.begin());
+            InventoryPolicyEventView copiedEvent{
+                .Kind = event.Kind,
+                .Scalars = std::span<const InventoryPolicyScalarValue>(scalarCopies.data(), event.Scalars.size()),
+            };
+
+            std::vector<DispatchRegistration> callbacks;
+            try
             {
-                std::lock_guard<std::mutex> lock(m_Mutex);
-                callbacks.reserve(m_Registrations.size());
-                for (const Registration& item : m_Registrations)
-                    callbacks.push_back({item.Id, item.Subscription});
+                {
+                    std::lock_guard<std::mutex> lock(m_Mutex);
+                    ++m_DispatchDepth;
+                    m_PendingDestroy.reserve(m_PendingDestroy.size() + m_Registrations.size());
+                    callbacks.reserve(m_Registrations.size());
+                    for (const Registration& item : m_Registrations)
+                        callbacks.push_back({item.Id, item.Subscription});
+                }
+
+                for (const DispatchRegistration& item : callbacks)
+                {
+                    if (!IsRegistrationActive(item.Id))
+                        continue;
+                    if (!item.Subscription.Callback)
+                        continue;
+
+                    try
+                    {
+                        GameplayCallbackScope callbackScope(GameplayCallbackFamily::Inventory);
+                        item.Subscription.Callback(copiedEvent, item.Subscription.UserData);
+                        ++dispatched;
+                    }
+                    catch (const std::exception& e)
+                    {
+                        if (Obelisk::Logger::IsInitialized())
+                            OBELISK_ERROR("Inventory policy event callback threw: {}", e.what());
+                    }
+                    catch (...)
+                    {
+                        if (Obelisk::Logger::IsInitialized())
+                            OBELISK_ERROR("Inventory policy event callback threw an unknown exception.");
+                    }
+                }
+            }
+            catch (const std::exception& e)
+            {
+                FinishDispatch();
+                if (Obelisk::Logger::IsInitialized())
+                {
+                    OBELISK_ERROR("Inventory policy event dispatch failed internally: {}", e.what());
+                }
+                return dispatched;
+            }
+            catch (...)
+            {
+                FinishDispatch();
+                if (Obelisk::Logger::IsInitialized())
+                    OBELISK_ERROR("Inventory policy event dispatch failed internally with an unknown exception.");
+                return dispatched;
             }
 
-            for (const DispatchRegistration& item : callbacks)
-            {
-                if (!IsRegistrationActive(item.Id))
-                    continue;
-                if (!item.Subscription.Callback)
-                    continue;
-
-                try
-                {
-                    item.Subscription.Callback(copiedEvent, item.Subscription.UserData);
-                    ++dispatched;
-                }
-                catch (const std::exception& e)
-                {
-                    if (Obelisk::Logger::IsInitialized())
-                        OBELISK_ERROR("Inventory policy event callback threw: {}", e.what());
-                }
-                catch (...)
-                {
-                    if (Obelisk::Logger::IsInitialized())
-                        OBELISK_ERROR("Inventory policy event callback threw an unknown exception.");
-                }
-            }
+            FinishDispatch();
+            return dispatched;
+        }
+        catch (const std::exception& e)
+        {
+            if (Obelisk::Logger::IsInitialized())
+                OBELISK_ERROR("Inventory policy event dispatch setup failed: {}", e.what());
+            return 0;
         }
         catch (...)
         {
-            FinishDispatch();
-            throw;
+            if (Obelisk::Logger::IsInitialized())
+                OBELISK_ERROR("Inventory policy event dispatch setup failed with an unknown exception.");
+            return 0;
         }
-
-        FinishDispatch();
-        return dispatched;
     }
 
     size_t InventoryPolicyEventDispatcher::SubscriptionCount() const
     {
-        std::lock_guard<std::mutex> lock(m_Mutex);
-        return m_Registrations.size();
+        return m_SubscriptionCount.load(std::memory_order_acquire);
     }
 }

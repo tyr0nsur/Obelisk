@@ -29,7 +29,6 @@ namespace Obelisk::Core
     {
         thread_local void* g_CurrentPluginOwner = nullptr;
         std::atomic<uint64_t> g_ApiCapabilities{OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS};
-        std::atomic<ChatEventDispatcher*> g_PublicChatDispatcher{nullptr};
 
         struct GameplayPolicyRegistration
         {
@@ -43,6 +42,12 @@ namespace Obelisk::Core
             void* Owner = nullptr;
             ChatEventDispatcher* Dispatcher = nullptr;
             uint64_t InternalRegistrationId = 0;
+        };
+
+        struct PluginOwnerApiState
+        {
+            uint64_t Capabilities = 0;
+            ChatEventDispatcher* ChatDispatcher = nullptr;
         };
 
         std::mutex& PluginOwnerLifecycleMutex()
@@ -81,6 +86,12 @@ namespace Obelisk::Core
             return *tokens;
         }
 
+        std::unordered_map<void*, PluginOwnerApiState>& PluginOwnerApiStates()
+        {
+            static auto* states = new std::unordered_map<void*, PluginOwnerApiState>();
+            return *states;
+        }
+
         std::mutex& GameplayPolicyRegistrationMutex()
         {
             static auto* mutex = new std::mutex();
@@ -115,6 +126,16 @@ namespace Obelisk::Core
         {
             static auto* sequence = new std::atomic<uint64_t>(1);
             return *sequence;
+        }
+
+        uint64_t AllocateChatMessageSequence()
+        {
+            for (;;)
+            {
+                const uint64_t sequence = NextChatMessageSequence().fetch_add(1, std::memory_order_relaxed);
+                if (sequence != 0)
+                    return sequence;
+            }
         }
 
         std::unordered_map<uint64_t, ChatMessageRegistration>& ChatMessageRegistrations()
@@ -244,7 +265,7 @@ namespace Obelisk::Core
             return owner && UnloadingPluginOwners().find(owner) != UnloadingPluginOwners().end();
         }
 
-        uint64_t AddPluginOwnerToken(void* owner)
+        uint64_t AddPluginOwnerToken(void* owner, uint64_t capabilities, ChatEventDispatcher* chatDispatcher)
         {
             if (!owner)
                 return 0;
@@ -261,6 +282,10 @@ namespace Obelisk::Core
             } while (token == 0 || PluginOwnerTokens().find(token) != PluginOwnerTokens().end());
 
             PluginOwnerTokens()[token] = owner;
+            PluginOwnerApiStates()[owner] = PluginOwnerApiState{
+                .Capabilities = capabilities,
+                .ChatDispatcher = chatDispatcher,
+            };
             return token;
         }
 
@@ -270,7 +295,26 @@ namespace Obelisk::Core
                 return;
 
             std::lock_guard<std::mutex> lock(PluginOwnerLifecycleMutex());
-            PluginOwnerTokens().erase(token);
+            const auto it = PluginOwnerTokens().find(token);
+            if (it != PluginOwnerTokens().end())
+            {
+                PluginOwnerApiStates().erase(it->second);
+                PluginOwnerTokens().erase(it);
+            }
+        }
+
+        bool PluginOwnerHasCapabilityLocked(void* owner, uint64_t capability)
+        {
+            const auto it = PluginOwnerApiStates().find(owner);
+            return it != PluginOwnerApiStates().end() && (it->second.Capabilities & capability) != 0;
+        }
+
+        ChatEventDispatcher* PluginOwnerChatDispatcherLocked(void* owner)
+        {
+            const auto it = PluginOwnerApiStates().find(owner);
+            if (it == PluginOwnerApiStates().end())
+                return nullptr;
+            return it->second.ChatDispatcher;
         }
 
         void* ResolvePluginOwnerTokenLocked(uint64_t token)
@@ -456,6 +500,12 @@ namespace Obelisk::Core
             return Runtime::IsInstanceMarkerEnabled(markerRoot, instanceId, "allow-global-process-event-callbacks");
         }
 
+        bool AreFilteredProcessEventCallbacksAllowed()
+        {
+            return Runtime::IsEnvAndInstanceMarkerEnabled("OBELISK_ALLOW_FILTERED_PROCESS_EVENT_CALLBACKS",
+                                                          "allow-filtered-process-event-callbacks");
+        }
+
         bool IsCallProcessEventAllowed()
         {
             return Runtime::IsEnvAndInstanceMarkerEnabled("OBELISK_ALLOW_CALL_PROCESS_EVENT",
@@ -478,12 +528,15 @@ namespace Obelisk::Core
         {
             uint64_t capabilities = OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS |
                 OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS |
-                OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES |
                 OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS |
                 OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS |
                 OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS;
             if (AreGlobalProcessEventCallbacksAllowed())
-                capabilities |= OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS;
+                capabilities |= OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS |
+                    OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES;
+            if (AreFilteredProcessEventCallbacksAllowed())
+                capabilities |= OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS |
+                    OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES;
             if (IsCallProcessEventAllowed())
                 capabilities |= OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT;
             if (IsProcessEventBlockingAllowed())
@@ -652,11 +705,45 @@ namespace Obelisk::Core
             }
         }
 
-        bool IsGlobalProcessEventCallbackCapabilityEnabled()
+        bool IsGlobalProcessEventCallbackCapabilityEnabledForOwnerLocked(void* owner)
         {
-            return (g_ApiCapabilities.load(std::memory_order_acquire) &
-                    OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS) != 0 &&
+            return PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS) &&
                 AreGlobalProcessEventCallbacksAllowed();
+        }
+
+        bool ValidateGlobalProcessEventCallbackCapabilityForOwnerLocked(const char* apiName, void* owner)
+        {
+            if (IsGlobalProcessEventCallbackCapabilityEnabledForOwnerLocked(owner))
+                return true;
+
+            OBELISK_WARN("{} rejected. Use a filtered ProcessEvent callback or enable allow-global-process-event-callbacks for a controlled debug window.", apiName);
+            return false;
+        }
+
+        bool IsFilteredProcessEventCallbackCapabilityEnabledForOwnerLocked(void* owner)
+        {
+            return PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS) &&
+                AreFilteredProcessEventCallbacksAllowed();
+        }
+
+        bool ValidateFilteredProcessEventCallbackCapabilityForOwnerLocked(const char* apiName, void* owner)
+        {
+            if (IsFilteredProcessEventCallbackCapabilityEnabledForOwnerLocked(owner))
+                return true;
+
+            OBELISK_WARN("{} rejected. Filtered ProcessEvent callbacks expose raw UE pointers and require allow-filtered-process-event-callbacks for a controlled debug window.", apiName);
+            return false;
+        }
+
+        bool IsChatMessageEventCapabilityEnabledForOwnerLocked(void* owner)
+        {
+            return PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_CHAT_EVENTS) &&
+                AreChatMessageEventsAllowed();
+        }
+
+        bool IsGameplayPolicyEventCapabilityEnabledForOwnerLocked(void* owner)
+        {
+            return PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS);
         }
 
         bool ValidateProcessEventCallback(const char* apiName, OnProcessEventCallback callback)
@@ -848,6 +935,25 @@ namespace Obelisk::Core
             delete static_cast<GameplayPolicyEventCallbackState*>(userData);
         }
 
+        void InvokeGameplayPolicyEventCallback(const GameplayPolicyEventCallbackState& state,
+                                               const ObeliskGameplayPolicyEvent& event)
+        {
+            try
+            {
+                state.Callback(&event, state.UserData);
+            }
+            catch (const std::exception& e)
+            {
+                if (Obelisk::Logger::IsInitialized())
+                    OBELISK_ERROR("Gameplay policy event callback threw: {}", e.what());
+            }
+            catch (...)
+            {
+                if (Obelisk::Logger::IsInitialized())
+                    OBELISK_ERROR("Gameplay policy event callback threw an unknown exception.");
+            }
+        }
+
         void DispatchGameplayPolicyEventFromStructure(const StructureEventView& event, void* userData)
         {
             auto* state = static_cast<GameplayPolicyEventCallbackState*>(userData);
@@ -874,7 +980,7 @@ namespace Obelisk::Core
             };
             for (const StructureScalarValue& scalar : event.Scalars)
                 CopyGameplayPolicyScalar(publicEvent, scalar);
-            state->Callback(&publicEvent, state->UserData);
+            InvokeGameplayPolicyEventCallback(*state, publicEvent);
         }
 
         void DispatchGameplayPolicyEventFromInventory(const InventoryPolicyEventView& event, void* userData)
@@ -903,7 +1009,7 @@ namespace Obelisk::Core
             };
             for (const InventoryPolicyScalarValue& scalar : event.Scalars)
                 CopyGameplayPolicyScalar(publicEvent, scalar);
-            state->Callback(&publicEvent, state->UserData);
+            InvokeGameplayPolicyEventCallback(*state, publicEvent);
         }
 
         struct ChatMessageEventCallbackState
@@ -915,6 +1021,25 @@ namespace Obelisk::Core
         void DestroyChatMessageEventCallbackState(void* userData)
         {
             delete static_cast<ChatMessageEventCallbackState*>(userData);
+        }
+
+        void InvokeChatMessageEventCallback(const ChatMessageEventCallbackState& state,
+                                            const ObeliskChatMessageEvent& event)
+        {
+            try
+            {
+                state.Callback(&event, state.UserData);
+            }
+            catch (const std::exception& e)
+            {
+                if (Obelisk::Logger::IsInitialized())
+                    OBELISK_ERROR("Chat message event callback threw: {}", e.what());
+            }
+            catch (...)
+            {
+                if (Obelisk::Logger::IsInitialized())
+                    OBELISK_ERROR("Chat message event callback threw an unknown exception.");
+            }
         }
 
         void DispatchPublicChatMessageEvent(const ChatMessageView& message, void* userData)
@@ -933,13 +1058,13 @@ namespace Obelisk::Core
                 .send_mode = sendMode,
                 .reserved0 = 0,
                 .flags = OBELISK_CHAT_MESSAGE_EVENT_FLAG_COPIED_PAYLOAD,
-                .sequence = NextChatMessageSequence().fetch_add(1, std::memory_order_relaxed),
+                .sequence = AllocateChatMessageSequence(),
                 .message = {
                     .data = message.Message.data(),
                     .size = message.Message.size(),
                 },
             };
-            state->Callback(&publicEvent, state->UserData);
+            InvokeChatMessageEventCallback(*state, publicEvent);
         }
 
         uint64_t AllocateChatMessageRegistrationIdLocked()
@@ -960,10 +1085,10 @@ namespace Obelisk::Core
         {
             if (!owner || !callback)
                 return 0;
-            if (!AreChatMessageEventsAllowed())
+            if (!IsChatMessageEventCapabilityEnabledForOwnerLocked(owner))
                 return 0;
 
-            ChatEventDispatcher* dispatcher = g_PublicChatDispatcher.load(std::memory_order_acquire);
+            ChatEventDispatcher* dispatcher = PluginOwnerChatDispatcherLocked(owner);
             if (!dispatcher)
                 return 0;
 
@@ -1074,6 +1199,8 @@ namespace Obelisk::Core
                                                      void* userData)
         {
             if (!owner)
+                return 0;
+            if (!IsGameplayPolicyEventCapabilityEnabledForOwnerLocked(owner))
                 return 0;
 
             uint64_t publicRegistrationId = 0;
@@ -1284,102 +1411,218 @@ namespace Obelisk::Core
         void PluginRegisterPreProcessEvent(OnProcessEventCallback callback) {
             if (!ValidateProcessEventCallback("RegisterPreProcessEvent", callback))
                 return;
-            if (!IsGlobalProcessEventCallbackCapabilityEnabled())
+            try
             {
-                OBELISK_WARN("Global PreProcessEvent callback rejected. Use RegisterPreProcessEventForNameIndex or enable allow-global-process-event-callbacks for a controlled debug window.");
-                return;
+                (void)RegisterProcessEventCallbackForCallbackOwner(
+                    "RegisterPreProcessEvent",
+                    callback,
+                    [callback](void* owner) {
+                        if (!ValidateGlobalProcessEventCallbackCapabilityForOwnerLocked("RegisterPreProcessEvent", owner))
+                            return uint64_t{0};
+                        return EventManager::Get().RegisterPreProcessEventOwned(owner, callback);
+                    });
             }
-            (void)RegisterProcessEventCallbackForCallbackOwner(
-                "RegisterPreProcessEvent",
-                callback,
-                [callback](void* owner) {
-                    return EventManager::Get().RegisterPreProcessEventOwned(owner, callback);
-                });
+            catch (const std::exception& e)
+            {
+                OBELISK_ERROR("RegisterPreProcessEvent rejected callback after exception: {}", e.what());
+            }
+            catch (...)
+            {
+                OBELISK_ERROR("RegisterPreProcessEvent rejected callback after unknown exception.");
+            }
         }
         void PluginRegisterPostProcessEvent(OnProcessEventCallback callback) {
             if (!ValidateProcessEventCallback("RegisterPostProcessEvent", callback))
                 return;
-            if (!IsGlobalProcessEventCallbackCapabilityEnabled())
+            try
             {
-                OBELISK_WARN("Global PostProcessEvent callback rejected. Use RegisterPostProcessEventForNameIndex or enable allow-global-process-event-callbacks for a controlled debug window.");
-                return;
+                (void)RegisterProcessEventCallbackForCallbackOwner(
+                    "RegisterPostProcessEvent",
+                    callback,
+                    [callback](void* owner) {
+                        if (!ValidateGlobalProcessEventCallbackCapabilityForOwnerLocked("RegisterPostProcessEvent", owner))
+                            return uint64_t{0};
+                        return EventManager::Get().RegisterPostProcessEventOwned(owner, callback);
+                    });
             }
-            (void)RegisterProcessEventCallbackForCallbackOwner(
-                "RegisterPostProcessEvent",
-                callback,
-                [callback](void* owner) {
-                    return EventManager::Get().RegisterPostProcessEventOwned(owner, callback);
-                });
+            catch (const std::exception& e)
+            {
+                OBELISK_ERROR("RegisterPostProcessEvent rejected callback after exception: {}", e.what());
+            }
+            catch (...)
+            {
+                OBELISK_ERROR("RegisterPostProcessEvent rejected callback after unknown exception.");
+            }
         }
         void PluginRegisterPreProcessEventForNameIndex(int32_t nameIndex, OnProcessEventCallback callback) {
             if (!ValidateFilteredProcessEventCallback("RegisterPreProcessEventForNameIndex", nameIndex, callback))
                 return;
-            (void)RegisterProcessEventCallbackForCallbackOwner(
-                "RegisterPreProcessEventForNameIndex",
-                callback,
-                [nameIndex, callback](void* owner) {
-                    return EventManager::Get().RegisterPreProcessEventForNameIndexOwned(owner, nameIndex, callback);
-                });
+            try
+            {
+                (void)RegisterProcessEventCallbackForCallbackOwner(
+                    "RegisterPreProcessEventForNameIndex",
+                    callback,
+                    [nameIndex, callback](void* owner) {
+                        if (!ValidateFilteredProcessEventCallbackCapabilityForOwnerLocked(
+                                "RegisterPreProcessEventForNameIndex",
+                                owner))
+                        {
+                            return uint64_t{0};
+                        }
+                        return EventManager::Get().RegisterPreProcessEventForNameIndexOwned(owner, nameIndex, callback);
+                    });
+            }
+            catch (const std::exception& e)
+            {
+                OBELISK_ERROR("RegisterPreProcessEventForNameIndex rejected callback after exception: {}", e.what());
+            }
+            catch (...)
+            {
+                OBELISK_ERROR("RegisterPreProcessEventForNameIndex rejected callback after unknown exception.");
+            }
         }
         void PluginRegisterPostProcessEventForNameIndex(int32_t nameIndex, OnProcessEventCallback callback) {
             if (!ValidateFilteredProcessEventCallback("RegisterPostProcessEventForNameIndex", nameIndex, callback))
                 return;
-            (void)RegisterProcessEventCallbackForCallbackOwner(
-                "RegisterPostProcessEventForNameIndex",
-                callback,
-                [nameIndex, callback](void* owner) {
-                    return EventManager::Get().RegisterPostProcessEventForNameIndexOwned(owner, nameIndex, callback);
-                });
+            try
+            {
+                (void)RegisterProcessEventCallbackForCallbackOwner(
+                    "RegisterPostProcessEventForNameIndex",
+                    callback,
+                    [nameIndex, callback](void* owner) {
+                        if (!ValidateFilteredProcessEventCallbackCapabilityForOwnerLocked(
+                                "RegisterPostProcessEventForNameIndex",
+                                owner))
+                        {
+                            return uint64_t{0};
+                        }
+                        return EventManager::Get().RegisterPostProcessEventForNameIndexOwned(owner, nameIndex, callback);
+                    });
+            }
+            catch (const std::exception& e)
+            {
+                OBELISK_ERROR("RegisterPostProcessEventForNameIndex rejected callback after exception: {}", e.what());
+            }
+            catch (...)
+            {
+                OBELISK_ERROR("RegisterPostProcessEventForNameIndex rejected callback after unknown exception.");
+            }
         }
         uint64_t PluginRegisterPreProcessEventWithOwnerTokenHandle(uint64_t ownerToken, OnProcessEventCallback callback) {
             if (!ValidateProcessEventCallback("RegisterPreProcessEventWithOwnerToken", callback))
                 return 0;
-            if (!IsGlobalProcessEventCallbackCapabilityEnabled())
+            try
             {
-                OBELISK_WARN("Global PreProcessEvent callback rejected. Use RegisterPreProcessEventForNameIndexWithOwnerToken or enable allow-global-process-event-callbacks for a controlled debug window.");
+                return RegisterProcessEventCallbackForOwnerToken(
+                    "RegisterPreProcessEventWithOwnerToken",
+                    ownerToken,
+                    [callback](void* owner) {
+                        if (!ValidateGlobalProcessEventCallbackCapabilityForOwnerLocked(
+                                "RegisterPreProcessEventWithOwnerToken",
+                                owner))
+                        {
+                            return uint64_t{0};
+                        }
+                        return EventManager::Get().RegisterPreProcessEventOwned(owner, callback);
+                    });
+            }
+            catch (const std::exception& e)
+            {
+                OBELISK_ERROR("RegisterPreProcessEventWithOwnerToken rejected callback after exception: {}", e.what());
                 return 0;
             }
-            return RegisterProcessEventCallbackForOwnerToken(
-                "RegisterPreProcessEventWithOwnerToken",
-                ownerToken,
-                [callback](void* owner) {
-                    return EventManager::Get().RegisterPreProcessEventOwned(owner, callback);
-                });
+            catch (...)
+            {
+                OBELISK_ERROR("RegisterPreProcessEventWithOwnerToken rejected callback after unknown exception.");
+                return 0;
+            }
         }
         uint64_t PluginRegisterPostProcessEventWithOwnerTokenHandle(uint64_t ownerToken, OnProcessEventCallback callback) {
             if (!ValidateProcessEventCallback("RegisterPostProcessEventWithOwnerToken", callback))
                 return 0;
-            if (!IsGlobalProcessEventCallbackCapabilityEnabled())
+            try
             {
-                OBELISK_WARN("Global PostProcessEvent callback rejected. Use RegisterPreProcessEventForNameIndexWithOwnerToken or enable allow-global-process-event-callbacks for a controlled debug window.");
+                return RegisterProcessEventCallbackForOwnerToken(
+                    "RegisterPostProcessEventWithOwnerToken",
+                    ownerToken,
+                    [callback](void* owner) {
+                        if (!ValidateGlobalProcessEventCallbackCapabilityForOwnerLocked(
+                                "RegisterPostProcessEventWithOwnerToken",
+                                owner))
+                        {
+                            return uint64_t{0};
+                        }
+                        return EventManager::Get().RegisterPostProcessEventOwned(owner, callback);
+                    });
+            }
+            catch (const std::exception& e)
+            {
+                OBELISK_ERROR("RegisterPostProcessEventWithOwnerToken rejected callback after exception: {}", e.what());
                 return 0;
             }
-            return RegisterProcessEventCallbackForOwnerToken(
-                "RegisterPostProcessEventWithOwnerToken",
-                ownerToken,
-                [callback](void* owner) {
-                    return EventManager::Get().RegisterPostProcessEventOwned(owner, callback);
-                });
+            catch (...)
+            {
+                OBELISK_ERROR("RegisterPostProcessEventWithOwnerToken rejected callback after unknown exception.");
+                return 0;
+            }
         }
         uint64_t PluginRegisterPreProcessEventForNameIndexWithOwnerTokenHandle(uint64_t ownerToken, int32_t nameIndex, OnProcessEventCallback callback) {
             if (!ValidateFilteredProcessEventCallback("RegisterPreProcessEventForNameIndexWithOwnerToken", nameIndex, callback))
                 return 0;
-            return RegisterProcessEventCallbackForOwnerToken(
-                "RegisterPreProcessEventForNameIndexWithOwnerToken",
-                ownerToken,
-                [nameIndex, callback](void* owner) {
-                    return EventManager::Get().RegisterPreProcessEventForNameIndexOwned(owner, nameIndex, callback);
-                });
+            try
+            {
+                return RegisterProcessEventCallbackForOwnerToken(
+                    "RegisterPreProcessEventForNameIndexWithOwnerToken",
+                    ownerToken,
+                    [nameIndex, callback](void* owner) {
+                        if (!ValidateFilteredProcessEventCallbackCapabilityForOwnerLocked(
+                                "RegisterPreProcessEventForNameIndexWithOwnerToken",
+                                owner))
+                        {
+                            return uint64_t{0};
+                        }
+                        return EventManager::Get().RegisterPreProcessEventForNameIndexOwned(owner, nameIndex, callback);
+                    });
+            }
+            catch (const std::exception& e)
+            {
+                OBELISK_ERROR("RegisterPreProcessEventForNameIndexWithOwnerToken rejected callback after exception: {}", e.what());
+                return 0;
+            }
+            catch (...)
+            {
+                OBELISK_ERROR("RegisterPreProcessEventForNameIndexWithOwnerToken rejected callback after unknown exception.");
+                return 0;
+            }
         }
         uint64_t PluginRegisterPostProcessEventForNameIndexWithOwnerTokenHandle(uint64_t ownerToken, int32_t nameIndex, OnProcessEventCallback callback) {
             if (!ValidateFilteredProcessEventCallback("RegisterPostProcessEventForNameIndexWithOwnerToken", nameIndex, callback))
                 return 0;
-            return RegisterProcessEventCallbackForOwnerToken(
-                "RegisterPostProcessEventForNameIndexWithOwnerToken",
-                ownerToken,
-                [nameIndex, callback](void* owner) {
-                    return EventManager::Get().RegisterPostProcessEventForNameIndexOwned(owner, nameIndex, callback);
-                });
+            try
+            {
+                return RegisterProcessEventCallbackForOwnerToken(
+                    "RegisterPostProcessEventForNameIndexWithOwnerToken",
+                    ownerToken,
+                    [nameIndex, callback](void* owner) {
+                        if (!ValidateFilteredProcessEventCallbackCapabilityForOwnerLocked(
+                                "RegisterPostProcessEventForNameIndexWithOwnerToken",
+                                owner))
+                        {
+                            return uint64_t{0};
+                        }
+                        return EventManager::Get().RegisterPostProcessEventForNameIndexOwned(owner, nameIndex, callback);
+                    });
+            }
+            catch (const std::exception& e)
+            {
+                OBELISK_ERROR("RegisterPostProcessEventForNameIndexWithOwnerToken rejected callback after exception: {}", e.what());
+                return 0;
+            }
+            catch (...)
+            {
+                OBELISK_ERROR("RegisterPostProcessEventForNameIndexWithOwnerToken rejected callback after unknown exception.");
+                return 0;
+            }
         }
         void PluginRegisterPreProcessEventWithOwnerToken(uint64_t ownerToken, OnProcessEventCallback callback) {
             (void)PluginRegisterPreProcessEventWithOwnerTokenHandle(ownerToken, callback);
@@ -1394,10 +1637,23 @@ namespace Obelisk::Core
             (void)PluginRegisterPostProcessEventForNameIndexWithOwnerTokenHandle(ownerToken, nameIndex, callback);
         }
         bool PluginUnregisterProcessEventCallbackWithOwnerToken(uint64_t ownerToken, uint64_t registrationId) {
-            void* owner = ResolveOwnerTokenForUnregister("UnregisterProcessEventCallbackWithOwnerToken", ownerToken);
-            if (!owner)
+            try
+            {
+                void* owner = ResolveOwnerTokenForUnregister("UnregisterProcessEventCallbackWithOwnerToken", ownerToken);
+                if (!owner)
+                    return false;
+                return EventManager::Get().UnregisterCallbackForOwner(owner, registrationId);
+            }
+            catch (const std::exception& e)
+            {
+                OBELISK_ERROR("UnregisterProcessEventCallbackWithOwnerToken failed after exception: {}", e.what());
                 return false;
-            return EventManager::Get().UnregisterCallbackForOwner(owner, registrationId);
+            }
+            catch (...)
+            {
+                OBELISK_ERROR("UnregisterProcessEventCallbackWithOwnerToken failed after unknown exception.");
+                return false;
+            }
         }
         uint64_t PluginRegisterGameplayPolicyEventWithOwnerTokenHandle(
             uint64_t ownerToken,
@@ -1438,10 +1694,23 @@ namespace Obelisk::Core
             }
         }
         bool PluginUnregisterGameplayPolicyEventWithOwnerToken(uint64_t ownerToken, uint64_t registrationId) {
-            void* owner = ResolveOwnerTokenForUnregister("UnregisterGameplayPolicyEventWithOwnerToken", ownerToken);
-            if (!owner)
+            try
+            {
+                void* owner = ResolveOwnerTokenForUnregister("UnregisterGameplayPolicyEventWithOwnerToken", ownerToken);
+                if (!owner)
+                    return false;
+                return UnregisterGameplayPolicyRegistrationForOwner(owner, registrationId);
+            }
+            catch (const std::exception& e)
+            {
+                OBELISK_ERROR("UnregisterGameplayPolicyEventWithOwnerToken failed after exception: {}", e.what());
                 return false;
-            return UnregisterGameplayPolicyRegistrationForOwner(owner, registrationId);
+            }
+            catch (...)
+            {
+                OBELISK_ERROR("UnregisterGameplayPolicyEventWithOwnerToken failed after unknown exception.");
+                return false;
+            }
         }
         uint64_t PluginRegisterChatMessageEventWithOwnerTokenHandle(
             uint64_t ownerToken,
@@ -1471,10 +1740,23 @@ namespace Obelisk::Core
             }
         }
         bool PluginUnregisterChatMessageEventWithOwnerToken(uint64_t ownerToken, uint64_t registrationId) {
-            void* owner = ResolveOwnerTokenForUnregister("UnregisterChatMessageEventWithOwnerToken", ownerToken);
-            if (!owner)
+            try
+            {
+                void* owner = ResolveOwnerTokenForUnregister("UnregisterChatMessageEventWithOwnerToken", ownerToken);
+                if (!owner)
+                    return false;
+                return UnregisterChatMessageRegistrationForOwner(owner, registrationId);
+            }
+            catch (const std::exception& e)
+            {
+                OBELISK_ERROR("UnregisterChatMessageEventWithOwnerToken failed after exception: {}", e.what());
                 return false;
-            return UnregisterChatMessageRegistrationForOwner(owner, registrationId);
+            }
+            catch (...)
+            {
+                OBELISK_ERROR("UnregisterChatMessageEventWithOwnerToken failed after unknown exception.");
+                return false;
+            }
         }
         bool PluginDescribeResourceKind(uint32_t resourceKind, ObeliskResourceKindDescriptor* out) {
             return DescribeResourceKind(resourceKind, out);
@@ -1540,7 +1822,6 @@ namespace Obelisk::Core
         m_Api.DescribeGameplayPolicyEventKind = PluginDescribeGameplayPolicyEventKind;
         m_Api.RegisterChatMessageEventWithOwnerTokenHandle = PluginRegisterChatMessageEventWithOwnerTokenHandle;
         m_Api.UnregisterChatMessageEventWithOwnerToken = PluginUnregisterChatMessageEventWithOwnerToken;
-        g_PublicChatDispatcher.store(m_ChatDispatcher, std::memory_order_release);
         g_ApiCapabilities.store(m_Api.capabilities, std::memory_order_release);
         EventManager::SetProcessEventBlockingCapabilityAdvertised(
             (m_Api.capabilities & OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING) != 0);
@@ -1557,15 +1838,14 @@ namespace Obelisk::Core
         NextPluginOwnerToken().store(nextOwnerToken == 0 ? 1 : nextOwnerToken, std::memory_order_relaxed);
     }
 
+    void PluginManager::SetNextChatMessageSequenceForTesting(uint64_t nextSequence)
+    {
+        NextChatMessageSequence().store(nextSequence == 0 ? 1 : nextSequence, std::memory_order_relaxed);
+    }
+
     PluginManager::~PluginManager()
     {
         UnloadAll();
-        ChatEventDispatcher* expected = m_ChatDispatcher;
-        g_PublicChatDispatcher.compare_exchange_strong(
-            expected,
-            nullptr,
-            std::memory_order_acq_rel,
-            std::memory_order_acquire);
     }
 
     void PluginManager::UnregisterPluginCallbacks(const std::string& pluginName, void* owner, const char* reason)
@@ -1770,7 +2050,7 @@ namespace Obelisk::Core
                 void* pluginOwner = m_Loader->GetSymbolOwner(handle, reinterpret_cast<void*>(initFunc));
                 if (!pluginOwner)
                     pluginOwner = handle;
-                const uint64_t pluginOwnerToken = AddPluginOwnerToken(pluginOwner);
+                const uint64_t pluginOwnerToken = AddPluginOwnerToken(pluginOwner, m_Api.capabilities, m_ChatDispatcher);
                 auto ownerTokenCleanup = MakeScopeExit([&]() {
                     RemovePluginOwnerToken(pluginOwnerToken);
                 });

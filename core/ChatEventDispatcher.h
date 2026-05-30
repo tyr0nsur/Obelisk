@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <cstddef>
+#include <condition_variable>
 #include <mutex>
 #include <string_view>
 #include <vector>
@@ -57,10 +58,19 @@ namespace Obelisk::Core
 
         uint64_t AllocateRegistrationId();
         bool HasRegistrationId(uint64_t registrationId) const;
+        bool IsRegistrationActive(uint64_t registrationId) const;
+        bool QueueOrDestroyRemovedSubscriptions(
+            std::vector<ChatMessageSubscription>& removed,
+            std::unique_lock<std::mutex>& lock);
+        bool IsDispatchCleanupComplete() const;
+        void FinishDispatch();
 
         mutable std::mutex m_Mutex;
-        std::recursive_mutex m_DispatchMutex;
+        std::condition_variable m_DispatchCv;
+        size_t m_DispatchDepth = 0;
         uint64_t m_NextRegistrationId = 1;
         std::vector<Registration> m_Registrations;
+        std::vector<ChatMessageSubscription> m_PendingDestroy;
+        size_t m_PendingDestroyInProgress = 0;
     };
 }

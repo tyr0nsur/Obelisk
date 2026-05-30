@@ -5,13 +5,16 @@
 #include "core/StructureEventDispatcher.h"
 #include "runtime/Logger.h"
 
+#include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <cstring>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -59,6 +62,7 @@ namespace
         bool throwOnClose = false;
         bool captureApi = false;
         bool mutateApiInInit = false;
+        std::atomic<bool>* closeObserved = nullptr;
         int getInfoCalls = 0;
         int initCalls = 0;
         int shutdownCalls = 0;
@@ -94,9 +98,11 @@ namespace
         uint32_t gameplayPolicyEventStructSize = 0;
         int chatMessageEventCalls = 0;
         uint32_t chatMessageSendMode = 0;
+        uint32_t chatMessageReserved0 = 1;
         uint64_t chatMessageFlags = 0;
         uint64_t chatMessageSequence = 0;
         std::string chatMessageText;
+        const char* chatMessageData = nullptr;
         uint32_t chatMessageEventAbiVersion = 0;
         uint32_t chatMessageEventStructSize = 0;
         size_t structureSubscriptionsAtShutdown = 0;
@@ -144,6 +150,14 @@ namespace
         plugin->gameplayPolicyEventStructSize = event->struct_size;
     }
 
+    void ThrowingGameplayPolicyEventCallback(const ObeliskGameplayPolicyEvent* event, void* userData)
+    {
+        Require(event != nullptr, "throwing gameplay policy callback received null event");
+        auto* callCount = static_cast<int*>(userData);
+        ++(*callCount);
+        throw std::runtime_error("injected gameplay policy callback failure");
+    }
+
     void FakeGameplayPolicySelfUnregisterCallback(const ObeliskGameplayPolicyEvent* event, void* userData)
     {
         FakeGameplayPolicyEventCallback(event, userData);
@@ -154,17 +168,189 @@ namespace
                 plugin->gameplayPolicyRegistrationId);
     }
 
+    struct ConcurrentGameplayPolicyUnregisterState
+    {
+        std::mutex Mutex;
+        std::condition_variable Cv;
+        const ObeliskApi* Api = nullptr;
+        uint64_t OwnerToken = 0;
+        uint64_t RegistrationId = 0;
+        int Entered = 0;
+        int Completed = 0;
+        int SuccessfulUnregisters = 0;
+        bool SawStructure = false;
+        bool SawInventory = false;
+        bool Release = false;
+    };
+
+    void ConcurrentGameplayPolicyUnregisterCallback(const ObeliskGameplayPolicyEvent* event, void* userData)
+    {
+        Require(event != nullptr, "concurrent gameplay policy callback received null event");
+        auto* state = static_cast<ConcurrentGameplayPolicyUnregisterState*>(userData);
+        {
+            std::unique_lock<std::mutex> lock(state->Mutex);
+            state->SawStructure = state->SawStructure ||
+                event->resource_kind == OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE;
+            state->SawInventory = state->SawInventory ||
+                event->resource_kind == OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM;
+            ++state->Entered;
+            state->Cv.notify_all();
+            state->Cv.wait(lock, [state]() { return state->Release; });
+        }
+
+        const bool unregistered =
+            state->Api && state->Api->UnregisterGameplayPolicyEventWithOwnerToken &&
+            state->Api->UnregisterGameplayPolicyEventWithOwnerToken(
+                state->OwnerToken,
+                state->RegistrationId);
+
+        {
+            std::lock_guard<std::mutex> lock(state->Mutex);
+            if (unregistered)
+                ++state->SuccessfulUnregisters;
+            ++state->Completed;
+            state->Cv.notify_all();
+        }
+    }
+
+    struct CrossFamilyFenceState
+    {
+        std::mutex Mutex;
+        std::condition_variable Cv;
+        const ObeliskApi* Api = nullptr;
+        uint64_t OwnerToken = 0;
+        uint64_t RegistrationId = 0;
+        int InventoryCalls = 0;
+        int StructureCalls = 0;
+        bool InventoryEntered = false;
+        bool ReleaseInventory = false;
+        bool StructureEntered = false;
+        bool ReleaseStructure = false;
+        bool StructureUnregisterReturned = false;
+        bool StructureUnregisterResult = false;
+        bool InventoryUnregisterReturned = false;
+        bool InventoryUnregisterResult = false;
+        bool BlockStructure = false;
+    };
+
+    void GameplayPolicyCrossFamilyFenceCallback(const ObeliskGameplayPolicyEvent* event, void* userData)
+    {
+        Require(event != nullptr, "cross-family fence callback received null event");
+        auto* state = static_cast<CrossFamilyFenceState*>(userData);
+        if (event->resource_kind == OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM)
+        {
+            {
+                std::unique_lock<std::mutex> lock(state->Mutex);
+                ++state->InventoryCalls;
+                state->InventoryEntered = true;
+                state->Cv.notify_all();
+                if (!state->BlockStructure)
+                {
+                    state->Cv.wait(lock, [state]() { return state->ReleaseInventory; });
+                    return;
+                }
+            }
+
+            const bool unregistered =
+                state->Api && state->Api->UnregisterGameplayPolicyEventWithOwnerToken &&
+                state->Api->UnregisterGameplayPolicyEventWithOwnerToken(
+                    state->OwnerToken,
+                    state->RegistrationId);
+
+            {
+                std::lock_guard<std::mutex> lock(state->Mutex);
+                state->InventoryUnregisterResult = unregistered;
+                state->InventoryUnregisterReturned = true;
+                state->Cv.notify_all();
+            }
+            return;
+        }
+
+        Require(event->resource_kind == OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE,
+                "cross-family fence callback received unexpected resource kind");
+        {
+            std::unique_lock<std::mutex> lock(state->Mutex);
+            ++state->StructureCalls;
+            state->StructureEntered = true;
+            state->Cv.notify_all();
+            if (state->BlockStructure)
+            {
+                state->Cv.wait(lock, [state]() { return state->ReleaseStructure; });
+                return;
+            }
+        }
+
+        const bool unregistered =
+            state->Api && state->Api->UnregisterGameplayPolicyEventWithOwnerToken &&
+            state->Api->UnregisterGameplayPolicyEventWithOwnerToken(
+                state->OwnerToken,
+                state->RegistrationId);
+
+        {
+            std::lock_guard<std::mutex> lock(state->Mutex);
+            state->StructureUnregisterResult = unregistered;
+            state->StructureUnregisterReturned = true;
+            state->Cv.notify_all();
+        }
+    }
+
+    struct ShutdownCrossFamilyFenceState
+    {
+        std::mutex Mutex;
+        std::condition_variable Cv;
+        int InventoryCalls = 0;
+        int StructureCalls = 0;
+        bool InventoryEntered = false;
+        bool StructureEntered = false;
+        bool ReleaseInventory = false;
+        bool ReleaseStructure = false;
+    };
+
+    void GameplayPolicyShutdownCrossFamilyFenceCallback(
+        const ObeliskGameplayPolicyEvent* event,
+        void* userData)
+    {
+        Require(event != nullptr, "shutdown cross-family fence callback received null event");
+        auto* state = static_cast<ShutdownCrossFamilyFenceState*>(userData);
+        std::unique_lock<std::mutex> lock(state->Mutex);
+        if (event->resource_kind == OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM)
+        {
+            ++state->InventoryCalls;
+            state->InventoryEntered = true;
+            state->Cv.notify_all();
+            state->Cv.wait(lock, [state]() { return state->ReleaseInventory; });
+            return;
+        }
+
+        Require(event->resource_kind == OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE,
+                "shutdown cross-family fence callback received unexpected resource kind");
+        ++state->StructureCalls;
+        state->StructureEntered = true;
+        state->Cv.notify_all();
+        state->Cv.wait(lock, [state]() { return state->ReleaseStructure; });
+    }
+
     void FakeChatMessageEventCallback(const ObeliskChatMessageEvent* event, void* userData)
     {
         Require(event != nullptr, "chat message callback received null event");
         auto* plugin = static_cast<FakePlugin*>(userData);
         ++plugin->chatMessageEventCalls;
         plugin->chatMessageSendMode = event->send_mode;
+        plugin->chatMessageReserved0 = event->reserved0;
         plugin->chatMessageFlags = event->flags;
         plugin->chatMessageSequence = event->sequence;
         plugin->chatMessageText.assign(event->message.data, event->message.size);
+        plugin->chatMessageData = event->message.data;
         plugin->chatMessageEventAbiVersion = event->abi_version;
         plugin->chatMessageEventStructSize = event->struct_size;
+    }
+
+    void ThrowingChatMessageEventCallback(const ObeliskChatMessageEvent* event, void* userData)
+    {
+        Require(event != nullptr, "throwing chat message callback received null event");
+        auto* callCount = static_cast<int*>(userData);
+        ++(*callCount);
+        throw std::runtime_error("injected chat message callback failure");
     }
 
     void FakeChatMessageSelfUnregisterCallback(const ObeliskChatMessageEvent* event, void* userData)
@@ -372,8 +558,6 @@ namespace
                 "plugin init received API without owned callback capability");
         Require((api->capabilities & OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS) != 0,
                 "plugin init received API without owner-token callback capability");
-        Require((api->capabilities & OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES) != 0,
-                "plugin init received API without callback handle capability");
         Require(context->plugin_owner_token != 0, "plugin init received empty owner token");
 
         if (g_CurrentFakePlugin->captureApi)
@@ -556,6 +740,8 @@ namespace
             plugin->structureSubscriptionsAtClose =
                 Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount();
             ++plugin->closeCalls;
+            if (plugin->closeObserved)
+                plugin->closeObserved->store(true, std::memory_order_release);
             if (plugin->orderLog)
                 plugin->orderLog->push_back("close:" + plugin->filename);
             if (plugin->throwOnClose)
@@ -598,10 +784,19 @@ namespace
         setenv("OBELISK_ROOT", root.string().c_str(), 1);
         setenv("OBELISK_INSTANCE_ID", "arkserver", 1);
         unsetenv("OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS");
+        unsetenv("OBELISK_ALLOW_FILTERED_PROCESS_EVENT_CALLBACKS");
         unsetenv("OBELISK_ALLOW_CALL_PROCESS_EVENT");
         unsetenv("OBELISK_ALLOW_PROCESS_EVENT_BLOCKING");
         unsetenv("OBELISK_ENABLE_CHAT_EVENTS");
         Obelisk::Core::EventManager::SetProcessEventBlockingCapabilityAdvertised(false);
+    }
+
+    void EnableFilteredProcessEventCallbacks(const fs::path& root)
+    {
+        setenv("OBELISK_ALLOW_FILTERED_PROCESS_EVENT_CALLBACKS", "1", 1);
+        fs::create_directories(root / "state" / "instances" / "arkserver");
+        std::ofstream marker(root / "state" / "instances" / "arkserver" / "allow-filtered-process-event-callbacks");
+        Require(marker.is_open(), "failed to create filtered ProcessEvent callback marker");
     }
 
     void CleanupPlugin(FakePlugin& plugin)
@@ -721,6 +916,7 @@ namespace
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_valid");
         ConfigureEnvironment(root);
+        EnableFilteredProcessEventCallbacks(root);
 
         FakePlugin plugin{.filename = "valid.so", .registerFilteredCallback = true};
         Obelisk::Core::ChatEventDispatcher chatDispatcher;
@@ -907,10 +1103,37 @@ namespace
         fs::remove_all(root);
     }
 
-    void TestFilteredProcessEventCallbackAllowedByDefault()
+    void TestFilteredProcessEventCallbackRejectedByDefault()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_filtered_denied");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{.filename = "filtered_denied.so", .registerFilteredCallback = true};
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        Require((manager.ApiCapabilitiesForTesting() & OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS) == 0,
+                "filtered ProcessEvent callback capability was enabled by default");
+        Require((manager.ApiCapabilitiesForTesting() & OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES) == 0,
+                "ProcessEvent callback handle capability was enabled by default");
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
+                "filtered callback was registered without explicit gate");
+
+        manager.UnloadAll();
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestFilteredProcessEventCallbackAllowedWithGate()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_filtered_allowed");
         ConfigureEnvironment(root);
+        EnableFilteredProcessEventCallbacks(root);
 
         FakePlugin plugin{.filename = "filtered_allowed.so", .registerFilteredCallback = true};
         FakeLoader loader;
@@ -919,13 +1142,55 @@ namespace
         WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
 
         Obelisk::Core::PluginManager manager(loader);
+        Require((manager.ApiCapabilitiesForTesting() & OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS) != 0,
+                "filtered ProcessEvent callback capability was not enabled with env and marker gate");
+        Require((manager.ApiCapabilitiesForTesting() & OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES) != 0,
+                "ProcessEvent callback handle capability was not enabled with filtered gate");
         manager.LoadPlugins((root / "plugins").string());
 
         Require(Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
-                "filtered callback was rejected by default");
+                "filtered callback was rejected with explicit gate");
 
         manager.UnloadAll();
         CleanupPlugin(plugin);
+        unsetenv("OBELISK_ALLOW_FILTERED_PROCESS_EVENT_CALLBACKS");
+        fs::remove_all(root);
+    }
+
+    void TestFilteredProcessEventCallbackRejectedAfterGateRevoked()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_filtered_revoked");
+        ConfigureEnvironment(root);
+        EnableFilteredProcessEventCallbacks(root);
+        const fs::path markerPath =
+            root / "state" / "instances" / "arkserver" / "allow-filtered-process-event-callbacks";
+
+        FakePlugin plugin{.filename = "filtered_revoked.so", .captureApi = true};
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        Require((manager.ApiCapabilitiesForTesting() & OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS) != 0,
+                "filtered callback capability was not enabled with env and marker gate");
+        manager.LoadPlugins((root / "plugins").string());
+        Require(plugin.initCalls == 1, "filtered-revoked plugin was not initialized");
+        fs::remove(markerPath);
+
+        const uint64_t registrationId =
+            plugin.capturedApi.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle(
+                plugin.initOwnerToken,
+                42,
+                FakeCallback);
+
+        Require(registrationId == 0, "filtered callback registration succeeded after marker revocation");
+        Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
+                "filtered callback was registered after marker revocation");
+
+        manager.UnloadAll();
+        CleanupPlugin(plugin);
+        unsetenv("OBELISK_ALLOW_FILTERED_PROCESS_EVENT_CALLBACKS");
         fs::remove_all(root);
     }
 
@@ -957,6 +1222,7 @@ namespace
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_owner_token");
         ConfigureEnvironment(root);
+        EnableFilteredProcessEventCallbacks(root);
 
         FakePlugin plugin{.filename = "owner_token.so", .captureApi = true};
         FakeLoader loader;
@@ -993,6 +1259,7 @@ namespace
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_owner_token_init_thread");
         ConfigureEnvironment(root);
+        EnableFilteredProcessEventCallbacks(root);
 
         FakePlugin plugin{
             .filename = "owner_token_init_thread.so",
@@ -1025,6 +1292,7 @@ namespace
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_owner_token_init_fail");
         ConfigureEnvironment(root);
+        EnableFilteredProcessEventCallbacks(root);
 
         FakePlugin plugin{
             .filename = "owner_token_init_fail.so",
@@ -1061,6 +1329,7 @@ namespace
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_owner_token_init_throw");
         ConfigureEnvironment(root);
+        EnableFilteredProcessEventCallbacks(root);
 
         FakePlugin plugin{
             .filename = "owner_token_init_throw.so",
@@ -1097,6 +1366,7 @@ namespace
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_owner_token_handle");
         ConfigureEnvironment(root);
+        EnableFilteredProcessEventCallbacks(root);
 
         FakePlugin plugin{.filename = "owner_token_handle.so", .captureApi = true};
         FakeLoader loader;
@@ -1487,8 +1757,9 @@ namespace
                     registrationId),
                 "wrong owner token unregistered a chat message callback");
 
+        const std::string sourceMessage = "!ping";
         const Obelisk::Core::ChatMessageView message{
-            .Message = "!ping",
+            .Message = sourceMessage,
             .SenderName = "ignored",
             .SenderPlatformId = "ignored",
             .SendMode = Obelisk::Core::ChatSendMode::Global,
@@ -1504,12 +1775,27 @@ namespace
                 "chat message event struct size mismatch");
         Require(plugin.chatMessageSendMode == OBELISK_CHAT_SEND_MODE_GLOBAL,
                 "chat message send mode mismatch");
+        Require(plugin.chatMessageReserved0 == 0,
+                "chat message reserved0 was not zeroed");
         Require((plugin.chatMessageFlags & OBELISK_CHAT_MESSAGE_EVENT_FLAG_COPIED_PAYLOAD) != 0,
                 "chat message event was not marked copied-payload");
         Require(plugin.chatMessageSequence != 0,
                 "chat message event sequence was zero");
         Require(plugin.chatMessageText == "!ping",
                 "chat message event copied wrong text");
+        Require(plugin.chatMessageData != sourceMessage.data(),
+                "chat message event exposed the dispatcher input buffer");
+
+        Obelisk::Core::PluginManager::SetNextChatMessageSequenceForTesting(
+            std::numeric_limits<uint64_t>::max());
+        Require(chatDispatcher.Dispatch(message) == 1,
+                "chat message callback did not dispatch at sequence wrap boundary");
+        Require(plugin.chatMessageSequence == std::numeric_limits<uint64_t>::max(),
+                "chat message event did not expose max sequence before wrap");
+        Require(chatDispatcher.Dispatch(message) == 1,
+                "chat message callback did not dispatch after sequence wrap");
+        Require(plugin.chatMessageSequence == 1,
+                "chat message event sequence did not skip zero after wrap");
 
         Require(plugin.capturedApi.UnregisterChatMessageEventWithOwnerToken(
                     plugin.initOwnerToken,
@@ -1554,6 +1840,170 @@ namespace
 
         CleanupPlugin(plugin);
         CleanupPlugin(otherPlugin);
+        fs::remove_all(root);
+    }
+
+    void TestChatMessageRegistrationRejectedWhenCapabilityWasNotAdvertised()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_chat_message_capability_snapshot");
+        ConfigureEnvironment(root);
+        fs::create_directories(root / "state" / "instances" / "arkserver");
+
+        FakePlugin plugin{
+            .filename = "chat_capability_snapshot.so",
+            .pluginId = "chat_capability_snapshot",
+            .captureApi = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::ChatEventDispatcher chatDispatcher;
+        Obelisk::Core::PluginManager manager(loader, chatDispatcher);
+        Require((manager.ApiCapabilitiesForTesting() & OBELISK_API_CAPABILITY_CHAT_EVENTS) == 0,
+                "chat message capability was advertised before the gate was enabled");
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "chat capability snapshot plugin was not initialized");
+        Require((plugin.capturedApi.capabilities & OBELISK_API_CAPABILITY_CHAT_EVENTS) == 0,
+                "plugin captured chat capability despite disabled constructor-time gate");
+
+        setenv("OBELISK_ENABLE_CHAT_EVENTS", "1", 1);
+        {
+            std::ofstream marker(root / "state" / "instances" / "arkserver" / "enable-chat-events");
+            Require(marker.is_open(), "failed to create chat events marker");
+        }
+
+        Require(plugin.capturedApi.RegisterChatMessageEventWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    FakeChatMessageEventCallback,
+                    &plugin) == 0,
+                "chat message callback registered after dynamic gate enabled without advertised capability");
+        Require(chatDispatcher.SubscriptionCount() == 0,
+                "chat callback subscription was created without advertised capability");
+
+        manager.UnloadAll();
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestChatMessageCallbackExceptionDoesNotEscapeDispatch()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_chat_message_callback_throw");
+        ConfigureEnvironment(root);
+        setenv("OBELISK_ENABLE_CHAT_EVENTS", "1", 1);
+        fs::create_directories(root / "state" / "instances" / "arkserver");
+        {
+            std::ofstream marker(root / "state" / "instances" / "arkserver" / "enable-chat-events");
+            Require(marker.is_open(), "failed to create chat events marker");
+        }
+
+        FakePlugin plugin{
+            .filename = "chat_message_callback_throw.so",
+            .pluginId = "chat_message_callback_throw",
+            .captureApi = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::ChatEventDispatcher chatDispatcher;
+        Obelisk::Core::PluginManager manager(loader, chatDispatcher);
+        manager.LoadPlugins((root / "plugins").string());
+        Require(plugin.initCalls == 1, "throwing chat message plugin was not initialized");
+
+        int throwingCallCount = 0;
+        const uint64_t registrationId =
+            plugin.capturedApi.RegisterChatMessageEventWithOwnerTokenHandle(
+                plugin.initOwnerToken,
+                ThrowingChatMessageEventCallback,
+                &throwingCallCount);
+        Require(registrationId != 0, "throwing chat message callback could not register");
+
+        const Obelisk::Core::ChatMessageView message{
+            .Message = "!throw",
+            .SenderName = "ignored",
+            .SenderPlatformId = "ignored",
+            .SendMode = Obelisk::Core::ChatSendMode::Global,
+            .SenderNameIndex = 777,
+        };
+        Require(chatDispatcher.Dispatch(message) == 1,
+                "throwing chat message callback was not counted as handled");
+        Require(throwingCallCount == 1, "throwing chat message callback was not invoked once");
+        Require(chatDispatcher.SubscriptionCount() == 1,
+                "throwing chat message callback was removed during dispatch");
+
+        manager.UnloadAll();
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestChatMessageRegistrationUsesOwnerCapabilitySnapshotAcrossManagers()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_chat_message_cross_manager_capability_snapshot");
+        ConfigureEnvironment(root);
+        fs::create_directories(root / "state" / "instances" / "arkserver");
+
+        FakePlugin pluginA{
+            .filename = "chat_cross_manager_a.so",
+            .pluginId = "chat_cross_manager_a",
+            .captureApi = true,
+        };
+        FakeLoader loaderA;
+        loaderA.Add(pluginA);
+        TouchPlugin(root, pluginA.filename);
+        WritePluginConfig(root, pluginA.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::ChatEventDispatcher dispatcherA;
+        Obelisk::Core::PluginManager managerA(loaderA, dispatcherA);
+        Require((managerA.ApiCapabilitiesForTesting() & OBELISK_API_CAPABILITY_CHAT_EVENTS) == 0,
+                "first manager advertised chat events before the gate was enabled");
+        managerA.LoadPlugins((root / "plugins").string());
+        Require(pluginA.initCalls == 1, "cross-manager plugin A was not initialized");
+        Require((pluginA.capturedApi.capabilities & OBELISK_API_CAPABILITY_CHAT_EVENTS) == 0,
+                "plugin A captured chat capability despite disabled gate");
+
+        setenv("OBELISK_ENABLE_CHAT_EVENTS", "1", 1);
+        {
+            std::ofstream marker(root / "state" / "instances" / "arkserver" / "enable-chat-events");
+            Require(marker.is_open(), "failed to create chat events marker");
+        }
+
+        FakePlugin pluginB{
+            .filename = "chat_cross_manager_b.so",
+            .pluginId = "chat_cross_manager_b",
+            .captureApi = true,
+        };
+        FakeLoader loaderB;
+        loaderB.Add(pluginB);
+        TouchPlugin(root, pluginB.filename);
+        WritePluginConfig(root, pluginB.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::ChatEventDispatcher dispatcherB;
+        Obelisk::Core::PluginManager managerB(loaderB, dispatcherB);
+        Require((managerB.ApiCapabilitiesForTesting() & OBELISK_API_CAPABILITY_CHAT_EVENTS) != 0,
+                "second manager did not advertise chat events after the gate was enabled");
+        managerB.LoadPlugins((root / "plugins").string());
+        Require(pluginB.initCalls == 1, "cross-manager plugin B was not initialized");
+        Require((pluginB.capturedApi.capabilities & OBELISK_API_CAPABILITY_CHAT_EVENTS) != 0,
+                "plugin B did not capture chat capability after gate enable");
+
+        Require(pluginA.capturedApi.RegisterChatMessageEventWithOwnerTokenHandle(
+                    pluginA.initOwnerToken,
+                    FakeChatMessageEventCallback,
+                    &pluginA) == 0,
+                "plugin A registered chat after a later manager widened global capability");
+        Require(dispatcherA.SubscriptionCount() == 0,
+                "plugin A registration created a subscription in its original dispatcher");
+        Require(dispatcherB.SubscriptionCount() == 0,
+                "plugin A registration leaked into a later manager dispatcher");
+
+        managerB.UnloadAll();
+        managerA.UnloadAll();
+        CleanupPlugin(pluginA);
+        CleanupPlugin(pluginB);
         fs::remove_all(root);
     }
 
@@ -1651,6 +2101,488 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestGameplayPolicyCallbackExceptionDoesNotEscapeDispatch()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_gameplay_policy_callback_throw");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "gameplay_policy_callback_throw.so",
+            .pluginId = "gameplay_policy_callback_throw",
+            .captureApi = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+        Require(plugin.initCalls == 1, "throwing gameplay policy plugin was not initialized");
+
+        int throwingCallCount = 0;
+        const uint64_t registrationId =
+            plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                plugin.initOwnerToken,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACCESS_CHECK,
+                ThrowingGameplayPolicyEventCallback,
+                &throwingCallCount);
+        Require(registrationId != 0, "throwing gameplay policy callback could not register");
+
+        const std::vector<Obelisk::Core::StructureScalarValue> scalars = MakeStructureScalars();
+        Require(Obelisk::Core::StructureEventDispatcher::Get().Dispatch(MakeStructureEvent(scalars)) == 1,
+                "throwing gameplay policy callback was not counted as handled");
+        Require(throwingCallCount == 1, "throwing gameplay policy callback was not invoked once");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 1,
+                "throwing gameplay policy callback was removed during dispatch");
+
+        manager.UnloadAll();
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestGameplayPolicyCrossDispatcherSelfUnregisterDoesNotDeadlock()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_gameplay_policy_cross_dispatcher_unregister");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "gameplay_policy_cross_dispatcher_unregister.so",
+            .pluginId = "gameplay_policy_cross_dispatcher_unregister",
+            .captureApi = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "cross-dispatcher plugin was not initialized");
+        Require(plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle != nullptr,
+                "gameplay policy registration function was not exposed");
+        Require(plugin.capturedApi.UnregisterGameplayPolicyEventWithOwnerToken != nullptr,
+                "gameplay policy unregister function was not exposed");
+
+        ConcurrentGameplayPolicyUnregisterState state;
+        state.Api = &plugin.capturedApi;
+        state.OwnerToken = plugin.initOwnerToken;
+        state.RegistrationId =
+            plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                plugin.initOwnerToken,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACCESS_CHECK |
+                    OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK,
+                ConcurrentGameplayPolicyUnregisterCallback,
+                &state);
+        Require(state.RegistrationId != 0, "cross-dispatcher gameplay policy registration returned zero");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 1,
+                "cross-dispatcher callback was not bridged into structure dispatcher");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 1,
+                "cross-dispatcher callback was not bridged into inventory dispatcher");
+
+        const std::vector<Obelisk::Core::StructureScalarValue> structureScalars = MakeStructureScalars();
+        const std::vector<Obelisk::Core::InventoryPolicyScalarValue> inventoryScalars =
+            MakeInventoryCanUseScalars();
+        std::atomic<size_t> structureDispatches{0};
+        std::atomic<size_t> inventoryDispatches{0};
+
+        std::thread structureThread([&]() {
+            structureDispatches.store(
+                Obelisk::Core::StructureEventDispatcher::Get().Dispatch(MakeStructureEvent(structureScalars)),
+                std::memory_order_release);
+        });
+        std::thread inventoryThread([&]() {
+            inventoryDispatches.store(
+                Obelisk::Core::InventoryPolicyEventDispatcher::Get().Dispatch(
+                    MakeInventoryCanUseEvent(inventoryScalars)),
+                std::memory_order_release);
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
+                        return state.Entered == 2;
+                    }),
+                    "both gameplay policy dispatcher callbacks did not enter");
+            state.Release = true;
+        }
+        state.Cv.notify_all();
+
+        bool completed = false;
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            completed = state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
+                return state.Completed == 2;
+            });
+        }
+
+        if (!completed)
+        {
+            structureThread.detach();
+            inventoryThread.detach();
+            Require(false, "cross-dispatcher gameplay policy unregister deadlocked");
+        }
+
+        structureThread.join();
+        inventoryThread.join();
+
+        Require(structureDispatches.load(std::memory_order_acquire) == 1,
+                "structure dispatch did not complete exactly one callback");
+        Require(inventoryDispatches.load(std::memory_order_acquire) == 1,
+                "inventory dispatch did not complete exactly one callback");
+        Require(state.SawStructure, "cross-dispatcher test did not observe structure event");
+        Require(state.SawInventory, "cross-dispatcher test did not observe inventory event");
+        Require(state.SuccessfulUnregisters == 1,
+                "cross-dispatcher self-unregister should succeed exactly once");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
+                "cross-dispatcher structure callback survived unregister");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
+                "cross-dispatcher inventory callback survived unregister");
+
+        manager.UnloadAll();
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestCrossFamilyUnregisterSuppressesWaitForOtherFamilyDispatch()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_gameplay_policy_cross_family_fence");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "gameplay_policy_cross_family_fence.so",
+            .pluginId = "gameplay_policy_cross_family_fence",
+            .captureApi = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "cross-family fence plugin was not initialized");
+        Require(plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle != nullptr,
+                "gameplay policy registration function was not exposed");
+        Require(plugin.capturedApi.UnregisterGameplayPolicyEventWithOwnerToken != nullptr,
+                "gameplay policy unregister function was not exposed");
+
+        CrossFamilyFenceState state;
+        state.Api = &plugin.capturedApi;
+        state.OwnerToken = plugin.initOwnerToken;
+        state.RegistrationId =
+            plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                plugin.initOwnerToken,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACCESS_CHECK |
+                    OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK,
+                GameplayPolicyCrossFamilyFenceCallback,
+                &state);
+        Require(state.RegistrationId != 0, "cross-family fence registration returned zero");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 1,
+                "cross-family fence callback was not bridged into structure dispatcher");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 1,
+                "cross-family fence callback was not bridged into inventory dispatcher");
+
+        const std::vector<Obelisk::Core::StructureScalarValue> structureScalars = MakeStructureScalars();
+        const std::vector<Obelisk::Core::InventoryPolicyScalarValue> inventoryScalars =
+            MakeInventoryCanUseScalars();
+        std::atomic<size_t> structureDispatches{0};
+        std::atomic<size_t> inventoryDispatches{0};
+
+        std::thread inventoryThread([&]() {
+            inventoryDispatches.store(
+                Obelisk::Core::InventoryPolicyEventDispatcher::Get().Dispatch(
+                    MakeInventoryCanUseEvent(inventoryScalars)),
+                std::memory_order_release);
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
+                        return state.InventoryEntered;
+                    }),
+                    "inventory fence callback did not enter");
+        }
+
+        std::thread structureThread([&]() {
+            structureDispatches.store(
+                Obelisk::Core::StructureEventDispatcher::Get().Dispatch(
+                    MakeStructureEvent(structureScalars)),
+                std::memory_order_release);
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
+                        return state.StructureEntered;
+                    }),
+                    "structure fence callback did not enter");
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        {
+            std::lock_guard<std::mutex> lock(state.Mutex);
+            Require(state.StructureUnregisterReturned,
+                    "cross-family unregister waited for the other family dispatch from a gameplay callback");
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(state.Mutex);
+            state.ReleaseInventory = true;
+        }
+        state.Cv.notify_all();
+
+        inventoryThread.join();
+        structureThread.join();
+
+        Require(inventoryDispatches.load(std::memory_order_acquire) == 1,
+                "inventory fence dispatch did not complete exactly one callback");
+        Require(structureDispatches.load(std::memory_order_acquire) == 1,
+                "structure fence dispatch did not complete exactly one callback");
+        Require(state.InventoryCalls == 1, "inventory fence callback call count mismatch");
+        Require(state.StructureCalls == 1, "structure fence callback call count mismatch");
+        Require(state.StructureUnregisterResult,
+                "cross-family unregister did not remove inventory callback");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
+                "inventory fence callback survived cross-family unregister");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
+                "structure fence callback survived cross-family unregister");
+
+        manager.UnloadAll();
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestCrossFamilyUnregisterSuppressesWaitForStructureDispatch()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_gameplay_policy_cross_family_structure_fence");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "gameplay_policy_cross_family_structure_fence.so",
+            .pluginId = "gameplay_policy_cross_family_structure_fence",
+            .captureApi = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "cross-family structure fence plugin was not initialized");
+        Require(plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle != nullptr,
+                "gameplay policy registration function was not exposed");
+        Require(plugin.capturedApi.UnregisterGameplayPolicyEventWithOwnerToken != nullptr,
+                "gameplay policy unregister function was not exposed");
+
+        CrossFamilyFenceState state;
+        state.Api = &plugin.capturedApi;
+        state.OwnerToken = plugin.initOwnerToken;
+        state.BlockStructure = true;
+        state.RegistrationId =
+            plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                plugin.initOwnerToken,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACCESS_CHECK |
+                    OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK,
+                GameplayPolicyCrossFamilyFenceCallback,
+                &state);
+        Require(state.RegistrationId != 0, "cross-family structure fence registration returned zero");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 1,
+                "cross-family structure fence callback was not bridged into structure dispatcher");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 1,
+                "cross-family structure fence callback was not bridged into inventory dispatcher");
+
+        const std::vector<Obelisk::Core::StructureScalarValue> structureScalars = MakeStructureScalars();
+        const std::vector<Obelisk::Core::InventoryPolicyScalarValue> inventoryScalars =
+            MakeInventoryCanUseScalars();
+        std::atomic<size_t> structureDispatches{0};
+        std::atomic<size_t> inventoryDispatches{0};
+
+        std::thread structureThread([&]() {
+            structureDispatches.store(
+                Obelisk::Core::StructureEventDispatcher::Get().Dispatch(
+                    MakeStructureEvent(structureScalars)),
+                std::memory_order_release);
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
+                        return state.StructureEntered;
+                    }),
+                    "structure fence callback did not enter");
+        }
+
+        std::thread inventoryThread([&]() {
+            inventoryDispatches.store(
+                Obelisk::Core::InventoryPolicyEventDispatcher::Get().Dispatch(
+                    MakeInventoryCanUseEvent(inventoryScalars)),
+                std::memory_order_release);
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
+                        return state.InventoryEntered;
+                    }),
+                    "inventory fence callback did not enter");
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        {
+            std::lock_guard<std::mutex> lock(state.Mutex);
+            Require(state.InventoryUnregisterReturned,
+                    "cross-family unregister waited for the structure dispatch from a gameplay callback");
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(state.Mutex);
+            state.ReleaseStructure = true;
+        }
+        state.Cv.notify_all();
+
+        structureThread.join();
+        inventoryThread.join();
+
+        Require(structureDispatches.load(std::memory_order_acquire) == 1,
+                "structure fence dispatch did not complete exactly one callback");
+        Require(inventoryDispatches.load(std::memory_order_acquire) == 1,
+                "inventory fence dispatch did not complete exactly one callback");
+        Require(state.StructureCalls == 1, "structure fence callback call count mismatch");
+        Require(state.InventoryCalls == 1, "inventory fence callback call count mismatch");
+        Require(state.InventoryUnregisterResult,
+                "cross-family unregister did not remove structure callback");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
+                "structure fence callback survived cross-family unregister");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
+                "inventory fence callback survived cross-family unregister");
+
+        manager.UnloadAll();
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestUnloadAllWaitsForCrossFamilyGameplayPolicyDispatchBeforeClose()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_gameplay_policy_shutdown_cross_family_fence");
+        ConfigureEnvironment(root);
+
+        std::atomic<bool> closeObserved{false};
+        FakePlugin plugin{
+            .filename = "gameplay_policy_shutdown_cross_family_fence.so",
+            .pluginId = "gameplay_policy_shutdown_cross_family_fence",
+            .captureApi = true,
+            .closeObserved = &closeObserved,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "shutdown cross-family plugin was not initialized");
+        Require(plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle != nullptr,
+                "gameplay policy registration function was not exposed");
+
+        ShutdownCrossFamilyFenceState state;
+        const uint64_t registrationId =
+            plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                plugin.initOwnerToken,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACCESS_CHECK |
+                    OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK,
+                GameplayPolicyShutdownCrossFamilyFenceCallback,
+                &state);
+        Require(registrationId != 0, "shutdown cross-family registration returned zero");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 1,
+                "shutdown cross-family callback was not bridged into structure dispatcher");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 1,
+                "shutdown cross-family callback was not bridged into inventory dispatcher");
+
+        const std::vector<Obelisk::Core::StructureScalarValue> structureScalars = MakeStructureScalars();
+        const std::vector<Obelisk::Core::InventoryPolicyScalarValue> inventoryScalars =
+            MakeInventoryCanUseScalars();
+        std::atomic<size_t> structureDispatches{0};
+        std::atomic<size_t> inventoryDispatches{0};
+        std::atomic<bool> unloadReturned{false};
+
+        std::thread structureThread([&]() {
+            structureDispatches.store(
+                Obelisk::Core::StructureEventDispatcher::Get().Dispatch(
+                    MakeStructureEvent(structureScalars)),
+                std::memory_order_release);
+        });
+        std::thread inventoryThread([&]() {
+            inventoryDispatches.store(
+                Obelisk::Core::InventoryPolicyEventDispatcher::Get().Dispatch(
+                    MakeInventoryCanUseEvent(inventoryScalars)),
+                std::memory_order_release);
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
+                        return state.StructureEntered && state.InventoryEntered;
+                    }),
+                    "shutdown cross-family callbacks did not both enter");
+        }
+
+        std::thread unloadThread([&]() {
+            manager.UnloadAll();
+            unloadReturned.store(true, std::memory_order_release);
+        });
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        Require(!closeObserved.load(std::memory_order_acquire),
+                "plugin was closed while cross-family gameplay policy callbacks were in flight");
+        Require(!unloadReturned.load(std::memory_order_acquire),
+                "UnloadAll returned while cross-family gameplay policy callbacks were in flight");
+
+        {
+            std::lock_guard<std::mutex> lock(state.Mutex);
+            state.ReleaseStructure = true;
+        }
+        state.Cv.notify_all();
+        structureThread.join();
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        Require(!closeObserved.load(std::memory_order_acquire),
+                "plugin was closed while the inventory gameplay policy callback was still in flight");
+        Require(!unloadReturned.load(std::memory_order_acquire),
+                "UnloadAll returned while the inventory gameplay policy callback was still in flight");
+
+        {
+            std::lock_guard<std::mutex> lock(state.Mutex);
+            state.ReleaseInventory = true;
+        }
+        state.Cv.notify_all();
+
+        inventoryThread.join();
+        unloadThread.join();
+
+        Require(structureDispatches.load(std::memory_order_acquire) == 1,
+                "shutdown cross-family structure dispatch did not complete exactly one callback");
+        Require(inventoryDispatches.load(std::memory_order_acquire) == 1,
+                "shutdown cross-family inventory dispatch did not complete exactly one callback");
+        Require(state.StructureCalls == 1, "shutdown cross-family structure callback call count mismatch");
+        Require(state.InventoryCalls == 1, "shutdown cross-family inventory callback call count mismatch");
+        Require(closeObserved.load(std::memory_order_acquire),
+                "plugin was not closed after cross-family callbacks completed");
+        Require(plugin.closeCalls == 1, "shutdown cross-family plugin was not closed once");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
+                "shutdown cross-family structure callback survived unload");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
+                "shutdown cross-family inventory callback survived unload");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestDescribeResourceKind()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_describe_resource_kind");
@@ -1692,6 +2624,8 @@ namespace
                 "resource descriptor struct size mismatch");
         Require(descriptor.resource_kind == OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE,
                 "resource descriptor kind mismatch");
+        Require(descriptor.reserved0 == 0,
+                "resource descriptor reserved0 was not zeroed");
         Require((descriptor.flags & OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_CATEGORY_ONLY) != 0,
                 "resource descriptor did not mark category-only");
         Require((descriptor.flags & OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY) != 0,
@@ -1717,6 +2651,8 @@ namespace
                 "DescribeResourceKind rejected inventory item resource kind");
         Require(descriptor.resource_kind == OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM,
                 "inventory resource descriptor kind mismatch");
+        Require(descriptor.reserved0 == 0,
+                "inventory resource descriptor reserved0 was not zeroed");
         Require((descriptor.flags & OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_CATEGORY_ONLY) != 0,
                 "inventory resource descriptor did not mark category-only");
         Require((descriptor.flags & OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY) != 0,
@@ -2056,6 +2992,7 @@ namespace
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_owner_token_shutdown_unregister");
         ConfigureEnvironment(root);
+        EnableFilteredProcessEventCallbacks(root);
 
         FakePlugin plugin{
             .filename = "owner_token_shutdown_unregister.so",
@@ -2091,6 +3028,7 @@ namespace
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_owner_token_init_fail_shutdown_unregister");
         ConfigureEnvironment(root);
+        EnableFilteredProcessEventCallbacks(root);
 
         FakePlugin plugin{
             .filename = "owner_token_init_fail_shutdown_unregister.so",
@@ -2151,6 +3089,7 @@ namespace
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_invalid_owner_token");
         ConfigureEnvironment(root);
+        EnableFilteredProcessEventCallbacks(root);
 
         FakePlugin plugin{.filename = "invalid_owner_token.so", .captureApi = true};
         FakeLoader loader;
@@ -2275,6 +3214,72 @@ namespace
 
         manager.UnloadAll();
         CleanupPlugin(plugin);
+        unsetenv("OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS");
+        fs::remove_all(root);
+    }
+
+    void TestGlobalProcessEventRegistrationUsesOwnerCapabilitySnapshotAcrossManagers()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_global_cross_manager_capability_snapshot");
+        ConfigureEnvironment(root);
+        fs::create_directories(root / "state" / "instances" / "arkserver");
+
+        FakePlugin pluginA{
+            .filename = "global_cross_manager_a.so",
+            .pluginId = "global_cross_manager_a",
+            .captureApi = true,
+        };
+        FakeLoader loaderA;
+        loaderA.Add(pluginA);
+        TouchPlugin(root, pluginA.filename);
+        WritePluginConfig(root, pluginA.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager managerA(loaderA);
+        Require((managerA.ApiCapabilitiesForTesting() & OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS) == 0,
+                "first manager advertised global callbacks before the gate was enabled");
+        managerA.LoadPlugins((root / "plugins").string());
+        Require(pluginA.initCalls == 1, "global cross-manager plugin A was not initialized");
+        Require((pluginA.capturedApi.capabilities & OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS) == 0,
+                "plugin A captured global callback capability despite disabled gate");
+
+        setenv("OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS", "1", 1);
+        const fs::path markerPath =
+            root / "state" / "instances" / "arkserver" / "allow-global-process-event-callbacks";
+        std::ofstream marker(markerPath);
+        Require(marker.is_open(), "failed to create global callback marker");
+        marker.close();
+
+        FakePlugin pluginB{
+            .filename = "global_cross_manager_b.so",
+            .pluginId = "global_cross_manager_b",
+            .captureApi = true,
+        };
+        FakeLoader loaderB;
+        loaderB.Add(pluginB);
+        TouchPlugin(root, pluginB.filename);
+        WritePluginConfig(root, pluginB.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager managerB(loaderB);
+        Require((managerB.ApiCapabilitiesForTesting() & OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS) != 0,
+                "second manager did not advertise global callbacks after the gate was enabled");
+        managerB.LoadPlugins((root / "plugins").string());
+        Require(pluginB.initCalls == 1, "global cross-manager plugin B was not initialized");
+        Require((pluginB.capturedApi.capabilities & OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS) != 0,
+                "plugin B did not capture global callback capability after gate enable");
+
+        const uint64_t registrationId =
+            pluginA.capturedApi.RegisterPreProcessEventWithOwnerTokenHandle(
+                pluginA.initOwnerToken,
+                FakeCallback);
+        Require(registrationId == 0,
+                "plugin A registered a global callback after a later manager widened global capability");
+        Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
+                "plugin A global callback registered after a later manager widened capability");
+
+        managerB.UnloadAll();
+        managerA.UnloadAll();
+        CleanupPlugin(pluginA);
+        CleanupPlugin(pluginB);
         unsetenv("OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS");
         fs::remove_all(root);
     }
@@ -2572,6 +3577,7 @@ namespace
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_init_fail");
         ConfigureEnvironment(root);
+        EnableFilteredProcessEventCallbacks(root);
 
         FakePlugin plugin{.filename = "init_fail.so", .initResult = false, .registerFilteredCallback = true};
         Obelisk::Core::ChatEventDispatcher chatDispatcher;
@@ -2621,6 +3627,7 @@ namespace
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_init_throw");
         ConfigureEnvironment(root);
+        EnableFilteredProcessEventCallbacks(root);
 
         FakePlugin plugin{
             .filename = "init_throw.so",
@@ -2780,6 +3787,7 @@ namespace
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_shutdown_throw");
         ConfigureEnvironment(root);
+        EnableFilteredProcessEventCallbacks(root);
 
         FakePlugin plugin{
             .filename = "shutdown_throw.so",
@@ -2874,6 +3882,7 @@ namespace
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_idempotent");
         ConfigureEnvironment(root);
+        EnableFilteredProcessEventCallbacks(root);
 
         FakePlugin plugin{.filename = "idempotent.so", .pluginId = "idempotent_plugin", .registerFilteredCallback = true};
         FakeLoader loader;
@@ -2917,7 +3926,9 @@ int main()
     TestCallbackHandleCapabilityImpliesOwnerTokenCapability();
     TestProcessEventBlockingCapabilityRejectedByDefault();
     TestProcessEventBlockingCapabilityAllowedWithGate();
-    TestFilteredProcessEventCallbackAllowedByDefault();
+    TestFilteredProcessEventCallbackRejectedByDefault();
+    TestFilteredProcessEventCallbackAllowedWithGate();
+    TestFilteredProcessEventCallbackRejectedAfterGateRevoked();
     TestPostInitUnownedCallbackRegistrationIsRejected();
     TestPostInitOwnerTokenCallbackRegistrationCleansOnUnload();
     TestOwnerTokenCallbackRegistrationFromInitThread();
@@ -2926,7 +3937,15 @@ int main()
     TestOwnerTokenHandleRegistrationCanUnregister();
     TestOwnerTokenGameplayPolicyEventRegistrationCanUnregister();
     TestOwnerTokenChatMessageEventRegistrationCanUnregister();
+    TestChatMessageRegistrationRejectedWhenCapabilityWasNotAdvertised();
+    TestChatMessageCallbackExceptionDoesNotEscapeDispatch();
+    TestChatMessageRegistrationUsesOwnerCapabilitySnapshotAcrossManagers();
     TestGameplayPolicyCallbackCanSelfUnregisterDuringDispatch();
+    TestGameplayPolicyCallbackExceptionDoesNotEscapeDispatch();
+    TestGameplayPolicyCrossDispatcherSelfUnregisterDoesNotDeadlock();
+    TestCrossFamilyUnregisterSuppressesWaitForOtherFamilyDispatch();
+    TestCrossFamilyUnregisterSuppressesWaitForStructureDispatch();
+    TestUnloadAllWaitsForCrossFamilyGameplayPolicyDispatchBeforeClose();
     TestDescribeResourceKind();
     TestDescribeGameplayPolicyEventKind();
     TestGameplayPolicyCallbackCleansOnInitFailure();
@@ -2942,6 +3961,7 @@ int main()
     TestUnsafeConfigRootDisablesPluginLoading();
     TestGlobalProcessEventCallbackAllowedWithGate();
     TestGlobalProcessEventCallbackRejectedAfterGateRevoked();
+    TestGlobalProcessEventRegistrationUsesOwnerCapabilitySnapshotAcrossManagers();
     TestCallProcessEventRejectedByDefault();
     TestCallProcessEventAllowedWithGate();
     TestCallProcessEventRejectedAfterGateRevoked();

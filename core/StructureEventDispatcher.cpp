@@ -1,4 +1,5 @@
 #include "StructureEventDispatcher.h"
+#include "GameplayCallbackScope.h"
 #include "runtime/Logger.h"
 
 #include <algorithm>
@@ -66,6 +67,11 @@ namespace Obelisk::Core
                     OBELISK_ERROR("Structure event subscription cleanup threw an unknown exception.");
             }
         }
+
+        bool IsInsideAnyGameplayCallback()
+        {
+            return GameplayCallbackScope::IsInsideAnyCallback();
+        }
     }
 
     StructureEventDispatcher& StructureEventDispatcher::Get()
@@ -118,12 +124,11 @@ namespace Obelisk::Core
         if (registrationId == 0)
             return false;
 
-        std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
         std::vector<StructureEventSubscription> removed;
         size_t before = 0;
         size_t after = 0;
         {
-            std::lock_guard<std::mutex> lock(m_Mutex);
+            std::unique_lock<std::mutex> lock(m_Mutex);
             before = m_Registrations.size();
             auto keepEnd = std::remove_if(m_Registrations.begin(),
                                           m_Registrations.end(),
@@ -135,8 +140,13 @@ namespace Obelisk::Core
                                           });
             m_Registrations.erase(keepEnd, m_Registrations.end());
             after = m_Registrations.size();
+            if (QueueOrDestroyRemovedSubscriptions(removed, lock))
+                m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
+            else if (!IsInsideAnyGameplayCallback() && !IsDispatchCleanupComplete())
+                m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
         }
-        QueueOrDestroyRemovedSubscriptions(removed);
+        for (const StructureEventSubscription& subscription : removed)
+            DestroySubscriptionUserData(subscription);
         return after != before;
     }
 
@@ -145,12 +155,11 @@ namespace Obelisk::Core
         if (!owner || registrationId == 0)
             return false;
 
-        std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
         std::vector<StructureEventSubscription> removed;
         size_t before = 0;
         size_t after = 0;
         {
-            std::lock_guard<std::mutex> lock(m_Mutex);
+            std::unique_lock<std::mutex> lock(m_Mutex);
             before = m_Registrations.size();
             auto keepEnd = std::remove_if(m_Registrations.begin(),
                                           m_Registrations.end(),
@@ -162,8 +171,13 @@ namespace Obelisk::Core
                                           });
             m_Registrations.erase(keepEnd, m_Registrations.end());
             after = m_Registrations.size();
+            if (QueueOrDestroyRemovedSubscriptions(removed, lock))
+                m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
+            else if (!IsInsideAnyGameplayCallback() && !IsDispatchCleanupComplete())
+                m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
         }
-        QueueOrDestroyRemovedSubscriptions(removed);
+        for (const StructureEventSubscription& subscription : removed)
+            DestroySubscriptionUserData(subscription);
         return after != before;
     }
 
@@ -172,12 +186,11 @@ namespace Obelisk::Core
         if (!owner)
             return 0;
 
-        std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
         std::vector<StructureEventSubscription> removed;
         size_t before = 0;
         size_t after = 0;
         {
-            std::lock_guard<std::mutex> lock(m_Mutex);
+            std::unique_lock<std::mutex> lock(m_Mutex);
             before = m_Registrations.size();
             auto keepEnd = std::remove_if(m_Registrations.begin(),
                                           m_Registrations.end(),
@@ -189,41 +202,61 @@ namespace Obelisk::Core
                                           });
             m_Registrations.erase(keepEnd, m_Registrations.end());
             after = m_Registrations.size();
+            if (QueueOrDestroyRemovedSubscriptions(removed, lock))
+                m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
+            else if (!IsInsideAnyGameplayCallback() && !IsDispatchCleanupComplete())
+                m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
         }
-        QueueOrDestroyRemovedSubscriptions(removed);
+        for (const StructureEventSubscription& subscription : removed)
+            DestroySubscriptionUserData(subscription);
         return before - after;
     }
 
-    void StructureEventDispatcher::QueueOrDestroyRemovedSubscriptions(
-        std::vector<StructureEventSubscription>& removed)
+    bool StructureEventDispatcher::QueueOrDestroyRemovedSubscriptions(
+        std::vector<StructureEventSubscription>& removed,
+        std::unique_lock<std::mutex>&)
     {
         if (removed.empty())
-            return;
+            return false;
 
         if (m_DispatchDepth > 0)
         {
             m_PendingDestroy.insert(m_PendingDestroy.end(), removed.begin(), removed.end());
             removed.clear();
-            return;
+            return !IsInsideAnyGameplayCallback();
         }
 
-        for (const StructureEventSubscription& subscription : removed)
-            DestroySubscriptionUserData(subscription);
+        return false;
+    }
+
+    bool StructureEventDispatcher::IsDispatchCleanupComplete() const
+    {
+        return m_DispatchDepth == 0 && m_PendingDestroy.empty() && m_PendingDestroyInProgress == 0;
     }
 
     void StructureEventDispatcher::FinishDispatch()
     {
-        if (m_DispatchDepth == 0)
-            return;
-
-        --m_DispatchDepth;
-        if (m_DispatchDepth != 0)
-            return;
-
         std::vector<StructureEventSubscription> pending;
-        pending.swap(m_PendingDestroy);
+        {
+            std::lock_guard<std::mutex> lock(m_Mutex);
+            if (m_DispatchDepth == 0)
+                return;
+
+            --m_DispatchDepth;
+            if (m_DispatchDepth != 0)
+                return;
+
+            pending.swap(m_PendingDestroy);
+            m_PendingDestroyInProgress += pending.size();
+        }
+
         for (const StructureEventSubscription& subscription : pending)
             DestroySubscriptionUserData(subscription);
+        {
+            std::lock_guard<std::mutex> lock(m_Mutex);
+            m_PendingDestroyInProgress -= pending.size();
+        }
+        m_DispatchCv.notify_all();
     }
 
     void StructureEventDispatcher::SetNextRegistrationIdForTesting(uint64_t nextRegistrationId)
@@ -237,59 +270,86 @@ namespace Obelisk::Core
         if (!IsValidEvent(event))
             return 0;
 
-        std::vector<StructureScalarValue> scalarCopies(event.Scalars.begin(), event.Scalars.end());
-        StructureEventView copiedEvent{
-            .Kind = event.Kind,
-            .FunctionNameIndex = event.FunctionNameIndex,
-            .OuterNameIndex = event.OuterNameIndex,
-            .Scalars = scalarCopies,
-        };
-
-        std::vector<DispatchRegistration> callbacks;
-        std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
-        ++m_DispatchDepth;
         size_t dispatched = 0;
         try
         {
+            std::vector<StructureScalarValue> scalarCopies(event.Scalars.begin(), event.Scalars.end());
+            StructureEventView copiedEvent{
+                .Kind = event.Kind,
+                .FunctionNameIndex = event.FunctionNameIndex,
+                .OuterNameIndex = event.OuterNameIndex,
+                .Scalars = scalarCopies,
+            };
+
+            std::vector<DispatchRegistration> callbacks;
+            try
             {
-                std::lock_guard<std::mutex> lock(m_Mutex);
-                callbacks.reserve(m_Registrations.size());
-                for (const Registration& item : m_Registrations)
-                    callbacks.push_back({item.Id, item.Subscription});
+                {
+                    std::lock_guard<std::mutex> lock(m_Mutex);
+                    ++m_DispatchDepth;
+                    m_PendingDestroy.reserve(m_PendingDestroy.size() + m_Registrations.size());
+                    callbacks.reserve(m_Registrations.size());
+                    for (const Registration& item : m_Registrations)
+                        callbacks.push_back({item.Id, item.Subscription});
+                }
+
+                for (const DispatchRegistration& item : callbacks)
+                {
+                    if (!IsRegistrationActive(item.Id))
+                        continue;
+                    if (!item.Subscription.Callback)
+                        continue;
+
+                    try
+                    {
+                        GameplayCallbackScope callbackScope(GameplayCallbackFamily::Structure);
+                        item.Subscription.Callback(copiedEvent, item.Subscription.UserData);
+                        ++dispatched;
+                    }
+                    catch (const std::exception& e)
+                    {
+                        if (Obelisk::Logger::IsInitialized())
+                            OBELISK_ERROR("Structure event callback threw: {}", e.what());
+                    }
+                    catch (...)
+                    {
+                        if (Obelisk::Logger::IsInitialized())
+                            OBELISK_ERROR("Structure event callback threw an unknown exception.");
+                    }
+                }
+            }
+            catch (const std::exception& e)
+            {
+                FinishDispatch();
+                if (Obelisk::Logger::IsInitialized())
+                {
+                    OBELISK_ERROR("Structure event dispatch failed internally: {}", e.what());
+                }
+                return dispatched;
+            }
+            catch (...)
+            {
+                FinishDispatch();
+                if (Obelisk::Logger::IsInitialized())
+                    OBELISK_ERROR("Structure event dispatch failed internally with an unknown exception.");
+                return dispatched;
             }
 
-            for (const DispatchRegistration& item : callbacks)
-            {
-                if (!IsRegistrationActive(item.Id))
-                    continue;
-                if (!item.Subscription.Callback)
-                    continue;
-
-                try
-                {
-                    item.Subscription.Callback(copiedEvent, item.Subscription.UserData);
-                    ++dispatched;
-                }
-                catch (const std::exception& e)
-                {
-                    if (Obelisk::Logger::IsInitialized())
-                        OBELISK_ERROR("Structure event callback threw: {}", e.what());
-                }
-                catch (...)
-                {
-                    if (Obelisk::Logger::IsInitialized())
-                        OBELISK_ERROR("Structure event callback threw an unknown exception.");
-                }
-            }
+            FinishDispatch();
+            return dispatched;
+        }
+        catch (const std::exception& e)
+        {
+            if (Obelisk::Logger::IsInitialized())
+                OBELISK_ERROR("Structure event dispatch setup failed: {}", e.what());
+            return 0;
         }
         catch (...)
         {
-            FinishDispatch();
-            throw;
+            if (Obelisk::Logger::IsInitialized())
+                OBELISK_ERROR("Structure event dispatch setup failed with an unknown exception.");
+            return 0;
         }
-
-        FinishDispatch();
-        return dispatched;
     }
 
     size_t StructureEventDispatcher::SubscriptionCount() const
