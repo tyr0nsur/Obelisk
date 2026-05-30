@@ -7,7 +7,7 @@
     "capture_id": "primary_core_20260527T031311Z",
     "evidence_pack_id": "primary_core_pack_20260527T031311Z",
     "generated_by": "scripts/inspect_core_ufunctions.py --snapshot-json",
-    "obelisk_commit": "6b48c28",
+    "obelisk_commit": "5ad06ff",
     "source": "offline_core",
     "status": "candidate-only"
   },

@@ -35,7 +35,13 @@ FORBIDDEN_SUBSTRINGS = [
     "ShooterGame/Binaries",
 ]
 ADDRESS_RE = re.compile(r"0x[0-9a-fA-F]{8,}")
-HEX_METADATA_KEYS = {"function_flags", "property_flags", "return_value_offset"}
+HEX_METADATA_KEYS = {
+    "function_flags",
+    "property_flags",
+    "return_value_offset",
+    "byte_mask",
+    "field_mask",
+}
 
 
 def walk_json(value: object) -> list[tuple[str | None, object]]:
@@ -51,6 +57,21 @@ def walk_json(value: object) -> list[tuple[str | None, object]]:
 
 
 class UFunctionSnapshotFixtureTests(unittest.TestCase):
+    def assert_candidate_bool_property_semantics(self, prop: dict[str, object]) -> None:
+        if prop.get("class_name") != "BoolProperty" or prop.get("status") != "candidate":
+            return
+
+        semantics = prop.get("bool_property_semantics")
+        self.assertIsInstance(semantics, dict)
+        self.assertEqual(semantics.get("status"), "candidate")
+        self.assertEqual(semantics.get("reject_reasons"), [])
+        self.assertIsInstance(prop.get("native_bool"), bool)
+        for mask_key in ("byte_mask", "field_mask"):
+            mask = prop.get(mask_key)
+            self.assertIsInstance(mask, str)
+            self.assertRegex(mask, r"^0x[0-9a-fA-F]+$")
+            self.assertNotEqual(int(mask, 16), 0)
+
     def fixture_paths(self) -> list[Path]:
         return sorted(FIXTURE_ROOT.glob("**/*.snapshot.json"))
 
@@ -143,6 +164,7 @@ class UFunctionSnapshotFixtureTests(unittest.TestCase):
                 self.assertIsInstance(properties, list)
                 self.assertEqual(len(properties), chain.get("observed_count"))
                 for prop in properties:
+                    self.assert_candidate_bool_property_semantics(prop)
                     self.assertIsInstance(prop.get("object_index"), int)
                     self.assertIsInstance(prop.get("name_index"), int)
                     self.assertIsInstance(prop.get("class_name_index"), int)

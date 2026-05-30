@@ -13,6 +13,11 @@ TARGET_SETS = {
         "obelisk.ufunction-chain.snapshot.v1:PrimalBuff.BPBuffPreventUploading",
         "obelisk.ufunction-chain.snapshot.v1:PrimalBuff.BP_OnBuffLifetimeUpdated",
     ),
+    "buff-breadth-intake": (
+        "obelisk.ufunction-chain.snapshot.v1:PrimalBuff.BuffOverrideInventoryAccessInput",
+        "obelisk.ufunction-chain.snapshot.v1:PrimalBuff.BPCustomAllowAddBuff",
+        "obelisk.ufunction-chain.snapshot.v1:PrimalBuff.BPPreventAddingOtherBuff",
+    ),
     "dino-compact-intake": (
         "obelisk.ufunction-chain.snapshot.v1:PrimalDinoCharacter.AddPassenger",
         "obelisk.ufunction-chain.snapshot.v1:PrimalDinoCharacter.AllowCarryCharacter",
@@ -28,6 +33,16 @@ TARGET_SETS = {
         "obelisk.ufunction-chain.snapshot.v1:PrimalItem.AllowRemoteAddToInventory",
         "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.AllowStructureAccess",
         "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToDemolish",
+    ),
+    "item-compact-intake": (
+        "obelisk.ufunction-chain.snapshot.v1:PrimalItem.AllowEquipItem",
+        "obelisk.ufunction-chain.snapshot.v1:PrimalItem.CanRepair",
+        "obelisk.ufunction-chain.snapshot.v1:PrimalItem.CraftBlueprint",
+        "obelisk.ufunction-chain.snapshot.v1:PrimalItem.UseItemOntoItem",
+    ),
+    "inventory-action-compact-intake": (
+        "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerRequestInventoryUseItem",
+        "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerRequestInventoryUseItemWithActor",
     ),
     "structure-observer-intake": (
         "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.AllowStructureAccess",

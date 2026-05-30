@@ -77,6 +77,10 @@ def base_snapshot() -> dict[str, object]:
                             "element_size": 1,
                             "array_dim": 1,
                             "property_flags": "0x80",
+                            "bool_property_semantics": {"status": "candidate", "reject_reasons": []},
+                            "native_bool": True,
+                            "byte_mask": "0xff",
+                            "field_mask": "0xff",
                             "status": "candidate",
                             "reject_reasons": [],
                             "membership_status": "candidate-uobject",
@@ -95,6 +99,10 @@ def base_snapshot() -> dict[str, object]:
                             "element_size": 1,
                             "array_dim": 1,
                             "property_flags": "0x80",
+                            "bool_property_semantics": {"status": "candidate", "reject_reasons": []},
+                            "native_bool": True,
+                            "byte_mask": "0xff",
+                            "field_mask": "0xff",
                             "status": "candidate",
                             "reject_reasons": [],
                             "membership_status": "candidate-uobject",
@@ -217,7 +225,32 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             "obelisk.ufunction-chain.snapshot.v1:PrimalBuff.BPBuffPreventUploading",
             sets["buff-compact-intake"],
         )
+        self.assertEqual(
+            sets["buff-breadth-intake"],
+            [
+                "obelisk.ufunction-chain.snapshot.v1:PrimalBuff.BuffOverrideInventoryAccessInput",
+                "obelisk.ufunction-chain.snapshot.v1:PrimalBuff.BPCustomAllowAddBuff",
+                "obelisk.ufunction-chain.snapshot.v1:PrimalBuff.BPPreventAddingOtherBuff",
+            ],
+        )
         self.assertIn("dino-compact-intake", sets)
+        self.assertIn("item-compact-intake", sets)
+        self.assertEqual(
+            sets["item-compact-intake"],
+            [
+                "obelisk.ufunction-chain.snapshot.v1:PrimalItem.AllowEquipItem",
+                "obelisk.ufunction-chain.snapshot.v1:PrimalItem.CanRepair",
+                "obelisk.ufunction-chain.snapshot.v1:PrimalItem.CraftBlueprint",
+                "obelisk.ufunction-chain.snapshot.v1:PrimalItem.UseItemOntoItem",
+            ],
+        )
+        self.assertEqual(
+            sets["inventory-action-compact-intake"],
+            [
+                "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerRequestInventoryUseItem",
+                "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerRequestInventoryUseItemWithActor",
+            ],
+        )
         self.assertIn(
             "obelisk.ufunction-chain.snapshot.v1:PrimalDinoCharacter.AllowCarryCharacter",
             sets["dino-compact-intake"],
@@ -471,6 +504,56 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         report = json.loads(result.stdout)
         self.assertEqual(report["counts"]["rejected"], 1)
         self.assertIn("offset_internal", report["results"][0]["diffs"][0]["path"])
+
+    def test_rejects_bool_mask_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            left = base_snapshot()
+            right = deepcopy(left)
+            right["targets"][0]["property_chain"]["properties"][1]["field_mask"] = "0x01"  # type: ignore[index]
+            write_snapshot(base, left)
+            write_snapshot(candidate, right)
+
+            result = run_compare(base, candidate, "--json")
+
+        self.assertEqual(result.returncode, 1)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["counts"]["rejected"], 1)
+        self.assertIn("field_mask", report["results"][0]["diffs"][0]["path"])
+
+    def test_missing_bool_mask_markers_blocks_comparison_even_when_both_sides_match(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            left = base_snapshot()
+            right = deepcopy(left)
+            for payload in (left, right):
+                for prop in payload["targets"][0]["property_chain"]["properties"]:  # type: ignore[index]
+                    prop.pop("native_bool", None)
+                    prop.pop("byte_mask", None)
+                    prop.pop("field_mask", None)
+            write_snapshot(base, left)
+            write_snapshot(candidate, right)
+
+            result = run_compare(base, candidate, "--json")
+
+        self.assertEqual(result.returncode, 2)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["counts"]["inconclusive"], 1)
+        reasons = report["results"][0]["reasons"]
+        self.assertIn("base:property[0]_native_bool_missing", reasons)
+        self.assertIn("base:property[0]_byte_mask_missing_or_zero", reasons)
+        self.assertIn("base:property[0]_field_mask_missing_or_zero", reasons)
+        self.assertIn("candidate:property[1]_native_bool_missing", reasons)
+        self.assertIn("candidate:property[1]_byte_mask_missing_or_zero", reasons)
+        self.assertIn("candidate:property[1]_field_mask_missing_or_zero", reasons)
 
     def test_marks_missing_or_raw_snapshot_inconclusive(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -752,6 +835,33 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(report["counts"]["inconclusive"], 1)
         self.assertIn("base:property[0]_status_rejected", report["results"][0]["reasons"])
         self.assertIn("candidate:property[0]_has_reject_reasons", report["results"][0]["reasons"])
+
+    def test_rejected_bool_property_semantics_blocks_comparison_even_when_both_sides_match(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            left = base_snapshot()
+            right = deepcopy(left)
+            for payload in (left, right):
+                prop = payload["targets"][0]["property_chain"]["properties"][0]  # type: ignore[index]
+                prop["bool_property_semantics"] = {
+                    "status": "rejected",
+                    "reject_reasons": ["zero_bool_field_mask"],
+                }
+            write_snapshot(base, left)
+            write_snapshot(candidate, right)
+
+            result = run_compare(base, candidate, "--json")
+
+        self.assertEqual(result.returncode, 2)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["counts"]["inconclusive"], 1)
+        reasons = report["results"][0]["reasons"]
+        self.assertIn("base:property[0]_bool_property_semantics_status_rejected", reasons)
+        self.assertIn("candidate:property[0]_bool_property_semantics_status_rejected", reasons)
 
     def test_weak_property_membership_blocks_comparison_even_when_both_sides_match(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1208,7 +1318,13 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(report["totals"]["second_source_missing"], 1)
         self.assertEqual(
             report["promotion_gate"],
-            {"ready": False, "blockers": [{"reason": "missing_second_source", "count": 1}]},
+            {
+                "ready": False,
+                "ready_scope": "not_ready",
+                "layout_ready": False,
+                "promotion_ready": False,
+                "blockers": [{"reason": "missing_second_source", "count": 1}],
+            },
         )
         self.assertEqual(report["modules"][0]["module"], "sdk_inventory")
         self.assertEqual(report["modules"][0]["schema"], "ufunction")
@@ -1304,7 +1420,16 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         report = json.loads(result.stdout)
         self.assertEqual(report["totals"]["targets"], 0)
-        self.assertEqual(report["promotion_gate"], {"ready": False, "blockers": [{"reason": "no_targets", "count": 1}]})
+        self.assertEqual(
+            report["promotion_gate"],
+            {
+                "ready": False,
+                "ready_scope": "not_ready",
+                "layout_ready": False,
+                "promotion_ready": False,
+                "blockers": [{"reason": "no_targets", "count": 1}],
+            },
+        )
         self.assertEqual(failing.returncode, 1)
 
     def test_readiness_report_counts_missing_schema_qualified_target_set_entries(self) -> None:
@@ -1364,7 +1489,13 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(report["totals"]["second_source_accepted"], 1)
         self.assertEqual(
             report["promotion_gate"],
-            {"ready": False, "blockers": [{"reason": "promotion_requires_target_set", "count": 1}]},
+            {
+                "ready": False,
+                "ready_scope": "layout_only",
+                "layout_ready": True,
+                "promotion_ready": False,
+                "blockers": [{"reason": "promotion_requires_target_set", "count": 1}],
+            },
         )
 
     def test_readiness_report_target_set_promotion_exit_zero_when_all_targets_are_accepted(self) -> None:
@@ -1386,7 +1517,19 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         report = json.loads(result.stdout)
         self.assertEqual(report["gate_mode"], "second_source_promotion")
         self.assertEqual(report["totals"]["second_source_accepted"], 4)
-        self.assertEqual(report["promotion_gate"], {"ready": True, "blockers": []})
+        self.assertEqual(
+            report["promotion_gate"],
+            {
+                "ready": True,
+                "ready_scope": "layout_only",
+                "layout_ready": True,
+                "promotion_ready": False,
+                "blockers": [],
+            },
+        )
+        self.assertEqual(report["evidence_scope"], "second_source_layout_evidence_only")
+        self.assertIn("public_sdk", report["not_promoted_surfaces"])
+        self.assertIn("resource_handle", report["not_promoted_surfaces"])
 
     def test_readiness_report_target_set_rejected_second_source_exits_one(self) -> None:
         def reject_one(payload: dict[str, object], _outer: str, name: str) -> None:
@@ -1461,7 +1604,13 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(report["gate_mode"], "informational_gap_report")
         self.assertEqual(
             report["promotion_gate"],
-            {"ready": False, "blockers": [{"reason": "not_second_source_promotion_gate", "count": 1}]},
+            {
+                "ready": False,
+                "ready_scope": "layout_only",
+                "layout_ready": True,
+                "promotion_ready": False,
+                "blockers": [{"reason": "not_second_source_promotion_gate", "count": 1}],
+            },
         )
 
     def test_readiness_report_can_fail_on_missing_target_set_entries(self) -> None:
@@ -1507,10 +1656,14 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
 
     def test_all_named_target_sets_match_committed_base_fixtures(self) -> None:
         target_sets = {
+            "chat-message-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 1),
             "minimal-second-source-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 4),
             "structure-observer-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 6),
             "buff-compact-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 3),
+            "buff-breadth-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 3),
             "dino-compact-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 2),
+            "item-compact-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 4),
+            "inventory-action-compact-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 2),
             "mission-compact-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 4),
             "tribe-compact-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 5),
             "transfer-ufunction-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 7),

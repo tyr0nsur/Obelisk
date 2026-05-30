@@ -33,6 +33,7 @@ FORBIDDEN_KEYS = {
 ADDRESS_RE = re.compile(r"0x[0-9a-fA-F]{8,}")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 SAFE_ARTIFACT_ID_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
+BOOL_MASK_RE = re.compile(r"^0x[0-9a-fA-F]{1,2}$")
 HEX_METADATA_KEYS = {"property_flags", "return_value_offset", "function_flags"}
 EVIDENCE_ARTIFACT_IDENTITY_KEYS = (
     "artifact_sha256",
@@ -43,6 +44,25 @@ EVIDENCE_ARTIFACT_IDENTITY_KEYS = (
 ALLOWED_ARTIFACT_KINDS = {"offline_core"}
 PROTECTED_SERVER_ROOT = Path("/servidor/ark")
 APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
+READINESS_EVIDENCE_SCOPE = "second_source_layout_evidence_only"
+READINESS_NOT_PROMOTED_SURFACES = {
+    "class_identity",
+    "cross_binary_portability",
+    "inventory_identity",
+    "item_identity",
+    "lookup",
+    "mutation",
+    "object_identity",
+    "public_sdk",
+    "raw_params",
+    "resource_handle",
+    "return_override",
+    "runtime_hooks",
+}
+READINESS_NON_CLAIMS = [
+    "accepted second-source readiness is layout evidence only",
+    "does not promote public SDK, object identity, lookup, mutation, return override, ResourceHandle, or runtime hooks",
+]
 
 
 def parse_args() -> argparse.Namespace:
@@ -255,6 +275,9 @@ def property_layout(prop: dict[str, Any], *, strict_identity_indices: bool) -> d
         "element_size": prop.get("element_size"),
         "array_dim": prop.get("array_dim"),
         "property_flags": prop.get("property_flags"),
+        "native_bool": prop.get("native_bool"),
+        "byte_mask": prop.get("byte_mask"),
+        "field_mask": prop.get("field_mask"),
         "status": prop.get("status"),
         "reject_reasons": prop.get("reject_reasons", []),
         "membership_status": prop.get("membership_status"),
@@ -302,6 +325,21 @@ def property_block_reasons(prop: dict[str, Any], *, index: int) -> list[str]:
         reasons.append(f"{prefix}_status_{prop.get('status')}")
     if prop.get("reject_reasons", []):
         reasons.append(f"{prefix}_has_reject_reasons")
+    if prop.get("class_name") == "BoolProperty":
+        bool_semantics = prop.get("bool_property_semantics")
+        if not isinstance(bool_semantics, dict):
+            reasons.append(f"{prefix}_bool_property_semantics_missing")
+        else:
+            if bool_semantics.get("status") != "candidate":
+                reasons.append(f"{prefix}_bool_property_semantics_status_{bool_semantics.get('status')}")
+            if bool_semantics.get("reject_reasons", []):
+                reasons.append(f"{prefix}_bool_property_semantics_has_reject_reasons")
+        if prop.get("native_bool") not in (True, False):
+            reasons.append(f"{prefix}_native_bool_missing")
+        for mask_key in ("byte_mask", "field_mask"):
+            mask = prop.get(mask_key)
+            if not isinstance(mask, str) or BOOL_MASK_RE.fullmatch(mask) is None or int(mask, 16) == 0:
+                reasons.append(f"{prefix}_{mask_key}_missing_or_zero")
     for membership_key in ("membership_status", "class_membership_status", "outer_membership_status"):
         membership = prop.get(membership_key)
         if membership != "candidate-uobject":
@@ -655,6 +693,9 @@ def readiness_report(
             blockers.append({"reason": "missing_second_source", "count": totals["second_source_missing"]})
         return {
             "ready": not blockers,
+            "ready_scope": "layout_only" if not blockers else "not_ready",
+            "layout_ready": not blockers,
+            "promotion_ready": False,
             "blockers": blockers,
         }
 
@@ -744,6 +785,9 @@ def readiness_report(
         "strict_identity_indices": strict_identity_indices,
         "target_filters": sorted(target_filters),
         "second_source_status": "compared" if candidate is not None else "missing_candidate_root",
+        "evidence_scope": READINESS_EVIDENCE_SCOPE,
+        "not_promoted_surfaces": sorted(READINESS_NOT_PROMOTED_SURFACES),
+        "non_claims": list(READINESS_NON_CLAIMS),
         "totals": totals,
         "promotion_gate": promotion_gate_summary(),
         "modules": [modules[key] for key in sorted(modules)],

@@ -87,6 +87,11 @@ When this readiness report is acting as a promotion gate, add
 `--fail-on-readiness-gaps` or run
 `scripts/check_release_readiness.sh --require-second-source-readiness`.
 
+The release-readiness script has no default RC ScriptStruct target set. Passing
+`--scriptstruct-second-source-root` requires at least one explicit
+`--scriptstruct-second-source-target-set`; ScriptStruct promotion, including
+`transfer-scriptstruct`, is opt-in only and is not part of the default RC gate.
+
 List focused target groups, including `transfer-scriptstruct`, with:
 
 ```bash

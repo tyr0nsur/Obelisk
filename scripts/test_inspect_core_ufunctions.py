@@ -150,6 +150,9 @@ def build_core_fixture(path: Path) -> dict[str, int]:
     def put_u32(address: int, value: int) -> None:
         struct.pack_into("<I", segment, address - base, value)
 
+    def put_u8(address: int, value: int) -> None:
+        struct.pack_into("<B", segment, address - base, value)
+
     def put_entry(index: int, text: bytes) -> None:
         entry = base + 0x10000 + index * 0x80
         put_ptr(addrs["fname_chunk"] + index * 8, entry)
@@ -951,6 +954,12 @@ def build_core_fixture(path: Path) -> dict[str, int]:
         put_ptr(address + 0x38, 0x1040000280)
         put_i32(address + 0x4C, offset)
 
+    def put_bool_property_data(address: int, *, byte_offset: int, native_bool: bool = True) -> None:
+        put_u8(address + 0x70, 1)
+        put_u8(address + 0x71, byte_offset & 0xFF)
+        put_u8(address + 0x72, 0xFF if native_bool else 0x01)
+        put_u8(address + 0x73, 0xFF if native_bool else 0x01)
+
     def put_function_data(address: int, *, first_property: int, num_parms: int, parms_size: int) -> None:
         put_ptr(address + 0x38, first_property)
         put_i32(address + 0x40, parms_size)
@@ -1174,6 +1183,35 @@ def build_core_fixture(path: Path) -> dict[str, int]:
         next_field=addrs["tribute_dino_id1_property"],
     )
     put_property_data(addrs["tribute_dino_id1_property"], offset=0x20, element_size=4)
+
+    for key in (
+        "requested_by_player_property",
+        "return_value_property",
+        "ignore_cooldown_property",
+        "can_use_return_property",
+        "force_direction_property",
+        "mission_force_add_property",
+        "mission_return_value_property",
+        "leave_return_value_property",
+        "allow_structure_access_return_property",
+        "demolish_return_property",
+        "force_set_property",
+        "set_variant_return_property",
+        "verify_pin_return_property",
+        "can_seat_force_property",
+        "can_seat_return_property",
+        "force_passenger_property",
+        "allow_flyers_water_property",
+        "skip_line_trace_property",
+        "add_passenger_return_property",
+        "allow_carry_return_property",
+        "bp_allow_carry_return_property",
+        "set_tameable_property",
+        "create_inventory_property",
+        "inventory_for_waking_tame_property",
+    ):
+        offset = struct.unpack_from("<i", segment, addrs[key] - base + 0x4C)[0]
+        put_bool_property_data(addrs[key], byte_offset=offset)
 
     write_minimal_elf64_core(path, base, bytes(segment))
     return addrs
@@ -1406,6 +1444,11 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
             self.assertEqual(prop["membership_status"], "candidate-uobject")
             self.assertEqual(prop["class_membership_status"], "candidate-uobject")
             self.assertEqual(prop["outer_membership_status"], "candidate-uobject")
+        for prop in props[2:]:
+            self.assertEqual(prop["bool_property_semantics"]["status"], "candidate")
+            self.assertIs(prop["native_bool"], True)
+            self.assertEqual(prop["byte_mask"], "0xff")
+            self.assertEqual(prop["field_mask"], "0xff")
 
     def test_primal_dino_server_request_attack_int_property_chain(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1960,6 +2003,12 @@ class InspectCoreUFunctionsTests(unittest.TestCase):
                 (2, "Dir", 43, "ByteProperty", 10, 10, 9, 1),
             ],
         )
+        bool_prop = target["property_chain"]["properties"][1]
+        self.assertIs(bool_prop["native_bool"], True)
+        self.assertEqual(bool_prop["byte_mask"], "0xff")
+        self.assertEqual(bool_prop["field_mask"], "0xff")
+        self.assertNotIn("bool_field_size", bool_prop)
+        self.assertNotIn("bool_byte_offset", bool_prop)
         serialized = json.dumps(snapshot, sort_keys=True)
         self.assertNotIn(hex(addrs["server_activate_function"]), serialized)
         self.assertNotIn(str(core), serialized)

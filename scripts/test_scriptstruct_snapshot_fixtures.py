@@ -36,7 +36,7 @@ FORBIDDEN_SUBSTRINGS = [
     "core-pack-",
     "ShooterGame/Binaries",
 ]
-HEX_METADATA_KEYS = {"property_flags"}
+HEX_METADATA_KEYS = {"property_flags", "byte_mask", "field_mask"}
 GENERATED_BY = "scripts/inspect_core_ufunctions.py --snapshot-json"
 
 
@@ -53,6 +53,21 @@ def walk_json(value: object) -> list[tuple[str | None, object]]:
 
 
 class ScriptStructSnapshotFixtureTests(unittest.TestCase):
+    def assert_candidate_bool_property_semantics(self, prop: dict[str, object]) -> None:
+        if prop.get("class_name") != "BoolProperty" or prop.get("status") != "candidate":
+            return
+
+        semantics = prop.get("bool_property_semantics")
+        self.assertIsInstance(semantics, dict)
+        self.assertEqual(semantics.get("status"), "candidate")
+        self.assertEqual(semantics.get("reject_reasons"), [])
+        self.assertIsInstance(prop.get("native_bool"), bool)
+        for mask_key in ("byte_mask", "field_mask"):
+            mask = prop.get(mask_key)
+            self.assertIsInstance(mask, str)
+            self.assertRegex(mask, r"^0x[0-9a-fA-F]+$")
+            self.assertNotEqual(int(mask, 16), 0)
+
     def manifest(self) -> dict[str, object]:
         return json.loads((FIXTURE_ROOT / "manifest.json").read_text(encoding="utf-8"))
 
@@ -163,6 +178,7 @@ class ScriptStructSnapshotFixtureTests(unittest.TestCase):
                 self.assertIsInstance(properties, list)
                 self.assertEqual(len(properties), chain.get("observed_count"))
                 for prop in properties:
+                    self.assert_candidate_bool_property_semantics(prop)
                     self.assertIsInstance(prop.get("object_index"), int)
                     self.assertIsInstance(prop.get("name_index"), int)
                     self.assertIsInstance(prop.get("class_name_index"), int)

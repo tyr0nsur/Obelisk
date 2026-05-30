@@ -60,6 +60,10 @@ def read_u16(memory: uobjects.CoreMemory, address: int) -> int | None:
     return read_int(memory, address, "<H")
 
 
+def read_u8(memory: uobjects.CoreMemory, address: int) -> int | None:
+    return read_int(memory, address, "<B")
+
+
 def read_i16(memory: uobjects.CoreMemory, address: int) -> int | None:
     return read_int(memory, address, "<h")
 
@@ -468,6 +472,40 @@ def inspect_struct_type_candidate(context: GObjectContext, property_address: int
     }
 
 
+def inspect_bool_property_semantics(
+    context: GObjectContext,
+    property_address: int,
+    *,
+    element_size: int | None,
+) -> dict[str, object]:
+    field_size = read_u8(context.memory, property_address + 0x70)
+    byte_offset = read_u8(context.memory, property_address + 0x71)
+    byte_mask = read_u8(context.memory, property_address + 0x72)
+    field_mask = read_u8(context.memory, property_address + 0x73)
+    reject_reasons: list[str] = []
+    if field_size is None or byte_offset is None or byte_mask is None or field_mask is None:
+        reject_reasons.append("unreadable_bool_tail")
+    else:
+        if field_size not in {1, 2, 4, 8}:
+            reject_reasons.append("implausible_bool_field_size")
+        if element_size is not None and element_size not in {1, 2, 4, 8}:
+            reject_reasons.append("implausible_bool_element_size")
+        if byte_mask == 0:
+            reject_reasons.append("zero_bool_byte_mask")
+        if field_mask == 0:
+            reject_reasons.append("zero_bool_field_mask")
+    native_bool = field_size == 1 and byte_mask == 0xFF and field_mask == 0xFF
+    return {
+        "status": "candidate" if not reject_reasons else "rejected",
+        "reject_reasons": reject_reasons,
+        "bool_field_size": field_size,
+        "bool_byte_offset": byte_offset,
+        "byte_mask": hex_or_none(byte_mask),
+        "field_mask": hex_or_none(field_mask),
+        "native_bool": native_bool if not reject_reasons else False,
+    }
+
+
 def inspect_property_chain(
     context: GObjectContext,
     *,
@@ -570,6 +608,19 @@ def inspect_property_chain(
             property_payload["array_inner_candidate"] = inspect_array_inner_candidate(context, current)
         if summary.get("class_name") == "StructProperty":
             property_payload["struct_type_candidate"] = inspect_struct_type_candidate(context, current)
+        if summary.get("class_name") == "BoolProperty":
+            bool_semantics = inspect_bool_property_semantics(
+                context,
+                current,
+                element_size=element_size,
+            )
+            property_payload["bool_property_semantics"] = bool_semantics
+            if bool_semantics["status"] == "candidate":
+                property_payload["bool_field_size"] = bool_semantics["bool_field_size"]
+                property_payload["bool_byte_offset"] = bool_semantics["bool_byte_offset"]
+                property_payload["byte_mask"] = bool_semantics["byte_mask"]
+                property_payload["field_mask"] = bool_semantics["field_mask"]
+                property_payload["native_bool"] = bool_semantics["native_bool"]
         properties.append(property_payload)
         if property_rejects:
             reject_reasons.append(f"property_{depth}_rejected")
@@ -865,6 +916,15 @@ def build_fixture_snapshot(
                     "membership_status": struct_type_candidate.get("membership_status"),
                     "struct_type": struct_type_candidate.get("struct_type"),
                 }
+            bool_semantics = prop.get("bool_property_semantics")
+            if isinstance(bool_semantics, dict):
+                property_payload["bool_property_semantics"] = {
+                    "status": bool_semantics.get("status"),
+                    "reject_reasons": bool_semantics.get("reject_reasons", []),
+                }
+            for key in ("byte_mask", "field_mask", "native_bool"):
+                if key in prop:
+                    property_payload[key] = prop.get(key)
             properties.append(property_payload)
 
         snapshot_target = {

@@ -32,6 +32,21 @@ SNAPSHOT_COMPARISON_REPORT = "readiness-report.json"
 SNAPSHOT_COMPARISON_STDERR = "readiness-report.stderr.txt"
 READINESS_SCHEMA = "obelisk.reflection-snapshot-readiness.v1"
 READINESS_GATE_MODE = "second_source_promotion"
+READINESS_EVIDENCE_SCOPE = "second_source_layout_evidence_only"
+REQUIRED_READINESS_NON_PROMOTED_SURFACES = {
+    "class_identity",
+    "cross_binary_portability",
+    "inventory_identity",
+    "item_identity",
+    "lookup",
+    "mutation",
+    "object_identity",
+    "public_sdk",
+    "raw_params",
+    "resource_handle",
+    "return_override",
+    "runtime_hooks",
+}
 ARTIFACT_IDENTITY_KEYS = (
     "artifact_kind",
     "artifact_sha256",
@@ -540,8 +555,19 @@ def require_persisted_readiness_report(
         raise ReadinessReportError("readiness report promotion_gate must be an object")
     if promotion_gate.get("ready") is not True:
         raise ReadinessReportError("readiness report promotion_gate.ready is not true")
+    if promotion_gate.get("ready_scope") != "layout_only":
+        raise ReadinessReportError("readiness report promotion_gate.ready_scope must be layout_only")
+    if promotion_gate.get("layout_ready") is not True:
+        raise ReadinessReportError("readiness report promotion_gate.layout_ready must be true")
+    if promotion_gate.get("promotion_ready") is not False:
+        raise ReadinessReportError("readiness report promotion_gate.promotion_ready must be false")
     if "blockers" in promotion_gate and promotion_gate["blockers"] != []:
         raise ReadinessReportError("readiness report promotion_gate.blockers must be empty or absent")
+    if report.get("evidence_scope") != READINESS_EVIDENCE_SCOPE:
+        raise ReadinessReportError("readiness report evidence_scope must be second_source_layout_evidence_only")
+    not_promoted = report.get("not_promoted_surfaces")
+    if not isinstance(not_promoted, list) or set(not_promoted) != REQUIRED_READINESS_NON_PROMOTED_SURFACES:
+        raise ReadinessReportError("readiness report missing required non-promoted surfaces")
 
     target_sets = report.get("target_sets")
     if not isinstance(target_sets, list) or not all(isinstance(item, str) for item in target_sets):

@@ -29,7 +29,15 @@ def readiness_report_json(
         {
             "schema": "obelisk.reflection-snapshot-readiness.v1",
             "gate_mode": "second_source_promotion",
-            "promotion_gate": {"ready": ready, "blockers": [] if blockers is None else blockers},
+            "evidence_scope": "second_source_layout_evidence_only",
+            "not_promoted_surfaces": sorted(intake.REQUIRED_READINESS_NON_PROMOTED_SURFACES),
+            "promotion_gate": {
+                "ready": ready,
+                "ready_scope": "layout_only" if ready else "not_ready",
+                "layout_ready": ready,
+                "promotion_ready": False,
+                "blockers": [] if blockers is None else blockers,
+            },
             "target_sets": ["minimal-second-source-intake"] if target_sets is None else target_sets,
             "totals": {"targets": targets},
         }
@@ -1079,6 +1087,36 @@ class RunSecondSourceCoreIntakeTests(unittest.TestCase):
                 )
 
         self.assertIn("evidence_status must be complete", str(raised.exception))
+
+    def test_rejects_readiness_report_with_reduced_non_promoted_surfaces(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            report = Path(temp_dir) / "readiness-report.json"
+            payload = json.loads(readiness_report_json())
+            payload["not_promoted_surfaces"] = ["mutation", "object_identity", "public_sdk"]
+            report.write_text(json.dumps(payload), encoding="utf-8")
+
+            with self.assertRaises(intake.ReadinessReportError) as raised:
+                intake.require_persisted_readiness_report(
+                    report,
+                    expected_target_sets=["minimal-second-source-intake"],
+                )
+
+        self.assertIn("missing required non-promoted surfaces", str(raised.exception))
+
+    def test_rejects_readiness_report_without_explicit_promotion_ready_false(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            report = Path(temp_dir) / "readiness-report.json"
+            payload = json.loads(readiness_report_json())
+            del payload["promotion_gate"]["promotion_ready"]
+            report.write_text(json.dumps(payload), encoding="utf-8")
+
+            with self.assertRaises(intake.ReadinessReportError) as raised:
+                intake.require_persisted_readiness_report(
+                    report,
+                    expected_target_sets=["minimal-second-source-intake"],
+                )
+
+        self.assertIn("promotion_gate.promotion_ready must be false", str(raised.exception))
 
     def test_rejects_gobjects_manifest_that_does_not_match_command_inputs(self) -> None:
         cases = (

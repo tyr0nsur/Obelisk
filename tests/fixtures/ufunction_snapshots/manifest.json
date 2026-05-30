@@ -79,6 +79,30 @@
       "outer": "PrimalItem"
     },
     {
+      "file": "PrimalItem.AllowEquipItem.snapshot.json",
+      "module": "sdk_items",
+      "name": "AllowEquipItem",
+      "outer": "PrimalItem"
+    },
+    {
+      "file": "PrimalItem.CanRepair.snapshot.json",
+      "module": "sdk_items",
+      "name": "CanRepair",
+      "outer": "PrimalItem"
+    },
+    {
+      "file": "PrimalItem.CraftBlueprint.snapshot.json",
+      "module": "sdk_items",
+      "name": "CraftBlueprint",
+      "outer": "PrimalItem"
+    },
+    {
+      "file": "PrimalItem.UseItemOntoItem.snapshot.json",
+      "module": "sdk_items",
+      "name": "UseItemOntoItem",
+      "outer": "PrimalItem"
+    },
+    {
       "file": "ShooterPlayerController.ServerRequestInventoryUseItem.snapshot.json",
       "module": "sdk_inventory",
       "name": "ServerRequestInventoryUseItem",

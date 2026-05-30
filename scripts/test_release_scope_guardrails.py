@@ -15,6 +15,25 @@ def read(relative: str) -> str:
     return (REPO_ROOT / relative).read_text(encoding="utf-8")
 
 
+def normalized(text: str) -> str:
+    return " ".join(text.split())
+
+
+def sentences(text: str) -> list[str]:
+    return [part.strip() for part in re.split(r"(?<=[.!?|\n])\s+", text) if part.strip()]
+
+
+def cmake_targets(cmake: str) -> list[tuple[str, str, str]]:
+    return [
+        (match.group("kind"), match.group("name"), match.group("body"))
+        for match in re.finditer(
+            r"add_(?P<kind>library|executable)\((?P<name>[A-Za-z0-9_]+)(?P<body>.*?)\n\)",
+            cmake,
+            re.S,
+        )
+    ]
+
+
 class ReleaseScopeGuardrailTests(unittest.TestCase):
     def test_first_stable_included_scope_is_documented_as_baseline(self) -> None:
         release = read("docs/RELEASE.md")
@@ -28,8 +47,12 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "Central install script and LinuxGSM wrappers",
             "`oBaseEvents`",
             "`OBELISK_INSTANCE_ID` logs and state markers",
-            "Filtered, non-mutating `ProcessEvent` callback infrastructure as the stable runtime",
-            "Target-specific gameplay/module surfaces remain experimental",
+            "Filtered raw `ProcessEvent` callback infrastructure as debug-gated runtime plumbing",
+            "Stable plugin paths should use copied Obelisk-owned events",
+            "Target-specific gameplay/module\n  surfaces remain experimental",
+            "Dispatcher callback cleanup that is safe across the current callback families",
+            "unregister/owner cleanup initiated from gameplay callbacks avoids dispatcher cleanup\n  waits",
+            "non-callback owner/plugin cleanup\n  still waits for in-flight dispatch and deferred `DestroyUserData` cleanup",
         ]
         required_status_items = [
             "`LD_PRELOAD` bootstrap | Stable baseline",
@@ -40,6 +63,9 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "`oBaseEvents` | Release example",
             "`oPolicyAudit` | Experimental",
             "Per-instance runtime flags | Stable baseline",
+            "Plugin callback ownership | Stable baseline",
+            "Unregister/owner cleanup initiated from gameplay callbacks avoids dispatcher cleanup waits",
+            "non-callback owner/plugin cleanup still waits for in-flight dispatch and deferred `DestroyUserData` cleanup",
         ]
         required_changelog_items = [
             "Linux `LD_PRELOAD` runtime bootstrap",
@@ -49,7 +75,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "Central install layout",
             "LinuxGSM wrapper templates",
             "`oBaseEvents` as the first official plugin example",
-            "Runtime default-deny gates for global ProcessEvent callbacks",
+            "Runtime default-deny gates for filtered/global ProcessEvent callbacks",
             "Fail-closed ProcessEvent hook removal",
             "safe `instance_allowlist` validation",
             "Multi-instance shared-root posture",
@@ -114,8 +140,9 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         status = read("docs/STATUS.md")
 
         for item in [
-            "Filtered, non-mutating `ProcessEvent` callback infrastructure as the stable runtime",
-            "Target-specific gameplay/module surfaces remain experimental",
+            "Filtered raw `ProcessEvent` callback infrastructure as debug-gated runtime plumbing",
+            "Stable plugin paths should use copied Obelisk-owned events",
+            "Target-specific gameplay/module\n  surfaces remain experimental",
             "Gameplay mutation, return overrides, arbitrary UE4 function calls, and public",
             "`CallProcessEvent`-based plugin behavior",
         ]:
@@ -124,7 +151,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
 
         for item in [
             "Current safe interaction shape",
-            "observe a narrow `ProcessEvent` target by exact `FName` index",
+            "observe selected UE4 `ProcessEvent` calls through debug-gated filtered callbacks",
             "keep callbacks filtered, non-blocking, and instance-gated",
             "record metadata or plugin-local state only",
             "Blocked from stable plugin APIs until promoted with evidence",
@@ -143,6 +170,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
                 self.assertIn(item, readme)
 
     def test_chat_message_event_release_docs_keep_rc_boundary_explicit(self) -> None:
+        readme = read("README.md")
         release = read("docs/RELEASE.md")
         status = read("docs/STATUS.md")
 
@@ -151,15 +179,18 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "copied UTF-8 message\n  text, send mode, copied-payload flag, and process-local sequence only",
             "not a command SDK,\n  chat send/moderation API, sender identity API, UE lookup path, mutation surface, or\n  return-override authority",
             "accepted `chat-message-intake` second-source comparison",
-            "The runtime producer\nexists behind observer-debug gates, SHA, marker, and positive dispatch budget",
-            "isolated\n`arkserver2` delivery validation is still required",
+            "The runtime producer\nexists behind the `enable-chat-events` marker/env path",
+            "accepted copied-log validation\n  with 18 accepted delivery events covering send modes `0,1,2,3` through the",
+            "further beta\nobservation is regression/revalidation only unless a new promotion gate is defined",
+            "Do not count `enable-chat-reflection` observer evidence for\nthat claim",
         ]
         required_status_items = [
             "ChatMessageEvent | v0.1-rc SDK ABI surface",
             "Minimal copied UTF-8 chat notification contract for plugins that parse text locally",
             "sender/player identity, resource identity, raw `FString`, raw params, FName/GObjects indices, UE pointers, chat send/moderation/blocking, command routing, mutation, and return overrides remain blocked",
-            "The target layout now has accepted second-source evidence",
-            "isolated debug-server delivery validation is still pending",
+            "The target layout has accepted second-source evidence",
+            "the `enable-chat-events` producer path has approved copied-log plugin-facing delivery validation with 18 accepted events covering all four known send modes (`0..3`) and no privacy blockers",
+            "Historical `enable-chat-reflection` observer logs still do not satisfy delivery evidence",
         ]
         forbidden_claims = [
             "ChatMessageEvent | Promoted v0.1 SDK surface",
@@ -179,16 +210,166 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         for item in required_status_items:
             with self.subTest(file="docs/STATUS.md", item=item):
                 self.assertIn(item, status)
+        for item in [
+            "v0.1-rc SDK surfaces:",
+            "Minimal v0.1-rc `ChatMessageEvent` callback ABI",
+            "This remains a copied notification contract only",
+        ]:
+            with self.subTest(file="README.md", item=item):
+                self.assertIn(item, readme)
+        self.assertLess(
+            readme.index("v0.1-rc SDK surfaces:"),
+            readme.index("Minimal v0.1-rc `ChatMessageEvent` callback ABI"),
+        )
         for item in forbidden_claims:
-            for path, text in (("docs/RELEASE.md", release), ("docs/STATUS.md", status)):
+            for path, text in (("docs/RELEASE.md", release), ("docs/STATUS.md", status), ("README.md", readme)):
                 with self.subTest(file=path, item=item):
                     self.assertNotIn(item, text)
+
+    def test_chat_message_event_docs_do_not_make_generic_stable_or_promoted_claims(self) -> None:
+        claim_words = re.compile(
+            r"\b(?:stable(?:\s+baseline|\s+api|\s+sdk|\s+surface)?|promoted(?:\s+v0\.1\s+sdk\s+surface)?|"
+            r"production-ready)\b",
+            re.IGNORECASE,
+        )
+        allowed_context = re.compile(
+            r"\b(?:minimal|v0\.1-rc|rc\b|not|no|outside|beyond|blocked|excluded|separate|separately|"
+            r"GameplayPolicyEvent|DescribeResourceKind|DescribeGameplayPolicyEventKind)\b",
+            re.IGNORECASE,
+        )
+        offenders: list[str] = []
+
+        for path in [
+            "README.md",
+            "CHANGELOG.md",
+            "docs/RELEASE.md",
+            "docs/STATUS.md",
+            "docs/public_gameplay_events.json",
+            ".github/pull_request_template.md",
+        ]:
+            for sentence in sentences(read(path)):
+                if "ChatMessageEvent" not in sentence or not claim_words.search(sentence):
+                    continue
+                if allowed_context.search(sentence):
+                    continue
+                offenders.append(f"{path}: {normalized(sentence)}")
+
+        self.assertEqual(offenders, [])
+
+    def test_chat_milestone_does_not_weaken_inventory_resource_or_ue_blocks(self) -> None:
+        release = read("docs/RELEASE.md")
+        status = read("docs/STATUS.md")
+        changelog = read("CHANGELOG.md")
+        pr_template = read(".github/pull_request_template.md")
+
+        for path, text in (
+            ("docs/RELEASE.md", release),
+            ("docs/STATUS.md", status),
+            ("CHANGELOG.md", changelog),
+        ):
+            with self.subTest(file=path, item="ResourceHandle"):
+                self.assertIn("ResourceHandle", text)
+            with self.subTest(file=path, item="Inventory SDK"):
+                self.assertIn("Inventory SDK", text)
+            with self.subTest(file=path, item="mutation"):
+                self.assertIn("mutation", text)
+            with self.subTest(file=path, item="return override"):
+                self.assertIn("return", text)
+                self.assertIn("override", text)
+
+        for item in [
+            "public Inventory SDK",
+            "It is not a `ResourceHandle`, object identity, lookup API, persistent handle",
+            "resource identity, raw `FString`, raw params, FName/GObjects indices, UE pointers",
+            "Inventory-backed signals use the same `GameplayPolicyEvent` family, not a separate Inventory SDK",
+            "Outside the promoted `GameplayPolicyEvent` and minimal `ChatMessageEvent` surfaces",
+        ]:
+            with self.subTest(file="docs/STATUS.md", item=item):
+                self.assertIn(item, status)
+
+        for item in [
+            "public Inventory SDK",
+            "`ResourceHandle`, object identity, GObjects lookup, mutation, or return overrides",
+            "raw `FString`, `UObject`, `UFunction`, FName/GObjects\nindices, raw params, mutation, or return overrides",
+            "ResourceHandle`, GNames/GObjects promotion, public Inventory SDK",
+        ]:
+            with self.subTest(file="docs/RELEASE.md", item=item):
+                self.assertIn(item, release)
+
+        for item in [
+            "does not promote public\n  Inventory/Structure SDKs, `ResourceHandle`, GObjects lookup, mutation, or return\n  overrides",
+            "raw `FString`, raw params, UE pointers, mutation, or return-override surface",
+            "`ResourceHandle`, public `StructureEvents`, public Inventory SDK",
+            "GNames/GObjects-backed reflection layer",
+        ]:
+            with self.subTest(file="CHANGELOG.md", item=item):
+                self.assertIn(item, changelog)
+
+        for item in [
+            "does not expose public Inventory SDKs, `ResourceHandle`, resource/object identity",
+            "UE pointers, raw `FString`, raw params, FName/GObjects indices",
+            "without a separately named promotion gate",
+        ]:
+            with self.subTest(file=".github/pull_request_template.md", item=item):
+                self.assertIn(item, pr_template)
+
+    def test_rc_checkpoint_slicing_plan_matches_current_public_scope(self) -> None:
+        plan = read("docs/research/2026-05-29-rc-checkpoint-slicing-plan.md")
+
+        for item in [
+            "GameplayPolicyEvent",
+            "ChatMessageEvent",
+            "DescribeResourceKind",
+            "DescribeGameplayPolicyEventKind",
+            "minimal copied `ChatMessageEvent`",
+            "metadata-only `DescribeGameplayPolicyEventKind`",
+            "richer chat APIs beyond the minimal copied `ChatMessageEvent`",
+            "no module SDK, UE lookup, mutation, identity, or return override",
+        ]:
+            with self.subTest(item=item):
+                self.assertIn(item, plan)
+
+        for stale in [
+            "only `GameplayPolicyEvent` and\n`DescribeResourceKind`",
+            "only `GameplayPolicyEvent` and `DescribeResourceKind`",
+            "public mission, tribe, buff, dino, transfer, chat, player",
+        ]:
+            with self.subTest(stale=stale):
+                self.assertNotIn(stale, plan)
+
+    def test_dispatcher_cleanup_rule_stays_callback_safe_without_overclaiming(self) -> None:
+        release = read("docs/RELEASE.md")
+        status = read("docs/STATUS.md")
+        hardening = read("docs/research/2026-05-29-dispatcher-hook-safety-hardening.md")
+        plan = read("docs/research/2026-05-29-rc-checkpoint-slicing-plan.md")
+
+        for path, text in (
+            ("docs/RELEASE.md", release),
+            ("docs/STATUS.md", status),
+            ("docs/research/2026-05-29-rc-checkpoint-slicing-plan.md", plan),
+        ):
+            lower_text = text.lower()
+            with self.subTest(file=path, item="callback-initiated cleanup avoids waits"):
+                self.assertIn("unregister/owner cleanup", lower_text)
+                self.assertIn("gameplay callbacks avoids dispatcher cleanup", lower_text)
+                self.assertIn("callback-to-callback deadlocks", lower_text)
+            with self.subTest(file=path, item="non-callback cleanup waits"):
+                self.assertIn("non-callback owner/plugin cleanup", lower_text)
+                self.assertIn("in-flight dispatch", lower_text)
+                self.assertIn("deferred `destroyuserdata` cleanup", lower_text)
+
+        self.assertIn("cross-family callback cleanup suppression was restored", hardening)
+        self.assertIn("unregister/owner cleanup initiated from any gameplay callback family must not wait", hardening)
+        self.assertIn("non-callback owner/plugin cleanup still waits", hardening)
+        self.assertIn("does not promote Inventory, StructureEvents, Mission, Dino, Tribe, Transfer", hardening)
 
     def test_release_readiness_is_the_documented_release_gate(self) -> None:
         release = read("docs/RELEASE.md")
         pr_template = read(".github/pull_request_template.md")
         ci = read(".github/workflows/ci.yml")
         script = read("scripts/check_release_readiness.sh")
+        status = read("docs/STATUS.md")
+        changelog = read("CHANGELOG.md")
         build_skill = read("agent-skills/obelisk-build-system/SKILL.md")
         workflow_skill = read("agent-skills/obelisk-github-research-workflow/SKILL.md")
 
@@ -198,6 +379,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("Obelisk freezes the\n   current append-only `ObeliskApi` ABI v1", release)
         self.assertIn("Any ABI v2 must use an explicit migration plan", release)
         self.assertIn("installed SDK consumer validation, and the `oBaseEvents` release\n   example", release)
+        self.assertIn("Owner-token public registrations must keep using the plugin owner's init-time", release)
         self.assertIn("first-stable plugin scope excludes background-work plugins", release)
         self.assertIn("idempotent shutdown through `ObeliskPlugin_Shutdown`", release)
         self.assertIn("owner-token callback handles unregistered before unload", release)
@@ -211,6 +393,13 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("analyze_runtime_observer_log.py --fail-on-quality-blockers", pr_template)
         self.assertIn("observational only", pr_template)
         self.assertIn("not release readiness or second-source promotion evidence", pr_template)
+        self.assertIn("If this PR claims runtime `ChatMessageEvent` delivery", pr_template)
+        self.assertIn("enable-chat-events", pr_template)
+        self.assertIn("approved operator-selected beta-test window", pr_template)
+        self.assertIn("operator-approved notice", pr_template)
+        self.assertIn("enable-chat-reflection", pr_template)
+        self.assertIn("historical `enable-chat-reflection` observer logs", pr_template)
+        self.assertIn("not counted as delivery evidence", pr_template)
         self.assertIn("Core-first release readiness", ci)
         self.assertIn("first-stable core release gate", ci)
         self.assertNotIn("scripts/install_obelisk.sh --dry-run /tmp/obelisk-ci-install", ci)
@@ -247,12 +436,55 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("--scriptstruct-second-source-target-set", release)
         self.assertIn("--scriptstruct-second-source-target-set", pr_template)
         self.assertIn("--scriptstruct-second-source-target-set", script)
-        self.assertIn("default second-source gate is intentionally scoped to the core-first UFunction intake", release)
+        self.assertIn("default second-source gate is intentionally scoped to the public RC UFunction target", release)
         self.assertIn("`minimal-second-source-intake`", release)
+        self.assertIn("`structure-observer-intake`", release)
+        self.assertIn("`chat-message-intake`", release)
+        self.assertIn("accepted default intake is layout-only evidence", release)
+        self.assertIn("promotion_gate.ready_scope=layout_only", release)
+        self.assertIn("promotion_gate.promotion_ready=false", release)
+        self.assertIn("does not by itself promote a public Inventory SDK", release)
+        self.assertIn("redacted signature manifests accepted in offline-artifact consume mode remain\ncandidate-only", release)
+        self.assertIn("transfer-ufunction-intake", release)
+        self.assertIn("transfer-scriptstruct", release)
+        self.assertIn("is layout-only offline evidence", release)
+        self.assertIn("does not promote a\npublic Transfer SDK", release)
+        self.assertIn("UObject flag transition matrices and static flag-policy reports", release)
+        self.assertIn("pass the offline\nartifact gate in consume mode are candidate evidence only", release)
+        self.assertIn("does\nnot prove lifecycle/validity semantics", release)
+        self.assertIn("does not satisfy promote-mode artifact gates", release)
+        self.assertIn("must not unlock `ResourceHandle`, object lookup, GObjects promotion", release)
+        self.assertIn("does not prove resource cross-event correlation", release)
+        self.assertIn("ResourceHandle semantic work must remain blocked", release)
+        self.assertIn("helper predicate", release)
+        self.assertIn("caller mode", release)
+        self.assertIn("mutation windows", release)
+        self.assertIn("refreshed default `minimal-second-source-intake` evidence remains layout-only", status)
+        self.assertIn("promotion_ready=false", status)
+        self.assertIn("accepted transfer evidence for `transfer-ufunction-intake` and `transfer-scriptstruct`", status)
+        self.assertIn("does not promote a public Transfer SDK", status)
+        self.assertIn("UObject flag validity policy | Not ready", status)
+        self.assertIn("Static flag-policy reports and transition matrices", status)
+        self.assertIn("do not unlock `ResourceHandle`, object lookup, GObjects promotion", status)
+        self.assertIn("capability-snapshot tests for owner-token public registrations", status)
+        self.assertIn("Current ResourceHandle semantic work remains blocked", status)
+        self.assertIn("cross-event correlation", status)
+        self.assertIn("refreshed default `minimal-second-source-intake`", changelog)
+        self.assertIn("does not promote public\n  Inventory/Structure SDKs", changelog)
         self.assertIn("Mission target sets such as `mission-compact-intake` are", release)
+        self.assertIn(
+            "Transfer target sets such as `transfer-ufunction-intake` are also not part of the default gate",
+            normalized(release),
+        )
         self.assertIn("not part of the default gate", release)
-        self.assertIn("scalar-candidate summaries are review aids only, not RC\nscope", release)
-        self.assertIn("Explicit\n`--ufunction-second-source-target-set` values replace that default", release)
+        self.assertIn("scalar-candidate summaries are review aids only, not RC scope", normalized(release))
+        self.assertIn(
+            "Mission copied-bool observer, Item return-only policy, then Transfer `bAccept`",
+            normalized(release),
+        )
+        self.assertIn("not promote a public SDK/API surface", release)
+        self.assertIn("Explicit\n`--ufunction-second-source-target-set` values add module target sets", release)
+        self.assertIn("they do not replace or omit the public RC gate", release)
         self.assertIn("--ufunction-second-source-target-set minimal-second-source-intake", release)
         self.assertIn("ScriptStruct promotion, including transfer structs, is not part of the default gate", release)
         self.assertIn("ScriptStruct promotion requires explicit opt-in", script)
@@ -266,6 +498,10 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("--second-source-report-dir", release)
         self.assertIn("--second-source-report-dir", pr_template)
         self.assertIn("--second-source-report-dir", script)
+        self.assertIn("validate_second_source_report_dir", script)
+        self.assertIn("git check-ignore", script)
+        self.assertIn("Second-source report dir inside the repository must be ignored", script)
+        self.assertIn("unignored in-repo report paths are rejected before the\nrelease build starts", release)
         self.assertIn("--fail-on-readiness-gaps", script)
         self.assertIn("gate_mode=second_source_promotion", release)
         self.assertIn("promotion_gate.ready=true", release)
@@ -286,6 +522,280 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("runtime_observer_observational_only", release)
         self.assertNotIn("--map Ragnarok --instance arkserver", release)
         self.assertIn("--map <map> --instance <instance-id>", release)
+
+    def test_rc_final_validation_does_not_use_minimal_only_root_for_all_public_target_sets(self) -> None:
+        plan = read("docs/research/2026-05-29-rc-checkpoint-slicing-plan.md")
+        final_validation = re.search(r"## Final RC Validation(?P<body>.*)", plan, re.S)
+        self.assertIsNotNone(final_validation)
+        final_text = final_validation.group("body")
+        release_gate = re.search(
+            r"```bash\n(?P<command>scripts/check_release_readiness\.sh \\\n.*?\n)```",
+            final_text,
+            re.S,
+        )
+        self.assertIsNotNone(release_gate)
+        release_gate_text = release_gate.group("command")
+
+        for target_set in [
+            "minimal-second-source-intake",
+            "structure-observer-intake",
+            "chat-message-intake",
+        ]:
+            with self.subTest(target_set=target_set):
+                self.assertIn(f"--ufunction-second-source-target-set {target_set}", release_gate_text)
+
+        self.assertIn("scripts/assemble_rc_ufunction_second_source_root.py", final_text)
+        self.assertIn("--minimal-root", final_text)
+        self.assertIn("--structure-root", final_text)
+        self.assertIn("--chat-root", final_text)
+        self.assertIn("/tmp/obelisk-rc-ufunction-second-source-root", final_text)
+        self.assertIn("--ufunction-second-source-root /tmp/obelisk-rc-ufunction-second-source-root", release_gate_text)
+        self.assertIn("must contain the candidate snapshots for all three", final_text)
+        self.assertNotRegex(
+            release_gate_text,
+            r"--ufunction-second-source-root\s+/servidor/ark/workspace-offline/[^\\\n]*minimal[^\\\n]*/ufunction-snapshots",
+        )
+
+    def test_rc_ufunction_root_helper_is_documented_as_copy_only(self) -> None:
+        plan = read("docs/research/2026-05-29-rc-checkpoint-slicing-plan.md")
+        compact = read("docs/agent-handoff/COMPACT_CONTEXT.md")
+
+        final_validation = re.search(r"## Final RC Validation(?P<body>.*)", plan, re.S)
+        self.assertIsNotNone(final_validation)
+        final_text = final_validation.group("body")
+
+        for path, text in (
+            ("docs/research/2026-05-29-rc-checkpoint-slicing-plan.md", final_text),
+            ("docs/agent-handoff/COMPACT_CONTEXT.md", compact),
+        ):
+            with self.subTest(file=path, claim="helper"):
+                self.assertIn("scripts/assemble_rc_ufunction_second_source_root.py", text)
+            with self.subTest(file=path, claim="copy-only snapshots"):
+                self.assertRegex(normalized(text), r"copies existing sanitized snapshots(?: only)?")
+            with self.subTest(file=path, claim="no evidence regeneration"):
+                self.assertRegex(normalized(text), r"does not regenerate evidence|without regenerating snapshots")
+
+    def test_rc_ufunction_root_helper_manifest_redaction_stays_explicit(self) -> None:
+        plan = read("docs/research/2026-05-29-rc-checkpoint-slicing-plan.md")
+        helper = read("scripts/assemble_rc_ufunction_second_source_root.py")
+
+        final_validation = re.search(r"## Final RC Validation(?P<body>.*)", plan, re.S)
+        self.assertIsNotNone(final_validation)
+        final_text = final_validation.group("body")
+
+        for item in [
+            "fresh\npath-redacted manifest written by the helper",
+            "do not reuse or publish older `/tmp`\nmanifests",
+            "absolute source roots",
+            "non-redacted input paths",
+        ]:
+            with self.subTest(item=item):
+                self.assertIn(item, final_text)
+
+        self.assertIn("path_redacted", helper)
+        self.assertIn("assert_no_manifest_path_leaks(manifest", helper)
+
+    def test_checkpoint_scope_preserves_resource_and_post_rc_ordering(self) -> None:
+        plan = read("docs/research/2026-05-29-rc-checkpoint-slicing-plan.md")
+        compact = read("docs/agent-handoff/COMPACT_CONTEXT.md")
+        current = read("docs/agent-handoff/CURRENT.md")
+        status = read("docs/STATUS.md")
+
+        order = "Mission copied-bool observer, Item return-only policy, then Transfer `bAccept`"
+        for path, text in (
+            ("docs/research/2026-05-29-rc-checkpoint-slicing-plan.md", plan),
+            ("docs/agent-handoff/COMPACT_CONTEXT.md", compact),
+            ("docs/agent-handoff/CURRENT.md", current),
+            ("docs/STATUS.md", status),
+        ):
+            with self.subTest(file=path, item="post-RC recognizer order"):
+                self.assertIn(order, normalized(text))
+            with self.subTest(file=path, item="no RC public SDK/API promotion"):
+                self.assertRegex(normalized(text), r"no RC public SDK/API|not RC public SDK/API|does not change the RC public API")
+
+        for path, text in (
+            ("docs/research/2026-05-29-rc-checkpoint-slicing-plan.md", plan),
+            ("docs/agent-handoff/COMPACT_CONTEXT.md", compact),
+            ("docs/agent-handoff/CURRENT.md", current),
+        ):
+            with self.subTest(file=path, item="ResourceHandle semantic blockers"):
+                compact_text = normalized(text)
+                self.assertIn("ResourceHandle", compact_text)
+                self.assertIn("semantic", compact_text)
+                self.assertIn("helper", compact_text)
+                self.assertIn("mutation", compact_text)
+                self.assertIn("fail-closed", compact_text)
+
+    def test_checkpoint_zero_stays_guardrail_only_before_runtime_api_or_research_slices(self) -> None:
+        plan = read("docs/research/2026-05-29-rc-checkpoint-slicing-plan.md")
+        compact = read("docs/agent-handoff/COMPACT_CONTEXT.md")
+        current = read("docs/agent-handoff/CURRENT.md")
+
+        checkpoint_zero_a = re.search(r"### 0a\..*?(?=\n### 0b\.)", plan, re.S)
+        checkpoint_zero_b = re.search(r"### 0b\..*?(?=\n### 1\.)", plan, re.S)
+        self.assertIsNotNone(checkpoint_zero_a)
+        self.assertIsNotNone(checkpoint_zero_b)
+        checkpoint_zero_a_text = checkpoint_zero_a.group(0)
+        checkpoint_zero_b_text = checkpoint_zero_b.group(0)
+        checkpoint_zero_a_include = re.search(
+            r"Include only:\n\n(?P<body>.*?)(?=\n\nValidate:)",
+            checkpoint_zero_a_text,
+            re.S,
+        )
+        self.assertIsNotNone(checkpoint_zero_a_include)
+        checkpoint_zero_a_include_paths = re.findall(
+            r"^- `([^`]+)`$",
+            checkpoint_zero_a_include.group("body"),
+            re.M,
+        )
+        self.assertEqual(
+            [
+                "scripts/scan_resource_handle_serials.py",
+                "scripts/test_scan_resource_handle_serials.py",
+                "scripts/validate_offline_artifact_gate.py",
+                "scripts/test_validate_offline_artifact_gate.py",
+            ],
+            checkpoint_zero_a_include_paths,
+        )
+        checkpoint_zero_b_include = re.search(
+            r"Include:\n\n(?P<body>.*?)(?=\n\nValidate:)",
+            checkpoint_zero_b_text,
+            re.S,
+        )
+        self.assertIsNotNone(checkpoint_zero_b_include)
+        checkpoint_zero_b_include_text = checkpoint_zero_b_include.group("body")
+        checkpoint_zero_b_include_paths = re.findall(
+            r"^- `([^`]+)`(?: .*)?$",
+            checkpoint_zero_b_include_text,
+            re.M,
+        )
+        self.assertEqual(
+            [
+                "scripts/check_release_readiness.sh",
+                "scripts/test_check_release_readiness_options.sh",
+            ],
+            checkpoint_zero_b_include_paths,
+        )
+
+        for item in [
+            "make the local review surface deterministic before slicing runtime/API changes",
+            "artifact hygiene only",
+            "scripts/validate_offline_artifact_gate.py",
+            "scripts/test_validate_offline_artifact_gate.py",
+            "broad release/public-scope guardrails that read public API/docs/handoff/skills",
+            "runtime/API implementation changes",
+            "analyzer output, offline evidence packs, generated snapshots, logs, copied server\n  configs, or other artifacts",
+            "any statement that the current dirty worktree passes the release gate",
+        ]:
+            with self.subTest(item=item):
+                self.assertIn(item, checkpoint_zero_a_text)
+
+        for item in [
+            "scripts/check_release_readiness.sh",
+            "scripts/test_check_release_readiness_options.sh",
+            "release-check option/default behavior self-contained",
+            "read only\nthe release gate script and its option fixtures",
+            "Run the broad\npublic-scope guardrails with the later API/docs checkpoint",
+            "option/default and in-repo report-dir ignored-path validation alignment",
+            "public docs, public metadata JSON, handoff, skills, research-note changes, or broad\n  public-scope guardrail edits",
+            "offline evidence packs, generated snapshots, logs, copied server configs, or other\n  artifacts",
+            "any claim that broad guardrail success proves RC readiness",
+        ]:
+            with self.subTest(item=item):
+                self.assertIn(item, checkpoint_zero_b_text)
+
+        self.assertNotIn("minimal docs wording required", checkpoint_zero_b_text)
+
+        for stale_path in [
+            "include/obelisk/ObeliskApi.h",
+            "src/",
+            "plugins/oBaseEvents/oBaseEvents.cpp",
+            "docs/public_gameplay_events.json",
+            "docs/research/2026-05-29-public-gameplay-event-readiness-audit.md",
+        ]:
+            with self.subTest(stale_path=stale_path):
+                self.assertNotIn(stale_path, checkpoint_zero_a_text)
+
+        for public_or_beta_scope in [
+            ".github/",
+            "CHANGELOG.md",
+            "README.md",
+            "agent-skills/",
+            "docs/RELEASE.md",
+            "docs/STATUS.md",
+            "docs/agent-handoff/",
+            "docs/public_gameplay_events.json",
+            "include/obelisk/ObeliskApi.h",
+            "enable-chat-events",
+            "beta",
+            "oChatLogger",
+            "chat route",
+        ]:
+            with self.subTest(public_or_beta_scope=public_or_beta_scope):
+                self.assertNotIn(public_or_beta_scope, checkpoint_zero_a_text)
+
+        for runtime_or_api_path in [
+            "include/obelisk/ObeliskApi.h",
+            "core/",
+            "hooks/",
+            "plugins/oBaseEvents/",
+            "docs/public_gameplay_events.json",
+            "tests/abi/",
+            "tests/sdk_consumer/",
+            "tests/sdk_installed_consumer/",
+        ]:
+            with self.subTest(runtime_or_api_path=runtime_or_api_path):
+                self.assertNotIn(runtime_or_api_path, checkpoint_zero_b_text)
+
+        for forbidden_checkpoint_zero_b_include in [
+            ".github/",
+            "CHANGELOG.md",
+            "README.md",
+            "CONTRIBUTING.md",
+            "agent-skills/",
+            "docs/RELEASE.md",
+            "docs/STATUS.md",
+            "docs/VERSIONING.md",
+            "docs/ARCHITECTURE.md",
+            "docs/INSTALL.md",
+            "docs/OPERATOR_CLI.md",
+            "docs/oBaseEvents.md",
+            "docs/public_gameplay_events.json",
+            "docs/research/",
+            "include/obelisk/",
+            "core/",
+            "hooks/",
+            "plugins/",
+            "tests/abi/",
+            "tests/sdk_consumer/",
+            "tests/sdk_installed_consumer/",
+            "tests/fixtures/",
+            "ufunction-snapshots",
+            "scriptstruct",
+            "snapshot_evidence_pack",
+            "/servidor/ark/",
+        ]:
+            with self.subTest(forbidden_checkpoint_zero_b_include=forbidden_checkpoint_zero_b_include):
+                self.assertNotIn(forbidden_checkpoint_zero_b_include, checkpoint_zero_b_include_text)
+
+        self.assertIn(
+            "Checkpoint 0-pre is first: staged-path helper only",
+            normalized(compact),
+        )
+        self.assertIn("Checkpoint 0a is artifact-gate scanner/gate only", normalized(compact))
+        self.assertIn("Checkpoint 0b is release-gate options only", normalized(compact))
+        self.assertIn("broad release/public guardrails run with the release docs/guardrails slice", normalized(compact))
+        current_text = normalized(current)
+        self.assertIn("Start with checkpoint 0-pre", current_text)
+        self.assertIn("staged-path helper only", current_text)
+        self.assertIn("0a is artifact-gate scanner/gate only", current_text)
+        self.assertIn("0b is release-gate options only", current_text)
+        self.assertIn("broad release/public guardrails run with the release docs/guardrails slice", current_text)
+        self.assertIn(
+            "Checkpoint order now starts with 0-pre staged-path helper, then 0a artifact-gate scanner/gate, then 0b release-gate options",
+            current_text,
+        )
+        self.assertIn("The current worktree has no staged checkpoint", current_text)
 
     def test_experimental_plugins_stay_out_of_release_scope(self) -> None:
         cmake = read("CMakeLists.txt")
@@ -319,6 +829,73 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertNotIn("OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON", script)
         self.assertNotIn("oPolicyAudit.so", script)
 
+    def test_post_rc_observers_stay_out_of_runtime_and_public_abi(self) -> None:
+        cmake = read("CMakeLists.txt")
+        process_event_hook = read("hooks/ProcessEventHook.cpp")
+        public_header = read("include/obelisk/ObeliskApi.h")
+
+        obelisk_target = re.search(
+            r"add_library\(obelisk SHARED\n(?P<sources>.*?)\n\)",
+            cmake,
+            re.S,
+        )
+        self.assertIsNotNone(obelisk_target)
+        obelisk_sources = obelisk_target.group("sources")
+
+        for source in [
+            "hooks/ProcessEventMissionReflection.cpp",
+            "hooks/ProcessEventItemReflection.cpp",
+            "hooks/ProcessEventTransferReflection.cpp",
+        ]:
+            with self.subTest(target="obelisk", source=source):
+                self.assertNotIn(source, obelisk_sources)
+
+        for token in [
+            "ProcessEventMissionReflection",
+            "ProcessEventItemReflection",
+            "ProcessEventTransferReflection",
+        ]:
+            with self.subTest(file="hooks/ProcessEventHook.cpp", token=token):
+                self.assertNotIn(token, process_event_hook)
+
+        for token in [
+            "ObeliskMission",
+            "ObeliskItem",
+            "ObeliskTransfer",
+            "MISSION",
+            "ITEM_EVENTS",
+            "TRANSFER",
+            "RegisterMission",
+            "RegisterItem",
+            "RegisterTransfer",
+        ]:
+            with self.subTest(file="include/obelisk/ObeliskApi.h", token=token):
+                self.assertNotIn(token, public_header)
+
+    def test_post_rc_hook_recognizers_remain_test_only_targets(self) -> None:
+        cmake = read("CMakeLists.txt")
+        post_rc_hook_sources = [
+            "hooks/ProcessEventMissionReflection.cpp",
+            "hooks/ProcessEventItemReflection.cpp",
+            "hooks/ProcessEventTransferReflection.cpp",
+        ]
+        offenders: list[str] = []
+
+        for kind, name, body in cmake_targets(cmake):
+            source_set = set(re.findall(r"\b(?:hooks|tests|ue)/[A-Za-z0-9_/]+\.cpp\b", body))
+            for source in post_rc_hook_sources:
+                if source not in source_set:
+                    continue
+                is_test_target = (
+                    kind == "executable"
+                    and name.endswith("_tests")
+                    and any(path.startswith("tests/") for path in source_set)
+                )
+                if not is_test_target:
+                    offenders.append(f"add_{kind}({name}): {source}")
+
+        self.assertEqual(offenders, [])
+
     def test_lead_commit_policy_prefers_useful_checkpoints(self) -> None:
         workflow_skill = read("agent-skills/obelisk-github-research-workflow/SKILL.md")
         handoff_skill = read("agent-skills/obelisk-agent-handoff/SKILL.md")
@@ -328,8 +905,8 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("Do not commit\n  and push after every routine round", workflow_skill)
         self.assertIn("useful to contributors", workflow_skill)
         self.assertIn("stable integration point", workflow_skill)
-        self.assertIn("Community/Discord updates are lead-only", workflow_skill)
-        self.assertIn("explicitly delegates that scope", workflow_skill)
+        self.assertIn("Do not draft or send community announcements unless explicitly delegated", workflow_skill)
+        self.assertIn("never store secret\nendpoints", workflow_skill)
         self.assertIn("useful stable\n   checkpoint", handoff_skill)
         self.assertIn("intentionally batched for later lead integration", learning_skill)
         self.assertNotIn("Are changes committed and pushed if stable?", learning_skill)
@@ -377,7 +954,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("mission/transfer APIs", release)
         self.assertIn("Mission target sets such as `mission-compact-intake` are", release)
         self.assertIn("not part of the default gate", release)
-        self.assertIn("scalar-candidate summaries are review aids only, not RC\nscope", release)
+        self.assertIn("scalar-candidate summaries are review aids only, not RC scope", normalized(release))
         self.assertIn("missions", status)
         self.assertIn("remain roadmap items", status)
 
