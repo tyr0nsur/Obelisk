@@ -48,6 +48,8 @@ namespace
     std::atomic<uint64_t> g_TimerId{0};
     uint64_t g_UserData = 0xC0A701;
 
+    constexpr size_t kRequiredBaseApiSize = offsetof(ObeliskApi, capabilities) + sizeof(ObeliskApi::capabilities);
+
     constexpr const char* kDefaultConfig = R"json({
     "enabled": false,
     "allow_all_instances": false,
@@ -536,8 +538,7 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
             return false;
 
         if (api->abi_version != OBELISK_API_ABI_VERSION ||
-            api->struct_size < offsetof(ObeliskApi, UnregisterTimerWithOwnerToken) +
-                sizeof(api->UnregisterTimerWithOwnerToken) ||
+            api->struct_size < kRequiredBaseApiSize ||
             context->abi_version != OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION ||
             context->struct_size < sizeof(ObeliskPluginInitContext) ||
             context->plugin_owner_token == 0)

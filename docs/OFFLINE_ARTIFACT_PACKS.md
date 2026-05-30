@@ -82,6 +82,8 @@ Relative path fields inside JSON manifests and provenance sidecars are resolved 
 to the JSON file that contains them before protected-root checks are applied; `../`
 traversal into protected server trees remains a blocker even when the protected path is
 not written literally.
+CLI `--root` and hidden protected-root inputs may be absolute or relative; the gate
+normalizes them before comparing direct path text and symlink-resolved paths.
 
 ## Consume Gate
 
@@ -173,6 +175,9 @@ python3 scripts/compare_reflection_snapshots.py \
   --target-set mission-copied-bool-policy-slice \
   --target-set transfer-baccept-only-policy-slice
 ```
+
+Pass each target set at most once when listing guidance. Duplicate `--target-set`
+filters fail closed instead of emitting repeated planning guidance.
 
 The mission and transfer policy-slice guidance records the current non-promotion
 boundaries: copied-bool evidence remains internal, distinct second-source layout is still

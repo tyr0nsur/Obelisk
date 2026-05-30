@@ -2841,6 +2841,48 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         self.assertEqual(offenders, [])
 
+    def test_player_identity_lifecycle_plan_stays_offline_candidate_only(self) -> None:
+        plan_path = REPO_ROOT / "docs" / "research" / "2026-05-30-player-identity-lifecycle-plan.md"
+        v1_map_path = REPO_ROOT / "docs" / "research" / "2026-05-30-v1-core-capability-map.md"
+        readme_path = REPO_ROOT / "docs" / "research" / "README.md"
+
+        plan = plan_path.read_text(encoding="utf-8")
+        compact = normalized(plan)
+        compact_lower = compact.lower()
+
+        for phrase in (
+            "candidate-only",
+            "copied/redacted fields",
+            "no ResourceHandle",
+            "no lookup",
+            "no SDK",
+            "no runtime",
+            "no mutation",
+            "no return override",
+            "promotion_gate.ready=false",
+            "promotion_ready=false",
+            "no `/servidor/ark` reads/writes",
+        ):
+            with self.subTest(item=phrase):
+                self.assertIn(normalized(phrase), compact)
+
+        for target in (
+            "ShooterPlayerController.ServerSendChatMessage",
+            "ShooterPlayerController.ServerListPlayers",
+            "ShooterPlayerController.ServerKickPlayer",
+            "ShooterPlayerController.IsInTribe",
+            "ShooterPlayerState.ServerRequestSpawnPointsForDownloadedCharacters",
+            "MissionType.BPOnPlayerRemovedFromMission",
+        ):
+            with self.subTest(target=target):
+                self.assertIn(target, plan)
+
+        self.assertIn("docs do not establish an exact accepted login/logout target", compact_lower)
+
+        for path in (v1_map_path, readme_path):
+            with self.subTest(file=path.relative_to(REPO_ROOT).as_posix()):
+                self.assertIn(plan_path.name, path.read_text(encoding="utf-8"))
+
     def test_scalar_candidate_tooling_is_not_public_sdk_promotion(self) -> None:
         fixture_readme = (REPO_ROOT / "tests/fixtures/ufunction_snapshots/README.md").read_text(
             encoding="utf-8"

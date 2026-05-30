@@ -80,6 +80,9 @@ for the current checkpoint.
 - `oBaseEvents` has a disabled-by-default plugin-local chat command helper over copied
   `ChatMessageEvent` bytes; no command ABI/router, identity, replies, moderation, send-chat
   API, mutation, or extra exported plugin symbols.
+- `oChatAudit` is still experimental and excluded from default release scope. Safe-disabled
+  init now requires only the base ABI prefix and owner token; optional chat/timer slots are
+  required only when config enables active audit registration.
 - ArkServerApi/AseApi remain names and behavior dictionaries for familiar ARK plugin
   concepts. Local `NextGenPlugins` clones are names/demand dictionaries only, not a
   porting target or copying source. Do not copy code, offsets, layouts, vtables, ABI
@@ -138,10 +141,17 @@ for the current checkpoint.
   containers: the pack manifest and relative `SHA256SUMS` must match current contents,
   symlinked pack entries fail closed, supported child manifests keep their own
   consume/promote blockers, and `promote` mode blocks the pack as container-only.
+  Relative `--root` and protected-root inputs are normalized before direct-path and
+  symlink-resolved protected path checks. Duplicate `--target-set` filters in target
+  guidance now fail closed instead of emitting repeated planning output.
 - `APrimalStructure.IsAllowedToBuild` is a high-demand build-policy dictionary seed, but it
   is second-wave only: no committed snapshot, no second-source comparison, no target-set
   promotion, no public StructureEvents/build-policy SDK, no mutation, and no return
   override.
+- `players_identity_lifecycle` has a docs-only candidate plan at
+  `docs/research/2026-05-30-player-identity-lifecycle-plan.md`. It is copied/redacted
+  planning only and does not establish accepted login/logout targets, player SDK,
+  `ResourceHandle`, lookup, runtime work, mutation, or return override.
 
 ## Priority Next Steps
 

@@ -520,6 +520,23 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertIn("does not promote Mission SDK", text_result.stdout)
         self.assertIn("does not promote Transfer SDK", text_result.stdout)
 
+    def test_target_set_guidance_rejects_duplicate_target_set_filter(self) -> None:
+        result = run_compare_raw(
+            "--list-target-guidance",
+            "--target-set",
+            "mission-copied-bool-policy-slice",
+            "--target-set",
+            "mission-copied-bool-policy-slice",
+            "--json",
+        )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, "")
+        self.assertIn(
+            "duplicate target-set guidance filter(s): mission-copied-bool-policy-slice",
+            result.stderr,
+        )
+
     def test_structure_build_policy_guidance_rejects_unmatched_explicit_target(self) -> None:
         result = run_compare_raw(
             "--list-target-guidance",

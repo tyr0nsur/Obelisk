@@ -48,6 +48,21 @@ def cmake_targets(cmake: str) -> list[tuple[str, str, str]]:
     ]
 
 
+def shell_array_values(script: str, name: str) -> list[str]:
+    match = re.search(rf"{re.escape(name)}=\(\n(?P<body>.*?)\n\)", script, re.S)
+    if not match:
+        return []
+    return re.findall(r'"([^"]+)"', match.group("body"))
+
+
+def target_set_args(text: str) -> list[str]:
+    return re.findall(r"--target-set\s+([A-Za-z0-9_-]+)", text)
+
+
+def ufunction_target_set_args(text: str) -> list[str]:
+    return re.findall(r"--ufunction-second-source-target-set\s+([A-Za-z0-9_-]+)", text)
+
+
 class ReleaseScopeGuardrailTests(unittest.TestCase):
     def assertNormalizedIn(self, expected: str, text: str, msg: str | None = None) -> None:
         self.assertTrue(normalized_contains(text, expected), msg or expected)
@@ -555,6 +570,22 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("${BUILD_DIR}/plugins/oDescriptorCatalog/oDescriptorCatalog.so", script)
         self.assertNotIn("oPolicyAudit.so", script)
         rc_smoke = read("scripts/check_rc_layout_evidence_smoke.sh")
+        release_second_source_command = re.search(
+            r"scripts/check_release_readiness\.sh \\\n(?P<body>.*?--second-source-report-dir /tmp/obelisk-rc-second-source)",
+            release,
+            re.S,
+        )
+        self.assertIsNotNone(release_second_source_command)
+        if release_second_source_command is not None:
+            self.assertEqual(
+                ufunction_target_set_args(release_second_source_command.group("body")),
+                PUBLIC_RC_UFUNCTION_TARGET_SETS,
+            )
+        self.assertEqual(
+            shell_array_values(script, "PUBLIC_RC_UFUNCTION_SECOND_SOURCE_TARGET_SETS"),
+            PUBLIC_RC_UFUNCTION_TARGET_SETS,
+        )
+        self.assertEqual(target_set_args(rc_smoke), PUBLIC_RC_UFUNCTION_TARGET_SETS)
         self.assertIn("freshly assembled for the intended HEAD", rc_smoke)
         self.assertNormalizedIn("including current bool-tail metadata", rc_smoke)
         self.assertIn("do not reuse the historical v0.1.0-rc.1 root", rc_smoke)

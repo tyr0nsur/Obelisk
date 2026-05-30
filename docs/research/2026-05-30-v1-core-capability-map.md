@@ -81,4 +81,7 @@ identity, lookup, mutation, return override, or handle contract.
    `players_identity_lifecycle`: build a closed offline target set around
    `ShooterPlayerController`/`PlayerState` login and lifecycle names, classify only
    copied/redacted fields, and keep `ResourceHandle`, lookup, UE pointers, mutation,
-   return override, and runtime work out of scope until a separate gate exists.
+   return override, and runtime work out of scope until a separate gate exists. The first
+   docs-only plan is
+   [2026-05-30-player-identity-lifecycle-plan.md](2026-05-30-player-identity-lifecycle-plan.md);
+   it is candidate-only and does not promote a player SDK.

@@ -135,6 +135,8 @@ a non-zero owner token. It registers exactly one chat callback and one repeating
 then unregisters the timer before the chat callback during shutdown. Digest output is
 process-local metadata only: accepted/malformed event counts, per-mode counts, total and
 max byte sizes, bounded size buckets, and overflow count.
+When disabled by config, discovery/init should require only the base ABI prefix and owner
+token; optional chat/timer slots are required only before registering active callbacks.
 
 ## Policy
 

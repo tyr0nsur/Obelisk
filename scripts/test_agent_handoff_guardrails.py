@@ -14,6 +14,7 @@ CURRENT = HANDOFF_DIR / "CURRENT.md"
 README = HANDOFF_DIR / "README.md"
 COMPACT_CONTEXT = HANDOFF_DIR / "COMPACT_CONTEXT.md"
 GITHUB_WORKFLOW_SKILL = REPO_ROOT / "agent-skills" / "obelisk-github-research-workflow" / "SKILL.md"
+REVERSING_RESEARCH_SKILL = REPO_ROOT / "agent-skills" / "obelisk-reversing-research" / "SKILL.md"
 MAX_CURRENT_LINES = 220
 MAX_SKILL_LINES = 260
 SCOPED_GUARDRAIL_FILES = [
@@ -188,6 +189,17 @@ class AgentHandoffGuardrailsTests(unittest.TestCase):
         self.assertIn("No run is approved by this note", mission_plan)
         self.assertIn("This plan is not approval to add or enable gates", mission_plan)
         self.assertNotIn("arkserver " + "ventana aprobada", send_discord_tests)
+
+    def test_resourcehandle_followup_does_not_restart_broad_scans(self) -> None:
+        current = normalized(CURRENT.read_text(encoding="utf-8"))
+        compact = normalized(COMPACT_CONTEXT.read_text(encoding="utf-8"))
+        reversing_skill = normalized(REVERSING_RESEARCH_SKILL.read_text(encoding="utf-8"))
+
+        for text in (current, compact, reversing_skill):
+            self.assertIn("ResourceHandle", text)
+            self.assertRegex(text, r"broad (FName, GObjects, or core scans|FName, GObjects, or core scan)")
+        self.assertIn("rejected runtime object samples", reversing_skill)
+        self.assertIn("runtime serial reuse/wraparound semantics", reversing_skill)
 
     def test_learning_skill_keeps_adopted_knowledge_compact(self) -> None:
         skill = (REPO_ROOT / "agent-skills/obelisk-continuous-learning/SKILL.md").read_text(

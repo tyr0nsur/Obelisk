@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -2558,6 +2559,39 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertEqual([], result["blockers"])
         self.assertTrue(result["artifacts"][0]["provenance_verified"])
         self.assertEqual(artifact_sha, result["artifacts"][0]["sha256"])
+
+    def test_accepts_relative_roots_after_absolute_path_normalization(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            previous_cwd = Path.cwd()
+            os.chdir(tmp)
+            try:
+                protected = Path("server")
+                workspace = protected / "workspace-offline"
+                artifact = workspace / "pack" / "artifact.txt"
+                artifact.parent.mkdir(parents=True)
+                artifact.write_text("offline evidence\n", encoding="utf-8")
+                artifact_sha = gate.sha256_file(artifact)
+                write_json(
+                    Path(f"{artifact}.provenance.json"),
+                    {
+                        "schema": gate.PROVENANCE_SCHEMA,
+                        "verified": True,
+                        "artifact_kind": "objdump",
+                        "producer": "test",
+                        "tool": "objdump",
+                        "binary_sha256": BINARY_SHA,
+                        "artifact_sha256": artifact_sha,
+                        "source_provenance": {},
+                    },
+                )
+
+                result = gate.build_result(args(root=workspace, protected_root=protected, artifacts=[("objdump", artifact)]))
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual("accepted", result["status"])
+        self.assertEqual([], result["blockers"])
+        self.assertTrue(result["artifacts"][0]["provenance_verified"])
 
     def test_rejects_direct_protected_dump_path_before_existence_check(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

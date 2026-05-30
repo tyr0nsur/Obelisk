@@ -84,6 +84,7 @@ Current post-RC research lane:
 - [2026-05-30-structure-return-only-policy-slice.md](2026-05-30-structure-return-only-policy-slice.md)
 - [2026-05-30-structure-nonpin-copied-scalar-policy-slice.md](2026-05-30-structure-nonpin-copied-scalar-policy-slice.md)
 - [2026-05-30-structure-build-policy-triage.md](2026-05-30-structure-build-policy-triage.md)
+- [2026-05-30-player-identity-lifecycle-plan.md](2026-05-30-player-identity-lifecycle-plan.md)
 - [2026-05-28-fname-index-manifest-plan.md](2026-05-28-fname-index-manifest-plan.md)
 - [2026-05-29-ghidra-fuobjectarray-field-window-probe.md](2026-05-29-ghidra-fuobjectarray-field-window-probe.md)
 - [2026-05-30-gobjects-strict-consume-recapture-needed.md](2026-05-30-gobjects-strict-consume-recapture-needed.md)
@@ -199,6 +200,7 @@ when a task explicitly targets that module.
 | [2026-05-29-transfer-copied-scalar-feasibility.md](2026-05-29-transfer-copied-scalar-feasibility.md) | Transfer copied-scalar feasibility | Ranks post-RC transfer copied-scalar candidates, with `ServerTransferredPlayerConfirmationResult.bAccept` as the only clean first internal candidate and no RC/public Transfer SDK claim. |
 | [2026-05-30-redacted-scriptstruct-signatures.md](2026-05-30-redacted-scriptstruct-signatures.md) | Redacted ScriptStruct signatures | Adds candidate-only redacted ScriptStruct signature summaries from sanitized snapshots without replacing second-source readiness, payload decoding, runtime promotion, or SDK gates. |
 | [2026-05-30-structure-build-policy-triage.md](2026-05-30-structure-build-policy-triage.md) | Structure build-policy triage | Records `APrimalStructure.IsAllowedToBuild` as a high-demand NextGenPlugins dictionary seed, but keeps it second-wave until sanitized snapshots, second-source evidence, redaction policy, and mutation/return-override blockers are resolved. |
+| [2026-05-30-player-identity-lifecycle-plan.md](2026-05-30-player-identity-lifecycle-plan.md) | Player identity lifecycle plan | Defines the first docs-only `players_identity_lifecycle` seed set from existing target names, with copied/redacted fields only and no ResourceHandle, lookup, SDK, runtime, mutation, or return override. |
 | [2026-05-27-sdk-chat-event-ownership-plan.md](2026-05-27-sdk-chat-event-ownership-plan.md) | Historical SDK event ownership plan | Defines ownership, ABI, callback cleanup, and validation gates required before a public module callback API. |
 | [2026-05-27-chat-sdk-abi-preflight.md](2026-05-27-chat-sdk-abi-preflight.md) | Historical SDK ABI preflight | Defines test-first ABI and dispatcher gates for a future module callback without changing the public header yet. |
 | [2026-05-27-theisland-chat-reflection-ab-runbook.md](2026-05-27-theisland-chat-reflection-ab-runbook.md) | TheIsland historical module A/B runbook | Historical/superseded; do not execute without explicit approval to start `arkserver2`, test, and shut it down afterward. |

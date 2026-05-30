@@ -61,6 +61,10 @@ Own these areas:
   history. Static `0x1d18a90` evidence shows a `FUObjectArray` sweep that sets
   `UObject+0x8` bit `0x100` and conditionally sets `0x8000`, but this is still unnamed
   lifecycle evidence and does not promote public handles.
+  Do not answer the remaining ResourceHandle blocker with another broad FName, GObjects,
+  or core scan unless the binary hash changes or existing evidence is contradicted.
+  The next useful blocker evidence is rejected runtime object samples plus runtime
+  serial reuse/wraparound semantics under an approved live-ops brief.
 - Accepted compact target sets are layout evidence only. They do not promote public module
   SDKs, object identity, mutation, return overrides, raw params, or `ResourceHandle`.
   Current module routing belongs in `docs/agent-handoff/CURRENT.md` and dated research

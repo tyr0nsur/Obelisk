@@ -303,6 +303,11 @@ if(TARGET oChatAudit)
     )
 
     add_test(
+        NAME SdkConsumerFixtureOChatAuditDisabledShortApi
+        COMMAND sdk_consumer_fixture "$<TARGET_FILE:oChatAudit>" oChatAudit disabled-short-api-before-chat-slots
+    )
+
+    add_test(
         NAME SdkConsumerFixtureOChatAuditRejectsZeroOwnerToken
         COMMAND sdk_consumer_fixture "$<TARGET_FILE:oChatAudit>" oChatAudit zero-owner-token
     )

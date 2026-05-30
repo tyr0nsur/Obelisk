@@ -50,8 +50,8 @@ python3 scripts/compare_reflection_snapshots.py \
   --base-root tests/fixtures/ufunction_snapshots \
   --candidate-root "${candidate_root}" \
   --readiness-report \
-  --target-set structure-observer-intake \
   --target-set minimal-second-source-intake \
+  --target-set structure-observer-intake \
   --target-set item-return-only-policy-slice \
   --target-set chat-message-intake \
   --fail-on-readiness-gaps

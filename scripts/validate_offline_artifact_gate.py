@@ -1077,12 +1077,16 @@ def path_state(path: Path, *, workspace_root: Path, protected_root: Path) -> dic
     expanded = path.expanduser()
     direct = expanded.absolute() if not expanded.is_absolute() else expanded
     resolved = expanded.resolve(strict=False)
+    workspace_direct = workspace_root.expanduser()
+    if not workspace_direct.is_absolute():
+        workspace_direct = workspace_direct.absolute()
+    protected_direct = protected_root.expanduser()
+    if not protected_direct.is_absolute():
+        protected_direct = protected_direct.absolute()
     workspace = normalized_root(workspace_root)
     default_workspace = normalized_root(DEFAULT_WORKSPACE_ROOT)
     protected = normalized_root(protected_root)
-    direct_under_workspace = expanded.is_absolute() and (
-        is_relative_to(direct, workspace_root) or is_relative_to(direct, default_workspace)
-    )
+    direct_under_workspace = is_relative_to(direct, workspace_direct) or is_relative_to(direct, default_workspace)
     resolved_under_workspace = is_relative_to(resolved, workspace) or is_relative_to(resolved, default_workspace)
     return {
         "path": str(path),
@@ -1090,7 +1094,7 @@ def path_state(path: Path, *, workspace_root: Path, protected_root: Path) -> dic
         "resolved": str(resolved),
         "direct_under_workspace": direct_under_workspace,
         "resolved_under_workspace": resolved_under_workspace,
-        "direct_under_protected": expanded.is_absolute() and is_relative_to(direct, protected_root),
+        "direct_under_protected": is_relative_to(direct, protected_direct),
         "resolved_under_protected": is_relative_to(resolved, protected),
     }
 

@@ -886,6 +886,14 @@ int main(int argc, char** argv)
             api.RegisterTimerWithOwnerTokenHandle = nullptr;
             api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken) = nullptr;
         }
+        if (mode == "disabled-short-api-before-chat-slots")
+        {
+            api.struct_size = offsetof(ObeliskApi, RegisterChatMessageEventWithOwnerTokenHandle);
+            api.RegisterChatMessageEventWithOwnerTokenHandle = nullptr;
+            api.UnregisterChatMessageEventWithOwnerToken = nullptr;
+            api.RegisterTimerWithOwnerTokenHandle = nullptr;
+            api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken) = nullptr;
+        }
         if (mode == "fail-gameplay-policy-registration")
             g_FailGameplayPolicyRegistration = true;
         if (mode == "fail-chat-message-registration")
@@ -1413,7 +1421,8 @@ int main(int argc, char** argv)
         if (std::strcmp(expectedPluginId, "oChatAudit") == 0 &&
             (mode.empty() ||
              mode == "disabled-no-chat-message-capability" ||
-             mode == "disabled-no-timer-capability"))
+             mode == "disabled-no-timer-capability" ||
+             mode == "disabled-short-api-before-chat-slots"))
         {
             Require(g_GameplayPolicyRegisterCount == 0,
                 "disabled chat audit unexpectedly registered gameplay policy callback");
@@ -1593,7 +1602,8 @@ int main(int argc, char** argv)
         if (std::strcmp(expectedPluginId, "oChatAudit") == 0 &&
             (mode.empty() ||
              mode == "disabled-no-chat-message-capability" ||
-             mode == "disabled-no-timer-capability"))
+             mode == "disabled-no-timer-capability" ||
+             mode == "disabled-short-api-before-chat-slots"))
         {
             Require(g_ChatMessageRegisterCount == 0,
                 "disabled chat audit registered a chat callback before shutdown");

@@ -317,6 +317,22 @@ def target_set_guidance_report(target_sets: list[str]) -> list[dict[str, Any]]:
     return guidance
 
 
+def duplicate_values(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    duplicates: set[str] = set()
+    for value in values:
+        if value in seen:
+            duplicates.add(value)
+        seen.add(value)
+    return sorted(duplicates)
+
+
+def reject_duplicate_target_set_guidance_filters(target_sets: list[str]) -> None:
+    duplicates = duplicate_values(target_sets)
+    if duplicates:
+        raise SystemExit("duplicate target-set guidance filter(s): " + ", ".join(duplicates))
+
+
 def unmatched_target_guidance_filters(targets: list[str]) -> list[str]:
     return [
         target
@@ -1151,6 +1167,7 @@ def main() -> int:
         return 0
     target_filters = expand_target_filters(args.target, args.target_set)
     if args.list_target_guidance:
+        reject_duplicate_target_set_guidance_filters(args.target_set)
         unmatched_guidance = unmatched_target_guidance_filters(args.target)
         if unmatched_guidance:
             raise SystemExit(
