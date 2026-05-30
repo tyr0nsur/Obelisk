@@ -2707,6 +2707,60 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         self.assertEqual(offenders, [])
 
+    def test_v1_modding_route_keeps_broad_surface_without_sdk_promise(self) -> None:
+        v1_map = (
+            REPO_ROOT / "docs" / "research" / "2026-05-30-v1-core-capability-map.md"
+        ).read_text(encoding="utf-8")
+        research_readme = (REPO_ROOT / "docs" / "research" / "README.md").read_text(
+            encoding="utf-8"
+        )
+        matrix = (REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md").read_text(
+            encoding="utf-8"
+        )
+
+        broad_surface_terms = (
+            "players",
+            "tribes",
+            "dinos",
+            "items",
+            "structures",
+            "permissions",
+            "commands",
+            "admin",
+            "transfers",
+            "missions",
+            "timers",
+            "storage",
+        )
+        focused_lane_terms = (
+            "chat",
+            "ResourceHandle",
+            "APrimalStructure.IsAllowedToBuild",
+        )
+
+        for path, text in (
+            ("docs/research/2026-05-30-v1-core-capability-map.md", v1_map),
+            ("docs/research/README.md", research_readme),
+            ("docs/PLUGIN_HUB_CAPABILITY_MATRIX.md", matrix),
+        ):
+            compact = normalized(text)
+            compact_lower = compact.lower()
+            with self.subTest(file=path, item="broad surface terms"):
+                for term in broad_surface_terms:
+                    self.assertIn(term, compact_lower)
+            with self.subTest(file=path, item="focused lanes are not center"):
+                for term in focused_lane_terms:
+                    self.assertIn(term, compact)
+                self.assertRegex(
+                    compact_lower,
+                    r"not (?:a )?(?:narrowed )?(?:v1 product )?center|not narrow|not turn .* center",
+                )
+            with self.subTest(file=path, item="no SDK promise from breadth"):
+                self.assertRegex(
+                    compact_lower,
+                    r"not (?:a )?(?:delivery |sdk )?promise|not .* sdk promise|no public sdk|not ready",
+                )
+
     def test_resource_handle_serial_policy_tooling_stays_internal_candidate_only(self) -> None:
         script = (REPO_ROOT / "scripts" / "build_resource_handle_serial_policy.py").read_text(
             encoding="utf-8"

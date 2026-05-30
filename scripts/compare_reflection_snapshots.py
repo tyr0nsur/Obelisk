@@ -109,6 +109,56 @@ TARGET_BLOCKER_GUIDANCE = {
         ),
     },
 }
+TARGET_SET_BLOCKER_GUIDANCE = {
+    "mission-copied-bool-policy-slice": {
+        "classification": "internal_mission_copied_bool_policy_candidate",
+        "why_blocked": [
+            "policy_slice_evidence_only",
+            "missing_distinct_second_source_layout",
+            "mission_payload_decoding_blocked",
+            "public_mission_sdk_blocked",
+            "runtime_observation_requires_separate_approval",
+        ],
+        "next_offline_input": (
+            "sanitized mission UFunction snapshots from distinct non-protected copied/offline "
+            "artifacts with complete artifact identity"
+        ),
+        "snapshot_prep_checks": [
+            "compare schema-qualified targets through --target-set mission-copied-bool-policy-slice",
+            "require AddPlayerToMission, BPAllowPlayerToLeaveMission, and BPOnPlayerRemovedFromMission layouts to be comparable",
+            "keep player/controller/character object refs, item arrays, mission payload identity, and raw params redacted or recognition-only",
+            "require distinct artifact identity before any second-source readiness claim",
+        ],
+        "non_claim": (
+            "does not promote Mission SDK, mission payload decoding, identity, lookup, mutation, "
+            "return override, runtime hooks, or target-set expansion"
+        ),
+    },
+    "transfer-baccept-only-policy-slice": {
+        "classification": "internal_transfer_baccept_policy_candidate",
+        "why_blocked": [
+            "policy_slice_evidence_only",
+            "missing_distinct_second_source_layout",
+            "transfer_payload_decoding_blocked",
+            "public_transfer_sdk_blocked",
+            "runtime_observation_requires_separate_approval",
+        ],
+        "next_offline_input": (
+            "sanitized ServerTransferredPlayerConfirmationResult snapshots from distinct "
+            "non-protected copied/offline artifacts with complete artifact identity"
+        ),
+        "snapshot_prep_checks": [
+            "compare schema-qualified targets through --target-set transfer-baccept-only-policy-slice",
+            "require the bAccept bool layout to be comparable and backed by candidate-uobject membership",
+            "keep transferred player payloads, inventory/dino data, object refs, arrays, and raw params redacted or recognition-only",
+            "require distinct artifact identity before any second-source readiness claim",
+        ],
+        "non_claim": (
+            "does not promote Transfer SDK, transfer payload decoding, identity, lookup, mutation, "
+            "return override, runtime hooks, or target-set expansion"
+        ),
+    },
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -243,8 +293,28 @@ def target_guidance_report(target_filters: set[str]) -> dict[str, Any]:
         "target_filters": sorted(target_filters),
         "not_promoted_surfaces": sorted(READINESS_NOT_PROMOTED_SURFACES),
         "non_claims": list(READINESS_NON_CLAIMS),
+        "target_set_guidance": [],
         "targets": guidance,
     }
+
+
+def target_set_blocker_guidance(target_set: str) -> dict[str, Any] | None:
+    guidance = TARGET_SET_BLOCKER_GUIDANCE.get(target_set)
+    if guidance is None:
+        return None
+    copied: dict[str, Any] = {}
+    for key, value in guidance.items():
+        copied[key] = list(value) if isinstance(value, list) else value
+    return copied
+
+
+def target_set_guidance_report(target_sets: list[str]) -> list[dict[str, Any]]:
+    guidance = []
+    for target_set in sorted(target_sets):
+        item = target_set_blocker_guidance(target_set)
+        if item is not None:
+            guidance.append({"target_set": target_set, **item})
+    return guidance
 
 
 def unmatched_target_guidance_filters(targets: list[str]) -> list[str]:
@@ -907,11 +977,30 @@ def print_text(report: dict[str, Any]) -> None:
 
     if report["schema"] == "obelisk.reflection-target-guidance.v1":
         print(
-            "target_guidance count={count} scope={scope}".format(
+            "target_guidance count={count} scope={scope} target_set_guidance={set_count}".format(
                 count=len(report["targets"]),
                 scope=report["guidance_scope"],
+                set_count=len(report.get("target_set_guidance", [])),
             )
         )
+        for item in report.get("target_set_guidance", []):
+            parts = [
+                f"target_set={item['target_set']}",
+                f"classification={item.get('classification')}",
+            ]
+            why_blocked = item.get("why_blocked")
+            if isinstance(why_blocked, list) and why_blocked:
+                parts.append(f"why_blocked={','.join(str(reason) for reason in why_blocked)}")
+            next_offline_input = item.get("next_offline_input")
+            if isinstance(next_offline_input, str) and next_offline_input:
+                parts.append(f"next_offline_input={next_offline_input}")
+            snapshot_prep_checks = item.get("snapshot_prep_checks")
+            if isinstance(snapshot_prep_checks, list) and snapshot_prep_checks:
+                parts.append(f"snapshot_prep_checks={len(snapshot_prep_checks)}")
+            non_claim = item.get("non_claim")
+            if isinstance(non_claim, str) and non_claim:
+                parts.append(f"non_claim={non_claim}")
+            print("  " + " ".join(parts))
         for item in report["targets"]:
             parts = [
                 f"target={item['target']}",
@@ -1070,6 +1159,7 @@ def main() -> int:
             )
         report = target_guidance_report(target_filters)
         report["target_sets"] = sorted(args.target_set)
+        report["target_set_guidance"] = target_set_guidance_report(args.target_set)
         if args.json:
             print(json.dumps(report, indent=2, sort_keys=True))
         else:

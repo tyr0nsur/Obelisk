@@ -32,6 +32,17 @@ UE lookup, or `ResourceHandle` APIs.
 | Admin | No gameplay admin API. | Keep core to operator/config/logging primitives until player identity and authority model exist. | Kick/ban/broadcast panels and automation. |
 | Economy/database | No core surface. | Do not include in v1 core unless a generic storage abstraction is separately designed and lifecycle-tested. | Economy, shop, rewards, MySQL-backed plugins. |
 
+## Breadth Guardrail
+
+The v1 route must not narrow into only chat helpers, `ResourceHandle` revalidation, or
+`APrimalStructure.IsAllowedToBuild` triage. Those are useful evidence lanes, but the
+planning map stays organized around the broader modding surface: players, tribes, dinos,
+items, structures, permissions, commands, admin, transfers, missions, timers, and storage.
+
+This breadth is a discovery and prioritization guardrail, not a delivery promise. A family
+can appear in the map as demand or future module work while still having no public SDK,
+identity, lookup, mutation, return override, or handle contract.
+
 ## Core v1 Principles
 
 - Public ABI remains C/POD, append-only, owner-token scoped, and capability-discovered.

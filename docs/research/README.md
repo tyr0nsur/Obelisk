@@ -101,6 +101,12 @@ Current post-RC research lane:
 - [2026-05-30-static-build-policy-tooling.md](2026-05-30-static-build-policy-tooling.md)
 - [2026-05-29-reflection-inventory-pack-smoke.md](2026-05-29-reflection-inventory-pack-smoke.md)
 
+Keep this lane broad enough to preserve the full modding surface: players, tribes, dinos,
+items, structures, permissions, commands, admin, transfers, missions, timers, and storage.
+Focused evidence lanes such as copied chat, `ResourceHandle` blocker work, and
+`APrimalStructure.IsAllowedToBuild` triage are inputs to that broader map, not a narrowed
+v1 product center or SDK promise.
+
 Historical reusable evidence:
 
 - [2026-05-27-general-ufunction-inventory.md](2026-05-27-general-ufunction-inventory.md)

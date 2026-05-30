@@ -332,6 +332,11 @@ def command_plugins_show(root: Path, plugin: str) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Read-only Obelisk operator CLI.",
+        epilog=(
+            "Current commands only inspect install, plugin, and per-instance marker state. "
+            "Lifecycle commands such as start, stop, restart, and plugin restart are "
+            "post-stable and are not implemented."
+        ),
     )
     parser.add_argument(
         "--root",

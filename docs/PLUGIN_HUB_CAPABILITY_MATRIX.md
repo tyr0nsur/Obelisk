@@ -117,6 +117,12 @@ RCON, inventory tools, dino tools, tribe tools, and build-placement policy remai
 work. Each requires its own copied-data evidence, ABI design, privacy policy, lifecycle
 tests, and promotion gate.
 
+Planning should keep the full demand surface visible: players, tribes, dinos, items,
+structures, permissions, commands, admin, transfers, missions, timers, and storage.
+Current attention on passive chat, `ResourceHandle` blockers, or structure build-placement
+triage must not turn those lanes into the Plugin Hub center, nor imply SDK availability
+for the wider surface.
+
 The safest future structure direction is likely aggregate/census-style data, such as
 counts by copied category or bounded proximity signals, because it can be designed without
 public structure handles. It still needs a separate design that avoids public GObjects

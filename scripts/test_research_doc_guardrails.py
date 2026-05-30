@@ -49,6 +49,75 @@ class ResearchDocGuardrailTests(unittest.TestCase):
 
         self.assertEqual(offenders, [])
 
+    def test_resourcehandle_current_checkpoint_preserves_no_scan_blockers(self) -> None:
+        note = REPO_ROOT / "docs/research/2026-05-30-post-rc-offline-resourcehandle-priority.md"
+        text = note.read_text(encoding="utf-8")
+        section = text.split("## Current No-Scan Checkpoint", 1)[1].split(
+            "## Next Repo-Local Improvement", 1
+        )[0]
+
+        for phrase in (
+            "Do not rerun or request broad FName, GObjects, core, UFunction,",
+            "ReflectionScanner, serial-sweep, or scanner-like discovery",
+            "unless the\nbinary hash changes or new contradictory artifact evidence invalidates",
+            "New repo-local work should consume the existing artifacts and produce only\n"
+            "redacted schema/gate planning artifacts.",
+            "resourcehandle-identity-complete-failclosed-20260530T165521Z/resourcehandle-revalidation.json",
+            "resourcehandle-post-callback-contract-20260530T171910Z/post-callback-contract.json",
+            "resourcehandle-serial-policy-20260530T190642Z/serial-policy.json",
+            "preserve these exact blocker labels",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, section)
+
+        current_promote_blockers = [
+            line.strip("- `")
+            for line in section.split("Current strict promote blockers:", 1)[1]
+            .split("Still-required ResourceHandle promotion blockers:", 1)[0]
+            .splitlines()
+            if line.startswith("- `")
+        ]
+        self.assertEqual(
+            current_promote_blockers,
+            [
+                "promote_mode_serial_policy_candidate_only",
+                "promote_mode_manifest_has_non_claims",
+            ],
+        )
+
+        required_resourcehandle_blockers = [
+            line.strip("- `")
+            for line in section.split("Still-required ResourceHandle promotion blockers:", 1)[1]
+            .split("Historical evaluator blockers", 1)[0]
+            .splitlines()
+            if line.startswith("- `")
+        ]
+        self.assertEqual(
+            required_resourcehandle_blockers,
+            [
+                "public_resourcehandle_policy_missing",
+                "no_public_resource_handle_contract",
+                "no_rejected_runtime_object_samples",
+                "no_serial_reuse_or_wraparound_policy",
+                "post_callback_lifetime_policy_unproven",
+                "no_version_matched_source_decompiler_correlation_for_public_lifecycle_names",
+            ],
+        )
+
+        historical_blockers = [
+            line.strip("- `")
+            for line in section.split("Historical evaluator blockers to retain as provenance", 1)[1]
+            .splitlines()
+            if line.startswith("- `")
+        ]
+        self.assertEqual(
+            historical_blockers,
+            [
+                "no_post_callback_lifetime_contract",
+                "uobject_flags_validity_semantics_unproven",
+            ],
+        )
+
     def test_no_obsolete_theisland_second_core_runbook_references(self) -> None:
         forbidden = [
             "theisland-second-core",

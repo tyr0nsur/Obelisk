@@ -120,12 +120,24 @@ class OperationalDocGuardrailTests(unittest.TestCase):
     def test_operator_cli_scope_stays_read_only_before_stable_lifecycle(self) -> None:
         cli_doc = (REPO_ROOT / "docs" / "OPERATOR_CLI.md").read_text(encoding="utf-8")
         cli_script = (REPO_ROOT / "scripts" / "obelisk.py").read_text(encoding="utf-8")
+        normalized_cli_doc = " ".join(cli_doc.split())
 
         self.assertIn("read-only", cli_doc)
         self.assertIn("Post-Stable Lifecycle TODO", cli_doc)
         self.assertIn("Hot Reload Boundary", cli_doc)
+        self.assertIn("multi-instance inventory and posture inspection", cli_doc)
+        self.assertIn(
+            "No current command starts, stops, restarts, installs, enables, disables, rolls back, or reloads anything",
+            normalized_cli_doc,
+        )
+        self.assertIn("roadmap boundary, not accepted syntax", cli_doc)
         self.assertIn("plugin restart must\nmean an operational restart", cli_doc)
         self.assertIn('description="Read-only Obelisk operator CLI."', cli_script)
+        self.assertIn("Current commands only inspect install, plugin, and per-instance marker state.", cli_script)
+        self.assertIn(
+            "Lifecycle commands such as start, stop, restart, and plugin restart are",
+            cli_script,
+        )
 
         for mutable_command in ("start", "stop", "restart", "enable", "disable", "install", "rollback"):
             self.assertNotIn(f'add_parser("{mutable_command}"', cli_script)

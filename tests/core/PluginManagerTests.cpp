@@ -3077,6 +3077,41 @@ namespace
                     MakeInventoryCanUseEvent(inventoryScalars)) == 0,
                 "inventory self-unregister callback dispatched after removal");
 
+        plugin.gameplayPolicyEventCalls = 0;
+        plugin.gameplayPolicySelfUnregisterResult = false;
+        plugin.gameplayPolicyRegistrationId =
+            plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                plugin.initOwnerToken,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_ALLOW_EQUIP_ITEM_CHECK,
+                FakeGameplayPolicySelfUnregisterCallback,
+                &plugin);
+        Require(plugin.gameplayPolicyRegistrationId != 0,
+                "item-return self-unregister gameplay policy registration returned zero");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 1,
+                "item-return self-unregister callback was not bridged into item-return dispatcher");
+
+        const std::vector<Obelisk::Core::ItemReturnScalarValue> itemReturnScalars =
+            MakeItemReturnScalars(true);
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().Dispatch(
+                    MakeItemReturnEvent(
+                        Obelisk::Core::ItemReturnEventKind::AllowEquipItem,
+                        itemReturnScalars)) == 1,
+                "item-return self-unregister callback did not dispatch");
+        Require(plugin.gameplayPolicyEventCalls == 1,
+                "item-return self-unregister callback call count mismatch");
+        Require(plugin.gameplayPolicyEventKind ==
+                    OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_ALLOW_EQUIP_ITEM_CHECK,
+                "item-return self-unregister callback received wrong event kind");
+        Require(plugin.gameplayPolicySelfUnregisterResult,
+                "item-return self-unregister callback could not unregister itself");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 0,
+                "item-return self-unregister callback remained registered after dispatch");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().Dispatch(
+                    MakeItemReturnEvent(
+                        Obelisk::Core::ItemReturnEventKind::AllowEquipItem,
+                        itemReturnScalars)) == 0,
+                "item-return self-unregister callback dispatched after removal");
+
         manager.UnloadAll();
 
         Require(plugin.shutdownCalls == 1, "self-unregister plugin shutdown was not called");
@@ -3085,6 +3120,8 @@ namespace
                 "structure self-unregister callback was still registered at dlclose");
         Require(plugin.inventoryPolicySubscriptionsAtClose == 0,
                 "inventory self-unregister callback was still registered at dlclose");
+        Require(plugin.itemReturnSubscriptionsAtClose == 0,
+                "item-return self-unregister callback was still registered at dlclose");
         Require(plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
                     plugin.initOwnerToken,
                     OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL,

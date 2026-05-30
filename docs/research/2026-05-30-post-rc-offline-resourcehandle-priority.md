@@ -465,6 +465,47 @@ artifact only defines fail-closed policy and explicitly does not prove runtime r
 safety, public lookup safety, persistent handles, identity, mutation, return overrides,
 or public `ResourceHandle`.
 
+## Current No-Scan Checkpoint
+
+Treat the ResourceHandle/GObjects lane as stopped for broad discovery on the current
+binary hash. Do not rerun or request broad FName, GObjects, core, UFunction,
+ReflectionScanner, serial-sweep, or scanner-like discovery for this route unless the
+binary hash changes or new contradictory artifact evidence invalidates the canonical
+inputs below. New repo-local work should consume the existing artifacts and produce only
+redacted schema/gate planning artifacts.
+
+Canonical inputs to reuse:
+
+- identity-complete fail-closed evaluator:
+  `/home/flowcommunity-ark/obelisk-artifacts/resourcehandle-identity-complete-failclosed-20260530T165521Z/resourcehandle-revalidation.json`
+- post-callback rejection contract:
+  `/home/flowcommunity-ark/obelisk-artifacts/resourcehandle-post-callback-contract-20260530T171910Z/post-callback-contract.json`
+- serial reuse/wraparound candidate policy:
+  `/home/flowcommunity-ark/obelisk-artifacts/resourcehandle-serial-policy-20260530T190642Z/serial-policy.json`
+
+When summarizing or extending this lane, preserve these exact blocker labels. If a later
+artifact narrows one, record the narrowing artifact next to the original label instead of
+dropping or renaming the blocker.
+
+Current strict promote blockers:
+
+- `promote_mode_serial_policy_candidate_only`
+- `promote_mode_manifest_has_non_claims`
+
+Still-required ResourceHandle promotion blockers:
+
+- `public_resourcehandle_policy_missing`
+- `no_public_resource_handle_contract`
+- `no_rejected_runtime_object_samples`
+- `no_serial_reuse_or_wraparound_policy`
+- `post_callback_lifetime_policy_unproven`
+- `no_version_matched_source_decompiler_correlation_for_public_lifecycle_names`
+
+Historical evaluator blockers to retain as provenance until directly superseded:
+
+- `no_post_callback_lifetime_contract`
+- `uobject_flags_validity_semantics_unproven`
+
 ## Next Repo-Local Improvement
 
 After serial-policy artifact acceptance, the smallest useful repo-local improvement is a

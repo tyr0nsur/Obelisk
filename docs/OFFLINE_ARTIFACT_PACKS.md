@@ -78,6 +78,10 @@ non-protected artifact root. Direct or symlink-resolved reads from a protected s
 outside the approved offline workspace remain blockers, even if the tool is installed.
 Existing analyzer text is reusable only when its provenance sidecar and child manifest
 pass the same fail-closed consume gate as any other static artifact.
+Relative path fields inside JSON manifests and provenance sidecars are resolved relative
+to the JSON file that contains them before protected-root checks are applied; `../`
+traversal into protected server trees remains a blocker even when the protected path is
+not written literally.
 
 ## Consume Gate
 
@@ -159,6 +163,23 @@ Guidance filters use exact `Outer.Name` or `schema:Outer.Name` targets. An expli
 returning an empty success report. A `--target-set` filter may return zero guidance
 entries; that only means the set has no deferred-target guidance recorded here, not that
 the set is promoted or that build-policy coverage exists.
+
+Some target sets carry set-level planning guidance instead of per-target blocker
+guidance. This is for offline evidence preparation only:
+
+```sh
+python3 scripts/compare_reflection_snapshots.py \
+  --list-target-guidance \
+  --target-set mission-copied-bool-policy-slice \
+  --target-set transfer-baccept-only-policy-slice
+```
+
+The mission and transfer policy-slice guidance records the current non-promotion
+boundaries: copied-bool evidence remains internal, distinct second-source layout is still
+required for readiness claims, player/controller/object refs, arrays, payload identity,
+and raw params stay redacted or recognition-only, and the output does not promote Mission
+SDK, Transfer SDK, payload decoding, identity, lookup, mutation, return override, runtime
+hooks, target-set expansion, or public API.
 
 The JSON guidance for deferred build-policy targets includes `snapshot_prep_checks`.
 Use those checks as an offline intake checklist when preparing a sanitized

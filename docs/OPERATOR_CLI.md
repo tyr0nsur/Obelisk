@@ -14,6 +14,10 @@ The CLI reads the central install root, plugin publication state, plugin config 
 and per-instance marker directories. It does not edit config, markers, plugin binaries, or
 LinuxGSM state.
 
+Current command scope is limited to multi-instance inventory and posture inspection. No
+current command starts, stops, restarts, installs, enables, disables, rolls back, or
+reloads anything; those verbs remain post-stable lifecycle work below.
+
 `status` reports valid plugin config directories separately from
 `invalid_plugin_config_entries`. `plugins list` does not follow a symlinked `plugins`
 directory, and `plugins list` / `plugins show` do not follow symlinked plugin config
@@ -52,6 +56,9 @@ unsafe marker entries are visible even before listing per-instance details.
 The first stable Obelisk line should not depend on mutable lifecycle commands. Keep the
 CLI read-only until the runtime/API/plugin config contract is stable enough for external
 modders and operators.
+
+The commands in this section are a roadmap boundary, not accepted syntax for
+`scripts/obelisk.py` today. A current operator should expect argparse to reject them.
 
 After the first stable production version, the target operator shape is:
 

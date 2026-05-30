@@ -279,6 +279,14 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         )
         self.assertIn("transfer-scriptstruct", sets)
         self.assertIn("mission-compact-intake", sets)
+        self.assertEqual(
+            sets["mission-copied-bool-policy-slice"],
+            [
+                "obelisk.ufunction-chain.snapshot.v1:MissionType.AddPlayerToMission",
+                "obelisk.ufunction-chain.snapshot.v1:MissionType.BPAllowPlayerToLeaveMission",
+                "obelisk.ufunction-chain.snapshot.v1:MissionType.BPOnPlayerRemovedFromMission",
+            ],
+        )
         self.assertIn("tribe-compact-intake", sets)
         self.assertIn("structure-observer-intake", sets)
         self.assertEqual(
@@ -297,6 +305,12 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             sets["structure-observer-intake"],
         )
         self.assertIn("transfer-ufunction-intake", sets)
+        self.assertEqual(
+            sets["transfer-baccept-only-policy-slice"],
+            [
+                "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerTransferredPlayerConfirmationResult",
+            ],
+        )
         self.assertIn("obelisk.ufunction-chain.snapshot.v1:MissionType.AddPlayerToMission", sets["mission-compact-intake"])
         self.assertIn(
             "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerRequestTribeLog",
@@ -450,6 +464,61 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             text_result.stdout,
         )
         self.assertIn("snapshot_prep_checks=5", text_result.stdout)
+
+    def test_mission_transfer_target_set_guidance_can_be_listed_without_snapshots(self) -> None:
+        result = run_compare_raw(
+            "--list-target-guidance",
+            "--target-set",
+            "mission-copied-bool-policy-slice",
+            "--target-set",
+            "transfer-baccept-only-policy-slice",
+            "--json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["schema"], "obelisk.reflection-target-guidance.v1")
+        self.assertEqual(report["guidance_scope"], "offline_planning_only")
+        self.assertEqual(
+            report["target_sets"],
+            ["mission-copied-bool-policy-slice", "transfer-baccept-only-policy-slice"],
+        )
+        self.assertEqual(report["targets"], [])
+        guidance = {item["target_set"]: item for item in report["target_set_guidance"]}
+        self.assertEqual(
+            set(guidance),
+            {"mission-copied-bool-policy-slice", "transfer-baccept-only-policy-slice"},
+        )
+        mission = guidance["mission-copied-bool-policy-slice"]
+        self.assertEqual(mission["classification"], "internal_mission_copied_bool_policy_candidate")
+        self.assertIn("public_mission_sdk_blocked", mission["why_blocked"])
+        self.assertIn("Mission SDK", mission["non_claim"])
+        self.assertIn("mission payload decoding", mission["non_claim"])
+        self.assertIn(
+            "keep player/controller/character object refs, item arrays, mission payload identity, and raw params redacted or recognition-only",
+            mission["snapshot_prep_checks"],
+        )
+        transfer = guidance["transfer-baccept-only-policy-slice"]
+        self.assertEqual(transfer["classification"], "internal_transfer_baccept_policy_candidate")
+        self.assertIn("public_transfer_sdk_blocked", transfer["why_blocked"])
+        self.assertIn("Transfer SDK", transfer["non_claim"])
+        self.assertIn("transfer payload decoding", transfer["non_claim"])
+        self.assertIn("public_sdk", report["not_promoted_surfaces"])
+        self.assertIn("runtime_hooks", report["not_promoted_surfaces"])
+
+        text_result = run_compare_raw(
+            "--list-target-guidance",
+            "--target-set",
+            "mission-copied-bool-policy-slice",
+            "--target-set",
+            "transfer-baccept-only-policy-slice",
+        )
+        self.assertEqual(text_result.returncode, 0, text_result.stderr + text_result.stdout)
+        self.assertIn("target_guidance count=0 scope=offline_planning_only target_set_guidance=2", text_result.stdout)
+        self.assertIn("target_set=mission-copied-bool-policy-slice", text_result.stdout)
+        self.assertIn("target_set=transfer-baccept-only-policy-slice", text_result.stdout)
+        self.assertIn("does not promote Mission SDK", text_result.stdout)
+        self.assertIn("does not promote Transfer SDK", text_result.stdout)
 
     def test_structure_build_policy_guidance_rejects_unmatched_explicit_target(self) -> None:
         result = run_compare_raw(

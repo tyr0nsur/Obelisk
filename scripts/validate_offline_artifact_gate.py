@@ -1282,10 +1282,14 @@ def validate_json_path_fields(
     protected_root: Path,
 ) -> list[dict[str, Any]]:
     blockers: list[dict[str, Any]] = []
+    source_path = Path(source_label)
+    source_base = source_path.parent if source_path.is_absolute() else None
     for trail, raw_path in collect_path_fields(payload):
         candidate = Path(raw_path)
         if not candidate.is_absolute():
-            continue
+            if source_base is None:
+                continue
+            candidate = source_base / candidate
         blockers.extend(
             path_blockers(
                 candidate,
