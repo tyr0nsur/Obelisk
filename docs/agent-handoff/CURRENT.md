@@ -26,27 +26,26 @@ for the current checkpoint.
 
 ## Hard Overrides
 
-- GitHub publication is lead-only and only for an evidenced, stable milestone. This
-  handoff does not authorize push, tag, release-ref updates, rebase, or routine
-  publication.
-- GitHub work may be delegated only for an evidenced, stable milestone.
+- GitHub publication is lead-only and only for an evidenced, stable milestone.
+  GitHub work may be delegated only for an evidenced, stable milestone; this handoff does
+  not authorize push, tag, release-ref updates, rebase, or routine publication.
 - No tag or release-ref push is authorized without explicit release-manager/lead
   authorization for the current-turn. Stale local tags are recreated only after rerunning
   the release gate on the intended ref and are not reused or pushed.
-- Server-backed debug/beta work requires a current approved live-ops brief naming target
-  instance/map, feature gates, marker/env changes, start/restart/stop window, notice path
-  when players are involved, evidence capture, and rollback.
-- No server target has standing approval. Do not restart/start/stop servers, edit
-  `/servidor/ark`, change markers, run ReflectionScanner, attach ptrace/gcore, enable broad
-  ProcessEvent tracing, or publish runtime observations outside an exact approved run.
-  Technical progress is only a reason to request a scoped run, not approval by itself.
+- No server target has standing approval. Server-backed debug/beta work requires a current
+  approved live-ops brief naming target instance/map, feature gates, marker/env changes,
+  start/restart/stop window, notice path when players are involved, evidence capture, and
+  rollback. Do not restart/start/stop servers, edit `/servidor/ark`, change markers, run
+  ReflectionScanner, attach ptrace/gcore, enable broad ProcessEvent tracing, or publish
+  runtime observations outside an exact approved run. Technical progress is only a reason
+  to request a scoped run, not approval by itself.
 - Runtime posture is default-deny for filtered/global raw `ProcessEvent`, public
   `CallProcessEvent`, ProcessEvent blocking, broad tracing, ReflectionScanner, debug
   controls, and observers unless the matching approved env+marker pair is enabled for a
   scoped debug window.
 - Discord sends require explicit current-turn approval for approved public milestones or
-  approved beta-test windows. Use no Discord for internal rounds or agent status, routine validation,
-  or speculative notes. Prefer `scripts/send_discord_embed.py --dry-run` and
+  approved beta-test windows. Use no Discord for internal rounds or agent status,
+  routine validation, or speculative notes. Prefer `scripts/send_discord_embed.py --dry-run` and
   one public-safe embed. Webhook URLs stay only in ignored `local/discord-webhooks.env`;
   repo text may name only `OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL` and
   `OBELISK_BETA_TEST_WEBHOOK_URL`.
@@ -61,6 +60,8 @@ for the current checkpoint.
 - `ObeliskApi` v1 remains append-only. New public surfaces require copied-data ownership,
   capability/`struct_size` gates, lifecycle cleanup, privacy rules, and accepted
   second-source/static evidence.
+- SDK packaging publishes only `include/obelisk/ObeliskApi.h`; more public headers require
+  explicit install layout/test updates and ABI review.
 - Promoted copied events are observational and non-authoritative: no UE pointers, raw
   params, identity, lookup, mutation, return override, pincode/player text publication, or
   broad module SDK claim.
@@ -111,9 +112,10 @@ for the current checkpoint.
   copied-scalar, and Buff breadth packages remain evidence-only/internal. Mission bool-tail
   preserves `bool_field_size=1`, `bool_byte_offset=0`, `byte_mask=0x01`,
   `field_mask=0xff`, and `native_bool=false`; consume mode accepts documented slices and
-  promote mode blocks promotion through a local mission consume-only denylist even if
-  shared planning-only metadata drifts. This does not authorize Transfer
-  runtime work, public Mission SDK, ResourceHandle, identity, mutation, or return override.
+  promote mode blocks promotion through local consume-only/planning-only denylists even if
+  shared metadata drifts. `transfer-baccept-only-policy-slice` is blocked from
+  release/public SDK gates. This does not authorize Transfer runtime work, public Mission
+  SDK, ResourceHandle, identity, mutation, or return override.
 - ResourceHandle/public GObjects remain blocked; old flag-policy artifact is obsolete and
   durable rich-provenance refresh is preserved. Consume mode accepts it and promote mode
   stays blocked. Do not rerun broad FName, GObjects, or core scans for ResourceHandle
@@ -202,15 +204,17 @@ for the current checkpoint.
 - Runtime/plugin lifecycle audit found no P1 blocker. `EventManager` granular raw
   ProcessEvent unregister now avoids waiting behind unrelated in-flight callbacks and
   validates snapshotted callbacks by id, generation, and callback pointer within the same
-  family; owner cleanup still waits as the plugin unload barrier.
+  family; owner cleanup still waits as the plugin unload barrier. Plugin init-failure
+  close paths also reject late owner-token timer registration.
 - Any future live/player validation requires a new approved live-ops brief and beta-test
   notice through the configured local webhook variable when players are involved.
 
 ## Agent Protocol
 
 - Lead owns server-safety decisions, GitHub, Discord, and stale-agent cleanup.
-- Before each sub-agent round: close stale agents, assign expert role, declare allowed paths,
-  pass only the skills required for the task, and record any still-active agent with a polling or integration plan.
+- Before each sub-agent round: close stale agents, assign expert role, declare allowed
+  paths, pass only the skills required for the task, and record any still-active agent
+  with a polling or integration plan.
 - Sub-agents receive scoped expert tasks, safety baseline, allowed paths, forbidden paths,
   required skills, validation expectations, and one concrete expected decision. Do not pass
   leader cadence, unrelated module history, or broad policy unless it changes the task.

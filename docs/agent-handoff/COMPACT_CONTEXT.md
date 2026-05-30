@@ -20,16 +20,13 @@ priorities, and do not use history files as the active source of truth.
   explicit release-manager/lead authorization for the current turn. Stale local tags are
   recreated only after rerunning the gate on the intended ref and are not reused or
   pushed.
-- No server restart/start/stop, `/servidor/ark` edit, marker change, ReflectionScanner,
-  ptrace/gcore, broad ProcessEvent tracing, or runtime observation unless the current
-  operator turn names an approved debug/beta scope or separately approved exact run.
-  Technical progress alone is not approval to restart; request the exact run only when
-  new runtime logs are genuinely needed after a concrete offline/code advance.
 - No standing operator approval for Obelisk debug/development or beta tests applies to
-  starts, restarts, marker edits, or runtime observation. Any server-backed run requires a
+  starts, restarts, marker edits, `/servidor/ark` edits, ReflectionScanner, ptrace/gcore,
+  broad ProcessEvent tracing, or runtime observation. Any server-backed run requires a
   live-ops brief for that turn naming the target, feature gates, marker/env changes,
   restart/start window, notice path when players are involved, evidence capture, and
-  rollback.
+  rollback. Technical progress alone is not approval to restart; request an exact run only
+  after a concrete offline/code advance genuinely needs new runtime logs.
 - Community updates are for major public modder-facing milestones only; beta-test
   activation notices are separate operational live-ops messages. Discord URLs are ignored
   local secrets in `local/discord-webhooks.env`; use only
@@ -485,9 +482,9 @@ priorities, and do not use history files as the active source of truth.
 
 - Use `obelisk-github-research-workflow` as the canonical coordination rule set. Repo-local
   JSON queue coordination stays out of active prompts, handoff, and checkpoint planning.
-- sub-agent prompts still need scoped objective, safety baseline, allowed paths, required skills,
-  expert role, and expected decision; pass only the skills needed for that scope and close
-  completed sub-agents before the next round.
+- Sub-agent prompts still need scoped objective, safety baseline, allowed paths,
+  required skills, expert role, and expected decision; pass only the skills needed for
+  that scope and close completed sub-agents before the next round.
 
 ## Canonical References
 

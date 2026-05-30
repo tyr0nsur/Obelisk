@@ -190,6 +190,7 @@ TARGET_SET_BLOCKER_GUIDANCE = {
         "classification": "internal_transfer_baccept_policy_candidate",
         "why_blocked": [
             "policy_slice_evidence_only",
+            "not_release_readiness_target",
             "missing_distinct_second_source_layout",
             "transfer_payload_decoding_blocked",
             "public_transfer_sdk_blocked",
@@ -204,6 +205,7 @@ TARGET_SET_BLOCKER_GUIDANCE = {
             "require the bAccept bool layout to be comparable and backed by candidate-uobject membership",
             "keep transferred player payloads, inventory/dino data, object refs, arrays, and raw params redacted or recognition-only",
             "require distinct artifact identity before any second-source readiness claim",
+            "do not use this target set for release/readiness or public SDK promotion gates",
         ],
         "non_claim": (
             "does not promote Transfer SDK, transfer payload decoding, identity, lookup, mutation, "

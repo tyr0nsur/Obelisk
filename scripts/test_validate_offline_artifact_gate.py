@@ -2593,6 +2593,28 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertEqual([], result["blockers"])
         self.assertTrue(result["artifacts"][0]["provenance_verified"])
 
+    def test_rejects_symlinked_workspace_root_even_when_it_resolves_to_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            protected = root / "server"
+            workspace = protected / "workspace-offline"
+            workspace.mkdir(parents=True)
+            linked_workspace = root / "workspace-link"
+            linked_workspace.symlink_to(workspace, target_is_directory=True)
+
+            result = gate.build_result(args(root=linked_workspace, protected_root=protected))
+
+        blockers = result["blockers"]
+        self.assertEqual("blocked", result["status"])
+        self.assertIn("path_is_symlink", {blocker["reason"] for blocker in blockers})
+        self.assertTrue(
+            any(
+                blocker.get("label") == "root"
+                and blocker.get("symlink_component") == str(linked_workspace)
+                for blocker in blockers
+            )
+        )
+
     def test_rejects_direct_protected_dump_path_before_existence_check(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"

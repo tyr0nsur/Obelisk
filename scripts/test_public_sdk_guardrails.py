@@ -990,6 +990,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             (timer_doc, "does not use or imply UE timers, gameplay timers, `ProcessEvent`"),
             (plugins_readme, "raw `ProcessEvent` callbacks\n  require explicit debug gates"),
             (plugins_readme, "`oPolicyAudit` demonstrates the promoted `GameplayPolicyEvent` callback family"),
+            (plugins_readme, "storage/database services, webhooks, inventory/item mutation"),
+            (plugins_readme, "until the matching public surface is promoted in the\ncapability matrix"),
         ):
             with self.subTest(required=required):
                 self.assertIn(normalized(required), normalized(text))
@@ -1013,6 +1015,26 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             with self.subTest(policy_forbidden=forbidden):
                 self.assertNotIn(forbidden, policy_source)
+
+    def test_plugin_hub_direction_does_not_promise_category_graduation(self) -> None:
+        matrix = (REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md").read_text(encoding="utf-8")
+        compact_matrix = normalized(matrix)
+
+        for required in (
+            "passive copied chat auditing/parsing is a candidate for promotion review before copied policy auditing, not a promised graduation path",
+            "The first useful Plugin Hub seed examples should be built from surfaces that already exist",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(normalized(required), compact_matrix)
+
+        forbidden_patterns = (
+            r"\bnext\s+(?:category|module|SDK)\s+to\s+graduate\b",
+            r"\b(?:category|module|SDK)\s+to\s+graduate\s+is\b",
+            r"\bfirst\s+useful\s+Plugin\s+Hub\s+categories\s+should\s+be\s+built\b",
+        )
+        for pattern in forbidden_patterns:
+            with self.subTest(pattern=pattern):
+                self.assertIsNone(re.search(pattern, matrix, flags=re.IGNORECASE))
 
     def test_experimental_plugin_targets_and_tests_stay_flag_gated(self) -> None:
         root_cmake = (REPO_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
@@ -1074,6 +1096,24 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         for target in experimental_plugins:
             with self.subTest(target=target, cmake="sdk_consumer_default"):
                 self.assertNotIn(target, sdk_without_experimental_blocks)
+
+    def test_sdk_install_layout_publishes_only_allowlisted_public_header(self) -> None:
+        root_cmake = (REPO_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+        installer = (REPO_ROOT / "scripts" / "install_obelisk.sh").read_text(encoding="utf-8")
+        public_headers = sorted(
+            path.relative_to(REPO_ROOT).as_posix()
+            for path in (REPO_ROOT / "include").rglob("*")
+            if path.is_file()
+        )
+
+        self.assertEqual(public_headers, ["include/obelisk/ObeliskApi.h"])
+        self.assertNotRegex(root_cmake, r"install\s*\(\s*DIRECTORY\s+include/?\b")
+        self.assertRegex(
+            root_cmake,
+            r"install\s*\(\s*FILES\s+include/obelisk/ObeliskApi\.h\s+"
+            r"DESTINATION\s+\$\{CMAKE_INSTALL_INCLUDEDIR\}/obelisk\s+COMPONENT\s+SDK\s*\)",
+        )
+        self.assertIn('"include/obelisk/ObeliskApi.h"', installer)
 
     def test_nextgenplugins_absolute_path_stays_out_of_public_docs_and_skills(self) -> None:
         offenders: list[str] = []

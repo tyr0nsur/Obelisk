@@ -47,10 +47,10 @@ compatibility target, source reference, ABI reference, schema, command parser, o
 implementation pattern.
 
 Do not add a first-party example that implies commands, permissions, economy, homes, RCON,
-inventory/item mutation, dino tools, tribe tools, transfer handling, structure placement
-enforcement, identity, lookup, replies, send-chat, moderation, or ArkApi portability until
-the matching public surface is promoted in the capability matrix and documented with its
-own evidence gate.
+storage/database services, webhooks, inventory/item mutation, dino tools, tribe tools,
+transfer handling, structure placement enforcement, identity, lookup, replies, send-chat,
+moderation, or ArkApi portability until the matching public surface is promoted in the
+capability matrix and documented with its own evidence gate.
 
 Seed examples are production-ready only when they keep the shared safe default config
 posture (`enabled=false`, `allow_all_instances=false`, and an empty

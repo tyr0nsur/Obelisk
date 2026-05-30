@@ -433,8 +433,8 @@ install(TARGETS obelisk_sdk
     COMPONENT SDK
 )
 
-install(DIRECTORY include/
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+install(FILES include/obelisk/ObeliskApi.h
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/obelisk
     COMPONENT SDK
 )
 

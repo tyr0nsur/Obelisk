@@ -19,15 +19,15 @@ Lead agents should read these before planning or delegating work:
 - `docs/SERVER_RESTORE.md`: recovery flow for ARK config after SteamCMD/LinuxGSM rewrites.
 - only the `agent-skills/*/SKILL.md` files relevant to the current scope.
 
-Treat handoff files as source material for a scoped prompt, not as text to forward
-wholesale. Do not pass the full leader objective, leader cadence,
+Treat handoff files as lead-owned source material for a scoped prompt, not as text to
+forward wholesale. Do not pass the full leader objective, leader cadence,
 community/announcement policy, GitHub flow, agent balance, or unrelated module history to
 a sub-agent unless that detail changes its specific task.
 
 Sub-agents should not read `CURRENT.md` or `COMPACT_CONTEXT.md` by default. Give them a
 distilled task brief containing only the facts, risks, allowed paths, required skills, and
-expected decision for their scope. Assign handoff-file edits only as an explicit ownership
-scope.
+expected decision for their scope. Ask a worker to read or edit handoff files only when
+handoff review/editing is its explicit ownership scope.
 
 For lead or explicitly assigned integration turns, update these before finishing:
 

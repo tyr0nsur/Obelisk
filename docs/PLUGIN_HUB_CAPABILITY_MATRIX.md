@@ -114,10 +114,11 @@ The current first-party examples already cover this safe seed set: `oBaseEvents`
 copied chat slices. Those three are seed examples only, not production Plugin Hub modules
 or promises that copied chat/policy auditing is generally available. After those examples,
 the next honest first-party work is not a new ArkApi-style category; it is hardening,
-documenting, or graduating one of the existing copied-data examples. If only default
-release examples are counted, the next category to graduate is passive copied chat
-auditing/parsing, followed by copied policy auditing. If experimental examples are counted
-too, no additional public category is supported by the current ABI.
+documenting, or reviewing one of the existing copied-data examples against promotion
+gates. If only default release examples are counted, passive copied chat
+auditing/parsing is a candidate for promotion review before copied policy auditing, not a
+promised graduation path. If experimental examples are counted too, no additional public
+category is supported by the current ABI.
 
 Do not start public examples with permissions, economy, homes, RCON, storage/database
 services, webhooks, inventory, dinos, tribes, transfers, structure enforcement, or item
@@ -127,7 +128,8 @@ lifecycle, and evidence gates are satisfied.
 
 ## Plugin Hub Direction
 
-The first useful Plugin Hub categories should be built from surfaces that already exist:
+The first useful Plugin Hub seed examples should be built from surfaces that already
+exist:
 
 - lifecycle/config/logging examples;
 - descriptor/catalog consumers;

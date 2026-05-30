@@ -89,6 +89,7 @@ namespace
         bool unregisterOwnerTokenCallbackInShutdown = false;
         bool registerTimerInShutdown = false;
         bool unregisterTimerInShutdown = false;
+        bool registerTimerAtClose = false;
         bool registerChatMessageInShutdown = false;
         bool unregisterChatMessageInShutdown = false;
         bool registerGameplayPolicyInShutdown = false;
@@ -120,6 +121,7 @@ namespace
         bool shutdownUnregisterResult = false;
         uint64_t shutdownTimerRegistrationId = 0;
         bool shutdownTimerUnregisterResult = false;
+        uint64_t closeTimerRegistrationId = 0;
         uint64_t shutdownChatMessageRegistrationId = 0;
         bool shutdownChatMessageUnregisterResult = false;
         uint64_t shutdownGameplayPolicyRegistrationId = 0;
@@ -963,6 +965,17 @@ namespace
                 std::lock_guard<std::mutex> lock(plugin->timerFence->Mutex);
                 plugin->timerFence->CloseEntered = true;
                 plugin->timerFence->Cv.notify_all();
+            }
+            if (plugin->registerTimerAtClose && plugin->capturedApi.RegisterTimerWithOwnerTokenHandle)
+            {
+                plugin->closeTimerRegistrationId =
+                    plugin->capturedApi.RegisterTimerWithOwnerTokenHandle(
+                        plugin->initOwnerToken,
+                        1000,
+                        0,
+                        0,
+                        FakeTimerCallback,
+                        plugin);
             }
             if (plugin->orderLog)
                 plugin->orderLog->push_back("close:" + plugin->filename);
@@ -4806,6 +4819,38 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestInitFailureRejectsOwnerTokenTimerRegistrationDuringClose()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_init_fail_close_register");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "init_fail_close_register.so",
+            .pluginId = "init_fail_close_register",
+            .initResult = false,
+        };
+        plugin.captureApi = true;
+        plugin.registerTimerAtClose = true;
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "close-register init-fail plugin Init was not called");
+        Require(plugin.shutdownCalls == 1, "close-register init-fail plugin shutdown was not called");
+        Require(plugin.closeCalls == 1, "close-register init-fail plugin was not closed");
+        Require(plugin.closeTimerRegistrationId == 0,
+                "owner-token timer registration succeeded during close after init failure");
+        Require(Obelisk::Core::TimerManager::Get().UnregisterCallbacksForOwner(plugin.owner) == 0,
+                "close-time owner-token timer survived init-failure close");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestMultiplePluginsLoadSortedAndUnloadReverse()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_multi");
@@ -5329,6 +5374,7 @@ int main()
     TestInvalidMetadataRejectsAndCloses();
     TestInitFailureCleansCallbacksAndCloses();
     TestInitExceptionCleansCallbacksAndCloses();
+    TestInitFailureRejectsOwnerTokenTimerRegistrationDuringClose();
     TestMultiplePluginsLoadSortedAndUnloadReverse();
     TestPluginApiMutationDoesNotPoisonLaterPlugins();
     TestUnloadAllContinuesAfterCloseException();

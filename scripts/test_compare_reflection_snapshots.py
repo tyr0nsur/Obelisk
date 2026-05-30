@@ -541,9 +541,14 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         )
         transfer = guidance["transfer-baccept-only-policy-slice"]
         self.assertEqual(transfer["classification"], "internal_transfer_baccept_policy_candidate")
+        self.assertIn("not_release_readiness_target", transfer["why_blocked"])
         self.assertIn("public_transfer_sdk_blocked", transfer["why_blocked"])
         self.assertIn("Transfer SDK", transfer["non_claim"])
         self.assertIn("transfer payload decoding", transfer["non_claim"])
+        self.assertIn(
+            "do not use this target set for release/readiness or public SDK promotion gates",
+            transfer["snapshot_prep_checks"],
+        )
         self.assertIn("public_sdk", report["not_promoted_surfaces"])
         self.assertIn("runtime_hooks", report["not_promoted_surfaces"])
 
@@ -2073,6 +2078,49 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(report["target_sets"], [target_set])
         self.assertEqual(report["totals"]["targets"], 3)
         self.assertEqual(report["totals"]["second_source_accepted"], 3)
+        self.assertEqual(
+            report["promotion_gate"],
+            {
+                "ready": False,
+                "ready_scope": "planning_only",
+                "layout_ready": True,
+                "promotion_ready": False,
+                "blockers": [{"reason": "target_set_not_release_readiness", "count": 1}],
+            },
+        )
+
+    def test_readiness_report_blocks_transfer_baccept_policy_slice_promotion_gate(self) -> None:
+        target_set = "transfer-baccept-only-policy-slice"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base_dir = root / "base" / "sha" / "sdk_transfers"
+            candidate_dir = root / "candidate" / "sha" / "sdk_transfers"
+            base_dir.mkdir(parents=True)
+            candidate_dir.mkdir(parents=True)
+            for target in compare.TARGET_SETS[target_set]:
+                _, _, short_key = target.partition(":")
+                outer, _, name = short_key.partition(".")
+                base_payload = rename_target(base_snapshot(), outer=outer, name=name)
+                candidate_payload = deepcopy(base_payload)
+                write_snapshot(base_dir, base_payload, f"{outer}.{name}.snapshot.json")
+                write_snapshot(candidate_dir, candidate_payload, f"{outer}.{name}.snapshot.json")
+
+            result = run_compare(
+                root / "base",
+                root / "candidate",
+                "--readiness-report",
+                "--target-set",
+                target_set,
+                "--fail-on-readiness-gaps",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 1)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["gate_mode"], "second_source_promotion")
+        self.assertEqual(report["target_sets"], [target_set])
+        self.assertEqual(report["totals"]["targets"], 1)
+        self.assertEqual(report["totals"]["second_source_accepted"], 1)
         self.assertEqual(
             report["promotion_gate"],
             {

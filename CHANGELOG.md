@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Hardened SDK packaging so install layout publishes only the allowlisted public
+  `include/obelisk/ObeliskApi.h` header instead of the full `include/` tree.
+- Hardened PluginManager init-failure cleanup coverage so owner-token timer registration
+  attempted during close is rejected and leaves no live timer for that owner.
+- Blocked `transfer-baccept-only-policy-slice` from release/public promotion gates while
+  preserving it as internal transfer evidence guidance.
+- Hardened offline artifact gates with explicit coverage for symlinked workspace roots.
+- Tightened Plugin Hub and first-party plugin wording so seed examples do not imply
+  category graduation, storage/database/webhook services, or unpromoted SDK surfaces.
 - Hardened release readiness so required UFunction second-source roots are preflighted
   before build/test/install work for complete artifact identity, current BoolProperty tail
   metadata, and unambiguous public RC target coverage.
