@@ -25,8 +25,11 @@
 - [ ] `ctest --test-dir build --output-on-failure`
 - [ ] `scripts/run_script_tests.sh`
 - [ ] `scripts/test_install_obelisk_layout.sh` for install, SDK, packaging, or CMake export changes.
-- [ ] `scripts/check_release_readiness.sh` for release-candidate, installer, SDK package, or first-stable scope changes.
+- [ ] `scripts/check_release_readiness.sh` for installer, SDK package, or first-stable scope changes that are not release-candidate publication.
+- [ ] Release-candidate publication PRs rerun `scripts/check_release_readiness.sh --require-second-source-readiness` on a clean worktree with the accepted second-source root and preserved report directory.
 - [ ] `scripts/check_release_readiness.sh --require-second-source-readiness` for PRs that promote reflected gameplay/module surfaces; name every promoted target set with `--ufunction-second-source-target-set` or `--scriptstruct-second-source-target-set`, pass `--ufunction-second-source-root` for promoted UFunction snapshots, pass `--scriptstruct-second-source-root` only when a ScriptStruct target set is explicitly named, and set `--second-source-report-dir` when keeping readiness reports.
+- [ ] Release tags and release-ref pushes have explicit release-manager/lead authorization for this PR/turn.
+- [ ] Any local or unpublished RC tag was verified with exact tag/ref comparison against the intended validated release ref; stale tags such as an old `v0.1.0-rc.1` are recreated only after rerunning the gate on that ref and are not reused or pushed.
 - [ ] `python3 scripts/analyze_runtime_observer_log.py --fail-on-quality-blockers <copied-log>` for approved runtime-observer capture reviews; this is observational only, not release readiness or second-source promotion evidence.
 - [ ] New runtime-observer modules include per-function analyzer fixture coverage and/or approved sanitized observer capture/research-note coverage; module-level field aggregates are not used as promotion evidence.
 - [ ] Docs-only changes explain why the build was skipped.

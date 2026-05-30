@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.0-rc.1 preparation
+
+Local release-candidate preparation is in progress. RC public scope remains limited to
+`GameplayPolicyEvent`, the minimal copied `ChatMessageEvent`, `DescribeResourceKind`, and
+`DescribeGameplayPolicyEventKind`. This entry is not a published release tag; the local
+`v0.1.0-rc.1` tag currently points at stale commit `22f41d9` and must not be reused or
+pushed until a clean release gate is rerun on the intended ref and exact tag/ref
+verification passes. No tag or release-ref push is authorized without explicit
+release-manager/lead authorization for the current turn.
+
 ## 0.1.0-dev
 
 Active development toward a future `v0.1.0`. This is not a release tag and does not promise

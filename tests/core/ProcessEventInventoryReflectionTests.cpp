@@ -996,6 +996,24 @@ namespace
         noParameterRanges.HasParameterRanges = false;
         Require(!TryBuildCopiedInventoryPolicyEvent(noParameterRanges, event),
                 "CanUse policy event built from invocation without parameter ranges");
+        Require(event.View.Kind == Obelisk::Core::InventoryPolicyEventKind::CanUse &&
+                    event.View.Scalars.empty(),
+                "failed CanUse without parameter ranges left partial copied event output");
+
+        InventoryReflection::InventoryInvocation missingField;
+        missingField.Function = InventoryReflection::InventoryFunction::CanUse;
+        missingField.FunctionNameIndex = kCanUseNameIndex;
+        missingField.OuterNameIndex = kPrimalItemNameIndex;
+        missingField.HasParameterRanges = true;
+        missingField.Fields.push_back(makeBoolField(InventoryReflection::InventoryField::BIgnoreCooldown,
+                                                    kBIgnoreCooldownNameIndex,
+                                                    0x00,
+                                                    &ignoreCooldown));
+        Require(!TryBuildCopiedInventoryPolicyEvent(missingField, event),
+                "CanUse policy event built with missing scalar field");
+        Require(event.View.Kind == Obelisk::Core::InventoryPolicyEventKind::CanUse &&
+                    event.View.Scalars.empty(),
+                "failed CanUse with missing scalar field left partial copied event output");
 
         InventoryReflection::InventoryInvocation wrongOuter = makeCanUse();
         wrongOuter.OuterNameIndex = kShooterPlayerControllerNameIndex;
@@ -1016,6 +1034,25 @@ namespace
         wrongRangeSize.Fields[0].Range.Size = 0;
         Require(!TryBuildCopiedInventoryPolicyEvent(wrongRangeSize, event),
                 "CanUse policy event built with wrong scalar range size");
+
+        uint8_t nonCanonical = 2;
+        InventoryReflection::InventoryInvocation nonCanonicalBool = makeCanUse();
+        nonCanonicalBool.Fields[1].Range.Data = &nonCanonical;
+        Require(!TryBuildCopiedInventoryPolicyEvent(nonCanonicalBool, event),
+                "CanUse policy event built with non-canonical copied bool");
+        Require(event.View.Scalars.empty(), "failed non-canonical CanUse left copied scalar span");
+
+        Attempt attempt;
+        attempt.Status = AttemptStatus::Matched;
+        attempt.Invocation = nonCanonicalBool;
+        std::atomic<uint64_t> dispatchCounter{0};
+        uint64_t observationNumber = 99;
+        Require(!TryReserveDispatchBudgetForMatchedAttempt(attempt, dispatchCounter, 1, observationNumber),
+                "non-canonical CanUse consumed copied-bool dispatch budget");
+        Require(observationNumber == 0, "non-canonical CanUse did not clear dispatch observation number");
+        Require(dispatchCounter.load() == 0, "non-canonical CanUse changed dispatch counter");
+        Require(MaybeDispatchCopiedInventoryPolicyEventAfterOriginal(true, nonCanonicalBool) == 0,
+                "non-canonical CanUse dispatched a copied policy event");
     }
 
     void TestRejectsDispatchWhenPolicyFieldSequenceDiffers()

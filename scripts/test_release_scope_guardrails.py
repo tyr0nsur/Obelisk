@@ -593,6 +593,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         docs = {
             "docs/RELEASE.md": read("docs/RELEASE.md"),
             "docs/STATUS.md": read("docs/STATUS.md"),
+            "CHANGELOG.md": read("CHANGELOG.md"),
             "docs/agent-handoff/CURRENT.md": read("docs/agent-handoff/CURRENT.md"),
             "docs/agent-handoff/COMPACT_CONTEXT.md": read("docs/agent-handoff/COMPACT_CONTEXT.md"),
         }
@@ -615,6 +616,16 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
                 self.assertIn(authorization_phrase, compact)
             with self.subTest(file=path, item="public api scope"):
                 self.assertIn(required_phrase, compact)
+
+        pr_template = normalized(read(".github/pull_request_template.md"))
+        pr_lower = pr_template.lower()
+        self.assertIn("release-candidate publication prs rerun", pr_lower)
+        self.assertIn("scripts/check_release_readiness.sh --require-second-source-readiness", pr_template)
+        self.assertIn("accepted second-source root", pr_lower)
+        self.assertIn("release tags and release-ref pushes have explicit release-manager/lead authorization", pr_lower)
+        self.assertIn("exact tag/ref comparison", pr_lower)
+        self.assertIn("stale tags", pr_lower)
+        self.assertIn("are not reused or pushed", pr_lower)
 
     def test_disable_plugins_marker_is_documented_as_wrapper_input_not_runtime_gate(self) -> None:
         install = read("docs/INSTALL.md")
@@ -740,7 +751,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
                 self.assertIn("mutation", compact_text)
                 self.assertIn("fail-closed", compact_text)
 
-    def test_checkpoint_zero_stays_guardrail_only_before_runtime_api_or_research_slices(self) -> None:
+    def test_historical_checkpoint_zero_stays_guardrail_only(self) -> None:
         plan = read("docs/research/2026-05-29-rc-checkpoint-slicing-plan.md")
         compact = read("docs/agent-handoff/COMPACT_CONTEXT.md")
         current = read("docs/agent-handoff/CURRENT.md")
@@ -892,24 +903,19 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             with self.subTest(forbidden_checkpoint_zero_b_include=forbidden_checkpoint_zero_b_include):
                 self.assertNotIn(forbidden_checkpoint_zero_b_include, checkpoint_zero_b_include_text)
 
-        self.assertIn(
-            "Checkpoint 0-pre is first: staged-path helper only",
-            normalized(compact),
-        )
-        self.assertIn("Checkpoint 0a is artifact-gate scanner/gate only", normalized(compact))
-        self.assertIn("Checkpoint 0b is release-gate options only", normalized(compact))
-        self.assertIn("broad release/public guardrails run with the release docs/guardrails slice", normalized(compact))
+        compact_text = normalized(compact)
+        self.assertIn("historical recovery context", compact_text)
+        self.assertIn("not active routing after checkpoint `b2f6a2b`", compact_text)
+        self.assertIn("rather than by the old 0-pre/0a/0b slicing sequence", compact_text)
         current_text = normalized(current)
-        self.assertIn("Start with checkpoint 0-pre", current_text)
-        self.assertIn("staged-path helper only", current_text)
-        self.assertIn("0a is artifact-gate scanner/gate only", current_text)
-        self.assertIn("0b is release-gate options only", current_text)
-        self.assertIn("broad release/public guardrails run with the release docs/guardrails slice", current_text)
+        self.assertIn("historical recovery context", current_text)
+        self.assertIn("not active routing", current_text)
+        self.assertIn("checkpointed after `b2f6a2b`", current_text)
         self.assertIn(
-            "Checkpoint order now starts with 0-pre staged-path helper, then 0a artifact-gate scanner/gate, then 0b release-gate options",
+            "Current RC blocker focus after `b2f6a2b`",
             current_text,
         )
-        self.assertIn("The current worktree has no staged checkpoint", current_text)
+        self.assertIn("accepted RC UFunction second-source root", current_text)
 
     def test_experimental_plugins_stay_out_of_release_scope(self) -> None:
         cmake = read("CMakeLists.txt")

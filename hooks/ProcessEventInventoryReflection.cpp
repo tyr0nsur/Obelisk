@@ -342,6 +342,11 @@ namespace Obelisk::Hooks::ProcessEventInventoryReflection
 
             uint8_t value = 0;
             std::memcpy(&value, field.Range.Data, sizeof(value));
+            if (value > 1)
+            {
+                out = {};
+                return false;
+            }
             out.Field = scalarField;
             out.BoolValue = value != 0;
             return true;
@@ -403,13 +408,13 @@ namespace Obelisk::Hooks::ProcessEventInventoryReflection
         {
             return false;
         }
-        out.View.Kind = expected.Kind;
-
         if (!invocation.HasParameterRanges)
             return false;
 
         if (!expected.Fields || invocation.Fields.size() != expected.FieldCount)
             return false;
+
+        out.View.Kind = expected.Kind;
 
         for (size_t fieldIndex = 0; fieldIndex < invocation.Fields.size(); ++fieldIndex)
         {

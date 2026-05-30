@@ -731,6 +731,83 @@ namespace
         }
     }
 
+    void RequireRejectedNonCanonicalCopiedBool(InventoryFixture& fixture,
+                                               size_t paramOffset,
+                                               const char* message)
+    {
+        fixture.Params[paramOffset] = 2;
+
+        InventoryReflection::InventoryInvocation invocation;
+        ReadResult result = InventoryReflection::TryIdentifyInventoryInvocation(
+            fixture.Reader(),
+            Options(),
+            fixture.Function.data(),
+            fixture.Params.data(),
+            invocation);
+        Require(result.Status == ReadStatus::Implausible, message);
+        Require(invocation.FunctionNameIndex == -1, "rejected inventory bool left stale function name");
+        Require(invocation.OuterNameIndex == -1, "rejected inventory bool left stale outer name");
+        Require(!invocation.HasParameterRanges, "rejected inventory bool left stale parameter-range state");
+        Require(invocation.Fields.empty(), "rejected inventory bool left stale fields");
+    }
+
+    void TestRejectsNonCanonicalCopiedBoolParams()
+    {
+        {
+            InventoryFixture fixture;
+            BuildCanUse(fixture);
+            fixture.Params[1] = 1;
+            RequireRejectedNonCanonicalCopiedBool(fixture,
+                                                  0,
+                                                  "non-canonical CanUse bIgnoreCooldown was accepted");
+        }
+        {
+            InventoryFixture fixture;
+            BuildCanUse(fixture);
+            fixture.Params[0] = 1;
+            fixture.Params[1] = 0xff;
+
+            InventoryReflection::InventoryInvocation invocation;
+            ReadResult result = InventoryReflection::TryIdentifyInventoryInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible,
+                    "non-canonical CanUse ReturnValue was accepted");
+            Require(invocation.FunctionNameIndex == -1, "rejected CanUse return left stale function name");
+            Require(invocation.Fields.empty(), "rejected CanUse return left stale fields");
+        }
+        {
+            InventoryFixture fixture;
+            BuildAllowRemoteAdd(fixture);
+            fixture.Params[0x11] = 1;
+            RequireRejectedNonCanonicalCopiedBool(
+                fixture,
+                0x10,
+                "non-canonical AllowRemoteAddToInventory bRequestedByPlayer was accepted");
+        }
+        {
+            InventoryFixture fixture;
+            BuildAllowRemoteAdd(fixture);
+            fixture.Params[0x10] = 1;
+            fixture.Params[0x11] = 0xff;
+
+            InventoryReflection::InventoryInvocation invocation;
+            ReadResult result = InventoryReflection::TryIdentifyInventoryInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible,
+                    "non-canonical AllowRemoteAddToInventory ReturnValue was accepted");
+            Require(invocation.FunctionNameIndex == -1, "rejected remote-add return left stale function name");
+            Require(invocation.Fields.empty(), "rejected remote-add return left stale fields");
+        }
+    }
+
     void TestGateRejectsBeforeReading()
     {
         InventoryFixture fixture;
@@ -765,6 +842,7 @@ int main()
     TestRejectsWrongFunctionClass();
     TestRejectsWrongShape();
     TestRejectsWrongPropertyMetadata();
+    TestRejectsNonCanonicalCopiedBoolParams();
     TestGateRejectsBeforeReading();
 
     std::cout << "InventoryReflectionTests passed\n";

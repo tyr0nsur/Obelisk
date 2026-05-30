@@ -137,9 +137,10 @@ This active routing table keeps only next-round facts; put durable evidence in
   `observer-debug` requires the scoped markers, exact supported SHA, and a positive limit.
   Route observations must not expand public delivery claims without copied plugin delivery
   logs.
-- Follow `docs/research/2026-05-29-rc-checkpoint-slicing-plan.md` for checkpoint slicing;
-  do not stage by path proximity. Ignored local build/pycache artifacts, logs, reports,
-  cores, dumps, and server config should remain unstaged.
+- `docs/research/2026-05-29-rc-checkpoint-slicing-plan.md` is now historical recovery
+  context for the broad pre-RC worktree, not active routing. The current tracked tree is
+  checkpointed after `b2f6a2b`; continue with focused RC blockers and post-RC research
+  notes instead of restarting the old slicing sequence.
 
 ## Priority Next Steps
 
@@ -148,12 +149,10 @@ This active routing table keeps only next-round facts; put durable evidence in
   standalone public Inventory SDK, public StructureEvents SDK, dino, buff, mission, tribe,
   transfer, richer chat, command, player, admin, mutation, return override, and public
   `CallProcessEvent` surfaces out of RC.
-- Checkpoint order now starts with 0-pre staged-path helper, then 0a artifact-gate
-  scanner/gate, then 0b release-gate options. Start with checkpoint 0-pre staged-path
-  helper only; 0a is artifact-gate scanner/gate only; 0b is release-gate options only.
-  The current worktree has no staged checkpoint; rerun focused tests and
-  `scripts/check_staged_paths.py`; broad release/public guardrails run with the release
-  docs/guardrails slice.
+- Current RC blocker focus after `b2f6a2b`: keep the public scope frozen, finish
+  release-safety blockers such as ProcessEvent hook removal, keep Inventory copied-bool
+  hardening inside `GameplayPolicyEvent`, and rerun the full release gate with the
+  accepted RC UFunction second-source root before any publication request.
 - Treat the latest `ChatMessageEvent` beta window as closed and preserved. Copied-log
   evidence under `/servidor/ark/workspace-offline` validates plugin-facing delivery for
   `send_mode=0,1,2,3` with no raw text/identity leaks. Any future live chat evidence must
@@ -161,11 +160,11 @@ This active routing table keeps only next-round facts; put durable evidence in
 - Keep second-source intake fail-closed: derive artifact-specific FName root, validate
   GObjects, regenerate snapshots, compare with readiness gaps enabled, and review the JSON
   plan before execution.
-- Keep ResourceHandle promotion blocked and post-RC/internal only. The 44 primary-core
-  `0x4000` samples have been reconciled to `ParticleSystemComponent0` objects, so the next
-  RC priority is not more broad ResourceHandle scanning. Continue with inventory copied-bool
-  hardening and release slicing unless a focused lifecycle/reuse experiment is explicitly
-  scoped later.
+- Keep ResourceHandle promotion blocked and post-RC/internal only. Use
+  `docs/research/2026-05-30-post-rc-offline-resourcehandle-priority.md` as the current
+  flag-policy/ResourceHandle pointer: consume-mode evidence is useful, promote-mode stays
+  blocked, and the next meaningful step is a post-RC lifecycle/reuse experiment plan, not
+  more broad scans.
 - Treat inventory as the best next value/risk hardening target only inside the existing
   `GameplayPolicyEvent` path: `PrimalItem.CanUse` and
   `PrimalItem.AllowRemoteAddToInventory` copied bools only; no `ItemId`, `AdditionalData`,

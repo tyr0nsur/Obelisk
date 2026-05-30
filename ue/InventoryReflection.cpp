@@ -1,6 +1,7 @@
 #include "InventoryReflection.h"
 
 #include <array>
+#include <cstring>
 #include <utility>
 
 namespace Obelisk::UE::InventoryReflection
@@ -296,6 +297,20 @@ namespace Obelisk::UE::InventoryReflection
 
             return ValidatePropertyClass(reader, layout, property, spec);
         }
+
+        RuntimeReflection::ReadResult ValidateCanonicalCopiedBool(const RuntimeReflection::ParamRange& range)
+        {
+            if (!range.Data || range.Size != kBoolPropertySize)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::InvalidArgument,
+                                                           "inventory copied bool parameter range is invalid");
+
+            uint8_t value = 0;
+            std::memcpy(&value, range.Data, sizeof(value));
+            if (value > 1)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                           "inventory copied bool parameter is not canonical");
+            return RuntimeReflection::ReadResult::Ok();
+        }
     }
 
     RuntimeReflection::ReadResult TryIdentifyInventoryInvocation(const RuntimeReflection::MemoryReader& reader,
@@ -304,6 +319,8 @@ namespace Obelisk::UE::InventoryReflection
                                                                  const void* params,
                                                                  InventoryInvocation& out)
     {
+        out = {};
+
         if (RuntimeReflection::ReadResult gate = ValidateGate(options); !gate)
             return gate;
         if (!function)
@@ -389,6 +406,8 @@ namespace Obelisk::UE::InventoryReflection
                 {
                     return result;
                 }
+                if (RuntimeReflection::ReadResult result = ValidateCanonicalCopiedBool(field.Range); !result)
+                    return result;
             }
 
             value.Fields.push_back(field);

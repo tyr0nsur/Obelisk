@@ -243,19 +243,14 @@ priorities, and do not use history files as the active source of truth.
   stale local RC tag at `22f41d9`. A real published RC requires focused checkpoints, the
   release gate without `--allow-dirty` on the intended release ref, exact tag/ref
   verification, and explicit authorization before any tag or release-ref push.
-- Use `docs/research/2026-05-29-rc-checkpoint-slicing-plan.md` for slicing. Handoff docs
-  should be refreshed separately from runtime, release/public docs, offline tooling, and
-  research-evidence slices.
-- Checkpoint 0-pre is first: staged-path helper only. Checkpoint 0a is artifact-gate
-  scanner/gate only, currently isolated to `scripts/scan_resource_handle_serials.py`,
-  `scripts/test_scan_resource_handle_serials.py`,
-  `scripts/validate_offline_artifact_gate.py`, and
-  `scripts/test_validate_offline_artifact_gate.py`. Checkpoint 0b is release-gate
-  options only (`scripts/check_release_readiness.sh` and its option tests). These
-  checkpoints require exact staged path validation before publication; broad
-  release/public guardrails run with the release docs/guardrails slice because they also read handoff, skills, and
-  post-RC routing. Keep runtime/API implementation changes out of both prelude
-  checkpoints.
+- `docs/research/2026-05-29-rc-checkpoint-slicing-plan.md` is historical recovery
+  context, not active routing after checkpoint `b2f6a2b`. Use `CURRENT.md` for current
+  blockers and keep future changes focused by subsystem rather than by the old 0-pre/0a/0b
+  slicing sequence.
+- Current ResourceHandle flag-policy pointer:
+  `docs/research/2026-05-30-post-rc-offline-resourcehandle-priority.md`. It records
+  consume-accepted/promote-blocked internal evidence; public `ResourceHandle`, lookup,
+  lifecycle names, mutation, and return override remain blocked.
 - Weak-helper caller-mode manifests now require embedded verified provenance for
   `ghidra_stdout`, `r2_windows`, and `direct_call_counts`; consume acceptance remains
   internal static evidence only and promote mode stays blocked.
@@ -315,8 +310,8 @@ priorities, and do not use history files as the active source of truth.
 - `docs/VERSIONING.md`: version and ABI line rules.
 - `docs/PLUGIN_ARCHITECTURE.md`: plugin lifecycle and promotion rules.
 - `docs/research/README.md`: canonical research-note format.
-- `docs/research/2026-05-29-rc-checkpoint-slicing-plan.md`: current dirty-tree checkpoint
-  slicing plan.
+- `docs/research/2026-05-29-rc-checkpoint-slicing-plan.md`: historical dirty-tree
+  recovery reference, not active routing after `b2f6a2b`.
 - `docs/research/2026-05-29-public-gameplay-event-readiness-audit.md`: promoted
   `GameplayPolicyEvent` boundary.
 - `docs/research/2026-05-29-minimal-second-source-readiness.md`: accepted minimal

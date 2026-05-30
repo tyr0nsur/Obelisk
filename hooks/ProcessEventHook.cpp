@@ -341,17 +341,30 @@ namespace Obelisk::Hooks
                 OBELISK_CRITICAL("ProcessEvent hook removal failed: restored target page could not be made RX; hook state and trampoline preserved.");
                 return false;
             }
+
+            // The patched target is restored now, so no new detour frames should enter
+            // through ProcessEvent. Let already-active frames keep resolving the
+            // trampoline while they drain; otherwise they can incorrectly skip the
+            // original call during shutdown.
+            s_RemovingProcessEventHook.store(false, std::memory_order_release);
         }
 
         const bool drained = WaitForActiveProcessEventFramesToDrain();
 
         {
             std::lock_guard<std::mutex> lock(s_ProcessEventHookMutex);
+            s_RemovingProcessEventHook.store(true, std::memory_order_release);
+
+            if (!drained || s_ActiveProcessEventFrames.load(std::memory_order_acquire) != 0)
+            {
+                s_RemovingProcessEventHook.store(false, std::memory_order_release);
+                OBELISK_WARN("ProcessEvent hook removal deferred because {} frame(s) were still active; hook state and trampoline preserved.",
+                             s_ActiveProcessEventFrames.load(std::memory_order_acquire));
+                return false;
+            }
+
             if (hook.Trampoline && drained)
                 munmap(hook.Trampoline, kTrampolineSize);
-            else if (hook.Trampoline)
-                OBELISK_WARN("ProcessEvent trampoline left mapped because {} frame(s) were still active during hook removal.",
-                             s_ActiveProcessEventFrames.load(std::memory_order_acquire));
 
             hook = {};
             s_RemovingProcessEventHook.store(false, std::memory_order_release);

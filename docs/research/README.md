@@ -29,6 +29,9 @@ RC required path:
 - [2026-05-29-minimal-second-source-readiness.md](2026-05-29-minimal-second-source-readiness.md)
 - [2026-05-29-public-gameplay-event-readiness-audit.md](2026-05-29-public-gameplay-event-readiness-audit.md)
 - [2026-05-29-chat-message-second-source-readiness.md](2026-05-29-chat-message-second-source-readiness.md)
+
+Historical recovery reference:
+
 - [2026-05-29-rc-checkpoint-slicing-plan.md](2026-05-29-rc-checkpoint-slicing-plan.md)
 
 Post-RC/research candidates:
@@ -55,6 +58,7 @@ Post-RC/research candidates:
 - [2026-05-29-uobject-flags-validity-blocker.md](2026-05-29-uobject-flags-validity-blocker.md)
 - [2026-05-29-fuobjectitem-serial-lifetime-audit.md](2026-05-29-fuobjectitem-serial-lifetime-audit.md)
 - [2026-05-29-resource-handle-flag-policy-candidate.md](2026-05-29-resource-handle-flag-policy-candidate.md)
+- [2026-05-30-post-rc-offline-resourcehandle-priority.md](2026-05-30-post-rc-offline-resourcehandle-priority.md)
 - [2026-05-29-reflection-inventory-pack-smoke.md](2026-05-29-reflection-inventory-pack-smoke.md)
 
 Historical reusable evidence:

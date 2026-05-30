@@ -127,9 +127,9 @@ turn. Convert long-running work into:
 Unattended automation must not commit, push, restart servers, change markers, run scanners,
 or attach debuggers. It can collect status snapshots for the lead to review later.
 
-## Lead Commit Flow
+## Lead Local Integration Flow
 
-Only the lead runs this flow:
+Only the lead runs this local integration flow:
 
 ```bash
 git status --short --ignored
@@ -138,11 +138,14 @@ cmake --build build -j"$(nproc)"
 git add <focused paths>
 git diff --cached --stat
 git commit -m "Short imperative summary"
-git push origin main
 ```
 
-Run the push step only for an evidenced, stable milestone selected for GitHub publication.
 Skip the build only for docs-only or skills-only commits, and say so in the final report.
+
+Publication is a separate lead-only step. Run `git push` only when the current user
+direction allows publication and the checkpoint is an evidenced, stable milestone. Release
+tags additionally require a clean release gate on the intended ref and exact tag/ref
+verification.
 
 ## Release Alignment
 
