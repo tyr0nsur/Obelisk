@@ -584,6 +584,10 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
             elif not release_statement_satisfies_exclusion_contract(release_statement_text, surface):
                 release_statement_missing_contracts.append(surface_id)
             continue
+        if surface_id in CANONICAL_V1_COMPLETION_BLOCKERS:
+            contract = surface.get("v1_decision_contract")
+            if not isinstance(contract, dict) or not as_string_list(contract.get("exclusion_requires")):
+                missing_completion_blocker_exclusion_contracts.append(surface_id)
         unresolved_completion_blockers.append(surface_id)
 
     for surface_id, surface in surfaces_by_id.items():

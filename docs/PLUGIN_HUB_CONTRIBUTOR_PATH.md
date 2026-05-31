@@ -24,7 +24,15 @@ do not change the tier and must not be copied as implementation patterns.
 For a release-supported installed-SDK seed, start from `examples/`:
 
 - copy `examples/sdk_minimal_plugin` for lifecycle/config/logging;
+- copy `examples/sdk_minimal_plugin` for descriptor/catalog readers, then add only
+  metadata-only `DescribeResourceKind` or `DescribeGameplayPolicyEventKind` calls behind
+  `struct_size`, capability-bit, and non-null function-pointer checks;
 - copy `examples/sdk_timer_plugin` for owner-token process-local timer work.
+
+Use `plugins/oDescriptorCatalog` as a behavior reference for descriptor validation and
+bounded logging, not as the external package scaffold. Keep the external package on
+`find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)` and
+`Obelisk::obelisk_sdk`.
 
 Keep external examples on the installed SDK contract:
 

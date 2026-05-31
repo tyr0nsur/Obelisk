@@ -1167,6 +1167,33 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("completion_blocker_exclusion_contract_missing", payload["blockers"])
         self.assertEqual(payload["missing_completion_blocker_exclusion_contracts"], ["obelisk.commands_replies.v1"])
 
+    def test_planning_completion_blocker_requires_exclusion_contract(self) -> None:
+        manifest, _ = complete_excluded_manifest()
+        manifest["v1_completion_required"] = False
+        manifest["stable_release_contract"]["claim_allowed"] = False
+        manifest["planning_surfaces"] = ["obelisk.player_identity.v1"]
+        manifest["post_v1_or_excluded_surfaces"] = [
+            surface_id
+            for surface_id in manifest["post_v1_or_excluded_surfaces"]
+            if surface_id != "obelisk.player_identity.v1"
+        ]
+        for surface in manifest["surfaces"]:
+            if surface["id"] == "obelisk.player_identity.v1":
+                surface["status"] = "planning"
+                surface.pop("v1_decision_contract", None)
+                break
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            result = self.run_checker("--manifest", str(manifest_path), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("completion_blocker_exclusion_contract_missing", payload["blockers"])
+        self.assertIn("v1_sdk_completion_blockers_unresolved", payload["blockers"])
+        self.assertEqual(payload["missing_completion_blocker_exclusion_contracts"], ["obelisk.player_identity.v1"])
+        self.assertEqual(payload["unresolved_completion_blockers"], ["obelisk.player_identity.v1"])
+
     def test_release_statement_required_for_v1_completion_claim(self) -> None:
         manifest, _ = complete_excluded_manifest()
         with tempfile.TemporaryDirectory() as temp_dir:
