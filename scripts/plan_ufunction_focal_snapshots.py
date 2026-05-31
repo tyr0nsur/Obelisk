@@ -13,6 +13,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 import ufunction_focal_snapshot_plan as focal_planner  # noqa: E402
 from reflection_target_sets import TARGET_SETS, schema_target_list  # noqa: E402
 from snapshot_evidence_pack import (  # noqa: E402
+    CORE_DUMP_EVIDENCE_PACK_SCHEMA,
     SHA256_RE,
     manifest_relative_path,
     reject_protected_input_path,
@@ -231,6 +232,8 @@ def require_player_identity_target_set_scope(
     if PLAYER_IDENTITY_TARGET_SET not in requested_target_sets:
         return
 
+    require_player_identity_core_evidence_pack(manifest_path, manifest)
+
     inputs = manifest.get("inputs")
     manifest_target_sets = inputs.get("target_sets") if isinstance(inputs, dict) else None
     if not isinstance(manifest_target_sets, list) or PLAYER_IDENTITY_TARGET_SET not in manifest_target_sets:
@@ -279,6 +282,69 @@ def require_player_identity_target_set_scope(
             f"missing_targets={','.join(missing_targets)} "
             f"expected_targets={','.join(PLAYER_IDENTITY_TARGETS)})"
         )
+
+
+def require_player_identity_core_evidence_pack(manifest_path: Path, manifest: dict[str, object]) -> None:
+    inputs = manifest.get("inputs")
+    evidence_pack_raw = inputs.get("evidence_pack_manifest") if isinstance(inputs, dict) else None
+    if not isinstance(evidence_pack_raw, str) or not evidence_pack_raw:
+        raise SystemExit(
+            f"{manifest_path}: inputs.evidence_pack_manifest must reference a complete "
+            f"{CORE_DUMP_EVIDENCE_PACK_SCHEMA} before planning player identity snapshots"
+        )
+
+    evidence_pack_path = manifest_relative_path(Path(evidence_pack_raw), manifest_path)
+    reject_symlink_component(evidence_pack_path, f"{manifest_path}: inputs.evidence_pack_manifest")
+    evidence_pack_path = reject_protected_input_path(
+        evidence_pack_path,
+        f"{manifest_path}: inputs.evidence_pack_manifest",
+    )
+    evidence_pack = load_json(evidence_pack_path, "core evidence pack manifest")
+    if evidence_pack.get("schema") != CORE_DUMP_EVIDENCE_PACK_SCHEMA:
+        raise SystemExit(
+            f"{evidence_pack_path}: schema must be {CORE_DUMP_EVIDENCE_PACK_SCHEMA} "
+            "before planning player identity snapshots"
+        )
+
+    pack_binary = manifest.get("binary")
+    pack_binary_sha = pack_binary.get("sha256") if isinstance(pack_binary, dict) else None
+    evidence_binary = evidence_pack.get("binary")
+    evidence_binary_sha = evidence_binary.get("sha256") if isinstance(evidence_binary, dict) else None
+    if not isinstance(evidence_binary_sha, str) or SHA256_RE.fullmatch(evidence_binary_sha) is None:
+        raise SystemExit(f"{evidence_pack_path}: binary.sha256 must be a lowercase 64-character SHA256")
+    if isinstance(pack_binary_sha, str) and evidence_binary_sha != pack_binary_sha:
+        raise SystemExit(
+            f"{evidence_pack_path}: binary.sha256 must match {manifest_path}: binary.sha256 "
+            "before planning player identity snapshots"
+        )
+
+    evidence_status = evidence_pack.get("evidence_status")
+    status = evidence_status.get("status") if isinstance(evidence_status, dict) else None
+    gdb_core_failed = evidence_status.get("gdb_core_failed") if isinstance(evidence_status, dict) else None
+    if status != "complete":
+        raise SystemExit(f"{evidence_pack_path}: evidence_status.status must be complete")
+    if gdb_core_failed is not False:
+        raise SystemExit(f"{evidence_pack_path}: evidence_status.gdb_core_failed must be false")
+
+    pack_core = manifest.get("core")
+    pack_core_sha = pack_core.get("sha256") if isinstance(pack_core, dict) else None
+    evidence_core = evidence_pack.get("core")
+    if not isinstance(evidence_core, dict):
+        raise SystemExit(f"{evidence_pack_path}: missing core")
+    evidence_core_sha = evidence_core.get("sha256")
+    if not isinstance(evidence_core_sha, str) or SHA256_RE.fullmatch(evidence_core_sha) is None:
+        raise SystemExit(f"{evidence_pack_path}: core.sha256 must be a lowercase 64-character SHA256")
+    if isinstance(pack_core_sha, str) and evidence_core_sha != pack_core_sha:
+        raise SystemExit(
+            f"{evidence_pack_path}: core.sha256 must match {manifest_path}: core.sha256 "
+            "before planning player identity snapshots"
+        )
+    evidence_core_path_raw = evidence_core.get("path")
+    if not isinstance(evidence_core_path_raw, str) or not evidence_core_path_raw:
+        raise SystemExit(f"{evidence_pack_path}: core.path must be a non-empty string")
+    evidence_core_path = manifest_relative_path(Path(evidence_core_path_raw), evidence_pack_path)
+    reject_symlink_component(evidence_core_path, f"{evidence_pack_path}: core.path")
+    reject_protected_input_path(evidence_core_path, f"{evidence_pack_path}: core.path")
 
 
 def load_targets(args: argparse.Namespace) -> tuple[list[str], dict[str, object]]:

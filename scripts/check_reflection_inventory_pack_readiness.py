@@ -14,6 +14,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 from reflection_target_sets import schema_target_list  # noqa: E402
 from snapshot_evidence_pack import (  # noqa: E402
+    CORE_DUMP_EVIDENCE_PACK_SCHEMA,
     SHA256_RE,
     manifest_relative_path,
     reject_protected_input_path,
@@ -400,8 +401,135 @@ def manifest_scope_blockers(manifest_path: Path, manifest: dict[str, Any]) -> li
     return blockers
 
 
+def core_evidence_pack_blockers(manifest_path: Path, manifest: dict[str, Any]) -> list[dict[str, object]]:
+    blockers: list[dict[str, object]] = []
+    inputs = manifest.get("inputs")
+    evidence_pack_raw = inputs.get("evidence_pack_manifest") if isinstance(inputs, dict) else None
+    if not isinstance(evidence_pack_raw, str) or not evidence_pack_raw:
+        return [
+            reason(
+                "missing_core_evidence_pack",
+                path=str(manifest_path),
+                field="inputs.evidence_pack_manifest",
+                required_schema=CORE_DUMP_EVIDENCE_PACK_SCHEMA,
+            )
+        ]
+
+    evidence_pack_path = manifest_relative_path(Path(evidence_pack_raw), manifest_path)
+    try:
+        reject_symlink_component(evidence_pack_path, f"{manifest_path}: inputs.evidence_pack_manifest")
+        evidence_pack_path = reject_protected_input_path(
+            evidence_pack_path,
+            f"{manifest_path}: inputs.evidence_pack_manifest",
+        )
+    except SystemExit as exc:
+        return [
+            reason(
+                "missing_core_evidence_pack",
+                path=str(manifest_path),
+                field="inputs.evidence_pack_manifest",
+                detail=str(exc),
+                required_schema=CORE_DUMP_EVIDENCE_PACK_SCHEMA,
+            )
+        ]
+
+    evidence_pack, error = load_json(evidence_pack_path)
+    if evidence_pack is None:
+        return [
+            reason(
+                "missing_core_evidence_pack",
+                path=str(evidence_pack_path),
+                detail=error,
+                required_schema=CORE_DUMP_EVIDENCE_PACK_SCHEMA,
+            )
+        ]
+    if evidence_pack.get("schema") != CORE_DUMP_EVIDENCE_PACK_SCHEMA:
+        blockers.append(
+            reason(
+                "missing_core_evidence_pack",
+                path=str(evidence_pack_path),
+                field="schema",
+                recorded=evidence_pack.get("schema"),
+                required_schema=CORE_DUMP_EVIDENCE_PACK_SCHEMA,
+            )
+        )
+
+    pack_binary = manifest.get("binary")
+    pack_binary_sha = pack_binary.get("sha256") if isinstance(pack_binary, dict) else None
+    evidence_binary = evidence_pack.get("binary")
+    evidence_binary_sha = evidence_binary.get("sha256") if isinstance(evidence_binary, dict) else None
+    if not isinstance(evidence_binary_sha, str) or SHA256_RE.fullmatch(evidence_binary_sha) is None:
+        blockers.append(reason("missing_core_evidence_pack", path=str(evidence_pack_path), field="binary.sha256"))
+    elif isinstance(pack_binary_sha, str) and evidence_binary_sha != pack_binary_sha:
+        blockers.append(
+            reason(
+                "missing_core_evidence_pack",
+                path=str(evidence_pack_path),
+                field="binary.sha256",
+                recorded=evidence_binary_sha,
+                expected=pack_binary_sha,
+            )
+        )
+
+    evidence_status = evidence_pack.get("evidence_status")
+    status = evidence_status.get("status") if isinstance(evidence_status, dict) else None
+    gdb_core_failed = evidence_status.get("gdb_core_failed") if isinstance(evidence_status, dict) else None
+    if status != "complete":
+        blockers.append(
+            reason("missing_core_evidence_pack", path=str(evidence_pack_path), field="evidence_status.status", recorded=status)
+        )
+    if gdb_core_failed is not False:
+        blockers.append(
+            reason(
+                "missing_core_evidence_pack",
+                path=str(evidence_pack_path),
+                field="evidence_status.gdb_core_failed",
+                recorded=gdb_core_failed,
+            )
+        )
+
+    pack_core = manifest.get("core")
+    pack_core_sha = pack_core.get("sha256") if isinstance(pack_core, dict) else None
+    evidence_core = evidence_pack.get("core")
+    evidence_core_sha = evidence_core.get("sha256") if isinstance(evidence_core, dict) else None
+    if not isinstance(evidence_core, dict):
+        blockers.append(reason("missing_core_evidence_pack", path=str(evidence_pack_path), field="core"))
+        return blockers
+    if not isinstance(evidence_core_sha, str) or SHA256_RE.fullmatch(evidence_core_sha) is None:
+        blockers.append(reason("missing_core_evidence_pack", path=str(evidence_pack_path), field="core.sha256"))
+    elif isinstance(pack_core_sha, str) and evidence_core_sha != pack_core_sha:
+        blockers.append(
+            reason(
+                "missing_core_evidence_pack",
+                path=str(evidence_pack_path),
+                field="core.sha256",
+                recorded=evidence_core_sha,
+                expected=pack_core_sha,
+            )
+        )
+    evidence_core_path_raw = evidence_core.get("path")
+    if not isinstance(evidence_core_path_raw, str) or not evidence_core_path_raw:
+        blockers.append(reason("missing_core_evidence_pack", path=str(evidence_pack_path), field="core.path"))
+    else:
+        evidence_core_path = manifest_relative_path(Path(evidence_core_path_raw), evidence_pack_path)
+        try:
+            reject_symlink_component(evidence_core_path, f"{evidence_pack_path}: core.path")
+            reject_protected_input_path(evidence_core_path, f"{evidence_pack_path}: core.path")
+        except SystemExit as exc:
+            blockers.append(
+                reason(
+                    "missing_core_evidence_pack",
+                    path=str(evidence_pack_path),
+                    field="core.path",
+                    detail=str(exc),
+                )
+            )
+    return blockers
+
+
 def evaluate_pack(manifest_path: Path, manifest: dict[str, Any]) -> dict[str, object]:
     pack_reasons = manifest_scope_blockers(manifest_path, manifest)
+    pack_reasons.extend(core_evidence_pack_blockers(manifest_path, manifest))
     inventory_path = inventory_path_from_manifest(manifest_path, manifest)
     targets: set[str] = set()
     if inventory_path is None:
@@ -512,6 +640,7 @@ def build_report(root: Path, max_depth: int) -> dict[str, object]:
 def non_claims() -> list[str]:
     return [
         "Read-only preflight; does not read a core, execute snapshot commands, write files, or touch servers.",
+        "An offline ShooterGameServer binary alone is insufficient; player-identity planning requires a non-protected complete core evidence pack and a reviewed UFunction reflection-inventory pack.",
         "Does not promote player identity, command routing, permissions, mutation, return override, public SDK scope, GObjects, UObject identity, or ResourceHandle.",
     ]
 

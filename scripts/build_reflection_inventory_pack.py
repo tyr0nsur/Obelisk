@@ -15,6 +15,7 @@ import reflection_target_sets  # noqa: E402
 import summarize_core_ufunction_inventory as ufunction_inventory  # noqa: E402
 import ufunction_focal_snapshot_plan as focal_planner  # noqa: E402
 from snapshot_evidence_pack import (  # noqa: E402
+    CORE_DUMP_EVIDENCE_PACK_SCHEMA,
     SHA256_RE,
     evidence_pack_defaults,
     reject_protected_input_path,
@@ -200,6 +201,11 @@ def main() -> int:
         raise SystemExit(
             f"--plan-snapshot-target-set {PLAYER_IDENTITY_TARGET_SET} requires "
             f"--target-set {PLAYER_IDENTITY_TARGET_SET} so the pack records player identity coverage"
+        )
+    if PLAYER_IDENTITY_TARGET_SET in args.target_set and not args.evidence_pack_manifest:
+        raise SystemExit(
+            f"--target-set {PLAYER_IDENTITY_TARGET_SET} requires --evidence-pack-manifest "
+            f"with complete {CORE_DUMP_EVIDENCE_PACK_SCHEMA}; direct --core mode is not enough"
         )
     if args.max_objects < 0:
         raise SystemExit("--max-objects must be non-negative")

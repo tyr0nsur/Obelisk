@@ -18,7 +18,8 @@ The checker is read-only and emits
 machine-readable reasons: `missing_reflection_inventory_pack`,
 `artifact_pack_container_not_reflection_inventory`,
 `scriptstruct_pack_not_reflection_inventory`, `schema_mismatch`,
-`missing_ufunction_inventory`, `wrong_target_scope`, or `missing_target`.
+`missing_core_evidence_pack`, `missing_ufunction_inventory`, `wrong_target_scope`, or
+`missing_target`.
 
 Current result:
 
@@ -68,6 +69,8 @@ reflection-inventory pack with:
 - `schema=obelisk.reflection-inventory-pack.v1`;
 - `status=candidate-only`;
 - `promotion_status=not_promoted_candidate_only`;
+- `inputs.evidence_pack_manifest` pointing to a complete non-protected
+  `obelisk.core-dump-evidence-pack.v1` manifest;
 - complete `artifact_identity` for an offline core;
 - `summary.fname_root_ready=true`;
 - empty `blockers`;
@@ -105,6 +108,11 @@ The checker and planner also fail closed when the inventory
 `target_set_coverage.target_sets` drifts from the pack manifest `inputs.target_sets`, so
 a mixed or stale coverage block cannot be used to plan the player-identity admin
 snapshots.
+
+An offline `ShooterGameServer` binary, copied core, manual `--gobjects`, and manual
+`--fname-root-slot` are not enough by themselves for this lane. The reflection inventory
+pack must be tied back to the complete core evidence-pack manifest before
+`players-identity-lifecycle-intake` planning is accepted.
 
 If a complete non-protected core evidence pack is available, a safe inventory-build route
 is:

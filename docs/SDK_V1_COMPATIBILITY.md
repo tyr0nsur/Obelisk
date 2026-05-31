@@ -10,8 +10,8 @@ The machine-readable companion is [`public_sdk_surfaces.json`](public_sdk_surfac
 promote each important modding category through copied ABI contracts and evidence, or
 explicitly exclude that category from the `v1.0` support statement.
 The machine-readable `v1_sdk_completion_blockers` list records the high-demand categories
-that currently prevent a complete SDK claim: player identity, commands/replies,
-permissions/admin, inventory/items mutation, structure census/build policy, gameplay
+that currently prevent a complete SDK claim: player identity, permissions/admin,
+commands/replies, inventory/items mutation, structure census/build policy, gameplay
 modules including buffs, player services/economy/mobility/areas, and operator
 ingress/storage. Those blockers must be promoted or deliberately excluded in the release
 statement before `v1_completion_required` can become true.

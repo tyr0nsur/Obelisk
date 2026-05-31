@@ -39,8 +39,8 @@
   ],
   "v1_sdk_completion_blockers": [
     "obelisk.player_identity.v1",
-    "obelisk.commands_replies.v1",
     "obelisk.permissions_admin.v1",
+    "obelisk.commands_replies.v1",
     "obelisk.inventory_items_mutation.v1",
     "obelisk.structure_census.v1",
     "obelisk.mission_transfer_dino_tribe.v1",
@@ -48,8 +48,8 @@
     "obelisk.operator_ingress_storage.v1"
   ],
   "post_v1_or_excluded_surfaces": [
-    "obelisk.commands_replies.v1",
     "obelisk.permissions_admin.v1",
+    "obelisk.commands_replies.v1",
     "obelisk.inventory_items_mutation.v1",
     "obelisk.player_services_economy_mobility.v1",
     "obelisk.operator_ingress_storage.v1",
@@ -477,6 +477,9 @@
       "status": "planning",
       "support_tier": "blocked",
       "public_contract": [],
+      "depends_on": [
+        "obelisk.player_identity.v1"
+      ],
       "evidence": {
         "planning_target_sets": [
           "structure-aggregate-census-planning",

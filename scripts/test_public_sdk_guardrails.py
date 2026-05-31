@@ -1488,7 +1488,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "v1.0",
             "SDK contract",
             "v1_sdk_completion_blockers",
-            "player identity, commands/replies",
+            "player identity, permissions/admin, commands/replies",
             "before `v1_completion_required` can become true",
             "pre-identity production seeds are not enough for v1 completion",
             "structure census/build policy",
@@ -1592,6 +1592,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "obelisk.permissions_admin.v1",
             "obelisk.commands_replies.v1",
         )
+        blocker_order = manifest["v1_sdk_completion_blockers"]
         unresolved_statuses = {"planning", "post-v1", "promoted-experimental-only", "debug-only"}
         unresolved = [
             surface_id
@@ -1613,6 +1614,14 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         )
         self.assertTrue(unresolved)
         self.assertTrue(set(unresolved).issubset(set(manifest["v1_sdk_completion_blockers"])))
+        self.assertLess(
+            blocker_order.index("obelisk.player_identity.v1"),
+            blocker_order.index("obelisk.permissions_admin.v1"),
+        )
+        self.assertLess(
+            blocker_order.index("obelisk.permissions_admin.v1"),
+            blocker_order.index("obelisk.commands_replies.v1"),
+        )
         self.assertFalse(
             manifest["v1_completion_required"],
             "v1 completion cannot be claimed while the command dependency chain is blocked",
@@ -1802,6 +1811,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
         structure = surfaces["obelisk.structure_census.v1"]
         modules = surfaces["obelisk.mission_transfer_dino_tribe.v1"]
+
+        self.assertEqual(structure["depends_on"], ["obelisk.player_identity.v1"])
 
         for token in (
             "No ownership, placement/build-policy, no-collision, or admin-exception contract.",

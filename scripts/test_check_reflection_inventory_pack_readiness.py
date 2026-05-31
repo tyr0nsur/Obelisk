@@ -52,10 +52,12 @@ class CheckReflectionInventoryPackReadinessTests(unittest.TestCase):
         manifest_updates: dict[str, object] | None = None,
         target_sets: list[str] | None = None,
         write_inventory: bool = True,
+        write_core_evidence_pack: bool = True,
     ) -> None:
         path.mkdir(parents=True)
         if target_sets is None:
             target_sets = [PLAYER_IDENTITY_TARGET_SET]
+        evidence_pack_manifest = path.parent / "core-evidence-pack" / "manifest.json"
         manifest: dict[str, object] = {
             "schema": "obelisk.reflection-inventory-pack.v1",
             "status": "candidate-only",
@@ -68,7 +70,7 @@ class CheckReflectionInventoryPackReadinessTests(unittest.TestCase):
             },
             "binary": {"sha256": BINARY_SHA},
             "core": {"path": str(path.parent / "missing-core"), "sha256": CORE_SHA},
-            "inputs": {"target_sets": target_sets},
+            "inputs": {"evidence_pack_manifest": str(evidence_pack_manifest), "target_sets": target_sets},
             "summary": {"fname_root_ready": True},
             "blockers": [],
             "artifacts": {"ufunction_inventory": "ufunction-inventory.json"},
@@ -87,6 +89,19 @@ class CheckReflectionInventoryPackReadinessTests(unittest.TestCase):
                 },
             }
             (path / "ufunction-inventory.json").write_text(json.dumps(inventory), encoding="utf-8")
+        if write_core_evidence_pack:
+            evidence_pack_manifest.parent.mkdir(parents=True, exist_ok=True)
+            evidence_pack_manifest.write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.core-dump-evidence-pack.v1",
+                        "binary": {"sha256": BINARY_SHA},
+                        "core": {"path": str(path.parent / "missing-core"), "sha256": CORE_SHA},
+                        "evidence_status": {"status": "complete", "gdb_core_failed": False},
+                    }
+                ),
+                encoding="utf-8",
+            )
 
     def run_checker(self, args: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
@@ -115,6 +130,25 @@ class CheckReflectionInventoryPackReadinessTests(unittest.TestCase):
         self.assertEqual(payload["required_target_set"]["expected_target_count"], len(PLAYER_IDENTITY_TARGETS))
         self.assertIn("ServerListPlayers", " ".join(payload["accepted_pack"]["matched_targets"]))
         self.assertIn("does not read a core", " ".join(payload["non_claims"]))
+        self.assertIn("offline ShooterGameServer binary alone is insufficient", " ".join(payload["non_claims"]))
+
+    def test_binary_only_manifest_fails_closed_without_core_evidence_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_pack(root / "pack", manifest_updates={"core": {}})
+
+            result = self.run_checker(["--root", str(root)], check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertFalse(payload["ready"])
+        self.assertIsNone(payload["accepted_pack"])
+        self.assertIn("offline ShooterGameServer binary alone is insufficient", " ".join(payload["non_claims"]))
+        core_path_reasons = [
+            reason
+            for reason in payload["reasons"]
+            if reason["reason"] == "wrong_target_scope" and reason.get("field") == "core.path"
+        ]
+        self.assertEqual(len(core_path_reasons), 1)
 
     def test_missing_pack_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -157,7 +191,11 @@ class CheckReflectionInventoryPackReadinessTests(unittest.TestCase):
         self.assertIsNone(payload["accepted_pack"])
         self.assertEqual(
             self.reason_codes(payload),
-            {"artifact_pack_container_not_reflection_inventory", "missing_reflection_inventory_pack"},
+            {
+                "artifact_pack_container_not_reflection_inventory",
+                "missing_reflection_inventory_pack",
+                "schema_mismatch",
+            },
         )
 
     def test_missing_ufunction_inventory_fails_closed(self) -> None:
@@ -170,6 +208,40 @@ class CheckReflectionInventoryPackReadinessTests(unittest.TestCase):
         payload = json.loads(result.stdout)
         self.assertIn("missing_ufunction_inventory", self.reason_codes(payload))
         self.assertIsNone(payload["accepted_pack"])
+
+    def test_missing_core_evidence_pack_manifest_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_pack(
+                root / "pack",
+                manifest_updates={"inputs": {"target_sets": [PLAYER_IDENTITY_TARGET_SET]}},
+                write_core_evidence_pack=False,
+            )
+
+            result = self.run_checker(["--root", str(root)], check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertFalse(payload["ready"])
+        self.assertIn("missing_core_evidence_pack", self.reason_codes(payload))
+        blockers = [reason for reason in payload["reasons"] if reason["reason"] == "missing_core_evidence_pack"]
+        self.assertEqual(blockers[0]["field"], "inputs.evidence_pack_manifest")
+
+    def test_partial_core_evidence_pack_manifest_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_pack(root / "pack")
+            evidence_manifest = root / "core-evidence-pack" / "manifest.json"
+            payload = json.loads(evidence_manifest.read_text(encoding="utf-8"))
+            payload["evidence_status"] = {"status": "partial-gdb-failed", "gdb_core_failed": True}
+            evidence_manifest.write_text(json.dumps(payload), encoding="utf-8")
+
+            result = self.run_checker(["--root", str(root)], check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertFalse(payload["ready"])
+        blockers = [reason for reason in payload["reasons"] if reason["reason"] == "missing_core_evidence_pack"]
+        self.assertIn("evidence_status.status", {reason.get("field") for reason in blockers})
+        self.assertIn("evidence_status.gdb_core_failed", {reason.get("field") for reason in blockers})
 
     def test_wrong_scope_and_missing_target_are_machine_readable(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

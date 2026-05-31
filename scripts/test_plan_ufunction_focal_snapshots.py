@@ -71,8 +71,10 @@ class PlanUFunctionFocalSnapshotsTests(unittest.TestCase):
         identity_updates: dict[str, object] | None = None,
         summary_updates: dict[str, object] | None = None,
         target_sets: list[str] | None = None,
+        write_core_evidence_pack: bool = True,
     ) -> None:
         path.mkdir(parents=True)
+        evidence_pack_manifest = path.parent / "core-evidence-pack" / "manifest.json"
         identity: dict[str, object] = {
             "artifact_kind": "offline_core",
             "artifact_sha256": CORE_SHA,
@@ -104,7 +106,11 @@ class PlanUFunctionFocalSnapshotsTests(unittest.TestCase):
                 "fname_root_slot": "0x595c000",
                 "fname_table": "0x12340000",
             },
-            "inputs": {"max_objects": 1234, "target_sets": target_sets or []},
+            "inputs": {
+                "evidence_pack_manifest": str(evidence_pack_manifest),
+                "max_objects": 1234,
+                "target_sets": target_sets or [],
+            },
             "artifacts": {
                 "ufunction_inventory": "ufunction-inventory.json",
                 "fname_root_validation": "fname-root-validation.json",
@@ -129,6 +135,19 @@ class PlanUFunctionFocalSnapshotsTests(unittest.TestCase):
             }
         (path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
         (path / "ufunction-inventory.json").write_text(json.dumps(inventory), encoding="utf-8")
+        if write_core_evidence_pack:
+            evidence_pack_manifest.parent.mkdir(parents=True, exist_ok=True)
+            evidence_pack_manifest.write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.core-dump-evidence-pack.v1",
+                        "binary": {"sha256": BINARY_SHA},
+                        "core": {"path": str(core_path), "sha256": CORE_SHA},
+                        "evidence_status": {"status": "complete", "gdb_core_failed": False},
+                    }
+                ),
+                encoding="utf-8",
+            )
 
     def run_planner(self, args: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
@@ -270,6 +289,61 @@ class PlanUFunctionFocalSnapshotsTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("inputs.target_sets must include players-identity-lifecycle-intake", result.stderr)
+
+    def test_player_identity_target_set_requires_core_evidence_pack_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            pack = root / "pack"
+            self.write_pack(
+                pack,
+                core_path=root / "missing-core",
+                functions=self.rows_for_target_set(PLAYER_IDENTITY_TARGET_SET),
+                manifest_updates={"inputs": {"max_objects": 1234, "target_sets": [PLAYER_IDENTITY_TARGET_SET]}},
+                target_sets=[PLAYER_IDENTITY_TARGET_SET],
+                write_core_evidence_pack=False,
+            )
+
+            result = self.run_planner(
+                [
+                    "--inventory-pack",
+                    str(pack),
+                    "--target-set",
+                    PLAYER_IDENTITY_TARGET_SET,
+                ],
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("inputs.evidence_pack_manifest must reference a complete", result.stderr)
+        self.assertIn("obelisk.core-dump-evidence-pack.v1", result.stderr)
+
+    def test_player_identity_target_set_rejects_partial_core_evidence_pack_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            pack = root / "pack"
+            self.write_pack(
+                pack,
+                core_path=root / "missing-core",
+                functions=self.rows_for_target_set(PLAYER_IDENTITY_TARGET_SET),
+                target_sets=[PLAYER_IDENTITY_TARGET_SET],
+            )
+            evidence_manifest = root / "core-evidence-pack" / "manifest.json"
+            payload = json.loads(evidence_manifest.read_text(encoding="utf-8"))
+            payload["evidence_status"] = {"status": "partial-gdb-failed", "gdb_core_failed": True}
+            evidence_manifest.write_text(json.dumps(payload), encoding="utf-8")
+
+            result = self.run_planner(
+                [
+                    "--inventory-pack",
+                    str(pack),
+                    "--target-set",
+                    PLAYER_IDENTITY_TARGET_SET,
+                ],
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("evidence_status.status must be complete", result.stderr)
 
     def test_player_identity_target_set_requires_complete_coverage_targets(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

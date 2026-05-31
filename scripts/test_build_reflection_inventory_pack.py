@@ -750,6 +750,33 @@ class BuildReflectionInventoryPackTests(unittest.TestCase):
             result.stderr,
         )
 
+    def test_player_identity_target_set_requires_core_evidence_pack_manifest_not_direct_core(self) -> None:
+        result = self.run_builder(
+            [
+                "--core",
+                "/tmp/missing-core",
+                "--gobjects",
+                "0x1",
+                "--fname-root-slot",
+                "0x2",
+                "--ark-binary-sha256",
+                "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                "--target-set",
+                "players-identity-lifecycle-intake",
+                "--output-dir",
+                "/tmp/obelisk-reflection-pack",
+            ],
+            check=False,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "--target-set players-identity-lifecycle-intake requires --evidence-pack-manifest",
+            result.stderr,
+        )
+        self.assertIn("direct --core mode is not enough", result.stderr)
+        self.assertNotIn("does not exist", result.stderr)
+
     def test_plan_target_reports_missing_inventory_target_as_blocked(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
