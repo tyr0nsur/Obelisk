@@ -222,7 +222,8 @@ Published release candidate. RC public scope remains limited to
 `GameplayPolicyEvent`, the minimal copied `ChatMessageEvent`, `DescribeResourceKind`, and
 `DescribeGameplayPolicyEventKind`. This entry is not a production-stable release claim.
 Post-RC development should target the broader `v1.0` complete SDK track and eventual
-ArkApi-style plugin replacement without retroactively expanding this RC scope.
+Obelisk-native coverage for familiar ARK server modding demand without retroactively
+expanding this RC scope.
 
 ## 0.1.0-dev
 

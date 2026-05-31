@@ -164,9 +164,13 @@ The shortest useful route toward a complete v1 SDK is:
    a parser-only extension to `ChatMessageEvent`.
 4. Advance structure census and inventory/items through narrow copied APIs, or explicitly
    exclude them from the first v1 support statement.
+5. Explicitly promote or name as excluded/post-v1 every remaining blocker ID:
+   mission/transfer/dino/tribe/buff modules, player services/economy/mobility/areas, and
+   operator ingress/storage.
 
 This route keeps chat, gameplay-policy slices, descriptors, and timers as useful seed
-surfaces while preventing them from being mistaken for a complete ArkApi-style SDK.
+surfaces while preventing them from being mistaken for a complete Obelisk SDK for
+familiar ARK server-modding demand.
 
 Inventory/items mutation, structure ownership/placement/build policy/no-collision,
 dino/tribe/mission/transfer/buff module SDKs, RCON, database/storage services, webhooks,
@@ -203,13 +207,14 @@ leave `.v1` experimental contracts in that state; it must promote them to stable
 surfaces, move them back to planning/post-v1, or explicitly exclude them in the release
 statement.
 
-If a high-demand category is not promoted, release notes must name it as excluded or
-post-v1 so plugin authors do not mistake foundation primitives for a complete ArkApi-style
-modding framework.
+If a high-demand category is not promoted, release notes must name it explicitly as
+excluded or post-v1 so plugin authors do not mistake foundation primitives for a complete
+Obelisk SDK.
 Umbrella names do not imply coverage: dino, tribe, buff/status, chat send/broadcast,
 player progression/engrams, economy, mobility, and operator ingress/storage each need a
 narrow copied C ABI surface or an explicit named exclusion.
 
 Passing runtime/core-first RC gates, shipping the promoted foundation, or proving
 pre-identity production seed usefulness is insufficient for `v1.0 stable` until the
-blocker list is promoted or explicitly excluded in the release statement.
+blocker list is promoted or explicitly named as excluded/post-v1 in the release
+statement.

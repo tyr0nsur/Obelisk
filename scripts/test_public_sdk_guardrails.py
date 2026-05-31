@@ -48,6 +48,11 @@ SDK_MINIMAL_PLUGIN_EXAMPLE_FILES = [
     REPO_ROOT / "examples" / "sdk_minimal_plugin" / "README.md",
     REPO_ROOT / "examples" / "sdk_minimal_plugin" / "minimal_plugin.c",
 ]
+SDK_TIMER_PLUGIN_EXAMPLE_FILES = [
+    REPO_ROOT / "examples" / "sdk_timer_plugin" / "CMakeLists.txt",
+    REPO_ROOT / "examples" / "sdk_timer_plugin" / "README.md",
+    REPO_ROOT / "examples" / "sdk_timer_plugin" / "timer_plugin.c",
+]
 PUBLIC_RELEASE_SCOPE_DOC_FILES = [
     REPO_ROOT / "docs" / "PLUGIN_ARCHITECTURE.md",
     REPO_ROOT / "docs" / "RELEASE.md",
@@ -1109,7 +1114,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             stable_contract["claim_requires"],
         )
         self.assertIn(
-            "every v1_sdk_completion_blocker is promoted or explicitly excluded by name in the v1 release statement",
+            "every v1_sdk_completion_blocker is promoted or explicitly named as excluded/post-v1 in the v1 release statement",
             stable_contract["claim_requires"],
         )
         self.assertIn(
@@ -1652,10 +1657,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "Build a fail-closed permissions/admin query layer",
             "Promote commands/replies as a new owner-token copied callback/response surface",
             "not as a parser-only extension to `ChatMessageEvent`",
-            "preventing them from being mistaken for a complete ArkApi-style SDK",
+            "preventing them from being mistaken for a complete Obelisk SDK",
             "Passing runtime/core-first RC gates",
             "pre-identity production seed usefulness is insufficient for `v1.0 stable`",
-            "blocker list is promoted or explicitly excluded",
+            "blocker list is promoted or explicitly named as excluded/post-v1",
             "mutation",
             "return override",
         )
@@ -3330,11 +3335,73 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         for token in (
             "SDK_MINIMAL_EXAMPLE_PLUGIN_PATH",
+            "SDK_TIMER_EXAMPLE_PLUGIN_PATH",
             '"${WORK_DIR}/build/consumer_fixture"',
             '"obelisk_sdk_minimal_plugin"',
+            '"obelisk_sdk_timer_plugin"',
         ):
             with self.subTest(path="scripts/test_install_obelisk_layout.sh", token=token):
                 self.assertIn(token, install_layout_script)
+
+    def test_sdk_timer_plugin_example_stays_installed_sdk_only(self) -> None:
+        examples_readme = (REPO_ROOT / "examples" / "README.md").read_text(encoding="utf-8")
+        timer_readme = (REPO_ROOT / "examples" / "sdk_timer_plugin" / "README.md").read_text(
+            encoding="utf-8"
+        )
+        timer_cmake = (REPO_ROOT / "examples" / "sdk_timer_plugin" / "CMakeLists.txt").read_text(
+            encoding="utf-8"
+        )
+        timer_source = (REPO_ROOT / "examples" / "sdk_timer_plugin" / "timer_plugin.c").read_text(
+            encoding="utf-8"
+        )
+
+        for path in SDK_TIMER_PLUGIN_EXAMPLE_FILES:
+            with self.subTest(path=path.relative_to(REPO_ROOT), token="example file"):
+                self.assertTrue(path.exists())
+
+        for text, relative in (
+            (examples_readme, "examples/README.md"),
+            (timer_readme, "examples/sdk_timer_plugin/README.md"),
+            (timer_cmake, "examples/sdk_timer_plugin/CMakeLists.txt"),
+        ):
+            normalized_text = re.sub(r"\s+", " ", text)
+            with self.subTest(path=relative, token="find_package"):
+                self.assertIn(
+                    "find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)",
+                    normalized_text,
+                )
+            with self.subTest(path=relative, token="sdk target"):
+                self.assertIn("Obelisk::obelisk_sdk", text)
+
+        for token in (
+            "OBELISK_API_CAPABILITY_TIMERS",
+            "RegisterTimerWithOwnerTokenHandle",
+            "UnregisterTimerWithOwnerToken",
+            "plugin_owner_token != 0",
+            "InstallLayoutConsumer_ScheduledCallbackSeen",
+        ):
+            with self.subTest(path="examples/sdk_timer_plugin/timer_plugin.c", token=token):
+                self.assertIn(token, timer_source)
+
+        for token in (
+            '#include "',
+            "#include <core/",
+            "#include <hooks/",
+            "#include <plugins/",
+            "UObject",
+            "UFunction",
+            "FString",
+            "ProcessEvent",
+            "CallProcessEvent",
+            "RegisterGameplay",
+            "RegisterChat",
+            "ChatMessageEvent",
+            "SendChat",
+            "Reply",
+            "ArkApi",
+        ):
+            with self.subTest(path="examples/sdk_timer_plugin/timer_plugin.c", forbidden=token):
+                self.assertNotIn(token, timer_source)
 
     def test_obaseevents_chat_helper_cleanup_guardrail_stays_in_release_tests(self) -> None:
         cmake = (REPO_ROOT / "tests/sdk_consumer/CMakeLists.txt").read_text(encoding="utf-8")

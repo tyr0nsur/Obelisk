@@ -27,9 +27,10 @@ identity, send-chat, or moderation.
 
 Creator-facing examples that build against an installed SDK package live under
 `examples/`; `examples/sdk_minimal_plugin` is the minimum seed for an installed SDK
-consumer. First-party runtime reference plugins live under `plugins/` and may use
-repository-local build/test wiring, so they are reference plugins in-tree rather than the
-minimum installed-SDK consumer contract.
+consumer, and `examples/sdk_timer_plugin` demonstrates the promoted process-local timer
+surface using only the installed package. First-party runtime reference plugins live under
+`plugins/` and may use repository-local build/test wiring, so they are reference plugins
+in-tree rather than the minimum installed-SDK consumer contract.
 
 External Plugin Hub examples should request the installed SDK component explicitly with
 `find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)` and link only

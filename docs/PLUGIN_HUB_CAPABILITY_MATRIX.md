@@ -155,7 +155,7 @@ experimental plugin-local `ChatMessageEvent` parsing lane.
 | Parse copied chat text locally | `ChatMessageEvent` with owner-token registration; `chat-message-intake` is the exact release-readiness target set | Minimal v0.1-rc ABI surface; experimental local parsing seed | Public command SDK/router, sender identity, replies, permissions, moderation, chat blocking, or send-chat API |
 | Run process-local scheduled work | Owner-token timers | Promoted v0.1 core primitive | UE/gameplay timers, cluster scheduler, persistent ids, permission system, or command router |
 | Inspect descriptor output safely | `oDescriptorCatalog` | First-party metadata example | Resource discovery, callback subscription, identity, lookup, mutation, or return override |
-| Build an installed-SDK consumer | `examples/sdk_minimal_plugin` with `find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)` and `Obelisk::obelisk_sdk` | Minimum installed SDK seed | Runtime reference-plugin wiring, gameplay authority, module SDK coverage, private runtime headers, or ArkApi plugin portability |
+| Build an installed-SDK consumer | `examples/sdk_minimal_plugin` and `examples/sdk_timer_plugin` with `find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)` and `Obelisk::obelisk_sdk` | Minimum installed SDK seed plus timer seed | Runtime reference-plugin wiring, gameplay authority, module SDK coverage, private runtime headers, or ArkApi plugin portability |
 | Study in-tree reference plugins | `plugins/oBaseEvents`, `plugins/oProcessTimer`, descriptor examples | Reference plugins | Minimum installed-SDK consumer contract, gameplay authority, module SDK coverage, or ArkApi plugin portability |
 | Use raw `ProcessEvent` callbacks | Filtered callbacks behind explicit debug gates | Debug-gated runtime plumbing | Stable gameplay API, borrowed pointer lifetime, raw param API, or public Plugin Hub dependency |
 | Commands, permissions, economy, kits, shops, RCON | No public Obelisk SDK yet | Not ready | ArkApi compatibility, player identity, reply/send-chat, database service, or operator command lifecycle |
@@ -199,6 +199,8 @@ Installed-SDK consumer seed:
 
 1. `examples/sdk_minimal_plugin` as the minimum package consumer that builds against the
    installed SDK.
+2. `examples/sdk_timer_plugin` as the installed-SDK timer seed for owner-token scheduled
+   work and shutdown cleanup.
 
 Production-supported seed lanes under `plugins/`:
 
@@ -212,9 +214,10 @@ Experimental pattern examples only:
 2. Copied policy auditors over target-set-promoted `GameplayPolicyEvent` kinds named
    above.
 
-The installed-SDK seed starts at `examples/sdk_minimal_plugin`. The current in-tree
-reference plugins cover this safe seed set: `oBaseEvents`, `oProcessTimer`, and
-`oDescriptorCatalog` cover the release-scope foundation under `plugins/`, while
+The installed-SDK seed starts at `examples/sdk_minimal_plugin` and now includes
+`examples/sdk_timer_plugin` for the promoted timer surface. The current in-tree reference
+plugins cover this safe seed set: `oBaseEvents`, `oProcessTimer`, and `oDescriptorCatalog`
+cover the release-scope foundation under `plugins/`, while
 `oPolicyAudit`, `oChatLogger`, and `oChatAudit` cover the experimental copied policy and
 copied chat slices. Those three are seed examples only, not production Plugin Hub modules;
 specifically, they are experimental pattern examples and not promises that copied
@@ -236,8 +239,8 @@ evidence gates are satisfied.
 ## Plugin Hub Direction
 
 The first useful Plugin Hub seed examples should be built from surfaces that already
-exist. The minimum installed-SDK consumer is `examples/sdk_minimal_plugin`; `plugins/*`
-contains in-tree runtime reference plugins.
+exist. The minimum installed-SDK consumers are `examples/sdk_minimal_plugin` and
+`examples/sdk_timer_plugin`; `plugins/*` contains in-tree runtime reference plugins.
 
 - lifecycle/config/logging examples;
 - descriptor/catalog consumers;

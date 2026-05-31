@@ -92,8 +92,8 @@ Mission's simpler copied-bool lifecycle review is complete.
 
 5. **Tribe and transfer**
 
-   Keep as later tracks. Both are important for ArkApi-style plugin parity, but they carry
-   identity, permissions, upload/download, nested struct, and privacy risks.
+   Keep as later tracks. Both are important familiar server-modding demand categories, but
+   they carry identity, permissions, upload/download, nested struct, and privacy risks.
 
 ## Next Offline Commands
 

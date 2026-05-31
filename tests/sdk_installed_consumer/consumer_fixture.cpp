@@ -1173,6 +1173,7 @@ int main(int argc, char** argv)
         const bool expectsGameplayPolicy = gameplayPolicyEventSeen != nullptr && gameplayPolicyEventAccepted != nullptr;
         const bool expectsTimer = timerSeen != nullptr;
         const bool lifecycleOnlyPlugin = std::strcmp(argv[2], "obelisk_sdk_minimal_plugin") == 0;
+        const bool timerOnlyPlugin = std::strcmp(argv[2], "obelisk_sdk_timer_plugin") == 0;
 
         ObeliskPluginMetadata metadata{};
         Require(getInfo(&metadata), "ObeliskPlugin_GetInfo failed");
@@ -1272,6 +1273,33 @@ int main(int argc, char** argv)
             Require(g_TimerUnregisterCount == 0, "minimal installed SDK example unexpectedly unregistered timer");
             shutdown();
             Require(g_UnregisterCount == 0, "minimal installed SDK example second shutdown unregistered callback");
+            dlclose(handle);
+            return 0;
+        }
+        if (timerOnlyPlugin)
+        {
+            Require(shutdown != nullptr, "timer installed SDK example must export shutdown");
+            Require(expectsTimer, "timer installed SDK example must expose timer observation probe");
+            Require(g_RegisterCount == 0, "timer installed SDK example unexpectedly registered ProcessEvent callback");
+            Require(g_GameplayPolicyRegisterCount == 0,
+                    "timer installed SDK example unexpectedly registered gameplay policy callback");
+            Require(g_ChatMessageRegisterCount == 0,
+                    "timer installed SDK example unexpectedly registered chat message callback");
+            Require(g_TimerRegisterCount == 1, "timer installed SDK example did not register one timer");
+            DispatchValidTimer();
+            Require(timerSeen(), "expected timer installed SDK example to observe timer callback");
+            api = {};
+            shutdown();
+            Require(g_UnregisterCount == 0, "timer installed SDK example unexpectedly unregistered callback");
+            Require(g_GameplayPolicyUnregisterCount == 0,
+                    "timer installed SDK example unexpectedly unregistered gameplay policy callback");
+            Require(g_ChatMessageUnregisterCount == 0,
+                    "timer installed SDK example unexpectedly unregistered chat message callback");
+            Require(g_TimerUnregisterCount == 1, "timer installed SDK example did not unregister timer exactly once");
+            Require(g_TimerCallback == nullptr, "timer installed SDK example callback was not cleared");
+            Require(g_TimerUserData == nullptr, "timer installed SDK example user data was not cleared");
+            shutdown();
+            Require(g_TimerUnregisterCount == 1, "timer installed SDK example second shutdown repeated timer unregister");
             dlclose(handle);
             return 0;
         }
