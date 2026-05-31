@@ -6565,6 +6565,89 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             self.assertIn(redacted, redacted_fields)
 
+    def test_inventory_policy_and_item_return_descriptors_stay_distinct(self) -> None:
+        manifest = json.loads(PUBLIC_GAMEPLAY_EVENTS_MANIFEST.read_text(encoding="utf-8"))
+        gameplay_policy = next(
+            (
+                event for event in manifest.get("promoted_events", [])
+                if isinstance(event, dict) and event.get("event_id") == "obelisk.gameplay_policy.v1"
+            ),
+            None,
+        )
+        self.assertIsNotNone(gameplay_policy)
+
+        inventory_events = {
+            event.get("stable_name"): event
+            for event in gameplay_policy.get("event_kinds", [])
+            if isinstance(event, dict)
+            and event.get("resource_kind") == "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM"
+        }
+        inventory_policy_names = {
+            stable_name
+            for stable_name in inventory_events
+            if isinstance(stable_name, str) and stable_name.startswith("inventory.")
+        }
+        item_return_names = {
+            stable_name
+            for stable_name in inventory_events
+            if isinstance(stable_name, str) and stable_name.startswith("inventory_item.")
+        }
+
+        self.assertEqual(
+            inventory_policy_names,
+            {
+                "inventory.remote_add_check",
+                "inventory.use_check",
+            },
+        )
+        self.assertEqual(
+            item_return_names,
+            {
+                "inventory_item.allow_equip_check",
+                "inventory_item.can_repair_check",
+                "inventory_item.use_onto_item_check",
+            },
+        )
+        self.assertEqual(set(inventory_events), inventory_policy_names | item_return_names)
+
+        self.assertEqual(
+            inventory_events["inventory.remote_add_check"].get("field_mask"),
+            [
+                "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
+                "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER",
+            ],
+        )
+        self.assertEqual(
+            inventory_events["inventory.use_check"].get("field_mask"),
+            [
+                "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
+                "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN",
+            ],
+        )
+        for stable_name in sorted(item_return_names):
+            with self.subTest(stable_name=stable_name):
+                self.assertEqual(
+                    inventory_events[stable_name].get("field_mask"),
+                    ["OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"],
+                )
+
+        self.assertEqual(
+            gameplay_policy.get("inventory_backing_target_set"),
+            "minimal-second-source-intake",
+        )
+        self.assertEqual(
+            gameplay_policy.get("item_return_backing_target_set"),
+            "item-return-only-policy-slice",
+        )
+        self.assertEqual(
+            gameplay_policy.get("inventory_sdk"),
+            "not promoted; inventory-backed policy signals are exposed only through GameplayPolicyEvent",
+        )
+        self.assertEqual(
+            gameplay_policy.get("item_module_sdk"),
+            "not promoted; item-return-backed policy signals are exposed only through GameplayPolicyEvent",
+        )
+
     def test_obasevents_documents_binary_scoped_fname_resolution(self) -> None:
         text = (REPO_ROOT / "docs/oBaseEvents.md").read_text(encoding="utf-8")
         normalized_text = " ".join(text.split())

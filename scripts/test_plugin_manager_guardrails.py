@@ -21,6 +21,14 @@ COPIED_DISPATCHER_CLEANUP_EXCEPTIONS = {
     ),
 }
 
+INVENTORY_GAMEPLAY_POLICY_EVENT_FAMILIES = {
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK": "InventoryPolicy",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK": "InventoryPolicy",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_ALLOW_EQUIP_ITEM_CHECK": "ItemReturn",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_CAN_REPAIR_CHECK": "ItemReturn",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK": "ItemReturn",
+}
+
 
 def extract_braced_body(text: str, match: re.Match[str]) -> str:
     start = text.find("{", match.end())
@@ -73,6 +81,38 @@ def obelisk_api_field_names(header: str) -> list[str]:
         if plain_field:
             fields.append(plain_field.group(1))
     return fields
+
+
+def inventory_gameplay_policy_event_kinds(header: str) -> set[str]:
+    match = re.search(
+        r"typedef\s+enum\s+ObeliskGameplayPolicyEventKind\s*\{(?P<body>.*?)\}"
+        r"\s*ObeliskGameplayPolicyEventKind\s*;",
+        strip_c_comments(header),
+        re.DOTALL,
+    )
+    if match is None:
+        raise AssertionError("ObeliskGameplayPolicyEventKind enum not found")
+
+    return set(
+        re.findall(
+            r"\b(OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_[A-Z0-9_]+)\b\s*=",
+            match.group("body"),
+        )
+    )
+
+
+def gameplay_policy_event_mask_name(event_kind: str) -> str:
+    return event_kind.replace(
+        "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_",
+        "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_",
+        1,
+    )
+
+
+def assert_tokens_present(test_case: unittest.TestCase, body: str, tokens: set[str]) -> None:
+    for token in sorted(tokens):
+        with test_case.subTest(token=token):
+            test_case.assertIn(token, body)
 
 
 class PluginManagerGuardrailTests(unittest.TestCase):
@@ -256,6 +296,121 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                 public_index = body.index(public_token)
                 for direct_token in direct_dispatcher_cleanup_tokens:
                     self.assertLess(public_index, body.index(direct_token))
+
+    def test_inventory_gameplay_policy_kinds_are_wired_to_expected_dispatcher_family(self) -> None:
+        api_header = OBELISK_API_HEADER.read_text(encoding="utf-8")
+        plugin_manager_text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+
+        declared_inventory_kinds = inventory_gameplay_policy_event_kinds(api_header)
+        expected_inventory_kinds = set(INVENTORY_GAMEPLAY_POLICY_EVENT_FAMILIES)
+        self.assertEqual(
+            declared_inventory_kinds,
+            expected_inventory_kinds,
+            "New OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_* values need an explicit "
+            "dispatcher-family decision in INVENTORY_GAMEPLAY_POLICY_EVENT_FAMILIES.",
+        )
+
+        inventory_policy_kinds = {
+            kind
+            for kind, family in INVENTORY_GAMEPLAY_POLICY_EVENT_FAMILIES.items()
+            if family == "InventoryPolicy"
+        }
+        item_return_kinds = {
+            kind
+            for kind, family in INVENTORY_GAMEPLAY_POLICY_EVENT_FAMILIES.items()
+            if family == "ItemReturn"
+        }
+        inventory_policy_masks = {gameplay_policy_event_mask_name(kind) for kind in inventory_policy_kinds}
+        item_return_masks = {gameplay_policy_event_mask_name(kind) for kind in item_return_kinds}
+
+        describe_body = extract_function_body(
+            plugin_manager_text,
+            r"bool DescribeGameplayPolicyEventKind\(.*?\)",
+        )
+        assert_tokens_present(self, describe_body, expected_inventory_kinds)
+        assert_tokens_present(self, describe_body, inventory_policy_masks | item_return_masks)
+        self.assertEqual(
+            describe_body.count("OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED"),
+            len(expected_inventory_kinds),
+        )
+
+        inventory_kind_body = extract_function_body(
+            plugin_manager_text,
+            r"uint32_t ToGameplayPolicyEventKind\(InventoryPolicyEventKind kind\)",
+        )
+        assert_tokens_present(self, inventory_kind_body, inventory_policy_kinds)
+        for token in sorted(item_return_kinds):
+            with self.subTest(forbidden_item_return_token=token):
+                self.assertNotIn(token, inventory_kind_body)
+
+        item_return_kind_body = extract_function_body(
+            plugin_manager_text,
+            r"uint32_t ToGameplayPolicyEventKind\(ItemReturnEventKind kind\)",
+        )
+        assert_tokens_present(self, item_return_kind_body, item_return_kinds)
+        for token in sorted(inventory_policy_kinds):
+            with self.subTest(forbidden_inventory_policy_token=token):
+                self.assertNotIn(token, item_return_kind_body)
+
+        mask_body = extract_function_body(
+            plugin_manager_text,
+            r"uint64_t ToGameplayPolicyEventMask\(uint32_t eventKind\)",
+        )
+        assert_tokens_present(self, mask_body, expected_inventory_kinds)
+        assert_tokens_present(self, mask_body, inventory_policy_masks | item_return_masks)
+
+        register_body = extract_function_body(
+            plugin_manager_text,
+            r"uint64_t RegisterGameplayPolicyEventForOwner\(.*?\)",
+        )
+        assert_tokens_present(self, register_body, inventory_policy_masks | item_return_masks)
+        for token in inventory_policy_masks:
+            with self.subTest(registration_family=token):
+                self.assertLess(register_body.index(token), register_body.index("InventoryPolicyEventDispatcher::Get().Register"))
+        for token in item_return_masks:
+            with self.subTest(registration_family=token):
+                self.assertLess(register_body.index(token), register_body.index("ItemReturnEventDispatcher::Get().Register"))
+        self.assertIn("DispatchGameplayPolicyEventFromInventory", register_body)
+        self.assertIn("DispatchGameplayPolicyEventFromItemReturn", register_body)
+
+        unregister_body = extract_function_body(
+            plugin_manager_text,
+            r"bool UnregisterGameplayPolicyRegistrationForOwner\(.*?\)",
+        )
+        self.assertIn("registration.InventoryRegistrationId", unregister_body)
+        self.assertIn("InventoryPolicyEventDispatcher::Get().UnregisterCallbackForOwner", unregister_body)
+        self.assertIn("registration.ItemReturnRegistrationId", unregister_body)
+        self.assertIn("ItemReturnEventDispatcher::Get().UnregisterCallbackForOwner", unregister_body)
+
+        unregister_owner_body = extract_function_body(
+            plugin_manager_text,
+            r"size_t UnregisterGameplayPolicyRegistrationsForOwner\(.*?\)",
+        )
+        self.assertIn("registration.InventoryRegistrationId", unregister_owner_body)
+        self.assertIn("InventoryPolicyEventDispatcher::Get().UnregisterCallbackForOwner", unregister_owner_body)
+        self.assertIn("registration.ItemReturnRegistrationId", unregister_owner_body)
+        self.assertIn("ItemReturnEventDispatcher::Get().UnregisterCallbackForOwner", unregister_owner_body)
+
+        cleanup_body = extract_function_body(
+            plugin_manager_text,
+            r"bool PluginManager::UnregisterPluginCallbacks\(.*?\)",
+        )
+        for token in (
+            "UnregisterGameplayPolicyRegistrationsForOwner(owner)",
+            "InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(owner)",
+            "ItemReturnEventDispatcher::Get().UnregisterCallbacksForOwner(owner)",
+        ):
+            with self.subTest(owner_cleanup_token=token):
+                self.assertIn(token, cleanup_body)
+        public_cleanup_index = cleanup_body.index("UnregisterGameplayPolicyRegistrationsForOwner(owner)")
+        self.assertLess(
+            public_cleanup_index,
+            cleanup_body.index("InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(owner)"),
+        )
+        self.assertLess(
+            public_cleanup_index,
+            cleanup_body.index("ItemReturnEventDispatcher::Get().UnregisterCallbacksForOwner(owner)"),
+        )
 
     def test_plugin_owner_cleanup_covers_each_plugin_facing_event_dispatcher(self) -> None:
         plugin_manager_text = PLUGIN_MANAGER.read_text(encoding="utf-8")
