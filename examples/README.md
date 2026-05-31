@@ -56,6 +56,10 @@ Before packaging, confirm the plugin:
   borrowed `ObeliskPluginInitContext` pointers;
 - checks `abi_version`, `struct_size`, capability bits, non-null function pointers, and a
   non-zero `plugin_owner_token` before using optional callbacks, descriptors, or timers;
+- treats callback handles, timer handles, copied event sequence values, and descriptor
+  cache state as process-local only; never persists them in config/shared storage or
+  reuses them after restart, map transfer, or another ARK server process; recreates
+  registrations during `ObeliskPlugin_Init` and releases them in `ObeliskPlugin_Shutdown`;
 - ships safe-disabled default config with `enabled=false`, `allow_all_instances=false`,
   and an empty `instance_allowlist`;
 - documents its support tier as production seed, experimental pattern, or blocked backlog

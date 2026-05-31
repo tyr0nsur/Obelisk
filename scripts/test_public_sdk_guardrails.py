@@ -14,6 +14,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 REFLECTION_TARGET_SET_VARS = runpy.run_path(str(REPO_ROOT / "scripts" / "reflection_target_sets.py"))
 TARGET_SETS = REFLECTION_TARGET_SET_VARS["TARGET_SETS"]
 PLANNING_ONLY_TARGET_SETS = REFLECTION_TARGET_SET_VARS["PLANNING_ONLY_TARGET_SETS"]
+RELEASE_READINESS_TARGET_SETS = REFLECTION_TARGET_SET_VARS["RELEASE_READINESS_TARGET_SETS"]
 PUBLIC_GAMEPLAY_EVENTS_MANIFEST = REPO_ROOT / "docs" / "public_gameplay_events.json"
 PUBLIC_SDK_SURFACES_MANIFEST = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
 PUBLIC_SDK_V1_COMPATIBILITY_DOC = REPO_ROOT / "docs" / "SDK_V1_COMPATIBILITY.md"
@@ -946,6 +947,26 @@ def json_string_values(value: object, path: str) -> list[tuple[str, str]]:
     return []
 
 
+def evidence_target_set_values(value: object, path: str = "evidence") -> list[tuple[str, str]]:
+    target_sets: list[tuple[str, str]] = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_path = f"{path}.{key}"
+            if key in {"target_set", "target_sets", "planning_target_sets", "release_readiness_target_sets"}:
+                if isinstance(child, str):
+                    target_sets.append((child_path, child))
+                elif isinstance(child, list):
+                    for index, item in enumerate(child):
+                        if isinstance(item, str):
+                            target_sets.append((f"{child_path}[{index}]", item))
+                continue
+            target_sets.extend(evidence_target_set_values(child, child_path))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            target_sets.extend(evidence_target_set_values(child, f"{path}[{index}]"))
+    return target_sets
+
+
 class PublicSdkGuardrailTests(unittest.TestCase):
     def test_public_sdk_surfaces_manifest_defines_v1_contract_without_claiming_completion(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
@@ -1434,6 +1455,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
     def test_public_sdk_v1_completion_stays_false_while_command_dependency_chain_is_blocked(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
         surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
+        identity_note = (
+            REPO_ROOT / "docs" / "research" / "2026-05-31-player-identity-first-evidence.md"
+        ).read_text(encoding="utf-8")
         critical_chain = (
             "obelisk.player_identity.v1",
             "obelisk.permissions_admin.v1",
@@ -1454,6 +1478,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 "obelisk.permissions_admin.v1",
             ],
         )
+        self.assertEqual(
+            surfaces["obelisk.permissions_admin.v1"]["depends_on"],
+            ["obelisk.player_identity.v1"],
+        )
         self.assertTrue(unresolved)
         self.assertTrue(set(unresolved).issubset(set(manifest["v1_sdk_completion_blockers"])))
         self.assertFalse(
@@ -1469,6 +1497,21 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             self.assertIn(term, release_guardrails)
 
+        self.assertIn(
+            "Only after identity exists can a permission/admin service be designed on a real\n"
+            "   principal.",
+            identity_note,
+        )
+        self.assertIn(
+            "Only after identity, permissions, and a safe response path exist can command routing\n"
+            "   with replies be designed.",
+            identity_note,
+        )
+        self.assertNotIn(
+            "Only after identity plus command routing exists can a permission service be designed.",
+            identity_note,
+        )
+
         compatibility = normalized(PUBLIC_SDK_V1_COMPATIBILITY_DOC.read_text(encoding="utf-8"))
         for term in (
             "Identity/principal, permissions/admin, and commands/replies are an ordered v1 dependency chain",
@@ -1476,6 +1519,55 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "no complete v1 SDK claim is valid",
         ):
             self.assertIn(normalized(term), compatibility)
+
+    def test_v1_blocker_evidence_cannot_shortcut_completion_through_target_sets_or_candidate_artifacts(self) -> None:
+        manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
+        completion_claim_re = re.compile(
+            r"\b(?:"
+            r"v1[_ -]?completion[_ -]?ready|"
+            r"public[_ -]?sdk[_ -]?ready|"
+            r"runtime[_ -]?readiness\s*[:=]\s*true|"
+            r"promotion[_ -]?ready\s*[:=]\s*true|"
+            r"promote[_ -]?mode\s*[:=]\s*(?:accepted|ready)|"
+            r"candidate\s+artifact\s+(?:completes|satisfies|unlocks)"
+            r")\b",
+            re.IGNORECASE,
+        )
+
+        self.assertFalse(manifest["v1_completion_required"])
+        for surface_id in manifest["v1_sdk_completion_blockers"]:
+            surface = surfaces[surface_id]
+            evidence = surface.get("evidence", {})
+            target_set_refs = evidence_target_set_values(evidence)
+            unknown_refs = [
+                f"{surface_id}:{path}={target_set}"
+                for path, target_set in target_set_refs
+                if target_set not in TARGET_SETS
+            ]
+            release_ready_refs = [
+                f"{surface_id}:{path}={target_set}"
+                for path, target_set in target_set_refs
+                if path.endswith(".release_readiness_target_sets")
+                or ".release_readiness_target_sets[" in path
+                or target_set in RELEASE_READINESS_TARGET_SETS
+            ]
+            completion_claims = [
+                f"{surface_id}:{path}: {value}"
+                for path, value in json_string_values(evidence, "evidence")
+                if completion_claim_re.search(value)
+            ]
+
+            with self.subTest(surface=surface_id, check="blocked status"):
+                self.assertIn(surface["status"], {"planning", "post-v1", "excluded"})
+                self.assertEqual(surface.get("support_tier"), "blocked")
+                self.assertEqual(surface.get("public_contract", []), [])
+            with self.subTest(surface=surface_id, check="known target-set refs"):
+                self.assertEqual(unknown_refs, [])
+            with self.subTest(surface=surface_id, check="no release-readiness target-set refs"):
+                self.assertEqual(release_ready_refs, [])
+            with self.subTest(surface=surface_id, check="no candidate-artifact completion claims"):
+                self.assertEqual(completion_claims, [])
 
     def test_public_sdk_surfaces_manifest_blocks_player_services_until_identity_permissions_and_storage(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
@@ -2831,6 +2923,15 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             ):
                 with self.subTest(path=relative, token=token):
                     self.assertIn(token, text)
+
+        examples_readme_normalized = re.sub(r"\s+", " ", examples_readme)
+        for token in (
+            "callback handles, timer handles, copied event sequence values, and descriptor cache state as process-local only",
+            "never persists them in config/shared storage or reuses them after restart, map transfer, or another ARK server process",
+            "recreates registrations during `ObeliskPlugin_Init` and releases them in `ObeliskPlugin_Shutdown`",
+        ):
+            with self.subTest(path="examples/README.md", token=token):
+                self.assertIn(token, examples_readme_normalized)
 
         minimal_readme_normalized = re.sub(r"\s+", " ", minimal_readme)
         for token in (

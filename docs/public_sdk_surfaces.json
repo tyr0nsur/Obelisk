@@ -591,6 +591,9 @@
       "status": "post-v1",
       "support_tier": "blocked",
       "public_contract": [],
+      "depends_on": [
+        "obelisk.player_identity.v1"
+      ],
       "blockers": [
         "No promoted player identity or authority model."
       ],

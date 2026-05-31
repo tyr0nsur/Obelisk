@@ -322,9 +322,11 @@ model:
 3. Prove, in a later approved debug window if offline evidence cannot answer it, the
    runtime order and cleanup semantics for join/chat/leave or equivalent lifecycle events.
 4. Only then draft a public identity payload.
-5. Only after identity exists can command routing with a real principal be designed.
-6. Only after identity plus command routing exists can a permission service be designed.
-7. Only after identity, commands, permissions, persistence, and relevant item/event
+5. Only after identity exists can a permission/admin service be designed on a real
+   principal.
+6. Only after identity, permissions, and a safe response path exist can command routing
+   with replies be designed.
+7. Only after identity, permissions, commands, persistence, and relevant item/event
    evidence exist can economy SDK work start.
 
 ## Public Identity Promotion Checklist
