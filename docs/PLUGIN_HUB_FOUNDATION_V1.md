@@ -10,7 +10,7 @@ It is a boundary document, not a roadmap freeze. It does not add public symbols,
 callbacks, capabilities, or gameplay modules. More specifically, it does not add public
 contract structs/events/descriptors/API tables. It does not promise ArkApi/AseApi
 compatibility, Windows/MSVC portability, source parity, or behavior parity. ArkApi,
-AseApi, and local popular-plugin clones are names and demand dictionaries only, not
+AseApi, and local NextGenPlugins clones are names and demand dictionaries only, not
 porting or copying sources; every Obelisk surface must be rebuilt through Obelisk
 reflection, copied C ABI contracts, explicitly named second-source target sets, and
 runtime safety gates.
@@ -38,8 +38,9 @@ persistence/storage, and safe mutation/grant surfaces are separately promoted.
 
 Creator-facing examples that build against an installed SDK package live under
 `examples/`; `examples/sdk_minimal_plugin` is the minimum seed for an installed SDK
-consumer, and `examples/sdk_timer_plugin` demonstrates the promoted process-local timer
-surface using only the installed package. First-party runtime reference plugins live under
+consumer, `examples/sdk_descriptor_catalog` demonstrates descriptor/catalog reads, and
+`examples/sdk_timer_plugin` demonstrates the promoted process-local timer surface using
+only the installed package. First-party runtime reference plugins live under
 `plugins/` and may use repository-local build/test wiring, so they are reference plugins
 in-tree rather than the minimum installed-SDK consumer contract.
 
@@ -190,7 +191,7 @@ explicit:
 Release-supported seeds:
 
 - lifecycle, config, and logging examples;
-- descriptor/catalog readers scaffolded from the minimal installed-SDK example;
+- descriptor/catalog readers scaffolded from `examples/sdk_descriptor_catalog`;
 - process-local timer utilities.
 
 Experimental pattern examples only:
@@ -201,9 +202,9 @@ Experimental pattern examples only:
   a command SDK; any routing/parsing stays plugin-local only, without permissions,
   send-chat, replies, or a public command SDK/router.
 
-Only lifecycle/config/logging examples, descriptor/catalog readers scaffolded from the
-minimal installed-SDK example, and process-local timer examples are release-supported
-seeds after the RC. Copied chat parsers and copied policy auditors
+Only lifecycle/config/logging examples, descriptor/catalog readers scaffolded from
+`examples/sdk_descriptor_catalog`, and process-local timer examples are
+release-supported seeds after the RC. Copied chat parsers and copied policy auditors
 may demonstrate patterns, but they remain experimental and are not promises for complete economy,
 permissions, homes, kits, shops, RCON, inventory, item, dino, tribe, mission, transfer,
 storage/database, webhook, or structure modules.

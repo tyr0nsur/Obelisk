@@ -24,6 +24,7 @@ PLAYER_IDENTITY_PUBLIC_CONTRACT_DECISIONS = (
     REPO_ROOT / "docs" / "player_identity_public_contract_decisions.json"
 )
 PUBLIC_SDK_V1_COMPATIBILITY_DOC = REPO_ROOT / "docs" / "SDK_V1_COMPATIBILITY.md"
+PLUGIN_HUB_PACKAGE_TEMPLATE_DOC = REPO_ROOT / "docs" / "PLUGIN_HUB_PACKAGE_TEMPLATE.md"
 PUBLIC_API_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
 PUBLIC_DOC_FILES = [
     REPO_ROOT / "README.md",
@@ -105,6 +106,7 @@ PLUGIN_HUB_PUBLIC_BOUNDARY_DOC_FILES = [
     REPO_ROOT / "docs" / "PLUGIN_HUB_CONTRIBUTOR_PATH.md",
     REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md",
     REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md",
+    PLUGIN_HUB_PACKAGE_TEMPLATE_DOC,
     REPO_ROOT / "docs" / "PLUGIN_HUB_SEED_BOUNDARY.md",
     REPO_ROOT / "plugins" / "README.md",
 ]
@@ -1180,7 +1182,7 @@ def broad_v1_completion_claims(text: str, relative_path: str) -> list[str]:
 
 
 def plugin_hub_seed_review_files() -> list[Path]:
-    paths = set(PLUGIN_HUB_PUBLIC_SEED_DOC_FILES)
+    paths = {PLUGIN_HUB_PACKAGE_TEMPLATE_DOC, *PLUGIN_HUB_PUBLIC_SEED_DOC_FILES}
 
     for root_name in ("examples", "plugins"):
         root = REPO_ROOT / root_name
@@ -6974,6 +6976,22 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         for path in plugin_hub_seed_review_files():
             text = path.read_text(encoding="utf-8")
             relative = path.relative_to(REPO_ROOT).as_posix()
+            if path == PLUGIN_HUB_PACKAGE_TEMPLATE_DOC:
+                expected_placeholder = (
+                    "Support tier: <release-supported seed | experimental pattern | blocked backlog>"
+                )
+                if expected_placeholder not in text:
+                    offenders.append(f"{relative}: missing Plugin Hub support tier placeholder")
+                    continue
+                offenders.extend(
+                    plugin_hub_seed_forbidden_claims(
+                        text,
+                        relative,
+                        "release-supported seed",
+                    )
+                )
+                continue
+
             declarations = plugin_hub_support_tier_declarations(text)
             if len(declarations) != 1:
                 offenders.append(
@@ -7066,11 +7084,14 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         timer_readme = (
             REPO_ROOT / "examples" / "sdk_timer_plugin" / "README.md"
         ).read_text(encoding="utf-8")
+        descriptor_readme = (
+            REPO_ROOT / "examples" / "sdk_descriptor_catalog" / "README.md"
+        ).read_text(encoding="utf-8")
 
         for text, required in (
             (
                 contributor_path,
-                "copy `examples/sdk_minimal_plugin` for descriptor/catalog readers, then add only",
+                "copy `examples/sdk_descriptor_catalog` for descriptor/catalog readers",
             ),
             (
                 contributor_path,
@@ -7101,6 +7122,17 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             with self.subTest(forbidden=forbidden):
                 self.assertNotIn(forbidden, combined_examples)
+
+        for required in (
+            "Support tier: release-supported seed.",
+            "DescribeResourceKind",
+            "DescribeGameplayPolicyEventKind",
+            "metadata-only descriptor discovery",
+            "not identity, lookup handles",
+            "does not use private headers, raw UE pointers, `ProcessEvent`",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(normalized(required), normalized(descriptor_readme))
 
     def test_mission_plugin_hub_boundary_stays_planning_only(self) -> None:
         foundation = (REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md").read_text(

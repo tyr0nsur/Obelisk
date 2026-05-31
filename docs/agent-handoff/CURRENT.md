@@ -175,6 +175,11 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   mutation, storage, inventory, or structure support outside that tier. Public v1
   completion evidence also rejects strict blocker evidence paths/schemas that are
   candidate/planning/orientation/preflight/readiness/consume-only/evidence-only.
+- Installed-SDK contributor examples now include `examples/sdk_minimal_plugin`,
+  `examples/sdk_descriptor_catalog`, and `examples/sdk_timer_plugin`. Use
+  `examples/sdk_descriptor_catalog` as the external scaffold for descriptor/catalog
+  readers; `plugins/oDescriptorCatalog` remains the in-tree runtime reference plugin, not
+  the external package scaffold.
 - Revalidate before any checkpoint: identity readiness stays blocked with
   `non_protected_core_input_missing`, public SDK v1 completion stays blocked, Plugin Hub
   docs stay non-promotional, and `git diff --check` passes.
