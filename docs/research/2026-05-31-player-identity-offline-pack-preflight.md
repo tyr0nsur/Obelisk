@@ -13,6 +13,18 @@ python3 scripts/check_reflection_inventory_pack_readiness.py \
   --root /home/flowcommunity-ark/obelisk-artifacts
 ```
 
+For the complete read-only player-identity lane preflight, use:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_player_identity_first_evidence_readiness.py \
+  --artifact-root /home/flowcommunity-ark/obelisk-artifacts
+```
+
+This wrapper combines reflection-inventory readiness, committed fixture coverage, and
+the fail-closed `obelisk.players-identity-first-evidence.v1` build attempt. It writes no
+artifacts, touches no servers, and must keep reporting candidate-only/planning-only
+non-claims even if the first evidence pack becomes buildable.
+
 The checker is read-only and emits
 `schema=obelisk.reflection-inventory-pack-readiness-check.v1`. It fails closed with
 machine-readable reasons: `missing_reflection_inventory_pack`,
@@ -31,6 +43,16 @@ Current result:
 - `reason=scriptstruct_pack_not_reflection_inventory`;
 - `reason=schema_mismatch` for the static-global preflight manifest;
 - `accepted_pack=null`.
+
+The combined preflight currently reports:
+
+- `reflection_inventory.ready=false`;
+- `fixture_coverage.targets=12`;
+- `fixture_coverage.comparable=10`;
+- `fixture_coverage.blocked=2`;
+- `first_evidence.ready=false`;
+- `first_evidence.missing_required_targets=[ServerKickPlayer, ServerListPlayers]`;
+- `next_step=produce_or_approve_non_protected_core_evidence_pack_then_reflection_inventory_pack`.
 
 The durable root currently contains normalized artifact packs and a ScriptStruct inventory
 pack, but no UFunction reflection-inventory pack with

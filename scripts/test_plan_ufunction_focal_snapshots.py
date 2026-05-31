@@ -290,6 +290,29 @@ class PlanUFunctionFocalSnapshotsTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("inputs.target_sets must include players-identity-lifecycle-intake", result.stderr)
 
+    def test_direct_player_identity_target_requires_matching_pack_scope(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            pack = root / "pack"
+            self.write_pack(
+                pack,
+                core_path=root / "missing-core",
+                functions=self.rows_for_target_set(PLAYER_IDENTITY_TARGET_SET),
+            )
+
+            result = self.run_planner(
+                [
+                    "--inventory-pack",
+                    str(pack),
+                    "--target",
+                    "ShooterPlayerController.ServerListPlayers",
+                ],
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("inputs.target_sets must include players-identity-lifecycle-intake", result.stderr)
+
     def test_player_identity_target_set_requires_core_evidence_pack_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

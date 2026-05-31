@@ -130,6 +130,12 @@ first-evidence gate force-redacts identity-like fields, treats `ServerKickPlayer
 as admin-mutation-not-public-identity, and fails closed until missing sanitized
 `ServerListPlayers` and `ServerKickPlayer` snapshots, accepted lifecycle anchors,
 principal privacy/invalidation semantics, and independent second-source evidence exist.
+Planning those missing admin snapshots must start from a reviewed non-protected complete
+`obelisk.core-dump-evidence-pack.v1` plus a reviewed UFunction
+`obelisk.reflection-inventory-pack.v1` that contains those two targets. An offline
+`ShooterGameServer` binary, copied core, manual FName/GObjects roots, or direct
+core/bin planning alone is insufficient and must not be described as public SDK,
+runtime-readiness, or promotion evidence.
 Player identity/principal evidence does not unlock `operator_ingress_storage`; operator
 ingress/storage remains a separate post-v1 blocker until secret-safe ingress,
 storage schema/migration, queue drain, audit, encoding, and lifecycle policy are promoted

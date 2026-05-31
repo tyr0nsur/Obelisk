@@ -107,6 +107,15 @@ define or protect runtime behavior.
 | General reflected UFunction parameter decoding | Not ready | Candidate-only module recognizers exist, but SDK-facing decoding remains unpromoted. |
 | Higher-level SDK APIs | Not ready | Outside the promoted `GameplayPolicyEvent` surface, the minimal `ChatMessageEvent` RC notification surface, and process-local core timers, Inventory, Items, players, richer chat, tribes, dinos, missions, transfers, permissions, gameplay/module timers, admin, commands, and public `StructureEvents` remain roadmap items until each has copied payloads, ABI tests, privacy policy, and accepted target-set evidence. The three item return-only checks are public only as copied `GameplayPolicyEvent` `ReturnValue` kinds; remaining item producer/runtime validation, Mission copied-bool observer, and Transfer `bAccept` work stay internal. Transfer `bAccept` internal work is offline/test-only only: no runtime target source, `PluginManager` wiring, marker/env activation, installed plugin path, public manifest, docs, or examples. Public Inventory SDK, Items SDK, Mission SDK, and Transfer SDK surfaces remain absent. |
 
+Player identity is the first v1 dependency, but it remains planning-only. The missing
+admin-surface snapshots require a reviewed non-protected complete
+`obelisk.core-dump-evidence-pack.v1` plus a reviewed UFunction
+`obelisk.reflection-inventory-pack.v1`; an offline `ShooterGameServer` binary, copied
+core, manual roots, or direct core/bin planning alone is not release-readiness, runtime,
+or public SDK evidence. Even after that fixture gap closes, permissions/admin and then
+commands/replies remain separately blocked until identity privacy, invalidation,
+authority, and a safe response path are promoted.
+
 ## v1.0 SDK Completion Bar
 
 `v1.0` should not be used for a partial runtime-only release. A stable SDK release needs:

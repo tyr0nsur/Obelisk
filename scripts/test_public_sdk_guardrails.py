@@ -1371,12 +1371,27 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             player_identity["evidence"]["target_set"],
             "players-identity-lifecycle-intake",
         )
+        self.assertEqual(
+            player_identity["evidence"]["requires"],
+            [
+                "non-protected complete obelisk.core-dump-evidence-pack.v1 manifest",
+                "reviewed UFunction obelisk.reflection-inventory-pack.v1 manifest",
+                "reflection inventory containing ShooterPlayerController.ServerListPlayers and ShooterPlayerController.ServerKickPlayer",
+            ],
+        )
+        for non_claim in (
+            "offline ShooterGameServer binary alone is insufficient",
+            "copied core or direct core/bin planning alone is insufficient",
+            "manual FName/GObjects roots alone are insufficient",
+        ):
+            self.assertIn(non_claim, player_identity["evidence"]["non_claims"])
         self.assertIn("obelisk.player_identity.v1", manifest["planning_surfaces"])
         self.assertNotIn("obelisk.player_identity.v1", manifest["promoted_surfaces"])
         self.assertNotIn("players-identity-lifecycle-intake", json.dumps(manifest["promoted_surfaces"]))
         self.assertNotIn("players-identity-lifecycle-intake", json.dumps(manifest["experimental_surfaces"]))
 
         for blocker in (
+            "No reviewed non-protected complete core evidence pack plus UFunction reflection-inventory pack accepted for the missing admin snapshots.",
             "Missing sanitized ServerListPlayers snapshot.",
             "Missing sanitized ServerKickPlayer snapshot.",
             "No accepted login/logout lifecycle anchors.",
@@ -1528,6 +1543,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "not public SDK or runtime readiness",
             "admin-mutation-not-public-identity",
             "`ServerListPlayers` and `ServerKickPlayer` snapshots",
+            "reviewed non-protected complete `obelisk.core-dump-evidence-pack.v1`",
+            "reviewed UFunction\n`obelisk.reflection-inventory-pack.v1`",
+            "An offline\n`ShooterGameServer` binary, copied core, manual FName/GObjects roots, or direct\ncore/bin planning alone is insufficient",
             "accepted lifecycle anchors",
             "principal privacy/invalidation semantics",
             "independent second-source evidence",
@@ -1657,6 +1675,40 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "no complete v1 SDK claim is valid",
         ):
             self.assertIn(normalized(term), compatibility)
+
+    def test_public_docs_record_player_identity_pack_gate_without_direct_core_shortcut(self) -> None:
+        manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        release_guardrails = normalized(" ".join(manifest["release_guardrails"]))
+        public_docs = {
+            "sdk_compatibility": PUBLIC_SDK_V1_COMPATIBILITY_DOC,
+            "status": REPO_ROOT / "docs" / "STATUS.md",
+            "plugin_hub_foundation": REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md",
+        }
+
+        for term in (
+            "non-protected complete core evidence pack",
+            "reviewed UFunction reflection-inventory pack",
+            "direct core/bin planning alone is not public SDK or promotion evidence",
+        ):
+            with self.subTest(doc="manifest_guardrails", term=term):
+                self.assertIn(normalized(term), release_guardrails)
+
+        for name, path in public_docs.items():
+            compact = normalized(path.read_text(encoding="utf-8"))
+            for term in (
+                "obelisk.core-dump-evidence-pack.v1",
+                "obelisk.reflection-inventory-pack.v1",
+                "ShooterGameServer",
+            ):
+                with self.subTest(doc=name, term=term):
+                    self.assertIn(normalized(term), compact)
+            with self.subTest(doc=name, term="direct shortcut blocked"):
+                self.assertRegex(
+                    compact,
+                    r"(?:direct core/bin planning alone is insufficient|"
+                    r"direct core/bin planning alone is not release-readiness|"
+                    r"not unlocked by direct binary/core access)",
+                )
 
     def test_v1_blocker_evidence_cannot_shortcut_completion_through_target_sets_or_candidate_artifacts(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
@@ -5679,6 +5731,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "scriptstruct_pack_not_reflection_inventory",
             "does not currently contain a non-protected `obelisk.core-dump-evidence-pack.v1` manifest",
             "safe inventory-build route",
+            "check_player_identity_first_evidence_readiness.py",
+            "fixture_coverage.comparable=10",
+            "first_evidence.ready=false",
+            "next_step=produce_or_approve_non_protected_core_evidence_pack_then_reflection_inventory_pack",
         ):
             with self.subTest(doc="preflight", term=term):
                 self.assertIn(normalized(term), docs["preflight"])

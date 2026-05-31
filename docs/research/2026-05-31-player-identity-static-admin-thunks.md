@@ -10,16 +10,34 @@ does not replace a core evidence pack or a UFunction reflection-inventory pack.
   `/home/flowcommunity-ark/obelisk-artifacts/offline-binaries/7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520/ShooterGameServer`
 - SHA256:
   `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`
-- Tools observed: `radare2`/`rabin2` 5.5.0. Ghidra headless is available, but no Ghidra
-  import was used for this lightweight pass.
+- File type: ELF 64-bit x86-64 executable, stripped, non-PIE `EXEC`, entry `0x81dc59`.
+- Tools observed:
+  - `/usr/bin/rabin2`: 5.5.0
+  - `/usr/bin/radare2`: 5.5.0
+  - `/usr/bin/objdump`: GNU Binutils 2.42
+  - `/usr/bin/readelf`: GNU Binutils 2.42
+  Ghidra headless is available, but no Ghidra import was used for this lightweight pass.
 - Server impact: none. Offline binary only.
+
+## ELF Ranges
+
+- RX `LOAD`: `0x400000..0x5604aab`
+- RW `LOAD` memory: `0x5805000..0x5a25b8f`
+- `.text`: `0x648400..0x3f6170e`
+- `.rodata`: `0x3f61740..0x47f2c83`
+- `.bss`: `0x58446c0..0x5a25b8f`
+
+For this binary hash, the candidate thunks `0x1547320` and `0x1547450` are in `.text`;
+ASCII and UTF-32 name strings are in `.rodata`; probable FName-ish slots `0x58eae60` and
+`0x58eae68` are in `.bss`.
 
 ## Static Clues
 
 String scan:
 
 ```bash
-rabin2 -z ShooterGameServer | grep -E 'ServerKickPlayer|ServerListPlayers|/Script/ShooterGame$|AShooterPlayerController$'
+BIN=/home/flowcommunity-ark/obelisk-artifacts/offline-binaries/7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520/ShooterGameServer
+rabin2 -z "${BIN}" | grep -E 'ServerKickPlayer|ServerListPlayers|/Script/ShooterGame$|AShooterPlayerController$'
 ```
 
 Relevant hits:
@@ -36,8 +54,8 @@ Relevant hits:
 Registration-like xrefs:
 
 ```bash
-objdump -d -j .text -M intel --no-show-raw-insn ShooterGameServer \
-  | grep -i -E -B6 -A10 '41632da|41632eb'
+objdump -d -j .text -M intel --no-show-raw-insn \
+  --start-address=0x1368f40 --stop-address=0x1368fd0 "${BIN}"
 ```
 
 Relevant static pattern:
@@ -71,6 +89,20 @@ runtime-initialized FName globals:
 
 Because those are `.bss` runtime values, the ELF alone does not provide accepted FName
 indices.
+
+## Limitations
+
+- The `objdump` checks are bounded disassembly windows and immediate-value references,
+  not a complete xref graph.
+- They can miss indirect references, data-only flows, relocations not printed as
+  immediates, and runtime writes through `.bss`.
+- UTF-32 name initialization and ASCII native-exec registration clues have different
+  roles; neither is accepted `UFunction` identity or an accepted FName index.
+- `objdump --start-address` can begin in the middle of an instruction if the window is
+  cut poorly. Only coherent `mov`/`call` sequences inside the bounded window are treated
+  as orientation clues.
+- Vtable offsets `0x1520` and `0x1528` are stripped-binary orientation only. They are not
+  a vtable definition, public ABI, or cross-build contract.
 
 ## Decision
 

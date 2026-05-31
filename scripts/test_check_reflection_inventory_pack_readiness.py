@@ -243,6 +243,32 @@ class CheckReflectionInventoryPackReadinessTests(unittest.TestCase):
         self.assertIn("evidence_status.status", {reason.get("field") for reason in blockers})
         self.assertIn("evidence_status.gdb_core_failed", {reason.get("field") for reason in blockers})
 
+    def test_pack_core_sha_must_match_artifact_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_pack(
+                root / "pack",
+                manifest_updates={
+                    "artifact_identity": {
+                        "artifact_kind": "offline_core",
+                        "artifact_sha256": "9" * 64,
+                        "capture_id": "reviewed-core",
+                        "evidence_pack_id": "reviewed-pack",
+                    }
+                },
+            )
+
+            result = self.run_checker(["--root", str(root)], check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertFalse(payload["ready"])
+        blockers = [
+            reason
+            for reason in payload["reasons"]
+            if reason["reason"] == "wrong_target_scope" and reason.get("field") == "core.sha256"
+        ]
+        self.assertEqual(blockers[0]["detail"], "does_not_match_artifact_identity")
+
     def test_wrong_scope_and_missing_target_are_machine_readable(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

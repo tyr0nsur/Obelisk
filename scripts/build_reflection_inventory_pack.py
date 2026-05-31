@@ -29,6 +29,12 @@ from snapshot_evidence_pack import (  # noqa: E402
 
 PACK_SCHEMA = "obelisk.reflection-inventory-pack.v1"
 PLAYER_IDENTITY_TARGET_SET = "players-identity-lifecycle-intake"
+DIRECT_PLAYER_IDENTITY_GATE_TARGETS = frozenset(
+    (
+        "ShooterPlayerController.ServerListPlayers",
+        "ShooterPlayerController.ServerKickPlayer",
+    )
+)
 DEFAULT_MAX_OBJECTS = ufunction_inventory.DEFAULT_MAX_OBJECTS
 DEFAULT_MAX_GROUPS = 20
 
@@ -182,8 +188,19 @@ def has_inventory_filters(args: argparse.Namespace) -> bool:
     )
 
 
+def player_identity_targets_from_requests(requested_targets: list[str]) -> list[str]:
+    matched: set[str] = set()
+    for target in requested_targets:
+        _, outer, name = focal_planner.parse_exact_target(target)
+        short_target = f"{outer}.{name}"
+        if short_target in DIRECT_PLAYER_IDENTITY_GATE_TARGETS:
+            matched.add(short_target)
+    return sorted(matched)
+
+
 def main() -> int:
     args = parse_args()
+    direct_plan_targets = list(args.plan_target)
     plan_snapshot_targets = list(args.plan_target)
     if args.plan_snapshot_target_set:
         plan_snapshot_targets.extend(
@@ -193,6 +210,12 @@ def main() -> int:
                     "obelisk.ufunction-chain.snapshot.v1",
                 )
             )
+        )
+    requested_player_identity_targets = player_identity_targets_from_requests(direct_plan_targets)
+    if requested_player_identity_targets and PLAYER_IDENTITY_TARGET_SET not in args.target_set:
+        raise SystemExit(
+            f"--plan-target for player identity targets requires --target-set {PLAYER_IDENTITY_TARGET_SET} "
+            "so the pack records player identity coverage"
         )
     if (
         PLAYER_IDENTITY_TARGET_SET in args.plan_snapshot_target_set

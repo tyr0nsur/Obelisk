@@ -208,6 +208,12 @@ If a plugin idea needs player identity, permissions, persistence, operator ingre
 replies, broadcast, inventory/item mutation, teleport, structure placement enforcement, or
 raw UE access, it is not a Foundation V1 plugin. Keep it as a design/research note until a
 separate copied-data surface is promoted.
+Player identity research is also not unlocked by direct binary/core access: the current
+admin snapshot gap requires a reviewed non-protected complete
+`obelisk.core-dump-evidence-pack.v1` plus a reviewed UFunction
+`obelisk.reflection-inventory-pack.v1` before planning. An offline `ShooterGameServer`
+binary or copied core alone is insufficient, and that route still remains candidate-only
+rather than Plugin Hub or public SDK evidence.
 
 ## Anti-Promises
 

@@ -77,6 +77,7 @@
     "Before identity/principal is promoted, production-safe Plugin Hub seeds are limited to lifecycle/config/logging, descriptors, and process-local timers; those pre-identity production seeds are not enough for v1 completion, and passive chat parsing and plugin-local routing remain promoted-experimental-only.",
     "Umbrella blockers do not imply broad module coverage; dino, tribe, buff/status, chat send/broadcast, player progression/engrams, economy, mobility, and operator ingress/storage must each be promoted as narrow copied C ABI surfaces or explicitly excluded by name in the v1 release statement.",
     "Player identity/principal evidence does not unlock operator ingress/storage; operator_ingress_storage remains a separate blocked/post-v1 surface until secret-safe ingress, storage schema/migration, queue drain, audit, encoding, and lifecycle policy are promoted or explicitly excluded.",
+    "Player identity/principal planning requires a non-protected complete core evidence pack plus a reviewed UFunction reflection-inventory pack; an offline ShooterGameServer binary, copied core, manual roots, or direct core/bin planning alone is not public SDK or promotion evidence.",
     "Every promoted-experimental-only surface must be promoted, downgraded to planning/post-v1, or explicitly excluded before v1_completion_required can become true.",
     "GameplayPolicyEvent and ChatMessageEvent are copied-data seeds only; separately or together they must not be described as v1-complete, v1.0 stable, or sufficient to turn on v1_completion_required.",
     "No surface may be listed as promoted unless its status is promoted.",
@@ -403,12 +404,23 @@
       "public_contract": [],
       "evidence": {
         "target_set": "players-identity-lifecycle-intake",
+        "requires": [
+          "non-protected complete obelisk.core-dump-evidence-pack.v1 manifest",
+          "reviewed UFunction obelisk.reflection-inventory-pack.v1 manifest",
+          "reflection inventory containing ShooterPlayerController.ServerListPlayers and ShooterPlayerController.ServerKickPlayer"
+        ],
+        "non_claims": [
+          "offline ShooterGameServer binary alone is insufficient",
+          "copied core or direct core/bin planning alone is insufficient",
+          "manual FName/GObjects roots alone are insufficient"
+        ],
         "docs": [
           "docs/research/2026-05-31-player-identity-first-evidence.md",
           "docs/research/2026-05-30-player-identity-lifecycle-plan.md"
         ]
       },
       "blockers": [
+        "No reviewed non-protected complete core evidence pack plus UFunction reflection-inventory pack accepted for the missing admin snapshots.",
         "Missing sanitized ServerListPlayers snapshot.",
         "Missing sanitized ServerKickPlayer snapshot.",
         "No accepted login/logout lifecycle anchors.",

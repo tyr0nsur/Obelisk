@@ -29,6 +29,12 @@ PLAYER_IDENTITY_TARGET_SET = "players-identity-lifecycle-intake"
 PLAYER_IDENTITY_TARGETS = tuple(
     schema_target_list(PLAYER_IDENTITY_TARGET_SET, "obelisk.ufunction-chain.snapshot.v1")
 )
+DIRECT_PLAYER_IDENTITY_GATE_TARGETS = frozenset(
+    (
+        "ShooterPlayerController.ServerListPlayers",
+        "ShooterPlayerController.ServerKickPlayer",
+    )
+)
 REDACTED_FUNCTION_KEYS = {
     "family",
     "function_flags",
@@ -228,8 +234,10 @@ def require_player_identity_target_set_scope(
     inventory_path: Path,
     inventory: dict[str, object],
     requested_target_sets: list[str],
+    requested_targets: list[str],
 ) -> None:
-    if PLAYER_IDENTITY_TARGET_SET not in requested_target_sets:
+    requested_player_identity_targets = player_identity_targets_from_requests(requested_targets)
+    if PLAYER_IDENTITY_TARGET_SET not in requested_target_sets and not requested_player_identity_targets:
         return
 
     require_player_identity_core_evidence_pack(manifest_path, manifest)
@@ -282,6 +290,16 @@ def require_player_identity_target_set_scope(
             f"missing_targets={','.join(missing_targets)} "
             f"expected_targets={','.join(PLAYER_IDENTITY_TARGETS)})"
         )
+
+
+def player_identity_targets_from_requests(requested_targets: list[str]) -> list[str]:
+    matched: set[str] = set()
+    for target in requested_targets:
+        _, outer, name = focal_planner.parse_exact_target(target)
+        short_target = f"{outer}.{name}"
+        if short_target in DIRECT_PLAYER_IDENTITY_GATE_TARGETS:
+            matched.add(short_target)
+    return sorted(matched)
 
 
 def require_player_identity_core_evidence_pack(manifest_path: Path, manifest: dict[str, object]) -> None:
@@ -388,6 +406,7 @@ def build_plan(args: argparse.Namespace) -> dict[str, object]:
         inventory_path,
         inventory,
         target_source["target_sets"],  # type: ignore[arg-type]
+        targets,
     )
 
     payload = focal_planner.focal_snapshot_plan(

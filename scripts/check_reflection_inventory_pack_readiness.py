@@ -367,10 +367,15 @@ def manifest_scope_blockers(manifest_path: Path, manifest: dict[str, Any]) -> li
         )
 
     identity = manifest.get("artifact_identity")
+    artifact_sha: str | None = None
     if not isinstance(identity, dict) or identity.get("artifact_kind") != "offline_core":
         blockers.append(reason("wrong_target_scope", path=str(manifest_path), field="artifact_identity.artifact_kind"))
-    elif not isinstance(identity.get("artifact_sha256"), str) or SHA256_RE.fullmatch(str(identity.get("artifact_sha256"))) is None:
-        blockers.append(reason("wrong_target_scope", path=str(manifest_path), field="artifact_identity.artifact_sha256"))
+    else:
+        raw_artifact_sha = identity.get("artifact_sha256")
+        if not isinstance(raw_artifact_sha, str) or SHA256_RE.fullmatch(raw_artifact_sha) is None:
+            blockers.append(reason("wrong_target_scope", path=str(manifest_path), field="artifact_identity.artifact_sha256"))
+        else:
+            artifact_sha = raw_artifact_sha
     for field in ("capture_id", "evidence_pack_id"):
         if not isinstance(identity, dict) or not isinstance(identity.get(field), str) or not identity.get(field):
             blockers.append(reason("wrong_target_scope", path=str(manifest_path), field=f"artifact_identity.{field}"))
@@ -388,6 +393,20 @@ def manifest_scope_blockers(manifest_path: Path, manifest: dict[str, Any]) -> li
         blockers.append(reason("wrong_target_scope", path=str(manifest_path), field="blockers", recorded=pack_blockers))
 
     core = manifest.get("core")
+    core_sha = core.get("sha256") if isinstance(core, dict) else None
+    if not isinstance(core_sha, str) or SHA256_RE.fullmatch(core_sha) is None:
+        blockers.append(reason("wrong_target_scope", path=str(manifest_path), field="core.sha256"))
+    elif artifact_sha is not None and core_sha != artifact_sha:
+        blockers.append(
+            reason(
+                "wrong_target_scope",
+                path=str(manifest_path),
+                field="core.sha256",
+                recorded=core_sha,
+                expected=artifact_sha,
+                detail="does_not_match_artifact_identity",
+            )
+        )
     core_path_raw = core.get("path") if isinstance(core, dict) else None
     if not isinstance(core_path_raw, str) or not core_path_raw:
         blockers.append(reason("wrong_target_scope", path=str(manifest_path), field="core.path"))
