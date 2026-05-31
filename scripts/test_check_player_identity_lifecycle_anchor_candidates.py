@@ -285,8 +285,8 @@ class PlayerIdentityLifecycleAnchorCandidateTests(unittest.TestCase):
         self.assertIn("lifecycle_acceptance_summary_mismatch", report["blockers"])
         self.assertIn("lifecycle_acceptance_targets_mismatch", report["blockers"])
         self.assertIn("safety_accepted_anchor_count_mismatch", report["blockers"])
-        self.assertEqual(report["accepted_start_targets"], ["ShooterPlayerController.ServerListPlayers"])
-        self.assertEqual(report["accepted_end_targets"], ["ShooterPlayerController.ServerKickPlayer"])
+        self.assertEqual(report["accepted_start_targets"], [])
+        self.assertEqual(report["accepted_end_targets"], [])
 
     def test_rejects_principal_invalidation_semantics_overclaim(self) -> None:
         payload = manifest()

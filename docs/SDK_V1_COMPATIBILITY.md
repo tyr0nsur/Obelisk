@@ -27,7 +27,7 @@ Those blockers must be promoted or deliberately excluded in the release statemen
 
 A pre-v1 Foundation/Plugin Hub seed can support lifecycle/config/logging,
 descriptor/catalog metadata, installed-SDK consumers, and owner-token process-local
-timers. That seed is useful for contributors, but pre-identity production seeds are not
+timers. That seed is useful for contributors, but pre-identity release-supported seeds are not
 enough for v1 completion and are not a `v1.0` complete SDK claim.
 Copied chat and gameplay-policy examples are experimental copied-data patterns only.
 `GameplayPolicyEvent` and `ChatMessageEvent`, separately or together, must not be
@@ -63,7 +63,7 @@ owner-token callback lifetime, process-local timers, and descriptor metadata:
 - process-local `RegisterTimerWithOwnerTokenHandle` and `UnregisterTimerWithOwnerToken`;
 - `DescribeResourceKind` and `DescribeGameplayPolicyEventKind`.
 
-These are production seed surfaces. They do not imply hot reload of Obelisk itself,
+These are release-supported seed surfaces. They do not imply hot reload of Obelisk itself,
 background ingress without shutdown proof, cluster scheduler state, gameplay timers,
 resource identity, lookup, mutation, or return override.
 
@@ -262,6 +262,6 @@ player progression/engrams, economy, mobility, and operator ingress/storage each
 narrow copied C ABI surface or an explicit named exclusion.
 
 Passing runtime/core-first RC gates, shipping the promoted foundation, or proving
-pre-identity production seed usefulness is insufficient for `v1.0 stable` until the
+pre-identity release-supported seed usefulness is insufficient for `v1.0 stable` until the
 blocker list is promoted or explicitly named as excluded/post-v1 in the release
 statement.

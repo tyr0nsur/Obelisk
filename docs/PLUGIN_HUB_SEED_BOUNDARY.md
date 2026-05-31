@@ -10,7 +10,7 @@ eventually need.
 
 Every proposal must use one label:
 
-- `production seed`: uses only lifecycle/config/logging, descriptor/catalog reads, or
+- `release-supported seed`: uses only lifecycle/config/logging, descriptor/catalog reads, or
   process-local timers from the current public C ABI.
 - `experimental pattern`: passively consumes copied `ChatMessageEvent` or
   `GameplayPolicyEvent` data as a labeled example, without production support.
@@ -18,7 +18,7 @@ Every proposal must use one label:
 
 ## Production Seeds Today
 
-Production seeds are limited to:
+Release-supported seeds are limited to:
 
 - lifecycle, config, logging, metadata, and shutdown hygiene;
 - descriptor/catalog consumers;

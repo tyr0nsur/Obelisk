@@ -17,7 +17,7 @@ on contributors, plugin authors, operators, and reproducible research.
 ## Plugin Author
 
 Start with the capability matrix when deciding what a plugin can honestly build today.
-The current production-supported seeds are lifecycle/config/logging, descriptor/catalog
+The current release-supported seeds are lifecycle/config/logging, descriptor/catalog
 consumers, and process-local timers. Copied chat parsers and `GameplayPolicyEvent`
 auditors are experimental pattern examples only, not production command/chat/policy
 SDKs. Anything that needs identity, lookup, mutation, replies/send-chat, permissions,

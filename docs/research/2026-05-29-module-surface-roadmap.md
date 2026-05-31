@@ -91,7 +91,7 @@ only; they do not turn target-set labels into public SDK names.
 
 Roadmap-to-Plugin-Hub alignment for contributors:
 
-- `hub foundation` is the only production seed lane now, and it means current-ABI
+- `hub foundation` is the only release-supported seed lane now, and it means current-ABI
   lifecycle/config/logging, descriptor/catalog, timer, packaging, and fail-closed
   capability work only.
 - `gameplay policy backing` protects the existing copied/redacted `GameplayPolicyEvent`

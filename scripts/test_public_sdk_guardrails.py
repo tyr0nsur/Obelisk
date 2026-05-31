@@ -1495,7 +1495,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             {
                 surface["id"]
                 for surface in manifest["surfaces"]
-                if surface.get("support_tier") == "production seed"
+                if surface.get("support_tier") == "release-supported seed"
             },
             production_seed_ids,
         )
@@ -1511,8 +1511,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         release_guardrails = normalized(" ".join(manifest["release_guardrails"]))
         for term in (
-            "Before identity/principal is promoted, production-safe Plugin Hub seeds are limited to lifecycle/config/logging, descriptors, and process-local timers",
-            "those pre-identity production seeds are not enough for v1 completion",
+            "Before identity/principal is promoted, release-supported Plugin Hub seeds are limited to lifecycle/config/logging, descriptors, and process-local timers",
+            "those pre-identity release-supported seeds are not enough for v1 completion",
             "passive chat parsing and plugin-local routing remain promoted-experimental-only",
             "GameplayPolicyEvent and ChatMessageEvent are copied-data seeds only; separately or together they must not be described as v1-complete, v1.0 stable, or sufficient to turn on v1_completion_required",
         ):
@@ -1818,7 +1818,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "installed SDK package shape",
             "player identity, permissions/admin, commands/replies",
             "before `v1_completion_required` can become true",
-            "pre-identity production seeds are not enough for v1 completion",
+            "pre-identity release-supported seeds are not enough for v1 completion",
             "structure census/build policy",
             "gameplay modules including buffs",
             "Gameplay/server tick callbacks",
@@ -1885,7 +1885,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "Lifecycle ops recovery is tracked as `obelisk.lifecycle_ops_recovery.v1`",
             "plugin watchdogs, hot plugin reload, Obelisk hot reload, process restart, server recovery API, operator reload commands, detached-worker ingress, and restart-state recovery are excluded or post-v1",
             "Passing runtime/core-first RC gates",
-            "pre-identity production seed usefulness is insufficient for `v1.0 stable`",
+            "pre-identity release-supported seed usefulness is insufficient for `v1.0 stable`",
             "blocker list is promoted or explicitly named as excluded/post-v1",
             "mutation",
             "return override",
@@ -2678,7 +2678,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         required = (
             "post-RC contributor seed for the current ABI, not a change to the published `v0.1.0-rc.2` tag",
-            "Post-RC production-supported seed work is limited to lifecycle/config/logging skeletons",
+            "Post-RC release-supported seed work is limited to lifecycle/config/logging skeletons",
             "Copied `ChatMessageEvent` parsing and copied `GameplayPolicyEvent` auditing remain experimental seed patterns only",
             "not production Plugin Hub modules, command/chat SDKs, policy-enforcement SDKs, or evidence of a new ABI",
             "does not add public symbols, structs, callbacks, capabilities, or gameplay modules",
@@ -2700,7 +2700,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "The pre-v1 Plugin Hub package contract is an intake boundary",
             "not a registry implementation, a machine-readable manifest\nschema, a compatibility promise, or v1 completion evidence",
             "`plugin_id`, display name, plugin version, minimum Obelisk SDK\nline, declared support tier, used capabilities, config path, exported ABI entry points",
-            "Acceptance for a production seed requires building against an installed SDK",
+            "Acceptance for a release-supported seed requires building against an installed SDK",
             "`find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)`",
             "hidden default symbol visibility, no private Obelisk headers",
             "fail-closed `struct_size` and\ncapability checks, safe-disabled config defaults, owner-token cleanup, and idempotent\nshutdown",
@@ -2718,7 +2718,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         required = (
             "what a plugin can honestly build today",
-            "current production-supported seeds are lifecycle/config/logging, descriptor/catalog consumers, and process-local timers",
+            "current release-supported seeds are lifecycle/config/logging, descriptor/catalog consumers, and process-local timers",
             "Copied chat parsers and `GameplayPolicyEvent` auditors are experimental pattern examples only",
             "not production command/chat/policy SDKs",
             "identity, lookup, mutation, replies/send-chat, permissions, storage, RCON, inventory/item APIs, or structure enforcement stays blocked until promoted",
@@ -2748,17 +2748,17 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             (foundation, "Add process-local timers"),
             (foundation, "Keep passive copied chat parsing experimental and plugin-local only"),
             (foundation, "Keep copied policy auditors experimental"),
-            (foundation, "Only lifecycle/config/logging, descriptor/catalog, and process-local timer examples are\nproduction-supported seeds after the RC"),
+            (foundation, "Only lifecycle/config/logging, descriptor/catalog, and process-local timer examples are\nrelease-supported seeds after the RC"),
             (foundation, "Copied chat parsers and copied policy auditors\nmay demonstrate patterns, but they remain experimental"),
             (matrix, "## Post-v0.1 Creator Ladder"),
-            (matrix, "Production-supported seed lanes"),
+            (matrix, "Release-supported seed lanes"),
             (matrix, "Experimental pattern examples only"),
             (matrix, "Descriptor consumers"),
             (matrix, "Passive chat text parsers"),
             (matrix, "Timer utilities"),
             (matrix, "Copied policy auditors"),
             (matrix, "## Post-RC Support Boundary"),
-            (matrix, "Post-RC production-supported Plugin Hub seed work is limited to lifecycle/config/logging"),
+            (matrix, "Post-RC release-supported Plugin Hub seed work is limited to lifecycle/config/logging"),
             (matrix, "Copied `ChatMessageEvent` parsing and\ncopied `GameplayPolicyEvent` auditing may remain useful experimental seed examples"),
             (matrix, "Those three are seed examples only, not production Plugin Hub modules"),
         ):
@@ -2780,8 +2780,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             (timer_doc, "`ObeliskApi::struct_size` through `UnregisterTimerWithOwnerToken`"),
             (timer_doc, "non-null timer\nregister/unregister function pointers"),
             (timer_doc, "non-zero `plugin_owner_token` before any\nregistration"),
-            (plugins_readme, "Production-supported seed examples are limited to lifecycle/config/logging, descriptor\nreaders, and process-local timer utilities"),
-            (plugins_readme, "Those production-supported seeds still must\nkeep the shared safe default config posture"),
+            (plugins_readme, "Release-supported seed examples are limited to lifecycle/config/logging, descriptor\nreaders, and process-local timer utilities"),
+            (plugins_readme, "Those release-supported seeds still must\nkeep the shared safe default config posture"),
             (plugins_readme, "raw `ProcessEvent` callbacks\n  require explicit debug gates"),
             (plugins_readme, "`oPolicyAudit` demonstrates the promoted `GameplayPolicyEvent` callback family"),
             (plugins_readme, "storage/database services, webhooks, inventory/item mutation"),
@@ -2819,7 +2819,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         for required in (
             "passive copied chat auditing/parsing is a candidate for promotion review before copied policy auditing, not a promised graduation path",
             "The first useful Plugin Hub seed examples should be built from surfaces that already exist",
-            "Those are the production-supported seed lanes",
+            "Those are the release-supported seed lanes",
             "Copied `GameplayPolicyEvent` auditors and\ncopied `ChatMessageEvent` parsers may still be useful experimental pattern examples",
             "must not claim policy enforcement, general chat,\ncommands, identity, replies, moderation, send-chat, or production Plugin Hub availability",
         ):
@@ -5730,7 +5730,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             rows[columns[1]] = columns[2]
 
         expected_tiers = {
-            "Lifecycle, descriptors, logging, config, local timers": "production seed available",
+            "Lifecycle, descriptors, logging, config, local timers": "release-supported seed available",
             "Passive chat parsing and plugin-local text routing": "experimental seed only",
             "Copied structure/item policy auditing": "experimental seed only",
             "Timed notices and chat broadcasts": "blocked",
@@ -5750,7 +5750,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertEqual(rows, expected_tiers)
         for required in (
             "## Support Tier Legend",
-            "`production seed available`: supported for narrow Obelisk-native examples",
+            "`release-supported seed available`: supported for narrow Obelisk-native examples",
             "`experimental seed only`: allowed for explicitly labeled pattern examples",
             "not supported as production Plugin Hub modules or as general chat, command, policy, structure, inventory, identity, mutation, or enforcement SDKs",
             "`blocked` and `blocked except experimental auditing`: backlog demand only",
@@ -5784,29 +5784,29 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         required = {
             "foundation": (
                 "## Contributor Intake Checklist",
-                "Production seed now",
+                "Release-supported seed now",
                 "Experimental pattern only",
                 "Blocked backlog",
                 "ArkApi/AseApi/NextGenPlugins demand can justify keeping a blocked idea visible",
-                "but it cannot reclassify that idea as a production seed or experimental pattern",
+                "but it cannot reclassify that idea as a release-supported seed or experimental pattern",
             ),
             "matrix": (
                 "## Foundation-To-Roadmap Alignment",
-                "`hub foundation` means production seed work",
+                "`hub foundation` means release-supported seed work",
                 "`gameplay policy backing` means preserving evidence and tests for already promoted",
                 "`internal recognizer planning` means docs, fixtures, and offline copied-bool planning",
                 "only a named promotion gate can move a row's support tier",
             ),
             "roadmap": (
                 "Roadmap-to-Plugin-Hub alignment for contributors",
-                "`hub foundation` is the only production seed lane now",
+                "`hub foundation` is the only release-supported seed lane now",
                 "`gameplay policy backing` protects the existing copied/redacted `GameplayPolicyEvent`",
                 "`internal recognizer planning` stays offline/test-only",
                 "append-only ABI/consumer-test plan",
             ),
             "research_readme": (
                 "Plugin Hub contributor intake uses the same three buckets as the public matrix",
-                "production seed now for lifecycle/config/logging, descriptor/catalog, timer, packaging",
+                "release-supported seed now for lifecycle/config/logging, descriptor/catalog, timer, packaging",
                 "experimental pattern only for passive copied chat or copied policy examples",
                 "blocked backlog for commands, identity, persistence, operator ingress, mutation",
                 "cannot change the support tier without a named promotion gate",
@@ -5870,10 +5870,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 "not sources for code, offsets, control flow, parsers, schemas, or implementation behavior",
             ),
             REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md": (
-                "Post-RC production-supported seed work is limited to lifecycle/config/logging skeletons",
+                "Post-RC release-supported seed work is limited to lifecycle/config/logging skeletons",
                 "Copied `ChatMessageEvent` parsing and copied `GameplayPolicyEvent` auditing remain experimental seed patterns only",
                 "Foundation V1 is enough for small, honest Plugin Hub seeds when the support tier is explicit",
-                "Production-supported seeds:",
+                "Release-supported seeds:",
                 "process-local timer utilities",
                 "This list names ABI primitives, not Plugin Hub module tiers",
                 "Experimental pattern examples only:",
@@ -5883,15 +5883,15 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 "Foundation V1 does not provide or imply",
             ),
             REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md": (
-                "Post-RC production-supported Plugin Hub seed work is limited to lifecycle/config/logging",
+                "Post-RC release-supported Plugin Hub seed work is limited to lifecycle/config/logging",
                 "`experimental seed only`: allowed for explicitly labeled pattern examples",
                 "not supported as production Plugin Hub modules",
                 "keep the support tier explicit",
-                "Production-supported seed lanes",
+                "Release-supported seed lanes",
                 "Experimental pattern examples only",
             ),
             REPO_ROOT / "plugins" / "README.md": (
-                "The production-supported additions after `v0.1` are descriptor readers and process-local timer utilities",
+                "The release-supported additions after `v0.1` are descriptor readers and process-local timer utilities",
                 "Passive copied-chat parsers and copied policy auditors are experimental pattern examples only",
                 "promoted in the public ABI, recorded in the capability matrix, and documented with its own evidence gate",
                 "These examples observe copied data only",
@@ -5911,7 +5911,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "small SDK seed set for production contributors",
         )
         forbidden_production_experimental_mix = re.compile(
-            r"\bproduction-supported\b[^.!?\n;]*(?:copied[- ]chat|copied\s+policy|"
+            r"\brelease-supported\b[^.!?\n;]*(?:copied[- ]chat|copied\s+policy|"
             r"ChatMessageEvent|GameplayPolicyEvent|policy\s+auditors?|chat\s+parsers?)",
             re.IGNORECASE,
         )

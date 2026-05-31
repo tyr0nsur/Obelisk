@@ -174,7 +174,7 @@ SDK, Items SDK, `StructureEvents`, build-policy API, identity/lookup, `ResourceH
 mutation, return override, runtime observation, or raw UE parameter access.
 
 Plugin Hub contributor intake uses the same three buckets as the public matrix:
-production seed now for lifecycle/config/logging, descriptor/catalog, timer, packaging,
+release-supported seed now for lifecycle/config/logging, descriptor/catalog, timer, packaging,
 and fail-closed capability work; experimental pattern only for passive copied chat or
 copied policy examples; blocked backlog for commands, identity, persistence, operator
 ingress, mutation, enforcement, `ResourceHandle`, raw UE access, or cross-instance state.

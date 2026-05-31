@@ -178,6 +178,6 @@ The minimum design cannot move beyond this note until all of these are resolved:
 ## Non-Claims
 
 This note does not promote `obelisk.permissions_admin.v1`. It does not make permissions a
-Foundation V1 or Plugin Hub production seed. It does not authorize runtime work, server
+Foundation V1 or Plugin Hub release-supported seed. It does not authorize runtime work, server
 access, new target sets, public ABI symbols, headers, tests, Discord updates, Git actions,
 or command/reply APIs.

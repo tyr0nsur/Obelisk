@@ -20,7 +20,7 @@ published `v0.1.0-rc.2` tag. It explains what small native examples can honestly
 while module lanes such as commands, permissions, inventory, structures, players,
 missions, transfers, and storage services remain planning-only until separately promoted.
 
-Post-RC production-supported seed work is limited to lifecycle/config/logging skeletons,
+Post-RC release-supported seed work is limited to lifecycle/config/logging skeletons,
 descriptor/catalog consumers, and process-local timer utilities that use the current C ABI
 with fail-closed capability checks. Copied `ChatMessageEvent` parsing and copied
 `GameplayPolicyEvent` auditing remain experimental seed patterns only; they are not
@@ -49,10 +49,10 @@ A candidate package should contain one Linux shared object, a README, license te
 config example or schema when the plugin reads config. The package metadata must be
 explicit enough for review: `plugin_id`, display name, plugin version, minimum Obelisk SDK
 line, declared support tier, used capabilities, config path, exported ABI entry points,
-and whether the package is a production seed, experimental pattern, or blocked backlog
+and whether the package is a release-supported seed, experimental pattern, or blocked backlog
 prototype.
 
-Acceptance for a production seed requires building against an installed SDK with
+Acceptance for a release-supported seed requires building against an installed SDK with
 `find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)`, linking only
 `Obelisk::obelisk_sdk`, hidden default symbol visibility, no private Obelisk headers, no
 raw UE pointers or ArkApi implementation patterns, fail-closed `struct_size` and
@@ -84,7 +84,7 @@ Foundation V1 contains only the public ABI already exposed by `ObeliskApi.h`:
 - raw `ProcessEvent` callbacks only as debug-gated runtime plumbing, not as Plugin Hub API
 
 This list names ABI primitives, not Plugin Hub module tiers. Use the support-tier split
-below before presenting any example as production-supported, experimental, or blocked.
+below before presenting any example as release-supported, experimental, or blocked.
 
 Plugins should use `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md` to decide which intents are safe
 today. If an intent is marked "not ready", a plugin must not fill the gap with raw UE
@@ -95,7 +95,7 @@ implementation patterns.
 
 Classify every Plugin Hub proposal before writing code:
 
-1. Production seed now: the proposal uses only lifecycle/config/logging,
+1. Release-supported seed now: the proposal uses only lifecycle/config/logging,
    descriptor/catalog reads, or process-local timers from the current C ABI.
 2. Experimental pattern only: the proposal passively consumes copied
    `ChatMessageEvent` or `GameplayPolicyEvent` data and clearly avoids identity, lookup,
@@ -107,7 +107,7 @@ Classify every Plugin Hub proposal before writing code:
    or cross-instance state.
 
 ArkApi/AseApi/NextGenPlugins demand can justify keeping a blocked idea visible in the
-matrix or a research note, but it cannot reclassify that idea as a production seed or
+matrix or a research note, but it cannot reclassify that idea as a release-supported seed or
 experimental pattern.
 
 ## C ABI Contract
@@ -171,7 +171,7 @@ or shared across maps, processes, or clusters.
 Foundation V1 is enough for small, honest Plugin Hub seeds when the support tier is
 explicit:
 
-Production-supported seeds:
+Release-supported seeds:
 
 - lifecycle, config, and logging examples;
 - descriptor/catalog readers;
@@ -186,7 +186,7 @@ Experimental pattern examples only:
   send-chat, replies, or a public command SDK/router.
 
 Only lifecycle/config/logging, descriptor/catalog, and process-local timer examples are
-production-supported seeds after the RC. Copied chat parsers and copied policy auditors
+release-supported seeds after the RC. Copied chat parsers and copied policy auditors
 may demonstrate patterns, but they remain experimental and are not promises for complete
 economy, permissions, homes, kits, shops, RCON, inventory, item, dino, tribe, mission,
 transfer, storage/database, webhook, or structure modules.

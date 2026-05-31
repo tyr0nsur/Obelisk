@@ -26,6 +26,7 @@ REQUIRED_KEYS = (
     "expected_image_base",
     "expected_window_count",
 )
+UNKNOWN_ARG_MARKER = "unknown_arg"
 ZERO_IMAGE_BASE_PATTERNS = (
     re.compile(r"\bexpected_image_base\s*=\s*0x0\b"),
     re.compile(r"\bimage_base\s*=\s*0x0\b"),
@@ -48,13 +49,22 @@ def iter_text_files(root: Path) -> list[Path]:
     ]
 
 
+def display_path(path: Path) -> str:
+    try:
+        return str(path.relative_to(REPO_ROOT))
+    except ValueError:
+        return str(path)
+
+
 def validate_script(path: Path, blockers: list[str]) -> None:
     text = path.read_text(encoding="utf-8")
     for key in REQUIRED_KEYS:
         if f'"{key}"' not in text:
-            blockers.append(f"{path.relative_to(REPO_ROOT)}: missing {key} preflight key")
+            blockers.append(f"{display_path(path)}: missing {key} preflight key")
+    if UNKNOWN_ARG_MARKER not in text:
+        blockers.append(f"{display_path(path)}: unknown preflight keys are not explicitly rejected")
     if "must_not_be_zero" not in text or "expectedImageBase == 0" not in text:
-        blockers.append(f"{path.relative_to(REPO_ROOT)}: expected_image_base zero is not explicitly rejected")
+        blockers.append(f"{display_path(path)}: expected_image_base zero is not explicitly rejected")
 
 
 def validate_scan_roots(roots: tuple[Path, ...], blockers: list[str]) -> None:

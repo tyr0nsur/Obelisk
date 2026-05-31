@@ -2,7 +2,7 @@
 
 This matrix is a contributor-facing planning aid for future Obelisk Plugin Hub work. It
 maps common modder intents to the public Obelisk surface that is safe today and separates
-post-RC production seed work from experimental copied-data examples.
+post-RC release-supported seed work from experimental copied-data examples.
 `PLUGIN_HUB_FOUNDATION_V1.md` defines the minimal foundation contract that this matrix
 builds on.
 
@@ -24,7 +24,7 @@ compatibility target, or an ABI reference.
 
 ## Post-RC Support Boundary
 
-Post-RC production-supported Plugin Hub seed work is limited to lifecycle/config/logging
+Post-RC release-supported Plugin Hub seed work is limited to lifecycle/config/logging
 skeletons, descriptor/catalog consumers, and process-local timer utilities that use the
 current C ABI with fail-closed capability checks. Copied `ChatMessageEvent` parsing and
 copied `GameplayPolicyEvent` auditing may remain useful experimental seed examples, but
@@ -46,7 +46,7 @@ not mistake a partial primitive for a complete Ark server modding framework.
 
 ## Support Tier Legend
 
-- `production seed available`: supported for narrow Obelisk-native examples that use only
+- `release-supported seed available`: supported for narrow Obelisk-native examples that use only
   the current public C ABI, fail-closed capability checks, safe-disabled config, and
   process-local ownership.
 - `experimental seed only`: allowed for explicitly labeled pattern examples that teach
@@ -64,7 +64,7 @@ not mistake a partial primitive for a complete Ark server modding framework.
 
 Start with `PLUGIN_HUB_SEED_BOUNDARY.md` before classifying a proposal.
 
-When selecting a Plugin Hub seed, start only from rows marked `production seed available`.
+When selecting a Plugin Hub seed, start only from rows marked `release-supported seed available`.
 Rows marked `experimental seed only` may be used for clearly labeled pattern examples, not
 production modules. Rows marked `blocked` or `blocked except experimental auditing` should
 produce design notes, evidence plans, or guardrail tests only; do not start first-party
@@ -75,7 +75,7 @@ modules are supported.
 
 For new contributors, the roadmap maps to this matrix in one direction only:
 
-- `hub foundation` means production seed work on lifecycle/config/logging,
+- `hub foundation` means release-supported seed work on lifecycle/config/logging,
   descriptor/catalog consumers, timers, packaging, and fail-closed capability checks.
 - `gameplay policy backing` means preserving evidence and tests for already promoted
   copied/redacted `GameplayPolicyEvent` fields from exact release-readiness target sets
@@ -115,7 +115,7 @@ it does not promise ArkApi plugin compatibility.
 
 | Priority | Category | Post-RC support tier | Safe interpretation |
 | --- | --- | --- | --- |
-| 1 | Lifecycle, descriptors, logging, config, local timers | production seed available | Build native examples around current core primitives; process restart/crash management is not public SDK surface |
+| 1 | Lifecycle, descriptors, logging, config, local timers | release-supported seed available | Build native examples around current core primitives; process restart/crash management is not public SDK surface |
 | 2 | Passive chat parsing and plugin-local text routing | experimental seed only | Use copied `ChatMessageEvent` for plugin-local parsing/routing only; no public command SDK/router, sender identity, replies, permissions, blocking, send-chat, or moderation contract |
 | 3 | Copied structure/item policy auditing | experimental seed only | Use copied `GameplayPolicyEvent` only for observational audits of event kinds from `minimal-second-source-intake`, `item-return-only-policy-slice`, and `structure-observer-intake`; no StructureEvents SDK, Inventory SDK, identity, mutation, enforcement, or return override |
 | 4 | Timed notices and chat broadcasts | blocked | Owner-token timers exist, but public send-chat/broadcast policy is not promoted |
@@ -129,7 +129,7 @@ it does not promise ArkApi plugin compatibility.
 | 12 | Engrams, inventory, item give/remove flows | blocked | Needs player/inventory/item identity, progression or item mutation APIs, rollback, and privacy policy |
 | 13 | Shared persistence, database-backed state, webhook services | blocked | Config files are available only for plugin config; no Obelisk storage service, database schema/migration contract, secret manager, webhook client, or cross-instance persistence API |
 
-`production seed available` means an Obelisk-native plugin can be written and documented
+`release-supported seed available` means an Obelisk-native plugin can be written and documented
 as a supported Plugin Hub seed against the stated current public ABI slice. `experimental
 seed only` means the example can teach copied-data callback patterns, but it should not be
 marketed as a production Plugin Hub module or as general chat, command/router, replies,
@@ -171,7 +171,7 @@ experimental plugin-local `ChatMessageEvent` parsing lane.
 
 ## Current Safe Route
 
-For plugin authors, the stable v0.1.x production seed shape is lifecycle/config/logging,
+For plugin authors, the stable v0.1.x release-supported seed shape is lifecycle/config/logging,
 descriptor-driven discovery, and process-local timers. Stop there for production
 Foundation examples. In this section, `promoted` means a copied, capability-gated ABI
 entry with an exact release-readiness second-source target set can be discovered or
@@ -204,7 +204,7 @@ Installed-SDK consumer seed:
 2. `examples/sdk_timer_plugin` as the installed-SDK timer seed for owner-token scheduled
    work and shutdown cleanup.
 
-Production-supported seed lanes under `plugins/`:
+Release-supported seed lanes under `plugins/`:
 
 1. Lifecycle/config/logging skeletons with safe-disabled config.
 2. Descriptor consumers that print sanitized promoted category/event metadata.
@@ -248,7 +248,7 @@ exist. The minimum installed-SDK consumers are `examples/sdk_minimal_plugin` and
 - descriptor/catalog consumers;
 - process-local timer utilities.
 
-Those are the production-supported seed lanes. Copied `GameplayPolicyEvent` auditors and
+Those are the release-supported seed lanes. Copied `GameplayPolicyEvent` auditors and
 copied `ChatMessageEvent` parsers may still be useful experimental pattern examples, but
 they must be labeled as experimental and must not claim policy enforcement, general chat,
 commands, identity, replies, moderation, send-chat, or production Plugin Hub availability.

@@ -42,7 +42,7 @@ HTTP endpoints, resource identities, lookups, mutations, return overrides, or ra
 ## Adding Creator-Facing Examples
 
 New first-party Plugin Hub seed examples should be small, safe-disabled, and native to the
-current Obelisk C ABI. The production-supported additions after `v0.1` are descriptor
+current Obelisk C ABI. The release-supported additions after `v0.1` are descriptor
 readers and process-local timer utilities. Passive copied-chat parsers and copied policy
 auditors are experimental pattern examples only. The current tree already has examples for
 both buckets, so treat new first-party work as a promotion review or refinement of the
@@ -60,8 +60,8 @@ transfer handling, structure placement enforcement, identity, lookup, replies, s
 moderation, or ArkApi portability until the matching public surface is promoted in the
 public ABI, recorded in the capability matrix, and documented with its own evidence gate.
 
-Production-supported seed examples are limited to lifecycle/config/logging, descriptor
-readers, and process-local timer utilities. Those production-supported seeds still must
+Release-supported seed examples are limited to lifecycle/config/logging, descriptor
+readers, and process-local timer utilities. Those release-supported seeds still must
 keep the shared safe default config posture (`enabled=false`, `allow_all_instances=false`,
 and an empty `instance_allowlist`), fail closed on missing capabilities or callbacks,
 validate instance scoping, unregister owner-token handles on every shutdown or

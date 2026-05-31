@@ -7,6 +7,7 @@ import argparse
 import json
 import re
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -79,6 +80,12 @@ FORBIDDEN_COORDINATE_KEYS = {
     "uobject_address",
     "function_address",
 }
+
+
+@dataclass
+class ManifestValidation:
+    blockers: list[dict[str, Any]]
+    accepted_by_role: dict[str, list[str]]
 
 
 def parse_args() -> argparse.Namespace:
@@ -270,11 +277,12 @@ def validate_anchor(anchor: Any, blockers: list[dict[str, Any]], index: int) -> 
     return role if isinstance(role, str) else None, target if isinstance(target, str) else None, accepted
 
 
-def validate_manifest(payload: dict[str, Any], *, promote: bool = False) -> list[dict[str, Any]]:
+def validate_manifest_details(payload: dict[str, Any], *, promote: bool = False) -> ManifestValidation:
     blockers: list[dict[str, Any]] = []
+    accepted_by_role: dict[str, list[str]] = {"session_start": [], "session_end": []}
     if payload.get("schema") != SCHEMA:
         add(blockers, "schema_mismatch", "$.schema")
-        return blockers
+        return ManifestValidation(blockers, accepted_by_role)
     if payload.get("artifact_status") != "candidate_only":
         add(blockers, "status_not_candidate_only", "$.artifact_status")
     if payload.get("readiness_classification") != "planning_only":
@@ -289,7 +297,6 @@ def validate_manifest(payload: dict[str, Any], *, promote: bool = False) -> list
 
     validate_artifact_identity(payload, blockers)
 
-    accepted_by_role: dict[str, list[str]] = {"session_start": [], "session_end": []}
     anchors = payload.get("candidate_anchors")
     if not isinstance(anchors, list):
         add(blockers, "candidate_anchors_not_list", "$.candidate_anchors")
@@ -353,34 +360,38 @@ def validate_manifest(payload: dict[str, Any], *, promote: bool = False) -> list
         add(blockers, "path_or_coordinate_leakage", trail, field=key)
     if promote:
         add(blockers, "promote_mode_players_identity_lifecycle_anchor_candidates_candidate_only", "$")
-    return blockers
+    return ManifestValidation(blockers, {role: sorted(targets) for role, targets in accepted_by_role.items()})
 
 
-def build_report(payload: dict[str, Any], blockers: list[dict[str, Any]], *, promote: bool) -> dict[str, Any]:
-    lifecycle = payload.get("lifecycle_acceptance")
-    accepted_start_targets = lifecycle.get("accepted_start_targets") if isinstance(lifecycle, dict) else []
-    accepted_end_targets = lifecycle.get("accepted_end_targets") if isinstance(lifecycle, dict) else []
+def validate_manifest(payload: dict[str, Any], *, promote: bool = False) -> list[dict[str, Any]]:
+    return validate_manifest_details(payload, promote=promote).blockers
+
+
+def build_report(payload: dict[str, Any], validation: ManifestValidation, *, promote: bool) -> dict[str, Any]:
+    accepted_start_targets = validation.accepted_by_role["session_start"]
+    accepted_end_targets = validation.accepted_by_role["session_end"]
     return {
         "schema": REPORT_SCHEMA,
         "input_schema": payload.get("schema"),
         "mode": "promote" if promote else "consume",
-        "ready": not blockers,
+        "ready": not validation.blockers,
         "candidate_only": payload.get("artifact_status") == "candidate_only",
         "promotion_ready": False,
         "public_sdk_ready": False,
         "runtime_ready": False,
-        "accepted_start_targets": accepted_start_targets if isinstance(accepted_start_targets, list) else [],
-        "accepted_end_targets": accepted_end_targets if isinstance(accepted_end_targets, list) else [],
-        "blockers": [blocker["reason"] for blocker in blockers],
-        "blocker_details": blockers,
+        "accepted_start_targets": accepted_start_targets,
+        "accepted_end_targets": accepted_end_targets,
+        "blockers": [blocker["reason"] for blocker in validation.blockers],
+        "blocker_details": validation.blockers,
     }
 
 
 def main() -> int:
     args = parse_args()
     payload = load_json(args.manifest)
-    blockers = validate_manifest(payload, promote=args.promote)
-    report = build_report(payload, blockers, promote=args.promote)
+    validation = validate_manifest_details(payload, promote=args.promote)
+    blockers = validation.blockers
+    report = build_report(payload, validation, promote=args.promote)
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
     elif blockers:
