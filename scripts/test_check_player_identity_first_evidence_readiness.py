@@ -80,6 +80,13 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                 "ShooterPlayerController.ServerListPlayers",
             ],
         )
+        self.assertEqual(
+            payload["artifact_chain"]["offline_inputs"]["status"],
+            "offline_binary_and_core_like_inputs_missing",
+        )
+        self.assertTrue(payload["artifact_chain"]["offline_inputs"]["artifact_root_only"])
+        self.assertEqual(payload["artifact_chain"]["offline_inputs"]["server_root_excluded"], "/servidor/ark")
+        self.assertFalse(payload["artifact_chain"]["offline_inputs"]["ready_to_build_core_evidence_pack"])
         self.assertTrue(payload["artifact_chain"]["blocked_before_focal_planning"])
         self.assertFalse(payload["artifact_chain"]["ready_to_plan_admin_snapshots"])
         self.assertEqual(
@@ -169,6 +176,25 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertEqual(diagnosis["reason_counts"]["artifact_pack_container_not_reflection_inventory"], 1)
         self.assertIn("scanned_paths", diagnosis["reason_examples"]["scriptstruct_pack_not_reflection_inventory"])
         self.assertIn("check_reflection_inventory_pack_readiness.py", diagnosis["next_useful_command"])
+
+    def test_offline_input_diagnosis_reports_binary_and_core_like_files_without_accepting_pack(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            binary_dir = root / "offline-binaries" / "fake"
+            binary_dir.mkdir(parents=True)
+            (binary_dir / "ShooterGameServer").write_bytes(b"not the real server")
+            (root / "core.1234").write_bytes(b"not a real core")
+
+            result = self.run_checker(["--artifact-root", str(root)], check=False)
+
+        payload = json.loads(result.stdout)
+        offline_inputs = payload["artifact_chain"]["offline_inputs"]
+        self.assertEqual(offline_inputs["status"], "offline_binary_present_hash_mismatch")
+        self.assertEqual(len(offline_inputs["shooter_game_server_candidates"]), 1)
+        self.assertFalse(offline_inputs["shooter_game_server_candidates"][0]["matches_current_binary"])
+        self.assertEqual(len(offline_inputs["core_like_candidates"]), 1)
+        self.assertFalse(offline_inputs["ready_to_build_core_evidence_pack"])
+        self.assertIn("file presence only", " ".join(offline_inputs["non_claims"]))
 
 
 if __name__ == "__main__":

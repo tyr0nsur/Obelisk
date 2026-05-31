@@ -719,7 +719,7 @@ class BuildReflectionInventoryPackTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("duplicate --plan-target: ShooterPlayerController.ServerSendChatMessage", result.stderr)
 
-    def test_player_identity_snapshot_target_set_requires_recorded_target_set_coverage(self) -> None:
+    def test_player_identity_snapshot_target_set_must_use_standalone_planner(self) -> None:
         result = self.run_builder(
             [
                 "--core",
@@ -746,11 +746,11 @@ class BuildReflectionInventoryPackTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "--plan-snapshot-target-set players-identity-lifecycle-intake requires --target-set",
+            "player identity target-set focal snapshots must be planned with exact",
             result.stderr,
         )
 
-    def test_direct_player_identity_plan_target_requires_recorded_target_set_coverage(self) -> None:
+    def test_direct_player_identity_plan_target_must_use_standalone_planner(self) -> None:
         result = self.run_builder(
             [
                 "--core",
@@ -777,7 +777,7 @@ class BuildReflectionInventoryPackTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "--plan-target for player identity targets requires --target-set players-identity-lifecycle-intake",
+            "player identity focal snapshots must be planned with scripts/plan_ufunction_focal_snapshots.py",
             result.stderr,
         )
         self.assertNotIn("does not exist", result.stderr)

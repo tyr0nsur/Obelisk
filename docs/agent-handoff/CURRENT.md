@@ -133,6 +133,19 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   false. Its `next_operator_recipe.forbidden_next_commands` explicitly rejects
   `/servidor/ark` IO for that recipe, broad player-identity target-set focal planning,
   direct `--core` mode, `--skip-core-sha256`, and `--allow-partial-gdb`.
+- The player-identity preflight now also records artifact-root-only offline input
+  diagnosis. The current durable artifact root has a matching offline `ShooterGameServer`
+  for SHA `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`, but no
+  core-like input, no complete `obelisk.core-dump-evidence-pack.v1`, and no accepted
+  `obelisk.reflection-inventory-pack.v1`. `build_reflection_inventory_pack.py` must only
+  build the full `players-identity-lifecycle-intake` inventory from a complete core
+  evidence pack; player-identity focal snapshot planning is reserved for
+  `scripts/plan_ufunction_focal_snapshots.py`, which now requires full matched target-set
+  coverage plus exact `ServerListPlayers` and `ServerKickPlayer` admin rows before command
+  emission.
+- The v1 completion checker rejects duplicate or mixed release-statement records per
+  surface and requires promoted canonical v1 blockers to provide valid surface-specific
+  ABI evidence and SDK-consumer evidence, not just one valid machine-evidence bucket.
 - `obelisk.operator_ingress_storage.v1` is not unlocked by player identity/principal evidence; it remains a separate post-v1 blocker until secret-safe ingress, storage schema/migration, queue drain, audit, encoding, and lifecycle policy are proven or explicitly excluded.
 - `obelisk.player_services_economy_mobility.v1` is a v1 blocker umbrella only, not a future monolithic public API. Future promoted surfaces should split player services, economy/shops/rewards, mobility/homes/teleport, and area policy after identity, permissions, storage/persistence, privacy, audit, rollback, and abuse controls are proven. Economy and mobility require promoted identity/principal, permissions/admin, and storage/persistence; identity alone is insufficient.
 - Player identity focal snapshot planning must start from a complete non-protected `obelisk.reflection-inventory-pack.v1` with `target_set_coverage` for the full 12-target `players-identity-lifecycle-intake` set and rows for `ShooterPlayerController.ServerListPlayers` and `ShooterPlayerController.ServerKickPlayer`. After that pack is reviewed, use `scripts/plan_ufunction_focal_snapshots.py` with exactly two `--target` arguments for `ShooterPlayerController.ServerListPlayers` and `ShooterPlayerController.ServerKickPlayer`; do not use `--target-set players-identity-lifecycle-intake` to emit plans.

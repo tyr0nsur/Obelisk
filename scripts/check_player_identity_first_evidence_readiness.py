@@ -4,11 +4,15 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any
+
+from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -17,6 +21,7 @@ REPORT_SCHEMA = "obelisk.player-identity-first-evidence-readiness.v1"
 PLAYER_IDENTITY_TARGET_SET = "players-identity-lifecycle-intake"
 MISSING_TARGET_PREFIX = "missing_required_target:"
 MAX_DIAGNOSIS_ITEMS = 8
+EXPECTED_SHOOTERGAME_SHA256 = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 REQUIRED_ADMIN_TARGETS = [
     "ShooterPlayerController.ServerKickPlayer",
     "ShooterPlayerController.ServerListPlayers",
@@ -94,6 +99,131 @@ def bounded_values(values: list[Any]) -> dict[str, Any]:
         "items": values[:MAX_DIAGNOSIS_ITEMS],
         "total_count": len(values),
         "omitted_count": len(values) - MAX_DIAGNOSIS_ITEMS,
+    }
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def bounded_artifact_file_scan(root: Path, *, max_depth: int = 6) -> dict[str, Any]:
+    try:
+        reject_symlink_component(root, "--artifact-root")
+        resolved = reject_protected_input_path(root, "--artifact-root")
+    except SystemExit as exc:
+        return {
+            "status": "artifact_root_rejected",
+            "artifact_root_only": True,
+            "error": str(exc),
+            "server_root_excluded": "/servidor/ark",
+            "shooter_game_server_candidates": [],
+            "core_like_candidates": [],
+            "ready_to_build_core_evidence_pack": False,
+        }
+    if not resolved.exists():
+        return {
+            "status": "artifact_root_missing",
+            "artifact_root_only": True,
+            "resolved_root": str(resolved),
+            "server_root_excluded": "/servidor/ark",
+            "shooter_game_server_candidates": [],
+            "core_like_candidates": [],
+            "ready_to_build_core_evidence_pack": False,
+        }
+    if not resolved.is_dir():
+        return {
+            "status": "artifact_root_not_directory",
+            "artifact_root_only": True,
+            "resolved_root": str(resolved),
+            "server_root_excluded": "/servidor/ark",
+            "shooter_game_server_candidates": [],
+            "core_like_candidates": [],
+            "ready_to_build_core_evidence_pack": False,
+        }
+
+    shooter_candidates: list[dict[str, Any]] = []
+    core_candidates: list[dict[str, Any]] = []
+    omitted_shooter = 0
+    omitted_core = 0
+    root_depth = len(resolved.parts)
+    for directory, dirnames, filenames in os.walk(resolved, followlinks=False):
+        current = Path(directory)
+        depth = len(current.parts) - root_depth
+        dirnames[:] = [name for name in dirnames if not (current / name).is_symlink()]
+        if depth >= max_depth:
+            dirnames[:] = []
+        for filename in filenames:
+            path = current / filename
+            if path.is_symlink():
+                continue
+            lower_name = filename.lower()
+            is_shooter = filename == "ShooterGameServer"
+            is_core_like = lower_name == "core" or lower_name.startswith("core.") or lower_name.endswith(".core")
+            if not is_shooter and not is_core_like:
+                continue
+            try:
+                stat = path.stat()
+            except OSError:
+                continue
+            if is_shooter:
+                if len(shooter_candidates) < MAX_DIAGNOSIS_ITEMS:
+                    try:
+                        digest = sha256_file(path)
+                    except OSError as exc:
+                        digest = f"unreadable:{exc}"
+                    shooter_candidates.append(
+                        {
+                            "path": str(path),
+                            "size_bytes": stat.st_size,
+                            "sha256": digest,
+                            "matches_current_binary": digest == EXPECTED_SHOOTERGAME_SHA256,
+                        }
+                    )
+                else:
+                    omitted_shooter += 1
+            if is_core_like:
+                if len(core_candidates) < MAX_DIAGNOSIS_ITEMS:
+                    core_candidates.append(
+                        {
+                            "path": str(path),
+                            "size_bytes": stat.st_size,
+                        }
+                    )
+                else:
+                    omitted_core += 1
+
+    has_matching_binary = any(candidate.get("matches_current_binary") is True for candidate in shooter_candidates)
+    has_core_like = bool(core_candidates)
+    if has_matching_binary and has_core_like:
+        status = "offline_binary_and_core_like_inputs_present"
+    elif has_matching_binary:
+        status = "offline_binary_present_core_like_input_missing"
+    elif shooter_candidates:
+        status = "offline_binary_present_hash_mismatch"
+    elif has_core_like:
+        status = "core_like_input_present_offline_binary_missing"
+    else:
+        status = "offline_binary_and_core_like_inputs_missing"
+
+    return {
+        "status": status,
+        "artifact_root_only": True,
+        "resolved_root": str(resolved),
+        "server_root_excluded": "/servidor/ark",
+        "expected_shooter_game_server_sha256": EXPECTED_SHOOTERGAME_SHA256,
+        "shooter_game_server_candidates": shooter_candidates,
+        "omitted_shooter_game_server_candidates": omitted_shooter,
+        "core_like_candidates": core_candidates,
+        "omitted_core_like_candidates": omitted_core,
+        "ready_to_build_core_evidence_pack": has_matching_binary and has_core_like,
+        "non_claims": [
+            "file presence only; core-like filenames are not accepted core evidence packs",
+            "does not read /servidor/ark, attach to processes, execute scanners, or validate runtime state",
+        ],
     }
 
 
@@ -300,6 +430,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         lifecycle_diagnosis["session_start_accepted"] is True
         and lifecycle_diagnosis["session_end_accepted"] is True
     )
+    offline_inputs = bounded_artifact_file_scan(args.artifact_root)
 
     downstream_blockers: list[str] = []
     if not inventory_ready:
@@ -324,10 +455,11 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         if not inventory_ready
         else "plan_missing_server_list_players_and_server_kick_player_snapshots"
     )
-    if first_evidence_ready and (second_source_missing or not lifecycle_ready):
-        next_step = "produce_distinct_second_source_and_accepted_lifecycle_anchor_evidence"
-    elif first_evidence_ready:
-        next_step = "validate_players_identity_first_evidence_consume_and_promote_blocked"
+    if inventory_ready:
+        if first_evidence_ready and (second_source_missing or not lifecycle_ready):
+            next_step = "produce_distinct_second_source_and_accepted_lifecycle_anchor_evidence"
+        elif first_evidence_ready:
+            next_step = "validate_players_identity_first_evidence_consume_and_promote_blocked"
 
     core_manifest_pattern = args.artifact_root / CORE_EVIDENCE_MANIFEST_PATTERN
     reflection_inventory_pattern = args.artifact_root / REFLECTION_INVENTORY_MANIFEST_PATTERN
@@ -395,6 +527,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             "required_admin_targets": REQUIRED_ADMIN_TARGETS,
             "blocked_before_focal_planning": not inventory_ready,
             "ready_to_plan_admin_snapshots": inventory_ready,
+            "offline_inputs": offline_inputs,
         },
         "public_sdk_ready": False,
         "runtime_ready": False,

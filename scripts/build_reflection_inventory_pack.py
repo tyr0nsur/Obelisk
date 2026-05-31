@@ -212,18 +212,19 @@ def main() -> int:
             )
         )
     requested_player_identity_targets = player_identity_targets_from_requests(direct_plan_targets)
-    if requested_player_identity_targets and PLAYER_IDENTITY_TARGET_SET not in args.target_set:
+    if requested_player_identity_targets:
         raise SystemExit(
-            f"--plan-target for player identity targets requires --target-set {PLAYER_IDENTITY_TARGET_SET} "
-            "so the pack records player identity coverage"
+            "player identity focal snapshots must be planned with "
+            "scripts/plan_ufunction_focal_snapshots.py after a reviewed "
+            f"{PLAYER_IDENTITY_TARGET_SET} reflection inventory pack; "
+            "do not use build_reflection_inventory_pack.py --plan-target for this lane"
         )
-    if (
-        PLAYER_IDENTITY_TARGET_SET in args.plan_snapshot_target_set
-        and PLAYER_IDENTITY_TARGET_SET not in args.target_set
-    ):
+    if PLAYER_IDENTITY_TARGET_SET in args.plan_snapshot_target_set:
         raise SystemExit(
-            f"--plan-snapshot-target-set {PLAYER_IDENTITY_TARGET_SET} requires "
-            f"--target-set {PLAYER_IDENTITY_TARGET_SET} so the pack records player identity coverage"
+            "player identity target-set focal snapshots must be planned with exact "
+            "ShooterPlayerController.ServerListPlayers and ShooterPlayerController.ServerKickPlayer "
+            "targets through scripts/plan_ufunction_focal_snapshots.py after a reviewed "
+            f"{PLAYER_IDENTITY_TARGET_SET} reflection inventory pack"
         )
     if PLAYER_IDENTITY_TARGET_SET in args.target_set and not args.evidence_pack_manifest:
         raise SystemExit(

@@ -118,16 +118,34 @@ def release_statement_names_outcome(text: str, surface_id: str, status: str) -> 
     return release_statement_surface_record(text, surface_id, expected) is not None
 
 
-def release_statement_surface_record(text: str, surface_id: str, status: str) -> str | None:
+def release_statement_surface_records(text: str, surface_id: str, status: str | None = None) -> list[tuple[str, str]]:
     pattern = re.compile(
-        rf"^\s*{re.escape(surface_id)}\s*:\s*{re.escape(status)}(?:\s+-\s*(?P<details>.+)|\s*)$",
+        rf"^\s*{re.escape(surface_id)}\s*:\s*(?P<status>excluded|post-v1)(?:\s+-\s*(?P<details>.+)|\s*)$",
         re.IGNORECASE,
     )
+    records: list[tuple[str, str]] = []
     for line in text.splitlines():
         match = pattern.fullmatch(line)
-        if match:
-            return line.strip()
-    return None
+        if not match:
+            continue
+        found_status = match.group("status").lower()
+        if status is None or found_status == status.lower():
+            records.append((found_status, line.strip()))
+    return records
+
+
+def release_statement_surface_record(text: str, surface_id: str, status: str) -> str | None:
+    records = release_statement_surface_records(text, surface_id, status)
+    if len(records) != 1:
+        return None
+    return records[0][1]
+
+
+def release_statement_duplicate_or_mixed_records(text: str, surface_id: str) -> bool:
+    records = release_statement_surface_records(text, surface_id)
+    if len(records) > 1:
+        return True
+    return False
 
 
 def required_release_statement_text(requirement: str) -> str | None:
@@ -230,6 +248,26 @@ def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
             return False
         if not isinstance(evidence.get("sdk_consumer_tests"), list) or not evidence["sdk_consumer_tests"]:
             return False
+    def evidence_value_valid(value: Any) -> bool:
+        if isinstance(value, list) and value:
+            return all(
+                isinstance(item, str)
+                and evidence_path_exists(item, allow_generic_dirs=allow_generic_dirs)
+                and (allow_generic_dirs or evidence_path_is_specific(item, surface_id))
+                for item in value
+            )
+        return (
+            isinstance(value, str)
+            and evidence_path_exists(value, allow_generic_dirs=allow_generic_dirs)
+            and (allow_generic_dirs or evidence_path_is_specific(value, surface_id))
+        )
+
+    if not allow_generic_dirs and not (
+        evidence_value_valid(evidence.get("abi_tests"))
+        and evidence_value_valid(evidence.get("sdk_consumer_tests"))
+    ):
+        return False
+
     machine_keys = (
         "abi_tests",
         "sdk_consumer_tests",
@@ -238,19 +276,7 @@ def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
         "install_gate",
     )
     for key in machine_keys:
-        value = evidence.get(key)
-        if isinstance(value, list) and value and all(
-            isinstance(item, str)
-            and evidence_path_exists(item, allow_generic_dirs=allow_generic_dirs)
-            and (allow_generic_dirs or evidence_path_is_specific(item, surface_id))
-            for item in value
-        ):
-            return True
-        if (
-            isinstance(value, str)
-            and evidence_path_exists(value, allow_generic_dirs=allow_generic_dirs)
-            and (allow_generic_dirs or evidence_path_is_specific(value, surface_id))
-        ):
+        if evidence_value_valid(evidence.get(key)):
             return True
     return False
 
@@ -328,6 +354,7 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
     release_statement_missing_blockers: list[str] = []
     release_statement_missing_contracts: list[str] = []
     release_statement_missing_experimental_outcomes: list[str] = []
+    release_statement_duplicate_records: list[str] = []
     missing_completion_blocker_exclusion_contracts: list[str] = []
     debug_only_promoted: list[str] = []
 
@@ -359,6 +386,8 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
         if status in {"post-v1", "excluded"} and surface_id in post_v1_or_excluded:
             if release_statement_text is None:
                 release_statement_missing_experimental_outcomes.append(surface_id)
+            elif release_statement_duplicate_or_mixed_records(release_statement_text, surface_id):
+                release_statement_duplicate_records.append(surface_id)
             elif not release_statement_names_outcome(release_statement_text, surface_id, status):
                 release_statement_missing_experimental_outcomes.append(surface_id)
             continue
@@ -383,6 +412,8 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
                     continue
             if release_statement_text is None:
                 release_statement_missing_blockers.append(surface_id)
+            elif release_statement_duplicate_or_mixed_records(release_statement_text, surface_id):
+                release_statement_duplicate_records.append(surface_id)
             elif not release_statement_names_outcome(release_statement_text, surface_id, status):
                 release_statement_missing_blockers.append(surface_id)
             elif not release_statement_satisfies_exclusion_contract(release_statement_text, surface):
@@ -455,6 +486,8 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
         blockers.append("release_statement_missing_exclusion_contract")
     if release_statement_missing_experimental_outcomes:
         blockers.append("release_statement_missing_experimental_outcomes")
+    if release_statement_duplicate_records:
+        blockers.append("release_statement_duplicate_or_mixed_surface_records")
     if release_statement_text is not None:
         if "docs/sdk_v1_compatibility.md" not in release_statement_text.lower():
             blockers.append("release_statement_missing_sdk_compatibility_reference")
@@ -492,6 +525,7 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
         "release_statement_missing_blocker_outcomes": sorted(set(release_statement_missing_blockers)),
         "release_statement_missing_exclusion_contracts": sorted(set(release_statement_missing_contracts)),
         "release_statement_missing_experimental_outcomes": sorted(set(release_statement_missing_experimental_outcomes)),
+        "release_statement_duplicate_or_mixed_records": sorted(set(release_statement_duplicate_records)),
         "non_claims": [
             "core-first release readiness, install layout, and package-shape checks do not satisfy this v1 SDK completion gate",
             "post-v1 or excluded surfaces must be named in the manifest and release statement before a stable v1 SDK claim",

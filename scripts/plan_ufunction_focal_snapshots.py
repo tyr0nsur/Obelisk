@@ -312,6 +312,32 @@ def require_player_identity_target_set_scope(
             f"missing_targets={','.join(missing_targets)} "
             f"expected_targets={','.join(PLAYER_IDENTITY_TARGETS)})"
         )
+    matched_targets = coverage.get("matched_targets")
+    if not isinstance(matched_targets, dict):
+        raise SystemExit(
+            f"{inventory_path}: target_set_coverage.matched_targets must record exact rows for "
+            "the complete player identity target set before planning player identity snapshots"
+        )
+    missing_count = coverage.get("missing_count")
+    ambiguous_count = coverage.get("ambiguous_count")
+    matched_count = coverage.get("matched_count")
+    if missing_count != 0 or ambiguous_count != 0 or matched_count != len(PLAYER_IDENTITY_TARGETS):
+        raise SystemExit(
+            f"{inventory_path}: target_set_coverage must have full matched player identity coverage "
+            f"before planning player identity snapshots (expected_matched_count={len(PLAYER_IDENTITY_TARGETS)} "
+            f"matched_count={matched_count} missing_count={missing_count} ambiguous_count={ambiguous_count})"
+        )
+    admin_targets_without_rows = [
+        target
+        for target in sorted(DIRECT_PLAYER_IDENTITY_GATE_TARGETS)
+        if not isinstance(matched_targets.get(target), dict)
+    ]
+    if admin_targets_without_rows:
+        raise SystemExit(
+            f"{inventory_path}: target_set_coverage.matched_targets must include exact admin rows before "
+            "planning player identity snapshots "
+            f"(missing_admin_targets={','.join(admin_targets_without_rows)})"
+        )
 
 
 def player_identity_target_set_targets_from_requests(requested_targets: list[str]) -> set[str]:

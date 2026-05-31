@@ -125,13 +125,27 @@ class PlanUFunctionFocalSnapshotsTests(unittest.TestCase):
             "functions": rows,
         }
         if target_sets:
+            requested_targets = [
+                qualified.partition(":")[2]
+                for target_set in target_sets
+                for qualified in TARGET_SETS[target_set]
+            ]
+            matched_targets = {
+                f"{row['outer_name']}.{row['name']}": {"count": 1, "samples": [row]}
+                for row in rows
+                if f"{row['outer_name']}.{row['name']}" in requested_targets
+            }
+            missing_targets = [target for target in requested_targets if target not in matched_targets]
             inventory["target_set_coverage"] = {
                 "target_sets": target_sets,
-                "requested_targets": [
-                    qualified.partition(":")[2]
-                    for target_set in target_sets
-                    for qualified in TARGET_SETS[target_set]
-                ],
+                "requested_targets": requested_targets,
+                "requested_count": len(requested_targets),
+                "matched_count": len(matched_targets),
+                "missing_count": len(missing_targets),
+                "missing_targets": missing_targets,
+                "ambiguous_count": 0,
+                "ambiguous_targets": [],
+                "matched_targets": matched_targets,
             }
         (path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
         (path / "ufunction-inventory.json").write_text(json.dumps(inventory), encoding="utf-8")
@@ -532,6 +546,69 @@ class PlanUFunctionFocalSnapshotsTests(unittest.TestCase):
         self.assertIn("target_set_coverage.target_sets must exactly match", result.stderr)
         self.assertIn("manifest_target_sets=players-identity-lifecycle-intake", result.stderr)
         self.assertIn("coverage_target_sets=players-identity-lifecycle-intake,mission-compact-intake", result.stderr)
+
+    def test_player_identity_target_set_requires_full_matched_coverage_before_planning(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            pack = root / "pack"
+            self.write_pack(
+                pack,
+                core_path=root / "missing-core",
+                functions=self.rows_for_target_set(PLAYER_IDENTITY_TARGET_SET),
+                target_sets=[PLAYER_IDENTITY_TARGET_SET],
+            )
+            inventory_path = pack / "ufunction-inventory.json"
+            inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+            inventory["target_set_coverage"]["matched_count"] = 11
+            inventory["target_set_coverage"]["missing_count"] = 1
+            inventory["target_set_coverage"]["missing_targets"] = [
+                "ShooterPlayerController.ServerKickPlayer"
+            ]
+            inventory_path.write_text(json.dumps(inventory), encoding="utf-8")
+
+            result = self.run_planner(
+                [
+                    "--inventory-pack",
+                    str(pack),
+                    "--target",
+                    "ShooterPlayerController.ServerListPlayers",
+                ],
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("target_set_coverage must have full matched player identity coverage", result.stderr)
+        self.assertIn("expected_matched_count=12", result.stderr)
+        self.assertIn("matched_count=11", result.stderr)
+
+    def test_player_identity_target_set_requires_admin_matched_rows_before_planning(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            pack = root / "pack"
+            self.write_pack(
+                pack,
+                core_path=root / "missing-core",
+                functions=self.rows_for_target_set(PLAYER_IDENTITY_TARGET_SET),
+                target_sets=[PLAYER_IDENTITY_TARGET_SET],
+            )
+            inventory_path = pack / "ufunction-inventory.json"
+            inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+            inventory["target_set_coverage"]["matched_targets"].pop("ShooterPlayerController.ServerKickPlayer")
+            inventory_path.write_text(json.dumps(inventory), encoding="utf-8")
+
+            result = self.run_planner(
+                [
+                    "--inventory-pack",
+                    str(pack),
+                    "--target",
+                    "ShooterPlayerController.ServerKickPlayer",
+                ],
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("target_set_coverage.matched_targets must include exact admin rows", result.stderr)
+        self.assertIn("missing_admin_targets=ShooterPlayerController.ServerKickPlayer", result.stderr)
 
     def test_unknown_target_set_rejects_before_planning(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

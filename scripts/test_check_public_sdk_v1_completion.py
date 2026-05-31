@@ -306,9 +306,42 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("release_statement_missing_exclusion_contract", payload["blockers"])
         self.assertEqual(payload["release_statement_missing_exclusion_contracts"], ["obelisk.player_identity.v1"])
 
+    def test_release_statement_rejects_duplicate_or_mixed_surface_records(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        release_statement += (
+            "obelisk.player_identity.v1: post-v1 - contradictory duplicate record for the same surface.\n"
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("release_statement_duplicate_or_mixed_surface_records", payload["blockers"])
+        self.assertEqual(payload["release_statement_duplicate_or_mixed_records"], ["obelisk.player_identity.v1"])
+
     def test_release_statement_accepts_exact_outcome_with_no_explanatory_text(self) -> None:
         manifest, release_statement = complete_excluded_manifest()
-        release_statement += "obelisk.player_identity.v1: excluded - no player identity API is included in v1.\n"
+        release_statement = release_statement.replace(
+            "obelisk.player_identity.v1: excluded - no public API for this surface is included in v1; "
+            "no player identity/principal, player lookup, cross-instance identity, session lifecycle, "
+            "permissions/admin, commands/replies, economy/mobility, mutation, return override, "
+            "ResourceHandle, UE pointer, raw params, or UObject identity API is included in v1\n",
+            "obelisk.player_identity.v1: excluded - no player identity/principal, player lookup, "
+            "cross-instance identity, session lifecycle, permissions/admin, commands/replies, "
+            "economy/mobility, mutation, return override, ResourceHandle, UE pointer, raw params, "
+            "or UObject identity API is included in v1\n",
+        )
         with tempfile.TemporaryDirectory() as temp_dir:
             manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
             statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
@@ -580,6 +613,31 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("promoted_surface_evidence_missing", payload["blockers"])
         self.assertEqual(payload["promoted_blockers_without_evidence"], ["obelisk.player_identity.v1"])
+
+    def test_promoted_completion_blocker_requires_valid_abi_and_sdk_consumer_evidence(self) -> None:
+        manifest, _ = complete_excluded_manifest()
+        for surface in manifest["surfaces"]:
+            if surface["id"] == "obelisk.structure_census.v1":
+                surface["status"] = "promoted"
+                surface["public_contract"] = ["ObeliskApi.RegisterStructureCensusCallback"]
+                surface["evidence"] = {
+                    "surface_id": "obelisk.structure_census.v1",
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                    "abi_tests": ["tests/core/StructureAggregateCensusTests.cpp"],
+                    "sdk_consumer_tests": ["TODO-missing-sdk-consumer-test"],
+                }
+                break
+        manifest["promoted_surfaces"].append("obelisk.structure_census.v1")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            result = self.run_checker("--manifest", str(manifest_path), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("promoted_surface_evidence_missing", payload["blockers"])
+        self.assertEqual(payload["promoted_blockers_without_evidence"], ["obelisk.structure_census.v1"])
 
     def test_new_planning_surface_blocks_v1_claim_until_outcome_is_named(self) -> None:
         manifest, _ = complete_excluded_manifest()

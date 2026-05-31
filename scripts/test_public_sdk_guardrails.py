@@ -1989,7 +1989,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             self.assertIn(requirement, decision_contract["promotion_requires"])
 
         for requirement in (
-            "the v1 release statement names obelisk.operator_ingress_storage.v1 as excluded",
+            "the v1 release statement names obelisk.operator_ingress_storage.v1 as post-v1 or excluded",
             "the v1 release statement states that no RCON, operator reload command API, Unicode/operator text encoding API, webhook, database/storage, secret manager, external ingress, or cross-instance storage API is included in v1",
             "v1_completion_required changes only after this blocker is promoted or that explicit exclusion is recorded",
         ):
