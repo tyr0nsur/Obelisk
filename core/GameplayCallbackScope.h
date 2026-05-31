@@ -9,6 +9,7 @@ namespace Obelisk::Core
         Chat,
         Structure,
         Inventory,
+        Mission,
     };
 
     class GameplayCallbackScope
@@ -37,7 +38,8 @@ namespace Obelisk::Core
         {
             return Depth(GameplayCallbackFamily::Chat) != 0 ||
                 Depth(GameplayCallbackFamily::Structure) != 0 ||
-                Depth(GameplayCallbackFamily::Inventory) != 0;
+                Depth(GameplayCallbackFamily::Inventory) != 0 ||
+                Depth(GameplayCallbackFamily::Mission) != 0;
         }
 
     private:
@@ -46,6 +48,7 @@ namespace Obelisk::Core
             static thread_local size_t chatDepth = 0;
             static thread_local size_t structureDepth = 0;
             static thread_local size_t inventoryDepth = 0;
+            static thread_local size_t missionDepth = 0;
             switch (family)
             {
             case GameplayCallbackFamily::Chat:
@@ -54,6 +57,8 @@ namespace Obelisk::Core
                 return structureDepth;
             case GameplayCallbackFamily::Inventory:
                 return inventoryDepth;
+            case GameplayCallbackFamily::Mission:
+                return missionDepth;
             }
             return chatDepth;
         }

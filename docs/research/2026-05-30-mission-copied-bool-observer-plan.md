@@ -226,9 +226,11 @@ the object/array-only target out of the copied-bool provenance path while preser
 bool-bearing validation path for `AddPlayerToMission`, `BPAllowPlayerToLeaveMission`, and
 `BPOnPlayerRemovedFromMission`.
 
-These mask semantics are now covered in test-only recognizer and hook-helper fixtures, but
-Mission still remains internal and non-promoted until runtime observation, dispatcher
-lifecycle, public ABI, identity/privacy, and SDK policy gates are handled separately.
+These mask semantics are now covered in test-only recognizer and hook-helper fixtures.
+`core/MissionCopiedBoolEventDispatcher` also exists as a test-only internal dispatcher
+outside the shared runtime/API targets for copied-data lifecycle checks. Mission remains
+non-promoted until runtime observation, public ABI, identity/privacy, and SDK policy gates
+are handled separately.
 
 Rejected metadata, disabled gates, non-mission FName values, unsupported SHA values,
 unreadable params, malformed bool bytes, and exhausted budgets should not emit per-event
@@ -299,7 +301,7 @@ Before runtime wiring is reviewed, local validation must include at least:
 
 ```bash
 cmake --build build --target mission_reflection_tests process_event_mission_reflection_tests -j"$(nproc)"
-ctest --test-dir build --output-on-failure -R '^(MissionReflectionTests|ProcessEventMissionReflectionTests)$'
+ctest --test-dir build --output-on-failure -R '^(MissionReflectionTests|ProcessEventMissionReflectionTests|MissionCopiedBoolEventDispatcherTests)$'
 python3 scripts/test_public_sdk_guardrails.py
 python3 scripts/test_release_scope_guardrails.py
 ```
@@ -308,7 +310,9 @@ Tests must prove disabled gates, missing profile/window/marker/SHA, unsupported 
 budget, and non-mission FName values do not read memory or consume budget. They must also
 prove accepted compact targets expose exactly the five copied bools, all six
 object/container fields stay redacted, rejection clears stale copied output, params are
-not mutated, and no dispatcher or public callback is invoked.
+not mutated, and no runtime dispatcher, hook wiring, or public callback is invoked. The
+test-only dispatcher must accept only the three bool-bearing Mission shapes and must not
+model `GetPlayerUsableItems`.
 
 ## Non-Goals
 
@@ -318,12 +322,12 @@ This plan does not promote or authorize:
   plugin callbacks, or SDK consumer fixtures;
 - `ProcessEventHook.cpp` wiring, CMake shared-library inclusion, wrapper scripts, marker
   definitions, env parsing, posture scripts, CLI summaries, or live-server activation;
-- dispatchers, callback lifecycle claims, object identity, player/controller/character
-  identity, mission identity, item identity, arrays, strings, raw params, FName/GObjects
-  indices, `ResourceHandle`, lookup APIs, mutation, blocking, return override, or manual
-  `ProcessEvent` calls;
+- runtime dispatchers, public callback lifecycle claims, object identity,
+  player/controller/character identity, mission identity, item identity, arrays, strings,
+  raw params, FName/GObjects indices, `ResourceHandle`, lookup APIs, mutation, blocking,
+  return override, or manual `ProcessEvent` calls;
 - scanner runs, ptrace, `gcore`, native exec probes, broad tracing, or production
   observation.
 
-The next actionable Mission step is still an internal/test-only policy decision. Public
-API work remains blocked.
+The current Mission dispatcher is a test-only helper, not runtime wiring or public API
+work. Public API work remains blocked.

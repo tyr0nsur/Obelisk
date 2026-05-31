@@ -1917,6 +1917,84 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
                 with self.subTest(file=path, token=token):
                     self.assertNotIn(token, text)
 
+    def test_mission_copied_bool_dispatcher_remains_test_only_if_added(self) -> None:
+        cmake = read("CMakeLists.txt")
+        forbidden_runtime_sources = [
+            "core/MissionCopiedBoolEventDispatcher.cpp",
+            "tests/core/MissionCopiedBoolEventDispatcherTests.cpp",
+        ]
+        obelisk_target = re.search(
+            r"add_library\(obelisk SHARED\n(?P<sources>.*?)\n\)",
+            cmake,
+            re.S,
+        )
+        self.assertIsNotNone(obelisk_target)
+        obelisk_sources = obelisk_target.group("sources") if obelisk_target else ""
+
+        for source in forbidden_runtime_sources:
+            with self.subTest(target="obelisk", source=source):
+                self.assertNotIn(source, obelisk_sources)
+
+        offenders: list[str] = []
+        saw_test_target = False
+        for kind, name, body in cmake_targets(cmake):
+            source_set = set(
+                re.findall(r"\b(?:core|hooks|tests|ue)/[A-Za-z0-9_/]+\.cpp\b", body)
+            )
+            mentions_mission_copied_bool_dispatcher = (
+                "mission_copied_bool_event_dispatcher" in name
+                or any("MissionCopiedBoolEventDispatcher" in source for source in source_set)
+            )
+            if not mentions_mission_copied_bool_dispatcher:
+                continue
+
+            is_test_target = (
+                kind == "executable"
+                and name == "mission_copied_bool_event_dispatcher_tests"
+                and "tests/core/MissionCopiedBoolEventDispatcherTests.cpp" in source_set
+            )
+            if is_test_target:
+                saw_test_target = True
+            else:
+                offenders.append(f"add_{kind}({name}): {sorted(source_set)}")
+
+        if "tests/core/MissionCopiedBoolEventDispatcherTests.cpp" in cmake:
+            self.assertTrue(saw_test_target)
+            self.assertIn(
+                "add_test(NAME MissionCopiedBoolEventDispatcherTests "
+                "COMMAND mission_copied_bool_event_dispatcher_tests)",
+                cmake,
+            )
+        self.assertEqual(offenders, [])
+
+        plugin_manager_paths = [
+            "core/PluginManager.cpp",
+            "core/PluginManager.h",
+        ]
+        operational_paths = [
+            "loader/Bootstrap.cpp",
+            "runtime/RuntimeMarkers.cpp",
+            "runtime/RuntimeMarkers.h",
+            "packaging/linuxgsm/ObeliskRun.sh",
+            "packaging/linuxgsm/ObeliskRunDebug.sh",
+            "packaging/linuxgsm/arkserver-obelisk-debug.cfg.example",
+            "scripts/check_linuxgsm_wrapper_drift.sh",
+            "scripts/check_obelisk_server_posture.sh",
+            "scripts/install_obelisk.sh",
+            "scripts/obelisk.py",
+        ]
+        forbidden_tokens = [
+            "MissionCopiedBoolEventDispatcher",
+            "OBELISK_ENABLE_MISSION_COPIED_BOOL",
+            "enable-mission-copied-bool",
+            "mission-copied-bool-events",
+        ]
+        for path in plugin_manager_paths + operational_paths:
+            text = read(path)
+            for token in forbidden_tokens:
+                with self.subTest(file=path, token=token):
+                    self.assertNotIn(token, text)
+
     def test_transfer_observer_has_no_operational_runtime_gate(self) -> None:
         operational_paths = [
             "loader/Bootstrap.cpp",

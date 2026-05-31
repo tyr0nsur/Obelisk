@@ -3241,6 +3241,50 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         self.assertEqual(offenders, [])
 
+    def test_mission_copied_bool_dispatcher_is_not_public_sdk_or_descriptor_surface(self) -> None:
+        forbidden_tokens = [
+            "MissionCopiedBoolEventDispatcher",
+            "MissionCopiedBoolEventDispatcherTests",
+            "ObeliskMissionCopiedBool",
+            "OBELISK_API_CAPABILITY_MISSION_COPIED_BOOL",
+            "RegisterMissionCopiedBool",
+            "UnregisterMissionCopiedBool",
+            "obelisk.mission_copied_bool",
+            "obelisk.mission-copied-bool",
+            "mission_copied_bool",
+            "MissionCopiedBool",
+            "mission-copied-bool-events",
+        ]
+        scanned_paths = [
+            PUBLIC_API_HEADER,
+            PUBLIC_GAMEPLAY_EVENTS_MANIFEST,
+            *PUBLIC_SDK_GUIDANCE_DOC_FILES,
+        ]
+        scanned_roots = [
+            REPO_ROOT / "plugins",
+            REPO_ROOT / "tests" / "sdk_consumer",
+            REPO_ROOT / "tests" / "sdk_installed_consumer",
+        ]
+
+        offenders: list[str] = []
+        for path in scanned_paths:
+            text = path.read_text(encoding="utf-8")
+            for token in forbidden_tokens:
+                if token in text:
+                    offenders.append(f"{path.relative_to(REPO_ROOT)}: {token}")
+        for root in scanned_roots:
+            if not root.exists():
+                continue
+            for path in root.rglob("*"):
+                if not path.is_file() or path.suffix not in {".c", ".cpp", ".h", ".hpp", ".md", ".json"}:
+                    continue
+                text = path.read_text(encoding="utf-8")
+                for token in forbidden_tokens:
+                    if token in text:
+                        offenders.append(f"{path.relative_to(REPO_ROOT)}: {token}")
+
+        self.assertEqual(offenders, [])
+
     def test_public_sdk_headers_have_no_resource_identity_or_ue_global_api_until_promotion(self) -> None:
         offenders: list[str] = []
         for path in (REPO_ROOT / "include" / "obelisk").rglob("*"):

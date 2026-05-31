@@ -172,8 +172,8 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   planning-only/consume-only, release/public promotion blocked, `GetPlayerUsableItems`
   recognition-only, and no Mission SDK, identity, mutation, return override, or runtime
   observer. See `2026-05-31-v02-module-priority.md`.
-- Next Mission step: test-only internal copied-bool dispatcher outside shared runtime/API
-  targets for the three copied-bool functions; keep `GetPlayerUsableItems` recognition-only.
+- Mission test-only copied-bool dispatcher exists outside shared runtime/API targets for
+  three copied-bool functions; next review is lifecycle/runtime observation, not public API.
 - Item return-only bridge hardening now keeps copied dispatch construction in
   `ProcessEventItemReflection` helpers, with unit coverage for the three supported event
   kinds, `CraftBlueprint` rejection before runtime item-return reflection, exact

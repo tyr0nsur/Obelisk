@@ -231,7 +231,8 @@ priorities, and do not use history files as the active source of truth.
   promoting target sets/runtime/API scope.
 - `ue/MissionReflection.*` is an internal fixture-backed recognizer for
   `mission-compact-intake`: copied bool ranges only, object refs and `OutItemIDs` arrays
-  recognition-only, no hook/runtime dispatcher/public Mission SDK. Tests reject copied
+  recognition-only, with only a test-only internal dispatcher/helper and no hook/runtime
+  dispatcher/public Mission SDK. Tests reject copied
   bool ranges that exceed `ParameterSize` and clear poisoned output on failure.
   The internal readiness note is
   `docs/research/2026-05-29-mission-reflection-internal-readiness.md`. A local

@@ -212,6 +212,16 @@ target_link_libraries(item_return_event_dispatcher_tests PRIVATE fmt::fmt spdlog
 
 add_test(NAME ItemReturnEventDispatcherTests COMMAND item_return_event_dispatcher_tests)
 
+add_executable(mission_copied_bool_event_dispatcher_tests
+    tests/core/MissionCopiedBoolEventDispatcherTests.cpp
+    core/MissionCopiedBoolEventDispatcher.cpp
+    runtime/Logger.cpp
+)
+target_include_directories(mission_copied_bool_event_dispatcher_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(mission_copied_bool_event_dispatcher_tests PRIVATE fmt::fmt spdlog::spdlog)
+
+add_test(NAME MissionCopiedBoolEventDispatcherTests COMMAND mission_copied_bool_event_dispatcher_tests)
+
 add_executable(plugin_manager_tests
     tests/core/PluginManagerTests.cpp
     core/ChatEventDispatcher.cpp

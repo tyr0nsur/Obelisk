@@ -29,6 +29,8 @@ PRODUCTION_FORBIDDEN_SYMBOL_PATTERNS=(
     "SetNextRegistrationIdForTesting"
     "ApiCapabilitiesForTesting"
     "SetNextTimerIdForTesting"
+    "MissionCopiedBoolEventDispatcher"
+    "MissionCopiedBoolEvent"
     "SetPluginCallbackCleanupFailure"
     "SetPluginRetentionFailure"
     "ClearPluginOwnerLifecycle"
