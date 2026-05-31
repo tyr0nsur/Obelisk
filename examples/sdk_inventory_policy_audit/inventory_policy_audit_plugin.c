@@ -7,9 +7,11 @@
 #include <stdio.h>
 #include <string.h>
 
-#if defined(_WIN32)
-#define OBELISK_PLUGIN_EXPORT __declspec(dllexport)
-#elif defined(__GNUC__) || defined(__clang__)
+#if !defined(__linux__) || !defined(__x86_64__)
+#error "Obelisk SDK examples target Linux x86_64 shared objects; they are not Windows/MSVC portability samples."
+#endif
+
+#if defined(__GNUC__) || defined(__clang__)
 #define OBELISK_PLUGIN_EXPORT __attribute__((visibility("default")))
 #else
 #define OBELISK_PLUGIN_EXPORT

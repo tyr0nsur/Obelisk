@@ -172,7 +172,8 @@ priorities, and do not use history files as the active source of truth.
   It validates descriptor coherence and logs sanitized resource/event metadata only; it
   registers no callbacks/timers and adds no ABI surface. Installed SDK consumer fixtures
   now cover fail-closed rejection of unknown resource/event kinds and undersized v1
-  descriptor structs.
+  descriptor structs. Installed SDK examples are Linux x86_64 samples only and must not
+  carry Windows/MSVC export branches or portability signals.
 - `InventoryPolicyEventDispatcher` and `StructureEventDispatcher` are internal
   copied-scalar infrastructure only. They do not promote public Inventory or
   StructureEvents SDKs.
@@ -275,7 +276,11 @@ priorities, and do not use history files as the active source of truth.
   `ShooterPlayerController.ServerKickPlayer`. A distinct vanilla-gdb candidate root at
   `/servidor/ark/workspace-offline/player-identity-offline-identity-vanilla-gdb-20260529T012853Z/focal-snapshots`
   now compares `12/12` accepted in planning-layout mode. The remaining blocker is accepted
-  lifecycle anchors plus principal invalidation semantics.
+  lifecycle anchors plus principal invalidation semantics. If an explicit
+  `--lifecycle-anchor-candidates-manifest` is provided to
+  `scripts/check_player_identity_first_evidence_readiness.py`, it may clear only the
+  lifecycle-anchor evidence precondition and must then remain blocked on
+  `principal_invalidation_semantics_unresolved`.
   Separately, all six `players-lifecycle-anchor-candidates` targets are reproducible in
   scratch base-vs-vanilla evidence with `accepted=6` and now have committed
   planning-only base fixtures under `players_lifecycle`; promotion still fails as

@@ -14,7 +14,7 @@ Support tier: release-supported seed.
 
 It does not use `ProcessEvent`, gameplay events, new gameplay APIs, chat events, timers,
 UE pointers, identity, lookup, mutation, return overrides, chat replies/send-chat, ArkApi
-compatibility, or private Obelisk headers.
+compatibility, Windows/MSVC portability, or private Obelisk headers.
 
 In a real Obelisk load, the runtime evaluates the plugin activation envelope before
 calling `ObeliskPlugin_Init`: `enabled=false`, a missing or non-matching

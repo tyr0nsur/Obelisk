@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import check_player_identity_lifecycle_anchor_candidates as lifecycle_anchor_candidates
 from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
 
 
@@ -72,6 +73,15 @@ def parse_args() -> argparse.Namespace:
         "--candidate-root",
         type=Path,
         help="Optional distinct sanitized second-source snapshot root for layout comparison.",
+    )
+    parser.add_argument(
+        "--lifecycle-anchor-candidates-manifest",
+        type=Path,
+        help=(
+            "Optional consume-only obelisk.players-identity-lifecycle-anchor-candidates.v1 "
+            "manifest. It can satisfy lifecycle anchor evidence only; it cannot promote "
+            "identity, runtime readiness, or public SDK readiness."
+        ),
     )
     parser.add_argument(
         "--json",
@@ -517,10 +527,17 @@ def build_layout_lifecycle_state(
     second_source_inconclusive: int | None,
     second_source_rejected: int | None,
     lifecycle_ready: bool,
+    principal_invalidation_ready: bool,
     lifecycle_diagnosis: dict[str, Any],
 ) -> dict[str, Any]:
-    lifecycle_invalidation_remains = layout_accepted and not lifecycle_ready
-    if lifecycle_invalidation_remains:
+    lifecycle_invalidation_remains = layout_accepted and (
+        not lifecycle_ready or not principal_invalidation_ready
+    )
+    if layout_accepted and lifecycle_ready and not principal_invalidation_ready:
+        status = "lifecycle_anchor_layout_accepted_principal_invalidation_remains"
+        statement = "lifecycle anchor layout accepted; principal invalidation remains"
+        remaining_work = ["principal_invalidation_semantics"]
+    elif lifecycle_invalidation_remains:
         status = "second_source_layout_accepted_lifecycle_invalidation_remains"
         statement = "second-source layout accepted; lifecycle invalidation remains"
         remaining_work = [
@@ -546,6 +563,7 @@ def build_layout_lifecycle_state(
         "second_source_rejected": second_source_rejected,
         "lifecycle_invalidation_remains": lifecycle_invalidation_remains,
         "lifecycle_anchor_ready": lifecycle_ready,
+        "principal_invalidation_ready": principal_invalidation_ready,
         "lifecycle_anchor_blockers": (
             lifecycle_diagnosis.get("blockers")
             if isinstance(lifecycle_diagnosis.get("blockers"), list)
@@ -748,7 +766,101 @@ def lifecycle_anchor_diagnosis(first_evidence_payload: dict[str, Any] | None) ->
         "accepted_start_targets": accepted_start_targets if isinstance(accepted_start_targets, list) else [],
         "accepted_end_targets": accepted_end_targets if isinstance(accepted_end_targets, list) else [],
         "blockers": blockers if isinstance(blockers, list) else [],
+        "source": "players_identity_first_evidence",
+        "principal_invalidation_ready": False,
     }
+
+
+def lifecycle_anchor_candidate_manifest_diagnosis(path: Path | None) -> dict[str, Any]:
+    base: dict[str, Any] = {
+        "provided": path is not None,
+        "path": str(path) if path is not None else None,
+        "ready": False,
+        "session_start_accepted": False,
+        "session_end_accepted": False,
+        "accepted_start_targets": [],
+        "accepted_end_targets": [],
+        "principal_invalidation_ready": False,
+        "blockers": [],
+        "source": "players_identity_lifecycle_anchor_candidates",
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "non_claims": [
+            "consume-only lifecycle anchor layout evidence; does not promote public identity, permissions, commands, lookup, ResourceHandle, mutation, return override, runtime hooks, or SDK surface",
+        ],
+    }
+    if path is None:
+        return base
+
+    try:
+        payload = lifecycle_anchor_candidates.load_json(path)
+    except SystemExit as exc:
+        return {**base, "blockers": ["lifecycle_anchor_manifest_unreadable"], "error": str(exc)}
+
+    validation = lifecycle_anchor_candidates.validate_manifest_details(payload, promote=False)
+    blockers = [blocker["reason"] for blocker in validation.blockers]
+    accepted_start_targets = validation.accepted_by_role.get("session_start", [])
+    accepted_end_targets = validation.accepted_by_role.get("session_end", [])
+    expected_start = ["ShooterGameMode.HandleNewPlayer"]
+    expected_end = ["ShooterGameMode.OnLogout"]
+    if accepted_start_targets != expected_start:
+        blockers.append("accepted_session_start_anchor_missing")
+    if accepted_end_targets != expected_end:
+        blockers.append("accepted_session_end_anchor_missing")
+
+    lifecycle_acceptance = payload.get("lifecycle_acceptance")
+    lifecycle_blockers = (
+        lifecycle_acceptance.get("blockers")
+        if isinstance(lifecycle_acceptance, dict) and isinstance(lifecycle_acceptance.get("blockers"), list)
+        else []
+    )
+    principal_invalidation_unresolved = "principal_invalidation_semantics_unresolved" in lifecycle_blockers
+    if not principal_invalidation_unresolved:
+        blockers.append("principal_invalidation_semantics_overclaim")
+
+    ready = (
+        not validation.blockers
+        and principal_invalidation_unresolved
+        and accepted_start_targets == expected_start
+        and accepted_end_targets == expected_end
+    )
+    return {
+        **base,
+        "ready": ready,
+        "session_start_accepted": ready,
+        "session_end_accepted": ready,
+        "accepted_start_targets": accepted_start_targets if ready else [],
+        "accepted_end_targets": accepted_end_targets if ready else [],
+        "principal_invalidation_ready": False,
+        "blockers": sorted(set(blockers)),
+        "lifecycle_acceptance_blockers": lifecycle_blockers,
+        "artifact_status": payload.get("artifact_status"),
+        "readiness_classification": payload.get("readiness_classification"),
+    }
+
+
+def merge_lifecycle_diagnosis(
+    first_evidence_diagnosis: dict[str, Any],
+    lifecycle_candidate_diagnosis: dict[str, Any],
+) -> dict[str, Any]:
+    if lifecycle_candidate_diagnosis.get("ready") is True:
+        blockers = [
+            item
+            for item in string_list(lifecycle_candidate_diagnosis.get("lifecycle_acceptance_blockers"))
+            if item != "principal_invalidation_semantics_unresolved"
+        ]
+        return {
+            "session_start_accepted": True,
+            "session_end_accepted": True,
+            "accepted_start_targets": string_list(lifecycle_candidate_diagnosis.get("accepted_start_targets")),
+            "accepted_end_targets": string_list(lifecycle_candidate_diagnosis.get("accepted_end_targets")),
+            "blockers": blockers,
+            "source": "players_identity_lifecycle_anchor_candidates",
+            "principal_invalidation_ready": False,
+            "principal_invalidation_blockers": ["principal_invalidation_semantics_unresolved"],
+        }
+    return first_evidence_diagnosis
 
 
 def first_matching_binary_path(offline_inputs: dict[str, Any]) -> str | None:
@@ -907,6 +1019,13 @@ def next_actionable_blocker(
             "code": "accepted_lifecycle_anchor_evidence_missing",
             "blocked_until": "consume_only_lifecycle_anchor_candidate_artifact",
             "why": "identity first evidence still lacks accepted candidate start/end lifecycle anchors",
+        }
+    if "principal_invalidation_semantics_unresolved" in downstream_blockers:
+        return {
+            **base,
+            "code": "principal_invalidation_semantics_unresolved",
+            "blocked_until": "reviewed_fail_closed_principal_invalidation_policy",
+            "why": "lifecycle anchor layout evidence is present, but public identity still lacks reviewed principal invalidation semantics",
         }
     return {
         **base,
@@ -1341,11 +1460,19 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     )
     first_evidence_ready = first_evidence_result.returncode == 0 and first_evidence_payload_valid
     missing_targets = parse_missing_required_targets(first_evidence_result.stderr)
-    lifecycle_diagnosis = lifecycle_anchor_diagnosis(first_evidence_payload)
+    first_evidence_lifecycle_diagnosis = lifecycle_anchor_diagnosis(first_evidence_payload)
+    lifecycle_candidate_diagnosis = lifecycle_anchor_candidate_manifest_diagnosis(
+        getattr(args, "lifecycle_anchor_candidates_manifest", None)
+    )
+    lifecycle_diagnosis = merge_lifecycle_diagnosis(
+        first_evidence_lifecycle_diagnosis,
+        lifecycle_candidate_diagnosis,
+    )
     lifecycle_ready = (
         lifecycle_diagnosis["session_start_accepted"] is True
         and lifecycle_diagnosis["session_end_accepted"] is True
     )
+    principal_invalidation_ready = lifecycle_diagnosis.get("principal_invalidation_ready") is True
     layout_accepted = second_source_layout_accepted(
         coverage_payload_valid=coverage_payload_valid,
         coverage_targets=coverage_targets,
@@ -1363,6 +1490,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         second_source_inconclusive=second_source_inconclusive,
         second_source_rejected=second_source_rejected,
         lifecycle_ready=lifecycle_ready,
+        principal_invalidation_ready=principal_invalidation_ready,
         lifecycle_diagnosis=lifecycle_diagnosis,
     )
     offline_inputs = bounded_artifact_file_scan(args.artifact_root)
@@ -1384,6 +1512,8 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         downstream_blockers.append("players_identity_first_evidence_not_buildable")
     if not lifecycle_ready:
         downstream_blockers.append("accepted_lifecycle_anchors_missing")
+    if lifecycle_ready and not principal_invalidation_ready:
+        downstream_blockers.append("principal_invalidation_semantics_unresolved")
     if inventory_ready:
         blockers.extend(downstream_blockers)
 
@@ -1399,6 +1529,8 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             next_step = "produce_distinct_second_source_layout_evidence"
         elif first_evidence_ready and not lifecycle_ready:
             next_step = "produce_accepted_lifecycle_anchor_and_principal_invalidation_evidence"
+        elif first_evidence_ready and not principal_invalidation_ready:
+            next_step = "produce_reviewed_principal_invalidation_semantics"
         elif first_evidence_ready:
             next_step = "validate_players_identity_first_evidence_consume_and_promote_blocked"
 
@@ -1520,6 +1652,11 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "artifact_root": str(args.artifact_root),
         "snapshot_root": str(args.snapshot_root),
         "candidate_root": str(args.candidate_root) if args.candidate_root else None,
+        "lifecycle_anchor_candidates_manifest": (
+            str(args.lifecycle_anchor_candidates_manifest)
+            if getattr(args, "lifecycle_anchor_candidates_manifest", None)
+            else None
+        ),
         "target_set": PLAYER_IDENTITY_TARGET_SET,
         "blockers": blockers,
         "deferred_until_reflection_inventory_ready": [] if inventory_ready else downstream_blockers,
@@ -1643,6 +1780,8 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             "schema": first_evidence_payload.get("schema") if first_evidence_payload else None,
             "missing_required_targets": missing_targets,
             "lifecycle_anchors": lifecycle_diagnosis,
+            "generated_lifecycle_anchors": first_evidence_lifecycle_diagnosis,
+            "lifecycle_anchor_candidates": lifecycle_candidate_diagnosis,
             "stderr": first_evidence_result.stderr.strip(),
         },
         "next_step": next_step,

@@ -20,6 +20,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 import check_player_identity_first_evidence_readiness as checker
+from test_check_player_identity_lifecycle_anchor_candidates import accepted_lifecycle_anchor_manifest
 from reflection_target_sets import schema_target_list  # noqa: E402
 
 
@@ -622,6 +623,98 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertFalse(payload["public_sdk_ready"])
         self.assertFalse(payload["runtime_ready"])
 
+    def test_consumes_lifecycle_anchor_candidate_but_keeps_principal_invalidation_blocked(self) -> None:
+        ok = subprocess.CompletedProcess(["mock"], 0, "", "")
+        vanilla_candidate_root = Path(
+            "/servidor/ark/workspace-offline/"
+            "player-identity-offline-identity-vanilla-gdb-20260529T012853Z/focal-snapshots"
+        )
+
+        def fake_run_json_command(args: list[str], *, check: bool = False):
+            command = " ".join(args)
+            if "check_reflection_inventory_pack_readiness.py" in command:
+                return ok, self.accepted_inventory_payload()
+            if "compare_reflection_snapshots.py" in command:
+                return ok, {
+                    "totals": {
+                        "targets": 12,
+                        "comparable": 12,
+                        "blocked": 0,
+                        "second_source_accepted": 12,
+                        "second_source_missing": 0,
+                        "second_source_inconclusive": 0,
+                        "second_source_rejected": 0,
+                    },
+                    "promotion_gate": {
+                        "layout_ready": True,
+                        "promotion_ready": False,
+                        "blockers": [{"reason": "target_set_not_release_readiness", "count": 1}],
+                    },
+                    "second_source_status": "compared",
+                }
+            if "build_redacted_ufunction_signatures.py" in command:
+                return ok, {
+                    "schema": "obelisk.players-identity-first-evidence.v1",
+                    "lifecycle_anchors": {
+                        "session_start_accepted": False,
+                        "session_end_accepted": False,
+                        "accepted_start_targets": [],
+                        "accepted_end_targets": [],
+                        "blockers": [
+                            "accepted_session_start_anchor_missing",
+                            "accepted_session_end_anchor_missing",
+                        ],
+                    },
+                }
+            if "check_player_identity_static_orientation.py" in command:
+                return ok, {
+                    "valid": True,
+                    "accepted_for_orientation": True,
+                    "not_artifact_gate": True,
+                    "blockers": [],
+                    "non_claims": ["candidate-only navigation evidence"],
+                }
+            self.fail(f"unexpected command: {command}")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            manifest = Path(tmp) / "lifecycle-candidates.json"
+            manifest.write_text(json.dumps(accepted_lifecycle_anchor_manifest()), encoding="utf-8")
+            args = SimpleNamespace(
+                artifact_root=Path("/tmp/player-identity-artifacts"),
+                snapshot_root=Path("/tmp/player-identity-snapshots"),
+                candidate_root=vanilla_candidate_root,
+                lifecycle_anchor_candidates_manifest=manifest,
+            )
+            with (
+                mock.patch.object(checker, "run_json_command", side_effect=fake_run_json_command),
+                mock.patch.object(
+                    checker,
+                    "bounded_artifact_file_scan",
+                    return_value={"ready_to_build_core_evidence_pack": False},
+                ),
+            ):
+                payload = checker.build_report(args)
+
+        self.assertFalse(payload["ready"])
+        self.assertEqual(payload["status"], "blocked")
+        self.assertEqual(payload["primary_blocker"], "principal_invalidation_semantics_unresolved")
+        self.assertIn("principal_invalidation_semantics_unresolved", payload["blockers"])
+        self.assertEqual(
+            payload["readiness_statement"],
+            "lifecycle anchor layout accepted; principal invalidation remains",
+        )
+        anchors = payload["first_evidence"]["lifecycle_anchors"]
+        self.assertEqual(anchors["source"], "players_identity_lifecycle_anchor_candidates")
+        self.assertTrue(anchors["session_start_accepted"])
+        self.assertTrue(anchors["session_end_accepted"])
+        self.assertEqual(anchors["accepted_start_targets"], ["ShooterGameMode.HandleNewPlayer"])
+        self.assertEqual(anchors["accepted_end_targets"], ["ShooterGameMode.OnLogout"])
+        self.assertFalse(anchors["principal_invalidation_ready"])
+        self.assertEqual(payload["next_step"], "produce_reviewed_principal_invalidation_semantics")
+        self.assertFalse(payload["promotion_ready"])
+        self.assertFalse(payload["public_sdk_ready"])
+        self.assertFalse(payload["runtime_ready"])
+
     def test_artifact_root_diagnosis_summarizes_non_matching_manifests(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -1199,15 +1292,16 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         ):
             payload = checker.build_report(args)
 
-        self.assertTrue(payload["ready"])
-        self.assertEqual(payload["status"], "candidate_ready")
-        self.assertTrue(payload["accepted_for_internal_planning"])
+        self.assertFalse(payload["ready"])
+        self.assertEqual(payload["status"], "blocked")
+        self.assertFalse(payload["accepted_for_internal_planning"])
+        self.assertEqual(payload["primary_blocker"], "principal_invalidation_semantics_unresolved")
         self.assertTrue(payload["not_artifact_gate"])
         self.assertFalse(payload["promotion_ready"])
         self.assertFalse(payload["public_sdk_ready"])
         self.assertFalse(payload["runtime_ready"])
-        self.assertEqual(payload["progress_signal"]["status"], "candidate_ready")
-        self.assertTrue(payload["progress_signal"]["ready"])
+        self.assertEqual(payload["progress_signal"]["status"], "blocked")
+        self.assertFalse(payload["progress_signal"]["ready"])
         self.assertTrue(payload["progress_signal"]["coverage"]["reflection_inventory_accepted"])
         self.assertEqual(payload["progress_signal"]["coverage"]["fixture_targets"], "12/12")
         self.assertTrue(payload["progress_signal"]["accepted_anchors"]["session_start"])
@@ -1272,9 +1366,10 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
 
         self.assertTrue(payload["reflection_inventory"]["chain_validation"]["ready"])
         self.assertEqual(payload["reflection_inventory"]["chain_validation"]["blockers"], [])
-        self.assertTrue(payload["ready"])
-        self.assertEqual(payload["status"], "candidate_ready")
-        self.assertTrue(payload["accepted_for_internal_planning"])
+        self.assertFalse(payload["ready"])
+        self.assertEqual(payload["status"], "blocked")
+        self.assertFalse(payload["accepted_for_internal_planning"])
+        self.assertEqual(payload["primary_blocker"], "principal_invalidation_semantics_unresolved")
         self.assertTrue(payload["not_artifact_gate"])
         self.assertFalse(payload["promotion_ready"])
         self.assertFalse(payload["public_sdk_ready"])

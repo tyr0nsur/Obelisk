@@ -71,7 +71,8 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - `oDescriptorCatalog` and Plugin Hub foundation work are metadata/contributor seeds only:
   lifecycle/config/logging, descriptor/catalog, and process-local timers are
   release-supported seed lanes; copied chat/policy stays experimental. Foundation work is
-  not a substitute for v1 blockers.
+  not a substitute for v1 blockers. Installed SDK examples are Linux x86_64 samples only;
+  they must not carry Windows/MSVC export branches or portability signals.
 - `obelisk.command_chat_response_path.v1` is post-v1 planning only, adds no ABI today,
   and keeps replies/send-chat/broadcast/moderation blocked. Static thunks, passive chat,
   vtable slots, raw callbacks, and legacy `CallProcessEvent` are insufficient; see
@@ -120,6 +121,11 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   --candidate-root
   /servidor/ark/workspace-offline/player-identity-offline-identity-vanilla-gdb-20260529T012853Z/focal-snapshots
   --json` currently reports `primary_blocker=accepted_lifecycle_anchor_evidence_missing`.
+  It can also take `--lifecycle-anchor-candidates-manifest` for the candidate-only
+  `obelisk.players-identity-lifecycle-anchor-candidates.v1` artifact. That clears only
+  the lifecycle-anchor evidence precondition; the checker must then remain blocked on
+  `principal_invalidation_semantics_unresolved` and must keep identity, runtime,
+  promotion, and public SDK readiness false.
 - Static orientation reports for identity/lifecycle/admin and command response are
   navigation clues only, not consume/promote evidence packs or artifact-gate schemas.
 - The current artifact-root audit is summarized in
@@ -207,11 +213,14 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   and rejects unnegated v1/ArkApi/permissions/identity/replies/mutation/storage/module
   support claims outside that tier. Release-supported examples are
   `sdk_minimal_plugin`, `sdk_descriptor_catalog`, and `sdk_timer_plugin`;
-  `sdk_inventory_policy_audit` remains experimental.
+  `sdk_inventory_policy_audit` remains experimental. Example source files should fail
+  clearly outside Linux x86_64 instead of advertising Windows/MSVC compatibility.
 - Plugin cleanup failure policy skips `dlclose`, retains the plugin for retry, and does not repeat plugin shutdown after shutdown already ran.
 - Revalidate before any checkpoint: identity readiness with the vanilla-gdb candidate root
-  stays blocked on lifecycle-anchor evidence, public SDK v1 completion stays blocked,
-  Plugin Hub docs stay non-promotional, and `git diff --check` passes.
+  stays blocked on lifecycle-anchor evidence unless an explicit lifecycle-anchor candidate
+  manifest is provided; with that manifest it stays blocked on principal invalidation
+  semantics. Public SDK v1 completion stays blocked, Plugin Hub docs stay non-promotional,
+  and `git diff --check` passes.
 - Start every supervised round by verifying no stale stand-by sub-agent remains open.
   Assign each sub-agent only the scoped objective, safety baseline, allowed paths,
   required skills, expert role, expected decision, and whether edits are allowed. Pass

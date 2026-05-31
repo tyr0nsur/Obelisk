@@ -20,7 +20,8 @@ state, return override authority, mutation, or object lookup.
 
 The example does not use private headers, raw UE pointers, `ProcessEvent`, gameplay
 module APIs, identity, lookup, mutation, return overrides, chat replies/send-chat, ArkApi
-compatibility, or implementation patterns from other frameworks.
+compatibility, Windows/MSVC portability, or implementation patterns from other
+frameworks.
 
 The `find_package` version is a compatibility floor for the current pre-release SDK line,
 not a complete SDK claim and not a claim that a stable `v0.1.0` release tag exists.

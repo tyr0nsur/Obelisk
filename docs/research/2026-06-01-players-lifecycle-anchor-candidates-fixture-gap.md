@@ -148,3 +148,10 @@ and end targets, and verifies that `--promote` blocks on unresolved principal in
 semantics plus the candidate-only gate while keeping public/runtime readiness false. This
 does not promote public player identity, UE pointer exposure, lookup, `ResourceHandle`,
 mutation, return override, or any runtime ordering claim.
+
+`scripts/check_player_identity_first_evidence_readiness.py` can consume the lifecycle
+candidate manifest through `--lifecycle-anchor-candidates-manifest`. That input clears
+only the `accepted_lifecycle_anchor_evidence_missing` precondition. The combined readiness
+report must remain blocked on `principal_invalidation_semantics_unresolved`, with
+`promotion_ready=false`, `public_sdk_ready=false`, and `runtime_ready=false`, until a
+separate reviewed principal invalidation policy exists.

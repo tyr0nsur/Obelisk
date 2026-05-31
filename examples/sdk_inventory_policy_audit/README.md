@@ -19,8 +19,9 @@ event kinds and logs only process-local aggregate counts during shutdown.
 
 The example does not provide an Inventory SDK, Items SDK, identity, lookup, mutation,
 return override, commands, permissions, chat replies/send-chat, storage, ArkApi
-compatibility, or implementation patterns from other frameworks. It does not make policy
-decisions and does not retain callback payloads after the callback returns.
+compatibility, Windows/MSVC portability, or implementation patterns from other
+frameworks. It does not make policy decisions and does not retain callback payloads after
+the callback returns.
 
 The `find_package` version is a compatibility floor for the current pre-release SDK line,
 not a complete SDK claim and not a claim that a stable `v0.1.0` release tag exists.
