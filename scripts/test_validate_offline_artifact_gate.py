@@ -1131,6 +1131,104 @@ def players_identity_first_evidence_manifest(
     }
 
 
+def players_identity_lifecycle_anchor_candidates_manifest() -> dict:
+    anchor = {
+        "role": "session_start",
+        "target": "ShooterPlayerController.ClientNotifyPlayerJoined",
+        "outer": "ShooterPlayerController",
+        "function": "ClientNotifyPlayerJoined",
+        "acceptance_status": "candidate_recorded",
+        "accepted": False,
+        "function_flags": "0x00000000",
+        "num_parms": 1,
+        "parms_size": 1,
+        "return_value_offset": "0xffffffff",
+        "property_order": ["bWasSuccessful"],
+        "fields": [
+            {
+                "name": "bWasSuccessful",
+                "source_property_class": "BoolProperty",
+                "direction": "out",
+                "offset": "0x0",
+                "element_size": 1,
+                "array_dim": 1,
+                "classification": "copied_candidate",
+                "copied_scalar_eligibility": "candidate_non_identity_scalar",
+                "bool_masks": {"byte_mask": "0x01", "field_mask": "0xff"},
+            }
+        ],
+        "evidence": {
+            "source_snapshot": "snapshot-0001",
+            "source_snapshot_sha256": "a" * 64,
+            "snapshot_schema": SNAPSHOT_SCHEMA,
+            "source_kind": "sanitized_snapshot",
+            "binary_sha256": BINARY_SHA,
+        },
+        "corroboration": {
+            "status": "missing",
+            "second_source_report_sha256": None,
+            "static_report_sha256": None,
+        },
+        "blockers": ["layout_not_accepted"],
+    }
+    return {
+        "schema": gate.PLAYERS_IDENTITY_LIFECYCLE_ANCHOR_CANDIDATES_SCHEMA,
+        "artifact_status": "candidate_only",
+        "readiness_classification": "planning_only",
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "input_target_set": "players-identity-lifecycle-intake",
+        "snapshot_root": "redacted",
+        "artifact_identity": {
+            "ark_binary_sha256": BINARY_SHA,
+            "obelisk_commit": "reviewed-commit",
+            "build_type": "sanitized_snapshot",
+            "target_set_revision": "reflection_target_sets.py:players-identity-lifecycle-intake",
+            "source_artifact_ids": [
+                f"artifact_sha256:{'b' * 64}",
+                "capture_id:player-lifecycle-candidates",
+                "evidence_pack_id:player-lifecycle-pack",
+            ],
+            "path_redacted": True,
+        },
+        "candidate_anchors": [anchor],
+        "lifecycle_acceptance": {
+            "session_start_accepted": False,
+            "session_end_accepted": False,
+            "accepted_start_targets": [],
+            "accepted_end_targets": [],
+            "blockers": ["layout_not_accepted"],
+        },
+        "principal_policy": {
+            "public_principal_ready": False,
+            "copied_public_identifier": None,
+            "principal_copy_policy": "unresolved",
+            "privacy_policy": "unresolved",
+            "invalidation_semantics": "unresolved",
+            "logging_policy": "identity_values_not_logged",
+        },
+        "promotion_gate": {
+            "ready": False,
+            "ready_scope": "planning_only",
+            "promotion_ready": False,
+            "blockers": ["public_principal_policy_unresolved"],
+        },
+        "safety_summary": {
+            "candidate_anchor_count": 1,
+            "accepted_anchor_count": 0,
+            "field_count": 1,
+            "identity_redacted_field_count": 0,
+            "copied_candidate_count": 1,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "explicitly_excluded": sorted(gate.lifecycle_anchor_candidates.REQUIRED_EXCLUSIONS),
+        },
+        "non_claims": sorted(gate.lifecycle_anchor_candidates.REQUIRED_NON_CLAIMS),
+    }
+
+
 def rc_ufunction_second_source_root_manifest(root: Path) -> dict:
     expected_sources = gate.expected_rc_ufunction_target_sources()
     assert expected_sources is not None
@@ -3532,6 +3630,37 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
 
         self.assertIn("unsupported_manifest_schema", {blocker["reason"] for blocker in result["blockers"]})
 
+    def test_artifact_pack_accepts_players_identity_lifecycle_anchor_child_schema(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            pack = workspace / "artifact-pack-20260530T072255Z"
+            pack.mkdir(parents=True)
+            write_json(pack / "players-identity-lifecycle-candidates.json", players_identity_lifecycle_anchor_candidates_manifest())
+            artifact_pack.normalize_pack(pack, pack.name, "2026-05-30T07:22:55Z")
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[pack / artifact_pack.MANIFEST_NAME]))
+
+        self.assertEqual("accepted", result["status"])
+        self.assertEqual([], result["blockers"])
+
+    def test_artifact_pack_revalidates_players_identity_lifecycle_anchor_child(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            pack = workspace / "artifact-pack-20260530T072255Z"
+            pack.mkdir(parents=True)
+            child = players_identity_lifecycle_anchor_candidates_manifest()
+            child["principal_policy"]["public_principal_ready"] = True
+            write_json(pack / "players-identity-lifecycle-candidates.json", child)
+            artifact_pack.normalize_pack(pack, pack.name, "2026-05-30T07:22:55Z")
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[pack / artifact_pack.MANIFEST_NAME]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertNotIn("unsupported_manifest_schema", reasons)
+        self.assertIn("public_principal_overclaim", reasons)
+
     def test_artifact_pack_revalidates_core_child_fail_closed_status(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"
@@ -5533,6 +5662,50 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertEqual("blocked", result["status"])
         reasons = {blocker["reason"] for blocker in result["blockers"]}
         self.assertIn("promote_mode_players_identity_first_evidence_candidate_only", reasons)
+
+    def test_accepts_players_identity_lifecycle_anchor_candidates_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "players-identity-lifecycle-candidates.json"
+            write_json(manifest, players_identity_lifecycle_anchor_candidates_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual("accepted", result["status"])
+        self.assertEqual(result["blockers"], [])
+
+    def test_blocks_players_identity_lifecycle_anchor_candidates_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "players-identity-lifecycle-candidates.json"
+            write_json(manifest, players_identity_lifecycle_anchor_candidates_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        self.assertEqual("blocked", result["status"])
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("promote_mode_players_identity_lifecycle_anchor_candidates_candidate_only", reasons)
+
+    def test_blocks_players_identity_lifecycle_anchor_candidate_public_overclaim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "players-identity-lifecycle-candidates.json"
+            payload = players_identity_lifecycle_anchor_candidates_manifest()
+            payload["principal_policy"]["public_principal_ready"] = True
+            payload["candidate_anchors"][0]["fields"][0]["name"] = "SteamID"
+            payload["candidate_anchors"][0]["fields"][0]["copied_scalar_eligibility"] = "candidate_copied_public_identifier"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual("blocked", result["status"])
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("public_principal_overclaim", reasons)
+        self.assertIn("identity_field_not_redacted", reasons)
+        self.assertIn("identity_field_copied_public_overclaim", reasons)
 
     def test_blocks_players_identity_first_evidence_weak_artifact_identity(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

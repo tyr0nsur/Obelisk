@@ -27,6 +27,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 
 from snapshot_evidence_pack import SHA256_RE, SERVER_ROOT, sha256_file  # noqa: E402
 import normalize_artifact_pack as artifact_pack  # noqa: E402
+import check_player_identity_lifecycle_anchor_candidates as lifecycle_anchor_candidates  # noqa: E402
 
 
 SCHEMA = "obelisk.offline-artifact-gate-result.v1"
@@ -119,6 +120,7 @@ STRUCTURE_RETURN_ONLY_POLICY_SLICE_SCHEMA = "obelisk.structure-return-only-polic
 STRUCTURE_NONPIN_COPIED_SCALAR_POLICY_SLICE_SCHEMA = "obelisk.structure-nonpin-copied-scalar-policy-slice.v1"
 STRUCTURE_AGGREGATE_CENSUS_POLICY_SLICE_SCHEMA = "obelisk.structure-aggregate-census-policy-slice.v1"
 PLAYERS_IDENTITY_FIRST_EVIDENCE_SCHEMA = "obelisk.players-identity-first-evidence.v1"
+PLAYERS_IDENTITY_LIFECYCLE_ANCHOR_CANDIDATES_SCHEMA = lifecycle_anchor_candidates.SCHEMA
 SUPPORTED_MANIFEST_SCHEMAS = {
     CORE_DUMP_EVIDENCE_PACK_SCHEMA,
     GOBJECTS_TWO_CORE_MANIFEST_SCHEMA,
@@ -150,6 +152,7 @@ SUPPORTED_MANIFEST_SCHEMAS = {
     STRUCTURE_NONPIN_COPIED_SCALAR_POLICY_SLICE_SCHEMA,
     STRUCTURE_AGGREGATE_CENSUS_POLICY_SLICE_SCHEMA,
     PLAYERS_IDENTITY_FIRST_EVIDENCE_SCHEMA,
+    PLAYERS_IDENTITY_LIFECYCLE_ANCHOR_CANDIDATES_SCHEMA,
 }
 UOBJECT_FLAG_TRANSITION_PROVENANCE_SCHEMAS = {
     "obelisk.offline-artifact-provenance.v1",
@@ -5405,6 +5408,25 @@ def validate_players_identity_first_evidence_manifest(payload: dict[str, Any], *
     return blockers
 
 
+def validate_players_identity_lifecycle_anchor_candidates_manifest(
+    payload: dict[str, Any],
+    *,
+    label: str,
+    mode: str,
+) -> list[dict[str, Any]]:
+    if payload.get("schema") != PLAYERS_IDENTITY_LIFECYCLE_ANCHOR_CANDIDATES_SCHEMA:
+        return []
+
+    blockers = lifecycle_anchor_candidates.validate_manifest(payload, promote=mode == "promote")
+    for blocker in blockers:
+        blocker_label = blocker.get("label")
+        if isinstance(blocker_label, str) and blocker_label.startswith("$"):
+            blocker["label"] = f"{label}:{blocker_label}"
+        elif "label" not in blocker:
+            blocker["label"] = label
+    return blockers
+
+
 def validate_static_global_promotion_evidence_manifest(
     payload: dict[str, Any],
     *,
@@ -8529,6 +8551,7 @@ def validate_manifest(
     blockers.extend(validate_structure_nonpin_copied_scalar_policy_slice_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_structure_aggregate_census_policy_slice_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_players_identity_first_evidence_manifest(payload, label=str(resolved), mode=mode))
+    blockers.extend(validate_players_identity_lifecycle_anchor_candidates_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_gobjects_two_core_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_static_global_promotion_evidence_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(

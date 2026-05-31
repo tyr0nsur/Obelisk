@@ -5,12 +5,50 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 from typing import Any
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
+CANONICAL_SURFACE_IDS = {
+    "obelisk.arkapi_compatibility.v1",
+    "obelisk.chat.local_routing.v1",
+    "obelisk.chat_message.v1",
+    "obelisk.commands_replies.v1",
+    "obelisk.debug_raw_process_event.v1",
+    "obelisk.descriptors.v1",
+    "obelisk.gameplay_policy_event.v1",
+    "obelisk.gameplay_tick_callbacks.v1",
+    "obelisk.inventory_item_copied_signals.v1",
+    "obelisk.inventory_items_mutation.v1",
+    "obelisk.lifecycle_config_logging.v1",
+    "obelisk.mission_transfer_dino_tribe.v1",
+    "obelisk.operator_ingress_storage.v1",
+    "obelisk.permissions_admin.v1",
+    "obelisk.player_identity.v1",
+    "obelisk.player_services_economy_mobility.v1",
+    "obelisk.process_local_timers.v1",
+    "obelisk.structure_census.v1",
+}
+CANONICAL_V1_COMPLETION_BLOCKERS = {
+    "obelisk.player_identity.v1",
+    "obelisk.permissions_admin.v1",
+    "obelisk.commands_replies.v1",
+    "obelisk.inventory_items_mutation.v1",
+    "obelisk.structure_census.v1",
+    "obelisk.mission_transfer_dino_tribe.v1",
+    "obelisk.player_services_economy_mobility.v1",
+    "obelisk.operator_ingress_storage.v1",
+    "obelisk.gameplay_tick_callbacks.v1",
+}
+CANONICAL_EXPERIMENTAL_SURFACE_IDS = {
+    "obelisk.gameplay_policy_event.v1",
+    "obelisk.chat_message.v1",
+    "obelisk.chat.local_routing.v1",
+    "obelisk.inventory_item_copied_signals.v1",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -59,16 +97,23 @@ def load_release_statement(path: Path | None) -> tuple[str | None, list[str]]:
 
 def release_statement_names_outcome(text: str, surface_id: str, status: str) -> bool:
     expected = "post-v1" if status == "post-v1" else "excluded"
-    surface_id_lower = surface_id.lower()
+    pattern = re.compile(rf"^\s*{re.escape(surface_id)}\s*(?::|-)\s*{re.escape(expected)}\b", re.IGNORECASE)
     for line in text.splitlines():
-        lowered = line.lower()
-        if surface_id_lower not in lowered:
-            continue
-        if "not " in lowered or " no " in lowered:
-            continue
-        if f"{surface_id_lower}: {expected}" in lowered or f"{surface_id_lower} - {expected}" in lowered:
+        if pattern.search(line):
             return True
     return False
+
+
+def required_release_statement_text(requirement: str) -> str | None:
+    lowered = requirement.lower()
+    marker = "the v1 release statement states that "
+    if lowered.startswith(marker):
+        return requirement[len(marker) :]
+    if lowered.startswith("the v1 release statement names "):
+        return None
+    if "v1_completion_required changes only" in lowered:
+        return None
+    return requirement
 
 
 def release_statement_satisfies_exclusion_contract(text: str, surface: dict[str, Any]) -> bool:
@@ -79,7 +124,15 @@ def release_statement_satisfies_exclusion_contract(text: str, surface: dict[str,
     if not required:
         return True
     lowered = text.lower()
-    return all(item.lower() in lowered for item in required)
+    required_text = [item for item in (required_release_statement_text(item) for item in required) if item]
+    return all(item.lower() in lowered for item in required_text)
+
+
+def evidence_path_exists(raw_path: str) -> bool:
+    path = Path(raw_path)
+    if not path.is_absolute():
+        path = REPO_ROOT / path
+    return path.exists()
 
 
 def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
@@ -95,9 +148,9 @@ def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
     )
     for key in machine_keys:
         value = evidence.get(key)
-        if isinstance(value, list) and value:
+        if isinstance(value, list) and value and all(isinstance(item, str) and evidence_path_exists(item) for item in value):
             return True
-        if isinstance(value, str) and value:
+        if isinstance(value, str) and evidence_path_exists(value):
             return True
     return False
 
@@ -149,23 +202,32 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
         if surface.get("status") == "promoted-experimental-only"
     }
     completion_blockers = as_string_list(manifest.get("v1_sdk_completion_blockers"))
+    completion_blocker_set = set(completion_blockers)
     post_v1_or_excluded = set(as_string_list(manifest.get("post_v1_or_excluded_surfaces")))
 
     unresolved_experimental: list[str] = []
     unresolved_completion_blockers: list[str] = []
     missing_surfaces: list[str] = []
+    missing_canonical_surfaces = sorted(CANONICAL_SURFACE_IDS - set(surfaces_by_id))
+    missing_canonical_completion_blockers = sorted(CANONICAL_V1_COMPLETION_BLOCKERS - completion_blocker_set)
     promoted_without_contract: list[str] = []
-    promoted_blockers_without_evidence: list[str] = []
+    promoted_without_evidence: list[str] = []
     non_promoted_with_contract: list[str] = []
     promoted_list_mismatches: list[str] = []
     experimental_list_mismatches: list[str] = []
     release_statement_missing_blockers: list[str] = []
     release_statement_missing_contracts: list[str] = []
+    release_statement_missing_experimental_outcomes: list[str] = []
 
     if experimental_surfaces != status_experimental_surfaces:
         experimental_list_mismatches = sorted(experimental_surfaces ^ status_experimental_surfaces)
 
-    for surface_id in sorted(experimental_surfaces | status_experimental_surfaces):
+    experimental_outcome_surface_ids = (
+        experimental_surfaces
+        | status_experimental_surfaces
+        | (CANONICAL_EXPERIMENTAL_SURFACE_IDS & set(surfaces_by_id))
+    )
+    for surface_id in sorted(experimental_outcome_surface_ids):
         surface = surfaces_by_id.get(surface_id)
         if not surface:
             missing_surfaces.append(surface_id)
@@ -175,6 +237,10 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
         if status == "promoted":
             continue
         if status in {"post-v1", "excluded"} and surface_id in post_v1_or_excluded:
+            if release_statement_text is None:
+                release_statement_missing_experimental_outcomes.append(surface_id)
+            elif not release_statement_names_outcome(release_statement_text, surface_id, status):
+                release_statement_missing_experimental_outcomes.append(surface_id)
             continue
         unresolved_experimental.append(surface_id)
 
@@ -187,7 +253,7 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
         status = surface.get("status")
         if status == "promoted":
             if not surface_has_promotion_evidence(surface):
-                promoted_blockers_without_evidence.append(surface_id)
+                promoted_without_evidence.append(surface_id)
             continue
         if status in {"post-v1", "excluded"} and surface_id in post_v1_or_excluded:
             if release_statement_text is None:
@@ -208,6 +274,8 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
                 promoted_list_mismatches.append(surface_id)
             if not contract_items:
                 promoted_without_contract.append(surface_id)
+            if not surface_has_promotion_evidence(surface):
+                promoted_without_evidence.append(surface_id)
         elif status != "promoted-experimental-only" and contract_items:
             non_promoted_with_contract.append(surface_id)
 
@@ -218,16 +286,23 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
         elif surface.get("status") != "promoted":
             promoted_list_mismatches.append(surface_id)
 
+    missing_surfaces.extend(missing_canonical_surfaces)
+    unresolved_completion_blockers.extend(missing_canonical_completion_blockers)
+
     if missing_surfaces:
         blockers.append("surface_id_missing")
+    if missing_canonical_surfaces:
+        blockers.append("canonical_surface_id_missing")
+    if missing_canonical_completion_blockers:
+        blockers.append("canonical_v1_completion_blocker_missing")
     if unresolved_experimental:
         blockers.append("promoted_experimental_surfaces_unresolved")
     if unresolved_completion_blockers:
         blockers.append("v1_sdk_completion_blockers_unresolved")
     if promoted_without_contract:
         blockers.append("promoted_surface_public_contract_missing")
-    if promoted_blockers_without_evidence:
-        blockers.append("promoted_blocker_evidence_missing")
+    if promoted_without_evidence:
+        blockers.append("promoted_surface_evidence_missing")
     if non_promoted_with_contract:
         blockers.append("non_promoted_surface_has_public_contract")
     if promoted_list_mismatches:
@@ -238,6 +313,8 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
         blockers.append("release_statement_missing_non_promoted_blocker_outcomes")
     if release_statement_missing_contracts:
         blockers.append("release_statement_missing_exclusion_contract")
+    if release_statement_missing_experimental_outcomes:
+        blockers.append("release_statement_missing_experimental_outcomes")
     if release_statement_text is not None:
         if "docs/sdk_v1_compatibility.md" not in release_statement_text.lower():
             blockers.append("release_statement_missing_sdk_compatibility_reference")
@@ -258,12 +335,16 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
         "unresolved_completion_blockers": sorted(set(unresolved_completion_blockers)),
         "missing_surfaces": sorted(set(missing_surfaces)),
         "promoted_without_public_contract": sorted(set(promoted_without_contract)),
-        "promoted_blockers_without_evidence": sorted(set(promoted_blockers_without_evidence)),
+        "missing_canonical_surfaces": missing_canonical_surfaces,
+        "missing_canonical_completion_blockers": missing_canonical_completion_blockers,
+        "promoted_surfaces_without_evidence": sorted(set(promoted_without_evidence)),
+        "promoted_blockers_without_evidence": sorted(set(promoted_without_evidence) & completion_blocker_set),
         "non_promoted_with_public_contract": sorted(set(non_promoted_with_contract)),
         "promoted_list_mismatches": sorted(set(promoted_list_mismatches)),
         "experimental_list_mismatches": sorted(set(experimental_list_mismatches)),
         "release_statement_missing_blocker_outcomes": sorted(set(release_statement_missing_blockers)),
         "release_statement_missing_exclusion_contracts": sorted(set(release_statement_missing_contracts)),
+        "release_statement_missing_experimental_outcomes": sorted(set(release_statement_missing_experimental_outcomes)),
         "non_claims": [
             "core-first release readiness, install layout, and package-shape checks do not satisfy this v1 SDK completion gate",
             "post-v1 or excluded surfaces must be named in the manifest and release statement before a stable v1 SDK claim",

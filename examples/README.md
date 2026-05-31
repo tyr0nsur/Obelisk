@@ -23,8 +23,18 @@ complete v1 SDK claim.
 From the external plugin source root:
 
 ```bash
-cmake -S . -B build -DCMAKE_PREFIX_PATH=/path/to/obelisk-install-root
+cmake -S . -B build \
+  -DCMAKE_PREFIX_PATH=/path/to/obelisk-install-root \
+  -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 cmake --build build -j"$(nproc)"
+```
+
+Confirm the build consumed the installed SDK headers and did not fall back to a local
+Obelisk source checkout:
+
+```bash
+rg -n '/path/to/obelisk-install-root/include' build/compile_commands.json
+! rg -n '/path/to/Obelisk/include' build/compile_commands.json
 ```
 
 The plugin CMake must request only the installed SDK package and target:

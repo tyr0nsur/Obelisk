@@ -120,6 +120,27 @@ teaches the offline artifact gate how to consume the field-window schema; gate-r
 provenance child manifests remain blocked with `unsupported_manifest_schema` until they
 have their own schema-specific validators.
 
+The same field-window evidence was re-materialized under the durable non-protected
+artifact root:
+
+```text
+/home/flowcommunity-ark/obelisk-artifacts/static-global-field-window-strict-20260531T040157Z
+```
+
+Refresh result:
+
+```text
+static-global consume gate: accepted
+static-global blockers: []
+artifact identity sha256: b2929c5061aefdf3cfd24c9a8c42b27490edb89b551dff1a3d544b4da42a9113
+promotion_gate.ready: false
+```
+
+This refresh is hygiene for static global evidence only. It still does not satisfy the
+current `v1.0` SDK blockers, does not replace a complete core evidence pack or reflection
+inventory pack, and does not promote public `GObjects`, `ResourceHandle`, identity,
+lookup, mutation, return override, runtime hooks, or SDK surface.
+
 ## Fastest Offline Route
 
 1. Do not rerun broad FName/GObjects scans for the current binary. If the artifact already
