@@ -3744,6 +3744,40 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         reasons = {blocker["reason"] for blocker in result["blockers"]}
         self.assertIn("unsupported_manifest_schema", reasons)
 
+    def test_command_chat_response_static_orientation_is_not_an_artifact_gate_schema(self) -> None:
+        orientation_schema = "obelisk.command-chat-response-static-orientation-check.v1"
+        self.assertNotIn(orientation_schema, gate.SUPPORTED_MANIFEST_SCHEMAS)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "command-chat-response-static-orientation" / "manifest.json"
+            write_json(
+                manifest,
+                {
+                    "schema": orientation_schema,
+                    "status": "valid",
+                    "accepted_for_orientation": True,
+                    "promotion_ready": False,
+                    "public_sdk_ready": False,
+                    "runtime_ready": False,
+                    "non_claims": [
+                        "valid static orientation is candidate-only planning evidence",
+                    ],
+                },
+            )
+
+            consume_result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+            promote_result = gate.build_result(
+                args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote")
+            )
+
+        for result in (consume_result, promote_result):
+            with self.subTest(mode=result["mode"]):
+                self.assertEqual(result["status"], "blocked")
+                reasons = {blocker["reason"] for blocker in result["blockers"]}
+                self.assertIn("unsupported_manifest_schema", reasons)
+
     def test_accepts_normalized_artifact_pack_manifest_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"

@@ -1907,6 +1907,108 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             self.assertIn(exclusion, response["exclusions"])
 
+    def test_public_header_does_not_expose_blocked_v1_sdk_surface_tokens(self) -> None:
+        header = PUBLIC_API_HEADER.read_text(encoding="utf-8")
+        manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
+
+        for surface_id in (
+            "obelisk.permissions_admin.v1",
+            "obelisk.command_chat_response_path.v1",
+            "obelisk.commands_replies.v1",
+            "obelisk.inventory_items_mutation.v1",
+        ):
+            with self.subTest(surface=surface_id):
+                self.assertIn(surfaces[surface_id]["status"], {"post-v1", "planning", "excluded"})
+                self.assertEqual(surfaces[surface_id].get("public_contract", []), [])
+
+        forbidden_public_header_tokens = (
+            "OBELISK_API_CAPABILITY_PERMISSION_CHECKS",
+            "OBELISK_API_CAPABILITY_PERMISSIONS_ADMIN",
+            "OBELISK_API_CAPABILITY_COMMANDS",
+            "OBELISK_API_CAPABILITY_COMMAND_REPLIES",
+            "OBELISK_API_CAPABILITY_CHAT_RESPONSES",
+            "OBELISK_API_CAPABILITY_INVENTORY_MUTATION",
+            "OBELISK_API_CAPABILITY_ITEM_MUTATION",
+            "ObeliskPermissionQuery",
+            "ObeliskPermissionDecision",
+            "ObeliskCommand",
+            "ObeliskCommandContext",
+            "ObeliskCommandReply",
+            "ObeliskChatResponse",
+            "ObeliskInventoryMutation",
+            "ObeliskItemMutation",
+            "RegisterCommand",
+            "UnregisterCommand",
+            "ReplyToCommand",
+            "SendChat",
+            "GrantPermission",
+            "RevokePermission",
+            "GiveItem",
+            "RemoveItem",
+            "SetItemQuantity",
+        )
+        for token in forbidden_public_header_tokens:
+            with self.subTest(token=token):
+                self.assertNotIn(token, header)
+
+    def test_public_sdk_surfaces_manifest_keeps_inventory_items_mutation_blocked_until_identity_promotion(self) -> None:
+        manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
+        inventory = surfaces["obelisk.inventory_items_mutation.v1"]
+
+        self.assertEqual(inventory["status"], "post-v1")
+        self.assertEqual(inventory["support_tier"], "blocked")
+        self.assertEqual(inventory["public_contract"], [])
+        self.assertIn("obelisk.inventory_items_mutation.v1", manifest["v1_sdk_completion_blockers"])
+        self.assertIn("obelisk.inventory_items_mutation.v1", manifest["post_v1_or_excluded_surfaces"])
+        self.assertNotIn("obelisk.inventory_items_mutation.v1", manifest["promoted_surfaces"])
+
+        decision = inventory["v1_decision_contract"]
+        self.assertEqual(
+            decision["current_decision"],
+            "blocked_until_promoted_or_explicitly_excluded",
+        )
+        self.assertTrue(decision["must_remain_without_public_contract_until_promotion"])
+        promotion_requires = " ".join(decision["promotion_requires"])
+        for term in (
+            "promoted player, inventory, and item identity semantics needed by that unit",
+            "rollback, privacy, and abuse controls for grants/removals/progression",
+            "append-only POD C ABI design with capability gates, owner-scoped cleanup, and SDK consumer tests",
+        ):
+            self.assertIn(term, promotion_requires)
+
+        exclusion_requires = " ".join(decision["exclusion_requires"])
+        self.assertIn(
+            "no Inventory SDK, Items SDK, give item API, remove item API, kits/rewards API, "
+            "engram/progression API, inventory lookup, item handles, item mutation, return "
+            "override, or ResourceHandle API is included in v1",
+            exclusion_requires,
+        )
+
+        for blocker in (
+            "No item/inventory identity.",
+            "No lookup or mutation contract.",
+            "No rollback/privacy policy for item grants or removals.",
+            "No player progression, engram unlock, kit grant, or item reward contract.",
+        ):
+            self.assertIn(blocker, inventory["blockers"])
+
+        for exclusion in (
+            "Inventory SDK",
+            "Items SDK",
+            "give item",
+            "remove item",
+            "kits/rewards",
+            "engram/progression API",
+            "inventory lookup",
+            "item handles",
+            "item mutation",
+            "return override",
+            "ResourceHandle",
+        ):
+            self.assertIn(exclusion, inventory["exclusions"])
+
     def test_public_sdk_surfaces_manifest_names_high_demand_umbrella_audit_units(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
         surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}

@@ -114,9 +114,10 @@ blocking API, permission API, or raw `FString`/UE payload.
 
 Plugin-local chat routing is experimental seed material only. A plugin may parse copied
 `ChatMessageEvent` bytes with `principal=unknown`, plugin-owned prefixes/tables,
-sanitized logs, and global plugin config. Obelisk v1 does not promise a public command
-SDK/router, sender identity, permissions, replies, send-chat, moderation, blocking,
-mutation, return override, UE lookup, or raw UE/`FString`/params exposure.
+sanitized logs, and global plugin config. The current core-first RC surface does not
+promise a public command SDK/router, sender identity, permissions, replies, send-chat,
+moderation, blocking, mutation, return override, UE lookup, or raw
+UE/`FString`/params exposure.
 
 Commands/replies is post-v1 and blocked as a combined surface. It depends on a promoted
 player identity/principal contract, a promoted permission/authority model, and the

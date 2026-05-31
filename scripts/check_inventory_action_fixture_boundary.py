@@ -71,17 +71,39 @@ EXPECTED_INVENTORY_COPIED_PUBLIC_CONTRACT = [
     "GameplayPolicyEvent inventory_item.can_repair_check",
     "GameplayPolicyEvent inventory_item.use_onto_item_check",
 ]
+EXPECTED_INVENTORY_COPIED_PAYLOAD_CONTRACT = [
+    "copied bool ReturnValue signals only where declared by docs/public_gameplay_events.json",
+    "copied bRequestedByPlayer for inventory.remote_add_check",
+    "copied bIgnoreCooldown for inventory.use_check",
+    "resource_kind remains INVENTORY_ITEM metadata only",
+    "post-original observation only; no authority",
+]
 REQUIRED_INVENTORY_COPIED_EXCLUSIONS = (
     "Inventory SDK",
     "Items SDK",
     "item identity",
     "inventory identity",
+    "ItemNetID identity",
     "lookup",
     "mutation",
     "return override",
     "ResourceHandle",
+    "CraftBlueprint",
     "AdditionalData",
     "UObject pointers",
+)
+REQUIRED_INVENTORY_MUTATION_EXCLUSIONS = (
+    "Inventory SDK",
+    "Items SDK",
+    "give item",
+    "remove item",
+    "kits/rewards",
+    "engram/progression API",
+    "inventory lookup",
+    "item handles",
+    "item mutation",
+    "return override",
+    "ResourceHandle",
 )
 
 
@@ -314,10 +336,14 @@ def scan_public_contract_manifest(path: Path, blockers: list[dict[str, Any]]) ->
     else:
         copied_status = inventory_copied.get("status")
         copied_contract = inventory_copied.get("public_contract")
+        copied_payload_contract = inventory_copied.get("payload_contract")
         copied_exclusions = inventory_copied.get("exclusions")
         surface_summary[INVENTORY_COPIED_SIGNALS_SURFACE] = {
             "status": copied_status,
             "public_contract_count": len(copied_contract) if isinstance(copied_contract, list) else None,
+            "payload_contract_count": (
+                len(copied_payload_contract) if isinstance(copied_payload_contract, list) else None
+            ),
         }
         if copied_status != "promoted-experimental-only":
             append_blocker(
@@ -332,6 +358,13 @@ def scan_public_contract_manifest(path: Path, blockers: list[dict[str, Any]]) ->
                 "inventory_copied_signals_public_contract_mismatch",
                 expected=EXPECTED_INVENTORY_COPIED_PUBLIC_CONTRACT,
                 value=copied_contract,
+            )
+        if copied_payload_contract != EXPECTED_INVENTORY_COPIED_PAYLOAD_CONTRACT:
+            append_blocker(
+                blockers,
+                "inventory_copied_signals_payload_contract_mismatch",
+                expected=EXPECTED_INVENTORY_COPIED_PAYLOAD_CONTRACT,
+                value=copied_payload_contract,
             )
         if not isinstance(copied_exclusions, list):
             append_blocker(blockers, "inventory_copied_signals_exclusions_missing")
@@ -351,9 +384,14 @@ def scan_public_contract_manifest(path: Path, blockers: list[dict[str, Any]]) ->
     else:
         mutation_status = inventory_mutation.get("status")
         mutation_contract = inventory_mutation.get("public_contract")
+        mutation_payload_contract = inventory_mutation.get("payload_contract", [])
+        mutation_exclusions = inventory_mutation.get("exclusions")
         surface_summary[INVENTORY_MUTATION_SURFACE] = {
             "status": mutation_status,
             "public_contract_count": len(mutation_contract) if isinstance(mutation_contract, list) else None,
+            "payload_contract_count": (
+                len(mutation_payload_contract) if isinstance(mutation_payload_contract, list) else None
+            ),
         }
         if mutation_status != "post-v1":
             append_blocker(
@@ -368,6 +406,24 @@ def scan_public_contract_manifest(path: Path, blockers: list[dict[str, Any]]) ->
                 "inventory_mutation_public_contract_present",
                 value=mutation_contract,
             )
+        if mutation_payload_contract != []:
+            append_blocker(
+                blockers,
+                "inventory_mutation_payload_contract_present",
+                value=mutation_payload_contract,
+            )
+        if not isinstance(mutation_exclusions, list):
+            append_blocker(blockers, "inventory_mutation_exclusions_missing")
+        else:
+            missing_exclusions = [
+                exclusion for exclusion in REQUIRED_INVENTORY_MUTATION_EXCLUSIONS if exclusion not in mutation_exclusions
+            ]
+            if missing_exclusions:
+                append_blocker(
+                    blockers,
+                    "inventory_mutation_exclusions_incomplete",
+                    missing=missing_exclusions,
+                )
 
     return {"path": str(path), "offenders": offenders, "surface_summary": surface_summary}
 

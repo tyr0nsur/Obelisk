@@ -72,8 +72,10 @@ class CheckInventoryActionFixtureBoundaryTests(unittest.TestCase):
             surface_summary["obelisk.inventory_item_copied_signals.v1"]["status"],
         )
         self.assertEqual(5, surface_summary["obelisk.inventory_item_copied_signals.v1"]["public_contract_count"])
+        self.assertEqual(5, surface_summary["obelisk.inventory_item_copied_signals.v1"]["payload_contract_count"])
         self.assertEqual("post-v1", surface_summary["obelisk.inventory_items_mutation.v1"]["status"])
         self.assertEqual(0, surface_summary["obelisk.inventory_items_mutation.v1"]["public_contract_count"])
+        self.assertEqual(0, surface_summary["obelisk.inventory_items_mutation.v1"]["payload_contract_count"])
 
     def test_mutated_fixture_counts_fail_closed(self) -> None:
         report = checker.build_fixture_report()
@@ -105,13 +107,15 @@ class CheckInventoryActionFixtureBoundaryTests(unittest.TestCase):
                                 "id": "obelisk.inventory_item_copied_signals.v1",
                                 "status": "promoted-experimental-only",
                                 "public_contract": checker.EXPECTED_INVENTORY_COPIED_PUBLIC_CONTRACT,
-                                "payload_contract": [],
+                                "payload_contract": checker.EXPECTED_INVENTORY_COPIED_PAYLOAD_CONTRACT,
                                 "exclusions": list(checker.REQUIRED_INVENTORY_COPIED_EXCLUSIONS),
                             },
                             {
                                 "id": "obelisk.inventory_items_mutation.v1",
                                 "status": "post-v1",
                                 "public_contract": [],
+                                "payload_contract": [],
+                                "exclusions": list(checker.REQUIRED_INVENTORY_MUTATION_EXCLUSIONS),
                             },
                             {
                                 "id": "synthetic.inventory",
@@ -146,13 +150,15 @@ class CheckInventoryActionFixtureBoundaryTests(unittest.TestCase):
                                 "id": "obelisk.inventory_item_copied_signals.v1",
                                 "status": "promoted",
                                 "public_contract": checker.EXPECTED_INVENTORY_COPIED_PUBLIC_CONTRACT,
-                                "payload_contract": [],
+                                "payload_contract": ["broader copied payload contract"],
                                 "exclusions": ["Inventory SDK"],
                             },
                             {
                                 "id": "obelisk.inventory_items_mutation.v1",
                                 "status": "promoted",
                                 "public_contract": ["GiveItem"],
+                                "payload_contract": ["mutation payload"],
+                                "exclusions": ["Inventory SDK"],
                             },
                         ]
                     }
@@ -164,9 +170,12 @@ class CheckInventoryActionFixtureBoundaryTests(unittest.TestCase):
         payload = json.loads(result.stdout)
         reasons = {blocker["reason"] for blocker in payload["blockers"]}
         self.assertIn("inventory_copied_signals_status_mismatch", reasons)
+        self.assertIn("inventory_copied_signals_payload_contract_mismatch", reasons)
         self.assertIn("inventory_copied_signals_exclusions_incomplete", reasons)
         self.assertIn("inventory_mutation_status_mismatch", reasons)
         self.assertIn("inventory_mutation_public_contract_present", reasons)
+        self.assertIn("inventory_mutation_payload_contract_present", reasons)
+        self.assertIn("inventory_mutation_exclusions_incomplete", reasons)
 
     def test_item_id_and_additional_data_redaction_mutations_fail_closed(self) -> None:
         report = checker.build_fixture_report()

@@ -46,8 +46,8 @@ promoted. Planning-only, internal-layout, consume-only, or test-only evidence is
 public SDK evidence.
 
 `v1.0` is the planned completion gate for a complete public SDK claim, not just a stable
-core runtime. The foundation rows below are the starting layer; the full stable SDK
-requires the blocked high-demand categories to be either promoted through
+core runtime. The foundation rows below are the starting layer; any future stable SDK
+claim requires the blocked high-demand categories to be either promoted through
 Obelisk-native copied ABI contracts and evidence, or explicitly left outside the `v1.0`
 support statement so plugin authors do not mistake a partial primitive for a complete Ark
 server modding framework.
@@ -164,8 +164,8 @@ experimental plugin-local `ChatMessageEvent` parsing lane.
 
 | Modder intent | Use now | Status | Must not imply |
 | --- | --- | --- | --- |
-| Load a Linux-native plugin | `ObeliskPlugin_GetInfo`, `ObeliskPlugin_Init`, optional `ObeliskPlugin_Shutdown` | Stable baseline | Hot reload of Obelisk itself, detached workers, or background ingress without shutdown proof |
-| Log through Obelisk | `ObeliskApi::LogInfo`, `LogWarn`, and `LogError` after `struct_size` checks | Stable baseline | Long-lived ownership of callback data or cross-thread logging contracts not proven by the plugin |
+| Load a Linux-native plugin | `ObeliskPlugin_GetInfo`, `ObeliskPlugin_Init`, optional `ObeliskPlugin_Shutdown` | Core-first RC baseline | Hot reload of Obelisk itself, detached workers, or background ingress without shutdown proof |
+| Log through Obelisk | `ObeliskApi::LogInfo`, `LogWarn`, and `LogError` after `struct_size` checks | Core-first RC baseline | Long-lived ownership of callback data or cross-thread logging contracts not proven by the plugin |
 | Discover resource categories | `DescribeResourceKind` | Promoted metadata | Resource identity, object lookup, persistent handles, or correlation between events |
 | Discover promoted policy event kinds | `DescribeGameplayPolicyEventKind` | Promoted metadata | No complete gameplay inventory, public module SDK, mutation path, or return override |
 | Observe copied structure/item policy data | `GameplayPolicyEvent` with owner-token registration for `minimal-second-source-intake`, `item-return-only-policy-slice`, and `structure-observer-intake` release-readiness target sets only | v0.1 copied-data ABI surface; experimental Plugin Hub seed, not v1-complete | Public `StructureEvents`, Inventory SDK, Items SDK, UE pointers, player/item/structure identity, mutation, or return override |
@@ -186,9 +186,10 @@ experimental plugin-local `ChatMessageEvent` parsing lane.
 
 ## Current Safe Route
 
-For plugin authors, the stable v0.1.x release-supported seed shape is lifecycle/config/logging,
-descriptor-driven discovery, and process-local timers. Stop there for production
-Foundation examples. In this section, `promoted` means a copied, capability-gated ABI
+For plugin authors, the current v0.1.x core-first release-supported seed shape is
+lifecycle/config/logging, descriptor-driven discovery, and process-local timers. Stop
+there for Foundation examples intended to be release-supported seeds. In this section,
+`promoted` means a copied, capability-gated ABI
 entry with an exact release-readiness second-source target set can be discovered or
 subscribed to by explicitly experimental copied-data examples; it does not turn copied
 chat/policy examples into production Plugin Hub modules, command/router or policy SDKs,

@@ -193,6 +193,13 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   artifact-pack child manifest in consume mode only.
 - Item return-only policy has three public `GameplayPolicyEvent` `ReturnValue` kinds only;
   no public Inventory SDK, Items SDK, identity, mutation, or return override is promoted.
+- Inventory action fixture guardrails now pin the exact five copied inventory/item
+  `GameplayPolicyEvent` public contracts, the exact copied payload-contract wording,
+  required copied-signal exclusions including `ItemNetID identity` and `CraftBlueprint`,
+  and empty public/payload contracts plus required exclusions for
+  `obelisk.inventory_items_mutation.v1`. This is still fixture-only/candidate-only and
+  does not promote Inventory SDK, Items SDK, identity, lookup, mutation, return override,
+  or `ResourceHandle`.
 - Mission copied-bool evidence keeps exact bool-tail metadata:
   `bool_field_size=1`, `bool_byte_offset=0`, `byte_mask=0x01`, `field_mask=0xff`, and
   `native_bool=false`. Consume mode accepts; promote mode blocks, with promotion ready:
