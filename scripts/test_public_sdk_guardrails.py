@@ -184,6 +184,23 @@ V010_PUBLIC_CALLBACK_TYPEDEF_ALLOWLIST = [
     "ObeliskChatMessageEventCallback",
     "ObeliskTimerCallback",
 ]
+V010_PLUGIN_METADATA_FIELDS = [
+    "abi_version",
+    "struct_size",
+    "plugin_id",
+    "name",
+    "version",
+    "config_file",
+    "default_config_json",
+]
+V010_PLUGIN_INIT_CONTEXT_FIELDS = [
+    "abi_version",
+    "struct_size",
+    "config_dir",
+    "config_path",
+    "instance_id",
+    "plugin_owner_token",
+]
 CORE_TIMER_PUBLIC_TOKENS = {
     "ObeliskTimer",
     "UnregisterTimer",
@@ -1473,6 +1490,12 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertEqual(public_enum_typedefs(header), V010_PUBLIC_ENUM_ALLOWLIST)
         self.assertEqual(public_enum_definitions(header), V010_PUBLIC_ENUM_VALUE_ALLOWLIST)
         self.assertEqual(public_callback_typedefs(header), V010_PUBLIC_CALLBACK_TYPEDEF_ALLOWLIST)
+        self.assertEqual(public_struct_field_names(header, "ObeliskPluginMetadata"), V010_PLUGIN_METADATA_FIELDS)
+        self.assertEqual(
+            public_struct_field_names(header, "ObeliskPluginInitContext"),
+            V010_PLUGIN_INIT_CONTEXT_FIELDS,
+        )
+        self.assertEqual(V010_PLUGIN_INIT_CONTEXT_FIELDS[-1], "plugin_owner_token")
 
     def test_gameplay_policy_event_payload_stays_minimal_copied_pod(self) -> None:
         header = PUBLIC_API_HEADER.read_text(encoding="utf-8")

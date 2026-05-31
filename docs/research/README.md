@@ -73,6 +73,7 @@ Current post-RC research lane:
 - [2026-05-29-module-surface-roadmap.md](2026-05-29-module-surface-roadmap.md)
 - [2026-05-31-v02-module-priority.md](2026-05-31-v02-module-priority.md)
 - [2026-05-29-next-targetset-discovery.md](2026-05-29-next-targetset-discovery.md)
+- [2026-05-31-batch-snapshot-planner-design.md](2026-05-31-batch-snapshot-planner-design.md)
 - [2026-05-29-mission-reflection-internal-readiness.md](2026-05-29-mission-reflection-internal-readiness.md)
 - [2026-05-30-mission-copied-bool-observer-plan.md](2026-05-30-mission-copied-bool-observer-plan.md)
 - [2026-05-29-item-compact-second-source-readiness.md](2026-05-29-item-compact-second-source-readiness.md)
@@ -88,6 +89,7 @@ Current post-RC research lane:
 - [2026-05-30-structure-build-policy-triage.md](2026-05-30-structure-build-policy-triage.md)
 - [2026-05-30-player-identity-lifecycle-plan.md](2026-05-30-player-identity-lifecycle-plan.md)
 - [2026-05-31-player-identity-first-evidence.md](2026-05-31-player-identity-first-evidence.md)
+- [2026-05-31-player-identity-targetset-gap.md](2026-05-31-player-identity-targetset-gap.md)
 - [2026-05-28-fname-index-manifest-plan.md](2026-05-28-fname-index-manifest-plan.md)
 - [2026-05-31-fname-gobjects-offline-route.md](2026-05-31-fname-gobjects-offline-route.md)
 - [2026-05-29-ghidra-fuobjectarray-field-window-probe.md](2026-05-29-ghidra-fuobjectarray-field-window-probe.md)
@@ -248,6 +250,7 @@ when a task explicitly targets that module.
 | [2026-05-28-fname-index-manifest-plan.md](2026-05-28-fname-index-manifest-plan.md) | FName index manifest plan | Defines a binary-scoped manifest/resolver path so raw `FName` indices remain evidence-backed and fail closed by ARK binary hash. |
 | [2026-05-29-module-surface-roadmap.md](2026-05-29-module-surface-roadmap.md) | Module surface roadmap | Ranks current module surfaces and keeps accepted compact target sets separate from public SDK promotion. |
 | [2026-05-31-v02-module-priority.md](2026-05-31-v02-module-priority.md) | v0.2 module priority | Selects Mission copied-bool as the next internal module lane after copied chat/policy while keeping public Mission SDK, runtime observers, identity, lookup, mutation, and return override blocked. |
+| [2026-05-31-batch-snapshot-planner-design.md](2026-05-31-batch-snapshot-planner-design.md) | Batch/focal snapshot planner design | Defines the safe pre-target-set planner path for exact candidate-only UFunction snapshots from reviewed inventory packs, without command execution or SDK promotion. |
 | [2026-05-29-next-targetset-discovery.md](2026-05-29-next-targetset-discovery.md) | Next target-set discovery | Records accepted second-source layout evidence for mission and tribe compact target sets and ranks mission as the cleaner next module candidate. |
 | [2026-05-29-mission-reflection-internal-readiness.md](2026-05-29-mission-reflection-internal-readiness.md) | Mission reflection internal readiness | Reviews the expanded `MissionReflectionTests` coverage and limits mission readiness to an internal recognizer/copy-readiness pack without public SDK, hook, dispatcher, identity, mutation, or return override promotion. |
 | [2026-05-30-mission-copied-bool-observer-plan.md](2026-05-30-mission-copied-bool-observer-plan.md) | Mission copied-bool observer plan | Freezes the docs-only internal observer model for exactly four Mission functions, five copied bool fields, six redacted object/container fields, log grammar, gates, rollback, and non-goals without runtime or public SDK promotion. |
@@ -277,6 +280,7 @@ when a task explicitly targets that module.
 | [2026-05-30-structure-build-policy-triage.md](2026-05-30-structure-build-policy-triage.md) | Structure build-policy triage | Records `APrimalStructure.IsAllowedToBuild` as a high-demand NextGenPlugins dictionary seed, but keeps it second-wave until sanitized snapshots, second-source evidence, redaction policy, and mutation/return-override blockers are resolved. |
 | [2026-05-30-player-identity-lifecycle-plan.md](2026-05-30-player-identity-lifecycle-plan.md) | Player identity lifecycle plan | Defines the first docs-only `players_identity_lifecycle` seed set from existing target names, with copied/redacted fields only and no ResourceHandle, lookup, SDK, runtime, mutation, or return override. |
 | [2026-05-31-player-identity-first-evidence.md](2026-05-31-player-identity-first-evidence.md) | Player identity first evidence | Defines the smallest candidate-only identity evidence package needed before public permissions, commands, or economy SDK design can start. |
+| [2026-05-31-player-identity-targetset-gap.md](2026-05-31-player-identity-targetset-gap.md) | Player identity target-set gap | Records that the planning target set is missing `ServerListPlayers` and `ServerKickPlayer` snapshots and still lacks accepted login/logout lifecycle anchors. |
 | [2026-05-27-sdk-chat-event-ownership-plan.md](2026-05-27-sdk-chat-event-ownership-plan.md) | Historical SDK event ownership plan | Defines ownership, ABI, callback cleanup, and validation gates required before a public module callback API. |
 | [2026-05-27-chat-sdk-abi-preflight.md](2026-05-27-chat-sdk-abi-preflight.md) | Historical SDK ABI preflight | Defines test-first ABI and dispatcher gates for a future module callback without changing the public header yet. |
 | [2026-05-27-theisland-chat-reflection-ab-runbook.md](2026-05-27-theisland-chat-reflection-ab-runbook.md) | TheIsland historical module A/B runbook | Historical/superseded; do not execute without explicit approval to start `arkserver2`, test, and shut it down afterward. |

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added candidate-only batch snapshot planning from closed UFunction target sets in the
+  reflection inventory pack builder, hardened `oDescriptorCatalog` fail-closed init,
+  strengthened Mission copied-bool stale-output rejection tests, and recorded the player
+  identity target-set gaps blocking command/permission/economy SDK design.
 - Recorded the next post-RC research route: reuse current FName/GObjects candidates for
   target-set-driven offline snapshots, keep copied chat commands repo-local/docs-first,
   define the first player-identity evidence package, and prioritize Mission copied-bool as

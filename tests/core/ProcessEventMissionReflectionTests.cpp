@@ -1399,8 +1399,11 @@ namespace
             attempt.Invocation.Fields[1].Range.Size = 1;
 
             CopiedMissionObservation observation;
+            PoisonObservation(observation);
             Require(!TryBuildCopiedMissionObservation(attempt.Invocation, observation),
                     "copied mission bool null data with one-byte range was accepted");
+            RequireObservationCleared(observation,
+                                      "copied mission bool null data did not clear copied output");
         }
         {
             MissionFixture fixture;
@@ -1411,8 +1414,11 @@ namespace
             attempt.Invocation.Fields[1].Range.Size = 2;
 
             CopiedMissionObservation observation;
+            PoisonObservation(observation);
             Require(!TryBuildCopiedMissionObservation(attempt.Invocation, observation),
                     "copied mission bool range size larger than one byte was accepted");
+            RequireObservationCleared(observation,
+                                      "copied mission bool range size larger than one byte did not clear output");
         }
         {
             MissionFixture fixture;
@@ -1423,8 +1429,11 @@ namespace
             attempt.Invocation.Fields[1].Range.Size = 0;
 
             CopiedMissionObservation observation;
+            PoisonObservation(observation);
             Require(!TryBuildCopiedMissionObservation(attempt.Invocation, observation),
                     "copied mission bool range size below one byte was accepted");
+            RequireObservationCleared(observation,
+                                      "copied mission bool range size below one byte did not clear output");
         }
         {
             MissionFixture fixture;
@@ -1483,8 +1492,11 @@ namespace
             attempt.Invocation.Fields[2].Range = {};
 
             CopiedMissionObservation observation;
+            PoisonObservation(observation);
             Require(!TryBuildCopiedMissionObservation(attempt.Invocation, observation),
                     "copied mission bool count below expected was accepted");
+            RequireObservationCleared(observation,
+                                      "copied mission bool count below expected did not clear output");
         }
         {
             MissionFixture fixture;
@@ -1624,8 +1636,11 @@ namespace
             Attempt attempt = IdentifyMetadataOnly(fixture, kAddPlayerToMissionNameIndex);
 
             CopiedMissionObservation observation;
+            PoisonObservation(observation);
             Require(!TryBuildCopiedMissionObservation(attempt.Invocation, observation),
                     "metadata-only AddPlayerToMission copied target was accepted");
+            RequireObservationCleared(observation,
+                                      "metadata-only AddPlayerToMission rejection did not clear output");
         }
         {
             MissionFixture fixture;
@@ -1633,8 +1648,11 @@ namespace
             Attempt attempt = IdentifyMetadataOnly(fixture, kBPAllowPlayerToLeaveMissionNameIndex);
 
             CopiedMissionObservation observation;
+            PoisonObservation(observation);
             Require(!TryBuildCopiedMissionObservation(attempt.Invocation, observation),
                     "metadata-only BPAllowPlayerToLeaveMission copied target was accepted");
+            RequireObservationCleared(observation,
+                                      "metadata-only BPAllowPlayerToLeaveMission rejection did not clear output");
         }
         {
             MissionFixture fixture;
@@ -1642,8 +1660,11 @@ namespace
             Attempt attempt = IdentifyMetadataOnly(fixture, kBPOnPlayerRemovedFromMissionNameIndex);
 
             CopiedMissionObservation observation;
+            PoisonObservation(observation);
             Require(!TryBuildCopiedMissionObservation(attempt.Invocation, observation),
                     "metadata-only BPOnPlayerRemovedFromMission copied target was accepted");
+            RequireObservationCleared(observation,
+                                      "metadata-only BPOnPlayerRemovedFromMission rejection did not clear output");
         }
     }
 
@@ -1670,8 +1691,11 @@ namespace
             attempt.Invocation.Fields[0].Range = {fixture.Params.data(), 0x08};
 
             CopiedMissionObservation observation;
+            PoisonObservation(observation);
             Require(!TryBuildCopiedMissionObservation(attempt.Invocation, observation),
                     "metadata-only GetPlayerUsableItems accepted a forged object range");
+            RequireObservationCleared(observation,
+                                      "metadata-only GetPlayerUsableItems forged range did not clear output");
         }
     }
 }

@@ -188,19 +188,16 @@ posture before doing more code or agent work.
 - A sample, weak probe, or partial match must not satisfy analyzer `--strict`.
 - Every capture note should include the post-capture stable posture check result.
 
-## Post-RC Research Backlog
+## Post-RC Research Route
 
-1. Resolve `fname_index -> name` through GNames/FNamePool.
-2. Add a bounded live data-mapping scanner or offline core scanner for FName-table-shaped
-   pointers instead of relying on one static slot.
-3. Use the binary-hash-scoped `GUObjectArray` research-candidate only as an offline input
-   for candidate UFunction enumeration and redacted signature tooling. Public/runtime
-   GObjects, object identity, lookup, and `ResourceHandle` promotion remain separate
-   blocked gates.
-4. Promote or validate GObjects beyond research-candidate status before any public object
-   identity or runtime lookup contract.
-5. Register callbacks by function name, not raw index.
-6. Decode function params from UProperty metadata.
-7. Compare sanitized UFunction/ScriptStruct snapshots against a second source before
-   promoting module recognizers.
-8. Replace raw FString and arbitrary param probing with reflected param decoding.
+1. For the current binary hash, reuse the reviewed FName root and `GUObjectArray`
+   research-candidate as offline inputs; do not restart broad FName/GObjects discovery
+   unless a new binary hash or contradictory evidence invalidates them.
+2. Advance new module work through closed target-set snapshots, redacted signatures, and
+   second-source comparison before promoting copied recognizers.
+3. Keep public/runtime GObjects, object identity, lookup, and `ResourceHandle` promotion as
+   separate blocked gates. ResourceHandle needs approved runtime rejection samples plus
+   serial reuse/wraparound semantics, not more broad offline scans.
+4. Register callbacks by function name, not raw index.
+5. Decode function params from UProperty metadata.
+6. Replace raw FString and arbitrary param probing with reflected param decoding.

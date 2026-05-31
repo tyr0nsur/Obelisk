@@ -35,6 +35,8 @@ namespace
         OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS |
         OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS;
 
+    constexpr size_t kRequiredBaseApiSize = offsetof(ObeliskApi, capabilities) + sizeof(ObeliskApi::capabilities);
+
     bool IsStringArray(const json& value)
     {
         if (!value.is_array())
@@ -226,6 +228,13 @@ namespace
                api->DescribeGameplayPolicyEventKind;
     }
 
+    bool HasBaseApiPrefix(const ObeliskApi* api)
+    {
+        return api &&
+               api->abi_version == OBELISK_API_ABI_VERSION &&
+               api->struct_size >= kRequiredBaseApiSize;
+    }
+
     void CopyApiPrefix(const ObeliskApi* api)
     {
         g_Api = {};
@@ -402,6 +411,12 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
     try
     {
         ResetState();
+        if (!HasBaseApiPrefix(api))
+        {
+            SafeLogError(api, "[oDescriptorCatalog] Incompatible Obelisk API.");
+            return false;
+        }
+
         bool logCatalog = true;
         if (!LoadConfig(context, logCatalog))
         {
@@ -420,10 +435,14 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
         if (!HasDescriptorApi(api))
         {
             SafeLogError(api, "[oDescriptorCatalog] Descriptor API unavailable.");
+            ResetState();
             return false;
         }
 
-        return BuildCatalog(api, logCatalog);
+        const bool catalogBuilt = BuildCatalog(api, logCatalog);
+        if (!catalogBuilt)
+            ResetState();
+        return catalogBuilt;
     }
     catch (const std::exception& e)
     {

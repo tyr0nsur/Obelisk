@@ -12,6 +12,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 import scan_core_fname_tables as fname_scanner  # noqa: E402
+import reflection_target_sets  # noqa: E402
 import summarize_core_ufunction_inventory as ufunction_inventory  # noqa: E402
 from snapshot_evidence_pack import (  # noqa: E402
     SHA256_RE,
@@ -73,6 +74,17 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Plan one exact ad hoc UFunction snapshot without adding a target set. "
             "Useful for second-wave candidates such as PrimalStructure.IsAllowedToBuild."
+        ),
+    )
+    parser.add_argument(
+        "--plan-snapshot-target-set",
+        action="append",
+        choices=ufunction_inventory.UFUNCTION_TARGET_SETS,
+        default=[],
+        metavar="TARGET_SET",
+        help=(
+            "Plan exact candidate-only UFunction snapshots for every target in a closed "
+            "target set, without adding fixtures or public SDK scope."
         ),
     )
     parser.add_argument(
@@ -336,6 +348,16 @@ def has_inventory_filters(args: argparse.Namespace) -> bool:
 
 def main() -> int:
     args = parse_args()
+    plan_snapshot_targets = list(args.plan_target)
+    if args.plan_snapshot_target_set:
+        plan_snapshot_targets.extend(
+            sorted(
+                reflection_target_sets.expand_schema_target_sets(
+                    args.plan_snapshot_target_set,
+                    "obelisk.ufunction-chain.snapshot.v1",
+                )
+            )
+        )
     if args.max_objects < 0:
         raise SystemExit("--max-objects must be non-negative")
     if args.max_groups <= 0:
@@ -346,7 +368,7 @@ def main() -> int:
         raise SystemExit("--max-params must be non-negative")
     if args.min_params is not None and args.max_params is not None and args.min_params > args.max_params:
         raise SystemExit("--min-params must be less than or equal to --max-params")
-    if args.plan_regeneration and not args.target_set and not args.plan_target:
+    if args.plan_regeneration and not args.target_set and not plan_snapshot_targets:
         raise SystemExit("--plan-regeneration requires at least one --target-set or --plan-target")
     target_set_plan_regeneration = args.plan_regeneration and bool(args.target_set)
 
@@ -375,18 +397,18 @@ def main() -> int:
         fname_root_slot = args.fname_root_slot
         binary_sha = resolve_binary_sha(args)
         artifact_kind = safe_component(args.artifact_kind, "artifact-kind")
-        if args.plan_target and artifact_kind == "offline_core" and (
+        if plan_snapshot_targets and artifact_kind == "offline_core" and (
             not args.capture_id or not args.evidence_pack_id
         ):
             raise SystemExit(
-                "direct --core --plan-target requires explicit --capture-id and --evidence-pack-id"
+                "direct --core snapshot planning requires explicit --capture-id and --evidence-pack-id"
             )
         capture_id = safe_component(args.capture_id or core.stem, "capture-id")
         evidence_pack_id = safe_component(args.evidence_pack_id or "direct-core", "evidence-pack-id")
         core_sha = sha256_file(core)
         evidence_pack_manifest = None
-    if args.plan_target and artifact_kind != "offline_core":
-        raise SystemExit("--plan-target only supports offline_core artifact identity")
+    if plan_snapshot_targets and artifact_kind != "offline_core":
+        raise SystemExit("snapshot planning only supports offline_core artifact identity")
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -418,7 +440,7 @@ def main() -> int:
             max_groups=args.max_groups,
             filters=filters,
             target_sets=args.target_set,
-            include_functions=args.include_functions or bool(args.plan_target),
+            include_functions=args.include_functions or bool(plan_snapshot_targets),
             redact_pointers=True,
             snapshot_manifest=snapshot_manifest,
             snapshot_manifest_path=args.snapshot_manifest if target_set_plan_regeneration else None,
@@ -434,7 +456,7 @@ def main() -> int:
                 else None
             ),
         )
-        if args.plan_target:
+        if plan_snapshot_targets:
             if has_inventory_filters(args):
                 plan_payload = ufunction_inventory.build_ufunction_inventory_payload(
                     memory,
@@ -464,12 +486,12 @@ def main() -> int:
     finally:
         memory.close()
 
-    if args.plan_target:
+    if plan_snapshot_targets:
         if plan_functions is None:
-            raise SystemExit("--plan-target requires redacted function inventory")
+            raise SystemExit("snapshot planning requires redacted function inventory")
         inventory_payload["focal_snapshot_plan"] = focal_snapshot_plan(
             plan_functions,
-            requested_targets=args.plan_target,
+            requested_targets=plan_snapshot_targets,
             core=core,
             gobjects=gobjects,
             fname_root_slot=fname_root_slot,
@@ -530,6 +552,7 @@ def main() -> int:
             "evidence_pack_manifest": str(evidence_pack_manifest) if evidence_pack_manifest else None,
             "target_sets": args.target_set,
             "plan_targets": args.plan_target,
+            "plan_snapshot_target_sets": args.plan_snapshot_target_set,
             "max_objects": args.max_objects,
             "fname_indices": [{"label": label, "index": index} for label, index in indices],
         },

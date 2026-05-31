@@ -516,7 +516,7 @@ class BuildReflectionInventoryPackTests(unittest.TestCase):
             )
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("--plan-target only supports offline_core artifact identity", result.stderr)
+        self.assertIn("snapshot planning only supports offline_core artifact identity", result.stderr)
 
     def test_direct_core_plan_target_requires_explicit_artifact_identity(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -546,9 +546,93 @@ class BuildReflectionInventoryPackTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "direct --core --plan-target requires explicit --capture-id and --evidence-pack-id",
+            "direct --core snapshot planning requires explicit --capture-id and --evidence-pack-id",
             result.stderr,
         )
+
+    def test_plan_snapshot_target_set_expands_closed_target_set_as_candidate_only(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            addrs = build_core_fixture(core)
+            output_dir = root / "out"
+
+            result = self.run_builder(
+                [
+                    "--core",
+                    str(core),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--fname-index",
+                    "None=0",
+                    "--fname-index",
+                    "ServerChat=4",
+                    "--ark-binary-sha256",
+                    "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                    "--capture-id",
+                    "fixture-core",
+                    "--evidence-pack-id",
+                    "fixture-pack",
+                    "--plan-snapshot-target-set",
+                    "chat-message-intake",
+                    "--output-dir",
+                    str(output_dir),
+                ]
+            )
+            stdout_manifest = json.loads(result.stdout)
+            inventory = json.loads((output_dir / "ufunction-inventory.json").read_text(encoding="utf-8"))
+            written_manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(stdout_manifest["inputs"]["plan_snapshot_target_sets"], ["chat-message-intake"])
+        self.assertEqual(written_manifest["inputs"]["plan_targets"], [])
+        plan = inventory["focal_snapshot_plan"]
+        self.assertEqual(plan["schema"], "obelisk.ufunction-focal-snapshot-plan.v1")
+        self.assertEqual(plan["requested_count"], 1)
+        self.assertEqual(plan["planned_command_count"], 0)
+        self.assertEqual(plan["blocked_count"], 1)
+        self.assertEqual(plan["targets"][0]["target"], (
+            "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerSendChatMessage"
+        ))
+        self.assertEqual(plan["targets"][0]["status"], "blocked")
+        self.assertEqual(plan["targets"][0]["blocker"], "missing_inventory_target")
+        self.assertEqual(plan["promotion_status"], "not_promoted_candidate_only")
+
+    def test_plan_snapshot_target_set_rejects_duplicate_explicit_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            addrs = build_core_fixture(core)
+
+            result = self.run_builder(
+                [
+                    "--core",
+                    str(core),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--fname-index",
+                    "None=0",
+                    "--ark-binary-sha256",
+                    "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                    "--capture-id",
+                    "fixture-core",
+                    "--evidence-pack-id",
+                    "fixture-pack",
+                    "--plan-target",
+                    "ShooterPlayerController.ServerSendChatMessage",
+                    "--plan-snapshot-target-set",
+                    "chat-message-intake",
+                    "--output-dir",
+                    str(root / "out"),
+                ],
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("duplicate --plan-target: ShooterPlayerController.ServerSendChatMessage", result.stderr)
 
     def test_plan_target_reports_missing_inventory_target_as_blocked(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
