@@ -150,6 +150,36 @@ class PreparePlayerIdentityOfflineRawLayoutTests(unittest.TestCase):
             self.assertEqual(payload["mode"], "copy")
             self.assertEqual((artifact_root / "player-identity-offline-run-2" / "raw" / "core").read_bytes(), b"core")
 
+    def test_explicit_obelisk_commit_overrides_git_detected_checkpoint(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            binary, core = self.write_inputs(root)
+            artifact_root = root / "artifacts"
+
+            result, stdout, stderr = self.run_main(
+                [
+                    "prepare_player_identity_offline_raw_layout.py",
+                    "--binary",
+                    str(binary),
+                    "--core",
+                    str(core),
+                    "--artifact-root",
+                    str(artifact_root),
+                    "--run-id",
+                    "run-reviewed",
+                    "--obelisk-commit",
+                    "reviewed12345",
+                ],
+                binary_sha=prep.EXPECTED_SHOOTERGAME_SHA256,
+            )
+
+            self.assertEqual(result, 0, stderr)
+            payload = json.loads(stdout)
+            self.assertEqual(payload["obelisk"]["commit"], "reviewed12345")
+            self.assertEqual(payload["obelisk"]["commit_source"], "--obelisk-commit")
+            self.assertIn("reviewed12345", payload["next_command_argv"])
+            self.assertNotIn("test-commit", payload["next_command_argv"])
+
     def test_next_command_is_shell_safe_for_spaced_artifact_paths(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

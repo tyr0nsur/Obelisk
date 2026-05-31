@@ -128,6 +128,19 @@ class CheckReflectionInventoryPackReadinessTests(unittest.TestCase):
         self.assertEqual(payload["required_target_set"]["target_set"], PLAYER_IDENTITY_TARGET_SET)
         self.assertEqual(payload["required_target_set"]["expected_target_count"], len(PLAYER_IDENTITY_TARGETS))
         self.assertIn("ServerListPlayers", " ".join(payload["accepted_pack"]["matched_targets"]))
+        self.assertEqual(payload["accepted_pack"]["schema"], "obelisk.reflection-inventory-pack.v1")
+        self.assertEqual(payload["accepted_pack"]["status"], "candidate-only")
+        self.assertEqual(payload["accepted_pack"]["promotion_status"], "not_promoted_candidate_only")
+        self.assertEqual(
+            payload["accepted_pack"]["inputs"]["evidence_pack_manifest"],
+            str(root / "packs" / "core-evidence-pack" / "manifest.json"),
+        )
+        self.assertEqual(
+            payload["accepted_pack"]["target_set_coverage"]["requested_targets"],
+            PLAYER_IDENTITY_TARGETS,
+        )
+        self.assertEqual(payload["accepted_pack"]["summary"]["fname_root_ready"], True)
+        self.assertEqual(payload["accepted_pack"]["blockers"], [])
         self.assertIn("does not read a core", " ".join(payload["non_claims"]))
         self.assertIn("offline ShooterGameServer binary alone is insufficient", " ".join(payload["non_claims"]))
         self.assertTrue(payload["accepted_for_candidate_planning"])

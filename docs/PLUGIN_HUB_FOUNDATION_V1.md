@@ -28,6 +28,14 @@ production Plugin Hub modules, command/chat SDKs, policy-enforcement SDKs, or ev
 a new ABI. They are also not public command SDK/router surfaces, replies, permissions,
 identity, send-chat, or moderation.
 
+For release notes, package READMEs, and contributor reviews, the supported seed set is
+exactly lifecycle/config/logging minimal plugins, descriptor/catalog readers, and
+process-local timer utilities. Passive copied chat parsing and copied policy auditing are
+experimental examples only. Permissions/admin, commands/replies/send-chat/broadcast,
+economy, kits, homes, teleport, and item grants stay blocked until the required
+identity/principal, permissions/admin, command routing, response path,
+persistence/storage, and safe mutation/grant surfaces are separately promoted.
+
 Creator-facing examples that build against an installed SDK package live under
 `examples/`; `examples/sdk_minimal_plugin` is the minimum seed for an installed SDK
 consumer, and `examples/sdk_timer_plugin` demonstrates the promoted process-local timer
@@ -217,6 +225,11 @@ If a plugin idea needs player identity, permissions, persistence, operator ingre
 replies, broadcast, inventory/item mutation, teleport, structure placement enforcement, or
 raw UE access, it is not a Foundation V1 plugin. Keep it as a design/research note until a
 separate copied-data surface is promoted.
+The same rule applies when the visible feature is framed as permissions/admin,
+commands/replies/send-chat/broadcast, economy, kits, homes, teleport, or item grants:
+those require promoted identity/principal, permissions/admin, command routing, response
+path, persistence/storage, and safe mutation/grant surfaces before they can become release
+Plugin Hub examples.
 Player identity research is also not unlocked by direct binary/core access: the current
 admin snapshot gap requires a reviewed non-protected complete
 `obelisk.core-dump-evidence-pack.v1` plus a reviewed UFunction
@@ -236,6 +249,10 @@ Foundation V1 does not provide or imply:
 - public Inventory SDK, Items SDK, StructureEvents SDK, command SDK, permissions,
   economy, kits, shops, homes, teleport, safe zones, RCON, replies, send-chat, or
   moderation;
+- public permissions/admin checks, command routing, reply path, send-chat/broadcast path,
+  economy/kits/homes state, teleport path, or item-grant path without promoted
+  identity/principal, permissions/admin, command routing, response path,
+  persistence/storage, and safe mutation/grant surfaces;
 - no public Mission SDK, Mission module readiness, Mission identity/state mutation, or
   reward/transfer authority from the internal/test-only Mission copied-bool lane;
 - public storage SDK, database service, schema/migration contract, secret manager, webhook

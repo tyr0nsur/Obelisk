@@ -257,13 +257,14 @@ status-only or empty evidence object must fail closed.
 The current fixture gap is exact: the committed snapshot manifest has 10/12
 `players-identity-lifecycle-intake` targets and lacks only
 `ShooterPlayerController.ServerListPlayers` and
-`ShooterPlayerController.ServerKickPlayer`. Existing offline core evidence is enough to
-generate sanitized candidate snapshots for those two admin surfaces without a live server,
-but current live-ops policy still requires an explicit approved offline `/servidor/ark`
-workspace action before reading or writing that path. Those snapshots would close the
-admin-surface fixture gap only; they would not establish login/logout lifecycle anchors.
-For a reviewed inventory pack, `scripts/plan_ufunction_focal_snapshots.py` must be called
-with the two exact admin targets:
+`ShooterPlayerController.ServerKickPlayer`. That fixture gap is not directly actionable
+from the repository alone: the current route first requires a reviewed non-protected
+`obelisk.core-dump-evidence-pack.v1`, then a full 12-target
+`obelisk.reflection-inventory-pack.v1` built from that evidence pack. Direct
+`/servidor/ark` workspace reads, direct-core planning, ScriptStruct inventories, and
+two-function-only inventories must not be used as substitutes. After the full reflection
+inventory pack is accepted, `scripts/plan_ufunction_focal_snapshots.py` must be called
+with only the two exact admin targets:
 `--target ShooterPlayerController.ServerListPlayers` and
 `--target ShooterPlayerController.ServerKickPlayer`. The planner intentionally rejects
 `--target-set players-identity-lifecycle-intake` for focal snapshot planning so the full

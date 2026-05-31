@@ -557,6 +557,18 @@ priorities, and do not use history files as the active source of truth.
   `ChatMessageEvent`, `GameplayPolicyEvent`, and global ProcessEvent callback
   registration. Public gameplay/chat callback bridges also catch plugin exceptions and
   continue dispatch; `PluginManagerTests` covers these regressions.
+- Post-RC command/chat response-path orientation exists as candidate-only tooling:
+  `scripts/check_command_chat_response_static_orientation.py --json` validates bounded
+  static clues for `ShooterPlayerController.ClientChatMessage`,
+  `ShooterPlayerController.ClientServerChatMessage`, and
+  `ShooterPlayerController.ClientServerChatDirectMessage` on the reviewed
+  `ShooterGameServer` SHA. It does not prove replies, send-chat, command routing,
+  identity, permissions, runtime readiness, or public SDK promotion.
+- Player-identity preflight contract drift was corrected: reflection-inventory readiness
+  now emits the accepted pack fields consumed by the combined identity preflight, and
+  `prepare_player_identity_offline_raw_layout.py` supports
+  `--obelisk-commit <reviewed-obelisk-id>` so evidence commands can name the reviewed
+  checkpoint explicitly instead of relying on Git HEAD.
 
 ## Agent Coordination
 

@@ -6359,6 +6359,50 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             with self.subTest(required=required):
                 self.assertIn(required, compact)
 
+    def test_plugin_hub_release_seed_and_blocked_dependency_boundary_is_explicit(self) -> None:
+        docs = {
+            "contributor_path": REPO_ROOT / "docs" / "PLUGIN_HUB_CONTRIBUTOR_PATH.md",
+            "foundation": REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md",
+            "matrix": REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md",
+        }
+        compacts = {
+            name: normalized(path.read_text(encoding="utf-8")) for name, path in docs.items()
+        }
+
+        shared_required = (
+            "lifecycle/config/logging",
+            "descriptor/catalog",
+            "process-local timer",
+            "Passive copied chat parsing",
+            "copied policy auditing",
+            "experimental examples only",
+            "Permissions/admin",
+            "commands/replies/send-chat/broadcast",
+            "economy, kits, homes, teleport, and item grants",
+            "identity/principal",
+            "permissions/admin",
+            "command routing",
+            "response path",
+            "persistence/storage",
+            "safe mutation/grant surfaces",
+        )
+        for name, compact in compacts.items():
+            for phrase in shared_required:
+                with self.subTest(file=name, phrase=phrase):
+                    self.assertIn(normalized(phrase), compact)
+
+        matrix = compacts["matrix"]
+        for required in (
+            "Owner-token timers exist, but public response path, send-chat/broadcast policy, command routing, permissions/admin, persistence, and cross-process scheduling are not promoted",
+            "query-only authorization requires copied identity/principal plus permissions/admin policy first",
+            "Needs identity/principal, permissions/admin, command routing, response path, persistence/storage, item grant/mutation, and event evidence",
+            "Needs location/area data, identity/principal, permissions/admin, command routing, response path",
+            "Needs player/inventory/item identity, permissions/admin where gated, command routing and response path where user-triggered, item grant/mutation APIs",
+            "The common blocked chain is identity/principal -> permissions/admin -> command routing -> response path",
+        ):
+            with self.subTest(matrix_required=required):
+                self.assertIn(normalized(required), matrix)
+
     def test_plugin_hub_v1_contributor_intake_boundary_is_consistent(self) -> None:
         docs = {
             "contributor_path": REPO_ROOT / "docs" / "PLUGIN_HUB_CONTRIBUTOR_PATH.md",

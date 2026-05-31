@@ -47,6 +47,13 @@ def parse_args() -> argparse.Namespace:
         default="hardlink",
         help="Stage files by hardlink by default, or copy when explicitly requested.",
     )
+    parser.add_argument(
+        "--obelisk-commit",
+        help=(
+            "Reviewed Obelisk checkpoint to embed in the next core-evidence command. "
+            "Defaults to the current Git HEAD only when this is omitted."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -173,7 +180,8 @@ def build_report(args: argparse.Namespace) -> dict[str, object]:
                 pass
         fail(f"failed to stage raw inputs with mode={args.mode}: {exc}")
 
-    obelisk_commit = detect_obelisk_commit()
+    obelisk_commit = args.obelisk_commit or detect_obelisk_commit()
+    obelisk_commit_source = "--obelisk-commit" if args.obelisk_commit else "git rev-parse --short=12 HEAD"
     next_command_argv = [
         "python3",
         "scripts/build_core_dump_evidence_pack.py",
@@ -219,7 +227,7 @@ def build_report(args: argparse.Namespace) -> dict[str, object]:
         },
         "obelisk": {
             "commit": obelisk_commit,
-            "commit_source": "git rev-parse --short=12 HEAD",
+            "commit_source": obelisk_commit_source,
         },
         "reviewed_seed_scope": {
             "binary_sha256": EXPECTED_SHOOTERGAME_SHA256,

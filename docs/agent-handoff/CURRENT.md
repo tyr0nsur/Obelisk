@@ -102,6 +102,14 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   response APIs, replies, send-chat, broadcast/notices, and moderation blocked until a
   future copied owner-token/capability/lifecycle/privacy promotion gate accepts it or a v1
   statement explicitly excludes it.
+- `scripts/check_command_chat_response_static_orientation.py --json` now provides bounded
+  offline static orientation for `ShooterPlayerController.ClientChatMessage`,
+  `ShooterPlayerController.ClientServerChatMessage`, and
+  `ShooterPlayerController.ClientServerChatDirectMessage` on the reviewed
+  `ShooterGameServer` SHA `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`.
+  It is candidate-only navigation evidence for `obelisk.command_chat_response_path.v1`;
+  it is not response delivery, send-chat, replies, command router, identity,
+  permissions, runtime readiness, or public SDK promotion.
 - Future command/principal routing is a new copied C ABI lifecycle/callback-ownership
   surface, not a parser-only extension. Current planning note:
   `docs/research/2026-05-31-commands-principal-routing-contract.md`.
@@ -130,8 +138,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - `scripts/prepare_player_identity_offline_raw_layout.py` may stage explicit
   non-protected offline `ShooterGameServer` and core inputs into the raw sibling layout
   under `/home/flowcommunity-ark/obelisk-artifacts/player-identity-offline-<run-id>/`.
-  It does not create or approve cores, touch protected server paths, or authorize server
-  access or runtime/core changes; follow the full recipe in
+  Pass `--obelisk-commit <reviewed-obelisk-id>` when the reviewed checkpoint is known; the
+  helper falls back to current Git HEAD only when that option is omitted. It does not
+  create or approve cores, touch protected server paths, or authorize server access or
+  runtime/core changes; follow the full recipe in
   `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`.
 - `scripts/validate_player_identity_raw_inputs.py` is the read-only dry-run check for an
   existing `player-identity-offline-<run-id>/raw/{ShooterGameServer,core}` pair. It
@@ -220,14 +230,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   without claiming SDK promotion. Prefer inventory copied-signal hygiene over structure
   census when choosing one side lane, because it has more near-term Plugin Hub value while
   identity remains core-blocked. This does not authorize Transfer runtime work.
-- A useful bounded static side task is command/chat response-path orientation for the
-  exact controller targets `ShooterPlayerController.ClientChatMessage`,
-  `ShooterPlayerController.ClientServerChatMessage`, and
-  `ShooterPlayerController.ClientServerChatDirectMessage` using local-window offline
-  inspection only. Treat any result as candidate-only planning evidence for
-  `obelisk.command_chat_response_path.v1`; it must not imply replies/send-chat,
-  command router, identity, permissions, raw UE/FString exposure, mutation, or runtime
-  readiness.
+- Keep `obelisk.command_chat_response_path.v1` as orientation-only until identity and
+  permissions/admin are promoted and a copied response contract exists. The current static
+  checker is useful for later target matching, but it must not become public ABI or runtime
+  work by itself.
 - Permissions/admin now has a machine-readable pre-ABI decision contract in
   `docs/permissions_admin_public_contract_decisions.json`. Future permission checks must
   consume promoted copied principal semantics with generation/scope fail-closed behavior;

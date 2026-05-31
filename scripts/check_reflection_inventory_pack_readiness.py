@@ -578,6 +578,13 @@ def evaluate_pack(manifest_path: Path, manifest: dict[str, Any]) -> dict[str, ob
         )
     return {
         "manifest": str(manifest_path),
+        "schema": manifest.get("schema"),
+        "status": manifest.get("status"),
+        "promotion_status": manifest.get("promotion_status"),
+        "inputs": manifest.get("inputs") if isinstance(manifest.get("inputs"), dict) else {},
+        "target_set_coverage": inventory.get("target_set_coverage") if isinstance(inventory, dict) else {},
+        "summary": manifest.get("summary") if isinstance(manifest.get("summary"), dict) else {},
+        "blockers": manifest.get("blockers") if isinstance(manifest.get("blockers"), list) else [],
         "inventory": str(inventory_path) if inventory_path is not None else None,
         "ready": not pack_reasons,
         "reasons": pack_reasons,

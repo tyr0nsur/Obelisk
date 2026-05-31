@@ -32,6 +32,13 @@ they are not production Plugin Hub modules, public command SDK/router surfaces, 
 permissions, identity, send-chat, moderation, policy-enforcement SDKs, or compatibility
 targets for ArkApi plugin families.
 
+Release-supported seeds are exactly lifecycle/config/logging minimal plugins,
+descriptor/catalog readers, and process-local timer utilities. Passive copied chat
+parsing and copied policy auditing are experimental examples only. Permissions/admin,
+commands/replies/send-chat/broadcast, economy, kits, homes, teleport, and item grants
+remain blocked until promoted identity/principal, permissions/admin, command routing,
+response path, persistence/storage, and safe mutation/grant surfaces exist.
+
 Every higher-level demand category below remains planning-only until its own copied-data
 payload, identity/privacy policy, lifecycle cleanup, persistence or ingress design where
 needed, SDK consumer tests, and exact release-readiness second-source target sets are
@@ -119,15 +126,15 @@ it does not promise ArkApi plugin compatibility.
 | 1 | Lifecycle, descriptors, logging, config, local timers | release-supported seed available | Build native examples around current core primitives; process restart/crash management is not public SDK surface |
 | 2 | Passive chat parsing and plugin-local text routing | experimental seed only | Use copied `ChatMessageEvent` for plugin-local parsing/routing only; no public command SDK/router, sender identity, replies, permissions, blocking, send-chat, or moderation contract |
 | 3 | Copied structure/item policy auditing | experimental seed only | Use copied `GameplayPolicyEvent` only for observational audits of event kinds from `minimal-second-source-intake`, `item-return-only-policy-slice`, and `structure-observer-intake`; no StructureEvents SDK, Inventory SDK, identity, mutation, enforcement, or return override |
-| 4 | Timed notices and chat broadcasts | blocked | Owner-token timers exist, but public send-chat/broadcast policy is not promoted |
-| 5 | Permissions/admin query checks | blocked | Dependency-order note only, not an immediate next public slice: query-only authorization requires copied principal identity first; groups, grants, admin actions, storage, RCON, and operator reload stay excluded |
+| 4 | Timed notices and chat broadcasts | blocked | Owner-token timers exist, but public response path, send-chat/broadcast policy, command routing, permissions/admin, persistence, and cross-process scheduling are not promoted |
+| 5 | Permissions/admin query checks | blocked | Dependency-order note only, not an immediate next public slice: query-only authorization requires copied identity/principal plus permissions/admin policy first; groups, grants, admin actions, storage, RCON, and operator reload stay excluded; command routing and response path also remain blocked |
 | 6 | RCON/operator I/O and Unicode text | blocked | Needs secret-safe ingress, audit policy, encoding rules, and command lifecycle |
-| 7 | Economy, shops, kits, rewards, stats | blocked | Needs commands, identity, permissions, persistence, item mutation, and event evidence |
-| 8 | Homes, teleport, safe zones, area policy | blocked | Needs location/area data, identity, combat/enemy restrictions, and safe mutation/enforcement contracts |
+| 7 | Economy, shops, kits, rewards, stats | blocked | Needs identity/principal, permissions/admin, command routing, response path, persistence/storage, item grant/mutation, and event evidence |
+| 8 | Homes, teleport, safe zones, area policy | blocked | Needs location/area data, identity/principal, permissions/admin, command routing, response path, combat/enemy restrictions, and safe teleport/mutation/enforcement contracts |
 | 9 | Structure counts, placement, ownership, collision policy | blocked except experimental auditing | Only narrow copied policy observer examples are experimental; census, ownership, placement denial, collision control, and mutation are not public surfaces |
 | 10 | Dino colors, carry rules, spawn/cosmetic policy | blocked | Needs dino/player identity, classification, interaction events, and safe mutation/enforcement |
 | 11 | Tribe MOTD, tribe-facing notices, and tribe policy | blocked | Needs tribe/player identity, privacy policy, send-chat/broadcast or command surface, and moderation/visibility rules |
-| 12 | Engrams, inventory, item give/remove flows | blocked | Needs player/inventory/item identity, progression or item mutation APIs, rollback, and privacy policy |
+| 12 | Engrams, inventory, item give/remove flows | blocked | Needs player/inventory/item identity, permissions/admin where gated, command routing and response path where user-triggered, item grant/mutation APIs, rollback, and privacy policy |
 | 13 | Shared persistence, database-backed state, webhook services | blocked | Config files are available only for plugin config; no Obelisk storage service, database schema/migration contract, secret manager, webhook client, or cross-instance persistence API |
 
 `release-supported seed available` means an Obelisk-native plugin can be written and documented
@@ -138,6 +145,13 @@ permissions, send-chat, moderation, policy, structure, or inventory SDK availabi
 Neither tier means the corresponding ArkApi plugin family can be ported, that command or
 identity semantics exist, or that blocked dependencies can be simulated through raw game
 access.
+
+The common blocked chain is identity/principal -> permissions/admin -> command routing ->
+response path, with send-chat/broadcast, persistence/storage, and safe mutation/grant
+surfaces added where the feature needs them. Economy, kits, homes, teleport, item grants,
+permissions/admin checks, commands, replies, send-chat, and broadcast must not be
+documented as release-supported seeds by pointing at only timers, logging, descriptors, or
+passive copied chat/policy examples.
 
 Command/principal routing is blocked as a lifecycle and callback-ownership surface, not
 just a missing parser. A future Plugin Hub command surface must use a new copied C ABI

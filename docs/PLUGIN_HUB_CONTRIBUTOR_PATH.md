@@ -16,6 +16,13 @@ Classify the idea before copying code:
   identity, lookup, persistence, storage services, inventory/item mutation, structure
   enforcement, return overrides, raw UE pointers, raw params, or cross-instance state.
 
+The supported seed set is intentionally small: lifecycle/config/logging minimal plugins,
+descriptor/catalog readers, and process-local timer utilities. Passive copied chat
+parsing and copied policy auditing are experimental examples only. Permissions/admin,
+commands/replies/send-chat/broadcast, economy, kits, homes, teleport, and item grants
+remain blocked until Obelisk promotes the required identity/principal, permissions/admin,
+command routing, response path, persistence/storage, and safe mutation/grant surfaces.
+
 Names from ArkApi, AseApi, or popular plugin families can justify demand notes, but they
 do not change the tier and must not be copied as implementation patterns.
 
@@ -123,3 +130,9 @@ services, mutation, or return overrides.
 Plugin Hub foundation examples help contributors learn the current C ABI. They do not
 declare a complete v1 SDK and do not create identity, permissions, command, chat reply,
 storage, inventory, structure, or gameplay mutation support.
+
+Do not split a blocked module into a "seed" by using only its timer, logging, or passive
+parser pieces. If the user-visible feature needs permissions/admin checks, command
+routing, replies, send-chat, broadcast, economy/kits/homes state, teleport, item grants,
+or other gameplay mutation, the package stays blocked until the required identity,
+permissions, commands, response path, persistence, and mutation surfaces exist.

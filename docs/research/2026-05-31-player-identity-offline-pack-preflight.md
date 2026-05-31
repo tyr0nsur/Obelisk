@@ -65,7 +65,7 @@ Current result:
 
 - `status=blocked`;
 - `ready=false`;
-- `manifests_scanned=16`;
+- `manifests_scanned=17`;
 - `reason=missing_reflection_inventory_pack`;
 - `reason=artifact_pack_container_not_reflection_inventory`;
 - `reason=scriptstruct_pack_not_reflection_inventory`;
@@ -252,7 +252,8 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/prepare_player_identity_offline_raw_la
   --binary <non-protected-ShooterGameServer> \
   --core <non-protected-core> \
   --artifact-root /home/flowcommunity-ark/obelisk-artifacts \
-  --run-id <run-id>
+  --run-id <run-id> \
+  --obelisk-commit <reviewed-obelisk-id>
 ```
 
 After the helper reports `ready_for_core_evidence_pack_command=true`, use its
