@@ -38,12 +38,34 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertEqual(payload["schema"], "obelisk.player-identity-first-evidence-readiness.v1")
         self.assertEqual(payload["status"], "blocked")
         self.assertFalse(payload["ready"])
+        self.assertFalse(payload["public_sdk_ready"])
+        self.assertFalse(payload["runtime_ready"])
         self.assertEqual(payload["target_set"], "players-identity-lifecycle-intake")
         self.assertIn("missing_reflection_inventory_pack_or_core_evidence_pack", payload["blockers"])
-        self.assertIn("fixture_coverage_incomplete", payload["blockers"])
-        self.assertIn("second_source_evidence_missing", payload["blockers"])
-        self.assertIn("players_identity_first_evidence_not_buildable", payload["blockers"])
-        self.assertIn("accepted_lifecycle_anchors_missing", payload["blockers"])
+        self.assertNotIn("fixture_coverage_incomplete", payload["blockers"])
+        self.assertNotIn("second_source_evidence_missing", payload["blockers"])
+        self.assertNotIn("players_identity_first_evidence_not_buildable", payload["blockers"])
+        self.assertNotIn("accepted_lifecycle_anchors_missing", payload["blockers"])
+        self.assertIn("fixture_coverage_incomplete", payload["deferred_until_reflection_inventory_ready"])
+        self.assertIn("second_source_evidence_missing", payload["deferred_until_reflection_inventory_ready"])
+        self.assertIn("players_identity_first_evidence_not_buildable", payload["deferred_until_reflection_inventory_ready"])
+        self.assertIn("accepted_lifecycle_anchors_missing", payload["deferred_until_reflection_inventory_ready"])
+        self.assertEqual(
+            [artifact["schema"] for artifact in payload["next_required_artifacts"]],
+            [
+                "obelisk.core-dump-evidence-pack.v1",
+                "obelisk.reflection-inventory-pack.v1",
+            ],
+        )
+        self.assertEqual(
+            payload["artifact_chain"]["required_admin_targets"],
+            [
+                "ShooterPlayerController.ServerKickPlayer",
+                "ShooterPlayerController.ServerListPlayers",
+            ],
+        )
+        self.assertTrue(payload["artifact_chain"]["blocked_before_focal_planning"])
+        self.assertFalse(payload["artifact_chain"]["ready_to_plan_admin_snapshots"])
         self.assertEqual(
             payload["reflection_inventory"]["artifact_root_diagnosis"]["status"],
             "no_manifest_files_found",
@@ -94,12 +116,13 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
 
         payload = json.loads(result.stdout)
         self.assertEqual(result.returncode, 1)
+        self.assertEqual(payload["blockers"], ["missing_reflection_inventory_pack_or_core_evidence_pack"])
         self.assertEqual(
             payload["candidate_root"],
             str(REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"),
         )
-        self.assertNotIn("second_source_evidence_missing", payload["blockers"])
-        self.assertIn("second_source_evidence_not_accepted", payload["blockers"])
+        self.assertNotIn("second_source_evidence_missing", payload["deferred_until_reflection_inventory_ready"])
+        self.assertIn("second_source_evidence_not_accepted", payload["deferred_until_reflection_inventory_ready"])
         self.assertEqual(payload["fixture_coverage"]["second_source_missing"], 0)
         self.assertEqual(payload["fixture_coverage"]["second_source_inconclusive"], 10)
         self.assertEqual(payload["fixture_coverage"]["second_source_rejected"], 0)

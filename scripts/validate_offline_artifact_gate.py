@@ -5424,6 +5424,23 @@ def validate_players_identity_lifecycle_anchor_candidates_manifest(
             blocker["label"] = f"{label}:{blocker_label}"
         elif "label" not in blocker:
             blocker["label"] = label
+    for trail, _ in collect_ready_overclaims(payload):
+        blockers.append(
+            {
+                "reason": "players_identity_lifecycle_anchor_candidates_readiness_overclaim",
+                "label": f"{label}:{trail}",
+            }
+        )
+    for trail, _, reason in collect_candidate_public_overclaims(
+        payload,
+        allowed_prefixes=("$.non_claims", "$.safety_summary.explicitly_excluded"),
+    ):
+        blockers.append(
+            {
+                "reason": f"players_identity_lifecycle_anchor_candidates_public_overclaim_{reason}",
+                "label": f"{label}:{trail}",
+            }
+        )
     return blockers
 
 

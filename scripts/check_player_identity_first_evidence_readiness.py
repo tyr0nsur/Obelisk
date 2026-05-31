@@ -17,6 +17,10 @@ REPORT_SCHEMA = "obelisk.player-identity-first-evidence-readiness.v1"
 PLAYER_IDENTITY_TARGET_SET = "players-identity-lifecycle-intake"
 MISSING_TARGET_PREFIX = "missing_required_target:"
 MAX_DIAGNOSIS_ITEMS = 8
+REQUIRED_ADMIN_TARGETS = [
+    "ShooterPlayerController.ServerKickPlayer",
+    "ShooterPlayerController.ServerListPlayers",
+]
 
 
 def parse_args() -> argparse.Namespace:
@@ -291,19 +295,23 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         and lifecycle_diagnosis["session_end_accepted"] is True
     )
 
-    blockers: list[str] = []
+    downstream_blockers: list[str] = []
     if not inventory_ready:
-        blockers.append("missing_reflection_inventory_pack_or_core_evidence_pack")
+        blockers = ["missing_reflection_inventory_pack_or_core_evidence_pack"]
+    else:
+        blockers = []
     if coverage_result.returncode != 0 or coverage_blocked:
-        blockers.append("fixture_coverage_incomplete")
+        downstream_blockers.append("fixture_coverage_incomplete")
     if second_source_missing:
-        blockers.append("second_source_evidence_missing")
+        downstream_blockers.append("second_source_evidence_missing")
     if second_source_inconclusive or second_source_rejected:
-        blockers.append("second_source_evidence_not_accepted")
+        downstream_blockers.append("second_source_evidence_not_accepted")
     if not first_evidence_ready:
-        blockers.append("players_identity_first_evidence_not_buildable")
+        downstream_blockers.append("players_identity_first_evidence_not_buildable")
     if not lifecycle_ready:
-        blockers.append("accepted_lifecycle_anchors_missing")
+        downstream_blockers.append("accepted_lifecycle_anchors_missing")
+    if inventory_ready:
+        blockers.extend(downstream_blockers)
 
     next_step = (
         "produce_or_approve_non_protected_core_evidence_pack_then_reflection_inventory_pack"
@@ -324,6 +332,39 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "candidate_root": str(args.candidate_root) if args.candidate_root else None,
         "target_set": PLAYER_IDENTITY_TARGET_SET,
         "blockers": blockers,
+        "deferred_until_reflection_inventory_ready": [] if inventory_ready else downstream_blockers,
+        "next_required_artifacts": [] if inventory_ready else [
+            {
+                "schema": "obelisk.core-dump-evidence-pack.v1",
+                "path_pattern": str(
+                    args.artifact_root
+                    / "player-identity-offline-<run-id>"
+                    / "core-evidence-pack"
+                    / "manifest.json"
+                ),
+                "purpose": "non_protected_complete_core_evidence",
+            },
+            {
+                "schema": "obelisk.reflection-inventory-pack.v1",
+                "path_pattern": str(
+                    args.artifact_root
+                    / "player-identity-offline-<run-id>"
+                    / "reflection-inventory-pack"
+                    / "manifest.json"
+                ),
+                "purpose": "reviewed_target_inventory_for_player_identity_lifecycle_intake",
+            },
+        ],
+        "artifact_chain": {
+            "core_evidence_pack_required": True,
+            "reflection_inventory_pack_required": True,
+            "accepted_reflection_inventory_pack": artifact_root_diagnosis(inventory_payload)["accepted_manifest"],
+            "required_admin_targets": REQUIRED_ADMIN_TARGETS,
+            "blocked_before_focal_planning": not inventory_ready,
+            "ready_to_plan_admin_snapshots": inventory_ready,
+        },
+        "public_sdk_ready": False,
+        "runtime_ready": False,
         "reflection_inventory": {
             "returncode": inventory_result.returncode,
             "ready": inventory_ready,

@@ -49,6 +49,13 @@ CANONICAL_EXPERIMENTAL_SURFACE_IDS = {
     "obelisk.chat.local_routing.v1",
     "obelisk.inventory_item_copied_signals.v1",
 }
+CANONICAL_DEBUG_ONLY_SURFACE_IDS = {
+    "obelisk.debug_raw_process_event.v1",
+}
+ALLOWED_GENERIC_EVIDENCE_DIRS = {
+    "tests/sdk_consumer",
+    "tests/sdk_installed_consumer",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -128,17 +135,39 @@ def release_statement_satisfies_exclusion_contract(text: str, surface: dict[str,
     return all(item.lower() in lowered for item in required_text)
 
 
-def evidence_path_exists(raw_path: str) -> bool:
+def repo_relative_evidence_path(raw_path: str) -> Path | None:
     path = Path(raw_path)
-    if not path.is_absolute():
+    if path.is_absolute():
+        try:
+            path.relative_to(REPO_ROOT)
+        except ValueError:
+            return None
+    else:
         path = REPO_ROOT / path
-    return path.exists()
+    try:
+        return path.resolve().relative_to(REPO_ROOT)
+    except (OSError, ValueError):
+        return None
+
+
+def evidence_path_exists(raw_path: str, *, allow_generic_dirs: bool) -> bool:
+    relative = repo_relative_evidence_path(raw_path)
+    if relative is None:
+        return False
+    path = REPO_ROOT / relative
+    if not path.exists():
+        return False
+    if path.is_dir():
+        return allow_generic_dirs and relative.as_posix() in ALLOWED_GENERIC_EVIDENCE_DIRS
+    return path.is_file()
 
 
 def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
     evidence = surface.get("evidence")
     if not isinstance(evidence, dict) or not evidence:
         return False
+    surface_id = surface.get("id")
+    allow_generic_dirs = surface_id not in CANONICAL_V1_COMPLETION_BLOCKERS
     machine_keys = (
         "abi_tests",
         "sdk_consumer_tests",
@@ -148,9 +177,12 @@ def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
     )
     for key in machine_keys:
         value = evidence.get(key)
-        if isinstance(value, list) and value and all(isinstance(item, str) and evidence_path_exists(item) for item in value):
+        if isinstance(value, list) and value and all(
+            isinstance(item, str) and evidence_path_exists(item, allow_generic_dirs=allow_generic_dirs)
+            for item in value
+        ):
             return True
-        if isinstance(value, str) and evidence_path_exists(value):
+        if isinstance(value, str) and evidence_path_exists(value, allow_generic_dirs=allow_generic_dirs):
             return True
     return False
 
@@ -204,9 +236,12 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
     completion_blockers = as_string_list(manifest.get("v1_sdk_completion_blockers"))
     completion_blocker_set = set(completion_blockers)
     post_v1_or_excluded = set(as_string_list(manifest.get("post_v1_or_excluded_surfaces")))
+    debug_only_surfaces = set(as_string_list(manifest.get("debug_only_surfaces")))
+    canonical_debug_only_present = CANONICAL_DEBUG_ONLY_SURFACE_IDS & set(surfaces_by_id)
 
     unresolved_experimental: list[str] = []
     unresolved_completion_blockers: list[str] = []
+    unresolved_planning_surfaces: list[str] = []
     missing_surfaces: list[str] = []
     missing_canonical_surfaces = sorted(CANONICAL_SURFACE_IDS - set(surfaces_by_id))
     missing_canonical_completion_blockers = sorted(CANONICAL_V1_COMPLETION_BLOCKERS - completion_blocker_set)
@@ -218,6 +253,10 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
     release_statement_missing_blockers: list[str] = []
     release_statement_missing_contracts: list[str] = []
     release_statement_missing_experimental_outcomes: list[str] = []
+    debug_only_promoted: list[str] = []
+
+    if not canonical_debug_only_present.issubset(debug_only_surfaces):
+        blockers.append("debug_only_surface_list_missing_canonical_ids")
 
     if experimental_surfaces != status_experimental_surfaces:
         experimental_list_mismatches = sorted(experimental_surfaces ^ status_experimental_surfaces)
@@ -269,6 +308,9 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
         status = surface.get("status")
         contract = surface.get("public_contract")
         contract_items = contract if isinstance(contract, list) else []
+        if surface_id in debug_only_surfaces or surface_id in CANONICAL_DEBUG_ONLY_SURFACE_IDS:
+            if status == "promoted" or surface_id in promoted_surfaces:
+                debug_only_promoted.append(surface_id)
         if status == "promoted":
             if surface_id not in promoted_surfaces:
                 promoted_list_mismatches.append(surface_id)
@@ -276,6 +318,8 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
                 promoted_without_contract.append(surface_id)
             if not surface_has_promotion_evidence(surface):
                 promoted_without_evidence.append(surface_id)
+        elif status == "planning":
+            unresolved_planning_surfaces.append(surface_id)
         elif status != "promoted-experimental-only" and contract_items:
             non_promoted_with_contract.append(surface_id)
 
@@ -299,6 +343,10 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
         blockers.append("promoted_experimental_surfaces_unresolved")
     if unresolved_completion_blockers:
         blockers.append("v1_sdk_completion_blockers_unresolved")
+    if unresolved_planning_surfaces:
+        blockers.append("planning_surfaces_unresolved_for_v1_claim")
+    if debug_only_promoted:
+        blockers.append("debug_only_surface_promoted")
     if promoted_without_contract:
         blockers.append("promoted_surface_public_contract_missing")
     if promoted_without_evidence:
@@ -333,6 +381,8 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
         "blockers": blockers,
         "unresolved_experimental_surfaces": sorted(set(unresolved_experimental)),
         "unresolved_completion_blockers": sorted(set(unresolved_completion_blockers)),
+        "unresolved_planning_surfaces": sorted(set(unresolved_planning_surfaces)),
+        "debug_only_promoted_surfaces": sorted(set(debug_only_promoted)),
         "missing_surfaces": sorted(set(missing_surfaces)),
         "promoted_without_public_contract": sorted(set(promoted_without_contract)),
         "missing_canonical_surfaces": missing_canonical_surfaces,

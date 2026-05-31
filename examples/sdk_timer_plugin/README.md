@@ -14,6 +14,11 @@ are runtime handles only. They are not stable across process restarts, ARK serve
 instances, maps, plugin reloads, or cluster nodes, and must never be persisted in shared
 configuration or storage.
 
+`ObeliskPlugin_Init` receives borrowed `api` and `context` pointers. This example copies
+the advertised `ObeliskApi` prefix by value before using it from shutdown, keeps only the
+process-local `plugin_owner_token`, and does not store `config_dir`, `config_path`, or
+`instance_id` pointers after init returns.
+
 The example does not use private headers, raw UE pointers, gameplay module APIs, identity,
 lookup, mutation, return overrides, chat replies/send-chat, ArkApi compatibility, or
 implementation patterns from other frameworks.

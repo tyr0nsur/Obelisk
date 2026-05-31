@@ -3652,6 +3652,8 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
             pack.mkdir(parents=True)
             child = players_identity_lifecycle_anchor_candidates_manifest()
             child["principal_policy"]["public_principal_ready"] = True
+            child["candidate_anchors"][0]["notes"] = "public SDK ready and runtime ready"
+            child["candidate_anchors"][0]["nested_claim"] = {"runtime_ready": True, "lookup_ready": True}
             write_json(pack / "players-identity-lifecycle-candidates.json", child)
             artifact_pack.normalize_pack(pack, pack.name, "2026-05-30T07:22:55Z")
 
@@ -3660,6 +3662,9 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         reasons = {blocker["reason"] for blocker in result["blockers"]}
         self.assertNotIn("unsupported_manifest_schema", reasons)
         self.assertIn("public_principal_overclaim", reasons)
+        self.assertIn("players_identity_lifecycle_anchor_candidates_readiness_overclaim", reasons)
+        self.assertIn("players_identity_lifecycle_anchor_candidates_public_overclaim_public_sdk", reasons)
+        self.assertIn("players_identity_lifecycle_anchor_candidates_public_overclaim_runtime_ready", reasons)
 
     def test_artifact_pack_revalidates_core_child_fail_closed_status(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -5695,6 +5700,8 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
             manifest = workspace / "players-identity-lifecycle-candidates.json"
             payload = players_identity_lifecycle_anchor_candidates_manifest()
             payload["principal_policy"]["public_principal_ready"] = True
+            payload["candidate_anchors"][0]["notes"] = "public SDK ready and runtime ready"
+            payload["candidate_anchors"][0]["nested_claim"] = {"runtime_ready": True, "lookup_ready": True}
             payload["candidate_anchors"][0]["fields"][0]["name"] = "SteamID"
             payload["candidate_anchors"][0]["fields"][0]["copied_scalar_eligibility"] = "candidate_copied_public_identifier"
             write_json(manifest, payload)
@@ -5704,6 +5711,9 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertEqual("blocked", result["status"])
         reasons = {blocker["reason"] for blocker in result["blockers"]}
         self.assertIn("public_principal_overclaim", reasons)
+        self.assertIn("players_identity_lifecycle_anchor_candidates_readiness_overclaim", reasons)
+        self.assertIn("players_identity_lifecycle_anchor_candidates_public_overclaim_public_sdk", reasons)
+        self.assertIn("players_identity_lifecycle_anchor_candidates_public_overclaim_runtime_ready", reasons)
         self.assertIn("identity_field_not_redacted", reasons)
         self.assertIn("identity_field_copied_public_overclaim", reasons)
 
