@@ -70,7 +70,7 @@ the stable posture check.
 External plugins can consume the installed SDK through the exported CMake package:
 
 ```cmake
-find_package(Obelisk 0.1.0 CONFIG REQUIRED)
+find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)
 target_link_libraries(MyPlugin PRIVATE Obelisk::obelisk_sdk)
 ```
 

@@ -28,6 +28,8 @@ storage, RCON, inventory/item APIs, or structure enforcement stays blocked until
 - `PLUGIN_HUB_CAPABILITY_MATRIX.md`: current safe plugin intents and future Plugin Hub boundaries.
 - `public_sdk_surfaces.json`: machine-readable SDK surface inventory and v1 release boundaries.
 - `oBaseEvents.md`: first-party reference plugin notes.
+- `../examples/README.md`: installed-SDK consumer examples, including `sdk_minimal_plugin`
+  and `sdk_timer_plugin`.
 - `../include/obelisk/ObeliskApi.h`: public C ABI header.
 
 ## Operator

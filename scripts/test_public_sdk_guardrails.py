@@ -379,6 +379,29 @@ EXPERIMENTAL_EVENT_V1_COMPLETION_BREAKERS = {
     "while",
 }
 EXPERIMENTAL_EVENT_V1_COMPLETION_WINDOW = 14
+BROAD_V1_COMPLETION_CLAIM_FILES = [
+    *PUBLIC_SDK_GUIDANCE_DOC_FILES,
+    PUBLIC_SDK_V1_COMPATIBILITY_DOC,
+    REPO_ROOT / "agent-skills" / "obelisk-github-research-workflow" / "SKILL.md",
+]
+BROAD_V1_COMPLETION_POSITIVE_RE = re.compile(
+    r"\b(?:"
+    r"(?:v1(?:\.0)?\s+stable|v1[- ]?0\s+stable).{0,80}"
+    r"(?:available|complete|delivered|for\s+production|production[- ]ready|ready|released|shipped|supported)|"
+    r"(?:complete|full|production[- ]ready)\s+(?:public\s+)?SDK.{0,80}"
+    r"(?:available|delivered|production[- ]ready|ready|released|shipped|supported|today|use)|"
+    r"(?:available|delivered|ready|released|shipped|supported|use).{0,80}"
+    r"(?:complete|full|production[- ]ready)\s+(?:public\s+)?SDK"
+    r")\b",
+    re.IGNORECASE,
+)
+BROAD_V1_COMPLETION_NEGATED_RE = re.compile(
+    r"\b(?:"
+    r"blocked|candidate|candidate-only|claim|definition|does\s+not|do\s+not|foundation|"
+    r"intended|must\s+mean|must\s+not|no|not|planning|post-v1|rc|scanned|toward|track|unless|until|without"
+    r")\b",
+    re.IGNORECASE,
+)
 GAMEPLAY_POLICY_SCOPE_FORBIDDEN_RE = re.compile(
     r"\bInventory\s+SDKs?\b|"
     r"\bStructureEvents?\s+SDKs?\b|"
@@ -1013,6 +1036,22 @@ def experimental_event_v1_completion_claims(text: str, relative_path: str) -> li
                 compact_segment = " ".join(segment.split())
                 offenders.append(f"{relative_path}:{line}: {compact_segment}")
                 break
+
+    return offenders
+
+
+def broad_v1_completion_claims(text: str, relative_path: str) -> list[str]:
+    offenders: list[str] = []
+    scan_text = re.sub(r"\bv1\.0\b", "v1-0", text)
+
+    for segment_start, segment in sentence_like_segments(scan_text):
+        if not BROAD_V1_COMPLETION_POSITIVE_RE.search(segment):
+            continue
+        if BROAD_V1_COMPLETION_NEGATED_RE.search(segment):
+            continue
+
+        line = scan_text.count("\n", 0, segment_start) + 1
+        offenders.append(f"{relative_path}:{line}: {normalized(segment)}")
 
     return offenders
 
@@ -3245,6 +3284,50 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             offenders.extend(
                 experimental_event_v1_completion_claims(
                     text,
+                    str(path.relative_to(REPO_ROOT)),
+                )
+            )
+
+        self.assertEqual(offenders, [])
+
+    def test_broad_v1_completion_claim_detector_allows_scoped_language_only(self) -> None:
+        forbidden = [
+            "Obelisk v1.0 stable is ready for production.",
+            "The complete SDK is available to plugin authors.",
+            "The full SDK has shipped.",
+            "The production-ready public SDK is released.",
+            "Server owners can use the complete public SDK today.",
+        ]
+        allowed = [
+            "Obelisk is moving toward a complete SDK.",
+            "The intended v1.0 stable milestone must mean the complete public SDK contract.",
+            "This is not a complete SDK claim.",
+            "The complete SDK remains blocked until the v1 checker allows the claim.",
+            "This RC foundation is not v1.0 stable.",
+        ]
+
+        for text in forbidden:
+            with self.subTest(kind="forbidden", text=text):
+                self.assertNotEqual(broad_v1_completion_claims(text, "synthetic.md"), [])
+        for text in allowed:
+            with self.subTest(kind="allowed", text=text):
+                self.assertEqual(broad_v1_completion_claims(text, "synthetic.md"), [])
+
+    def test_public_material_does_not_claim_broad_v1_completion_before_gate(self) -> None:
+        completion_report = runpy.run_path(
+            str(REPO_ROOT / "scripts" / "check_public_sdk_v1_completion.py"),
+            run_name="__not_main__",
+        )
+        report = completion_report["build_report"](PUBLIC_SDK_SURFACES_MANIFEST)
+
+        if report["stable_claim_allowed"]:
+            return
+
+        offenders: list[str] = []
+        for path in BROAD_V1_COMPLETION_CLAIM_FILES:
+            offenders.extend(
+                broad_v1_completion_claims(
+                    path.read_text(encoding="utf-8"),
                     str(path.relative_to(REPO_ROOT)),
                 )
             )

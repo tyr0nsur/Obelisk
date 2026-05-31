@@ -20,6 +20,9 @@ worker, should end with one of these outcomes:
 
 If the finding changes how agents should behave, update a skill. If it only records one
 experiment or evidence trail, update `docs/research/`.
+If a skill update changes release, publication, safety, or promotion policy, add or update
+a guardrail test in the same checkpoint, or explicitly document why the rule is not
+machine-checkable.
 
 Adopted knowledge should not remain only in chat or an agent result. Promote it to the
 smallest durable place that will help the next worker:
@@ -129,6 +132,8 @@ starting a new round.
 - [ ] Is there a rejected hypothesis worth saving?
 - [ ] Did a sub-agent suggest a skill update that the lead must accept, reject, or defer?
 - [ ] Did a live-server rule change?
+- [ ] Did a release, publication, safety, or promotion policy skill change also update a
+      guardrail test, or record why no machine check applies?
 - [ ] Did a long-running or unattended workflow get reduced to read-only snapshots plus
       explicit next actions?
 - [ ] Did the relevant skill get updated?

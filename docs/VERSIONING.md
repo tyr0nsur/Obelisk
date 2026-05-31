@@ -37,7 +37,7 @@ project(Obelisk VERSION 0.1.0)
 ```
 
 `ObeliskConfigVersion.cmake` and installed SDK consumers use the numeric compatibility
-floor, for example `find_package(Obelisk 0.1.0 CONFIG REQUIRED)`. That numeric package
+floor, for example `find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)`. That numeric package
 version is not a release claim by itself; the release claim exists only when a matching
 Git tag is cut after the release checklist passes.
 

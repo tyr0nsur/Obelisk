@@ -157,6 +157,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   string/xref/thunk candidates only. It does not replace the missing core evidence pack,
   reflection inventory pack, second source, focal snapshots, lifecycle anchors, or public
   SDK promotion evidence.
+- A machine-readable companion exists at
+  `docs/research/2026-05-31-player-identity-static-target-orientation.json` with
+  `status=candidate_blocked` and `promotion_ready=false`; it is an orientation index only,
+  not an offline artifact gate or promotion source.
 - Lifecycle-anchor candidate artifacts now fail closed if a candidate anchor target is
   outside the closed `players-identity-lifecycle-intake` target set, or if principal
   invalidation semantics are claimed as resolved before promotion.

@@ -62,14 +62,16 @@ class VersioningGuardrailTests(unittest.TestCase):
         self.assertIn('set(OBELISK_DEVELOPMENT_LINE "0.1.0-dev")', cmake)
         self.assertIn('set(OBELISK_RELEASE_CHANNEL "dev")', cmake)
         self.assertIn("project(Obelisk VERSION 0.1.0)", versioning)
-        self.assertIn("find_package(Obelisk 0.1.0 CONFIG REQUIRED)", versioning)
+        self.assertIn("find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)", versioning)
+        self.assertNotIn("find_package(Obelisk 0.1.0 CONFIG REQUIRED)`. That", versioning)
         self.assertIn('Obelisk_DEVELOPMENT_LINE STREQUAL "0.1.0-dev"', installed_consumer_cmake)
         self.assertIn('Obelisk_RELEASE_CHANNEL STREQUAL "dev"', installed_consumer_cmake)
         self.assertIn(
             "find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)",
             installed_consumer_cmake,
         )
-        self.assertIn("find_package(Obelisk 0.1.0 CONFIG REQUIRED)", install_doc)
+        self.assertIn("find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)", install_doc)
+        self.assertNotIn("find_package(Obelisk 0.1.0 CONFIG REQUIRED)\n", install_doc)
         self.assertIn("numeric package version is the SDK compatibility floor", install_doc)
         self.assertIn("not a claim that a stable `v0.1.0` tag exists", install_doc)
         for token in (
