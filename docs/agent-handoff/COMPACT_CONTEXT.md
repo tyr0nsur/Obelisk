@@ -120,11 +120,11 @@ priorities, and do not use history files as the active source of truth.
   richer chat APIs beyond minimal `ChatMessageEvent`, HTTP/threads/file-reader plugin
   ingress, and lifecycle-unsafe plugins.
 - Plugin Hub v1 seed work starts from `docs/PLUGIN_HUB_FOUNDATION_V1.md` and
-  `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`. Production-supported seeds are small
+  `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`. Release-supported seeds are small
   Obelisk-native lifecycle/config/logging examples, descriptor reads, and process-local
   timers. Passive copied chat parsing and copied policy auditing are experimental pattern
   examples only; demand-map or `NextGenPlugins` dictionary entries do not make a seed
-  production-ready and do not promote permissions, RCON, economy, homes/safe zones,
+  release-ready and do not promote permissions, RCON, economy, homes/safe zones,
   structure enforcement, dinos, tribes, transfers, inventory, item mutation, identity,
   lookup, replies, send-chat, moderation, or ArkApi portability.
 - `DescribeResourceKind` is a metadata-only v0.1 SDK helper for known resource categories.

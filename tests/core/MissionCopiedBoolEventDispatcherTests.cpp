@@ -142,6 +142,50 @@ namespace
         Require(capture.BoolPointer != sourcePointer, "dispatcher passed borrowed bool storage");
     }
 
+    void TestDispatchSnapshotsStackAndHeapSubscribers()
+    {
+        for (const size_t subscriberCount : {size_t{4}, size_t{5}})
+        {
+            MissionCopiedBoolEventDispatcher dispatcher;
+            int owner = 0;
+            std::vector<Capture> captures(subscriberCount);
+            const std::vector<MissionCopiedBoolValue> bools = MakeAddPlayerBools(false, true);
+            const auto* sourcePointer = bools.data();
+
+            for (Capture& capture : captures)
+            {
+                const uint64_t id = dispatcher.Register(&owner, {CaptureCallback, &capture});
+                Require(id != 0, "stack/heap subscriber registration failed");
+            }
+            Require(dispatcher.SubscriptionCount() == subscriberCount,
+                    "stack/heap subscriber count mismatch before dispatch");
+
+            Require(dispatcher.Dispatch(MakeEvent(bools)) == subscriberCount,
+                    "stack/heap subscriber dispatch count mismatch");
+
+            for (const Capture& capture : captures)
+            {
+                Require(capture.Calls == 1, "stack/heap subscriber did not run once");
+                Require(capture.Kind == MissionCopiedBoolEventKind::AddPlayerToMission,
+                        "stack/heap subscriber event kind mismatch");
+                Require(capture.Bools.size() == 2, "stack/heap subscriber bool count mismatch");
+                Require(capture.Bools[0].Field == MissionCopiedBoolField::BForceAdd,
+                        "stack/heap subscriber first field mismatch");
+                Require(!capture.Bools[0].Value, "stack/heap subscriber first value mismatch");
+                Require(capture.Bools[1].Field == MissionCopiedBoolField::ReturnValue,
+                        "stack/heap subscriber return field mismatch");
+                Require(capture.Bools[1].Value, "stack/heap subscriber return value mismatch");
+                Require(capture.BoolPointer != sourcePointer,
+                        "stack/heap subscriber received borrowed bool storage");
+            }
+
+            Require(dispatcher.UnregisterCallbacksForOwner(&owner) == subscriberCount,
+                    "stack/heap subscriber cleanup removed wrong count");
+            Require(dispatcher.SubscriptionCount() == 0,
+                    "stack/heap subscriber cleanup left registrations behind");
+        }
+    }
+
     void TestRegisterRejectsInvalidInput()
     {
         MissionCopiedBoolEventDispatcher dispatcher;
@@ -642,6 +686,7 @@ int main()
     {
         TestMissionCopiedBoolSurfaceIsInternalObservationOnly();
         TestDispatchCopiesBoolInputForCallbackDuration();
+        TestDispatchSnapshotsStackAndHeapSubscribers();
         TestRegisterRejectsInvalidInput();
         TestDispatchRejectsUnknownEventShape();
         TestDispatchRejectsUnexpectedBoolShape();

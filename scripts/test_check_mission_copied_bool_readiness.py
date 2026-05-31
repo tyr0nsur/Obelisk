@@ -28,29 +28,184 @@ class CheckMissionCopiedBoolReadinessTests(unittest.TestCase):
         )
 
     def make_policy(self) -> dict:
-        def copied(target: str, field: str, direction: str) -> dict:
+        snapshots = [
+            {
+                "id": "snapshot-0001",
+                "sha256": "1" * 64,
+                "target": "MissionType.AddPlayerToMission",
+            },
+            {
+                "id": "snapshot-0002",
+                "sha256": "2" * 64,
+                "target": "MissionType.BPAllowPlayerToLeaveMission",
+            },
+            {
+                "id": "snapshot-0003",
+                "sha256": "3" * 64,
+                "target": "MissionType.BPOnPlayerRemovedFromMission",
+            },
+            {
+                "id": "snapshot-0004",
+                "sha256": "4" * 64,
+                "target": "MissionType.GetPlayerUsableItems",
+            },
+        ]
+        snapshot_by_target = {snapshot["target"]: snapshot for snapshot in snapshots}
+        copied_shapes = {
+            "MissionType.AddPlayerToMission.bForceAdd": {
+                "field": "bForceAdd",
+                "direction": "in",
+                "offset": "0x8",
+                "offset_internal": 8,
+                "property_flags": "0x1040000280",
+                "return_value_offset": "0x9",
+            },
+            "MissionType.AddPlayerToMission.ReturnValue": {
+                "field": "ReturnValue",
+                "direction": "return",
+                "offset": "0x9",
+                "offset_internal": 9,
+                "property_flags": "0x1040000780",
+                "return_value_offset": "0x9",
+            },
+            "MissionType.BPAllowPlayerToLeaveMission.ReturnValue": {
+                "field": "ReturnValue",
+                "direction": "return",
+                "offset": "0x8",
+                "offset_internal": 8,
+                "property_flags": "0x1040000780",
+                "return_value_offset": "0x8",
+            },
+            "MissionType.BPOnPlayerRemovedFromMission.bFromMissionCompleteEvent": {
+                "field": "bFromMissionCompleteEvent",
+                "direction": "in",
+                "offset": "0x10",
+                "offset_internal": 16,
+                "property_flags": "0x1040000280",
+                "return_value_offset": "0xffff",
+            },
+            "MissionType.BPOnPlayerRemovedFromMission.bLastPhaseSuccess": {
+                "field": "bLastPhaseSuccess",
+                "direction": "in",
+                "offset": "0x11",
+                "offset_internal": 17,
+                "property_flags": "0x1040000280",
+                "return_value_offset": "0xffff",
+            },
+        }
+        redacted_shapes = {
+            "MissionType.AddPlayerToMission.PlayerCharacter": {
+                "field": "PlayerCharacter",
+                "property_class": "ObjectProperty",
+                "offset": "0x0",
+                "offset_internal": 0,
+                "element_size": 8,
+                "array_dim": 1,
+                "property_flags": "0x1040000280",
+            },
+            "MissionType.BPAllowPlayerToLeaveMission.PlayerPawn": {
+                "field": "PlayerPawn",
+                "property_class": "ObjectProperty",
+                "offset": "0x0",
+                "offset_internal": 0,
+                "element_size": 8,
+                "array_dim": 1,
+                "property_flags": "0x1040000280",
+            },
+            "MissionType.BPOnPlayerRemovedFromMission.Player": {
+                "field": "Player",
+                "property_class": "ObjectProperty",
+                "offset": "0x0",
+                "offset_internal": 0,
+                "element_size": 8,
+                "array_dim": 1,
+                "property_flags": "0x1040000280",
+            },
+            "MissionType.BPOnPlayerRemovedFromMission.Controller": {
+                "field": "Controller",
+                "property_class": "ObjectProperty",
+                "offset": "0x8",
+                "offset_internal": 8,
+                "element_size": 8,
+                "array_dim": 1,
+                "property_flags": "0x1040000280",
+            },
+            "MissionType.GetPlayerUsableItems.Character": {
+                "field": "Character",
+                "property_class": "ObjectProperty",
+                "offset": "0x0",
+                "offset_internal": 0,
+                "element_size": 8,
+                "array_dim": 1,
+                "property_flags": "0x1040000280",
+            },
+            "MissionType.GetPlayerUsableItems.OutItemIDs": {
+                "field": "OutItemIDs",
+                "property_class": "ArrayProperty",
+                "offset": "0x8",
+                "offset_internal": 8,
+                "element_size": 16,
+                "array_dim": 1,
+                "property_flags": "0x380",
+            },
+        }
+        copied_fields = [
+            "MissionType.AddPlayerToMission.bForceAdd",
+            "MissionType.AddPlayerToMission.ReturnValue",
+            "MissionType.BPAllowPlayerToLeaveMission.ReturnValue",
+            "MissionType.BPOnPlayerRemovedFromMission.bFromMissionCompleteEvent",
+            "MissionType.BPOnPlayerRemovedFromMission.bLastPhaseSuccess",
+        ]
+        redacted_fields = [
+            "MissionType.AddPlayerToMission.PlayerCharacter",
+            "MissionType.BPAllowPlayerToLeaveMission.PlayerPawn",
+            "MissionType.BPOnPlayerRemovedFromMission.Player",
+            "MissionType.BPOnPlayerRemovedFromMission.Controller",
+            "MissionType.GetPlayerUsableItems.Character",
+            "MissionType.GetPlayerUsableItems.OutItemIDs",
+        ]
+
+        def copied(copied_field: str) -> dict:
+            target = copied_field.rsplit(".", 1)[0]
+            snapshot = snapshot_by_target[target]
             return {
                 "array_dim": 1,
                 "bool_byte_offset": 0,
                 "bool_field_size": 1,
                 "byte_mask": "0x01",
-                "copied_field": f"{target}.{field}",
-                "direction": direction,
+                "copied_field": copied_field,
                 "element_size": 1,
                 "evidence_status": "copied-mission-bool-only",
-                "field": field,
                 "field_mask": "0xff",
                 "native_bool": False,
                 "property_class": "BoolProperty",
+                "source_snapshot": snapshot["id"],
+                "source_snapshot_sha256": snapshot["sha256"],
                 "target": target,
                 "type": "bool",
+                **copied_shapes[copied_field],
+            }
+
+        def redacted(redacted_field: str) -> dict:
+            target = redacted_field.rsplit(".", 1)[0]
+            snapshot = snapshot_by_target[target]
+            return {
+                "evidence_status": "recognition-only-redacted",
+                "reason": "unit_test_redacted",
+                "redacted_field": redacted_field,
+                "source_snapshot": snapshot["id"],
+                "source_snapshot_sha256": snapshot["sha256"],
+                "target": target,
+                **redacted_shapes[redacted_field],
             }
 
         return {
             "schema": "obelisk.mission-copied-bool-policy-slice.v1",
+            "snapshot_root": "redacted",
             "input_target_set": "mission-compact-intake",
             "output_target_set": "mission-copied-bool-policy-slice",
             "policy_status": "evidence-only",
+            "missing_targets": [],
             "coverage": {
                 "status": "complete",
                 "input_targets": [
@@ -64,43 +219,37 @@ class CheckMissionCopiedBoolReadinessTests(unittest.TestCase):
                     "MissionType.BPAllowPlayerToLeaveMission",
                     "MissionType.BPOnPlayerRemovedFromMission",
                 ],
-                "copied_fields": [
-                    "MissionType.AddPlayerToMission.bForceAdd",
-                    "MissionType.AddPlayerToMission.ReturnValue",
-                    "MissionType.BPAllowPlayerToLeaveMission.ReturnValue",
-                    "MissionType.BPOnPlayerRemovedFromMission.bFromMissionCompleteEvent",
-                    "MissionType.BPOnPlayerRemovedFromMission.bLastPhaseSuccess",
-                ],
-                "redacted_fields": [
-                    "MissionType.AddPlayerToMission.PlayerCharacter",
-                    "MissionType.BPAllowPlayerToLeaveMission.PlayerPawn",
-                    "MissionType.BPOnPlayerRemovedFromMission.Player",
-                    "MissionType.BPOnPlayerRemovedFromMission.Controller",
-                    "MissionType.GetPlayerUsableItems.Character",
-                    "MissionType.GetPlayerUsableItems.OutItemIDs",
-                ],
+                "copied_fields": copied_fields,
+                "redacted_fields": redacted_fields,
             },
-            "copied_bools": [
-                copied("MissionType.AddPlayerToMission", "bForceAdd", "in"),
-                copied("MissionType.AddPlayerToMission", "ReturnValue", "return"),
-                copied("MissionType.BPAllowPlayerToLeaveMission", "ReturnValue", "return"),
-                copied("MissionType.BPOnPlayerRemovedFromMission", "bFromMissionCompleteEvent", "in"),
-                copied("MissionType.BPOnPlayerRemovedFromMission", "bLastPhaseSuccess", "in"),
-            ],
+            "copied_bools": [copied(field) for field in copied_fields],
+            "redacted_mission_fields": [redacted(field) for field in redacted_fields],
             "generated_from": {
                 "snapshot_schema": "obelisk.ufunction-chain.snapshot.v1",
-                "input_snapshots": [
-                    {"id": "snapshot-0001", "target": "MissionType.AddPlayerToMission"},
-                    {"id": "snapshot-0002", "target": "MissionType.BPAllowPlayerToLeaveMission"},
-                    {"id": "snapshot-0003", "target": "MissionType.BPOnPlayerRemovedFromMission"},
-                    {"id": "snapshot-0004", "target": "MissionType.GetPlayerUsableItems"},
-                ],
+                "input_snapshots": snapshots,
             },
             "safety_summary": {
                 "artifact_status": "evidence_only",
-                "consume_only": True,
-                "promotion_ready": False,
                 "intended_use": "offline_review_only",
+                "promotion_ready": False,
+                "copied_bool_count": 5,
+                "redacted_field_count": 6,
+                "explicitly_excluded": [
+                    "GetPlayerUsableItems.OutItemIDs",
+                    "Mission SDK",
+                    "arrays",
+                    "dispatcher_wiring",
+                    "hook_wiring",
+                    "mission_identity",
+                    "mutation",
+                    "object_refs",
+                    "player_identity",
+                    "public_sdk",
+                    "raw_params",
+                    "resource_handle",
+                    "return_override",
+                    "runtime_markers",
+                ],
             },
             "non_claims": [
                 "does not expose UE pointers, object identity, class identity, raw params, mutation, or return overrides",
@@ -193,6 +342,37 @@ class CheckMissionCopiedBoolReadinessTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         reasons = {blocker["reason"] for blocker in report["blockers"]}
         self.assertIn("copied_bool_entry_metadata_mismatch", reasons)
+        self.assertIn("mission_copied_bool_policy_copied_bool_shape_mismatch", reasons)
+
+    def test_stale_manifest_without_bool_tail_metadata_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            payload = self.make_policy()
+            for entry in payload["copied_bools"]:
+                del entry["bool_field_size"]
+                del entry["bool_byte_offset"]
+            manifest, sha256 = self.write_pack(root, payload)
+
+            result = self.run_checker(*self.checker_args(root, manifest, sha256), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        reasons = {blocker["reason"] for blocker in report["blockers"]}
+        self.assertIn("copied_bool_entry_metadata_mismatch", reasons)
+        self.assertIn("mission_copied_bool_policy_copied_bool_shape_mismatch", reasons)
+
+    def test_manifest_hash_mismatch_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            manifest, _ = self.write_pack(root)
+            result = self.run_checker(
+                *self.checker_args(root, manifest, "0" * 64),
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("manifest_sha256_mismatch", {blocker["reason"] for blocker in report["blockers"]})
 
     def test_promote_gate_must_stay_blocked(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -210,6 +390,32 @@ class CheckMissionCopiedBoolReadinessTests(unittest.TestCase):
         self.assertIn("required_non_claim_missing", reasons)
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
+
+    def test_public_runtime_and_artifact_gate_claims_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            payload = self.make_policy()
+            payload["not_artifact_gate"] = False
+            payload["consume_only"] = False
+            payload["public_mission_sdk_ready"] = True
+            payload["runtime_ready"] = True
+            payload["runtime_claim"] = "runtime ready with public Mission SDK"
+            payload["safety_summary"]["public_sdk_ready"] = True
+            payload["safety_summary"]["runtime_hook_ready"] = True
+            manifest, sha256 = self.write_pack(root, payload)
+
+            result = self.run_checker(*self.checker_args(root, manifest, sha256), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        reasons = {blocker["reason"] for blocker in report["blockers"]}
+        self.assertIn("not_artifact_gate_contradiction", reasons)
+        self.assertIn("consume_only_not_true", reasons)
+        self.assertIn("readiness_overclaim", reasons)
+        self.assertIn("runtime_public_readiness_overclaim", reasons)
+        self.assertIn("runtime_public_claim_overclaim", reasons)
+        self.assertIn("mission_copied_bool_policy_public_overclaim_public_sdk", reasons)
+        self.assertIn("mission_copied_bool_policy_public_overclaim_runtime_ready", reasons)
 
     def test_protected_and_symlink_inputs_are_rejected(self) -> None:
         result = self.run_checker(

@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import validate_offline_artifact_gate as offline_gate
 from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
 
 
@@ -63,6 +64,15 @@ FORBIDDEN_COPIED_RE = re.compile(
     r"lookup|mutation|object_refs|public_sdk|resource_handle|return_override|runtime|ue_pointer)",
     re.IGNORECASE,
 )
+FORBIDDEN_TRUE_READY_KEYS = {
+    "dispatcher_ready",
+    "mission_payload_decoding_ready",
+    "public_api_ready",
+    "public_mission_sdk_ready",
+    "public_sdk_ready",
+    "runtime_hook_ready",
+    "runtime_ready",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -221,6 +231,43 @@ def validate_copied_bool_entries(policy: dict[str, Any], copied_fields: set[str]
         )
 
 
+def validate_internal_only_boundaries(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    gate_blockers = offline_gate.validate_mission_copied_bool_policy_slice_manifest(
+        policy,
+        label="mission-copied-bool-readiness",
+        mode="consume",
+    )
+    for blocker in gate_blockers:
+        if not isinstance(blocker, dict):
+            append_blocker(blockers, "offline_artifact_gate_blocker_unparseable", value=blocker)
+            continue
+        reason = blocker.get("reason")
+        append_blocker(
+            blockers,
+            reason if isinstance(reason, str) else "offline_artifact_gate_blocker_missing_reason",
+            source="offline_artifact_gate",
+            label=blocker.get("label"),
+            expected=blocker.get("expected"),
+            recorded=blocker.get("recorded"),
+        )
+
+    for trail, _ in offline_gate.collect_ready_overclaims(policy):
+        append_blocker(blockers, "readiness_overclaim", field=trail)
+    for trail, value in offline_gate.collect_bool_fields(policy):
+        key = trail.rsplit(".", 1)[-1]
+        if key == "not_artifact_gate" and value is False:
+            append_blocker(blockers, "not_artifact_gate_contradiction", field=trail)
+        if key == "consume_only" and value is False:
+            append_blocker(blockers, "consume_only_not_true", field=trail)
+        if value is True and key in FORBIDDEN_TRUE_READY_KEYS:
+            append_blocker(blockers, "runtime_public_readiness_overclaim", field=trail)
+    for trail, _, reason in offline_gate.collect_candidate_public_overclaims(
+        policy,
+        allowed_prefixes=("$.non_claims", "$.safety_summary.explicitly_excluded"),
+    ):
+        append_blocker(blockers, "runtime_public_claim_overclaim", field=trail, claim=reason)
+
+
 def validate_policy(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> dict[str, Any]:
     if policy.get("schema") != POLICY_SCHEMA:
         append_blocker(blockers, "schema_mismatch", value=policy.get("schema"))
@@ -230,6 +277,10 @@ def validate_policy(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> d
         append_blocker(blockers, "output_target_set_mismatch", value=policy.get("output_target_set"))
     if policy.get("policy_status") != "evidence-only":
         append_blocker(blockers, "policy_status_not_evidence_only", value=policy.get("policy_status"))
+    if policy.get("snapshot_root") != "redacted":
+        append_blocker(blockers, "snapshot_root_not_redacted", value=policy.get("snapshot_root"))
+    if policy.get("missing_targets") != []:
+        append_blocker(blockers, "missing_targets_present", value=policy.get("missing_targets"))
 
     coverage = policy.get("coverage")
     if not isinstance(coverage, dict):
@@ -288,6 +339,27 @@ def validate_policy(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> d
                 value=len(snapshots) if isinstance(snapshots, list) else None,
             )
 
+    safety_summary = policy.get("safety_summary")
+    if not isinstance(safety_summary, dict):
+        append_blocker(blockers, "safety_summary_missing")
+    else:
+        required_safety = {
+            "artifact_status": "evidence_only",
+            "intended_use": "offline_review_only",
+            "promotion_ready": False,
+            "copied_bool_count": len(EXPECTED_COPIED_FIELDS),
+            "redacted_field_count": len(EXPECTED_REDACTED_FIELDS),
+        }
+        for key, expected in required_safety.items():
+            if safety_summary.get(key) != expected:
+                append_blocker(
+                    blockers,
+                    "safety_summary_mismatch",
+                    field=key,
+                    expected=expected,
+                    value=safety_summary.get(key),
+                )
+
     non_claims = policy.get("non_claims")
     if not isinstance(non_claims, list):
         append_blocker(blockers, "non_claims_missing")
@@ -297,6 +369,8 @@ def validate_policy(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> d
     for token in REQUIRED_NON_CLAIM_TOKENS:
         if token not in non_claims_text:
             append_blocker(blockers, "required_non_claim_missing", token=token)
+
+    validate_internal_only_boundaries(policy, blockers)
 
     return {
         "input_targets": sorted(input_targets),
