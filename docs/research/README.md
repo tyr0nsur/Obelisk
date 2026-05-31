@@ -77,6 +77,7 @@ Current post-RC research evidence lane (side-lane inventory for research reuse; 
 - [2026-05-30-chat-command-helper-roadmap.md](2026-05-30-chat-command-helper-roadmap.md)
 - [2026-05-31-chat-command-readiness.md](2026-05-31-chat-command-readiness.md)
 - [2026-05-31-commands-principal-routing-contract.md](2026-05-31-commands-principal-routing-contract.md)
+- [2026-05-31-command-chat-response-thunk-orientation.md](2026-05-31-command-chat-response-thunk-orientation.md) (candidate-only static thunk orientation)
 - [2026-05-31-permissions-admin-minimum-post-identity.md](2026-05-31-permissions-admin-minimum-post-identity.md)
 - [2026-05-31-operator-ingress-storage-blocker-brief.md](2026-05-31-operator-ingress-storage-blocker-brief.md)
 - [2026-05-30-chat-audit-plugin-plan.md](2026-05-30-chat-audit-plugin-plan.md)
@@ -263,6 +264,7 @@ when a task explicitly targets that module.
 | [2026-05-30-post-rc-targetset-priorities.md](2026-05-30-post-rc-targetset-priorities.md) | Post-RC target-set priorities | Ranks Mission, Dino, Buff, Structure build-policy, Tribe, and Transfer follow-up work for offline/internal research without promoting new SDK surfaces. |
 | [2026-05-30-chat-command-helper-roadmap.md](2026-05-30-chat-command-helper-roadmap.md) | Chat command helper roadmap | Defines a plugin-local, non-ABI helper pattern over `ChatMessageEvent` with `principal=unknown`, global config-only enablement, and no player permissions or chat response path. |
 | [2026-05-31-chat-command-readiness.md](2026-05-31-chat-command-readiness.md) | Chat command readiness audit | Confirms copied chat is enough for repo-local plugin command parsing tests only, with docs/tests as the next hardening step and no public command SDK, identity, replies, moderation, mutation, or live-test approval. |
+| [2026-05-31-command-chat-response-thunk-orientation.md](2026-05-31-command-chat-response-thunk-orientation.md) | Command/chat response thunk orientation | Preserves candidate-only static thunk orientation without promoting replies, send-chat, command routing, identity, permissions, runtime readiness, or public SDK status. |
 | [2026-05-29-filtered-process-event-debug-gate-hardening.md](2026-05-29-filtered-process-event-debug-gate-hardening.md) | Filtered ProcessEvent debug gate hardening | Records why raw filtered `ProcessEvent` callbacks moved behind an explicit debug gate so copied events remain the RC plugin path. |
 | [2026-05-29-rc-checkpoint-slicing-plan.md](2026-05-29-rc-checkpoint-slicing-plan.md) | RC checkpoint slicing | Splits the broad dirty worktree into reviewable local checkpoints and keeps the first RC limited to core API, lifecycle, release gates, and redacted evidence. |
 | [2026-05-29-buff-after-compact-next-step.md](2026-05-29-buff-after-compact-next-step.md) | Buff after compact next step | Recommends no buff runtime hooks after accepted compact layout evidence; limits useful follow-up to docs or offline target-set expansion. |

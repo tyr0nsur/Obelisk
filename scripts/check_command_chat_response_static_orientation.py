@@ -25,8 +25,34 @@ DEFAULT_BINARY = Path(
 REPORT_SCHEMA = "obelisk.command-chat-response-static-orientation-check.v1"
 EXPECTED_BINARY_SHA256 = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 PLANNING_SURFACE = "obelisk.command_chat_response_path.v1"
+CANDIDATE_EVIDENCE_STATUS = "candidate_only_static_orientation"
 REGISTRAR_CALL_VMA = 0x1CCC140
 CONTROLLER_CLASS_SLOT_VMA = 0x58EEBF0
+PUBLIC_ABI_STATUS = "blocked_pending_identity_permission_and_copied_response_contracts"
+PUBLIC_ABI_FALSE_FIELDS = (
+    "public_command_api",
+    "public_reply_api",
+    "public_send_chat_api",
+    "runtime_command_router",
+    "player_identity_contract",
+    "permission_admin_contract",
+    "copied_response_contract",
+    "raw_ue_pointer_or_fstring_exposure",
+)
+REQUIRED_PROMOTION_BLOCKERS = (
+    "player_identity_contract_not_promoted",
+    "permission_admin_contract_not_promoted",
+    "copied_response_contract_not_promoted",
+    "public_command_reply_send_chat_api_not_promoted",
+    "static_orientation_not_registered_artifact_gate",
+)
+CONTRACT_TOPIC = "command_chat_response_path"
+REQUIRED_CONTRACT_BLOCKERS = (
+    "requires_non_protected_core_evidence_pack",
+    "requires_reflection_inventory_or_focal_snapshots_for_response_path_targets",
+    "requires_command_router_identity_and_permission_contracts_before_command_replies",
+    "requires_copied_data_response_contract_before_public_sdk_promotion",
+)
 
 
 @dataclass(frozen=True)
@@ -518,7 +544,11 @@ def validate_target(
         "target": target.target,
         "kind": "command_chat_response_path_static_orientation",
         "status": "candidate_orientation_valid" if len(blockers) == before else "blocked",
+        "candidate_only": len(blockers) == before,
         "confidence": "candidate",
+        "public_abi_ready": False,
+        "public_sdk_evidence": "not_public_sdk_evidence",
+        "artifact_gate_evidence": "not_artifact_gate_evidence",
         "ascii_name": target.ascii_name,
         "ascii_name_file_offset": hex(ascii_file_offset) if ascii_file_offset is not None else None,
         "ascii_name_vma": hex(ascii_vma) if ascii_vma is not None else None,
@@ -545,6 +575,9 @@ def contract_subjects(checked_targets: list[dict[str, Any]]) -> list[dict[str, A
             if target.get("status") == "candidate_orientation_valid"
             else target.get("status"),
             "confidence": target.get("confidence"),
+            "public_abi_ready": target.get("public_abi_ready"),
+            "public_sdk_evidence": target.get("public_sdk_evidence"),
+            "artifact_gate_evidence": target.get("artifact_gate_evidence"),
             "ascii_name_vma": target.get("ascii_name_vma"),
             "class_slot_vma": target.get("class_slot_vma"),
             "registration_vmas": target.get("registration_vmas"),
@@ -553,6 +586,186 @@ def contract_subjects(checked_targets: list[dict[str, Any]]) -> list[dict[str, A
         }
         for target in checked_targets
     ]
+
+
+def artifact_gate_boundary() -> dict[str, Any]:
+    return {
+        "status": "not_artifact_gate",
+        "registered": False,
+        "may_gate_artifacts": False,
+        "consume_mode": "candidate_orientation_only",
+        "promote_mode": "blocked",
+    }
+
+
+def public_abi_boundary() -> dict[str, Any]:
+    boundary: dict[str, Any] = {"status": PUBLIC_ABI_STATUS}
+    for field in PUBLIC_ABI_FALSE_FIELDS:
+        boundary[field] = False
+    return boundary
+
+
+def validate_report_boundary(report: dict[str, Any]) -> list[dict[str, Any]]:
+    blockers: list[dict[str, Any]] = []
+
+    def add(reason: str, **details: Any) -> None:
+        blockers.append({"reason": reason, **details})
+
+    if report.get("schema") != REPORT_SCHEMA:
+        add("command_chat_response_schema_invalid", expected=REPORT_SCHEMA, value=report.get("schema"))
+    if report.get("candidate_evidence_status") != CANDIDATE_EVIDENCE_STATUS:
+        add(
+            "command_chat_response_candidate_status_invalid",
+            value=report.get("candidate_evidence_status"),
+        )
+    for field in ("promotion_ready", "public_sdk_ready", "public_abi_ready", "runtime_ready"):
+        if report.get(field) is not False:
+            add("command_chat_response_readiness_overclaim", field=field, value=report.get(field))
+    if report.get("not_artifact_gate") is not True:
+        add(
+            "command_chat_response_artifact_gate_overclaim",
+            field="not_artifact_gate",
+            value=report.get("not_artifact_gate"),
+        )
+
+    gate = report.get("artifact_gate")
+    if not isinstance(gate, dict):
+        add("command_chat_response_artifact_gate_boundary_missing")
+    else:
+        expected_gate = artifact_gate_boundary()
+        for field, expected in expected_gate.items():
+            if gate.get(field) != expected:
+                add(
+                    "command_chat_response_artifact_gate_boundary_invalid",
+                    field=field,
+                    expected=expected,
+                    value=gate.get(field),
+                )
+
+    public_boundary = report.get("public_abi_boundary")
+    if not isinstance(public_boundary, dict):
+        add("command_chat_response_public_abi_boundary_missing")
+    else:
+        if public_boundary.get("status") != PUBLIC_ABI_STATUS:
+            add(
+                "command_chat_response_public_abi_status_invalid",
+                expected=PUBLIC_ABI_STATUS,
+                value=public_boundary.get("status"),
+            )
+        for field in PUBLIC_ABI_FALSE_FIELDS:
+            if public_boundary.get(field) is not False:
+                add(
+                    "command_chat_response_public_abi_overclaim",
+                    field=field,
+                    value=public_boundary.get(field),
+                )
+
+    promotion_blockers = report.get("promotion_blockers")
+    if not isinstance(promotion_blockers, list) or not all(isinstance(item, str) for item in promotion_blockers):
+        add("command_chat_response_promotion_blockers_invalid")
+    else:
+        missing = sorted(set(REQUIRED_PROMOTION_BLOCKERS) - set(promotion_blockers))
+        if missing:
+            add("command_chat_response_required_promotion_blocker_missing", missing=missing)
+
+    contract = report.get("static_candidate_orientation_contract")
+    if not isinstance(contract, dict):
+        add("command_chat_response_static_contract_missing")
+    else:
+        for blocker in validate_contract(contract):
+            add(
+                "command_chat_response_static_contract_invalid",
+                contract_reason=blocker.get("reason"),
+                contract_blocker=blocker,
+            )
+
+        scope = contract.get("scope")
+        if not isinstance(scope, dict):
+            add("command_chat_response_static_contract_scope_missing")
+        else:
+            expected_targets = sorted(EXPECTED_TARGET_NAMES)
+            if scope.get("topic") != CONTRACT_TOPIC:
+                add(
+                    "command_chat_response_static_contract_topic_invalid",
+                    expected=CONTRACT_TOPIC,
+                    value=scope.get("topic"),
+                )
+            if scope.get("target_set") != PLANNING_SURFACE:
+                add(
+                    "command_chat_response_static_contract_target_set_invalid",
+                    expected=PLANNING_SURFACE,
+                    value=scope.get("target_set"),
+                )
+            if scope.get("binary_sha256") != report.get("binary_sha256"):
+                add(
+                    "command_chat_response_static_contract_binary_sha256_mismatch",
+                    expected=report.get("binary_sha256"),
+                    value=scope.get("binary_sha256"),
+                )
+            if scope.get("expected_targets") != expected_targets:
+                add(
+                    "command_chat_response_static_contract_expected_targets_invalid",
+                    expected=expected_targets,
+                    value=scope.get("expected_targets"),
+                )
+
+        contract_blockers = contract.get("blockers")
+        if not isinstance(contract_blockers, list) or not all(isinstance(item, str) for item in contract_blockers):
+            add("command_chat_response_static_contract_blockers_invalid")
+        else:
+            missing = sorted(set(REQUIRED_CONTRACT_BLOCKERS) - set(contract_blockers))
+            if missing:
+                add("command_chat_response_static_contract_required_blocker_missing", missing=missing)
+
+        if contract.get("non_claims") != report.get("non_claims"):
+            add("command_chat_response_static_contract_non_claims_mismatch")
+
+        subjects = contract.get("subjects")
+        checked_targets = report.get("checked_targets")
+        if isinstance(subjects, list) and isinstance(checked_targets, list):
+            subject_names = sorted(
+                subject["target"]
+                for subject in subjects
+                if isinstance(subject, dict) and isinstance(subject.get("target"), str)
+            )
+            checked_names = sorted(
+                target["target"]
+                for target in checked_targets
+                if isinstance(target, dict) and isinstance(target.get("target"), str)
+            )
+            if subject_names != checked_names:
+                add(
+                    "command_chat_response_static_contract_subjects_mismatch",
+                    expected=checked_names,
+                    value=subject_names,
+                )
+
+    for target in report.get("checked_targets", []):
+        if not isinstance(target, dict):
+            add("command_chat_response_target_boundary_invalid")
+            continue
+        if target.get("status") == "candidate_orientation_valid" and target.get("candidate_only") is not True:
+            add("command_chat_response_target_candidate_boundary_missing", target=target.get("target"))
+        if target.get("public_abi_ready") is not False:
+            add(
+                "command_chat_response_target_public_abi_overclaim",
+                target=target.get("target"),
+                value=target.get("public_abi_ready"),
+            )
+        if target.get("public_sdk_evidence") != "not_public_sdk_evidence":
+            add(
+                "command_chat_response_target_public_sdk_evidence_overclaim",
+                target=target.get("target"),
+                value=target.get("public_sdk_evidence"),
+            )
+        if target.get("artifact_gate_evidence") != "not_artifact_gate_evidence":
+            add(
+                "command_chat_response_target_artifact_gate_evidence_overclaim",
+                target=target.get("target"),
+                value=target.get("artifact_gate_evidence"),
+            )
+
+    return blockers
 
 
 def validate_binary(path: Path, expected_sha256: str) -> dict[str, Any]:
@@ -603,8 +816,9 @@ def validate_binary(path: Path, expected_sha256: str) -> dict[str, Any]:
         "requires_command_router_identity_and_permission_contracts_before_command_replies",
         "requires_copied_data_response_contract_before_public_sdk_promotion",
     ]
+    promotion_blockers = list(REQUIRED_PROMOTION_BLOCKERS)
     static_contract = build_contract(
-        topic="command_chat_response_path",
+        topic=CONTRACT_TOPIC,
         binary_sha256=binary_sha256,
         target_set=PLANNING_SURFACE,
         expected_targets=EXPECTED_TARGET_NAMES,
@@ -613,18 +827,21 @@ def validate_binary(path: Path, expected_sha256: str) -> dict[str, Any]:
         non_claims=non_claims,
         blockers=blocker_labels,
     )
-    blockers.extend(validate_contract(static_contract))
 
-    valid = not blockers
-    return {
+    report = {
         "schema": REPORT_SCHEMA,
-        "status": "valid" if valid else "blocked",
-        "valid": valid,
-        "accepted_for_orientation": valid,
+        "status": "blocked",
+        "valid": False,
+        "accepted_for_orientation": False,
+        "candidate_evidence_status": CANDIDATE_EVIDENCE_STATUS,
         "not_artifact_gate": True,
+        "artifact_gate": artifact_gate_boundary(),
         "promotion_ready": False,
         "public_sdk_ready": False,
+        "public_abi_ready": False,
         "runtime_ready": False,
+        "public_abi_boundary": public_abi_boundary(),
+        "promotion_blockers": promotion_blockers,
         "planning_surface": PLANNING_SURFACE,
         "binary": str(resolved if resolved is not None else path),
         "binary_sha256": binary_sha256,
@@ -635,6 +852,12 @@ def validate_binary(path: Path, expected_sha256: str) -> dict[str, Any]:
         "blockers": blockers,
         "non_claims": non_claims,
     }
+    blockers.extend(validate_report_boundary(report))
+    valid = not blockers
+    report["status"] = "valid" if valid else "blocked"
+    report["valid"] = valid
+    report["accepted_for_orientation"] = valid
+    return report
 
 
 def main() -> int:

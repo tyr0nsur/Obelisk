@@ -10,6 +10,7 @@ import struct
 import sys
 import tempfile
 import unittest
+from copy import deepcopy
 from pathlib import Path
 
 
@@ -26,7 +27,9 @@ sys.path.insert(0, str(SCRIPT_DIR))
 from check_command_chat_response_static_orientation import (  # noqa: E402
     CONTROLLER_CLASS_SLOT_VMA,
     REGISTRAR_CALL_VMA,
+    REQUIRED_PROMOTION_BLOCKERS,
     RESPONSE_PATH_TARGETS,
+    validate_report_boundary,
 )
 
 
@@ -196,10 +199,38 @@ class CheckCommandChatResponseStaticOrientationTests(unittest.TestCase):
         self.assertEqual(payload["status"], "valid")
         self.assertTrue(payload["valid"])
         self.assertTrue(payload["accepted_for_orientation"])
+        self.assertEqual(payload["candidate_evidence_status"], "candidate_only_static_orientation")
         self.assertTrue(payload["not_artifact_gate"])
+        self.assertEqual(
+            payload["artifact_gate"],
+            {
+                "status": "not_artifact_gate",
+                "registered": False,
+                "may_gate_artifacts": False,
+                "consume_mode": "candidate_orientation_only",
+                "promote_mode": "blocked",
+            },
+        )
         self.assertFalse(payload["promotion_ready"])
         self.assertFalse(payload["public_sdk_ready"])
+        self.assertFalse(payload["public_abi_ready"])
         self.assertFalse(payload["runtime_ready"])
+        self.assertEqual(
+            payload["public_abi_boundary"]["status"],
+            "blocked_pending_identity_permission_and_copied_response_contracts",
+        )
+        for field in (
+            "public_command_api",
+            "public_reply_api",
+            "public_send_chat_api",
+            "runtime_command_router",
+            "player_identity_contract",
+            "permission_admin_contract",
+            "copied_response_contract",
+            "raw_ue_pointer_or_fstring_exposure",
+        ):
+            self.assertFalse(payload["public_abi_boundary"][field])
+        self.assertEqual(set(payload["promotion_blockers"]), set(REQUIRED_PROMOTION_BLOCKERS))
         self.assertEqual(payload["planning_surface"], "obelisk.command_chat_response_path.v1")
         self.assertEqual(payload["blockers"], [])
         self.assertEqual(
@@ -212,6 +243,14 @@ class CheckCommandChatResponseStaticOrientationTests(unittest.TestCase):
         )
 
         observed = {target["target"]: target for target in payload["checked_targets"]}
+        self.assertTrue(all(target["candidate_only"] for target in observed.values()))
+        self.assertTrue(all(not target["public_abi_ready"] for target in observed.values()))
+        self.assertTrue(
+            all(target["public_sdk_evidence"] == "not_public_sdk_evidence" for target in observed.values())
+        )
+        self.assertTrue(
+            all(target["artifact_gate_evidence"] == "not_artifact_gate_evidence" for target in observed.values())
+        )
         self.assertEqual(observed["ShooterPlayerController.ClientChatMessage"]["ascii_name_vma"], "0x4161a92")
         self.assertEqual(
             observed["ShooterPlayerController.ClientServerChatDirectMessage"]["registration_vmas"],
@@ -244,6 +283,97 @@ class CheckCommandChatResponseStaticOrientationTests(unittest.TestCase):
         ):
             self.assertIn(phrase, joined_non_claims)
 
+    def test_boundary_validator_blocks_public_api_overclaims(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fake = Path(temp_dir) / "ShooterGameServer"
+            fake_sha256 = self.write_synthetic_response_path_elf(fake)
+            result = self.run_checker(
+                str(fake),
+                "--expected-binary-sha256",
+                fake_sha256,
+            )
+        payload = json.loads(result.stdout)
+        mutated = deepcopy(payload)
+
+        mutated["promotion_ready"] = True
+        mutated["public_abi_ready"] = True
+        mutated["artifact_gate"]["registered"] = True
+        mutated["artifact_gate"]["may_gate_artifacts"] = True
+        mutated["public_abi_boundary"]["public_send_chat_api"] = True
+        mutated["public_abi_boundary"]["permission_admin_contract"] = True
+        mutated["checked_targets"][0]["public_abi_ready"] = True
+        mutated["checked_targets"][0]["public_sdk_evidence"] = "public_sdk_evidence"
+
+        reasons = {blocker["reason"] for blocker in validate_report_boundary(mutated)}
+        self.assertIn("command_chat_response_readiness_overclaim", reasons)
+        self.assertIn("command_chat_response_artifact_gate_boundary_invalid", reasons)
+        self.assertIn("command_chat_response_public_abi_overclaim", reasons)
+        self.assertIn("command_chat_response_target_public_abi_overclaim", reasons)
+        self.assertIn("command_chat_response_target_public_sdk_evidence_overclaim", reasons)
+
+    def test_boundary_validator_blocks_static_contract_overclaims_and_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fake = Path(temp_dir) / "ShooterGameServer"
+            fake_sha256 = self.write_synthetic_response_path_elf(fake)
+            result = self.run_checker(
+                str(fake),
+                "--expected-binary-sha256",
+                fake_sha256,
+            )
+        payload = json.loads(result.stdout)
+        mutated = deepcopy(payload)
+        contract = mutated["static_candidate_orientation_contract"]
+
+        contract["promotion_ready"] = True
+        contract["not_artifact_gate"] = False
+        contract["gate_mode"] = "promote"
+        contract["scope"]["target_set"] = "obelisk.public_sdk.v1"
+        contract["scope"]["expected_targets"] = contract["scope"]["expected_targets"][:-1]
+        contract["subjects"] = contract["subjects"][:-1]
+        contract["non_claims"] = ["promotes public command replies"]
+        contract["blockers"] = [
+            blocker
+            for blocker in contract["blockers"]
+            if blocker != "requires_copied_data_response_contract_before_public_sdk_promotion"
+        ]
+
+        reasons = {blocker["reason"] for blocker in validate_report_boundary(mutated)}
+        self.assertIn("command_chat_response_static_contract_invalid", reasons)
+        self.assertIn("command_chat_response_static_contract_target_set_invalid", reasons)
+        self.assertIn("command_chat_response_static_contract_expected_targets_invalid", reasons)
+        self.assertIn("command_chat_response_static_contract_required_blocker_missing", reasons)
+        self.assertIn("command_chat_response_static_contract_non_claims_mismatch", reasons)
+        self.assertIn("command_chat_response_static_contract_subjects_mismatch", reasons)
+
+    def test_boundary_validator_requires_identity_permissions_and_copied_response_blockers(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fake = Path(temp_dir) / "ShooterGameServer"
+            fake_sha256 = self.write_synthetic_response_path_elf(fake)
+            result = self.run_checker(
+                str(fake),
+                "--expected-binary-sha256",
+                fake_sha256,
+            )
+        payload = json.loads(result.stdout)
+        mutated = deepcopy(payload)
+        mutated["promotion_blockers"] = [
+            blocker
+            for blocker in mutated["promotion_blockers"]
+            if blocker != "copied_response_contract_not_promoted"
+        ]
+
+        blockers = validate_report_boundary(mutated)
+        self.assertIn(
+            "command_chat_response_required_promotion_blocker_missing",
+            {blocker["reason"] for blocker in blockers},
+        )
+        missing = next(
+            blocker["missing"]
+            for blocker in blockers
+            if blocker["reason"] == "command_chat_response_required_promotion_blocker_missing"
+        )
+        self.assertEqual(missing, ["copied_response_contract_not_promoted"])
+
     @unittest.skipUnless(DEFAULT_BINARY.exists(), "offline ShooterGameServer binary not available")
     def test_default_binary_smoke_candidate_only_orientation(self) -> None:
         result = self.run_checker("--json")
@@ -275,6 +405,7 @@ class CheckCommandChatResponseStaticOrientationTests(unittest.TestCase):
         self.assertFalse(payload["valid"])
         self.assertFalse(payload["accepted_for_orientation"])
         self.assertFalse(payload["public_sdk_ready"])
+        self.assertFalse(payload["public_abi_ready"])
         self.assertFalse(payload["runtime_ready"])
         self.assertIn("binary_sha256_mismatch", {blocker["reason"] for blocker in payload["blockers"]})
 

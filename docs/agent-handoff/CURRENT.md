@@ -166,6 +166,11 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   checker is useful for later target matching, but it must not become public ABI or
   runtime work by itself. Its portable unit coverage now uses a synthetic ELF fixture;
   the reviewed real-binary check is optional smoke/evidence only.
+  The companion thunk note
+  `docs/research/2026-05-31-command-chat-response-thunk-orientation.md` records candidate
+  vtable slots `0x19d0`, `0x1790`, and `0x1788` for the reviewed binary only; it is
+  navigation evidence and does not unlock replies, send-chat, identity, permissions,
+  runtime testing, artifact-gate input, or public SDK promotion.
 - Permissions/admin now has a machine-readable pre-ABI decision contract in
   `docs/permissions_admin_public_contract_decisions.json`. Future permission checks must
   consume promoted copied principal semantics with generation/scope fail-closed behavior;
