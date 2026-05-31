@@ -141,6 +141,52 @@ inventory observer only within the existing narrow scope:
 - no public Inventory SDK, no capability bit, no return override, no mutation, no raw
   object/item/player identity, no inventory contents, and no arrays or structs.
 
+## 2026-05-31 Inventory/Mission Offline Hardening Audit
+
+Current routing update: do not treat the older `sdk.inventory` recommendation as a new
+SDK or runtime-observer request. Inventory already has the narrow public copied/redacted
+`GameplayPolicyEvent` lane for the minimal compact shapes, while item return-only evidence
+is split into its own return-bool policy slice. The useful offline hardening is now a
+route lock: preserve the copied-scalar boundaries and stop future notes from translating
+accepted layout evidence into Inventory SDK, Mission SDK, identity, mutation, return
+override, or runtime-hook claims.
+
+Inventory lane status:
+
+- `PrimalItem.CanUse` and `PrimalItem.AllowRemoteAddToInventory` back copied/redacted
+  `GameplayPolicyEvent` observations only.
+- copied fields remain limited to `bIgnoreCooldown`, `bRequestedByPlayer`, and
+  `ReturnValue`;
+- `invComp`, `ByPC`, item ids, inventory contents, player/item/inventory identity,
+  `ResourceHandle`, arrays, structs, raw params, mutation, and return override remain
+  blocked;
+- broader controller-side inventory action targets remain candidate/internal-only even
+  when their layout comparison is accepted.
+
+Mission lane status:
+
+- `mission-compact-intake` now has strict bool-tail second-source evidence for the compact
+  target set and an evidence-only copied-bool policy plan.
+- copied fields remain exactly the five one-byte bools from `AddPlayerToMission`,
+  `BPAllowPlayerToLeaveMission`, and `BPOnPlayerRemovedFromMission`;
+- `GetPlayerUsableItems`, player/controller/character/object fields, `OutItemIDs`, item
+  arrays, mission identity, object identity, `ResourceHandle`, raw params, mutation, and
+  return override remain blocked;
+- Mission remains internal/test-only and must not be routed into `ProcessEventHook.cpp`,
+  a dispatcher, public Mission SDK, public capability, or plugin callback from offline
+  evidence alone.
+
+Decision: the next useful offline hardening for v1.0 is docs/guardrail hardening that
+keeps these two lanes distinct and non-promoting. More offline snapshot or signature
+evidence can improve traceability, but it is no longer the gate that unlocks Mission or a
+broader Inventory surface.
+
+The next real gate is a separate runtime-observation and lifecycle review for one named
+internal observer slice, with an approved debug window, exact gates, bounded budgets,
+post-original behavior, copied-output cleanup, dispatcher/owner lifecycle review if a
+dispatcher is involved, and explicit rollback posture. This audit does not approve that
+gate or any server action.
+
 ## Why Not Buff Compact First
 
 `buff-compact-intake` is accepted as offline layout evidence, but it is not the fastest path

@@ -130,6 +130,37 @@ only; they do not turn target-set labels into public SDK names.
 10. `admin/permissions lane`: keep documentation-only until a permission model and abuse
     controls exist.
 
+## Next v1 Round Recommendation
+
+Run the next v1 planning round as a narrow core-first/doc-and-fixture pass, not a new
+module promotion pass:
+
+1. `hub foundation`: harden lifecycle/descriptors/capability docs, release checks,
+   packaging, and fail-closed configuration. This is the only broadly v1-facing lane in
+   the next round because it does not require UE object identity, return override, or
+   borrowed pointer contracts.
+2. `gameplay policy backing`: preserve the already-public copied/redacted
+   `GameplayPolicyEvent` path by tightening inventory/structure/item return-only
+   evidence and tests. Treat every accepted target set here as backing evidence for
+   existing copied POD fields, not as a new Inventory, Structure, or Items SDK.
+3. `internal recognizer planning`: keep mission as the first post-RC internal copied-bool
+   planning thread after item return-only evidence is preserved. Buff, dino, tribe, and
+   transfer remain lane-specific backlog until their blockers below are narrowed by named
+   offline artifacts.
+
+No-repeat rules for this round:
+
+- Do not rerun broad FName, GObjects, UFunction, ReflectionScanner, core, or serial-sweep
+  discovery on the current binary unless the hash changes or an existing artifact
+  contradicts the accepted evidence.
+- Do not use ArkApi/AseApi/NextGenPlugins as implementation sources; they remain names
+  and demand signals only.
+- Do not promote any `sdk.*` label, `promotion_gate.ready=true`, accepted target count, or
+  compact layout artifact into a public SDK, runtime observer, identity/lookup contract,
+  mutation path, return override, raw params, or `ResourceHandle`.
+- Do not route work back to chat as the roadmap center. Chat remains a small copied
+  notification example and regression surface.
+
 ## Copied-POD Candidates
 
 - Structures already public through `GameplayPolicyEvent`: `ReturnValue`, `VariantIndex`,
@@ -166,6 +197,15 @@ only; they do not turn target-set labels into public SDK names.
 - `ResourceHandle` is not blocked by lack of FName/UFunction discovery. It is blocked by
   `uobject_flags_validity_semantics_unproven`, lack of rejected object samples, and no
   accepted lifetime/revalidation contract across hook callbacks and possible object reuse.
+- Hub foundation blockers: release docs/tests, installed packaging checks, descriptor and
+  capability stability, fail-closed config behavior, and plugin lifecycle cleanup remain
+  the only blockers on the next broadly v1-facing lane.
+- Gameplay policy backing blockers: every added event kind still needs exact target-set
+  membership, copied/redacted POD ownership, fixture and consume-gate coverage, no raw UE
+  pointer exposure, no mutation, and no return override.
+- Internal recognizer planning blockers: mission, buff, dino, tribe, and transfer work
+  must each name the exact offline artifact and blocker it narrows; otherwise it is
+  backlog, not a next-round task.
 - Missing accepted second-source comparison roots for admin, broader non-compact
   target sets, and any broader module target set. Transfer UFunction and ScriptStruct
   layout-only second-source evidence is now accepted for its exact documented targets, but

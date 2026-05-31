@@ -182,8 +182,9 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `scripts/build_reflection_inventory_pack.py --plan-target Outer.Name` to produce a
   candidate-only focal plan from a complete non-protected evidence-pack manifest; the
   planner now uses unfiltered redacted inventory for exact matches, blocks unsafe/incomplete
-  FName-root inputs before command emission, and remains planning-only. Then generate one
-  sanitized snapshot and a distinct second-source compare. Fixture/rootless
+  FName-root inputs before command emission, requires explicit artifact identity for
+  direct-core planning, and remains planning-only. Then generate one sanitized snapshot and
+  a distinct second-source compare. Fixture/rootless
   reports remain negative guardrails; do not add these keys to release target sets, ABI
   enums, descriptors, dispatchers, public docs, or runtime gates.
 - Plugin Hub planning starts from `docs/PLUGIN_HUB_FOUNDATION_V1.md` and

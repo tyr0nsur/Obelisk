@@ -135,6 +135,34 @@ RELEASE_READINESS_TARGET_SETS = frozenset(
 INTERNAL_LAYOUT_ONLY_TARGET_SETS = frozenset(TARGET_SETS) - RELEASE_READINESS_TARGET_SETS
 
 
+TARGET_SET_MODULE_LANES = {
+    "buff-breadth-intake": "buff",
+    "buff-compact-intake": "buff",
+    "chat-message-intake": "chat",
+    "dino-compact-intake": "dino",
+    "inventory-action-compact-intake": "inventory",
+    "item-compact-intake": "items",
+    "item-return-only-policy-slice": "items",
+    "minimal-second-source-intake": "core_gameplay_policy",
+    "mission-compact-intake": "mission",
+    "mission-copied-bool-policy-slice": "mission",
+    "players-identity-lifecycle-intake": "players_identity",
+    "structure-nonpin-copied-scalar-policy-slice": "structures",
+    "structure-observer-intake": "structures",
+    "structure-return-only-policy-slice": "structures",
+    "transfer-baccept-only-policy-slice": "transfer",
+    "transfer-scriptstruct": "transfer",
+    "transfer-ufunction-intake": "transfer",
+    "tribe-compact-intake": "tribe",
+}
+
+
+def target_set_module_lane(target_set: str) -> str:
+    if target_set in TARGET_SET_MODULE_LANES:
+        return TARGET_SET_MODULE_LANES[target_set]
+    raise KeyError(target_set)
+
+
 def target_set_readiness_classification(target_set: str) -> str:
     if target_set in RELEASE_READINESS_TARGET_SETS:
         return "release_readiness"

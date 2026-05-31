@@ -351,6 +351,7 @@ class BuildReflectionInventoryPackTests(unittest.TestCase):
         self.assertEqual(plan["blocked_count"], 0)
         self.assertEqual(plan["inventory_source"], "unfiltered_redacted_functions")
         self.assertEqual(plan["fname_root_readiness"], {"ready": True, "blockers": []})
+        self.assertEqual(plan["artifact_identity"]["source"], "evidence-pack-manifest")
         target = plan["targets"][0]
         self.assertEqual(target["status"], "planned")
         self.assertEqual(target["promotion_status"], "not_promoted_candidate_only")
@@ -389,6 +390,10 @@ class BuildReflectionInventoryPackTests(unittest.TestCase):
                     "ServerChat=4",
                     "--ark-binary-sha256",
                     "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                    "--capture-id",
+                    "fixture-core",
+                    "--evidence-pack-id",
+                    "fixture-pack",
                     "--name-contains",
                     "NoSuchName",
                     "--plan-target",
@@ -427,6 +432,10 @@ class BuildReflectionInventoryPackTests(unittest.TestCase):
                     "ServerChat=999",
                     "--ark-binary-sha256",
                     "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                    "--capture-id",
+                    "fixture-core",
+                    "--evidence-pack-id",
+                    "fixture-pack",
                     "--plan-target",
                     "obelisk.ufunction-chain.snapshot.v1:/Script/CoreUObject.ServerChat",
                     "--output-dir",
@@ -461,6 +470,10 @@ class BuildReflectionInventoryPackTests(unittest.TestCase):
                     "None=0",
                     "--ark-binary-sha256",
                     "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                    "--capture-id",
+                    "fixture-core",
+                    "--evidence-pack-id",
+                    "fixture-pack",
                     "--plan-target",
                     "PrimalStructure.IsAllowedToBuild",
                     "--plan-target",
@@ -505,6 +518,38 @@ class BuildReflectionInventoryPackTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("--plan-target only supports offline_core artifact identity", result.stderr)
 
+    def test_direct_core_plan_target_requires_explicit_artifact_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            addrs = build_core_fixture(core)
+
+            result = self.run_builder(
+                [
+                    "--core",
+                    str(core),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--fname-index",
+                    "None=0",
+                    "--ark-binary-sha256",
+                    "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                    "--plan-target",
+                    "PrimalStructure.IsAllowedToBuild",
+                    "--output-dir",
+                    str(root / "out"),
+                ],
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "direct --core --plan-target requires explicit --capture-id and --evidence-pack-id",
+            result.stderr,
+        )
+
     def test_plan_target_reports_missing_inventory_target_as_blocked(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -524,6 +569,10 @@ class BuildReflectionInventoryPackTests(unittest.TestCase):
                     "None=0",
                     "--ark-binary-sha256",
                     "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                    "--capture-id",
+                    "fixture-core",
+                    "--evidence-pack-id",
+                    "fixture-pack",
                     "--plan-target",
                     "PrimalStructure.IsAllowedToBuild",
                     "--output-dir",

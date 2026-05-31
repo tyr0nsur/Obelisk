@@ -56,7 +56,7 @@ namespace
             OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY |
             OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP;
         return descriptor.abi_version == OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION &&
-            descriptor.struct_size >= sizeof(ObeliskResourceKindDescriptor) &&
+            descriptor.struct_size == sizeof(ObeliskResourceKindDescriptor) &&
             descriptor.resource_kind == resourceKind &&
             descriptor.reserved0 == 0 &&
             (descriptor.flags & kRequiredFlags) == kRequiredFlags &&
@@ -87,7 +87,7 @@ namespace
         constexpr uint64_t kKnownFlags = OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD | kKnownBackingFlags;
         const uint64_t requiredFlags = OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD | backingFlag;
         return descriptor.abi_version == OBELISK_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION &&
-            descriptor.struct_size >= sizeof(ObeliskGameplayPolicyEventDescriptor) &&
+            descriptor.struct_size == sizeof(ObeliskGameplayPolicyEventDescriptor) &&
             descriptor.event_kind == eventKind &&
             descriptor.resource_kind == resourceKind &&
             (descriptor.flags & requiredFlags) == requiredFlags &&

@@ -1746,6 +1746,29 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                             f"{relative} must null-check/use {slot} for {surface['name']}",
                         )
 
+    def test_public_sdk_consumers_treat_v1_descriptors_as_fixed_size(self) -> None:
+        forbidden_checks = (
+            "descriptor.struct_size >= sizeof(ObeliskResourceKindDescriptor)",
+            "descriptor.struct_size >= sizeof(ObeliskGameplayPolicyEventDescriptor)",
+        )
+        required_checks = (
+            "descriptor.struct_size == sizeof(ObeliskResourceKindDescriptor)",
+            "descriptor.struct_size == sizeof(ObeliskGameplayPolicyEventDescriptor)",
+        )
+
+        for path in PUBLIC_SDK_OPTIONAL_API_CONSUMERS:
+            text = path.read_text(encoding="utf-8")
+            relative = path.relative_to(REPO_ROOT).as_posix()
+            if "DescribeResourceKind" not in text and "DescribeGameplayPolicyEventKind" not in text:
+                continue
+
+            for token in forbidden_checks:
+                with self.subTest(file=relative, forbidden=token):
+                    self.assertNotIn(token, text)
+            for token in required_checks:
+                with self.subTest(file=relative, required=token):
+                    self.assertIn(token, text)
+
     def test_public_abi_layout_freeze_tests_cover_repo_and_installed_consumers(self) -> None:
         root_cmake = (REPO_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
         c_layout = (REPO_ROOT / "tests" / "abi" / "CAbiLayoutTests.c").read_text(encoding="utf-8")

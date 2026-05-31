@@ -193,6 +193,7 @@ def focal_snapshot_plan(
     max_object_scan: int,
     fname_root_ready: bool,
     fname_root_blockers: list[str],
+    artifact_identity_source: str,
 ) -> dict[str, object]:
     inventory_by_key: dict[str, list[dict[str, object]]] = {}
     for item in functions:
@@ -311,6 +312,7 @@ def focal_snapshot_plan(
             "artifact_sha256": core_sha,
             "capture_id": capture_id,
             "evidence_pack_id": evidence_pack_id,
+            "source": artifact_identity_source,
         },
         "binary": {"sha256": binary_sha},
         "targets": records,
@@ -373,6 +375,12 @@ def main() -> int:
         fname_root_slot = args.fname_root_slot
         binary_sha = resolve_binary_sha(args)
         artifact_kind = safe_component(args.artifact_kind, "artifact-kind")
+        if args.plan_target and artifact_kind == "offline_core" and (
+            not args.capture_id or not args.evidence_pack_id
+        ):
+            raise SystemExit(
+                "direct --core --plan-target requires explicit --capture-id and --evidence-pack-id"
+            )
         capture_id = safe_component(args.capture_id or core.stem, "capture-id")
         evidence_pack_id = safe_component(args.evidence_pack_id or "direct-core", "evidence-pack-id")
         core_sha = sha256_file(core)
@@ -472,6 +480,7 @@ def main() -> int:
             max_object_scan=args.max_objects,
             fname_root_ready=root_readiness["ready"] is True,
             fname_root_blockers=[str(item) for item in root_readiness["blockers"]],
+            artifact_identity_source="evidence-pack-manifest" if evidence_pack_manifest else "direct-core-explicit",
         )
 
     fname_payload = {

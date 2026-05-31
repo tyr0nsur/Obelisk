@@ -237,10 +237,16 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(report["schema"], "obelisk.reflection-snapshot-target-sets.v1")
         sets = {item["name"]: item["targets"] for item in report["target_sets"]}
         classifications = {item["name"]: item["readiness_classification"] for item in report["target_sets"]}
+        lanes = {item["name"]: item["module_lane"] for item in report["target_sets"]}
         release_flags = {item["name"]: item["release_readiness"] for item in report["target_sets"]}
         readiness_scopes = {item["name"]: item["readiness_scope"] for item in report["target_sets"]}
         promotion_flags = {item["name"]: item["promotion_ready"] for item in report["target_sets"]}
         public_sdk_flags = {item["name"]: item["public_sdk_ready"] for item in report["target_sets"]}
+        self.assertEqual(set(lanes), set(compare.TARGET_SETS))
+        self.assertEqual(lanes["chat-message-intake"], "chat")
+        self.assertEqual(lanes["mission-copied-bool-policy-slice"], "mission")
+        self.assertEqual(lanes["structure-observer-intake"], "structures")
+        self.assertEqual(lanes["transfer-scriptstruct"], "transfer")
         self.assertEqual(report["evidence_scope"], "second_source_layout_evidence_only")
         self.assertIn("public_sdk", report["not_promoted_surfaces"])
         self.assertIn("runtime_hooks", report["not_promoted_surfaces"])

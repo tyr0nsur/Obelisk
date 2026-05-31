@@ -17,6 +17,7 @@ from reflection_target_sets import (
     PLANNING_ONLY_TARGET_SETS,
     RELEASE_READINESS_TARGET_SETS,
     TARGET_SETS,
+    target_set_module_lane,
     target_set_readiness_classification,
 )
 
@@ -499,6 +500,7 @@ def target_set_report() -> dict[str, Any]:
         "target_sets": [
             {
                 "name": name,
+                "module_lane": target_set_module_lane(name),
                 "readiness_classification": target_set_readiness_classification(name),
                 "release_readiness": name in RELEASE_READINESS_TARGET_SETS,
                 "readiness_scope": (

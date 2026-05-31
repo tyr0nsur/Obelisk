@@ -334,3 +334,26 @@ still does not promote a public Mission SDK, runtime observer wiring, dispatcher
 callback ABI, object/class identity, arrays, mutation, return override, or server
 validation. The next Mission step remains an internal/test-only policy decision, not
 public API work.
+
+## 2026-05-31 Offline Audit Checkpoint
+
+The compact Mission lane no longer needs another broad offline discovery pass to decide
+basic copied-bool shape. The useful offline hardening is to preserve the boundary already
+proven by the refreshed snapshots, redacted signatures, and copied-bool policy plan:
+
+- exactly four recognized functions in `mission-compact-intake`;
+- exactly five copied canonical one-byte bool fields;
+- `GetPlayerUsableItems` remains recognition-only with zero copied bool payload;
+- all player, controller, character, object, mission, item-array, raw-param, identity,
+  lookup, `ResourceHandle`, mutation, and return-override surfaces remain blocked.
+
+Do not reopen this lane as Mission SDK design from the strict bool-tail evidence. A future
+runtime proposal must start as a separate internal observer/lifecycle review and must
+prove default-off gating, exact FName/name/outer/shape prefilters, supported SHA, non-zero
+budget, post-original behavior, copied-output cleanup, aggregate-only rejected counters,
+and rollback posture before any server-backed window is requested.
+
+This checkpoint is documentation-only. It does not authorize edits to
+`ProcessEventHook.cpp`, shared-library runtime inclusion, dispatcher/API work, public
+Mission capability bits, plugin callbacks, marker/env changes, server access, mutation, or
+return override.

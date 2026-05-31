@@ -197,7 +197,9 @@ Strict coverage requires `target_set_coverage` to be complete and internally con
 declared target sets must be known, expected targets must match the project target-set
 definition, emitted targets must match the signatures, and missing or unexpected targets
 must be recorded as empty. Historical missing-coverage markers can allow old consume
-checks, but strict mode still blocks them.
+checks, but strict mode still blocks them. Each `target_sets` and `source_target_sets`
+list must name a target set at most once; duplicate names are treated as traceability
+blockers even when duplicated coverage rows are otherwise self-consistent.
 
 ## Build-Policy Gap Checks
 

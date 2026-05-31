@@ -364,7 +364,7 @@ static bool ValidateResourceKindDescriptor(const ObeliskApi* api,
         return false;
 
     return descriptor.abi_version == OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION &&
-        descriptor.struct_size >= sizeof(ObeliskResourceKindDescriptor) &&
+        descriptor.struct_size == sizeof(ObeliskResourceKindDescriptor) &&
         descriptor.resource_kind == resource_kind &&
         (descriptor.flags & required_flags) == required_flags &&
         descriptor.supported_gameplay_policy_event_mask == expected_event_mask &&
@@ -423,7 +423,7 @@ static bool ValidateGameplayPolicyEventDescriptor(const ObeliskApi* api,
         return false;
 
     return descriptor.abi_version == OBELISK_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION &&
-        descriptor.struct_size >= sizeof(ObeliskGameplayPolicyEventDescriptor) &&
+        descriptor.struct_size == sizeof(ObeliskGameplayPolicyEventDescriptor) &&
         descriptor.event_kind == event_kind &&
         descriptor.resource_kind == resource_kind &&
         (descriptor.flags & OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD) != 0 &&

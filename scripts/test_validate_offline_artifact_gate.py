@@ -3678,6 +3678,84 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertEqual("accepted", result["status"])
         self.assertEqual([], result["blockers"])
 
+    def test_blocks_duplicate_redacted_signature_target_sets_even_with_matching_coverage(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "signatures" / "signatures.json"
+            target = "SyntheticOfflineArtifact.Target"
+            target_set = "offline-artifact-hygiene-intake"
+            report = redacted_signature_manifest(
+                target=target,
+                target_sets=[target_set, target_set],
+            )
+            report["target_set_coverage"] = {
+                "schema": gate.TARGET_SET_COVERAGE_SCHEMA,
+                "status": "complete",
+                "complete": True,
+                "declared_target_sets": [
+                    {
+                        "name": target_set,
+                        "source": "manifest",
+                        "expected_targets": [target],
+                        "covered_targets": [target],
+                        "missing_targets": [],
+                        "complete": True,
+                    },
+                    {
+                        "name": target_set,
+                        "source": "manifest",
+                        "expected_targets": [target],
+                        "covered_targets": [target],
+                        "missing_targets": [],
+                        "complete": True,
+                    },
+                ],
+                "expected_targets": [target],
+                "emitted_targets": [target],
+                "missing_targets": [],
+                "unexpected_targets": [],
+            }
+            write_json(manifest, report)
+
+            with mock.patch.object(
+                gate,
+                "known_ufunction_target_set_targets",
+                return_value=[target],
+            ):
+                result = gate.build_result(
+                    args(
+                        root=workspace,
+                        protected_root=protected,
+                        manifests=[manifest],
+                        strict_target_set_coverage=True,
+                    )
+                )
+
+        self.assertIn(
+            "signature_manifest_duplicate_target_sets",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_duplicate_redacted_signature_source_target_sets(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "signatures" / "signatures.json"
+            payload = redacted_signature_manifest(
+                artifact_hygiene=historical_missing_coverage_marker(),
+                safety_overrides={"target_set_count": 2},
+            )
+            payload["source_target_sets"] = ["item-compact-intake", "item-compact-intake"]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "signature_manifest_duplicate_source_target_sets",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
     def test_strict_blocks_redacted_signature_manifest_missing_target_set_coverage(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"

@@ -205,7 +205,7 @@ namespace
             OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP;
 
         return descriptor.abi_version == OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION &&
-            descriptor.struct_size >= sizeof(ObeliskResourceKindDescriptor) &&
+            descriptor.struct_size == sizeof(ObeliskResourceKindDescriptor) &&
             descriptor.resource_kind == resourceKind &&
             (descriptor.flags & kRequiredFlags) == kRequiredFlags &&
             descriptor.supported_gameplay_policy_event_mask == eventMask &&
@@ -257,7 +257,7 @@ namespace
             return false;
 
         return descriptor.abi_version == OBELISK_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION &&
-            descriptor.struct_size >= sizeof(ObeliskGameplayPolicyEventDescriptor) &&
+            descriptor.struct_size == sizeof(ObeliskGameplayPolicyEventDescriptor) &&
             descriptor.event_kind == eventKind &&
             descriptor.resource_kind == resourceKind &&
             (descriptor.flags & OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD) != 0 &&

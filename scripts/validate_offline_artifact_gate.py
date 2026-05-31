@@ -1524,6 +1524,16 @@ def unique_ordered(values: list[str]) -> list[str]:
     return ordered
 
 
+def duplicate_strings(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    duplicates: list[str] = []
+    for value in values:
+        if value in seen and value not in duplicates:
+            duplicates.append(value)
+        seen.add(value)
+    return duplicates
+
+
 def known_ufunction_target_set_targets(target_set: str) -> list[str] | None:
     try:
         from reflection_target_sets import TARGET_SETS
@@ -2042,12 +2052,30 @@ def validate_redacted_signature_manifest(
         blockers.append({"reason": "signature_manifest_target_sets_invalid", "label": f"{source_label}:$.target_sets"})
     else:
         target_set_count = len(target_sets)
+        duplicates = duplicate_strings(target_sets)
+        if duplicates:
+            blockers.append(
+                {
+                    "reason": "signature_manifest_duplicate_target_sets",
+                    "label": f"{source_label}:$.target_sets",
+                    "duplicates": duplicates,
+                }
+            )
     source_target_sets = payload.get("source_target_sets", [])
     source_target_set_count = 0
     if not isinstance(source_target_sets, list) or any(not isinstance(item, str) or not item for item in source_target_sets):
         blockers.append({"reason": "signature_manifest_source_target_sets_invalid", "label": f"{source_label}:$.source_target_sets"})
     else:
         source_target_set_count = len(source_target_sets)
+        duplicates = duplicate_strings(source_target_sets)
+        if duplicates:
+            blockers.append(
+                {
+                    "reason": "signature_manifest_duplicate_source_target_sets",
+                    "label": f"{source_label}:$.source_target_sets",
+                    "duplicates": duplicates,
+                }
+            )
     recorded_snapshot_count = payload.get("snapshot_count")
     if recorded_snapshot_count != input_snapshot_count:
         blockers.append(

@@ -1,7 +1,7 @@
 # Structure Build-Policy Focal Snapshot Planner
 
 Date: 2026-05-31
-Obelisk commit reviewed: `0b0bd4f`
+Obelisk commit reviewed: `9450f78`
 
 ## Scope
 
@@ -51,6 +51,11 @@ The new plan mode:
   `PYTHONDONTWRITEBYTECODE=1` environment;
 - blocks command generation when FName root validation is not ready;
 - blocks missing or ambiguous inventory matches instead of inventing fixture entries;
+- requires explicit `--capture-id` and `--evidence-pack-id` for direct
+  `--core --plan-target` runs, so candidate snapshots do not inherit generic
+  `core.stem` / `direct-core` identity;
+- records whether focal snapshot artifact identity came from an evidence-pack manifest
+  or from explicit direct-core arguments;
 - records redaction review reminders for placement structs, location/rotation values,
   player/controller context, object refs, arrays, and raw params;
 - records non-claims: no target set, no fixture, no StructureEvents/build-policy SDK,
@@ -91,6 +96,8 @@ Still missing for extraction:
   or a complete core evidence-pack manifest whose `core.path` resolves outside protected
   server roots;
 - matching `core.sha256` and binary SHA identity;
+- explicit direct-core `capture_id` and `evidence_pack_id`, unless those values are
+  derived from a complete evidence-pack manifest;
 - usable FName root slot and GObjects candidate in the evidence-pack manifest;
 - exactly one inventory match for `PrimalStructure.IsAllowedToBuild` or, if observed,
   `APrimalStructure.IsAllowedToBuild`.

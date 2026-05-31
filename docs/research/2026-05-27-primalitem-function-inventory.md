@@ -162,3 +162,22 @@ No candidate is safe to invoke and no public SDK item API is ready.
 4. Treat runtime observation as a separate live-ops/debug-window task, not evidence from
    this note; it requires explicit approval, scoped gates, rollback, and stable-posture
    checks before any server execution.
+
+## 2026-05-31 Audit Update
+
+The original next-step list is historical discovery guidance. Later work split the item
+and inventory lanes:
+
+- `PrimalItem.CanUse` and `PrimalItem.AllowRemoteAddToInventory` are part of the compact
+  inventory backing for copied/redacted `GameplayPolicyEvent` only.
+- `AllowEquipItem`, `CanRepair`, and `UseItemOntoItem` are handled by the separate
+  return-only item policy slice; that slice copies `ReturnValue` only.
+- `CraftBlueprint`, `CanRepair.bIgnoreInventoryRequirement`, object refs,
+  `AdditionalData`, item/inventory/player identity, `ItemNetID`, `ResourceHandle`, raw
+  params, mutation, and return override remain excluded from the copied public payload.
+
+Do not use this older inventory survey to justify a public Items SDK, public Inventory SDK,
+new capability bit, identity/lookup surface, runtime observer, mutation path, or return
+override. The next offline hardening is to preserve those exclusions in route and docs
+guardrails; the next real promotion gate would be a separate named runtime/lifecycle review
+with exact copied-scalar scope and approved debug posture.

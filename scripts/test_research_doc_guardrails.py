@@ -361,9 +361,16 @@ class ResearchDocGuardrailTests(unittest.TestCase):
         roadmap_compact = normalized(roadmap)
         for phrase in (
             "Recommended lane order",
+            "Next v1 Round Recommendation",
+            "hub foundation",
+            "gameplay policy backing",
+            "internal recognizer planning",
+            "No-repeat rules for this round",
             "Promotion gate for every module lane",
             "exact layout target set",
             "do not turn target-set labels into public SDK names",
+            "Do not rerun broad FName, GObjects, UFunction, ReflectionScanner, core, or serial-sweep discovery",
+            "Do not route work back to chat as the roadmap center",
             "structures lane",
             "inventory lane",
             "items lane",
@@ -376,6 +383,18 @@ class ResearchDocGuardrailTests(unittest.TestCase):
         ):
             with self.subTest(file="docs/research/2026-05-29-module-surface-roadmap.md", phrase=phrase):
                 self.assertIn(phrase, roadmap_compact)
+
+        for phrase in (
+            "Next v1 research round",
+            "hub foundation first",
+            "`GameplayPolicyEvent` backing evidence",
+            "mission copied-bool internal planning",
+            "Do not repeat broad discovery on the current binary",
+            "do not promote new SDK modules",
+            "do not recenter the roadmap on chat",
+        ):
+            with self.subTest(file="docs/research/README.md", phrase=phrase):
+                self.assertIn(phrase, readme_compact)
 
         for path, text in (
             ("docs/research/2026-05-27-module-readiness-matrix.md", readiness),
@@ -394,6 +413,72 @@ class ResearchDocGuardrailTests(unittest.TestCase):
             ):
                 with self.subTest(file=path, phrase=phrase):
                     self.assertIn(phrase, compact)
+
+    def test_inventory_mission_route_lock_stays_internal_and_non_promoting(self) -> None:
+        readme = (REPO_ROOT / "docs/research/README.md").read_text(encoding="utf-8")
+        next_candidate = (
+            REPO_ROOT / "docs/research/2026-05-29-next-internal-module-candidate.md"
+        ).read_text(encoding="utf-8")
+        mission = (
+            REPO_ROOT / "docs/research/2026-05-29-mission-reflection-internal-readiness.md"
+        ).read_text(encoding="utf-8")
+        primalitem = (
+            REPO_ROOT / "docs/research/2026-05-27-primalitem-function-inventory.md"
+        ).read_text(encoding="utf-8")
+
+        readme_compact = normalized(readme)
+        for phrase in (
+            "offline hardening target is boundary preservation",
+            "Inventory may use only the already promoted copied/redacted `GameplayPolicyEvent` lane",
+            "Mission remains internal/test-only copied-bool planning",
+            "Neither lane is a public Inventory SDK, public Mission SDK, new capability family",
+            "identity/lookup contract, mutation path, return override, or server-observation approval",
+        ):
+            with self.subTest(file="docs/research/README.md", phrase=phrase):
+                self.assertIn(phrase, readme_compact)
+
+        next_compact = normalized(next_candidate)
+        for phrase in (
+            "2026-05-31 Inventory/Mission Offline Hardening Audit",
+            "do not treat the older `sdk.inventory` recommendation as a new SDK or runtime-observer request",
+            "Mission remains internal/test-only",
+            "must not be routed into `ProcessEventHook.cpp`, a dispatcher, public Mission SDK",
+            "the next useful offline hardening for v1.0 is docs/guardrail hardening",
+            "The next real gate is a separate runtime-observation and lifecycle review",
+        ):
+            with self.subTest(
+                file="docs/research/2026-05-29-next-internal-module-candidate.md",
+                phrase=phrase,
+            ):
+                self.assertIn(phrase, next_compact)
+
+        mission_compact = normalized(mission)
+        for phrase in (
+            "2026-05-31 Offline Audit Checkpoint",
+            "exactly five copied canonical one-byte bool fields",
+            "Do not reopen this lane as Mission SDK design",
+            "does not authorize edits to `ProcessEventHook.cpp`",
+            "public Mission capability bits, plugin callbacks",
+        ):
+            with self.subTest(
+                file="docs/research/2026-05-29-mission-reflection-internal-readiness.md",
+                phrase=phrase,
+            ):
+                self.assertIn(phrase, mission_compact)
+
+        primalitem_compact = normalized(primalitem)
+        for phrase in (
+            "The original next-step list is historical discovery guidance",
+            "`PrimalItem.CanUse` and `PrimalItem.AllowRemoteAddToInventory` are part of the compact inventory backing",
+            "`AllowEquipItem`, `CanRepair`, and `UseItemOntoItem` are handled by the separate return-only item policy slice",
+            "Do not use this older inventory survey to justify a public Items SDK, public Inventory SDK",
+            "The next offline hardening is to preserve those exclusions in route and docs guardrails",
+        ):
+            with self.subTest(
+                file="docs/research/2026-05-27-primalitem-function-inventory.md",
+                phrase=phrase,
+            ):
+                self.assertIn(phrase, primalitem_compact)
 
     def test_second_source_intake_runbook_keeps_planner_phases_explicit(self) -> None:
         runbook = REPO_ROOT / "docs/research/2026-05-28-second-source-core-intake-runbook.md"

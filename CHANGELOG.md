@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Hardened v1 planning and evidence tooling so target-set listings expose module lanes,
+  direct-core focal planning requires explicit artifact identity, redacted signature
+  manifests reject duplicate target-set declarations, SDK consumers treat v1 descriptors
+  as fixed-size contracts, and contributor guardrails block webhook/secrets/local path
+  leakage in public-facing review material.
 - Hardened post-RC planning and contributor guardrails so focal snapshot planning uses
   unfiltered redacted inventory, refuses unsafe or incomplete FName/root inputs before
   emitting commands, de-duplicates artifact-pack blockers, verifies installed descriptor

@@ -129,6 +129,20 @@ gate only. They do not make the named UE functions callable or usable plugin fun
 and they do not authorize public SDK surfaces, runtime observers, hooks, mutation, return
 overrides, lookup, identity, or raw UE pointer access.
 
+For the current inventory/mission route, the offline hardening target is boundary
+preservation. Inventory may use only the already promoted copied/redacted
+`GameplayPolicyEvent` lane or candidate/internal-only planning notes. Mission remains
+internal/test-only copied-bool planning. Neither lane is a public Inventory SDK, public
+Mission SDK, new capability family, identity/lookup contract, mutation path, return
+override, or server-observation approval.
+
+Next v1 research round: use
+[2026-05-29-module-surface-roadmap.md](2026-05-29-module-surface-roadmap.md) as the
+module prioritization checkpoint. The next useful pass is hub foundation first, then
+`GameplayPolicyEvent` backing evidence, then mission copied-bool internal planning only
+after item return-only evidence is preserved. Do not repeat broad discovery on the current
+binary, do not promote new SDK modules, and do not recenter the roadmap on chat.
+
 Current v1 research lane snapshot from the current notes:
 
 | Lane | Current state | Use next |
@@ -222,7 +236,7 @@ when a task explicitly targets that module.
 | [2026-05-29-resource-handle-nonzero-revalidation.md](2026-05-29-resource-handle-nonzero-revalidation.md) | ResourceHandle nonzero serial revalidation | Records `32/32` accepted offline samples with `32` nonzero serial candidates and proven GObjects field coherence, while keeping public ResourceHandle blocked on `uobject_flags_validity_semantics_unproven`. |
 | [2026-05-30-post-rc-offline-resourcehandle-priority.md](2026-05-30-post-rc-offline-resourcehandle-priority.md) | Post-RC ResourceHandle priority | Records the current fail-closed ResourceHandle lane, including identity-complete evaluator input with 44/44 accepted samples while keeping public ResourceHandle, GObjects, lookup, mutation, and post-callback handles blocked. |
 | [2026-05-30-static-build-policy-tooling.md](2026-05-30-static-build-policy-tooling.md) | Static build-policy tooling audit | Confirms offline `radare2`, Ghidra headless, and non-protected artifact availability for future `IsAllowedToBuild` triage without promoting any build-policy candidate. |
-| [2026-05-31-structure-build-policy-focal-snapshot-planner.md](2026-05-31-structure-build-policy-focal-snapshot-planner.md) | Structure build-policy focal snapshot planner | Adds a candidate-only `--plan-target` path from complete evidence-pack manifests to exact `IsAllowedToBuild` snapshot commands, while keeping target sets, SDKs, runtime hooks, mutation, and return override blocked. |
+| [2026-05-31-structure-build-policy-focal-snapshot-planner.md](2026-05-31-structure-build-policy-focal-snapshot-planner.md) | Structure build-policy focal snapshot planner | Adds a candidate-only `--plan-target` path from complete evidence-pack manifests or explicit direct-core identity to exact `IsAllowedToBuild` snapshot commands, while keeping target sets, SDKs, runtime hooks, mutation, and return override blocked. |
 | [2026-05-29-uobject-flags-fullscan.md](2026-05-29-uobject-flags-fullscan.md) | UObject flags fullscan | Historical no-repeat evidence: copied-core volume found thousands of nonzero serial candidates and no `0x100`/`0x4000` mask-positive samples, so the current blocker is semantic runtime evidence rather than another broad scan. |
 | [2026-05-29-weak-helper-flag-polarity.md](2026-05-29-weak-helper-flag-polarity.md) | Weak helper flag polarity | Refines `UObject+0x8` validity semantics from bounded static helper/caller evidence while keeping public ResourceHandle blocked. |
 | [2026-05-29-resource-handle-flag-policy-candidate.md](2026-05-29-resource-handle-flag-policy-candidate.md) | ResourceHandle flag-policy candidate | Consolidates weak-helper caller-mode and nonzero readiness JSON into a short matrix: FName/GObjects/serial are not the main blocker; flag and lifecycle semantics keep post-callback handles blocked. |
