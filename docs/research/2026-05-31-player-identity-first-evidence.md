@@ -334,6 +334,33 @@ model:
 7. Only after identity, permissions, commands, persistence, and relevant item/event
    evidence exist can economy SDK work start.
 
+## Post-Evidence Minimal Concept
+
+If the first-evidence package later proves lifecycle anchors, field privacy, invalidation,
+and second-source layout evidence, the smallest design discussion should stay limited to a
+conceptual copied identity record:
+
+```text
+PlayerIdentity {
+  provider,
+  id64,
+  display_name?,
+  tribe_id?,
+  online_state
+}
+```
+
+This is not a public ABI, header contract, capability bit, runtime observer, lookup API, or
+permission principal yet. It is a post-evidence vocabulary for reviewing whether a future
+copied principal can be safe. `provider` and `id64` may be considered only after the
+privacy policy accepts a copied platform identifier scope; `display_name` and `tribe_id`
+remain optional and redacted by default until separately justified; `online_state` must be
+derived from accepted lifecycle anchors and invalidation rules, not from post-callback UE
+lookup. The concept must not imply persistence, cross-instance correlation, sender
+authentication, command routing, permission checks, admin actions, economy identity,
+object lookup, mutation, return override, or exposure of raw UE pointers/params,
+FName/GObjects indices, strings, IPs, or pointer-derived handles.
+
 ## Public Identity Promotion Checklist
 
 `obelisk.player_identity.v1` cannot be promoted until all of the following are proven by

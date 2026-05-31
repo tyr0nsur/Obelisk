@@ -3403,6 +3403,19 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         self.assertEqual(offenders, [])
 
+    def test_public_header_marks_copied_event_seeds_as_not_v1_complete(self) -> None:
+        header = PUBLIC_API_HEADER.read_text(encoding="utf-8")
+        raw_callback_section = header[
+            header.index("Raw ProcessEvent callback registration") :
+            header.index("Filtered registrations are rejected")
+        ]
+
+        self.assertIn("copied v0.1", raw_callback_section)
+        self.assertIn("GameplayPolicyEvent", raw_callback_section)
+        self.assertIn("ChatMessageEvent", raw_callback_section)
+        self.assertIn("promoted-experimental-only", raw_callback_section)
+        self.assertIn("not a v1-complete", raw_callback_section)
+
     def test_broad_v1_completion_claim_detector_allows_scoped_language_only(self) -> None:
         forbidden = [
             "Obelisk v1.0 stable is ready for production.",
