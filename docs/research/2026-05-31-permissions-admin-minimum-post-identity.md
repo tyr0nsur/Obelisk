@@ -28,7 +28,7 @@ moderation, kick/ban, live-server work, or public SDK availability.
 surface docs already preserve the critical order:
 
 ```text
-player_identity -> permissions_admin -> commands_replies
+player_identity -> permissions_admin -> command_chat_response_path -> commands_replies
 ```
 
 The improvement captured here is the minimum safe shape after identity, so later work has
@@ -74,17 +74,21 @@ The minimum permission/admin surface must not include:
 ## ABI Shape
 
 A future ABI should be append-only and capability-gated. Names below are placeholders for
-design review, not approved public symbols:
+design review, not approved public symbols. This sketch is intentionally synchronized
+with `docs/permissions_admin_public_contract_decisions.json`: a permission query needs
+generation and scope fields, because `principal_handle` alone never authorizes.
 
 ```c
 typedef struct ObeliskPermissionQuery {
     uint32_t abi_version;
     uint32_t struct_size;
     uint64_t principal_handle;
+    uint64_t principal_generation;
+    uint64_t principal_scope_flags;
     const char* action;
     size_t action_size;
-    const char* scope;
-    size_t scope_size;
+    const char* resource_scope;
+    size_t resource_scope_size;
     uint64_t request_flags;
 } ObeliskPermissionQuery;
 
@@ -115,6 +119,10 @@ Required ABI properties:
 - missing capability, missing identity, malformed strings, unsupported scope, stale
   principal, unloaded policy, or invalid owner token returns failure or `deny/unknown`,
   never `allow`;
+- missing `principal_generation`, mismatched `principal_generation`, unsupported
+  `principal_scope_flags`, or any cache key that omits generation/scope fails closed; no
+  public permission cache ABI is allowed until `policy_epoch` and full
+  generation/scope keying semantics are promoted;
 - no callback registration is required for the first query-only surface. If a future
   policy-change callback is added, it must use owner-token handle registration,
   owner-scoped unregister, and plugin-owner cleanup before `dlclose`.

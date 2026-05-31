@@ -42,7 +42,24 @@ machine-readable reasons: `missing_reflection_inventory_pack`,
 `artifact_pack_container_not_reflection_inventory`,
 `scriptstruct_pack_not_reflection_inventory`, `schema_mismatch`,
 `missing_core_evidence_pack`, `missing_ufunction_inventory`, `wrong_target_scope`, or
-`missing_target`.
+`missing_target`. It also accepts `--json` as a compatibility flag; JSON output is the
+default either way.
+
+For operator-facing summaries, the report now includes compact top-level readiness
+boundaries:
+
+- `accepted_for_candidate_planning=<bool>`;
+- `promotion_ready=false`;
+- `public_sdk_ready=false`;
+- `runtime_ready=false`;
+- `next_step=<compact_next_step>`;
+- `operator_next_step.server_access_required=false`;
+- `operator_next_step.summary=<candidate-only boundary>`.
+
+When a reflection inventory pack is accepted, that acceptance means only
+candidate-only focal snapshot planning. It is not player identity promotion, Inventory
+SDK promotion, public SDK promotion, runtime identity readiness, lookup readiness, or
+`ResourceHandle` readiness.
 
 Current result:
 
@@ -155,7 +172,9 @@ record `target_set_coverage` for the full 12-target
 targets: `ShooterPlayerController.ServerListPlayers` and
 `ShooterPlayerController.ServerKickPlayer`. Do not build a two-function-only reflection
 inventory pack; only the later focal snapshot plan narrows to the two missing admin
-snapshots.
+snapshots. Treat checker acceptance as permission to plan those candidate-only focal
+snapshots, not as identity, Inventory SDK, public SDK, runtime, lookup, or
+`ResourceHandle` promotion.
 
 The checker and planner also fail closed when the inventory
 `target_set_coverage.target_sets` drifts from the pack manifest `inputs.target_sets`, so
@@ -197,6 +216,30 @@ Operator preflight for this direct route:
 - Keep all outputs under `ROOT`; the expected pack manifests are
   `${ROOT}/core-evidence-pack/manifest.json` and
   `${ROOT}/reflection-inventory-pack/manifest.json`.
+
+Dry-run the raw input layout before running any builder:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate_player_identity_raw_inputs.py \
+  --root /home/flowcommunity-ark/obelisk-artifacts/player-identity-offline-<run-id>
+```
+
+This validator writes nothing and returns JSON. It requires the exact
+`ROOT/raw/ShooterGameServer` and `ROOT/raw/core` sibling layout, rejects direct or
+symlink-resolved `/servidor/ark` paths, rejects symlink components, hashes only the
+binary against the reviewed `ShooterGameServer` SHA, and checks the core file by metadata
+only. It does not parse core contents, run `gdb`, attach to processes, run scanners, or
+build/stage evidence packs. `status=accepted` and
+`ready_for_core_evidence_pack_command=true` mean the raw input pair is shaped correctly
+for the next offline command; it is not proof that the core is semantically usable.
+
+If the raw files are already known explicitly, the equivalent no-staging check is:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate_player_identity_raw_inputs.py \
+  --binary /home/flowcommunity-ark/obelisk-artifacts/player-identity-offline-<run-id>/raw/ShooterGameServer \
+  --core /home/flowcommunity-ark/obelisk-artifacts/player-identity-offline-<run-id>/raw/core
+```
 
 Use the staging helper when the source binary/core already exist as explicit
 non-protected files. It verifies the reviewed `ShooterGameServer` SHA, rejects symlinks

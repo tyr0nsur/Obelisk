@@ -329,8 +329,8 @@ model:
 4. Only then draft a public identity payload.
 5. Only after identity exists can a permission/admin service be designed on a real
    principal.
-6. Only after identity, permissions, and a safe response path exist can command routing
-   with replies be designed.
+6. Only after identity, permissions, and `obelisk.command_chat_response_path.v1` exist
+   can command routing with replies be designed.
 7. Only after identity, permissions, commands, persistence, and relevant item/event
    evidence exist can economy SDK work start.
 
@@ -418,8 +418,8 @@ current artifacts, tests, or an explicitly approved runtime evidence window:
      migration, locking, and audit are promoted separately.
    - `obelisk.permissions_admin.v1` stays post-v1. The first identity API must not include
      grants, checks, admin groups, kick/ban, moderation, or an authority model.
-   - Command routing remains blocked until identity, permissions, and a safe response path
-     are all promoted.
+   - Command routing remains blocked until identity, permissions, and
+     `obelisk.command_chat_response_path.v1` are all promoted.
 
 ## Explicit Non-Claims
 

@@ -112,9 +112,10 @@ admin-surface snapshots require a reviewed non-protected complete
 `obelisk.core-dump-evidence-pack.v1` plus a reviewed UFunction
 `obelisk.reflection-inventory-pack.v1`; an offline `ShooterGameServer` binary, copied
 core, manual roots, or direct core/bin planning alone is not release-readiness, runtime,
-or public SDK evidence. Even after that fixture gap closes, permissions/admin and then
-commands/replies remain separately blocked until identity privacy, invalidation,
-authority, and a safe response path are promoted.
+or public SDK evidence. Even after that fixture gap closes, permissions/admin,
+`obelisk.command_chat_response_path.v1`, and then commands/replies remain separately
+blocked until identity privacy, invalidation, authority, and the named copied response
+path are promoted.
 
 ## v1.0 SDK Completion Bar
 

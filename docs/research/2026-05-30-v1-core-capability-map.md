@@ -21,7 +21,7 @@ UE lookup, or `ResourceHandle` APIs.
 
 | Family | Current Obelisk surface | Promotion gate before any v1 surface | Later plugin/module work |
 | --- | --- | --- | --- |
-| Chat and commands | Minimal copied `ChatMessageEvent` with send mode, local sequence, and copied text. | A command router over copied chat text, owner-token command registrations, permission checks, and safe response path once authority is defined. | Command plugins, aliases, moderation, chat tools. |
+| Chat and commands | Minimal copied `ChatMessageEvent` with send mode, local sequence, and copied text. | A command router over copied chat text, owner-token command registrations, permission checks, and the named `obelisk.command_chat_response_path.v1` response path once authority is defined. | Command plugins, aliases, moderation, chat tools. |
 | Permissions | No public permission service. | A process-local permission service with stable copied identities when available, config-backed rules, and no pointer-derived IDs. | External sync, admin UI, ArkApi migration helpers. |
 | Players | No public player identity or lookup. | Copied online-player identity and lifecycle events only after evidence proves stable IDs, privacy boundaries, and fail-closed lookup semantics. | Welcome, stats, moderation, kits, player tools. |
 | Tribes | No public tribe API. | Not required for the first v1 core unless needed by permissions/ownership; promote only copied IDs/names after evidence. | Tribe logs, claims, governance. |

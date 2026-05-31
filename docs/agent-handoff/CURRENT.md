@@ -133,6 +133,17 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   It does not create or approve cores, touch protected server paths, or authorize server
   access or runtime/core changes; follow the full recipe in
   `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`.
+- `scripts/validate_player_identity_raw_inputs.py` is the read-only dry-run check for an
+  existing `player-identity-offline-<run-id>/raw/{ShooterGameServer,core}` pair. It
+  rejects direct or symlink-resolved `/servidor/ark` paths, symlinks, wrong layout,
+  empty files, and binary SHA mismatch; it hashes only the binary and checks the core by
+  metadata only. `ready_for_core_evidence_pack_command=true` is raw-layout readiness, not
+  proof that the core is semantically usable.
+- `scripts/check_reflection_inventory_pack_readiness.py --json` accepts `--json` as a
+  compatibility flag and reports `accepted_for_candidate_planning`, `promotion_ready=false`,
+  `public_sdk_ready=false`, `runtime_ready=false`, and `operator_next_step`. Accepted
+  reflection inventory means candidate-only focal snapshot planning, not identity,
+  Inventory SDK, public SDK, runtime, lookup, or `ResourceHandle` promotion.
 - Player identity focal snapshot planning must start from a complete non-protected
   `obelisk.reflection-inventory-pack.v1` with target-set coverage for the full 12-target
   `players-identity-lifecycle-intake` set and exact rows for

@@ -131,6 +131,28 @@ class CheckReflectionInventoryPackReadinessTests(unittest.TestCase):
         self.assertIn("ServerListPlayers", " ".join(payload["accepted_pack"]["matched_targets"]))
         self.assertIn("does not read a core", " ".join(payload["non_claims"]))
         self.assertIn("offline ShooterGameServer binary alone is insufficient", " ".join(payload["non_claims"]))
+        self.assertTrue(payload["accepted_for_candidate_planning"])
+        self.assertFalse(payload["promotion_ready"])
+        self.assertFalse(payload["public_sdk_ready"])
+        self.assertFalse(payload["runtime_ready"])
+        self.assertEqual(payload["next_step"], "plan_candidate_only_server_list_players_and_server_kick_player_snapshots")
+        self.assertFalse(payload["operator_next_step"]["server_access_required"])
+        self.assertEqual(payload["operator_next_step"]["status"], "accepted_for_candidate_only_planning")
+        operator_summary = payload["operator_next_step"]["summary"]
+        self.assertIn("candidate-only focal snapshot planning", operator_summary)
+        self.assertIn("does not promote player identity", operator_summary)
+        self.assertIn("public SDK", operator_summary)
+        self.assertNotIn("promotes", operator_summary.lower())
+
+    def test_json_flag_is_compatibility_only(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_pack(root / "pack")
+
+            default_result = self.run_checker(["--root", str(root)])
+            json_result = self.run_checker(["--json", "--root", str(root)])
+
+        self.assertEqual(json.loads(json_result.stdout), json.loads(default_result.stdout))
 
     def test_binary_only_manifest_fails_closed_without_core_evidence_path(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -157,6 +179,14 @@ class CheckReflectionInventoryPackReadinessTests(unittest.TestCase):
         payload = json.loads(result.stdout)
         self.assertEqual(result.returncode, 1)
         self.assertFalse(payload["ready"])
+        self.assertEqual(payload["status"], "blocked")
+        self.assertFalse(payload["accepted_for_candidate_planning"])
+        self.assertEqual(
+            payload["next_step"],
+            "produce_or_approve_non_protected_core_evidence_pack_then_reflection_inventory_pack",
+        )
+        self.assertEqual(payload["operator_next_step"]["status"], "blocked_before_planning")
+        self.assertFalse(payload["operator_next_step"]["server_access_required"])
         self.assertEqual(self.reason_codes(payload), {"missing_reflection_inventory_pack"})
 
     def test_scriptstruct_pack_fails_closed_when_only_non_matching_manifest_exists(self) -> None:

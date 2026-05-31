@@ -265,6 +265,13 @@ priorities, and do not use history files as the active source of truth.
   It does not create or approve cores, touch protected server paths, or authorize server
   access or runtime/core changes. The detailed stop/continue recipe remains in
   `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`.
+- `scripts/validate_player_identity_raw_inputs.py` is the read-only dry-run validator for
+  an existing `player-identity-offline-<run-id>/raw/{ShooterGameServer,core}` pair. It
+  rejects direct or symlink-resolved `/servidor/ark`, symlinks, wrong layout, empty files,
+  and binary SHA mismatch; it hashes only the binary and treats the core as metadata-only.
+- `scripts/check_reflection_inventory_pack_readiness.py --json` reports candidate-only
+  planning boundaries: accepted reflection inventory is not identity, Inventory SDK,
+  public SDK, runtime, lookup, or `ResourceHandle` promotion.
 - Player identity has a candidate-only privacy/invalidation contract in
   `docs/research/2026-05-31-player-identity-privacy-invalidation-contract.md`: future
   principals must be opaque copied POD values, generation-checked, process-local by

@@ -97,7 +97,7 @@
     "v1_completion_required must stay false until docs/STATUS.md claims a complete v1 SDK.",
     "Every v1_sdk_completion_blocker must be promoted or explicitly named as excluded/post-v1 in the v1 release statement before v1_completion_required can become true.",
     "Installed SDK package/component validation, including CMake COMPONENTS SDK, is package-shape evidence only and is not a v1.0 completion marker.",
-    "Identity/principal, permissions/admin, and commands/replies are an ordered v1 dependency chain; if any of those surfaces remains blocked, planning, or post-v1, v1_completion_required must stay false.",
+    "Identity/principal, permissions/admin, command/chat response path, and commands/replies are an ordered v1 dependency chain; if any of those surfaces remains blocked, planning, or post-v1, v1_completion_required must stay false.",
     "That dependency chain must not be documented as permissions/admin being the immediate next public slice; groups, grants, admin actions, and mutation authority remain excluded unless a future promotion gate explicitly says otherwise.",
     "Commands/replies also depend on obelisk.command_chat_response_path.v1; while that command/chat response path is post-v1, no reply, send-chat, broadcast/notices, moderation, or public CallProcessEvent path may be documented as promoted.",
     "Before identity/principal is promoted, release-supported Plugin Hub seeds are limited to lifecycle/config/logging, descriptors, and process-local timers; those pre-identity release-supported seeds are not enough for v1 completion, and passive chat parsing and plugin-local routing remain promoted-experimental-only.",
@@ -831,7 +831,7 @@
       "blockers": [
         "Needs promoted player identity/principal semantics.",
         "Needs promoted permission/authority model.",
-        "Needs a safe response path for replies/send-chat.",
+        "Needs obelisk.command_chat_response_path.v1 promoted or explicitly excluded before replies/send-chat can be claimed.",
         "Send-chat, broadcast, scheduled notices, and moderation are separate response/authority surfaces, not implied by passive copied chat parsing.",
         "Needs command lifecycle and abuse boundaries."
       ],

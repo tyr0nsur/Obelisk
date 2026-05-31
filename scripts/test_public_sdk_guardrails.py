@@ -1796,7 +1796,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         for blocker in (
             "Needs promoted player identity/principal semantics.",
             "Needs promoted permission/authority model.",
-            "Needs a safe response path for replies/send-chat.",
+            "Needs obelisk.command_chat_response_path.v1 promoted or explicitly excluded before replies/send-chat can be claimed.",
             "Send-chat, broadcast, scheduled notices, and moderation are separate response/authority surfaces, not implied by passive copied chat parsing.",
             "Needs command lifecycle and abuse boundaries.",
         ):
@@ -2150,7 +2150,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         release_guardrails = " ".join(manifest["release_guardrails"])
         for term in (
-            "Identity/principal, permissions/admin, and commands/replies are an ordered v1 dependency chain",
+            "Identity/principal, permissions/admin, command/chat response path, and commands/replies are an ordered v1 dependency chain",
             "if any of those surfaces remains blocked, planning, or post-v1",
             "v1_completion_required must stay false",
             "must not be documented as permissions/admin being the immediate next public slice",
@@ -2164,8 +2164,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             identity_note,
         )
         self.assertIn(
-            "Only after identity, permissions, and a safe response path exist can command routing\n"
-            "   with replies be designed.",
+            "Only after identity, permissions, and `obelisk.command_chat_response_path.v1` exist\n"
+            "   can command routing with replies be designed.",
             identity_note,
         )
         self.assertNotIn(
@@ -2175,10 +2175,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         compatibility = normalized(PUBLIC_SDK_V1_COMPATIBILITY_DOC.read_text(encoding="utf-8"))
         for term in (
-            "Identity/principal, permissions/admin, and commands/replies are an ordered v1 dependency chain",
+            "Identity/principal, permissions/admin, command/chat response path, and commands/replies are an ordered v1 dependency chain",
             "if any of those surfaces remains blocked, planning, or post-v1",
             "no complete v1 SDK claim is valid",
-            "The completion checker must also reject any promoted permissions/admin or commands/replies surface whose dependency rows are not already promoted",
+            "The completion checker must also reject any promoted permissions/admin,\ncommand/chat response path, or commands/replies surface whose dependency rows are not\nalready promoted",
             "not a declaration that permissions/admin is the immediate next public slice",
             "groups, grants, admin actions, and mutation authority remain excluded",
             "The command/chat response path is a named planning dependency only, not a promoted surface",
@@ -2311,6 +2311,42 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertIn(
             "obelisk.command_chat_response_path.v1",
             report["promoted_surfaces_with_unresolved_dependencies"]["obelisk.commands_replies.v1"],
+        )
+
+    def test_public_sdk_v1_completion_checker_rejects_response_path_before_dependencies(self) -> None:
+        checker = runpy.run_path(
+            str(REPO_ROOT / "scripts" / "check_public_sdk_v1_completion.py"),
+            run_name="__not_main__",
+        )
+        manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        for surface in manifest["surfaces"]:
+            if surface["id"] == "obelisk.command_chat_response_path.v1":
+                surface["status"] = "promoted"
+                surface["public_contract"] = ["synthetic copied response contract"]
+                surface["evidence"] = {
+                    "surface_id": "obelisk.command_chat_response_path.v1",
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                    "abi_tests": ["tests/core/CommandChatResponsePathTests.cpp"],
+                    "sdk_consumer_tests": ["tests/sdk_consumer/command_chat_response_path_plugin.cpp"],
+                }
+                break
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest_path = Path(tmpdir) / "public_sdk_surfaces.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            report = checker["build_report"](manifest_path)
+
+        self.assertFalse(report["ready"])
+        self.assertIn("promoted_surface_dependency_unresolved", report["blockers"])
+        self.assertEqual(
+            report["promoted_surfaces_with_unresolved_dependencies"][
+                "obelisk.command_chat_response_path.v1"
+            ],
+            [
+                "obelisk.permissions_admin.v1",
+                "obelisk.player_identity.v1",
+            ],
         )
 
     def test_public_sdk_docs_do_not_imply_command_chat_response_path_promotion(self) -> None:

@@ -59,6 +59,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--root", required=True, type=Path, help="Non-protected root to search.")
     parser.add_argument("--max-depth", type=int, default=6, help="Maximum directory depth below --root.")
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Compatibility flag; output is JSON with or without this option.",
+    )
     return parser.parse_args()
 
 
@@ -588,6 +593,12 @@ def build_report(root: Path, max_depth: int) -> dict[str, object]:
             "reasons": [reason("wrong_target_scope", path=str(root), detail=str(exc))],
             "required_targets": list(REQUIRED_TARGETS),
             "required_target_set": player_identity_target_set_expectation_fields(),
+            "accepted_for_candidate_planning": False,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "next_step": "produce_or_approve_non_protected_core_evidence_pack_then_reflection_inventory_pack",
+            "operator_next_step": operator_next_step(None),
             "non_claims": non_claims(),
         }
 
@@ -657,6 +668,10 @@ def build_report(root: Path, max_depth: int) -> dict[str, object]:
         "schema": REPORT_SCHEMA,
         "status": "ready" if accepted else "blocked",
         "ready": accepted is not None,
+        "accepted_for_candidate_planning": accepted is not None,
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
         "root": str(root),
         "manifests_scanned": len(manifest_paths),
         "candidate_packs": candidate_packs,
@@ -664,7 +679,37 @@ def build_report(root: Path, max_depth: int) -> dict[str, object]:
         "reasons": reasons,
         "required_targets": list(REQUIRED_TARGETS),
         "required_target_set": player_identity_target_set_expectation_fields(),
+        "next_step": (
+            "plan_candidate_only_server_list_players_and_server_kick_player_snapshots"
+            if accepted
+            else "produce_or_approve_non_protected_core_evidence_pack_then_reflection_inventory_pack"
+        ),
+        "operator_next_step": operator_next_step(accepted),
         "non_claims": non_claims(),
+    }
+
+
+def operator_next_step(accepted: dict[str, object] | None) -> dict[str, object]:
+    if accepted is None:
+        return {
+            "status": "blocked_before_planning",
+            "scope": "offline_candidate_only",
+            "server_access_required": False,
+            "next_step": "produce_or_approve_non_protected_core_evidence_pack_then_reflection_inventory_pack",
+            "summary": (
+                "No accepted reflection inventory pack is available; focal snapshot planning remains blocked "
+                "until a reviewed non-protected candidate-only inventory pack is accepted."
+            ),
+        }
+    return {
+        "status": "accepted_for_candidate_only_planning",
+        "scope": "offline_candidate_only",
+        "server_access_required": False,
+        "next_step": "plan_candidate_only_server_list_players_and_server_kick_player_snapshots",
+        "summary": (
+            "Accepted reflection inventory only enables candidate-only focal snapshot planning; it does not "
+            "promote player identity, Inventory SDK, public SDK, runtime identity, lookup, or ResourceHandle."
+        ),
     }
 
 
@@ -672,6 +717,7 @@ def non_claims() -> list[str]:
     return [
         "Read-only preflight; does not read a core, execute snapshot commands, write files, or touch servers.",
         "An offline ShooterGameServer binary alone is insufficient; player-identity planning requires a non-protected complete core evidence pack and a reviewed UFunction reflection-inventory pack.",
+        "Accepted reflection inventory means candidate-only snapshot planning, not player identity, Inventory SDK, public SDK, runtime identity, lookup, GObjects, UObject identity, or ResourceHandle promotion.",
         "Does not promote player identity, command routing, permissions, mutation, return override, public SDK scope, GObjects, UObject identity, or ResourceHandle.",
     ]
 
