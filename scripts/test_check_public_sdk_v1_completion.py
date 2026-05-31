@@ -411,6 +411,97 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("release_statement_missing_exclusion_contract", payload["blockers"])
         self.assertEqual(payload["release_statement_missing_exclusion_contracts"], ["obelisk.player_identity.v1"])
 
+    def test_release_statement_rejects_complete_sdk_claim_after_excluded_blocker_record(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        release_statement = "\n".join(
+            (
+                line + "; Inventory SDK is a complete SDK for v1 plugin authors."
+                if line.startswith("obelisk.inventory_items_mutation.v1: excluded -")
+                else line
+            )
+            for line in release_statement.splitlines()
+        ) + "\n"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("release_statement_missing_exclusion_contract", payload["blockers"])
+        self.assertEqual(
+            payload["release_statement_missing_exclusion_contracts"],
+            ["obelisk.inventory_items_mutation.v1"],
+        )
+
+    def test_release_statement_rejects_available_support_claim_after_post_v1_record(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        for surface in manifest["surfaces"]:
+            if surface["id"] == "obelisk.commands_replies.v1":
+                surface["status"] = "post-v1"
+                break
+        release_statement = "\n".join(
+            (
+                line.replace("obelisk.commands_replies.v1: excluded -", "obelisk.commands_replies.v1: post-v1 -")
+                + "; command router support is available in v1."
+                if line.startswith("obelisk.commands_replies.v1: excluded -")
+                else line
+            )
+            for line in release_statement.splitlines()
+        ) + "\n"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("release_statement_missing_exclusion_contract", payload["blockers"])
+        self.assertEqual(payload["release_statement_missing_exclusion_contracts"], ["obelisk.commands_replies.v1"])
+
+    def test_release_statement_rejects_global_complete_sdk_claim_for_excluded_blocker(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        release_statement += "Release summary: Inventory SDK is a complete SDK for v1 plugin authors.\n"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("release_statement_missing_exclusion_contract", payload["blockers"])
+        self.assertEqual(
+            payload["release_statement_missing_exclusion_contracts"],
+            ["obelisk.inventory_items_mutation.v1"],
+        )
+
     def test_release_statement_rejects_duplicate_or_mixed_surface_records(self) -> None:
         manifest, release_statement = complete_excluded_manifest()
         release_statement += (

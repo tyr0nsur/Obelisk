@@ -109,6 +109,20 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertFalse(payload["static_orientation"]["public_sdk_ready"])
         self.assertFalse(payload["static_orientation"]["runtime_ready"])
         self.assertEqual(payload["static_orientation"]["blockers"], [])
+        pre_core_boundary = payload["static_orientation"]["pre_core_evidence_boundary"]
+        self.assertTrue(pre_core_boundary["useful"])
+        self.assertTrue(pre_core_boundary["blocked"])
+        self.assertEqual(pre_core_boundary["status"], "useful_orientation_blocked_before_core_evidence")
+        self.assertIn("requires_non_protected_core_evidence_pack", pre_core_boundary["blockers"])
+        self.assertIn(
+            "requires_accepted_reflection_inventory_pack_before_admin_focal_planning",
+            pre_core_boundary["blockers"],
+        )
+        self.assertIn("static_lifecycle_admin_orientation", pre_core_boundary["useful_for"])
+        self.assertIn(
+            "static orientation does not replace core evidence",
+            " ".join(pre_core_boundary["non_claims"]),
+        )
         self.assertIn(
             "candidate-only navigation evidence",
             " ".join(payload["static_orientation"]["non_claims"]),
@@ -286,6 +300,12 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertEqual(payload["status"], "blocked")
         self.assertIn("fixture_coverage_incomplete", payload["blockers"])
         self.assertEqual(payload["deferred_until_reflection_inventory_ready"], [])
+        self.assertEqual(
+            payload["static_orientation"]["pre_core_evidence_boundary"]["status"],
+            "orientation_only_not_downstream_promotion_gate",
+        )
+        self.assertFalse(payload["static_orientation"]["pre_core_evidence_boundary"]["blocked"])
+        self.assertEqual(payload["static_orientation"]["pre_core_evidence_boundary"]["blockers"], [])
 
     def test_accepted_inventory_still_fails_closed_on_wrong_first_evidence_schema(self) -> None:
         ok = subprocess.CompletedProcess(["mock"], 0, "", "")

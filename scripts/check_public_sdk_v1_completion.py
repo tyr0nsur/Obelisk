@@ -76,6 +76,13 @@ GENERIC_SCRIPT_EVIDENCE_DENYLIST = {
     "scripts/check_release_readiness.sh",
     "scripts/check_public_sdk_v1_completion.py",
 }
+AFFIRMATIVE_RELEASE_CLAIM_PATTERNS = (
+    r"\b(?:complete|full|production|stable)\s+(?:[a-z0-9_/+-]+\s+){0,5}(?:sdk|api|support)\b",
+    r"\b(?:sdk|api|surface|capability|support)\s+"
+    r"(?:is|are|remains?|stays?)\s+"
+    r"(?:complete|full|production|stable|available|supported|included|shipped)\b",
+)
+CLAUSE_START_PATTERN = re.compile(r"[.;\n]|(?:\s+-\s+)")
 
 
 def parse_args() -> argparse.Namespace:
@@ -194,6 +201,21 @@ def required_release_statement_outcomes(surface: dict[str, Any]) -> set[str]:
     return {status} if status in {"excluded", "post-v1"} else set()
 
 
+def text_has_affirmative_release_claim(text: str) -> bool:
+    lowered = text.lower()
+    for pattern in AFFIRMATIVE_RELEASE_CLAIM_PATTERNS:
+        for match in re.finditer(pattern, lowered):
+            prefix = lowered[: match.start()]
+            clause_start = 0
+            for boundary in CLAUSE_START_PATTERN.finditer(prefix):
+                clause_start = boundary.end()
+            claim_prefix = lowered[clause_start : match.start()]
+            if re.search(r"\b(?:no|not|never|without|excluded|post-v1|post v1)\b", claim_prefix):
+                continue
+            return True
+    return False
+
+
 def release_statement_record_has_contradiction(record: str) -> bool:
     lowered = record.lower()
     if re.search(
@@ -202,14 +224,46 @@ def release_statement_record_has_contradiction(record: str) -> bool:
         lowered,
     ):
         return True
-    return (
-        re.search(
-            r"\b(?:except|other than|unless|but|however)\b[^.;\n]*"
-            r"\b(?:included|available|supported|shipped)\b",
-            lowered,
-        )
-        is not None
-    )
+    if re.search(
+        r"\b(?:except|other than|unless|but|however)\b[^.;\n]*"
+        r"\b(?:included|available|supported|shipped)\b",
+        lowered,
+    ):
+        return True
+    return text_has_affirmative_release_claim(record)
+
+
+def surface_exclusion_claim_terms(surface: dict[str, Any]) -> set[str]:
+    terms = set(as_string_list(surface.get("exclusions")))
+    terms.update(as_string_list(surface.get("audit_units")))
+    if isinstance(surface.get("public_name"), str):
+        terms.add(surface["public_name"])
+    contract = surface.get("v1_decision_contract")
+    if isinstance(contract, dict):
+        for requirement in as_string_list(contract.get("exclusion_requires")):
+            required_text = required_release_statement_text(requirement)
+            if required_text is None:
+                continue
+            body = re.sub(r"^\s*no\s+", "", required_text, flags=re.IGNORECASE)
+            body = re.sub(r"\s+(?:api\s+)?is included in v1\s*$", "", body, flags=re.IGNORECASE)
+            for term in re.split(r"\s*,\s*|\s+\bor\b\s+|\s+\band\b\s+", body):
+                term = term.strip(" .")
+                if len(term) >= 4:
+                    terms.add(term)
+    return {term.lower() for term in terms if term}
+
+
+def release_statement_has_surface_claim_contradiction(text: str, surface: dict[str, Any]) -> bool:
+    terms = surface_exclusion_claim_terms(surface)
+    if not terms:
+        return False
+    for line in text.splitlines():
+        if re.match(r"^\s*obelisk\.[a-z0-9_.-]+\.v1\s*:", line, re.IGNORECASE):
+            continue
+        lowered = line.lower()
+        if any(term in lowered for term in terms) and text_has_affirmative_release_claim(line):
+            return True
+    return False
 
 
 def release_statement_satisfies_exclusion_contract(text: str, surface: dict[str, Any]) -> bool:
@@ -229,6 +283,8 @@ def release_statement_satisfies_exclusion_contract(text: str, surface: dict[str,
         return False
     lowered = record.lower()
     if release_statement_record_has_contradiction(record):
+        return False
+    if release_statement_has_surface_claim_contradiction(text, surface):
         return False
     required_text = [item for item in (required_release_statement_text(item) for item in required) if item]
     return all(item.lower() in lowered for item in required_text)

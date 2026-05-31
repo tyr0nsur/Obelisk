@@ -447,6 +447,11 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     )
 
     inventory_ready = bool(inventory_payload and inventory_payload.get("ready") is True)
+    orientation_valid = (
+        isinstance(orientation_payload, dict)
+        and orientation_payload.get("valid") is True
+        and orientation_payload.get("accepted_for_orientation") is True
+    )
     coverage_totals = coverage_payload.get("totals", {}) if isinstance(coverage_payload, dict) else {}
     coverage_targets = coverage_totals.get("targets")
     coverage_comparable = coverage_totals.get("comparable")
@@ -603,6 +608,27 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
                 if isinstance(orientation_payload, dict)
                 else True
             ),
+            "pre_core_evidence_boundary": {
+                "useful": orientation_valid,
+                "status": (
+                    "useful_orientation_blocked_before_core_evidence"
+                    if not inventory_ready
+                    else "orientation_only_not_downstream_promotion_gate"
+                ),
+                "blocked": not inventory_ready,
+                "blockers": [] if inventory_ready else [
+                    "requires_non_protected_core_evidence_pack",
+                    "requires_accepted_reflection_inventory_pack_before_admin_focal_planning",
+                ],
+                "useful_for": [
+                    "static_lifecycle_admin_orientation",
+                    "future_focal_snapshot_matching_after_inventory_acceptance",
+                ],
+                "non_claims": [
+                    "static orientation does not replace core evidence, reflection inventory, focal snapshots, second-source evidence, or lifecycle anchors",
+                    "static orientation does not promote public identity, permissions, commands, runtime hooks, lookup, ResourceHandle, mutation, return override, or SDK surface",
+                ],
+            },
             "promotion_ready": False,
             "public_sdk_ready": False,
             "runtime_ready": False,
