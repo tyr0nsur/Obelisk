@@ -883,6 +883,67 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertNotIn("release_statement_forbidden_broad_claims", payload["blockers"])
         self.assertEqual(payload["release_statement_forbidden_broad_claims"], [])
 
+    def test_release_statement_rejects_non_promotional_evidence_as_v1_claim_basis(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        release_statement += (
+            "Candidate evidence proves a complete SDK for v1 plugin authors.\n"
+            "Static orientation readiness makes the public SDK ready.\n"
+            "Consume-only planning evidence validates v1.0 stable.\n"
+            "Foundation package shape support is production-ready SDK support.\n"
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("release_statement_forbidden_broad_claims", payload["blockers"])
+        forbidden_claims = "\n".join(payload["release_statement_forbidden_broad_claims"])
+        for term in (
+            "Candidate evidence proves a complete SDK for v1 plugin authors.",
+            "Static orientation readiness makes the public SDK ready.",
+            "Consume-only planning evidence validates v1.0 stable.",
+            "Foundation package shape support is production-ready SDK support.",
+        ):
+            with self.subTest(term=term):
+                self.assertIn(term, forbidden_claims)
+
+    def test_release_statement_allows_negated_non_promotional_evidence_boundaries(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        release_statement += (
+            "Candidate evidence does not prove a complete SDK for v1 plugin authors.\n"
+            "Static orientation readiness is not public SDK readiness.\n"
+            "Consume-only planning evidence does not validate v1.0 stable.\n"
+            "Foundation package shape support is not production-ready SDK support.\n"
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 0)
+        self.assertNotIn("release_statement_forbidden_broad_claims", payload["blockers"])
+        self.assertEqual(payload["release_statement_forbidden_broad_claims"], [])
+
     def test_release_statement_rejects_blocked_claim_inside_other_surface_record(self) -> None:
         manifest, release_statement = complete_excluded_manifest()
         release_statement = release_statement.replace(

@@ -4,6 +4,9 @@ This directory contains creator-facing examples that build against the installed
 SDK package. These examples are separate from `plugins/`, which contains first-party
 in-tree reference plugins used by Obelisk's own build and tests.
 
+They are foundation/contributor-readiness samples for the current installed SDK package,
+not ArkApi portability kits, module SDKs, or evidence that Obelisk SDK v1 is complete.
+
 - `sdk_minimal_plugin/`: smallest external C plugin using `find_package(Obelisk 0.1.0
   CONFIG REQUIRED COMPONENTS SDK)` and `Obelisk::obelisk_sdk`.
 - `sdk_descriptor_catalog/`: external C plugin that reads metadata-only resource and

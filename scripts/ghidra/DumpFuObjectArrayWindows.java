@@ -53,6 +53,10 @@ public class DumpFuObjectArrayWindows extends GhidraScript {
             println("image_base=" + program.getImageBase());
             println("executable_sha256=" + program.getExecutableSHA256());
             println("window_count=" + windows.length);
+            println("status=candidate-only static orientation");
+            println("not_artifact_gate=true");
+            println("promotion_ready=false");
+            println("non_claim=Ghidra windows are offline navigation only; not consume or promote evidence");
             validatePreflight(program);
             for (Window window : windows) {
                 println("window_spec=" + window.label + " start=0x" + Long.toHexString(window.start)

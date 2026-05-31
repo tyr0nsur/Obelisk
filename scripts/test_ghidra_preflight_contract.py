@@ -30,6 +30,7 @@ class GhidraPreflightContractTests(unittest.TestCase):
         include_window_count: bool = True,
         include_unknown_reject: bool = True,
         include_zero_reject: bool = True,
+        include_non_promotion_markers: bool = True,
     ) -> None:
         window_count_branch = (
             'else if (key.equals("expected_window_count")) { requireEquals(key, 7, windows.length); }'
@@ -46,10 +47,21 @@ class GhidraPreflightContractTests(unittest.TestCase):
             if include_zero_reject
             else ""
         )
+        non_promotion_markers = (
+            """
+                    println("status=candidate-only static orientation");
+                    println("not_artifact_gate=true");
+                    println("promotion_ready=false");
+                    println("non_claim=Ghidra windows are offline navigation only; not consume or promote evidence");
+            """
+            if include_non_promotion_markers
+            else ""
+        )
         path.write_text(
             f"""
             class Script {{
                 void validatePreflight() {{
+                    {non_promotion_markers}
                     if (key.equals("expected_sha256")) {{ requireEquals(key, expected, actual); }}
                     else if (key.equals("expected_language")) {{ requireEquals(key, expected, actual); }}
                     else if (key.equals("expected_image_base")) {{
@@ -108,6 +120,11 @@ class GhidraPreflightContractTests(unittest.TestCase):
                 "missing_zero_image_base_reject",
                 {"include_zero_reject": False},
                 "expected_image_base zero is not explicitly rejected",
+            ),
+            (
+                "missing_non_promotion_markers",
+                {"include_non_promotion_markers": False},
+                "missing non-promotional marker status=candidate-only static orientation",
             ),
         )
         with tempfile.TemporaryDirectory() as tmp:

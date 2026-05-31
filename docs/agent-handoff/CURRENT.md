@@ -8,6 +8,9 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 
 - `v0.1.0-rc.2` is the current published core-first RC baseline after a clean release
   gate and tag/ref verification; stale tags must not be reused.
+- Current post-RC focus: move from the accepted RC UFunction second-source root and
+  core-first release baseline toward the complete SDK track without treating historical
+  recovery context as active routing.
 - Post-RC work moves toward `v1.0`: a complete public SDK contract for plugin authors,
   not just a stable runtime. Use `docs/SDK_V1_COMPATIBILITY.md` and
   `docs/public_sdk_surfaces.json` as the v1 surface map until a release gate supersedes
@@ -87,6 +90,14 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `ShooterGameServer` SHA `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`,
   but no non-protected copied core, no complete `obelisk.core-dump-evidence-pack.v1`, and
   no accepted `obelisk.reflection-inventory-pack.v1`.
+- Current identity next step is to produce or approve a non-protected UFunction
+  reflection-inventory pack with `target_set_coverage` for the full 12-target
+  `players-identity-lifecycle-intake` set. After that pack is accepted, use
+  `scripts/plan_ufunction_focal_snapshots.py` for
+  `ShooterPlayerController.ServerListPlayers` and
+  `ShooterPlayerController.ServerKickPlayer` only; do not treat ScriptStruct inventory,
+  standalone snapshots, redacted signatures, static thunks, or a two-function-only
+  inventory as satisfying this lane.
 - `scripts/check_player_identity_first_evidence_readiness.py --artifact-root
   /home/flowcommunity-ark/obelisk-artifacts --json` currently reports
   `next_actionable_blocker.code=non_protected_core_input_missing`; the expected copied
@@ -143,20 +154,28 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - No-core fallback: if no copied core is available for identity, keep progress offline by
   tightening guardrails, permission/admin query-only minimum design, command/principal
   contract, and inventory copied-signal evidence hygiene without claiming SDK promotion.
-  Inventory copied signals are the preferred no-core side lane because they already ride
-  copied `GameplayPolicyEvent` evidence and have near-term Plugin Hub value. This does
-  not authorize Transfer runtime work, and no side lane displaces identity ->
-  permissions/admin -> command response -> commands/replies.
+  While identity waits on copied core evidence, inventory copied signals are the
+  higher-value side lane because they already ride copied `GameplayPolicyEvent` evidence
+  and have near-term Plugin Hub value; structure census remains useful offline
+  planning/consume-only work. This does not authorize Transfer runtime work, and no side
+  lane displaces identity -> permissions/admin -> command response -> commands/replies.
+  Neither side lane displaces
+  identity -> permissions/admin -> commands/replies. Prefer inventory copied-signal
+  hygiene over structure census when choosing one side lane, and treat inventory/item
+  copied signals as the higher-value side lane than structure census. Keep that work
+  experimental and non-completion.
 - Current no-core side-lane priority: `item-return-only-policy-slice` has three copied
   `GameplayPolicyEvent` `ReturnValue` checks and is the best value/risk target set.
   Descriptor-preflight hardening keeps internal descriptor candidates unassigned to
   public event kinds/masks. Describe it only as copied `ReturnValue` signal evidence; it
-  does not promote Inventory/Items SDK, identity, lookup, mutation, return override,
-  runtime validation, or v1 completion.
+  does not promote public Inventory SDK, Items SDK, identity, lookup, mutation, return
+  override, runtime validation, or v1 completion.
 - v0.2 internal hardening lane: Mission copied-bool is selected only for internal
   default-off recognizer/helper hardening, not a product-facing Plugin Hub module or
   Mission SDK/identity/mutation/return-override/v1-completion claim. Detail:
-  `docs/research/2026-05-31-v02-module-priority.md`.
+  `docs/research/2026-05-31-v02-module-priority.md`. The current bool-tail contract is
+  `bool_field_size=1`, `bool_byte_offset=0`, `byte_mask=0x01`, `field_mask=0xff`, and
+  `native_bool=false`; it remains candidate-only.
 - Product-planning lane: Structure aggregate/census is planning/consume-only, with no
   runtime observer, callback ABI, descriptor, public StructureEvents SDK, identity,
   mutation, enforcement, return override, or v1 completion claim. Detail:

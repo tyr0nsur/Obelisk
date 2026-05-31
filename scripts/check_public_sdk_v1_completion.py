@@ -218,6 +218,24 @@ FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
     r"\b(?:available|complete|full|production[- ]?ready|ready|released|shipped|stable|supported)\b",
     r"\b(?:available|complete|full|production[- ]?ready|ready|released|shipped|stable|supported)\b"
     r".{0,80}\b(?:plugin\s+hub|pluginhub)\b",
+    r"\b(?:candidate(?:[- ]?only)?|planning(?:[- ]?only)?|orientation(?:[- ]?only)?|"
+    r"consume[- ]?only|evidence[- ]?only|preflight|readiness|foundation|package[- ]?shape|"
+    r"static[- ]?orientation)\b.{0,100}"
+    r"\b(?:available|complete|full|included|production[- ]?ready|public|ready|released|"
+    r"shipped|stable|supported|promoted)\b.{0,40}"
+    r"\b(?:v1(?:\.0)?|sdk|api|surface|support|claim|release)\b",
+    r"\b(?:v1(?:\.0)?|sdk|api|surface|support|claim|release)\b.{0,40}"
+    r"\b(?:available|complete|full|included|production[- ]?ready|public|ready|released|"
+    r"shipped|stable|supported|promoted)\b.{0,100}"
+    r"\b(?:candidate(?:[- ]?only)?|planning(?:[- ]?only)?|orientation(?:[- ]?only)?|"
+    r"consume[- ]?only|evidence[- ]?only|preflight|readiness|foundation|package[- ]?shape|"
+    r"static[- ]?orientation)\b",
+    r"\b(?:candidate(?:[- ]?only)?|planning(?:[- ]?only)?|orientation(?:[- ]?only)?|"
+    r"consume[- ]?only|evidence[- ]?only|preflight|readiness|foundation|package[- ]?shape|"
+    r"static[- ]?orientation)\b.{0,100}"
+    r"\b(?:proves?|validates?|unlocks?|satisf(?:y|ies)|enables?)\b.{0,60}"
+    r"\b(?:v1(?:\.0)?\s+stable|complete\s+(?:sdk|api)|full\s+(?:sdk|api)|"
+    r"production[- ]?ready\s+(?:sdk|api|support)|production\s+(?:sdk|api|support))\b",
 )
 FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_NEGATORS = re.compile(
     r"\b(?:blocked|cannot|does\s+not|do\s+not|excluded|insufficient|limited|"

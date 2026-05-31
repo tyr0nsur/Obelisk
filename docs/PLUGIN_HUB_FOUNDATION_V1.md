@@ -4,7 +4,9 @@ Read `PLUGIN_HUB_SEED_BOUNDARY.md` first: Plugin Hub seeds are not evidence that
 Obelisk v1 SDK is complete.
 
 Plugin Hub Foundation V1 is the minimum contributor-facing contract for Linux-native
-Obelisk plugins that consume `include/obelisk/ObeliskApi.h`.
+Obelisk plugins that consume `include/obelisk/ObeliskApi.h`. In this document, `V1`
+means the first reviewed Plugin Hub foundation/intake contract revision. It is not
+Obelisk SDK v1, not `v1.0 stable`, and not a Plugin Hub completion claim.
 
 It is a boundary document, not a roadmap freeze. It does not add public symbols, structs,
 callbacks, capabilities, or gameplay modules. More specifically, it does not add public

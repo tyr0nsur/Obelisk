@@ -3626,6 +3626,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         compact = normalized(foundation)
 
         required = (
+            "In this document, `V1` means the first reviewed Plugin Hub foundation/intake contract revision",
+            "It is not Obelisk SDK v1, not `v1.0 stable`, and not a Plugin Hub completion claim",
             "post-RC contributor seed for the current ABI, not a change to the published `v0.1.0-rc.2` tag",
             "Post-RC release-supported seed work is limited to lifecycle/config/logging skeletons",
             "Copied `ChatMessageEvent` parsing and copied `GameplayPolicyEvent` auditing remain experimental seed patterns only",
@@ -4953,6 +4955,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 self.assertIn("compatibility floor for the current pre-release SDK line", compact)
                 self.assertIn("not a complete SDK claim", compact)
                 self.assertIn("not a claim that a stable `v0.1.0` release tag exists", compact)
+                self.assertIn("foundation/contributor-readiness sample", compact)
+                self.assertIn("not ArkApi portability", compact)
+                self.assertIn("not Obelisk SDK v1 evidence", compact)
 
     def test_obaseevents_chat_helper_cleanup_guardrail_stays_in_release_tests(self) -> None:
         cmake = (REPO_ROOT / "tests/sdk_consumer/CMakeLists.txt").read_text(encoding="utf-8")
@@ -6982,6 +6987,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertEqual(rows, expected_tiers)
         for required in (
             "## Support Tier Legend",
+            "The `Foundation V1` label means the first reviewed foundation/intake contract revision for contributor readiness",
+            "it is not Obelisk SDK v1, `v1.0 stable`, or a Plugin Hub completion claim",
             "`release-supported seed available`: supported for narrow Obelisk-native examples",
             "`experimental seed only`: allowed for explicitly labeled pattern examples",
             "not supported as production Plugin Hub modules or as general chat, command, policy, structure, inventory, identity, mutation, or enforcement SDKs",

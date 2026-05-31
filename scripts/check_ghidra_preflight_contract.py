@@ -26,6 +26,12 @@ REQUIRED_KEYS = (
     "expected_image_base",
     "expected_window_count",
 )
+REQUIRED_NON_PROMOTION_MARKERS = (
+    "status=candidate-only static orientation",
+    "not_artifact_gate=true",
+    "promotion_ready=false",
+    "not consume or promote evidence",
+)
 UNKNOWN_ARG_MARKER = "unknown_arg"
 ZERO_IMAGE_BASE_PATTERNS = (
     re.compile(r"\bexpected_image_base\s*=\s*0x0\b"),
@@ -61,6 +67,9 @@ def validate_script(path: Path, blockers: list[str]) -> None:
     for key in REQUIRED_KEYS:
         if f'"{key}"' not in text:
             blockers.append(f"{display_path(path)}: missing {key} preflight key")
+    for marker in REQUIRED_NON_PROMOTION_MARKERS:
+        if marker not in text:
+            blockers.append(f"{display_path(path)}: missing non-promotional marker {marker}")
     if UNKNOWN_ARG_MARKER not in text:
         blockers.append(f"{display_path(path)}: unknown preflight keys are not explicitly rejected")
     if "must_not_be_zero" not in text or "expectedImageBase == 0" not in text:

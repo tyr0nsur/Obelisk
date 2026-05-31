@@ -156,13 +156,14 @@ checking `struct_size`, a non-zero `plugin_owner_token`, and non-null function p
 callbacks run on an Obelisk worker thread, must return quickly, must not throw across the
 C ABI, and must not call unsafe UE4 functions. A timer may unregister its own handle from
 inside its callback, but plugins should still unregister outstanding timers during
-shutdown while callback code and state are valid. `UnregisterTimerWithOwnerToken` cancels
-future delivery for that handle, but it is not a quiescence barrier for already in-flight
-callbacks and does not make `user_data` safe to free by itself; runtime owner cleanup on
-init failure/unload is only the backstop. If cleanup succeeds, it waits for in-flight
-callbacks before `dlclose`; if any owner cleanup family fails, the runtime must keep the
-plugin library mapped and retry cleanup later instead of unloading code that callbacks may
-still reference.
+shutdown while callback code and state are valid. The timer owner-token unregister path
+cancels future delivery for that handle, but it is not a quiescence barrier for already
+in-flight callbacks and does not make `user_data` safe to free by itself; runtime owner
+cleanup on init failure/unload is only the backstop. If cleanup succeeds, it waits for
+in-flight callbacks before `dlclose`; if any owner cleanup family fails, the runtime
+must keep the plugin
+library mapped and retry cleanup later instead of unloading code that callbacks may still
+reference.
 
 ## Build And Drop-In Model
 
