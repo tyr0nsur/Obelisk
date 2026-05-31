@@ -2393,6 +2393,46 @@ def gobjects_two_core_manifest() -> dict:
     return payload
 
 
+def reflection_inventory_comparison_manifest(workspace: Path) -> dict:
+    return {
+        "schema": gate.REFLECTION_INVENTORY_PACK_COMPARISON_SCHEMA,
+        "status": "accepted",
+        "promotion_status": "not_promoted_candidate_only",
+        "base": {
+            "pack": str(workspace / "base-pack"),
+            "artifact_identity": {
+                "artifact_kind": "offline-core",
+                "artifact_sha256": "b" * 64,
+                "capture_id": "base-capture",
+                "evidence_pack_id": "base-pack",
+            },
+            "binary_sha256": BINARY_SHA,
+            "summary": {"fname_root_ready": True},
+        },
+        "candidate": {
+            "pack": str(workspace / "candidate-pack"),
+            "artifact_identity": {
+                "artifact_kind": "offline-core",
+                "artifact_sha256": "c" * 64,
+                "capture_id": "candidate-capture",
+                "evidence_pack_id": "candidate-pack",
+            },
+            "binary_sha256": BINARY_SHA,
+            "summary": {"fname_root_ready": True},
+        },
+        "function_comparison": {
+            "base_function_count": 2,
+            "candidate_function_count": 2,
+            "shared_function_count": 2,
+            "missing_in_candidate": [],
+            "new_in_candidate": [],
+            "changed_functions": [],
+        },
+        "blockers": [],
+        "non_claims": sorted(gate.REQUIRED_REFLECTION_INVENTORY_COMPARISON_NON_CLAIMS),
+    }
+
+
 def scriptstruct_inventory_child_payload(count: int = 2, *, include_scriptstructs: bool = False) -> dict:
     payload = {
         "schema": "obelisk.scriptstruct-inventory.v1",
@@ -2706,6 +2746,97 @@ def args(
 
 
 class ValidateOfflineArtifactGateTests(unittest.TestCase):
+    def test_accepts_reflection_inventory_comparison_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "reflection-comparison" / "manifest.json"
+            write_json(manifest, reflection_inventory_comparison_manifest(workspace))
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual(result["status"], "accepted")
+        self.assertEqual([], result["blockers"])
+
+    def test_blocks_reflection_inventory_comparison_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "reflection-comparison" / "manifest.json"
+            write_json(manifest, reflection_inventory_comparison_manifest(workspace))
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        self.assertIn(
+            "promote_mode_reflection_inventory_comparison_candidate_only",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_reflection_inventory_comparison_with_function_gaps(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "reflection-comparison" / "manifest.json"
+            payload = reflection_inventory_comparison_manifest(workspace)
+            payload["status"] = "blocked"
+            payload["function_comparison"]["missing_in_candidate"] = ["ShooterPlayerController.ServerKickPlayer"]
+            payload["blockers"] = ["missing_functions_in_candidate"]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("reflection_inventory_comparison_status_not_accepted", reasons)
+        self.assertIn("reflection_inventory_comparison_blockers_present", reasons)
+        self.assertIn("reflection_inventory_comparison_missing_in_candidate_present", reasons)
+
+    def test_blocks_reflection_inventory_comparison_reused_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "reflection-comparison" / "manifest.json"
+            payload = reflection_inventory_comparison_manifest(workspace)
+            payload["candidate"]["artifact_identity"] = dict(payload["base"]["artifact_identity"])
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("reflection_inventory_comparison_artifact_identity_not_distinct_artifact_sha256", reasons)
+        self.assertIn("reflection_inventory_comparison_artifact_identity_not_distinct_capture_id", reasons)
+        self.assertIn("reflection_inventory_comparison_artifact_identity_not_distinct_evidence_pack_id", reasons)
+
+    def test_blocks_reflection_inventory_comparison_protected_pack_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "reflection-comparison" / "manifest.json"
+            payload = reflection_inventory_comparison_manifest(workspace)
+            payload["base"]["pack"] = str(protected / "live-pack")
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("reflection_inventory_comparison_base_path_text_under_protected_root", reasons)
+        self.assertIn("reflection_inventory_comparison_base_path_not_textually_under_workspace_root", reasons)
+
+    def test_blocks_reflection_inventory_comparison_missing_non_claims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "reflection-comparison" / "manifest.json"
+            payload = reflection_inventory_comparison_manifest(workspace)
+            payload["non_claims"] = []
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "reflection_inventory_comparison_non_claims_missing",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
     def test_accepts_scriptstruct_inventory_pack_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"

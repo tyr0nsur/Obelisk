@@ -38,6 +38,7 @@ REDACTED_UFUNCTION_SIGNATURE_SCHEMA = "obelisk.redacted-ufunction-signatures.v1"
 REDACTED_SCRIPTSTRUCT_SIGNATURE_SCHEMA = "obelisk.redacted-scriptstruct-signatures.v1"
 REDACTED_SCRIPTSTRUCT_TARGET_SET_COVERAGE_SCHEMA = "obelisk.redacted-scriptstruct-target-set-coverage.v1"
 SCRIPTSTRUCT_INVENTORY_PACK_SCHEMA = "obelisk.scriptstruct-inventory-pack.v1"
+REFLECTION_INVENTORY_PACK_COMPARISON_SCHEMA = "obelisk.reflection-inventory-pack-comparison.v1"
 ARTIFACT_PACK_MANIFEST_SCHEMA = "obelisk.artifact-pack.manifest.v1"
 TRANSFER_SCRIPTSTRUCT_TARGET_SET = "transfer-scriptstruct"
 TRANSFER_SCRIPTSTRUCT_REQUIRED_BLOCKERS = {
@@ -127,6 +128,7 @@ SUPPORTED_MANIFEST_SCHEMAS = {
     REDACTED_UFUNCTION_SIGNATURE_SCHEMA,
     REDACTED_SCRIPTSTRUCT_SIGNATURE_SCHEMA,
     SCRIPTSTRUCT_INVENTORY_PACK_SCHEMA,
+    REFLECTION_INVENTORY_PACK_COMPARISON_SCHEMA,
     ARTIFACT_PACK_MANIFEST_SCHEMA,
     RC_UFUNCTION_SECOND_SOURCE_ROOT_SCHEMA,
     WEAK_HELPER_CALLER_MODE_SCHEMA,
@@ -222,6 +224,11 @@ REQUIRED_SCRIPTSTRUCT_INVENTORY_NON_CLAIMS = {
     "Does not promote Inventory, Transfer, Items, or Resources SDK callbacks.",
     "Does not expose UObject pointers, raw UE params, FName/GObjects indices, object identity, lookup, or ResourceHandle.",
     "Does not authorize mutation, return override, ProcessEvent blocking, or UE call replay.",
+}
+REQUIRED_REFLECTION_INVENTORY_COMPARISON_NON_CLAIMS = {
+    "Does not promote GObjects/GUObjectArray as runtime-stable.",
+    "Does not expose UObject pointers, raw params, object identity, mutation, or return overrides.",
+    "Does not replace strict per-target snapshot readiness reports.",
 }
 REQUIRED_READINESS_NON_PROMOTED_SURFACES = {
     "class_identity",
@@ -3597,6 +3604,153 @@ def validate_scriptstruct_inventory_pack_manifest(
         )
     if mode == "promote":
         blockers.append({"reason": "promote_mode_scriptstruct_inventory_candidate_only", "label": label})
+    return blockers
+
+
+def reflection_inventory_comparison_pack_path(
+    raw_path: object,
+    *,
+    manifest_path: Path,
+) -> Path | None:
+    if not isinstance(raw_path, str) or not raw_path:
+        return None
+    path = Path(raw_path)
+    return path if path.is_absolute() else manifest_path.parent / path
+
+
+def validate_reflection_inventory_comparison_identity(
+    identity: object,
+    *,
+    label: str,
+    side: str,
+) -> list[dict[str, Any]]:
+    blockers: list[dict[str, Any]] = []
+    if not isinstance(identity, dict):
+        return [{"reason": f"reflection_inventory_comparison_{side}_artifact_identity_missing", "label": label}]
+    artifact_kind = identity.get("artifact_kind")
+    artifact_sha256 = identity.get("artifact_sha256")
+    capture_id = identity.get("capture_id")
+    evidence_pack_id = identity.get("evidence_pack_id")
+    if not isinstance(artifact_kind, str) or not artifact_kind or not is_safe_artifact_id(artifact_kind):
+        blockers.append({"reason": f"reflection_inventory_comparison_{side}_artifact_kind_invalid", "label": f"{label}.artifact_kind"})
+    if not isinstance(artifact_sha256, str) or SHA256_RE.fullmatch(artifact_sha256) is None:
+        blockers.append({"reason": f"reflection_inventory_comparison_{side}_artifact_sha_invalid", "label": f"{label}.artifact_sha256"})
+    if not is_safe_artifact_id(capture_id):
+        blockers.append({"reason": f"reflection_inventory_comparison_{side}_capture_id_invalid", "label": f"{label}.capture_id"})
+    if not is_safe_artifact_id(evidence_pack_id):
+        blockers.append({"reason": f"reflection_inventory_comparison_{side}_evidence_pack_id_invalid", "label": f"{label}.evidence_pack_id"})
+    return blockers
+
+
+def validate_reflection_inventory_pack_comparison_manifest(
+    payload: dict[str, Any],
+    *,
+    label: str,
+    manifest_path: Path,
+    workspace_root: Path,
+    protected_root: Path,
+    mode: str,
+    expected_binary_sha256: str | None,
+) -> list[dict[str, Any]]:
+    if payload.get("schema") != REFLECTION_INVENTORY_PACK_COMPARISON_SCHEMA:
+        return []
+
+    blockers: list[dict[str, Any]] = []
+    if payload.get("status") != "accepted":
+        blockers.append({"reason": "reflection_inventory_comparison_status_not_accepted", "label": f"{label}:$.status"})
+    if payload.get("promotion_status") != "not_promoted_candidate_only":
+        blockers.append({"reason": "reflection_inventory_comparison_promotion_status_mismatch", "label": f"{label}:$.promotion_status"})
+    comparison_blockers = payload.get("blockers")
+    if comparison_blockers != []:
+        blockers.append({"reason": "reflection_inventory_comparison_blockers_present", "label": f"{label}:$.blockers"})
+
+    sides: dict[str, dict[str, Any]] = {}
+    for side in ("base", "candidate"):
+        side_payload = payload.get(side)
+        side_label = f"{label}:$.{side}"
+        if not isinstance(side_payload, dict):
+            blockers.append({"reason": f"reflection_inventory_comparison_{side}_missing", "label": side_label})
+            continue
+        sides[side] = side_payload
+
+        pack_path = reflection_inventory_comparison_pack_path(side_payload.get("pack"), manifest_path=manifest_path)
+        if pack_path is None:
+            blockers.append({"reason": f"reflection_inventory_comparison_{side}_pack_path_invalid", "label": f"{side_label}.pack"})
+        else:
+            blockers.extend(
+                {
+                    **blocker,
+                    "reason": f"reflection_inventory_comparison_{side}_{blocker['reason']}",
+                }
+                for blocker in path_blockers(
+                    pack_path,
+                    label=f"{side_label}.pack",
+                    workspace_root=workspace_root,
+                    protected_root=protected_root,
+                    require_workspace=True,
+                )
+            )
+
+        binary_sha256 = side_payload.get("binary_sha256")
+        if not isinstance(binary_sha256, str) or SHA256_RE.fullmatch(binary_sha256) is None:
+            blockers.append({"reason": f"reflection_inventory_comparison_{side}_binary_sha_invalid", "label": f"{side_label}.binary_sha256"})
+        elif expected_binary_sha256 is not None and binary_sha256 != expected_binary_sha256:
+            blockers.append(
+                {
+                    "reason": f"reflection_inventory_comparison_{side}_binary_sha_mismatch",
+                    "label": f"{side_label}.binary_sha256",
+                    "expected": expected_binary_sha256,
+                    "recorded": binary_sha256,
+                }
+            )
+        blockers.extend(
+            validate_reflection_inventory_comparison_identity(
+                side_payload.get("artifact_identity"),
+                label=f"{side_label}.artifact_identity",
+                side=side,
+            )
+        )
+
+    if set(sides) == {"base", "candidate"}:
+        base_sha = sides["base"].get("binary_sha256")
+        candidate_sha = sides["candidate"].get("binary_sha256")
+        if base_sha != candidate_sha:
+            blockers.append({"reason": "reflection_inventory_comparison_binary_sha_mismatch", "label": label})
+        base_identity = sides["base"].get("artifact_identity")
+        candidate_identity = sides["candidate"].get("artifact_identity")
+        if isinstance(base_identity, dict) and isinstance(candidate_identity, dict):
+            for key in ("artifact_sha256", "capture_id", "evidence_pack_id"):
+                if base_identity.get(key) == candidate_identity.get(key):
+                    blockers.append(
+                        {
+                            "reason": f"reflection_inventory_comparison_artifact_identity_not_distinct_{key}",
+                            "label": f"{label}:$.candidate.artifact_identity.{key}",
+                        }
+                    )
+
+    function_comparison = payload.get("function_comparison")
+    if not isinstance(function_comparison, dict):
+        blockers.append({"reason": "reflection_inventory_comparison_function_comparison_missing", "label": f"{label}:$.function_comparison"})
+    else:
+        for key in ("missing_in_candidate", "new_in_candidate", "changed_functions"):
+            if function_comparison.get(key) != []:
+                blockers.append({"reason": f"reflection_inventory_comparison_{key}_present", "label": f"{label}:$.function_comparison.{key}"})
+        for key in ("base_function_count", "candidate_function_count", "shared_function_count"):
+            if not is_json_int(function_comparison.get(key)):
+                blockers.append({"reason": f"reflection_inventory_comparison_{key}_invalid", "label": f"{label}:$.function_comparison.{key}"})
+
+    non_claims = payload.get("non_claims")
+    if not isinstance(non_claims, list) or not REQUIRED_REFLECTION_INVENTORY_COMPARISON_NON_CLAIMS.issubset(set(non_claims)):
+        blockers.append(
+            {
+                "reason": "reflection_inventory_comparison_non_claims_missing",
+                "label": f"{label}:$.non_claims",
+                "expected": sorted(REQUIRED_REFLECTION_INVENTORY_COMPARISON_NON_CLAIMS),
+                "recorded": non_claims,
+            }
+        )
+    if mode == "promote":
+        blockers.append({"reason": "promote_mode_reflection_inventory_comparison_candidate_only", "label": label})
     return blockers
 
 
@@ -8510,6 +8664,17 @@ def validate_manifest(
     blockers.extend(validate_redacted_scriptstruct_signature_manifest(payload, source_label=str(resolved), mode=mode))
     blockers.extend(
         validate_scriptstruct_inventory_pack_manifest(
+            payload,
+            label=str(resolved),
+            manifest_path=resolved,
+            workspace_root=workspace_root,
+            protected_root=protected_root,
+            mode=mode,
+            expected_binary_sha256=expected_binary_sha256,
+        )
+    )
+    blockers.extend(
+        validate_reflection_inventory_pack_comparison_manifest(
             payload,
             label=str(resolved),
             manifest_path=resolved,

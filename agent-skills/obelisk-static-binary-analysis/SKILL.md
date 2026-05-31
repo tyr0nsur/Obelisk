@@ -102,6 +102,12 @@ claims from a stripped Linux server binary.
   `promotion_gate.promotion_ready=false`. Consume-mode acceptance is not public API,
   runtime hook, mutation, return override, or object identity promotion, and promote mode
   must stay blocked until a separate schema-specific promotion contract exists.
+- Reflection inventory pack comparisons use
+  `obelisk.reflection-inventory-pack-comparison.v1` as consume-only planning evidence.
+  The offline artifact gate may accept clean, distinct, same-binary comparisons with no
+  changed/missing/new function rows, but promote mode remains blocked and this evidence
+  does not replace per-target snapshot readiness, runtime observation, public SDK
+  promotion, object identity, mutation, or return override evidence.
 
 ## Repo-Local UFunction Fixture Commands
 
