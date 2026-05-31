@@ -26,8 +26,9 @@ packages or supersedes them.
 Treat `docs/public_sdk_surfaces.json::v1_sdk_completion_blockers` as the lead-owned list
 of high-demand blockers that prevent a complete v1 SDK claim. Foundation/Plugin Hub seed
 work can improve contributor readiness, but it must not be used to declare v1 complete
-while those blockers remain planning, post-v1, or excluded without an explicit v1 release
-statement.
+while those blockers remain planning or post-v1. Explicitly excluded blockers require a
+reviewed v1 release statement with scoped wording; exclusions do not permit claiming a
+complete SDK for the excluded capability.
 
 Compatibility research may consult ArkServerApi/AseApi as names and demand dictionaries
 for familiar ARK plugin concepts. Local NextGenPlugins clones are names and demand
@@ -180,6 +181,12 @@ verification.
 - When release-scope behavior changes, keep `docs/RELEASE.md`, `docs/STATUS.md`,
   `CHANGELOG.md`, `.github/pull_request_template.md`, and release-scope guardrail tests in
   agreement.
+- Public release sinks such as README, changelog, release notes, GitHub release bodies,
+  tag annotations, package metadata, installer text, community updates, and Plugin Hub
+  planning must not use broad phrases like `v1.0 stable`, `complete SDK`, `full SDK`, or
+  `production SDK` unless `scripts/check_public_sdk_v1_completion.py --json` reports the
+  stable SDK claim is allowed. Otherwise the wording must be explicitly scoped as
+  candidate, planning, RC, foundation, or post-v1.
 - A local or unpublished RC tag does not validate publication. Before pushing a release
   tag, rerun the release gate on the intended ref and verify the tag dereferences exactly
   to that ref; resolve stale local tags instead of reusing or pushing them.
@@ -241,3 +248,5 @@ lead workflow, GitHub ownership, supervised agents, publication, and handoff pol
 - [ ] Research findings that matter later are in `docs/research/`.
 - [ ] Skills reflect new safety rules or workflow changes.
 - [ ] Commit message explains the change without claiming unverified stability.
+- [ ] Public-facing text was scanned for broad `v1.0 stable` / `complete SDK` / `full SDK`
+      claims, and any such claim is backed by the v1 completion checker or scoped down.

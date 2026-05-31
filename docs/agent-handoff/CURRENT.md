@@ -152,6 +152,11 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `scripts/build_core_dump_evidence_pack.py` command using reviewed `verified_fname_root_slot`
   and `gobjects` labels. The recipe intentionally omits `--skip-core-sha256` and
   `--allow-partial-gdb`; those remain forbidden for this lane.
+- Static orientation for all 12 `players-identity-lifecycle-intake` targets is recorded in
+  `docs/research/2026-05-31-player-identity-static-target-orientation.md`. It provides
+  string/xref/thunk candidates only. It does not replace the missing core evidence pack,
+  reflection inventory pack, second source, focal snapshots, lifecycle anchors, or public
+  SDK promotion evidence.
 - Lifecycle-anchor candidate artifacts now fail closed if a candidate anchor target is
   outside the closed `players-identity-lifecycle-intake` target set, or if principal
   invalidation semantics are claimed as resolved before promotion.

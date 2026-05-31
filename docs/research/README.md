@@ -97,6 +97,7 @@ Current post-RC research lane:
 - [2026-05-31-player-identity-targetset-gap.md](2026-05-31-player-identity-targetset-gap.md)
 - [2026-05-31-player-identity-offline-pack-preflight.md](2026-05-31-player-identity-offline-pack-preflight.md)
 - [2026-05-31-player-identity-static-admin-thunks.md](2026-05-31-player-identity-static-admin-thunks.md)
+- [2026-05-31-player-identity-static-target-orientation.md](2026-05-31-player-identity-static-target-orientation.md)
 - [2026-05-28-fname-index-manifest-plan.md](2026-05-28-fname-index-manifest-plan.md)
 - [2026-05-31-fname-gobjects-offline-route.md](2026-05-31-fname-gobjects-offline-route.md)
 - [2026-05-29-ghidra-fuobjectarray-field-window-probe.md](2026-05-29-ghidra-fuobjectarray-field-window-probe.md)
