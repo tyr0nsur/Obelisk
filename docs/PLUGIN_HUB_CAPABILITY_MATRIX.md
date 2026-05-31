@@ -261,13 +261,11 @@ Experimental pattern examples only:
 The installed-SDK seed starts at `examples/sdk_minimal_plugin` and now includes
 `examples/sdk_descriptor_catalog` for descriptor reads and `examples/sdk_timer_plugin` for
 the promoted timer surface. `examples/sdk_inventory_policy_audit` is separate from that
-release-supported seed set; it is an experimental copied policy audit pattern only. The
-current in-tree reference plugins cover this safe seed set: `oBaseEvents`,
-`oProcessTimer`, and `oDescriptorCatalog` cover the release-scope
-foundation under `plugins/`, while
-`oPolicyAudit`, `oChatLogger`, and `oChatAudit` cover the experimental copied policy and
-copied chat slices. Those three are seed examples only, not production Plugin Hub modules;
-specifically, they are experimental pattern examples and not promises that copied
+release-supported seed set; it is an experimental copied policy audit pattern only. Under
+`plugins/`, `oBaseEvents`, `oProcessTimer`, and `oDescriptorCatalog` cover the
+release-scope foundation, while `oPolicyAudit`, `oChatLogger`, and `oChatAudit` cover the
+experimental copied policy and copied chat slices. Those three are seed examples only, not production Plugin Hub modules;
+specifically, they are experimental pattern examples and are not promises that copied
 chat/policy auditing is generally available.
 After those examples, the next honest first-party work is not a new ArkApi-style category; it is hardening,
 documenting, or reviewing one of the existing copied-data examples against promotion

@@ -174,12 +174,114 @@ class BuildNativeUFunctionRegistrationStaticDiscoveryTests(unittest.TestCase):
         self.assertEqual(payload["inputs"]["input_addresses"], [])
         target = payload["targets"][0]
         self.assertEqual(target["target"], "ShooterPlayerController.ServerListPlayers")
+        self.assertEqual(target["schema_target"], "ShooterPlayerController.ServerListPlayers")
+        self.assertEqual(target["outer_name"], "ShooterPlayerController")
+        self.assertEqual(target["name"], "ServerListPlayers")
+        self.assertEqual(target["target_set_memberships"], ["players-identity-lifecycle-intake"])
+        self.assertTrue(target["player_identity_focal_gate_target"])
+        self.assertEqual(
+            target["discovery_summary"],
+            {
+                "blocked_candidate_count": 0,
+                "readable_ascii_hit_count": 1,
+                "registration_candidate_count": 1,
+                "selected_candidate_status": "candidate",
+                "string_hit_counts": {"ascii": 1, "utf32le": 0},
+            },
+        )
+        self.assertEqual(
+            target["focal_snapshot_orientation"],
+            {
+                "allowed_after_inventory": True,
+                "planner_target": "ShooterPlayerController.ServerListPlayers",
+                "requires_core_evidence_pack": True,
+                "requires_reflection_inventory_pack": True,
+                "static_report_usable_as_planner_input": False,
+            },
+        )
         self.assertEqual(target["registration_candidates"][0]["thunk_vma"], "0x242400")
+        self.assertEqual(target["registration_candidates"][0]["xref_file_offset"], "0x1181")
+        self.assertEqual(target["registration_candidates"][0]["candidate_file_offset"], "0x1179")
+        self.assertEqual(target["registration_candidates"][0]["registration_window_file_offset"], "0x1179")
+        self.assertEqual(target["registration_candidates"][0]["registration_window_size"], 56)
+        self.assertEqual(target["registration_candidates"][0]["name_immediate_file_offset"], "0x1181")
+        self.assertEqual(target["registration_candidates"][0]["thunk_file_offset"], "0x2400")
+        self.assertEqual(target["registration_candidates"][0]["thunk_opcode_file_offset"], "0x1185")
+        self.assertEqual(target["registration_candidates"][0]["registrar_call_file_offset"], "0x118c")
         self.assertEqual(target["registration_candidates"][0]["registrar_target_vma"], "0x242220")
         self.assertEqual(target["registration_candidates"][0]["source_string_hit"]["encoding"], "ascii")
         self.assertEqual(target["selected_candidate"]["thunk_vma"], "0x242400")
         self.assertIn("thunk_prefix_code_like", target["selected_candidate"]["selection_reasons"])
+        self.assertEqual(
+            payload["orientation_next_actions"],
+            [
+                "build complete non-protected core evidence pack",
+                "build full 12-target reflection inventory pack",
+                "plan exact focal snapshots for ServerListPlayers and ServerKickPlayer",
+            ],
+        )
         self.assertIn("does_not_promote_public_sdk", payload["non_claims"])
+
+    def test_candidate_window_provenance_is_deterministic(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            binary = root / "ShooterGameServer"
+            elf = SyntheticElf(base=0x240000)
+            elf.add_target(
+                name="ServerListPlayers",
+                string_vma=0x249120,
+                registration_vma=0x241180,
+                thunk_vma=0x242400,
+            )
+            digest = elf.write(binary)
+            expected_window_start = elf.vma_to_offset(0x241181) - 8
+            expected_window_end = elf.vma_to_offset(0x241181) + 48
+            expected_window_hash = hashlib.sha256(elf.data[expected_window_start:expected_window_end]).hexdigest()
+
+            payloads = [
+                json.loads(
+                    self.run_script(
+                        "--binary",
+                        str(binary),
+                        "--expected-binary-sha256",
+                        digest,
+                        "--target",
+                        "ShooterPlayerController.ServerListPlayers",
+                        "--run-id",
+                        "deterministic-provenance",
+                        "--json",
+                    ).stdout
+                )
+                for _ in range(2)
+            ]
+
+        provenance_keys = {
+            "xref_file_offset",
+            "candidate_file_offset",
+            "registration_window_file_offset",
+            "registration_window_size",
+            "registration_window_sha256",
+            "name_immediate_file_offset",
+            "thunk_file_offset",
+            "thunk_opcode_file_offset",
+            "registrar_call_file_offset",
+        }
+        first_candidate = payloads[0]["targets"][0]["registration_candidates"][0]
+        second_candidate = payloads[1]["targets"][0]["registration_candidates"][0]
+        first_provenance = {key: first_candidate[key] for key in provenance_keys}
+        second_provenance = {key: second_candidate[key] for key in provenance_keys}
+
+        self.assertEqual(first_provenance, second_provenance)
+        self.assertEqual(first_candidate["registration_window_sha256"], expected_window_hash)
+        self.assertEqual(first_candidate["registration_window_file_offset"], hex(expected_window_start))
+        self.assertEqual(first_candidate["registration_window_size"], expected_window_end - expected_window_start)
+        self.assertEqual(
+            payloads[0]["targets"][0]["selected_candidate"]["registration_window_sha256"],
+            expected_window_hash,
+        )
+        self.assertTrue(payloads[0]["not_artifact_gate"])
+        self.assertFalse(payloads[0]["artifact_gate_eligible"])
+        self.assertFalse(payloads[0]["promotion_ready"])
 
     def test_prefers_code_like_thunk_over_string_table_false_positive(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

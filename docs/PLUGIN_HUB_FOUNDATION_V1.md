@@ -224,9 +224,9 @@ Experimental pattern examples only:
 Only lifecycle/config/logging examples, descriptor/catalog readers scaffolded from
 `examples/sdk_descriptor_catalog`, and process-local timer examples are
 release-supported seeds after the RC. Copied chat parsers and copied policy auditors
-may demonstrate patterns, but they remain experimental and are not promises for complete economy,
-permissions, homes, kits, shops, RCON, inventory, item, dino, tribe, mission, transfer,
-storage/database, webhook, or structure modules.
+may demonstrate patterns, but they remain experimental and are not promises of complete
+or partial support for economy, permissions, homes, kits, shops, RCON, inventory, item,
+dino, tribe, mission, transfer, storage/database, webhook, or structure modules.
 
 ## Fastest Honest Creator Path
 

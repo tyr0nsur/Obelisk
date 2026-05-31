@@ -24,6 +24,10 @@ from snapshot_evidence_pack import reject_protected_input_path, reject_protected
 
 SCHEMA = "obelisk.native-ufunction-registration-static-discovery.v1"
 EXPECTED_BINARY_SHA256 = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
+PLAYER_IDENTITY_FOCAL_TARGETS = {
+    "ShooterPlayerController.ServerListPlayers",
+    "ShooterPlayerController.ServerKickPlayer",
+}
 DEFAULT_BINARY = Path(
     "/home/flowcommunity-ark/obelisk-artifacts/offline-binaries/"
     "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520/"
@@ -250,6 +254,8 @@ def find_registration_candidates(
         search_start = max(xref_segment.offset, offset - 8)
         search_end = min(xref_segment.offset + xref_segment.filesz, offset + 48)
         window = data[search_start:search_end]
+        window_vma = file_offset_to_vma(segments, search_start, 1) or xref_vma
+        window_sha256 = hashlib.sha256(window).hexdigest()
         local_name_offset = offset - search_start
         thunk_vma: int | None = None
         thunk_opcode_offset: int | None = None
@@ -262,10 +268,25 @@ def find_registration_candidates(
                     thunk_opcode_offset = search_start + index
                     break
         if thunk_vma is None or thunk_opcode_offset is None:
-            candidates.append({"xref_vma": hex(xref_vma), "status": "blocked", "reason": "thunk_immediate_not_found"})
+            candidates.append(
+                {
+                    "xref_vma": hex(xref_vma),
+                    "xref_file_offset": hex(offset),
+                    "candidate_file_offset": hex(search_start),
+                    "status": "blocked",
+                    "reason": "thunk_immediate_not_found",
+                    "registration_window_vma": hex(window_vma),
+                    "registration_window_file_offset": hex(search_start),
+                    "registration_window_size": len(window),
+                    "registration_window_sha256": window_sha256,
+                    "name_immediate_vma": hex(xref_vma),
+                    "name_immediate_file_offset": hex(offset),
+                }
+            )
             continue
 
         registrar_call_vma = None
+        registrar_call_file_offset = None
         registrar_target_vma = None
         for index in range(thunk_opcode_offset + 5, min(search_start + len(window) - 4, thunk_opcode_offset + 32)):
             call_vma = file_offset_to_vma(segments, index, 5)
@@ -274,24 +295,38 @@ def find_registration_candidates(
             target = call_target_from(data, index, call_vma)
             if target is not None:
                 registrar_call_vma = call_vma
+                registrar_call_file_offset = index
                 registrar_target_vma = target
                 break
+        thunk_segment = segment_for_vma(segments, thunk_vma, 1)
+        thunk_file_offset = thunk_segment.file_offset_for(thunk_vma) if thunk_segment is not None else None
         candidates.append(
             {
                 "xref_vma": hex(xref_vma),
+                "xref_file_offset": hex(offset),
+                "candidate_file_offset": hex(search_start),
                 "status": "candidate",
                 "source_string_hit": {
                     "encoding": source_hit["encoding"],
                     "vma": source_hit["vma"],
                     "file_offset": source_hit["file_offset"],
                 },
-                "registration_window_vma": hex(file_offset_to_vma(segments, search_start, 1) or xref_vma),
+                "registration_window_vma": hex(window_vma),
+                "registration_window_file_offset": hex(search_start),
+                "registration_window_size": len(window),
+                "registration_window_sha256": window_sha256,
                 "name_immediate_vma": hex(xref_vma),
+                "name_immediate_file_offset": hex(offset),
                 "thunk_vma": hex(thunk_vma),
+                "thunk_file_offset": hex(thunk_file_offset) if thunk_file_offset is not None else None,
+                "thunk_opcode_file_offset": hex(thunk_opcode_offset),
                 "thunk_segment_rx": True,
                 "thunk_prefix_hex": (read_vma(data, segments, thunk_vma, 16) or b"").hex(),
                 "thunk_prefix_code_like": looks_like_x86_64_code(read_vma(data, segments, thunk_vma, 16)),
                 "registrar_call_vma": hex(registrar_call_vma) if registrar_call_vma is not None else None,
+                "registrar_call_file_offset": hex(registrar_call_file_offset)
+                if registrar_call_file_offset is not None
+                else None,
                 "registrar_target_vma": hex(registrar_target_vma) if registrar_target_vma is not None else None,
             }
         )
@@ -360,6 +395,25 @@ def expand_targets(targets: list[str], target_sets: list[str]) -> list[str]:
     return expanded
 
 
+def split_qualified_target(target: str) -> tuple[str, str]:
+    outer_name, short_name = target.rsplit(".", 1)
+    return outer_name, short_name
+
+
+def target_member_sets(target: str, requested_target_sets: list[str]) -> list[str]:
+    memberships: list[str] = []
+    for target_set in requested_target_sets:
+        try:
+            members = reflection_target_sets.schema_target_list(target_set, "obelisk.ufunction-chain.snapshot.v1")
+        except KeyError:
+            continue
+        if target in members:
+            memberships.append(target_set)
+    if target in PLAYER_IDENTITY_FOCAL_TARGETS and "players-identity-lifecycle-intake" not in memberships:
+        memberships.append("players-identity-lifecycle-intake")
+    return memberships
+
+
 def safe_run_id(value: str) -> str:
     if SAFE_RUN_ID_RE.fullmatch(value) is None or ".." in value:
         raise SystemExit(f"--run-id contains unsafe characters: {value}")
@@ -394,7 +448,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     registrar_clusters: dict[str, list[str]] = {}
     pending_target_reports: list[dict[str, Any]] = []
     for target in targets:
-        short_name = target.rsplit(".", 1)[-1]
+        outer_name, short_name = split_qualified_target(target)
         string_hits = find_string_hits(data, segments, short_name) if segments else []
         for hit in string_hits:
             hit["used_for_registration_candidates"] = hit.get("encoding") == "ascii"
@@ -424,10 +478,34 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             target_blockers.append({"reason": "ascii_target_name_string_not_found"})
         if readable_hits and not any(candidate.get("status") == "candidate" for candidate in registration_candidates):
             target_blockers.append({"reason": "registration_candidate_not_found"})
+        candidate_count = sum(1 for candidate in registration_candidates if candidate.get("status") == "candidate")
+        blocked_candidate_count = sum(1 for candidate in registration_candidates if candidate.get("status") == "blocked")
+        focal_target = target in PLAYER_IDENTITY_FOCAL_TARGETS
         pending_target_reports.append(
             {
                 "target": target,
+                "schema_target": target,
+                "outer_name": outer_name,
+                "name": short_name,
                 "short_name": short_name,
+                "target_set_memberships": target_member_sets(target, args.target_set),
+                "player_identity_focal_gate_target": focal_target,
+                "discovery_summary": {
+                    "string_hit_counts": {
+                        "ascii": sum(1 for hit in string_hits if hit.get("encoding") == "ascii"),
+                        "utf32le": sum(1 for hit in string_hits if hit.get("encoding") == "utf32le"),
+                    },
+                    "readable_ascii_hit_count": len(registration_source_hits),
+                    "registration_candidate_count": candidate_count,
+                    "blocked_candidate_count": blocked_candidate_count,
+                },
+                "focal_snapshot_orientation": {
+                    "planner_target": target if focal_target else None,
+                    "requires_core_evidence_pack": True,
+                    "requires_reflection_inventory_pack": True,
+                    "static_report_usable_as_planner_input": False,
+                    "allowed_after_inventory": focal_target,
+                },
                 "string_hits": string_hits,
                 "registration_candidates": registration_candidates,
                 "blockers": target_blockers,
@@ -442,6 +520,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             target_report["blockers"].append({"reason": "selected_registration_candidate_missing"})
             target_report["status"] = "blocked"
         target_report["selected_candidate"] = selected
+        target_report["discovery_summary"]["selected_candidate_status"] = selected.get("status") if selected else None
         target_reports.append(target_report)
 
     if any(target["status"] == "blocked" for target in target_reports):
@@ -478,19 +557,12 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "preplan_scope": {
             "target_set": "players-identity-lifecycle-intake"
             if "players-identity-lifecycle-intake" in args.target_set
-            or {
-                "ShooterPlayerController.ServerListPlayers",
-                "ShooterPlayerController.ServerKickPlayer",
-            }.issubset(set(targets))
+            or PLAYER_IDENTITY_FOCAL_TARGETS.issubset(set(targets))
             else None,
             "focal_targets": [
                 target
                 for target in targets
-                if target
-                in {
-                    "ShooterPlayerController.ServerListPlayers",
-                    "ShooterPlayerController.ServerKickPlayer",
-                }
+                if target in PLAYER_IDENTITY_FOCAL_TARGETS
             ],
             "requires_full_12_target_inventory": True,
             "downstream_blockers": [
@@ -507,6 +579,11 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             for registrar, cluster_targets in sorted(registrar_clusters.items())
         ],
         "blockers": blockers,
+        "orientation_next_actions": [
+            "build complete non-protected core evidence pack",
+            "build full 12-target reflection inventory pack",
+            "plan exact focal snapshots for ServerListPlayers and ServerKickPlayer",
+        ],
         "non_claims": [
             "static registration discovery is navigation evidence only",
             "does_not_promote_public_sdk",
