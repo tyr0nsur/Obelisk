@@ -410,6 +410,62 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertIn("<non-protected-artifact-root>", recipe_commands)
         self.assertNotIn("/servidor/ark/obelisk/player-identity-offline", recipe_commands)
 
+    def test_workspace_offline_artifact_root_is_rejected_before_inventory_scan(self) -> None:
+        ok = subprocess.CompletedProcess(["mock"], 0, "", "")
+
+        def fake_run_json_command(args: list[str], *, check: bool = False):
+            command = " ".join(args)
+            if "check_reflection_inventory_pack_readiness.py" in command:
+                self.fail("protected artifact root must be rejected before inventory scan")
+            if "compare_reflection_snapshots.py" in command:
+                return ok, {
+                    "totals": {
+                        "targets": 12,
+                        "comparable": 10,
+                        "blocked": 2,
+                        "second_source_missing": 10,
+                        "second_source_inconclusive": 0,
+                        "second_source_rejected": 0,
+                    },
+                    "promotion_gate": {"promotion_ready": False},
+                    "second_source_status": "missing",
+                }
+            if "build_redacted_ufunction_signatures.py" in command:
+                return subprocess.CompletedProcess(
+                    ["mock"],
+                    1,
+                    "{}",
+                    "missing_required_target:ShooterPlayerController.ServerKickPlayer",
+                ), {}
+            if "check_player_identity_static_orientation.py" in command:
+                return ok, {
+                    "valid": True,
+                    "accepted_for_orientation": True,
+                    "not_artifact_gate": True,
+                    "blockers": [],
+                    "non_claims": ["candidate-only navigation evidence"],
+                }
+            self.fail(f"unexpected command: {command}")
+
+        args = SimpleNamespace(
+            artifact_root=Path("/servidor/ark/workspace-offline/player-identity-offline"),
+            snapshot_root=Path("/tmp/player-identity-snapshots"),
+            candidate_root=None,
+        )
+        with mock.patch.object(checker, "run_json_command", side_effect=fake_run_json_command):
+            payload = checker.build_report(args)
+
+        self.assertFalse(payload["ready"])
+        self.assertEqual(payload["status"], "blocked")
+        self.assertEqual(payload["artifact_chain"]["offline_inputs"]["status"], "artifact_root_rejected")
+        self.assertEqual(payload["reflection_inventory"]["returncode"], 1)
+        self.assertEqual(payload["reflection_inventory"]["manifests_scanned"], 0)
+        self.assertEqual(payload["reflection_inventory"]["reason_codes"], ["wrong_target_scope"])
+        detail = payload["reflection_inventory"]["artifact_root_diagnosis"]["reason_examples"][
+            "wrong_target_scope"
+        ]["detail"]
+        self.assertIn("protected server root /servidor/ark", detail)
+
     def test_candidate_root_reports_second_source_not_accepted_separately_from_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             result = self.run_checker(

@@ -1474,6 +1474,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                     ],
                     "schemas": [
                         "obelisk.player-identity-static-orientation-check.v1",
+                        "obelisk.player-identity-static-admin-thunks-check.v1",
                         "obelisk.static-candidate-orientation-contract.v1",
                     ],
                     "terms": [
@@ -1511,10 +1512,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 prefix="player_identity_static_orientation",
             ) as sdk_dir,
         ):
-            core_test = Path(core_dir) / "PlayerIdentityStaticOrientationTests.cpp"
-            sdk_test = Path(sdk_dir) / "player_identity_static_orientation_plugin.c"
-            core_test.write_text("// candidate-only player identity orientation test\n", encoding="utf-8")
-            sdk_test.write_text("// candidate-only player identity orientation consumer\n", encoding="utf-8")
+            core_test = Path(core_dir) / "PlayerIdentityAdminThunksTests.cpp"
+            sdk_test = Path(sdk_dir) / "player_identity_admin_thunks_plugin.c"
+            core_test.write_text("// candidate-only player identity admin thunks test\n", encoding="utf-8")
+            sdk_test.write_text("// candidate-only player identity admin thunks consumer\n", encoding="utf-8")
             manifest, _ = complete_excluded_manifest()
             for surface in manifest["surfaces"]:
                 if surface["id"] == "obelisk.player_identity.v1":
@@ -1577,6 +1578,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                         "sdk_consumer_tests": [str(sdk_test.relative_to(REPO_ROOT))],
                         "schemas": [
                             "obelisk.player-identity-static-orientation-check.v1",
+                            "obelisk.player-identity-static-admin-thunks-check.v1",
                             "obelisk.static-candidate-orientation-contract.v1",
                         ],
                         "terms": [

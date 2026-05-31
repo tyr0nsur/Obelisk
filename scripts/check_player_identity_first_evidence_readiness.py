@@ -39,6 +39,7 @@ REFLECTION_INVENTORY_MANIFEST_PATTERN = (
     "player-identity-offline-<run-id>/reflection-inventory-pack/manifest.json"
 )
 RAW_LAYOUT_HELPER = "scripts/prepare_player_identity_offline_raw_layout.py"
+PROTECTED_SERVER_ROOT = Path("/servidor/ark")
 STATIC_ORIENTATION_SCHEMA_PREFIX = "obelisk.player-identity-static-"
 STATIC_ORIENTATION_MANIFEST_TOKENS = (
     "radare2-static-orientation",
@@ -132,10 +133,49 @@ def detect_obelisk_commit() -> str:
     return env_commit or "unknown"
 
 
+def is_relative_to(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+
+def reject_player_identity_artifact_root(path: Path, label: str) -> Path:
+    """Reject every /servidor/ark root for this preflight, including workspace-offline."""
+
+    reject_symlink_component(path, label)
+    expanded = path.expanduser()
+    absolute = expanded if expanded.is_absolute() else expanded.absolute()
+    protected = PROTECTED_SERVER_ROOT
+    resolved_protected = protected.resolve()
+    if is_relative_to(absolute, protected):
+        raise SystemExit(f"{label} must not read from protected server root {protected}: {absolute}")
+    resolved = reject_protected_input_path(path, label)
+    if is_relative_to(resolved, resolved_protected):
+        raise SystemExit(f"{label} must not read from protected server root {protected}: {resolved}")
+    return resolved
+
+
+def rejected_artifact_root_inventory_payload(root: Path, detail: str) -> dict[str, Any]:
+    return {
+        "ready": False,
+        "accepted_pack": None,
+        "manifests_scanned": 0,
+        "candidate_packs": [],
+        "reasons": [
+            {
+                "reason": "wrong_target_scope",
+                "path": str(root),
+                "detail": detail,
+            }
+        ],
+    }
+
+
 def bounded_artifact_file_scan(root: Path, *, max_depth: int = 6) -> dict[str, Any]:
     try:
-        reject_symlink_component(root, "--artifact-root")
-        resolved = reject_protected_input_path(root, "--artifact-root")
+        resolved = reject_player_identity_artifact_root(root, "--artifact-root")
     except SystemExit as exc:
         return {
             "status": "artifact_root_rejected",
@@ -1059,13 +1099,31 @@ def build_progress_signal(
 
 
 def build_report(args: argparse.Namespace) -> dict[str, Any]:
-    inventory_result, inventory_payload = run_json_command(
-        [
-            str(SCRIPT_DIR / "check_reflection_inventory_pack_readiness.py"),
-            "--root",
-            str(args.artifact_root),
-        ]
-    )
+    try:
+        reject_player_identity_artifact_root(args.artifact_root, "--artifact-root")
+        artifact_root_rejection = None
+    except SystemExit as exc:
+        artifact_root_rejection = str(exc)
+
+    if artifact_root_rejection is None:
+        inventory_result, inventory_payload = run_json_command(
+            [
+                str(SCRIPT_DIR / "check_reflection_inventory_pack_readiness.py"),
+                "--root",
+                str(args.artifact_root),
+            ]
+        )
+    else:
+        inventory_result = subprocess.CompletedProcess(
+            ["check_reflection_inventory_pack_readiness.py", "--root", str(args.artifact_root)],
+            1,
+            "",
+            artifact_root_rejection,
+        )
+        inventory_payload = rejected_artifact_root_inventory_payload(
+            args.artifact_root,
+            artifact_root_rejection,
+        )
     coverage_command = [
         str(SCRIPT_DIR / "compare_reflection_snapshots.py"),
         "--base-root",

@@ -114,6 +114,8 @@ PROMOTION_EVIDENCE_NEGATIVE_TERM_CONTEXT = re.compile(
 )
 STRICT_PROMOTION_EVIDENCE_PATH_DENY_MARKERS = (
     "candidate",
+    "admin_thunk",
+    "admin_thunks",
     "chat_message_event_seed",
     "chat_seed",
     "copied_data",
@@ -133,6 +135,8 @@ STRICT_PROMOTION_EVIDENCE_PATH_DENY_MARKERS = (
     "orientation",
     "preflight",
     "readiness",
+    "static_candidate",
+    "static_target",
     "return_only",
     "consume-only",
     "consume_only",
@@ -165,7 +169,7 @@ STRICT_PROMOTION_EVIDENCE_SCHEMA_KEYS = {
 STRICT_PROMOTION_EVIDENCE_SCHEMA_DENY_MARKERS = re.compile(
     r"(?:candidate|planning|plugin[-_ ]?hub|package[-_ ]?shape|core[-_ ]?first|"
     r"copied[-_ ]?data|(?:chat[-_ ]?message|gameplay[-_ ]?policy[-_ ]?event|event|chat)[-_ ]?seeds?|"
-    r"static[-_ ]?orientation|orientation|preflight|readiness|"
+    r"static[-_ ]?(?:orientation|candidate|target)|admin[-_ ]?thunks?|orientation|preflight|readiness|"
     r"item[-_ ]?return[-_ ]?only|return[-_ ]?only|descriptor[-_ ]?preflight|"
     r"descriptor[-_ ]?catalog|consume[-_ ]?only|evidence[-_ ]?only)",
     re.IGNORECASE,

@@ -3829,7 +3829,10 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
     def test_static_orientation_reports_cannot_be_accepted_as_artifacts(self) -> None:
         orientation_schemas = [
             "obelisk.command-chat-response-static-orientation-check.v1",
+            "obelisk.radare2-static-orientation-windows.v1",
+            "obelisk.static-candidate-orientation-contract.v1",
             "obelisk.player-identity-static-orientation-check.v1",
+            "obelisk.player-identity-static-target-orientation.v1",
             "obelisk.player-identity-static-lifecycle-orientation-check.v1",
             "obelisk.player-identity-static-admin-thunks-check.v1",
         ]

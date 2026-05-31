@@ -515,7 +515,7 @@ PLUGIN_HUB_SEED_FORBIDDEN_TERM_RE = (
     r"(?:player|sender|resource|object|inventory|item|structure)?[- ]?identity|"
     r"send[- ]?chat|repl(?:y|ies)|"
     r"mutation|mutations|mutate|"
-    r"storage|database|webhooks?|"
+    r"storage|database|webhooks?|economy|shops?|kits?|homes?|"
     r"Inventory[- ]?SDK|inventory(?:/item)?|"
     r"StructureEvents?|structures?"
     r")"
@@ -534,6 +534,22 @@ PLUGIN_HUB_SEED_FORBIDDEN_NEGATED_RE = re.compile(
 PLUGIN_HUB_SEED_LOCAL_BOUNDARY_RE = re.compile(
     r"\b(?:callback-scope|copied\s+metadata|diagnostic|plugin-local|process-local|"
     r"safe-disabled)\b",
+    re.IGNORECASE,
+)
+PLUGIN_HUB_PUBLIC_DOC_CLAIM_SUPPORT_RE = (
+    r"(?:available|compatib(?:le|ility)|exposes?|implements?|production[- ]ready|"
+    r"production[- ]supported|provides?|ready|released|ships?|shipped|stable|complete(?:d|s)?|"
+    r"supported|supports?)"
+)
+PLUGIN_HUB_PUBLIC_DOC_CLAIM_RE = re.compile(
+    rf"\b{PLUGIN_HUB_SEED_FORBIDDEN_TERM_RE}\b.{{0,96}}\b{PLUGIN_HUB_PUBLIC_DOC_CLAIM_SUPPORT_RE}\b|"
+    rf"\b{PLUGIN_HUB_PUBLIC_DOC_CLAIM_SUPPORT_RE}\b.{{0,96}}\b{PLUGIN_HUB_SEED_FORBIDDEN_TERM_RE}\b",
+    re.IGNORECASE,
+)
+PLUGIN_HUB_PUBLIC_DOC_NEGATED_RE = re.compile(
+    r"\b(?:blocked|cannot|does\s+not|do\s+not|excluded|excludes?|fail|future|"
+    r"must\s+not|need|needs|not|no|never|only|outside|planning|planning-only|"
+    r"reject|rejected|remain|remains|requires?|until|without)\b",
     re.IGNORECASE,
 )
 MODULE_AGGREGATE_CENSUS_PUBLIC_CLAIM_FILES = [
@@ -1240,6 +1256,24 @@ def plugin_hub_seed_forbidden_claims(
             offenders.append(
                 f"{relative_path}:{line}: {support_tier}: {normalized(segment)}"
             )
+            break
+
+    return offenders
+
+
+def plugin_hub_public_doc_forbidden_claims(text: str, relative_path: str) -> list[str]:
+    offenders = broad_v1_completion_claims(text, relative_path)
+
+    for segment_start, segment in sentence_like_segments(text):
+        for match in PLUGIN_HUB_PUBLIC_DOC_CLAIM_RE.finditer(segment):
+            absolute_match_start = segment_start + match.start()
+            absolute_match_end = segment_start + match.end()
+            context = text[max(0, absolute_match_start - 240): absolute_match_end + 120]
+            if PLUGIN_HUB_PUBLIC_DOC_NEGATED_RE.search(context):
+                continue
+
+            line = text.count("\n", 0, segment_start) + 1
+            offenders.append(f"{relative_path}:{line}: {normalized(segment)}")
             break
 
     return offenders
@@ -7196,6 +7230,39 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                     )
 
         self.assertEqual(offenders, [])
+
+    def test_plugin_hub_public_docs_do_not_claim_blocked_surfaces_or_v1_completion(self) -> None:
+        docs = (
+            REPO_ROOT / "docs" / "PLUGIN_HUB_CONTRIBUTOR_PATH.md",
+            REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md",
+            REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md",
+        )
+
+        offenders: list[str] = []
+        for path in docs:
+            offenders.extend(
+                plugin_hub_public_doc_forbidden_claims(
+                    path.read_text(encoding="utf-8"),
+                    path.relative_to(REPO_ROOT).as_posix(),
+                )
+            )
+
+        self.assertEqual(offenders, [])
+
+        bad_claims = """
+        Plugin Hub supports ArkApi compatible command routing and permissions.
+        The Inventory SDK is available with sender identity, storage, and economy support.
+        Foundation examples provide a complete v1 SDK.
+        """
+        bad_offenders = plugin_hub_public_doc_forbidden_claims(
+            bad_claims,
+            "docs/PLUGIN_HUB_FOUNDATION_V1.md",
+        )
+
+        self.assertGreaterEqual(len(bad_offenders), 3)
+        self.assertTrue(any("ArkApi compatible command routing" in offender for offender in bad_offenders))
+        self.assertTrue(any("Inventory SDK is available" in offender for offender in bad_offenders))
+        self.assertTrue(any("complete v1 SDK" in offender for offender in bad_offenders))
 
     def test_plugin_hub_seed_review_files_declare_one_tier_and_no_blocked_claims(self) -> None:
         offenders: list[str] = []

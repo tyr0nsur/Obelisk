@@ -124,7 +124,10 @@ PLAYERS_IDENTITY_FIRST_EVIDENCE_SCHEMA = "obelisk.players-identity-first-evidenc
 PLAYERS_IDENTITY_LIFECYCLE_ANCHOR_CANDIDATES_SCHEMA = lifecycle_anchor_candidates.SCHEMA
 STATIC_ORIENTATION_REPORT_SCHEMAS = {
     "obelisk.command-chat-response-static-orientation-check.v1",
+    "obelisk.radare2-static-orientation-windows.v1",
+    "obelisk.static-candidate-orientation-contract.v1",
     "obelisk.player-identity-static-orientation-check.v1",
+    "obelisk.player-identity-static-target-orientation.v1",
     "obelisk.player-identity-static-lifecycle-orientation-check.v1",
     "obelisk.player-identity-static-admin-thunks-check.v1",
 }
