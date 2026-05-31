@@ -6307,6 +6307,7 @@ def validate_resource_handle_revalidation_evaluator_manifest(
 
     blockers: list[dict[str, Any]] = []
     artifact_identity = payload.get("artifact_identity")
+    output_identity_required = False
     if not isinstance(artifact_identity, dict):
         blockers.append({"reason": "resource_handle_revalidation_missing_artifact_identity", "label": f"{label}:$.artifact_identity"})
     else:
@@ -6324,6 +6325,8 @@ def validate_resource_handle_revalidation_evaluator_manifest(
                     "label": f"{label}:$.artifact_identity.required",
                 }
             )
+        else:
+            output_identity_required = True
         hash_count = artifact_identity.get("hash_count")
         hashes = artifact_identity.get("hashes")
         if not is_json_int(hash_count) or hash_count < 0:
@@ -6346,6 +6349,45 @@ def validate_resource_handle_revalidation_evaluator_manifest(
             blockers.append({"reason": "resource_handle_revalidation_artifact_identity_missing_or_partial_inputs", "label": f"{label}:$.artifact_identity.missing_or_partial_input_count"})
         if is_json_int(invalid_count) and invalid_count > 0:
             blockers.append({"reason": "resource_handle_revalidation_artifact_identity_invalid_inputs", "label": f"{label}:$.artifact_identity.invalid_input_count"})
+
+    if output_identity_required:
+        output_identity, output_identity_errors = complete_artifact_identity(
+            payload,
+            container_key="output_artifact_identity",
+            expected_artifact_kind=RESOURCE_HANDLE_REVALIDATION_EVALUATOR_SCHEMA,
+        )
+        if output_identity_errors or output_identity is None:
+            blockers.append(
+                {
+                    "reason": "resource_handle_revalidation_output_artifact_identity_invalid",
+                    "label": f"{label}:$.output_artifact_identity",
+                    "errors": output_identity_errors,
+                }
+            )
+        else:
+            identity_without_hash = {
+                "artifact_kind": output_identity["artifact_kind"],
+                "capture_id": output_identity["capture_id"],
+                "evidence_pack_id": output_identity["evidence_pack_id"],
+            }
+            material = {
+                "artifact_identity": identity_without_hash,
+                "report": {
+                    key: value
+                    for key, value in payload.items()
+                    if key != "output_artifact_identity"
+                },
+            }
+            expected_hash = hashlib.sha256(canonical_json_bytes(material)).hexdigest()
+            if output_identity["artifact_sha256"] != expected_hash:
+                blockers.append(
+                    {
+                        "reason": "resource_handle_revalidation_output_artifact_identity_hash_mismatch",
+                        "label": f"{label}:$.output_artifact_identity.artifact_sha256",
+                        "expected": expected_hash,
+                        "recorded": output_identity["artifact_sha256"],
+                    }
+                )
     if mode != "promote":
         return blockers
 

@@ -1452,7 +1452,7 @@ def fuobjectarray_field_window_redacted_manifest() -> dict:
 
 
 def resource_handle_revalidation_evaluator_manifest(*, ready: bool = False) -> dict:
-    return {
+    payload = {
         "schema": gate.RESOURCE_HANDLE_REVALIDATION_EVALUATOR_SCHEMA,
         "artifact_identity": {
             "required": True,
@@ -1471,6 +1471,20 @@ def resource_handle_revalidation_evaluator_manifest(*, ready: bool = False) -> d
             "blockers": [] if ready else ["uobject_flags_validity_semantics_unproven"],
         },
     }
+    identity_without_hash = {
+        "artifact_kind": gate.RESOURCE_HANDLE_REVALIDATION_EVALUATOR_SCHEMA,
+        "capture_id": "resourcehandle-revalidation-test",
+        "evidence_pack_id": "resourcehandle-revalidation-pack",
+    }
+    material = {
+        "artifact_identity": identity_without_hash,
+        "report": payload,
+    }
+    payload["output_artifact_identity"] = {
+        **identity_without_hash,
+        "artifact_sha256": hashlib.sha256(gate.canonical_json_bytes(material)).hexdigest(),
+    }
+    return payload
 
 
 def internal_uobject_post_callback_contract_manifest(*, overclaim: bool = False) -> dict:
@@ -6763,6 +6777,39 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
             result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
 
         self.assertEqual(result["blockers"], [])
+
+    def test_blocks_resource_handle_revalidation_missing_output_artifact_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle.json"
+            payload = resource_handle_revalidation_evaluator_manifest()
+            payload.pop("output_artifact_identity")
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "resource_handle_revalidation_output_artifact_identity_invalid",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_resource_handle_revalidation_hashes_not_bound_to_output_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle.json"
+            payload = resource_handle_revalidation_evaluator_manifest()
+            payload["artifact_identity"]["hashes"].append("c" * 64)
+            payload["artifact_identity"]["hash_count"] = 3
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "resource_handle_revalidation_output_artifact_identity_hash_mismatch",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
 
     def test_blocks_resource_handle_revalidation_evaluator_in_promote_mode_when_not_ready(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -111,6 +111,7 @@ Current post-RC research evidence lane (side-lane inventory for research reuse; 
 - [2026-05-31-player-identity-static-admin-thunks.md](2026-05-31-player-identity-static-admin-thunks.md)
 - [2026-05-31-player-identity-static-target-orientation.md](2026-05-31-player-identity-static-target-orientation.md)
 - [2026-05-31-player-identity-static-target-orientation.json](2026-05-31-player-identity-static-target-orientation.json)
+- [2026-05-31-native-ufunction-registration-static-discovery-plan.md](2026-05-31-native-ufunction-registration-static-discovery-plan.md)
 - [2026-05-31-arktribute-playerdata-identity-boundary.md](2026-05-31-arktribute-playerdata-identity-boundary.md)
 - [2026-05-28-fname-index-manifest-plan.md](2026-05-28-fname-index-manifest-plan.md)
 - [2026-05-31-fname-gobjects-offline-route.md](2026-05-31-fname-gobjects-offline-route.md)

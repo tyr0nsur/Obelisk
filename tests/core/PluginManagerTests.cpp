@@ -5401,7 +5401,12 @@ namespace
             Require(marker.is_open(), "failed to create chat events marker");
         }
 
-        FakePlugin plugin{.filename = "cleanup_fail.so", .registerChatCallback = true, .captureApi = true};
+        FakePlugin plugin{
+            .filename = "cleanup_fail.so",
+            .registerChatCallback = true,
+            .registerTimerCallback = true,
+            .captureApi = true,
+        };
         Obelisk::Core::ChatEventDispatcher chatDispatcher;
         plugin.chatDispatcher = &chatDispatcher;
         FakeLoader loader;
@@ -5422,6 +5427,7 @@ namespace
         Require(ownerTokenRegistrationId != 0, "cleanup-fail plugin owner-token chat callback was not registered");
         Require(chatDispatcher.SubscriptionCount() == 2,
                 "cleanup-fail plugin owner-token chat callback was not bridged");
+        Require(plugin.timerRegistrationId != 0, "cleanup-fail plugin timer was not registered");
 
         Obelisk::Core::SetPluginCallbackCleanupFailureForTesting(true);
         manager.UnloadAll();
@@ -5435,6 +5441,20 @@ namespace
                     FakeChatMessageEventCallback,
                     &plugin) == 0,
                 "cleanup-fail retained plugin accepted a new owner-token callback while unloading");
+        Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    1000,
+                    0,
+                    0,
+                    FakeTimerCallback,
+                    &plugin) == 0,
+                "cleanup-fail retained plugin accepted a new owner-token timer while unloading");
+        Require(plugin.capturedApi.UnregisterTimerWithOwnerToken(
+                    plugin.initOwnerToken,
+                    plugin.timerRegistrationId),
+                "cleanup-fail retained plugin owner-token timer unregister failed while unloading");
+        Require(Obelisk::Core::TimerManager::Get().UnregisterCallbacksForOwner(plugin.owner) == 0,
+                "cleanup-fail retained plugin timer survived explicit unregister");
 
         manager.UnloadAll();
 
