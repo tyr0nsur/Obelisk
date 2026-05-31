@@ -1000,6 +1000,71 @@ def structure_aggregate_census_policy_slice_manifest(
     }
 
 
+def players_identity_first_evidence_manifest(
+    *,
+    artifact_status: str = "candidate_only",
+    promotion_ready: bool = False,
+    public_sdk_ready: bool = False,
+    runtime_ready: bool = False,
+) -> dict:
+    input_snapshots = [
+        {
+            "id": f"snapshot-{index:04d}",
+            "sha256": hashlib.sha256(target.encode("utf-8")).hexdigest(),
+            "target": target,
+        }
+        for index, target in enumerate(sorted(gate.REQUIRED_PLAYERS_IDENTITY_INPUT_TARGETS), start=1)
+    ]
+    return {
+        "schema": gate.PLAYERS_IDENTITY_FIRST_EVIDENCE_SCHEMA,
+        "artifact_status": artifact_status,
+        "readiness_classification": "planning_only",
+        "promotion_ready": promotion_ready,
+        "public_sdk_ready": public_sdk_ready,
+        "runtime_ready": runtime_ready,
+        "snapshot_root": "redacted",
+        "input_target_set": "players-identity-lifecycle-intake",
+        "generated_from": {"snapshot_schema": SNAPSHOT_SCHEMA, "input_snapshots": input_snapshots},
+        "target_set_coverage": {"status": "complete"},
+        "artifact_identity": {"path_redacted": True},
+        "targets": [],
+        "fields": [],
+        "copied_candidates": [],
+        "forced_redacted_fields": [],
+        "forbidden_fields": [],
+        "lifecycle_anchors": {
+            "session_start_accepted": False,
+            "session_end_accepted": False,
+            "accepted_start_targets": [],
+            "accepted_end_targets": [],
+            "blockers": [
+                "no accepted session-start/login/connect UFunction anchor in players-identity-lifecycle-intake",
+                "no accepted session-end/logout/disconnect UFunction anchor in players-identity-lifecycle-intake",
+            ],
+        },
+        "privacy_policy": {
+            "public_principal_ready": False,
+            "copied_public_identifier": None,
+            "persistent_identifier_ready": False,
+            "process_local_identifier_ready": False,
+        },
+        "promotion_gate": {"ready": False, "promotion_ready": False, "blockers": ["identity remains planning-only"]},
+        "safety_summary": {
+            "target_count": len(gate.REQUIRED_PLAYERS_IDENTITY_INPUT_TARGETS),
+            "expected_target_count": len(gate.REQUIRED_PLAYERS_IDENTITY_INPUT_TARGETS),
+            "missing_target_count": 0,
+            "promotion_ready": promotion_ready,
+            "public_sdk_ready": public_sdk_ready,
+            "runtime_ready": runtime_ready,
+            "explicitly_excluded": sorted(gate.REQUIRED_PLAYERS_IDENTITY_EXPLICIT_EXCLUSIONS),
+        },
+        "non_claims": [
+            "candidate-only planning evidence for players-identity-lifecycle-intake",
+            "does not expose copied public player identity, process-local identity, persistent identity, sender identity, permissions, commands, economy, or moderation APIs",
+        ],
+    }
+
+
 def rc_ufunction_second_source_root_manifest(root: Path) -> dict:
     expected_sources = gate.expected_rc_ufunction_target_sources()
     assert expected_sources is not None
@@ -5300,6 +5365,76 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("structure_aggregate_policy_contains_verify_pin_code_copied_field", reasons)
         self.assertIn("structure_aggregate_policy_readiness_overclaim", reasons)
         self.assertIn("structure_aggregate_policy_public_overclaim_public_structure_events", reasons)
+
+    def test_accepts_players_identity_first_evidence_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "players-identity-first-evidence.json"
+            write_json(manifest, players_identity_first_evidence_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual("accepted", result["status"])
+        self.assertEqual(result["blockers"], [])
+
+    def test_blocks_players_identity_first_evidence_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "players-identity-first-evidence.json"
+            write_json(manifest, players_identity_first_evidence_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        self.assertEqual("blocked", result["status"])
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("promote_mode_players_identity_first_evidence_candidate_only", reasons)
+
+    def test_blocks_players_identity_first_evidence_overclaims_or_target_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "players-identity-first-evidence.json"
+            payload = players_identity_first_evidence_manifest(
+                artifact_status="accepted",
+                promotion_ready=True,
+                public_sdk_ready=True,
+                runtime_ready=True,
+            )
+            payload["readiness_classification"] = "release_readiness"
+            payload["snapshot_root"] = str(workspace / "ufunction_snapshots")
+            payload["generated_from"]["input_snapshots"] = payload["generated_from"]["input_snapshots"][:-1]
+            payload["target_set_coverage"]["status"] = "partial"
+            payload["lifecycle_anchors"]["session_start_accepted"] = True
+            payload["lifecycle_anchors"]["accepted_start_targets"] = ["ShooterPlayerController.ServerListPlayers"]
+            payload["privacy_policy"]["public_principal_ready"] = True
+            payload["privacy_policy"]["copied_public_identifier"] = "SteamID"
+            payload["promotion_gate"]["ready"] = True
+            payload["promotion_gate"]["promotion_ready"] = True
+            payload["safety_summary"]["target_count"] = 11
+            payload["safety_summary"]["missing_target_count"] = 1
+            payload["safety_summary"]["explicitly_excluded"] = ["raw_params"]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("players_identity_first_evidence_status_not_candidate_only", reasons)
+        self.assertIn("players_identity_first_evidence_not_planning_only", reasons)
+        self.assertIn("players_identity_first_evidence_promotion_ready_not_false", reasons)
+        self.assertIn("players_identity_first_evidence_public_sdk_ready_not_false", reasons)
+        self.assertIn("players_identity_first_evidence_runtime_ready_not_false", reasons)
+        self.assertIn("players_identity_first_evidence_snapshot_root_not_redacted", reasons)
+        self.assertIn("players_identity_first_evidence_input_snapshot_count_mismatch", reasons)
+        self.assertIn("players_identity_first_evidence_target_set_coverage_not_complete", reasons)
+        self.assertIn("players_identity_first_evidence_lifecycle_anchor_overclaim", reasons)
+        self.assertIn("players_identity_first_evidence_accepted_lifecycle_targets_present", reasons)
+        self.assertIn("players_identity_first_evidence_public_principal_overclaim", reasons)
+        self.assertIn("players_identity_first_evidence_promotion_gate_ready_not_false", reasons)
+        self.assertIn("players_identity_first_evidence_target_count_mismatch", reasons)
+        self.assertIn("players_identity_first_evidence_missing_target_count_mismatch", reasons)
+        self.assertIn("players_identity_first_evidence_explicit_exclusions_missing_boundaries", reasons)
 
     def test_accepts_static_global_promotion_evidence_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

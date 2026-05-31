@@ -3220,6 +3220,9 @@ def player_identity_field_entry(
         redaction_reason = "unsupported_or_non_scalar_identity_surface_forbidden"
         blockers.append("field_forbidden_for_identity_evidence")
 
+    if target == "ShooterPlayerController.ServerKickPlayer":
+        blockers.append("admin_mutation_field_not_public_identity")
+
     entry = {
         "field": field_key,
         "target": target,

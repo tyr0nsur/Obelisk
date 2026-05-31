@@ -313,6 +313,74 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
 
         self.assertIn("missing_required_target:ShooterPlayerController.ServerKickPlayer", str(raised.exception))
 
+    def test_players_identity_first_evidence_cli_fails_closed_on_default_fixture_gap(self) -> None:
+        original_argv = sys.argv
+        try:
+            sys.argv = [
+                "build_redacted_ufunction_signatures.py",
+                "--players-identity-first-evidence",
+                "--json",
+            ]
+            with self.assertRaisesRegex(
+                SystemExit,
+                "missing_required_target:ShooterPlayerController.ServerListPlayers",
+            ) as raised:
+                tool.main()
+        finally:
+            sys.argv = original_argv
+
+        self.assertIn("missing_required_target:ShooterPlayerController.ServerKickPlayer", str(raised.exception))
+
+    def test_players_identity_lifecycle_manifest_gap_is_exact_admin_pair(self) -> None:
+        fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
+
+        paths, missing_targets = tool.snapshot_paths_from_target_sets(
+            fixture_root,
+            ["players-identity-lifecycle-intake"],
+        )
+
+        self.assertEqual(10, len(paths))
+        self.assertEqual(
+            [
+                "ShooterPlayerController.ServerListPlayers",
+                "ShooterPlayerController.ServerKickPlayer",
+            ],
+            missing_targets,
+        )
+
+    def test_player_identity_classifier_forces_identity_like_fields_redacted(self) -> None:
+        cases = [
+            (
+                {"name": "SteamID", "class_name": "UInt64Property"},
+                "identity_like_scalar_forced_redacted",
+            ),
+            (
+                {"name": "EOSID", "class_name": "StrProperty"},
+                "text_identity_or_private_value_forced_redacted",
+            ),
+            (
+                {"name": "PlatformID", "class_name": "NameProperty"},
+                "fname_identity_forced_redacted",
+            ),
+            (
+                {"name": "OnlinePlayers", "class_name": "ArrayProperty"},
+                "container_payload_identity_forced_redacted",
+            ),
+            (
+                {"name": "Controller", "class_name": "ObjectProperty"},
+                "ue_object_identity_forced_redacted",
+            ),
+            (
+                {"name": "MissionTags", "class_name": "SetProperty"},
+                "container_payload_identity_forced_redacted",
+            ),
+        ]
+
+        for prop, reason in cases:
+            with self.subTest(prop=prop):
+                self.assertTrue(tool.player_identity_field_is_identity_like(prop))
+                self.assertEqual(reason, tool.player_identity_redaction_reason(prop))
+
     def test_players_identity_first_evidence_is_candidate_only_and_force_redacted(self) -> None:
         fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -361,6 +429,8 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         bban = fields_by_key["ShooterPlayerController.ServerKickPlayer.bBan"]
         self.assertEqual("copied_candidate", bban["classification"])
         self.assertEqual({"byte_mask": "0x01", "field_mask": "0xff"}, bban["bool_masks"])
+        self.assertIn("admin_mutation_field_not_public_identity", bban["blockers"])
+        self.assertIn("candidate_scalar_not_public_identity", bban["blockers"])
 
         copied_fields = {entry["field"] for entry in report["copied_candidates"]}
         self.assertIn("ShooterPlayerController.ServerKickPlayer.bBan", copied_fields)

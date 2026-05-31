@@ -1095,8 +1095,43 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             self.assertIn(exclusion, inventory_signals["exclusions"])
 
+    def test_public_sdk_surfaces_manifest_keeps_player_identity_planning_only_blocked(self) -> None:
+        manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
+        player_identity = surfaces["obelisk.player_identity.v1"]
+
+        self.assertEqual(player_identity["status"], "planning")
+        self.assertEqual(player_identity["support_tier"], "blocked")
+        self.assertEqual(player_identity["public_contract"], [])
+        self.assertEqual(
+            player_identity["evidence"]["target_set"],
+            "players-identity-lifecycle-intake",
+        )
+        self.assertIn("obelisk.player_identity.v1", manifest["planning_surfaces"])
+        self.assertNotIn("obelisk.player_identity.v1", manifest["promoted_surfaces"])
+        self.assertNotIn("players-identity-lifecycle-intake", json.dumps(manifest["promoted_surfaces"]))
+        self.assertNotIn("players-identity-lifecycle-intake", json.dumps(manifest["experimental_surfaces"]))
+
+        for blocker in (
+            "Missing sanitized ServerListPlayers snapshot.",
+            "Missing sanitized ServerKickPlayer snapshot.",
+            "No accepted login/logout lifecycle anchors.",
+            "No principal privacy, invalidation, or cross-instance semantics.",
+        ):
+            self.assertIn(blocker, player_identity["blockers"])
+
+        for exclusion in (
+            "player lookup",
+            "permissions",
+            "moderation",
+            "economy identity",
+            "send-chat identity",
+        ):
+            self.assertIn(exclusion, player_identity["exclusions"])
+
     def test_sdk_v1_compatibility_doc_tracks_manifest_and_exclusions(self) -> None:
         text = PUBLIC_SDK_V1_COMPATIBILITY_DOC.read_text(encoding="utf-8")
+        compact = normalized(text)
         required_terms = (
             "public_sdk_surfaces.json",
             "v1.0",
@@ -1113,11 +1148,15 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "ResourceHandle",
             "ArkApi",
             "post-v1",
+            "Player identity is planning-only",
+            "`ServerListPlayers` and `ServerKickPlayer` snapshots",
+            "missing accepted lifecycle anchors",
+            "missing privacy/invalidation semantics",
             "mutation",
             "return override",
         )
         for term in required_terms:
-            self.assertIn(term, text)
+            self.assertIn(normalized(term), compact)
         self.assertNotIn("promoted-minimal", text)
 
     def test_public_gameplay_event_manifest_contains_no_server_paths(self) -> None:

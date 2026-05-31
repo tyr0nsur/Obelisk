@@ -313,6 +313,12 @@ namespace Obelisk::Core
         size_t dispatched = 0;
         try
         {
+            {
+                std::lock_guard<std::mutex> lock(m_Mutex);
+                if (m_Registrations.empty())
+                    return 0;
+            }
+
             std::string messageCopy(message.Message);
             std::string senderNameCopy(message.SenderName);
             std::string senderPlatformIdCopy(message.SenderPlatformId);

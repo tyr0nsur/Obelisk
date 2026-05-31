@@ -135,6 +135,11 @@ Own these areas:
   owner token. Unregister/owner cleanup initiated from any gameplay callback family must
   avoid waiting on dispatcher cleanup; non-callback plugin unload/owner cleanup must still
   wait for all in-flight dispatch and deferred `DestroyUserData` cleanup before returning.
+- For copied events that may contain player text or identity-like internal fields, keep a
+  zero-subscriber fast path before payload copies when the producer or dispatcher can know
+  there are no authorized callbacks. Future player identity surfaces must treat
+  no-subscriber, disabled gate, unsupported binary/window, zero budget, nonmatching FName,
+  and invalid shape as no-copy/no-retain paths.
 - Preserve optional plugin shutdown ordering: call `ObeliskPlugin_Shutdown()` before
   plugin-owned callback cleanup and before `dlclose`.
 - Follow `docs/PLUGIN_ARCHITECTURE.md` before adding plugin examples or promoting

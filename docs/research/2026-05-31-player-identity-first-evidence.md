@@ -242,6 +242,31 @@ arrays, strings/text, `NameProperty`, `FName`/GObjects indices, raw params, UE p
 and pointer-derived handles. Bool candidates remain candidates only and must preserve the
 canonical-byte rule.
 
+The offline artifact gate now recognizes `obelisk.players-identity-first-evidence.v1` as
+a consume-only, promote-blocked schema. A complete candidate pack may be accepted for
+offline reuse only when it remains `candidate_only`, `planning_only`, redacts
+`snapshot_root`, contains exactly the 12 `players-identity-lifecycle-intake` snapshots,
+keeps lifecycle anchors unaccepted, keeps public principal policy unset, and carries the
+required explicit exclusions for commands, permissions, economy, lookup, `ResourceHandle`,
+mutation, return override, UE pointers, raw params, and FName/GObjects indices. Promote
+mode must stay blocked even for a complete 12-target pack.
+
+The current fixture gap is exact: the committed snapshot manifest has 10/12
+`players-identity-lifecycle-intake` targets and lacks only
+`ShooterPlayerController.ServerListPlayers` and
+`ShooterPlayerController.ServerKickPlayer`. Existing offline core evidence is enough to
+generate sanitized candidate snapshots for those two admin surfaces without a live server,
+but current live-ops policy still requires an explicit approved offline `/servidor/ark`
+workspace action before reading or writing that path. Those snapshots would close the
+admin-surface fixture gap only; they would not establish login/logout lifecycle anchors.
+
+Demand review of local plugin source dictionaries reinforces priority rather than
+promotion: plugin authors expect player identity, tribe identity, command/RCON registries,
+permissions, outbound chat/notifications, economy, kits, rewards, and persistence. In
+Obelisk ordering, those remain downstream of copied principal semantics and invalidation
+policy. ArkApi/NextGen sources remain names and demand signals only; no offsets, layouts,
+wrappers, schemas, parsers, or control flow are used.
+
 Minimum blockers to always record until independently cleared:
 
 ```text
@@ -264,6 +289,10 @@ Required tests belong beside the existing script tests:
   `obelisk.players-identity-first-evidence.v1`, keeps `promotion_ready=false`, fails
   closed on missing `ServerListPlayers` or `ServerKickPlayer`, redacts input paths, and
   reports every required blocker.
+- `scripts/test_validate_offline_artifact_gate.py`: consume mode accepts a complete
+  candidate-only `obelisk.players-identity-first-evidence.v1` manifest; promote mode
+  blocks it; readiness, lifecycle-anchor, public-principal, target-count, and exclusion
+  overclaims fail closed.
 - Identity scalar negatives: `PlayerDataID`, online-player arrays, mission tags, chat
   strings, object refs, and synthetic `SteamID`/`EOSID`/`PlatformID` fields never appear in
   copied/public fields.

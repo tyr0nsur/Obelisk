@@ -92,6 +92,16 @@ namespace
         Require(capture.messagePointer != sourcePointer, "dispatcher passed borrowed input text");
     }
 
+    void TestNoSubscriberDispatchReturnsBeforeCallbackSnapshot()
+    {
+        Obelisk::Core::ChatEventDispatcher dispatcher;
+
+        Require(dispatcher.SubscriptionCount() == 0, "new chat dispatcher unexpectedly had subscribers");
+        Require(dispatcher.Dispatch(MakeMessage("private text that should not be copied")) == 0,
+                "no-subscriber chat dispatch returned callbacks");
+        Require(dispatcher.SubscriptionCount() == 0, "no-subscriber chat dispatch changed registrations");
+    }
+
     void TestRegisterRejectsInvalidInput()
     {
         Obelisk::Core::ChatEventDispatcher dispatcher;
@@ -798,6 +808,7 @@ namespace
 int main()
 {
     TestDispatchCopiesInputForCallbackDuration();
+    TestNoSubscriberDispatchReturnsBeforeCallbackSnapshot();
     TestRegisterRejectsInvalidInput();
     TestUnregisterIsIdempotent();
     TestRegistrationIdsSkipZeroAndLiveIdsAfterWrap();

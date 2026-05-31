@@ -116,6 +116,7 @@ MISSION_COPIED_BOOL_POLICY_SLICE_SCHEMA = "obelisk.mission-copied-bool-policy-sl
 STRUCTURE_RETURN_ONLY_POLICY_SLICE_SCHEMA = "obelisk.structure-return-only-policy-slice.v1"
 STRUCTURE_NONPIN_COPIED_SCALAR_POLICY_SLICE_SCHEMA = "obelisk.structure-nonpin-copied-scalar-policy-slice.v1"
 STRUCTURE_AGGREGATE_CENSUS_POLICY_SLICE_SCHEMA = "obelisk.structure-aggregate-census-policy-slice.v1"
+PLAYERS_IDENTITY_FIRST_EVIDENCE_SCHEMA = "obelisk.players-identity-first-evidence.v1"
 SUPPORTED_MANIFEST_SCHEMAS = {
     CORE_DUMP_EVIDENCE_PACK_SCHEMA,
     GOBJECTS_TWO_CORE_MANIFEST_SCHEMA,
@@ -145,6 +146,7 @@ SUPPORTED_MANIFEST_SCHEMAS = {
     STRUCTURE_RETURN_ONLY_POLICY_SLICE_SCHEMA,
     STRUCTURE_NONPIN_COPIED_SCALAR_POLICY_SLICE_SCHEMA,
     STRUCTURE_AGGREGATE_CENSUS_POLICY_SLICE_SCHEMA,
+    PLAYERS_IDENTITY_FIRST_EVIDENCE_SCHEMA,
 }
 UOBJECT_FLAG_TRANSITION_PROVENANCE_SCHEMAS = {
     "obelisk.offline-artifact-provenance.v1",
@@ -496,6 +498,41 @@ REQUIRED_STRUCTURE_AGGREGATE_EXPLICIT_EXCLUSIONS = {
     "resource_handle",
     "return_override",
     "runtime",
+}
+REQUIRED_PLAYERS_IDENTITY_INPUT_TARGETS = {
+    "ShooterPlayerController.ServerListPlayers",
+    "ShooterPlayerController.ServerKickPlayer",
+    "ShooterPlayerController.ServerSendChatMessage",
+    "ShooterPlayerController.ServerRequestTribeLog",
+    "ShooterPlayerController.AllowTribeGroupPermission",
+    "ShooterPlayerController.IsInTribe",
+    "ShooterPlayerController.ClientReceiveMyTribeOnlineList",
+    "ShooterPlayerController.ClientReceiveActiveMissionTags",
+    "ShooterPlayerState.ServerRequestSpawnPointsForDownloadedCharacters",
+    "MissionType.AddPlayerToMission",
+    "MissionType.BPAllowPlayerToLeaveMission",
+    "MissionType.BPOnPlayerRemovedFromMission",
+}
+REQUIRED_PLAYERS_IDENTITY_EXPLICIT_EXCLUSIONS = {
+    "public_api",
+    "public_sdk",
+    "runtime_hook_wiring",
+    "dispatcher_wiring",
+    "commands",
+    "permissions",
+    "economy",
+    "player_identity",
+    "persistent_identity",
+    "process_local_identity",
+    "lookup",
+    "ResourceHandle",
+    "mutation",
+    "return_override",
+    "raw_params",
+    "ue_pointers",
+    "fname_indices",
+    "gobjects_indices",
+    "identity_value_logging",
 }
 REQUIRED_UOBJECT_FLAG_POLICY_WINDOWS = {
     "weak_helper_reject_0x100",
@@ -5066,6 +5103,107 @@ def validate_structure_aggregate_census_policy_slice_manifest(payload: dict[str,
     return blockers
 
 
+def validate_players_identity_first_evidence_manifest(payload: dict[str, Any], *, label: str, mode: str) -> list[dict[str, Any]]:
+    if payload.get("schema") != PLAYERS_IDENTITY_FIRST_EVIDENCE_SCHEMA:
+        return []
+
+    blockers: list[dict[str, Any]] = []
+    safety_summary = payload.get("safety_summary")
+    if not isinstance(safety_summary, dict):
+        blockers.append({"reason": "players_identity_first_evidence_safety_summary_missing", "label": f"{label}:$.safety_summary"})
+        return blockers
+
+    if payload.get("artifact_status") != "candidate_only":
+        blockers.append({"reason": "players_identity_first_evidence_status_not_candidate_only", "label": f"{label}:$.artifact_status"})
+    if payload.get("readiness_classification") != "planning_only":
+        blockers.append({"reason": "players_identity_first_evidence_not_planning_only", "label": f"{label}:$.readiness_classification"})
+    for key in ("promotion_ready", "public_sdk_ready", "runtime_ready"):
+        if payload.get(key) is not False:
+            blockers.append({"reason": f"players_identity_first_evidence_{key}_not_false", "label": f"{label}:$.{key}"})
+    if payload.get("snapshot_root") != "redacted":
+        blockers.append({"reason": "players_identity_first_evidence_snapshot_root_not_redacted", "label": f"{label}:$.snapshot_root"})
+    if payload.get("input_target_set") != "players-identity-lifecycle-intake":
+        blockers.append({"reason": "players_identity_first_evidence_input_target_set_mismatch", "label": f"{label}:$.input_target_set"})
+
+    generated_from = payload.get("generated_from")
+    if not isinstance(generated_from, dict):
+        blockers.append({"reason": "players_identity_first_evidence_generated_from_missing", "label": f"{label}:$.generated_from"})
+    else:
+        if generated_from.get("snapshot_schema") != RC_UFUNCTION_SNAPSHOT_SCHEMA:
+            blockers.append({"reason": "players_identity_first_evidence_snapshot_schema_mismatch", "label": f"{label}:$.generated_from.snapshot_schema"})
+        input_snapshots = generated_from.get("input_snapshots")
+        if not isinstance(input_snapshots, list) or len(input_snapshots) != len(REQUIRED_PLAYERS_IDENTITY_INPUT_TARGETS):
+            blockers.append({"reason": "players_identity_first_evidence_input_snapshot_count_mismatch", "label": f"{label}:$.generated_from.input_snapshots"})
+        else:
+            seen_snapshot_ids: set[str] = set()
+            seen_targets: set[str] = set()
+            for index, snapshot in enumerate(input_snapshots):
+                snapshot_label = f"{label}:$.generated_from.input_snapshots[{index}]"
+                if not isinstance(snapshot, dict):
+                    blockers.append({"reason": "players_identity_first_evidence_input_snapshot_entry_invalid", "label": snapshot_label})
+                    continue
+                snapshot_id = snapshot.get("id")
+                snapshot_sha256 = snapshot.get("sha256")
+                snapshot_target = snapshot.get("target")
+                if not isinstance(snapshot_id, str) or not snapshot_id or snapshot_id in seen_snapshot_ids:
+                    blockers.append({"reason": "players_identity_first_evidence_input_snapshot_id_invalid", "label": f"{snapshot_label}.id"})
+                else:
+                    seen_snapshot_ids.add(snapshot_id)
+                if not isinstance(snapshot_sha256, str) or SHA256_RE.fullmatch(snapshot_sha256) is None:
+                    blockers.append({"reason": "players_identity_first_evidence_input_snapshot_sha256_invalid", "label": f"{snapshot_label}.sha256"})
+                if not isinstance(snapshot_target, str) or snapshot_target not in REQUIRED_PLAYERS_IDENTITY_INPUT_TARGETS:
+                    blockers.append({"reason": "players_identity_first_evidence_input_snapshot_target_invalid", "label": f"{snapshot_label}.target"})
+                else:
+                    seen_targets.add(snapshot_target)
+            if seen_targets != REQUIRED_PLAYERS_IDENTITY_INPUT_TARGETS:
+                blockers.append({"reason": "players_identity_first_evidence_input_snapshot_targets_mismatch", "label": f"{label}:$.generated_from.input_snapshots"})
+
+    coverage = payload.get("target_set_coverage")
+    if not isinstance(coverage, dict) or coverage.get("status") != "complete":
+        blockers.append({"reason": "players_identity_first_evidence_target_set_coverage_not_complete", "label": f"{label}:$.target_set_coverage.status"})
+
+    lifecycle = payload.get("lifecycle_anchors")
+    if not isinstance(lifecycle, dict):
+        blockers.append({"reason": "players_identity_first_evidence_lifecycle_anchors_missing", "label": f"{label}:$.lifecycle_anchors"})
+    else:
+        if lifecycle.get("session_start_accepted") is not False or lifecycle.get("session_end_accepted") is not False:
+            blockers.append({"reason": "players_identity_first_evidence_lifecycle_anchor_overclaim", "label": f"{label}:$.lifecycle_anchors"})
+        if lifecycle.get("accepted_start_targets") != [] or lifecycle.get("accepted_end_targets") != []:
+            blockers.append({"reason": "players_identity_first_evidence_accepted_lifecycle_targets_present", "label": f"{label}:$.lifecycle_anchors"})
+
+    privacy = payload.get("privacy_policy")
+    if not isinstance(privacy, dict):
+        blockers.append({"reason": "players_identity_first_evidence_privacy_policy_missing", "label": f"{label}:$.privacy_policy"})
+    else:
+        if privacy.get("public_principal_ready") is not False or privacy.get("copied_public_identifier") is not None:
+            blockers.append({"reason": "players_identity_first_evidence_public_principal_overclaim", "label": f"{label}:$.privacy_policy"})
+
+    promotion_gate = payload.get("promotion_gate")
+    if not isinstance(promotion_gate, dict):
+        blockers.append({"reason": "players_identity_first_evidence_promotion_gate_missing", "label": f"{label}:$.promotion_gate"})
+    else:
+        if promotion_gate.get("ready") is not False or promotion_gate.get("promotion_ready") is not False:
+            blockers.append({"reason": "players_identity_first_evidence_promotion_gate_ready_not_false", "label": f"{label}:$.promotion_gate"})
+
+    for key, expected in {
+        "target_count": len(REQUIRED_PLAYERS_IDENTITY_INPUT_TARGETS),
+        "expected_target_count": len(REQUIRED_PLAYERS_IDENTITY_INPUT_TARGETS),
+        "missing_target_count": 0,
+    }.items():
+        if safety_summary.get(key) != expected:
+            blockers.append({"reason": f"players_identity_first_evidence_{key}_mismatch", "label": f"{label}:$.safety_summary.{key}", "expected": expected, "recorded": safety_summary.get(key)})
+    for key in ("promotion_ready", "public_sdk_ready", "runtime_ready"):
+        if safety_summary.get(key) is not False:
+            blockers.append({"reason": f"players_identity_first_evidence_summary_{key}_not_false", "label": f"{label}:$.safety_summary.{key}"})
+    explicitly_excluded = safety_summary.get("explicitly_excluded")
+    if not isinstance(explicitly_excluded, list) or not REQUIRED_PLAYERS_IDENTITY_EXPLICIT_EXCLUSIONS.issubset(set(explicitly_excluded)):
+        blockers.append({"reason": "players_identity_first_evidence_explicit_exclusions_missing_boundaries", "label": f"{label}:$.safety_summary.explicitly_excluded"})
+
+    if mode == "promote":
+        blockers.append({"reason": "promote_mode_players_identity_first_evidence_candidate_only", "label": label})
+    return blockers
+
+
 def validate_static_global_promotion_evidence_manifest(
     payload: dict[str, Any],
     *,
@@ -8046,6 +8184,7 @@ def validate_manifest(
     blockers.extend(validate_structure_return_only_policy_slice_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_structure_nonpin_copied_scalar_policy_slice_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_structure_aggregate_census_policy_slice_manifest(payload, label=str(resolved), mode=mode))
+    blockers.extend(validate_players_identity_first_evidence_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_gobjects_two_core_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_static_global_promotion_evidence_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_resource_handle_revalidation_evaluator_manifest(payload, label=str(resolved), mode=mode))
