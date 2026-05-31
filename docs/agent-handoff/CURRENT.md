@@ -31,6 +31,12 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `ObeliskConfig.cmake` declares the `SDK` component, but that only proves package
   consumption; it does not promote blocked gameplay surfaces.
 - `docs/public_sdk_surfaces.json::v1_sdk_completion_blockers` is the active blocker list for a complete SDK claim: player identity, permissions/admin, commands/replies, inventory/items mutation, structure census/build policy, mission/transfer/dino/tribe/buff modules, player services/economy/mobility/areas, and operator ingress/storage. Foundation/Plugin Hub seed work remains pre-v1 unless those blockers are promoted or explicitly excluded in a v1 release statement.
+- `permissions/admin` remains blocked until `player_identity` is promoted. The documented
+  minimum later shape is query-only, owner-scoped, capability-gated, copied POD,
+  process-local, and fail-closed; it does not include commands/replies, send-chat,
+  moderation, kick/ban, grant CRUD, storage, RCON/operator ingress, lookup, mutation, or
+  cross-instance authority. Research note:
+  `docs/research/2026-05-31-permissions-admin-minimum-post-identity.md`.
 - Surfaces marked `promoted-experimental-only` also block a complete `v1.0` SDK claim until each is promoted, downgraded to planning/post-v1, or explicitly excluded in the release statement. Do not treat copied chat or copied gameplay-policy seeds as v1-complete.
 - `ObeliskApi` v1 remains append-only. New public surfaces require copied-data ownership, capability/`struct_size` gates, lifecycle cleanup, privacy rules, and accepted second-source/static evidence.
 - SDK packaging publishes only `include/obelisk/ObeliskApi.h`; more public headers require explicit install layout/test updates and ABI review.
@@ -38,6 +44,11 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - Core dump evidence-pack manifests must declare `obelisk.core-dump-evidence-pack.v1`; snapshot/regeneration consumers and offline artifact gates require binary/core SHA, safe `core.path`, complete status, and `gdb_core_failed=false`.
 - Promoted copied events are observational and non-authoritative: no UE pointers, raw params, identity, lookup, mutation, return override, pincode/player text publication, or broad module SDK claim.
 - Plugin unload/init-failure cleanup skips `dlclose` when callback cleanup cannot be proven complete, retains the plugin for retry, does not repeat plugin shutdown, runs copied-event `DestroyUserData` inside the relevant gameplay callback scope to avoid reentrant cleanup deadlocks, and release readiness rejects production `libobelisk.so` builds exposing manager/dispatcher test-only symbols.
+- Plugin-facing copied event dispatcher families with owner cleanup must be covered by
+  `PluginManager::UnregisterPluginCallbacks`; the static guardrail discovers
+  `*EventDispatcher.h` owner-cleanup families and allows only explicitly documented
+  internal/test-only exceptions. Before identity or other copied dispatcher promotion,
+  remove it from the exception path and add init-failure/unload cleanup coverage.
 - `oProcessTimer` is the first process-local timer example. Timer ids are process-local, not cluster state, UE identity, gameplay/module timer abstractions, or persistent handles, or shared scheduler state; owner-token timers require explicit unregister. Timer allocation skips zero/live ids after wrap. Safe-disabled config prep works without optional timer capability; active config fails closed on missing timer capability, owner token, or appended timer slots.
 - `oPolicyAudit` now unregisters its `GameplayPolicyEvent` owner-token handle if init fails after callback registration. The SDK fixture covers injected post-registration log failure cleanup.
 - `oDescriptorCatalog` is the metadata-only descriptor example. It registers no callbacks, timers, chat handlers, identity, lookup, mutation, return override, or ABI expansion.

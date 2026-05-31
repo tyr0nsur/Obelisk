@@ -66,7 +66,7 @@ class VersioningGuardrailTests(unittest.TestCase):
         self.assertIn('Obelisk_DEVELOPMENT_LINE STREQUAL "0.1.0-dev"', installed_consumer_cmake)
         self.assertIn('Obelisk_RELEASE_CHANNEL STREQUAL "dev"', installed_consumer_cmake)
         self.assertIn(
-            "find_package(Obelisk 0.1.0 CONFIG REQUIRED)",
+            "find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)",
             installed_consumer_cmake,
         )
         self.assertIn("find_package(Obelisk 0.1.0 CONFIG REQUIRED)", install_doc)

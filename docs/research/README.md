@@ -70,6 +70,7 @@ Current post-RC research lane:
 - [2026-05-30-chat-command-helper-roadmap.md](2026-05-30-chat-command-helper-roadmap.md)
 - [2026-05-31-chat-command-readiness.md](2026-05-31-chat-command-readiness.md)
 - [2026-05-31-commands-principal-routing-contract.md](2026-05-31-commands-principal-routing-contract.md)
+- [2026-05-31-permissions-admin-minimum-post-identity.md](2026-05-31-permissions-admin-minimum-post-identity.md)
 - [2026-05-30-chat-audit-plugin-plan.md](2026-05-30-chat-audit-plugin-plan.md)
 - [2026-05-29-module-surface-roadmap.md](2026-05-29-module-surface-roadmap.md)
 - [2026-05-31-v02-module-priority.md](2026-05-31-v02-module-priority.md)
@@ -191,7 +192,7 @@ Current v1 research lane snapshot from the current notes:
 | Buff lane | Fact: compact and breadth target sets provide internal layout evidence for bool/class/zero-param shapes. | Treat as copied-payload/redaction design only; no public Buff SDK, runtime hooks, class/object exposure, mutation, return override, or gameplay semantics. |
 | Dino lane | Fact: passenger/carry compact target sets have accepted layout evidence. | Use only for later recognizer design until identity, lifetime, privacy/redaction, resource-handle, mutation, return-override, and callback gates are resolved. |
 | Tribe lane | Fact: permission, membership, log-control, online-list, and mission-tag shapes are useful but identity-sensitive. | Keep as internal/layout planning until player/tribe identity, arrays/strings, privacy, and permission policy are promoted. |
-| Admin/permissions lane | Fact: admin, permissions, RCON, economy, storage, and operator surfaces are demand signals or documentation-only. | Require explicit abuse controls, permission model, lifecycle/ownership policy, ABI tests, and operator approval before any runtime or public SDK proposal. |
+| Admin/permissions lane | Fact: admin, permissions, RCON, economy, storage, and operator surfaces are demand signals or documentation-only. | Keep `permissions/admin` blocked until identity is promoted; the minimum later shape is query-only, owner-scoped, capability-gated, process-local, and fail-closed. Require explicit abuse controls, permission model, lifecycle/ownership policy, ABI tests, and operator approval before any runtime or public SDK proposal. |
 
 Historical reusable evidence:
 
@@ -295,6 +296,7 @@ when a task explicitly targets that module.
 | [2026-05-31-player-identity-first-evidence.md](2026-05-31-player-identity-first-evidence.md) | Player identity first evidence | Defines the smallest candidate-only identity evidence package needed before public permissions, commands, or economy SDK design can start. |
 | [2026-05-31-player-identity-targetset-gap.md](2026-05-31-player-identity-targetset-gap.md) | Player identity target-set gap | Records that the planning target set is missing `ServerListPlayers` and `ServerKickPlayer` snapshots and still lacks accepted login/logout lifecycle anchors. |
 | [2026-05-31-player-identity-static-admin-thunks.md](2026-05-31-player-identity-static-admin-thunks.md) | Player identity static admin thunks | Preserves lightweight static clues for `ServerListPlayers` and `ServerKickPlayer` native thunks while keeping them orientation-only and not a substitute for core/reflection inventory evidence. |
+| [2026-05-31-permissions-admin-minimum-post-identity.md](2026-05-31-permissions-admin-minimum-post-identity.md) | Permissions/admin minimum post-identity | Defines the smallest safe post-identity permission/admin design as query-only, owner-scoped, capability-gated, process-local, and fail-closed while keeping public permissions, admin actions, commands, replies, storage, and operator ingress blocked. |
 | [2026-05-31-offline-artifact-curation.md](2026-05-31-offline-artifact-curation.md) | Offline artifact curation | Classifies current non-protected artifact roots into usable planning inputs, legacy/blocked roots, and player-identity non-inputs. |
 | [2026-05-27-sdk-chat-event-ownership-plan.md](2026-05-27-sdk-chat-event-ownership-plan.md) | Historical SDK event ownership plan | Defines ownership, ABI, callback cleanup, and validation gates required before a public module callback API. |
 | [2026-05-27-chat-sdk-abi-preflight.md](2026-05-27-chat-sdk-abi-preflight.md) | Historical SDK ABI preflight | Defines test-first ABI and dispatcher gates for a future module callback without changing the public header yet. |

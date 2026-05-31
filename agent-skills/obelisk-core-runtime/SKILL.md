@@ -122,6 +122,10 @@ Own these areas:
   subscriptions are backed by `StructureEventDispatcher` and must keep owner-token handle
   registration, owner-scoped unregister, `DestroyUserData` cleanup, and plugin unload
   cleanup intact.
+- New copied event dispatcher families with owner cleanup must be added to
+  `PluginManager::UnregisterPluginCallbacks` and the static guardrail in
+  `scripts/test_plugin_manager_guardrails.py`; a dispatcher may be excluded only while it
+  is explicitly documented as internal/test-only and not plugin-facing.
 - Internal dispatchers called from the `ProcessEvent` hook must fail closed on setup or
   internal allocation errors. Do not rethrow dispatcher internals into the hook path.
   Snapshot callbacks by registration id, skip callbacks whose registration was removed

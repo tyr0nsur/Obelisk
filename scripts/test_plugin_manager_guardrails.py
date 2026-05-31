@@ -10,6 +10,14 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PLUGIN_MANAGER = REPO_ROOT / "core" / "PluginManager.cpp"
+CORE_DIR = REPO_ROOT / "core"
+
+COPIED_DISPATCHER_CLEANUP_EXCEPTIONS = {
+    "MissionCopiedBoolEventDispatcher": (
+        "internal/test-only copied lifecycle dispatcher; not plugin-facing until a later "
+        "promotion wires a public ABI registration path"
+    ),
+}
 
 
 def extract_braced_body(text: str, match: re.Match[str]) -> str:
@@ -160,6 +168,54 @@ class PluginManagerGuardrailTests(unittest.TestCase):
         self.assertIn("SafeLogErrorNoThrow", body)
         self.assertNotIn("OBELISK_ERROR", body)
         self.assertGreaterEqual(body.count("cleanupFamily("), 5)
+
+    def test_plugin_owner_cleanup_covers_each_plugin_facing_event_dispatcher(self) -> None:
+        plugin_manager_text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+        cleanup_body = extract_function_body(
+            plugin_manager_text,
+            r"bool PluginManager::UnregisterPluginCallbacks\(.*?\)",
+        )
+
+        dispatcher_classes: set[str] = set()
+        for header in CORE_DIR.glob("*EventDispatcher.h"):
+            header_text = header.read_text(encoding="utf-8")
+            if "UnregisterCallbacksForOwner" not in header_text:
+                continue
+            match = re.search(r"class\s+(\w+EventDispatcher)\b", header_text)
+            self.assertIsNotNone(match, f"{header} has owner cleanup but no dispatcher class")
+            dispatcher_classes.add(match.group(1))
+
+        cleaned_dispatchers = set(
+            re.findall(
+                r"\b(\w+EventDispatcher)::Get\(\)\.UnregisterCallbacksForOwner\(owner\)",
+                cleanup_body,
+            )
+        )
+        if "m_ChatDispatcher->UnregisterCallbacksForOwner(owner)" in cleanup_body:
+            cleaned_dispatchers.add("ChatEventDispatcher")
+
+        missing = sorted(
+            dispatcher_classes
+            - cleaned_dispatchers
+            - set(COPIED_DISPATCHER_CLEANUP_EXCEPTIONS)
+        )
+        self.assertEqual(
+            missing,
+            [],
+            "New plugin-facing copied event dispatchers must be added to "
+            "PluginManager::UnregisterPluginCallbacks, or explicitly documented in "
+            "COPIED_DISPATCHER_CLEANUP_EXCEPTIONS while still internal/test-only.",
+        )
+
+        stale_exceptions = sorted(
+            set(COPIED_DISPATCHER_CLEANUP_EXCEPTIONS) - dispatcher_classes
+        )
+        self.assertEqual(stale_exceptions, [])
+        for dispatcher, reason in COPIED_DISPATCHER_CLEANUP_EXCEPTIONS.items():
+            with self.subTest(dispatcher=dispatcher):
+                self.assertIn(dispatcher, dispatcher_classes)
+                self.assertIn("internal/test-only", reason)
+                self.assertNotIn(dispatcher, cleaned_dispatchers)
 
     def test_plugin_boundary_catches_use_no_throw_logging(self) -> None:
         text = PLUGIN_MANAGER.read_text(encoding="utf-8")
