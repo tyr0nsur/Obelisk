@@ -1,0 +1,139 @@
+{
+  "schema": "obelisk.permissions-admin-public-contract-decisions.v1",
+  "surface": "obelisk.permissions_admin.v1",
+  "status": "blocked",
+  "public_header_allowed": false,
+  "public_header": "include/obelisk/ObeliskApi.h",
+  "forbidden_public_contract": [
+    "permission groups",
+    "admin groups",
+    "grant/revoke API",
+    "ban/kick API",
+    "moderation authority",
+    "storage/persistence",
+    "operator ingress",
+    "command router",
+    "replies/send-chat",
+    "UE pointers",
+    "raw params",
+    "FName/GObjects indices",
+    "ResourceHandle",
+    "lookup",
+    "mutation",
+    "return override"
+  ],
+  "required_before_public_header": [
+    {
+      "id": "dependency.promoted_player_identity",
+      "category": "dependency",
+      "status": "unresolved",
+      "decision_required": "Promote obelisk.player_identity.v1 before any permission check API is public."
+    },
+    {
+      "id": "identity.principal_generation_required",
+      "category": "identity",
+      "status": "unresolved",
+      "decision_required": "Permission queries must carry principal_generation or be formally callback-local only.",
+      "required_behavior": [
+        "principal_handle alone never authorizes",
+        "missing generation fails closed",
+        "stale generation fails closed",
+        "generation mismatch returns deny or unknown, never allow"
+      ]
+    },
+    {
+      "id": "identity.principal_scope_compatibility",
+      "category": "identity",
+      "status": "unresolved",
+      "allowed_initial_scopes": [
+        "callback-local",
+        "process-local"
+      ],
+      "forbidden_until_separate_promotion": [
+        "cluster-stable",
+        "persistent",
+        "cross-map shared"
+      ],
+      "required_behavior": [
+        "unsupported principal scope fails closed",
+        "process mismatch fails closed",
+        "restart-local or wider scope requires an explicit promoted identity contract"
+      ]
+    },
+    {
+      "id": "abi.permission_query_identity_fields",
+      "category": "abi",
+      "status": "unresolved",
+      "required_fields_or_equivalent": [
+        "principal_handle",
+        "principal_generation",
+        "principal_scope_flags",
+        "action",
+        "action_size",
+        "resource_scope",
+        "resource_scope_size"
+      ],
+      "required_properties": [
+        "POD C ABI",
+        "abi_version and struct_size front-loaded",
+        "owner-token scoped call",
+        "capability gated",
+        "no UE pointers or raw params"
+      ]
+    },
+    {
+      "id": "cache.generation_scope_keying",
+      "category": "cache",
+      "status": "unresolved",
+      "required_cache_key_fields": [
+        "plugin_owner_token",
+        "principal_handle",
+        "principal_generation",
+        "principal_scope_flags",
+        "action",
+        "resource_scope",
+        "policy_epoch"
+      ],
+      "required_behavior": [
+        "cache disabled unless all key fields are defined",
+        "policy epoch mismatch fails closed",
+        "cached allow decisions are invalidated on principal generation change"
+      ]
+    },
+    {
+      "id": "fail_closed.stale_or_scope_mismatch",
+      "category": "fail_closed",
+      "status": "unresolved",
+      "deny_or_unknown_conditions": [
+        "missing principal_generation",
+        "mismatched principal_generation",
+        "unsupported principal_scope_flags",
+        "stale principal",
+        "process mismatch",
+        "unknown policy source",
+        "missing plugin owner token",
+        "missing capability"
+      ],
+      "must_never_return_allow_for": [
+        "stale principal",
+        "scope mismatch",
+        "missing identity",
+        "unknown authority source"
+      ]
+    },
+    {
+      "id": "separation.no_commands_replies_or_admin_mutation",
+      "category": "scope",
+      "status": "unresolved",
+      "required_exclusions": [
+        "command router",
+        "replies/send-chat",
+        "moderation",
+        "ban/kick",
+        "groups/grants",
+        "storage/persistence",
+        "operator ingress"
+      ]
+    }
+  ]
+}

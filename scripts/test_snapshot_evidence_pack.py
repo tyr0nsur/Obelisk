@@ -6,10 +6,15 @@ from __future__ import annotations
 import json
 import hashlib
 import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
 
 import snapshot_evidence_pack
 from snapshot_evidence_pack import evidence_pack_defaults, merge_manifest_default

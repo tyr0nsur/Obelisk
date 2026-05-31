@@ -71,6 +71,10 @@ priorities, and do not use history files as the active source of truth.
 - After player identity, the permissions/admin candidate is query-only fail-closed checks;
   commands/replies still require identity, permissions/admin, and a safe response path,
   while structure census remains an offline side-lane candidate.
+- `docs/permissions_admin_public_contract_decisions.json` blocks any public
+  permissions/admin ABI until principal generation, principal scope, cache keying, and
+  stale/scope-mismatch fail-closed behavior are resolved on top of promoted copied
+  player identity.
 - Stable plugin loading requires safe `OBELISK_INSTANCE_ID` plus real non-symlink plugin,
   config, log, and state roots.
 - `ObeliskApi` v1 is append-only for `v0.1.0`; ABI v2 requires an explicit migration plan.

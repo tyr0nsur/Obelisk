@@ -189,6 +189,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   permission/admin query-only minimum design, command/principal contract, and structure
   census side-lane consume/promote-blocked checks without claiming SDK promotion. This
   does not authorize Transfer runtime work.
+- Permissions/admin now has a machine-readable pre-ABI decision contract in
+  `docs/permissions_admin_public_contract_decisions.json`. Future permission checks must
+  consume promoted copied principal semantics with generation/scope fail-closed behavior;
+  do not add public permission ABI symbols before that contract is resolved.
 - Revalidate before any checkpoint: identity readiness stays blocked with
   `non_protected_core_input_missing`, public SDK v1 completion stays blocked, Plugin Hub
   docs stay non-promotional, and `git diff --check` passes.

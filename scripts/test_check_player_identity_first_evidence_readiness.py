@@ -15,6 +15,8 @@ from unittest import mock
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
 
 import check_player_identity_first_evidence_readiness as checker
 
@@ -88,6 +90,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertEqual(payload["schema"], "obelisk.player-identity-first-evidence-readiness.v1")
         self.assertEqual(payload["status"], "blocked")
         self.assertFalse(payload["ready"])
+        self.assertEqual(payload["primary_blocker"], "offline_binary_and_core_input_missing")
         self.assertFalse(payload["accepted_for_internal_planning"])
         self.assertTrue(payload["not_artifact_gate"])
         self.assertFalse(payload["promotion_ready"])
@@ -212,6 +215,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             "produce_or_approve_non_protected_core_evidence_pack_then_reflection_inventory_pack",
         )
         self.assertEqual(payload["next_actionable_blocker"]["code"], "offline_binary_and_core_input_missing")
+        self.assertEqual(payload["primary_blocker"], payload["next_actionable_blocker"]["code"])
         self.assertEqual(
             payload["next_actionable_blocker"]["blocked_until"],
             "non_protected_offline_binary_and_core_inputs",

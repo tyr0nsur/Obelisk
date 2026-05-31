@@ -806,6 +806,8 @@
         "promotion_requires": [
           "promoted player identity/principal semantics",
           "query-only fail-closed permission checks over copied principals",
+          "permission queries include principal_generation and principal_scope_flags or are formally callback-local only",
+          "stale principal, scope mismatch, missing generation, missing owner token, and unknown authority source fail closed",
           "authority source, abuse controls, and privacy boundaries",
           "append-only POD C ABI design with capability gates, owner-scoped cleanup, and SDK consumer tests"
         ],

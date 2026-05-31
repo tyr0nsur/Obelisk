@@ -1816,6 +1816,16 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             self.assertIn(blocker, permissions["blockers"])
 
+        promotion_requires = " ".join(permissions["v1_decision_contract"]["promotion_requires"])
+        for term in (
+            "principal_generation",
+            "principal_scope_flags",
+            "stale principal",
+            "scope mismatch",
+            "query-only fail-closed permission checks",
+        ):
+            self.assertIn(term, promotion_requires)
+
         for exclusion in (
             "permission groups",
             "admin groups",

@@ -13,11 +13,14 @@ import tempfile
 import unittest
 from pathlib import Path
 
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
 import build_uobject_flag_policy_report as builder
 import validate_offline_artifact_gate as gate
 
-
-SCRIPT_DIR = Path(__file__).resolve().parent
 SCRIPT = SCRIPT_DIR / "build_uobject_flag_policy_report.py"
 CONVERTER = SCRIPT_DIR / "convert_weak_helper_caller_modes.py"
 BINARY_SHA256 = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"

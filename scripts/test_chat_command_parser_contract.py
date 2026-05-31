@@ -4,7 +4,14 @@
 from __future__ import annotations
 
 from dataclasses import fields
+from pathlib import Path
+import sys
 import unittest
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
 
 from plugin_local_chat_command_parser_contract import (
     CHAT_MESSAGE_EVENT_ABI_VERSION,

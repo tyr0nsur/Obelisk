@@ -13,6 +13,10 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
 ANALYZER = REPO_ROOT / "scripts" / "analyze_reflectionscanner_capture.py"
 EVIDENCE_PACK_BUILDER = REPO_ROOT / "scripts" / "build_reflection_evidence_pack.py"
 

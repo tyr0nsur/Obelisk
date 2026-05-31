@@ -1157,6 +1157,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "target_set": PLAYER_IDENTITY_TARGET_SET,
         "blockers": blockers,
         "deferred_until_reflection_inventory_ready": [] if inventory_ready else downstream_blockers,
+        "primary_blocker": next_blocker.get("code"),
         "next_required_artifacts": [] if inventory_ready else [
             {
                 "schema": "obelisk.core-dump-evidence-pack.v1",
