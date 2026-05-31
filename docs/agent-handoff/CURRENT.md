@@ -173,6 +173,12 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   SDK evidence, or a public StructureEvents surface; use it only to bound copied/redacted
   Structure aggregate/census design while evidence, ABI, privacy, and lifecycle policy are
   missing. Design note: `docs/research/2026-05-31-structure-aggregate-census-v0.md`.
+  The 2026-05-31 refinement keeps the lane internal/default-off, limits v0 inputs to
+  copied scalar event views, excludes `VerifyPinCode.ReturnValue` from aggregate output,
+  and records consume-accepted/promote-blocked policy-slice gates. After this lane,
+  Mission copied-bool is the next fastest internal copied-data bridge; Dino compact
+  remains behind it until scalar-only copied-event policy and lifecycle/redaction review
+  exist.
 - Item return-only bridge hardening now keeps copied dispatch construction in
   `ProcessEventItemReflection` helpers, with unit coverage for the three supported event
   kinds, `CraftBlueprint` rejection before runtime item-return reflection, exact

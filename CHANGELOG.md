@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Hardened minimal `ChatMessageEvent` lifecycle and installed-SDK release-example
+  coverage: init-failure/post-registration failure and in-flight unload paths now have
+  regression tests, and the install-layout test builds release-scope examples against the
+  installed `Obelisk::obelisk_sdk` package without source-tree header fallback. This does
+  not promote new public SDK surface.
 - Hardened Mission copied-bool evidence tests, installed SDK shutdown/API guardrails, and
   contributor/operator wording so Mission remains internal-only, descriptor queries fail
   closed before invalid API use, shutdown is idempotent, and server/Discord actions stay

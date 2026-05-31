@@ -1,97 +1,89 @@
-# Structure Aggregate/Census v0 Planning
+# Structure Aggregate/Census v0 Refinement
 
-## Objective
+## Scope
 
-Define the next safe Structure direction after `v0.1.0-rc.2`: an aggregate/census
-surface that can give plugin authors useful read-only build-pressure signals without
-promoting public `StructureEvents`, structure identity, lookup, mutation, return override,
-or `ResourceHandle`.
+This note refines the internal v0 aggregate/census design for Structure observations.
+It is planning-only and records a copied/redacted aggregate contract. It does not promote
+public `StructureEvents`, a Structure SDK, structure identity, lookup, mutation, return
+override, or `ResourceHandle`.
 
-This note is planning only. It records the contract that an internal implementation
-candidate must satisfy before any public SDK design is proposed.
+The safe unit is "validated reflected event shape plus copied/redacted scalar facts".
+It is not "this UE structure", "this player", "this tribe", "this base", or any stable
+cross-event object.
 
-## Current Evidence
+## Event Sources
 
-- Current target-set seed: `structure-aggregate-census-planning`.
-- Classification: planning-only / guidance-only, not release readiness.
-- Seed targets are the same six compact Structure targets already accepted for
-  `structure-observer-intake` layout evidence:
-  - `PrimalStructure.AllowStructureAccess`
-  - `PrimalStructure.IsAllowedToDemolish`
-  - `PrimalStructure.SetVariant`
-  - `PrimalStructureItemContainer.AllowToggleActivation`
-  - `PrimalStructureItemContainer.VerifyPinCode`
-  - `PrimalStructureSeating.CanSeat`
-- Layout-only second-source evidence for those six targets is recorded in
-  `2026-05-29-structure-observer-intake-refresh.md`.
-- Non-PIN copied scalar evidence is recorded in
-  `2026-05-30-structure-nonpin-copied-scalar-policy-slice.md`.
+v0 may aggregate only the six compact Structure targets already accepted for
+`structure-observer-intake` layout evidence and only after the original `ProcessEvent`
+call reports that the original path ran:
 
-The accepted layout evidence supports copied/redacted `GameplayPolicyEvent` backing and
-internal review. It does not prove a census SDK, object identity, runtime traversal, or
-structure authority.
-
-## v0 Contract
-
-The first useful census design should be an internal snapshot/query model, not a public
-push-event stream. It should count only Obelisk-owned, copied/redacted facts:
-
-- event kind counters for the six known target functions;
-- accepted/rejected recognizer counters by target;
-- copied scalar field-mask counters;
-- boolean outcome counters where safe and non-sensitive;
-- non-identifying buckets derived from copied scalar categories, if a later note proves
-  they cannot identify a player, base, tribe, location, or structure.
-
-The unit is "reflected event shape plus copied/redacted scalar facts", not "this UE
-structure". A future public form, if promoted, should prefer caller-copied snapshot data
-over object handles. A plugin may compare snapshots in its own process-local memory, but
-Obelisk must not imply cross-event identity, persistence, cluster state, or lookup.
-
-## Allowed Internal Inputs
-
-For an internal implementation candidate, the following copied scalars are usable as
-inputs after exact shape validation and canonical bool checks:
-
-| Target | Copied fields |
+| Target | v0 source status |
 | --- | --- |
-| `AllowStructureAccess` | `ReturnValue` bool |
-| `IsAllowedToDemolish` | `ReturnValue` bool |
-| `SetVariant` | `VariantIndex` int32, `bForceSet` bool, `ReturnValue` bool |
-| `AllowToggleActivation` | `ReturnValue` bool |
-| `CanSeat` | `bForce` bool, `ReturnValue` bool |
+| `PrimalStructure.AllowStructureAccess` | Count recognition plus copied `ReturnValue` bool. |
+| `PrimalStructure.IsAllowedToDemolish` | Count recognition plus copied `ReturnValue` bool. |
+| `PrimalStructure.SetVariant` | Count recognition plus copied `VariantIndex` int32, `bForceSet` bool, and `ReturnValue` bool. |
+| `PrimalStructureItemContainer.AllowToggleActivation` | Count recognition plus copied `ReturnValue` bool. |
+| `PrimalStructureItemContainer.VerifyPinCode` | Count metadata-level recognition/rejection only. No result or PIN-derived aggregate. |
+| `PrimalStructureSeating.CanSeat` | Count recognition plus copied `bForce` bool and `ReturnValue` bool. |
 
-`VerifyPinCode` may contribute only metadata-level recognition/rejection counts unless a
-future privacy review proves a narrower safe aggregate. Do not count or expose
-`VerifyPinCode.ReturnValue`; it can create a PIN oracle even without exposing `pinCode`.
+Accepted layout evidence for these targets is recorded in
+`2026-05-29-structure-observer-intake-refresh.md`. Non-PIN copied scalar policy evidence
+is recorded in `2026-05-30-structure-nonpin-copied-scalar-policy-slice.md`.
 
-All bool values must be canonical bytes `0` or `1`; values greater than `1` fail closed.
-Object refs, strings, arrays, structs, raw params, and UE pointers stay redacted or absent.
+v0 inputs are copied scalar event views only. Raw UE params, object refs, strings,
+arrays, structs, addresses, FName/GObjects indices, and caller/callee pointers are not
+event sources.
 
-## Field Mask Model
+## Privacy Exclusions
 
-Use an internal recognition mask aligned with the current `StructureField` enum:
+The aggregate must exclude values that can identify or help resolve a player, base,
+tribe, owner, location, inventory, structure, or PIN state. Required exclusions:
 
-```text
-bit0 ForPC
-bit1 ForCharacter
-bit2 PinCode
-bit3 VariantIndex
-bit4 BForceSet
-bit5 BForce
-bit6 ReturnValue
-```
+- `pinCode`, `VerifyPinCode.ReturnValue`, and any PIN-success/failure aggregate;
+- player/controller/character references and identifiers;
+- tribe, alliance, owner, base, team, or structure identity;
+- object addresses, UE pointers, raw params, FName/GObjects identity, and handle-like
+  values;
+- exact coordinates, radii, placement structs, snap groups, inventory/container details,
+  item identifiers, strings, and free text;
+- exact per-event timestamps or sequence data that enables cross-event correlation.
 
-| Target | Recognition mask | Copied/counted mask | Redacted mask |
-| --- | ---: | ---: | ---: |
-| `AllowStructureAccess` | `0x41` | `0x40` | `0x01` |
-| `IsAllowedToDemolish` | `0x41` | `0x40` | `0x01` |
-| `SetVariant` | `0x58` | `0x58` | `0x00` |
-| `AllowToggleActivation` | `0x41` | `0x40` | `0x01` |
-| `VerifyPinCode` | `0x44` | `0x00` | `0x44` |
-| `CanSeat` | `0x63` | `0x60` | `0x03` |
+`VariantIndex` may be aggregated only through a capped per-window histogram. The cap must
+keep the field from becoming an identity, location, or rare-configuration side channel.
 
-Allowed counters by window and target:
+## Lifecycle Gates
+
+The census accumulator remains internal and default-off. It may produce an aggregate
+window only when all lifecycle gates pass:
+
+- Structure recognition gate enabled.
+- Explicit profile/window/marker present.
+- Binary SHA present and supported for the accepted target specs.
+- Runtime budget available for the aggregate path.
+- Exact target prefilter matched before any parameter read or budget reservation.
+- Original `ProcessEvent` path completed before copied return data is counted.
+- Output window contains only approved counters and capped histograms.
+
+When a lifecycle gate fails, the accumulator must clear pending output and skip budget
+consumption. A disabled gate, missing profile/window/marker, missing SHA, unsupported
+SHA, zero budget, or non-target `nameIndex` must not read metadata or params.
+
+## Validation Gates
+
+Each counted event must pass the same strict reflected-shape gates used for copied
+Structure event views:
+
+- exact function name, outer, `NumParms`, `ParmsSize`, property count, and accepted
+  return offset;
+- exact property name, offset, size, `ElementSize`, `ArrayDim`, class name, and schema
+  class-object check for every copied field;
+- copied field ranges present, in bounds, and size-matched;
+- copied bool bytes canonical: only `0` and `1` are accepted;
+- rejection paths clear copied output;
+- redacted fields may influence only redaction/recognition counters, never copied values;
+- unknown, drifted, out-of-bounds, or exception-backed reads fail closed.
+
+Allowed counters by target/window:
 
 - `matched_total`;
 - `original_called_total`;
@@ -101,86 +93,35 @@ Allowed counters by window and target:
 - `copied_field_present_total[field]`;
 - `bool_true_total[field]` and `bool_false_total[field]`;
 - `int32_present_total[field]`;
-- capped `int32_value_histogram[field]` only for `VariantIndex`.
+- capped `int32_value_histogram[VariantIndex]`.
 
-The histogram must cap cardinality per window and must not become an identity or location
-side channel.
+No aggregate output may include raw values for redacted fields, object identity, player
+identity, exact location, exact timestamp, or any field outside the approved copied scalar
+set.
 
-## Abort Conditions
+## Blocked
 
-An internal census accumulator must clear output and skip budget consumption when any of
-these conditions occur:
+The following remain blocked for v0:
 
-- Structure gate disabled, missing profile/window/marker, missing SHA, or unsupported SHA.
-- Both log and dispatch/census limits are zero.
-- `nameIndex` is outside the six exact targets.
-- `function == nullptr`, unsupported layout, reader exception, or invalid memory read.
-- Function name, outer, `NumParms`, `ParmsSize`, `ReturnValueOffset`, or property count
-  drifts from the accepted target spec.
-- Property name, offset, size, `ElementSize`, `ArrayDim`, class name, or class object index
-  drifts from the accepted field spec.
-- Parameter range is absent, out-of-bounds, or size mismatched for a copied field.
-- Any copied bool byte is greater than `1`.
-- The original `ProcessEvent` did not run.
-- Runtime logs or output would include PINs, player identifiers, object addresses,
-  inventory/location data, broad traces, or any other privacy-sensitive value.
-
-## Explicit Non-Claims
-
-This plan does not promote:
-
-- public `StructureEvents`;
-- public Structure SDK;
-- structure handles or `ResourceHandle`;
-- player, tribe, owner, base, or structure identity;
-- FName/GObjects indices as identity;
-- lookup, traversal, linked-structure graphs, or cross-event correlation;
-- exact coordinates, radii, placement structs, snap groups, pin codes, or player text;
-- placement denial, no-collision, destroy/repair/change APIs, mutation, or return override;
-- runtime observation or live-server testing without a current live-ops brief.
+- public `StructureEvents`, public Structure SDK, or public aggregate/census SDK claims;
+- structure handles, `ResourceHandle`, lookup, traversal, linked-structure graphs, or
+  cross-event correlation;
+- player, tribe, owner, base, location, or structure-scoped counts;
+- PIN validation outcomes, PIN-derived aggregates, and `pinCode` exposure;
+- object refs, strings, arrays, structs, raw params, UE pointers, addresses, FName/GObjects
+  identity, and exact timestamps in output;
+- placement denial, no-collision, destroy/repair/change APIs, mutation, return override,
+  or manually calling original `ProcessEvent`;
+- runtime observation, live-server testing, restarts, markers, ptrace, gcore, broad
+  tracing, or `/servidor/ark` access without a separate current live-ops brief.
 
 `APrimalStructure.IsAllowedToBuild` and `PrimalStructure.IsAllowedToBuild` remain
-second-wave build-policy seeds. They are outside this v0 census plan until an exact
-sanitized snapshot, redaction policy, distinct second-source comparison, and separate
-promotion review exist.
+second-wave build-policy seeds. They are outside v0 until an exact sanitized snapshot,
+redaction policy, distinct second-source comparison, and separate promotion review exist.
 
-## Product Uses That Are Honest
+## Offline Check
 
-If promoted later, v0 could support:
-
-- process-local aggregate audit logs by event kind and field mask;
-- dashboard-style "build pressure" counters without identities or locations;
-- rough, non-identifying category/bucket summaries;
-- plugin-local trend comparisons between snapshots;
-- descriptor/catalog examples that show what census categories exist.
-
-Uses that must wait for player identity, `ResourceHandle`, or mutation gates:
-
-- counts by player, tribe, alliance, owner, or base;
-- "top tribes" or ownership reports;
-- selecting, following, resolving, or inspecting one structure;
-- correlating multiple events as the same structure;
-- linked structure graphs, exact location/radius queries, safe-zone enforcement,
-  no-collision, placement denial, destroy/repair/mutate behavior, or return override.
-
-## Promotion Path
-
-1. Keep `structure-aggregate-census-planning` planning-only and release-gate rejected.
-2. Add focused guardrails for public docs/API claims around Structure aggregate/census
-   before public wording grows.
-3. Build an internal aggregate accumulator only over copied/redacted Structure event
-   views, not raw UE params.
-4. Test abort conditions: PIN result, object refs, FName/GObjects-as-identity, raw params,
-   addresses, exact timestamps, exact locations, and unknown fields must not enter output.
-5. If runtime evidence becomes necessary, request a scoped live-ops brief with instance,
-   gates, window, privacy bounds, evidence path, and rollback. Do not infer approval from
-   this plan.
-6. Only after internal lifecycle, privacy, ABI, installed SDK consumer tests, and
-   second-source/static evidence pass should a public SDK proposal be written.
-
-## Offline Commands
-
-List guidance without reading snapshots:
+The planning target set can be listed without reading snapshots or touching servers:
 
 ```bash
 python3 scripts/compare_reflection_snapshots.py \
@@ -189,17 +130,40 @@ python3 scripts/compare_reflection_snapshots.py \
   --json
 ```
 
-Check the existing release Structure layout lane with sanitized fixture inputs only:
+Current supporting policy-slice artifacts are usable only as internal evidence. They must
+continue to pass consume mode and block promote mode before any implementation work cites
+them:
 
 ```bash
-python3 scripts/compare_reflection_snapshots.py \
-  --base-root tests/fixtures/ufunction_snapshots \
-  --readiness-report \
-  --fail-on-readiness-gaps \
-  --target-set structure-observer-intake \
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate_offline_artifact_gate.py \
+  --root /home/flowcommunity-ark/obelisk-artifacts/structure-return-only-policy-slice-20260530T093002Z \
+  --manifest /home/flowcommunity-ark/obelisk-artifacts/structure-return-only-policy-slice-20260530T093002Z/structure-return-only-policy-slice.json \
+  --mode consume \
+  --json
+
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate_offline_artifact_gate.py \
+  --root /home/flowcommunity-ark/obelisk-artifacts/structure-return-only-policy-slice-20260530T093002Z \
+  --manifest /home/flowcommunity-ark/obelisk-artifacts/structure-return-only-policy-slice-20260530T093002Z/structure-return-only-policy-slice.json \
+  --mode promote \
+  --json
+
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate_offline_artifact_gate.py \
+  --root /home/flowcommunity-ark/obelisk-artifacts/structure-nonpin-copied-scalar-policy-slice-20260530T100717Z \
+  --manifest /home/flowcommunity-ark/obelisk-artifacts/structure-nonpin-copied-scalar-policy-slice-20260530T100717Z/structure-nonpin-copied-scalar-policy-slice.json \
+  --mode consume \
+  --json
+
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate_offline_artifact_gate.py \
+  --root /home/flowcommunity-ark/obelisk-artifacts/structure-nonpin-copied-scalar-policy-slice-20260530T100717Z \
+  --manifest /home/flowcommunity-ark/obelisk-artifacts/structure-nonpin-copied-scalar-policy-slice-20260530T100717Z/structure-nonpin-copied-scalar-policy-slice.json \
+  --mode promote \
   --json
 ```
 
-This second command is expected to require a distinct `--candidate-root` for a real
-second-source readiness check. Do not use `/servidor/ark` live roots, restarts, ptrace,
-gcore, markers, or ReflectionScanner for this planning step.
+Observed on 2026-05-31: both consume gates returned `status=accepted`; both promote gates
+returned `status=blocked` with evidence-only/non-claim blockers. That is the intended
+state for v0 planning: useful enough to design internal copied counters, not promotable
+as a public Structure SDK or runtime claim.
+
+Do not use live roots, restarts, ptrace, gcore, markers, `/servidor/ark`, or
+`ReflectionScanner` for this planning note.
