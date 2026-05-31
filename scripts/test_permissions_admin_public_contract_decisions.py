@@ -78,6 +78,8 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
             "permission cache ABI",
             "command/chat response path",
             "replies/send-chat",
+            "principal or permission claims from command text",
+            "principal or permission claims from operator config",
             "allow without provenance",
             "public header symbols",
         ):
@@ -94,6 +96,9 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
         for behavior in (
             "before player identity is promoted, permissions/admin exposes no public ABI, callbacks, cache ABI, command/reply implication, or header symbols",
             "player identity planning evidence alone cannot enable permissions/admin",
+            "runtime observation must establish principal identity before permissions/admin can consume it",
+            "operator config enables surfaces or policy inputs only and cannot establish principal identity",
+            "command text cannot establish principal identity",
             "permissions/admin remains post-v1 or excluded until this dependency is promoted or explicitly excluded",
         ):
             self.assertIn(behavior, dependency["required_behavior"])
@@ -184,6 +189,9 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
             "authority generation mismatch fails closed",
             "allow decisions must carry policy_epoch provenance",
             "allow without policy provenance is forbidden",
+            "operator-config cannot establish principal identity or permission claims before runtime principal observation",
+            "command text cannot establish principal identity, permission authority, or policy provenance",
+            "permission authority derives only from an established runtime principal plus runtime-owned provenance",
             "plugin input cannot self-attest authority provenance",
         ):
             self.assertIn(behavior, provenance["required_behavior"])
@@ -209,6 +217,9 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
         fail_closed = requirements["fail_closed.stale_or_scope_mismatch"]
         for condition in (
             "missing principal_generation",
+            "missing runtime principal identity",
+            "command text principal claim",
+            "operator config principal claim",
             "mismatched principal_generation",
             "unsupported principal_scope_flags",
             "stale principal",
@@ -224,6 +235,9 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
             self.assertIn(condition, fail_closed["deny_or_unknown_conditions"])
         self.assertIn("unknown authority source", fail_closed["must_never_return_allow_for"])
         self.assertIn("missing policy source provenance", fail_closed["must_never_return_allow_for"])
+        self.assertIn("missing runtime principal identity", fail_closed["must_never_return_allow_for"])
+        self.assertIn("command text principal claim", fail_closed["must_never_return_allow_for"])
+        self.assertIn("operator config principal claim", fail_closed["must_never_return_allow_for"])
         self.assertIn("allow without policy_epoch provenance", fail_closed["must_never_return_allow_for"])
         self.assertIn("plugin-supplied provenance", fail_closed["must_never_return_allow_for"])
         self.assertIn("rate limit exceeded", fail_closed["must_never_return_allow_for"])

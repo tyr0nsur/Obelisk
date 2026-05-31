@@ -131,3 +131,11 @@ lookup, mutation, or return override remain explicitly insufficient.
 The requirements block also records that the current report does not authorize runtime
 work, server operations, debug attachment, `ptrace`, `gcore`, runtime scanners, restarts,
 Discord/community notices, GitHub publication, tags, pushes, or release claims.
+
+`scripts/check_player_identity_runtime_principal_lifecycle_evidence.py` is the current
+schema-specific guard for a future private runtime-evidence manifest. It accepts only a
+synthetic/redacted shape fixture and reports `approved_runtime_evidence_present=false`;
+`validate_offline_artifact_gate.py` can consume that schema, but promote mode remains
+blocked. This gives the future runtime window a fail-closed manifest shape without
+turning synthetic fixtures, raw logs, protected paths, UE coordinates, player identifiers,
+or principal policy documents into public SDK evidence.

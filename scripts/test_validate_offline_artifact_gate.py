@@ -20,6 +20,9 @@ import build_resource_handle_serial_policy as serial_policy_builder
 from test_check_permissions_admin_query_failclosed_contract import (
     manifest as permissions_admin_query_failclosed_manifest,
 )
+from test_check_player_identity_runtime_principal_lifecycle_evidence import (
+    manifest as runtime_principal_lifecycle_evidence_manifest,
+)
 
 
 BINARY_SHA = "a" * 64
@@ -6546,6 +6549,49 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertEqual("blocked", result["status"])
         reasons = {blocker["reason"] for blocker in result["blockers"]}
         self.assertIn("promote_mode_players_identity_principal_invalidation_policy_candidate_only", reasons)
+
+    def test_accepts_players_identity_runtime_principal_lifecycle_shape_fixture_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "players-identity-runtime-principal-lifecycle-evidence.json"
+            write_json(manifest, runtime_principal_lifecycle_evidence_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual("accepted", result["status"])
+        self.assertEqual(result["blockers"], [])
+
+    def test_blocks_players_identity_runtime_principal_lifecycle_shape_fixture_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "players-identity-runtime-principal-lifecycle-evidence.json"
+            write_json(manifest, runtime_principal_lifecycle_evidence_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        self.assertEqual("blocked", result["status"])
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("promote_mode_players_identity_runtime_principal_lifecycle_evidence_not_readiness", reasons)
+
+    def test_blocks_players_identity_runtime_principal_lifecycle_shape_fixture_overclaims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "players-identity-runtime-principal-lifecycle-evidence.json"
+            payload = runtime_principal_lifecycle_evidence_manifest()
+            payload["runtime_ready"] = True
+            payload["observations"][0]["uobject_address"] = "0x1234"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual("blocked", result["status"])
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("runtime_ready_not_false", reasons)
+        self.assertIn("ue_coordinate_or_pointer_leakage", reasons)
+        self.assertIn("players_identity_runtime_principal_lifecycle_evidence_readiness_overclaim", reasons)
 
     def test_accepts_permissions_admin_query_failclosed_contract_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

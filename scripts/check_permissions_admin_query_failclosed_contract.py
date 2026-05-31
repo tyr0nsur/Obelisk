@@ -54,6 +54,9 @@ REQUIRED_FAIL_CLOSED_CASES = frozenset(
     (
         "stale_principal",
         "scope_mismatch",
+        "missing_runtime_principal_identity",
+        "command_text_principal_claim",
+        "operator_config_principal_claim",
         "missing_principal_generation",
         "missing_plugin_owner_token",
         "missing_capability",
@@ -90,9 +93,19 @@ REQUIRED_NON_CLAIMS = frozenset(
         "candidate-only pre-ABI permissions/admin query contract",
         "does not add public headers, runtime wiring, public cache ABI, command responses, commands, replies, storage, groups, grants, ban/kick, mutation, lookup, ResourceHandle, UE pointers, or return override",
         "allow decisions require policy provenance and fail closed on missing or unknown authority",
+        "command text and operator config cannot establish principal identity or permission claims before runtime principal observation",
         "promotion, public SDK readiness, and runtime readiness require a separate reviewed ABI and runtime gate",
     )
 )
+REQUIRED_PRINCIPAL_RUNTIME_IDENTITY_POLICY = {
+    "config_enables_surface_only": True,
+    "runtime_observation_establishes_identity": True,
+    "runtime_principal_required_for_permission_authority": True,
+    "command_text_principal_claim_allowed": False,
+    "operator_config_principal_claim_allowed": False,
+    "command_text_permission_claim_allowed": False,
+    "operator_config_permission_claim_allowed": False,
+}
 
 FORBIDDEN_COORDINATE_KEYS = frozenset(
     (
@@ -158,6 +171,27 @@ OVERCLAIM_NEGATIVE_PREFIXES = (
     "$.negative_surface_exclusions",
     "$.non_claims",
     "$.promotion_gate.blockers",
+)
+FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_KEYS = frozenset(
+    (
+        "authority_claim_source",
+        "identity_claim_source",
+        "identity_source",
+        "permission_claim_source",
+        "permission_source",
+        "principal_claim_source",
+        "principal_source",
+    )
+)
+FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_VALUES = frozenset(
+    (
+        "command text",
+        "command-text",
+        "command_text",
+        "operator config",
+        "operator-config",
+        "operator_config",
+    )
 )
 
 
@@ -263,6 +297,36 @@ def find_forbidden_surface(value: Any, trail: str = "$") -> tuple[str, str] | No
                 return found
     elif isinstance(value, str) and FORBIDDEN_SURFACE_RE.search(value):
         return value, trail
+    return None
+
+
+def contains_forbidden_pre_runtime_claim_source(value: Any) -> bool:
+    if isinstance(value, str):
+        return value.casefold() in FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_VALUES
+    if isinstance(value, list):
+        return any(contains_forbidden_pre_runtime_claim_source(item) for item in value)
+    if isinstance(value, dict):
+        return any(contains_forbidden_pre_runtime_claim_source(item) for item in value.values())
+    return False
+
+
+def find_forbidden_pre_runtime_claim_source(value: Any, trail: str = "$") -> tuple[str, str] | None:
+    if is_negative_context(trail):
+        return None
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_trail = f"{trail}.{key}"
+            normalized_key = str(key).casefold().replace("-", "_").replace(" ", "_")
+            if normalized_key in FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_KEYS and contains_forbidden_pre_runtime_claim_source(child):
+                return str(key), child_trail
+            found = find_forbidden_pre_runtime_claim_source(child, child_trail)
+            if found is not None:
+                return found
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            found = find_forbidden_pre_runtime_claim_source(child, f"{trail}[{index}]")
+            if found is not None:
+                return found
     return None
 
 
@@ -462,6 +526,22 @@ def validate_authority_policy(policy: Any, blockers: list[dict[str, Any]]) -> tu
     return recognized, allow_capable
 
 
+def validate_principal_runtime_identity_policy(policy: Any, blockers: list[dict[str, Any]]) -> None:
+    label = "$.principal_runtime_identity_policy"
+    if not isinstance(policy, dict):
+        add(blockers, "principal_runtime_identity_policy_missing", label)
+        return
+    for key, expected in REQUIRED_PRINCIPAL_RUNTIME_IDENTITY_POLICY.items():
+        if policy.get(key) is not expected:
+            add(
+                blockers,
+                f"principal_runtime_identity_policy_{key}_invalid",
+                f"{label}.{key}",
+                expected=expected,
+                value=policy.get(key),
+            )
+
+
 def validate_fail_closed_cases(cases: Any, blockers: list[dict[str, Any]]) -> list[str]:
     if not isinstance(cases, list):
         add(blockers, "fail_closed_cases_not_list", "$.fail_closed_cases")
@@ -543,6 +623,7 @@ def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation
     recognized_authority_kinds, allow_capable_authority_kinds = validate_authority_policy(
         payload.get("authority_policy"), blockers
     )
+    validate_principal_runtime_identity_policy(payload.get("principal_runtime_identity_policy"), blockers)
     fail_closed_cases = validate_fail_closed_cases(payload.get("fail_closed_cases"), blockers)
     validate_negative_exclusions(payload.get("negative_surface_exclusions"), blockers)
     validate_promotion_gate(payload.get("promotion_gate"), blockers)
@@ -560,6 +641,10 @@ def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation
     if forbidden is not None:
         value, trail = forbidden
         add(blockers, "forbidden_surface_claim", trail, value=value)
+    claim_source = find_forbidden_pre_runtime_claim_source(payload)
+    if claim_source is not None:
+        field, trail = claim_source
+        add(blockers, "pre_runtime_principal_or_permission_claim_source", trail, field=field)
     for overclaim in collect_overclaim_fields(payload):
         add(blockers, overclaim["reason"], overclaim["label"])
 

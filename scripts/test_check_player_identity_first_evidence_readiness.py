@@ -22,6 +22,7 @@ if str(SCRIPT_DIR) not in sys.path:
 import check_player_identity_first_evidence_readiness as checker
 from test_check_player_identity_lifecycle_anchor_candidates import accepted_lifecycle_anchor_manifest
 from test_check_player_identity_principal_invalidation_policy import manifest as principal_policy_manifest
+from test_check_player_identity_runtime_principal_lifecycle_evidence import manifest as runtime_principal_lifecycle_manifest
 from reflection_target_sets import schema_target_list  # noqa: E402
 
 
@@ -764,14 +765,20 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             lifecycle_manifest = Path(tmp) / "lifecycle-candidates.json"
             principal_manifest = Path(tmp) / "principal-policy.json"
+            runtime_manifest = Path(tmp) / "runtime-principal-lifecycle-shape.json"
             lifecycle_manifest.write_text(json.dumps(accepted_lifecycle_anchor_manifest()), encoding="utf-8")
             principal_manifest.write_text(json.dumps(principal_policy_manifest()), encoding="utf-8")
+            runtime_manifest.write_text(
+                json.dumps(runtime_principal_lifecycle_manifest()),
+                encoding="utf-8",
+            )
             args = SimpleNamespace(
                 artifact_root=Path("/tmp/player-identity-artifacts"),
                 snapshot_root=Path("/tmp/player-identity-snapshots"),
                 candidate_root=Path("/tmp/player-identity-second-source"),
                 lifecycle_anchor_candidates_manifest=lifecycle_manifest,
                 principal_invalidation_policy_manifest=principal_manifest,
+                runtime_principal_lifecycle_evidence_manifest=runtime_manifest,
             )
             with (
                 mock.patch.object(checker, "run_json_command", side_effect=fake_run_json_command),
@@ -821,6 +828,12 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             payload["next_actionable_blocker"]["next_required_evidence"]["schema"],
             runtime_requirements["schema"],
         )
+        runtime_manifest_diagnosis = payload["first_evidence"]["runtime_principal_lifecycle_evidence_manifest"]
+        self.assertTrue(runtime_manifest_diagnosis["ready"])
+        self.assertTrue(runtime_manifest_diagnosis["shape_accepted_by_this_checker"])
+        self.assertFalse(runtime_manifest_diagnosis["approved_runtime_evidence_present"])
+        self.assertFalse(runtime_manifest_diagnosis["runtime_evidence_ready"])
+        self.assertEqual(runtime_manifest_diagnosis["remaining_blockers"], ["approved_runtime_evidence_missing"])
         self.assertEqual(payload["next_step"], "produce_approved_runtime_principal_lifecycle_evidence")
         self.assertFalse(payload["promotion_ready"])
         self.assertFalse(payload["public_sdk_ready"])

@@ -23,6 +23,8 @@
     "moderation authority",
     "storage/persistence",
     "operator ingress",
+    "principal or permission claims from command text",
+    "principal or permission claims from operator config",
     "command router",
     "command/chat response path",
     "replies/send-chat",
@@ -46,6 +48,9 @@
       "required_behavior": [
         "before player identity is promoted, permissions/admin exposes no public ABI, callbacks, cache ABI, command/reply implication, or header symbols",
         "player identity planning evidence alone cannot enable permissions/admin",
+        "runtime observation must establish principal identity before permissions/admin can consume it",
+        "operator config enables surfaces or policy inputs only and cannot establish principal identity",
+        "command text cannot establish principal identity",
         "permissions/admin remains post-v1 or excluded until this dependency is promoted or explicitly excluded"
       ]
     },
@@ -163,6 +168,9 @@
         "missing authority generation fails closed",
         "authority generation mismatch fails closed",
         "operator-config authority is recognized but not allow-capable until separately promoted",
+        "operator-config cannot establish principal identity or permission claims before runtime principal observation",
+        "command text cannot establish principal identity, permission authority, or policy provenance",
+        "permission authority derives only from an established runtime principal plus runtime-owned provenance",
         "allow decisions must carry policy_epoch provenance",
         "allow without policy provenance is forbidden",
         "plugin input cannot self-attest authority provenance"
@@ -188,6 +196,9 @@
       "status": "unresolved",
       "deny_or_unknown_conditions": [
         "missing principal_generation",
+        "missing runtime principal identity",
+        "command text principal claim",
+        "operator config principal claim",
         "mismatched principal_generation",
         "unsupported principal_scope_flags",
         "stale principal",
@@ -208,6 +219,9 @@
         "stale principal",
         "scope mismatch",
         "missing identity",
+        "missing runtime principal identity",
+        "command text principal claim",
+        "operator config principal claim",
         "unknown authority source",
         "missing policy source provenance",
         "allow without policy_epoch provenance",

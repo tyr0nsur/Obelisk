@@ -91,9 +91,21 @@ def manifest() -> dict:
             "cross_process_authority_allowed": False,
             "unknown_authority_fails_closed": True,
         },
+        "principal_runtime_identity_policy": {
+            "config_enables_surface_only": True,
+            "runtime_observation_establishes_identity": True,
+            "runtime_principal_required_for_permission_authority": True,
+            "command_text_principal_claim_allowed": False,
+            "operator_config_principal_claim_allowed": False,
+            "command_text_permission_claim_allowed": False,
+            "operator_config_permission_claim_allowed": False,
+        },
         "fail_closed_cases": [
             fail_closed_case("stale_principal"),
             fail_closed_case("scope_mismatch"),
+            fail_closed_case("missing_runtime_principal_identity"),
+            fail_closed_case("command_text_principal_claim"),
+            fail_closed_case("operator_config_principal_claim"),
             fail_closed_case("missing_principal_generation"),
             fail_closed_case("missing_plugin_owner_token"),
             fail_closed_case("missing_capability"),
@@ -137,6 +149,7 @@ def manifest() -> dict:
             "candidate-only pre-ABI permissions/admin query contract",
             "does not add public headers, runtime wiring, public cache ABI, command responses, commands, replies, storage, groups, grants, ban/kick, mutation, lookup, ResourceHandle, UE pointers, or return override",
             "allow decisions require policy provenance and fail closed on missing or unknown authority",
+            "command text and operator config cannot establish principal identity or permission claims before runtime principal observation",
             "promotion, public SDK readiness, and runtime readiness require a separate reviewed ABI and runtime gate",
         ],
     }
@@ -203,6 +216,7 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
             report["fail_closed_cases"],
             [
                 "authority_generation_mismatch",
+                "command_text_principal_claim",
                 "missing_authority_generation",
                 "missing_capability",
                 "missing_plugin_owner_token",
@@ -210,6 +224,8 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
                 "missing_policy_source",
                 "missing_policy_source_generation",
                 "missing_principal_generation",
+                "missing_runtime_principal_identity",
+                "operator_config_principal_claim",
                 "plugin_supplied_provenance",
                 "policy_source_generation_mismatch",
                 "rate_limit_exceeded",
@@ -303,6 +319,9 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
     def test_rejects_missing_fail_closed_blocker_cases(self) -> None:
         for case_name in (
             "scope_mismatch",
+            "missing_runtime_principal_identity",
+            "command_text_principal_claim",
+            "operator_config_principal_claim",
             "missing_policy_source",
             "missing_policy_source_generation",
             "policy_source_generation_mismatch",
@@ -365,6 +384,55 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("authority_allow_capable_kinds_unexpected", report["blockers"])
         self.assertIn("authority_forbidden_allow_capable_kind", report["blockers"])
+
+    def test_rejects_missing_or_weakened_principal_runtime_identity_policy(self) -> None:
+        payload = manifest()
+        payload.pop("principal_runtime_identity_policy")
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("principal_runtime_identity_policy_missing", report["blockers"])
+
+        payload = manifest()
+        payload["principal_runtime_identity_policy"]["runtime_observation_establishes_identity"] = False
+        payload["principal_runtime_identity_policy"]["command_text_principal_claim_allowed"] = True
+        payload["principal_runtime_identity_policy"]["operator_config_permission_claim_allowed"] = True
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(
+            "principal_runtime_identity_policy_runtime_observation_establishes_identity_invalid",
+            report["blockers"],
+        )
+        self.assertIn(
+            "principal_runtime_identity_policy_command_text_principal_claim_allowed_invalid",
+            report["blockers"],
+        )
+        self.assertIn(
+            "principal_runtime_identity_policy_operator_config_permission_claim_allowed_invalid",
+            report["blockers"],
+        )
+
+    def test_rejects_principal_or_permission_claim_sources_before_runtime_identity(self) -> None:
+        for key, value in (
+            ("principal_source", "command_text"),
+            ("identity_claim_source", "operator-config"),
+            ("permission_claim_source", ["operator config"]),
+            ("authority_claim_source", {"source": "command text"}),
+        ):
+            with self.subTest(key=key):
+                payload = manifest()
+                payload["future_claim"] = {key: value}
+
+                result = self.run_checker(payload, check=False)
+                report = json.loads(result.stdout)
+
+                self.assertEqual(result.returncode, 1)
+                self.assertIn("pre_runtime_principal_or_permission_claim_source", report["blockers"])
 
     def test_rejects_missing_required_authority_kind_sets(self) -> None:
         payload = manifest()

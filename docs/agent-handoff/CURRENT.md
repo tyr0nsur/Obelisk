@@ -106,7 +106,9 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `/servidor/ark/workspace-offline/player-identity-principal-invalidation-policy-20260531T231247Z/`,
   the primary blocker becomes `approved_runtime_evidence_missing`. The emitted
   `first_evidence.runtime_principal_lifecycle_evidence` block is requirements-only, not
-  accepted evidence or promotion.
+  accepted evidence or promotion. The optional
+  `--runtime-principal-lifecycle-evidence-manifest` input accepts only a synthetic/redacted
+  shape fixture; it still leaves `approved_runtime_evidence_missing` in place.
 - Static orientation reports for identity/lifecycle/admin and command response are
   navigation clues only, not consume/promote evidence packs or artifact-gate schemas.
 - The current artifact-root audit is summarized in

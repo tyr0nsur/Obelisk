@@ -53,6 +53,24 @@ class CommandChatResponsePublicContractDecisionTests(unittest.TestCase):
         self.assertFalse(payload["legacy_call_process_event_public_response_allowed"])
         recorded = {item["id"] for item in payload["required_before_public_header"]}
         self.assertEqual(recorded, REQUIRED_IDS)
+        for forbidden in (
+            "principal or permission claims from command text",
+            "principal or permission claims from operator config",
+        ):
+            self.assertIn(forbidden, payload["forbidden_public_contract"])
+
+        identity = next(
+            item
+            for item in payload["required_before_public_header"]
+            if item["id"] == "dependency.promoted_player_identity"
+        )
+        for behavior in (
+            "runtime observation establishes principal identity before command/chat response can consume it",
+            "command text cannot establish principal identity",
+            "operator config enables surfaces only and cannot establish principal identity",
+            "response delivery never creates identity or permission claims",
+        ):
+            self.assertIn(behavior, identity["required_behavior"])
 
     def test_copied_response_abi_blocks_raw_ue_and_legacy_debug_paths(self) -> None:
         payload = self.load_decisions()
@@ -110,6 +128,9 @@ class CommandChatResponsePublicContractDecisionTests(unittest.TestCase):
         privacy = requirements["privacy.redaction_and_targeting"]
         for behavior in (
             "stale principal fails closed",
+            "missing established runtime principal fails closed",
+            "command text principal claims fail closed",
+            "operator config principal claims fail closed",
             "principal generation mismatch fails closed",
             "unsupported scope fails closed",
             "private identity fields are not logged",

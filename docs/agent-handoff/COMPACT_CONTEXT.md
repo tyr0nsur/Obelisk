@@ -288,7 +288,9 @@ priorities, and do not use history files as the active source of truth.
   checker moves the primary blocker to `approved_runtime_evidence_missing`, still with
   promotion/public/runtime readiness false. The report also carries a requirements-only
   `first_evidence.runtime_principal_lifecycle_evidence` block for the future approved
-  runtime window; it is not accepted evidence and must not be used for promotion.
+  runtime window; it is not accepted evidence and must not be used for promotion. The
+  optional runtime-principal lifecycle manifest checker accepts only a synthetic/redacted
+  shape fixture and stays blocked on approved runtime evidence.
   Separately, all six `players-lifecycle-anchor-candidates` targets are reproducible in
   scratch base-vs-vanilla evidence with `accepted=6` and now have committed
   planning-only base fixtures under `players_lifecycle`; promotion still fails as

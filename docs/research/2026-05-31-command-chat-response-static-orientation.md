@@ -39,6 +39,11 @@ The new checker validates only bounded static features:
   `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`;
 - protected-path and symlink rejection before reading input.
 
+The checker also keeps the principal route invariant explicit: static response-path
+orientation cannot create identity or permission claims. Command text and operator config
+are not principal sources; a future copied response path may only consume an already
+established runtime principal and a separately promoted permissions/admin decision.
+
 ## Repro Commands
 
 ```bash
@@ -79,6 +84,8 @@ fails.
 - Does not prove UFunction object identity, FName index stability, UProperty chains,
   parameter offsets, copied-data ownership, response payload shape, command execution, or
   player/principal mapping.
+- Does not derive principal identity, permission, or admin authority from command text or
+  operator config.
 - Does not replace a non-protected complete core evidence pack, reflection inventory pack,
   focal snapshots, second-source evidence, isolated runtime validation, or a copied-data
   response contract.

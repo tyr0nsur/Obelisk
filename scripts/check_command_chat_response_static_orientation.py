@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import struct
 from dataclasses import dataclass
 from pathlib import Path
@@ -37,10 +38,14 @@ PUBLIC_ABI_FALSE_FIELDS = (
     "player_identity_contract",
     "permission_admin_contract",
     "copied_response_contract",
+    "principal_identity_claim_from_command_text",
+    "principal_identity_claim_from_operator_config",
+    "permission_claim_creation",
     "raw_ue_pointer_or_fstring_exposure",
 )
 REQUIRED_PROMOTION_BLOCKERS = (
     "player_identity_contract_not_promoted",
+    "runtime_principal_identity_not_established",
     "permission_admin_contract_not_promoted",
     "copied_response_contract_not_promoted",
     "public_command_reply_send_chat_api_not_promoted",
@@ -50,8 +55,48 @@ CONTRACT_TOPIC = "command_chat_response_path"
 REQUIRED_CONTRACT_BLOCKERS = (
     "requires_non_protected_core_evidence_pack",
     "requires_reflection_inventory_or_focal_snapshots_for_response_path_targets",
+    "requires_established_runtime_principal_before_response_authority",
     "requires_command_router_identity_and_permission_contracts_before_command_replies",
     "requires_copied_data_response_contract_before_public_sdk_promotion",
+)
+RUNTIME_PRINCIPAL_AUTHORITY_BOUNDARY_STATUS = "blocked_until_runtime_principal_and_permission_authority_established"
+RUNTIME_PRINCIPAL_AUTHORITY_BOUNDARY = {
+    "status": RUNTIME_PRINCIPAL_AUTHORITY_BOUNDARY_STATUS,
+    "config_enables_surface_only": True,
+    "runtime_observation_required_for_identity": True,
+    "established_runtime_principal_required": True,
+    "permission_authority_must_preexist_response": True,
+    "command_text_identity_claim_allowed": False,
+    "operator_config_identity_claim_allowed": False,
+    "response_creates_identity_claims": False,
+    "response_creates_permission_claims": False,
+}
+NEGATIVE_CONTEXT_TOKENS = (
+    "blocker",
+    "deny",
+    "exclude",
+    "exclusion",
+    "fail_closed",
+    "forbid",
+    "forbidden",
+    "negative",
+    "non_claim",
+    "reject",
+)
+FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_KEYS = frozenset(
+    (
+        "authority_claim_source",
+        "identity_claim_source",
+        "identity_source",
+        "permission_claim_source",
+        "permission_source",
+        "principal_claim_source",
+        "principal_source",
+    )
+)
+FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_RE = re.compile(
+    r"\b(command[_ -]?text|operator[_ -]?config)\b",
+    re.IGNORECASE,
 )
 
 
@@ -605,6 +650,45 @@ def public_abi_boundary() -> dict[str, Any]:
     return boundary
 
 
+def principal_authority_boundary() -> dict[str, Any]:
+    return dict(RUNTIME_PRINCIPAL_AUTHORITY_BOUNDARY)
+
+
+def is_negative_context(trail: str) -> bool:
+    lowered = trail.casefold()
+    return any(token in lowered for token in NEGATIVE_CONTEXT_TOKENS)
+
+
+def contains_forbidden_pre_runtime_claim_source(value: Any) -> bool:
+    if isinstance(value, str):
+        return FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_RE.search(value) is not None
+    if isinstance(value, list):
+        return any(contains_forbidden_pre_runtime_claim_source(item) for item in value)
+    if isinstance(value, dict):
+        return any(contains_forbidden_pre_runtime_claim_source(item) for item in value.values())
+    return False
+
+
+def find_forbidden_pre_runtime_claim_source(value: Any, trail: str = "$") -> tuple[str, str] | None:
+    if is_negative_context(trail):
+        return None
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_trail = f"{trail}.{key}"
+            normalized_key = str(key).casefold().replace("-", "_").replace(" ", "_")
+            if normalized_key in FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_KEYS and contains_forbidden_pre_runtime_claim_source(child):
+                return str(key), child_trail
+            found = find_forbidden_pre_runtime_claim_source(child, child_trail)
+            if found is not None:
+                return found
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            found = find_forbidden_pre_runtime_claim_source(child, f"{trail}[{index}]")
+            if found is not None:
+                return found
+    return None
+
+
 def validate_report_boundary(report: dict[str, Any]) -> list[dict[str, Any]]:
     blockers: list[dict[str, Any]] = []
 
@@ -658,6 +742,19 @@ def validate_report_boundary(report: dict[str, Any]) -> list[dict[str, Any]]:
                     "command_chat_response_public_abi_overclaim",
                     field=field,
                     value=public_boundary.get(field),
+                )
+
+    principal_boundary = report.get("principal_authority_boundary")
+    if not isinstance(principal_boundary, dict):
+        add("command_chat_response_principal_authority_boundary_missing")
+    else:
+        for field, expected in RUNTIME_PRINCIPAL_AUTHORITY_BOUNDARY.items():
+            if principal_boundary.get(field) != expected:
+                add(
+                    "command_chat_response_principal_authority_boundary_invalid",
+                    field=field,
+                    expected=expected,
+                    value=principal_boundary.get(field),
                 )
 
     promotion_blockers = report.get("promotion_blockers")
@@ -765,6 +862,11 @@ def validate_report_boundary(report: dict[str, Any]) -> list[dict[str, Any]]:
                 value=target.get("artifact_gate_evidence"),
             )
 
+    claim_source = find_forbidden_pre_runtime_claim_source(report)
+    if claim_source is not None:
+        field, trail = claim_source
+        add("command_chat_response_pre_runtime_principal_or_permission_claim_source", field=field, trail=trail)
+
     return blockers
 
 
@@ -805,6 +907,7 @@ def validate_binary(path: Path, expected_sha256: str) -> dict[str, Any]:
     non_claims = [
         "valid static orientation is candidate-only planning evidence for obelisk.command_chat_response_path.v1",
         "does not claim replies, send-chat API, command router, identity, permissions, raw UE pointer exposure, raw FString exposure, mutation, return override, runtime readiness, or public SDK promotion",
+        "does not derive principal identity, permissions, or admin authority from command text or operator config",
         "does not replace a non-protected complete core evidence pack, reflection inventory pack, focal snapshots, second-source evidence, or runtime validation",
         "does not promote public identity, runtime hooks, object lookup, command execution, or SDK surface",
         "does not promote permissions or commands",
@@ -813,6 +916,7 @@ def validate_binary(path: Path, expected_sha256: str) -> dict[str, Any]:
     blocker_labels = [
         "requires_non_protected_core_evidence_pack",
         "requires_reflection_inventory_or_focal_snapshots_for_response_path_targets",
+        "requires_established_runtime_principal_before_response_authority",
         "requires_command_router_identity_and_permission_contracts_before_command_replies",
         "requires_copied_data_response_contract_before_public_sdk_promotion",
     ]
@@ -841,6 +945,7 @@ def validate_binary(path: Path, expected_sha256: str) -> dict[str, Any]:
         "public_abi_ready": False,
         "runtime_ready": False,
         "public_abi_boundary": public_abi_boundary(),
+        "principal_authority_boundary": principal_authority_boundary(),
         "promotion_blockers": promotion_blockers,
         "planning_surface": PLANNING_SURFACE,
         "binary": str(resolved if resolved is not None else path),

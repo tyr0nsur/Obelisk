@@ -49,6 +49,11 @@ The decision shape should require:
 `allow` must require runtime-owned policy/authority provenance. Plugin-provided input
 cannot self-attest authority, policy source, or policy epoch.
 
+Config can enable a permissions/admin surface or provide policy inputs only. It cannot
+establish principal identity or permission claims. Command text is copied request data
+only and cannot establish identity, authority, policy provenance, or admin permission
+claims before runtime observation has established a principal.
+
 ## Fail-Closed Requirements
 
 The candidate contract should require deny/unknown for:
@@ -56,6 +61,9 @@ The candidate contract should require deny/unknown for:
 - missing or zero owner token;
 - missing capability;
 - missing principal;
+- missing established runtime principal identity;
+- command text principal or permission claim;
+- operator-config principal or permission claim;
 - missing or mismatched principal generation;
 - stale principal;
 - unsupported principal scope flags;

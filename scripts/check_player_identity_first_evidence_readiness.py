@@ -15,6 +15,7 @@ from typing import Any
 
 import check_player_identity_lifecycle_anchor_candidates as lifecycle_anchor_candidates
 import check_player_identity_principal_invalidation_policy as principal_invalidation_policy
+import check_player_identity_runtime_principal_lifecycle_evidence as runtime_principal_lifecycle_evidence
 from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
 
 
@@ -91,6 +92,16 @@ def parse_args() -> argparse.Namespace:
             "Optional consume-only obelisk.players-identity-principal-invalidation-policy.v1 "
             "manifest. It can satisfy the planning policy precondition only; it cannot "
             "promote identity, runtime readiness, or public SDK readiness."
+        ),
+    )
+    parser.add_argument(
+        "--runtime-principal-lifecycle-evidence-manifest",
+        type=Path,
+        help=(
+            "Optional obelisk.players-identity-runtime-principal-lifecycle-evidence.v1 "
+            "synthetic/redacted shape fixture. It validates private manifest shape only; "
+            "it cannot satisfy approved runtime evidence, runtime readiness, promotion, "
+            "or public SDK readiness."
         ),
     )
     parser.add_argument(
@@ -911,6 +922,46 @@ def principal_invalidation_policy_diagnosis(path: Path | None) -> dict[str, Any]
     }
 
 
+def runtime_principal_lifecycle_evidence_manifest_diagnosis(path: Path | None) -> dict[str, Any]:
+    base: dict[str, Any] = {
+        "provided": path is not None,
+        "path": str(path) if path is not None else None,
+        "ready": False,
+        "shape_accepted_by_this_checker": False,
+        "approved_runtime_evidence_present": False,
+        "runtime_evidence_ready": False,
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "blockers": [],
+        "remaining_blockers": ["approved_runtime_evidence_missing"],
+        "non_claims": [
+            "synthetic/redacted shape fixture only; does not approve runtime evidence, authorize server work, promote public SDK, or publish claims",
+        ],
+    }
+    if path is None:
+        return base
+    try:
+        payload = runtime_principal_lifecycle_evidence.load_json(path)
+    except SystemExit as exc:
+        return {**base, "blockers": ["runtime_principal_lifecycle_manifest_unreadable"], "error": str(exc)}
+    validation = runtime_principal_lifecycle_evidence.validate_manifest(payload, check_mode="consume")
+    report = runtime_principal_lifecycle_evidence.build_report(payload, validation, check_mode="consume")
+    blockers = [blocker["reason"] for blocker in validation.blockers]
+    return {
+        **base,
+        "ready": not blockers,
+        "shape_accepted_by_this_checker": report["shape_accepted_by_this_checker"],
+        "blockers": blockers,
+        "observed_cases": report["observed_cases"],
+        "approved_runtime_evidence_present": False,
+        "runtime_evidence_ready": False,
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+    }
+
+
 def runtime_principal_lifecycle_evidence_requirements() -> dict[str, Any]:
     return {
         "schema": "obelisk.players-identity-runtime-principal-lifecycle-evidence.requirements.v1",
@@ -1587,6 +1638,9 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     principal_policy_diagnosis = principal_invalidation_policy_diagnosis(
         getattr(args, "principal_invalidation_policy_manifest", None)
     )
+    runtime_evidence_manifest_diagnosis = runtime_principal_lifecycle_evidence_manifest_diagnosis(
+        getattr(args, "runtime_principal_lifecycle_evidence_manifest", None)
+    )
     runtime_evidence_requirements = runtime_principal_lifecycle_evidence_requirements()
     lifecycle_ready = (
         lifecycle_diagnosis["session_start_accepted"] is True
@@ -1788,6 +1842,11 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             if getattr(args, "principal_invalidation_policy_manifest", None)
             else None
         ),
+        "runtime_principal_lifecycle_evidence_manifest": (
+            str(args.runtime_principal_lifecycle_evidence_manifest)
+            if getattr(args, "runtime_principal_lifecycle_evidence_manifest", None)
+            else None
+        ),
         "target_set": PLAYER_IDENTITY_TARGET_SET,
         "blockers": blockers,
         "deferred_until_reflection_inventory_ready": [] if inventory_ready else downstream_blockers,
@@ -1915,6 +1974,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             "lifecycle_anchor_candidates": lifecycle_candidate_diagnosis,
             "principal_invalidation_policy": principal_policy_diagnosis,
             "runtime_principal_lifecycle_evidence": runtime_evidence_requirements,
+            "runtime_principal_lifecycle_evidence_manifest": runtime_evidence_manifest_diagnosis,
             "stderr": first_evidence_result.stderr.strip(),
         },
         "next_step": next_step,
