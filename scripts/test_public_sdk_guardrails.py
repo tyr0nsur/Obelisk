@@ -4893,6 +4893,59 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             with self.subTest(file=path.relative_to(REPO_ROOT).as_posix()):
                 self.assertIn(plan_path.name, path.read_text(encoding="utf-8"))
 
+    def test_player_identity_next_step_requires_non_protected_ufunction_inventory_pack(self) -> None:
+        current_path = REPO_ROOT / "docs" / "agent-handoff" / "CURRENT.md"
+        readme_path = REPO_ROOT / "docs" / "research" / "README.md"
+        preflight_path = (
+            REPO_ROOT
+            / "docs"
+            / "research"
+            / "2026-05-31-player-identity-offline-pack-preflight.md"
+        )
+        docs = {
+            "handoff": normalized(current_path.read_text(encoding="utf-8")),
+            "research_readme": normalized(readme_path.read_text(encoding="utf-8")),
+            "preflight": normalized(preflight_path.read_text(encoding="utf-8")),
+        }
+
+        shared_terms = (
+            "obelisk.reflection-inventory-pack.v1",
+            "non-protected",
+            "ShooterPlayerController.ServerListPlayers",
+            "ShooterPlayerController.ServerKickPlayer",
+        )
+        for name, text in docs.items():
+            for term in shared_terms:
+                with self.subTest(doc=name, term=term):
+                    self.assertIn(normalized(term), text)
+
+        for term in (
+            "produce or approve a non-protected UFunction reflection-inventory pack",
+            "use `scripts/plan_ufunction_focal_snapshots.py` for "
+            "`ShooterPlayerController.ServerListPlayers` and "
+            "`ShooterPlayerController.ServerKickPlayer` only",
+        ):
+            with self.subTest(doc="handoff", term=term):
+                self.assertIn(normalized(term), docs["handoff"])
+
+        for term in (
+            "First produce or approve a reviewed non-protected UFunction `obelisk.reflection-inventory-pack.v1`",
+            "then plan only `ShooterPlayerController.ServerListPlayers` and `ShooterPlayerController.ServerKickPlayer`",
+            "do not run runtime work or repeat broad FName/GObjects/core discovery for this route",
+        ):
+            with self.subTest(doc="research_readme", term=term):
+                self.assertIn(normalized(term), docs["research_readme"])
+
+        for term in (
+            "does not reread a core",
+            "execute snapshot commands",
+            "promote identity",
+            "authorize runtime work",
+            "create a public SDK surface",
+        ):
+            with self.subTest(doc="preflight", term=term):
+                self.assertIn(normalized(term), docs["preflight"])
+
     def test_planning_only_target_sets_do_not_back_public_sdk_surface(self) -> None:
         manifest = json.loads(PUBLIC_GAMEPLAY_EVENTS_MANIFEST.read_text(encoding="utf-8"))
         public_manifest_sets = {

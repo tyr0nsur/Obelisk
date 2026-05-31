@@ -9,14 +9,48 @@ No usable `obelisk.reflection-inventory-pack.v1` manifest was found under the cu
 non-protected durable artifact root:
 
 ```bash
-find /home/flowcommunity-ark/obelisk-artifacts -maxdepth 4 -type f \
-  \( -name 'manifest.json' -o -name '*inventory*manifest*.json' -o -name 'artifact-pack.manifest.json' \)
+python3 scripts/check_reflection_inventory_pack_readiness.py \
+  --root /home/flowcommunity-ark/obelisk-artifacts
 ```
 
+The checker is read-only and emits
+`schema=obelisk.reflection-inventory-pack-readiness-check.v1`. It fails closed with
+machine-readable reasons: `missing_reflection_inventory_pack`, `schema_mismatch`,
+`missing_ufunction_inventory`, `wrong_target_scope`, or `missing_target`.
+
+Current result:
+
+- `status=blocked`;
+- `ready=false`;
+- `manifests_scanned=16`;
+- `reason=missing_reflection_inventory_pack`;
+- `reason=schema_mismatch`;
+- `accepted_pack=null`.
+
 The durable root currently contains normalized artifact packs and a ScriptStruct inventory
-pack, but no UFunction reflection-inventory pack with `schema=obelisk.reflection-inventory-pack.v1`.
-That means the next player-identity snapshot step cannot be planned from
-`/home/flowcommunity-ark/obelisk-artifacts` alone.
+pack, but no UFunction reflection-inventory pack with
+`schema=obelisk.reflection-inventory-pack.v1`. That means the next player-identity
+snapshot step cannot be planned from `/home/flowcommunity-ark/obelisk-artifacts` alone.
+
+## V1 SDK Progress Signal
+
+Player identity is a complete-SDK v1 blocker because permissions, commands/replies,
+moderation, economy, and mobility need a copied principal model. Current progress should
+be reported internally as:
+
+- `players-identity-lifecycle-intake coverage=10/12 committed candidate snapshots`;
+- `second-source comparable=not complete until 12/12`;
+- `accepted login anchors=0/1`;
+- `accepted logout anchors=0/1`;
+- `promotion_ready=false`;
+- `public_sdk_ready=false`;
+- `runtime_ready=false`;
+- `target_set=planning_only`.
+
+Closing `ShooterPlayerController.ServerListPlayers` and
+`ShooterPlayerController.ServerKickPlayer` reduces the admin-surface fixture gap. It does
+not unblock permissions, command routing, operator ingress/storage, Inventory SDK, runtime
+identity, login/logout lifecycle anchors, or any public v1 SDK claim.
 
 ## Safe Next Step
 
@@ -47,6 +81,30 @@ python3 scripts/plan_ufunction_focal_snapshots.py \
 The planner emits candidate-only `inspect_core_ufunctions.py --snapshot-json` commands.
 It does not reread a core, execute snapshot commands, promote identity, authorize runtime
 work, or create a public SDK surface.
+
+Before running the planner, re-run:
+
+```bash
+python3 scripts/check_reflection_inventory_pack_readiness.py \
+  --root <non-protected-artifact-root>
+```
+
+Proceed only when the checker reports `ready=true` and the accepted pack contains both
+`ShooterPlayerController.ServerListPlayers` and
+`ShooterPlayerController.ServerKickPlayer`.
+
+If a complete non-protected core evidence pack is available, a safe planning route is:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/build_reflection_inventory_pack.py \
+  --evidence-pack-manifest <non-protected-pack>/manifest.json \
+  --target-set players-identity-lifecycle-intake \
+  --include-functions \
+  --output-dir /tmp/obelisk-reflection-inventory-identity-pack
+```
+
+This command shape is still offline and candidate-only. It must not use direct or
+symlinked `/servidor/ark` paths without a current scoped approval.
 
 ## Boundary
 
