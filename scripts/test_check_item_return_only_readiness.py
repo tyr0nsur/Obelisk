@@ -112,6 +112,44 @@ class CheckItemReturnOnlyReadinessTests(unittest.TestCase):
 
         return {
             "schema": "obelisk.public-gameplay-events.v1",
+            "metadata_surfaces": [
+                {
+                    "surface_id": "obelisk.resource_kind_descriptors.v1",
+                    "public_name": "DescribeResourceKind",
+                    "descriptor_struct": "ObeliskResourceKindDescriptor",
+                    "descriptor": "DescribeResourceKind",
+                    "scope": (
+                        "metadata-only resource category descriptors for routing/config; no identity, no lookup, "
+                        "no handle, no cross-event correlation, no mutation, and no UE object access"
+                    ),
+                    "descriptor_fields": readiness.EXPECTED_DESCRIPTOR_SURFACES[
+                        "obelisk.resource_kind_descriptors.v1"
+                    ]["descriptor_fields"],
+                    "not_promoted": sorted(
+                        readiness.EXPECTED_DESCRIPTOR_SURFACES[
+                            "obelisk.resource_kind_descriptors.v1"
+                        ]["not_promoted"]
+                    ),
+                },
+                {
+                    "surface_id": "obelisk.gameplay_policy_event_descriptors.v1",
+                    "public_name": "DescribeGameplayPolicyEventKind",
+                    "descriptor_struct": "ObeliskGameplayPolicyEventDescriptor",
+                    "descriptor": "DescribeGameplayPolicyEventKind",
+                    "scope": (
+                        "metadata-only descriptors for promoted GameplayPolicyEvent kinds; no identity, no lookup, "
+                        "no cross-event correlation, no mutation, no return override, and no UE object access"
+                    ),
+                    "descriptor_fields": readiness.EXPECTED_DESCRIPTOR_SURFACES[
+                        "obelisk.gameplay_policy_event_descriptors.v1"
+                    ]["descriptor_fields"],
+                    "not_promoted": sorted(
+                        readiness.EXPECTED_DESCRIPTOR_SURFACES[
+                            "obelisk.gameplay_policy_event_descriptors.v1"
+                        ]["not_promoted"]
+                    ),
+                },
+            ],
             "promoted_events": [
                 {
                     "event_id": "obelisk.gameplay_policy.v1",
@@ -188,11 +226,37 @@ class CheckItemReturnOnlyReadinessTests(unittest.TestCase):
         summary = readiness.validate_public_gameplay_events(self.make_public_gameplay_events(), blockers)
 
         self.assertEqual(blockers, [])
+        self.assertEqual(
+            summary["descriptor_surface_ids"],
+            sorted(readiness.EXPECTED_METADATA_SURFACE_IDS),
+        )
         self.assertEqual(summary["item_return_backing_target_set"], "item-return-only-policy-slice")
         self.assertEqual(
             summary["item_return_event_kinds"],
             sorted(readiness.EXPECTED_PUBLIC_ITEM_RETURN_EVENT_KINDS),
         )
+
+    def test_public_gameplay_events_rejects_descriptor_surface_overclaims(self) -> None:
+        public_events = self.make_public_gameplay_events()
+        resource_surface = public_events["metadata_surfaces"][0]
+        event_surface = public_events["metadata_surfaces"][1]
+        resource_surface["descriptor_fields"] = [
+            *resource_surface["descriptor_fields"],
+            "resource_handle",
+        ]
+        event_surface["scope"] = "metadata-only descriptors with return override authority"
+        event_surface["not_promoted"] = [
+            item for item in event_surface["not_promoted"] if item != "return override"
+        ]
+        blockers: list[dict] = []
+
+        readiness.validate_public_gameplay_events(public_events, blockers)
+
+        reasons = {blocker["reason"] for blocker in blockers}
+        self.assertIn("public_descriptor_fields_mismatch", reasons)
+        self.assertIn("public_descriptor_forbidden_field", reasons)
+        self.assertIn("public_descriptor_scope_missing_guardrail", reasons)
+        self.assertIn("public_descriptor_not_promoted_missing", reasons)
 
     def test_public_gameplay_events_rejects_extra_item_kind_and_non_return_value_field(self) -> None:
         public_events = self.make_public_gameplay_events()

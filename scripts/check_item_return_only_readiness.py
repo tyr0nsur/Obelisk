@@ -29,6 +29,102 @@ PUBLIC_GAMEPLAY_EVENTS_SCHEMA = "obelisk.public-gameplay-events.v1"
 GAMEPLAY_POLICY_EVENT_ID = "obelisk.gameplay_policy.v1"
 INVENTORY_ITEM_RESOURCE_KIND = "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM"
 RETURN_VALUE_FIELD_MASK = "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"
+EXPECTED_METADATA_SURFACE_IDS = {
+    "obelisk.resource_kind_descriptors.v1",
+    "obelisk.gameplay_policy_event_descriptors.v1",
+}
+EXPECTED_DESCRIPTOR_SURFACES = {
+    "obelisk.resource_kind_descriptors.v1": {
+        "public_name": "DescribeResourceKind",
+        "descriptor_struct": "ObeliskResourceKindDescriptor",
+        "descriptor": "DescribeResourceKind",
+        "descriptor_fields": [
+            "abi_version",
+            "struct_size",
+            "resource_kind",
+            "reserved0",
+            "flags",
+            "supported_gameplay_policy_event_mask",
+            "supported_gameplay_policy_field_mask",
+            "stable_name",
+            "display_name",
+        ],
+        "scope_terms": [
+            "metadata-only",
+            "no identity",
+            "no lookup",
+            "no handle",
+            "no cross-event correlation",
+            "no mutation",
+            "no UE object access",
+        ],
+        "not_promoted": {
+            "ResourceHandle",
+            "object identity",
+            "lookup",
+            "cross-event correlation",
+            "persistent handles",
+            "UE pointers",
+            "mutation",
+            "return override",
+        },
+    },
+    "obelisk.gameplay_policy_event_descriptors.v1": {
+        "public_name": "DescribeGameplayPolicyEventKind",
+        "descriptor_struct": "ObeliskGameplayPolicyEventDescriptor",
+        "descriptor": "DescribeGameplayPolicyEventKind",
+        "descriptor_fields": [
+            "abi_version",
+            "struct_size",
+            "event_kind",
+            "resource_kind",
+            "flags",
+            "event_kind_mask",
+            "field_mask",
+            "stable_name",
+            "display_name",
+        ],
+        "scope_terms": [
+            "metadata-only",
+            "no identity",
+            "no lookup",
+            "no cross-event correlation",
+            "no mutation",
+            "no return override",
+            "no UE object access",
+        ],
+        "not_promoted": {
+            "module-specific SDK",
+            "ResourceHandle",
+            "persistent handles",
+            "object identity",
+            "lookup",
+            "cross-event correlation",
+            "UE pointers",
+            "mutation",
+            "return override",
+        },
+    },
+}
+FORBIDDEN_DESCRIPTOR_FIELD_NAMES = {
+    "handle",
+    "resource_handle",
+    "resource_id",
+    "object_id",
+    "player_id",
+    "tribe_id",
+    "inventory_id",
+    "item_id",
+    "lookup_key",
+    "uobject",
+    "gobject",
+    "gobjects",
+    "fname_index",
+    "coordinates",
+    "location",
+    "mutation",
+    "return_override",
+}
 EXPECTED_INPUT_TARGETS = {
     "PrimalItem.AllowEquipItem",
     "PrimalItem.CanRepair",
@@ -332,13 +428,100 @@ def find_gameplay_policy_event(public_events: dict[str, Any], blockers: list[dic
     return matches[0]
 
 
+def validate_descriptor_surfaces(public_events: dict[str, Any], blockers: list[dict[str, Any]]) -> list[str]:
+    metadata_surfaces = public_events.get("metadata_surfaces")
+    if not isinstance(metadata_surfaces, list):
+        append_blocker(blockers, "public_metadata_surfaces_missing")
+        return []
+
+    surfaces = {
+        surface.get("surface_id"): surface
+        for surface in metadata_surfaces
+        if isinstance(surface, dict) and isinstance(surface.get("surface_id"), str)
+    }
+    surface_ids = set(surfaces)
+    if surface_ids != EXPECTED_METADATA_SURFACE_IDS:
+        append_blocker(
+            blockers,
+            "public_metadata_surface_ids_mismatch",
+            missing=sorted(EXPECTED_METADATA_SURFACE_IDS - surface_ids),
+            unexpected=sorted(surface_ids - EXPECTED_METADATA_SURFACE_IDS),
+        )
+
+    for surface_id, expected in EXPECTED_DESCRIPTOR_SURFACES.items():
+        surface = surfaces.get(surface_id)
+        if not isinstance(surface, dict):
+            append_blocker(blockers, "public_descriptor_surface_missing", surface_id=surface_id)
+            continue
+        for key in ("public_name", "descriptor_struct", "descriptor"):
+            if surface.get(key) != expected[key]:
+                append_blocker(
+                    blockers,
+                    "public_descriptor_surface_metadata_mismatch",
+                    surface_id=surface_id,
+                    field=key,
+                    expected=expected[key],
+                    value=surface.get(key),
+                )
+        descriptor_fields = surface.get("descriptor_fields")
+        if descriptor_fields != expected["descriptor_fields"]:
+            append_blocker(
+                blockers,
+                "public_descriptor_fields_mismatch",
+                surface_id=surface_id,
+                expected=expected["descriptor_fields"],
+                value=descriptor_fields,
+            )
+        if isinstance(descriptor_fields, list):
+            forbidden_fields = [
+                field
+                for field in descriptor_fields
+                if isinstance(field, str) and field.lower() in FORBIDDEN_DESCRIPTOR_FIELD_NAMES
+            ]
+            if forbidden_fields:
+                append_blocker(
+                    blockers,
+                    "public_descriptor_forbidden_field",
+                    surface_id=surface_id,
+                    fields=forbidden_fields,
+                )
+        else:
+            append_blocker(blockers, "public_descriptor_fields_not_list", surface_id=surface_id)
+
+        scope = surface.get("scope")
+        scope_text = scope.lower() if isinstance(scope, str) else ""
+        for term in expected["scope_terms"]:
+            if term.lower() not in scope_text:
+                append_blocker(
+                    blockers,
+                    "public_descriptor_scope_missing_guardrail",
+                    surface_id=surface_id,
+                    term=term,
+                    value=scope,
+                )
+        not_promoted = surface.get("not_promoted")
+        promoted_exclusions = set(not_promoted) if isinstance(not_promoted, list) else set()
+        missing_exclusions = expected["not_promoted"] - promoted_exclusions
+        if missing_exclusions:
+            append_blocker(
+                blockers,
+                "public_descriptor_not_promoted_missing",
+                surface_id=surface_id,
+                missing=sorted(missing_exclusions),
+            )
+
+    return sorted(surface_ids)
+
+
 def validate_public_gameplay_events(public_events: dict[str, Any], blockers: list[dict[str, Any]]) -> dict[str, Any]:
     if public_events.get("schema") != PUBLIC_GAMEPLAY_EVENTS_SCHEMA:
         append_blocker(blockers, "public_gameplay_events_schema_mismatch", value=public_events.get("schema"))
 
+    descriptor_surface_ids = validate_descriptor_surfaces(public_events, blockers)
     event = find_gameplay_policy_event(public_events, blockers)
     if not event:
         return {
+            "descriptor_surface_ids": descriptor_surface_ids,
             "item_return_event_kinds": [],
             "item_return_backing_target_set": None,
         }
@@ -406,6 +589,7 @@ def validate_public_gameplay_events(public_events: dict[str, Any], blockers: lis
     if not isinstance(event_kinds, list):
         append_blocker(blockers, "public_gameplay_event_kinds_missing")
         return {
+            "descriptor_surface_ids": descriptor_surface_ids,
             "item_return_event_kinds": [],
             "item_return_backing_target_set": item_return_backing,
         }
@@ -482,6 +666,7 @@ def validate_public_gameplay_events(public_events: dict[str, Any], blockers: lis
         append_blocker(blockers, "public_item_return_event_kind_count_mismatch", expected=3, value=len(item_return_kinds))
 
     return {
+        "descriptor_surface_ids": descriptor_surface_ids,
         "item_return_event_kinds": sorted(item_return_kind_set),
         "item_return_backing_target_set": item_return_backing,
     }
