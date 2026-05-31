@@ -48,6 +48,62 @@ This closes the Mission compact bool second-source gap for observer planning onl
 does not close runtime observer, dispatcher lifecycle, callback ABI, public SDK, identity,
 array payload, mutation, return override, or server-validation gates.
 
+## Future-Agent Bridge Lane
+
+The exact internal bridge lane is: consume the current focused
+`mission-copied-bool-policy-slice` artifact as offline evidence, keep Mission recognition
+inside `MissionReflection`, and, only after a separate runtime-review gate, build a
+default-off post-original log observer that copies approved bool bytes into Obelisk-owned
+memory. This lane is internal planning only. It is not a public Mission SDK, plugin
+callback, runtime dispatcher, return override, mutation path, identity handle, or array
+payload bridge.
+
+The only copied fields in this lane are the five canonical one-byte bools:
+
+- `MissionType.AddPlayerToMission.bForceAdd`
+- `MissionType.AddPlayerToMission.ReturnValue`
+- `MissionType.BPAllowPlayerToLeaveMission.ReturnValue`
+- `MissionType.BPOnPlayerRemovedFromMission.bFromMissionCompleteEvent`
+- `MissionType.BPOnPlayerRemovedFromMission.bLastPhaseSuccess`
+
+The only recognized-but-redacted fields are these six object/container fields; future work
+may count and name them as redacted metadata, but must not copy, log, expose, hash, derive
+payload sizes from, or turn them into identity:
+
+- `MissionType.AddPlayerToMission.PlayerCharacter`
+- `MissionType.BPAllowPlayerToLeaveMission.PlayerPawn`
+- `MissionType.BPOnPlayerRemovedFromMission.Player`
+- `MissionType.BPOnPlayerRemovedFromMission.Controller`
+- `MissionType.GetPlayerUsableItems.Character`
+- `MissionType.GetPlayerUsableItems.OutItemIDs`
+
+Consume/promote gate status is deliberately asymmetric: consume-mode is accepted for the
+current artifact and tests, while promote-mode stays blocked for release readiness, public
+ABI/API, runtime activation, identity, arrays, mutation, return override, and live-server
+validation. `MissionType.GetPlayerUsableItems` remains recognition-only and must not enter
+the copied-bool policy slice.
+
+Use the direct policy manifest for consume evidence:
+
+```bash
+python3 scripts/validate_offline_artifact_gate.py \
+  --root /home/flowcommunity-ark/obelisk-artifacts/mission-copied-bool-tail-policy-slice-20260530T090211Z \
+  --manifest /home/flowcommunity-ark/obelisk-artifacts/mission-copied-bool-tail-policy-slice-20260530T090211Z/mission-copied-bool-policy-slice.json \
+  --mode consume \
+  --json
+```
+
+Do not cite the wrapper `artifact-pack.manifest.json` as the consume input for this lane:
+it includes prior gate-result JSON files and protected-root strings, so the offline
+artifact gate blocks it. The direct policy manifest is the durable clean consume target.
+
+The next validation step is local-only review of the internal copied-bool bridge lifecycle:
+prove gate-denied paths perform no metadata/parameter reads and reserve no budget, prove
+all rejection paths clear copied output, prove non-canonical bool bytes greater than `1`
+are rejected, and prove the test-only dispatcher cannot model `GetPlayerUsableItems`.
+Runtime observation remains a later operator-approved live-ops window, not an implied next
+step.
+
 ## 2026-05-31 Offline Evidence Hardening
 
 The low-risk offline hardening step is to keep the focused policy slice fixture-backed and

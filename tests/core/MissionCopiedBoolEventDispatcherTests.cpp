@@ -11,15 +11,29 @@
 #include <mutex>
 #include <stdexcept>
 #include <thread>
+#include <type_traits>
 #include <vector>
 
 namespace
 {
+    using Obelisk::Core::MissionCopiedBoolEventCallback;
     using Obelisk::Core::MissionCopiedBoolEventDispatcher;
     using Obelisk::Core::MissionCopiedBoolEventKind;
     using Obelisk::Core::MissionCopiedBoolEventView;
     using Obelisk::Core::MissionCopiedBoolField;
     using Obelisk::Core::MissionCopiedBoolValue;
+
+    static_assert(std::is_same_v<
+                      std::invoke_result_t<MissionCopiedBoolEventCallback,
+                                           const MissionCopiedBoolEventView&,
+                                           void*>,
+                      void>,
+                  "Mission copied-bool callbacks must not expose block/override return values");
+    static_assert(std::is_same_v<decltype(MissionCopiedBoolEventView::Bools),
+                                 std::span<const MissionCopiedBoolValue>>,
+                  "Mission copied-bool dispatch must expose only immutable copied bool storage");
+    static_assert(std::is_const_v<decltype(MissionCopiedBoolEventView::Bools)::element_type>,
+                  "Mission copied-bool payload elements must remain read-only to callbacks");
 
     struct Capture
     {
@@ -90,6 +104,16 @@ namespace
     void ThrowingUnknownCallback(const MissionCopiedBoolEventView&, void*)
     {
         throw 7;
+    }
+
+    void TestMissionCopiedBoolSurfaceIsInternalObservationOnly()
+    {
+        const auto [kind, bools] = MissionCopiedBoolEventView{};
+        const auto [field, value] = MissionCopiedBoolValue{};
+        (void)kind;
+        (void)bools;
+        (void)field;
+        (void)value;
     }
 
     void TestDispatchCopiesBoolInputForCallbackDuration()
@@ -507,6 +531,7 @@ int main()
 {
     try
     {
+        TestMissionCopiedBoolSurfaceIsInternalObservationOnly();
         TestDispatchCopiesBoolInputForCallbackDuration();
         TestRegisterRejectsInvalidInput();
         TestDispatchRejectsUnknownEventShape();

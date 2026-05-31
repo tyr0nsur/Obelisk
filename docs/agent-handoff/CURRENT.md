@@ -105,13 +105,29 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   identity, mutation, and return override remain blocked without a live-ops brief and
   separate promotion gates.
 - Mission copied-bool, Transfer `bAccept`, Structure return-only, Structure non-PIN
-  copied-scalar, and Buff breadth packages remain evidence-only/internal. Mission bool-tail
-  preserves `bool_field_size=1`, `bool_byte_offset=0`, `byte_mask=0x01`,
-  `field_mask=0xff`, and `native_bool=false`; consume mode accepts documented slices and
-  promote mode blocks promotion through local consume-only/planning-only denylists even if
-  shared metadata drifts. `transfer-baccept-only-policy-slice` is blocked from
-  release/public SDK gates. This does not authorize Transfer runtime work, public Mission
-  SDK, ResourceHandle, identity, mutation, or return override.
+  copied-scalar, and Buff breadth packages remain evidence-only/internal. Mission's exact
+  internal bridge lane is the focused `mission-copied-bool-policy-slice` consumed as
+  offline evidence, then `MissionReflection`-only recognition for a future default-off
+  post-original log observer; it is not runtime/API promotion. Mission bool-tail preserves
+  `bool_field_size=1`, `bool_byte_offset=0`, `byte_mask=0x01`, `field_mask=0xff`, and
+  `native_bool=false`. The only copied bools are
+  `AddPlayerToMission.bForceAdd`, `AddPlayerToMission.ReturnValue`,
+  `BPAllowPlayerToLeaveMission.ReturnValue`,
+  `BPOnPlayerRemovedFromMission.bFromMissionCompleteEvent`, and
+  `BPOnPlayerRemovedFromMission.bLastPhaseSuccess`. The redacted-only fields are
+  `AddPlayerToMission.PlayerCharacter`, `BPAllowPlayerToLeaveMission.PlayerPawn`,
+  `BPOnPlayerRemovedFromMission.Player`, `BPOnPlayerRemovedFromMission.Controller`,
+  `GetPlayerUsableItems.Character`, and `GetPlayerUsableItems.OutItemIDs`;
+  `GetPlayerUsableItems` stays recognition-only and outside copied-bool policy output.
+  Consume mode accepts documented slices and promote mode blocks release/public/runtime
+  promotion through local consume-only/planning-only denylists even if shared metadata
+  drifts. Next Mission validation is local lifecycle/gate proof: disabled/missing
+  profile/window/marker/SHA, unsupported SHA, zero budget, and non-target FName must do no
+  metadata/parameter reads and reserve no budget; rejection must clear copied output and
+  non-canonical bool bytes greater than `1` must fail closed. `transfer-baccept-only-policy-slice`
+  is blocked from release/public SDK gates. This does not authorize Transfer runtime work,
+  public Mission SDK, runtime Mission dispatchers/callbacks, ResourceHandle, identity,
+  arrays, mutation, return override, or server observation.
 - ResourceHandle/public GObjects remain blocked; old flag-policy artifact is obsolete and
   durable rich-provenance refresh is preserved. Consume mode accepts it and promote mode
   stays blocked. Do not rerun broad FName, GObjects, or core scans for ResourceHandle
