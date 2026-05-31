@@ -5764,8 +5764,12 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
             payload = mission_copied_bool_policy_slice_manifest()
             payload["runtime_ready"] = True
             payload["public_mission_sdk_ready"] = True
+            payload["mission_identity_ready"] = True
+            payload["player_authority_ready"] = True
             payload["claim"] = "public Mission SDK ready"
             payload["runtime_claim"] = "runtime ready"
+            payload["identity_claim"] = "mission identity established"
+            payload["authority_claim"] = "player authority promoted"
             payload["input_target_set"] = "mission-public-sdk-intake"
             payload["generated_from"]["input_snapshots"] = payload["generated_from"]["input_snapshots"][:2]
             write_json(manifest, payload)
@@ -5776,6 +5780,8 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("mission_copied_bool_policy_readiness_overclaim", reasons)
         self.assertIn("mission_copied_bool_policy_public_overclaim_public_sdk", reasons)
         self.assertIn("mission_copied_bool_policy_public_overclaim_runtime_ready", reasons)
+        self.assertIn("mission_copied_bool_policy_public_overclaim_mission_identity", reasons)
+        self.assertIn("mission_copied_bool_policy_public_overclaim_player_authority", reasons)
         self.assertIn("mission_copied_bool_policy_input_target_set_mismatch", reasons)
         self.assertIn("mission_copied_bool_policy_input_snapshot_count_mismatch", reasons)
 

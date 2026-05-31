@@ -156,6 +156,8 @@ AFFIRMATIVE_RELEASE_CLAIM_PATTERNS = (
     r"\b(?:sdk|api|surface|capability|support)\s+"
     r"(?:is|are|remains?|stays?)\s+"
     r"(?:complete|full|production|stable|available|supported|included|shipped)\b",
+    r"\b[a-z0-9_ /+-]{2,80}\s+(?:is|are)\s+"
+    r"(?:available|supported|included|shipped)\s+in\s+v1\b",
 )
 CLAUSE_START_PATTERN = re.compile(r"[.;\n]|(?:\s+-\s+)")
 BLOCKED_CONTRACT_HEADER_SYMBOL_PATTERNS = {
@@ -452,6 +454,12 @@ def text_has_affirmative_release_claim(text: str) -> bool:
             claim_prefix = lowered[clause_start : match.start()]
             if re.search(r"\b(?:no|not|never|without|excluded|post-v1|post v1)\b", claim_prefix):
                 continue
+            claim_clause = lowered[clause_start : match.end()]
+            if re.match(r"\s*(?:no|not|never|without|excluded|post-v1|post v1)\b", claim_clause):
+                continue
+            claim_match = lowered[match.start() : match.end()]
+            if re.match(r"\s*(?:no|not|never|without|excluded|post-v1|post v1)\b", claim_match):
+                continue
             return True
     return False
 
@@ -498,8 +506,6 @@ def release_statement_has_surface_claim_contradiction(text: str, surface: dict[s
     if not terms:
         return False
     for line in text.splitlines():
-        if re.match(r"^\s*obelisk\.[a-z0-9_.-]+\.v1\s*:", line, re.IGNORECASE):
-            continue
         lowered = line.lower()
         if any(term in lowered for term in terms) and text_has_affirmative_release_claim(line):
             return True

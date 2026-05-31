@@ -27,15 +27,25 @@ REQUIRED_IDS = {
 }
 
 FORBIDDEN_HEADER_TOKENS = {
+    "OBELISK_API_CAPABILITY_ADMIN",
+    "OBELISK_API_CAPABILITY_AUTHORIZATION",
     "OBELISK_API_CAPABILITY_PERMISSION_CHECKS",
     "OBELISK_API_CAPABILITY_PERMISSIONS_ADMIN",
+    "OBELISK_PERMISSION_CACHE_ABI_VERSION",
     "OBELISK_PERMISSION_QUERY_ABI_VERSION",
+    "ObeliskAdminAction",
+    "ObeliskAuthorizationDecision",
+    "ObeliskPermissionCache",
     "ObeliskPermissionQuery",
     "ObeliskPermissionDecision",
+    "AuthorizePermission",
     "CheckPermissionWithOwnerToken",
+    "CheckPermissionCachedWithOwnerToken",
     "RegisterPermission",
     "GrantPermission",
     "RevokePermission",
+    "BanPlayer",
+    "KickPlayer",
 }
 
 
@@ -51,8 +61,42 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
         self.assertFalse(payload["public_header_allowed"])
         self.assertEqual(payload["public_header_symbols_now"], [])
         self.assertFalse(payload["public_cache_abi_allowed"])
+        self.assertEqual(
+            payload["allowed_public_surface_after_player_identity"],
+            ["query-only fail-closed permission decision checks over copied principals"],
+        )
+        self.assertFalse(payload["allow_without_policy_provenance_allowed"])
+        self.assertEqual(payload["public_permission_cache_contract"], "none")
+        self.assertEqual(payload["public_command_reply_contract"], "none")
+        self.assertEqual(payload["public_admin_mutation_contract"], "none")
+        for forbidden in (
+            "permission groups",
+            "admin groups",
+            "grant/revoke API",
+            "admin actions",
+            "admin mutation",
+            "permission cache ABI",
+            "command/chat response path",
+            "replies/send-chat",
+            "allow without provenance",
+            "public header symbols",
+        ):
+            with self.subTest(forbidden=forbidden):
+                self.assertIn(forbidden, payload["forbidden_public_contract"])
         recorded = {item["id"] for item in payload["required_before_public_header"]}
         self.assertEqual(recorded, REQUIRED_IDS)
+
+        dependency = next(
+            item
+            for item in payload["required_before_public_header"]
+            if item["id"] == "dependency.promoted_player_identity"
+        )
+        for behavior in (
+            "before player identity is promoted, permissions/admin exposes no public ABI, callbacks, cache ABI, command/reply implication, or header symbols",
+            "player identity planning evidence alone cannot enable permissions/admin",
+            "permissions/admin remains post-v1 or excluded until this dependency is promoted or explicitly excluded",
+        ):
+            self.assertIn(behavior, dependency["required_behavior"])
 
     def test_generation_scope_and_cache_contracts_are_machine_readable(self) -> None:
         payload = self.load_decisions()
@@ -86,6 +130,9 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
             },
         )
         self.assertIn("owner-token scoped call", abi["required_properties"])
+        self.assertIn("query-only result contract only", abi["required_properties"])
+        self.assertIn("no mutation of permission policy or admin state", abi["required_properties"])
+        self.assertIn("no command/reply handles", abi["required_properties"])
         self.assertIn("no UE pointers or raw params", abi["required_properties"])
 
         cache = requirements["cache.generation_scope_keying"]
@@ -101,6 +148,7 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
             "no public permission cache ABI until policy_epoch and full generation/scope keying semantics are promoted",
             cache["required_behavior"],
         )
+        self.assertIn("cache keys or entries must not cross the public ABI", cache["required_behavior"])
         self.assertIn("cache disabled unless all key fields are defined", cache["required_behavior"])
 
     def test_policy_authority_provenance_and_abuse_gates_are_explicit(self) -> None:
@@ -131,9 +179,11 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
         for behavior in (
             "missing policy source fails closed",
             "unknown authority kind fails closed",
+            "missing policy_epoch provenance fails closed",
             "policy source generation mismatch fails closed",
             "authority generation mismatch fails closed",
             "allow decisions must carry policy_epoch provenance",
+            "allow without policy provenance is forbidden",
             "plugin input cannot self-attest authority provenance",
         ):
             self.assertIn(behavior, provenance["required_behavior"])
@@ -165,6 +215,7 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
             "process mismatch",
             "unknown policy source",
             "missing policy source provenance",
+            "missing policy_epoch provenance",
             "policy source generation mismatch",
             "missing plugin owner token",
             "missing capability",
@@ -173,6 +224,8 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
             self.assertIn(condition, fail_closed["deny_or_unknown_conditions"])
         self.assertIn("unknown authority source", fail_closed["must_never_return_allow_for"])
         self.assertIn("missing policy source provenance", fail_closed["must_never_return_allow_for"])
+        self.assertIn("allow without policy_epoch provenance", fail_closed["must_never_return_allow_for"])
+        self.assertIn("plugin-supplied provenance", fail_closed["must_never_return_allow_for"])
         self.assertIn("rate limit exceeded", fail_closed["must_never_return_allow_for"])
 
         separation = requirements["separation.no_commands_replies_or_admin_mutation"]
@@ -185,7 +238,16 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
                 "commands/replies cannot imply permission groups, admin mutation, storage, or operator ingress",
             ],
         )
-        for exclusion in ("command router", "replies/send-chat", "ban/kick", "groups/grants", "operator ingress"):
+        for exclusion in (
+            "command router",
+            "command/chat response path",
+            "replies/send-chat",
+            "ban/kick",
+            "admin actions",
+            "groups/grants",
+            "permission cache ABI",
+            "operator ingress",
+        ):
             self.assertIn(exclusion, separation["required_exclusions"])
 
     def test_public_header_stays_blocked_until_permissions_decisions_resolve(self) -> None:
@@ -234,6 +296,19 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
         self.assertEqual(permissions["status"], "post-v1")
         self.assertEqual(permissions["public_contract"], [])
         self.assertEqual(permissions["depends_on"], ["obelisk.player_identity.v1"])
+        self.assertEqual(
+            permissions["v1_decision_contract"]["decision_manifest"],
+            "docs/permissions_admin_public_contract_decisions.json",
+        )
+        for not_sufficient in (
+            "player identity planning without promoted player identity",
+            "permission cache sketches",
+            "command/reply planning",
+            "plugin-local command parser scaffolds",
+            "static admin thunk orientation",
+            "raw ProcessEvent callbacks",
+        ):
+            self.assertIn(not_sufficient, permissions["v1_decision_contract"]["not_sufficient_evidence"])
 
         promotion_requires = " ".join(permissions["v1_decision_contract"]["promotion_requires"])
         for term in (
@@ -242,6 +317,15 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
             "stale principal",
             "scope mismatch",
             "query-only fail-closed permission checks",
+            "missing policy provenance fail closed",
+            "allow without provenance is forbidden",
+            "no public permission cache ABI",
+            "no permission groups",
+            "admin groups",
+            "grant/revoke API",
+            "admin actions",
+            "command/chat response path",
+            "replies/send-chat implication",
         ):
             self.assertIn(term, promotion_requires)
 
@@ -282,11 +366,17 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
             "policy",
             "abuse controls",
             "privacy boundaries",
+            "allow without provenance",
+            "permission cache ABI",
             "command router",
+            "command/chat response path",
             "replies/send-chat",
+            "admin actions",
+            "admin mutation",
             "ban/kick API",
             "storage/persistence",
             "operator ingress",
+            "public header permission symbols",
         ):
             with self.subTest(term=term):
                 self.assertIn(term, surface_contract)

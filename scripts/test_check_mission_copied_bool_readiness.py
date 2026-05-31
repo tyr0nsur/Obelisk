@@ -399,7 +399,11 @@ class CheckMissionCopiedBoolReadinessTests(unittest.TestCase):
             payload["consume_only"] = False
             payload["public_mission_sdk_ready"] = True
             payload["runtime_ready"] = True
+            payload["mission_identity_ready"] = True
+            payload["player_authority_ready"] = True
             payload["runtime_claim"] = "runtime ready with public Mission SDK"
+            payload["identity_claim"] = "mission identity established"
+            payload["authority_claim"] = "player authority promoted"
             payload["safety_summary"]["public_sdk_ready"] = True
             payload["safety_summary"]["runtime_hook_ready"] = True
             manifest, sha256 = self.write_pack(root, payload)
@@ -416,6 +420,8 @@ class CheckMissionCopiedBoolReadinessTests(unittest.TestCase):
         self.assertIn("runtime_public_claim_overclaim", reasons)
         self.assertIn("mission_copied_bool_policy_public_overclaim_public_sdk", reasons)
         self.assertIn("mission_copied_bool_policy_public_overclaim_runtime_ready", reasons)
+        self.assertIn("mission_copied_bool_policy_public_overclaim_mission_identity", reasons)
+        self.assertIn("mission_copied_bool_policy_public_overclaim_player_authority", reasons)
 
     def test_protected_and_symlink_inputs_are_rejected(self) -> None:
         result = self.run_checker(

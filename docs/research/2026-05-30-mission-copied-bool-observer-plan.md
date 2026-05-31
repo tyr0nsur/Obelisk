@@ -110,6 +110,9 @@ The low-risk offline hardening step is to keep the focused policy slice fixture-
 test-enforced. Script tests now pin the exact five canonical copied bool fields, the six
 redacted object/container fields, the exclusion of `MissionType.GetPlayerUsableItems`
 from copied-bool policy output, and the consume-only/promote-blocked gate behavior.
+The offline artifact and readiness gates also fail closed on Mission/player
+identity-ready or authority-ready claims, including string claims outside required
+non-claim/exclusion text.
 
 This is evidence hardening only. It does not change runtime code, public SDK headers,
 dispatcher wiring, marker/env behavior, live-server posture, identity exposure, array

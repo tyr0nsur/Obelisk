@@ -696,9 +696,9 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         payload = json.loads(result.stdout)
         self.assertEqual(result.returncode, 1)
         self.assertIn("release_statement_missing_exclusion_contract", payload["blockers"])
-        self.assertEqual(
+        self.assertIn(
+            "obelisk.inventory_items_mutation.v1",
             payload["release_statement_missing_exclusion_contracts"],
-            ["obelisk.inventory_items_mutation.v1"],
         )
 
     def test_release_statement_rejects_available_support_claim_after_post_v1_record(self) -> None:
@@ -733,7 +733,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         payload = json.loads(result.stdout)
         self.assertEqual(result.returncode, 1)
         self.assertIn("release_statement_missing_exclusion_contract", payload["blockers"])
-        self.assertEqual(payload["release_statement_missing_exclusion_contracts"], ["obelisk.commands_replies.v1"])
+        self.assertIn("obelisk.commands_replies.v1", payload["release_statement_missing_exclusion_contracts"])
 
     def test_release_statement_rejects_global_complete_sdk_claim_for_excluded_blocker(self) -> None:
         manifest, release_statement = complete_excluded_manifest()
@@ -755,9 +755,62 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         payload = json.loads(result.stdout)
         self.assertEqual(result.returncode, 1)
         self.assertIn("release_statement_missing_exclusion_contract", payload["blockers"])
-        self.assertEqual(
+        self.assertIn(
+            "obelisk.inventory_items_mutation.v1",
             payload["release_statement_missing_exclusion_contracts"],
-            ["obelisk.inventory_items_mutation.v1"],
+        )
+
+    def test_release_statement_rejects_blocked_claim_inside_other_surface_record(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        release_statement = release_statement.replace(
+            "obelisk.chat_message.v1: excluded - ChatMessageEvent is not included in v1.",
+            "obelisk.chat_message.v1: excluded - ChatMessageEvent is not included in v1; chat replies are included in v1.",
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("release_statement_missing_exclusion_contract", payload["blockers"])
+        self.assertIn("obelisk.commands_replies.v1", payload["release_statement_missing_exclusion_contracts"])
+
+    def test_release_statement_rejects_side_lane_claim_inside_other_surface_record(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        release_statement = release_statement.replace(
+            "obelisk.inventory_item_copied_signals.v1: excluded - inventory copied signals are not included in v1.",
+            "obelisk.inventory_item_copied_signals.v1: excluded - inventory copied signals are not included in v1; Mission SDK is included in v1.",
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("release_statement_missing_exclusion_contract", payload["blockers"])
+        self.assertIn(
+            "obelisk.mission_transfer_dino_tribe.v1",
+            payload["release_statement_missing_exclusion_contracts"],
         )
 
     def test_release_statement_rejects_duplicate_or_mixed_surface_records(self) -> None:

@@ -884,36 +884,55 @@
       ],
       "v1_decision_contract": {
         "current_decision": "blocked_until_promoted_or_explicitly_excluded",
+        "decision_manifest": "docs/permissions_admin_public_contract_decisions.json",
         "must_remain_without_public_contract_until_promotion": true,
+        "not_sufficient_evidence": [
+          "player identity planning without promoted player identity",
+          "permission cache sketches",
+          "command/reply planning",
+          "plugin-local command parser scaffolds",
+          "static admin thunk orientation",
+          "raw ProcessEvent callbacks"
+        ],
         "promotion_requires": [
           "promoted player identity/principal semantics",
           "query-only fail-closed permission checks over copied principals",
           "permission queries include principal_generation and principal_scope_flags or are formally callback-local only",
-          "stale principal, scope mismatch, missing generation, missing owner token, and unknown authority source fail closed",
-          "authority source, abuse controls, and privacy boundaries",
+          "stale principal, scope mismatch, missing generation, missing owner token, unknown authority source, and missing policy provenance fail closed",
+          "allow decisions carry policy_source_id, policy_source_generation, authority_kind, authority_generation, and policy_epoch provenance; allow without provenance is forbidden",
+          "authority source, abuse controls, audit, and privacy boundaries",
+          "no public permission cache ABI until policy_epoch, generation, and scope keying semantics are separately promoted",
+          "no permission groups, admin groups, grant/revoke API, admin actions, moderation actions, mutation authority, command router, command/chat response path, or replies/send-chat implication",
           "append-only POD C ABI design with capability gates, owner-scoped cleanup, and SDK consumer tests"
         ],
         "exclusion_requires": [
           "the v1 release statement names obelisk.permissions_admin.v1 as post-v1 or excluded",
-          "the v1 release statement states that no permission groups, admin groups, grant/revoke API, storage/persistence, operator ingress, command router, replies/send-chat, moderation authority, or ban/kick API is included in v1",
+          "the v1 release statement states that no permission groups, admin groups, grant/revoke API, admin actions, permission cache ABI, storage/persistence, operator ingress, command router, command/chat response path, replies/send-chat, moderation authority, or ban/kick API is included in v1",
           "v1_completion_required changes only after this blocker is promoted or that explicit exclusion is recorded"
         ]
       },
       "blockers": [
         "No promoted player identity or authority model.",
         "First public slice must be query-only permission checks over a copied principal, not groups/grants/admin actions.",
-        "No fail-closed policy source, abuse controls, owner-token/capability/struct_size ABI tests, or SDK consumer coverage."
+        "No fail-closed policy source, abuse controls, owner-token/capability/struct_size ABI tests, or SDK consumer coverage.",
+        "No public permission cache ABI, command/reply implication, admin mutation path, or public header permission symbols."
       ],
       "exclusions": [
         "permission groups",
         "admin groups",
         "grant/revoke API",
+        "admin actions",
+        "admin mutation",
+        "permission cache ABI",
         "storage/persistence",
         "operator ingress",
         "command router",
+        "command/chat response path",
         "replies/send-chat",
         "moderation authority",
-        "ban/kick API"
+        "ban/kick API",
+        "allow without provenance",
+        "public header permission symbols"
       ]
     },
     {

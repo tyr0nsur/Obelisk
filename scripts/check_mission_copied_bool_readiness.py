@@ -72,7 +72,7 @@ FORBIDDEN_TRUE_READY_KEYS = {
     "public_sdk_ready",
     "runtime_hook_ready",
     "runtime_ready",
-}
+} | offline_gate.MISSION_COPIED_BOOL_FORBIDDEN_TRUE_READY_KEYS
 
 
 def parse_args() -> argparse.Namespace:

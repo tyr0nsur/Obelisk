@@ -6,16 +6,29 @@
   "public_header": "include/obelisk/ObeliskApi.h",
   "public_header_symbols_now": [],
   "public_cache_abi_allowed": false,
+  "allowed_public_surface_after_player_identity": [
+    "query-only fail-closed permission decision checks over copied principals"
+  ],
+  "allow_without_policy_provenance_allowed": false,
+  "public_permission_cache_contract": "none",
+  "public_command_reply_contract": "none",
+  "public_admin_mutation_contract": "none",
   "forbidden_public_contract": [
     "permission groups",
     "admin groups",
     "grant/revoke API",
     "ban/kick API",
+    "admin actions",
+    "admin mutation",
     "moderation authority",
     "storage/persistence",
     "operator ingress",
     "command router",
+    "command/chat response path",
     "replies/send-chat",
+    "permission cache ABI",
+    "allow without provenance",
+    "public header symbols",
     "UE pointers",
     "raw params",
     "FName/GObjects indices",
@@ -29,7 +42,12 @@
       "id": "dependency.promoted_player_identity",
       "category": "dependency",
       "status": "unresolved",
-      "decision_required": "Promote obelisk.player_identity.v1 before any permission check API is public."
+      "decision_required": "Promote obelisk.player_identity.v1 before any permission check API is public.",
+      "required_behavior": [
+        "before player identity is promoted, permissions/admin exposes no public ABI, callbacks, cache ABI, command/reply implication, or header symbols",
+        "player identity planning evidence alone cannot enable permissions/admin",
+        "permissions/admin remains post-v1 or excluded until this dependency is promoted or explicitly excluded"
+      ]
     },
     {
       "id": "identity.principal_generation_required",
@@ -80,6 +98,9 @@
         "abi_version and struct_size front-loaded",
         "owner-token scoped call",
         "capability gated",
+        "query-only result contract only",
+        "no mutation of permission policy or admin state",
+        "no command/reply handles",
         "no UE pointers or raw params"
       ]
     },
@@ -99,6 +120,7 @@
       ],
       "required_behavior": [
         "no public permission cache ABI until policy_epoch and full generation/scope keying semantics are promoted",
+        "cache keys or entries must not cross the public ABI",
         "cache disabled unless all key fields are defined",
         "policy epoch mismatch fails closed",
         "cached allow decisions are invalidated on principal generation change"
@@ -128,9 +150,11 @@
       "required_behavior": [
         "missing policy source fails closed",
         "unknown authority kind fails closed",
+        "missing policy_epoch provenance fails closed",
         "policy source generation mismatch fails closed",
         "authority generation mismatch fails closed",
         "allow decisions must carry policy_epoch provenance",
+        "allow without policy provenance is forbidden",
         "plugin input cannot self-attest authority provenance"
       ]
     },
@@ -160,6 +184,7 @@
         "process mismatch",
         "unknown policy source",
         "missing policy source provenance",
+        "missing policy_epoch provenance",
         "policy source generation mismatch",
         "missing plugin owner token",
         "missing capability",
@@ -171,6 +196,8 @@
         "missing identity",
         "unknown authority source",
         "missing policy source provenance",
+        "allow without policy_epoch provenance",
+        "plugin-supplied provenance",
         "rate limit exceeded"
       ]
     },
@@ -187,10 +214,13 @@
       ],
       "required_exclusions": [
         "command router",
+        "command/chat response path",
         "replies/send-chat",
         "moderation",
         "ban/kick",
+        "admin actions",
         "groups/grants",
+        "permission cache ABI",
         "storage/persistence",
         "operator ingress"
       ]

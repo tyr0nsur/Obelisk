@@ -154,10 +154,9 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   identity remains core-blocked. Keep that work experimental and non-completion. This
   does not authorize Transfer runtime work. inventory copied signals are the higher-value side lane; structure census remains useful offline planning/consume-only work; Neither side lane displaces identity -> permissions/admin -> commands/replies. The accepted RC UFunction second-source root is guardrail evidence only, not a broad SDK completion signal.
 - Current no-core side-lane priority: `item-return-only-policy-slice` has three copied
-  `GameplayPolicyEvent` `ReturnValue` checks and is the best
-  value/risk target set because it already has release-readiness classification,
-  fixture coverage, and second-source layout evidence behind existing
-  `GameplayPolicyEvent` event kinds. Descriptor-preflight hardening now requires the
+  `GameplayPolicyEvent` `ReturnValue` checks and is the best value/risk target set
+  because it already has release-readiness classification, fixture coverage, and
+  second-source layout evidence. Descriptor-preflight hardening now requires the
   three internal descriptor candidates to stay unassigned to public event kinds/masks and
   blocks drift toward Inventory SDK/Items SDK/identity/lookup/mutation/return override
   metadata. The preserved artifact gates were regenerated against manifest sha256

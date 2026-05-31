@@ -145,7 +145,17 @@ already promoted, and player identity promotion must name the reviewed core/refl
 evidence before it can support public permissions or command claims.
 That ordering is a dependency guardrail, not a declaration that permissions/admin is the
 immediate next public slice; the only post-identity candidate inside permissions/admin is
-query-only fail-closed permission checks, and groups, grants, admin actions, and mutation authority remain excluded unless a future promotion gate explicitly says otherwise.
+query-only fail-closed permission checks over copied principals. Before player identity
+is promoted, permissions/admin has no public header symbols, callbacks, command/reply
+implication, or public cache ABI. After identity promotion, any permission `allow` must
+carry policy source, authority generation, and `policy_epoch` provenance; missing or
+stale provenance returns deny or unknown, never allow. Groups, grants, admin actions,
+moderation actions, mutation authority, command/chat response paths, replies/send-chat,
+storage/persistence, and operator ingress remain excluded unless a future promotion gate
+explicitly says otherwise. The pre-ABI decision checklist for this future surface is
+[`permissions_admin_public_contract_decisions.json`](permissions_admin_public_contract_decisions.json).
+groups, grants, admin actions, and mutation authority remain excluded from the
+permissions/admin candidate unless a future promotion gate explicitly says otherwise.
 
 The command/chat response path is a named planning dependency only, not a promoted
 surface. Until it is separately promoted, Obelisk v1 exposes no public `CallProcessEvent`
@@ -199,7 +209,8 @@ The shortest useful route toward a complete v1 SDK is:
 1. Promote the smallest copied `player_identity`/principal lifecycle contract that can
    support privacy, invalidation, and multi-instance semantics.
 2. Build a fail-closed permissions/admin query layer on that principal model, initially
-   limited to query-only checks.
+   limited to query-only checks with no public cache ABI, no command/reply implication,
+   and no admin mutation.
 3. Promote the command/chat response path, then promote commands/replies as a new
    owner-token copied callback/response surface, not as a parser-only extension to
    `ChatMessageEvent`.
@@ -262,7 +273,7 @@ experimental, or debug-only surfaces as release exclusions.
 | Surface or demand family | Required v1 outcome | Depends on | Release-statement detail |
 | --- | --- | --- | --- |
 | `obelisk.player_identity.v1` | `promoted` or `excluded` | accepted admin snapshots, lifecycle anchors, privacy/invalidation, second source | Name player identity, principal, player lookup, permission principal, economy identity, and send-chat identity. |
-| `obelisk.permissions_admin.v1` | `promoted`, `excluded`, or `post-v1` | promoted player identity/principal | Name permission groups, admin groups, grant/revoke, storage/persistence, operator ingress, command router, replies/send-chat, moderation, and ban/kick. |
+| `obelisk.permissions_admin.v1` | `promoted`, `excluded`, or `post-v1` | promoted player identity/principal | Name permission groups, admin groups, grant/revoke, admin actions, permission cache ABI, storage/persistence, operator ingress, command router, command/chat response path, replies/send-chat, moderation, ban/kick, and public header permission symbols. |
 | `obelisk.command_chat_response_path.v1` | `promoted`, `excluded`, or `post-v1` | promoted player identity/principal and permissions/admin | Name command/chat response path, public CallProcessEvent response path, raw UE pointer/ProcessEvent/FString response APIs, chat replies, send-chat, broadcast/notices, and moderation. |
 | `obelisk.commands_replies.v1` | `promoted`, `excluded`, or `post-v1` | promoted player identity, permissions/admin, and command/chat response path | Name command router, console/RCON commands, player/admin commands, chat replies, send-chat, broadcast/notices, and moderation. |
 | `obelisk.inventory_items_mutation.v1` | `promoted`, `excluded`, or `post-v1` | player/inventory/item identity plus rollback/privacy controls | Name Inventory SDK, Items SDK, give/remove item, kits/rewards, engrams/progression, lookup, item handles, mutation, return override, and `ResourceHandle`. |

@@ -426,6 +426,23 @@ REQUIRED_MISSION_COPIED_BOOL_EXPLICIT_EXCLUSIONS = {
     "return_override",
     "runtime_markers",
 }
+MISSION_COPIED_BOOL_FORBIDDEN_TRUE_READY_KEYS = {
+    "authority_ready",
+    "identity_ready",
+    "mission_authority_ready",
+    "mission_identity_ready",
+    "player_authority_ready",
+    "player_identity_ready",
+}
+MISSION_COPIED_BOOL_FORBIDDEN_CLAIM_PHRASES = {
+    "authority ready": "authority_ready",
+    "authority promoted": "authority_promoted",
+    "authoritative identity": "authoritative_identity",
+    "mission authority": "mission_authority",
+    "mission identity": "mission_identity",
+    "player authority": "player_authority",
+    "player identity": "player_identity",
+}
 REQUIRED_STRUCTURE_RETURN_ONLY_COPIED_FIELDS = {
     "PrimalStructure.AllowStructureAccess.ReturnValue",
     "PrimalStructure.IsAllowedToDemolish.ReturnValue",
@@ -4959,7 +4976,7 @@ def validate_mission_copied_bool_policy_slice_manifest(payload: dict[str, Any], 
             "public_mission_sdk_ready",
             "public_sdk_ready",
             "runtime_hook_ready",
-        }:
+        } | MISSION_COPIED_BOOL_FORBIDDEN_TRUE_READY_KEYS:
             blockers.append({"reason": "mission_copied_bool_policy_readiness_overclaim", "label": f"{label}:{trail}"})
     for trail, _, reason in collect_candidate_public_overclaims(
         payload,
@@ -4969,6 +4986,13 @@ def validate_mission_copied_bool_policy_slice_manifest(payload: dict[str, Any], 
         ),
     ):
         blockers.append({"reason": f"mission_copied_bool_policy_public_overclaim_{reason}", "label": f"{label}:{trail}"})
+    for trail, raw_value in collect_string_fields(payload):
+        if trail.startswith("$.non_claims") or trail.startswith("$.safety_summary.explicitly_excluded"):
+            continue
+        text = raw_value.casefold()
+        for needle, reason in MISSION_COPIED_BOOL_FORBIDDEN_CLAIM_PHRASES.items():
+            if needle in text:
+                blockers.append({"reason": f"mission_copied_bool_policy_public_overclaim_{reason}", "label": f"{label}:{trail}"})
 
     return blockers
 
