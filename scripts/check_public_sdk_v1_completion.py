@@ -58,6 +58,30 @@ CANONICAL_EXPERIMENTAL_RELEASE_STATEMENT_TEXT = {
     "obelisk.inventory_item_copied_signals.v1": ("inventory copied signals", "not included in v1"),
 }
 STRICT_PROMOTION_EVIDENCE_SURFACE_IDS = CANONICAL_V1_COMPLETION_BLOCKERS | CANONICAL_EXPERIMENTAL_SURFACE_IDS
+PROMOTION_EVIDENCE_REQUIRED_TERMS = {
+    "obelisk.player_identity.v1": (
+        "obelisk.core-dump-evidence-pack.v1",
+        "obelisk.reflection-inventory-pack.v1",
+        "ServerListPlayers",
+        "ServerKickPlayer",
+    ),
+}
+PROMOTION_EVIDENCE_NEGATIVE_CONTEXT_KEYS = {
+    "blockers",
+    "candidate",
+    "missing",
+    "non_claim",
+    "non_claims",
+    "planning",
+    "requires",
+    "todo",
+    "todos",
+    "unresolved",
+}
+PROMOTION_EVIDENCE_NEGATIVE_TERM_CONTEXT = re.compile(
+    r"\b(?:blocked|candidate(?:-only)?|insufficient|missing|needs?|no|not|planning|requires?|todo|unresolved|without)\b",
+    re.IGNORECASE,
+)
 CANONICAL_DEBUG_ONLY_SURFACE_IDS = {
     "obelisk.debug_raw_process_event.v1",
 }
@@ -411,6 +435,68 @@ def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
     return False
 
 
+def promotion_evidence_key_is_negative_context(parent_key: str | None) -> bool:
+    if parent_key is None:
+        return False
+    normalized = parent_key.lower().replace("-", "_")
+    return any(marker in normalized for marker in PROMOTION_EVIDENCE_NEGATIVE_CONTEXT_KEYS)
+
+
+def evidence_value_contains_positive_term(
+    value: Any,
+    term: str,
+    *,
+    parent_key: str | None = None,
+) -> bool:
+    if promotion_evidence_key_is_negative_context(parent_key):
+        return False
+    if isinstance(value, dict):
+        for key, item in value.items():
+            next_key = key if isinstance(key, str) else None
+            if evidence_value_contains_positive_term(item, term, parent_key=next_key):
+                return True
+        return False
+    if isinstance(value, list):
+        return any(
+            evidence_value_contains_positive_term(item, term, parent_key=parent_key) for item in value
+        )
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        text = str(value)
+    else:
+        try:
+            text = json.dumps(value, sort_keys=True)
+        except TypeError:
+            text = str(value)
+    if term.lower() not in text.lower():
+        return False
+    return PROMOTION_EVIDENCE_NEGATIVE_TERM_CONTEXT.search(text) is None
+
+
+def surface_missing_required_promotion_evidence(surface: dict[str, Any]) -> list[str]:
+    surface_id = surface.get("id")
+    if not isinstance(surface_id, str) or surface.get("status") != "promoted":
+        return []
+    required_terms = PROMOTION_EVIDENCE_REQUIRED_TERMS.get(surface_id, ())
+    if not required_terms:
+        return []
+    evidence = surface.get("evidence", {})
+    return [term for term in required_terms if not evidence_value_contains_positive_term(evidence, term)]
+
+
+def unresolved_promoted_surface_dependencies(
+    surface: dict[str, Any],
+    surfaces_by_id: dict[str, dict[str, Any]],
+) -> list[str]:
+    if surface.get("status") != "promoted":
+        return []
+    unresolved: list[str] = []
+    for dependency_id in as_string_list(surface.get("depends_on")):
+        dependency = surfaces_by_id.get(dependency_id)
+        if not isinstance(dependency, dict) or dependency.get("status") != "promoted":
+            unresolved.append(dependency_id)
+    return unresolved
+
+
 def build_report(manifest_path: Path, release_statement_path: Path | None = None) -> dict[str, Any]:
     manifest, blockers = load_manifest(manifest_path)
     release_statement_text, release_statement_blockers = load_release_statement(release_statement_path)
@@ -502,6 +588,8 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
     release_statement_duplicate_records: list[str] = []
     missing_completion_blocker_exclusion_contracts: list[str] = []
     debug_only_promoted: list[str] = []
+    promoted_dependency_failures: dict[str, list[str]] = {}
+    promoted_missing_required_evidence_terms: dict[str, list[str]] = {}
 
     if stable_claim_allowed and manifest.get("v1_completion_required") is True and release_statement_text is None:
         blockers.append("release_statement_required_for_v1_completion")
@@ -604,6 +692,12 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
                 promoted_without_contract.append(surface_id)
             if not surface_has_promotion_evidence(surface):
                 promoted_without_evidence.append(surface_id)
+            missing_required_terms = surface_missing_required_promotion_evidence(surface)
+            if missing_required_terms:
+                promoted_missing_required_evidence_terms[surface_id] = missing_required_terms
+            unresolved_dependencies = unresolved_promoted_surface_dependencies(surface, surfaces_by_id)
+            if unresolved_dependencies:
+                promoted_dependency_failures[surface_id] = unresolved_dependencies
         elif status == "planning":
             unresolved_planning_surfaces.append(surface_id)
         elif status != "promoted-experimental-only" and contract_items:
@@ -643,6 +737,10 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
         blockers.append("promoted_surface_public_contract_missing")
     if promoted_without_evidence:
         blockers.append("promoted_surface_evidence_missing")
+    if promoted_missing_required_evidence_terms:
+        blockers.append("promoted_surface_required_evidence_terms_missing")
+    if promoted_dependency_failures:
+        blockers.append("promoted_surface_dependency_unresolved")
     if non_promoted_with_contract:
         blockers.append("non_promoted_surface_has_public_contract")
     if promoted_list_mismatches:
@@ -693,6 +791,14 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
         "missing_canonical_surfaces": missing_canonical_surfaces,
         "missing_canonical_completion_blockers": missing_canonical_completion_blockers,
         "promoted_surfaces_without_evidence": sorted(set(promoted_without_evidence)),
+        "promoted_surfaces_missing_required_evidence_terms": {
+            surface_id: sorted(set(terms))
+            for surface_id, terms in sorted(promoted_missing_required_evidence_terms.items())
+        },
+        "promoted_surfaces_with_unresolved_dependencies": {
+            surface_id: sorted(set(dependencies))
+            for surface_id, dependencies in sorted(promoted_dependency_failures.items())
+        },
         "promoted_blockers_without_evidence": sorted(set(promoted_without_evidence) & completion_blocker_set),
         "non_promoted_with_public_contract": sorted(set(non_promoted_with_contract)),
         "promoted_list_mismatches": sorted(set(promoted_list_mismatches)),

@@ -7,6 +7,7 @@ import hashlib
 import json
 import re
 import runpy
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -2093,10 +2094,177 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "Identity/principal, permissions/admin, and commands/replies are an ordered v1 dependency chain",
             "if any of those surfaces remains blocked, planning, or post-v1",
             "no complete v1 SDK claim is valid",
+            "The completion checker must also reject any promoted permissions/admin or commands/replies surface whose dependency rows are not already promoted",
             "not a declaration that permissions/admin is the immediate next public slice",
             "groups, grants, admin actions, and mutation authority remain excluded",
         ):
             self.assertIn(normalized(term), compatibility)
+
+    def test_public_sdk_v1_completion_checker_rejects_promoted_commands_before_dependencies(self) -> None:
+        checker = runpy.run_path(
+            str(REPO_ROOT / "scripts" / "check_public_sdk_v1_completion.py"),
+            run_name="__not_main__",
+        )
+        manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        for surface in manifest["surfaces"]:
+            if surface["id"] == "obelisk.commands_replies.v1":
+                surface["status"] = "promoted"
+                surface["public_contract"] = ["synthetic command router contract"]
+                surface["evidence"] = {
+                    "surface_id": "obelisk.commands_replies.v1",
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                    "abi_tests": ["tests/core/CommandsRepliesTests.cpp"],
+                    "sdk_consumer_tests": ["tests/sdk_consumer/commands_replies_plugin.cpp"],
+                }
+                break
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest_path = Path(tmpdir) / "public_sdk_surfaces.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            report = checker["build_report"](manifest_path)
+
+        self.assertIn("promoted_surface_dependency_unresolved", report["blockers"])
+        self.assertEqual(
+            report["promoted_surfaces_with_unresolved_dependencies"]["obelisk.commands_replies.v1"],
+            [
+                "obelisk.permissions_admin.v1",
+                "obelisk.player_identity.v1",
+            ],
+        )
+
+    def test_public_sdk_v1_completion_checker_rejects_promoted_permissions_before_identity(self) -> None:
+        checker = runpy.run_path(
+            str(REPO_ROOT / "scripts" / "check_public_sdk_v1_completion.py"),
+            run_name="__not_main__",
+        )
+        manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        for surface in manifest["surfaces"]:
+            if surface["id"] == "obelisk.permissions_admin.v1":
+                surface["status"] = "promoted"
+                surface["public_contract"] = ["synthetic fail-closed permissions query contract"]
+                surface["evidence"] = {
+                    "surface_id": "obelisk.permissions_admin.v1",
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                    "abi_tests": ["tests/core/PermissionsAdminTests.cpp"],
+                    "sdk_consumer_tests": ["tests/sdk_consumer/permissions_admin_plugin.cpp"],
+                }
+                break
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest_path = Path(tmpdir) / "public_sdk_surfaces.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            report = checker["build_report"](manifest_path)
+
+        self.assertIn("promoted_surface_dependency_unresolved", report["blockers"])
+        self.assertEqual(
+            report["promoted_surfaces_with_unresolved_dependencies"]["obelisk.permissions_admin.v1"],
+            ["obelisk.player_identity.v1"],
+        )
+
+    def test_public_sdk_v1_completion_checker_requires_identity_core_reflection_evidence(self) -> None:
+        checker = runpy.run_path(
+            str(REPO_ROOT / "scripts" / "check_public_sdk_v1_completion.py"),
+            run_name="__not_main__",
+        )
+        missing_terms = checker["surface_missing_required_promotion_evidence"](
+            {
+                "id": "obelisk.player_identity.v1",
+                "status": "promoted",
+                "evidence": {
+                    "surface_id": "obelisk.player_identity.v1",
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                    "abi_tests": ["tests/core/PlayerIdentityTests.cpp"],
+                    "sdk_consumer_tests": ["tests/sdk_consumer/player_identity_plugin.cpp"],
+                },
+            }
+        )
+
+        self.assertEqual(
+            missing_terms,
+            [
+                "obelisk.core-dump-evidence-pack.v1",
+                "obelisk.reflection-inventory-pack.v1",
+                "ServerListPlayers",
+                "ServerKickPlayer",
+            ],
+        )
+
+        planning_only_terms = checker["surface_missing_required_promotion_evidence"](
+            {
+                "id": "obelisk.player_identity.v1",
+                "status": "promoted",
+                "evidence": {
+                    "surface_id": "obelisk.player_identity.v1",
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                    "abi_tests": ["tests/core/PlayerIdentityTests.cpp"],
+                    "sdk_consumer_tests": ["tests/sdk_consumer/player_identity_plugin.cpp"],
+                    "requires": [
+                        "non-protected complete obelisk.core-dump-evidence-pack.v1 manifest",
+                        "reviewed UFunction obelisk.reflection-inventory-pack.v1 manifest",
+                        "reflection inventory containing ServerListPlayers and ServerKickPlayer",
+                    ],
+                    "non_claims": [
+                        "ServerListPlayers and ServerKickPlayer are not accepted promotion evidence yet",
+                    ],
+                },
+            }
+        )
+
+        self.assertEqual(
+            planning_only_terms,
+            [
+                "obelisk.core-dump-evidence-pack.v1",
+                "obelisk.reflection-inventory-pack.v1",
+                "ServerListPlayers",
+                "ServerKickPlayer",
+            ],
+        )
+
+        negated_positive_field_terms = checker["surface_missing_required_promotion_evidence"](
+            {
+                "id": "obelisk.player_identity.v1",
+                "status": "promoted",
+                "evidence": {
+                    "core_pack": "missing obelisk.core-dump-evidence-pack.v1",
+                    "reflection_pack": "obelisk.reflection-inventory-pack.v1 is not reviewed",
+                    "targets": [
+                        "ServerListPlayers is still unresolved",
+                        "ServerKickPlayer needs validation",
+                    ],
+                },
+            }
+        )
+
+        self.assertEqual(
+            negated_positive_field_terms,
+            [
+                "obelisk.core-dump-evidence-pack.v1",
+                "obelisk.reflection-inventory-pack.v1",
+                "ServerListPlayers",
+                "ServerKickPlayer",
+            ],
+        )
+
+        complete_terms = checker["surface_missing_required_promotion_evidence"](
+            {
+                "id": "obelisk.player_identity.v1",
+                "status": "promoted",
+                "evidence": {
+                    "core_pack": "accepted non-protected obelisk.core-dump-evidence-pack.v1",
+                    "reflection_pack": "reviewed obelisk.reflection-inventory-pack.v1",
+                    "targets": [
+                        "ShooterPlayerController.ServerListPlayers",
+                        "ShooterPlayerController.ServerKickPlayer",
+                    ],
+                },
+            }
+        )
+
+        self.assertEqual(complete_terms, [])
 
     def test_public_docs_record_player_identity_pack_gate_without_direct_core_shortcut(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))

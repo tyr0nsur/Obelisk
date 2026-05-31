@@ -57,6 +57,55 @@ class PlayerIdentityPublicContractDecisionTests(unittest.TestCase):
         recorded = {item["id"] for item in payload["required_before_public_header"]}
         self.assertEqual(recorded, REQUIRED_IDS)
 
+    def test_privacy_and_lifetime_blockers_have_machine_readable_contracts(self) -> None:
+        payload = self.load_decisions()
+        requirements = {
+            item["id"]: item
+            for item in payload["required_before_public_header"]
+        }
+
+        public_form = requirements["privacy.public_identifier_form"]
+        self.assertIn("generation-bearing or otherwise invalidation-aware", public_form["required_properties"])
+        for forbidden in ("SteamID", "EOS ID", "PlayerDataID", "player name", "UE pointer", "ResourceHandle"):
+            with self.subTest(forbidden=forbidden):
+                self.assertIn(forbidden, public_form["must_not_expose"])
+
+        redaction = requirements["privacy.redacted_identifier_fields"]
+        self.assertEqual(
+            set(redaction["allowed_field_classes"]),
+            {"copied opaque principal", "recognition-only", "private-redacted", "forbidden"},
+        )
+        self.assertIn("controller/playerstate object references", redaction["must_redact"])
+
+        logging_policy = requirements["privacy.logging_and_storage_policy"]
+        self.assertEqual(logging_policy["default_policy"], "no identity persistence and no raw identity logging")
+        self.assertIn("operator ingress/storage surface promotion", logging_policy["requires_before_persistence"])
+
+        scope = requirements["lifetime.principal_scope"]
+        self.assertEqual(set(scope["allowed_scopes"]), {"callback-local", "process-local", "restart-local"})
+        self.assertIn("cluster-stable", scope["forbidden_until_separate_promotion"])
+        self.assertEqual(set(scope["required_fields"]), {"principal_handle", "principal_generation", "scope_flags"})
+
+        invalidation = requirements["lifetime.invalidation_events"]
+        self.assertEqual(
+            set(invalidation["required_invalidation_events"]),
+            {
+                "disconnect",
+                "logout",
+                "transfer",
+                "reconnect",
+                "duplicate principal observation",
+                "server restart",
+                "stale controller/playerstate",
+                "failed evidence validation",
+            },
+        )
+        self.assertIn("stale principal fails closed", invalidation["required_behavior"])
+
+        stale_policy = requirements["lifetime.reconnect_duplicate_stale_policy"]
+        self.assertIn("stale handles never resolve to a different player", stale_policy["required_policy"])
+        self.assertIn("lookup-by-public-handle remains unavailable unless separately promoted", stale_policy["required_policy"])
+
     def test_public_header_stays_blocked_until_all_decisions_are_resolved(self) -> None:
         payload = self.load_decisions()
         unresolved = [

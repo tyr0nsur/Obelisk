@@ -64,6 +64,10 @@ priorities, and do not use history files as the active source of truth.
   `docs/public_sdk_surfaces.json`, with human guidance in `docs/SDK_V1_COMPATIBILITY.md`;
   both are planning-contract artifacts until a future release gate packages or supersedes
   them.
+- The v1 completion checker must reject promoted permissions/admin or commands/replies
+  rows whose dependencies are not promoted, and promoted player identity must name the
+  reviewed core/reflection evidence terms before supporting public permissions or command
+  claims.
 - Stable plugin loading requires safe `OBELISK_INSTANCE_ID` plus real non-symlink plugin,
   config, log, and state roots.
 - `ObeliskApi` v1 is append-only for `v0.1.0`; ABI v2 requires an explicit migration plan.
@@ -241,6 +245,12 @@ priorities, and do not use history files as the active source of truth.
   coverage, then plan only the exact `ShooterPlayerController.ServerListPlayers` and
   `ShooterPlayerController.ServerKickPlayer` targets; do not use the full target set to
   emit focal plans.
+- Player identity has a candidate-only privacy/invalidation contract in
+  `docs/research/2026-05-31-player-identity-privacy-invalidation-contract.md`: future
+  principals must be opaque copied POD values, generation-checked, process-local by
+  default, and invalidated fail-closed. This does not promote public identity, lookup,
+  persistence, platform ids, player names, `ResourceHandle`, UE pointers, or runtime
+  access.
 - `ue/MissionReflection.*` is an internal fixture-backed recognizer for
   `mission-compact-intake`: copied bool ranges only, object refs and `OutItemIDs` arrays
   recognition-only, with only a test-only internal dispatcher/helper and no hook/runtime

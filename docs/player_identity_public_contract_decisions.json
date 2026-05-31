@@ -38,32 +38,118 @@
     {
       "id": "privacy.public_identifier_form",
       "category": "privacy",
-      "status": "unresolved"
+      "status": "unresolved",
+      "decision_required": "Choose an opaque copied principal form before any public header symbol is added.",
+      "must_not_expose": [
+        "SteamID",
+        "EOS ID",
+        "UniqueNetId",
+        "PlayerDataID",
+        "tribe ID",
+        "player name",
+        "IP address",
+        "UE pointer",
+        "FName/GObjects index",
+        "ResourceHandle"
+      ],
+      "required_properties": [
+        "process-local by default",
+        "not persistent unless a future storage/ingress contract promotes persistence",
+        "generation-bearing or otherwise invalidation-aware",
+        "safe to copy across the C ABI as POD"
+      ]
     },
     {
       "id": "privacy.redacted_identifier_fields",
       "category": "privacy",
-      "status": "unresolved"
+      "status": "unresolved",
+      "decision_required": "Classify every identity-like UFunction/UProperty field before copying any value.",
+      "allowed_field_classes": [
+        "copied opaque principal",
+        "recognition-only",
+        "private-redacted",
+        "forbidden"
+      ],
+      "must_redact": [
+        "platform account ids",
+        "player names",
+        "tribe identifiers",
+        "network addresses",
+        "raw chat text used as identity",
+        "controller/playerstate object references"
+      ]
     },
     {
       "id": "privacy.logging_and_storage_policy",
       "category": "privacy",
-      "status": "unresolved"
+      "status": "unresolved",
+      "decision_required": "Define what identity-related data may be logged or persisted.",
+      "default_policy": "no identity persistence and no raw identity logging",
+      "allowed_logs": [
+        "opaque principal handle presence",
+        "generation mismatch reason flags",
+        "sanitized lifecycle transition reason flags"
+      ],
+      "requires_before_persistence": [
+        "operator ingress/storage surface promotion",
+        "storage schema and migration policy",
+        "secret-safe encoding policy",
+        "audit and retention policy"
+      ]
     },
     {
       "id": "lifetime.principal_scope",
       "category": "lifetime",
-      "status": "unresolved"
+      "status": "unresolved",
+      "decision_required": "Declare the exact lifetime scope of any public principal handle.",
+      "allowed_scopes": [
+        "callback-local",
+        "process-local",
+        "restart-local"
+      ],
+      "forbidden_until_separate_promotion": [
+        "cluster-stable",
+        "persistent",
+        "cross-map shared"
+      ],
+      "required_fields": [
+        "principal_handle",
+        "principal_generation",
+        "scope_flags"
+      ]
     },
     {
       "id": "lifetime.invalidation_events",
       "category": "lifetime",
-      "status": "unresolved"
+      "status": "unresolved",
+      "decision_required": "List every event that invalidates a copied principal before permissions or commands consume it.",
+      "required_invalidation_events": [
+        "disconnect",
+        "logout",
+        "transfer",
+        "reconnect",
+        "duplicate principal observation",
+        "server restart",
+        "stale controller/playerstate",
+        "failed evidence validation"
+      ],
+      "required_behavior": [
+        "stale principal fails closed",
+        "permission decisions include generation or are callback-local only",
+        "commands/replies reject stale principal handles"
+      ]
     },
     {
       "id": "lifetime.reconnect_duplicate_stale_policy",
       "category": "lifetime",
-      "status": "unresolved"
+      "status": "unresolved",
+      "decision_required": "Define reconnect, duplicate, and stale-handle conflict behavior.",
+      "required_policy": [
+        "new generation on reconnect unless evidence proves continuity",
+        "duplicate observations invalidate or quarantine both principals",
+        "stale handles never resolve to a different player",
+        "lookup-by-public-handle remains unavailable unless separately promoted"
+      ]
     },
     {
       "id": "abi.payload_shape",

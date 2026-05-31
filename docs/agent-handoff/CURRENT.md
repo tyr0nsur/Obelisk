@@ -65,6 +65,11 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - `scripts/check_public_sdk_v1_completion.py --json` intentionally reports blocked on the
   current tree. Do not use broad phrases like `v1.0 stable`, `complete SDK`, `full SDK`,
   or `production SDK` in public sinks unless that gate allows the stable SDK claim.
+- The public SDK completion checker now also blocks promoted commands/replies or
+  permissions/admin claims when their dependency rows are not promoted, and promoted
+  player identity must name `obelisk.core-dump-evidence-pack.v1`,
+  `obelisk.reflection-inventory-pack.v1`, `ServerListPlayers`, and `ServerKickPlayer`
+  evidence terms.
 - `ObeliskApi` v1 remains append-only. New public surfaces require copied-data ownership,
   capability and `struct_size` gates, lifecycle cleanup, privacy rules, accepted evidence,
   ABI tests, and installed SDK consumer tests.
@@ -102,6 +107,12 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `ShooterGameServer` SHA `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`,
   but no non-protected copied core, no complete `obelisk.core-dump-evidence-pack.v1`, and
   no accepted `obelisk.reflection-inventory-pack.v1`.
+- Player identity now has a candidate-only privacy/invalidation contract in
+  `docs/research/2026-05-31-player-identity-privacy-invalidation-contract.md` and
+  machine-readable decision guardrails. Future principals must be opaque copied values,
+  generation/invalidation-aware, process-local by default, and fail closed; this does not
+  promote `obelisk.player_identity.v1`, lookup, persistence, platform ids, names,
+  `ResourceHandle`, or UE pointers.
 - `scripts/check_player_identity_first_evidence_readiness.py --artifact-root
   /home/flowcommunity-ark/obelisk-artifacts --json` currently reports
   `next_actionable_blocker.code=non_protected_core_input_missing`; the expected copied
@@ -125,7 +136,7 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - Static orientation for all 12 identity targets and bounded admin thunk byte checks are
   valid navigation evidence only. They do not replace the missing core evidence pack,
   reflection inventory, focal snapshots, second source, lifecycle anchors, or
-  privacy/invalidation policy.
+  accepted privacy/invalidation implementation and tests.
 - `PrimalLocalProfile.ArkTributePlayerData` is metadata/layout evidence only. The
   `scripts/check_arktribute_playerdata_identity_boundary.py` checker proves only that the
   current transfer ScriptStruct artifacts remain layout-only, candidate-only,

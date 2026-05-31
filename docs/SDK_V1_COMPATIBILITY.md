@@ -124,6 +124,10 @@ claimed.
 Identity/principal, permissions/admin, and commands/replies are an ordered v1 dependency
 chain: if any of those surfaces remains blocked, planning, or post-v1, no complete v1 SDK
 claim is valid.
+The completion checker must also reject any promoted permissions/admin or
+commands/replies surface whose dependency rows are not already promoted, and player
+identity promotion must name the reviewed core/reflection evidence before it can support
+public permissions or command claims.
 That ordering is a dependency guardrail, not a declaration that permissions/admin is the
 immediate next public slice; groups, grants, admin actions, and mutation authority remain
 excluded unless a future promotion gate explicitly says otherwise.
