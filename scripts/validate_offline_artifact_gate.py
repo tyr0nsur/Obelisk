@@ -177,6 +177,7 @@ READY_OVERCLAIM_KEYS = {
     "promotion_ready",
     "public_resource_handle_ready",
     "post_callback_resource_handle_ready",
+    "public_sdk_ready",
     "resource_handle_ready",
     "return_override_ready",
     "runtime_ready",
@@ -5277,6 +5278,45 @@ def validate_players_identity_first_evidence_manifest(payload: dict[str, Any], *
             entry = declared[0]
             if not isinstance(entry, dict) or entry.get("name") != "players-identity-lifecycle-intake":
                 blockers.append({"reason": "players_identity_first_evidence_declared_target_set_identity_mismatch", "label": f"{label}:$.target_set_coverage.declared_target_sets[0]"})
+            elif entry.get("source") != "manifest":
+                blockers.append({"reason": "players_identity_first_evidence_declared_target_set_source_mismatch", "label": f"{label}:$.target_set_coverage.declared_target_sets[0].source", "recorded": entry.get("source")})
+            if isinstance(entry, dict):
+                if entry.get("expected_targets") != expected_targets:
+                    blockers.append(
+                        {
+                            "reason": "players_identity_first_evidence_declared_target_set_expected_targets_mismatch",
+                            "label": f"{label}:$.target_set_coverage.declared_target_sets[0].expected_targets",
+                            "expected": expected_targets,
+                            "recorded": entry.get("expected_targets"),
+                        }
+                    )
+                if entry.get("covered_targets") != emitted_targets:
+                    blockers.append(
+                        {
+                            "reason": "players_identity_first_evidence_declared_target_set_covered_targets_mismatch",
+                            "label": f"{label}:$.target_set_coverage.declared_target_sets[0].covered_targets",
+                            "expected": emitted_targets,
+                            "recorded": entry.get("covered_targets"),
+                        }
+                    )
+                if entry.get("missing_targets") != []:
+                    blockers.append(
+                        {
+                            "reason": "players_identity_first_evidence_declared_target_set_missing_targets_mismatch",
+                            "label": f"{label}:$.target_set_coverage.declared_target_sets[0].missing_targets",
+                            "recorded": entry.get("missing_targets"),
+                        }
+                    )
+                if entry.get("complete") is not True:
+                    blockers.append(
+                        {
+                            "reason": "players_identity_first_evidence_declared_target_set_complete_mismatch",
+                            "label": f"{label}:$.target_set_coverage.declared_target_sets[0].complete",
+                            "recorded": entry.get("complete"),
+                        }
+                    )
+        if coverage.get("complete") is not True:
+            blockers.append({"reason": "players_identity_first_evidence_target_set_coverage_complete_mismatch", "label": f"{label}:$.target_set_coverage.complete", "recorded": coverage.get("complete")})
         if coverage.get("expected_targets") != expected_targets:
             blockers.append({"reason": "players_identity_first_evidence_target_set_expected_targets_mismatch", "label": f"{label}:$.target_set_coverage.expected_targets", "expected": expected_targets, "recorded": coverage.get("expected_targets")})
         if coverage.get("emitted_targets") != emitted_targets:

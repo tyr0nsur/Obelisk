@@ -112,9 +112,13 @@ principal privacy/invalidation semantics, and independent second-source evidence
 Inventory/items mutation, structure ownership/placement/build policy/no-collision,
 dino/tribe/mission/transfer/buff module SDKs, RCON, database/storage services, webhooks,
 economy, shops, rewards, kits, stats, homes, teleport, safe zones, area policy,
-broadcast/timed notices, and permissions remain outside the current promoted scope. If
-they are included in the eventual `v1.0` support statement, they must be promoted before
-the release is called `v1.0`.
+broadcast/timed notices, and permissions remain outside the current promoted scope. The
+machine-readable blocker entries keep those broad areas auditable as release-statement
+units: structure aggregate/census, ownership/access identity, placement/build-policy,
+no-collision and admin exceptions; buff redaction, lifecycle/stacking/invalidation, and
+aggregate/proximity/count/mutation exclusions; and player services, economy, mobility,
+area policy, and timed-notice services. If they are included in the eventual `v1.0`
+support statement, they must be promoted before the release is called `v1.0`.
 
 ## v1.0 Release Bar
 

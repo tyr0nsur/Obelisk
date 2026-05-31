@@ -327,6 +327,66 @@ model:
 7. Only after identity, commands, permissions, persistence, and relevant item/event
    evidence exist can economy SDK work start.
 
+## Public Identity Promotion Checklist
+
+`obelisk.player_identity.v1` cannot be promoted until all of the following are proven by
+current artifacts, tests, or an explicitly approved runtime evidence window:
+
+1. Offline evidence:
+   - `players-identity-lifecycle-intake` remains `planning_only`, not release readiness,
+     until a separate release statement changes it.
+   - A complete `obelisk.players-identity-first-evidence.v1` pack covers all 12 targets.
+   - The missing sanitized `ShooterPlayerController.ServerListPlayers` and
+     `ShooterPlayerController.ServerKickPlayer` snapshots are present.
+   - At least one session-start/login/connect anchor and one
+     session-end/logout/disconnect anchor are accepted, or promotion remains explicitly
+     blocked.
+   - Anchor evidence includes exact `Outer.Function`, `ParmsSize`, property order,
+     offsets, sizes, property classes, and second-source comparison.
+   - `PlayerDataID`, Steam/EOS/platform IDs, names, IPs, tribe IDs, arrays, strings,
+     object refs, FName/GObjects indices, raw params, and UE pointers are
+     redacted/forbidden.
+   - Any copied bool candidate accepts only canonical bytes `0` or `1`.
+2. Initial public contract:
+   - The first public payload is copied POD and opaque.
+   - It exposes no `UObject`, `UFunction`, raw `FString`, raw params, FName/GObjects,
+     addresses, pointer-derived IDs, or `ResourceHandle`.
+   - Principal scope is explicit. Default is no persistence and no cross-instance claim.
+   - Identity has a dedicated passive capability, separate from commands, permissions,
+     persistence, and response/send-chat.
+   - ABI is append-only with `abi_version`, `struct_size`, capability discovery,
+     owner-token registration, owner-scoped unregister, and unload cleanup.
+   - SDK/ABI tests cover installed consumers, struct size, capability gating, and
+     fail-closed behavior.
+3. Runtime/live-ops evidence:
+   - No runtime evidence is authorized by this note.
+   - If offline evidence cannot answer lifecycle order, an operator-approved window must
+     name the instance, markers/env, rollback, evidence, redaction, and final stable
+     posture.
+   - Runtime logs must be copied/redacted and must not include real IDs, names, IPs,
+     sensitive chat text, or persistent correlations.
+4. Privacy and invalidation:
+   - A written policy separates public, private-redacted, recognition-only, and forbidden
+     fields.
+   - No real identifier is logged by default.
+   - Any public ID is copied, opaque, not pointer-derived, and has documented scope.
+   - `ChatMessageEvent` remains `principal=unknown` until separate evidence authenticates
+     a sender.
+   - Missing, duplicated, malformed, stale, or unsupported identity artifacts fail closed.
+   - Disconnect, transfer, reconnect conflict, controller/state change, restart, and
+     validation failure invalidate the principal.
+   - No post-callback UE lookup is required.
+5. Multi-instance and permissions separation:
+   - Handles, callback IDs, sequence IDs, and caches are process-local unless a future
+     public contract says otherwise.
+   - No state is shared between instances merely because plugins or config files match.
+   - Persistence/cross-instance identity remains outside the first API unless storage,
+     migration, locking, and audit are promoted separately.
+   - `obelisk.permissions_admin.v1` stays post-v1. The first identity API must not include
+     grants, checks, admin groups, kick/ban, moderation, or an authority model.
+   - Command routing remains blocked until identity, permissions, and a safe response path
+     are all promoted.
+
 ## Explicit Non-Claims
 
 - This note does not promote `players-identity-lifecycle-intake`.

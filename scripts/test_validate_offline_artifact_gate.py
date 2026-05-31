@@ -5587,6 +5587,33 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("players_identity_first_evidence_public_overclaim_public_sdk", reasons)
         self.assertIn("players_identity_first_evidence_non_claims_missing_required_boundaries", reasons)
 
+    def test_blocks_players_identity_first_evidence_declared_coverage_drift_and_nested_public_sdk_ready(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "players-identity-first-evidence.json"
+            payload = players_identity_first_evidence_manifest()
+            declared = payload["target_set_coverage"]["declared_target_sets"][0]
+            declared["source"] = "summary"
+            declared["expected_targets"] = declared["expected_targets"][:-1]
+            declared["covered_targets"] = declared["covered_targets"][:-1]
+            declared["missing_targets"] = ["MissionType.BPOnPlayerRemovedFromMission"]
+            declared["complete"] = False
+            payload["target_set_coverage"]["complete"] = False
+            payload["metadata"] = {"public_sdk_ready": True}
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("players_identity_first_evidence_declared_target_set_source_mismatch", reasons)
+        self.assertIn("players_identity_first_evidence_declared_target_set_expected_targets_mismatch", reasons)
+        self.assertIn("players_identity_first_evidence_declared_target_set_covered_targets_mismatch", reasons)
+        self.assertIn("players_identity_first_evidence_declared_target_set_missing_targets_mismatch", reasons)
+        self.assertIn("players_identity_first_evidence_declared_target_set_complete_mismatch", reasons)
+        self.assertIn("players_identity_first_evidence_target_set_coverage_complete_mismatch", reasons)
+        self.assertIn("players_identity_first_evidence_readiness_overclaim", reasons)
+
     def test_accepts_static_global_promotion_evidence_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"

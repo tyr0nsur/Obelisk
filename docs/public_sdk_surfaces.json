@@ -483,6 +483,12 @@
         "No ownership, placement/build-policy, no-collision, or admin-exception contract.",
         "No runtime lifecycle or privacy promotion."
       ],
+      "audit_units": [
+        "structure aggregate/census snapshots",
+        "structure ownership/access identity",
+        "placement/build-policy/no-collision",
+        "admin exceptions"
+      ],
       "exclusions": [
         "StructureEvents SDK",
         "structure identity",
@@ -516,6 +522,18 @@
         "Current lanes are internal, planning-only, or layout-only.",
         "No public identity, lookup, mutation, return override, or runtime promotion.",
         "No public Buff SDK or class/object redaction contract."
+      ],
+      "audit_units": [
+        "mission",
+        "transfer",
+        "dino",
+        "tribe",
+        "buff"
+      ],
+      "buff_audit_requirements": [
+        "buff class/object redaction contract",
+        "buff lifecycle, stacking, and invalidation semantics",
+        "no buff aggregate, proximity, count, or mutation API until promoted"
       ],
       "exclusions": [
         "Mission SDK",
@@ -619,6 +637,16 @@
         "No persistence, migration, or cross-instance consistency contract.",
         "No abuse, rate-limit, rollback, audit, or privacy policy for economy and mobility actions.",
         "No safe runtime action surface for teleport, homes, rewards, kits, stats, safe zones, or timed notices."
+      ],
+      "audit_units": [
+        "player services",
+        "economy/shops/rewards/kits/stats",
+        "mobility/homes/teleport",
+        "safe-zone/area policy",
+        "broadcast/timed notices"
+      ],
+      "release_bar": [
+        "Each audit unit must be promoted as its own copied C ABI surface or explicitly excluded in the v1 release statement."
       ],
       "exclusions": [
         "economy API",

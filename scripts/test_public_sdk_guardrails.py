@@ -1325,6 +1325,21 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             self.assertIn(exclusion, services["exclusions"])
 
+        self.assertEqual(
+            services["audit_units"],
+            [
+                "player services",
+                "economy/shops/rewards/kits/stats",
+                "mobility/homes/teleport",
+                "safe-zone/area policy",
+                "broadcast/timed notices",
+            ],
+        )
+        self.assertIn(
+            "Each audit unit must be promoted as its own copied C ABI surface or explicitly excluded in the v1 release statement.",
+            services["release_bar"],
+        )
+
     def test_public_sdk_surfaces_manifest_keeps_structure_and_buff_scope_blocked(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
         surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
@@ -1339,12 +1354,29 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             self.assertIn(token, json.dumps(structure))
 
+        self.assertEqual(
+            structure["audit_units"],
+            [
+                "structure aggregate/census snapshots",
+                "structure ownership/access identity",
+                "placement/build-policy/no-collision",
+                "admin exceptions",
+            ],
+        )
+
         self.assertIn("buff-compact-intake", modules["evidence"]["planning_target_sets"])
         for token in (
             "No public Buff SDK or class/object redaction contract.",
             "Buff SDK",
         ):
             self.assertIn(token, json.dumps(modules))
+        self.assertEqual(modules["audit_units"], ["mission", "transfer", "dino", "tribe", "buff"])
+        for requirement in (
+            "buff class/object redaction contract",
+            "buff lifecycle, stacking, and invalidation semantics",
+            "no buff aggregate, proximity, count, or mutation API until promoted",
+        ):
+            self.assertIn(requirement, modules["buff_audit_requirements"])
 
     def test_future_command_principal_routing_requires_new_owner_scoped_lifecycle_surface(self) -> None:
         docs = {
