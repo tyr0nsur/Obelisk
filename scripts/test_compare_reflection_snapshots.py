@@ -245,6 +245,7 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(set(lanes), set(compare.TARGET_SETS))
         self.assertEqual(lanes["chat-message-intake"], "chat")
         self.assertEqual(lanes["mission-copied-bool-policy-slice"], "mission")
+        self.assertEqual(lanes["players-lifecycle-anchor-candidates"], "players_lifecycle")
         self.assertEqual(lanes["structure-observer-intake"], "structures")
         self.assertEqual(lanes["transfer-scriptstruct"], "transfer")
         self.assertEqual(report["evidence_scope"], "second_source_layout_evidence_only")
@@ -272,6 +273,9 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(readiness_scopes["mission-copied-bool-policy-slice"], "planning_only")
         self.assertEqual(classifications["players-identity-lifecycle-intake"], "planning_only")
         self.assertIs(release_flags["players-identity-lifecycle-intake"], False)
+        self.assertEqual(classifications["players-lifecycle-anchor-candidates"], "planning_only")
+        self.assertIs(release_flags["players-lifecycle-anchor-candidates"], False)
+        self.assertEqual(readiness_scopes["players-lifecycle-anchor-candidates"], "planning_only")
         self.assertEqual(classifications["structure-aggregate-census-planning"], "planning_only")
         self.assertIs(release_flags["structure-aggregate-census-planning"], False)
         self.assertEqual(readiness_scopes["structure-aggregate-census-planning"], "planning_only")
@@ -295,6 +299,17 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
                 "obelisk.ufunction-chain.snapshot.v1:MissionType.AddPlayerToMission",
                 "obelisk.ufunction-chain.snapshot.v1:MissionType.BPAllowPlayerToLeaveMission",
                 "obelisk.ufunction-chain.snapshot.v1:MissionType.BPOnPlayerRemovedFromMission",
+            ],
+        )
+        self.assertEqual(
+            sets["players-lifecycle-anchor-candidates"],
+            [
+                "obelisk.ufunction-chain.snapshot.v1:GameMode.K2_PostLogin",
+                "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.CheckJoinInProgress",
+                "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.HandleNewPlayer",
+                "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.OnLogout",
+                "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.OnPostLogin__DelegateSignature",
+                "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.OnStartNewPlayer__DelegateSignature",
             ],
         )
         self.assertEqual(
@@ -2539,6 +2554,41 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
                 "blockers": [{"reason": "target_set_not_release_readiness", "count": 1}],
             },
         )
+
+    def test_readiness_report_blocks_lifecycle_anchor_candidate_promotion_gate(self) -> None:
+        target_set = "players-lifecycle-anchor-candidates"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_target_set_root(root / "base", target_set)
+            write_target_set_root(root / "candidate", target_set)
+
+            result = run_compare(
+                root / "base",
+                root / "candidate",
+                "--readiness-report",
+                "--target-set",
+                target_set,
+                "--fail-on-readiness-gaps",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 1)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["gate_mode"], "second_source_promotion")
+        self.assertEqual(report["target_sets"], [target_set])
+        self.assertEqual(report["totals"]["targets"], len(compare.TARGET_SETS[target_set]))
+        self.assertEqual(report["totals"]["second_source_accepted"], len(compare.TARGET_SETS[target_set]))
+        self.assertEqual(
+            report["promotion_gate"],
+            {
+                "ready": False,
+                "ready_scope": "planning_only",
+                "layout_ready": True,
+                "promotion_ready": False,
+                "blockers": [{"reason": "target_set_not_release_readiness", "count": 1}],
+            },
+        )
+        self.assertEqual(report["target_set_guidance"], [])
 
     def test_planning_layout_intake_accepts_planning_only_layout_without_promotion(self) -> None:
         target_set = "players-identity-lifecycle-intake"

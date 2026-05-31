@@ -118,6 +118,16 @@ TARGET_SETS = {
         "obelisk.ufunction-chain.snapshot.v1:MissionType.BPAllowPlayerToLeaveMission",
         "obelisk.ufunction-chain.snapshot.v1:MissionType.BPOnPlayerRemovedFromMission",
     ),
+    # Planning/guidance only: lifecycle anchor candidates from closed reflection planning.
+    # Tuple order is stable serialization only; it does not claim runtime lifecycle ordering.
+    "players-lifecycle-anchor-candidates": (
+        "obelisk.ufunction-chain.snapshot.v1:GameMode.K2_PostLogin",
+        "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.CheckJoinInProgress",
+        "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.HandleNewPlayer",
+        "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.OnLogout",
+        "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.OnPostLogin__DelegateSignature",
+        "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.OnStartNewPlayer__DelegateSignature",
+    ),
     "transfer-scriptstruct": (
         "obelisk.scriptstruct-chain.snapshot.v1:PrimalLocalProfile.ARKTributeDino",
         "obelisk.scriptstruct-chain.snapshot.v1:PrimalLocalProfile.ArkTributePlayerData",
@@ -128,6 +138,7 @@ TARGET_SETS = {
 PLANNING_ONLY_TARGET_SETS = frozenset(
     (
         "mission-copied-bool-policy-slice",
+        "players-lifecycle-anchor-candidates",
         "players-identity-lifecycle-intake",
         "structure-aggregate-census-planning",
     )
@@ -159,6 +170,7 @@ TARGET_SET_MODULE_LANES = {
     "mission-compact-intake": "mission",
     "mission-copied-bool-policy-slice": "mission",
     "players-identity-lifecycle-intake": "players_identity",
+    "players-lifecycle-anchor-candidates": "players_lifecycle",
     "structure-aggregate-census-planning": "structures",
     "structure-nonpin-copied-scalar-policy-slice": "structures",
     "structure-observer-intake": "structures",

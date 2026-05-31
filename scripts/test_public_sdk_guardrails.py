@@ -8680,11 +8680,19 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         required_boundary = normalized(
             "Planning-only target-set artifact packs are consume-mode planning evidence only. "
             "The planning-only target sets are `mission-copied-bool-policy-slice`, "
-            "`players-identity-lifecycle-intake`, and `structure-aggregate-census-planning`; "
+            "`players-identity-lifecycle-intake`, `players-lifecycle-anchor-candidates`, "
+            "and `structure-aggregate-census-planning`; "
             "their packs, container manifests, and child evidence must not be cited as "
             "release-readiness roots, public SDK promotion evidence, or `v1.0` completion signals."
         )
         self.assertIn(required_boundary, compact)
+        self.assertIn(
+            normalized(
+                "The `players-lifecycle-anchor-candidates` target set is layout-planning only "
+                "and carries no runtime lifecycle ordering claim."
+            ),
+            compact,
+        )
         for target_set in sorted(PLANNING_ONLY_TARGET_SETS):
             with self.subTest(target_set=target_set):
                 self.assertIn(target_set, curation)
