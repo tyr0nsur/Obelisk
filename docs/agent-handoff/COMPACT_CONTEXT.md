@@ -67,7 +67,10 @@ priorities, and do not use history files as the active source of truth.
 - The v1 completion checker must reject promoted permissions/admin, command/chat response
   path, or commands/replies rows whose dependencies are not promoted, and promoted player
   identity must name the reviewed core/reflection evidence terms before supporting public
-  permissions or command claims.
+  permissions or command claims. It must also enforce the canonical
+  `stable_release_contract.claim_requires` and `not_sufficient` clauses so Plugin Hub
+  package shape, core-first readiness, and copied event seeds remain non-sufficient for a
+  stable SDK claim.
 - After player identity, the permissions/admin candidate is query-only fail-closed checks;
   commands/replies still require identity, permissions/admin, and the named post-v1
   `obelisk.command_chat_response_path.v1` planning dependency. That response path adds no

@@ -184,6 +184,45 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("obelisk.player_identity.v1", payload["missing_canonical_surfaces"])
         self.assertIn("obelisk.player_identity.v1", payload["missing_canonical_completion_blockers"])
 
+    def test_stable_release_contract_must_keep_canonical_claim_boundaries(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        manifest["stable_release_contract"]["claim_requires"] = [
+            item
+            for item in manifest["stable_release_contract"]["claim_requires"]
+            if "promoted-experimental-only" not in item
+        ]
+        manifest["stable_release_contract"]["not_sufficient"] = [
+            item
+            for item in manifest["stable_release_contract"]["not_sufficient"]
+            if item != "Foundation/Plugin Hub seed package shape"
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            release_statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            release_statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(release_statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("stable_release_contract_claim_requires_incomplete", payload["blockers"])
+        self.assertIn("stable_release_contract_not_sufficient_incomplete", payload["blockers"])
+        self.assertEqual(
+            payload["stable_release_contract_missing_claim_requires"],
+            ["no promoted-experimental-only surface remains unresolved"],
+        )
+        self.assertEqual(
+            payload["stable_release_contract_missing_not_sufficient"],
+            ["Foundation/Plugin Hub seed package shape"],
+        )
+
     def test_release_statement_must_name_non_promoted_blockers(self) -> None:
         manifest = {
             "schema": "obelisk.public-sdk-surfaces.v1",

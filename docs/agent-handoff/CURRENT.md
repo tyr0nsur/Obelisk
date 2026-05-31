@@ -64,6 +64,9 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - `scripts/check_public_sdk_v1_completion.py --json` intentionally reports blocked on the
   current tree. Do not use broad phrases like `v1.0 stable`, `complete SDK`, `full SDK`,
   or `production SDK` in public sinks unless that gate allows the stable SDK claim.
+  The checker also enforces canonical `stable_release_contract.claim_requires` and
+  `not_sufficient` clauses so Plugin Hub package shape, RC readiness, and copied-data
+  seeds cannot become sufficient evidence by manifest drift.
 - `oDescriptorCatalog` and Plugin Hub foundation work are metadata/contributor seeds only:
   lifecycle/config/logging, descriptor/catalog, and process-local timers are
   release-supported seed lanes; copied chat/policy stays experimental. Foundation work is

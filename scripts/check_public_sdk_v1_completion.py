@@ -59,6 +59,18 @@ CANONICAL_EXPERIMENTAL_RELEASE_STATEMENT_TEXT = {
     "obelisk.chat.local_routing.v1": ("chat routing", "not included in v1"),
     "obelisk.inventory_item_copied_signals.v1": ("inventory copied signals", "not included in v1"),
 }
+CANONICAL_STABLE_RELEASE_CLAIM_REQUIRES = (
+    "v1_completion_required is true in this manifest",
+    "every v1_sdk_completion_blocker is promoted or explicitly named as excluded/post-v1 in the v1 release statement",
+    "no promoted-experimental-only surface remains unresolved",
+    "the release ships a reviewed SDK compatibility statement based on docs/SDK_V1_COMPATIBILITY.md and docs/public_sdk_surfaces.json",
+)
+CANONICAL_STABLE_RELEASE_NOT_SUFFICIENT = (
+    "runtime/core-first RC readiness",
+    "internal runtime stability",
+    "Foundation/Plugin Hub seed package shape",
+    "GameplayPolicyEvent and ChatMessageEvent copied-data seeds",
+)
 STRICT_PROMOTION_EVIDENCE_SURFACE_IDS = CANONICAL_V1_COMPLETION_BLOCKERS | CANONICAL_EXPERIMENTAL_SURFACE_IDS
 PROMOTION_EVIDENCE_REQUIRED_TERMS = {
     "obelisk.player_identity.v1": (
@@ -625,10 +637,28 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
     if not isinstance(stable_contract, dict):
         blockers.append("stable_release_contract_missing")
         stable_claim_allowed = False
+        missing_stable_claim_requires = list(CANONICAL_STABLE_RELEASE_CLAIM_REQUIRES)
+        missing_stable_not_sufficient = list(CANONICAL_STABLE_RELEASE_NOT_SUFFICIENT)
     else:
         stable_claim_allowed = stable_contract.get("claim_allowed") is True
         if not stable_claim_allowed:
             blockers.append("stable_release_contract_claim_not_allowed")
+        stable_claim_requires = set(as_string_list(stable_contract.get("claim_requires")))
+        missing_stable_claim_requires = [
+            requirement
+            for requirement in CANONICAL_STABLE_RELEASE_CLAIM_REQUIRES
+            if requirement not in stable_claim_requires
+        ]
+        stable_not_sufficient = set(as_string_list(stable_contract.get("not_sufficient")))
+        missing_stable_not_sufficient = [
+            item
+            for item in CANONICAL_STABLE_RELEASE_NOT_SUFFICIENT
+            if item not in stable_not_sufficient
+        ]
+    if missing_stable_claim_requires:
+        blockers.append("stable_release_contract_claim_requires_incomplete")
+    if missing_stable_not_sufficient:
+        blockers.append("stable_release_contract_not_sufficient_incomplete")
 
     if manifest.get("v1_completion_required") is not True:
         blockers.append("v1_completion_required_false")
@@ -862,6 +892,8 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
         "sdk_version": manifest.get("sdk_version"),
         "v1_completion_required": manifest.get("v1_completion_required"),
         "stable_claim_allowed": stable_claim_allowed,
+        "stable_release_contract_missing_claim_requires": missing_stable_claim_requires,
+        "stable_release_contract_missing_not_sufficient": missing_stable_not_sufficient,
         "blockers": blockers,
         "unresolved_experimental_surfaces": sorted(set(unresolved_experimental)),
         "unresolved_completion_blockers": sorted(set(unresolved_completion_blockers)),
