@@ -40,6 +40,7 @@ EXPECTED_BINARY_SHA256 = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf6
 SCHEMA = "obelisk.radare2-static-orientation-windows.v1"
 ADDRESS_CONVENTION = "non-PIE ELF VMA for the reviewed ARK Linux ShooterGameServer binary"
 SAFE_COMPONENT_RE = re.compile(r"[^A-Za-z0-9_.-]+")
+SAFE_RUN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 HEX_RE = re.compile(r"^0x[0-9a-fA-F]+$")
 
 
@@ -77,6 +78,13 @@ def sha256_file(path: Path) -> str:
 
 
 def run_command(command: list[str], *, timeout_sec: int) -> dict[str, Any]:
+    def output_text(value: str | bytes | None) -> str:
+        if value is None:
+            return ""
+        if isinstance(value, bytes):
+            return value.decode("utf-8", errors="replace")
+        return value
+
     try:
         completed = subprocess.run(
             command,
@@ -93,8 +101,8 @@ def run_command(command: list[str], *, timeout_sec: int) -> dict[str, Any]:
             "argv": command,
             "status": "timeout",
             "timeout_sec": timeout_sec,
-            "stdout": exc.stdout or "",
-            "stderr": exc.stderr or "",
+            "stdout": output_text(exc.stdout),
+            "stderr": output_text(exc.stderr),
         }
     return {
         "argv": command,
@@ -145,6 +153,22 @@ def resolve_output_root(path: Path) -> Path:
     return resolved
 
 
+def resolve_orientation_json(path: Path) -> Path:
+    resolved = reject_protected_input_path(path, "--orientation-json")
+    reject_symlink_component(path, "--orientation-json")
+    if not resolved.exists():
+        raise SystemExit(f"--orientation-json does not exist: {resolved}")
+    if not resolved.is_file():
+        raise SystemExit(f"--orientation-json must be a file: {resolved}")
+    return resolved
+
+
+def safe_run_id(value: str) -> str:
+    if SAFE_RUN_ID_RE.fullmatch(value) is None or ".." in value:
+        raise SystemExit(f"--run-id contains unsafe characters: {value}")
+    return value
+
+
 def ensure_directory(path: Path, label: str) -> None:
     reject_symlink(path, label)
     path.mkdir(parents=True, exist_ok=True)
@@ -179,14 +203,46 @@ def write_text(path: Path, value: str) -> None:
         handle.write(value)
 
 
-def find_radare2(explicit: str | None) -> str:
+def has_path_separator(value: str) -> bool:
+    return "/" in value or (os.altsep is not None and os.altsep in value)
+
+
+def resolve_radare2_executable(
+    candidate: str,
+    *,
+    explicit: bool,
+) -> tuple[str, list[dict[str, Any]]]:
+    path = Path(candidate).expanduser()
+    resolved = reject_protected_input_path(path, "--radare2")
+    display = str(resolved if path.is_absolute() or has_path_separator(candidate) else path)
+    if not resolved.exists():
+        return display, [
+            {
+                "reason": "radare2_not_found",
+                "path": display,
+                "source": "explicit" if explicit else "path",
+            }
+        ]
+    if not resolved.is_file():
+        return str(resolved), [{"reason": "radare2_not_file", "path": str(resolved)}]
+    if not os.access(resolved, os.X_OK):
+        return str(resolved), [{"reason": "radare2_not_executable", "path": str(resolved)}]
+    return str(resolved), []
+
+
+def find_radare2(explicit: str | None) -> tuple[str, list[dict[str, Any]]]:
     if explicit:
-        return explicit
+        if has_path_separator(explicit) or Path(explicit).expanduser().is_absolute():
+            return resolve_radare2_executable(explicit, explicit=True)
+        found = shutil.which(explicit)
+        if found is None:
+            return explicit, [{"reason": "radare2_not_found", "path": explicit, "source": "explicit"}]
+        return resolve_radare2_executable(found, explicit=True)
     for name in ("radare2", "r2"):
         path = shutil.which(name)
         if path is not None:
-            return path
-    raise SystemExit("radare2/r2 not found; install radare2 or pass --radare2")
+            return resolve_radare2_executable(path, explicit=False)
+    return "radare2", [{"reason": "radare2_not_found", "path": "radare2", "source": "path"}]
 
 
 def load_player_identity_windows(
@@ -391,9 +447,10 @@ def capture_window(
 def build_manifest(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
     binary = resolve_binary(args.binary)
     output_root = resolve_output_root(args.output_root)
-    run_id = args.run_id or f"{utc_now().replace('-', '').replace(':', '')}-radare2-static-orientation"
-    if SAFE_COMPONENT_RE.search(run_id) or ".." in run_id:
-        raise SystemExit(f"--run-id contains unsafe characters: {run_id}")
+    args.orientation_json = resolve_orientation_json(args.orientation_json)
+    default_run_id = f"{utc_now().replace('-', '').replace(':', '')}-radare2-static-orientation"
+    requested_run_id = args.run_id if args.run_id is not None else default_run_id
+    run_id = safe_run_id(requested_run_id)
     output_dir = output_root / run_id
     ensure_directory(output_dir, "--output-root run directory")
 
@@ -408,9 +465,17 @@ def build_manifest(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
             }
         )
 
-    radare2 = find_radare2(args.radare2)
-    version_probe = run_command([radare2, "-v"], timeout_sec=args.timeout_sec)
-    if version_probe["status"] != "ok":
+    radare2, radare2_blockers = find_radare2(args.radare2)
+    blockers.extend(radare2_blockers)
+    if radare2_blockers:
+        version_probe = {
+            "argv": [radare2, "-v"],
+            "status": "missing",
+            "stderr": "radare2/r2 not found or not executable",
+        }
+    else:
+        version_probe = run_command([radare2, "-v"], timeout_sec=args.timeout_sec)
+    if not radare2_blockers and version_probe["status"] != "ok":
         blockers.append({"reason": "radare2_version_probe_failed", "status": version_probe["status"]})
 
     captured: list[dict[str, Any]] = []
