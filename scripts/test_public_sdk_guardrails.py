@@ -508,6 +508,11 @@ PUBLIC_SDK_OPTIONAL_API_CONSUMERS = [
     REPO_ROOT / "tests" / "sdk_installed_consumer" / "c_abi_plugin.c",
     REPO_ROOT / "tests" / "sdk_installed_consumer" / "descriptor_catalog_plugin.cpp",
 ]
+FIRST_PARTY_CPP_EXAMPLE_PLUGINS = [
+    REPO_ROOT / "plugins" / "oBaseEvents" / "oBaseEvents.cpp",
+    REPO_ROOT / "plugins" / "oProcessTimer" / "oProcessTimer.cpp",
+    REPO_ROOT / "plugins" / "oDescriptorCatalog" / "oDescriptorCatalog.cpp",
+]
 PUBLIC_SDK_OPTIONAL_API_SURFACES = [
     {
         "name": "ProcessEvent owner-token handles",
@@ -775,6 +780,29 @@ def public_callback_typedefs(header: str) -> list[str]:
         r"typedef\s+[^;(){}]+?\(\*\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)\s*\(",
         strip_c_comments(header),
     )
+
+
+def exported_shutdown_body(source: str) -> str:
+    marker = "ObeliskPlugin_Shutdown"
+    marker_index = source.find(marker)
+    if marker_index < 0:
+        raise AssertionError("ObeliskPlugin_Shutdown not found")
+
+    open_brace = source.find("{", marker_index)
+    if open_brace < 0:
+        raise AssertionError("ObeliskPlugin_Shutdown body not found")
+
+    depth = 0
+    for index in range(open_brace, len(source)):
+        ch = source[index]
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return source[open_brace + 1:index]
+
+    raise AssertionError("ObeliskPlugin_Shutdown body is incomplete")
 
 
 def sentence_like_segments(text: str) -> list[tuple[int, str]]:
@@ -1838,6 +1866,15 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 text,
                 f"{relative} consumes optional SDK state and must expose idempotent shutdown cleanup",
             )
+
+    def test_first_party_cpp_example_shutdown_exports_catch_exceptions(self) -> None:
+        for path in FIRST_PARTY_CPP_EXAMPLE_PLUGINS:
+            text = path.read_text(encoding="utf-8")
+            relative = path.relative_to(REPO_ROOT).as_posix()
+            shutdown_body = exported_shutdown_body(text)
+            with self.subTest(file=relative):
+                self.assertIn("try", shutdown_body)
+                self.assertIn("catch (...)", shutdown_body)
 
     def test_public_sdk_consumers_treat_v1_descriptors_as_fixed_size(self) -> None:
         forbidden_checks = (

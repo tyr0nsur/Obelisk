@@ -335,7 +335,18 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         self.assertEqual("redacted", report["snapshot_root"])
         self.assertEqual("transfer-ufunction-intake", report["input_target_set"])
         self.assertEqual("transfer-baccept-only-policy-slice", report["output_target_set"])
+        self.assertEqual("evidence-only", report["policy_status"])
+        self.assertEqual([], report["missing_targets"])
         self.assertEqual("complete", report["coverage"]["status"])
+        self.assertEqual(
+            ["ShooterPlayerController.ServerTransferredPlayerConfirmationResult.bAccept"],
+            report["coverage"]["copied_fields"],
+        )
+        self.assertEqual(
+            ["ShooterPlayerController.ServerTransferredPlayerConfirmationResult"],
+            report["coverage"]["copied_targets"],
+        )
+        self.assertEqual(set(tool.TRANSFER_BACCEPT_ONLY_EXCLUDED_REASONS), set(report["coverage"]["forbidden_fields"]))
         self.assertEqual(7, len(report["generated_from"]["input_snapshots"]))
         self.assertEqual(
             "ShooterPlayerController.ServerTransferredPlayerConfirmationResult.bAccept",
@@ -375,6 +386,45 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         self.assertIn("dispatcher_wiring", report["safety_summary"]["explicitly_excluded"])
         self.assertIn("ARKTributeDino", report["safety_summary"]["explicitly_excluded"])
         self.assertIn("public_sdk", report["safety_summary"]["explicitly_excluded"])
+        self.assertIn("mutation", report["safety_summary"]["explicitly_excluded"])
+        self.assertIn("return_override", report["safety_summary"]["explicitly_excluded"])
+        self.assertIn("object_refs", report["safety_summary"]["explicitly_excluded"])
+        self.assertIn("class_refs", report["safety_summary"]["explicitly_excluded"])
+        self.assertIn("ids", report["safety_summary"]["explicitly_excluded"])
+        self.assertIn(
+            "does not promote runtime hook wiring, dispatcher wiring, transfer payload decoding, or public Transfer SDK",
+            report["non_claims"],
+        )
+        self.assertIn(
+            "does not expose UE pointers, object identity, class identity, raw params, mutation, or return overrides",
+            report["non_claims"],
+        )
+        self.assertEqual(
+            {
+                "target",
+                "field",
+                "copied_field",
+                "direction",
+                "type",
+                "offset",
+                "offset_internal",
+                "element_size",
+                "array_dim",
+                "byte_mask",
+                "field_mask",
+                "native_bool",
+                "function_flags",
+                "num_parms",
+                "parms_size",
+                "return_value_offset",
+                "property_flags",
+                "property_class",
+                "source_snapshot",
+                "source_snapshot_sha256",
+                "evidence_status",
+            },
+            set(copied),
+        )
 
         self.assertEqual(
             [
@@ -418,6 +468,34 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         self.assertNotIn("PlayerDataID", copied_serialized)
         self.assertNotIn("DownloadedDino", copied_serialized)
         self.assertNotIn("ReturnValue", copied_serialized)
+        self.assertNotIn("Transfer SDK", copied_serialized)
+        self.assertNotIn("payload", copied_serialized)
+        self.assertNotIn("identity", copied_serialized)
+        self.assertNotIn("mutation", copied_serialized)
+        self.assertNotIn("return_override", copied_serialized)
+
+    def test_transfer_baccept_only_policy_slice_rejects_extra_or_native_bool_shape(self) -> None:
+        fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            copied_root = Path(temp_dir) / "ufunction_snapshots"
+            shutil.copytree(fixture_root, copied_root)
+            snapshot = (
+                copied_root
+                / "7e7ded49e0c6"
+                / "sdk_transfers"
+                / "ShooterPlayerController.ServerTransferredPlayerConfirmationResult.snapshot.json"
+            )
+            payload = json.loads(snapshot.read_text(encoding="utf-8"))
+            target = payload["targets"][0]
+            prop = target["property_chain"]["properties"][0]
+            prop["native_bool"] = True
+            target["property_chain"]["expected_count"] = 2
+            target["property_chain"]["observed_count"] = 2
+            target["property_chain"]["properties"].append({**prop, "name": "ReturnValue"})
+            write_json(snapshot, payload)
+
+            with self.assertRaisesRegex(SystemExit, "property count drifted"):
+                tool.build_transfer_baccept_only_policy_slice(snapshot_root=copied_root)
 
     def test_transfer_baccept_only_target_set_contains_single_confirmation_target(self) -> None:
         from reflection_target_sets import TARGET_SETS

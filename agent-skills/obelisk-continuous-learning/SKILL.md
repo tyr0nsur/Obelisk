@@ -28,6 +28,10 @@ smallest durable place that will help the next worker:
 - research note when it records evidence, rejected hypotheses, or a design investigation;
 - active handoff only when it changes the next turn's routing or immediate priorities.
 
+Commits are local checkpoints only unless the current turn explicitly authorizes GitHub
+publication. Do not push, tag, or publish release refs from a learning/documentation round
+without current lead/release-manager direction and the matching validation evidence.
+
 Keep the promoted form concise. Avoid copying full agent transcripts, leader cadence, or
 coordination chatter into skills or contributor docs.
 

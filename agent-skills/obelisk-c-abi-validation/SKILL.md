@@ -164,8 +164,10 @@ Validation rules:
   through that temporary initializing-owner window before `dlclose`.
 - Chat callback unregister must be idempotent and safe when called by the callback itself;
   cross-thread owner cleanup must still wait until in-flight dispatch finishes.
-- Keep tests for both self-unregister and cross-thread owner cleanup waiting before
-  exposing any chat callback registration through the public SDK.
+- Keep regression tests for the already exposed minimal `ChatMessageEvent` callback path:
+  self-unregister, cross-thread owner cleanup waiting, copied payload ownership, and
+  exception containment. Richer chat APIs such as replies, send-chat, moderation, command
+  routing, identity, or blocking still require separate promotion before public exposure.
 - Timer callbacks must obey the same lifecycle rule: self-unregister must not deadlock,
   plugin unload/init-failure owner cleanup must wait for in-flight timer callbacks unless
   cleanup is initiated by that same owner callback, and callback exceptions must be caught

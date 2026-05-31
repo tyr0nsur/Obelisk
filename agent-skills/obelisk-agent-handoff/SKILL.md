@@ -75,8 +75,11 @@ For the lead:
 1. Review and integrate sub-agent findings.
 2. Update `docs/agent-handoff/CURRENT.md` with what changed.
 3. Add or update research notes and skills when the evidence changes future behavior.
-4. Commit and push only when the accumulated documentation/code is a useful stable
-   checkpoint for contributors, release behavior, or integration.
+4. Commit locally only when the accumulated documentation/code is a useful stable
+   checkpoint for contributors, release behavior, or integration. Push/GitHub publication
+   is a separate lead-owned step and requires current direction that allows publication;
+   release tags also require current release-manager/lead authorization and a fresh gate
+   on the intended ref.
 5. Report uncommitted files, skipped validation, and remaining risks.
 
 ## CURRENT.md Rules

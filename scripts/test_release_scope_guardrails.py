@@ -913,7 +913,33 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 2, result.stderr + result.stdout)
         self.assertIn("UFunction second-source root failed pre-build readiness metadata preflight", result.stderr)
-        self.assertIn("complete artifact identity and current BoolProperty tail metadata", result.stderr)
+        self.assertIn("complete artifact identity", result.stderr)
+        self.assertIn("current BoolProperty tail metadata", result.stderr)
+        self.assertNotIn("cmake -S", result.stdout)
+
+    def test_release_gate_preflight_blocks_ambiguous_ufunction_target_sets_before_build(self) -> None:
+        result = subprocess.run(
+            [
+                str(REPO_ROOT / "scripts/check_release_readiness.sh"),
+                "--allow-dirty",
+                "--allow-cross-ref-second-source-root",
+                "--require-second-source-readiness",
+                "--ufunction-second-source-root",
+                str(REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"),
+                "--ufunction-second-source-target-set",
+                "minimal-second-source-intake",
+                "--ufunction-second-source-target-set",
+                "structure-observer-intake",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertNotEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertIn("ambiguous_target_set_coverage", result.stderr)
+        self.assertIn("PrimalStructure.AllowStructureAccess", result.stderr)
         self.assertNotIn("cmake -S", result.stdout)
 
     def test_active_handoff_rc_tag_mentions_track_published_baseline(self) -> None:

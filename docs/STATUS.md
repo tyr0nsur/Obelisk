@@ -20,8 +20,9 @@ for the refreshed RC evidence root and gate result. RC public scope remains limi
 promoting gameplay/module timers.
 Post-RC development continues toward the broader `v1.0` core-stability track: general
 reflection evidence, copied-data module APIs, operator lifecycle safety, metadata-only
-reference plugins such as `oDescriptorCatalog`, and ArkApi-style plugin replacement
-capacity without retroactively expanding the published RC tag.
+reference plugins such as `oDescriptorCatalog`, and ArkApi-demand-informed
+Obelisk-native plugin replacement capacity without copying or porting ArkApi/NextGen
+implementations or retroactively expanding the published RC tag.
 
 Scope terms used here:
 
@@ -61,7 +62,7 @@ define or protect runtime behavior.
 | `LD_PRELOAD` bootstrap | Stable baseline | Runtime loads through the central install layout. |
 | Central install root | Stable baseline | Operator-chosen Obelisk root with `lib/`, `plugins/`, `config/`, `logs/`, and `state/instances/`; examples should use placeholders such as `<obelisk-root>`. |
 | Multi-server shared root | Stable baseline | Multiple ARK processes may share Obelisk `lib/`, `plugins/`, and `config/` when each process has a unique `OBELISK_INSTANCE_ID`; logs, markers, and mutable runtime state stay per instance. |
-| ARK/LinuxGSM validation adapter | Stable baseline | Versioned wrappers live under `packaging/linuxgsm/`; copy to the ARK binary directory only for adapter validation. Use `scripts/check_linuxgsm_wrapper_drift.sh` before maintenance restarts. |
+| ARK/LinuxGSM validation adapter | Stable baseline | Versioned wrappers live under `packaging/linuxgsm/`; copying or deploying them into an ARK binary directory requires a current approved adapter-validation window with rollback. Use `scripts/check_linuxgsm_wrapper_drift.sh` before maintenance restarts. |
 | Installer plugin posture | Stable baseline | `scripts/install_obelisk.sh` installs runtime/SDK artifacts; plugins are published with `scripts/install_obelisk_plugin.sh`, which stages under a non-`.so` name before atomic rename into `plugins/`. |
 | Operator CLI | Experimental | `scripts/obelisk.py` exposes read-only `status`, `instances list`, `plugins list`, and `plugins show`; lifecycle commands are planned after LinuxGSM integration and explicit restart safety gates. |
 | Per-instance runtime flags | Stable baseline | `OBELISK_INSTANCE_ID` selects logs and markers under `state/instances/<id>/`; map markers are obsolete. |

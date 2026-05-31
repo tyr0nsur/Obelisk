@@ -240,27 +240,63 @@ preflight_ufunction_second_source_readiness() {
         exit 2
     fi
 
+    local command=(
+        python3 scripts/compare_reflection_snapshots.py
+        --base-root tests/fixtures/ufunction_snapshots
+        --candidate-root "${UFUNCTION_SECOND_SOURCE_ROOT}"
+        --readiness-report
+    )
     local target_set
-    local status
     for target_set in "${UFUNCTION_SECOND_SOURCE_TARGET_SETS[@]}"; do
-        set +e
-        python3 scripts/compare_reflection_snapshots.py \
-            --base-root tests/fixtures/ufunction_snapshots \
-            --candidate-root "${UFUNCTION_SECOND_SOURCE_ROOT}" \
-            --readiness-report \
-            --target-set "${target_set}" \
-            --fail-on-readiness-gaps \
-            --json >/dev/null
-        status=$?
-        set -e
-
-        if [[ "${status}" -ne 0 ]]; then
-            printf 'UFunction second-source root failed pre-build readiness metadata preflight for target set %s.\n' \
-                "${target_set}" >&2
-            printf 'Regenerate the root for the intended release ref with complete artifact identity and current BoolProperty tail metadata.\n' >&2
-            exit "${status}"
-        fi
+        command+=(--target-set "${target_set}")
     done
+    command+=(--fail-on-readiness-gaps --json)
+
+    local report_path
+    report_path="$(mktemp /tmp/obelisk-ufunction-second-source-preflight.XXXXXX.json)"
+    local status
+    set +e
+    "${command[@]}" >"${report_path}"
+    status=$?
+    set -e
+
+    if [[ "${status}" -ne 0 ]]; then
+        printf 'UFunction second-source root failed pre-build readiness metadata preflight for requested target sets.\n' >&2
+        python3 - "${report_path}" <<'PY' >&2 || true
+import json
+import sys
+
+try:
+    with open(sys.argv[1], "r", encoding="utf-8") as handle:
+        report = json.load(handle)
+except (OSError, json.JSONDecodeError):
+    raise SystemExit(0)
+
+promotion_gate = report.get("promotion_gate")
+blockers = promotion_gate.get("blockers") if isinstance(promotion_gate, dict) else None
+if not isinstance(blockers, list):
+    raise SystemExit(0)
+
+for blocker in blockers[:8]:
+    if not isinstance(blocker, dict):
+        continue
+    reason = blocker.get("reason", "<unknown>")
+    count = blocker.get("count")
+    if isinstance(count, int):
+        print(f"UFunction second-source preflight blocker: {reason} (count={count})")
+    else:
+        print(f"UFunction second-source preflight blocker: {reason}")
+    targets = blocker.get("targets")
+    if isinstance(targets, list):
+        for target in targets[:8]:
+            print(f"  target: {target}")
+PY
+        rm -f "${report_path}"
+        printf 'Regenerate the root for the intended release ref with complete artifact identity, current BoolProperty tail metadata, and unambiguous target-set coverage.\n' >&2
+        exit "${status}"
+    fi
+
+    rm -f "${report_path}"
 }
 
 while [[ $# -gt 0 ]]; do

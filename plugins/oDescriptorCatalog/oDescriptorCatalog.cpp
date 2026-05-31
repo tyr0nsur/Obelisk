@@ -460,5 +460,11 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
 
 extern "C" __attribute__((visibility("default"))) void ObeliskPlugin_Shutdown()
 {
-    ResetState();
+    try
+    {
+        ResetState();
+    }
+    catch (...)
+    {
+    }
 }
