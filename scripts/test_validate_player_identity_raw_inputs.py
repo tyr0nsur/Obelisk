@@ -89,8 +89,27 @@ class ValidatePlayerIdentityRawInputsTests(unittest.TestCase):
         self.assertEqual(payload["run_root"], str(run_root))
         self.assertEqual(payload["raw_dir"], str(raw_dir))
 
-    def test_rejects_protected_root_before_hashing(self) -> None:
-        protected_run_root = Path("/servidor/ark/workspace-offline/player-identity-offline-run-2")
+    def test_accepts_workspace_offline_root_as_offline_layout(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            protected = Path(temp) / "server-root"
+            workspace = protected / "workspace-offline"
+            workspace.mkdir(parents=True)
+            run_root = self.write_raw_layout(workspace)
+
+            with (
+                mock.patch.object(validator, "PROTECTED_ROOT", protected),
+                mock.patch.object(validator, "APPROVED_OFFLINE_WORKSPACE_ROOTS", (workspace,)),
+            ):
+                result, payload, stderr = self.run_main(
+                    ["validate_player_identity_raw_inputs.py", "--root", str(run_root)]
+                )
+
+        self.assertEqual(result, 0, stderr)
+        self.assertEqual(payload["status"], "accepted")
+        self.assertTrue(payload["ready_for_core_evidence_pack_command"])
+
+    def test_rejects_protected_non_workspace_root_before_hashing(self) -> None:
+        protected_run_root = Path("/servidor/ark/obelisk/player-identity-offline-run-2")
         with mock.patch.object(validator, "sha256_file") as sha256_file:
             result, payload, stderr = self.run_main(
                 ["validate_player_identity_raw_inputs.py", "--root", str(protected_run_root)],
@@ -98,7 +117,7 @@ class ValidatePlayerIdentityRawInputsTests(unittest.TestCase):
             )
 
         self.assertEqual(result, 1, stderr)
-        self.assertIn("path_under_protected_root", self.blocker_reasons(payload))
+        self.assertIn("path_under_live_server_root", self.blocker_reasons(payload))
         sha256_file.assert_not_called()
 
     def test_rejects_symlinked_core_component(self) -> None:

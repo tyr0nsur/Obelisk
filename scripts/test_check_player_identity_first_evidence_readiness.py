@@ -140,16 +140,10 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertFalse(progress_signal["ready"])
         self.assertEqual(progress_signal["primary_blocker"], "offline_binary_and_core_input_missing")
         self.assertFalse(progress_signal["coverage"]["reflection_inventory_accepted"])
-        self.assertEqual(progress_signal["coverage"]["fixture_targets"], "10/12")
-        self.assertEqual(progress_signal["coverage"]["fixture_blocked_targets"], 2)
-        self.assertEqual(progress_signal["coverage"]["second_source"]["missing"], 10)
-        self.assertEqual(
-            progress_signal["missing"]["required_targets"],
-            [
-                "ShooterPlayerController.ServerKickPlayer",
-                "ShooterPlayerController.ServerListPlayers",
-            ],
-        )
+        self.assertEqual(progress_signal["coverage"]["fixture_targets"], "12/12")
+        self.assertEqual(progress_signal["coverage"]["fixture_blocked_targets"], 0)
+        self.assertEqual(progress_signal["coverage"]["second_source"]["missing"], 12)
+        self.assertEqual(progress_signal["missing"]["required_targets"], [])
         self.assertEqual(
             progress_signal["missing"]["operator_inputs"],
             [
@@ -164,9 +158,9 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertNotIn("second_source_evidence_missing", payload["blockers"])
         self.assertNotIn("players_identity_first_evidence_not_buildable", payload["blockers"])
         self.assertNotIn("accepted_lifecycle_anchors_missing", payload["blockers"])
-        self.assertIn("fixture_coverage_incomplete", payload["deferred_until_reflection_inventory_ready"])
+        self.assertNotIn("fixture_coverage_incomplete", payload["deferred_until_reflection_inventory_ready"])
         self.assertIn("second_source_evidence_missing", payload["deferred_until_reflection_inventory_ready"])
-        self.assertIn("players_identity_first_evidence_not_buildable", payload["deferred_until_reflection_inventory_ready"])
+        self.assertNotIn("players_identity_first_evidence_not_buildable", payload["deferred_until_reflection_inventory_ready"])
         self.assertIn("accepted_lifecycle_anchors_missing", payload["deferred_until_reflection_inventory_ready"])
         self.assertEqual(
             [artifact["schema"] for artifact in payload["next_required_artifacts"]],
@@ -256,27 +250,21 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         )
         self.assertEqual(payload["reflection_inventory"]["artifact_root_diagnosis"]["candidate_pack_count"], 0)
         self.assertEqual(payload["fixture_coverage"]["targets"], 12)
-        self.assertEqual(payload["fixture_coverage"]["comparable"], 10)
-        self.assertEqual(payload["fixture_coverage"]["blocked"], 2)
-        self.assertEqual(payload["fixture_coverage"]["second_source_missing"], 10)
+        self.assertEqual(payload["fixture_coverage"]["comparable"], 12)
+        self.assertEqual(payload["fixture_coverage"]["blocked"], 0)
+        self.assertEqual(payload["fixture_coverage"]["second_source_missing"], 12)
         self.assertEqual(payload["fixture_coverage"]["second_source_inconclusive"], 0)
         self.assertEqual(payload["fixture_coverage"]["second_source_rejected"], 0)
         self.assertIsNone(payload["candidate_root"])
-        self.assertEqual(
-            payload["first_evidence"]["missing_required_targets"],
-            [
-                "ShooterPlayerController.ServerKickPlayer",
-                "ShooterPlayerController.ServerListPlayers",
-            ],
-        )
+        self.assertEqual(payload["first_evidence"]["missing_required_targets"], [])
         self.assertFalse(payload["first_evidence"]["lifecycle_anchors"]["session_start_accepted"])
         self.assertFalse(payload["first_evidence"]["lifecycle_anchors"]["session_end_accepted"])
         self.assertIn(
-            "accepted_session_start_anchor_missing",
+            "no accepted session-start/login/connect UFunction anchor in players-identity-lifecycle-intake",
             payload["first_evidence"]["lifecycle_anchors"]["blockers"],
         )
         self.assertIn(
-            "accepted_session_end_anchor_missing",
+            "no accepted session-end/logout/disconnect UFunction anchor in players-identity-lifecycle-intake",
             payload["first_evidence"]["lifecycle_anchors"]["blockers"],
         )
         self.assertEqual(
@@ -333,8 +321,10 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             ],
         )
         self.assertIn("validate_player_identity_raw_inputs.py", blocked_resolution["validation_command_after_missing_inputs_exist"])
-        self.assertIn("<matching-non-protected-ShooterGameServer>", blocked_resolution["validation_command_after_missing_inputs_exist"])
-        self.assertIn("<non-protected-core-dump-input>", blocked_resolution["validation_command_after_missing_inputs_exist"])
+        self.assertIn(
+            "player-identity-offline-<run-id-suffix>",
+            blocked_resolution["validation_command_after_missing_inputs_exist"],
+        )
         self.assertIn("does not make blocked commands runnable", " ".join(blocked_resolution["non_claims"]))
         input_staging = operator_commands["input_staging"]
         self.assertEqual(input_staging["id"], "stage_offline_raw_layout")
@@ -425,13 +415,16 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertIn("<non-protected-artifact-root>", recipe_commands)
         self.assertNotIn("/servidor/ark/obelisk/player-identity-offline", recipe_commands)
 
-    def test_workspace_offline_artifact_root_is_rejected_before_inventory_scan(self) -> None:
+    def test_workspace_offline_artifact_root_is_allowed_for_inventory_scan(self) -> None:
         ok = subprocess.CompletedProcess(["mock"], 0, "", "")
+        saw_inventory_scan = False
 
         def fake_run_json_command(args: list[str], *, check: bool = False):
+            nonlocal saw_inventory_scan
             command = " ".join(args)
             if "check_reflection_inventory_pack_readiness.py" in command:
-                self.fail("protected artifact root must be rejected before inventory scan")
+                saw_inventory_scan = True
+                return ok, {"ready": False, "accepted_pack": None, "reasons": []}
             if "compare_reflection_snapshots.py" in command:
                 return ok, {
                     "totals": {
@@ -467,19 +460,35 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             snapshot_root=Path("/tmp/player-identity-snapshots"),
             candidate_root=None,
         )
-        with mock.patch.object(checker, "run_json_command", side_effect=fake_run_json_command):
+        with (
+            mock.patch.object(checker, "run_json_command", side_effect=fake_run_json_command),
+            mock.patch.object(
+                checker,
+                "bounded_artifact_file_scan",
+                return_value={
+                    "status": "offline_binary_and_core_like_inputs_missing",
+                    "artifact_root_only": True,
+                    "resolved_root": "/servidor/ark/workspace-offline/player-identity-offline",
+                    "server_root_excluded": "/servidor/ark",
+                    "approved_offline_workspace_roots": ["/servidor/ark/workspace-offline"],
+                    "shooter_game_server_candidates": [],
+                    "core_like_candidates": [],
+                    "ready_to_build_core_evidence_pack": False,
+                },
+            ),
+        ):
             payload = checker.build_report(args)
 
+        self.assertTrue(saw_inventory_scan)
         self.assertFalse(payload["ready"])
         self.assertEqual(payload["status"], "blocked")
-        self.assertEqual(payload["artifact_chain"]["offline_inputs"]["status"], "artifact_root_rejected")
-        self.assertEqual(payload["reflection_inventory"]["returncode"], 1)
-        self.assertEqual(payload["reflection_inventory"]["manifests_scanned"], 0)
-        self.assertEqual(payload["reflection_inventory"]["reason_codes"], ["wrong_target_scope"])
-        detail = payload["reflection_inventory"]["artifact_root_diagnosis"]["reason_examples"][
-            "wrong_target_scope"
-        ]["detail"]
-        self.assertIn("protected server root /servidor/ark", detail)
+        self.assertEqual(
+            payload["artifact_chain"]["offline_inputs"]["status"],
+            "offline_binary_and_core_like_inputs_missing",
+        )
+        self.assertEqual(payload["reflection_inventory"]["returncode"], 0)
+        self.assertIsNone(payload["reflection_inventory"]["manifests_scanned"])
+        self.assertEqual(payload["reflection_inventory"]["reason_codes"], [])
 
     def test_candidate_root_reports_second_source_not_accepted_separately_from_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -503,7 +512,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertNotIn("second_source_evidence_missing", payload["deferred_until_reflection_inventory_ready"])
         self.assertIn("second_source_evidence_not_accepted", payload["deferred_until_reflection_inventory_ready"])
         self.assertEqual(payload["fixture_coverage"]["second_source_missing"], 0)
-        self.assertEqual(payload["fixture_coverage"]["second_source_inconclusive"], 10)
+        self.assertEqual(payload["fixture_coverage"]["second_source_inconclusive"], 12)
         self.assertEqual(payload["fixture_coverage"]["second_source_rejected"], 0)
         self.assertEqual(payload["fixture_coverage"]["second_source_status"], "compared")
 
@@ -694,10 +703,10 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertEqual(blocked_resolution["expected_core_destination"], "/tmp/artifacts/raw/core")
         self.assertEqual(
             blocked_resolution["validation_command_argv"][3],
-            "/tmp/artifacts/raw/ShooterGameServer",
+            "/tmp/player-identity-offline-<run-id-suffix>",
         )
-        self.assertEqual(blocked_resolution["validation_command_argv"][5], "<non-protected-core-dump-input>")
         self.assertIn("validate_player_identity_raw_inputs.py", blocked_resolution["validation_command_after_missing_inputs_exist"])
+        self.assertIn("/tmp/player-identity-offline-<run-id-suffix>", blocked_resolution["validation_command_argv"][3])
         self.assertIn("does not accept or promote core evidence", " ".join(blocked_resolution["non_claims"]))
         self.assertEqual(
             operator_commands["input_layout_requirements"]["next_input_preparation_action"],
@@ -899,9 +908,8 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         )
         self.assertEqual(
             blocked_resolution["validation_command_argv"][3],
-            "/tmp/player-identity-artifacts/player-identity-offline-a/raw/ShooterGameServer",
+            "/tmp/player-identity-artifacts/player-identity-offline-<run-id-suffix>",
         )
-        self.assertEqual(blocked_resolution["validation_command_argv"][5], "<non-protected-core-dump-input>")
         self.assertEqual(operator_commands["sequence"][0]["status"], "blocked")
         self.assertFalse(operator_commands["sequence"][0]["ready"])
         self.assertEqual(operator_commands["sequence"][0]["blocked_until"], "non_protected_core_dump_input")

@@ -1,0 +1,61 @@
+{
+  "address_policy": "absolute core paths and addresses omitted; use full inspector JSON for local evidence review",
+  "evidence": {
+    "ark_binary_sha256": "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+    "artifact_kind": "offline_core",
+    "artifact_sha256": "62d1768fd5962ee9270641f0a340dc04dc15edde53eacefbf247eff37e5bed78",
+    "capture_id": "core",
+    "evidence_pack_id": "core-evidence-pack",
+    "generated_by": "scripts/inspect_core_ufunctions.py --snapshot-json",
+    "obelisk_commit": "e55b75c",
+    "source": "offline_core",
+    "status": "candidate-only"
+  },
+  "interpretation": {
+    "note": "Offsets are candidate observations from this core, not accepted UE4 layout contracts.",
+    "status": "candidate-only"
+  },
+  "metadata": {
+    "max_object_scan": 30000,
+    "object_count": 977251
+  },
+  "schema": "obelisk.ufunction-chain.snapshot.v1",
+  "targets": [
+    {
+      "function_flags": "0x280cc0",
+      "inspection_mode": "ufunction",
+      "membership": {
+        "class": "candidate-uobject",
+        "outer": "candidate-uobject",
+        "target": "candidate-uobject"
+      },
+      "num_parms": 0,
+      "parms_size": 0,
+      "property_chain": {
+        "expected_count": 0,
+        "observed_count": 0,
+        "parms_size": 0,
+        "properties": [],
+        "reject_reasons": [],
+        "status": "candidate"
+      },
+      "reject_reasons": [],
+      "return_value_offset": "0xffff",
+      "status": "candidate",
+      "target": {
+        "class_name": "Function",
+        "class_name_index": 10650,
+        "class_object_index": 518,
+        "kind": "index",
+        "name": "ServerListPlayers",
+        "name_index": 2590,
+        "object_index": 10266,
+        "outer_class_name": "Class",
+        "outer_name": "ShooterPlayerController",
+        "outer_name_index": 6721,
+        "outer_object_index": 50,
+        "value": 10266
+      }
+    }
+  ]
+}

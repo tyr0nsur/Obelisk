@@ -18,6 +18,7 @@ from unittest import mock
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 import prepare_player_identity_offline_raw_layout as prep
+import snapshot_evidence_pack
 
 
 class PreparePlayerIdentityOfflineRawLayoutTests(unittest.TestCase):
@@ -259,53 +260,74 @@ class PreparePlayerIdentityOfflineRawLayoutTests(unittest.TestCase):
             self.assertIn("--core must not read from protected server root /servidor/ark", stderr)
             self.assertFalse((root / "artifacts").exists())
 
-    def test_rejects_workspace_offline_binary_direct_path_before_staging(self) -> None:
+    def test_accepts_workspace_offline_binary_direct_path_past_protected_gate(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
+            protected = root / "server-root"
+            workspace = protected / "workspace-offline"
+            workspace.mkdir(parents=True)
+            binary = workspace / "player-identity" / "ShooterGameServer"
+            binary.parent.mkdir()
+            binary.write_bytes(b"binary")
             _, core = self.write_inputs(root)
 
-            result, _, stderr = self.run_main(
-                [
-                    "prepare_player_identity_offline_raw_layout.py",
-                    "--binary",
-                    "/servidor/ark/workspace-offline/player-identity/ShooterGameServer",
-                    "--core",
-                    str(core),
-                    "--artifact-root",
-                    str(root / "artifacts"),
-                    "--run-id",
-                    "run-workspace-input",
-                ]
-            )
+            with (
+                mock.patch.object(snapshot_evidence_pack, "SERVER_ROOT", protected),
+                mock.patch.object(snapshot_evidence_pack, "APPROVED_OFFLINE_WORKSPACE_ROOTS", (workspace,)),
+            ):
+                result, stdout, stderr = self.run_main(
+                    [
+                        "prepare_player_identity_offline_raw_layout.py",
+                        "--binary",
+                        str(binary),
+                        "--core",
+                        str(core),
+                        "--artifact-root",
+                        str(root / "artifacts"),
+                        "--run-id",
+                        "run-workspace-input",
+                    ],
+                    binary_sha=prep.EXPECTED_SHOOTERGAME_SHA256,
+                )
 
-            self.assertEqual(result, 2)
-            self.assertIn("--binary must not read from protected server root /servidor/ark", stderr)
-            self.assertIn("non-protected artifact root", stderr)
-            self.assertFalse((root / "artifacts").exists())
+            self.assertEqual(result, 0, stderr)
+            payload = json.loads(stdout)
+            self.assertEqual(payload["binary"]["source"], str(binary.resolve()))
 
-    def test_rejects_workspace_offline_artifact_root_before_staging(self) -> None:
+    def test_accepts_workspace_offline_artifact_root_for_staging(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
+            protected = root / "server-root"
+            workspace = protected / "workspace-offline"
+            workspace.mkdir(parents=True)
             binary, core = self.write_inputs(root)
+            artifact_root = workspace / "player-identity"
 
-            result, _, stderr = self.run_main(
-                [
-                    "prepare_player_identity_offline_raw_layout.py",
-                    "--binary",
-                    str(binary),
-                    "--core",
-                    str(core),
-                    "--artifact-root",
-                    "/servidor/ark/workspace-offline/player-identity",
-                    "--run-id",
-                    "run-workspace-output",
-                ],
-                binary_sha=prep.EXPECTED_SHOOTERGAME_SHA256,
+            with (
+                mock.patch.object(snapshot_evidence_pack, "SERVER_ROOT", protected),
+                mock.patch.object(snapshot_evidence_pack, "APPROVED_OFFLINE_WORKSPACE_ROOTS", (workspace,)),
+            ):
+                result, stdout, stderr = self.run_main(
+                    [
+                        "prepare_player_identity_offline_raw_layout.py",
+                        "--binary",
+                        str(binary),
+                        "--core",
+                        str(core),
+                        "--artifact-root",
+                        str(artifact_root),
+                        "--run-id",
+                        "run-workspace-output",
+                    ],
+                    binary_sha=prep.EXPECTED_SHOOTERGAME_SHA256,
+                )
+
+            self.assertEqual(result, 0, stderr)
+            payload = json.loads(stdout)
+            self.assertEqual(
+                payload["raw_dir"],
+                str(artifact_root / "player-identity-offline-run-workspace-output" / "raw"),
             )
-
-            self.assertEqual(result, 2)
-            self.assertIn("--artifact-root must not write under protected server root /servidor/ark", stderr)
-            self.assertIn("non-protected artifact root", stderr)
 
     def test_rejects_symlinked_input_even_when_target_is_non_protected(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

@@ -302,18 +302,17 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         self.assertIs(False, report["safety_summary"]["promotion_ready"])
         self.assertEqual("offline_review_only", report["safety_summary"]["intended_use"])
 
-    def test_players_identity_first_evidence_fails_closed_on_missing_admin_anchors(self) -> None:
+    def test_players_identity_first_evidence_uses_committed_admin_snapshots(self) -> None:
         fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
 
-        with self.assertRaisesRegex(
-            SystemExit,
-            "missing_required_target:ShooterPlayerController.ServerListPlayers",
-        ) as raised:
-            tool.build_players_identity_first_evidence(snapshot_root=fixture_root)
+        report = tool.build_players_identity_first_evidence(snapshot_root=fixture_root)
 
-        self.assertIn("missing_required_target:ShooterPlayerController.ServerKickPlayer", str(raised.exception))
+        self.assertEqual(12, report["safety_summary"]["target_count"])
+        self.assertEqual([], report["target_set_coverage"]["missing_targets"])
+        self.assertIs(False, report["lifecycle_anchors"]["session_start_accepted"])
+        self.assertIs(False, report["lifecycle_anchors"]["session_end_accepted"])
 
-    def test_players_identity_first_evidence_cli_fails_closed_on_default_fixture_gap(self) -> None:
+    def test_players_identity_first_evidence_cli_succeeds_on_default_fixtures(self) -> None:
         original_argv = sys.argv
         try:
             sys.argv = [
@@ -321,17 +320,13 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
                 "--players-identity-first-evidence",
                 "--json",
             ]
-            with self.assertRaisesRegex(
-                SystemExit,
-                "missing_required_target:ShooterPlayerController.ServerListPlayers",
-            ) as raised:
-                tool.main()
+            with contextlib.redirect_stdout(io.StringIO()) as stdout:
+                self.assertEqual(0, tool.main())
+            self.assertIn(tool.PLAYERS_IDENTITY_FIRST_EVIDENCE_SCHEMA, stdout.getvalue())
         finally:
             sys.argv = original_argv
 
-        self.assertIn("missing_required_target:ShooterPlayerController.ServerKickPlayer", str(raised.exception))
-
-    def test_players_identity_lifecycle_manifest_gap_is_exact_admin_pair(self) -> None:
+    def test_players_identity_lifecycle_manifest_covers_admin_pair(self) -> None:
         fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
 
         paths, missing_targets = tool.snapshot_paths_from_target_sets(
@@ -339,14 +334,8 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
             ["players-identity-lifecycle-intake"],
         )
 
-        self.assertEqual(10, len(paths))
-        self.assertEqual(
-            [
-                "ShooterPlayerController.ServerListPlayers",
-                "ShooterPlayerController.ServerKickPlayer",
-            ],
-            missing_targets,
-        )
+        self.assertEqual(12, len(paths))
+        self.assertEqual([], missing_targets)
 
     def test_player_identity_classifier_forces_identity_like_fields_redacted(self) -> None:
         cases = [
@@ -386,7 +375,6 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             copied_root = Path(temp_dir) / "ufunction_snapshots"
             shutil.copytree(fixture_root, copied_root)
-            self.add_player_identity_admin_anchor_snapshots(copied_root)
 
             report = tool.build_players_identity_first_evidence(snapshot_root=copied_root)
 
@@ -403,7 +391,7 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         self.assertEqual(12, len(report["generated_from"]["input_snapshots"]))
         self.assertTrue(report["artifact_identity"]["path_redacted"])
         self.assertEqual("7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520", report["artifact_identity"]["ark_binary_sha256"])
-        self.assertEqual("5ad06ff", report["artifact_identity"]["obelisk_commit"])
+        self.assertEqual("mixed_or_unknown", report["artifact_identity"]["obelisk_commit"])
 
         target_roles = {entry["target"]: entry["lifecycle_anchor_role"] for entry in report["targets"]}
         self.assertEqual(
@@ -420,28 +408,29 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         self.assertEqual([], report["lifecycle_anchors"]["accepted_end_targets"])
 
         fields_by_key = {entry["field"]: entry for entry in report["fields"]}
-        player_id = fields_by_key["ShooterPlayerController.ServerKickPlayer.PlayerId"]
-        self.assertEqual("forced_redacted", player_id["classification"])
-        self.assertEqual("identity_like_scalar_forced_redacted", player_id["redaction_reason"])
-        reason = fields_by_key["ShooterPlayerController.ServerKickPlayer.Reason"]
-        self.assertEqual("forced_redacted", reason["classification"])
-        self.assertEqual("text_identity_or_private_value_forced_redacted", reason["redaction_reason"])
-        bban = fields_by_key["ShooterPlayerController.ServerKickPlayer.bBan"]
-        self.assertEqual("copied_candidate", bban["classification"])
-        self.assertEqual({"byte_mask": "0x01", "field_mask": "0xff"}, bban["bool_masks"])
-        self.assertIn("admin_mutation_field_not_public_identity", bban["blockers"])
-        self.assertIn("candidate_scalar_not_public_identity", bban["blockers"])
+        steam_name = fields_by_key["ShooterPlayerController.ServerKickPlayer.PlayerSteamName"]
+        self.assertEqual("forced_redacted", steam_name["classification"])
+        self.assertEqual("text_identity_or_private_value_forced_redacted", steam_name["redaction_reason"])
+        steam_id = fields_by_key["ShooterPlayerController.ServerKickPlayer.PlayerSteamID"]
+        self.assertEqual("forced_redacted", steam_id["classification"])
+        self.assertEqual("text_identity_or_private_value_forced_redacted", steam_id["redaction_reason"])
 
         copied_fields = {entry["field"] for entry in report["copied_candidates"]}
-        self.assertIn("ShooterPlayerController.ServerKickPlayer.bBan", copied_fields)
-        self.assertNotIn("ShooterPlayerController.ServerKickPlayer.PlayerId", copied_fields)
+        self.assertNotIn("ShooterPlayerController.ServerKickPlayer.PlayerSteamName", copied_fields)
+        self.assertNotIn("ShooterPlayerController.ServerKickPlayer.PlayerSteamID", copied_fields)
         forced_fields = {entry["field"] for entry in report["forced_redacted_fields"]}
-        self.assertIn("ShooterPlayerController.ServerKickPlayer.PlayerId", forced_fields)
-        self.assertIn("ShooterPlayerController.ServerKickPlayer.Reason", forced_fields)
+        self.assertIn("ShooterPlayerController.ServerKickPlayer.PlayerSteamName", forced_fields)
+        self.assertIn("ShooterPlayerController.ServerKickPlayer.PlayerSteamID", forced_fields)
 
         forbidden_by_key = {entry["forbidden_field"]: entry for entry in report["forbidden_fields"]}
-        self.assertIn("fname_or_gobjects_indices", forbidden_by_key["ShooterPlayerController.ServerKickPlayer.PlayerId"]["forbidden_sources"])
-        self.assertIn("raw_process_event_params", forbidden_by_key["ShooterPlayerController.ServerKickPlayer.PlayerId"]["forbidden_sources"])
+        self.assertIn(
+            "fname_or_gobjects_indices",
+            forbidden_by_key["ShooterPlayerController.ServerKickPlayer.PlayerSteamID"]["forbidden_sources"],
+        )
+        self.assertIn(
+            "raw_process_event_params",
+            forbidden_by_key["ShooterPlayerController.ServerKickPlayer.PlayerSteamID"]["forbidden_sources"],
+        )
         self.assertIs(False, report["privacy_policy"]["public_principal_ready"])
         self.assertIsNone(report["privacy_policy"]["copied_public_identifier"])
         self.assertIs(False, report["promotion_gate"]["ready"])
@@ -455,14 +444,13 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         self.assertNotIn(str(copied_root), serialized)
         self.assertNotIn("name_index", serialized)
         self.assertNotIn("object_index", serialized)
-        self.assertNotIn('"PlayerId", "classification": "copied_candidate"', serialized)
+        self.assertNotIn('"PlayerSteamID", "classification": "copied_candidate"', serialized)
 
     def test_players_identity_first_evidence_cli_mode_returns_success(self) -> None:
         fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
         with tempfile.TemporaryDirectory() as temp_dir:
             copied_root = Path(temp_dir) / "ufunction_snapshots"
             shutil.copytree(fixture_root, copied_root)
-            self.add_player_identity_admin_anchor_snapshots(copied_root)
 
             original_argv = sys.argv
             try:

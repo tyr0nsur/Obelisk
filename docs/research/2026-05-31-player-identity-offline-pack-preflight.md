@@ -74,21 +74,31 @@ Current result:
 
 The combined preflight currently reports:
 
-- `reflection_inventory.ready=false`;
+- `reflection_inventory.ready=true` for the approved
+  `/servidor/ark/workspace-offline/player-identity-offline-identity-second-source-20260529T011227Z`
+  run;
 - `fixture_coverage.targets=12`;
-- `fixture_coverage.comparable=10`;
-- `fixture_coverage.blocked=2`;
+- `fixture_coverage.comparable=12`;
+- `fixture_coverage.blocked=0`;
 - `first_evidence.ready=false`;
-- `first_evidence.missing_required_targets=[ServerKickPlayer, ServerListPlayers]`;
-- `next_step=produce_or_approve_non_protected_core_evidence_pack_then_reflection_inventory_pack`.
+- `first_evidence.missing_required_targets=[]`;
+- `next_step=produce_distinct_second_source_and_accepted_lifecycle_anchor_evidence`.
+
+When the vanilla-gdb candidate root is supplied, the combined preflight advances to:
+
+- `fixture_coverage.second_source_missing=0`;
+- `fixture_coverage.second_source_inconclusive=0`;
+- `fixture_coverage.second_source_rejected=0`;
+- `fixture_coverage.second_source_status=compared`;
+- `primary_blocker=accepted_lifecycle_anchor_evidence_missing`.
 
 It also emits a top-level `progress_signal` field for leads/operators who need the
 current blocker without reading the whole report. The field is only a compact rendering
 of existing gates:
 
-- `progress_signal.coverage.fixture_targets=10/12`;
-- `progress_signal.coverage.reflection_inventory_accepted=false`;
-- `progress_signal.missing.required_targets=[ServerKickPlayer, ServerListPlayers]`;
+- `progress_signal.coverage.fixture_targets=12/12`;
+- `progress_signal.coverage.reflection_inventory_accepted=true`;
+- `progress_signal.missing.required_targets=[]`;
 - `progress_signal.accepted_anchors.session_start=false`;
 - `progress_signal.accepted_anchors.session_end=false`;
 - `progress_signal.primary_blocker=<next_actionable_blocker.code>`.
@@ -117,6 +127,89 @@ It also does not currently contain a non-protected
 `scripts/build_reflection_inventory_pack.py`; the current durable root by itself is
 therefore not enough to produce the missing UFunction inventory pack.
 
+Current protected dump inventory observed during the 2026-05-31 lead preflight:
+
+- `/servidor/ark/obelisk/dumps/second-source-arkserver2-TheIsland-20260529T011227Z/raw/`
+  contains a matching `ShooterGameServer`
+  `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`
+  and a core-like file
+  `arkserver2-TheIsland-20260529T011227Z.880453`
+  `62d1768fd5962ee9270641f0a340dc04dc15edde53eacefbf247eff37e5bed78`.
+- `/servidor/ark/obelisk/dumps/arkserver-20260527T031311Z/` contains a matching
+  `ShooterGameServer` hash record and the core-like file
+  `core/arkserver-20260527T031311Z.2902200`
+  `1c4bf8876706b3af40bd9b73fbeb907a31356e62d6c9ff93aed0158d2cb2fe5e`.
+
+Those dump files are valuable historical captures, but the `dumps` paths are still under
+the protected raw capture root. They must not be used directly by player-identity tooling
+and must not be reported as satisfying `non_protected_core_dump_input`.
+
+The accepted low-copy route is to use hardlinked or copied files under the approved
+offline workspace `/servidor/ark/workspace-offline`, with the normal
+`player-identity-offline-<run-id>/raw/{ShooterGameServer,core}` layout. During the same
+lead preflight, the `second-source-arkserver2-TheIsland-20260529T011227Z` workspace core
+was staged by hardlink into:
+
+```text
+/servidor/ark/workspace-offline/player-identity-offline-identity-second-source-20260529T011227Z/raw/ShooterGameServer
+/servidor/ark/workspace-offline/player-identity-offline-identity-second-source-20260529T011227Z/raw/core
+```
+
+That layout is a valid input shape for the next offline core-evidence-pack command. It is
+not by itself a core evidence pack, reflection inventory pack, player identity promotion,
+runtime identity readiness, or public SDK evidence.
+
+The follow-up offline chain for that workspace run has now been produced and accepted for
+candidate planning:
+
+- complete `obelisk.core-dump-evidence-pack.v1`;
+- accepted `obelisk.reflection-inventory-pack.v1`;
+- `players-identity-lifecycle-intake` coverage `12/12`;
+- committed candidate snapshots for `ShooterPlayerController.ServerListPlayers` and
+  `ShooterPlayerController.ServerKickPlayer`.
+
+That closes the admin-surface fixture gap only. The current blocker is
+`distinct_second_source_evidence_missing_or_not_accepted`, plus no accepted
+session-start/session-end lifecycle anchors. Do not rerun the completed admin focal
+planning route unless the snapshot fixtures or binary hash change.
+
+A distinct vanilla-gdb workspace run has also been produced from
+`/servidor/ark/workspace-offline/vanilla-gdb-arkserver2-TheIsland-20260529T012853Z/raw`
+and staged as:
+
+```text
+/servidor/ark/workspace-offline/player-identity-offline-identity-vanilla-gdb-20260529T012853Z/
+```
+
+Its core SHA256 is
+`56cf24c61d6822a060fa1bb74ebdb7dc13e3ddf9afc3d5f4843787c046eeeedb`, which is distinct
+from the base fixture source `62d1768fd5962ee9270641f0a340dc04dc15edde53eacefbf247eff37e5bed78`.
+The run now contains a complete core evidence pack, an accepted
+`players-identity-lifecycle-intake` reflection inventory pack, and 12 sanitized focal
+snapshots under:
+
+```text
+/servidor/ark/workspace-offline/player-identity-offline-identity-vanilla-gdb-20260529T012853Z/focal-snapshots
+```
+
+The second-source comparison command:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/compare_reflection_snapshots.py \
+  --base-root tests/fixtures/ufunction_snapshots \
+  --candidate-root /servidor/ark/workspace-offline/player-identity-offline-identity-vanilla-gdb-20260529T012853Z/focal-snapshots \
+  --target-set players-identity-lifecycle-intake \
+  --readiness-report \
+  --planning-layout-intake \
+  --json
+```
+
+reports `targets=12`, `comparable=12`, `second_source_accepted=12`,
+`second_source_inconclusive=0`, `second_source_missing=0`, `second_source_rejected=0`,
+and `planning_layout_gate.ready=true`. This is still planning-layout evidence only:
+`promotion_gate.ready=false`, public SDK readiness is false, and runtime readiness is
+false.
+
 Static orientation, including admin thunk navigation for `ServerListPlayers` or
 `ServerKickPlayer`, is not a substitute for the offline evidence chain. It can help
 operators understand where future focal matching will look, but it must not be used to
@@ -130,8 +223,8 @@ Player identity is a complete-SDK v1 blocker because permissions, commands/repli
 moderation, economy, and mobility need a copied principal model. Current progress should
 be reported internally as:
 
-- `players-identity-lifecycle-intake coverage=10/12 committed candidate snapshots`;
-- `second-source comparable=not complete until 12/12`;
+- `players-identity-lifecycle-intake coverage=12/12 committed candidate snapshots`;
+- `second-source comparable=accepted distinct layout for 12/12`;
 - `accepted login anchors=0/1`;
 - `accepted logout anchors=0/1`;
 - `promotion_ready=false`;
@@ -140,13 +233,14 @@ be reported internally as:
 - `target_set=planning_only`.
 
 Closing `ShooterPlayerController.ServerListPlayers` and
-`ShooterPlayerController.ServerKickPlayer` reduces the admin-surface fixture gap. It does
+`ShooterPlayerController.ServerKickPlayer` removed the admin-surface fixture gap. It does
 not unblock permissions, command routing, operator ingress/storage, Inventory SDK, runtime
-identity, login/logout lifecycle anchors, or any public v1 SDK claim.
+identity, login/logout lifecycle anchors, principal invalidation semantics, or any public
+v1 SDK claim.
 
-## Safe Next Step
+## Completed Admin Snapshot Route
 
-The next useful action is to produce or approve a reviewed, non-protected
+The completed admin snapshot route was to produce or approve a reviewed, non-protected
 reflection-inventory pack with:
 
 - `schema=obelisk.reflection-inventory-pack.v1`;
@@ -160,6 +254,9 @@ reflection-inventory pack with:
 - a redacted `ufunction-inventory.json` containing
   `ShooterPlayerController.ServerListPlayers` and
   `ShooterPlayerController.ServerKickPlayer`.
+
+Do not treat ScriptStruct inventory, standalone snapshots, redacted signatures, static
+thunks, or a two-function-only inventory as satisfying this lane.
 
 Once that pack exists outside protected live-server paths, the safe planning command is:
 
@@ -188,10 +285,21 @@ record `target_set_coverage` for the full 12-target
 `players-identity-lifecycle-intake` set and contain inventory rows for both missing admin
 targets: `ShooterPlayerController.ServerListPlayers` and
 `ShooterPlayerController.ServerKickPlayer`. Do not build a two-function-only reflection
-inventory pack; only the later focal snapshot plan narrows to the two missing admin
+inventory pack; only the later focal snapshot plan narrows to those admin
 snapshots. Treat checker acceptance as permission to plan those candidate-only focal
 snapshots, not as identity, Inventory SDK, public SDK, runtime, lookup, or
 `ResourceHandle` promotion.
+
+## Safe Next Step
+
+The next useful action is to produce accepted lifecycle anchor evidence for at least one
+session-start/login/connect target and one session-end/logout/disconnect target in the
+same candidate-only identity lane, plus principal invalidation semantics. Current
+candidate anchors from static orientation are `ShooterGameMode.HandleNewPlayer`
+(`session_start`) and `ShooterGameMode.OnLogout` (`session_end`), but they are not
+accepted anchors yet. That work must preserve the same non-claims: no public identity,
+permissions, command routing, runtime lookup, mutation, return override, ResourceHandle,
+or complete v1 SDK claim is promoted by fixture coverage or second-source layout alone.
 
 The checker and planner also fail closed when the inventory
 `target_set_coverage.target_sets` drifts from the pack manifest `inputs.target_sets`, so
@@ -340,7 +448,7 @@ reuse `0x5956f30` or `0x595b7e0` for a different ARK binary hash without new evi
 This command shape is still offline and candidate-only. It must not use direct or
 symlinked `/servidor/ark` paths without a current scoped approval.
 
-Even after the two missing admin snapshots exist, the combined preflight must still stay
+Even with the admin snapshots now present, the combined preflight must still stay
 blocked until a distinct second-source snapshot root is accepted and session-start plus
 session-end lifecycle anchors are accepted. The wrapper reports those as
 `second_source_evidence_missing`, `second_source_evidence_not_accepted`, and
@@ -349,12 +457,12 @@ mistaken for player identity readiness.
 
 ## Boundary
 
-The two missing snapshots close only the admin-surface fixture gap. They do not establish
+The completed admin snapshots close only the admin-surface fixture gap. They do not establish
 login/logout lifecycle anchors, principal validity, identity privacy, permission
 authority, command routing, economy identity, runtime readiness, mutation, return
 override, `ResourceHandle`, or player lookup.
 
-After those admin snapshots exist, the player identity lane still remains planning-only
+With those admin snapshots present, the player identity lane still remains planning-only
 until a separate candidate pack proves at least one real session-start anchor and one real
 session-end anchor. That pack must record exact `Outer.Function`, `ParmsSize`, property
 order, offsets, sizes, property classes, and a distinct second-source/static comparison.

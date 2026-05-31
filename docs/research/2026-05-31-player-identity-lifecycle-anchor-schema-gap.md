@@ -5,17 +5,17 @@ Date: 2026-05-31
 ## Summary
 
 `players-identity-lifecycle-intake` can guide player identity research, but it does not
-yet contain accepted session-start or session-end anchors. Closing the current
-`ServerListPlayers` and `ServerKickPlayer` fixture gap would improve admin-surface
-coverage only; it would not prove login/logout lifecycle semantics or public principal
-invalidation.
+yet contain accepted session-start or session-end anchors. The admin-surface fixture gap
+and the distinct second-source layout gap are now closed for planning evidence; the
+remaining gap is a reviewed lifecycle-anchor schema plus principal invalidation policy.
 
 ## Current Evidence Boundary
 
 - The existing target set is planning-only and must stay out of release/public readiness.
-- Fixture coverage remains blocked on missing sanitized snapshots for:
-  - `ShooterPlayerController.ServerListPlayers`
-  - `ShooterPlayerController.ServerKickPlayer`
+- Fixture coverage for the 12-target player-identity intake is now complete. The
+  vanilla-gdb candidate root
+  `/servidor/ark/workspace-offline/player-identity-offline-identity-vanilla-gdb-20260529T012853Z/focal-snapshots`
+  compares `12/12` accepted in planning-layout mode against the committed fixtures.
 - Static offline string/registration orientation has identified two additional
   lifecycle-shaped clues in the same ShooterGameServer binary hash:
   - `ShooterGameMode.HandleNewPlayer`: ASCII name VMA `0x4170122`, registration VMA
@@ -24,10 +24,21 @@ invalidation.
   - `ShooterGameMode.OnLogout`: ASCII name VMA `0x417024f`, registration VMA
     `0x13cc560`, native thunk `0x15d1500`, class slot `0x58f2bd0`, class name UTF-32 VMA
     `0x40e0b24`, probable FName-ish slot `0x58ed3e0`.
-  These are navigation clues only. They are not in the committed target set, do not prove
-  login/logout order, and must not be treated as accepted lifecycle anchors without a
-  reviewed schema update, sanitized snapshots, property-chain evidence, second source, and
-  invalidation policy.
+  These began as navigation clues only. They are still not in the committed target set, do
+  not prove login/logout order, and must not be treated as accepted lifecycle anchors
+  without a reviewed schema update and invalidation policy.
+- Sanitized lifecycle snapshots now exist for both candidates from the base and
+  vanilla-gdb offline cores:
+  - `ShooterGameMode.HandleNewPlayer`: `ParmsSize=26`, `NumParms=5`, fields
+    `NewPlayer:ObjectProperty@0/8`, `PlayerData:ObjectProperty@8/8`,
+    `PlayerCharacter:ObjectProperty@16/8`, `bIsFromLogin:BoolProperty@24/1`,
+    `ReturnValue:BoolProperty@25/1`.
+  - `ShooterGameMode.OnLogout`: `ParmsSize=8`, `NumParms=1`, field
+    `Exiting:ObjectProperty@0/8`.
+  Comparing those lifecycle snapshot roots with `scripts/compare_reflection_snapshots.py`
+  reports `accepted=2`, `inconclusive=0`, `rejected=0`. This is exact layout
+  corroboration only; object-typed fields remain non-public, raw UE pointers stay
+  forbidden, and principal validity/invalidation semantics are not proven.
 - `build_redacted_ufunction_signatures.py --players-identity-first-evidence` intentionally
   reports `session_start_accepted=false`, `session_end_accepted=false`, and empty accepted
   target lists.
@@ -66,8 +77,10 @@ Required candidate fields should include:
 
 ## Next Step
 
-Before adding login/logout target names to release or public SDK gates, add a synthetic
-fixture/test for the lifecycle-anchor candidate schema. The test should prove that a
-candidate can be preserved as research evidence while accepted lifecycle anchors still
-require exact layout evidence plus second-source/static corroboration and explicit
-invalidation semantics.
+Before adding login/logout target names to release or public SDK gates, update the
+lifecycle-anchor candidate schema and tests so they can consume the two corroborated
+layout snapshots while still blocking promotion until explicit invalidation semantics are
+recorded. The test should prove that a candidate can be preserved as research evidence
+while accepted lifecycle anchors remain non-public and do not imply public identity,
+permissions, commands, lookup, mutation, return override, ResourceHandle, or runtime
+readiness.

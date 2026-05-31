@@ -1540,6 +1540,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "obelisk.permissions_admin.v1",
             "obelisk.arkapi_compatibility.v1",
             "obelisk.operator_ingress_storage.v1",
+            "obelisk.gameplay_tick_callbacks.v1",
             "obelisk.debug_raw_process_event.v1",
         }
         self.assertTrue(required_ids.issubset(surfaces))
@@ -1993,9 +1994,6 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertNotIn("players-identity-lifecycle-intake", json.dumps(manifest["experimental_surfaces"]))
 
         for blocker in (
-            "No reviewed non-protected complete core evidence pack plus UFunction reflection-inventory pack accepted for the missing admin snapshots.",
-            "Missing sanitized ServerListPlayers snapshot.",
-            "Missing sanitized ServerKickPlayer snapshot.",
             "No accepted login/logout lifecycle anchors.",
             "No principal privacy, invalidation, or cross-instance semantics.",
         ):
@@ -8524,7 +8522,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ]
         self.assertEqual(missing_tests, [])
 
-    def test_player_identity_next_step_requires_non_protected_ufunction_inventory_pack(self) -> None:
+    def test_player_identity_current_route_records_completed_admin_snapshots_and_remaining_blockers(self) -> None:
         current_path = REPO_ROOT / "docs" / "agent-handoff" / "CURRENT.md"
         readme_path = REPO_ROOT / "docs" / "research" / "README.md"
         preflight_path = (
@@ -8551,15 +8549,23 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                     self.assertIn(normalized(term), text)
 
         for term in (
-            "produce or approve a non-protected UFunction reflection-inventory pack",
-            "target_set_coverage` for the full 12-target `players-identity-lifecycle-intake` set",
-            "do not treat ScriptStruct inventory, standalone snapshots, redacted signatures, static thunks, or a two-function-only inventory as satisfying this lane",
-            "use `scripts/plan_ufunction_focal_snapshots.py` for "
-            "`ShooterPlayerController.ServerListPlayers` and "
-            "`ShooterPlayerController.ServerKickPlayer` only",
+            "lifecycle-anchor schema/target-set and principal\n  invalidation policy still need a reviewed gate",
+            "complete `obelisk.core-dump-evidence-pack.v1`",
+            "accepted `obelisk.reflection-inventory-pack.v1`",
+            "12/12 candidate fixtures",
+            "accepted distinct second-source layout\n  evidence from the vanilla-gdb core",
+            "Do not rerun the completed admin snapshot, second-source layout, or lifecycle layout routes",
         ):
             with self.subTest(doc="handoff", term=term):
                 self.assertIn(normalized(term), docs["handoff"])
+
+        for term in (
+            "completed admin snapshot route",
+            "target_set_coverage` for the full 12-target `players-identity-lifecycle-intake` set",
+            "Do not treat ScriptStruct inventory, standalone snapshots, redacted signatures, static thunks, or a two-function-only inventory as satisfying this lane",
+        ):
+            with self.subTest(doc="preflight", term=term):
+                self.assertIn(normalized(term), docs["preflight"])
 
     def test_mission_copied_bool_priority_records_offline_blockers_not_public_sdk(self) -> None:
         note = (REPO_ROOT / "docs" / "research" / "2026-05-31-v02-module-priority.md").read_text(
@@ -8567,8 +8573,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         )
         compact = normalized(note)
         docs = {
-            "research_readme": normalized(
-                (REPO_ROOT / "docs" / "research" / "README.md").read_text(encoding="utf-8")
+            "handoff": normalized(
+                (REPO_ROOT / "docs" / "agent-handoff" / "CURRENT.md").read_text(
+                    encoding="utf-8"
+                )
             ),
             "preflight": normalized(
                 (
@@ -8596,12 +8604,12 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 self.assertIn(normalized(term), compact)
 
         for term in (
-            "First produce or approve a reviewed non-protected UFunction `obelisk.reflection-inventory-pack.v1`",
-            "then plan only `ShooterPlayerController.ServerListPlayers` and `ShooterPlayerController.ServerKickPlayer`",
-            "do not run runtime work or repeat broad FName/GObjects/core discovery for this route",
+            "lifecycle-anchor candidate schema\n  gate that consumes the corroborated `HandleNewPlayer`/`OnLogout` layouts",
+            "Do not\n  rerun the completed admin snapshot, second-source layout, or lifecycle layout routes",
+            "Current recipe:\n  `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`",
         ):
-            with self.subTest(doc="research_readme", term=term):
-                self.assertIn(normalized(term), docs["research_readme"])
+            with self.subTest(doc="handoff", term=term):
+                self.assertIn(normalized(term), docs["handoff"])
 
         for term in (
             "does not reread a core",
@@ -8619,9 +8627,15 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "`accepted_lifecycle_anchors_missing`",
             "fixture\ncoverage cannot be mistaken for player identity readiness",
             "check_player_identity_first_evidence_readiness.py",
-            "fixture_coverage.comparable=10",
+            "fixture_coverage.comparable=12",
+            "fixture_coverage.second_source_missing=0",
+            "second_source_accepted=12",
+            "planning_layout_gate.ready=true",
             "first_evidence.ready=false",
-            "next_step=produce_or_approve_non_protected_core_evidence_pack_then_reflection_inventory_pack",
+            "primary_blocker=accepted_lifecycle_anchor_evidence_missing",
+            "candidate anchors from static orientation are `ShooterGameMode.HandleNewPlayer`",
+            "Even with the admin snapshots now present",
+            "completed admin snapshots close only the admin-surface fixture gap",
         ):
             with self.subTest(doc="preflight", term=term):
                 self.assertIn(normalized(term), docs["preflight"])
@@ -8816,6 +8830,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "Do not use `--skip-core-sha256`",
             "do not use `--allow-partial-gdb`",
             "at least one real session-start anchor and one real\nsession-end anchor",
+            "Even with the admin snapshots now present",
+            "completed admin snapshots close only the admin-surface fixture gap",
             "`ChatMessageEvent` must continue to treat `principal=unknown`",
         ):
             with self.subTest(term=term):

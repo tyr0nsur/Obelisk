@@ -260,20 +260,26 @@ priorities, and do not use history files as the active source of truth.
   `scripts/plan_ufunction_focal_snapshots.py` consumes an already reviewed
   reflection-inventory pack plus exact targets/target files and emits candidate-only
   planned commands without rereading a core, executing commands, writing snapshots, or
-  promoting target sets/runtime/API scope. For player identity, first review a complete
-  reflection inventory pack with full 12-target `players-identity-lifecycle-intake`
-  coverage, then plan only the exact `ShooterPlayerController.ServerListPlayers` and
-  `ShooterPlayerController.ServerKickPlayer` targets; do not use the full target set to
-  emit focal plans.
+  promoting target sets/runtime/API scope. For player identity, the 2026-05-31 workspace
+  route produced a complete 12-target reflection inventory pack and committed candidate
+  fixtures for `ShooterPlayerController.ServerListPlayers` and
+  `ShooterPlayerController.ServerKickPlayer`. A distinct vanilla-gdb candidate root at
+  `/servidor/ark/workspace-offline/player-identity-offline-identity-vanilla-gdb-20260529T012853Z/focal-snapshots`
+  now compares `12/12` accepted in planning-layout mode. The remaining blocker is accepted
+  lifecycle anchors plus principal invalidation semantics, not the old admin fixture gap or
+  second-source layout.
 - Player identity offline staging has a helper for the raw sibling layout:
   `scripts/prepare_player_identity_offline_raw_layout.py`. Use it only to stage explicit
-  non-protected offline `ShooterGameServer` and core inputs into
-  `/home/flowcommunity-ark/obelisk-artifacts/player-identity-offline-<run-id>/raw/`.
-  It does not create or approve cores, touch protected server paths, or authorize server
-  access or runtime/core changes. Current artifact audit: the matching offline binary
-  exists in `/home/flowcommunity-ark/obelisk-artifacts`, but no core file or
-  `player-identity-offline-*` run directory exists there. The detailed stop/continue
-  recipe remains in `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`.
+  offline `ShooterGameServer` and core inputs into a
+  `player-identity-offline-<run-id>/raw/` directory under a non-protected artifact root
+  or the approved `/servidor/ark/workspace-offline` root. It does not create or approve
+  cores, touch live server roots, or authorize server access or runtime/core changes.
+  Current workspace run:
+  `/servidor/ark/workspace-offline/player-identity-offline-identity-second-source-20260529T011227Z`.
+  Current distinct second-source workspace run:
+  `/servidor/ark/workspace-offline/player-identity-offline-identity-vanilla-gdb-20260529T012853Z`.
+  The detailed stop/continue recipe remains in
+  `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`.
 - `scripts/validate_player_identity_raw_inputs.py` is the read-only dry-run validator for
   an existing `player-identity-offline-<run-id>/raw/{ShooterGameServer,core}` pair. It
   rejects direct or symlink-resolved `/servidor/ark`, symlinks, wrong layout, empty files,

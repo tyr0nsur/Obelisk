@@ -127,6 +127,18 @@
       "outer": "ShooterPlayerController"
     },
     {
+      "file": "ShooterPlayerController.ServerListPlayers.snapshot.json",
+      "module": "sdk_players",
+      "name": "ServerListPlayers",
+      "outer": "ShooterPlayerController"
+    },
+    {
+      "file": "ShooterPlayerController.ServerKickPlayer.snapshot.json",
+      "module": "sdk_players",
+      "name": "ServerKickPlayer",
+      "outer": "ShooterPlayerController"
+    },
+    {
       "file": "PrimalBuff.AllowPostProcessEffect.snapshot.json",
       "module": "sdk_buffs",
       "name": "AllowPostProcessEffect",

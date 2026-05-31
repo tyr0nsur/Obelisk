@@ -80,30 +80,42 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - Player identity is the first v1 dependency for permissions, commands, economy,
   moderation, and several ownership-sensitive module APIs. The target set is 12-target
   `players-identity-lifecycle-intake`; it remains planning-only and candidate-only.
-- Current player-identity state: the artifact root has the matching offline
-  `ShooterGameServer` SHA `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`,
-  but no non-protected copied core, no complete `obelisk.core-dump-evidence-pack.v1`, and
-  no accepted `obelisk.reflection-inventory-pack.v1`.
-- Current identity next step is to produce or approve a non-protected UFunction
-  reflection-inventory pack with `target_set_coverage` for the full 12-target
-  `players-identity-lifecycle-intake` set after core evidence exists. Then use
-  `scripts/plan_ufunction_focal_snapshots.py` for
-  `ShooterPlayerController.ServerListPlayers` and
-  `ShooterPlayerController.ServerKickPlayer` only; do not treat ScriptStruct inventory,
-  standalone snapshots, redacted signatures, static thunks, or a two-function-only
-  inventory as satisfying this lane.
+- Current player-identity state: `/servidor/ark/workspace-offline` now has the staged
+  `player-identity-offline-identity-second-source-20260529T011227Z` hardlink layout, a
+  complete `obelisk.core-dump-evidence-pack.v1`, an accepted
+  `obelisk.reflection-inventory-pack.v1` with 12/12
+  `players-identity-lifecycle-intake` target coverage, and committed candidate fixtures
+  for `ShooterPlayerController.ServerListPlayers` and
+  `ShooterPlayerController.ServerKickPlayer`.
+- Distinct second-source layout is now accepted for the 12-target player-identity intake
+  when using candidate root
+  `/servidor/ark/workspace-offline/player-identity-offline-identity-vanilla-gdb-20260529T012853Z/focal-snapshots`
+  with `scripts/compare_reflection_snapshots.py --planning-layout-intake`: totals are
+  `targets=12`, `comparable=12`, `second_source_accepted=12`, rejected/inconclusive/missing
+  all zero, and promotion remains false.
+- Current identity next step is accepted login/logout lifecycle anchor evidence and
+  principal invalidation semantics. The lane remains planning-only and candidate-only: no
+  public identity, permissions, commands, runtime lookup, ResourceHandle, mutation, return
+  override, or v1 SDK completion claim is promoted.
+- Candidate lifecycle layouts are now corroborated across the base and vanilla-gdb offline
+  cores for `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout`, but they are
+  not accepted anchors because the lifecycle-anchor schema/target-set and principal
+  invalidation policy still need a reviewed gate.
 - `scripts/check_player_identity_first_evidence_readiness.py --artifact-root
-  /home/flowcommunity-ark/obelisk-artifacts --json` currently reports
-  `next_actionable_blocker.code=non_protected_core_input_missing`; the expected copied
-  core path pattern is
-  `/home/flowcommunity-ark/obelisk-artifacts/player-identity-offline-<run-id>/raw/core`.
+  /servidor/ark/workspace-offline/player-identity-offline-identity-second-source-20260529T011227Z
+  --candidate-root
+  /servidor/ark/workspace-offline/player-identity-offline-identity-vanilla-gdb-20260529T012853Z/focal-snapshots
+  --json` currently reports `primary_blocker=accepted_lifecycle_anchor_evidence_missing`.
 - Static orientation reports for identity/lifecycle/admin and command response are
   navigation clues only, not consume/promote evidence packs or artifact-gate schemas.
 - The current artifact-root audit is summarized in
   `docs/research/2026-05-31-offline-artifact-inventory-audit.md`: usable roots are
   layout-only, evidence-only, or consume-only, command/chat response remains
-  orientation-only, and player identity is still blocked on a non-protected core plus a
-  complete reflection inventory pack.
+  orientation-only, and the older `/home/flowcommunity-ark/obelisk-artifacts` route is
+  still blocked on a non-protected core plus a complete reflection inventory pack. The
+  active `/servidor/ark/workspace-offline` player-identity run has already passed that
+  stage and now has distinct second-source layout evidence; it is blocked on accepted
+  lifecycle anchors and principal invalidation semantics.
 - Inventory, structures, missions, transfers, dinos, buffs, tribes, ResourceHandle, and
   GObjects remain internal/candidate. ResourceHandle/public GObjects remain blocked; old
   flag-policy artifact is obsolete; durable rich-provenance refresh is preserved; Consume
@@ -122,14 +134,17 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 
 ## Priority Next Steps
 
-- Primary v1 route: player identity remains blocked on a regular non-symlink
-  non-protected copied core under
-  `/home/flowcommunity-ark/obelisk-artifacts/player-identity-offline-<run-id>/raw/`.
-  Matching offline binary exists; no paired core/run dir exists. After inputs exist, stage
-  them with `scripts/prepare_player_identity_offline_raw_layout.py`, build
-  `obelisk.core-dump-evidence-pack.v1`, then the 12-target
-  `obelisk.reflection-inventory-pack.v1`, then exact admin focal snapshots. Current
-  recipe: `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`.
+- Primary v1 route: player identity now has a staged approved-offline workspace run,
+  complete `obelisk.core-dump-evidence-pack.v1`, accepted
+  `obelisk.reflection-inventory-pack.v1`, 12/12 candidate fixtures for the
+  `players-identity-lifecycle-intake` set, and accepted distinct second-source layout
+  evidence from the vanilla-gdb core. The next work is a lifecycle-anchor candidate schema
+  gate that consumes the corroborated `HandleNewPlayer`/`OnLogout` layouts while still
+  blocking public identity until principal invalidation semantics are explicit. Do not
+  rerun the completed admin snapshot, second-source layout, or lifecycle layout routes or
+  broad FName/GObjects/core discovery unless a new binary hash or rejected evidence
+  requires it. Current recipe:
+  `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`.
 - Demand-map priority from local NextGenPlugins dictionary signals is P0 identity,
   commands/replies/response path, and permissions/admin; P1 economy/storage/operator
   ingress, inventory/items mutation, and structure/build policy; P2 dinos/tribes/
@@ -172,9 +187,9 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `sdk_minimal_plugin`, `sdk_descriptor_catalog`, and `sdk_timer_plugin`;
   `sdk_inventory_policy_audit` remains experimental.
 - Plugin cleanup failure policy skips `dlclose`, retains the plugin for retry, and does not repeat plugin shutdown after shutdown already ran.
-- Revalidate before any checkpoint: identity readiness stays blocked with
-  `non_protected_core_input_missing`, public SDK v1 completion stays blocked, Plugin Hub
-  docs stay non-promotional, and `git diff --check` passes.
+- Revalidate before any checkpoint: identity readiness with the vanilla-gdb candidate root
+  stays blocked on lifecycle-anchor evidence, public SDK v1 completion stays blocked,
+  Plugin Hub docs stay non-promotional, and `git diff --check` passes.
 - Start every supervised round by verifying no stale stand-by sub-agent remains open.
   Assign each sub-agent only the scoped objective, safety baseline, allowed paths,
   required skills, expert role, expected decision, and whether edits are allowed. Pass

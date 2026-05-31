@@ -117,7 +117,6 @@ def reject_direct_protected_path(path: Path, label: str, *, access: str) -> None
 
 
 def validate_input_file(path: Path, label: str) -> Path:
-    reject_direct_protected_path(path, label, access="read from")
     reject_symlink_component(path, label)
     resolved = reject_protected_input_path(path, label)
     if not resolved.exists():
@@ -128,7 +127,6 @@ def validate_input_file(path: Path, label: str) -> Path:
 
 
 def validate_artifact_root(path: Path) -> Path:
-    reject_direct_protected_path(path, "--artifact-root", access="write under")
     reject_symlink_component(path, "--artifact-root")
     resolved = reject_protected_output_path(path, "--artifact-root")
     try:

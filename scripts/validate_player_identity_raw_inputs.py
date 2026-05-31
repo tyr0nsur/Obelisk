@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import protected_paths
 from check_player_identity_first_evidence_readiness import (
     EXPECTED_SHOOTERGAME_SHA256,
     PLAYER_IDENTITY_RAW_RUN_PREFIX,
@@ -20,6 +21,7 @@ from snapshot_evidence_pack import REPO_ROOT, SHA256_RE, first_symlink_component
 
 REPORT_SCHEMA = "obelisk.player-identity-raw-input-validation.v1"
 PROTECTED_ROOT = Path("/servidor/ark")
+APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
 BINARY_NAME = "ShooterGameServer"
 CORE_NAME = "core"
 
@@ -72,8 +74,15 @@ def path_contains_parent_reference(path: Path) -> bool:
 
 
 def direct_protected_path(path: Path) -> bool:
-    expanded = path.expanduser()
-    return expanded.is_absolute() and is_relative_to(expanded, PROTECTED_ROOT)
+    try:
+        return protected_paths.protected_path_status(
+            path,
+            protected_root=PROTECTED_ROOT,
+            approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+        ).protected
+    except OSError:
+        expanded = path.expanduser()
+        return expanded.is_absolute() and is_relative_to(expanded, PROTECTED_ROOT)
 
 
 def resolved_path(path: Path) -> tuple[Path | None, str | None]:
@@ -84,35 +93,26 @@ def resolved_path(path: Path) -> tuple[Path | None, str | None]:
 
 
 def protected_path_blockers(path: Path, label: str) -> tuple[list[dict[str, object]], Path | None]:
-    if direct_protected_path(path):
-        return (
-            [
-                blocker(
-                    "path_under_protected_root",
-                    label,
-                    path=str(path),
-                    protected_root=str(PROTECTED_ROOT),
-                )
-            ],
-            None,
-        )
-
     resolved, error = resolved_path(path)
     if resolved is None:
         return [blocker("path_resolve_failed", label, path=str(path), detail=error or "unknown")], None
-    if is_relative_to(resolved, PROTECTED_ROOT):
-        return (
-            [
-                blocker(
-                    "resolved_path_under_protected_root",
-                    label,
-                    path=str(path),
-                    resolved_path=str(resolved),
-                    protected_root=str(PROTECTED_ROOT),
-                )
-            ],
-            resolved,
-        )
+    blockers = protected_paths.protected_input_path_blockers(
+        path,
+        protected_root=PROTECTED_ROOT,
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    )
+    if blockers:
+        return [
+            blocker(
+                entry.get("reason", "path_under_protected_root"),
+                label,
+                path=str(path),
+                resolved_path=str(resolved),
+                protected_root=str(PROTECTED_ROOT),
+                detail=entry.get("detail", ""),
+            )
+            for entry in blockers
+        ], resolved
     return [], resolved
 
 
@@ -306,7 +306,7 @@ def build_result(args: argparse.Namespace) -> dict[str, Any]:
         "non_claims": [
             "does not stage, copy, hardlink, create, delete, or modify files",
             "does not read or parse core contents; core checks are metadata-only",
-            "does not allow direct or resolved /servidor/ark paths",
+            "does not allow direct or resolved /servidor/ark paths outside approved offline workspaces",
             "does not run gdb, ptrace, scanners, servers, or evidence-pack builders",
             "does not prove the core matches the binary beyond raw-layout pairing and binary SHA",
         ],

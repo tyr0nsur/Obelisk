@@ -396,6 +396,18 @@ namespace
         bool ReleaseStructure = false;
     };
 
+    struct InventoryItemReturnUnloadFenceState
+    {
+        std::mutex Mutex;
+        std::condition_variable Cv;
+        int InventoryCalls = 0;
+        int ItemReturnCalls = 0;
+        bool InventoryEntered = false;
+        bool ItemReturnEntered = false;
+        bool ReleaseInventory = false;
+        bool ReleaseItemReturn = false;
+    };
+
     void GameplayPolicyShutdownCrossFamilyFenceCallback(
         const ObeliskGameplayPolicyEvent* event,
         void* userData)
@@ -418,6 +430,58 @@ namespace
         state->StructureEntered = true;
         state->Cv.notify_all();
         state->Cv.wait(lock, [state]() { return state->ReleaseStructure; });
+    }
+
+    void GameplayPolicyInventoryItemReturnUnloadFenceCallback(
+        const ObeliskGameplayPolicyEvent* event,
+        void* userData)
+    {
+        Require(event != nullptr, "inventory/item-return unload fence callback received null event");
+        auto* state = static_cast<InventoryItemReturnUnloadFenceState*>(userData);
+        std::unique_lock<std::mutex> lock(state->Mutex);
+        if (event->event_kind == OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK)
+        {
+            ++state->InventoryCalls;
+            state->InventoryEntered = true;
+            state->Cv.notify_all();
+            state->Cv.wait(lock, [state]() { return state->ReleaseInventory; });
+            return;
+        }
+
+        Require(event->event_kind == OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_ALLOW_EQUIP_ITEM_CHECK,
+                "inventory/item-return unload fence callback received unexpected event kind");
+        ++state->ItemReturnCalls;
+        state->ItemReturnEntered = true;
+        state->Cv.notify_all();
+        state->Cv.wait(lock, [state]() { return state->ReleaseItemReturn; });
+    }
+
+    void DirectInventoryUnloadFenceCallback(
+        const Obelisk::Core::InventoryPolicyEventView& event,
+        void* userData)
+    {
+        Require(event.Kind == Obelisk::Core::InventoryPolicyEventKind::CanUse,
+                "direct inventory unload fence callback received unexpected event kind");
+        auto* state = static_cast<InventoryItemReturnUnloadFenceState*>(userData);
+        std::unique_lock<std::mutex> lock(state->Mutex);
+        ++state->InventoryCalls;
+        state->InventoryEntered = true;
+        state->Cv.notify_all();
+        state->Cv.wait(lock, [state]() { return state->ReleaseInventory; });
+    }
+
+    void DirectItemReturnUnloadFenceCallback(
+        const Obelisk::Core::ItemReturnEventView& event,
+        void* userData)
+    {
+        Require(event.Kind == Obelisk::Core::ItemReturnEventKind::AllowEquipItem,
+                "direct item-return unload fence callback received unexpected event kind");
+        auto* state = static_cast<InventoryItemReturnUnloadFenceState*>(userData);
+        std::unique_lock<std::mutex> lock(state->Mutex);
+        ++state->ItemReturnCalls;
+        state->ItemReturnEntered = true;
+        state->Cv.notify_all();
+        state->Cv.wait(lock, [state]() { return state->ReleaseItemReturn; });
     }
 
     void FakeChatMessageEventCallback(const ObeliskChatMessageEvent* event, void* userData)
@@ -3861,6 +3925,253 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestUnloadAllWaitsForInventoryAndItemReturnGameplayPolicyDispatchBeforeClose()
+    {
+        const fs::path root =
+            MakeTempRoot("obelisk_plugin_manager_gameplay_policy_shutdown_inventory_item_return_fence");
+        ConfigureEnvironment(root);
+
+        std::atomic<bool> closeObserved{false};
+        FakePlugin plugin{
+            .filename = "gameplay_policy_shutdown_inventory_item_return_fence.so",
+            .pluginId = "gameplay_policy_shutdown_inventory_item_return_fence",
+            .captureApi = true,
+            .closeObserved = &closeObserved,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "inventory/item-return unload fence plugin was not initialized");
+        Require(plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle != nullptr,
+                "gameplay policy registration function was not exposed");
+
+        InventoryItemReturnUnloadFenceState state;
+        const uint64_t registrationId =
+            plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                plugin.initOwnerToken,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK |
+                    OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_ALLOW_EQUIP_ITEM_CHECK,
+                GameplayPolicyInventoryItemReturnUnloadFenceCallback,
+                &state);
+        Require(registrationId != 0, "inventory/item-return unload fence registration returned zero");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 1,
+                "inventory/item-return unload fence callback was not bridged into inventory dispatcher");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 1,
+                "inventory/item-return unload fence callback was not bridged into item-return dispatcher");
+
+        const std::vector<Obelisk::Core::InventoryPolicyScalarValue> inventoryScalars =
+            MakeInventoryCanUseScalars();
+        const std::vector<Obelisk::Core::ItemReturnScalarValue> itemReturnScalars =
+            MakeItemReturnScalars(true);
+        std::atomic<size_t> inventoryDispatches{0};
+        std::atomic<size_t> itemReturnDispatches{0};
+        std::atomic<bool> unloadReturned{false};
+
+        std::thread inventoryThread([&]() {
+            inventoryDispatches.store(
+                Obelisk::Core::InventoryPolicyEventDispatcher::Get().Dispatch(
+                    MakeInventoryCanUseEvent(inventoryScalars)),
+                std::memory_order_release);
+        });
+        std::thread itemReturnThread([&]() {
+            itemReturnDispatches.store(
+                Obelisk::Core::ItemReturnEventDispatcher::Get().Dispatch(
+                    MakeItemReturnEvent(
+                        Obelisk::Core::ItemReturnEventKind::AllowEquipItem,
+                        itemReturnScalars)),
+                std::memory_order_release);
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
+                        return state.InventoryEntered && state.ItemReturnEntered;
+                    }),
+                    "inventory/item-return unload fence callbacks did not both enter");
+        }
+
+        std::thread unloadThread([&]() {
+            manager.UnloadAll();
+            unloadReturned.store(true, std::memory_order_release);
+        });
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        Require(!closeObserved.load(std::memory_order_acquire),
+                "plugin was closed while inventory/item-return gameplay policy callbacks were in flight");
+        Require(!unloadReturned.load(std::memory_order_acquire),
+                "UnloadAll returned while inventory/item-return gameplay policy callbacks were in flight");
+
+        {
+            std::lock_guard<std::mutex> lock(state.Mutex);
+            state.ReleaseInventory = true;
+        }
+        state.Cv.notify_all();
+        inventoryThread.join();
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        Require(!closeObserved.load(std::memory_order_acquire),
+                "plugin was closed while the item-return gameplay policy callback was still in flight");
+        Require(!unloadReturned.load(std::memory_order_acquire),
+                "UnloadAll returned while the item-return gameplay policy callback was still in flight");
+
+        {
+            std::lock_guard<std::mutex> lock(state.Mutex);
+            state.ReleaseItemReturn = true;
+        }
+        state.Cv.notify_all();
+
+        itemReturnThread.join();
+        unloadThread.join();
+
+        Require(inventoryDispatches.load(std::memory_order_acquire) == 1,
+                "inventory unload fence dispatch did not complete exactly one callback");
+        Require(itemReturnDispatches.load(std::memory_order_acquire) == 1,
+                "item-return unload fence dispatch did not complete exactly one callback");
+        Require(state.InventoryCalls == 1, "inventory unload fence callback call count mismatch");
+        Require(state.ItemReturnCalls == 1, "item-return unload fence callback call count mismatch");
+        Require(closeObserved.load(std::memory_order_acquire),
+                "plugin was not closed after inventory/item-return callbacks completed");
+        Require(plugin.closeCalls == 1, "inventory/item-return unload fence plugin was not closed once");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
+                "inventory unload fence callback survived unload");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 0,
+                "item-return unload fence callback survived unload");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestUnloadAllWaitsForDirectInventoryAndItemReturnDispatchBeforeClose()
+    {
+        const fs::path root =
+            MakeTempRoot("obelisk_plugin_manager_direct_inventory_item_return_unload_fence");
+        ConfigureEnvironment(root);
+
+        std::atomic<bool> closeObserved{false};
+        FakePlugin plugin{
+            .filename = "direct_inventory_item_return_unload_fence.so",
+            .pluginId = "direct_inventory_item_return_unload_fence",
+            .closeObserved = &closeObserved,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "direct inventory/item-return unload fence plugin was not initialized");
+
+        InventoryItemReturnUnloadFenceState state;
+        const uint64_t inventoryRegistrationId =
+            Obelisk::Core::InventoryPolicyEventDispatcher::Get().Register(
+                plugin.owner,
+                Obelisk::Core::InventoryPolicyEventSubscription{
+                    DirectInventoryUnloadFenceCallback,
+                    &state,
+                });
+        const uint64_t itemReturnRegistrationId =
+            Obelisk::Core::ItemReturnEventDispatcher::Get().Register(
+                plugin.owner,
+                Obelisk::Core::ItemReturnEventSubscription{
+                    DirectItemReturnUnloadFenceCallback,
+                    &state,
+                });
+        Require(inventoryRegistrationId != 0, "direct inventory unload fence registration returned zero");
+        Require(itemReturnRegistrationId != 0, "direct item-return unload fence registration returned zero");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 1,
+                "direct inventory unload fence callback was not registered");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 1,
+                "direct item-return unload fence callback was not registered");
+
+        const std::vector<Obelisk::Core::InventoryPolicyScalarValue> inventoryScalars =
+            MakeInventoryCanUseScalars();
+        const std::vector<Obelisk::Core::ItemReturnScalarValue> itemReturnScalars =
+            MakeItemReturnScalars(true);
+        std::atomic<size_t> inventoryDispatches{0};
+        std::atomic<size_t> itemReturnDispatches{0};
+        std::atomic<bool> unloadReturned{false};
+
+        std::thread inventoryThread([&]() {
+            inventoryDispatches.store(
+                Obelisk::Core::InventoryPolicyEventDispatcher::Get().Dispatch(
+                    MakeInventoryCanUseEvent(inventoryScalars)),
+                std::memory_order_release);
+        });
+        std::thread itemReturnThread([&]() {
+            itemReturnDispatches.store(
+                Obelisk::Core::ItemReturnEventDispatcher::Get().Dispatch(
+                    MakeItemReturnEvent(
+                        Obelisk::Core::ItemReturnEventKind::AllowEquipItem,
+                        itemReturnScalars)),
+                std::memory_order_release);
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
+                        return state.InventoryEntered && state.ItemReturnEntered;
+                    }),
+                    "direct inventory/item-return unload fence callbacks did not both enter");
+        }
+
+        std::thread unloadThread([&]() {
+            manager.UnloadAll();
+            unloadReturned.store(true, std::memory_order_release);
+        });
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        Require(!closeObserved.load(std::memory_order_acquire),
+                "plugin was closed while direct inventory/item-return callbacks were in flight");
+        Require(!unloadReturned.load(std::memory_order_acquire),
+                "UnloadAll returned while direct inventory/item-return callbacks were in flight");
+
+        {
+            std::lock_guard<std::mutex> lock(state.Mutex);
+            state.ReleaseInventory = true;
+        }
+        state.Cv.notify_all();
+        inventoryThread.join();
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        Require(!closeObserved.load(std::memory_order_acquire),
+                "plugin was closed while the direct item-return callback was still in flight");
+        Require(!unloadReturned.load(std::memory_order_acquire),
+                "UnloadAll returned while the direct item-return callback was still in flight");
+
+        {
+            std::lock_guard<std::mutex> lock(state.Mutex);
+            state.ReleaseItemReturn = true;
+        }
+        state.Cv.notify_all();
+
+        itemReturnThread.join();
+        unloadThread.join();
+
+        Require(inventoryDispatches.load(std::memory_order_acquire) == 1,
+                "direct inventory unload fence dispatch did not complete exactly one callback");
+        Require(itemReturnDispatches.load(std::memory_order_acquire) == 1,
+                "direct item-return unload fence dispatch did not complete exactly one callback");
+        Require(state.InventoryCalls == 1, "direct inventory unload fence callback call count mismatch");
+        Require(state.ItemReturnCalls == 1, "direct item-return unload fence callback call count mismatch");
+        Require(closeObserved.load(std::memory_order_acquire),
+                "plugin was not closed after direct inventory/item-return callbacks completed");
+        Require(plugin.closeCalls == 1, "direct inventory/item-return unload fence plugin was not closed once");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
+                "direct inventory unload fence callback survived unload");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 0,
+                "direct item-return unload fence callback survived unload");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestDescribeResourceKind()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_describe_resource_kind");
@@ -5731,6 +6042,8 @@ int main()
     TestCrossFamilyUnregisterSuppressesWaitForOtherFamilyDispatch();
     TestCrossFamilyUnregisterSuppressesWaitForStructureDispatch();
     TestUnloadAllWaitsForCrossFamilyGameplayPolicyDispatchBeforeClose();
+    TestUnloadAllWaitsForInventoryAndItemReturnGameplayPolicyDispatchBeforeClose();
+    TestUnloadAllWaitsForDirectInventoryAndItemReturnDispatchBeforeClose();
     TestDescribeResourceKind();
     TestDescribeGameplayPolicyEventKind();
     TestGameplayPolicyCallbackCleansOnInitFailure();

@@ -14,6 +14,13 @@ FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
 READINESS_DOC = REPO_ROOT / "docs" / "research" / "2026-05-27-module-readiness-matrix.md"
 EXPECTED_ARK_SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 EXPECTED_ARTIFACT_SHA = "1c4bf8876706b3af40bd9b73fbeb907a31356e62d6c9ff93aed0158d2cb2fe5e"
+EXPECTED_EVIDENCE_BY_MODULE = {
+    "sdk_players": {
+        "artifact_sha256": "62d1768fd5962ee9270641f0a340dc04dc15edde53eacefbf247eff37e5bed78",
+        "capture_id": "core",
+        "evidence_pack_id": "core-evidence-pack",
+    },
+}
 MANIFEST_SCHEMA = "obelisk.ufunction-snapshot-manifest.v1"
 FORBIDDEN_KEYS = {
     "object",
@@ -119,6 +126,15 @@ class UFunctionSnapshotFixtureTests(unittest.TestCase):
         for path in paths:
             with self.subTest(path=path.relative_to(REPO_ROOT)):
                 payload = json.loads(path.read_text(encoding="utf-8"))
+                module = path.parent.name
+                expected_evidence = EXPECTED_EVIDENCE_BY_MODULE.get(
+                    module,
+                    {
+                        "artifact_sha256": EXPECTED_ARTIFACT_SHA,
+                        "capture_id": "primary_core_20260527T031311Z",
+                        "evidence_pack_id": "primary_core_pack_20260527T031311Z",
+                    },
+                )
                 self.assertEqual(payload["schema"], "obelisk.ufunction-chain.snapshot.v1")
 
                 evidence = payload.get("evidence")
@@ -128,9 +144,9 @@ class UFunctionSnapshotFixtureTests(unittest.TestCase):
                 self.assertEqual(evidence.get("source"), "offline_core")
                 self.assertEqual(evidence.get("status"), "candidate-only")
                 self.assertEqual(evidence.get("artifact_kind"), "offline_core")
-                self.assertEqual(evidence.get("artifact_sha256"), EXPECTED_ARTIFACT_SHA)
-                self.assertEqual(evidence.get("capture_id"), "primary_core_20260527T031311Z")
-                self.assertEqual(evidence.get("evidence_pack_id"), "primary_core_pack_20260527T031311Z")
+                self.assertEqual(evidence.get("artifact_sha256"), expected_evidence["artifact_sha256"])
+                self.assertEqual(evidence.get("capture_id"), expected_evidence["capture_id"])
+                self.assertEqual(evidence.get("evidence_pack_id"), expected_evidence["evidence_pack_id"])
                 self.assertEqual(
                     evidence.get("generated_by"),
                     "scripts/inspect_core_ufunctions.py --snapshot-json",

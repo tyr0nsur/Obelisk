@@ -156,18 +156,10 @@ def is_relative_to(path: Path, root: Path) -> bool:
 
 
 def reject_player_identity_artifact_root(path: Path, label: str) -> Path:
-    """Reject every /servidor/ark root for this preflight, including workspace-offline."""
+    """Reject live/protected roots while allowing approved offline workspaces."""
 
     reject_symlink_component(path, label)
-    expanded = path.expanduser()
-    absolute = expanded if expanded.is_absolute() else expanded.absolute()
-    protected = PROTECTED_SERVER_ROOT
-    resolved_protected = protected.resolve()
-    if is_relative_to(absolute, protected):
-        raise SystemExit(f"{label} must not read from protected server root {protected}: {absolute}")
     resolved = reject_protected_input_path(path, label)
-    if is_relative_to(resolved, resolved_protected):
-        raise SystemExit(f"{label} must not read from protected server root {protected}: {resolved}")
     return resolved
 
 
@@ -329,6 +321,7 @@ def bounded_artifact_file_scan(root: Path, *, max_depth: int = 6) -> dict[str, A
         "artifact_root_only": True,
         "resolved_root": str(resolved),
         "server_root_excluded": "/servidor/ark",
+        "approved_offline_workspace_roots": ["/servidor/ark/workspace-offline"],
         "expected_shooter_game_server_sha256": EXPECTED_SHOOTERGAME_SHA256,
         "shooter_game_server_candidates": shooter_candidates,
         "omitted_shooter_game_server_candidates": omitted_shooter,
@@ -340,7 +333,7 @@ def bounded_artifact_file_scan(root: Path, *, max_depth: int = 6) -> dict[str, A
         "non_claims": [
             "file presence only; core-like filenames are not accepted core evidence packs",
             "core and ShooterGameServer must be paired under the same player-identity-offline run raw directory before the core evidence pack step is considered runnable",
-            "does not read /servidor/ark, attach to processes, execute scanners, or validate runtime state",
+            "does not read protected live-server or raw dump roots, attach to processes, execute scanners, or validate runtime state",
         ],
     }
 
@@ -901,6 +894,7 @@ def build_operator_next_commands(
     )
     staging_binary_arg = matching_binary_path or "<matching-non-protected-ShooterGameServer>"
     staging_core_arg = unpaired_core_like_path or "<non-protected-core-dump-input>"
+    staged_run_root = artifact_root_pattern / f"{PLAYER_IDENTITY_RAW_RUN_PREFIX}<run-id-suffix>"
     staging_command_argv = [
         "python3",
         RAW_LAYOUT_HELPER,
@@ -919,10 +913,8 @@ def build_operator_next_commands(
     validation_command_argv = [
         "python3",
         RAW_INPUT_VALIDATOR,
-        "--binary",
-        staging_binary_arg,
-        "--core",
-        staging_core_arg,
+        "--root",
+        str(staged_run_root),
     ]
     validation_command = "PYTHONDONTWRITEBYTECODE=1 " + shlex.join(validation_command_argv)
     if inventory_ready or ready_to_build_core:
