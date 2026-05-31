@@ -222,6 +222,28 @@ class CheckStaticToolingTests(unittest.TestCase):
             self.assertEqual("ok", result["status"])
             self.assertTrue((output / "ghidra-smoke" / "project").is_dir())
 
+    def test_rejects_symlinked_ghidra_project_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            binary = root / "ShooterGameServer"
+            output = root / "out"
+            target = root / "project-target"
+            fake_ghidra = root / "analyzeHeadless"
+            binary.write_bytes(b"not really an elf")
+            (output / "ghidra-smoke").mkdir(parents=True)
+            target.mkdir()
+            (output / "ghidra-smoke" / "project").symlink_to(target, target_is_directory=True)
+            fake_ghidra.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            fake_ghidra.chmod(0o755)
+
+            with self.assertRaises(SystemExit):
+                tool.run_ghidra_smoke(
+                    {"available": True, "path": str(fake_ghidra)},
+                    binary,
+                    output,
+                    timeout_sec=1,
+                )
+
     def test_analyze_headless_version_rc_one_is_available_probe(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             executable = Path(temp_dir) / "analyzeHeadless"
